@@ -1,0 +1,2 @@
+wrap = 120    # Wrap lines at 120 characters
+number = true  # Use consecutive numbering (1, 2, 3) instead of all 1s

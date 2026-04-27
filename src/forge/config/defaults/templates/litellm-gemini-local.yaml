@@ -1,0 +1,31 @@
+# Template: litellm-gemini-local
+# Gemini models via local LiteLLM proxy with personal API key (DEVELOPMENT)
+#
+# Requires:
+#   - GEMINI_API_KEY in .env
+#
+# Backend (LiteLLM on port 4000) starts automatically.
+# For tests: Use litellm-gemini-test template (port 4001)
+
+proxy:
+  preferred_provider: litellm
+  default_port: 8086
+
+  # Backend dependency (auto-started when proxy starts)
+  backend_dependency:
+    adapter: litellm
+    port: 4000
+    required_env_vars:
+      - GEMINI_API_KEY
+
+  litellm:
+    tiers:
+      haiku: gemini/gemini-3-flash-preview
+      sonnet: gemini/gemini-3.1-pro-preview
+      opus: gemini/gemini-3.1-pro-preview
+    # Per-tier overrides to differentiate sonnet/opus (both use same model)
+    tier_overrides:
+      sonnet:
+        reasoning_effort: medium
+      opus:
+        reasoning_effort: high

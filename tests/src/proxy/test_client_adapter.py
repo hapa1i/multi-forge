@@ -1,0 +1,442 @@
+"""Tests for proxy core.llm adapter behavior.
+
+These tests focus on request-shaping edge cases where the proxy converts
+Anthropic-style history into OpenAI-like messages and then into core.llm types.
+"""
+
+from __future__ import annotations
+
+import logging
+from typing import Any
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
+
+from forge.config import init_config
+from forge.core.llm.types import CompletionResponse, StreamEvent
+from forge.proxy.client_adapter import (
+    CoreLLMClientAdapter,
+    _extract_cache_info,
+    _sanitize_header_value,
+)
+
+
+def test_openai_messages_to_core_handles_tool_calls_with_null_content() -> None:
+    # Ensure unified config is initialized (adapter construction relies on core.llm routing).
+    init_config(template="litellm-openai", proxy_id=None)
+
+    adapter = CoreLLMClientAdapter(model="openai/gpt-5.2", provider="litellm_remote")
+
+    openai_messages: list[dict[str, Any]] = [
+        {
+            "role": "assistant",
+            "content": None,  # OpenAI tool-call messages commonly use null content
+            "tool_calls": [
+                {
+                    "id": "toolu_1",
+                    "type": "function",
+                    "function": {
+                        "name": "Read",
+                        "arguments": '{"file_path": "/tmp/a"}',
+                    },
+                }
+            ],
+        },
+        {"role": "tool", "tool_call_id": "toolu_1", "content": "ok"},
+    ]
+
+    core_messages = adapter._openai_messages_to_core(openai_messages)
+
+    assert len(core_messages) == 2
+    assert core_messages[0].role == "assistant"
+    assert core_messages[0].content == ""
+    assert core_messages[0].tool_calls is not None
+    assert core_messages[0].tool_calls[0].id == "toolu_1"
+    assert core_messages[0].tool_calls[0].name == "Read"
+    assert core_messages[0].tool_calls[0].arguments == {"file_path": "/tmp/a"}
+
+
+# ---------------------------------------------------------------------------
+# _extract_cache_info tests
+# ---------------------------------------------------------------------------
+
+
+class TestExtractCacheInfo:
+    """Tests for the _extract_cache_info() helper."""
+
+    def test_with_cached_tokens(self) -> None:
+        usage = {
+            "prompt_tokens": 1000,
+            "completion_tokens": 200,
+            "total_tokens": 1200,
+            "cached_tokens": 800,
+        }
+        result = _extract_cache_info(usage)
+        assert result["cached_tokens"] == 800
+        assert result["cache_hit_rate"] == pytest.approx(80.0)
+
+    def test_no_cache_data(self) -> None:
+        usage = {"prompt_tokens": 1000, "completion_tokens": 200, "total_tokens": 1200}
+        assert _extract_cache_info(usage) == {}
+
+    def test_zero_cached_tokens(self) -> None:
+        usage = {
+            "prompt_tokens": 1000,
+            "completion_tokens": 200,
+            "total_tokens": 1200,
+            "cached_tokens": 0,
+        }
+        assert _extract_cache_info(usage) == {}
+
+    def test_none_usage(self) -> None:
+        assert _extract_cache_info(None) == {}
+
+    def test_zero_prompt_tokens_no_division_error(self) -> None:
+        usage = {
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "total_tokens": 0,
+            "cached_tokens": 100,
+        }
+        result = _extract_cache_info(usage)
+        assert result["cached_tokens"] == 100
+        assert result["cache_hit_rate"] == 0
+
+    def test_partial_cache_hit(self) -> None:
+        usage = {"prompt_tokens": 5000, "cached_tokens": 1250}
+        result = _extract_cache_info(usage)
+        assert result["cache_hit_rate"] == pytest.approx(25.0)
+
+
+# ---------------------------------------------------------------------------
+# Cache hit logging integration tests
+# ---------------------------------------------------------------------------
+
+
+def _make_adapter_with_mock_client() -> CoreLLMClientAdapter:
+    """Create an adapter with a mocked core.llm client (no real LLM calls)."""
+    init_config(template="litellm-openai", proxy_id=None)
+    adapter = CoreLLMClientAdapter(model="openai/gpt-5.2", provider="litellm_remote")
+    adapter._client = MagicMock()
+    return adapter
+
+
+@pytest.mark.asyncio
+async def test_create_completion_logs_cache_info(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    adapter = _make_adapter_with_mock_client()
+    adapter._client = MagicMock(  # type: ignore[assignment]
+        complete=AsyncMock(
+            return_value=CompletionResponse(
+                text="Hello",
+                usage={
+                    "prompt_tokens": 1000,
+                    "completion_tokens": 50,
+                    "total_tokens": 1050,
+                    "cached_tokens": 600,
+                },
+            )
+        )
+    )
+
+    with caplog.at_level(logging.INFO, logger="forge.proxy.client_adapter"):
+        result = await adapter.create_completion(
+            {"messages": [{"role": "user", "content": "hi"}], "max_tokens": 100},
+            request_id="req-1",
+        )
+
+    assert result["usage"]["prompt_tokens"] == 1000
+    # Verify cache info appeared in log
+    assert any("cached_tokens=600" in msg and "60.0% cache hit" in msg for msg in caplog.messages)
+
+
+@pytest.mark.asyncio
+async def test_create_completion_logs_without_cache_when_absent(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    adapter = _make_adapter_with_mock_client()
+    adapter._client = MagicMock(  # type: ignore[assignment]
+        complete=AsyncMock(
+            return_value=CompletionResponse(
+                text="Hello",
+                usage={
+                    "prompt_tokens": 500,
+                    "completion_tokens": 50,
+                    "total_tokens": 550,
+                },
+            )
+        )
+    )
+
+    with caplog.at_level(logging.INFO, logger="forge.proxy.client_adapter"):
+        await adapter.create_completion(
+            {"messages": [{"role": "user", "content": "hi"}], "max_tokens": 100},
+            request_id="req-2",
+        )
+
+    # Token usage logged but no cache info
+    assert any("input_tokens=500" in msg for msg in caplog.messages)
+    assert not any("cached_tokens" in msg for msg in caplog.messages)
+
+
+@pytest.mark.asyncio
+async def test_create_streaming_completion_logs_cache_info(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    adapter = _make_adapter_with_mock_client()
+
+    async def _fake_stream(*args, **kwargs):  # type: ignore[no-untyped-def]
+        yield StreamEvent(type="text_delta", text="Hi")
+        yield StreamEvent(
+            type="usage",
+            usage={
+                "prompt_tokens": 2000,
+                "completion_tokens": 100,
+                "total_tokens": 2100,
+                "cached_tokens": 1500,
+            },
+        )
+        yield StreamEvent(type="response_end")
+
+    adapter._client = MagicMock(stream=_fake_stream)  # type: ignore[assignment]
+
+    chunks = []
+    with caplog.at_level(logging.INFO, logger="forge.proxy.client_adapter"):
+        async for chunk in adapter.create_streaming_completion(
+            {"messages": [{"role": "user", "content": "hi"}], "max_tokens": 100},
+            request_id="req-3",
+        ):
+            chunks.append(chunk)
+
+    assert len(chunks) >= 2  # text_delta + usage + response_end
+    # Verify cache info appeared in post-stream log
+    assert any("cached_tokens=1500" in msg and "75.0% cache hit" in msg for msg in caplog.messages)
+
+
+# ---------------------------------------------------------------------------
+# User-Agent forwarding tests
+# ---------------------------------------------------------------------------
+
+
+class TestSanitizeHeaderValue:
+    """Tests for header injection prevention via control char stripping."""
+
+    def test_clean_value_unchanged(self) -> None:
+        assert _sanitize_header_value("claude-code/2.1.0") == "claude-code/2.1.0"
+
+    def test_strips_crlf(self) -> None:
+        assert _sanitize_header_value("bad\r\nheader") == "badheader"
+
+    def test_strips_null_bytes(self) -> None:
+        assert _sanitize_header_value("bad\x00header") == "badheader"
+
+    def test_strips_all_ascii_control_chars(self) -> None:
+        """All C0 controls (0x01-0x1F) and DEL (0x7F) are stripped."""
+        # Tab, bell, escape, DEL
+        assert _sanitize_header_value("a\tb\x07c\x1bd\x7fe") == "abcde"
+
+    def test_preserves_non_ascii(self) -> None:
+        """Non-ASCII chars (e.g., UTF-8 accented letters) are preserved."""
+        assert _sanitize_header_value("café") == "café"
+
+    def test_caps_length(self) -> None:
+        long = "x" * 500
+        assert len(_sanitize_header_value(long)) == 256
+
+    def test_custom_max_length(self) -> None:
+        assert _sanitize_header_value("abcdef", max_length=3) == "abc"
+
+
+@pytest.mark.asyncio
+async def test_create_completion_forwards_user_agent() -> None:
+    """User-Agent from _user_agent metadata flows to extra_headers in hyperparams."""
+    adapter = _make_adapter_with_mock_client()
+    mock_complete = AsyncMock(
+        return_value=CompletionResponse(
+            text="ok",
+            usage={"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
+        )
+    )
+    adapter._client = MagicMock(complete=mock_complete)  # type: ignore[assignment]
+
+    await adapter.create_completion(
+        {
+            "messages": [{"role": "user", "content": "hi"}],
+            "max_tokens": 100,
+            "_user_agent": "claude-code/2.1.0",
+        },
+        request_id="req-ua",
+    )
+
+    # Verify the hyperparams passed to core.llm include extra_headers
+    call_kwargs = mock_complete.call_args
+    hyperparams = call_kwargs.kwargs.get("hyperparams") or call_kwargs[1].get("hyperparams")
+    assert hyperparams is not None
+    assert hyperparams.extra["openai"]["extra_headers"] == {"User-Agent": "claude-code/2.1.0"}
+
+
+@pytest.mark.asyncio
+async def test_create_completion_no_user_agent_no_extra_headers() -> None:
+    """Without _user_agent, extra should be empty (no extra_headers injected)."""
+    adapter = _make_adapter_with_mock_client()
+    mock_complete = AsyncMock(
+        return_value=CompletionResponse(
+            text="ok",
+            usage={"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
+        )
+    )
+    adapter._client = MagicMock(complete=mock_complete)  # type: ignore[assignment]
+
+    await adapter.create_completion(
+        {"messages": [{"role": "user", "content": "hi"}], "max_tokens": 100},
+        request_id="req-no-ua",
+    )
+
+    call_kwargs = mock_complete.call_args
+    hyperparams = call_kwargs.kwargs.get("hyperparams") or call_kwargs[1].get("hyperparams")
+    assert hyperparams is not None
+    assert hyperparams.extra == {}
+
+
+@pytest.mark.asyncio
+async def test_streaming_completion_forwards_user_agent() -> None:
+    """User-Agent forwarding also works on the streaming path."""
+    adapter = _make_adapter_with_mock_client()
+
+    captured_hyperparams = []
+
+    async def _fake_stream(*args, **kwargs):  # type: ignore[no-untyped-def]
+        captured_hyperparams.append(kwargs.get("hyperparams"))
+        yield StreamEvent(type="text_delta", text="Hi")
+        yield StreamEvent(type="response_end")
+
+    adapter._client = MagicMock(stream=_fake_stream)  # type: ignore[assignment]
+
+    chunks = []
+    async for chunk in adapter.create_streaming_completion(
+        {
+            "messages": [{"role": "user", "content": "hi"}],
+            "max_tokens": 100,
+            "_user_agent": "claude-code/2.1.0",
+        },
+        request_id="req-stream-ua",
+    ):
+        chunks.append(chunk)
+
+    assert len(captured_hyperparams) == 1
+    hp = captured_hyperparams[0]
+    assert hp.extra["openai"]["extra_headers"] == {"User-Agent": "claude-code/2.1.0"}
+
+
+# ---------------------------------------------------------------------------
+# cached_tokens propagation tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_core_response_includes_cached_tokens() -> None:
+    """_core_response_to_openai must propagate cached_tokens from core.llm response."""
+    adapter = _make_adapter_with_mock_client()
+    adapter._client = MagicMock(  # type: ignore[assignment]
+        complete=AsyncMock(
+            return_value=CompletionResponse(
+                text="Hi",
+                usage={
+                    "prompt_tokens": 1000,
+                    "completion_tokens": 50,
+                    "total_tokens": 1050,
+                    "cached_tokens": 600,
+                },
+            )
+        )
+    )
+
+    result = await adapter.create_completion(
+        {"messages": [{"role": "user", "content": "hi"}], "max_tokens": 100},
+        request_id="req-cached",
+    )
+
+    assert result["usage"]["cached_tokens"] == 600
+
+
+@pytest.mark.asyncio
+async def test_core_response_cached_tokens_zero_when_absent() -> None:
+    """cached_tokens defaults to 0 when not present in core.llm response."""
+    adapter = _make_adapter_with_mock_client()
+    adapter._client = MagicMock(  # type: ignore[assignment]
+        complete=AsyncMock(
+            return_value=CompletionResponse(
+                text="Hi",
+                usage={"prompt_tokens": 500, "completion_tokens": 50, "total_tokens": 550},
+            )
+        )
+    )
+
+    result = await adapter.create_completion(
+        {"messages": [{"role": "user", "content": "hi"}], "max_tokens": 100},
+        request_id="req-no-cache",
+    )
+
+    assert result["usage"]["cached_tokens"] == 0
+
+
+@pytest.mark.asyncio
+async def test_streaming_usage_chunk_includes_cached_tokens() -> None:
+    """Streaming usage chunks must propagate cached_tokens from core.llm events."""
+    adapter = _make_adapter_with_mock_client()
+
+    async def _fake_stream(*args, **kwargs):  # type: ignore[no-untyped-def]
+        yield StreamEvent(type="text_delta", text="Hi")
+        yield StreamEvent(
+            type="usage",
+            usage={
+                "prompt_tokens": 2000,
+                "completion_tokens": 100,
+                "total_tokens": 2100,
+                "cached_tokens": 1500,
+            },
+        )
+        yield StreamEvent(type="response_end")
+
+    adapter._client = MagicMock(stream=_fake_stream)  # type: ignore[assignment]
+
+    usage_chunks = []
+    async for chunk in adapter.create_streaming_completion(
+        {"messages": [{"role": "user", "content": "hi"}], "max_tokens": 100},
+        request_id="req-stream-cached",
+    ):
+        if chunk.get("usage"):
+            usage_chunks.append(chunk["usage"])
+
+    assert len(usage_chunks) == 1
+    assert usage_chunks[0]["cached_tokens"] == 1500
+
+
+@pytest.mark.asyncio
+async def test_user_agent_sanitized_before_forwarding() -> None:
+    """Malicious User-Agent values are sanitized (CRLF stripped)."""
+    adapter = _make_adapter_with_mock_client()
+    mock_complete = AsyncMock(
+        return_value=CompletionResponse(
+            text="ok",
+            usage={"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
+        )
+    )
+    adapter._client = MagicMock(complete=mock_complete)  # type: ignore[assignment]
+
+    await adapter.create_completion(
+        {
+            "messages": [{"role": "user", "content": "hi"}],
+            "max_tokens": 100,
+            "_user_agent": "evil\r\nX-Injected: true",
+        },
+        request_id="req-evil",
+    )
+
+    call_kwargs = mock_complete.call_args
+    hyperparams = call_kwargs.kwargs.get("hyperparams") or call_kwargs[1].get("hyperparams")
+    forwarded_ua = hyperparams.extra["openai"]["extra_headers"]["User-Agent"]
+    assert "\r" not in forwarded_ua
+    assert "\n" not in forwarded_ua
+    assert forwarded_ua == "evilX-Injected: true"

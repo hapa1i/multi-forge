@@ -1,0 +1,36 @@
+# Dockerfile.sidecar — Sidecar container for Claude Forge
+#
+# Bundles proxy + Claude Code in a single container for lifecycle coupling.
+# Used by `forge session start --sidecar`.
+#
+# Build:
+#   docker build -f docker/Dockerfile.sidecar -t forge-sidecar:latest .
+#
+# The image is based on forge-claude-test which includes:
+#   - Python 3.12 + uv
+#   - Node.js + npm
+#   - Claude Code (npm-installed)
+#   - Forge (uv sync'd)
+#
+# Usage (via forge CLI, not directly):
+#   forge session start my-feature --sidecar --template litellm-openai
+
+FROM forge-claude-test:latest
+
+# Ensure curl is available for health checks
+# (Already in base image from Dockerfile.forge, but explicit for documentation)
+RUN command -v curl > /dev/null || (apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*)
+
+# Copy and set up entrypoint script
+COPY docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Default working directory (will be overridden by mount)
+WORKDIR /workspace
+
+# Container entrypoint handles proxy startup and Claude invocation
+ENTRYPOINT ["/entrypoint.sh"]
+
+# Labels for metadata
+LABEL org.opencontainers.image.title="Forge Sidecar Container"
+LABEL org.opencontainers.image.description="Bundled Claude Code + Proxy execution environment"

@@ -1,0 +1,77 @@
+default_stages: [ pre-commit ]
+
+repos:
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v6.0.0
+  hooks:
+      - id: check-merge-conflict
+      - id: trailing-whitespace
+      - id: check-yaml
+      - id: check-json
+      - id: detect-private-key
+      - id: pretty-format-json          # Auto-format JSON files
+        args: [
+          --autofix,
+          --indent=2,
+          --no-ensure-ascii,            # Keep non-ASCII chars verbatim
+          --no-sort-keys,               # Preserve original key order
+          --top-keys="",                # No keys forced to the top
+        ]
+      - id: check-shebang-scripts-are-executable
+      - id: end-of-file-fixer
+      - id: check-added-large-files
+
+- repo: https://github.com/gitleaks/gitleaks
+  rev: v8.30.0
+  hooks:                                # Prevent the accidental inclusion of passwords, API keys, and tokens in your commits
+    - id: gitleaks                      # defaults to: gitleaks git --pre-commit --redact --staged --verbose
+
+- repo: https://github.com/pycqa/isort
+  rev: 7.0.0
+  hooks:
+   - id: isort
+     args: ['--profile', 'black']
+     exclude: >-
+         (?x)^(
+         .*__init__\.py$
+         )
+
+- repo: https://github.com/astral-sh/ruff-pre-commit
+  rev: v0.15.1
+  hooks:
+    - id: ruff
+      args: ['--fix', '--line-length', '120', '--exclude', '__init__.py']
+
+- repo: https://github.com/psf/black
+  rev: 26.1.0
+  hooks:
+    - id: black
+      name: black
+      entry: black
+      language: python
+      types_or: [python, pyi]
+      args: ["--line-length", "120", "-t", "py310"]
+    - id: black-jupyter
+      name: black-jupyter
+      entry: black
+      language: python
+      types_or: [python, pyi, jupyter]
+      args: ["--line-length", "120", "-t", "py310"]
+      additional_dependencies: [".[jupyter]"]
+- repo: local
+  hooks:
+  - id: mypy
+    name: mypy
+    language: system
+    entry: uv run --frozen mypy
+    types: [python]
+    require_serial: true
+    exclude: ^src/skills/
+- repo: https://github.com/hukkin/mdformat
+  rev: 1.0.0
+  hooks:
+    - id: mdformat
+      additional_dependencies:
+        - mdformat-gfm                   # GitHub-Flavored Markdown support - see https://github.github.com/gfm
+        - mdformat-simple-breaks         # thematic breaks using three dashes instead of 70 underscores
+        - mdformat-frontmatter           # support for YAML front matter in Markdown files

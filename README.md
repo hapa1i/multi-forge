@@ -1,0 +1,181 @@
+# Claude Forge
+
+**The missing connective tissue for [Claude Code](https://claude.ai/code).**
+
+Forge is a CLI that wraps Claude Code, adding persistent sessions, multi-model routing, and autonomous verification. You
+run `forge session start` instead of `claude`, and Forge handles the rest -- routing to your chosen model provider,
+tracking state across sessions, and enforcing policies.
+
+```bash
+# Use Claude with session tracking (no proxy needed)
+forge session start
+
+# Or route through different model providers (after creating proxies -- see Quick Start)
+forge session start planner --proxy litellm-openai    # GPT for planning
+forge session start --proxy litellm-gemini            # Gemini for review
+```
+
+## Why Forge?
+
+Claude Code talks to Anthropic and tracks conversations. Forge adds an operational layer on top:
+
+- **Session Tracking** -- Named sessions that persist artifacts, plans, and transcripts. Works with or without a proxy.
+- **Multi-Model Routing** -- Route to GPT, Gemini, or any LiteLLM-supported model through a local proxy.
+- **Context Compatibility** -- When routing to models with different context windows, Forge sets the native
+  `CLAUDE_CODE_AUTO_COMPACT_WINDOW` so compaction timing matches the routed model.
+- **Autonomous Loops** -- Verification policies that keep Claude working until tests pass.
+- **Session Resume** -- When context fills up, hand off to a fresh session with AI-curated history.
+- **Policy Engine** -- TDD enforcement, coding standards, and semantic alignment checks.
+- **Multi-Model Review** -- Fan out code reviews to multiple models, get adversarial consensus.
+
+### Why launch through Forge?
+
+Running `claude` directly bypasses session tracking. When you launch through Forge (`forge session start`), you get:
+
+| Feature                | `claude` directly | `forge session start`                         |
+| ---------------------- | ----------------- | --------------------------------------------- |
+| Session tracking       | No                | Yes -- named sessions, artifacts, transcripts |
+| Session resume         | No                | Yes -- AI-curated handoff to fresh context    |
+| Status line            | No                | Yes -- proxy, session, policy info            |
+| Hook-driven artifacts  | No                | Yes -- plan snapshots, transcript capture     |
+| Policy enforcement     | No                | Yes -- TDD, coding standards, supervisor      |
+| Search across sessions | No                | Yes -- `forge search` indexes transcripts     |
+| Handoff agent          | No                | Yes -- auto-updates project docs on exit      |
+
+Even without a proxy, `forge session start` gives you session tracking, hooks, and the status line (direct mode is the
+default). The proxy adds multi-model routing on top. (`forge claude start` is also available as a bare launcher with
+proxy routing only, no session state.)
+
+## How it Works
+
+Forge runs a local [LiteLLM](https://github.com/BerriAI/litellm) proxy that translates Claude Code's Anthropic API calls
+into requests for any LLM provider. Claude Code connects to this proxy (via `ANTHROPIC_BASE_URL`), and Forge handles
+model selection, session state, and policy enforcement.
+
+```
+Claude Code  -->  Forge Proxy (local)  -->  LiteLLM  -->  OpenAI / Google / Anthropic
+                       |
+                  Session state, policies, artifacts
+```
+
+Non-local templates (e.g., `litellm-openai`) connect to a shared LiteLLM deployment via `LITELLM_BASE_URL`. The `-local`
+variants (e.g., `litellm-openai-local`) start a local LiteLLM instance for you -- just provide an API key, no shared
+infrastructure needed.
+
+**Direct mode** (the default) skips the proxy and talks to Anthropic directly. `forge session start` gives you session
+tracking, hooks, and all Forge features except multi-model routing. Use `--proxy` to add routing.
+
+## Requirements
+
+- **Platform**: macOS or Linux
+- **Python**: 3.11+
+- **[uv](https://docs.astral.sh/uv/)**
+- **Claude Code**: installed and on PATH
+- **API key**: at least one provider key (e.g., `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `OPENAI_API_KEY`)
+
+## Quick Start
+
+```bash
+# Install Forge
+pip install tr-claude-forge
+
+# Or for development (editable install from local clone):
+git clone https://github.com/thomsonreuters/claude-forge.git
+cd claude-forge && pip install -e .
+
+# Install extensions (hooks, skills, status line) into Claude Code
+forge extension enable
+
+# Launch Claude with session tracking (no proxy needed)
+forge session start
+
+# Or with multi-model routing (remote LiteLLM):
+forge authentication login                       # Store API keys
+forge proxy create litellm-openai                # Create a proxy (connects to shared LiteLLM)
+forge session start --proxy litellm-openai
+
+# No shared LiteLLM? Use a -local template instead (starts LiteLLM for you):
+# forge proxy create litellm-openai-local
+```
+
+Once running, try `/forge:walkthrough` inside Claude Code for a guided tour in a sandboxed test environment.
+
+### Upgrading from Pre-OSS Forge
+
+Existing pre-OSS Forge installs are not supported in-place. If upgrading:
+
+1. If Claude Code was previously patched, run `claude update` or reinstall Claude Code for a pristine binary.
+2. Remove stale Forge state: `rm ~/.forge/installed.json`
+3. Re-enable extensions: `forge extension enable`
+4. If you had `FORGE_CONTEXT_LIMIT` in your shell config, remove it. Use `CLAUDE_CODE_AUTO_COMPACT_WINDOW` for native
+   Claude Code behavior, or `forge config set context_limit=N` for Forge proxy fallback.
+
+### Example Workflow: Plan, Execute, Review
+
+With proxies configured, a typical feature workflow looks like:
+
+```bash
+# 1. Start a planning session with a high-reasoning model
+forge session start planner --proxy litellm-openai
+# ... Claude creates a plan, you approve it, /exit
+
+# 2. Fork the planner into a worktree with plan supervision
+forge session fork planner --name executor --worktree --supervise
+# ... Claude implements the plan; supervisor auto-checks every Write/Edit
+
+# 3. Context fills up? Resume with AI-curated history (supervisor config carries over)
+forge session resume executor --fresh --strategy ai-curated
+# ... keeps working with fresh context
+
+# 4. Fork the planner into the executor's worktree to review
+forge session fork planner --into ../executor-worktree  # Path to executor's worktree
+# ... reviews with full plan context, suggests fixes
+
+# 5. Push and create a PR for human review
+git push origin feature-branch
+```
+
+Each step uses the best model for the job. The `--supervise` flag wires the planner as a semantic supervisor -- every
+code change is checked against the approved plan. Sessions track artifacts and transcripts automatically, so context
+flows across forks and resumes. See the [end-user guide](docs/end-user/) for the full tour, or run `/forge:walkthrough`
+inside Claude Code for an interactive walkthrough.
+
+## CLI Overview
+
+| Command Group          | Purpose                                      |
+| ---------------------- | -------------------------------------------- |
+| `forge claude`         | Bare launch, settings preset management      |
+| `forge session`        | Named sessions, worktrees, resume, fork      |
+| `forge proxy`          | Model routing, templates, tier mappings      |
+| `forge authentication` | Credential management (`credentials.yaml`)   |
+| `forge guard`          | Policy enforcement, plan supervision         |
+| `forge workflow`       | Workflow runners (panel, analyze, debate)    |
+| `forge search`         | Transcript search across sessions            |
+| `forge config`         | Runtime preferences (`~/.forge/config.yaml`) |
+| `forge extension`      | Enable/sync/disable extensions               |
+| `forge info`           | System health and installation info          |
+
+Run `forge <command> --help` for details on any command.
+
+## Documentation
+
+| Audience         | Location                           | Contents                                          |
+| ---------------- | ---------------------------------- | ------------------------------------------------- |
+| **Users**        | [docs/end-user/](docs/end-user/)   | Tour, guides for sessions, proxies, policies, ... |
+| **Developers**   | [docs/developer/](docs/developer/) | Setup, coding standards, testing guidelines       |
+| **Architecture** | [docs/design.md](docs/design.md)   | System narrative, data flow, invariants           |
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and PR guidelines.
+
+## Uninstall
+
+```bash
+forge extension disable
+pip uninstall tr-claude-forge
+```
+
+## License
+
+Apache 2.0 -- see [LICENSE](LICENSE.md).

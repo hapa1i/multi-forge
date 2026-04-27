@@ -1,0 +1,156 @@
+# Dockerfile.forge — Full dev container for Claude Forge with Claude Code
+#
+# Build (native - default):
+#   docker build -f docker/Dockerfile.forge -t forge-claude-test .
+#
+# Build (npm fallback):
+#   docker build -f docker/Dockerfile.forge --build-arg INSTALL_METHOD=npm -t forge-claude-test:npm .
+#   docker build -f docker/Dockerfile.forge --build-arg INSTALL_METHOD=npm --build-arg CLAUDE_VERSION=2.1.7 -t forge-claude-test:npm-2.1.7 .
+#
+# Run:
+#   docker run -it forge-claude-test bash
+#
+# Code is COPY'd into image at build time (uses .dockerignore).
+# Use --build flag to pick up code changes.
+#
+# Install methods:
+#   - npm (default): Uses npm install; >= 2.1.112 downloads platform-native binary
+#     via optional deps. Older versions shipped a text cli.js.
+#   - native: Uses Anthropic's install.sh
+
+ARG PYTHON_VERSION=3.12
+# Default to npm for regular test containers
+ARG INSTALL_METHOD=npm
+
+# =============================================================================
+# Base stage: Common OS deps, uv, and CA setup
+# =============================================================================
+FROM python:${PYTHON_VERSION}-slim-bookworm AS base
+
+# System dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    git \
+    ca-certificates \
+    gnupg \
+    vim-tiny \
+    && rm -rf /var/lib/apt/lists/* \
+    && ln -s /usr/bin/vim.tiny /usr/bin/vim
+
+# Install uv for Python package management
+RUN pip install --no-cache-dir uv
+
+WORKDIR /forge
+
+# -----------------------------------------------------------------------------
+# Additional CA certificates (e.g. enterprise SSL inspection, Zscaler)
+# Drop CA certificate .pem or .crt files into docker/certs/ (top-level only).
+# WARNING: Do NOT place private keys here — they would be bundled into the image.
+# Copied early (before source) — rarely changes, maximizes cache reuse
+# -----------------------------------------------------------------------------
+COPY docker/certs/ /forge/docker/certs/
+RUN cert_count=$(find /forge/docker/certs/ -maxdepth 1 -type f \( -name '*.pem' -o -name '*.crt' \) ! -name 'ca-bundle.pem' | wc -l) && \
+    if [ "$cert_count" -gt 0 ]; then \
+        echo "Installing $cert_count additional CA certificate(s)..." && \
+        find /forge/docker/certs/ -maxdepth 1 -type f \( -name '*.pem' -o -name '*.crt' \) ! -name 'ca-bundle.pem' -exec cat -- {} + > /forge/docker/certs/ca-bundle.pem && \
+        cp /forge/docker/certs/ca-bundle.pem /usr/local/share/ca-certificates/additional-ca.crt && \
+        update-ca-certificates && \
+        echo "Additional CA installed successfully"; \
+    else \
+        echo "No additional CA certificates found in docker/certs/"; \
+        touch /forge/docker/certs/ca-bundle.pem; \
+    fi
+
+# Set NODE_EXTRA_CA_CERTS for Node.js (concatenated bundle; empty file is safe)
+ENV NODE_EXTRA_CA_CERTS=/forge/docker/certs/ca-bundle.pem
+
+# =============================================================================
+# Toolchain stages: Install Claude Code before Forge source copy
+# This keeps toolchain layers cached across normal source edits.
+# =============================================================================
+FROM base AS native-toolchain
+
+# Install ripgrep (may be needed by native Claude Code)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ripgrep \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Claude Code via official installer
+# Note: install.sh installs to ~/.local/bin/claude
+RUN curl -fsSL https://claude.ai/install.sh | bash
+
+# Add claude to PATH for root user
+ENV PATH="/root/.local/bin:${PATH}"
+
+# Verify claude executable exists
+RUN test -x /root/.local/bin/claude \
+    || (echo "ERROR: claude executable not found - install.sh may have failed" && exit 1)
+
+# Debug: show PATH and verify claude is findable
+RUN echo "Shell PATH=$PATH" && which claude && claude --version
+
+FROM base AS npm-toolchain
+
+# Install Node.js, npm, and ripgrep
+# ripgrep was previously vendored in the npm package; >= 2.1.112 ships a native
+# binary that may expect system ripgrep (or bundles it internally -- install to be safe)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    nodejs \
+    npm \
+    ripgrep \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Claude Code via npm
+# >= 2.1.112: downloads platform-native binary via optional deps (no cli.js)
+# <  2.1.112: ships cli.js directly in the package
+ARG CLAUDE_VERSION=latest
+RUN npm install -g @anthropic-ai/claude-code@${CLAUDE_VERSION}
+
+# Verify claude is available (works for both old cli.js and new native-binary packaging)
+# CI=1 suppresses any first-run interactive prompts in non-TTY Docker builds
+RUN CI=1 claude --version \
+    || (echo "ERROR: claude not available after npm install" && exit 1)
+
+# =============================================================================
+# Forge stage: Sync Python deps and copy repo content on top of selected toolchain
+# =============================================================================
+FROM ${INSTALL_METHOD}-toolchain AS forge-install
+
+# Dependency install (cached independently of source changes)
+# Copy only manifests first so uv sync is re-run only when deps change.
+# --no-install-project skips the editable project install (needs source tree).
+COPY pyproject.toml uv.lock ./
+RUN uv sync --no-install-project
+
+# Copy only the package metadata + sources needed for editable install.
+# This keeps docs/tests/skills changes from invalidating the project install
+# layer, while still rebuilding when the Forge Python package itself changes.
+COPY README.md ./
+COPY src/forge ./src/forge
+RUN uv sync
+
+# Copy the remaining repo content used by tests, extension installers, and
+# container tooling after the editable install layer is cached.
+COPY src/skills ./src/skills
+COPY src/commands ./src/commands
+COPY src/agents ./src/agents
+COPY tests ./tests
+COPY docs ./docs
+COPY scripts ./scripts
+COPY docker ./docker
+COPY CLAUDE.md CONTRIBUTING.md LICENSE.md Makefile ./
+
+# =============================================================================
+# Final stage: Select based on INSTALL_METHOD
+# =============================================================================
+FROM forge-install AS final
+
+# Forge source revision (used by test runner to detect stale images)
+ARG FORGE_REV=unknown
+
+# Labels for metadata
+LABEL org.opencontainers.image.title="Forge Claude Dev Container"
+LABEL org.opencontainers.image.description="Claude Code + Forge development environment for E2E testing"
+LABEL org.opencontainers.image.revision=${FORGE_REV}
+
+CMD ["/bin/bash"]

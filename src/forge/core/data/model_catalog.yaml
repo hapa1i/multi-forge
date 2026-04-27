@@ -1,0 +1,1057 @@
+# Central Model Catalog - Intrinsic Properties & Safe Defaults
+# ============================================================
+# This file is the single source of truth for model capabilities.
+# Families reference models by ID; this defines what each model CAN do.
+#
+# DO NOT put operational config here (tier mappings, routing, etc.)
+# Those belong in template YAML overlays under config/defaults/templates/
+#
+# HYPERPARAMETER FIELDS:
+# - temperature_constraint: "fixed" (must be 1.0) or "range" (configurable)
+# - supports_top_p: Whether top_p sampling is supported (reasoning models don't)
+# - default_timeout_seconds: Safe default timeout (client can override)
+#
+# PROMPT CACHING (via LiteLLM - see docs.litellm.ai/docs/completion/prompt_caching):
+# LiteLLM reports cached_tokens for: OpenAI, Anthropic, Bedrock, Deepseek (NOT Gemini)
+# - prompt_caching.supports: Whether LiteLLM supports prompt caching for this model
+# - prompt_caching.mechanism: How the provider implements caching
+#     "auto": Server-side automatic (OpenAI/Deepseek) - no client action needed
+#     "cache_control": Requires explicit cache_control blocks (Anthropic)
+# - prompt_caching.min_tokens: Minimum tokens for caching to activate
+# - prompt_caching.max_cache_blocks: Max cache_control blocks (Anthropic = 4)
+#
+# NOTE: Only Anthropic caching can be controlled via input (cache_control markers).
+# OpenAI/Deepseek cache automatically - client policies have no effect on them.
+
+schema_version: 1
+
+# =============================================================================
+# DEFAULTS - Per-provider edge picks at each tier
+# =============================================================================
+# Single source of truth for "which model should we use by default?"
+# Review defaults, tests, and proxy templates derive from these.
+# Update here when adopting a new model family.
+defaults:
+  openai:
+    haiku: gpt-5.4-mini
+    sonnet: gpt-5.5
+    opus: gpt-5.5
+  gemini:
+    haiku: gemini-3-flash-preview
+    sonnet: gemini-2.5-pro
+    opus: gemini-2.5-pro
+  anthropic:
+    haiku: claude-haiku-4-5-20251001
+    sonnet: claude-sonnet-4-6
+    opus: claude-opus-4-6
+
+# =============================================================================
+# MODELS - Canonical IDs are provider-agnostic
+# =============================================================================
+models:
+  # ---------------------------------------------------------------------------
+  # OpenAI Models (via Azure or direct)
+  # ---------------------------------------------------------------------------
+  gpt-5.4:
+    friendly_name: GPT-5.4
+    context_window_tokens: 400000
+    max_output_tokens: 128000
+    max_thinking_tokens: null
+    supports_thinking: true
+    supports_images: true
+    supports_verbosity: true
+    verbosity_levels: [low, medium, high]
+    temperature_constraint: fixed
+    temperature: 1.0
+    supports_top_p: false
+    default_timeout_seconds: 180
+    prompt_caching:
+      supports: true
+      mechanism: auto
+      min_tokens: 1024
+    native_thinking_param: reasoning_effort
+    litellm_reasoning_efforts: [none, low, medium, high, xhigh]
+    default_reasoning_effort: medium
+    use_responses_api: true
+    intelligence_score: 99
+    tags: []
+
+  gpt-5.5:
+    friendly_name: GPT-5.5
+    context_window_tokens: 400000
+    max_output_tokens: 128000
+    max_thinking_tokens: null
+    supports_thinking: true
+    supports_images: true
+    supports_verbosity: true
+    verbosity_levels: [low, medium, high]
+    temperature_constraint: fixed
+    temperature: 1.0
+    supports_top_p: false
+    default_timeout_seconds: 180
+    prompt_caching:
+      supports: true
+      mechanism: auto
+      min_tokens: 1024
+    native_thinking_param: reasoning_effort
+    litellm_reasoning_efforts: [none, low, medium, high, xhigh]
+    default_reasoning_effort: medium
+    use_responses_api: true
+    intelligence_score: 99
+    tags: []
+
+  gpt-5.4-pro:
+    friendly_name: GPT-5.4 Pro
+    context_window_tokens: 400000
+    max_output_tokens: 272000
+    max_thinking_tokens: null
+    supports_thinking: true
+    supports_images: true
+    supports_verbosity: true
+    verbosity_levels: [low, medium, high]
+    temperature_constraint: fixed
+    temperature: 1.0
+    supports_top_p: false
+    default_timeout_seconds: 300
+    prompt_caching:
+      supports: true
+      mechanism: auto
+      min_tokens: 1024
+    native_thinking_param: reasoning_effort
+    litellm_reasoning_efforts: [none, low, medium, high, xhigh]
+    default_reasoning_effort: high
+    use_responses_api: true
+    intelligence_score: 100
+    tags: []
+
+  gpt-5.4-mini:
+    friendly_name: GPT-5.4 Mini
+    context_window_tokens: 400000
+    max_output_tokens: 128000
+    max_thinking_tokens: null
+    supports_thinking: true
+    supports_images: true
+    supports_verbosity: true
+    verbosity_levels: [low, medium, high]
+    temperature_constraint: fixed
+    temperature: 1.0
+    supports_top_p: false
+    default_timeout_seconds: 120
+    prompt_caching:
+      supports: true
+      mechanism: auto
+      min_tokens: 1024
+    native_thinking_param: reasoning_effort
+    litellm_reasoning_efforts: [none, low, medium, high, xhigh]
+    default_reasoning_effort: medium
+    use_responses_api: true
+    intelligence_score: 85
+    tags: []
+
+  gpt-5.4-nano:
+    friendly_name: GPT-5.4 Nano
+    context_window_tokens: 400000
+    max_output_tokens: 128000
+    max_thinking_tokens: null
+    supports_thinking: true
+    supports_images: true
+    supports_verbosity: true
+    verbosity_levels: [low, medium, high]
+    temperature_constraint: fixed
+    temperature: 1.0
+    supports_top_p: false
+    default_timeout_seconds: 90
+    prompt_caching:
+      supports: true
+      mechanism: auto
+      min_tokens: 1024
+    native_thinking_param: reasoning_effort
+    litellm_reasoning_efforts: [none, low, medium, high, xhigh]
+    default_reasoning_effort: minimal
+    use_responses_api: true
+    intelligence_score: 76
+    tags: []
+
+  gpt-5.2:
+    friendly_name: GPT-5.2
+    context_window_tokens: 400000
+    max_output_tokens: 128000
+    max_thinking_tokens: null
+    supports_thinking: true
+    supports_images: true
+    supports_verbosity: true
+    verbosity_levels: [low, medium, high]
+    temperature_constraint: fixed
+    temperature: 1.0
+    supports_top_p: false  # Reasoning models don't support top_p
+    default_timeout_seconds: 180   # Reasoning models need longer timeouts
+    prompt_caching:
+      supports: true
+      mechanism: auto           # OpenAI handles caching automatically
+      min_tokens: 1024     # OpenAI requires 1024+ tokens for caching
+    native_thinking_param: reasoning_effort
+    # LiteLLM docs: gpt-5.2 supports none, low, medium, high, xhigh (no minimal)
+    litellm_reasoning_efforts: [none, low, medium, high, xhigh]
+    default_reasoning_effort: medium
+    intelligence_score: 98
+    tags: []
+
+  gpt-5.2-pro:
+    friendly_name: GPT-5.2 Pro
+    context_window_tokens: 400000
+    max_output_tokens: 272000
+    max_thinking_tokens: null
+    supports_thinking: true
+    supports_images: true
+    supports_verbosity: true
+    verbosity_levels: [low, medium, high]
+    temperature_constraint: fixed
+    temperature: 1.0
+    supports_top_p: false  # Reasoning models don't support top_p
+    default_timeout_seconds: 300   # Pro models need even longer timeouts
+    prompt_caching:
+      supports: true
+      mechanism: auto
+      min_tokens: 1024
+    native_thinking_param: reasoning_effort
+    # OpenAI matrix: gpt-5.2-pro supports medium, high, xhigh only (no none/minimal/low)
+    litellm_reasoning_efforts: [medium, high, xhigh]
+    default_reasoning_effort: high
+    use_responses_api: true
+    intelligence_score: 99
+    tags: []
+
+  gpt-5.3-codex:
+    friendly_name: GPT-5.3 Codex
+    context_window_tokens: 400000
+    max_output_tokens: 128000
+    max_thinking_tokens: null
+    supports_thinking: true
+    supports_images: true
+    supports_verbosity: false
+    temperature_constraint: fixed
+    temperature: 1.0
+    supports_top_p: false
+    default_timeout_seconds: 180
+    prompt_caching:
+      supports: true
+      mechanism: auto
+      min_tokens: 1024
+    native_thinking_param: reasoning_effort
+    litellm_reasoning_efforts: [low, medium, high, xhigh]
+    default_reasoning_effort: high
+    use_responses_api: true
+    intelligence_score: 95
+    tags: [code-gen]
+
+  gpt-5.2-codex:
+    friendly_name: GPT-5.2 Codex
+    context_window_tokens: 400000
+    max_output_tokens: 128000
+    max_thinking_tokens: null
+    supports_thinking: true
+    supports_images: true
+    supports_verbosity: false  # Codex models don't support verbosity
+    temperature_constraint: fixed
+    temperature: 1.0
+    supports_top_p: false  # Reasoning/codex models don't support top_p
+    default_timeout_seconds: 180   # Code generation can take time
+    prompt_caching:
+      supports: true
+      mechanism: auto
+      min_tokens: 1024
+    native_thinking_param: reasoning_effort
+    # OpenAI matrix: gpt-5.2-codex supports low, medium, high, xhigh
+    litellm_reasoning_efforts: [low, medium, high, xhigh]
+    default_reasoning_effort: high
+    use_responses_api: true
+    intelligence_score: 90
+    tags: [code-gen]
+
+  gpt-5.1-codex:
+    friendly_name: GPT-5.1 Codex
+    context_window_tokens: 400000
+    max_output_tokens: 128000
+    max_thinking_tokens: null
+    supports_thinking: true
+    supports_images: true
+    supports_verbosity: false  # Codex models don't support verbosity
+    temperature_constraint: fixed
+    temperature: 1.0
+    supports_top_p: false  # Reasoning/codex models don't support top_p
+    default_timeout_seconds: 180   # Code generation can take time
+    prompt_caching:
+      supports: true
+      mechanism: auto
+      min_tokens: 1024
+    native_thinking_param: reasoning_effort
+    # LiteLLM docs: codex models support low, medium, high only (default: adaptive)
+    litellm_reasoning_efforts: [low, medium, high]
+    default_reasoning_effort: high
+    use_responses_api: true
+    intelligence_score: 82
+    tags: [code-gen]
+
+  gpt-5.1-codex-mini:
+    friendly_name: GPT-5.1 Codex Mini
+    short_name: codex-mini
+    context_window_tokens: 400000
+    max_output_tokens: 128000
+    max_thinking_tokens: null
+    supports_thinking: true
+    supports_images: false
+    supports_verbosity: false  # Codex models don't support verbosity
+    temperature_constraint: fixed
+    temperature: 1.0
+    supports_top_p: false
+    default_timeout_seconds: 120
+    prompt_caching:
+      supports: true
+      mechanism: auto
+      min_tokens: 1024
+    native_thinking_param: reasoning_effort
+    # LiteLLM docs: codex-mini supports low, medium, high only (default: adaptive)
+    litellm_reasoning_efforts: [low, medium, high]
+    default_reasoning_effort: medium
+    intelligence_score: 77
+    tags: [code-gen]
+
+  gpt-5.1-codex-max:
+    friendly_name: GPT-5.1 Codex Max
+    context_window_tokens: 400000
+    max_output_tokens: 128000
+    max_thinking_tokens: null
+    supports_thinking: true
+    supports_images: true
+    supports_verbosity: false  # Codex models don't support verbosity
+    temperature_constraint: fixed
+    temperature: 1.0
+    supports_top_p: false
+    default_timeout_seconds: 240   # Max variant needs more time
+    prompt_caching:
+      supports: true
+      mechanism: auto
+      min_tokens: 1024
+    native_thinking_param: reasoning_effort
+    # LiteLLM docs: codex-max supports low, medium, high, xhigh (default: adaptive)
+    litellm_reasoning_efforts: [low, medium, high, xhigh]
+    default_reasoning_effort: high
+    use_responses_api: true
+    intelligence_score: 85
+    tags: [code-gen]
+
+  gpt-5.1-mini:
+    friendly_name: GPT-5.1 Mini
+    context_window_tokens: 200000
+    max_output_tokens: 64000
+    max_thinking_tokens: null
+    supports_thinking: true
+    supports_images: false
+    supports_verbosity: true
+    verbosity_levels: [low, medium, high]
+    temperature_constraint: fixed
+    temperature: 1.0
+    supports_top_p: false  # Reasoning models don't support top_p
+    default_timeout_seconds: 120
+    prompt_caching:
+      supports: true
+      mechanism: auto
+      min_tokens: 1024
+    native_thinking_param: reasoning_effort
+    # LiteLLM docs: gpt-5.1 series supports none, low, medium, high (no minimal)
+    litellm_reasoning_efforts: [none, low, medium, high]
+    default_reasoning_effort: none
+    intelligence_score: 76
+    tags: []
+
+  gpt-5-mini:
+    friendly_name: GPT-5 Mini
+    context_window_tokens: 400000
+    max_output_tokens: 128000
+    max_thinking_tokens: null
+    supports_thinking: true
+    supports_images: true
+    supports_verbosity: true
+    verbosity_levels: [low, medium, high]
+    temperature_constraint: fixed
+    temperature: 1.0
+    supports_top_p: false
+    default_timeout_seconds: 120
+    prompt_caching:
+      supports: true
+      mechanism: auto
+      min_tokens: 1024
+    native_thinking_param: reasoning_effort
+    # LiteLLM docs: gpt-5-mini supports minimal, low, medium, high (no none)
+    litellm_reasoning_efforts: [minimal, low, medium, high]
+    default_reasoning_effort: medium
+    intelligence_score: 79
+    tags: []
+
+  gpt-5:
+    friendly_name: GPT-5
+    context_window_tokens: 400000
+    max_output_tokens: 128000
+    max_thinking_tokens: null
+    supports_thinking: true
+    supports_images: true
+    supports_verbosity: true
+    verbosity_levels: [low, medium, high]
+    temperature_constraint: fixed
+    temperature: 1.0
+    supports_top_p: false
+    default_timeout_seconds: 180
+    prompt_caching:
+      supports: true
+      mechanism: auto
+      min_tokens: 1024
+    native_thinking_param: reasoning_effort
+    # LiteLLM docs: gpt-5 supports minimal, low, medium, high (no none)
+    litellm_reasoning_efforts: [minimal, low, medium, high]
+    default_reasoning_effort: medium
+    intelligence_score: 88
+    tags: []
+
+  gpt-5-pro:
+    friendly_name: GPT-5 Pro
+    context_window_tokens: 400000
+    max_output_tokens: 272000
+    max_thinking_tokens: null
+    supports_thinking: true
+    supports_images: true
+    supports_verbosity: true
+    verbosity_levels: [low, medium, high]
+    temperature_constraint: fixed
+    temperature: 1.0
+    supports_top_p: false
+    default_timeout_seconds: 300  # Pro models need longer timeouts
+    prompt_caching:
+      supports: true
+      mechanism: auto
+      min_tokens: 1024
+    native_thinking_param: reasoning_effort
+    # LiteLLM docs: gpt-5-pro ONLY supports high
+    litellm_reasoning_efforts: [high]
+    default_reasoning_effort: high
+    use_responses_api: true
+    intelligence_score: 91
+    tags: []
+
+  gpt-5-codex:
+    friendly_name: GPT-5 Codex
+    context_window_tokens: 400000
+    max_output_tokens: 128000
+    max_thinking_tokens: null
+    supports_thinking: true
+    supports_images: true
+    supports_verbosity: false  # Codex models don't support verbosity
+    temperature_constraint: fixed
+    temperature: 1.0
+    supports_top_p: false
+    default_timeout_seconds: 180
+    prompt_caching:
+      supports: true
+      mechanism: auto
+      min_tokens: 1024
+    native_thinking_param: reasoning_effort
+    # LiteLLM docs: codex models support low, medium, high only (default: adaptive)
+    litellm_reasoning_efforts: [low, medium, high]
+    default_reasoning_effort: medium
+    use_responses_api: true
+    intelligence_score: 80
+    tags: [code-gen]
+
+  gpt-5-nano:
+    friendly_name: GPT-5 Nano
+    context_window_tokens: 400000
+    max_output_tokens: 128000
+    max_thinking_tokens: null
+    supports_thinking: true
+    supports_images: true
+    supports_verbosity: true
+    verbosity_levels: [low, medium, high]
+    temperature_constraint: fixed
+    temperature: 1.0
+    supports_top_p: false
+    default_timeout_seconds: 90  # Nano is faster
+    prompt_caching:
+      supports: true
+      mechanism: auto
+      min_tokens: 1024
+    native_thinking_param: reasoning_effort
+    # OpenAI matrix: gpt-5-nano supports minimal, low, medium, high (no none)
+    litellm_reasoning_efforts: [minimal, low, medium, high]
+    default_reasoning_effort: minimal
+    intelligence_score: 70
+    tags: []
+
+  gpt-4o:
+    friendly_name: GPT-4o
+    context_window_tokens: 128000
+    max_output_tokens: 16384
+    max_thinking_tokens: null
+    supports_thinking: false
+    supports_images: true
+    temperature_constraint: range
+    temperature:
+      min: 0.0
+      default: 1.0
+      max: 2.0
+    supports_top_p: true  # Non-reasoning models support top_p
+    default_timeout_seconds: 60
+    prompt_caching:
+      supports: true
+      mechanism: auto
+      min_tokens: 1024
+    # No reasoning_effort support (non-reasoning model)
+    native_thinking_param: null
+    litellm_reasoning_efforts: null
+    default_reasoning_effort: null
+    intelligence_score: 76
+    tags: []
+
+  gpt-4o-mini:
+    friendly_name: GPT-4o Mini
+    context_window_tokens: 128000
+    max_output_tokens: 16384
+    max_thinking_tokens: null
+    supports_thinking: false
+    supports_images: true
+    temperature_constraint: range
+    temperature:
+      min: 0.0
+      default: 1.0
+      max: 2.0
+    supports_top_p: true
+    default_timeout_seconds: 60  # Mini models are fast but need margin for P99
+    prompt_caching:
+      supports: true
+      mechanism: auto
+      min_tokens: 1024
+    native_thinking_param: null
+    litellm_reasoning_efforts: null
+    default_reasoning_effort: null
+    intelligence_score: 65
+    tags: []
+
+  gpt-4.1:
+    friendly_name: GPT-4.1
+    context_window_tokens: 1000000
+    max_output_tokens: 32768
+    max_thinking_tokens: null
+    supports_thinking: false
+    supports_images: true
+    temperature_constraint: range
+    temperature:
+      min: 0.0
+      default: 1.0
+      max: 2.0
+    supports_top_p: true
+    default_timeout_seconds: 90  # Large context can be slow
+    prompt_caching:
+      supports: true
+      mechanism: auto
+      min_tokens: 1024
+    native_thinking_param: null
+    litellm_reasoning_efforts: null
+    default_reasoning_effort: null
+    intelligence_score: 72
+    tags: []
+
+  o4-mini:
+    friendly_name: O4 Mini
+    context_window_tokens: 200000
+    max_output_tokens: 65536
+    max_thinking_tokens: null
+    supports_thinking: true
+    supports_images: true
+    temperature_constraint: fixed
+    temperature: 1.0
+    supports_top_p: false  # Reasoning models don't support top_p
+    default_timeout_seconds: 120
+    prompt_caching:
+      supports: true
+      mechanism: auto
+      min_tokens: 1024
+    native_thinking_param: reasoning_effort
+    litellm_reasoning_efforts: [none, minimal, low, medium, high]
+    default_reasoning_effort: medium
+    intelligence_score: 60
+    tags: []
+
+  o3:
+    friendly_name: O3
+    context_window_tokens: 200000
+    max_output_tokens: 65536
+    max_thinking_tokens: null
+    supports_thinking: true
+    supports_images: false
+    temperature_constraint: fixed
+    temperature: 1.0
+    supports_top_p: false
+    default_timeout_seconds: 180
+    prompt_caching:
+      supports: true
+      mechanism: auto
+      min_tokens: 1024
+    native_thinking_param: reasoning_effort
+    litellm_reasoning_efforts: [none, minimal, low, medium, high]
+    default_reasoning_effort: medium
+    intelligence_score: 85
+    tags: []
+
+  o3-pro:
+    friendly_name: O3 Pro
+    context_window_tokens: 200000
+    max_output_tokens: 65536
+    max_thinking_tokens: null
+    supports_thinking: true
+    supports_images: true
+    temperature_constraint: fixed
+    temperature: 1.0
+    supports_top_p: false
+    default_timeout_seconds: 300  # Pro reasoning takes longer
+    prompt_caching:
+      supports: true
+      mechanism: auto
+      min_tokens: 1024
+    native_thinking_param: reasoning_effort
+    litellm_reasoning_efforts: [none, minimal, low, medium, high]
+    default_reasoning_effort: high
+    use_responses_api: true
+    intelligence_score: 87
+    tags: []
+
+  o3-mini:
+    friendly_name: O3 Mini
+    context_window_tokens: 200000
+    max_output_tokens: 65536
+    max_thinking_tokens: null
+    supports_thinking: true
+    supports_images: false
+    temperature_constraint: fixed
+    temperature: 1.0
+    supports_top_p: false
+    default_timeout_seconds: 90
+    prompt_caching:
+      supports: true
+      mechanism: auto
+      min_tokens: 1024
+    native_thinking_param: reasoning_effort
+    litellm_reasoning_efforts: [none, minimal, low, medium, high]
+    default_reasoning_effort: medium
+    intelligence_score: 67
+    tags: []
+
+  o1:
+    friendly_name: O1
+    context_window_tokens: 128000
+    max_output_tokens: 65536
+    max_thinking_tokens: null
+    supports_thinking: true
+    supports_images: false
+    temperature_constraint: fixed
+    temperature: 1.0
+    supports_top_p: false
+    default_timeout_seconds: 180
+    prompt_caching:
+      supports: true
+      mechanism: auto
+      min_tokens: 1024
+    native_thinking_param: reasoning_effort
+    litellm_reasoning_efforts: [none, minimal, low, medium, high]
+    default_reasoning_effort: medium
+    intelligence_score: 84
+    tags: []
+
+  # ---------------------------------------------------------------------------
+  # Gemini Models (via Vertex AI or Google AI Studio)
+  # ---------------------------------------------------------------------------
+  gemini-3.1-pro-preview:
+    friendly_name: Gemini 3.1 Pro Preview
+    context_window_tokens: 1048576
+    max_output_tokens: 65536
+    max_thinking_tokens: null
+    supports_thinking: true
+    supports_images: true
+    temperature_constraint: fixed
+    temperature: 1.0
+    supports_top_p: true  # Gemini supports top_p
+    default_timeout_seconds: 180
+    prompt_caching:
+      supports: false  # Gemini has Context Caching API but LiteLLM doesn't support it
+    # Native: thinking_level (low, high only for Pro)
+    native_thinking_param: thinking_level
+    thinking_levels: [low, high]
+    default_thinking_level: high
+    # LiteLLM mapping: reasoning_effort -> thinking_level
+    # minimal/low/none/disable -> low, medium/high -> high
+    litellm_reasoning_efforts: [none, disable, minimal, low, medium, high]
+    default_reasoning_effort: high
+    intelligence_score: 94
+    tags: []
+
+  gemini-3.1-pro-preview-customtools:
+    friendly_name: Gemini 3.1 Pro Preview (Custom Tools)
+    short_name: gemini-3.1-pro-ct
+    context_window_tokens: 1048576
+    max_output_tokens: 65536
+    max_thinking_tokens: null
+    supports_thinking: true
+    supports_images: true
+    temperature_constraint: fixed
+    temperature: 1.0
+    supports_top_p: true
+    default_timeout_seconds: 180
+    prompt_caching:
+      supports: false
+    # Same thinking params as 3.1 Pro
+    native_thinking_param: thinking_level
+    thinking_levels: [low, high]
+    default_thinking_level: high
+    litellm_reasoning_efforts: [none, disable, minimal, low, medium, high]
+    default_reasoning_effort: high
+    intelligence_score: 94
+    tags: [agentic, custom-tools]
+
+  gemini-3-flash-preview:
+    friendly_name: Gemini 3 Flash Preview
+    context_window_tokens: 1048576
+    max_output_tokens: 65536
+    max_thinking_tokens: null
+    supports_thinking: true
+    supports_images: true
+    temperature_constraint: fixed
+    temperature: 1.0
+    supports_top_p: true
+    default_timeout_seconds: 120
+    prompt_caching:
+      supports: false  # Gemini has Context Caching API but LiteLLM doesn't support it
+    # Native: thinking_level (minimal, low, medium, high for Flash)
+    native_thinking_param: thinking_level
+    thinking_levels: [minimal, low, medium, high]
+    default_thinking_level: high
+    # LiteLLM mapping: reasoning_effort -> thinking_level
+    litellm_reasoning_efforts: [none, disable, minimal, low, medium, high]
+    default_reasoning_effort: high
+    intelligence_score: 80
+    tags: []
+
+  gemini-2.5-pro:
+    friendly_name: Gemini 2.5 Pro
+    context_window_tokens: 1048576
+    max_output_tokens: 65536
+    max_thinking_tokens: 32768
+    supports_thinking: true
+    supports_images: true
+    temperature_constraint: range
+    temperature:
+      min: 0.0
+      default: 1.0
+      max: 2.0
+    supports_top_p: true
+    default_timeout_seconds: 180
+    prompt_caching:
+      supports: false  # Gemini has Context Caching API but LiteLLM doesn't support it
+    # Native: thinking.budget_tokens (128 to 32768, cannot disable)
+    native_thinking_param: thinking_budget
+    # LiteLLM mapping: reasoning_effort -> budget_tokens
+    # none=0, disable=0, low=1024, medium=2048, high=4096
+    # Note: Cannot disable thinking on 2.5 Pro (none still uses dynamic)
+    litellm_reasoning_efforts: [none, disable, low, medium, high]
+    default_reasoning_effort: high
+    intelligence_score: 89
+    tags: []
+
+  gemini-2.5-flash:
+    friendly_name: Gemini 2.5 Flash
+    short_name: gemini-flash
+    context_window_tokens: 1048576
+    max_output_tokens: 65536
+    max_thinking_tokens: 24576
+    supports_thinking: true
+    supports_images: true
+    temperature_constraint: range
+    temperature:
+      min: 0.0
+      default: 1.0
+      max: 2.0
+    supports_top_p: true
+    default_timeout_seconds: 90
+    prompt_caching:
+      supports: false  # Gemini has Context Caching API but LiteLLM doesn't support it
+    # Native: thinking.budget_tokens (0 to 24576, can disable with 0)
+    native_thinking_param: thinking_budget
+    # LiteLLM mapping: reasoning_effort -> budget_tokens
+    # none=0, disable=0, low=1024, medium=2048, high=4096
+    litellm_reasoning_efforts: [none, disable, low, medium, high]
+    default_reasoning_effort: medium
+    intelligence_score: 73
+    tags: []
+
+  # ---------------------------------------------------------------------------
+  # Claude Models (4.6 + 4.5 series)
+  # ---------------------------------------------------------------------------
+
+  # --- Claude 4.6 Series ---
+  claude-opus-4-6:
+    friendly_name: Claude Opus 4.6
+    context_window_tokens: 200000
+    max_output_tokens: 128000
+    max_thinking_tokens: 32768
+    supports_thinking: true
+    supports_images: true
+    temperature_constraint: range
+    temperature:
+      min: 0.0
+      default: 1.0
+      max: 1.0
+    supports_top_p: true
+    default_timeout_seconds: 180
+    prompt_caching:
+      supports: true
+      mechanism: cache_control
+      min_tokens: 1024
+      max_cache_blocks: 4
+    native_thinking_param: output_config.effort
+    litellm_reasoning_efforts: [low, medium, high]
+    default_reasoning_effort: high
+    intelligence_score: 98
+    tags: []
+
+  claude-sonnet-4-6:
+    friendly_name: Claude Sonnet 4.6
+    context_window_tokens: 200000
+    max_output_tokens: 64000
+    max_thinking_tokens: 32768
+    supports_thinking: true
+    supports_images: true
+    temperature_constraint: range
+    temperature:
+      min: 0.0
+      default: 1.0
+      max: 1.0
+    supports_top_p: true
+    default_timeout_seconds: 120
+    prompt_caching:
+      supports: true
+      mechanism: cache_control
+      min_tokens: 1024
+      max_cache_blocks: 4
+    native_thinking_param: output_config.effort
+    litellm_reasoning_efforts: [low, medium, high]
+    default_reasoning_effort: medium
+    intelligence_score: 92
+    tags: []
+
+  # 1M context variants (requires anthropic-beta header via LiteLLM extra_headers)
+  claude-opus-4-6-1m:
+    friendly_name: Claude Opus 4.6 (1M)
+    context_window_tokens: 1000000
+    max_output_tokens: 128000
+    max_thinking_tokens: 32768
+    supports_thinking: true
+    supports_images: true
+    temperature_constraint: range
+    temperature:
+      min: 0.0
+      default: 1.0
+      max: 1.0
+    supports_top_p: true
+    default_timeout_seconds: 240
+    prompt_caching:
+      supports: true
+      mechanism: cache_control
+      min_tokens: 1024
+      max_cache_blocks: 4
+    native_thinking_param: output_config.effort
+    litellm_reasoning_efforts: [low, medium, high]
+    default_reasoning_effort: high
+    intelligence_score: 98
+    tags: []
+
+  claude-sonnet-4-6-1m:
+    friendly_name: Claude Sonnet 4.6 (1M)
+    context_window_tokens: 1000000
+    max_output_tokens: 64000
+    max_thinking_tokens: 32768
+    supports_thinking: true
+    supports_images: true
+    temperature_constraint: range
+    temperature:
+      min: 0.0
+      default: 1.0
+      max: 1.0
+    supports_top_p: true
+    default_timeout_seconds: 180
+    prompt_caching:
+      supports: true
+      mechanism: cache_control
+      min_tokens: 1024
+      max_cache_blocks: 4
+    native_thinking_param: output_config.effort
+    litellm_reasoning_efforts: [low, medium, high]
+    default_reasoning_effort: medium
+    intelligence_score: 92
+    tags: []
+
+  # --- Claude 4.5 Series ---
+  claude-opus-4-5-20251101:
+    friendly_name: Claude Opus 4.5
+    context_window_tokens: 200000
+    max_output_tokens: 65536
+    max_thinking_tokens: 32768
+    supports_thinking: true
+    supports_images: true
+    temperature_constraint: range
+    temperature:
+      min: 0.0
+      default: 1.0
+      max: 1.0
+    supports_top_p: true  # Claude supports top_p
+    default_timeout_seconds: 180
+    prompt_caching:
+      supports: true
+      mechanism: cache_control  # Requires cache_control: {type: ephemeral} on content blocks
+      min_tokens: 1024  # Effective with 1024+ tokens, max 4 cache_control blocks
+      max_cache_blocks: 4  # Anthropic limit
+    # Native: output_config.effort (Opus 4.5 only, beta)
+    native_thinking_param: output_config.effort
+    # LiteLLM mapping: reasoning_effort -> output_config.effort
+    litellm_reasoning_efforts: [low, medium, high]
+    default_reasoning_effort: high
+    intelligence_score: 96
+    tags: []
+
+  claude-sonnet-4-5-20250929:
+    friendly_name: Claude Sonnet 4.5
+    context_window_tokens: 200000
+    max_output_tokens: 65536
+    max_thinking_tokens: 32768
+    supports_thinking: true
+    supports_images: true
+    temperature_constraint: range
+    temperature:
+      min: 0.0
+      default: 1.0
+      max: 1.0
+    supports_top_p: true
+    default_timeout_seconds: 120
+    prompt_caching:
+      supports: true
+      mechanism: cache_control
+      min_tokens: 1024
+      max_cache_blocks: 4
+    # No effort param support (Sonnet 4.5 doesn't support effort beta)
+    native_thinking_param: null
+    litellm_reasoning_efforts: null
+    default_reasoning_effort: null
+    intelligence_score: 90
+    tags: []
+
+  claude-haiku-4-5-20251001:
+    friendly_name: Claude Haiku 4.5
+    context_window_tokens: 200000
+    max_output_tokens: 64000
+    max_thinking_tokens: 32768
+    supports_thinking: true
+    supports_images: true
+    temperature_constraint: range
+    temperature:
+      min: 0.0
+      default: 1.0
+      max: 1.0
+    supports_top_p: true
+    default_timeout_seconds: 60  # Haiku is fast
+    prompt_caching:
+      supports: true
+      mechanism: cache_control
+      min_tokens: 1024
+      max_cache_blocks: 4
+    # No effort param support (Haiku 4.5 doesn't support effort beta)
+    native_thinking_param: null
+    litellm_reasoning_efforts: null
+    default_reasoning_effort: null
+    intelligence_score: 81
+    tags: []
+
+
+# =============================================================================
+# ALIASES - Provider-prefixed IDs map to canonical models
+# =============================================================================
+aliases:
+  # OpenAI provider prefix (LiteLLM style)
+  openai/gpt-5.5: gpt-5.5
+  openai/gpt-5.4: gpt-5.4
+  openai/gpt-5.4-pro: gpt-5.4-pro
+  openai/gpt-5.4-mini: gpt-5.4-mini
+  openai/gpt-5.4-nano: gpt-5.4-nano
+  openai/gpt-5.2: gpt-5.2
+  openai/gpt-5.2-pro: gpt-5.2-pro
+  openai/gpt-5.3-codex: gpt-5.3-codex
+  openai/gpt-5.2-codex: gpt-5.2-codex
+  openai/gpt-5.1-codex: gpt-5.1-codex
+  openai/gpt-5.1-codex-mini: gpt-5.1-codex-mini
+  openai/gpt-5.1-codex-max: gpt-5.1-codex-max
+  openai/gpt-5.1-mini: gpt-5.1-mini
+  openai/gpt-5-pro: gpt-5-pro
+  openai/gpt-5-mini: gpt-5-mini
+  openai/gpt-5: gpt-5
+  openai/gpt-5-codex: gpt-5-codex
+  openai/gpt-5-nano: gpt-5-nano
+  openai/gpt-4.1: gpt-4.1
+  openai/gpt-4o: gpt-4o
+  openai/gpt-4o-mini: gpt-4o-mini
+  openai/o4-mini: o4-mini
+  openai/o3: o3
+  openai/o3-pro: o3-pro
+  openai/o3-mini: o3-mini
+  openai/o1: o1
+
+  # Vertex AI provider prefix (LiteLLM style)
+  vertex_ai/gemini-3.1-pro-preview: gemini-3.1-pro-preview
+  vertex_ai/gemini-3.1-pro-preview-customtools: gemini-3.1-pro-preview-customtools
+  vertex_ai/gemini-3-flash-preview: gemini-3-flash-preview
+  vertex_ai/gemini-2.5-pro: gemini-2.5-pro
+  vertex_ai/gemini-2.5-flash: gemini-2.5-flash
+
+  # Google AI Studio provider prefix (LiteLLM style)
+  gemini/gemini-3.1-pro-preview: gemini-3.1-pro-preview
+  gemini/gemini-3.1-pro-preview-customtools: gemini-3.1-pro-preview-customtools
+  gemini/gemini-3-flash-preview: gemini-3-flash-preview
+  gemini/gemini-2.5-pro: gemini-2.5-pro
+  gemini/gemini-2.5-flash: gemini-2.5-flash
+
+  # Anthropic provider prefix + friendly aliases
+  # Opus 4.6
+  anthropic/claude-opus-4-6: claude-opus-4-6
+  anthropic/claude-opus-4-6-1m: claude-opus-4-6-1m
+  opus-4-6: claude-opus-4-6
+  opus-4-6-1m: claude-opus-4-6-1m
+  opus: claude-opus-4-6
+
+  # Sonnet 4.6
+  anthropic/claude-sonnet-4-6: claude-sonnet-4-6
+  anthropic/claude-sonnet-4-6-1m: claude-sonnet-4-6-1m
+  sonnet-4-6: claude-sonnet-4-6
+  sonnet-4-6-1m: claude-sonnet-4-6-1m
+  sonnet: claude-sonnet-4-6
+
+  # Opus 4.5
+  anthropic/claude-opus-4-5-20251101: claude-opus-4-5-20251101
+  anthropic/claude-opus-4-5: claude-opus-4-5-20251101
+  claude-opus-4-5: claude-opus-4-5-20251101
+  opus-4-5: claude-opus-4-5-20251101
+
+  # Sonnet 4.5
+  anthropic/claude-sonnet-4-5-20250929: claude-sonnet-4-5-20250929
+  anthropic/claude-sonnet-4-5: claude-sonnet-4-5-20250929
+  claude-sonnet-4-5: claude-sonnet-4-5-20250929
+  sonnet-4-5: claude-sonnet-4-5-20250929
+
+  # Haiku 4.5
+  anthropic/claude-haiku-4-5-20251001: claude-haiku-4-5-20251001
+  anthropic/claude-haiku-4-5: claude-haiku-4-5-20251001
+  claude-haiku-4-5: claude-haiku-4-5-20251001
+  haiku-4-5: claude-haiku-4-5-20251001
+  haiku: claude-haiku-4-5-20251001

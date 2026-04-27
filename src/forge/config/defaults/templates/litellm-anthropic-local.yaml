@@ -1,0 +1,29 @@
+# Template: litellm-anthropic-local
+# Anthropic Claude via local LiteLLM with personal API key (DEVELOPMENT)
+#
+# Requires:
+#   - ANTHROPIC_API_KEY in .env
+#
+# Backend (LiteLLM on port 4000) starts automatically.
+#
+# Note: If you added ANTHROPIC_API_KEY after the backend started,
+# restart with: forge backend stop litellm-4000
+
+proxy:
+  preferred_provider: litellm
+  default_port: 8091
+
+  # Backend dependency (auto-started when proxy starts)
+  backend_dependency:
+    adapter: litellm
+    port: 4000
+    required_env_vars:
+      - ANTHROPIC_API_KEY
+
+  litellm:
+    tiers:
+      haiku: anthropic/claude-haiku-4-5
+      sonnet: anthropic/claude-sonnet-4-6
+      opus: anthropic/claude-opus-4-6
+    prompt_caching: passthrough
+    error_hints: true

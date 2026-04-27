@@ -1,0 +1,142 @@
+"""Claude subprocess management for headless (-p) mode.
+
+Provides a unified interface for running ``claude -p`` as a subprocess
+with structured result handling. Used by the semantic supervisor
+(``claude -p --resume``) and handoff agent (``claude -p``).
+
+For interactive sessions (stdin/stdout inherited), use
+``forge.session.claude.invoke.invoke_claude()`` instead.
+"""
+
+from __future__ import annotations
+
+import logging
+import subprocess
+from dataclasses import dataclass
+
+from forge.core.reactive.env import build_claude_env, can_use_bare
+
+_log = logging.getLogger(__name__)
+
+
+@dataclass
+class SessionResult:
+    """Result from a ``claude -p`` invocation.
+
+    The runner never raises — all errors are captured in the ``error`` field.
+    Callers inspect ``success`` and ``error`` to decide their own fail
+    behavior (fail-open warnings for supervisor, return False for handoff).
+    """
+
+    stdout: str
+    stderr: str
+    returncode: int
+    timed_out: bool = False
+    error: str | None = None
+
+    @property
+    def success(self) -> bool:
+        """True if the subprocess completed successfully."""
+        return self.returncode == 0 and not self.timed_out and self.error is None
+
+
+def run_claude_session(
+    prompt: str,
+    *,
+    resume_id: str | None = None,
+    fork_session: bool = False,
+    bare: bool | None = None,
+    base_url: str | None = None,
+    direct: bool = False,
+    timeout_seconds: int = 60,
+    cwd: str | None = None,
+    extra_env: dict[str, str] | None = None,
+) -> SessionResult:
+    """Run ``claude -p`` as a headless subprocess.
+
+    Builds the command, environment, and runs ``subprocess.run`` with
+    ``capture_output=True``. All exceptions are caught and reported
+    via ``SessionResult.error``.
+
+    Args:
+        prompt: Text sent to claude via stdin.
+        resume_id: If set, adds ``--resume <id>`` to continue a session.
+        fork_session: If True and resume_id is set, adds ``--fork-session``
+            to create an ephemeral fork instead of appending to the
+            original conversation.
+        bare: If True, adds ``--bare`` to skip hooks/LSP/plugins.
+            None (default) auto-detects: uses ``--bare`` only when
+            ANTHROPIC_API_KEY is present (``--bare`` disables OAuth).
+        base_url: Proxy URL (sets ANTHROPIC_BASE_URL in environment).
+        timeout_seconds: Maximum seconds to wait for completion.
+        cwd: Working directory for the subprocess.
+        extra_env: Additional environment variables.
+
+    Returns:
+        SessionResult with stdout/stderr/returncode or error details.
+    """
+    use_bare = bare if bare is not None else can_use_bare()
+    cmd = ["claude", "-p"]
+    if use_bare:
+        cmd.append("--bare")
+    if resume_id:
+        cmd.extend(["--resume", resume_id])
+        if fork_session:
+            cmd.append("--fork-session")
+
+    env = build_claude_env(base_url=base_url, extra_vars=extra_env, direct=direct)
+
+    try:
+        _log.debug(
+            "Running claude session: cmd=%s, resume=%s, cwd=%s",
+            cmd,
+            resume_id and resume_id[:16],
+            cwd,
+        )
+
+        result = subprocess.run(
+            cmd,
+            input=prompt,
+            capture_output=True,
+            text=True,
+            timeout=timeout_seconds,
+            cwd=cwd,
+            env=env,
+        )
+
+        if result.returncode != 0:
+            _log.warning("claude -p returned non-zero exit code: %d", result.returncode)
+
+        return SessionResult(
+            stdout=result.stdout,
+            stderr=result.stderr,
+            returncode=result.returncode,
+        )
+
+    except subprocess.TimeoutExpired:
+        _log.warning("claude -p timed out after %ds", timeout_seconds)
+        return SessionResult(
+            stdout="",
+            stderr="",
+            returncode=-1,
+            timed_out=True,
+            error=f"Timed out after {timeout_seconds}s",
+        )
+
+    except FileNotFoundError:
+        _log.error("claude CLI not found in PATH")
+        return SessionResult(
+            stdout="",
+            stderr="",
+            returncode=-1,
+            error="claude CLI not found in PATH",
+        )
+
+    except Exception as e:
+        _log.warning("claude -p failed: %s", e)
+        return SessionResult(
+            stdout="",
+            stderr="",
+            returncode=-1,
+            error=str(e),
+        )

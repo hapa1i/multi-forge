@@ -1,0 +1,44 @@
+# .dockerignore — Exclude from Docker build context
+# This significantly speeds up builds and prevents "too many open files" errors
+
+# Python virtual environments and caches
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.egg-info/
+
+# Git
+.git/
+.gitignore
+
+# Logs and runtime artifacts
+*.log
+src/forge/logs/
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Secrets (must not leak into image)
+.env
+.env.*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+dist/
+build/
+
+# Docker (avoid recursive context)
+docker-compose*.yml

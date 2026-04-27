@@ -1,0 +1,127 @@
+[project]
+name = "tr-claude-forge"
+version = "0.1.0"
+description = "Developer toolkit for Claude Code: multi-model proxy routing, session management, policy engine, and skills architecture"
+readme = "README.md"
+license = "Apache-2.0"
+authors = [
+    { name = "Habib Farr", email = "Habib.Farr@thomsonreuters.com" },
+    { name = "Habib Farr", email = "habib.farr@pm.me" },
+]
+requires-python = ">=3.11"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development",
+]
+
+dependencies = [
+    "dacite>=1.8.0",
+    "click>=8.3.1",
+    "coolname>=2.2.0,<3",
+    "rich>=13.0.0",
+    "pydantic>=2.0.0",
+    "openai>=1.0.0",
+    "httpx>=0.25.0",
+    "tenacity>=8.0.0",
+    "python-dotenv>=1.2.2",
+    "pyyaml>=6.0.0",
+    "ruamel.yaml>=0.18.0",
+    "packaging>=21.0",
+    # Proxy dependencies (previously optional, now core)
+    "fastapi[standard]>=0.115.11",
+    "uvicorn>=0.31.1",
+    "tiktoken>=0.11.0",
+    "litellm[proxy]>=1.83.0",
+]
+
+[project.scripts]
+forge = "forge.cli.main:main"
+
+[project.urls]
+Homepage = "https://github.com/thomsonreuters/claude-forge"
+Repository = "https://github.com/thomsonreuters/claude-forge"
+Issues = "https://github.com/thomsonreuters/claude-forge/issues"
+Documentation = "https://github.com/thomsonreuters/claude-forge/tree/main/docs"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/forge"]
+
+# Include non-Python data files (YAML catalogs, etc.) in the wheel
+[tool.hatch.build.targets.wheel.sources]
+"src" = ""
+
+[tool.hatch.build]
+include = [
+    "src/forge/**/*.py",
+    "src/forge/**/*.yaml",
+    "src/forge/**/*.md",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
+    "slow: marks tests as slow (require network/API access, deselect with '-m \"not slow\"')",
+    "regression: marks tests as regression/bug-fix tests (run with '-m regression')",
+    "docker_in: tests that exec commands inside a container (use '-m \"not docker_in\"' to skip)",
+    "docker_host: tests that spawn containers from host - sandbox tests (use '-m \"not docker_host\"' to skip)",
+]
+
+[tool.pytest-asyncio]
+asyncio_mode = "auto"
+
+[tool.mypy]
+# Exclude extension scripts with optional dependencies
+exclude = [
+    "src/skills/",
+]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+disallow_untyped_calls = false
+
+# Security floor for transitive dependencies (Dependabot alerts)
+[tool.uv]
+constraint-dependencies = [
+    "filelock>=3.20.3",
+    "virtualenv>=20.36.1",
+    "aiohttp>=3.13.4",
+    "cryptography>=46.0.7",
+    "python-multipart>=0.0.26",
+    "Pygments>=2.20.0",
+]
+# litellm pins fastapi-sso<0.17.0 but 0.16.x has a CSRF vulnerability.
+# Forge doesn't use fastapi-sso directly; override to force the patched version.
+override-dependencies = [
+    "fastapi-sso>=0.19.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+    "pytest-cov>=4.1.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-mock>=3.15.1",
+    "ruff>=0.8.0",
+    "mypy>=1.13.0",
+    "pyright>=1.1.0",
+    "pytest-rerunfailures>=14.0",
+    "pre-commit>=4.0.0",
+    "types-PyYAML>=6.0.0",
+    "types-requests>=2.31.0",
+    "python-dotenv>=1.2.1",
+]

@@ -1,0 +1,238 @@
+"""Data models for multi-model review.
+
+Defines model specifications, review results, and the default
+model catalog. Models reference ``proxy`` (proxy_id or template name)
+for proxy resolution via ``lookup_proxy_base_url()``.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+
+
+@dataclass(frozen=True)
+class ModelSpec:
+    """A model backend for multi-model review.
+
+    Attributes:
+        name: Human-readable identifier (e.g., "gpt-5.1").
+        proxy: Proxy (proxy_id or template name) for base_url resolution.
+            None means direct Anthropic (no ANTHROPIC_BASE_URL).
+        model_flag: Value for ``claude -p --model <flag>``.
+            None means use the proxy's default model.
+        description: What this model is good at.
+        prompt: Per-worker prompt override. When set, this worker receives
+            this prompt instead of the global prompt passed to run_multi_review().
+        worker_id: Stable key for JSON output. Defaults to ``name`` when None.
+            Use when the same model appears multiple times with different roles
+            (e.g., ``gpt-5.5-security``, ``gpt-5.5-architecture``).
+    """
+
+    name: str
+    proxy: str | None
+    model_flag: str | None
+    description: str
+    prompt: str | None = None
+    worker_id: str | None = None
+
+    @property
+    def effective_worker_id(self) -> str:
+        """Stable key for result maps and JSON output."""
+        return self.worker_id if self.worker_id is not None else self.name
+
+
+@dataclass
+class ReviewResult:
+    """Result from one model's review."""
+
+    model_name: str
+    stdout: str
+    stderr: str
+    success: bool
+    duration_seconds: float
+    error: str | None = None
+
+
+@dataclass
+class MultiReviewOutput:
+    """Aggregate output from a multi-model review run."""
+
+    prompt: str
+    results: list[ReviewResult] = field(default_factory=list)
+
+    @property
+    def successful(self) -> int:
+        return sum(1 for r in self.results if r.success)
+
+    @property
+    def failed(self) -> int:
+        return sum(1 for r in self.results if not r.success)
+
+
+def _build_default_models() -> dict[str, ModelSpec]:
+    """Build default review models from the model catalog's defaults section.
+
+    Model names and flags derive from model_catalog.yaml so updating
+    defaults is a single YAML change. Dict keys use compact display names
+    (e.g., "gemini-3.1-pro" not "gemini-3.1-pro-preview") so the CLI
+    surface stays clean.
+    """
+    from forge.core.models.catalog import get_compact_name, get_default_model
+
+    openai_opus = get_default_model("openai", "opus")
+    gemini_opus = get_default_model("gemini", "opus")
+    anthropic_opus = get_default_model("anthropic", "opus")
+
+    openai_name = get_compact_name(openai_opus)
+    gemini_name = get_compact_name(gemini_opus)
+
+    return {
+        openai_name: ModelSpec(
+            name=openai_name,
+            proxy="litellm-openai",
+            model_flag=None,
+            description="Logical problems, systematic code review",
+        ),
+        gemini_name: ModelSpec(
+            name=gemini_name,
+            proxy="litellm-gemini",
+            model_flag=None,
+            description="Balanced analysis, pragmatic suggestions, large context",
+        ),
+        "claude-opus": ModelSpec(
+            name="claude-opus",
+            proxy=None,
+            model_flag=anthropic_opus,
+            description="Deep architectural analysis, complex reasoning",
+        ),
+    }
+
+
+# Proxy_ids match Forge template names (forge proxy create <template>).
+DEFAULT_MODELS: dict[str, ModelSpec] = _build_default_models()
+
+
+def resolve_model_specs(names_str: str | None) -> list[ModelSpec]:
+    """Parse comma-separated model names into ModelSpec list.
+
+    Returns all DEFAULT_MODELS when names_str is None.
+    Raises ValueError for unknown model names.
+    """
+    if not names_str:
+        return list(DEFAULT_MODELS.values())
+
+    names = [m.strip() for m in names_str.split(",")]
+    invalid = [m for m in names if m not in DEFAULT_MODELS]
+    if invalid:
+        available = list(DEFAULT_MODELS.keys())
+        raise ValueError(f"Unknown models: {invalid}. Available: {available}")
+
+    return [DEFAULT_MODELS[m] for m in names]
+
+
+NAMED_ROLES: dict[str, str] = {
+    "security": ("Focus on security vulnerabilities, injection risks, " "auth bypasses, and data exposure."),
+    "performance": ("Focus on performance bottlenecks, memory usage, " "algorithmic complexity, and I/O patterns."),
+    "architecture": ("Focus on architectural alignment, coupling, " "abstraction quality, and design patterns."),
+    "maintainability": ("Focus on readability, complexity, test coverage, " "naming, and change isolation."),
+    "correctness": ("Focus on logical errors, edge cases, " "off-by-one errors, and invariant violations."),
+}
+
+
+_VALID_STANCES = frozenset({"for", "against", "neutral", "custom"})
+
+
+@dataclass
+class StanceSpec:
+    """A stance-injected worker for adversarial evaluation.
+
+    Attributes:
+        stance: One of "for", "against", "neutral", "custom".
+        stance_prompt: Text injected via ``{stance_prompt}`` replacement.
+        model: Which model runs this stance.
+        display_label: User-facing label for output. Falls back to stance when None.
+            Use for custom stances where the raw stance ("custom") is not informative.
+    """
+
+    stance: str
+    stance_prompt: str
+    model: ModelSpec
+    display_label: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.stance not in _VALID_STANCES:
+            raise ValueError(f"Invalid stance '{self.stance}'. Must be one of: {sorted(_VALID_STANCES)}")
+
+    @property
+    def effective_label(self) -> str:
+        """Label for output display and worker naming."""
+        return self.display_label if self.display_label is not None else self.stance
+
+
+@dataclass
+class RoleSpec:
+    """A role-assigned worker for consensus building.
+
+    Unlike StanceSpec, role is not validated against a fixed set because
+    custom role prompts are first-class.
+
+    Attributes:
+        role: Role name (key from NAMED_ROLES) or "custom".
+        role_prompt: Text injected via ``{role_prompt}`` replacement.
+        model: Which model runs this role.
+        display_label: User-facing label for output. Falls back to role when None.
+    """
+
+    role: str
+    role_prompt: str
+    model: ModelSpec
+    display_label: str | None = None
+
+    @property
+    def effective_label(self) -> str:
+        """Label for output display and worker naming."""
+        return self.display_label if self.display_label is not None else self.role
+
+
+@dataclass
+class ConsensusOutput:
+    """Aggregate output from a two-round consensus workflow.
+
+    ``role_map`` keyed by worker_id is the authoritative role mapping
+    for disambiguation when duplicate models exist.
+    """
+
+    subject: str
+    roles: list[str] = field(default_factory=list)
+    round1_results: list[ReviewResult] = field(default_factory=list)
+    round2_results: list[ReviewResult] = field(default_factory=list)
+    role_map: dict[str, str] = field(default_factory=dict)
+    reconciliation_brief: str = ""
+
+    @property
+    def successful(self) -> int:
+        """Count successful workers in Round 2 (final output)."""
+        return sum(1 for r in self.round2_results if r.success)
+
+    @property
+    def failed(self) -> int:
+        """Count failed workers in Round 2 (final output)."""
+        return sum(1 for r in self.round2_results if not r.success)
+
+
+@dataclass
+class AdversarialOutput:
+    """Aggregate output from an adversarial evaluation run."""
+
+    resource_path: str
+    stances: list[str] = field(default_factory=list)
+    results: list[ReviewResult] = field(default_factory=list)
+    stance_map: dict[str, str] = field(default_factory=dict)
+
+    @property
+    def successful(self) -> int:
+        return sum(1 for r in self.results if r.success)
+
+    @property
+    def failed(self) -> int:
+        return sum(1 for r in self.results if not r.success)

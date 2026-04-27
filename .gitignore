@@ -1,0 +1,72 @@
+# MacOS
+.DS_Store
+
+# PyCharm
+.idea
+*.iml
+*.iws
+
+# Virtual environment
+.venv/
+venv/
+ENV/
+env/
+
+# Environment variables
+.env
+
+# git files
+.git
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[codz]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# PEP 582; used by e.g. github.com/David-OConnor/pyflow and github.com/pdm-project/pdm
+__pypackages__/
+
+# Claude Code local artifacts (machine-specific)
+.claude/
+
+# Forge local artifacts (machine-specific, may contain sensitive transcript snippets)
+.forge/
+
+# Runtime config files
+config.yaml.runtime.*
+
+# Logs (proxy and general)
+logs/
+src/forge/logs/
+docker/certs/
