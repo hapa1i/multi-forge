@@ -44,6 +44,10 @@ def hook_env(tmp_path: Path) -> dict[str, Path]:
     claude_home = tmp_path / ".claude"
     claude_home.mkdir()
 
+    # _is_repo_checkout() requires both src/forge/ AND an extension dir
+    (tmp_path / "src" / "forge").mkdir(parents=True)
+    (tmp_path / "src" / "skills").mkdir()
+
     return {
         "forge_home": forge_home,
         "claude_home": claude_home,

@@ -107,7 +107,8 @@ class TrackingStore:
         if version != TRACKING_VERSION:
             raise TrackingCorruptedError(
                 str(self._path),
-                f"unsupported version: {version} (expected {TRACKING_VERSION})",
+                f"incompatible version {version} (this Forge expects {TRACKING_VERSION}). "
+                f"Delete this file and run 'forge extension enable' again.",
             )
 
         # Guard: reject manifests from pre-OSS patching builds.

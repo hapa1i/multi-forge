@@ -332,3 +332,42 @@ class TestLiteLLMFromFile:
         with patch.dict(os.environ, {}, clear=True):
             result = await cm.get_credentials("litellm_local")
             assert result["api_key"] == "sk-local-from-file"
+
+
+class TestLiteLLMRemoteBaseUrlResolution:
+    """Regression: _get_litellm_remote_base_url credential-file fallback."""
+
+    def test_config_empty_env_missing_credential_file_resolves(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """base_url resolved from credential file when config and env are empty."""
+        from forge.core.llm.credentials import _get_litellm_remote_base_url
+
+        monkeypatch.delenv("LITELLM_BASE_URL", raising=False)
+        # Lazy import inside function reads forge.config.config — mock it at source
+        mock_cfg = type("C", (), {"proxy": type("P", (), {"litellm": type("L", (), {"base_url": ""})()})()})()
+        with (
+            patch("forge.config.get_config", return_value=mock_cfg),
+            patch("forge.config._config", mock_cfg),
+            patch(
+                "forge.core.auth.template_secrets._get_file_secrets",
+                return_value={"LITELLM_BASE_URL": "https://from-cred-file.example.com"},
+            ),
+        ):
+            result = _get_litellm_remote_base_url()
+        assert result == "https://from-cred-file.example.com"
+
+    def test_all_empty_raises_with_auth_guidance(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Error message mentions forge auth login when nothing is configured."""
+        from forge.core.llm.credentials import _get_litellm_remote_base_url
+
+        monkeypatch.delenv("LITELLM_BASE_URL", raising=False)
+        mock_cfg = type("C", (), {"proxy": type("P", (), {"litellm": type("L", (), {"base_url": ""})()})()})()
+        with (
+            patch("forge.config.get_config", return_value=mock_cfg),
+            patch("forge.config._config", mock_cfg),
+            patch(
+                "forge.core.auth.template_secrets._get_file_secrets",
+                return_value={},
+            ),
+        ):
+            with pytest.raises(ValueError, match="forge auth login"):
+                _get_litellm_remote_base_url()

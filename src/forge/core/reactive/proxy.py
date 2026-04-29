@@ -36,3 +36,43 @@ def lookup_proxy_base_url(proxy: str | None) -> str | None:
     registry = ProxyRegistryStore().read()
     entry = resolve_proxy(registry, proxy)
     return entry.base_url
+
+
+def check_proxy_reachable(
+    proxy: str,
+    timeout_s: float = 1.0,
+) -> tuple[bool, str, str | None]:
+    """Check if a named proxy is locally routable.
+
+    Resolves via registry, then HTTP health-checks the endpoint.
+    "Ready" means the proxy responds at its base_url with valid
+    proxy metadata -- not just that it exists in the registry.
+
+    Returns:
+        (reachable, reason, base_url):
+        - reachable: True if proxy resolves AND health check passes
+        - reason: empty if reachable, human-readable otherwise
+        - base_url: proxy URL if resolved, None otherwise
+    """
+    from forge.proxy.proxies import ProxyRegistryStore, resolve_proxy
+    from forge.proxy.proxy_orchestrator import check_proxy_health
+
+    try:
+        registry = ProxyRegistryStore().read()
+    except Exception as e:
+        return (False, f"Registry error: {e}", None)
+
+    try:
+        entry = resolve_proxy(registry, proxy)
+    except Exception as e:
+        return (False, str(e), None)
+
+    if not check_proxy_health(
+        base_url=entry.base_url,
+        expected_template=entry.template,
+        expected_proxy_id=entry.proxy_id,
+        timeout_s=timeout_s,
+    ):
+        return (False, f"Proxy '{proxy}' not responding at {entry.base_url}", entry.base_url)
+
+    return (True, "", entry.base_url)

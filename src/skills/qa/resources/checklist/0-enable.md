@@ -50,8 +50,7 @@ cd /forge && /forge/scripts/setup.sh --local
 - [ ] `forge` binary available (at `~/.local/bin/forge` for `--local` mode)
 - [ ] Success message displayed
 
-> Note: `setup.sh` installs Forge but does not automatically install Claude extensions. After
-> install, run:
+> Note: `setup.sh` installs Forge but does not automatically install Claude extensions. After install, run:
 >
 > - `forge extension enable --user` (installs commands/agents/skills/hooks)
 

@@ -338,13 +338,13 @@ To avoid writer conflicts:
 
 #### 3.6.1 Definitions (normative)
 
-| Concept            | Definition                                                                                                                    |
-| ------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
-| **Proxy**          | base_url/port/template + tier→model + default hyperparams. Canonical routing identity for a proxy.                            |
-| **Session**        | Forge-project-scoped intent/overrides/artifacts. May reference a proxy, cannot change proxy-owned fields.                     |
-| **Config**         | In-repo defaults + secrets-only user config (env vars and/or `~/.forge/credentials.yaml`). Never affects routing or policies. |
-| **Proxy Template** | Operational profile defining provider/endpoint/tier-mappings. Internal template for proxy creation.                           |
-| **Model Catalog**  | Authoritative internal data for model capabilities (`model_catalog.yaml`). Not user-editable.                                 |
+| Concept            | Definition                                                                                                                                                                                                                                  |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Proxy**          | base_url/port/template + tier→model + default hyperparams. Canonical routing identity for a proxy.                                                                                                                                          |
+| **Session**        | Forge-project-scoped intent/overrides/artifacts. May reference a proxy, cannot change proxy-owned fields.                                                                                                                                   |
+| **Config**         | In-repo defaults + user credentials/connection values (env vars and/or `~/.forge/credentials.yaml`). Connection values (e.g., `LITELLM_BASE_URL`) bootstrap proxy creation; once `proxy.yaml` exists, proxy-owned routing is authoritative. |
+| **Proxy Template** | Operational profile defining provider/endpoint/tier-mappings. Internal template for proxy creation.                                                                                                                                         |
+| **Model Catalog**  | Authoritative internal data for model capabilities (`model_catalog.yaml`). Not user-editable.                                                                                                                                               |
 
 #### 3.6.2 Field ownership invariants (normative)
 
@@ -1586,5 +1586,5 @@ log isolation. Configurable via `~/.forge/config.yaml` (`proxy_mode: host|sideca
 isolation). Sidecar sessions also persist their launch mode, extra mounts, and image in `intent.launch` so
 `forge session resume <name>` can replay the same runtime wiring later.
 
-**Forge still owns:** Docker test infrastructure, runtime config. `src/forge/sidecar/` provides
-sidecar mode — operational, not a security sandbox.
+**Forge still owns:** Docker test infrastructure, runtime config. `src/forge/sidecar/` provides sidecar mode —
+operational, not a security sandbox.

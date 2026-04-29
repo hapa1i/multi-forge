@@ -51,14 +51,14 @@ class TrackingCorruptedError(ForgeInstallError):
     """Raised when tracking file cannot be parsed.
 
     Attributes:
-        path: Path to the corrupted tracking file.
+        path: Path to the problematic tracking file.
         reason: What went wrong during parsing.
     """
 
     def __init__(self, path: str, reason: str) -> None:
         self.path = path
         self.reason = reason
-        super().__init__(f"tracking file at '{path}' is corrupted: {reason}")
+        super().__init__(f"tracking file at '{path}': {reason}")
 
 
 class NotInstalledError(ForgeInstallError):

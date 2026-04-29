@@ -29,9 +29,10 @@ def _get_litellm_remote_base_url() -> str:
     """Get remote LiteLLM base URL.
 
     Resolution order:
-    1. Template config (config.proxy.litellm.base_url)
+    1. Template/proxy config (config.proxy.litellm.base_url)
     2. LITELLM_BASE_URL environment variable
-    3. Error if neither set
+    3. Credential file (~/.forge/credentials.yaml)
+    4. Error if none set
     """
     try:
         from forge.config import config
@@ -48,9 +49,17 @@ def _get_litellm_remote_base_url() -> str:
         logger.debug(f"Using LiteLLM base_url from LITELLM_BASE_URL: {env_url}")
         return env_url
 
+    from forge.core.auth.template_secrets import resolve_env_or_credential
+
+    cred_url = resolve_env_or_credential("LITELLM_BASE_URL")
+    if cred_url:
+        logger.debug("Using LiteLLM base_url from credential file")
+        return cred_url
+
     raise ValueError(
         "LiteLLM remote base_url not configured. "
-        "Set base_url in the template YAML or set the LITELLM_BASE_URL environment variable."
+        "Use 'forge proxy create <template> --base-url <url>' or "
+        "'forge auth login -p litellm-remote' to store it."
     )
 
 

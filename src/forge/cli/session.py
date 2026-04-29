@@ -140,7 +140,10 @@ def _resolve_routing_from_cli(
             expected_proxy_id=entry.proxy_id,
         )
     except ValueError as e:
-        raise click.ClickException(str(e))
+        msg = str(e)
+        if "not running" in msg:
+            msg += f"\nTip: Run 'forge proxy start {entry.proxy_id}' to start it."
+        raise click.ClickException(msg)
 
     return ResolvedRouting(
         template=entry.template,

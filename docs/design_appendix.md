@@ -106,16 +106,18 @@ The model catalog is **authoritative internal data**:
 - Defines: model capabilities, context windows, provider mappings
 - **NOT a user edit surface**
 
-### A.6 Secrets (§3.6.9)
+### A.6 Credentials and Connection Values (§3.6.9)
 
-Secrets resolve from environment variables first (`.env`, shell exports), then fall back to the Forge credential store
-(`~/.forge/credentials.yaml`, managed by `forge authentication`). Env vars always override stored credentials.
+Credentials resolve from environment variables first (`.env`, shell exports), then fall back to the Forge credential
+store (`~/.forge/credentials.yaml`, managed by `forge authentication`). Env vars always override stored credentials.
 
 - `LITELLM_API_KEY` -- Remote/shared LiteLLM API key
-- `LITELLM_BASE_URL` -- Remote LiteLLM base URL (if not set in template)
+- `LITELLM_BASE_URL` -- Remote LiteLLM base URL (convenience fallback for proxy bootstrapping)
 - `GEMINI_API_KEY` -- Personal Gemini API key (for local LiteLLM)
 
-**Rule:** Do NOT put routing configuration in secret storage. Secrets only.
+**Rule:** Credential storage holds secrets and connection values (e.g., `LITELLM_BASE_URL`). Connection values are a
+convenience fallback for bootstrapping proxy creation (`forge proxy create`). Once `proxy.yaml` exists, proxy-owned
+routing is authoritative. Do NOT store other routing configuration in credential storage.
 
 ### A.7 Runtime config (§3.6.10 -- `~/.forge/config.yaml`)
 
@@ -648,8 +650,8 @@ than cross-format deduplication. If overlap becomes painful, a small prompt twea
 
 ## H. (Removed)
 
-CLI patching was removed for the OSS release. Forge now uses the native `CLAUDE_CODE_AUTO_COMPACT_WINDOW` env var
-to control compaction timing in proxy mode.
+CLI patching was removed for the OSS release. Forge now uses the native `CLAUDE_CODE_AUTO_COMPACT_WINDOW` env var to
+control compaction timing in proxy mode.
 
 ---
 

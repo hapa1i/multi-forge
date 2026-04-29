@@ -34,10 +34,11 @@ def mock_claude_workspace(
     """
     # Create symlink for forge, mock claude script, and clean global state
     result = clean_workspace.exec("""
-        # Remote templates need LITELLM_BASE_URL (no longer hardcoded).
-        # Write to /forge/.env (WORKDIR) so load_dotenv() picks it up,
-        # AND export for subprocesses in this shell session.
+        # Remote templates need LITELLM_BASE_URL; direct Anthropic workers
+        # need ANTHROPIC_API_KEY for preflight validation.
+        # Write to /forge/.env (WORKDIR) so load_dotenv() picks it up.
         echo 'LITELLM_BASE_URL=https://litellm.test.example.com' >> /forge/.env
+        echo 'ANTHROPIC_API_KEY=sk-ant-test-mock-key' >> /forge/.env
 
         # Clean global forge state (session index, pending-work, etc.)
         rm -rf ~/.forge ~/.claude

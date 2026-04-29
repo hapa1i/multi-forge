@@ -113,7 +113,7 @@ class IndexStore:
         if version != INDEX_VERSION:
             raise IndexCorruptedError(
                 str(self._index_path),
-                f"unsupported version: {version} (expected {INDEX_VERSION})",
+                f"incompatible version {version} (this Forge expects {INDEX_VERSION}). " f"Delete this file and retry.",
             )
         self._validate_key_shape(data)
 

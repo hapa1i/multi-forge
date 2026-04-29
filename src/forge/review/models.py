@@ -130,6 +130,67 @@ def resolve_model_specs(names_str: str | None) -> list[ModelSpec]:
     return [DEFAULT_MODELS[m] for m in names]
 
 
+@dataclass(frozen=True)
+class ModelAvailability:
+    """Availability status for a model backend."""
+
+    spec: ModelSpec
+    status: str  # "ready" | "unavailable" | "error"
+    reason: str  # empty when ready
+
+
+def check_model_availability(
+    specs: list[ModelSpec] | None = None,
+    timeout_s: float = 1.0,
+) -> list[ModelAvailability]:
+    """Check proxy/credential availability for each model.
+
+    Deduplicates proxy health checks internally. Does not fail on
+    unavailable models -- returns status for each.
+    """
+    from forge.core.auth.template_secrets import resolve_env_or_credential
+    from forge.core.reactive.proxy import check_proxy_reachable
+
+    if specs is None:
+        specs = list(DEFAULT_MODELS.values())
+
+    proxy_cache: dict[str, tuple[str, str, str | None]] = {}
+    results: list[ModelAvailability] = []
+
+    for spec in specs:
+        if spec.proxy is None:
+            if resolve_env_or_credential("ANTHROPIC_API_KEY"):
+                results.append(ModelAvailability(spec=spec, status="ready", reason=""))
+            else:
+                results.append(
+                    ModelAvailability(
+                        spec=spec,
+                        status="unavailable",
+                        reason="ANTHROPIC_API_KEY not configured",
+                    )
+                )
+            continue
+
+        if spec.proxy in proxy_cache:
+            status, reason, _url = proxy_cache[spec.proxy]
+            results.append(ModelAvailability(spec=spec, status=status, reason=reason))
+            continue
+
+        try:
+            reachable, reason, _url = check_proxy_reachable(spec.proxy, timeout_s)
+            if reachable:
+                status, reason = "ready", ""
+            else:
+                status = "unavailable"
+        except Exception as e:
+            status, reason, _url = "error", str(e), None
+
+        proxy_cache[spec.proxy] = (status, reason, _url)
+        results.append(ModelAvailability(spec=spec, status=status, reason=reason))
+
+    return results
+
+
 NAMED_ROLES: dict[str, str] = {
     "security": ("Focus on security vulnerabilities, injection risks, " "auth bypasses, and data exposure."),
     "performance": ("Focus on performance bottlenecks, memory usage, " "algorithmic complexity, and I/O patterns."),

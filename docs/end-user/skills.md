@@ -127,7 +127,8 @@ consensus findings, unique insights, and conflicts.
 | `gemini-2.5-pro` | Balanced analysis, large context     | litellm-gemini       |
 | `claude-opus`    | Deep architecture, complex reasoning | Direct Anthropic     |
 
-**Requirements:** GPT-5.5 and Gemini require active proxies. Use `forge workflow list-models` to check availability.
+**Requirements:** GPT-5.5 and Gemini require active proxies; Claude Opus requires `ANTHROPIC_API_KEY`. See
+[auth.md](auth.md#which-auth-do-i-need) for setup.
 
 ---
 
@@ -157,7 +158,8 @@ key disagreements, and an evidence-weighted recommendation.
 | `gemini-2.5-pro` | AGAINST | Critic -- risks          | litellm-gemini       |
 | `claude-opus`    | NEUTRAL | Analyst -- balanced view | Direct Anthropic     |
 
-**Requirements:** GPT-5.5 and Gemini require active proxies. Use `forge workflow list-models` to check availability.
+**Requirements:** GPT-5.5 and Gemini require active proxies; Claude Opus requires `ANTHROPIC_API_KEY`. See
+[auth.md](auth.md#which-auth-do-i-need) for setup.
 
 ---
 

@@ -2240,3 +2240,27 @@ class TestProxyTemplate:
         """--template flag was removed from proxy show."""
         result = runner.invoke(main, ["proxy", "show", "foo", "--template"])
         assert result.exit_code != 0
+
+
+class TestProxyCreateMissingUrl:
+    """Regression: missing LITELLM_BASE_URL should give actionable error, not traceback."""
+
+    @pytest.fixture(autouse=True)
+    def _no_base_url(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("LITELLM_BASE_URL", raising=False)
+        monkeypatch.delenv("LITELLM_LOCAL_BASE_URL", raising=False)
+        # Also block credential-file fallback so the URL is truly missing
+        monkeypatch.setattr(
+            "forge.proxy.proxy_orchestrator.resolve_env_or_credential",
+            lambda key: None,
+        )
+
+    def test_no_traceback_on_missing_base_url(self, runner: CliRunner, temp_env: Path) -> None:
+        result = runner.invoke(main, ["proxy", "create", "litellm-openai", "--no-start"])
+        assert result.exit_code != 0
+        assert "Traceback" not in result.output
+        assert "upstream URL" in result.output
+
+    def test_error_suggests_auth_login(self, runner: CliRunner, temp_env: Path) -> None:
+        result = runner.invoke(main, ["proxy", "create", "litellm-openai", "--no-start"])
+        assert "forge auth login" in result.output

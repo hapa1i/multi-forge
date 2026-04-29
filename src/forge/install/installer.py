@@ -10,6 +10,7 @@ import logging
 import shutil
 import subprocess
 from copy import deepcopy
+from importlib.resources import files
 from pathlib import Path
 from typing import Any
 
@@ -63,27 +64,57 @@ from .tracking import TrackingStore, compute_checksum
 logger = logging.getLogger(__name__)
 
 
+_EXTENSION_MODULE_NAMES = ("skills", "agents", "commands")
+
+
 def get_forge_source_root() -> Path:
-    """Get the forge repo source root.
+    """Get the forge repo source root (for git-tracked file filtering).
 
-    This assumes running from a repo checkout. Future work may use
-    importlib.resources for pip-installed packages.
-
-    Returns:
-        Path to the repo root (parent of src/).
+    Returns the repo root when running from a checkout; returns a
+    best-effort path otherwise (git operations will gracefully fail).
     """
-    # Navigate from this file to repo root:
-    # src/forge/install/installer.py -> ../../../..
     return Path(__file__).parent.parent.parent.parent
 
 
-def get_extensions_root() -> Path:
-    """Get the extensions source directory (src/).
+def _is_repo_checkout(forge_source: Path) -> bool:
+    """Return True if forge_source looks like the Forge dev repo.
 
-    Returns:
-        Path to src/ directory containing extension modules.
+    Requires both the Python package (src/forge/) AND at least one extension
+    directory to be present. The two-signal check rules out false positives
+    like a user project that happens to have src/skills/ but isn't a Forge
+    checkout.
     """
-    return get_forge_source_root() / "src"
+    src = forge_source / "src"
+    if not (src / "forge").is_dir():
+        return False
+    return any((src / name).is_dir() for name in _EXTENSION_MODULE_NAMES)
+
+
+def _get_bundled_extensions_path() -> Path:
+    """Return the path to bundled extensions inside the installed package.
+
+    Uses importlib.resources to locate package data — robust against
+    zip imports and namespace package layouts. Extracted as a separate
+    function so tests can mock it cleanly.
+    """
+    return Path(str(files("forge") / "_extensions"))
+
+
+def get_extensions_root() -> Path:
+    """Get the directory containing extension modules (skills, agents, commands).
+
+    Tries repo checkout first (editable/dev install), then falls back
+    to bundled extensions inside the wheel (forge/_extensions/).
+    """
+    forge_source = get_forge_source_root()
+    if _is_repo_checkout(forge_source):
+        return forge_source / "src"
+
+    bundled = _get_bundled_extensions_path()
+    if bundled.is_dir():
+        return bundled
+
+    raise FileNotFoundError("Extension source files not found. Reinstall Forge or run from a repo checkout.")
 
 
 _EXCLUDED_DIR_NAMES = {"__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache"}
@@ -413,8 +444,12 @@ class Installer:
         target_root = get_target_root(self._scope, self._project_root)
         existing = self._tracking.get_installation(self._scope.value, self._project_path_str)
 
-        # Only install git-tracked files (avoids __pycache__, .pyc, editor temps, etc.)
-        git_tracked = _get_git_tracked_files(get_forge_source_root())
+        # Only filter by git when extensions come from a repo checkout. When
+        # running from a wheel install, source_root is forge/_extensions/ inside
+        # site-packages — typically gitignored, so a git-tracked filter would
+        # exclude every file. _is_installable() handles the wheel-install case.
+        forge_source = get_forge_source_root()
+        git_tracked = _get_git_tracked_files(forge_source) if _is_repo_checkout(forge_source) else None
 
         # Precompute installed skill names from manifest (skill-level, not file-level)
         # so that update keeps the entire skill coherent when new files are added

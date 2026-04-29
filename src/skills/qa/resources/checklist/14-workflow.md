@@ -16,9 +16,16 @@ Validates workflow runners + skill architecture.
 
 ```bash
 forge workflow list-models
+forge workflow list-models --json
+forge workflow list-models --available
 ```
 
 - [ ] Shows configured models with proxy and description
+- [ ] Shows status column (ready/unavailable/error)
+- [ ] `--json` outputs structured JSON array with status field
+- [ ] `--available` filters to ready models only
+- [ ] `--available` with no ready models shows explanatory message (table), `[]` (JSON)
+- [ ] Proxy in registry but not running shows "unavailable" (not "ready")
 
 ### 14.2 `forge workflow panel`
 

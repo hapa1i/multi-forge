@@ -42,6 +42,8 @@ def symlink_env(tmp_path: Path) -> dict[str, Path]:
     src = tmp_path / "src"
     commands = src / "commands"
     commands.mkdir(parents=True)
+    (src / "skills").mkdir()
+    (src / "forge").mkdir()
 
     return {
         "forge_home": forge_home,

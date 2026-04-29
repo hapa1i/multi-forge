@@ -40,6 +40,11 @@ Unless you pass `-m`, the multi-model workflows use this built-in worker set:
 - `gemini-2.5-pro` -> proxy id `litellm-gemini`
 - `claude-opus` -> direct Anthropic
 
+Check which models are locally routable with `forge workflow list-models`. Models whose proxy isn't running or whose
+direct Anthropic API key isn't configured show as **unavailable**. This checks local proxy reachability, not upstream
+provider auth -- use `forge proxy create <template> --smoke-test` to verify end-to-end connectivity. Use `--available`
+to see only ready models, or `--json` for structured output.
+
 ---
 
 ## Workflows
@@ -202,15 +207,23 @@ your decision rather than the executor freelancing.
 ### "No active proxy found" or a worker fails immediately
 
 The built-in `gpt-5.5` and `gemini-2.5-pro` workers expect active proxies with ids `litellm-openai` and
-`litellm-gemini`. Create or start them first:
+`litellm-gemini`. Check availability and create missing proxies:
 
 ```bash
+# See which models are ready vs unavailable
+forge workflow list-models
+
+# Create missing proxies
 forge proxy create litellm-openai
 forge proxy create litellm-gemini
+
+# Filter to only ready models (useful for scripting)
+forge workflow list-models --available
+forge workflow list-models --available --json
 ```
 
-Use `forge workflow list-models` to inspect the available worker names. Unknown names such as `gemini-pro` are rejected
-before execution.
+Unknown model names such as `gemini-pro` are rejected before execution. Models with unavailable proxies are flagged by
+the preflight check with an actionable suggestion.
 
 ### "--check failed but output looks fine"
 

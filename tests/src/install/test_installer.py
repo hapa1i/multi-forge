@@ -19,6 +19,7 @@ from forge.install.installer import (
     Installer,
     find_claude_root,
     find_forge_installation,
+    get_extensions_root,
     get_forge_source_root,
     get_target_root,
     resolve_modules,
@@ -129,6 +130,84 @@ class TestGetForgeSourceRoot:
         assert (root / "src").is_dir() or not root.exists()
 
 
+class TestIsRepoCheckout:
+    """Tests for the strengthened repo-detection heuristic."""
+
+    def test_repo_with_skills(self, tmp_path: Path) -> None:
+        from forge.install.installer import _is_repo_checkout
+
+        (tmp_path / "src" / "forge").mkdir(parents=True)
+        (tmp_path / "src" / "skills").mkdir()
+        assert _is_repo_checkout(tmp_path) is True
+
+    def test_repo_with_agents(self, tmp_path: Path) -> None:
+        from forge.install.installer import _is_repo_checkout
+
+        (tmp_path / "src" / "forge").mkdir(parents=True)
+        (tmp_path / "src" / "agents").mkdir()
+        assert _is_repo_checkout(tmp_path) is True
+
+    def test_rejects_user_project_with_only_skills(self, tmp_path: Path) -> None:
+        """A user project with src/skills but no src/forge is NOT a Forge checkout."""
+        from forge.install.installer import _is_repo_checkout
+
+        (tmp_path / "src" / "skills").mkdir(parents=True)
+        assert _is_repo_checkout(tmp_path) is False
+
+    def test_rejects_forge_only_no_extensions(self, tmp_path: Path) -> None:
+        """src/forge without any extension dir doesn't count (incomplete checkout)."""
+        from forge.install.installer import _is_repo_checkout
+
+        (tmp_path / "src" / "forge").mkdir(parents=True)
+        assert _is_repo_checkout(tmp_path) is False
+
+    def test_rejects_empty_dir(self, tmp_path: Path) -> None:
+        from forge.install.installer import _is_repo_checkout
+
+        assert _is_repo_checkout(tmp_path) is False
+
+
+class TestGetExtensionsRoot:
+    """Tests for get_extensions_root with repo vs bundled fallback."""
+
+    def test_prefers_repo_checkout(self) -> None:
+        root = get_extensions_root()
+        assert (root / "skills").is_dir()
+
+    def test_falls_back_to_bundled(self, tmp_path: Path) -> None:
+        """When repo src/skills doesn't exist, return the bundled location."""
+        bundled = tmp_path / "_extensions"
+        (bundled / "skills").mkdir(parents=True)
+        (bundled / "agents").mkdir()
+        (bundled / "commands").mkdir()
+
+        with patch(
+            "forge.install.installer.get_forge_source_root",
+            return_value=tmp_path / "no-repo",
+        ):
+            with patch(
+                "forge.install.installer._get_bundled_extensions_path",
+                return_value=bundled,
+            ):
+                result = get_extensions_root()
+
+        assert result == bundled
+        assert (result / "skills").is_dir()
+
+    def test_raises_when_neither_exists(self, tmp_path: Path) -> None:
+        """Both repo and bundled missing → clear error."""
+        with patch(
+            "forge.install.installer.get_forge_source_root",
+            return_value=tmp_path / "no-repo",
+        ):
+            with patch(
+                "forge.install.installer._get_bundled_extensions_path",
+                return_value=tmp_path / "no-bundled",
+            ):
+                with pytest.raises(FileNotFoundError, match="Extension source files not found"):
+                    get_extensions_root()
+
+
 class TestInstallerPlan:
     """Tests for Installer.plan method."""
 
@@ -188,6 +267,8 @@ class TestInstallerInit:
         commands = src / "commands"
         commands.mkdir()
         (commands / "test.md").write_text("# Test Command\n")
+        (src / "skills").mkdir()
+        (src / "forge").mkdir()  # _is_repo_checkout requires src/forge + extension dir
 
         tracking = TrackingStore(tracking_path=forge_home / "installed.json")
 
@@ -349,6 +430,8 @@ class TestInstallerSymlinkMode:
         commands = src / "commands"
         commands.mkdir()
         (commands / "test.md").write_text("# Test\n")
+        (src / "skills").mkdir()
+        (src / "forge").mkdir()  # _is_repo_checkout requires src/forge + extension dir
 
         tracking = TrackingStore(tracking_path=forge_home / "installed.json")
         installer = Installer(

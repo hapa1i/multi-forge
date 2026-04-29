@@ -45,6 +45,7 @@ def skill_installer(tmp_path: Path) -> tuple[Installer, Path, Path, Path]:
     claude_home.mkdir()
 
     src = tmp_path / "src"
+    (src / "forge").mkdir(parents=True)  # _is_repo_checkout requires src/forge
 
     # Commands (needed for profile resolution)
     commands = src / "commands"

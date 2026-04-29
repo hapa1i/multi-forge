@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -196,3 +197,136 @@ class TestEnableFailureCleanup:
 
         assert result.exit_code != 0
         assert not (repo / ".forge").is_dir()
+
+
+class TestEmptyModuleWarning:
+    """Tests for the 0-file sanity warning (catches broken installs)."""
+
+    def _make_plan(self, modules: list[str], file_paths: list[str]) -> Any:
+        from unittest.mock import MagicMock
+
+        plan = MagicMock()
+        plan.modules = modules
+        plan.files = [MagicMock(target_path=p, action="install") for p in file_paths]
+        plan.settings = []
+        return plan
+
+    def test_warns_when_file_module_has_no_files_anywhere(self, tmp_path: Path) -> None:
+        from unittest.mock import MagicMock
+
+        from forge.cli.extensions import _warn_if_modules_have_no_files
+        from forge.install.tracking import TrackingStore
+
+        plan = self._make_plan(modules=["skills", "hooks"], file_paths=[])
+        tracking = MagicMock(spec=TrackingStore)
+        tracking.get_installation.return_value = None  # no prior install
+
+        from io import StringIO
+
+        from rich.console import Console
+
+        buf = StringIO()
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr("forge.cli.extensions.console", Console(file=buf, width=200))
+            _warn_if_modules_have_no_files(plan, InstallScope.USER, None, tracking)
+
+        output = buf.getvalue()
+        assert "Warning" in output
+        assert "skills" in output
+
+    def test_no_warn_when_files_in_plan(self, tmp_path: Path) -> None:
+        from unittest.mock import MagicMock
+
+        from forge.cli.extensions import _warn_if_modules_have_no_files
+        from forge.install.tracking import TrackingStore
+
+        plan = self._make_plan(
+            modules=["skills"],
+            file_paths=["/some/path/.claude/skills/foo/SKILL.md"],
+        )
+        tracking = MagicMock(spec=TrackingStore)
+        tracking.get_installation.return_value = None
+
+        from io import StringIO
+
+        from rich.console import Console
+
+        buf = StringIO()
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr("forge.cli.extensions.console", Console(file=buf, width=200))
+            _warn_if_modules_have_no_files(plan, InstallScope.USER, None, tracking)
+
+        assert "Warning" not in buf.getvalue()
+
+    def test_no_warn_when_files_in_existing_install(self, tmp_path: Path) -> None:
+        """Up-to-date install: 0 plan files but tracking has files → no warning."""
+        from unittest.mock import MagicMock
+
+        from forge.cli.extensions import _warn_if_modules_have_no_files
+        from forge.install.tracking import TrackingStore
+
+        plan = self._make_plan(modules=["skills"], file_paths=[])
+        tracking = MagicMock(spec=TrackingStore)
+        existing = MagicMock()
+        existing.files = [MagicMock(target_path="/some/path/.claude/skills/foo/SKILL.md")]
+        tracking.get_installation.return_value = existing
+
+        from io import StringIO
+
+        from rich.console import Console
+
+        buf = StringIO()
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr("forge.cli.extensions.console", Console(file=buf, width=200))
+            _warn_if_modules_have_no_files(plan, InstallScope.USER, None, tracking)
+
+        assert "Warning" not in buf.getvalue()
+
+    def test_no_warn_for_intentionally_empty_modules(self, tmp_path: Path) -> None:
+        """Allowlisted empty modules (agents, commands) should not warn."""
+        from unittest.mock import MagicMock
+
+        from forge.cli.extensions import _warn_if_modules_have_no_files
+        from forge.install.tracking import TrackingStore
+
+        plan = self._make_plan(modules=["agents", "commands", "skills"], file_paths=[])
+        tracking = MagicMock(spec=TrackingStore)
+        tracking.get_installation.return_value = None
+
+        from io import StringIO
+
+        from rich.console import Console
+
+        buf = StringIO()
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr("forge.cli.extensions.console", Console(file=buf, width=200))
+            _warn_if_modules_have_no_files(plan, InstallScope.USER, None, tracking)
+
+        output = buf.getvalue()
+        # Should warn about skills (not allowlisted, 0 files), not agents/commands
+        assert "Warning" in output
+        assert "skills" in output
+        assert "agents" not in output
+        assert "commands" not in output
+
+    def test_no_warn_for_settings_only_modules(self, tmp_path: Path) -> None:
+        """Settings-only modules (hooks, permissions) should never trigger the warning."""
+        from unittest.mock import MagicMock
+
+        from forge.cli.extensions import _warn_if_modules_have_no_files
+        from forge.install.tracking import TrackingStore
+
+        plan = self._make_plan(modules=["hooks", "permissions", "status-line"], file_paths=[])
+        tracking = MagicMock(spec=TrackingStore)
+        tracking.get_installation.return_value = None
+
+        from io import StringIO
+
+        from rich.console import Console
+
+        buf = StringIO()
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr("forge.cli.extensions.console", Console(file=buf, width=200))
+            _warn_if_modules_have_no_files(plan, InstallScope.USER, None, tracking)
+
+        assert "Warning" not in buf.getvalue()

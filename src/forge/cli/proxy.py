@@ -399,7 +399,8 @@ def create_cmd(
             sys.exit(1)
         except ProxyStartError as e:
             console.print(f"[red]Failed to start server:[/red] {e}")
-            if "dependency backend" not in str(e):
+            err_str = str(e)
+            if "dependency backend" not in err_str and "upstream URL" not in err_str:
                 console.print("\n[dim]Tip: Use --no-start to create the config without starting the server:[/dim]")
                 console.print(f"  forge proxy create {template} --name {proxy_name} --no-start")
             sys.exit(1)
@@ -1463,14 +1464,14 @@ def metrics_cmd(proxy_id: str | None, json_output: bool, show_all: bool) -> None
     try:
         store = ProxyRegistryStore()
     except ProxyRegistryCorruptedError as e:
-        console.print(f"[red]Error:[/red] Proxy registry corrupted: {e}")
+        console.print(f"[red]Error:[/red] Proxy registry error: {e}")
         sys.exit(1)
 
     if show_all:
         try:
             proxies = store.list_proxies()
         except ProxyRegistryCorruptedError as e:
-            console.print(f"[red]Error:[/red] Proxy registry corrupted: {e}")
+            console.print(f"[red]Error:[/red] Proxy registry error: {e}")
             sys.exit(1)
         if not proxies:
             console.print("[dim]No proxies registered.[/dim]")
@@ -1505,7 +1506,7 @@ def metrics_cmd(proxy_id: str | None, json_output: bool, show_all: bool) -> None
         try:
             proxies = store.list_proxies()
         except ProxyRegistryCorruptedError as e:
-            console.print(f"[red]Error:[/red] Proxy registry corrupted: {e}")
+            console.print(f"[red]Error:[/red] Proxy registry error: {e}")
             sys.exit(1)
         if len(proxies) == 1:
             proxy_id = proxies[0].proxy_id
@@ -1519,7 +1520,7 @@ def metrics_cmd(proxy_id: str | None, json_output: bool, show_all: bool) -> None
     try:
         registry = store.read()
     except ProxyRegistryCorruptedError as e:
-        console.print(f"[red]Error:[/red] Proxy registry corrupted: {e}")
+        console.print(f"[red]Error:[/red] Proxy registry error: {e}")
         sys.exit(1)
     maybe_entry = registry.proxies.get(proxy_id)
     if maybe_entry is None:

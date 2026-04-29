@@ -48,16 +48,16 @@ Notes:
 
 Available settings:
 
-| Key                              | Default                | Description                                                      |
-| -------------------------------- | ---------------------- | ---------------------------------------------------------------- |
-| `proxy_mode`                     | `host`                 | `host` (proxy on host) or `sidecar` (bundled in Docker)          |
-| `sidecar_image`                  | `forge-sidecar:latest` | Docker image for sidecar mode                                    |
-| `user_agent_claude_code_version` | *(empty)*              | Version in User-Agent header sent to upstream LLM providers      |
+| Key                              | Default                | Description                                                                               |
+| -------------------------------- | ---------------------- | ----------------------------------------------------------------------------------------- |
+| `proxy_mode`                     | `host`                 | `host` (proxy on host) or `sidecar` (bundled in Docker)                                   |
+| `sidecar_image`                  | `forge-sidecar:latest` | Docker image for sidecar mode                                                             |
+| `user_agent_claude_code_version` | *(empty)*              | Version in User-Agent header sent to upstream LLM providers                               |
 | `context_limit`                  | `200000`               | Fallback auto-compact window for proxy mode (passed as `CLAUDE_CODE_AUTO_COMPACT_WINDOW`) |
-| `status_timeout`                 | `2.0`                  | Status line proxy/git call timeout (seconds)                     |
-| `handoff_timeout`                | `300`                  | Handoff agent timeout (seconds)                                  |
-| `log_level`                      | `off`                  | File logging level (`off`, `debug`, `info`, `warning`)           |
-| `policy_summary_feedback`        | `on`                   | Post-evaluation summary lines and additionalContext (`on`/`off`) |
+| `status_timeout`                 | `2.0`                  | Status line proxy/git call timeout (seconds)                                              |
+| `handoff_timeout`                | `300`                  | Handoff agent timeout (seconds)                                                           |
+| `log_level`                      | `off`                  | File logging level (`off`, `debug`, `info`, `warning`)                                    |
+| `policy_summary_feedback`        | `on`                   | Post-evaluation summary lines and additionalContext (`on`/`off`)                          |
 
 Environment overrides:
 
@@ -129,7 +129,8 @@ forge authentication status
 
 See [auth.md](auth.md) for profiles, migration from `.env`, and full CLI reference.
 
-**Rule:** Do NOT put routing configuration in credential storage. Secrets only.
+**Rule:** Credential storage holds secrets and connection values (e.g., `LITELLM_BASE_URL`). Connection values are a
+convenience fallback for bootstrapping proxy creation. Once `proxy.yaml` exists, proxy-owned routing is authoritative.
 
 ---
 

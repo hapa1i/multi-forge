@@ -52,14 +52,30 @@ ANTHROPIC_API_KEY=sk-ant-temp forge session start test
 
 `forge authentication login` knows which keys each provider needs:
 
-| Provider         | Required keys       | Optional keys                                               | Description                                  |
-| ---------------- | ------------------- | ----------------------------------------------------------- | -------------------------------------------- |
-| `litellm-remote` | `LITELLM_API_KEY`   |                                                             | Remote/shared LiteLLM gateway                |
-| `litellm-local`  |                     | `GEMINI_API_KEY`, `OPENAI_API_KEY`, `LITELLM_LOCAL_API_KEY` | Local LiteLLM (store keys for your template) |
-| `anthropic`      | `ANTHROPIC_API_KEY` |                                                             | Direct Anthropic API                         |
+| Provider         | Required keys                         | Optional keys                                               | Description                                  |
+| ---------------- | ------------------------------------- | ----------------------------------------------------------- | -------------------------------------------- |
+| `litellm-remote` | `LITELLM_API_KEY`, `LITELLM_BASE_URL` |                                                             | Remote/shared LiteLLM gateway                |
+| `litellm-local`  |                                       | `GEMINI_API_KEY`, `OPENAI_API_KEY`, `LITELLM_LOCAL_API_KEY` | Local LiteLLM (store keys for your template) |
+| `anthropic`      | `ANTHROPIC_API_KEY`                   |                                                             | Direct Anthropic API                         |
 
-> **Note:** `ANTHROPIC_API_KEY` is required for subprocess features (supervisor, ensemble, handoff agent, analyze).
-> These run headless `claude -p` workers that authenticate via API key regardless of how the main session authenticates.
+### Subprocess authentication
+
+Multi-model workflows (`forge workflow panel`, `debate`, `analyze`, `consensus`) spawn headless `claude -p` workers.
+These workers authenticate via `ANTHROPIC_API_KEY` regardless of how the main session authenticates (subscription auth
+is interactive-only). Forge resolves `ANTHROPIC_API_KEY` from env or `~/.forge/credentials.yaml` automatically.
+
+If you see authentication errors in workflow output, run `forge auth login -p anthropic` to store the key.
+
+### Which auth do I need?
+
+| Flow                                         | Needs                                                            |
+| -------------------------------------------- | ---------------------------------------------------------------- |
+| `forge session start` (direct)               | Claude Code login/subscription is enough                         |
+| `forge workflow analyze` (default)           | `ANTHROPIC_API_KEY`                                              |
+| `forge workflow panel` (default)             | `ANTHROPIC_API_KEY` + active `litellm-openai` + `litellm-gemini` |
+| Remote LiteLLM proxy (`litellm-openai`)      | `LITELLM_API_KEY` + `LITELLM_BASE_URL`                           |
+| Local LiteLLM proxy (`litellm-openai-local`) | `OPENAI_API_KEY`                                                 |
+| Local LiteLLM proxy (`litellm-gemini-local`) | `GEMINI_API_KEY`                                                 |
 
 ---
 

@@ -14,6 +14,7 @@ import json
 
 import pytest
 
+from forge.session.identity import make_scoped_key
 from forge.session.models import SCHEMA_VERSION
 
 pytestmark = pytest.mark.regression
@@ -30,14 +31,22 @@ def forge_env(tmp_path, monkeypatch):
     worktree.mkdir()
     monkeypatch.chdir(worktree)
 
-    # Create index with the session registered
+    # Create index with the session registered (scoped key format)
+    scoped_key = make_scoped_key("stale-session", str(worktree))
     index = {
         "version": 1,
         "sessions": {
-            "stale-session": {
+            scoped_key: {
                 "worktree_path": str(worktree),
                 "project_root": str(worktree),
                 "last_accessed_at": "2026-01-01T00:00:00Z",
+                "is_fork": False,
+                "is_incognito": False,
+                "parent_session": None,
+                "claude_session_id": None,
+                "forge_root": str(worktree),
+                "checkout_root": str(worktree),
+                "relative_path": ".",
             }
         },
     }
@@ -72,7 +81,7 @@ def test_delete_without_force_fails_on_schema_mismatch(forge_env):
     result = runner.invoke(delete, ["stale-session"], input="y\n")
 
     assert result.exit_code != 0
-    assert "unsupported schema version" in result.output.lower() or result.exception
+    assert "incompatible schema version" in result.output.lower() or result.exception
 
 
 def test_delete_with_force_succeeds_on_schema_mismatch(forge_env):

@@ -60,7 +60,7 @@ def list_proxies(*, ctx: ExecutionContext) -> ListProxiesResult:
         ListProxiesResult with proxy entries and configs.
 
     Raises:
-        ForgeOpError: if the proxy registry is corrupted.
+        ForgeOpError: if the proxy registry cannot be read.
     """
     _log.debug("list_proxies: cwd=%s", ctx.cwd)
 
@@ -69,7 +69,7 @@ def list_proxies(*, ctx: ExecutionContext) -> ListProxiesResult:
     try:
         registry = store.read()
     except ProxyRegistryCorruptedError as e:
-        raise ForgeOpError(f"Proxy registry corrupted: {e}") from e
+        raise ForgeOpError(f"Proxy registry error: {e}") from e
 
     items: list[ListProxiesItem] = []
     for proxy_id, entry in registry.proxies.items():
@@ -113,7 +113,7 @@ def show_proxy(*, ctx: ExecutionContext, proxy_id: str) -> ShowProxyResult:
         registry = store.read()
         entry = registry.proxies.get(proxy_id)
     except ProxyRegistryCorruptedError:
-        _log.debug("Registry corrupted, proceeding without registry info")
+        _log.debug("Registry unreadable, proceeding without registry info")
 
     # Load config
     config: ProxyInstanceConfig | None = None

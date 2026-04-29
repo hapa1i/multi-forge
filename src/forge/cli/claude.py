@@ -75,6 +75,8 @@ def _healthcheck_proxy(*, base_url: str, expected_template: str, expected_proxy_
 
     try:
         response = httpx.get(url, timeout=2.0)
+    except httpx.ConnectError:
+        raise ValueError(f"proxy is not running (connection refused at {url})")
     except httpx.RequestError as e:
         raise ValueError(f"proxy healthcheck failed at {url}: {e}")
 
@@ -220,6 +222,8 @@ def start_cmd(
             )
         except ValueError as e:
             click.echo(f"Error: {e}")
+            if "not running" in str(e):
+                click.echo(f"Tip: Run 'forge proxy start {entry.proxy_id}' to start it.")
             sys.exit(1)
 
         template = entry.template

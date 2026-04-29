@@ -5,10 +5,22 @@ from __future__ import annotations
 import json
 from unittest.mock import patch
 
+import pytest
 from click.testing import CliRunner
 
 from forge.cli.main import main
-from forge.review.models import MultiReviewOutput, ReviewResult
+from forge.review.models import (
+    ModelAvailability,
+    ModelSpec,
+    MultiReviewOutput,
+    ReviewResult,
+)
+
+
+@pytest.fixture(autouse=True)
+def _skip_preflight(monkeypatch):
+    """Bypass preflight in CLI workflow tests (engine is mocked anyway)."""
+    monkeypatch.setattr("forge.cli.workflow._run_preflight", lambda *a, **kw: None)
 
 
 def _mock_output(
@@ -42,17 +54,116 @@ class TestRunHelp:
         assert result.exit_code != 0
 
 
-class TestListModels:
-    def test_list_models_exits_zero(self):
-        from forge.core.models.catalog import get_compact_name, get_default_model
+def _avail_ready(name: str = "test", proxy: str | None = "p") -> ModelAvailability:
+    spec = ModelSpec(name=name, proxy=proxy, model_flag=None, description="Test model")
+    return ModelAvailability(spec=spec, status="ready", reason="")
 
+
+def _avail_unavailable(name: str = "test", proxy: str | None = "p", reason: str = "not found") -> ModelAvailability:
+    spec = ModelSpec(name=name, proxy=proxy, model_flag=None, description="Test model")
+    return ModelAvailability(spec=spec, status="unavailable", reason=reason)
+
+
+class TestListModels:
+    @patch("forge.review.models.check_model_availability")
+    def test_list_models_exits_zero(self, mock_avail):
+        mock_avail.return_value = [_avail_ready("model-a"), _avail_ready("model-b")]
         runner = CliRunner()
         result = runner.invoke(main, ["workflow", "list-models"])
         assert result.exit_code == 0
+        assert "model-a" in result.output
 
-        openai_name = get_compact_name(get_default_model("openai", "opus"))
-        assert openai_name in result.output
-        assert "claude-opus" in result.output
+    @patch("forge.review.models.check_model_availability")
+    def test_table_shows_status_column(self, mock_avail):
+        mock_avail.return_value = [_avail_ready("model-a")]
+        runner = CliRunner()
+        result = runner.invoke(main, ["workflow", "list-models"])
+        assert result.exit_code == 0
+        assert "Status" in result.output
+        assert "ready" in result.output
+
+    @patch("forge.review.models.check_model_availability")
+    def test_json_output(self, mock_avail):
+        mock_avail.return_value = [_avail_ready("model-a", proxy="litellm-openai")]
+        runner = CliRunner()
+        result = runner.invoke(main, ["workflow", "list-models", "--json"])
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert isinstance(data, list)
+        assert len(data) == 1
+        assert data[0]["name"] == "model-a"
+        assert data[0]["status"] == "ready"
+        assert "proxy" in data[0]
+
+    @patch("forge.review.models.check_model_availability")
+    def test_json_mixed_status(self, mock_avail):
+        mock_avail.return_value = [
+            _avail_ready("model-a"),
+            _avail_unavailable("model-b", reason="not responding"),
+        ]
+        runner = CliRunner()
+        result = runner.invoke(main, ["workflow", "list-models", "--json"])
+        data = json.loads(result.output)
+        statuses = {d["name"]: d["status"] for d in data}
+        assert statuses == {"model-a": "ready", "model-b": "unavailable"}
+
+    @patch("forge.review.models.check_model_availability")
+    def test_available_filter_table(self, mock_avail):
+        mock_avail.return_value = [
+            _avail_ready("model-a"),
+            _avail_unavailable("model-b"),
+        ]
+        runner = CliRunner()
+        result = runner.invoke(main, ["workflow", "list-models", "--available"])
+        assert "model-a" in result.output
+        assert "model-b" not in result.output
+
+    @patch("forge.review.models.check_model_availability")
+    def test_available_filter_json(self, mock_avail):
+        mock_avail.return_value = [
+            _avail_ready("model-a"),
+            _avail_unavailable("model-b"),
+        ]
+        runner = CliRunner()
+        result = runner.invoke(main, ["workflow", "list-models", "--json", "--available"])
+        data = json.loads(result.output)
+        assert len(data) == 1
+        assert data[0]["name"] == "model-a"
+
+    @patch("forge.review.models.check_model_availability")
+    def test_unavailable_shows_reason_in_json(self, mock_avail):
+        mock_avail.return_value = [
+            _avail_unavailable("model-b", reason="Proxy 'litellm-gemini' not responding"),
+        ]
+        runner = CliRunner()
+        result = runner.invoke(main, ["workflow", "list-models", "--json"])
+        data = json.loads(result.output)
+        assert data[0]["status"] == "unavailable"
+        assert "not responding" in data[0]["reason"]
+
+    @patch("forge.review.models.check_model_availability")
+    def test_unavailable_shows_in_table(self, mock_avail):
+        mock_avail.return_value = [
+            _avail_unavailable("model-b", reason="gone"),
+        ]
+        runner = CliRunner()
+        result = runner.invoke(main, ["workflow", "list-models"])
+        assert "unavailable" in result.output
+
+    @patch("forge.review.models.check_model_availability")
+    def test_available_no_ready_models_message(self, mock_avail):
+        mock_avail.return_value = [_avail_unavailable("model-a")]
+        runner = CliRunner()
+        result = runner.invoke(main, ["workflow", "list-models", "--available"])
+        assert "No models are currently ready" in result.output
+
+    @patch("forge.review.models.check_model_availability")
+    def test_available_no_ready_json_empty(self, mock_avail):
+        mock_avail.return_value = [_avail_unavailable("model-a")]
+        runner = CliRunner()
+        result = runner.invoke(main, ["workflow", "list-models", "--json", "--available"])
+        data = json.loads(result.output)
+        assert data == []
 
 
 class TestRunPanel:

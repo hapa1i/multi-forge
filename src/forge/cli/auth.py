@@ -27,13 +27,14 @@ from forge.core.auth.credentials_file import (
     save_profile,
 )
 
-# Provider specifications: required and optional env vars
+# Provider specifications: required and optional credentials/connection values.
 #
-# Keys cover both the Forge client side (e.g., LITELLM_API_KEY for talking to LiteLLM)
-# AND sidecar upstream keys (e.g., GEMINI_API_KEY that LiteLLM forwards to Google).
+# Keys cover: Forge client credentials (e.g., LITELLM_API_KEY), sidecar upstream keys
+# (e.g., GEMINI_API_KEY), and connection values (e.g., LITELLM_BASE_URL) stored as a
+# convenience fallback for proxy bootstrapping.
 PROVIDERS = {
     "litellm-remote": {
-        "required": ["LITELLM_API_KEY"],
+        "required": ["LITELLM_API_KEY", "LITELLM_BASE_URL"],
         "optional": [],
         "description": "Remote LiteLLM gateway",
     },
@@ -200,6 +201,7 @@ def status(profile: str | None) -> None:
     click.echo(f"\nCredential status (profile: {profile_name})")
     click.echo("=" * 50)
 
+    any_missing = False
     for prov_name, spec in PROVIDERS.items():
         all_keys = list(spec["required"]) + list(spec["optional"])
         if not all_keys:
@@ -214,17 +216,20 @@ def status(profile: str | None) -> None:
             file_val = file_secrets.get(key)
 
             if env_val:
-                masked = _mask_value(env_val)
-                click.secho(f"  ✓ {key} = {masked}  (env)", fg="green")
+                display = _mask_value(env_val) if _is_sensitive(key) else env_val
+                click.secho(f"  ✓ {key} = {display}  (env)", fg="green")
             elif file_val:
-                masked = _mask_value(file_val)
-                click.secho(f"  ✓ {key} = {masked}  (file:{profile_name})", fg="green")
+                display = _mask_value(file_val) if _is_sensitive(key) else file_val
+                click.secho(f"  ✓ {key} = {display}  (file:{profile_name})", fg="green")
             elif is_required:
                 click.secho(f"  ✗ {key}  MISSING", fg="red")
+                any_missing = True
             else:
                 click.secho(f"  ○ {key}  not set (optional)", fg="yellow")
 
     click.echo()
+    if any_missing:
+        click.echo("Tip: Run 'forge auth login' to add missing credentials.")
 
 
 @auth.command("logout")

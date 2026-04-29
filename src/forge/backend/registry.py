@@ -112,7 +112,8 @@ class BackendRegistryStore:
         if version != BACKEND_REGISTRY_VERSION:
             raise BackendRegistryCorruptedError(
                 str(self._registry_path),
-                f"unsupported version: {version} (expected {BACKEND_REGISTRY_VERSION})",
+                f"incompatible version {version} (this Forge expects {BACKEND_REGISTRY_VERSION}). "
+                f"Delete this file and retry.",
             )
 
         try:

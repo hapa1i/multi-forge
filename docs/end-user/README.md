@@ -44,17 +44,21 @@ status line.
 If you want to route through other providers (Gemini, GPT, etc.):
 
 ```bash
-# Store your API key
+# Store your credentials (API keys + connection values)
 forge authentication login
 
 # Create a proxy (starts a local LiteLLM automatically)
 forge proxy create litellm-gemini-local
 
+# Verify upstream connectivity (optional, recommended on first setup)
+forge proxy start litellm-gemini-local --smoke-test
+
 # Launch with proxy routing
 forge session start --proxy litellm-gemini-local
 ```
 
-See [proxies.md](proxies.md) for templates, tier mappings, and per-tier hyperparameter tuning.
+See [proxies.md](proxies.md) for templates, tier mappings, and per-tier hyperparameter tuning. See
+[auth.md](auth.md#which-auth-do-i-need) for which credentials each workflow needs.
 
 ### D. Resume when context fills up
 

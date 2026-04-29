@@ -31,6 +31,11 @@ Run a panel review: fans out the same review task to multiple models in parallel
 
 **Available models:** !`forge workflow list-models`
 
+Only use models with status **ready** in the table above. If the default set includes unavailable models, pass
+`--models <ready models>` explicitly. If the user explicitly requested an unavailable model, stop and tell them what
+proxy or credential is missing rather than silently substituting. If no models are ready, tell the user what's missing
+and stop.
+
 ## Models Used
 
 | Model            | Strength                             | Via                  |

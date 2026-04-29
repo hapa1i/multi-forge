@@ -239,7 +239,8 @@ class ProxyRegistryStore:
         if version != PROXY_REGISTRY_VERSION:
             raise ProxyRegistryCorruptedError(
                 str(self._registry_path),
-                f"unsupported version: {version} (expected {PROXY_REGISTRY_VERSION})",
+                f"incompatible version {version} (this Forge expects {PROXY_REGISTRY_VERSION}). "
+                f"Delete this file and retry.",
             )
 
         try:

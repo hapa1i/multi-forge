@@ -146,7 +146,7 @@ class TestSupervisorE2E:
         assert output["clean"] is True
         assert output["final_decision"] == "allow"
         assert output["warnings"] == []
-        assert f"claude -p --resume {SUPERVISOR_RESUME_ID}" in invocations
+        assert f"--resume {SUPERVISOR_RESUME_ID}" in invocations
 
     def test_resume_harness_denies_divergent_action(self, supervisor_workspace: ContainerLike) -> None:
         exit_code, output, invocations = _run_supervisor_check(supervisor_workspace, mode="divergent")
@@ -155,7 +155,7 @@ class TestSupervisorE2E:
         assert output["passed"] is False
         assert output["final_decision"] == "deny"
         assert len(output["violations"]) == 1
-        assert f"claude -p --resume {SUPERVISOR_RESUME_ID}" in invocations
+        assert f"--resume {SUPERVISOR_RESUME_ID}" in invocations
 
     def test_resume_harness_reports_infra_error(self, supervisor_workspace: ContainerLike) -> None:
         exit_code, output, invocations = _run_supervisor_check(supervisor_workspace, mode="infra_error")
@@ -165,7 +165,7 @@ class TestSupervisorE2E:
         assert output["clean"] is False
         assert output["final_decision"] == "error"
         assert any(str(w).startswith("Supervisor error:") for w in output["warnings"])
-        assert f"claude -p --resume {SUPERVISOR_RESUME_ID}" in invocations
+        assert f"--resume {SUPERVISOR_RESUME_ID}" in invocations
 
     def test_session_set_wires_supervisor_config(self, supervisor_workspace: ContainerLike) -> None:
         """``forge session set policy.supervisor.*`` should populate the manifest."""

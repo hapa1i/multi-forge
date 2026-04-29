@@ -61,7 +61,6 @@ class TestStateCorruptedError:
         msg = str(err)
         assert "/path/to/file.json" in msg
         assert "invalid JSON" in msg
-        assert "corrupted" in msg
 
 
 class TestSchemaVersionError:
@@ -89,7 +88,7 @@ class TestSchemaVersionError:
         msg = str(err)
         assert "1" in msg  # actual
         assert "[2, 3]" in msg  # expected (sorted)
-        assert "unsupported schema version" in msg
+        assert "incompatible version" in msg
 
     def test_inherits_path_attribute(self) -> None:
         """SchemaVersionError has path attribute from parent."""

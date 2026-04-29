@@ -83,7 +83,7 @@ src/forge/
 
 ### Shared Libraries (`src/forge/core/`)
 
-- `forge.core.auth` - File-based credentials, LiteLLM auth
+- `forge.core.auth` - Credential resolution (env > `~/.forge/credentials.yaml`), template-to-secrets mapping
 - `forge.core.llm` - Async-first LLM client abstraction (see design_appendix.md §J)
 - `forge.core.models` - Model catalog with templates/tiers
 - `forge.core.state` - State read/write operations

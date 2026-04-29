@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 import pytest
 
 from forge.core.models.catalog import get_compact_name, get_default_model
@@ -10,6 +12,7 @@ from forge.review.models import (
     ModelSpec,
     MultiReviewOutput,
     ReviewResult,
+    check_model_availability,
     resolve_model_specs,
 )
 
@@ -121,3 +124,84 @@ class TestResolveModelSpecs:
     def test_mixed_valid_invalid_raises(self):
         with pytest.raises(ValueError, match="nonexistent"):
             resolve_model_specs(f"{OPENAI_DEFAULT},nonexistent")
+
+
+def _spec(
+    name: str = "test-model",
+    proxy: str | None = "test-proxy",
+) -> ModelSpec:
+    return ModelSpec(name=name, proxy=proxy, model_flag=None, description="Test")
+
+
+class TestCheckModelAvailability:
+    @patch(
+        "forge.core.reactive.proxy.check_proxy_reachable",
+        return_value=(True, "", "http://localhost:8085"),
+    )
+    @patch(
+        "forge.core.auth.template_secrets.resolve_env_or_credential",
+        return_value="sk-test",
+    )
+    def test_all_ready(self, _mock_cred, _mock_proxy):
+        specs = [_spec("a", proxy="p1"), _spec("b", proxy=None)]
+        result = check_model_availability(specs)
+        assert all(a.status == "ready" for a in result)
+        assert len(result) == 2
+
+    @patch(
+        "forge.core.reactive.proxy.check_proxy_reachable",
+        return_value=(False, "Proxy 'p1' not responding at http://localhost:8085", "http://localhost:8085"),
+    )
+    def test_proxy_unavailable(self, _mock_proxy):
+        result = check_model_availability([_spec("a", proxy="p1")])
+        assert result[0].status == "unavailable"
+        assert "not responding" in result[0].reason
+
+    @patch(
+        "forge.core.auth.template_secrets.resolve_env_or_credential",
+        return_value="sk-test",
+    )
+    def test_direct_ready_with_key(self, _mock_cred):
+        result = check_model_availability([_spec("opus", proxy=None)])
+        assert result[0].status == "ready"
+
+    @patch(
+        "forge.core.auth.template_secrets.resolve_env_or_credential",
+        return_value=None,
+    )
+    def test_direct_unavailable_no_key(self, _mock_cred):
+        result = check_model_availability([_spec("opus", proxy=None)])
+        assert result[0].status == "unavailable"
+        assert "ANTHROPIC_API_KEY" in result[0].reason
+
+    @patch(
+        "forge.core.reactive.proxy.check_proxy_reachable",
+        side_effect=RuntimeError("unexpected"),
+    )
+    def test_unexpected_error(self, _mock_proxy):
+        result = check_model_availability([_spec("a", proxy="p1")])
+        assert result[0].status == "error"
+        assert "unexpected" in result[0].reason
+
+    @patch(
+        "forge.core.reactive.proxy.check_proxy_reachable",
+        return_value=(True, "", "http://localhost:8085"),
+    )
+    def test_deduplicates_proxy_checks(self, mock_proxy):
+        specs = [_spec("a", proxy="same"), _spec("b", proxy="same")]
+        result = check_model_availability(specs)
+        assert len(result) == 2
+        assert all(a.status == "ready" for a in result)
+        mock_proxy.assert_called_once()
+
+    @patch(
+        "forge.core.reactive.proxy.check_proxy_reachable",
+        return_value=(True, "", "http://localhost:8085"),
+    )
+    @patch(
+        "forge.core.auth.template_secrets.resolve_env_or_credential",
+        return_value="sk-test",
+    )
+    def test_defaults_to_all_models(self, _mock_cred, _mock_proxy):
+        result = check_model_availability()
+        assert len(result) == len(DEFAULT_MODELS)

@@ -265,8 +265,9 @@ class SessionStore:
         elif data["schema_version"] not in _SUPPORTED_SCHEMA_VERSIONS:
             raise ManifestCorruptedError(
                 str(self._manifest_path),
-                f"unsupported schema version: {data['schema_version']} "
-                f"(supported: {sorted(_SUPPORTED_SCHEMA_VERSIONS)})",
+                f"incompatible schema version {data['schema_version']} "
+                f"(this Forge expects {sorted(_SUPPORTED_SCHEMA_VERSIONS)}). "
+                f"Delete this session and recreate it.",
             )
 
         # Overrides are required (empty dict allowed)

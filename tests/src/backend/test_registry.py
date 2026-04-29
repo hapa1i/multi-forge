@@ -132,7 +132,7 @@ class TestBackendRegistryStore:
         store = BackendRegistryStore(registry_path)
         with pytest.raises(BackendRegistryCorruptedError) as exc_info:
             store.read()
-        assert "unsupported version" in str(exc_info.value)
+        assert "incompatible version" in str(exc_info.value)
 
     def test_update_applies_mutation(self, tmp_path: Path) -> None:
         """Verify update applies mutation function."""

@@ -100,12 +100,14 @@ class TestAutoCompactWindowContract:
 
         registry = ProxyRegistry(
             version=1,
-            proxies={"test-proxy": ProxyEntry(
-                proxy_id="test-proxy",
-                base_url="http://localhost:9999",
-                port=9999,
-                template="litellm-openai",
-            )},
+            proxies={
+                "test-proxy": ProxyEntry(
+                    proxy_id="test-proxy",
+                    base_url="http://localhost:9999",
+                    port=9999,
+                    template="litellm-openai",
+                )
+            },
         )
         store = ProxyRegistryStore()
         store.write(registry)

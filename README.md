@@ -90,11 +90,13 @@ forge extension enable
 forge session start
 
 # Or with multi-model routing (remote LiteLLM):
-forge authentication login                       # Store API keys
+forge authentication login -p litellm-remote     # Store API key + base URL
 forge proxy create litellm-openai                # Create a proxy (connects to shared LiteLLM)
+forge proxy start litellm-openai --smoke-test    # Verify upstream connectivity
 forge session start --proxy litellm-openai
 
 # No shared LiteLLM? Use a -local template instead (starts LiteLLM for you):
+# forge authentication login -p litellm-local
 # forge proxy create litellm-openai-local
 ```
 

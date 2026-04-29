@@ -7,7 +7,8 @@
 # To change the repo URL, update FORGE_REPO below (all derived URLs follow).
 #
 # Options:
-#   --uninstall       Remove Forge completely (all artifacts, Docker images, etc.)
+#   --uninstall       Remove Forge completely (keeps project-local .forge/ dirs)
+#   --purge           With --uninstall: also remove project-local .forge/ dirs
 #   --local           Install from current directory in editable mode (for development)
 #   --no-modify-path  Don't modify shell profile
 #   --version X.Y.Z   Install specific version
@@ -36,7 +37,10 @@ FORGE_SETUP_URL="$FORGE_RAW_URL/main/scripts/setup.sh"
 FORGE_VERSION="${FORGE_VERSION:-main}"
 MODIFY_PATH=true
 UNINSTALL=false
+PURGE=false
+YES=false
 LOCAL_MODE=false
+FORGE_HOME_STAMP="managed-by-setup-sh"
 MODIFIED_PROFILE=""  # Track which profile was modified (for accurate messaging)
 
 # Block markers for safe profile editing (industry standard pattern)
@@ -74,6 +78,106 @@ header() {
     echo -e "${CYAN}$(printf '─%.0s' {1..50})${NC}"
 }
 
+trim_trailing_slashes() {
+    local path="$1"
+    while [[ "$path" != "/" && "$path" == */ ]]; do
+        path="${path%/}"
+    done
+    printf "%s" "$path"
+}
+
+validate_forge_home() {
+    local action="$1"
+    local home
+    home="$(trim_trailing_slashes "$HOME")"
+    FORGE_HOME="$(trim_trailing_slashes "$FORGE_HOME")"
+    FORGE_BIN="$FORGE_HOME/bin"
+
+    if [[ -z "$home" ]]; then
+        fatal "HOME is empty - refusing to $action"
+    fi
+    if [[ -z "$FORGE_HOME" ]]; then
+        fatal "FORGE_HOME is empty - refusing to $action"
+    fi
+    if [[ "$FORGE_HOME" == "~" || "$FORGE_HOME" == "~/"* ]]; then
+        fatal "FORGE_HOME ('$FORGE_HOME') uses '~', which is not expanded here. Use an absolute path."
+    fi
+    if [[ "$FORGE_HOME" != /* ]]; then
+        fatal "FORGE_HOME ('$FORGE_HOME') must be an absolute path - refusing to $action"
+    fi
+    if [[ "$FORGE_HOME" == "/" ]]; then
+        fatal "FORGE_HOME is root (/) - refusing to $action"
+    fi
+    if [[ "$FORGE_HOME" == "$home" ]]; then
+        fatal "FORGE_HOME cannot be \$HOME itself - refusing to $action"
+    fi
+    if [[ ! "$FORGE_HOME" == "$home"/* ]]; then
+        fatal "FORGE_HOME ('$FORGE_HOME') is not under \$HOME - refusing to $action"
+    fi
+
+    case "$FORGE_HOME" in
+        "$home/.local"|"$home/.local/bin"|"$home/.local/share"|"$home/.config"|"$home/.cache"|"$home/Library"|"$home/Library/Application Support")
+            fatal "FORGE_HOME ('$FORGE_HOME') is a broad user directory - refusing to $action"
+            ;;
+    esac
+
+    local base="${FORGE_HOME##*/}"
+    if [[ "$base" != *forge* && "$base" != *Forge* && "$base" != *FORGE* ]]; then
+        fatal "FORGE_HOME ('$FORGE_HOME') must be a Forge-specific directory (for example: $home/.forge)"
+    fi
+}
+
+is_forge_repo_dir() {
+    local repo_dir="$1"
+    local pyproject="$repo_dir/pyproject.toml"
+    [[ -f "$pyproject" ]] && grep -Eq "^[[:space:]]*name[[:space:]]*=[[:space:]]*[\"']$FORGE_PACKAGE[\"']" "$pyproject"
+}
+
+looks_like_forge_home() {
+    if [[ -f "$FORGE_HOME/.forge-home" ]] && grep -qx "$FORGE_HOME_STAMP" "$FORGE_HOME/.forge-home" 2>/dev/null; then
+        return 0
+    fi
+
+    # Legacy setup.sh installs predate the stamp, but still have a Forge repo
+    # checkout or symlink at FORGE_HOME/repo.
+    is_forge_repo_dir "$FORGE_HOME/repo"
+}
+
+# Portable pip wrapper: tries python3 -m pip first, falls back to pip3/pip.
+# Needed because python3 may resolve to a venv without pip, while the stale
+# package lives in the system Python reachable via pip3.
+_pip() {
+    if python3 -m pip "$@" 2>/dev/null; then
+        return 0
+    elif command -v pip3 &>/dev/null && pip3 "$@" 2>/dev/null; then
+        return 0
+    elif command -v pip &>/dev/null && pip "$@" 2>/dev/null; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# Uninstall a pip package using whichever pip command can see it.
+# `pip uninstall -y` exits 0 even for missing packages, so _pip would
+# succeed on the first interpreter and never reach the one that has it.
+# This function finds which pip has the package, then uninstalls with that.
+_pip_remove() {
+    local pkg="$1"
+    if python3 -m pip show "$pkg" &>/dev/null 2>&1; then
+        python3 -m pip uninstall -y "$pkg" 2>/dev/null
+        return $?
+    elif command -v pip3 &>/dev/null && pip3 show "$pkg" &>/dev/null 2>&1; then
+        pip3 uninstall -y "$pkg" 2>/dev/null
+        return $?
+    elif command -v pip &>/dev/null && pip show "$pkg" &>/dev/null 2>&1; then
+        pip uninstall -y "$pkg" 2>/dev/null
+        return $?
+    else
+        return 1
+    fi
+}
+
 # -----------------------------------------------------------------------------
 # Prerequisite Checks
 # -----------------------------------------------------------------------------
@@ -87,18 +191,18 @@ check_prerequisites() {
 
     local missing=()
 
-    # Python 3.10+
+    # Python 3.11+ (pyproject.toml requires-python = ">=3.11")
     if check_command python3; then
         local py_version=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
         local py_major=$(echo $py_version | cut -d. -f1)
         local py_minor=$(echo $py_version | cut -d. -f2)
-        if [[ $py_major -ge 3 && $py_minor -ge 10 ]]; then
+        if [[ $py_major -ge 3 && $py_minor -ge 11 ]]; then
             success "Python $py_version"
         else
-            missing+=("Python 3.10+ (found $py_version)")
+            missing+=("Python 3.11+ (found $py_version)")
         fi
     else
-        missing+=("Python 3.10+")
+        missing+=("Python 3.11+")
     fi
 
     # uv (Python package manager)
@@ -143,10 +247,26 @@ check_prerequisites() {
 
 install_forge() {
     header "Installing Forge"
+    validate_forge_home "install Forge"
 
-    # Create directories
+    # Create directories and stamp as a Forge-managed home
     mkdir -p "$FORGE_HOME"
     mkdir -p "$FORGE_BIN"
+    echo "$FORGE_HOME_STAMP" > "$FORGE_HOME/.forge-home"
+
+    # Remove stale pip/uv-tool installs that would conflict
+    for pkg in "$FORGE_PACKAGE" "claude-forge"; do
+        if _pip show "$pkg" &>/dev/null; then
+            warn "Found stale pip install of '$pkg' -- removing to avoid conflicts..."
+            _pip_remove "$pkg" || {
+                warn "Could not uninstall '$pkg' (run manually: pip uninstall $pkg)"
+            }
+        fi
+        if uv tool list 2>/dev/null | grep -q "^$pkg"; then
+            warn "Found stale uv tool install of '$pkg' -- removing to avoid conflicts..."
+            uv tool uninstall "$pkg" 2>/dev/null || true
+        fi
+    done
 
     # Clone or update repository
     local repo_dir="$FORGE_HOME/repo"
@@ -188,6 +308,7 @@ WRAPPER
 
 install_forge_local() {
     header "Installing Forge (Local/Development Mode)"
+    validate_forge_home "install Forge"
 
     # Verify we're in a Forge repo
     if [[ ! -f "pyproject.toml" ]]; then
@@ -202,13 +323,29 @@ install_forge_local() {
 
     # Create ~/.forge for config/state (still needed even in local mode)
     mkdir -p "$FORGE_HOME"
+    echo "$FORGE_HOME_STAMP" > "$FORGE_HOME/.forge-home"
 
-    # FIX: Remove old wrapper from standard install to prevent PATH shadowing
-    # (If user had standard install, ~/.forge/bin/forge would shadow ~/.local/bin/forge)
+    # Remove old wrapper from standard install to prevent PATH shadowing
     if [[ -f "$FORGE_BIN/forge" ]]; then
         info "Removing old wrapper at $FORGE_BIN/forge..."
         rm -f "$FORGE_BIN/forge"
     fi
+
+    # Remove stale pip/uv-tool installs that would conflict.
+    # A pip-installed 'forge' package (editable or not) can shadow the uv tool
+    # binary or inject old code into the Python import path.
+    for pkg in "$FORGE_PACKAGE" "claude-forge"; do
+        if _pip show "$pkg" &>/dev/null; then
+            warn "Found stale pip install of '$pkg' -- removing to avoid conflicts..."
+            _pip_remove "$pkg" || {
+                warn "Could not uninstall '$pkg' (run manually: pip uninstall $pkg)"
+            }
+        fi
+        if uv tool list 2>/dev/null | grep -q "^$pkg"; then
+            warn "Found stale uv tool install of '$pkg' -- removing to avoid conflicts..."
+            uv tool uninstall "$pkg" 2>/dev/null || true
+        fi
+    done
 
     # Use uv tool install for editable installation
     # This installs to ~/.local/bin/forge and uses the local source
@@ -386,26 +523,9 @@ uninstall_forge() {
     header "Uninstalling Forge"
 
     # CRITICAL: Validate FORGE_HOME before any rm -rf operations
-    if [[ -z "$FORGE_HOME" ]]; then
-        fatal "FORGE_HOME is empty - refusing to proceed"
-    fi
-    if [[ "$FORGE_HOME" == "/" ]]; then
-        fatal "FORGE_HOME is root (/) - refusing to proceed"
-    fi
-    # Must be under $HOME but NOT $HOME itself
-    if [[ "$FORGE_HOME" == "$HOME" || "$FORGE_HOME" == "$HOME/" ]]; then
-        fatal "FORGE_HOME cannot be \$HOME itself - refusing to proceed"
-    fi
-    if [[ ! "$FORGE_HOME" == "$HOME"/* ]]; then
-        fatal "FORGE_HOME ('$FORGE_HOME') is not under \$HOME - refusing to proceed for safety"
-    fi
-    # Sentinel check: only proceed if this looks like a Forge installation
-    if [[ ! -d "$FORGE_HOME/repo" && ! -f "$FORGE_HOME/bin/forge" ]]; then
-        warn "FORGE_HOME ('$FORGE_HOME') doesn't look like a Forge installation"
-        warn "Expected to find $FORGE_HOME/repo/ or $FORGE_HOME/bin/forge"
-        if [[ "$1" != "--force" ]]; then
-            fatal "Use --force to override this check (DANGEROUS)"
-        fi
+    validate_forge_home "uninstall Forge"
+    if ! looks_like_forge_home; then
+        fatal "FORGE_HOME ('$FORGE_HOME') doesn't look like a Forge installation. Set FORGE_HOME correctly or remove it manually."
     fi
 
     local had_errors=false
@@ -436,12 +556,21 @@ uninstall_forge() {
         warn "Forge command not found, skipping extension removal"
     fi
 
-    # 2. Remove uv tool installation (if installed with --local)
-    if uv tool list 2>/dev/null | grep -q "$FORGE_PACKAGE"; then
-        info "Removing uv tool installation..."
-        uv tool uninstall "$FORGE_PACKAGE" 2>/dev/null || true
-        success "Removed uv tool installation"
-    fi
+    # 2. Remove all package installations (uv tool + pip, current + legacy names)
+    for pkg in "$FORGE_PACKAGE" "claude-forge"; do
+        if uv tool list 2>/dev/null | grep -q "^$pkg"; then
+            info "Removing uv tool installation of '$pkg'..."
+            uv tool uninstall "$pkg" 2>/dev/null || true
+            success "Removed uv tool package '$pkg'"
+        fi
+        if _pip show "$pkg" &>/dev/null; then
+            info "Removing pip-installed '$pkg'..."
+            _pip_remove "$pkg" || {
+                warn "Could not uninstall pip package '$pkg' (may need manual: pip uninstall $pkg)"
+            }
+            success "Removed pip package '$pkg'"
+        fi
+    done
 
     # 3. Remove ~/.forge directory
     # IMPORTANT: Handle symlinked repo (from --local install) to avoid deleting user's source
@@ -460,9 +589,47 @@ uninstall_forge() {
         info "$FORGE_HOME does not exist"
     fi
 
-    # 4. Clean up project-local .forge directories (optional - warn only)
-    warn "Note: Project-local .forge/ directories are NOT removed"
-    warn "      Remove them manually if needed: find ~ -type d -name '.forge' 2>/dev/null"
+    # 4. Clean up project-local .forge directories
+    if [[ "$PURGE" == "true" ]]; then
+        info "Scanning for project-local .forge/ directories..."
+        local forge_dirs
+        forge_dirs=$(find "$HOME" -maxdepth 6 -type d -name '.forge' \
+            ! -path "$FORGE_HOME" ! -path "$FORGE_HOME/*" 2>/dev/null || true)
+        if [[ -n "$forge_dirs" ]]; then
+            echo ""
+            echo "$forge_dirs" | while read -r d; do echo "  $d"; done
+            echo ""
+            local count
+            count=$(echo "$forge_dirs" | wc -l | tr -d ' ')
+            warn "Found $count project-local .forge/ directories (sessions, artifacts, search index)"
+            local confirm="n"
+            if [[ "$YES" == "true" ]]; then
+                confirm="y"
+            elif [[ -t 0 ]]; then
+                read -p "  Remove all? [y/N] " confirm
+            else
+                # stdin is piped (e.g. curl | bash); read from terminal
+                read -p "  Remove all? [y/N] " confirm </dev/tty || {
+                    warn "Cannot prompt for confirmation (no terminal). Use --yes to skip."
+                    confirm="n"
+                }
+            fi
+            if [[ "$confirm" =~ ^[Yy]$ ]]; then
+                echo "$forge_dirs" | while read -r d; do
+                    rm -rf "$d"
+                    success "Removed $d"
+                done
+            else
+                info "Skipped project-local cleanup"
+            fi
+        else
+            info "No project-local .forge/ directories found"
+        fi
+    else
+        warn "Note: Project-local .forge/ directories are NOT removed"
+        warn "      Use --purge to include them, or remove manually:"
+        warn "      find ~ -maxdepth 6 -type d -name '.forge'"
+    fi
 
     # 6. Remove Docker images (only claude-forge-* to avoid deleting unrelated images)
     if check_command docker && docker info &>/dev/null; then
@@ -533,11 +700,17 @@ uninstall_forge() {
     echo "  Removed:"
     echo "    ✓ ~/.forge/ directory (sessions, proxies, config)"
     echo "    ✓ Claude Code extensions (all tracked scopes)"
+    echo "    ✓ Python packages (pip + uv tool)"
     echo "    ✓ Docker images (claude-forge-*)"
     echo "    ✓ Shell PATH entries"
+    if [[ "$PURGE" == "true" ]]; then
+        echo "    ✓ Project-local .forge/ directories"
+    fi
     echo ""
     echo "  Not removed (manual cleanup if needed):"
-    echo "    • Project-local .forge/ directories (sessions, artifacts, search index)"
+    if [[ "$PURGE" != "true" ]]; then
+        echo "    • Project-local .forge/ directories (use --purge)"
+    fi
     echo "    • Claude Code itself"
     echo ""
     echo "  Restart your terminal to complete cleanup."
@@ -559,7 +732,9 @@ Usage:
 
 Options:
   --local             Install from current directory in editable mode (for development)
-  --uninstall         Remove Forge completely
+  --uninstall         Remove Forge completely (keeps project-local .forge/ dirs)
+  --purge             With --uninstall: also remove project-local .forge/ directories
+  --yes, -y           Skip interactive confirmations (for scripted use)
   --no-modify-path    Don't modify shell profile
   --version X.Y.Z     Install specific version/branch
   --help              Show this help
@@ -580,6 +755,9 @@ Examples:
 
   # Complete uninstall
   curl -sSL $FORGE_SETUP_URL | bash -s -- --uninstall
+
+  # Full purge (including project-local .forge/ directories)
+  curl -sSL $FORGE_SETUP_URL | bash -s -- --uninstall --purge --yes
 EOF
 }
 
@@ -589,6 +767,14 @@ main() {
         case "$1" in
             --uninstall)
                 UNINSTALL=true
+                shift
+                ;;
+            --purge)
+                PURGE=true
+                shift
+                ;;
+            --yes|-y)
+                YES=true
                 shift
                 ;;
             --local)

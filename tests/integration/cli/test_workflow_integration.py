@@ -40,6 +40,37 @@ def _write_proxy_registry(workspace: ContainerLike, *, proxy_id: str, base_url: 
             },
         },
     )
+    _start_proxy_health_stub(workspace, proxy_id=proxy_id, port=port)
+
+
+def _start_proxy_health_stub(workspace: ContainerLike, *, proxy_id: str, port: int) -> None:
+    """Start a minimal HTTP stub that responds to proxy health checks.
+
+    check_proxy_reachable() does an HTTP GET to the proxy base_url to verify
+    it's actually running. This stub satisfies that check in tests where no
+    real proxy is needed.
+    """
+    workspace.write_file(
+        "/tmp/health_stub.py",
+        f"""import http.server, json
+class H(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        self.wfile.write(json.dumps({{"is_proxy": True, "template": "litellm-openai", "proxy": {{"proxy_id": "{proxy_id}"}}}}).encode())
+    def log_message(self, *a):
+        pass
+http.server.HTTPServer(("127.0.0.1", {port}), H).serve_forever()
+""",
+    )
+    result = workspace.exec(
+        "nohup python3 /tmp/health_stub.py > /dev/null 2>&1 & "
+        "sleep 0.5 && "
+        f"curl -sf http://127.0.0.1:{port}/ > /dev/null",
+        timeout=10,
+    )
+    assert result.returncode == 0, f"Health stub not responding on port {port}: {result.stderr}"
 
 
 def _assert_invocation_count(workspace: ContainerLike, expected: int) -> None:

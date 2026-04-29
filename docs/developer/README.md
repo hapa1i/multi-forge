@@ -148,7 +148,7 @@ Claude Forge follows a "glue" approach -- connecting specialized tools rather th
 | Component       | Location             | Purpose                                    |
 | --------------- | -------------------- | ------------------------------------------ |
 | Session Manager | `src/forge/session/` | Named sessions, worktrees, artifacts       |
-| Installer       | `src/forge/install/` | Extension installer and tracking            |
+| Installer       | `src/forge/install/` | Extension installer and tracking           |
 | Proxy           | `src/forge/proxy/`   | Model routing, tier mappings               |
 | Guard           | `src/forge/guard/`   | Policy enforcement (TDD, coding standards) |
 | Core Libraries  | `src/forge/core/`    | Shared auth, models, state, LLM client     |
@@ -203,4 +203,3 @@ Forge uses files instead of a database:
 1. Implement in `src/forge/cli/hooks/`
 2. Register in hook dispatcher (`src/forge/cli/hooks/commands.py`)
 3. Add to installer's hook settings
-

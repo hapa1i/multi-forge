@@ -24,17 +24,17 @@ class StateNotFoundError(StateError):
 
 
 class StateCorruptedError(StateError):
-    """Raised when a state file cannot be parsed.
+    """Raised when a state file cannot be parsed or has an incompatible format.
 
     Attributes:
-        path: Path to the corrupted file.
+        path: Path to the problematic file.
         reason: Description of what went wrong.
     """
 
     def __init__(self, path: str, reason: str) -> None:
         self.path = path
         self.reason = reason
-        super().__init__(f"state file at '{path}' is corrupted: {reason}")
+        super().__init__(f"'{path}': {reason}")
 
 
 class SchemaVersionError(StateCorruptedError):
@@ -49,7 +49,11 @@ class SchemaVersionError(StateCorruptedError):
     def __init__(self, path: str, expected: int | set[int], actual: int) -> None:
         self.expected = expected if isinstance(expected, set) else {expected}
         self.actual = actual
-        super().__init__(
-            path,
-            f"unsupported schema version: {actual} (expected: {sorted(self.expected)})",
+        self.path = path
+        self.reason = f"incompatible version {actual} (expected {sorted(self.expected)})"
+        Exception.__init__(
+            self,
+            f"'{path}' has incompatible version {actual} "
+            f"(this Forge expects {sorted(self.expected)}). "
+            f"Delete this file and retry.",
         )

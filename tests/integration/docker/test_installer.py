@@ -14,8 +14,6 @@ from tests.fixtures.docker import ContainerLike
 pytestmark = [pytest.mark.integration, pytest.mark.docker_in]
 
 
-
-
 def _get_tracking_path(container: ContainerLike) -> str:
     """Return the tracking manifest path resolved by Forge inside the test environment."""
     result = container.exec("""
@@ -268,5 +266,3 @@ print('symlinks verified')
         """)
         assert check.returncode == 0, f"Symlink check failed: {check.stderr}"
         assert "symlinks verified" in check.stdout
-
-

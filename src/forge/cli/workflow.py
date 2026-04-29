@@ -63,6 +63,28 @@ def _coerce_passed(val: Any) -> bool:
 console = Console()
 
 
+def _run_preflight(specs: list[ModelSpec], *, json_output: bool = False) -> None:
+    """Check proxy resolution and auth before spawning workers. Exit 1 on failure."""
+    from forge.review.engine import preflight_check
+
+    errors = preflight_check(specs)
+    if not errors:
+        return
+    if json_output:
+        click.echo(json.dumps({"preflight_errors": errors}))
+    else:
+        console.print("[red]Error:[/red] Workflow preflight failed:")
+        for err in errors:
+            console.print(f"  - {err}")
+        console.print(
+            "\n[dim]Tip: Check model availability with 'forge workflow list-models'.\n"
+            "Check proxy status: 'forge proxy list'\n"
+            "Check auth status: 'forge auth status'\n"
+            "Create a proxy: 'forge proxy create <template>'[/dim]"
+        )
+    sys.exit(1)
+
+
 def _load_workflow_resource(name: str) -> str:
     """Load a bundled workflow resource by name via importlib.resources."""
     from importlib import resources
@@ -84,22 +106,58 @@ def workflow_cmd() -> None:
 
 
 @workflow_cmd.command(name="list-models")
-def list_models() -> None:
+@click.option("--json", "json_output", is_flag=True, help="Output as JSON")
+@click.option("--available", "available_only", is_flag=True, help="Show only ready models")
+def list_models(json_output: bool, available_only: bool) -> None:
     """Show available model backends for workflow runners."""
-    from rich.table import Table
+    from forge.review.models import check_model_availability
 
-    from forge.review.models import DEFAULT_MODELS
+    availabilities = check_model_availability()
+
+    if available_only:
+        availabilities = [a for a in availabilities if a.status == "ready"]
+
+    if json_output:
+        items = [
+            {
+                "name": a.spec.name,
+                "proxy": a.spec.proxy,
+                "model_flag": a.spec.model_flag,
+                "description": a.spec.description,
+                "status": a.status,
+                "reason": a.reason,
+            }
+            for a in availabilities
+        ]
+        click.echo(json.dumps(items, indent=2))
+        return
+
+    if not availabilities:
+        console.print(
+            "[yellow]No models are currently ready.[/yellow]\n"
+            "[dim]Tip: Check 'forge proxy list' and 'forge auth status'.[/dim]"
+        )
+        return
+
+    from rich.table import Table
 
     table = Table(title="Available Models")
     table.add_column("Name", style="cyan")
     table.add_column("Proxy ID", style="green")
     table.add_column("Model Flag")
     table.add_column("Description")
+    table.add_column("Status")
 
-    for spec in DEFAULT_MODELS.values():
-        proxy_display = spec.proxy or "(direct Anthropic)"
-        model_display = spec.model_flag or "(proxy default)"
-        table.add_row(spec.name, proxy_display, model_display, spec.description)
+    _STATUS_STYLES = {"ready": "green", "unavailable": "yellow", "error": "red"}
+
+    for a in availabilities:
+        proxy_display = a.spec.proxy or "(direct Anthropic)"
+        model_display = a.spec.model_flag or "(proxy default)"
+        desc = a.spec.description
+        if a.reason:
+            desc += f" [dim]({a.reason})[/dim]"
+        style = _STATUS_STYLES.get(a.status, "")
+        table.add_row(a.spec.name, proxy_display, model_display, desc, f"[{style}]{a.status}[/{style}]")
 
     console.print(table)
 
@@ -234,6 +292,8 @@ def panel(
             ctx.exit(2)
             return
         specs = _apply_panel_roles(specs, role_list, resolved_prompt)
+
+    _run_preflight(specs, json_output=json_output)
 
     from forge.review.engine import run_multi_review
 
@@ -550,6 +610,8 @@ def analyze(
         console.print(f"[red]Error:[/red] {e}")
         ctx.exit(2)
         return
+
+    _run_preflight(specs, json_output=json_output)
 
     framework = _load_workflow_resource("thinkdeep.md")
     combined_prompt = f"{framework}\n\n---\n\n## Topic to Analyze\n\n{resolved_topic}\n"
@@ -947,6 +1009,8 @@ def debate(
                 ctx.exit(2)
                 return
             stances = _build_stances(specs, code_mode=code_mode)
+
+        _run_preflight([s.model for s in stances], json_output=json_output)
 
         output = run_adversarial(
             resource_path,
@@ -1572,6 +1636,8 @@ def consensus(
                 ctx.exit(2)
                 return
             role_specs = _build_consensus_roles(specs, code_mode)
+
+        _run_preflight([r.model for r in role_specs], json_output=json_output)
 
         output = run_consensus(
             resource_path,

@@ -12,6 +12,12 @@ from forge.cli.main import main
 from forge.review.models import ConsensusOutput, ReviewResult
 
 
+@pytest.fixture(autouse=True)
+def _skip_preflight(monkeypatch):
+    """Bypass preflight in CLI workflow tests (engine is mocked anyway)."""
+    monkeypatch.setattr("forge.cli.workflow._run_preflight", lambda *a, **kw: None)
+
+
 def _mock_consensus_output(
     round1: list[ReviewResult] | None = None,
     round2: list[ReviewResult] | None = None,

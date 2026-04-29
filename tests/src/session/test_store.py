@@ -316,7 +316,7 @@ class TestSessionStoreRead:
 
         with pytest.raises(ManifestCorruptedError) as exc_info:
             store.read()
-        assert "unsupported schema version" in str(exc_info.value)
+        assert "incompatible schema version" in str(exc_info.value)
 
     def test_read_missing_name(self, store: SessionStore) -> None:
         """read() should raise ManifestValidationError for missing name."""

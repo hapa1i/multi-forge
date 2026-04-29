@@ -40,6 +40,7 @@ from forge.config.schema import (
     TierModels,
     TierOverrides,
 )
+from forge.core.auth.template_secrets import resolve_env_or_credential
 from forge.core.paths import get_forge_home
 from forge.core.state import now_iso
 from forge.proxy.proxies import ProxyEntry, ProxyRegistry, ProxyRegistryStore
@@ -161,23 +162,22 @@ def create_proxy_file(
     if hasattr(provider, "error_hints") and provider.error_hints:
         provider_settings["error_hints"] = True
 
-    # Resolve upstream base_url: explicit arg > template > env var > backend port
+    # Resolve upstream base_url: explicit arg > template > env/credential file > backend port
     resolved_upstream = upstream_base_url or provider.base_url
     is_local_template = cfg.proxy.backend_dependency is not None
     if not resolved_upstream:
         dep = cfg.proxy.backend_dependency
         if is_local_template and dep is not None:
-            # Local: env var > derive from backend port
-            resolved_upstream = os.environ.get("LITELLM_LOCAL_BASE_URL", "")
+            resolved_upstream = resolve_env_or_credential("LITELLM_LOCAL_BASE_URL") or ""
             if not resolved_upstream and dep.port:
                 resolved_upstream = f"http://localhost:{dep.port}"
         else:
-            # Remote: env var only
-            resolved_upstream = os.environ.get("LITELLM_BASE_URL", "")
+            resolved_upstream = resolve_env_or_credential("LITELLM_BASE_URL") or ""
     if not resolved_upstream:
-        env_hint = "LITELLM_LOCAL_BASE_URL" if is_local_template else "LITELLM_BASE_URL"
-        raise ValueError(
-            f"Template '{template}' has no base_url configured. " f"Set the {env_hint} environment variable."
+        raise ProxyStartError(
+            f"Template '{template}' has no upstream URL configured.\n"
+            f"Use: forge proxy create {template} --base-url https://your-litellm-server/\n"
+            f"Or store it: forge auth login -p litellm-remote"
         )
 
     proxy_config = ProxyInstanceConfig(
@@ -293,12 +293,22 @@ def _ensure_dependency_backend(backend_dep: BackendDependency, template: str) ->
                 f"[dim]Tip: Delete {backend_config} and restart to get latest defaults.[/dim]"
             )
 
-    missing = [k for k in backend_dep.required_env_vars if not _has_env_var(k)]
+    missing = [k for k in backend_dep.required_env_vars if not resolve_env_or_credential(k)]
     if missing:
         raise ProxyStartError(
-            f"Template '{template}' requires environment variables: {', '.join(missing)}\n"
-            f"Add to .env in your project root or ~/.forge/.env"
+            f"Template '{template}' requires credentials: {', '.join(missing)}\n"
+            f"Run 'forge auth login' to store them, or add to .env / shell exports."
         )
+
+    # Inject credential-file values into os.environ for the backend subprocess
+    # (LiteLLM adapter copies os.environ when spawning).
+    injected: dict[str, str] = {}
+    for key in backend_dep.required_env_vars:
+        if not os.environ.get(key):
+            val = resolve_env_or_credential(key)
+            if val:
+                os.environ[key] = val
+                injected[key] = val
 
     try:
         result = backend_manager.ensure_backend(backend_id, backend_dep.adapter, backend_dep.port)
@@ -311,6 +321,10 @@ def _ensure_dependency_backend(backend_dep: BackendDependency, template: str) ->
             f"Failed to start dependency backend for '{template}': {e}\n"
             f"Backend: {backend_dep.adapter} on port {backend_dep.port}"
         )
+    finally:
+        for key, val in injected.items():
+            if os.environ.get(key) == val:
+                os.environ.pop(key, None)
 
 
 def start_proxy(

@@ -41,7 +41,7 @@ class ManifestCorruptedError(ForgeSessionError):
     def __init__(self, path: str, reason: str) -> None:
         self.path = path
         self.reason = reason
-        super().__init__(f"manifest at '{path}' is corrupted: {reason}")
+        super().__init__(f"manifest at '{path}': {reason}")
 
 
 class ManifestValidationError(ForgeSessionError):
@@ -60,7 +60,7 @@ class IndexCorruptedError(ForgeSessionError):
     def __init__(self, path: str, reason: str) -> None:
         self.path = path
         self.reason = reason
-        super().__init__(f"index at '{path}' is corrupted: {reason}")
+        super().__init__(f"index at '{path}': {reason}")
 
 
 class CannotForkIncognitoError(ForgeSessionError):

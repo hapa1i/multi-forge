@@ -63,7 +63,7 @@ forge proxy template reset <name># Reset to built-in default
 
 # Create / start
 forge proxy create <template> [--name <id>] [--no-start]
-forge proxy start <proxy_id>
+forge proxy start <proxy_id> [--smoke-test]
 forge proxy stop <proxy_id>
 
 # Show / list
@@ -128,15 +128,21 @@ forge proxy create litellm-openai --name my-high-reasoning
 
 # Create config only (don't start the server)
 forge proxy create litellm-openai --no-start
+
+# Start and verify upstream connectivity (sends a real request)
+forge proxy start litellm-openai --smoke-test
 ```
 
 **Semantics (reuse/adopt/spawn):**
 
-- ✔ Reuses an existing healthy proxy for that template if present
-- ✔ Adopts an orphan proxy at the expected default port if found
-- ✔ Spawns a new proxy if neither exists
-- ✔ Blocks until the proxy is healthy (with timeout)
-- ✔ Records in `~/.forge/proxies/index.json`
+- Reuses an existing healthy proxy for that template if present
+- Adopts an orphan proxy at the expected default port if found
+- Spawns a new proxy if neither exists
+- Blocks until the proxy is healthy (with timeout)
+- Records in `~/.forge/proxies/index.json`
+
+Use `--smoke-test` after first setup or credential changes to verify the proxy can reach its upstream LLM provider.
+Without it, health checks only confirm the local proxy process is alive.
 
 ### Start Claude with a proxy
 

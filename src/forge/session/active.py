@@ -81,14 +81,8 @@ class ActiveSessionStore:
             data = json.load(f)
 
         version = data.get("version")
-        if version != ACTIVE_INDEX_VERSION:
-            raise ValueError(
-                f"unsupported active-session registry version: {version} "
-                f"(expected {ACTIVE_INDEX_VERSION})"
-            )
-
-        if not self._has_current_key_shape(data):
-            logger.info("Discarding pre-OSS active-session registry shape")
+        if version != ACTIVE_INDEX_VERSION or not self._has_current_key_shape(data):
+            logger.info("Discarding incompatible active-session registry (version=%s)", version)
             empty = ActiveSessionIndex()
             self.write(empty)
             return empty

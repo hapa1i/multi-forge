@@ -7,8 +7,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from forge.proxy.proxies import ProxyNotFoundError
-from forge.review.engine import run_multi_review
-from forge.review.models import DEFAULT_MODELS, ModelSpec
+from forge.review.engine import preflight_check, run_multi_review
+from forge.review.models import DEFAULT_MODELS, ModelAvailability, ModelSpec
 
 
 @pytest.fixture(autouse=True)
@@ -93,7 +93,8 @@ class TestRunMultiReview:
 
         assert len(output.results) == 2
         assert [r.model_name for r in output.results] == ["same-model", "same-model"]
-        assert [r.stdout for r in output.results] == ["first", "second"]
+        # Both results must be present (thread scheduling determines which gets which mock)
+        assert {r.stdout for r in output.results} == {"first", "second"}
 
     @patch(
         "forge.review.engine.lookup_proxy_base_url",
@@ -280,3 +281,108 @@ class TestRunMultiReview:
         run_multi_review("global prompt", models=specs)
         inputs = {call[1]["input"] for call in mock_popen_cls.return_value.communicate.call_args_list}
         assert inputs == {"my custom", "global prompt"}
+
+
+def _avail(spec: ModelSpec, status: str = "ready", reason: str = "") -> ModelAvailability:
+    return ModelAvailability(spec=spec, status=status, reason=reason)
+
+
+class TestPreflightCheck:
+    """Tests for preflight_check() — delegates to check_model_availability."""
+
+    @patch("forge.review.engine.check_model_availability")
+    def test_all_ready_returns_empty(self, mock_avail) -> None:
+        specs = [_spec("a", proxy="litellm-openai"), _spec("b", proxy="litellm-gemini")]
+        mock_avail.return_value = [_avail(s) for s in specs]
+        assert preflight_check(specs) == []
+
+    @patch("forge.review.engine.check_model_availability")
+    def test_unavailable_proxy_returns_error(self, mock_avail) -> None:
+        spec = _spec("a", proxy="litellm-openai")
+        mock_avail.return_value = [
+            _avail(spec, status="unavailable", reason="Proxy 'litellm-openai' not responding"),
+        ]
+        errors = preflight_check([spec])
+        assert len(errors) == 1
+        assert "litellm-openai" in errors[0]
+        assert "not responding" in errors[0]
+
+    @patch("forge.review.engine.check_model_availability")
+    def test_unavailable_proxy_includes_create_hint(self, mock_avail) -> None:
+        spec = _spec("a", proxy="litellm-openai")
+        mock_avail.return_value = [
+            _avail(spec, status="unavailable", reason="not found"),
+        ]
+        errors = preflight_check([spec])
+        assert "forge proxy create litellm-openai" in errors[0]
+
+    @patch("forge.review.engine.check_model_availability")
+    def test_direct_unavailable_includes_auth_hint(self, mock_avail) -> None:
+        spec = _spec("opus", proxy=None)
+        mock_avail.return_value = [
+            _avail(spec, status="unavailable", reason="ANTHROPIC_API_KEY not configured"),
+        ]
+        errors = preflight_check([spec])
+        assert len(errors) == 1
+        assert "ANTHROPIC_API_KEY" in errors[0]
+        assert "forge auth login" in errors[0]
+        assert "forge proxy create" not in errors[0]
+
+    @patch("forge.review.engine.check_model_availability")
+    def test_mixed_ready_and_unavailable(self, mock_avail) -> None:
+        spec_ok = _spec("a", proxy="litellm-openai")
+        spec_bad = _spec("b", proxy="litellm-gemini")
+        mock_avail.return_value = [
+            _avail(spec_ok),
+            _avail(spec_bad, status="unavailable", reason="not found"),
+        ]
+        errors = preflight_check([spec_ok, spec_bad])
+        assert len(errors) == 1
+        assert "b" in errors[0]
+
+    @patch("forge.review.engine.check_model_availability")
+    def test_error_status_also_reported(self, mock_avail) -> None:
+        spec = _spec("a", proxy="broken")
+        mock_avail.return_value = [
+            _avail(spec, status="error", reason="Registry corrupted"),
+        ]
+        errors = preflight_check([spec])
+        assert len(errors) == 1
+        assert "Registry corrupted" in errors[0]
+
+
+class TestCredentialInjection:
+    """Tests for ANTHROPIC_API_KEY injection from credential file into workflow env."""
+
+    @patch("forge.review.engine.lookup_proxy_base_url", return_value=None)
+    @patch("forge.review.engine.subprocess.Popen")
+    def test_credential_file_key_injected_into_env(
+        self, mock_popen_cls, _mock_lookup, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+        mock_popen_cls.return_value = _mock_popen("output")
+
+        with patch(
+            "forge.review.engine.resolve_env_or_credential",
+            return_value="sk-from-file",
+        ):
+            run_multi_review("test", models=[_spec("opus", proxy=None)])
+
+        call_kwargs = mock_popen_cls.call_args[1]
+        assert call_kwargs["env"]["ANTHROPIC_API_KEY"] == "sk-from-file"
+
+    @patch("forge.review.engine.lookup_proxy_base_url", return_value=None)
+    @patch("forge.review.engine.subprocess.Popen")
+    def test_bare_flag_uses_built_env(self, mock_popen_cls, _mock_lookup, monkeypatch: pytest.MonkeyPatch) -> None:
+        """--bare should be added when ANTHROPIC_API_KEY is in the built env (not just os.environ)."""
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+        mock_popen_cls.return_value = _mock_popen("output")
+
+        with patch(
+            "forge.review.engine.resolve_env_or_credential",
+            return_value="sk-from-file",
+        ):
+            run_multi_review("test", models=[_spec("opus", proxy=None)])
+
+        cmd = mock_popen_cls.call_args[0][0]
+        assert "--bare" in cmd

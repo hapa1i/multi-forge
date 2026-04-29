@@ -16,6 +16,7 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+from forge.core.auth.template_secrets import resolve_env_or_credential
 from forge.core.reactive.env import (
     build_claude_env,
     can_use_bare,
@@ -23,9 +24,36 @@ from forge.core.reactive.env import (
 )
 from forge.core.reactive.proxy import lookup_proxy_base_url
 
-from .models import DEFAULT_MODELS, ModelSpec, MultiReviewOutput, ReviewResult
+from .models import (
+    DEFAULT_MODELS,
+    ModelSpec,
+    MultiReviewOutput,
+    ReviewResult,
+    check_model_availability,
+)
 
 _log = logging.getLogger(__name__)
+
+
+def preflight_check(specs: list[ModelSpec]) -> list[str]:
+    """Validate proxy reachability and auth before spawning workers.
+
+    Delegates to check_model_availability() so discovery (list-models) and
+    runtime (preflight) use identical health-check logic.
+
+    Returns a list of error strings (empty means all OK).
+    """
+    availabilities = check_model_availability(specs)
+    errors: list[str] = []
+    for avail in availabilities:
+        if avail.status == "ready":
+            continue
+        if avail.spec.proxy:
+            hint = f" Run 'forge proxy create {avail.spec.proxy}' to set it up."
+        else:
+            hint = " Run 'forge auth login -p anthropic' or use --models to select only proxy-backed models."
+        errors.append(f"{avail.spec.name}: {avail.reason}.{hint}")
+    return errors
 
 
 def run_multi_review(
@@ -102,13 +130,18 @@ def run_multi_review(
                 error=f"Proxy '{spec.proxy}' not found: {e}",
             )
 
-        env = build_claude_env(base_url=base_url)
-        # For direct Anthropic, ensure no stale ANTHROPIC_BASE_URL
+        extra_env: dict[str, str] = {}
+        if not os.environ.get("ANTHROPIC_API_KEY"):
+            ak = resolve_env_or_credential("ANTHROPIC_API_KEY")
+            if ak:
+                extra_env["ANTHROPIC_API_KEY"] = ak
+
+        env = build_claude_env(base_url=base_url, extra_vars=extra_env or None)
         if not base_url:
             env.pop("ANTHROPIC_BASE_URL", None)
 
         cmd = ["claude", "-p"]
-        if can_use_bare():
+        if can_use_bare(env):
             cmd.append("--bare")
         if resume_id:
             cmd.extend(["--resume", resume_id])

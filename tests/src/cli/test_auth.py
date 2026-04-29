@@ -401,3 +401,50 @@ class TestAuthGroup:
         assert "status" in result.output
         assert "logout" in result.output
         assert "profiles" in result.output
+
+
+class TestLitellmRemoteBaseUrl:
+    """LITELLM_BASE_URL should be prompted during litellm-remote login."""
+
+    def test_login_prompts_for_base_url(self, runner: CliRunner, creds_file: Path) -> None:
+        result = runner.invoke(
+            main,
+            ["auth", "login", "-p", "litellm-remote"],
+            input="my-api-key\nhttps://litellm.example.com\n",
+        )
+        assert result.exit_code == 0
+        creds = yaml.safe_load(creds_file.read_text())
+        saved = creds["profiles"]["default"]
+        assert saved["LITELLM_API_KEY"] == "my-api-key"
+        assert saved["LITELLM_BASE_URL"] == "https://litellm.example.com"
+
+    def test_base_url_not_masked_in_status(
+        self, runner: CliRunner, creds_file: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """LITELLM_BASE_URL is a connection value, not a secret -- show it plainly."""
+        for key in (
+            "LITELLM_BASE_URL",
+            "LITELLM_API_KEY",
+            "GEMINI_API_KEY",
+            "OPENAI_API_KEY",
+            "ANTHROPIC_API_KEY",
+            "LITELLM_LOCAL_API_KEY",
+        ):
+            monkeypatch.delenv(key, raising=False)
+        creds_file.write_text(
+            yaml.dump(
+                {
+                    "version": 1,
+                    "profiles": {
+                        "default": {
+                            "LITELLM_API_KEY": "sk-secret-key",
+                            "LITELLM_BASE_URL": "https://litellm.example.com",
+                        }
+                    },
+                }
+            )
+        )
+        result = runner.invoke(main, ["auth", "status"])
+        assert result.exit_code == 0
+        assert "https://litellm.example.com" in result.output
+        assert "sk-secret-key" not in result.output

@@ -28,6 +28,7 @@ from forge.install.exceptions import (
 )
 from forge.install.installer import Installer, find_claude_root, find_forge_installation
 from forge.install.models import (
+    FILE_MODULES,
     InstallMode,
     InstallModule,
     InstallPlan,
@@ -108,10 +109,65 @@ def _count_actions(plan: InstallPlan) -> tuple[int, int]:
     return file_actions, settings_actions
 
 
-def _print_completion_message(plan: InstallPlan) -> None:
+# Modules that are intentionally empty in the source tree (only .gitkeep).
+# Checked by allowlist so a broken wheel that omits skills/ still warns.
+_INTENTIONALLY_EMPTY_MODULES: set[InstallModule] = {
+    InstallModule.AGENTS,
+    InstallModule.COMMANDS,
+}
+
+
+def _warn_if_modules_have_no_files(
+    plan: InstallPlan,
+    scope: InstallScope,
+    project_root: Path | None,
+    tracking: TrackingStore,
+) -> None:
+    """Warn when a file-bearing module has no files anywhere (plan or tracking).
+
+    A clean install with 0 files in the plan is normal IF the existing
+    tracked install already has files for the module. But if neither plan
+    nor tracking has files for an enabled file-bearing module, the install
+    is broken — typically a wheel missing bundled extensions.
+    """
+    enabled = {InstallModule(m) for m in plan.modules if InstallModule(m) in FILE_MODULES}
+    enabled -= _INTENTIONALLY_EMPTY_MODULES
+    if not enabled:
+        return
+
+    project_str = None if scope == InstallScope.USER else (str(project_root) if project_root else None)
+    existing = tracking.get_installation(scope.value, project_str)
+
+    def _module_has_files(module: InstallModule, paths: list[str]) -> bool:
+        sep = f"/{module.value}/"
+        return any(sep in p for p in paths)
+
+    plan_paths = [f.target_path for f in plan.files]
+    existing_paths = [f.target_path for f in existing.files] if existing else []
+
+    missing = {m for m in enabled if not _module_has_files(m, plan_paths) and not _module_has_files(m, existing_paths)}
+    if not missing:
+        return
+
+    names = ", ".join(sorted(m.value for m in missing))
+    console.print(
+        f"\n[yellow]Warning:[/yellow] No files found for enabled module(s): {names}. "
+        "Your Forge installation may be missing bundled extensions. "
+        "Try reinstalling: 'pip install --force-reinstall <wheel>'."
+    )
+
+
+def _print_completion_message(
+    plan: InstallPlan,
+    scope: InstallScope,
+    project_root: Path | None,
+    tracking: TrackingStore,
+) -> None:
     """Print appropriate completion message based on what was done."""
     file_actions, settings_actions = _count_actions(plan)
     total_actions = file_actions + settings_actions
+
+    _warn_if_modules_have_no_files(plan, scope, project_root, tracking)
 
     if total_actions == 0:
         console.print("\n[dim]Already up to date.[/dim]")
@@ -124,6 +180,11 @@ def _print_completion_message(plan: InstallPlan) -> None:
         console.print(f"\n[green]Extensions enabled.[/green] ({', '.join(parts)} updated)")
 
     console.print("[dim]Tip: Customize permissions and env vars with 'forge claude preset edit'.[/dim]")
+
+    if InstallModule.SKILLS.value in plan.modules:
+        console.print(
+            "[dim]Tip: Multi-model skills require proxy credentials. " "Run 'forge auth status' to check.[/dim]"
+        )
 
     profile = InstallProfile(plan.profile)
     gated = get_gated_skills(profile)
@@ -493,7 +554,7 @@ def enable_cmd(
                     (project_root / ".forge").mkdir(exist_ok=True)
                     _log.info("Created %s for session state", project_root / ".forge")
 
-                _print_completion_message(plan)
+                _print_completion_message(plan, install_scope, project_root, TrackingStore())
 
     except NoClaudeDirectoryError as e:
         console.print(f"[red]Error:[/red] {e}")

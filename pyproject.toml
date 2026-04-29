@@ -62,11 +62,26 @@ packages = ["src/forge"]
 [tool.hatch.build.targets.wheel.sources]
 "src" = ""
 
+# Bundle extension files (skills, agents, commands) into the wheel.
+# These live outside src/forge/ in the repo but must be accessible from
+# a wheel install for `forge extension enable` to work.
+[tool.hatch.build.targets.wheel.force-include]
+"src/skills" = "forge/_extensions/skills"
+"src/agents" = "forge/_extensions/agents"
+"src/commands" = "forge/_extensions/commands"
+
 [tool.hatch.build]
 include = [
     "src/forge/**/*.py",
     "src/forge/**/*.yaml",
     "src/forge/**/*.md",
+    # Extensions are bundled into wheels via force-include above; they must
+    # also be included here so source distributions ship them. Without this,
+    # `pip install --no-binary=:all:` (or anyone building from sdist) would
+    # produce a wheel missing all extensions.
+    "src/skills/**",
+    "src/agents/**",
+    "src/commands/**",
 ]
 
 [tool.pytest.ini_options]

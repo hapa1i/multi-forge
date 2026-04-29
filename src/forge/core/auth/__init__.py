@@ -24,6 +24,10 @@ from forge.core.auth.secrets import (
     EnvSecretsProvider,
     FileSecretsProvider,
 )
+from forge.core.auth.template_secrets import (
+    TEMPLATE_SECRETS,
+    resolve_env_or_credential,
+)
 
 # Re-export errors from core.llm.errors (no new types)
 from forge.core.llm.errors import AuthenticationError, NoApiKeyError
@@ -35,6 +39,9 @@ __all__ = [
     "ConfigSecretsProvider",
     "FileSecretsProvider",
     "ChainSecretsProvider",
+    # Template credential resolution
+    "TEMPLATE_SECRETS",
+    "resolve_env_or_credential",
     # Credential file errors
     "CredentialVersionError",
     # Re-exported errors (canonical source: core.llm.errors)

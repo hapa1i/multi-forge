@@ -33,6 +33,7 @@ def mock_repo(tmp_path: Path) -> Path:
     repo.mkdir()
     src = repo / "src"
     src.mkdir()
+    (src / "forge").mkdir()  # _is_repo_checkout requires src/forge
 
     # Commands
     commands = src / "commands"

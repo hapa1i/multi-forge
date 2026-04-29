@@ -147,7 +147,7 @@ class TestIndexStoreRead:
 
         with pytest.raises(IndexCorruptedError) as exc_info:
             store.read()
-        assert "unsupported version" in str(exc_info.value)
+        assert "incompatible version" in str(exc_info.value)
 
 
 class TestIndexStoreWrite:
@@ -531,7 +531,7 @@ class TestIndexStoreUuidFields:
 
         with pytest.raises(IndexCorruptedError) as exc_info:
             store.read()
-        assert "unsupported version" in str(exc_info.value)
+        assert "incompatible version" in str(exc_info.value)
 
 
 class TestIndexStoreFindByUuid:
@@ -793,7 +793,7 @@ class TestProjectIdentityFields:
 
         with pytest.raises(IndexCorruptedError) as exc_info:
             store.read()
-        assert "unsupported version" in str(exc_info.value)
+        assert "incompatible version" in str(exc_info.value)
 
     def test_read_rejects_extra_fields(self, store: IndexStore, index_path: Path) -> None:
         """Strict deserialization rejects unknown fields in index entries."""

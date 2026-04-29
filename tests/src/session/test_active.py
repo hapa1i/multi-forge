@@ -10,6 +10,7 @@ import pytest
 
 from forge.session.active import (
     ACTIVE_FILENAME,
+    ACTIVE_INDEX_VERSION,
     ActiveSessionStore,
     get_active_index_path,
     track_active_session,
@@ -71,14 +72,14 @@ class TestActiveSessionStore:
         assert entry is not None
         assert entry.claude_session_id == "hook-uuid-456"
 
-    def test_v2_registry_rejected(self, store: ActiveSessionStore) -> None:
-        """Only the OSS v1 active-session registry version is accepted."""
+    def test_v2_registry_self_heals(self, store: ActiveSessionStore) -> None:
+        """Incompatible version is discarded and recreated (runtime-only state)."""
         store.index_path.parent.mkdir(parents=True, exist_ok=True)
-        store.index_path.write_text(json.dumps({"version": 2, "sessions": {}}))
+        store.index_path.write_text(json.dumps({"version": 2, "sessions": {"old": {}}}))
 
-        with pytest.raises(ValueError) as exc_info:
-            store.read()
-        assert "unsupported active-session registry version" in str(exc_info.value)
+        result = store.read()
+        assert result.sessions == {}
+        assert result.version == ACTIVE_INDEX_VERSION
 
     def test_pre_oss_v1_bare_keys_are_discarded(self, store: ActiveSessionStore) -> None:
         """Old same-version active registry shape is reset because it is runtime-only."""

@@ -92,7 +92,7 @@ class TestTrackingStore:
         with pytest.raises(TrackingCorruptedError) as exc_info:
             tracking_store.read()
 
-        assert "unsupported version" in str(exc_info.value)
+        assert "incompatible version" in str(exc_info.value)
 
     def test_read_rejects_pre_oss_manifest_with_patched_files(self, tracking_store: TrackingStore) -> None:
         """Old manifests containing patched_files produce a clean-break error."""

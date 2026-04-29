@@ -122,18 +122,20 @@ FROM ${INSTALL_METHOD}-toolchain AS forge-install
 COPY pyproject.toml uv.lock ./
 RUN uv sync --no-install-project
 
-# Copy only the package metadata + sources needed for editable install.
-# This keeps docs/tests/skills changes from invalidating the project install
-# layer, while still rebuilding when the Forge Python package itself changes.
+# Copy package sources needed for editable install. Extensions (skills, agents,
+# commands) are bundled into the wheel via hatch force-include in pyproject.toml,
+# so they must be present when uv sync runs the editable build. Changes to
+# these directories invalidate the editable install layer; that's acceptable
+# since extension changes are infrequent compared to test/doc edits.
 COPY README.md ./
 COPY src/forge ./src/forge
+COPY src/skills ./src/skills
+COPY src/commands ./src/commands
+COPY src/agents ./src/agents
 RUN uv sync
 
 # Copy the remaining repo content used by tests, extension installers, and
 # container tooling after the editable install layer is cached.
-COPY src/skills ./src/skills
-COPY src/commands ./src/commands
-COPY src/agents ./src/agents
 COPY tests ./tests
 COPY docs ./docs
 COPY scripts ./scripts

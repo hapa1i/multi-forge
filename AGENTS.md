@@ -12,8 +12,10 @@ docs in `docs/`, runtime images in `docker/`, and automation scripts in `scripts
 
 Use the repo docs as the source of truth for their domains: `README.md` for the overview, `docs/developer/` for setup,
 and `CLAUDE.md` for agent context. `docs/developer/coding-standards.md`, `testing-guidelines.md`, and
-`documentation-guidelines.md` define code style, test policy, and doc maintenance rules. Update `docs/design.md` when
-architecture or file ownership changes.
+`documentation-guidelines.md` define code style, test policy, and doc maintenance rules. Update `docs/design.md` and
+`docs/design_appendix.md` when architecture or file ownership changes. When changing config ownership, auth resolution,
+installer behavior, proxy/session semantics, or workflow prerequisites, also update the relevant `docs/end-user/*` guide
+so wheel-installed users get the right Day 1 path.
 
 ## Build, Test, and Development Commands
 
@@ -26,6 +28,18 @@ Use `uv` for dependencies and `make` for the standard workflow:
 - `make test-regression` runs regression tests.
 - `make lint`, `make format`, `make type-check`, and `make pre-commit` run Ruff, formatting, mypy, and the full hook
   suite.
+
+## OSS Release & UX Verification
+
+Editable installs can hide packaging and clean-environment bugs. For changes that affect `pyproject.toml`,
+`scripts/setup.sh`, installer code, bundled extensions (`src/skills/`, `src/commands/`, `src/agents/`), or runtime files
+loaded with `importlib.resources`, build a wheel/sdist and verify the behavior from a clean install path when practical.
+
+For auth, proxy, and workflow changes, test the no-`.env` path explicitly: credentials should resolve from environment
+variables first and `~/.forge/credentials.yaml` second, CLI failures should be actionable rather than raw tracebacks,
+and workflow preflight should fail fast when required auth or proxies are missing. Remember that proxy health only
+confirms the local proxy process is reachable; use `forge proxy start <proxy_id> --smoke-test` to verify upstream LLM
+connectivity after first setup, credential changes, or proxy auth changes.
 
 ## Coding Style & Naming Conventions
 
