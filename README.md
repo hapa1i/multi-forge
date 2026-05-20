@@ -1,7 +1,8 @@
 # Multi-Forge
 
+[![PyPI](https://img.shields.io/pypi/v/multi-forge)](https://pypi.org/project/multi-forge/)
+[![Python](https://img.shields.io/pypi/pyversions/multi-forge)](https://pypi.org/project/multi-forge/)
 [![License](https://img.shields.io/github/license/hapa1i/multi-forge)](LICENSE)
-[![Python](https://img.shields.io/badge/python-3.11--3.13-blue)](https://github.com/hapa1i/multi-forge)
 
 > [!WARNING]
 > **Research Preview** -- Forge is under active development. APIs, commands, and file formats may change without notice
