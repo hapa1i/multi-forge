@@ -28,7 +28,7 @@ completed", or ask the user to run the commands manually unless a real prerequis
 | ---------- | -------- | ---------------------------------------------------------------------------------- |
 | `subject`  | Optional | File, directory, proposal, or instruction on what to evaluate (defaults to cwd)    |
 | `--code`   | Optional | Switch: use code evaluation framework (default: proposal)                          |
-| `--models` | Optional | Comma-separated model list (default: all available)                                |
+| `--models` | Optional | Comma-separated model list (default: Forge workflow defaults)                      |
 | `--worker` | Optional | Repeatable: model:role or model:"custom prompt" (mutually exclusive with --models) |
 | `--output` | Optional | Write result to file instead of conversation (e.g., `consensus.md`)                |
 
@@ -70,6 +70,8 @@ Parse the JSON output. The workflow runs two rounds:
 
 - **Round 1**: Each model independently evaluates the subject from their assigned role
 - **Round 2**: Each model receives all Round 1 positions and produces a reconciled recommendation
+- **Resolved models**: The `resolved_models` object records the requested model, actual routed model ref, provider,
+  proxy, template, and role for each worker
 
 If the command fails, surface the real error and stop; do not claim success.
 
@@ -77,7 +79,9 @@ If the command fails, surface the real error and stop; do not claim success.
 
 Read `${CLAUDE_SKILL_DIR}/resources/synthesis.md` for synthesis instructions.
 
-Apply the synthesis rules to produce a unified consensus report from both rounds of results.
+Apply the synthesis rules to produce a unified consensus report from both rounds of results. Start the report with a
+"Resolved Models Used" section listing each worker from `resolved_models`, including requested model, resolved model
+ref, provider, proxy, template, and role.
 
 **Output routing:** If `--output` was specified, write the complete synthesis to that path using the Write tool (create
 parent directories if needed). Print a one-line confirmation: `Wrote synthesis to {path}`. Do not also print the full
@@ -91,19 +95,19 @@ Models are assigned roles cyclically. Default roles differ by mode:
 
 **Proposal mode** (default):
 
-| Order | Default Model  | Role         | Focus                                        |
-| ----- | -------------- | ------------ | -------------------------------------------- |
-| 1st   | gpt-5.5        | architecture | Structural alignment, coupling, abstractions |
-| 2nd   | gemini-2.5-pro | security     | Vulnerabilities, trust boundaries, risks     |
-| 3rd   | claude-opus    | correctness  | Logic errors, edge cases, invariants         |
+| Order | Default Model          | Role         | Focus                                        |
+| ----- | ---------------------- | ------------ | -------------------------------------------- |
+| 1st   | gpt-5.5                | architecture | Structural alignment, coupling, abstractions |
+| 2nd   | gemini-3.1-pro-preview | security     | Vulnerabilities, trust boundaries, risks     |
+| 3rd   | claude-opus            | correctness  | Logic errors, edge cases, invariants         |
 
 **Code mode** (`--code`):
 
-| Order | Default Model  | Role            | Focus                                  |
-| ----- | -------------- | --------------- | -------------------------------------- |
-| 1st   | gpt-5.5        | architecture    | Component boundaries, dependency flow  |
-| 2nd   | gemini-2.5-pro | security        | Injection, auth, secrets, trust        |
-| 3rd   | claude-opus    | maintainability | Readability, complexity, test coverage |
+| Order | Default Model          | Role            | Focus                                  |
+| ----- | ---------------------- | --------------- | -------------------------------------- |
+| 1st   | gpt-5.5                | architecture    | Component boundaries, dependency flow  |
+| 2nd   | gemini-3.1-pro-preview | security        | Injection, auth, secrets, trust        |
+| 3rd   | claude-opus            | maintainability | Readability, complexity, test coverage |
 
 Use `--models` to control which models participate. Use `--worker` for explicit model:role mapping.
 
@@ -112,4 +116,5 @@ Use `--models` to control which models participate. Use `--worker` for explicit 
 ## Requirements
 
 - **Forge CLI**: `forge` must be on PATH
-- **Proxies**: GPT-5.5 and Gemini require active proxies (`forge proxy create litellm-openai`)
+- **Claude CLI**: workflow workers run through local `claude -p`; `claude` must be on PATH in this Bash environment
+- **Proxies**: GPT-5.5 and Gemini require active proxies (`forge proxy create openrouter-openai`)

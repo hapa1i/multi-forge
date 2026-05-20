@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 SKILLS_DIR = Path(__file__).parent.parent.parent.parent / "src" / "skills"
@@ -30,6 +31,12 @@ class TestReviewCodeSkill:
         content = (SKILLS_DIR / "review" / "SKILL.md").read_text()
         assert "forge session context" in content
         assert "model_family" in content
+        assert 'forge session context "${CLAUDE_SESSION_ID}"' not in content
+
+    def test_preflight_reports_main_model(self):
+        content = (SKILLS_DIR / "review" / "SKILL.md").read_text()
+        assert "--field main_model" in content
+        assert "exact model not exposed to Forge" in content
 
     def test_no_style_flag(self):
         content = (SKILLS_DIR / "review" / "SKILL.md").read_text()
@@ -44,8 +51,35 @@ class TestReviewCodeSkill:
     def test_references_exist(self):
         refs = SKILLS_DIR / "review" / "references"
         assert (refs / "claude-4.6.md").exists()
+        assert (refs / "claude-4.7.md").exists()
         assert (refs / "gpt-5.5.md").exists()
         assert (refs / "gemini-3.1.md").exists()
+
+    def test_model_guides_are_standalone(self):
+        refs = SKILLS_DIR / "review" / "references"
+        guide_names = ("claude-4.6.md", "claude-4.7.md", "gpt-5.5.md", "gemini-3.1.md")
+        cross_guide_phrases = (
+            "4.6 guide",
+            "4.7 guide",
+            "gpt-5.5 guide",
+            "gemini 3.1 guide",
+            "other guide",
+            "companion guide",
+            "reference set",
+        )
+        local_md_link = re.compile(r"\[[^\]]+\]\((?!https?://)[^)]+\.md(?:#[^)]+)?\)")
+
+        for guide_name in guide_names:
+            content = (refs / guide_name).read_text()
+            lower_content = content.lower()
+
+            assert not local_md_link.search(content), f"{guide_name} links to another local Markdown file"
+
+            for other_guide in guide_names:
+                assert other_guide not in content, f"{guide_name} references {other_guide}"
+
+            for phrase in cross_guide_phrases:
+                assert phrase not in lower_content, f"{guide_name} contains cross-guide phrase: {phrase}"
 
 
 class TestModelDocDrift:
@@ -62,9 +96,9 @@ class TestModelDocDrift:
 
     def test_gpt_55_parallel_tool_note_uses_supported_reasoning_effort(self):
         content = (SKILLS_DIR / "review" / "references" / "gpt-5.5.md").read_text()
-        parallel_section = content.split("### Parallel Tool Calls", 1)[1].split("### First-Call Accuracy", 1)[0]
+        parallel_section = content.split("### Parallel Tool Calls", 1)[1].split("---", 1)[0]
 
-        assert "`reasoning_effort` is `none`" in parallel_section
+        assert "`none`" in parallel_section
         assert "`minimal`" not in parallel_section
 
 
@@ -88,6 +122,12 @@ class TestReviewDocsSkill:
         content = (SKILLS_DIR / "review-docs" / "SKILL.md").read_text()
         assert "forge session context" in content
         assert "model_family" in content
+        assert 'forge session context "${CLAUDE_SESSION_ID}"' not in content
+
+    def test_preflight_reports_main_model(self):
+        content = (SKILLS_DIR / "review-docs" / "SKILL.md").read_text()
+        assert "--field main_model" in content
+        assert "exact model not exposed to Forge" in content
 
 
 class TestOldSkillsDeleted:
@@ -241,6 +281,12 @@ class TestUnderstandSkill:
         content = (SKILLS_DIR / "understand" / "SKILL.md").read_text()
         assert "forge session context" in content
         assert "model_family" in content
+        assert 'forge session context "${CLAUDE_SESSION_ID}"' not in content
+
+    def test_preflight_reports_main_model(self):
+        content = (SKILLS_DIR / "understand" / "SKILL.md").read_text()
+        assert "--field main_model" in content
+        assert "exact model not exposed to Forge" in content
 
     def test_allows_bash_for_model_detection(self):
         content = (SKILLS_DIR / "understand" / "SKILL.md").read_text()
@@ -293,6 +339,14 @@ class TestChallengeSkill:
 
 
 class TestQaWorkflowChecklist:
+    def test_extensions_prereqs_are_step_level_for_partial_runs(self):
+        """Section 2 prereqs should not pull clean-state checks after install."""
+        extensions_md = SKILLS_DIR / "qa" / "resources" / "checklist" / "2-extensions.md"
+        content = extensions_md.read_text()
+        first_line = content.splitlines()[0]
+        assert first_line == "<!-- prereq: 0.3, 1.1 -->"
+        assert "<!-- prereq: 0, 1 -->" not in content
+
     def test_session_context_step_uses_positional_session_arg(self):
         skills_md = SKILLS_DIR / "qa" / "resources" / "checklist" / "15-skills.md"
         content = skills_md.read_text()
@@ -311,7 +365,7 @@ class TestQaWorkflowChecklist:
         """Regression for QA-036: guided step must not look directly runnable."""
         review_md = SKILLS_DIR / "qa" / "resources" / "checklist" / "14-workflow.md"
         content = review_md.read_text()
-        step = content.split("### 14.10", 1)[1].split("\n---", 1)[0]
+        step = content.split("### 14.10", 1)[1].split("\n### ", 1)[0]
         assert "```bash" not in step
 
 
@@ -426,8 +480,9 @@ class TestQaHandoffChecklist:
         handoff_md = SKILLS_DIR / "qa" / "resources" / "checklist" / "16-handoff.md"
         content = handoff_md.read_text()
         step = content.split("### 16.3", 1)[1].split("### 16.4", 1)[0]
-        assert '"strategy":"suggested"' in step
-        assert '"shadows":"docs/team-standards.md"' in step
+        assert "forge session memory add-doc .forge/memory/suggested_standards.md" in step
+        assert "--strategy suggested" in step
+        assert "--shadows docs/team-standards.md" in step
         assert "cmp -s docs/team-standards.md /tmp/team-standards.before" in step
 
     def test_handoff_includes_queued_startup_step(self):

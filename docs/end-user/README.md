@@ -7,7 +7,7 @@ How to use Forge features. Each guide is self-contained; start here for the over
 Running `claude` directly works, but you lose session tracking. Forge wraps Claude Code to add:
 
 - **Session tracking** -- named sessions with artifacts, plans, and transcripts
-- **Session resume** -- AI-curated handoff when context fills up
+- **Session resume** -- structured or AI-curated handoff when context fills up
 - **Hook-driven capture** -- plan snapshots, transcript archival on exit
 - **Status line** -- proxy, session, and policy info in the Claude UI
 - **Policy enforcement** -- TDD, coding standards, semantic supervisor
@@ -47,14 +47,14 @@ If you want to route through other providers (Gemini, GPT, etc.):
 # Store your credentials (API keys + connection values)
 forge authentication login
 
-# Create a proxy (starts a local LiteLLM automatically)
-forge proxy create litellm-gemini-local
+# Create a proxy (OpenRouter direct, no LiteLLM needed)
+forge proxy create openrouter-anthropic
 
 # Verify upstream connectivity (optional, recommended on first setup)
-forge proxy start litellm-gemini-local --smoke-test
+forge proxy start openrouter-anthropic --smoke-test
 
 # Launch with proxy routing
-forge session start --proxy litellm-gemini-local
+forge session start --proxy openrouter-anthropic
 ```
 
 See [proxies.md](proxies.md) for templates, tier mappings, and per-tier hyperparameter tuning. See
@@ -97,7 +97,7 @@ and confirmed state:
 ```bash
 forge session start                                            # Auto-named, direct to Anthropic
 forge session start quick-fix                                  # Named, direct to Anthropic
-forge session start my-feature --proxy litellm-gemini-local    # With proxy routing
+forge session start my-feature --proxy openrouter-anthropic    # With proxy routing
 forge session resume my-feature                                # Reattach to conversation
 forge session show my-feature                                  # Session details
 ```

@@ -65,6 +65,8 @@ to parse partial output or fabricate a response.
 
 Format the model's deep analysis as a structured response:
 
+0. Resolved model used: from `resolved_models`, include requested model, resolved model ref, provider, proxy, and
+   template
 1. Problem decomposition
 2. Key evidence and considerations
 3. Analysis and trade-offs
@@ -81,4 +83,5 @@ result in the conversation. If `--output` was not specified, print the result in
 ## Requirements
 
 - **Forge CLI**: `forge` must be on PATH
+- **Claude CLI**: workflow workers run through local `claude -p`; `claude` must be on PATH in this Bash environment
 - **Claude Opus**: Uses direct Anthropic (no proxy needed)

@@ -5,10 +5,21 @@ designated project memory documents. It spawns ``claude -p`` as a headless
 subprocess that reads the session transcript and writes updates to
 configured designated docs.
 
+Note: this is the memory-doc maintenance agent, not the resume-context
+generator. The resume handoff (parent->child context for ``forge session
+resume --fresh``) is in ``handoff.py``. Despite the shared name they are
+different concepts; see ``docs/end-user/handoff.md`` for the user-facing
+distinction.
+
 Supports two modes:
 - **Direct update (Mode 1)**: Agent edits designated docs in-place.
 - **Shadow/propose (Mode 2)**: Agent writes suggestions to a shadow file
   for human review, reading the official doc first for comparison.
+
+Each run persists its stdout to
+``<forge_root>/.forge/artifacts/<session>/handoff/review-<timestamp>.md`` so
+users can inspect proposed/applied changes -- surfaced via
+``forge session handoff show``.
 """
 
 from __future__ import annotations
@@ -17,7 +28,7 @@ import logging
 import re
 from pathlib import Path
 
-from forge.core.reactive.proxy import lookup_proxy_base_url
+from forge.core.reactive.routing import resolve_subprocess_routing
 from forge.core.reactive.session_runner import run_claude_session
 from forge.core.transcript import parse_jsonl_transcript
 from forge.session.claude.invoke import is_claude_available
@@ -195,23 +206,32 @@ def resolve_handoff_base_url(
     env_base_url: str | None = None,
     *,
     direct: bool = False,
+    subprocess_proxy: str | None = None,
 ) -> str | None:
     """Resolve ANTHROPIC_BASE_URL for the handoff agent.
 
     When direct=True, short-circuits the entire chain and returns None
     (forces direct Anthropic routing regardless of session proxy).
 
+    Delegates to ``resolve_subprocess_routing()`` with fail-open semantics.
+    The handoff's proxy_id is soft (preferred, not strict) because handoff
+    is async/best-effort — using the session's confirmed proxy is better
+    than failing.
+
     Priority chain (when not direct):
-    1. proxy_id -> registry lookup (explicit config override, accepts template names)
-    2. confirmed_proxy_base_url -> session's confirmed proxy (same model)
-    3. env_base_url -> current ANTHROPIC_BASE_URL from environment
-    4. None -> Anthropic direct
+    1. proxy_id -> preferred_proxy (handoff config, soft)
+    2. subprocess_proxy -> persisted session subprocess proxy (soft)
+    3. confirmed_proxy_base_url -> session's confirmed proxy
+    4. env_base_url -> current ANTHROPIC_BASE_URL
+    5. None -> Anthropic direct
 
     Args:
-        proxy_id: Optional proxy (proxy_id or template name) from HandoffConfig.
+        proxy_id: Optional proxy from HandoffConfig. Soft: falls through
+            on miss (unlike workflow's strict --proxy).
         confirmed_proxy_base_url: Base URL from session's confirmed proxy.
         env_base_url: Fallback base URL from environment.
         direct: When True, force direct routing (skip all proxy resolution).
+        subprocess_proxy: Session-level subprocess proxy intent.
 
     Returns:
         base_url string or None.
@@ -219,15 +239,17 @@ def resolve_handoff_base_url(
     if direct:
         return None
 
-    if proxy_id:
-        try:
-            base_url = lookup_proxy_base_url(proxy_id)
-            if base_url:
-                return base_url
-        except Exception as e:
-            # Handoff is async/best-effort — fall through to confirmed proxy
-            # (same model the session was using) rather than going direct
-            logger.warning("Handoff proxy '%s' not found, falling back: %s", proxy_id, e)
+    for candidate in (proxy_id, subprocess_proxy):
+        if not candidate:
+            continue
+        result = resolve_subprocess_routing(
+            preferred_proxy=candidate,
+            require_route=False,
+            use_environment=False,
+        )
+
+        if result.base_url:
+            return result.base_url
 
     return confirmed_proxy_base_url or env_base_url
 
@@ -238,7 +260,7 @@ def resolve_handoff_base_url(
 _UNSAFE_PATH_RE = re.compile(r"[`\x00-\x1f\x7f]")
 
 
-def _is_safe_path(path: str, base: Path, resolved_base: Path) -> str | None:
+def is_safe_designated_doc_path(path: str, base: Path, resolved_base: Path) -> str | None:
     """Check a single path for safety. Return rejection reason or None if safe."""
     if Path(path).is_absolute():
         return f"absolute path: {path}"
@@ -288,13 +310,13 @@ def _validate_designated_docs(
     valid: list[DesignatedDoc] = []
     resolved_base = forge_root.resolve()
     for doc in designated_docs:
-        reason = _is_safe_path(doc.path, forge_root, resolved_base)
+        reason = is_safe_designated_doc_path(doc.path, forge_root, resolved_base)
         if reason:
             logger.warning("Skipping designated_doc (%s): %s", doc.path, reason)
             continue
 
         if doc.shadows is not None:
-            reason = _is_safe_path(doc.shadows, forge_root, resolved_base)
+            reason = is_safe_designated_doc_path(doc.shadows, forge_root, resolved_base)
             if reason:
                 logger.warning("Skipping designated_doc shadows (%s): %s", doc.shadows, reason)
                 continue
@@ -355,7 +377,7 @@ def run_handoff_agent(
     project_root = forge_root
 
     # Validate transcript path (system boundary: CLI args / marker payload)
-    reason = _is_safe_path(transcript_snapshot_rel, project_root, project_root.resolve())
+    reason = is_safe_designated_doc_path(transcript_snapshot_rel, project_root, project_root.resolve())
     if reason:
         logger.warning("Handoff agent: unsafe transcript path (%s)", reason)
         return False
@@ -432,18 +454,40 @@ def run_handoff_agent(
 
     # Use forge_root as cwd so designated doc paths (relative) resolve
     # against the correct branch content. Transcript path is absolute.
+    from forge.core.reactive.cost_tracking import track_verb_cost
+
     effective_timeout = timeout_seconds if timeout_seconds is not None else _default_timeout()
-    result = run_claude_session(
-        prompt,
-        base_url=base_url,
-        timeout_seconds=effective_timeout,
-        cwd=str(forge_root),
-    )
+    tracking_url = base_url
+
+    with track_verb_cost("handoff", [tracking_url] if tracking_url else []):
+        result = run_claude_session(
+            prompt,
+            base_url=base_url,
+            direct=config.direct,
+            timeout_seconds=effective_timeout,
+            cwd=str(forge_root),
+        )
 
     if not result.success:
         detail = result.error or (result.stderr[:500] if result.stderr else f"exit {result.returncode}")
         logger.warning("Handoff agent for %s failed: %s", session_name, detail)
         return False
+
+    # Persist the agent's stdout to a per-session review file so users can
+    # inspect what was proposed (review-only mode) or what was applied
+    # (augment mode). The work-queue spawns this command detached with
+    # stdout/stderr -> DEVNULL, so the file is the only visible artifact.
+    try:
+        _persist_review_report(
+            forge_root=forge_root,
+            session_name=session_name,
+            mode=config.mode,
+            turn_count=turn_count,
+            stdout=result.stdout,
+        )
+    except OSError as e:
+        # Best-effort: don't fail the agent if the review file can't be written
+        logger.warning("Could not persist handoff review file for %s: %s", session_name, e)
 
     # Only check for permission denial in augment mode. review-only mode
     # explicitly tells Claude "Do NOT modify any files", so a compliant
@@ -458,3 +502,43 @@ def run_handoff_agent(
 
     logger.info("Handoff agent completed for session %s", session_name)
     return True
+
+
+def review_dir(forge_root: Path, session_name: str) -> Path:
+    """Return the directory where handoff agent review reports live."""
+    return forge_root / ".forge" / "artifacts" / session_name / "handoff"
+
+
+def _persist_review_report(
+    *,
+    forge_root: Path,
+    session_name: str,
+    mode: str,
+    turn_count: int,
+    stdout: str,
+) -> Path:
+    """Write the agent's stdout to a timestamped review file.
+
+    Returns the absolute path of the written file. The work queue spawns the
+    agent detached so stdout/stderr go to DEVNULL; this file is the only way
+    users can inspect what the agent proposed or applied. See ``forge session
+    handoff show``.
+    """
+    from datetime import datetime, timezone
+
+    output_dir = review_dir(forge_root, session_name)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    now = datetime.now(timezone.utc)
+    stamp = now.strftime("%Y%m%d-%H%M%S-%f")
+    target = output_dir / f"review-{stamp}.md"
+
+    header = (
+        f"# Handoff Agent Report -- {session_name}\n\n"
+        f"**Mode**: {mode}\n"
+        f"**Timestamp**: {now.isoformat()}\n"
+        f"**Turns**: {turn_count}\n\n"
+        "---\n\n"
+    )
+    target.write_text(header + (stdout or "_(no output)_\n"), encoding="utf-8")
+    return target

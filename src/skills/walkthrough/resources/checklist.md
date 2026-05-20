@@ -2,9 +2,9 @@
 
 <!-- version: 1.0.0 -->
 
-<!-- test-count: 84 assertions -->
+<!-- test-count: 90 assertions -->
 
-<!-- last-updated: 2026-03-19 -->
+<!-- last-updated: 2026-05-18 -->
 
 <!-- aligned-with: v0.1.0 -->
 
@@ -87,7 +87,7 @@ terminal to try Forge commands hands-on in later sections.
 <!-- auto -->
 
 ```bash
-bash "$SCRIPTS/run-in-repo.sh" forge extension enable --local
+bash "$SCRIPTS/run-in-repo.sh" forge extension enable --scope local
 ```
 
 - [ ] Exit code 0
@@ -206,7 +206,7 @@ Try at least 2-3 commands. They all run in the sandbox — your real system is n
 <!-- auto -->
 
 ```bash
-bash "$SCRIPTS/run-in-repo.sh" forge proxy create litellm-openai
+bash "$SCRIPTS/run-in-repo.sh" forge proxy create openrouter-anthropic
 ```
 
 - [ ] Proxy created successfully
@@ -265,7 +265,7 @@ forge claude start --proxy $PROXY_ID
 ```
 
 This starts Claude Code (Session B) with API calls routed through the proxy. Forge hooks, status line, and % commands
-are all active because extensions were installed `--local`.
+are all active because extensions were installed with `--scope local`.
 
 - [ ] Claude Code launched in test repo
 - [ ] Session B is running and responsive
@@ -280,11 +280,12 @@ Look at the **status bar** at the bottom of Session B. You should see two lines 
 
 - **Session name** (`walkthrough-demo`) and branch info
 
-- **Proxy template** (`litellm-openai`) and **model mappings** (e.g., `[O:gpt-5.2 S:gpt-5.1-codex H:gpt-5-mini]`)
+- **Proxy template** (`openrouter-anthropic`) and **model mappings** (e.g.,
+  `[O:claude-opus S:claude-sonnet H:claude-haiku]`)
 
 - [ ] Status line shows session name (walkthrough-demo)
 
-- [ ] Status line shows proxy template (litellm-openai) and tier-to-model mappings
+- [ ] Status line shows proxy template (openrouter-anthropic) and tier-to-model mappings
 
 ---
 
@@ -516,6 +517,31 @@ bash "$SCRIPTS/run-in-repo.sh" forge session list
 
 - [ ] Both walkthrough-demo and walkthrough-fork appear in session list
 
+### 11.5 Try Memory Doc Commands
+
+<!-- human:guided -->
+
+In your **Terminal** window, try the lightweight memory-doc setup commands. This does not run the handoff agent; it only
+verifies that session memory docs can be added, inspected, and removed without editing raw JSON.
+
+```
+mkdir -p .forge/memory
+cat > .forge/memory/walkthrough-notes.md <<'EOF'
+# Walkthrough Notes
+EOF
+
+forge session memory add-doc .forge/memory/walkthrough-notes.md --strategy debugging --session walkthrough-demo
+forge session memory list-docs --session walkthrough-demo
+forge session memory list-docs --json --session walkthrough-demo
+forge session memory remove-doc .forge/memory/walkthrough-notes.md --session walkthrough-demo
+forge session memory list-docs --session walkthrough-demo
+```
+
+- [ ] `add-doc` succeeds for `.forge/memory/walkthrough-notes.md`
+- [ ] `list-docs` shows the path with `debugging` strategy
+- [ ] `list-docs --json` emits the same designated doc in JSON form
+- [ ] `remove-doc` succeeds and the final list no longer includes the doc
+
 ---
 
 ## 12. Sidecar Execution
@@ -674,16 +700,21 @@ rm -rf "$FORGE_TEST_REPO/.forge/artifacts"
 rm -rf "$FORGE_TEST_REPO/.forge/search-index"
 ```
 
+```bash
+rm -rf "$FORGE_TEST_REPO/.forge/memory"
+```
+
 - [ ] Fork session cleaned (or did not exist)
 - [ ] Session deleted
 - [ ] Proxy deleted
+- [ ] Walkthrough memory docs removed
 
 ### 13.3 Uninstall from Sandbox
 
 <!-- auto -->
 
 ```bash
-bash "$SCRIPTS/run-in-repo.sh" forge extension disable --local --force
+bash "$SCRIPTS/run-in-repo.sh" forge extension disable --scope local --force
 ```
 
 - [ ] Uninstall completed (exit code 0)

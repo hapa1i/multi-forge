@@ -15,8 +15,8 @@ A **session** is a human unit of work with a **1:1 relationship** to a Claude pr
 
 - named session identity (portable name)
 - worktree association (optional for parallel work — multiple sessions can also run in the same directory)
-- session manifest (`.forge/sessions/<name>/forge.session.json`) storing intent/overrides/confirmed facts, including
-  relaunch preferences
+- session manifest (`<forge_root>/.forge/sessions/<name>/forge.session.json`) storing intent/overrides/confirmed facts,
+  including relaunch preferences
 - artifacts (approved plans, transcripts)
 - exactly one `claude_session_id` (set by the SessionStart hook when Claude starts, not pre-seeded)
 
@@ -40,7 +40,8 @@ A session is **not** a proxy routing identity.
 > **Session identity:** Hooks use Forge launch env vars only. Resolution order is: `FORGE_FORK_NAME` -> `FORGE_SESSION`
 > -> IndexStore UUID lookup. No CWD-based directory scan.
 
-Multiple sessions can coexist in the same Forge project, each with its own directory under `.forge/sessions/`.
+Multiple sessions can coexist in the same Forge project, each with its own directory under
+`<forge_root>/.forge/sessions/`.
 
 The session file includes hook-confirmed facts such as:
 
@@ -64,7 +65,7 @@ Always launch Claude through Forge to get session tracking:
 ```bash
 forge session start                                            # Auto-named, direct to Anthropic
 forge session start my-feature                                 # Named, direct to Anthropic
-forge session start my-feature --proxy litellm-gemini-local    # Named + proxy routing
+forge session start my-feature --proxy openrouter-anthropic    # Named + proxy routing
 ```
 
 This gives you: named session with manifest, hook-driven plan snapshots, transcript capture, status line, session
@@ -73,7 +74,7 @@ resume, search, and handoff agent. Requires `forge extension enable` first (crea
 **Bare launch** (`forge claude start`) — proxy routing only, no session state:
 
 ```bash
-forge claude start --proxy litellm-gemini-local
+forge claude start --proxy openrouter-anthropic
 forge claude start --no-proxy
 ```
 
@@ -160,7 +161,7 @@ forge session list --older-than 30            # List old sessions before cleanin
 ```
 
 Active sessions are always skipped. Worktrees and branches are preserved by default. Claude transcript files
-(`~/.claude/projects/*.jsonl`) are deleted; Forge artifact snapshots (`.forge/artifacts/`) are not.
+(`~/.claude/projects/*.jsonl`) are deleted; Forge artifact snapshots (`<forge_root>/.forge/artifacts/`) are not.
 
 For automatic cleanup, set `session_retention_days` in `~/.forge/config.yaml`:
 
@@ -179,7 +180,7 @@ Sessions require a **Forge project** — a directory with `.forge/` (and `.claud
 
 ```bash
 cd my-repo
-forge extension enable --local    # Creates .claude/ and .forge/ if needed
+forge extension enable --scope local    # Creates .claude/ and .forge/ if needed
 forge session start my-feature    # Now works
 ```
 
@@ -193,6 +194,16 @@ require `.forge/`.
 All session state (manifests, artifacts, search index, handoff files) is scoped to the **Forge project root**
 (`forge_root`) — the directory containing `.forge/`. In most setups this is your repo root. In monorepos with nested
 Forge projects, each project has its own session namespace.
+
+Session files always live under `<forge_root>/.forge/...`; `worktree.path` records where the code checkout lives. The
+common worktree cases are:
+
+| Command shape                                                | Where the child/session state lives                                           |
+| :----------------------------------------------------------- | :---------------------------------------------------------------------------- |
+| `forge session start --worktree` from a root-level project   | Original project root's `.forge/`; the new worktree is only the code checkout |
+| `forge session start --worktree` from a nested Forge project | Equivalent nested Forge project inside the new worktree                       |
+| `forge session fork --worktree`                              | New worktree's Forge project root                                             |
+| `forge session fork --into <path>`                           | Target worktree's Forge project root at the equivalent position               |
 
 ### Which commands resolve cross-project?
 
@@ -248,6 +259,10 @@ Why use a worktree:
 
 > Worktrees add **filesystem** isolation so multiple sessions can modify files concurrently without conflicts. Sessions
 > can also coexist in the same worktree (see [Session state](#session-state-what-files-exist)).
+
+For root-level Forge projects, `start --worktree` keeps the session manifest and artifacts in the original
+`<forge_root>/.forge/`; the manifest's `worktree.path` points at the isolated checkout. Nested Forge projects are
+remapped to the equivalent nested Forge root inside the new worktree.
 
 ### Start a sidecar session (Docker isolation)
 
@@ -318,12 +333,34 @@ forge session resume auth-refactor --fresh
 
 # Lossless: carry full conversation history
 forge session resume auth-refactor --fresh --resume-mode native
+
+# Curate the assembled context in $EDITOR before launching
+forge session resume auth-refactor --fresh --review
 ```
 
 Native mode requires the parent to have a confirmed Claude session ID (i.e., the session must have been launched at
-least once). `--strategy` and `--depth` are ignored in native mode.
+least once). `--strategy` and `--depth` are ignored in native mode. `--review` is only valid for handoff mode (native
+resumes carry the conversation verbatim and have no editable artifact).
 
-Resume and fork-recovery launches inject the generated handoff file directly with `--append-system-prompt-file`. If you
+**Curating the handoff with `--review`.** When you pass `--review`, Forge opens the generated per-child handoff file in
+`$EDITOR` and waits. Save and exit normally to launch; abort (`:cq` in vim) to skip the launch. The edited file is
+preserved on disk regardless of whether the launch proceeded. If you abort, the child session remains unlaunched; run
+`forge session resume <child>` later to launch it with the preserved edited handoff file.
+
+**Per-parent layout for resume artifacts.** Each parent gets a directory under `.forge/prev_sessions/`:
+
+```text
+<forge_root>/.forge/prev_sessions/
+└── <parent>/
+    ├── generated.md             # Regeneratable cache (overwritten on every resume)
+    └── children/
+        └── <child>.md           # Per-child authoritative context (durable)
+```
+
+Re-resuming the same parent regenerates `generated.md` but never disturbs an existing `children/<child>.md`. Any
+hand-edits a user makes to a child file survive subsequent resumes from the same parent.
+
+Resume and fork-recovery launches inject the per-child file directly with `--append-system-prompt-file`. If you
 customize `CLAUDE.md`, do not also add manual references to `.forge/prev_sessions/...` there, or you may duplicate the
 same handoff context.
 
@@ -350,8 +387,12 @@ forge session fork auth-refactor --name auth-refactor-alt --worktree
 
 Creates a git worktree for the fork. `--branch` implies `--worktree`. Because Claude conversations are project-scoped,
 the fork starts a fresh Claude session in the new worktree and automatically injects a parent handoff context file
-(`.forge/prev_sessions/<parent>.md`). Claude knows where the parent left off, but the old visible chat history is not
-replayed.
+(`.forge/prev_sessions/<parent>/children/<fork-name>.md`). Claude knows where the parent left off, but the old visible
+chat history is not replayed.
+
+The fork manifest and handoff file live under the new worktree's Forge root. For a root-level project, inspect
+`<new-worktree>/.forge/sessions/<fork>/forge.session.json` and
+`<new-worktree>/.forge/prev_sessions/<parent>/children/<fork-name>.md`.
 
 **With `--into` (existing worktree):**
 
@@ -362,6 +403,9 @@ forge session fork planner-session --into /path/to/executor-worktree
 Forks into an **existing** non-main worktree. The fork gets the parent's conversation context (via handoff file) but
 lands in the target worktree's code. The target must be part of the same git repository (validated via
 `git-common-dir`). The main checkout is rejected — use a same-directory fork instead.
+
+The child manifest and handoff file live under the target worktree's Forge root, for example
+`/path/to/executor-worktree/.forge/sessions/<child>/forge.session.json` for a root-level project.
 
 Key differences from `--worktree`:
 
@@ -380,6 +424,9 @@ Key differences from `--worktree`:
 
 These flags apply to `--worktree` and `--into` forks (file-based handoff). Same-directory forks use native
 `--resume --fork-session` and ignore these flags.
+
+`ai-curated` uses OpenRouter directly and requires `OPENROUTER_API_KEY`. If OpenRouter auth is unavailable, Forge warns
+and falls back to the deterministic `structured` strategy.
 
 **Use case: Plan -> Execute -> Review workflow:**
 
@@ -406,16 +453,16 @@ existing sessions with `forge guard supervise <session>` or `%guard supervise <s
 
 ```bash
 # Fork with supervisor on a different model (e.g., Gemini for checking, Opus for coding)
-forge session fork planner --worktree --supervise --supervisor-proxy litellm-gemini --no-proxy
+forge session fork planner --worktree --supervise --supervisor-proxy openrouter-gemini --no-proxy
 
 # Fork with supervisor going direct to Anthropic
 forge session fork planner --worktree --supervise --no-supervisor-proxy
 
 # Same flags work on session start
-forge session start executor --supervise planner --supervisor-proxy litellm-gemini
+forge session start executor --supervise planner --supervisor-proxy openrouter-gemini
 
 # Or change supervisor routing on an existing session
-forge guard supervise planner --supervisor-proxy litellm-gemini
+forge guard supervise planner --supervisor-proxy openrouter-gemini
 ```
 
 **Supervisor lifecycle controls:**
@@ -464,7 +511,7 @@ Claude.
 ### Start a session with a proxy
 
 ```bash
-forge session start my-session --proxy litellm-openai
+forge session start my-session --proxy openrouter-anthropic
 ```
 
 `--proxy` sets the session's initial proxy intent. It accepts a proxy ID or template name. Without `--proxy`, sessions
@@ -472,16 +519,53 @@ default to direct mode (Anthropic API).
 
 The invariant: choosing a proxy chooses routing defaults (model family, context limit).
 
+### Pin a Claude model (`--model`)
+
+```bash
+forge session start review-pass --model claude-opus-4-7
+forge session start long-sonnet --model claude-sonnet-4-6[1m]
+forge session start review-pass --proxy openrouter-anthropic --model claude-opus-4-7
+```
+
+`--model` behavior depends on the session routing mode:
+
+| Mode                                    | What `--model` does                                                 | `[1m]` support                 |
+| --------------------------------------- | ------------------------------------------------------------------- | ------------------------------ |
+| Direct (no `--proxy`)                   | Pins Claude Code's `ANTHROPIC_MODEL` directly                       | Yes                            |
+| Proxy + alternative configured          | Selects a `model_alternatives` entry; proxy routes to backend model | Yes (stripped at proxy lookup) |
+| Proxy + no alternative                  | Errors: "does not configure model alternative for ..."              | N/A                            |
+| Subprocess proxy (`--subprocess-proxy`) | Pins Claude Code env vars (main is direct; subprocesses inherit)    | Yes                            |
+
+Rejected with `--sidecar` or `--host-proxy`.
+
+Forge stores the normalized model pin in the session intent and relaunches resume/fork children with the same
+`ANTHROPIC_MODEL` and `ANTHROPIC_DEFAULT_*_MODEL` environment variables. The stable `claude-opus`/`opus` aliases point
+at Claude Opus 4.6; use `claude-opus-4-7` explicitly for Opus 4.7.
+
+For proxy-mode `model_alternatives` configuration, see [proxies.md](proxies.md#model-alternatives).
+
 ### Resume with a routing override
 
 ```bash
-forge session resume parent-session --fresh --proxy litellm-gemini-local
+forge session resume parent-session --fresh --proxy openrouter-gemini
 ```
 
 `--proxy` performs full proxy resolution (exact proxy_id match or active template lookup) with a healthcheck, then
 routes the child session through the resolved proxy. It accepts both proxy IDs and template names.
 
 `--no-proxy` forces direct Anthropic routing, bypassing any inherited proxy.
+
+### Route only subprocesses through a proxy
+
+Use `--subprocess-proxy` when the main session should use Claude Code's direct Anthropic auth, but Forge-spawned
+subprocesses such as supervisor, panel, or handoff jobs should use a proxy:
+
+```bash
+forge session start my-session --subprocess-proxy openrouter
+```
+
+This records `intent.subprocess_proxy` and sets `FORGE_SUBPROCESS_PROXY` for child jobs. It is mutually exclusive with
+`--proxy`: use `--proxy` when the main session itself should route through the proxy.
 
 ---
 
@@ -571,11 +655,11 @@ All commands (`start`, `resume`, `fork`, `claude start`) use the same `resolve_p
 
 ### Files to inspect (debugging)
 
-| File                                        | Purpose                                     |
-| ------------------------------------------- | ------------------------------------------- |
-| `.forge/sessions/<name>/forge.session.json` | Session manifest (intent + confirmed state) |
-| `~/.forge/sessions/index.json`              | Global session registry (with UUIDs)        |
-| `~/.forge/sessions/active.json`             | Runtime live-session registry               |
+| File                                                     | Purpose                                     |
+| -------------------------------------------------------- | ------------------------------------------- |
+| `<forge_root>/.forge/sessions/<name>/forge.session.json` | Session manifest (intent + confirmed state) |
+| `~/.forge/sessions/index.json`                           | Global session registry (with UUIDs)        |
+| `~/.forge/sessions/active.json`                          | Runtime live-session registry               |
 
 ### Gotchas
 

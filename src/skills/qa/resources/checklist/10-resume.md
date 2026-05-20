@@ -11,7 +11,7 @@
 SESSION_JSON=".forge/sessions/test-session-1/forge.session.json"
 SESSION_ID=$(jq -r '.confirmed.claude_session_id // "fixture-transcript"' "$SESSION_JSON")
 TRANSCRIPT_REL=".forge/artifacts/test-session-1/transcripts/${SESSION_ID}.jsonl"
-TRANSCRIPT_ABS="/workspace/${TRANSCRIPT_REL}"
+TRANSCRIPT_ABS="$FORGE_TEST_REPO/${TRANSCRIPT_REL}"
 
 mkdir -p "$(dirname "$TRANSCRIPT_ABS")"
 cat > "$TRANSCRIPT_ABS" << 'EOF'
@@ -48,6 +48,8 @@ jq \
 
 ### 10.2 Resume with Minimal Strategy
 
+<!-- prereq: 10.1 -->
+
 <!-- requires: api_key -->
 
 <!-- human:guided -->
@@ -68,6 +70,8 @@ cat .forge/sessions/test-resumed-minimal/forge.session.json | jq '.confirmed.der
 
 ### 10.3 Resume with Structured Strategy
 
+<!-- prereq: 10.1 -->
+
 <!-- requires: api_key -->
 
 <!-- human:guided -->
@@ -80,13 +84,15 @@ created, then exit.
 forge session resume test-session-1 --fresh --strategy structured --child-name test-resumed-structured
 
 # Check processed handoff
-cat .forge/prev_sessions/test-session-1.md
+cat .forge/prev_sessions/test-session-1/generated.md
 ```
 
-- [ ] Handoff file created in `.forge/prev_sessions/`
+- [ ] Handoff file created at `.forge/prev_sessions/<parent>/children/<child>.md`
 - [ ] Contains conversation skeleton with truncated tool results
 
 ### 10.4 Resume with Full Strategy
+
+<!-- prereq: 10.1 -->
 
 <!-- requires: api_key -->
 
@@ -100,7 +106,7 @@ fail if the transcript is too large for the proxy context window.
 forge session resume test-session-1 --fresh --strategy full --child-name test-resumed-full
 
 # Check the handoff
-cat .forge/prev_sessions/test-session-1.md
+cat .forge/prev_sessions/test-session-1/generated.md
 ```
 
 - [ ] Full transcript included
@@ -108,23 +114,30 @@ cat .forge/prev_sessions/test-session-1.md
 
 ### 10.5 Resume with AI-Curated Strategy
 
+<!-- prereq: 10.1 -->
+
 <!-- requires: api_key -->
 
 <!-- human:guided -->
 
-In the **container shell**, resume with `--strategy ai-curated`. This uses an LLM to select highlights — expect a
-security warning about external API access.
+In the **container shell**, resume with `--strategy ai-curated`. This uses OpenRouter directly to select highlights from
+the parent transcript, then launches the child session. Expect a security warning about external API access.
 
 ```
 # Resume with AI-curated strategy (LLM-selected highlights)
-# NOTE: Requires LLM access - may show security warning
+# NOTE: Requires OPENROUTER_API_KEY in the default QA provider profile.
+forge session delete test-resumed-ai --yes --force 2>/dev/null || true
 forge session resume test-session-1 --fresh --strategy ai-curated --child-name test-resumed-ai
 
-# If successful, check the curated output
-cat .forge/prev_sessions/test-session-1.md
+# Check the curated output or fallback output
+cat .forge/prev_sessions/test-session-1/generated.md
 ```
 
-- [ ] Security warning shown about external API
-- [ ] LLM-selected highlights in handoff (or fallback to structured)
+- [ ] Parent transcript fixture from 10.1 exists
+- [ ] Security warning shown about sending transcript content to OpenRouter
+- [ ] Default OpenRouter QA profile: handoff shows `Strategy: ai-curated` and LLM-selected highlights
+- [ ] If OpenRouter auth is unavailable, fallback to structured is acceptable and the warning explains the auth failure
+- [ ] No warning about missing remote LiteLLM infrastructure in the default OpenRouter QA profile
+- [ ] No `No transcript available; using minimal strategy` warning
 
 ---

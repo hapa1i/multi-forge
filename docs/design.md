@@ -9,8 +9,8 @@
 
 ## 1. Philosophy: The "Glue" Approach
 
-Forge is **not** a monolith. It is the **connective tissue** between specialized tools -- a monorepo of proven tools
-sharing common libraries (Auth, Models, State) under a unified interface (`forge` CLI).
+Forge is **not** a monolith. It is the **connective tissue** between specialized tools -- a monorepo of tools sharing
+common libraries (Auth, Models, State) under a unified interface (`forge` CLI).
 
 ## 2. Core components (the "pieces")
 
@@ -83,7 +83,7 @@ project_root    (logical repo -- git identity, shared across worktrees)
    `.forge/`.
 4. Project/local `forge extension enable` requires `.claude/` at the target directory. If missing, it is created
    silently (it is a directory, not a config file -- no ambiguity, no interactive prompt needed). User-level install
-   (`--user`) goes to `~/.claude/` and does not require a project anchor.
+   (`--scope user`) goes to `~/.claude/` and does not require a project anchor.
 
 **Definitions:**
 
@@ -131,7 +131,8 @@ this.
 
 When sessions cross **Forge project boundaries** (worktree forks, `fork --into`, resume), Forge uses **file-based
 handoff**: `process_handoff()` reads the parent's transcript artifacts and generates a portable context file at
-`<forge_root>/.forge/prev_sessions/<parent>.md`, appended at launch via `--append-system-prompt-file`. This is an
+`<forge_root>/.forge/prev_sessions/<parent>/generated.md`, then copies it to the launch-time child artifact at
+`<forge_root>/.forge/prev_sessions/<parent>/children/<child>.md`, appended via `--append-system-prompt-file`. This is an
 accepted tradeoff: handoff files are lossy compared to native `--resume` (structured summary vs full conversation), but
 they enable branch isolation and cross-worktree workflows.
 
@@ -149,8 +150,8 @@ checkout and leaves final cleanup to the user.
 
 This workflow motivates Forge's separation of **Session** and **Proxy**.
 
-**Goal:** Combine meticulous planning/review from one proxy (e.g., OpenAI-based) with fast/high-quality implementation
-from another, while keeping artifacts and the working directory shared.
+**Goal:** Combine deep planning/review from one proxy (e.g., OpenAI-based) with fast/high-quality implementation from
+another, while keeping artifacts and the working directory shared.
 
 > See [diagrams.md §7: Multi-Proxy Workflow](diagrams.md#7-multi-proxy-workflow).
 
@@ -201,8 +202,10 @@ worktrees and Forge projects within the logical repo. **`project`** filters by `
 
 **1:1 invariant:** Each Forge session corresponds to exactly one Claude process invocation.
 `confirmed.claude_session_id` is **launch-owned** — it starts as `None` when a session is created, and is set by the
-SessionStart hook when Claude actually starts. A non-null `claude_session_id` means "this session has been used."
-Relaunching a used session creates a child with lineage (`parent_session`), not a reuse of the same session.
+SessionStart hook when Claude actually starts. A non-null `claude_session_id` means "this session has been used." Stop
+and StopFailure also reconcile `claude_session_id` and `transcript_path` from their hook payloads to correct
+fork-session launches where SessionStart sees an inherited parent UUID. Relaunching a used session creates a child with
+lineage (`parent_session`), not a reuse of the same session.
 
 **Default resume behavior.** `forge session resume <name>` reattaches to the same Claude conversation without creating a
 child. This relaxes the 1:1 model (a new process invocation on the same Forge session) and is the default path: the
@@ -232,6 +235,16 @@ launch:
 
 This keeps `forge session resume <name>` honest for sidecar sessions without overloading `confirmed` with user-owned
 preferences.
+
+**`intent.subprocess_proxy`**: optional proxy ID used only by Forge-spawned subprocesses:
+
+```yaml
+subprocess_proxy: openrouter-anthropic
+```
+
+This supports direct-mode main sessions that still need panel, supervisor, or handoff subprocesses routed through a
+proxy for API-key auth and cost visibility. It is session-owned launch intent, not a proxy-owned tier/model override.
+Resume, fork, and relaunch children inherit it unless the launch path explicitly chooses different routing.
 
 **`confirmed.started_with_proxy`**: the proxy this session is running with (set at start, immutable for the run):
 
@@ -294,6 +307,15 @@ proxy-owned routing properties. (Proxy requests do not carry a stable session id
 - Does NOT require `.forge/` -- works from any directory
 - Only sets `ANTHROPIC_BASE_URL` (proxy mode) or nothing (direct mode)
 
+**Subprocess proxy launch variant** (`forge session start --subprocess-proxy <proxy_id>`):
+
+- Creates a normal direct-mode Forge session for the main Claude process
+- Records `intent.subprocess_proxy=<proxy_id>`
+- Sets `FORGE_SUBPROCESS_PROXY` so Forge-spawned subprocesses resolve the proxy and set `ANTHROPIC_BASE_URL`
+- Leaves the main Claude process on direct Anthropic routing
+- Is mutually exclusive with `--proxy`; `--proxy` routes the main session through the proxy, while `--subprocess-proxy`
+  is specifically dual-auth routing for direct sessions and their child jobs
+
 Running `claude` directly bypasses both paths; neither proxy routing nor session integration will work.
 
 > See [diagrams.md §6: Proxy Routing Flow](diagrams.md#6-proxy-routing-flow) for a sequence diagram.
@@ -310,10 +332,13 @@ To avoid writer conflicts:
   - `confirmed` bootstrap/runtime fields written by the CLI: `derivation` (resume metadata), `is_sandboxed` (updated at
     launch time to reflect whether Claude is running via sidecar)
   - Sets `FORGE_SESSION=<session_name>` when launching Claude
-  - Note: `claude_session_id` is **not** pre-seeded by the CLI; it is set by the SessionStart hook (launch-owned)
+  - Note: `claude_session_id` is **not** pre-seeded by the CLI; it is set by hooks from Claude's live conversation
+    payloads. SessionStart sets the initial value, and Stop/StopFailure may reconcile it when native fork launches
+    materialize a child UUID after startup.
 - Hooks write:
   - `confirmed` section **during the session**: `claude_session_id`, proxy identity, artifacts, policy state, transcript
-    paths. The SessionStart hook is the authoritative source for `claude_session_id`.
+    paths. SessionStart is the first source for `claude_session_id`; Stop and StopFailure are authoritative
+    reconciliation points for the final live conversation identity.
   - Locate session via `FORGE_SESSION`
 - Forge Proxy Orchestrator writes:
   - `~/.forge/proxies/index.json`
@@ -342,14 +367,16 @@ To avoid writer conflicts:
 | **Config**         | In-repo defaults + user credentials/connection values (env vars and/or `~/.forge/credentials.yaml`). Connection values (e.g., `LITELLM_BASE_URL`) bootstrap proxy creation; once `proxy.yaml` exists, proxy-owned routing is authoritative. |
 | **Proxy Template** | Operational profile defining provider/endpoint/tier-mappings. Internal template for proxy creation.                                                                                                                                         |
 | **Model Catalog**  | Authoritative internal data for model capabilities (`model_catalog.yaml`). Not user-editable.                                                                                                                                               |
+| **ModelRoute**     | Derived routing option pairing a model with a provider/credential/template. Generated by `derive_model_routes()`, not hand-authored.                                                                                                        |
+| **RoutingResult**  | Structured outcome of subprocess routing resolution: base_url, proxy_id, resolution source, selected route, warning. Replaces bare `str \| None`.                                                                                           |
 
 #### 3.6.2 Field ownership invariants (normative)
 
-| Owner             | Fields                                                                                                                         |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| **Proxy-owned**   | tier→model mappings, provider/base_url, default hyperparams (reasoning_effort, temperature, verbosity, thinking_budget_tokens) |
-| **Session-owned** | policy/TDD mode, memory/artifacts, `forge_root`, `checkout_root`, `relative_path`, session metadata                            |
-| **Routing chain** | request explicit tier → proxy default tier                                                                                     |
+| Owner             | Fields                                                                                                                                                              |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Proxy-owned**   | tier→model mappings, provider/base_url, default hyperparams (reasoning_effort, temperature, verbosity, thinking_budget_tokens)                                      |
+| **Session-owned** | policy/TDD mode, memory/artifacts, `forge_root`, `checkout_root`, `relative_path`, session metadata                                                                 |
+| **Routing chain** | Tier: request explicit tier → proxy default tier. Subprocess: explicit → subprocess proxy → preferred proxy → route scan → session proxy → unresolved (see §3.6.12) |
 
 **CLI enforcement:** Enforced in the CLI: `forge proxy` edits proxy settings; `forge session` edits session settings.
 Session commands can't set proxy-owned keys.
@@ -391,6 +418,46 @@ forge proxy delete <proxy_id>
 > config (`~/.forge/config.yaml`), model catalog, and status line guidance are in
 > [design_appendix.md §A](design_appendix.md#a-configuration-reference).
 
+#### 3.6.12 Subprocess routing resolution (normative)
+
+All Forge subprocesses (workflow workers, supervisor, handoff agent) resolve proxy routing through a single shared
+function (`resolve_subprocess_routing()`). This replaced four ad-hoc resolution paths that each implemented different
+fallback chains with different semantics.
+
+**Resolution chain** (same for every subprocess type):
+
+| Step | Source             | Behavior                                                                 |
+| ---- | ------------------ | ------------------------------------------------------------------------ |
+| 1    | `explicit`         | CLI flag override (`--proxy`, `--supervisor-proxy`, config URL)          |
+| 2    | `subprocess_proxy` | Session ambient (`FORGE_SUBPROCESS_PROXY`) -- user intent for child jobs |
+| 3    | `preferred_proxy`  | Catalog hint (`ModelSpec.preferred_proxy`); soft -- skip if not running  |
+| 4    | `route_scan`       | Find any running proxy compatible with a derived `ModelRoute`            |
+| 5    | `session_proxy`    | Inherited `ANTHROPIC_BASE_URL`                                           |
+| 6    | `unresolved`       | No route found; callers decide fail-open vs fail-closed                  |
+
+`source="direct"` is produced by workflow routing (`review.routing`) for direct-only model specs (e.g., `claude-opus`
+running `claude -p --bare`), not by the shared resolver. `route` is present when model compatibility is known; `None`
+can mean unresolved or opaque/non-model-specific routing (e.g., explicit base URL). `source` and `base_url` distinguish
+them.
+
+**Fail behavior by subprocess type:**
+
+| Subprocess | On unresolved | Rationale                                                        |
+| ---------- | ------------- | ---------------------------------------------------------------- |
+| Workflows  | Fail closed   | User asked for this work; partial results worse than an error    |
+| Supervisor | Fail open     | Blocking the coding session is worse than skipping a check       |
+| Handoff    | Fail open     | Async/best-effort; benefits future sessions, not the current one |
+
+**Per-invocation routing plan:** Workflow commands resolve routing for all workers **once** at invocation start as a
+frozen `WorkerRoutingPlan`. No per-worker resolution at runtime. This prevents registry drift during parallel fan-out
+and ensures preflight checks match runtime behavior. User-facing workflow JSON surfaces this decision as
+`resolved_models`, including requested model, actual model ref, provider, proxy, template, and routing source for each
+worker.
+
+> **Routing reference details** — data type schemas (`ModelRoute`, `RoutingResult`, `WorkerRoutingPlan`), function
+> signatures, route derivation ranking, and sidecar constraints are in
+> [design_appendix.md §L](design_appendix.md#l-subprocess-routing-reference).
+
 ### 3.7 Proxy runtime truth
 
 When the proxy base URL is reachable, **live proxy introspection is authoritative** for tier→model mappings and context
@@ -415,11 +482,16 @@ The proxy exposes runtime truth via `GET /`:
 - The proxy does **not** know about sessions (see §3.6.2)
 - Session info comes from the session file, not the proxy
 - Status line tools read both sources independently
+- Spend cap rejections return HTTP 429 with `error.type=spend_cap_exceeded`
+- Warn-mode spend caps allow the request and attach `X-Spend-Warning`
 
 **Tier selection precedence:**
 
 1. Request explicit tier (model name contains `haiku|sonnet|opus`)
 2. Proxy default tier (configured for that base URL)
+
+This applies to tier selection *within* a resolved proxy. Which proxy a subprocess uses is decided by the resolution
+chain (§3.6.12).
 
 ### 3.8 Session artifacts (plans + transcripts)
 
@@ -541,10 +613,12 @@ This pulls relevant context from earlier sessions (e.g., a decision from 5 sessi
 **Processed context location:**
 
 ```
-<forge_root>/.forge/prev_sessions/<parent-name>.md   # Strategy-dependent context view
+<forge_root>/.forge/prev_sessions/<parent-name>/generated.md            # Regeneratable parent cache
+<forge_root>/.forge/prev_sessions/<parent-name>/children/<child>.md     # Per-child launch artifact
 ```
 
-You can resume the same parent with different strategies. Raw artifacts stay immutable; only the processed view changes.
+You can resume the same parent with different strategies. Raw artifacts stay immutable; the parent cache is regenerated,
+while existing per-child launch artifacts are not overwritten.
 
 **Session derivation tracking:**
 
@@ -578,7 +652,7 @@ child's `forge_root` when the parent was in a different checkout). `parent_proje
 **Context assembly (what child loads at start):**
 
 1. Designated memory docs (always, via CLAUDE.md)
-2. Processed handoff: `<forge_root>/.forge/prev_sessions/<parent>.md` (strategy-dependent)
+2. Processed handoff: `<forge_root>/.forge/prev_sessions/<parent>/children/<child>.md` (strategy-dependent)
 3. Lineage reference: pointer to raw artifacts for deep reads
 
 **Why two phases?**
@@ -745,6 +819,46 @@ handling deletes the marker; poison markers (5+ attempts) move to `pending-work/
 > Marker schema, processing contract, and known kinds in
 > [design_appendix.md §C](design_appendix.md#c-work-queue-internals).
 
+### 3.14 Cost tracking and spend caps
+
+Forge records proxy cost telemetry in append-only JSONL files under `~/.forge/costs/`.
+
+| Path                                 | Writer                  | Purpose                                      |
+| ------------------------------------ | ----------------------- | -------------------------------------------- |
+| `costs/requests/<month>_<pid>.jsonl` | Proxy request handler   | Per-request token/cost records               |
+| `costs/verbs/<month>_<pid>.jsonl`    | Forge verb cost wrapper | Best-effort cost deltas for panels/workflows |
+
+Request logs are the source of truth for proxy spend. The proxy bootstraps its in-memory `CostTracker` from current and
+previous month request logs on startup so cap enforcement survives restarts. Verb logs are attribution aids for CLI
+visibility; they are estimates because several Forge subprocesses can share a proxy concurrently.
+
+Each proxy may define:
+
+```yaml
+costs:
+  caps:
+    per_day: 20.00
+    per_month: 100.00
+  cap_mode: post      # post | strict
+  on_cap_hit: reject  # reject | warn
+```
+
+`post` mode blocks after accumulated spend reaches a configured cap. `strict` mode also estimates the pending request
+before forwarding it. `reject` returns HTTP 429 with:
+
+```json
+{
+  "type": "error",
+  "error": {
+    "type": "spend_cap_exceeded",
+    "message": "daily spend cap reached: ..."
+  }
+}
+```
+
+`warn` mode forwards the request and returns the same message in `X-Spend-Warning`. Cost tracking is best effort:
+pricing or log write failures must not break successful LLM responses.
+
 ## 4. Unified CLI (`forge`)
 
 The primary entry point for all Forge operations.
@@ -769,21 +883,26 @@ groups require an explicit subcommand. List/show commands support `--json` for s
 
 #### Session management
 
-| Command                                | Purpose                                                                           |
-| -------------------------------------- | --------------------------------------------------------------------------------- |
-| `forge session start [name]`           | Create and start a new session (auto-named if omitted)                            |
-| `forge session resume [name]`          | Reattach to an existing session (default), or derive a fresh child with `--fresh` |
-| `forge session fork <parent> [--name]` | Fork a session (same dir by default; `--worktree` for isolation)                  |
-| `forge session show [session]`         | Show session details (`--json`, `--field`); accepts name or UUID                  |
-| `forge session list`                   | List sessions (`--scope repo\|project\|all`; default `repo`; `--json`)            |
-| `forge session set <key> <value>`      | Set a mid-session override                                                        |
-| `forge session reset [key]`            | Reset overrides to intent                                                         |
-| `forge session delete <name>...`       | Delete one or more sessions (`--all` for bulk deletion)                           |
-| `forge session clean --older-than N`   | Bulk-delete sessions older than N days                                            |
-| `forge session incognito [name]`       | Start an ephemeral session (auto-delete on exit)                                  |
-| `forge session shell [name]`           | Open shell in sidecar container                                                   |
+| Command                                  | Purpose                                                                           |
+| ---------------------------------------- | --------------------------------------------------------------------------------- |
+| `forge session start [name]`             | Create and start a new session (auto-named if omitted)                            |
+| `forge session resume [name]`            | Reattach to an existing session (default), or derive a fresh child with `--fresh` |
+| `forge session fork <parent> [--name]`   | Fork a session (same dir by default; `--worktree` for isolation)                  |
+| `forge session show [session]`           | Show session details (`--json`, `--field`); accepts name or UUID                  |
+| `forge session list`                     | List sessions (`--scope repo\|project\|all`; default `repo`; `--json`)            |
+| `forge session set <key> <value>`        | Set a mid-session override                                                        |
+| `forge session reset [key]`              | Reset overrides to intent                                                         |
+| `forge session delete <name>...`         | Delete one or more sessions (`--all` for bulk deletion)                           |
+| `forge session clean --older-than N`     | Bulk-delete sessions older than N days                                            |
+| `forge session incognito [name]`         | Start an ephemeral session (auto-delete on exit)                                  |
+| `forge session shell [name]`             | Open shell in sidecar container                                                   |
+| `forge session memory list-docs`         | List designated memory docs (`--json`)                                            |
+| `forge session memory add-doc <path>`    | Add a designated memory doc (`--strategy`, `--shadows`)                           |
+| `forge session memory remove-doc <path>` | Remove a designated memory doc                                                    |
+| `forge session handoff show [name]`      | Inspect handoff-agent review reports (`--latest`, `--all`)                        |
 
-Note: `session context` is a deprecated alias for `session show`.
+Note: `session context` is a deprecated alias for `session show`. `session resume --fresh --review` opens the generated
+per-child handoff file in `$EDITOR` before launching Claude.
 
 #### Proxy management
 
@@ -851,6 +970,12 @@ Note: `session context` is a deprecated alias for `session show`.
 | `forge workflow debate [subject]`    | Adversarial evaluation with stance workers |
 | `forge workflow consensus [subject]` | Two-round multi-model convergence          |
 | `forge workflow list-models`         | Show available model backends              |
+
+Workflow model specs support proxy-backed workers and explicit direct Claude workers. The stable `claude-opus` worker is
+kept on Claude Opus 4.6; newer direct workers such as `claude-opus-4.7` are opt-in and can attach per-worker prompt
+hints through `ModelSpec.prompt`. All workflow execution commands (panel, analyze, debate, consensus) accept
+`--proxy <proxy_id>` to route proxy-backed workers through a specific proxy, overriding preferred_proxy and route scan
+(§3.6.12). Direct workers (e.g., `claude-opus`) remain on Anthropic routing regardless of `--proxy`.
 
 #### Search
 
@@ -1203,12 +1328,12 @@ Enforcement results = observed facts → hook-written `confirmed`. Stateful poli
 ## 5. Extensions install model
 
 Claude Code extensions live in this repo and are installed via `forge extension enable`. Forge follows Claude Code's
-scope model (`--user` / `--project` / `--local`) and provides modular installation via profiles (`minimal` / `standard`
-/ `full`). Six installable modules (commands, agents, skills, hooks, status-line, permissions) are combined into
-profiles. Settings merge is additive (hooks append + dedupe, permissions union). `~/.forge/installed.json` tracks what
-was installed for clean update/uninstall. Project/local enablement requires a `.claude/` anchor at the target directory
-(created if missing); user-level install (`--user`) goes to `~/.claude/` and does not require a project anchor. This
-establishes the Forge project per the identity model (§3).
+scope model (`--scope user` / `--scope project` / `--scope local`) and provides modular installation via profiles
+(`minimal` / `standard` / `full`). Six installable modules (commands, agents, skills, hooks, status-line, permissions)
+are combined into profiles. Settings merge is additive (hooks append + dedupe, permissions union).
+`~/.forge/installed.json` tracks what was installed for clean update/uninstall. Project/local enablement requires a
+`.claude/` anchor at the target directory (created if missing); user-level install (`--scope user`) goes to `~/.claude/`
+and does not require a project anchor. This establishes the Forge project per the identity model (§3).
 
 > Scope model, module inventory, merge rules, and tracking file details in
 > [design_appendix.md §E](design_appendix.md#e-install-model-reference). Multi-scope installation behavior (dual user +
@@ -1409,6 +1534,13 @@ review/evaluation skills are adversarial-compatible (runner checks for `{stance_
 Cross-session continuity via designated markdown files that sessions keep updated—no knowledge graphs or async
 synthesis.
 
+> **Naming note: "handoff" refers to two unrelated things in Forge.** The **handoff agent** (this section) is the
+> Stop-time worker that updates memory docs. **Resume handoff** (§3.9) is the parent-context file generated by
+> `forge session resume --fresh`. Different concept, different file location
+> (`<forge_root>/.forge/prev_sessions/<parent>/children/<child>.md`), different lifecycle. See
+> `docs/end-user/handoff.md` for the user-facing distinction and `forge session handoff show` for inspecting agent
+> output.
+
 The simplest memory system is:
 
 1. Designated markdown files with templates
@@ -1469,7 +1601,8 @@ Per-doc strategies control how each file is updated. Strategies are a `str → s
 
 **No file creation.** Designated docs must already exist; missing files are skipped. Humans choose which docs to
 maintain; the agent maintains them. This avoids the agent making structural choices (new files/templates) implicitly.
-Seed files before configuring them.
+Seed files before configuring them. `forge session memory add-doc` enforces this at configuration time; runtime skip
+handling remains for manual JSON overrides and stale manifests.
 
 Direct update strategies (Mode 1) include: `project-state`, `checklist`, `changelog`, `debugging`, `patterns`,
 `generic`. Shadow strategy (Mode 2): `suggested` (propose additions as checkboxes with rationale).

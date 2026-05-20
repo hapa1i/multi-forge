@@ -6,18 +6,32 @@
 
 <!-- human:confirm -->
 
+This is a rendered status-line smoke test. It does not call Claude or an LLM; it feeds a synthetic Claude Code
+`statusLine` JSON payload into `forge status-line` and asks you to review the terminal-facing output.
+
+Expected visible shape, with colors/spaces rendered by the terminal:
+
+```text
+${FORGE_TEST_REPO} (main) | test-session-1
+[Opus 4.6] -------- 6%/200K | 3m | +12/-3 | in:28.0K out:17.5K
+```
+
+The output may wrap to two physical terminal lines. A proxy template/tier prefix is expected only when
+`ANTHROPIC_BASE_URL` points at a live or registered Forge proxy; if `test-session-1` was started without a proxy, no
+proxy segment is expected here.
+
 ```bash
 cd $FORGE_TEST_REPO
 
 # Mirror Claude Code's statusLine JSON contract and the Forge launch env.
 BASE_URL=$(jq -r '.intent.proxy.base_url // empty' .forge/sessions/test-session-1/forge.session.json)
 mkdir -p .forge/walkthrough
-cat > .forge/walkthrough/status-line-transcript.jsonl <<'EOF'
+cat > .forge/walkthrough/status-line-transcript.jsonl <<EOF
 {"requestId":"req-001","message":{"role":"user","content":[{"type":"text","text":"Read the config file."}]}}
-{"requestId":"req-001","message":{"role":"assistant","content":[{"type":"text","text":"I'll inspect it."},{"type":"tool_use","id":"tool-001","name":"Read","input":{"file_path":"/workspace/config.yaml"}}]}}
+{"requestId":"req-001","message":{"role":"assistant","content":[{"type":"text","text":"I'll inspect it."},{"type":"tool_use","id":"tool-001","name":"Read","input":{"file_path":"${FORGE_TEST_REPO}/config.yaml"}}]}}
 {"requestId":"req-001","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"tool-001","content":"timeout: 10"}]}}
 {"requestId":"req-002","message":{"role":"user","content":[{"type":"text","text":"Update the timeout and run tests."}]}}
-{"requestId":"req-002","message":{"role":"assistant","content":[{"type":"tool_use","id":"tool-002","name":"Edit","input":{"file_path":"/workspace/config.yaml"}},{"type":"tool_use","id":"tool-003","name":"Bash","input":{"command":"uv run pytest"}}]}}
+{"requestId":"req-002","message":{"role":"assistant","content":[{"type":"tool_use","id":"tool-002","name":"Edit","input":{"file_path":"${FORGE_TEST_REPO}/config.yaml"}},{"type":"tool_use","id":"tool-003","name":"Bash","input":{"command":"uv run pytest"}}]}}
 EOF
 STATUS_INPUT=$(jq -nc \
   --arg cwd "$FORGE_TEST_REPO" \
@@ -48,10 +62,12 @@ echo "$STATUS_INPUT" \
   | FORGE_SESSION=test-session-1 ANTHROPIC_BASE_URL="$BASE_URL" forge status-line
 ```
 
-- [ ] Shows workspace/session info (path + session name)
-- [ ] Shows model or tier display plus context bar
-- [ ] If the configured `ANTHROPIC_BASE_URL` belongs to a created/running proxy, also shows proxy template/tier info
-- [ ] Formatted for terminal display (ANSI reset prefix)
+- [ ] Shows compact workspace path, git branch, and `test-session-1`
+- [ ] Shows `[Opus 4.6]` plus context usage `6%/200K` with a visible progress bar
+- [ ] Shows seeded metrics: `3m`, `+12/-3`, `in:28.0K`, and `out:17.5K`
+- [ ] If `ANTHROPIC_BASE_URL` belongs to a created/running proxy, also shows proxy template/tier info
+- [ ] Does not print raw JSON, a Python traceback, or `[Error: ...]`
+- [ ] ANSI/color and non-breaking-space internals are checked in 8.2, not by this rendered review
 
 ### 8.2 Verify Display Elements
 
@@ -71,12 +87,12 @@ cd $FORGE_TEST_REPO
 
 BASE_URL=$(jq -r '.intent.proxy.base_url // empty' .forge/sessions/test-session-1/forge.session.json)
 mkdir -p .forge/walkthrough
-cat > .forge/walkthrough/status-line-transcript.jsonl <<'EOF'
+cat > .forge/walkthrough/status-line-transcript.jsonl <<EOF
 {"requestId":"req-001","message":{"role":"user","content":[{"type":"text","text":"Read the config file."}]}}
-{"requestId":"req-001","message":{"role":"assistant","content":[{"type":"text","text":"I'll inspect it."},{"type":"tool_use","id":"tool-001","name":"Read","input":{"file_path":"/workspace/config.yaml"}}]}}
+{"requestId":"req-001","message":{"role":"assistant","content":[{"type":"text","text":"I'll inspect it."},{"type":"tool_use","id":"tool-001","name":"Read","input":{"file_path":"${FORGE_TEST_REPO}/config.yaml"}}]}}
 {"requestId":"req-001","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"tool-001","content":"timeout: 10"}]}}
 {"requestId":"req-002","message":{"role":"user","content":[{"type":"text","text":"Update the timeout and run tests."}]}}
-{"requestId":"req-002","message":{"role":"assistant","content":[{"type":"tool_use","id":"tool-002","name":"Edit","input":{"file_path":"/workspace/config.yaml"}},{"type":"tool_use","id":"tool-003","name":"Bash","input":{"command":"uv run pytest"}}]}}
+{"requestId":"req-002","message":{"role":"assistant","content":[{"type":"tool_use","id":"tool-002","name":"Edit","input":{"file_path":"${FORGE_TEST_REPO}/config.yaml"}},{"type":"tool_use","id":"tool-003","name":"Bash","input":{"command":"uv run pytest"}}]}}
 EOF
 STATUS_INPUT=$(jq -nc \
   --arg cwd "$FORGE_TEST_REPO" \
