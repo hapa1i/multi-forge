@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Claude Forge is a toolkit for Claude Code enhancement that consolidates multiple AI developer tools (proxy, session
+Multi-Forge is a toolkit for Claude Code enhancement that consolidates multiple AI developer tools (proxy, session
 manager, status line, TDD guard) into a unified monorepo. The architecture follows a "glue approach" - building
 connective tissue between specialized tools rather than a monolithic application.
 

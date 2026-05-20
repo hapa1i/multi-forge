@@ -1,4 +1,4 @@
-"""Unified configuration system for Claude Forge.
+"""Unified configuration system for Multi-Forge.
 
 This module provides a type-safe configuration system with three sources:
 

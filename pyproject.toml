@@ -1,16 +1,15 @@
 [project]
-name = "tr-claude-forge"
+name = "multi-forge"
 version = "0.2.0"
-description = "Developer toolkit for Claude Code: multi-model proxy routing, session management, policy engine, and skills architecture"
+description = "Multi-runtime agent toolkit: proxy routing, cost control, session management, policy enforcement, and workflow orchestration"
 readme = "README.md"
 license = "Apache-2.0"
 authors = [
-    { name = "Habib Farr", email = "Habib.Farr@thomsonreuters.com" },
-    { name = "Habib Farr", email = "habib.farr@pm.me" },
+    { name = "Habib Farr", email = "hapali@pm.me" },
 ]
 # `uvloop` is pulled in transitively via `litellm[proxy]` and has no cp314 wheel
 # at time of writing; building from source fails on macOS. Lift the upper bound
-# once uvloop ships 3.14 wheels. See https://github.com/thomsonreuters/claude-forge/issues/1
+# once uvloop ships 3.14 wheels. See https://github.com/hapa1i/multi-forge/issues/1
 requires-python = ">=3.11,<3.14"
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -52,10 +51,10 @@ dependencies = [
 forge = "forge.cli.main:main"
 
 [project.urls]
-Homepage = "https://github.com/thomsonreuters/claude-forge"
-Repository = "https://github.com/thomsonreuters/claude-forge"
-Issues = "https://github.com/thomsonreuters/claude-forge/issues"
-Documentation = "https://github.com/thomsonreuters/claude-forge/tree/main/docs"
+Homepage = "https://github.com/hapa1i/multi-forge"
+Repository = "https://github.com/hapa1i/multi-forge"
+Issues = "https://github.com/hapa1i/multi-forge/issues"
+Documentation = "https://github.com/hapa1i/multi-forge/tree/main/docs"
 
 [build-system]
 requires = ["hatchling"]

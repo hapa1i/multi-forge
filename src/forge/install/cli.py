@@ -61,7 +61,7 @@ def _gather_info_data(max_sessions: int) -> dict:
     try:
         from importlib.metadata import version
 
-        data["forge_version"] = version("tr-claude-forge")
+        data["forge_version"] = version("multi-forge")
     except Exception:
         data["forge_version"] = "unknown"
 

@@ -1,6 +1,6 @@
 # Documentation Guidelines
 
-Documentation standards for Claude Forge.
+Documentation standards for Multi-Forge.
 
 ---
 

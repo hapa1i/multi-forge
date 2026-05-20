@@ -1,5 +1,5 @@
 #!/bin/bash
-# Sidecar container entrypoint for Claude Forge.
+# Sidecar container entrypoint for Multi-Forge.
 #
 # This script:
 # 1. Optionally syncs project dependencies

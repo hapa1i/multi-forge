@@ -4,7 +4,8 @@
 
 **Please do not report security vulnerabilities through public GitHub issues.**
 
-Instead, please report them via email to security@thomsonreuters.com.
+Instead, please report them privately via GitHub Security Advisory if enabled for this repository, or by email to
+hapali@pm.me.
 
 You should receive a response shortly. If for some reason you do not, please follow up via email to ensure we received
 your original message.

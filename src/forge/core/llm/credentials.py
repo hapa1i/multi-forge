@@ -389,8 +389,8 @@ class CredentialManager:
             "api_key": api_key,
             "base_url": base_url,
             "extra_headers": {
-                "HTTP-Referer": "https://github.com/thomsonreuters/claude-forge",
-                "X-OpenRouter-Title": "Claude Forge",
+                "HTTP-Referer": "https://github.com/hapa1i/multi-forge",
+                "X-OpenRouter-Title": "Multi-Forge",
             },
         }
 

@@ -355,8 +355,8 @@ class TestValidateAnchor:
         _validate_anchor(repo)
 
     def test_accepts_path_containing_claude_in_name(self, tmp_path: Path) -> None:
-        """A directory named 'claude-forge' should not be rejected."""
-        repo = tmp_path / "claude-forge"
+        """A directory named 'multi-forge' should not be rejected."""
+        repo = tmp_path / "multi-forge"
         repo.mkdir()
         _validate_anchor(repo)
 

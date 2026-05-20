@@ -1,4 +1,4 @@
-"""Shared test fixtures for Claude Forge.
+"""Shared test fixtures for Multi-Forge.
 
 This module provides reusable fixtures for:
 - Repository setup (git repos, worktrees)

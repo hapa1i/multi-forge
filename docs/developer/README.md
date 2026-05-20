@@ -1,13 +1,13 @@
 # Developer Guide
 
-Setup, testing, and architecture reference for Claude Forge contributors.
+Setup, testing, and architecture reference for Multi-Forge contributors.
 
 ## Setup
 
 ```bash
 # Clone and install dependencies
 git clone <repo-url>
-cd claude-forge
+cd multi-forge
 uv sync
 
 # Install pre-commit hooks
@@ -143,7 +143,7 @@ make pre-commit               # All pre-commit hooks (ruff, black, isort, mypy, 
 
 ## Architecture
 
-Claude Forge follows a "glue" approach -- connecting specialized tools rather than building a monolith.
+Multi-Forge follows a "glue" approach -- connecting specialized tools rather than building a monolith.
 
 ### Core Components
 

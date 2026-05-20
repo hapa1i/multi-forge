@@ -1,6 +1,6 @@
 # Coding Standards
 
-Python coding conventions for Claude Forge.
+Python coding conventions for Multi-Forge.
 
 ---
 

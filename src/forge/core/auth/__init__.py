@@ -1,4 +1,4 @@
-"""Consolidated authentication module for Claude Forge.
+"""Consolidated authentication module for Multi-Forge.
 
 This package provides:
 1. SecretsProvider - unified interface for accessing secrets from env/config

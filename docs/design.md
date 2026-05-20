@@ -1678,7 +1678,7 @@ verification.
 ## 6. Directory structure (monorepo)
 
 ```text
-claude-forge/
+multi-forge/
 ├── src/
 │   ├── forge/    # Python package
 │   │   ├── core/        # Shared libraries

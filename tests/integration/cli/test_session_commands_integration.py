@@ -687,7 +687,7 @@ class TestMainGroup:
         result = mock_claude_workspace.exec("forge --help")
 
         assert result.returncode == 0
-        assert "Claude Forge" in result.stdout or "forge" in result.stdout.lower()
+        assert "Multi-Forge" in result.stdout or "forge" in result.stdout.lower()
 
     def test_session_subcommand_help(self, mock_claude_workspace: ContainerLike) -> None:
         """Should show session subcommand help."""

@@ -49,7 +49,7 @@ Then it removes `~/.forge/` and other artifacts.
 - [ ] Shows "Found N Forge installation(s)" summary (if forge available)
 - [ ] `~/.forge/` removed
 - [ ] `~/.forge/sessions/` removed (Forge session data)
-- [ ] Docker images removed (claude-forge-\*)
+- [ ] Docker images removed (multi-forge-\*)
 - [ ] Shell profile cleaned (block markers removed)
 
 ### 19.3 Verify Complete Removal
@@ -123,7 +123,7 @@ for profile in "${PROFILES[@]}"; do
   if [ -f "$profile" ]; then
     FOUND_PROFILE=1
     echo "Checking $profile"
-    grep -n ">>> claude-forge >>>" "$profile" && exit 1 || true
+    grep -n ">>> multi-forge >>>" "$profile" && exit 1 || true
     grep -n "$HOME/.forge/bin" "$profile" && exit 1 || true
   fi
 
@@ -139,7 +139,7 @@ if [ "$FOUND_PROFILE" -eq 0 ]; then
 fi
 ```
 
-- [ ] No `>>> claude-forge >>>` block remains in any existing shell profile
+- [ ] No `>>> multi-forge >>>` block remains in any existing shell profile
 - [ ] No `.forge/bin` PATH entry remains in any existing shell profile
 - [ ] Backup file exists for any profile that was modified; if no shell profile exists, profile cleanup is N/A
 

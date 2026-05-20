@@ -1,18 +1,19 @@
-# Claude Forge
+# Multi-Forge
 
-[![PyPI](https://img.shields.io/pypi/v/tr-claude-forge.svg)](https://pypi.org/project/tr-claude-forge/)
-[![Python](https://img.shields.io/pypi/pyversions/tr-claude-forge.svg)](https://pypi.org/project/tr-claude-forge/)
-[![License](https://img.shields.io/pypi/l/tr-claude-forge.svg)](LICENSE)
+[![License](https://img.shields.io/github/license/hapa1i/multi-forge)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.11--3.13-blue)](https://github.com/hapa1i/multi-forge)
 
 > [!WARNING]
 > **Research Preview** -- Forge is under active development. APIs, commands, and file formats may change without notice
 > between releases. Not recommended for production use.
 
-**The missing connective tissue for [Claude Code](https://claude.ai/code).**
+**Multi-runtime agent toolkit: proxy routing, cost control, session management, and policy enforcement for coding
+agents.**
 
-Forge is a CLI that wraps Claude Code, adding persistent sessions, multi-model routing, and autonomous verification. You
-run `forge session start` instead of `claude`, and Forge handles the rest -- routing to your chosen model provider,
-tracking state across sessions, and enforcing policies.
+Forge sits between you and your coding agent (Claude Code today, Codex and Gemini next), adding persistent sessions,
+multi-provider model routing, cost visibility with spend caps, and autonomous verification. You run
+`forge session start` instead of `claude`, and Forge handles the rest -- routing to your chosen model provider, tracking
+state across sessions, and enforcing policies.
 
 ```bash
 # Use Claude with session tracking (no proxy needed)
@@ -87,11 +88,11 @@ tracking, hooks, and all Forge features except multi-model routing. Use `--proxy
 
 ```bash
 # Install Forge
-pip install tr-claude-forge
+pip install multi-forge
 
 # Or for development (editable install from local clone):
-git clone https://github.com/thomsonreuters/claude-forge.git
-cd claude-forge && pip install -e .
+git clone https://github.com/hapa1i/multi-forge.git
+cd multi-forge && pip install -e .
 
 # Install extensions (hooks, skills, status line) into Claude Code
 forge extension enable
@@ -189,9 +190,12 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and PR guidelines.
 
 ```bash
 forge extension disable
-pip uninstall tr-claude-forge
+pip uninstall multi-forge
 ```
 
 ## License
 
 Apache 2.0 -- see [LICENSE](LICENSE).
+
+Originally developed as Claude Forge at [Thomson Reuters](https://github.com/thomsonreuters/claude-forge) and
+open-sourced under Apache 2.0. Continued as Multi-Forge by the original author.

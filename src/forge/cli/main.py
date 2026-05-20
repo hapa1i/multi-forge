@@ -237,13 +237,13 @@ def _auto_clean_sessions_best_effort() -> None:
     context_settings={"help_option_names": ["-h", "--help"]},
     invoke_without_command=True,
 )
-@click.version_option(None, "-V", "--version", package_name="tr-claude-forge", prog_name="forge")
+@click.version_option(None, "-V", "--version", package_name="multi-forge", prog_name="forge")
 @click.pass_context
 def main(ctx: click.Context) -> None:
-    """Claude Forge - Enhanced session management for Claude Code.
+    """Multi-Forge - Multi-runtime agent toolkit.
 
-    Forge provides named sessions, model routing, and workflow tooling
-    for Claude Code development.
+    Proxy routing, cost control, session management, policy enforcement,
+    and workflow orchestration for coding agents.
     """
     # Configure file logging for non-exempt subcommands.
     # Hooks configure their own logging (hooks/ subdirectory).

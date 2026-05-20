@@ -1,4 +1,4 @@
-"""Forge CLI - Command line interface for Claude Forge.
+"""Forge CLI - Command line interface for Multi-Forge.
 
 Entry point: `forge` command (installed via pyproject.toml scripts).
 

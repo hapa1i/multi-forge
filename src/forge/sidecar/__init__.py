@@ -1,4 +1,4 @@
-"""Sidecar execution module for Claude Forge.
+"""Sidecar execution module for Multi-Forge.
 
 Bundles proxy + Claude Code in a Docker container with lifecycle coupling,
 port isolation, and version consistency. Not a security sandbox — Claude

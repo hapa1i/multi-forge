@@ -1,6 +1,6 @@
 ---
 name: Bug Report
-about: Report a bug in Claude Forge
+about: Report a bug in Multi-Forge
 labels: bug
 ---
 
@@ -22,5 +22,5 @@ labels: bug
 
 - OS:
 - Python version:
-- Claude Forge version (`forge --version`):
+- Multi-Forge version (`forge --version`):
 - Claude Code version (`claude --version`):

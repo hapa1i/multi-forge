@@ -1,4 +1,4 @@
-# Makefile for Claude Forge
+# Makefile for Multi-Forge
 # Provides standard targets for testing, linting, and development
 
 .PHONY: help deps test-unit test-integration test-regression test lint format type-check pre-commit clean clean-docker clean-all
@@ -10,7 +10,7 @@ deps:
 
 # Default target: show help
 help:
-	@echo "Claude Forge - Available Make targets:"
+	@echo "Multi Forge - Available Make targets:"
 	@echo ""
 	@echo "  make test-unit          - Run unit tests (fast, no Docker required)"
 	@echo "  make test-integration   - Run integration tests (requires Docker)"

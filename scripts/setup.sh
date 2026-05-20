@@ -28,8 +28,8 @@ BOLD='\033[1m'
 # Configuration
 FORGE_HOME="${FORGE_HOME:-$HOME/.forge}"
 FORGE_BIN="$FORGE_HOME/bin"
-FORGE_PACKAGE="tr-claude-forge"
-FORGE_REPO="https://github.com/thomsonreuters/claude-forge.git"
+FORGE_PACKAGE="multi-forge"
+FORGE_REPO="https://github.com/hapa1i/multi-forge.git"
 # Derived: raw content URL for curl-pipe-bash install (strips .git suffix)
 FORGE_RAW_URL="https://raw.githubusercontent.com/${FORGE_REPO#https://github.com/}"
 FORGE_RAW_URL="${FORGE_RAW_URL%.git}"
@@ -44,8 +44,8 @@ FORGE_HOME_STAMP="managed-by-setup-sh"
 MODIFIED_PROFILE=""  # Track which profile was modified (for accurate messaging)
 
 # Block markers for safe profile editing (industry standard pattern)
-BLOCK_START="# >>> claude-forge >>>"
-BLOCK_END="# <<< claude-forge <<<"
+BLOCK_START="# >>> multi-forge >>>"
+BLOCK_END="# <<< multi-forge <<<"
 
 # -----------------------------------------------------------------------------
 # Helpers
@@ -255,7 +255,7 @@ install_forge() {
     echo "$FORGE_HOME_STAMP" > "$FORGE_HOME/.forge-home"
 
     # Remove stale pip/uv-tool installs that would conflict
-    for pkg in "$FORGE_PACKAGE" "claude-forge"; do
+    for pkg in "$FORGE_PACKAGE" "tr-claude-forge" "claude-forge"; do
         if _pip show "$pkg" &>/dev/null; then
             warn "Found stale pip install of '$pkg' -- removing to avoid conflicts..."
             _pip_remove "$pkg" || {
@@ -334,7 +334,7 @@ install_forge_local() {
     # Remove stale pip/uv-tool installs that would conflict.
     # A pip-installed 'forge' package (editable or not) can shadow the uv tool
     # binary or inject old code into the Python import path.
-    for pkg in "$FORGE_PACKAGE" "claude-forge"; do
+    for pkg in "$FORGE_PACKAGE" "tr-claude-forge" "claude-forge"; do
         if _pip show "$pkg" &>/dev/null; then
             warn "Found stale pip install of '$pkg' -- removing to avoid conflicts..."
             _pip_remove "$pkg" || {
@@ -557,7 +557,7 @@ uninstall_forge() {
     fi
 
     # 2. Remove all package installations (uv tool + pip, current + legacy names)
-    for pkg in "$FORGE_PACKAGE" "claude-forge"; do
+    for pkg in "$FORGE_PACKAGE" "tr-claude-forge" "claude-forge"; do
         if uv tool list 2>/dev/null | grep -q "^$pkg"; then
             info "Removing uv tool installation of '$pkg'..."
             uv tool uninstall "$pkg" 2>/dev/null || true
@@ -631,11 +631,11 @@ uninstall_forge() {
         warn "      find ~ -maxdepth 6 -type d -name '.forge'"
     fi
 
-    # 6. Remove Docker images (only claude-forge-* to avoid deleting unrelated images)
+    # 6. Remove Docker images (current + legacy prefixes, avoiding unrelated images)
     if check_command docker && docker info &>/dev/null; then
         info "Removing Forge Docker images..."
         # Use specific prefix to avoid deleting unrelated images like "forge-server"
-        local images=$(docker images --format '{{.Repository}}:{{.Tag}}' | grep -E '^claude-forge-' || true)
+        local images=$(docker images --format '{{.Repository}}:{{.Tag}}' | grep -E '^(multi-forge-|claude-forge-)' || true)
         if [[ -n "$images" ]]; then
             # Note: xargs -r is not portable (BSD/macOS doesn't support it)
             # Use conditional instead
@@ -701,7 +701,7 @@ uninstall_forge() {
     echo "    ✓ ~/.forge/ directory (sessions, proxies, config)"
     echo "    ✓ Claude Code extensions (all tracked scopes)"
     echo "    ✓ Python packages (pip + uv tool)"
-    echo "    ✓ Docker images (claude-forge-*)"
+    echo "    ✓ Docker images (multi-forge-*, claude-forge-*)"
     echo "    ✓ Shell PATH entries"
     if [[ "$PURGE" == "true" ]]; then
         echo "    ✓ Project-local .forge/ directories"
@@ -751,7 +751,7 @@ Examples:
   curl -sSL $FORGE_SETUP_URL | bash -s -- --version v1.0.0
 
   # Development install (from local clone)
-  cd claude-forge && ./scripts/setup.sh --local
+  cd multi-forge && ./scripts/setup.sh --local
 
   # Complete uninstall
   curl -sSL $FORGE_SETUP_URL | bash -s -- --uninstall

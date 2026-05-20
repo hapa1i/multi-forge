@@ -1,1 +1,1 @@
-"""Tests for claude-forge."""
+"""Tests for multi-forge."""

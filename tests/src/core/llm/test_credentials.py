@@ -264,7 +264,7 @@ class TestOpenRouterCredentials:
             assert creds["api_key"] == "sk-or-test"
             assert creds["base_url"] == "https://openrouter.ai/api/v1"
             assert "X-OpenRouter-Title" in creds["extra_headers"]
-            assert creds["extra_headers"]["X-OpenRouter-Title"] == "Claude Forge"
+            assert creds["extra_headers"]["X-OpenRouter-Title"] == "Multi-Forge"
 
     async def test_env_base_url_overrides_default(self, mock_config):
         """OPENROUTER_BASE_URL env var overrides the default."""

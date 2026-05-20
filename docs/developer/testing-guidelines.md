@@ -1,6 +1,6 @@
 # Testing Guidelines
 
-Testing standards for Claude Forge.
+Testing standards for Multi-Forge.
 
 ---
 

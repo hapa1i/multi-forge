@@ -1,6 +1,6 @@
-# Contributing to Claude Forge
+# Contributing to Multi-Forge
 
-Thanks for your interest in contributing to Claude Forge!
+Thanks for your interest in contributing to Multi-Forge!
 
 ## Quick Start
 
@@ -8,7 +8,7 @@ Thanks for your interest in contributing to Claude Forge!
 
 ```bash
 git clone <repo-url>
-cd claude-forge
+cd multi-forge
 uv sync
 pre-commit install
 ```

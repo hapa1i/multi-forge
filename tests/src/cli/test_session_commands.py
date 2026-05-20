@@ -3507,7 +3507,7 @@ class TestMainGroup:
         result = runner.invoke(main, ["--help"])
 
         assert result.exit_code == 0
-        assert "Claude Forge" in result.output
+        assert "Multi-Forge" in result.output
 
     def test_session_subcommand_help(self, runner: CliRunner) -> None:
         """Should show session subcommand help."""
