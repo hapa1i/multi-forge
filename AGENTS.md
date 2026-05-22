@@ -12,10 +12,11 @@ docs in `docs/`, runtime images in `docker/`, and automation scripts in `scripts
 
 Use the repo docs as the source of truth for their domains: `README.md` for the overview, `docs/developer/` for setup,
 and `CLAUDE.md` for agent context. `docs/developer/coding-standards.md`, `testing-guidelines.md`, and
-`documentation-guidelines.md` define code style, test policy, and doc maintenance rules. Update `docs/design.md` and
-`docs/design_appendix.md` when architecture or file ownership changes. When changing config ownership, auth resolution,
-installer behavior, proxy/session semantics, or workflow prerequisites, also update the relevant `docs/end-user/*` guide
-so wheel-installed users get the right Day 1 path.
+`documentation-guidelines.md` define code style, test policy, and doc maintenance rules. `docs/status/README.md` defines
+the living status-doc contract for active checklists, the change log, implementation notes, and archived proposal
+checklists. Update `docs/design.md` and `docs/design_appendix.md` when architecture or file ownership changes. When
+changing config ownership, auth resolution, installer behavior, proxy/session semantics, or workflow prerequisites, also
+update the relevant `docs/end-user/*` guide so wheel-installed users get the right Day 1 path.
 
 ## Build, Test, and Development Commands
 

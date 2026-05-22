@@ -147,6 +147,7 @@ fact_id, orchestration) unless explicitly asked. When in doubt, ask before renam
 
 - `docs/design.md` - Unified design and migration plan (canonical)
 - `docs/design_appendix.md` - Reference details (schemas, config tables)
+- `docs/status/README.md` - Living status-doc contract for checklists, change log, and implementation notes
 - `docs/end-user/` - End-user guides (sessions, proxies, hooks, configs)
 
 ## UX Guidelines
