@@ -66,6 +66,88 @@ handoff agent mark checklist items at Stop time, add it explicitly:
 forge session memory add-doc docs/status/checklist.md --strategy checklist
 ```
 
+## Advanced Workflow
+
+Use this when one high-reasoning planner owns the approved plan, one supervised executor implements in an isolated
+worktree, and one reviewer enters the executor's worktree with the planner's context.
+
+Compared with the shortest three-command workflow, the dogfood path adds three safeguards:
+
+- Create the planner with `--no-launch` so memory docs are attached before the first Stop event.
+- Run the first handoff-agent pass in `review-only`, inspect it, then switch to `augment`.
+- Use `--inline-plan` for worktree forks, and seed gitignored shadow docs in each worktree until Forge auto-creates
+  `.forge/memory/suggested_impl_notes.md` (see `docs/proposals/memory_enhancement.md`).
+
+### 1. Planner
+
+Create the planner without launching, attach memory docs, then start the planning session:
+
+```bash
+forge session start planner --proxy openrouter-openai --no-launch
+
+mkdir -p .forge/memory
+touch .forge/memory/suggested_impl_notes.md
+
+forge session set memory.auto_update.enabled true --session planner
+forge session set memory.auto_update.mode review-only --session planner
+forge session memory add-doc docs/status/change_log.md --strategy changelog --session planner
+forge session memory add-doc .forge/memory/suggested_impl_notes.md \
+  --strategy suggested \
+  --shadows docs/status/impl_notes.md \
+  --session planner
+forge session memory list-docs --json --session planner
+
+forge session resume planner
+```
+
+After the planner exits, inspect the first proposed memory update before allowing writes:
+
+```bash
+forge session handoff show planner --latest
+forge session set memory.auto_update.mode augment --session planner
+```
+
+### 2. Supervised Executor
+
+Fork the planner into a dedicated worktree. `--supervise` makes the planner the executor's plan supervisor, and
+`--inline-plan` carries the approved plan directly in the handoff context.
+
+```bash
+forge session fork planner \
+  --name executor \
+  --worktree \
+  --supervise \
+  --inline-plan \
+  --no-launch
+
+mkdir -p ../multi-forge-executor/.forge/memory
+touch ../multi-forge-executor/.forge/memory/suggested_impl_notes.md
+
+forge session resume executor
+```
+
+For this repository, `executor` defaults to the sibling worktree `../multi-forge-executor`. If the repo or session name
+changes, use the worktree path printed by `forge session fork`.
+
+### 3. Reviewer
+
+Fork the planner into the executor's existing worktree so the reviewer sees the approved plan plus the executor's file
+state:
+
+```bash
+forge session fork planner \
+  --name reviewer \
+  --into ../multi-forge-executor \
+  --inline-plan
+```
+
+`fork --into` targets an existing non-main worktree, so it uses resume handoff rather than native Claude resume across
+the CWD boundary. `fork` does not yet have a review-edit flag; make the review-only intent explicit in the reviewer
+session prompt until the runtime-abstraction Phase 1 context commands land.
+
+Use `--strategy full` only when the executor or reviewer needs full transcript detail. Otherwise the default structured
+handoff plus `--inline-plan` keeps context smaller while preserving the approved plan.
+
 ## Scoping
 
 These docs intentionally use git-tracked and gitignored locations to define scope:
