@@ -77,7 +77,10 @@ STRATEGY_INSTRUCTIONS: dict[str, str] = {
     ),
     "suggested": (
         "Propose additions to the official document as `- [ ]` checkboxes, each with "
-        "a brief rationale. Remove any checkboxes whose content has already been merged "
+        "a brief rationale and source reference (session name, file changed, or "
+        "conversation context). Be liberal: include any potentially durable information "
+        "missing from the official doc -- the human will prune during review. "
+        "Remove any checkboxes whose content has already been merged "
         "into the official document (self-prune). "
         "Do NOT duplicate suggestions that are already present in either file."
     ),
@@ -172,6 +175,43 @@ def resolve_passport_source(doc: DesignatedDoc) -> str:
     official doc (``doc.shadows``). Otherwise it lives on ``doc.path``.
     """
     return doc.shadows or doc.path
+
+
+def derive_shadow_path(official_path: str) -> str:
+    """Derive a default shadow file path for an official doc.
+
+    Encodes the immediate parent directory to reduce collisions:
+    ``docs/status/notes.md`` -> ``.forge/memory/suggested_status_notes.md``.
+    Top-level files omit the parent prefix.
+    """
+    p = Path(official_path)
+    parent = p.parent.name
+    if parent and parent != ".":
+        return f".forge/memory/suggested_{parent}_{p.stem}.md"
+    return f".forge/memory/suggested_{p.stem}.md"
+
+
+def check_shadow_path_collision(
+    shadow_path: str,
+    official_path: str,
+    existing_docs: list[DesignatedDoc],
+) -> str | None:
+    """Check whether *shadow_path* collides with an existing manifest entry.
+
+    Returns an actionable error message on collision, ``None`` when safe.
+    Re-tracking the same official doc is not a collision (upsert).
+    """
+    for doc in existing_docs:
+        if doc.path != shadow_path:
+            continue
+        if doc.shadows is not None and doc.shadows == official_path:
+            continue  # same official re-tracked -- upsert, not collision
+        return (
+            f"Shadow path {shadow_path} is already used"
+            + (f" for {doc.shadows}" if doc.shadows else " as a direct doc")
+            + ". Use --shadow <path> to specify a different shadow path."
+        )
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -655,6 +695,7 @@ def resolve_with_overrides(
     *,
     strategy: str | None = None,
     update_mode: str | None = None,
+    shadow_path: str | None = None,
     writers: str | None = None,
 ) -> tuple[Passport, list[str]]:
     """Apply CLI-flag overrides to a deep copy of the passport.
@@ -689,6 +730,12 @@ def resolve_with_overrides(
         if update_mode == "direct" and resolved.update.shadow_path:
             warnings.append("CLI --mode direct ignores passport shadow_path " f"'{resolved.update.shadow_path}'")
             resolved.update.shadow_path = None
+
+    if shadow_path is not None and shadow_path != resolved.update.shadow_path:
+        old = resolved.update.shadow_path
+        if old:
+            warnings.append(f"CLI --shadow {shadow_path} overrides passport shadow_path '{old}'")
+        resolved.update.shadow_path = shadow_path
 
     if writers is not None and writers != resolved.update.writers:
         validate_writer_spec(writers)

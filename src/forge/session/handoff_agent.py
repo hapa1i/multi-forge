@@ -108,6 +108,11 @@ def build_multi_doc_prompt(
             lines.append(f"### `{spec.write_path}` (proposes changes to `{spec.official_path}`)")
             lines.append(f"1. Read the OFFICIAL document at `{spec.official_path}` first.")
             lines.append(f"2. Read this shadow document at `{spec.write_path}` (if it exists).")
+            lines.append(
+                "3. Write suggestions liberally. Include anything potentially useful "
+                "that is not already in the official doc. The human will review and "
+                "promote selectively."
+            )
         else:
             lines.append(f"### `{spec.write_path}`")
 

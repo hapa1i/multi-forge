@@ -220,7 +220,8 @@ class TestMemoryTrack:
         assert effective.memory.auto_update.enabled is True
         assert effective.memory.auto_update.min_turns == 10
 
-    def test_track_rejects_shadow_only_passport(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+    def test_track_shadow_only_passport_accepted(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        """Shadow-only passport without --propose is accepted using the passport's shadow_path."""
         forge_root = seeded_session[0]
         from forge.session.passport import synthesize_passport, write_passport
 
@@ -232,9 +233,14 @@ class TestMemoryTrack:
         write_passport(forge_root / "docs/impl_notes.md", pp)
 
         result = runner.invoke(main, ["memory", "track", "docs/impl_notes.md"])
-        assert result.exit_code != 0
-        assert "shadow-only" in result.output
-        assert "--propose" not in result.output
+        assert result.exit_code == 0, result.output
+        assert "shadow proposal" in result.output
+        # Verify manifest entry uses the passport's shadow_path
+        list_result = runner.invoke(main, ["memory", "list", "--json"])
+        docs = json.loads(list_result.output)
+        shadow_entries = [d for d in docs if d.get("shadows") == "docs/impl_notes.md"]
+        assert len(shadow_entries) == 1
+        assert shadow_entries[0]["path"] == ".forge/memory/suggested.md"
 
     def test_track_rejects_absolute_path(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
         result = runner.invoke(main, ["memory", "track", "/etc/passwd", "--as", "generic"])
@@ -271,6 +277,164 @@ class TestMemoryTrack:
         pp = read_passport(forge_root / "docs/checklist.md")
         assert pp is not None
         assert pp.intent == "Active task tracking"
+
+
+# ---------------------------------------------------------------------------
+# track --propose
+# ---------------------------------------------------------------------------
+
+
+class TestMemoryTrackPropose:
+    def test_propose_derives_shadow_path(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        result = runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--propose"])
+        assert result.exit_code == 0, result.output
+        assert "shadow proposal" in result.output
+        list_result = runner.invoke(main, ["memory", "list", "--json"])
+        docs = json.loads(list_result.output)
+        shadow = [d for d in docs if d.get("shadows") == "docs/impl_notes.md"]
+        assert len(shadow) == 1
+        assert shadow[0]["path"] == ".forge/memory/suggested_docs_impl_notes.md"
+
+    def test_propose_auto_creates_shadow_file(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        forge_root = seeded_session[0]
+        derived = ".forge/memory/suggested_docs_impl_notes.md"
+        assert not (forge_root / derived).exists()
+        result = runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--propose"])
+        assert result.exit_code == 0, result.output
+        assert (forge_root / derived).is_file()
+        assert "Shadow file created" in result.output
+
+    def test_propose_creates_shadow_only_passport(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        forge_root = seeded_session[0]
+        runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--propose"])
+        from forge.session.passport import read_passport
+
+        pp = read_passport(forge_root / "docs/impl_notes.md")
+        assert pp is not None
+        assert pp.update.mode == "shadow-only"
+        assert pp.update.strategy == "suggested"
+        assert pp.update.shadow_path == ".forge/memory/suggested_docs_impl_notes.md"
+
+    def test_propose_implies_suggested_strategy(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        result = runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--propose"])
+        assert result.exit_code == 0, result.output
+        list_result = runner.invoke(main, ["memory", "list", "--json"])
+        docs = json.loads(list_result.output)
+        shadow = [d for d in docs if d.get("shadows")]
+        assert shadow[0]["strategy"] == "suggested"
+
+    def test_propose_with_as_suggested_compatible(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        result = runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--propose", "--as", "suggested"])
+        assert result.exit_code == 0, result.output
+
+    def test_propose_with_as_nonsuggested_fails(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        result = runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--propose", "--as", "checklist"])
+        assert result.exit_code != 0
+        assert "suggested" in result.output
+
+    def test_propose_with_shadow_override(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        forge_root = seeded_session[0]
+        custom = ".forge/memory/custom_shadow.md"
+        (forge_root / custom).parent.mkdir(parents=True, exist_ok=True)
+        (forge_root / custom).write_text("", encoding="utf-8")
+        result = runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--propose", "--shadow", custom])
+        assert result.exit_code == 0, result.output
+        list_result = runner.invoke(main, ["memory", "list", "--json"])
+        docs = json.loads(list_result.output)
+        shadow = [d for d in docs if d.get("shadows") == "docs/impl_notes.md"]
+        assert shadow[0]["path"] == custom
+
+    def test_shadow_without_propose_fails(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        result = runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--shadow", ".forge/memory/x.md"])
+        assert result.exit_code != 0
+        assert "--propose" in result.output
+
+    def test_propose_does_not_autocreate_non_forge_paths(
+        self, runner: CliRunner, seeded_session: tuple[Path, str]
+    ) -> None:
+        result = runner.invoke(
+            main, ["memory", "track", "docs/impl_notes.md", "--propose", "--shadow", "docs/nonexistent.md"]
+        )
+        assert result.exit_code != 0
+        assert "does not exist" in result.output
+
+    def test_propose_converts_direct_to_shadow(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--as", "generic"])
+        result = runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--propose"])
+        assert result.exit_code == 0, result.output
+        assert "Converting direct tracking" in result.output
+        list_result = runner.invoke(main, ["memory", "list", "--json"])
+        docs = json.loads(list_result.output)
+        assert len(docs) == 1
+        assert docs[0]["shadows"] == "docs/impl_notes.md"
+
+    def test_propose_auto_enables_memory(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        result = runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--propose"])
+        assert result.exit_code == 0, result.output
+        assert "auto-update enabled" in result.output
+
+    def test_propose_output_mentions_shadow(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        result = runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--propose"])
+        assert result.exit_code == 0, result.output
+        assert "through shadow proposal" in result.output
+
+    def test_propose_with_intent(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        forge_root = seeded_session[0]
+        runner.invoke(
+            main,
+            ["memory", "track", "docs/impl_notes.md", "--propose", "--intent", "Durable memory"],
+        )
+        from forge.session.passport import read_passport
+
+        pp = read_passport(forge_root / "docs/impl_notes.md")
+        assert pp is not None
+        assert pp.intent == "Durable memory"
+
+    def test_propose_upsert_updates_shadow_entry(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        forge_root = seeded_session[0]
+        runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--propose"])
+        custom = ".forge/memory/new_shadow.md"
+        (forge_root / custom).parent.mkdir(parents=True, exist_ok=True)
+        (forge_root / custom).write_text("", encoding="utf-8")
+        result = runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--propose", "--shadow", custom])
+        assert result.exit_code == 0, result.output
+        assert "Updated tracking" in result.output
+        list_result = runner.invoke(main, ["memory", "list", "--json"])
+        docs = json.loads(list_result.output)
+        assert len(docs) == 1
+        assert docs[0]["path"] == custom
+
+    def test_auto_create_rejects_traversal(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        result = runner.invoke(
+            main,
+            ["memory", "track", "docs/impl_notes.md", "--propose", "--shadow", ".forge/memory/../../etc/passwd"],
+        )
+        assert result.exit_code != 0
+
+    def test_propose_derived_collision_fails(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        """Two official docs with the same parent+stem collide on derived shadow path."""
+        forge_root = seeded_session[0]
+        (forge_root / "other/docs").mkdir(parents=True, exist_ok=True)
+        (forge_root / "other/docs/impl_notes.md").write_text("# Other\n", encoding="utf-8")
+        runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--propose"])
+        result = runner.invoke(main, ["memory", "track", "other/docs/impl_notes.md", "--propose"])
+        assert result.exit_code != 0
+        assert "--shadow" in result.output
+
+    def test_propose_explicit_shadow_collision_fails(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--propose"])
+        list_result = runner.invoke(main, ["memory", "list", "--json"])
+        used_shadow = json.loads(list_result.output)[0]["path"]
+        result = runner.invoke(main, ["memory", "track", "docs/changelog.md", "--propose", "--shadow", used_shadow])
+        assert result.exit_code != 0
+        assert "--shadow" in result.output
+
+    def test_propose_self_shadow_fails(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        result = runner.invoke(
+            main, ["memory", "track", "docs/impl_notes.md", "--propose", "--shadow", "docs/impl_notes.md"]
+        )
+        assert result.exit_code != 0
+        assert "same as the official" in result.output
 
 
 # ---------------------------------------------------------------------------
@@ -316,6 +480,41 @@ class TestMemoryUntrack:
 
 
 # ---------------------------------------------------------------------------
+# untrack (shadow)
+# ---------------------------------------------------------------------------
+
+
+class TestMemoryUntrackShadow:
+    def test_untrack_by_official_path(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--propose"])
+        result = runner.invoke(main, ["memory", "untrack", "docs/impl_notes.md"])
+        assert result.exit_code == 0, result.output
+        assert "Untracked" in result.output
+        listed = runner.invoke(main, ["memory", "list", "--json"])
+        assert json.loads(listed.output) == []
+
+    def test_untrack_by_shadow_path(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--propose"])
+        list_result = runner.invoke(main, ["memory", "list", "--json"])
+        shadow_path = json.loads(list_result.output)[0]["path"]
+        result = runner.invoke(main, ["memory", "untrack", shadow_path])
+        assert result.exit_code == 0, result.output
+        assert "Untracked" in result.output
+        listed = runner.invoke(main, ["memory", "list", "--json"])
+        assert json.loads(listed.output) == []
+
+    def test_untrack_shadow_leaves_passport(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        forge_root = seeded_session[0]
+        runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--propose"])
+        runner.invoke(main, ["memory", "untrack", "docs/impl_notes.md"])
+        from forge.session.passport import read_passport
+
+        pp = read_passport(forge_root / "docs/impl_notes.md")
+        assert pp is not None
+        assert pp.update.mode == "shadow-only"
+
+
+# ---------------------------------------------------------------------------
 # list
 # ---------------------------------------------------------------------------
 
@@ -341,6 +540,19 @@ class TestMemoryList:
         assert len(docs) == 1
         assert docs[0]["path"] == "docs/checklist.md"
         assert docs[0]["has_passport"] is True
+
+    def test_list_shows_shadow_target(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--propose"])
+        result = runner.invoke(main, ["memory", "list", "--json"])
+        docs = json.loads(result.output)
+        assert docs[0]["shadows"] == "docs/impl_notes.md"
+
+    def test_list_json_includes_shadows_field(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        runner.invoke(main, ["memory", "track", "docs/checklist.md", "--as", "checklist"])
+        result = runner.invoke(main, ["memory", "list", "--json"])
+        docs = json.loads(result.output)
+        assert "shadows" in docs[0]
+        assert docs[0]["shadows"] is None
 
     def test_legacy_docs_trigger_warning(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
         """Docs added via old override path (no passport) trigger legacy warning."""
@@ -417,6 +629,20 @@ class TestMemoryStatus:
         result = runner.invoke(main, ["memory", "status", "--scope", "project"])
         assert result.exit_code == 0, result.output
         assert "No tracked" in result.output
+
+    def test_status_doc_filter_matches_shadow_target(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--propose"])
+        result = runner.invoke(main, ["memory", "status", "--doc", "docs/impl_notes.md", "--json"])
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert len(data["entries"]) == 1
+        assert data["entries"][0]["shadows"] == "docs/impl_notes.md"
+
+    def test_status_json_includes_shadows_field(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        runner.invoke(main, ["memory", "track", "docs/checklist.md", "--as", "checklist"])
+        result = runner.invoke(main, ["memory", "status", "--json"])
+        data = json.loads(result.output)
+        assert "shadows" in data["entries"][0]
 
 
 # ---------------------------------------------------------------------------
@@ -512,6 +738,81 @@ class TestLegacyDetection:
         assert result.exit_code == 0, result.output
         # Should NOT warn -- passport exists on the official doc
         assert "no passport" not in result.output.lower()
+
+
+# ---------------------------------------------------------------------------
+# shadows list/show
+# ---------------------------------------------------------------------------
+
+
+class TestMemoryShadowsList:
+    def test_empty_shadows(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        result = runner.invoke(main, ["memory", "shadows", "list"])
+        assert result.exit_code == 0, result.output
+        assert "No shadow" in result.output
+
+    def test_shadows_list_shows_entries(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--propose"])
+        result = runner.invoke(main, ["memory", "shadows", "list"])
+        assert result.exit_code == 0, result.output
+        assert "docs/impl_notes.md" in result.output
+
+    def test_shadows_list_json(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--propose"])
+        result = runner.invoke(main, ["memory", "shadows", "list", "--json"])
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert len(data) == 1
+        assert data[0]["official"] == "docs/impl_notes.md"
+        assert "sessions" in data[0]
+        assert "forge_root" in data[0]
+
+    def test_shadows_list_groups_by_official(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--propose"])
+        runner.invoke(main, ["memory", "track", "docs/changelog.md", "--propose"])
+        result = runner.invoke(main, ["memory", "shadows", "list", "--json"])
+        data = json.loads(result.output)
+        assert len(data) == 2
+        officials = {d["official"] for d in data}
+        assert "docs/impl_notes.md" in officials
+        assert "docs/changelog.md" in officials
+
+    def test_shadows_list_scope_project(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--propose"])
+        result = runner.invoke(main, ["memory", "shadows", "list", "--scope", "project", "--json"])
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert len(data) == 1
+
+
+class TestMemoryShadowsShow:
+    def test_show_no_match(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        result = runner.invoke(main, ["memory", "shadows", "show", "--for", "docs/nonexistent.md"])
+        assert result.exit_code == 0, result.output
+        assert "No shadow" in result.output
+
+    def test_show_prints_content(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        forge_root = seeded_session[0]
+        runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--propose"])
+        # Write content to the shadow file
+        list_result = runner.invoke(main, ["memory", "list", "--json"])
+        shadow_path = json.loads(list_result.output)[0]["path"]
+        (forge_root / shadow_path).write_text("- [ ] Add error handling notes\n", encoding="utf-8")
+
+        result = runner.invoke(main, ["memory", "shadows", "show", "--for", "docs/impl_notes.md"])
+        assert result.exit_code == 0, result.output
+        assert "error handling" in result.output
+
+    def test_show_missing_shadow_file(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        forge_root = seeded_session[0]
+        runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--propose"])
+        list_result = runner.invoke(main, ["memory", "list", "--json"])
+        shadow_path = json.loads(list_result.output)[0]["path"]
+        (forge_root / shadow_path).unlink()
+
+        result = runner.invoke(main, ["memory", "shadows", "show", "--for", "docs/impl_notes.md"])
+        assert result.exit_code == 0, result.output
+        assert "does not exist" in result.output
 
 
 # ---------------------------------------------------------------------------

@@ -903,13 +903,15 @@ per-child handoff file in `$EDITOR` before launching Claude. `forge session memo
 
 #### Memory management
 
-| Command                       | Purpose                                                               |
-| :---------------------------- | :-------------------------------------------------------------------- |
-| `forge memory enable`         | Enable memory auto-update for handoff agent (`--session`)             |
-| `forge memory track <path>`   | Track a memory doc (`--as <strategy>`, `--session`)                   |
-| `forge memory untrack <path>` | Stop tracking a memory doc (`--session`)                              |
-| `forge memory list`           | List tracked memory docs (`--session`, `--json`)                      |
-| `forge memory status`         | Show memory doc status across sessions (`--scope`, `--doc`, `--json`) |
+| Command                       | Purpose                                                                        |
+| :---------------------------- | :----------------------------------------------------------------------------- |
+| `forge memory enable`         | Enable memory auto-update for handoff agent (`--session`)                      |
+| `forge memory track <path>`   | Track a memory doc (`--as <strategy>`, `--propose`, `--shadow`, `--session`)   |
+| `forge memory untrack <path>` | Stop tracking a memory doc (`--session`)                                       |
+| `forge memory list`           | List tracked memory docs (`--session`, `--json`)                               |
+| `forge memory status`         | Show memory doc status across sessions (`--scope`, `--doc`, `--json`)          |
+| `forge memory shadows list`   | List accumulated shadow proposals (`--scope`, `--session`, `--json`)           |
+| `forge memory shadows show`   | Show shadow proposal content (`--for <doc>`, `--scope`, `--session`)           |
 
 #### Proxy management
 

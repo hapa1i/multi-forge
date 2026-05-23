@@ -384,6 +384,32 @@ class TestBuildMultiDocPrompt:
         assert "proposes changes to `STANDARDS.md`" in prompt
         assert "Read the OFFICIAL document" in prompt
 
+    def test_shadow_prompt_includes_liberal_framing(self) -> None:
+        """Shadow docs include liberal suggestion framing."""
+        docs = [
+            DesignatedDoc(
+                path=".forge/memory/suggested.md",
+                strategy="suggested",
+                shadows="OFFICIAL.md",
+            ),
+        ]
+        prompt = build_multi_doc_prompt(
+            session_name="test",
+            transcript_path="/abs/path/t.jsonl",
+            docs=_resolve_docs(docs),
+        )
+        assert "Write suggestions liberally" in prompt
+
+    def test_direct_doc_no_liberal_framing(self) -> None:
+        """Direct docs do NOT include liberal suggestion framing."""
+        docs = [DesignatedDoc(path="docs/checklist.md", strategy="checklist")]
+        prompt = build_multi_doc_prompt(
+            session_name="test",
+            transcript_path="/abs/path/t.jsonl",
+            docs=_resolve_docs(docs),
+        )
+        assert "Write suggestions liberally" not in prompt
+
 
 # ---------------------------------------------------------------------------
 # resolve_handoff_base_url

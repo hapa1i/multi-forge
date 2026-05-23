@@ -20,7 +20,9 @@ from forge.session.passport import (
     MemoryStrategy,
     Passport,
     PassportUpdate,
+    check_shadow_path_collision,
     check_writer_access,
+    derive_shadow_path,
     extract_frontmatter,
     parse_passport,
     read_passport,
@@ -647,6 +649,122 @@ class TestResolveWithOverrides:
     def test_invalid_mode_override_raises(self) -> None:
         with pytest.raises(PassportError, match="unknown mode"):
             resolve_with_overrides(self._base_passport(), update_mode="append")
+
+    def test_shadow_path_override_warns(self) -> None:
+        p = Passport(
+            version=1,
+            intent="Test",
+            update=PassportUpdate(
+                strategy="suggested",
+                mode="shadow-only",
+                shadow_path=".forge/memory/old.md",
+            ),
+        )
+        resolved, warnings = resolve_with_overrides(p, shadow_path=".forge/memory/new.md")
+        assert resolved.update.shadow_path == ".forge/memory/new.md"
+        assert len(warnings) == 1
+        assert "old.md" in warnings[0]
+
+    def test_mode_and_shadow_path_override_together(self) -> None:
+        p = self._base_passport()
+        resolved, warnings = resolve_with_overrides(
+            p,
+            update_mode="shadow-only",
+            shadow_path=".forge/memory/shadow.md",
+        )
+        assert resolved.update.mode == "shadow-only"
+        assert resolved.update.shadow_path == ".forge/memory/shadow.md"
+        # 1 warning for mode override; shadow_path has no old value to override
+        assert len(warnings) == 1
+
+
+# ---------------------------------------------------------------------------
+# TestDeriveShadowPath
+# ---------------------------------------------------------------------------
+
+
+class TestDeriveShadowPath:
+    def test_basic_with_parent_prefix(self) -> None:
+        assert derive_shadow_path("docs/status/impl_notes.md") == ".forge/memory/suggested_status_impl_notes.md"
+
+    def test_top_level_file_no_prefix(self) -> None:
+        assert derive_shadow_path("README.md") == ".forge/memory/suggested_README.md"
+
+    def test_single_parent_dir(self) -> None:
+        assert derive_shadow_path("docs/checklist.md") == ".forge/memory/suggested_docs_checklist.md"
+
+    def test_deeply_nested_uses_immediate_parent(self) -> None:
+        assert derive_shadow_path("a/b/c/deep/notes.md") == ".forge/memory/suggested_deep_notes.md"
+
+
+# ---------------------------------------------------------------------------
+# TestShadowPathCollision
+# ---------------------------------------------------------------------------
+
+
+class TestShadowPathCollision:
+    def test_no_existing_docs_safe(self) -> None:
+        assert check_shadow_path_collision(".forge/memory/suggested_notes.md", "docs/notes.md", []) is None
+
+    def test_same_official_retrack_safe(self) -> None:
+        existing = [
+            DesignatedDoc(
+                path=".forge/memory/suggested_status_notes.md",
+                strategy="suggested",
+                shadows="docs/status/notes.md",
+            ),
+        ]
+        result = check_shadow_path_collision(
+            ".forge/memory/suggested_status_notes.md",
+            "docs/status/notes.md",
+            existing,
+        )
+        assert result is None
+
+    def test_derived_collision_different_officials(self) -> None:
+        existing = [
+            DesignatedDoc(
+                path=".forge/memory/suggested_status_notes.md",
+                strategy="suggested",
+                shadows="a/status/notes.md",
+            ),
+        ]
+        result = check_shadow_path_collision(
+            ".forge/memory/suggested_status_notes.md",
+            "b/status/notes.md",
+            existing,
+        )
+        assert result is not None
+        assert "--shadow" in result
+        assert "a/status/notes.md" in result
+
+    def test_explicit_shadow_collision(self) -> None:
+        existing = [
+            DesignatedDoc(
+                path=".forge/memory/custom.md",
+                strategy="suggested",
+                shadows="docs/a.md",
+            ),
+        ]
+        result = check_shadow_path_collision(
+            ".forge/memory/custom.md",
+            "docs/b.md",
+            existing,
+        )
+        assert result is not None
+        assert "--shadow" in result
+
+    def test_collision_with_direct_doc(self) -> None:
+        existing = [
+            DesignatedDoc(path=".forge/memory/suggested_notes.md", strategy="generic"),
+        ]
+        result = check_shadow_path_collision(
+            ".forge/memory/suggested_notes.md",
+            "docs/notes.md",
+            existing,
+        )
+        assert result is not None
+        assert "direct doc" in result
 
 
 # ---------------------------------------------------------------------------
