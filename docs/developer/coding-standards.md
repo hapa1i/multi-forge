@@ -59,6 +59,9 @@ Research-preview breaking changes require:
 - **Direct update**: update the command, schema, docs, tests, and examples to the new shape.
 - **No default shims**: do not keep old aliases, adapters, or compatibility wrappers unless the proposal explicitly
   justifies them.
+- **Helpful failure**: removed CLI commands/options and rejected stale durable state should fail with an actionable
+  message that names the replacement command or reset path. A hidden tombstone command that only errors is acceptable
+  when it prevents a generic "unknown command" dead end; it must not execute old behavior.
 - **Clear reset/migration instructions**: tell users what to delete, recreate, or re-run.
 - **Changelog entry**: document the breaking change and the reset/migration path.
 
@@ -116,6 +119,8 @@ reads.
   - Discard and recreate runtime-only state (for example `active.json`).
 - Research-preview (`0.x`) schema changes may be clean breaks: bump the version or document the reset, reject stale
   durable state with a clear message, and update docs/tests in the same change.
+- Known legacy state that is intentionally ignored must still be detected and surfaced with a one-time notice or
+  actionable warning. Do not let stale recognized config degrade into an apparently valid empty/default state.
 - Stable schema changes require a version bump plus either:
   - An explicit migration command (`forge migrate`), or
   - A documented breaking release for intentionally non-migrated state.

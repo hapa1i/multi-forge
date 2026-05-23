@@ -34,31 +34,46 @@ the authoritative contract and session manifests only as resolved participation 
   - Verification: branch split performed before replacing this checklist.
 - [ ] Map the current `forge session memory` command implementation.
   - Assertion: command registration, add/list/remove behavior, duplicate-path failure, session config writes, and test
-    coverage are identified before deleting the public command group.
-- [ ] Map the current memory handoff path.
+    coverage are identified before deleting the public command group. Include `src/forge/cli/session_memory.py`,
+    subgroup registration in `src/forge/cli/session.py`, `tests/src/cli/test_session_memory.py`, and integration
+    coverage that shells out to the old commands.
+- [ ] Map the Stop-time memory update path.
   - Assertion: auto-update mode resolution, `review-only` report generation, augment writes, designated-doc strategy
-    prompts, and `forge session handoff show --latest` are tied to concrete code references.
+    prompts, and `src/forge/session/handoff_agent.py` update behavior are tied to concrete code references.
+- [ ] Map the handoff report/show surface.
+  - Assertion: `forge session handoff show --latest`, review artifact paths, and any CLI read paths are tied to concrete
+    code references separately from the update-side handoff agent.
 - [ ] Inventory old memory UX references.
   - Assertion: docs, tests, skills, command help, README snippets, and status-doc setup examples that mention
-    `forge session memory` are listed with a keep/update/remove decision.
+    `forge session memory` are listed with a keep/update/remove decision. Include, at minimum, `docs/status/README.md`,
+    `docs/design.md`, `docs/end-user/handoff.md`, `tests/integration/cli/`, `tests/src/cli/test_session_memory.py`,
+    `src/skills/qa/resources/checklist/`, and `src/skills/walkthrough/resources/checklist.md`.
 - [ ] Decide which existing helpers stay private.
   - Assertion: reusable storage, validation, and handoff helpers are named, and public compatibility aliases are
     explicitly excluded.
 
 ## Phase 1 - Passport Model
 
+- [ ] Define the v1 memory strategy enum.
+  - Assertion: the supported `--as <strategy>` set is named in one shared place and used by passport validation, CLI
+    validation, and handoff prompts. Initial set: `project-state`, `checklist`, `changelog`, `debugging`, `patterns`,
+    `suggested`, and `generic`.
 - [ ] Add `forge_memory` frontmatter parsing and serialization.
   - Assertion: parser preserves unrelated Markdown content, validates `version`, `intent`, `captures`, `excludes`, and
-    `update` fields, and reports actionable errors for malformed passports.
+    all `update` subfields from the proposal examples (`instruction`, `strategy`, `mode`, `writers`, `inherit_on_fork`,
+    `compact_when`, optional `shadow_path`, optional `approval`), and reports actionable errors for malformed passports.
 - [ ] Implement passport-required-at-rest behavior.
-  - Assertion: `forge memory track` leaves every tracked official doc with a valid passport, synthesizes one from
-    CLI flags when possible, and fails with a concrete suggested command when required fields are missing.
+  - Assertion: `forge memory track` leaves every tracked official doc with a valid passport, synthesizes one from CLI
+    flags when possible, and fails with a concrete suggested command when required fields are missing.
 - [ ] Implement flag-vs-passport conflict handling.
   - Assertion: CLI flags win for the current invocation, warnings name the overridden passport field, and persisted
     updates are deterministic.
 - [ ] Keep ownership split between passport and session manifest.
   - Assertion: the session manifest stores only participation and auto-update runtime state; Stop-time update logic
     re-reads passport intent, instructions, writers, strategy, mode, shadow path, and inheritance.
+  - Verification target: a test edits a tracked doc's passport after session participation is configured but before the
+    Stop-time handoff update, then proves the handoff behavior follows the edited passport without re-running
+    `forge memory track`.
 - [ ] Validate v1 writer semantics.
   - Assertion: `all-sessions` and exact session-name writers work; lineage and role semantics are rejected or deferred
     with clear errors.
@@ -66,20 +81,32 @@ the authoritative contract and session manifests only as resolved participation 
 ## Phase 2 - Top-Level CLI
 
 - [ ] Add the canonical `forge memory` command group.
-  - Assertion: user-facing docs/help expose `forge memory`; the old public `forge session memory` group is removed with
-    no compatibility alias.
+  - Assertion: user-facing CLI help exposes `forge memory enable|track|untrack|list|status|shadows`; mutating commands
+    require `--session <name>` unless an active session is resolved.
+- [ ] Delete the old public `forge session memory` surface.
+  - Assertion: `src/forge/cli/session_memory.py` is removed or made private, subgroup registration is removed from
+    `src/forge/cli/session.py`, old command tests are deleted or rewritten for `forge memory`, docs no longer list the
+    old command table entries, there is no compatibility alias, and old invocations fail with a helpful replacement
+    message instead of a generic unknown-command dead end.
+- [ ] Detect ignored legacy designated-doc config.
+  - Assertion: when a session manifest contains a non-empty legacy `intent.memory.designated_docs[]`, Forge ignores it
+    for behavior but emits a one-time notice or actionable warning that explains the clean break and points to
+    `forge memory enable` / `forge memory track`.
 - [ ] Implement `forge memory enable`.
   - Assertion: command sets `memory.auto_update.enabled=true`, defaults mode to `augment`, supports `--review-only`,
     prints current tracked/shadowed docs, and is idempotent when re-run.
 - [ ] Implement idempotent `track`.
   - Assertion: direct tracking adds or upserts a doc, updates strategy/mode when rerun, auto-enables memory for the
-    session when needed, and never creates duplicate entries.
+    session when needed, validates `--as` against the v1 strategy enum, and never creates duplicate entries.
 - [ ] Implement idempotent `untrack`.
   - Assertion: untracking removes direct and shadow participation as requested, succeeds clearly when the doc is absent,
     and leaves passport frontmatter intact unless an explicit passport-edit command is added later.
 - [ ] Implement `list` and `status` visibility.
-  - Assertion: `forge memory list --session <name>` and `forge memory status --scope project|repo|all|--doc <path>`
+  - Assertion: `forge memory list --session <name>` and `forge memory status --scope project|repo|all --doc <path>`
     distinguish direct writers, shadow writers, handoff mode, strategy, session/worktree, and missing targets.
+- [ ] Implement cross-`forge_root` discovery for read-only `--scope all`.
+  - Assertion: `forge memory status --scope all` can discover readable Forge roots, handles missing or inaccessible
+    roots without failing the whole command, and clearly reports which roots were scanned.
 - [ ] Keep CLI language outcome-oriented.
   - Assertion: command output explains "tracks changelog directly" and "tracks impl_notes through a shadow proposal"
     without requiring users to understand the passport YAML shape.
@@ -97,22 +124,25 @@ the authoritative contract and session manifests only as resolved participation 
     derives a disambiguated path or fails with an actionable override command.
 - [ ] Add `forge memory shadows list|show`.
   - Assertion: shadow content can be grouped by official target and source session/worktree, separately from status
-    configuration.
+    configuration; `--scope all` uses the Phase 2 read-only discovery path.
 - [ ] Tune handoff-agent shadow behavior.
   - Assertion: shadow update prompts allow liberal, sourceable suggestions for durable memory, while direct-write docs
     remain compact and conservative.
 
 ## Phase 4 - Fork Inheritance
 
+Tasks in this phase are coupled: do not ship `--inherit-memory shadowed` without inherited-shadow materialization and
+passport override handling in the same slice.
+
+- [ ] Build inherited-shadow materialization support.
+  - Assertion: inherited `.forge/memory/` shadow files can be created in the target worktree before a child session is
+    persisted; non-Forge-owned shadows are reported but not created.
 - [ ] Add `--inherit-memory all|none|shadowed` to session fork flows.
   - Assertion: default `all` preserves existing sticky-session expectations; `none` removes memory participation; and
-    `shadowed` inherits only proposal/shadow docs.
+    `shadowed` inherits only proposal/shadow docs while using the materialization helper above.
 - [ ] Apply passport inheritance overrides consistently.
   - Assertion: `--inherit-memory` overrides `forge_memory.update.inherit_on_fork` with warnings, and passport defaults
     apply when the flag is omitted.
-- [ ] Materialize inherited shadow files in new worktrees.
-  - Assertion: inherited `.forge/memory/` shadow files are created in the target worktree, non-Forge-owned shadows are
-    reported but not created, and all created paths are shown to the user.
 - [ ] Add fork/resume tests for inherited memory.
   - Assertion: tests cover normal worktree fork, `--into` existing worktree, and no-memory scratch forks.
 
@@ -136,8 +166,9 @@ the authoritative contract and session manifests only as resolved participation 
 ## Phase 6 - Docs, Tests, And Dogfooding
 
 - [ ] Update user and developer docs for the new memory model.
-  - Assertion: README/status docs/design/developer docs no longer teach `forge session memory`; they explain
-    `forge memory`, passports, shadows, first-run review-only mode, idempotency, and clean-break migration.
+  - Assertion: Phase 0's old-UX inventory has been applied. README/status docs/design/developer docs/end-user guides and
+    skill checklists no longer teach `forge session memory`; they explain `forge memory`, passports, shadows, first-run
+    review-only mode, idempotency, and clean-break migration.
 - [ ] Add targeted unit and CLI tests.
   - Assertion: tests cover passport parsing, track/untrack idempotency, enable behavior, status scopes, shadow
     auto-create, inheritance modes, and curation report ownership.

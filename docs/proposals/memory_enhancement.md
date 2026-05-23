@@ -146,7 +146,9 @@ The first implementation slice should improve the write-side UX without dependin
 
 Add a top-level memory command group as the canonical UX. The existing `forge session memory ...` group is removed in
 the same release: only `forge memory ...` is public, with no compatibility alias. Internal helpers from the old surface
-may be reused behind the new commands, but docs, tests, and user-facing guidance target `forge memory` exclusively.
+may be reused behind the new commands, but docs, tests, and user-facing guidance target `forge memory` exclusively. Old
+invocations should fail with a helpful message that points to the equivalent `forge memory` command; they must not
+execute old behavior.
 
 ```bash
 forge memory enable --session planner
@@ -399,6 +401,10 @@ forge memory recall --session planner --mode skill-read
 Pre-OSS designated-memory state under `intent.memory.designated_docs[]` is not migrated. v1 of the passport model is a
 clean break: docs become tracked when `forge memory track` is run against them, and the existing JSON configuration is
 ignored. There is no compat shim or deprecation period.
+
+Forge should still detect a non-empty legacy `intent.memory.designated_docs[]` and surface a one-time notice instead of
+silently reporting "nothing tracked." The notice should explain that legacy designated docs are ignored by the passport
+model and point to `forge memory track ...` / `forge memory enable ...` as the replacement setup path.
 
 This matches `README.md`: Multi-Forge is a research preview whose APIs, commands, and file formats may change without
 notice between releases, and pre-OSS Forge installs are not supported in-place. It also follows
