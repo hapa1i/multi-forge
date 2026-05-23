@@ -92,6 +92,13 @@ conflicts between this plan and earlier conversation context, THIS plan takes pr
 
 ---"""
 
+_CLAUDE_MODEL_PIN_ENV_VARS = (
+    "ANTHROPIC_MODEL",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL",
+)
+
 
 def _plan_fingerprint(path: str, forge_root: str | None) -> str:
     """Return a cheap fingerprint for cache key differentiation: path:mtime_ns:size."""
@@ -420,6 +427,8 @@ def invoke_supervisor(
 
     if config.direct:
         base_url = None
+        model = None
+        unset_env_vars = None
     else:
         try:
             routing_result = resolve_subprocess_routing(
@@ -435,6 +444,11 @@ def invoke_supervisor(
                 policy_id="semantic.supervisor",
                 warnings=[f"Supervisor proxy '{config.proxy}' not found: {e}"],
             )
+        # Keep executor model pins from leaking into the read-only supervisor.
+        # With a proxy URL, `--model opus` routes through the proxy's opus tier,
+        # so alternatives like claude-opus-4-7 remain opt-in for the executor.
+        model = "opus" if base_url else None
+        unset_env_vars = _CLAUDE_MODEL_PIN_ENV_VARS if base_url else None
 
     from forge.core.reactive.cost_tracking import track_verb_cost
 
@@ -445,10 +459,12 @@ def invoke_supervisor(
             prompt,
             resume_id=resolved.resume_id,
             fork_session=config.fork_session,
+            model=model,
             base_url=base_url,
             direct=config.direct,
             timeout_seconds=config.timeout_seconds,
             cwd=resolved.source_cwd,
+            unset_env_vars=unset_env_vars,
         )
 
     if not result.success:

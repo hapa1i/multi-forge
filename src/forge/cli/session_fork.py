@@ -19,11 +19,14 @@ from forge.cli.session_addendum import (
 from forge.core.paths import display_path
 from forge.session import (
     LAUNCH_MODE_HOST,
+    LAUNCH_MODE_SIDECAR,
     ForgeSessionError,
     SessionState,
 )
 from forge.session.direct_model import (
+    DirectModelPin,
     apply_direct_model_env,
+    resolve_direct_model_pin,
 )
 from forge.session.exceptions import (
     BranchExistsError,
@@ -57,12 +60,15 @@ from forge.cli.session import (  # noqa: E402
     logger,
 )
 from forge.cli.session_lifecycle import (  # noqa: E402
+    _apply_and_persist_direct_model_override,
+    _apply_direct_model_env_if_supported,
     _launch_claude_for_session,
     _persist_fork_handoff_derivation,
     _print_branch_exists_tip,
     _print_post_exit_tip,
     _resolve_manifest_prompt_file,
     _resume_tip_command,
+    _validate_direct_model_pin_for_routing,
     session,
 )
 
@@ -90,6 +96,13 @@ __all__ = ["fork"]
     is_flag=True,
     help="Bypass the proxy and talk to Anthropic directly",
 )
+@click.option(
+    "--model",
+    "direct_model",
+    type=str,
+    default=None,
+    help="Pin the Claude model for this fork and future resumes (for example: claude-opus-4-6 or claude-opus-4-7)",
+)
 @click.option("--incognito", "-i", is_flag=True, help="Auto-delete fork on exit")
 @click.option("--worktree", "-w", is_flag=True, help="Create git worktree for fork isolation")
 @click.option("--branch", "-b", help="Override branch name (implies --worktree)")
@@ -109,7 +122,7 @@ __all__ = ["fork"]
     "--inline-plan",
     is_flag=True,
     default=False,
-    help="Inline the approved plan content in handoff context",
+    help="For worktree/--into forks, embed approved plan text in the handoff; default is a parent plan-path reference",
 )
 @click.option(
     "--into",
@@ -149,6 +162,7 @@ def fork(
     name: str | None,
     proxy_name: str | None,
     direct: bool,
+    direct_model: str | None,
     incognito: bool,
     worktree: bool,
     branch: str | None,
@@ -188,6 +202,16 @@ def fork(
     if (supervisor_proxy or supervisor_direct) and not supervise_target:
         console.print("[red]Error:[/red] --supervisor-proxy/--no-supervisor-proxy require --supervise")
         sys.exit(1)
+
+    normalized_direct_model: str | None = None
+    direct_model_pin: DirectModelPin | None = None
+    if direct_model:
+        try:
+            direct_model_pin = resolve_direct_model_pin(direct_model)
+            normalized_direct_model = direct_model_pin.env_model
+        except ValueError as e:
+            console.print(f"[red]Error:[/red] {e}")
+            sys.exit(1)
 
     if branch:
         worktree = True
@@ -314,6 +338,38 @@ def fork(
     _preflight_routing: ResolvedRouting | None = None
     if proxy_name:
         _preflight_routing = _sess()._resolve_routing_from_cli(proxy_name=proxy_name, direct=False)
+
+    if direct_model_pin:
+        try:
+            parent_state_for_model = manager.get_session(parent, forge_root=_fr)
+        except SessionNotFoundError:
+            if not _hint_cross_project_session(parent, _fr):
+                console.print(f"[red]Error:[/red] session '{parent}' not found")
+            sys.exit(1)
+        except ForgeSessionError as e:
+            _handle_error(e)
+            return
+
+        if not direct:
+            inherited_launch = parent_state_for_model.intent.launch
+            inherited_sidecar = parent_state_for_model.confirmed.is_sandboxed or (
+                inherited_launch is not None and inherited_launch.mode == LAUNCH_MODE_SIDECAR
+            )
+            if inherited_sidecar:
+                console.print("[red]Error:[/red] --model cannot be combined with sidecar fork")
+                sys.exit(1)
+
+            _, inherited_base_url, inherited_proxy_id = _get_effective_proxy_for_session(parent_state_for_model)
+            error = _validate_direct_model_pin_for_routing(
+                pin=direct_model_pin,
+                proxy_id=_preflight_routing.proxy_id if _preflight_routing else inherited_proxy_id,
+                base_url=_preflight_routing.base_url if _preflight_routing else inherited_base_url,
+                surface="fork",
+            )
+            if error:
+                console.print(f"[red]Error:[/red] {error}")
+                sys.exit(1)
+
     if is_cross_dir and strategy == "full" and not direct:
         try:
             from forge.session.artifacts import resolve_artifact_path
@@ -480,6 +536,13 @@ def fork(
         sys.exit(1)
 
     use_sidecar, mounts, image = _get_launch_preferences(fork_manifest)
+    _apply_and_persist_direct_model_override(
+        state=fork_manifest,
+        direct_model=normalized_direct_model,
+        forge_root=Path(fork_manifest.forge_root) if fork_manifest.forge_root else fork_worktree_path,
+        use_sidecar=use_sidecar,
+        surface="fork",
+    )
 
     # Set env vars for fork registration (hook uses FORGE_FORK_NAME for fork detection)
     env_vars, unset_env_vars = _sess()._build_session_env(
@@ -501,6 +564,13 @@ def fork(
         fork_direct_model = fork_manifest.intent.launch.direct_model if fork_manifest.intent.launch else None
         fork_direct_model = fork_direct_model or get_default_direct_model()
         error = apply_direct_model_env(env_vars, fork_direct_model)
+        if error:
+            console.print(f"[red]Error:[/red] {error}")
+            sys.exit(1)
+    elif fork_manifest.intent.launch and fork_manifest.intent.launch.direct_model and effective_proxy_id:
+        error = _apply_direct_model_env_if_supported(
+            env_vars, effective_proxy_id, fork_manifest.intent.launch.direct_model
+        )
         if error:
             console.print(f"[red]Error:[/red] {error}")
             sys.exit(1)

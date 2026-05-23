@@ -12,6 +12,7 @@ Tests cover:
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -539,6 +540,40 @@ class TestSupervisorResumeTargetResolution:
 
         invoke_supervisor(_make_config(resume_id=raw_uuid, fork_session=False), _make_context())
         assert mock_run.call_args.kwargs["fork_session"] is False
+
+    @patch("forge.guard.semantic.supervisor.resolve_subprocess_routing")
+    @patch("forge.guard.semantic.supervisor.run_claude_session")
+    def test_proxied_supervisor_uses_proxy_opus_tier_without_executor_model_pin(
+        self,
+        mock_run: MagicMock,
+        mock_resolve: MagicMock,
+    ) -> None:
+        """Executor --model pins should not leak into proxied supervisor calls."""
+        from forge.core.reactive.session_runner import SessionResult
+        from forge.guard.semantic.supervisor import invoke_supervisor
+
+        mock_resolve.return_value = SimpleNamespace(base_url="http://localhost:8095")
+        mock_run.return_value = SessionResult(
+            stdout='```json\n{"verdict": "aligned", "confidence": 0.9, "violations": []}\n```',
+            stderr="",
+            returncode=0,
+        )
+
+        raw_uuid = "12345678-1234-1234-1234-123456789abc"
+        with patch.dict(
+            "os.environ",
+            {
+                "ANTHROPIC_MODEL": "opus",
+                "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-4-7",
+            },
+        ):
+            invoke_supervisor(_make_config(resume_id=raw_uuid, proxy="openrouter-anthropic"), _make_context())
+
+        kwargs = mock_run.call_args.kwargs
+        assert kwargs["base_url"] == "http://localhost:8095"
+        assert kwargs["model"] == "opus"
+        assert "ANTHROPIC_MODEL" in kwargs["unset_env_vars"]
+        assert "ANTHROPIC_DEFAULT_OPUS_MODEL" in kwargs["unset_env_vars"]
 
     @patch("forge.guard.semantic.supervisor.resolve_subprocess_routing")
     @patch("forge.guard.semantic.supervisor.run_claude_session")

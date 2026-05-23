@@ -18,8 +18,9 @@ from typing import cast
 
 import click
 
+from forge.config.schema import ProxyInstanceConfig
 from forge.core.paths import display_path
-from forge.core.state import now_iso
+from forge.core.state import FileLockTimeoutError, now_iso
 from forge.session import (
     LAUNCH_MODE_HOST,
     LAUNCH_MODE_SIDECAR,
@@ -32,6 +33,7 @@ from forge.session import (
 )
 from forge.session.claude import build_claude_args
 from forge.session.direct_model import (
+    DirectModelPin,
     apply_direct_model_env,
     resolve_direct_model_pin,
     token_estimate_multiplier_for_direct_model,
@@ -39,6 +41,10 @@ from forge.session.direct_model import (
 from forge.session.exceptions import (
     BranchExistsError,
     InvalidBranchNameError,
+    InvalidSessionNameError,
+    ManifestCorruptedError,
+    ManifestValidationError,
+    SessionFileNotFoundError,
     SessionNotFoundError,
     WorktreePathExistsError,
 )
@@ -562,18 +568,10 @@ def _launch_claude_for_session(
         # Proxy mode with explicit --model: apply model pin so Claude Code sends
         # the right model name in requests (proxy resolves via model_alternatives).
         # Only apply if the proxy actually configures alternatives for this model.
-        from forge.config.loader import load_proxy_instance_config
-
-        proxy_cfg = load_proxy_instance_config(proxy_id)
-        if proxy_cfg and proxy_cfg.model_alternatives:
-            dm = manifest.intent.launch.direct_model
-            pin = resolve_direct_model_pin(dm)
-            alt_models = proxy_cfg.model_alternatives.get(pin.tier, {})
-            if pin.canonical_model in alt_models:
-                error = apply_direct_model_env(env_vars, dm)
-                if error:
-                    console.print(f"[red]Error:[/red] {error}")
-                    return 1
+        error = _apply_direct_model_env_if_supported(env_vars, proxy_id, manifest.intent.launch.direct_model)
+        if error:
+            console.print(f"[red]Error:[/red] {error}")
+            return 1
 
     exit_code = _sess().run_with_active_session(
         session_name=manifest.name,
@@ -653,6 +651,7 @@ def _resume_token_estimate_multiplier(
     *,
     parent_state: SessionState,
     effective_proxy_ref: str | None,
+    direct_model_override: str | None = None,
 ) -> float:
     """Return a model-specific heuristic multiplier for fresh full-resume checks."""
     if effective_proxy_ref is not None:
@@ -662,7 +661,9 @@ def _resume_token_estimate_multiplier(
 
     from forge.runtime_config import get_default_direct_model
 
-    direct_model = parent_state.intent.launch.direct_model if parent_state.intent.launch else None
+    direct_model = direct_model_override or (
+        parent_state.intent.launch.direct_model if parent_state.intent.launch else None
+    )
     direct_model = direct_model or get_default_direct_model()
     if not direct_model:
         return 1.0
@@ -670,6 +671,168 @@ def _resume_token_estimate_multiplier(
         return token_estimate_multiplier_for_direct_model(direct_model)
     except ValueError:
         return 1.0
+
+
+def _proxy_supports_model_pin(proxy_cfg: ProxyInstanceConfig, pin: DirectModelPin) -> bool:
+    """Whether a proxy can honor a Claude model pin via tier default or alternatives."""
+    alt_models = proxy_cfg.model_alternatives.get(pin.tier, {})
+    if pin.canonical_model in alt_models:
+        return True
+
+    tier_model = proxy_cfg.tiers.get(pin.tier)
+    if not tier_model:
+        return False
+
+    try:
+        from forge.core.models.catalog import ModelCatalogError, resolve_model_id
+
+        default_model = resolve_model_id(str(tier_model)).removesuffix("-1m")
+    except ModelCatalogError:
+        return False
+    return default_model == pin.canonical_model
+
+
+def _apply_direct_model_env_if_supported(
+    env_vars: dict[str, str],
+    proxy_id: str,
+    direct_model: str,
+) -> str | None:
+    """Apply --model env vars when the proxy can honor the pin.
+
+    No-op (returns None) when the proxy is missing or cannot honor the pin.
+    Returns an error message only when env application itself fails.
+    """
+    from forge.config.loader import load_proxy_instance_config
+
+    proxy_cfg = load_proxy_instance_config(proxy_id)
+    if proxy_cfg is None:
+        return None
+    if not _proxy_supports_model_pin(proxy_cfg, resolve_direct_model_pin(direct_model)):
+        return None
+    return apply_direct_model_env(env_vars, direct_model)
+
+
+def _validate_proxy_model_pin(proxy_id: str, pin: DirectModelPin) -> str | None:
+    """Return a user-facing error if a proxy cannot honor a Claude model pin."""
+    from forge.config.loader import load_proxy_instance_config
+
+    try:
+        proxy_cfg = load_proxy_instance_config(proxy_id)
+    except (FileNotFoundError, TypeError, ValueError) as e:
+        return f"Could not load proxy config for '{proxy_id}': {e}"
+
+    if proxy_cfg is None:
+        return f"Could not load proxy config for '{proxy_id}'"
+
+    if _proxy_supports_model_pin(proxy_cfg, pin):
+        return None
+
+    alt_models = proxy_cfg.model_alternatives.get(pin.tier, {})
+    available = ", ".join(sorted(alt_models.keys())) if alt_models else "(none configured)"
+    return (
+        f"Proxy '{proxy_id}' does not configure model alternative or tier default "
+        f"for '{pin.canonical_model}' in tier '{pin.tier}'. Available alternatives: {available}"
+    )
+
+
+def _validate_direct_model_pin_for_routing(
+    *,
+    pin: DirectModelPin | None,
+    proxy_id: str | None,
+    base_url: str | None,
+    surface: str,
+) -> str | None:
+    """Validate a --model pin against explicit or inherited routing."""
+    if pin is None:
+        return None
+    if proxy_id:
+        return _validate_proxy_model_pin(proxy_id, pin)
+    if base_url is not None:
+        return (
+            f"--model with inherited proxy routing requires an active proxy id for {surface}. "
+            "Pass --proxy <proxy_id> to select the proxy explicitly."
+        )
+    return None
+
+
+def _apply_direct_model_override_to_state(state: SessionState, direct_model: str | None) -> None:
+    """Apply a normalized --model override to an in-memory session state."""
+    if direct_model is None:
+        return
+    if state.intent.launch is None:
+        from forge.session.models import LaunchIntent
+
+        state.intent.launch = LaunchIntent()
+    state.intent.launch.direct_model = direct_model
+
+
+def _persist_direct_model_override(
+    *,
+    forge_root: Path,
+    session_name: str,
+    direct_model: str | None,
+) -> None:
+    """Persist a --model override into the session manifest."""
+    if direct_model is None:
+        return
+
+    store = SessionStore(str(forge_root), session_name)
+
+    def _mutate(m: SessionState) -> None:
+        _apply_direct_model_override_to_state(m, direct_model)
+
+    try:
+        store.update(timeout_s=5.0, mutate=_mutate)
+    except FileLockTimeoutError as e:
+        logger.warning("Failed to persist direct model override to manifest", exc_info=True)
+        console.print(
+            f"[yellow]Warning:[/yellow] Could not persist --model override for session "
+            f"[green]{session_name}[/green]: {e}"
+        )
+        console.print(
+            "[dim]Tip: If this command launches Claude, it will use the requested model for this run, "
+            "but future resumes may use the previous stored model. Retry after current Forge state updates finish.[/dim]"
+        )
+    except (
+        InvalidSessionNameError,
+        ManifestCorruptedError,
+        ManifestValidationError,
+        OSError,
+        SessionFileNotFoundError,
+        ValueError,
+    ) as e:
+        logger.warning("Failed to persist direct model override to manifest", exc_info=True)
+        console.print(
+            f"[yellow]Warning:[/yellow] Could not persist --model override for session "
+            f"[green]{session_name}[/green]: {e}"
+        )
+        console.print(
+            "[dim]Tip: If this command launches Claude, it will use the requested model for this run, "
+            "but future resumes may use the previous stored model. Check the session manifest before relying on this pin.[/dim]"
+        )
+
+
+def _apply_and_persist_direct_model_override(
+    *,
+    state: SessionState,
+    direct_model: str | None,
+    forge_root: Path,
+    use_sidecar: bool,
+    surface: str,
+) -> None:
+    """Apply a --model override to a launch state and persist it when requested."""
+    if direct_model is None:
+        return
+    if use_sidecar:
+        console.print(f"[red]Error:[/red] --model cannot be combined with sidecar {surface}")
+        sys.exit(1)
+
+    _apply_direct_model_override_to_state(state, direct_model)
+    _persist_direct_model_override(
+        forge_root=forge_root,
+        session_name=state.name,
+        direct_model=direct_model,
+    )
 
 
 # --- Shared session creation + launch ---
@@ -755,25 +918,9 @@ def launch_new_session(
 
     # Validate --model against proxy model_alternatives when in proxy mode
     if direct_model_pin and proxy_id and not direct:
-        from forge.config.loader import load_proxy_instance_config
-
-        try:
-            proxy_cfg = load_proxy_instance_config(proxy_id)
-            if proxy_cfg is None:
-                raise FileNotFoundError(proxy_id)
-        except Exception:
-            console.print(f"[red]Error:[/red] Could not load proxy config for '{proxy_id}'")
-            return 1
-        tier = direct_model_pin.tier
-        # Strip [1m] suffix for alternative lookup (context pinning, not routing)
-        lookup_model = direct_model_pin.canonical_model
-        alt_models = proxy_cfg.model_alternatives.get(tier, {})
-        if lookup_model not in alt_models:
-            available = ", ".join(sorted(alt_models.keys())) if alt_models else "(none configured)"
-            console.print(
-                f"[red]Error:[/red] Proxy '{proxy_id}' does not configure model alternative "
-                f"for '{lookup_model}' in tier '{tier}'. Available alternatives: {available}"
-            )
+        error = _validate_proxy_model_pin(proxy_id, direct_model_pin)
+        if error:
+            console.print(f"[red]Error:[/red] {error}")
             return 1
 
     # Resolve system prompt to absolute path BEFORE worktree creation
@@ -1184,6 +1331,13 @@ def start(
     help="Bypass the proxy and talk to Anthropic directly",
 )
 @click.option(
+    "--model",
+    "direct_model",
+    type=str,
+    default=None,
+    help="Pin the Claude model for this and future resumes (for example: claude-opus-4-6 or claude-opus-4-7)",
+)
+@click.option(
     "--fresh",
     is_flag=True,
     default=False,
@@ -1232,6 +1386,7 @@ def resume(
     name: str | None,
     proxy_name: str | None,
     direct: bool,
+    direct_model: str | None,
     fresh: bool,
     child_name: str | None,
     strategy: str,
@@ -1264,6 +1419,16 @@ def resume(
     if direct and proxy_name:
         console.print("[red]Error:[/red] --no-proxy and --proxy are mutually exclusive")
         sys.exit(1)
+
+    normalized_direct_model: str | None = None
+    direct_model_pin: DirectModelPin | None = None
+    if direct_model:
+        try:
+            direct_model_pin = resolve_direct_model_pin(direct_model)
+            normalized_direct_model = direct_model_pin.env_model
+        except ValueError as e:
+            console.print(f"[red]Error:[/red] {e}")
+            sys.exit(1)
 
     if resume_mode and not fresh:
         console.print("[red]Error:[/red] --resume-mode requires --fresh")
@@ -1313,6 +1478,24 @@ def resume(
         _handle_error(e)
         return
 
+    _, validation_base_url, validation_proxy_id = _get_effective_proxy_for_session(manifest)
+    if routing:
+        validation_base_url = routing.base_url
+        validation_proxy_id = routing.proxy_id
+    elif direct:
+        validation_base_url = None
+        validation_proxy_id = None
+    if direct_model_pin:
+        error = _validate_direct_model_pin_for_routing(
+            pin=direct_model_pin,
+            proxy_id=validation_proxy_id,
+            base_url=validation_base_url,
+            surface="resume",
+        )
+        if error:
+            console.print(f"[red]Error:[/red] {error}")
+            sys.exit(1)
+
     if fresh:
         effective_resume_mode = resume_mode or "handoff"
 
@@ -1341,6 +1524,7 @@ def resume(
                 child_name=child_name,
                 routing=routing,
                 direct=direct,
+                direct_model_override=normalized_direct_model,
             )
         else:
             _resume_fresh(
@@ -1353,6 +1537,7 @@ def resume(
                 routing=routing,
                 direct=direct,
                 review=review,
+                direct_model_override=normalized_direct_model,
             )
     elif not _has_confirmed_claude_session(manifest):
         _launch_in_place(
@@ -1361,6 +1546,7 @@ def resume(
             manifest=manifest,
             routing=routing,
             direct=direct,
+            direct_model_override=normalized_direct_model,
         )
     elif _is_resumable_session(manifest):
         active_entry = _get_active_session_entry(name, forge_root=manifest.forge_root)
@@ -1389,6 +1575,7 @@ def resume(
                 parent=manifest,
                 routing=routing,
                 direct=direct,
+                direct_model_override=normalized_direct_model,
             )
         else:
             _reconnect_in_place(
@@ -1397,6 +1584,7 @@ def resume(
                 manifest=manifest,
                 routing=routing,
                 direct=direct,
+                direct_model_override=normalized_direct_model,
             )
     else:
         _launch_as_child(
@@ -1405,6 +1593,7 @@ def resume(
             parent=manifest,
             routing=routing,
             direct=direct,
+            direct_model_override=normalized_direct_model,
         )
 
 
@@ -1415,6 +1604,7 @@ def _launch_in_place(
     manifest: SessionState,
     routing: ResolvedRouting | None = None,
     direct: bool = False,
+    direct_model_override: str | None = None,
 ) -> None:
     """Launch a never-used session in-place (satisfies 1:1)."""
     manager.switch_session(name, forge_root=manifest.forge_root)
@@ -1427,10 +1617,18 @@ def _launch_in_place(
         routing=routing,
         direct=direct,
     )
-
     effective_template, effective_url, effective_proxy_id = _get_effective_proxy_for_session(manifest)
+    if routing and routing.proxy_id:
+        effective_proxy_id = routing.proxy_id
     context_limit = _sess()._resolve_context_limit(effective_proxy_id or effective_template)
     use_sidecar, mounts, image = _get_launch_preferences(manifest)
+    _apply_and_persist_direct_model_override(
+        state=manifest,
+        direct_model=direct_model_override,
+        forge_root=Path(manifest.forge_root) if manifest.forge_root else worktree_path,
+        use_sidecar=use_sidecar,
+        surface="resume",
+    )
     prompt_files: list[Path] = []
 
     configured_prompt = _resolve_manifest_prompt_file(manifest)
@@ -1519,6 +1717,7 @@ def _reconnect_in_place(
     manifest: SessionState,
     routing: ResolvedRouting | None = None,
     direct: bool = False,
+    direct_model_override: str | None = None,
 ) -> None:
     """Reconnect to the same Claude conversation without creating a child.
 
@@ -1549,10 +1748,18 @@ def _reconnect_in_place(
         routing=routing,
         direct=direct,
     )
-
     effective_template, effective_url, effective_proxy_id = _get_effective_proxy_for_session(manifest)
+    if routing and routing.proxy_id:
+        effective_proxy_id = routing.proxy_id
     context_limit = _sess()._resolve_context_limit(effective_proxy_id or effective_template)
     use_sidecar, mounts, image = _get_launch_preferences(manifest)
+    _apply_and_persist_direct_model_override(
+        state=manifest,
+        direct_model=direct_model_override,
+        forge_root=Path(manifest.forge_root) if manifest.forge_root else worktree_path,
+        use_sidecar=use_sidecar,
+        surface="resume",
+    )
     runtime_base_url = _get_runtime_base_url(use_sidecar=use_sidecar, effective_url=effective_url)
 
     console.print(f"Reconnecting to session [green]{name}[/green]")
@@ -1588,6 +1795,7 @@ def _launch_as_child(
     parent: SessionState,
     routing: ResolvedRouting | None = None,
     direct: bool = False,
+    direct_model_override: str | None = None,
 ) -> None:
     """Create a child session and resume the parent's Claude conversation.
 
@@ -1608,10 +1816,18 @@ def _launch_as_child(
         routing=routing,
         direct=direct,
     )
-
     effective_template, effective_url, effective_proxy_id = _get_effective_proxy_for_session(child)
+    if routing and routing.proxy_id:
+        effective_proxy_id = routing.proxy_id
     context_limit = _sess()._resolve_context_limit(effective_proxy_id or effective_template)
     use_sidecar, mounts, image = _get_launch_preferences(child)
+    _apply_and_persist_direct_model_override(
+        state=child,
+        direct_model=direct_model_override,
+        forge_root=Path(child.forge_root) if child.forge_root else worktree_path,
+        use_sidecar=use_sidecar,
+        surface="resume",
+    )
 
     runtime_base_url = _get_runtime_base_url(use_sidecar=use_sidecar, effective_url=effective_url)
 
@@ -1753,6 +1969,7 @@ def _resume_fresh(
     routing: ResolvedRouting | None,
     direct: bool,
     review: bool = False,
+    direct_model_override: str | None = None,
 ) -> None:
     """Create a fresh child session with context assembled from parent.
 
@@ -1774,6 +1991,7 @@ def _resume_fresh(
     token_multiplier = _resume_token_estimate_multiplier(
         parent_state=parent_state,
         effective_proxy_ref=effective_proxy_ref,
+        direct_model_override=direct_model_override,
     )
 
     try:
@@ -1828,8 +2046,17 @@ def _resume_fresh(
     )
 
     launch_template, launch_base_url, launch_proxy_id = _get_effective_proxy_for_session(child_manifest)
+    if routing and routing.proxy_id:
+        launch_proxy_id = routing.proxy_id
 
     use_sidecar, mounts, image = _get_launch_preferences(child_manifest)
+    _apply_and_persist_direct_model_override(
+        state=child_manifest,
+        direct_model=direct_model_override,
+        forge_root=Path(child_manifest.forge_root) if child_manifest.forge_root else child_worktree_path,
+        use_sidecar=use_sidecar,
+        surface="resume",
+    )
     runtime_base_url = _get_runtime_base_url(use_sidecar=use_sidecar, effective_url=launch_base_url)
 
     pre_seeded_uuid = str(_uuid.uuid4())
@@ -1876,6 +2103,7 @@ def _resume_fresh_native(
     child_name: str | None,
     routing: ResolvedRouting | None,
     direct: bool,
+    direct_model_override: str | None = None,
 ) -> None:
     """Create a child session with native conversation resume.
 
@@ -1923,7 +2151,16 @@ def _resume_fresh_native(
     console.print()
 
     launch_template, launch_base_url, launch_proxy_id = _get_effective_proxy_for_session(child_manifest)
+    if routing and routing.proxy_id:
+        launch_proxy_id = routing.proxy_id
     use_sidecar, mounts, image = _get_launch_preferences(child_manifest)
+    _apply_and_persist_direct_model_override(
+        state=child_manifest,
+        direct_model=direct_model_override,
+        forge_root=Path(child_manifest.forge_root) if child_manifest.forge_root else child_worktree_path,
+        use_sidecar=use_sidecar,
+        surface="resume",
+    )
     runtime_base_url = _get_runtime_base_url(use_sidecar=use_sidecar, effective_url=launch_base_url)
 
     _print_routing_summary(template=launch_template, base_url=runtime_base_url)
@@ -1962,6 +2199,13 @@ def _resume_fresh_native(
     is_flag=True,
     help="Bypass the proxy and talk to Anthropic directly",
 )
+@click.option(
+    "--model",
+    "direct_model",
+    type=str,
+    default=None,
+    help="Pin the Claude model for this incognito session (for example: claude-opus-4-6 or claude-opus-4-7)",
+)
 @click.option("--system-prompt", "-s", help="Append system prompt text")
 @click.option(
     "--system-prompt-file",
@@ -1984,6 +2228,7 @@ def incognito(
     name: str | None,
     proxy_name: str | None,
     direct: bool,
+    direct_model: str | None,
     system_prompt: str | None,
     system_prompt_file: str | None,
     worktree: bool,
@@ -2049,5 +2294,6 @@ def incognito(
             proxy_id=routing.proxy_id if routing else None,
             proxy_display=routing.proxy_id if routing else None,
             context_limit_override=routing.context_limit if routing else None,
+            direct_model=direct_model,
         )
     )

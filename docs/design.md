@@ -440,6 +440,12 @@ running `claude -p --bare`), not by the shared resolver. `route` is present when
 can mean unresolved or opaque/non-model-specific routing (e.g., explicit base URL). `source` and `base_url` distinguish
 them.
 
+**Supervisor model scope:** When supervisor routing resolves to a proxy URL, the supervisor invokes
+`claude -p --model opus` and clears inherited Claude model-pin env vars (`ANTHROPIC_MODEL`,
+`ANTHROPIC_DEFAULT_*_MODEL`). This keeps executor/session `--model` pins local to the executor while allowing the
+supervisor to use the selected proxy's `opus` tier. Direct supervisors do not get this proxy-tier reset because there is
+no Forge proxy mapping to resolve.
+
 **Fail behavior by subprocess type:**
 
 | Subprocess | On unresolved | Rationale                                                        |
@@ -903,15 +909,15 @@ per-child handoff file in `$EDITOR` before launching Claude. `forge session memo
 
 #### Memory management
 
-| Command                       | Purpose                                                                        |
-| :---------------------------- | :----------------------------------------------------------------------------- |
-| `forge memory enable`         | Enable memory auto-update for handoff agent (`--session`)                      |
-| `forge memory track <path>`   | Track a memory doc (`--as <strategy>`, `--propose`, `--shadow`, `--session`)   |
-| `forge memory untrack <path>` | Stop tracking a memory doc (`--session`)                                       |
-| `forge memory list`           | List tracked memory docs (`--session`, `--json`)                               |
-| `forge memory status`         | Show memory doc status across sessions (`--scope`, `--doc`, `--json`)          |
-| `forge memory shadows list`   | List accumulated shadow proposals (`--scope`, `--session`, `--json`)           |
-| `forge memory shadows show`   | Show shadow proposal content (`--for <doc>`, `--scope`, `--session`)           |
+| Command                       | Purpose                                                                      |
+| :---------------------------- | :--------------------------------------------------------------------------- |
+| `forge memory enable`         | Enable memory auto-update for handoff agent (`--session`)                    |
+| `forge memory track <path>`   | Track a memory doc (`--as <strategy>`, `--propose`, `--shadow`, `--session`) |
+| `forge memory untrack <path>` | Stop tracking a memory doc (`--session`)                                     |
+| `forge memory list`           | List tracked memory docs (`--session`, `--json`)                             |
+| `forge memory status`         | Show memory doc status across sessions (`--scope`, `--doc`, `--json`)        |
+| `forge memory shadows list`   | List accumulated shadow proposals (`--scope`, `--session`, `--json`)         |
+| `forge memory shadows show`   | Show shadow proposal content (`--for <doc>`, `--scope`, `--session`)         |
 
 #### Proxy management
 
@@ -1108,7 +1114,8 @@ before we hardcode a default. For now: `forge session set policy.supervisor.resu
 
 **Mechanism: "CLI-Fork Supervision"**
 
-The `policy-check` hook runs the supervisor via `claude -p --resume <supervisor_id>`:
+The `policy-check` hook runs the supervisor via `claude -p --resume <supervisor_id>` (plus `--model opus` for proxied
+supervisors):
 
 1. **Configure**: `forge session set policy.supervisor.resume_id <uuid>` (from planning session).
 2. **Check**: Runs at PreToolUse for Write/Edit, throttled via cache (default 30s).

@@ -225,6 +225,10 @@ available instead of reporting `none`.
 **No manual configuration needed.** The right instructions are selected automatically based on which proxy you're
 connected to.
 
+For per-role guidance on which family to choose for `/forge:review` (one-shot capability gains favor Opus 4.7) vs
+`/forge:panel` (mix families for diverse independent perspectives) vs the supervisor (multi-needle retrieval favors Opus
+4.6, with Gemini useful for mid-long or multimodal planner contexts), see [model-selection.md](model-selection.md).
+
 ---
 
 ## Troubleshooting

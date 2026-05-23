@@ -49,12 +49,14 @@ def run_claude_session(
     *,
     resume_id: str | None = None,
     fork_session: bool = False,
+    model: str | None = None,
     bare: bool | None = None,
     base_url: str | None = None,
     direct: bool = False,
     timeout_seconds: int = 60,
     cwd: str | None = None,
     extra_env: dict[str, str] | None = None,
+    unset_env_vars: list[str] | tuple[str, ...] | None = None,
 ) -> SessionResult:
     """Run ``claude -p`` as a headless subprocess.
 
@@ -68,6 +70,7 @@ def run_claude_session(
         fork_session: If True and resume_id is set, adds ``--fork-session``
             to create an ephemeral fork instead of appending to the
             original conversation.
+        model: Optional Claude model/tier passed via ``--model``.
         bare: If True, adds ``--bare`` to skip hooks/LSP/plugins.
             None (default) auto-detects: uses ``--bare`` only when
             ANTHROPIC_API_KEY is present (``--bare`` disables OAuth).
@@ -75,11 +78,15 @@ def run_claude_session(
         timeout_seconds: Maximum seconds to wait for completion.
         cwd: Working directory for the subprocess.
         extra_env: Additional environment variables.
+        unset_env_vars: Environment variables to remove from the child process
+            after routing env has been built.
 
     Returns:
         SessionResult with stdout/stderr/returncode or error details.
     """
     env = build_claude_env(base_url=base_url, extra_vars=extra_env, direct=direct)
+    for key in unset_env_vars or ():
+        env.pop(key, None)
 
     use_bare = bare if bare is not None else can_use_bare(env)
     cmd = ["claude", "-p"]
@@ -89,6 +96,8 @@ def run_claude_session(
         cmd.extend(["--resume", resume_id])
         if fork_session:
             cmd.append("--fork-session")
+    if model:
+        cmd.extend(["--model", model])
 
     # Guard: fail if subprocess proxy was configured but didn't resolve.
     # Prevents silent fallback to direct mode (which would burn subscription quota).
