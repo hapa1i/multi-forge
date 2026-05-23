@@ -32,25 +32,37 @@ the authoritative contract and session manifests only as resolved participation 
   - Assertion: `feat/runtime-abstraction` points at the previous runtime checklist state, while the active branch is
     `feat/memory-enhancement`.
   - Verification: branch split performed before replacing this checklist.
-- [ ] Map the current `forge session memory` command implementation.
+- [x] Map the current `forge session memory` command implementation.
   - Assertion: command registration, add/list/remove behavior, duplicate-path failure, session config writes, and test
     coverage are identified before deleting the public command group. Include `src/forge/cli/session_memory.py`,
     subgroup registration in `src/forge/cli/session.py`, `tests/src/cli/test_session_memory.py`, and integration
     coverage that shells out to the old commands.
-- [ ] Map the Stop-time memory update path.
+  - Verification: CLI module (session_memory.py), registration (session.py:869-877), model (models.py:79-139, covering
+    HandoffConfig, DesignatedDoc, MemoryIntent), 13 tests (test_session_memory.py), and read-effective/write-override
+    persistence path all mapped in impl_notes.md.
+- [x] Map the Stop-time memory update path.
   - Assertion: auto-update mode resolution, `review-only` report generation, augment writes, designated-doc strategy
     prompts, and `src/forge/session/handoff_agent.py` update behavior are tied to concrete code references.
-- [ ] Map the handoff report/show surface.
+  - Verification: full 5-step chain (stop hook, work queue, CLI startup fire-and-forget, CLI runner, agent core) with
+    code references and fire-and-forget queue semantics mapped in impl_notes.md.
+- [x] Map the handoff report/show surface.
   - Assertion: `forge session handoff show --latest`, review artifact paths, and any CLI read paths are tied to concrete
     code references separately from the update-side handoff agent.
-- [ ] Inventory old memory UX references.
+  - Verification: show command (session_handoff.py), review_dir(), report listing (\_list_reports), artifact path
+    pattern, and test_session_handoff_show.py mapped separately from update-side agent in impl_notes.md.
+- [x] Inventory old memory UX references.
   - Assertion: docs, tests, skills, command help, README snippets, and status-doc setup examples that mention
     `forge session memory` are listed with a keep/update/remove decision. Include, at minimum, `docs/status/README.md`,
     `docs/design.md`, `docs/end-user/handoff.md`, `tests/integration/cli/`, `tests/src/cli/test_session_memory.py`,
     `src/skills/qa/resources/checklist/`, and `src/skills/walkthrough/resources/checklist.md`.
-- [ ] Decide which existing helpers stay private.
+  - Verification: 8 UPDATE (including old-model YAML config in handoff.md, design_appendix.md G.2, and design.md
+    DesignatedDoc schema), 2 REMOVE, 5 KEEP -- full inventory with line numbers in impl_notes.md. Includes
+    test_session_handoff_show.py (KEEP) and proposals/memory_enhancement.md (KEEP).
+- [x] Decide which existing helpers stay private.
   - Assertion: reusable storage, validation, and handoff helpers are named, and public compatibility aliases are
     explicitly excluded.
+  - Verification: 8 helpers + 2 patterns named with reuse-privately decision; VALID_STRATEGIES moves to shared location
+    in Phase 1; tombstone diagnostic path replaces old commands (no alias). Decision in impl_notes.md.
 
 ## Phase 1 - Passport Model
 
