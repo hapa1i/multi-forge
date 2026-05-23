@@ -17,7 +17,7 @@ import logging
 import os
 import re
 import tempfile
-from importlib.abc import Traversable
+from importlib.resources.abc import Traversable
 from pathlib import Path
 from typing import Any
 

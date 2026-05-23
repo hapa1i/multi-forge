@@ -66,29 +66,50 @@ the authoritative contract and session manifests only as resolved participation 
 
 ## Phase 1 - Passport Model
 
-- [ ] Define the v1 memory strategy enum.
+- [x] Define the v1 memory strategy enum.
   - Assertion: the supported `--as <strategy>` set is named in one shared place and used by passport validation, CLI
     validation, and handoff prompts. Initial set: `project-state`, `checklist`, `changelog`, `debugging`, `patterns`,
     `suggested`, and `generic`.
-- [ ] Add `forge_memory` frontmatter parsing and serialization.
+  - Verification: `MemoryStrategy(str, Enum)` with `VALID_STRATEGY_NAMES` and `STRATEGY_INSTRUCTIONS` in
+    `src/forge/session/passport.py`. `session_memory.py` and `handoff_agent.py` both import from this shared source.
+    Inline `DOC_STRATEGIES` removed from runtime code; legacy prompt tests alias `STRATEGY_INSTRUCTIONS` locally.
+    `TestMemoryStrategy` covers enum/instruction shape.
+- [x] Add `forge_memory` frontmatter parsing and serialization.
   - Assertion: parser preserves unrelated Markdown content, validates `version`, `intent`, `captures`, `excludes`, and
     all `update` subfields from the proposal examples (`instruction`, `strategy`, `mode`, `writers`, `inherit_on_fork`,
     `compact_when`, optional `shadow_path`, optional `approval`), and reports actionable errors for malformed passports.
+  - Verification: `extract_frontmatter()`, `parse_passport()`, `read_passport()`, `write_passport()`,
+    `serialize_passport()` in `passport.py`. `PassportError(field_path, reason, hint)` in `exceptions.py`. Strict
+    validation rejects unknown keys, validates all fields. Atomic write via `atomic_write_text()`. Omits None fields.
+    Round-trip test proves write-then-read identity. Focused tests cover frontmatter extraction, parsing, reading, and
+    writing.
 - [ ] Implement passport-required-at-rest behavior.
   - Assertion: `forge memory track` leaves every tracked official doc with a valid passport, synthesizes one from CLI
     flags when possible, and fails with a concrete suggested command when required fields are missing.
+  - Note: infrastructure built in Phase 1 (`synthesize_passport()` with strategy-derived default intents); CLI
+    enforcement via `forge memory track` lands in Phase 2.
 - [ ] Implement flag-vs-passport conflict handling.
   - Assertion: CLI flags win for the current invocation, warnings name the overridden passport field, and persisted
     updates are deterministic.
-- [ ] Keep ownership split between passport and session manifest.
+  - Note: infrastructure built in Phase 1 (`resolve_with_overrides()` deep-copies passport, returns warnings); CLI usage
+    via `forge memory track` lands in Phase 2.
+- [x] Keep ownership split between passport and session manifest.
   - Assertion: the session manifest stores only participation and auto-update runtime state; Stop-time update logic
     re-reads passport intent, instructions, writers, strategy, mode, shadow path, and inheritance.
   - Verification target: a test edits a tracked doc's passport after session participation is configured but before the
     Stop-time handoff update, then proves the handoff behavior follows the edited passport without re-running
     `forge memory track`.
-- [ ] Validate v1 writer semantics.
+  - Verification: `run_handoff_agent()` reads passports via `resolve_passport_source()`, filters by
+    `check_writer_access()`, resolves via `resolve_doc_spec()`, passes `list[ResolvedDocSpec]` to
+    `build_multi_doc_prompt()`. Prompt builder has no file I/O. Passport-less docs use DesignatedDoc fallbacks.
+    `TestPassportLessDocsWork` proves backward compat. Full passport contract (intent, captures, excludes, compact_when,
+    approval) appears in prompt context.
+- [x] Validate v1 writer semantics.
   - Assertion: `all-sessions` and exact session-name writers work; lineage and role semantics are rejected or deferred
     with clear errors.
+  - Verification: `validate_writer_spec()` and `check_writer_access()` in `passport.py`. `lineage:` and `role:` prefixes
+    rejected with deferral message. `none` rejected. Invalid session names rejected via `validation.validate_name()`. 10
+    tests across `TestWriterValidation` and `TestCheckWriterAccess`.
 
 ## Phase 2 - Top-Level CLI
 

@@ -22,16 +22,7 @@ from forge.core.ops.context import ExecutionContext
 from forge.core.ops.session import ForgeOpError, resolve_session, set_session_override
 from forge.session.handoff_agent import is_safe_designated_doc_path
 from forge.session.models import DesignatedDoc
-
-VALID_STRATEGIES = {
-    "project-state",
-    "checklist",
-    "changelog",
-    "debugging",
-    "patterns",
-    "suggested",
-    "generic",
-}
+from forge.session.passport import VALID_STRATEGY_NAMES
 
 
 @click.group("memory")
@@ -62,8 +53,8 @@ def _validate_single_doc(path: str, strategy: str, shadows: str | None, base: Pa
         if shadows == path:
             raise click.ClickException("--shadows path must differ from doc path")
 
-    if strategy not in VALID_STRATEGIES:
-        raise click.ClickException(f"Unknown strategy {strategy!r}. Valid: {', '.join(sorted(VALID_STRATEGIES))}")
+    if strategy not in VALID_STRATEGY_NAMES:
+        raise click.ClickException(f"Unknown strategy {strategy!r}. Valid: {', '.join(sorted(VALID_STRATEGY_NAMES))}")
 
     if strategy == "suggested" and not shadows:
         raise click.ClickException("strategy 'suggested' requires --shadows <official-path>")
@@ -141,7 +132,7 @@ def list_docs_cmd(session_name: str | None, as_json: bool) -> None:
 @click.argument("path")
 @click.option(
     "--strategy",
-    type=click.Choice(sorted(VALID_STRATEGIES)),
+    type=click.Choice(sorted(VALID_STRATEGY_NAMES)),
     default="generic",
     show_default=True,
 )

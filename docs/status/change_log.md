@@ -27,6 +27,29 @@ wc -l docs/status/change_log.md
 
 ## 2026-05-22
 
+### Phase 1: Passport Model (Memory Enhancement)
+
+**Goal**: Build passport model infrastructure (shared strategy enum, YAML frontmatter parsing/serialization, validation,
+handoff agent integration) so Phase 2 can wire it into the `forge memory` CLI.
+
+**Key changes**:
+
+- Created `src/forge/session/passport.py` with `MemoryStrategy` enum, `Passport`/`PassportUpdate`/`ResolvedDocSpec`
+  dataclasses, frontmatter parsing (`extract_frontmatter`, `parse_passport`, `read_passport`), atomic serialization
+  (`write_passport`), synthesis (`synthesize_passport`), writer validation (`validate_writer_spec`,
+  `check_writer_access`), and flag-vs-passport conflict handling (`resolve_with_overrides`).
+- Added `PassportError(field_path, reason, hint)` to `forge.session.exceptions`, subclassing `ForgeSessionError`.
+- Refactored `handoff_agent.py`: replaced inline `DOC_STRATEGIES` with import from `passport.STRATEGY_INSTRUCTIONS`.
+  `build_multi_doc_prompt()` now takes `list[ResolvedDocSpec]` (no file I/O). `run_handoff_agent()` reads passports,
+  filters by writer authorization, resolves effective doc specs, and includes full passport contract (intent, captures,
+  excludes, approval, compact_when) in the prompt.
+- Updated `session_memory.py` to import `VALID_STRATEGY_NAMES` from `passport.py`.
+- Tasks 3 (passport-required-at-rest) and 4 (flag-vs-passport conflicts) have infrastructure built but CLI enforcement
+  deferred to Phase 2.
+
+**Verification**: 4,441 unit tests pass. Focused passport/handoff/session-memory suite passes 191 tests. `make lint`
+and `make type-check` clean. Passport-less docs continue working identically.
+
 ### Phase 0: Branch and Baseline (Memory Enhancement)
 
 **Goal**: Map the existing `forge session memory` surface, stop-time update path, handoff report surface, old UX

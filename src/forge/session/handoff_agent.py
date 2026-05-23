@@ -32,7 +32,16 @@ from forge.core.reactive.routing import resolve_subprocess_routing
 from forge.core.reactive.session_runner import run_claude_session
 from forge.core.transcript import parse_jsonl_transcript
 from forge.session.claude.invoke import is_claude_available
+from forge.session.exceptions import PassportError
 from forge.session.models import DesignatedDoc, HandoffConfig
+from forge.session.passport import (
+    Passport,
+    ResolvedDocSpec,
+    check_writer_access,
+    read_passport,
+    resolve_doc_spec,
+    resolve_passport_source,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -42,51 +51,6 @@ def _default_timeout() -> int:
 
     return get_runtime_config().handoff_timeout
 
-
-# Per-doc strategy instructions.
-# Mode 1 (direct update): strictly additive — no removals/rewrites.
-# Mode 2 (suggested): self-prunes merged items from shadow file.
-DOC_STRATEGIES: dict[str, str] = {
-    "project-state": (
-        "Update current focus, active work, recent decisions, and handoff notes. "
-        "Mark completed items as done rather than removing them. "
-        "If the file does not exist, skip it and report that it was missing."
-    ),
-    "checklist": (
-        "Mark completed tasks with [x]. Add newly discovered tasks. "
-        "Do NOT remove, rewrite, or restructure existing entries. "
-        "If the file does not exist, skip it and report that it was missing."
-    ),
-    "changelog": (
-        "Add accomplishments from this session not already recorded. "
-        "Follow the existing entry format. "
-        "Do NOT modify or remove existing entries. "
-        "If the file does not exist, skip it and report that it was missing."
-    ),
-    "debugging": (
-        "Record error causes, solutions, and workarounds encountered in this session. "
-        "Group entries by topic (build errors, runtime errors, test failures, etc.). "
-        "Do NOT duplicate entries that are already documented. "
-        "If the file does not exist, skip it and report that it was missing."
-    ),
-    "patterns": (
-        "Record architecture patterns, conventions, and recurring techniques observed "
-        "in this session. Include code idioms, design patterns, and naming conventions. "
-        "Do NOT duplicate patterns that are already documented. "
-        "If the file does not exist, skip it and report that it was missing."
-    ),
-    "suggested": (
-        "Propose additions to the official document as `- [ ]` checkboxes, each with "
-        "a brief rationale. Remove any checkboxes whose content has already been merged "
-        "into the official document (self-prune). "
-        "Do NOT duplicate suggestions that are already present in either file."
-    ),
-    "generic": (
-        "Read the file and add any NEW information from this session that is missing. "
-        "Do NOT duplicate, rephrase, or remove what is already documented. "
-        "If the file does not exist, skip it and report that it was missing."
-    ),
-}
 
 MULTI_DOC_PROMPT_TEMPLATE = """\
 You are a project documentation agent. Your job is to update project documents \
@@ -119,43 +83,49 @@ def build_multi_doc_prompt(
     session_name: str,
     transcript_path: str,
     mode: str = "augment",
-    designated_docs: list[DesignatedDoc],
+    docs: list[ResolvedDocSpec],
 ) -> str:
     """Build a multi-doc prompt for the handoff agent.
 
     Generates a single prompt that instructs ``claude -p`` to update
     multiple designated documents with per-doc strategies. For shadow docs
-    (``doc.shadows`` is set), the prompt instructs reading the official
-    document first before proposing changes.
+    (``spec.official_path`` is set), the prompt instructs reading the
+    official document first before proposing changes.
 
     Args:
         session_name: The Forge session name.
         transcript_path: Absolute path to the transcript artifact.
         mode: "augment" (write updates) or "review-only" (print suggestions).
-        designated_docs: List of DesignatedDoc entries to update.
-
-    Returns:
-        The complete prompt string.
+        docs: Passport-resolved doc specs (no file I/O in this function).
     """
     action_instruction = MULTI_DOC_AUGMENT_INSTRUCTION if mode == "augment" else MULTI_DOC_REVIEW_INSTRUCTION
 
     sections: list[str] = []
-    for doc in designated_docs:
-        instructions = DOC_STRATEGIES.get(doc.strategy, DOC_STRATEGIES["generic"])
+    for spec in docs:
+        lines: list[str] = []
 
-        if doc.shadows:
-            # Shadow/propose mode (Mode 2): read official doc first, then propose
-            section = (
-                f"### `{doc.path}` (proposes changes to `{doc.shadows}`)\n"
-                f"1. Read the OFFICIAL document at `{doc.shadows}` first.\n"
-                f"2. Read this shadow document at `{doc.path}` (if it exists).\n"
-                f"3. {instructions}"
-            )
+        if spec.official_path:
+            lines.append(f"### `{spec.write_path}` (proposes changes to `{spec.official_path}`)")
+            lines.append(f"1. Read the OFFICIAL document at `{spec.official_path}` first.")
+            lines.append(f"2. Read this shadow document at `{spec.write_path}` (if it exists).")
         else:
-            # Direct update mode (Mode 1)
-            section = f"### `{doc.path}`\n{instructions}"
+            lines.append(f"### `{spec.write_path}`")
 
-        sections.append(section)
+        if spec.intent:
+            lines.append(f"**Purpose**: {spec.intent}")
+        if spec.captures:
+            lines.append(f"**Captures**: {', '.join(spec.captures)}")
+        if spec.excludes:
+            lines.append(f"**Excludes**: {', '.join(spec.excludes)}")
+        if spec.approval == "human-promoted":
+            lines.append("**Approval**: human-promoted -- propose only, do not make authoritative changes")
+        if spec.custom_instruction:
+            lines.append(spec.custom_instruction)
+        lines.append(spec.strategy_instruction)
+        if spec.compact_when:
+            lines.append(f"**Compact when**: {spec.compact_when}")
+
+        sections.append("\n".join(lines))
 
     file_sections = "\n\n".join(sections)
 
@@ -415,23 +385,59 @@ def run_handoff_agent(
 
     safe_docs = _validate_designated_docs(designated_docs, forge_root)
 
-    # Only update files that already exist — handoff never creates new files.
-    ready_docs: list[DesignatedDoc] = []
+    # Read passports and filter by writer authorization
+    passport_resolved: list[tuple[DesignatedDoc, Passport | None]] = []
     for doc in safe_docs:
-        if not (forge_root / doc.path).is_file():
-            logger.info("Skipping missing file: %s", doc.path)
+        passport_source = resolve_passport_source(doc)
+        passport = None
+        try:
+            passport = read_passport(forge_root / passport_source)
+        except FileNotFoundError:
+            pass  # File doesn't exist yet; existence check happens below
+        except PassportError as e:
+            logger.warning("Skipping %s: malformed passport: %s", doc.path, e)
             continue
-        # For shadow docs, the official doc must also exist
-        if doc.shadows and not (forge_root / doc.shadows).is_file():
+
+        if passport and not check_writer_access(passport.update.writers, session_name):
             logger.info(
-                "Skipping shadow doc %s: official doc %s not found",
+                "Session %s not authorized for %s (writer: %s)",
+                session_name,
                 doc.path,
-                doc.shadows,
+                passport.update.writers,
             )
             continue
-        ready_docs.append(doc)
 
-    if not ready_docs:
+        # Warn if shadow file has its own passport (official doc passport wins)
+        if doc.shadows:
+            try:
+                shadow_passport = read_passport(forge_root / doc.path)
+            except (FileNotFoundError, PassportError):
+                shadow_passport = None
+            if shadow_passport:
+                logger.warning(
+                    "Ignoring passport on shadow file %s (official doc %s passport is authoritative)",
+                    doc.path,
+                    doc.shadows,
+                )
+
+        passport_resolved.append((doc, passport))
+
+    # Resolve effective doc specs and check file existence
+    ready_specs: list[ResolvedDocSpec] = []
+    for doc, passport in passport_resolved:
+        spec = resolve_doc_spec(doc, passport)
+        if not (forge_root / spec.write_path).is_file():
+            logger.info("Skipping missing file: %s", spec.write_path)
+            continue
+        if spec.official_path and not (forge_root / spec.official_path).is_file():
+            logger.info(
+                "Skipping: official doc %s not found",
+                spec.official_path,
+            )
+            continue
+        ready_specs.append(spec)
+
+    if not ready_specs:
         logger.info(
             "No designated_docs ready after validation/existence checks (session %s)",
             session_name,
@@ -442,7 +448,7 @@ def run_handoff_agent(
         session_name=session_name,
         transcript_path=str(transcript_abs),
         mode=config.mode,
-        designated_docs=ready_docs,
+        docs=ready_specs,
     )
 
     logger.info(
