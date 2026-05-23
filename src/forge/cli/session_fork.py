@@ -157,7 +157,16 @@ __all__ = ["fork"]
     is_flag=True,
     help="Replace existing branch/worktree and skip budget preflight",
 )
+@click.option(
+    "--inherit-memory",
+    "inherit_memory",
+    type=click.Choice(["all", "none", "shadowed"]),
+    default="all",
+    help="Memory doc inheritance: all (default), none, or shadowed only",
+)
+@click.pass_context
 def fork(
+    ctx: click.Context,
     parent: str,
     name: str | None,
     proxy_name: str | None,
@@ -175,6 +184,7 @@ def fork(
     supervisor_proxy: str | None,
     supervisor_direct: bool,
     force: bool,
+    inherit_memory: str,
 ) -> None:
     """Fork an existing session.
 
@@ -424,6 +434,9 @@ def fork(
             console.print(f"[red]Error:[/red] {e}")
             sys.exit(1)
 
+    inherit_memory_explicit = ctx.get_parameter_source("inherit_memory") == click.core.ParameterSource.COMMANDLINE
+
+    fork_warnings: list[str] = []
     try:
         parent_manifest, fork_manifest = manager.fork_session(
             parent_name=parent,
@@ -435,6 +448,9 @@ def fork(
             into_path=into_resolved,
             forge_root=_fr,
             force=force,
+            inherit_memory=inherit_memory,
+            inherit_memory_explicit=inherit_memory_explicit,
+            warnings_sink=fork_warnings,
         )
     except CannotForkIncognitoError as e:
         console.print(f"[red]Error:[/red] {e}")
@@ -465,6 +481,9 @@ def fork(
     except ForgeSessionError as e:
         _handle_error(e)
         return
+
+    for w in fork_warnings:
+        console.print(f"[dim]{w}[/dim]")
 
     # Persist routing override to manifest (ensures --no-launch retains proxy choice)
     fork_worktree_path = Path(fork_manifest.worktree.path) if fork_manifest.worktree else Path.cwd()

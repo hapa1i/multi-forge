@@ -19,7 +19,6 @@ from forge.cli.session import console
 from forge.core.ops.context import ExecutionContext
 from forge.core.ops.session import ForgeOpError, resolve_session, set_session_override
 from forge.session.exceptions import ForgeSessionError, PassportError
-from forge.session.handoff_agent import is_safe_designated_doc_path
 from forge.session.models import DesignatedDoc
 from forge.session.passport import (
     VALID_STRATEGY_NAMES,
@@ -32,6 +31,7 @@ from forge.session.passport import (
     synthesize_passport,
     write_passport,
 )
+from forge.session.validation import is_safe_designated_doc_path
 
 logger = logging.getLogger(__name__)
 
@@ -107,18 +107,12 @@ def _auto_create_shadow(shadow_path: str, forge_root: Path) -> bool:
     ``.forge/memory/`` (caller must validate those exist separately).
     Raises ClickException on unsafe paths.
     """
-    resolved_base = forge_root.resolve()
-    reason = is_safe_designated_doc_path(shadow_path, forge_root, resolved_base)
-    if reason:
-        raise click.ClickException(f"Invalid shadow path: {reason}")
-    abs_shadow = (forge_root / shadow_path).resolve()
-    if not abs_shadow.is_relative_to(resolved_base / ".forge" / "memory"):
-        return False
-    if abs_shadow.is_file():
-        return False
-    abs_shadow.parent.mkdir(parents=True, exist_ok=True)
-    abs_shadow.write_text("", encoding="utf-8")
-    return True
+    from forge.session.memory_inheritance import create_shadow_file
+
+    try:
+        return create_shadow_file(shadow_path, forge_root)
+    except ValueError as e:
+        raise click.ClickException(f"Invalid shadow path: {e}") from e
 
 
 def _auto_enable_memory(*, ctx: ExecutionContext, session_name: str | None, effective_memory: object) -> bool:

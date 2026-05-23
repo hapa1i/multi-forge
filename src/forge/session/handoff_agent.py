@@ -42,6 +42,7 @@ from forge.session.passport import (
     resolve_doc_spec,
     resolve_passport_source,
 )
+from forge.session.validation import is_safe_designated_doc_path
 
 logger = logging.getLogger(__name__)
 
@@ -227,24 +228,6 @@ def resolve_handoff_base_url(
             return result.base_url
 
     return confirmed_proxy_base_url or env_base_url
-
-
-# Paths with these characters are rejected to prevent prompt injection when
-# interpolated into markdown headings (e.g., backticks break ```...``` blocks,
-# newlines inject arbitrary prompt lines, control chars corrupt structure).
-_UNSAFE_PATH_RE = re.compile(r"[`\x00-\x1f\x7f]")
-
-
-def is_safe_designated_doc_path(path: str, base: Path, resolved_base: Path) -> str | None:
-    """Check a single path for safety. Return rejection reason or None if safe."""
-    if Path(path).is_absolute():
-        return f"absolute path: {path}"
-    if _UNSAFE_PATH_RE.search(path):
-        return f"unsafe characters: {path!r}"
-    abs_path = (base / path).resolve()
-    if not abs_path.is_relative_to(resolved_base):
-        return f"escapes base directory: {path}"
-    return None
 
 
 _PERMISSION_DENIED_PATTERNS = [

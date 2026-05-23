@@ -1382,7 +1382,16 @@ def start(
     is_flag=True,
     help="Bypass active-session guard (launches as new child)",
 )
+@click.option(
+    "--inherit-memory",
+    "inherit_memory",
+    type=click.Choice(["all", "none", "shadowed"]),
+    default="all",
+    help="Memory doc inheritance for fresh resume (default: all)",
+)
+@click.pass_context
 def resume(
+    ctx: click.Context,
     name: str | None,
     proxy_name: str | None,
     direct: bool,
@@ -1394,6 +1403,7 @@ def resume(
     resume_mode: str | None,
     review: bool,
     force: bool,
+    inherit_memory: str,
 ) -> None:
     """Resume a session.
 
@@ -1430,12 +1440,18 @@ def resume(
             console.print(f"[red]Error:[/red] {e}")
             sys.exit(1)
 
+    inherit_memory_explicit = ctx.get_parameter_source("inherit_memory") == click.core.ParameterSource.COMMANDLINE
+
     if resume_mode and not fresh:
         console.print("[red]Error:[/red] --resume-mode requires --fresh")
         sys.exit(1)
 
     if not fresh and child_name:
         console.print("[red]Error:[/red] --child-name requires --fresh")
+        sys.exit(1)
+
+    if inherit_memory_explicit and not fresh:
+        console.print("[red]Error:[/red] --inherit-memory requires --fresh")
         sys.exit(1)
 
     if review and not fresh:
@@ -1525,6 +1541,8 @@ def resume(
                 routing=routing,
                 direct=direct,
                 direct_model_override=normalized_direct_model,
+                inherit_memory=inherit_memory,
+                inherit_memory_explicit=inherit_memory_explicit,
             )
         else:
             _resume_fresh(
@@ -1538,6 +1556,8 @@ def resume(
                 direct=direct,
                 review=review,
                 direct_model_override=normalized_direct_model,
+                inherit_memory=inherit_memory,
+                inherit_memory_explicit=inherit_memory_explicit,
             )
     elif not _has_confirmed_claude_session(manifest):
         _launch_in_place(
@@ -1970,6 +1990,8 @@ def _resume_fresh(
     direct: bool,
     review: bool = False,
     direct_model_override: str | None = None,
+    inherit_memory: str = "all",
+    inherit_memory_explicit: bool = False,
 ) -> None:
     """Create a fresh child session with context assembled from parent.
 
@@ -2003,6 +2025,8 @@ def _resume_fresh(
             context_limit=context_limit,
             token_estimate_multiplier=token_multiplier,
             forge_root=parent_state.forge_root,
+            inherit_memory=inherit_memory,
+            inherit_memory_explicit=inherit_memory_explicit,
         )
     except ForgeSessionError as e:
         _handle_error(e)
@@ -2104,6 +2128,8 @@ def _resume_fresh_native(
     routing: ResolvedRouting | None,
     direct: bool,
     direct_model_override: str | None = None,
+    inherit_memory: str = "all",
+    inherit_memory_explicit: bool = False,
 ) -> None:
     """Create a child session with native conversation resume.
 
@@ -2124,11 +2150,13 @@ def _resume_fresh_native(
     context_limit = _sess()._resolve_context_limit(effective_proxy_ref)
 
     try:
-        child_manifest, _handoff = manager.resume_session(
+        child_manifest, handoff_result = manager.resume_session(
             parent,
             child_name=child_name,
             resume_mode="native",
             forge_root=parent_state.forge_root,
+            inherit_memory=inherit_memory,
+            inherit_memory_explicit=inherit_memory_explicit,
         )
     except ForgeSessionError as e:
         _handle_error(e)
@@ -2142,6 +2170,10 @@ def _resume_fresh_native(
         direct=direct,
     )
     _apply_routing_override_to_state(state=child_manifest, routing=routing, direct=direct)
+
+    if handoff_result.warnings:
+        for warning in handoff_result.warnings:
+            console.print(f"[yellow]Warning:[/yellow] {warning}")
 
     parent_uuid = parent_state.confirmed.claude_session_id
     assert parent_uuid is not None  # caller validated
