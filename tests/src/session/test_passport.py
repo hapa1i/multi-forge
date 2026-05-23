@@ -32,7 +32,6 @@ from forge.session.passport import (
     write_passport,
 )
 
-
 # ---------------------------------------------------------------------------
 # TestMemoryStrategy
 # ---------------------------------------------------------------------------
@@ -280,9 +279,7 @@ class TestParsePassport:
 class TestReadPassport:
     def test_read_from_file_with_passport(self, tmp_path: Path) -> None:
         doc = tmp_path / "doc.md"
-        doc.write_text(
-            "---\nforge_memory:\n  version: 1\n  intent: Test doc\n---\n# Content\n"
-        )
+        doc.write_text("---\nforge_memory:\n  version: 1\n  intent: Test doc\n---\n# Content\n")
         p = read_passport(doc)
         assert p is not None
         assert p.intent == "Test doc"
@@ -299,9 +296,7 @@ class TestReadPassport:
 
     def test_malformed_passport_raises(self, tmp_path: Path) -> None:
         doc = tmp_path / "doc.md"
-        doc.write_text(
-            "---\nforge_memory:\n  version: 99\n  intent: Test\n---\n# Content\n"
-        )
+        doc.write_text("---\nforge_memory:\n  version: 99\n  intent: Test\n---\n# Content\n")
         with pytest.raises(PassportError, match="upgrade"):
             read_passport(doc)
 
@@ -349,9 +344,7 @@ class TestWritePassport:
 
     def test_replace_existing_passport(self, tmp_path: Path) -> None:
         doc = tmp_path / "doc.md"
-        doc.write_text(
-            "---\nforge_memory:\n  version: 1\n  intent: Old\n---\n# Body\n"
-        )
+        doc.write_text("---\nforge_memory:\n  version: 1\n  intent: Old\n---\n# Body\n")
         write_passport(doc, self._make_passport(strategy="checklist"))
         text = doc.read_text()
         assert "strategy: checklist" in text
@@ -449,9 +442,7 @@ class TestSynthesizePassport:
 
     def test_direct_with_shadow_path_raises(self) -> None:
         with pytest.raises(PassportError, match="shadow_path.*not allowed"):
-            synthesize_passport(
-                strategy="generic", update_mode="direct", shadow_path="shadow.md"
-            )
+            synthesize_passport(strategy="generic", update_mode="direct", shadow_path="shadow.md")
 
 
 # ---------------------------------------------------------------------------
@@ -589,9 +580,7 @@ class TestResolveWithOverrides:
         assert resolved is not original  # deep copy
 
     def test_strategy_override_warns(self) -> None:
-        resolved, warnings = resolve_with_overrides(
-            self._base_passport(), strategy="changelog"
-        )
+        resolved, warnings = resolve_with_overrides(self._base_passport(), strategy="changelog")
         assert resolved.update.strategy == "changelog"
         assert len(warnings) == 1
         assert "changelog" in warnings[0]
@@ -630,9 +619,7 @@ class TestResolveWithOverrides:
         assert "shadow_path" in warnings[1]
 
     def test_multiple_overrides_produce_multiple_warnings(self) -> None:
-        _, warnings = resolve_with_overrides(
-            self._base_passport(), strategy="changelog", writers="planner"
-        )
+        _, warnings = resolve_with_overrides(self._base_passport(), strategy="changelog", writers="planner")
         assert len(warnings) == 2
 
     def test_original_passport_unchanged_after_override(self) -> None:

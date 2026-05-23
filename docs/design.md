@@ -883,26 +883,33 @@ groups require an explicit subcommand. List/show commands support `--json` for s
 
 #### Session management
 
-| Command                                  | Purpose                                                                           |
-| ---------------------------------------- | --------------------------------------------------------------------------------- |
-| `forge session start [name]`             | Create and start a new session (auto-named if omitted)                            |
-| `forge session resume [name]`            | Reattach to an existing session (default), or derive a fresh child with `--fresh` |
-| `forge session fork <parent> [--name]`   | Fork a session (same dir by default; `--worktree` for isolation)                  |
-| `forge session show [session]`           | Show session details (`--json`, `--field`); accepts name or UUID                  |
-| `forge session list`                     | List sessions (`--scope repo\|project\|all`; default `repo`; `--json`)            |
-| `forge session set <key> <value>`        | Set a mid-session override                                                        |
-| `forge session reset [key]`              | Reset overrides to intent                                                         |
-| `forge session delete <name>...`         | Delete one or more sessions (`--all` for bulk deletion)                           |
-| `forge session clean --older-than N`     | Bulk-delete sessions older than N days                                            |
-| `forge session incognito [name]`         | Start an ephemeral session (auto-delete on exit)                                  |
-| `forge session shell [name]`             | Open shell in sidecar container                                                   |
-| `forge session memory list-docs`         | List designated memory docs (`--json`)                                            |
-| `forge session memory add-doc <path>`    | Add a designated memory doc (`--strategy`, `--shadows`)                           |
-| `forge session memory remove-doc <path>` | Remove a designated memory doc                                                    |
-| `forge session handoff show [name]`      | Inspect handoff-agent review reports (`--latest`, `--all`)                        |
+| Command                                | Purpose                                                                           |
+| -------------------------------------- | --------------------------------------------------------------------------------- |
+| `forge session start [name]`           | Create and start a new session (auto-named if omitted)                            |
+| `forge session resume [name]`          | Reattach to an existing session (default), or derive a fresh child with `--fresh` |
+| `forge session fork <parent> [--name]` | Fork a session (same dir by default; `--worktree` for isolation)                  |
+| `forge session show [session]`         | Show session details (`--json`, `--field`); accepts name or UUID                  |
+| `forge session list`                   | List sessions (`--scope repo\|project\|all`; default `repo`; `--json`)            |
+| `forge session set <key> <value>`      | Set a mid-session override                                                        |
+| `forge session reset [key]`            | Reset overrides to intent                                                         |
+| `forge session delete <name>...`       | Delete one or more sessions (`--all` for bulk deletion)                           |
+| `forge session clean --older-than N`   | Bulk-delete sessions older than N days                                            |
+| `forge session incognito [name]`       | Start an ephemeral session (auto-delete on exit)                                  |
+| `forge session shell [name]`           | Open shell in sidecar container                                                   |
+| `forge session handoff show [name]`    | Inspect handoff-agent review reports (`--latest`, `--all`)                        |
 
 Note: `session context` is a deprecated alias for `session show`. `session resume --fresh --review` opens the generated
-per-child handoff file in `$EDITOR` before launching Claude.
+per-child handoff file in `$EDITOR` before launching Claude. `forge session memory` is removed; use `forge memory`.
+
+#### Memory management
+
+| Command                       | Purpose                                                               |
+| :---------------------------- | :-------------------------------------------------------------------- |
+| `forge memory enable`         | Enable memory auto-update for handoff agent (`--session`)             |
+| `forge memory track <path>`   | Track a memory doc (`--as <strategy>`, `--session`)                   |
+| `forge memory untrack <path>` | Stop tracking a memory doc (`--session`)                              |
+| `forge memory list`           | List tracked memory docs (`--session`, `--json`)                      |
+| `forge memory status`         | Show memory doc status across sessions (`--scope`, `--doc`, `--json`) |
 
 #### Proxy management
 
@@ -1601,8 +1608,8 @@ Per-doc strategies control how each file is updated. Strategies are a `str → s
 
 **No file creation.** Designated docs must already exist; missing files are skipped. Humans choose which docs to
 maintain; the agent maintains them. This avoids the agent making structural choices (new files/templates) implicitly.
-Seed files before configuring them. `forge session memory add-doc` enforces this at configuration time; runtime skip
-handling remains for manual JSON overrides and stale manifests.
+Seed files before configuring them. `forge memory track` enforces this at configuration time; runtime skip handling
+remains for manual JSON overrides and stale manifests.
 
 Direct update strategies (Mode 1) include: `project-state`, `checklist`, `changelog`, `debugging`, `patterns`,
 `generic`. Shadow strategy (Mode 2): `suggested` (propose additions as checkboxes with rationale).

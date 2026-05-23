@@ -13,12 +13,11 @@ import re
 from copy import deepcopy
 from dataclasses import asdict, dataclass, field
 from enum import Enum
+from io import StringIO
 from pathlib import Path
 from typing import Any
 
 import yaml
-from io import StringIO
-
 from ruamel.yaml import YAML
 
 from forge.core.state.io import atomic_write_text
@@ -194,9 +193,7 @@ def resolve_doc_spec(
         return ResolvedDocSpec(
             write_path=doc.path,
             official_path=doc.shadows,
-            strategy_instruction=STRATEGY_INSTRUCTIONS.get(
-                strategy_key, STRATEGY_INSTRUCTIONS["generic"]
-            ),
+            strategy_instruction=STRATEGY_INSTRUCTIONS.get(strategy_key, STRATEGY_INSTRUCTIONS["generic"]),
             custom_instruction=None,
             intent=None,
             captures=[],
@@ -230,9 +227,7 @@ def resolve_doc_spec(
     return ResolvedDocSpec(
         write_path=write_path,
         official_path=official_path,
-        strategy_instruction=STRATEGY_INSTRUCTIONS.get(
-            strategy_key, STRATEGY_INSTRUCTIONS["generic"]
-        ),
+        strategy_instruction=STRATEGY_INSTRUCTIONS.get(strategy_key, STRATEGY_INSTRUCTIONS["generic"]),
         custom_instruction=passport.update.instruction,
         intent=passport.intent,
         captures=list(passport.captures),
@@ -359,9 +354,7 @@ def _parse_string_list(value: Any, field_path: str) -> list[str]:
 
 def _parse_update(data: Any) -> PassportUpdate:
     if not isinstance(data, dict):
-        raise PassportError(
-            "forge_memory.update", f"must be a mapping (got {type(data).__name__})"
-        )
+        raise PassportError("forge_memory.update", f"must be a mapping (got {type(data).__name__})")
 
     unknown = set(data.keys()) - _KNOWN_UPDATE_KEYS
     if unknown:
@@ -681,9 +674,7 @@ def resolve_with_overrides(
                 f"unknown strategy '{strategy}'",
                 hint=f"valid strategies: {', '.join(sorted(VALID_STRATEGY_NAMES))}",
             )
-        warnings.append(
-            f"CLI --as {strategy} overrides passport strategy '{resolved.update.strategy}'"
-        )
+        warnings.append(f"CLI --as {strategy} overrides passport strategy '{resolved.update.strategy}'")
         resolved.update.strategy = strategy
 
     if update_mode is not None and update_mode != resolved.update.mode:
@@ -693,22 +684,15 @@ def resolve_with_overrides(
                 f"unknown mode '{update_mode}'",
                 hint=f"valid modes: {', '.join(sorted(VALID_PASSPORT_MODES))}",
             )
-        warnings.append(
-            f"CLI --mode {update_mode} overrides passport mode '{resolved.update.mode}'"
-        )
+        warnings.append(f"CLI --mode {update_mode} overrides passport mode '{resolved.update.mode}'")
         resolved.update.mode = update_mode
         if update_mode == "direct" and resolved.update.shadow_path:
-            warnings.append(
-                "CLI --mode direct ignores passport shadow_path "
-                f"'{resolved.update.shadow_path}'"
-            )
+            warnings.append("CLI --mode direct ignores passport shadow_path " f"'{resolved.update.shadow_path}'")
             resolved.update.shadow_path = None
 
     if writers is not None and writers != resolved.update.writers:
         validate_writer_spec(writers)
-        warnings.append(
-            f"CLI --writers {writers} overrides passport writers '{resolved.update.writers}'"
-        )
+        warnings.append(f"CLI --writers {writers} overrides passport writers '{resolved.update.writers}'")
         resolved.update.writers = writers
 
     # Post-override invariant: shadow-only requires shadow_path

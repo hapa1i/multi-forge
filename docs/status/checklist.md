@@ -83,16 +83,18 @@ the authoritative contract and session manifests only as resolved participation 
     validation rejects unknown keys, validates all fields. Atomic write via `atomic_write_text()`. Omits None fields.
     Round-trip test proves write-then-read identity. Focused tests cover frontmatter extraction, parsing, reading, and
     writing.
-- [ ] Implement passport-required-at-rest behavior.
+- [x] Implement passport-required-at-rest behavior.
   - Assertion: `forge memory track` leaves every tracked official doc with a valid passport, synthesizes one from CLI
     flags when possible, and fails with a concrete suggested command when required fields are missing.
-  - Note: infrastructure built in Phase 1 (`synthesize_passport()` with strategy-derived default intents); CLI
-    enforcement via `forge memory track` lands in Phase 2.
-- [ ] Implement flag-vs-passport conflict handling.
+  - Verification: no passport + no `--as` fails with actionable command suggestion listing valid strategies; no passport
+    - `--as` synthesizes via `synthesize_passport()` and writes via `write_passport()` before persisting manifest entry.
+      `test_track_without_passport_and_without_as_fails` and `test_track_synthesizes_passport` verify both paths.
+- [x] Implement flag-vs-passport conflict handling.
   - Assertion: CLI flags win for the current invocation, warnings name the overridden passport field, and persisted
     updates are deterministic.
-  - Note: infrastructure built in Phase 1 (`resolve_with_overrides()` deep-copies passport, returns warnings); CLI usage
-    via `forge memory track` lands in Phase 2.
+  - Verification: `--as` override calls `resolve_with_overrides()`, rewrites passport file (not session-scoped), and
+    prints "Future sessions will use the new values." `read_passport()` after track confirms the rewritten strategy.
+    `test_track_as_flag_overrides_and_rewrites_passport` verifies round-trip.
 - [x] Keep ownership split between passport and session manifest.
   - Assertion: the session manifest stores only participation and auto-update runtime state; Stop-time update logic
     re-reads passport intent, instructions, writers, strategy, mode, shadow path, and inheritance.
@@ -113,36 +115,63 @@ the authoritative contract and session manifests only as resolved participation 
 
 ## Phase 2 - Top-Level CLI
 
-- [ ] Add the canonical `forge memory` command group.
+- [x] Add the canonical `forge memory` command group.
   - Assertion: user-facing CLI help exposes `forge memory enable|track|untrack|list|status|shadows`; mutating commands
     require `--session <name>` unless an active session is resolved.
-- [ ] Delete the old public `forge session memory` surface.
+  - Verification: `src/forge/cli/memory.py` with 5 commands (enable, track, untrack, list, status) registered as
+    top-level `forge memory` in `main.py` with `mem` alias. `shadows` deferred to Phase 3. All commands accept
+    `--session` with `$FORGE_SESSION` fallback.
+- [x] Delete the old public `forge session memory` surface.
   - Assertion: `src/forge/cli/session_memory.py` is removed or made private, subgroup registration is removed from
     `src/forge/cli/session.py`, old command tests are deleted or rewritten for `forge memory`, docs no longer list the
     old command table entries, there is no compatibility alias, and old invocations fail with a helpful replacement
     message instead of a generic unknown-command dead end.
-- [ ] Detect ignored legacy designated-doc config.
+  - Verification: `session_memory.py` replaced with hidden tombstone group (3 commands that error with replacement
+    guidance). Registration in `session.py:_register_subgroups()` unchanged (imports the same `memory_group` name). Old
+    13 tests replaced with 5 tombstone tests (bare group, help, and 3 command tombstones). `design.md` command table
+    updated to remove old entries and add `forge memory` section.
+- [x] Detect ignored legacy designated-doc config.
   - Assertion: when a session manifest contains a non-empty legacy `intent.memory.designated_docs[]`, Forge ignores it
     for behavior but emits a one-time notice or actionable warning that explains the clean break and points to
     `forge memory enable` / `forge memory track`.
-- [ ] Implement `forge memory enable`.
+  - Verification: `_check_legacy_docs()` counts missing vs malformed passports per-doc using
+    `resolve_passport_source(doc)`. Warning says "manifest-fallback behavior" (accurate: passport-less docs still work).
+    Separate counts for missing and malformed. 5 tests in `TestLegacyDetection` including shadow-doc passport source
+    resolution.
+- [x] Implement `forge memory enable`.
   - Assertion: command sets `memory.auto_update.enabled=true`, defaults mode to `augment`, supports `--review-only`,
     prints current tracked/shadowed docs, and is idempotent when re-run.
-- [ ] Implement idempotent `track`.
+  - Verification: leaf-key overrides (`memory.auto_update.enabled`, `memory.auto_update.mode`) preserve existing fields
+    like `min_turns`. 5 tests in `TestMemoryEnable` covering idempotency, review-only mode, doc count display.
+- [x] Implement idempotent `track`.
   - Assertion: direct tracking adds or upserts a doc, updates strategy/mode when rerun, auto-enables memory for the
     session when needed, validates `--as` against the v1 strategy enum, and never creates duplicate entries.
-- [ ] Implement idempotent `untrack`.
+  - Verification: 15 tests in `TestMemoryTrack` covering passport synthesis, flag-override rewrite with round-trip
+    verification, upsert without duplicates, auto-enable with min_turns preservation, shadow-only rejection, invalid
+    path/file/strategy rejection, output order, and custom intent.
+- [x] Implement idempotent `untrack`.
   - Assertion: untracking removes direct and shadow participation as requested, succeeds clearly when the doc is absent,
     and leaves passport frontmatter intact unless an explicit passport-edit command is added later.
-- [ ] Implement `list` and `status` visibility.
+  - Verification: 4 tests in `TestMemoryUntrack` covering removal, absent-path success, leaves-others, and
+    passport-intact.
+- [x] Implement `list` and `status` visibility.
   - Assertion: `forge memory list --session <name>` and `forge memory status --scope project|repo|all --doc <path>`
     distinguish direct writers, shadow writers, handoff mode, strategy, session/worktree, and missing targets.
-- [ ] Implement cross-`forge_root` discovery for read-only `--scope all`.
+  - Verification: `list` shows Rich table with Path/Strategy/Mode/Writers/Passport columns and reads passport info
+    per-doc (best-effort). `status` aggregates across sessions via `list_sessions()` with scope filtering. JSON output
+    includes `forge_root` and `session` for disambiguation. 9 tests across `TestMemoryList` and `TestMemoryStatus`.
+- [x] Implement cross-`forge_root` discovery for read-only `--scope all`.
   - Assertion: `forge memory status --scope all` can discover readable Forge roots, handles missing or inaccessible
     roots without failing the whole command, and clearly reports which roots were scanned.
-- [ ] Keep CLI language outcome-oriented.
+  - Verification: `status` uses `list_sessions(scope="all")` which returns sessions across all forge_roots. Inaccessible
+    manifests are skipped with debug log. JSON output includes `scanned_roots` array. Rich output shows root count.
+    `test_inaccessible_manifest_skipped` monkeypatches `SessionManager.get_session` to simulate failure.
+- [x] Keep CLI language outcome-oriented.
   - Assertion: command output explains "tracks changelog directly" and "tracks impl_notes through a shadow proposal"
     without requiring users to understand the passport YAML shape.
+  - Verification: `track` output says "Tracking docs/checklist.md directly as checklist" and "Updated tracking for
+    docs/changelog.md (strategy: debugging)". `enable` says "Memory auto-update enabled (mode: augment)". `untrack` says
+    "Untracked docs/checklist.md." No YAML shape references in user-facing output.
 
 ## Phase 3 - Shadow Proposals
 

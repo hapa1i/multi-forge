@@ -267,8 +267,10 @@ def _validate_designated_docs(
     Guards (per doc):
     1. Path safety: reject absolute, unsafe chars, traversal
        (applied to both ``path`` and ``shadows``).
-    2. Strategy consistency: ``suggested`` requires ``shadows``;
-       ``shadows`` requires ``suggested``.
+    2. Strategy consistency (passport-less docs only): ``suggested``
+       requires ``shadows``; ``shadows`` requires ``suggested``.
+       Passported docs skip this check -- passport resolution
+       (``resolve_doc_spec``) handles mode/strategy independently.
 
     Args:
         designated_docs: List of docs to validate.
@@ -291,20 +293,23 @@ def _validate_designated_docs(
                 logger.warning("Skipping designated_doc shadows (%s): %s", doc.shadows, reason)
                 continue
 
-        # Strategy consistency: suggested ↔ shadows (non-empty)
-        if doc.strategy == "suggested" and not doc.shadows:
-            logger.warning(
-                "Skipping designated_doc %s: strategy 'suggested' requires non-empty 'shadows'",
-                doc.path,
-            )
-            continue
-        if doc.shadows is not None and doc.strategy != "suggested":
-            logger.warning(
-                "Skipping designated_doc %s: 'shadows' requires strategy 'suggested' " "(got %r)",
-                doc.path,
-                doc.strategy,
-            )
-            continue
+        # Strategy/shadows coupling: only enforced for passport-less docs.
+        # Passported docs resolve mode/strategy through resolve_doc_spec().
+        has_passport = _has_passport_on_disk(doc, forge_root)
+        if not has_passport:
+            if doc.strategy == "suggested" and not doc.shadows:
+                logger.warning(
+                    "Skipping designated_doc %s: strategy 'suggested' requires non-empty 'shadows'",
+                    doc.path,
+                )
+                continue
+            if doc.shadows is not None and doc.strategy != "suggested":
+                logger.warning(
+                    "Skipping designated_doc %s: 'shadows' requires strategy 'suggested' (got %r)",
+                    doc.path,
+                    doc.strategy,
+                )
+                continue
         if doc.shadows and doc.path == doc.shadows:
             logger.warning(
                 "Skipping designated_doc %s: 'path' and 'shadows' must differ",
@@ -314,6 +319,16 @@ def _validate_designated_docs(
 
         valid.append(doc)
     return valid
+
+
+def _has_passport_on_disk(doc: DesignatedDoc, forge_root: Path) -> bool:
+    """Best-effort check for passport existence (no validation)."""
+    passport_path = forge_root / resolve_passport_source(doc)
+    try:
+        pp = read_passport(passport_path)
+        return pp is not None
+    except (FileNotFoundError, PassportError):
+        return False
 
 
 def run_handoff_agent(

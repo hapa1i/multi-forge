@@ -110,18 +110,13 @@ Add and remove designated docs incrementally with the dedicated CLI verbs:
 
 ```bash
 # List current designated docs (or --json for scripting)
-forge session memory list-docs
+forge memory list --session planner
 
-# Add a direct-update doc (Mode 1)
-forge session memory add-doc docs/checklist.md --strategy checklist
+# Track a direct-update doc
+forge memory track docs/checklist.md --as checklist --session planner
 
-# Add a shadow/propose doc (Mode 2)
-forge session memory add-doc .forge/memory/suggested_standards.md \
-    --strategy suggested \
-    --shadows docs/developer/coding-standards.md
-
-# Remove one
-forge session memory remove-doc docs/checklist.md
+# Untrack
+forge memory untrack docs/checklist.md --session planner
 ```
 
 Each verb validates path safety and strategy/shadows consistency before persisting, so the agent never silently skips a

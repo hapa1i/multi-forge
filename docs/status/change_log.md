@@ -25,6 +25,34 @@ wc -l docs/status/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/documentation-guidelines.md` "Change Log Policy" for
 > the full spec.
 
+## 2026-05-23
+
+### Phase 2: Top-Level CLI (Memory Enhancement)
+
+**Goal**: Replace `forge session memory` with a new top-level `forge memory` command group, wire passport infrastructure
+from Phase 1 into CLI commands, add legacy config detection, and complete Phase 1 deferred tasks 3-4.
+
+**Key changes**:
+
+- Created `src/forge/cli/memory.py` with 5 commands: `enable`, `track`, `untrack`, `list`, `status`. Registered as
+  top-level `forge memory` in `main.py` with `mem` alias.
+- `track` synthesizes passports for docs without one (`--as` required), rewrites passports when flags override existing
+  values (passport-authoritative design), rejects shadow-only passports (Phase 3), and auto-enables memory on first
+  tracked doc. Uses leaf-key overrides (`memory.auto_update.enabled`, `memory.auto_update.mode`) to preserve existing
+  auto-update fields like `min_turns`.
+- `status` aggregates across sessions using `list_sessions()` with scope filtering. JSON output includes `forge_root`
+  and `session` for disambiguation. Inaccessible manifests skipped gracefully.
+- Replaced `session_memory.py` with hidden tombstone group: old commands error with replacement guidance. Registration
+  in `session.py:_register_subgroups()` unchanged.
+- Legacy detection via `_check_legacy_docs()`: per-doc counting of missing vs malformed passports using
+  `resolve_passport_source(doc)`. Warning says "manifest-fallback behavior" (accurate for Phase 1 fallback).
+- Updated `design.md` command table: removed old `forge session memory` entries, added `forge memory` section.
+- Completed Phase 1 tasks 3 (passport-required-at-rest: no passport + no `--as` fails) and 4 (flag-vs-passport
+  conflicts: `--as` rewrites passport, warnings printed, round-trip verified).
+
+**Verification**: 4,471 unit tests pass (38 new `test_memory.py` + 5 tombstone tests replacing 13 old tests). All
+pre-commit hooks clean (ruff, black, mypy, mdformat).
+
 ## 2026-05-22
 
 ### Phase 1: Passport Model (Memory Enhancement)
@@ -47,8 +75,8 @@ handoff agent integration) so Phase 2 can wire it into the `forge memory` CLI.
 - Tasks 3 (passport-required-at-rest) and 4 (flag-vs-passport conflicts) have infrastructure built but CLI enforcement
   deferred to Phase 2.
 
-**Verification**: 4,441 unit tests pass. Focused passport/handoff/session-memory suite passes 191 tests. `make lint`
-and `make type-check` clean. Passport-less docs continue working identically.
+**Verification**: 4,441 unit tests pass. Focused passport/handoff/session-memory suite passes 191 tests. `make lint` and
+`make type-check` clean. Passport-less docs continue working identically.
 
 ### Phase 0: Branch and Baseline (Memory Enhancement)
 
