@@ -1,0 +1,23 @@
+{
+  "typeCheckingMode": "standard",
+  "extraPaths": [
+    "src"
+  ],
+  "include": [
+    "src/forge"
+  ],
+  "exclude": [
+    "src/skills"
+  ],
+  "ignore": [
+    "src/forge/cli/extensions.py",
+    "src/forge/cli/session_fork.py",
+    "src/forge/cli/session_lifecycle.py",
+    "src/forge/core/llm/clients/litellm.py",
+    "src/forge/core/llm/clients/openrouter.py",
+    "src/forge/proxy/server.py",
+    "src/forge/proxy/utils.py",
+    "src/forge/review/engine.py",
+    "src/forge/session/overrides.py"
+  ]
+}

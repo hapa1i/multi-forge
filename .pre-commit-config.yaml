@@ -67,6 +67,14 @@ repos:
     types: [python]
     require_serial: true
     exclude: ^src/skills/
+  - id: pyright
+    name: pyright
+    language: system
+    entry: uv run --frozen pyright
+    types: [python]
+    pass_filenames: false
+    require_serial: true
+    exclude: ^src/skills/
 - repo: https://github.com/hukkin/mdformat
   rev: 1.0.0
   hooks:
