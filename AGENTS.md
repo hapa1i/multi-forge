@@ -34,7 +34,8 @@ Use `uv` for dependencies and `make` for the standard workflow:
 - `make test-integration` builds Docker images, starts test infrastructure, and runs integration-marked tests.
 - `make test-regression` runs regression tests.
 - `make test` runs the full test suite.
-- `make lint`, `make format`, `make type-check`, and `make pre-commit` run individual checks or the full hook suite.
+- `make pre-commit` runs the full hook suite (ruff, black, isort, mypy, pyright, mdformat, gitleaks); run it before
+  committing.
 - For targeted reruns, use direct `pytest` only after `make` has prepared prerequisites; integration flows depend on the
   setup performed by `make test-integration`.
 

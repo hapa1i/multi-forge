@@ -29,15 +29,11 @@ make test                   # Full suite
 # uv run pytest tests/integration -v
 
 # Code quality (run `make pre-commit` before every commit)
-make lint                  # Run ruff linter
-make format                # Run ruff formatter
-make type-check            # Run mypy
-make pre-commit            # All pre-commit hooks
+make pre-commit            # All hooks: ruff, black, isort, mypy, pyright, mdformat, gitleaks
 make clean                 # Remove caches
 
-# Alternative: Direct tool usage
+# Direct tool usage (read-only checks; let pre-commit own formatting)
 uv run ruff check src/
-uv run ruff format src/
 uv run mypy src/
 pre-commit run --all-files
 ```

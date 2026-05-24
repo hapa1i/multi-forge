@@ -107,10 +107,7 @@ make test-integration       # ~2-3 min
 make test                   # ~3 min
 
 # Other targets
-make lint                   # Ruff lint
-make format                 # Ruff format
-make type-check             # mypy
-make pre-commit             # pre-commit
+make pre-commit             # All hooks: ruff, black, isort, mypy, pyright, mdformat
 make clean                  # remove caches
 ```
 

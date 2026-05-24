@@ -119,7 +119,7 @@ Use newest-first order:
 
 - What changed and why it matters.
 
-**Verification**: Focused test suite passes; `make type-check` clean.
+**Verification**: Focused test suite passes; `make pre-commit` clean.
 ```
 
 Keep entries proportional:
