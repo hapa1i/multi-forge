@@ -158,6 +158,10 @@ class TestParsePassport:
         with pytest.raises(PassportError, match="invalid version"):
             parse_passport({"version": 0, "intent": "Test"})
 
+    def test_bool_version_raises(self) -> None:
+        with pytest.raises(PassportError, match="must be an integer"):
+            parse_passport({"version": True, "intent": "Test"})
+
     def test_missing_intent_raises(self) -> None:
         with pytest.raises(PassportError, match="intent.*required"):
             parse_passport({"version": 1})

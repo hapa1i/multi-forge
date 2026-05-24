@@ -968,7 +968,14 @@ def shadows_show_cmd(for_doc: str, session_name: str | None, scope: str) -> None
 
     multi_root = len(scanned_roots) > 1
 
+    skipped: list[str] = []
     for (fr, shadow_path), sessions in sorted(seen.items()):
+        entry_root = Path(fr)
+        shadow_err = is_safe_designated_doc_path(shadow_path, entry_root, entry_root.resolve())
+        if shadow_err:
+            skipped.append(f"{shadow_path}: {shadow_err}")
+            continue
+
         header_parts = [f"[bold]{shadow_path}[/bold]"]
         header_parts.append(f"sessions: {', '.join(sorted(set(sessions)))}")
         if multi_root:
@@ -976,7 +983,7 @@ def shadows_show_cmd(for_doc: str, session_name: str | None, scope: str) -> None
         console.print(" | ".join(header_parts))
         console.print()
 
-        abs_path = Path(fr) / shadow_path
+        abs_path = entry_root / shadow_path
         if not abs_path.is_file():
             console.print("[dim](shadow file does not exist yet)[/dim]")
         else:
@@ -986,6 +993,12 @@ def shadows_show_cmd(for_doc: str, session_name: str | None, scope: str) -> None
             else:
                 console.print("[dim](empty)[/dim]")
         console.print()
+
+    for warning in skipped:
+        console.print(f"[yellow]Warning:[/yellow] Skipping unsafe shadow path {warning}")
+
+    if skipped and len(skipped) == len(seen):
+        console.print(f"[dim]No readable shadow proposals found for {for_doc} (scope: {scope}).[/dim]")
 
 
 @shadows_group.command("review")

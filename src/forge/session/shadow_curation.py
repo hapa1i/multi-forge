@@ -120,9 +120,7 @@ against an official document and produce a structured synthesis.
 
 **Path**: {official_path}
 
-```
-{official_content}
-```
+{official_block}
 
 ## Shadow Proposals
 
@@ -155,6 +153,13 @@ One bullet each with brief rationale.
 Do NOT modify any files. This is a read-only review."""
 
 
+def _fenced_markdown_block(content: str) -> str:
+    """Wrap content in a Markdown fence that cannot be closed by the content."""
+    longest_backtick_run = max((len(m.group(0)) for m in re.finditer(r"`+", content)), default=0)
+    fence = "`" * max(3, longest_backtick_run + 1)
+    return f"{fence}\n{content}\n{fence}"
+
+
 def build_curation_prompt(
     *,
     official_path: str,
@@ -166,13 +171,13 @@ def build_curation_prompt(
     for entry in shadow_entries:
         header = f"### {entry.shadow_path} (session: {entry.session}, root: {entry.forge_root})"
         body = entry.content.strip() if entry.content else "_(empty)_"
-        sections.append(f"{header}\n\n```\n{body}\n```")
+        sections.append(f"{header}\n\n{_fenced_markdown_block(body)}")
 
     shadow_text = "\n\n".join(sections) if sections else "_(no shadow proposals)_"
 
     return _CURATION_TEMPLATE.format(
         official_path=official_path,
-        official_content=official_content,
+        official_block=_fenced_markdown_block(official_content),
         shadow_sections=shadow_text,
     )
 

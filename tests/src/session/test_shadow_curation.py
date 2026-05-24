@@ -69,6 +69,27 @@ class TestBuildCurationPrompt:
         )
         assert "no shadow proposals" in prompt.lower()
 
+    def test_embedded_fences_cannot_close_content_blocks(self) -> None:
+        entries = [
+            ShadowEntry(
+                official="docs/notes.md",
+                shadow_path=".forge/memory/suggested_notes.md",
+                strategy="suggested",
+                session="s1",
+                forge_root="/project",
+                content="````\nshadow proposal\n````",
+            ),
+        ]
+
+        prompt = build_curation_prompt(
+            official_path="docs/notes.md",
+            official_content="```python\nprint('official')\n```",
+            shadow_entries=entries,
+        )
+
+        assert "````\n```python\nprint('official')\n```\n````" in prompt
+        assert "`````\n````\nshadow proposal\n````\n`````" in prompt
+
 
 # ---------------------------------------------------------------------------
 # _doc_slug

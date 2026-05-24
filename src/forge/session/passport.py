@@ -339,7 +339,7 @@ def parse_passport(data: Any) -> Passport:
     if "version" not in data:
         raise PassportError("forge_memory.version", "required field missing")
     version = data["version"]
-    if not isinstance(version, int):
+    if isinstance(version, bool) or not isinstance(version, int):
         raise PassportError("forge_memory.version", f"must be an integer (got {type(version).__name__})")
     if version > PASSPORT_VERSION:
         raise PassportError(
