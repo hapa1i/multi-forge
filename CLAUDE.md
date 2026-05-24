@@ -47,6 +47,13 @@ pre-commit run --all-files
 - **`main`**: Primary branch. All PRs target `main`.
 - **Feature branches**: Branch from `main`, PR back into `main`.
 
+## Work Board Quick Semantics
+
+The authoritative board workflow is in `docs/developer/work-board-contract.md`. In short: `todo/` means accepted but
+parked. When asked to work on a `todo/` card, create or switch to its execution branch, move the card directory to
+`docs/board/doing/<slug>/`, and create/update `checklist.md`. `doing/` is active work; `done/` means shipped, verified,
+design docs synced, and closeout recorded.
+
 ## Git Hooks
 
 Pre-commit hooks reformat code (black, isort) and **strip emoji from staged files** (personal `normalize-text` hook).
@@ -142,12 +149,14 @@ fact_id, orchestration) unless explicitly asked. When in doubt, ask before renam
 ## Guidelines (load into context)
 
 @docs/developer/coding-standards.md @docs/developer/testing-guidelines.md @docs/developer/documentation-guidelines.md
+@docs/developer/work-board-contract.md
 
-## Key Design Documents
+## Key Documents
 
 - `docs/design.md` - Unified design and migration plan (canonical)
 - `docs/design_appendix.md` - Reference details (schemas, config tables)
-- `docs/board/README.md` - Work-board contract for cards, checklists, change log, and implementation notes
+- `docs/developer/work-board-contract.md` - Work-board lane, checklist, and closeout contract
+- `docs/board/README.md` - Board directory guide and dogfood examples
 - `docs/end-user/` - End-user guides (sessions, proxies, hooks, configs)
 
 ## UX Guidelines

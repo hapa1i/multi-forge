@@ -11,12 +11,16 @@ docs in `docs/`, runtime images in `docker/`, and automation scripts in `scripts
 ## Documentation Guide
 
 Use the repo docs as the source of truth for their domains: `README.md` for the overview, `docs/developer/` for setup,
-and `CLAUDE.md` for agent context. `docs/developer/coding-standards.md`, `testing-guidelines.md`, and
-`documentation-guidelines.md` define code style, test policy, and doc maintenance rules. `docs/board/README.md` defines
-the work-board contract for cards, checklists, the change log, implementation notes, and completed work snapshots.
-Update `docs/design.md` and `docs/design_appendix.md` when architecture or file ownership changes. When changing config
+and `CLAUDE.md` for agent context. `docs/developer/coding-standards.md`, `testing-guidelines.md`,
+`documentation-guidelines.md`, and `work-board-contract.md` define code style, test policy, doc writing, and board
+workflow rules. `docs/board/README.md` is a board directory guide with examples, not the authority. Update
+`docs/design.md` and `docs/design_appendix.md` when architecture or file ownership changes. When changing config
 ownership, auth resolution, installer behavior, proxy/session semantics, or workflow prerequisites, also update the
 relevant `docs/end-user/*` guide so wheel-installed users get the right Day 1 path.
+
+Board quick semantics: `todo/` means accepted but parked; starting a todo card means create or switch to the execution
+branch, move the card directory to `doing/`, and create/update its `checklist.md`. `doing/` is active work; `done/`
+means shipped, verified, design docs synced, and closeout recorded.
 
 ## Build, Test, and Development Commands
 
