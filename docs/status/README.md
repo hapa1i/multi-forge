@@ -13,52 +13,52 @@ This directory holds living implementation context for Forge.
 
 ## Handoff Agent Setup
 
+`forge memory enable` and `forge memory track` are **session-scoped mutations** — they write to a session manifest, so
+they need a target session. Pass `--session <name>`, or run them with `$FORGE_SESSION` set / inside an active session.
+The session must already exist; create one first with `forge session start <name> --no-launch` if needed.
+Project/repo-wide *reads* (`forge memory status`, `forge memory shadows`) do not require a session.
+
+These status docs use three different update models:
+
+| Doc             | Update model                           | Setup                                      |
+| --------------- | -------------------------------------- | ------------------------------------------ |
+| `change_log.md` | Handoff agent, direct write at Stop    | `forge memory track ... --as changelog`    |
+| `impl_notes.md` | Handoff agent, shadow proposal at Stop | `forge memory track ... --propose`         |
+| `checklist.md`  | In-session agent, at your direction    | none — the agent edits it as a normal file |
+
 For the first run, use `review-only` to inspect the handoff agent's proposed output before allowing writes:
 
 ```bash
-forge memory enable --review-only
-forge memory track docs/status/change_log.md --as changelog
+forge memory enable --review-only --session <name>
+forge memory track docs/status/change_log.md --as changelog --session <name>
 forge memory track docs/status/impl_notes.md \
-  --propose --shadow .forge/memory/suggested_impl_notes.md
-forge memory list --json
+  --propose --shadow .forge/memory/suggested_impl_notes.md --session <name>
+forge memory list --json --session <name>
 ```
 
-After the first review-only run completes, inspect the agent's proposed output:
+The explicit `--shadow` pins the proposal to `.forge/memory/suggested_impl_notes.md` (the source path referenced in
+`impl_notes.md` and the scoping table below). Without it, the derived path would encode the parent directory
+(`suggested_status_impl_notes.md`). Leave `docs/status/checklist.md` untracked — direct the coding agent to tick items
+and add blockers during the session.
+
+Inspect the proposed output, then switch to augment (write) mode:
 
 ```bash
-forge session handoff show --latest
+forge session handoff show <name> --latest
+forge memory enable --session <name>
 ```
 
-If the report looks good, switch to the normal augment mode:
-
-```bash
-forge memory enable
-```
-
-For established sessions, augment mode is the default:
-
-```bash
-forge memory enable
-forge memory track docs/status/change_log.md --as changelog
-forge memory track docs/status/impl_notes.md \
-  --propose --shadow .forge/memory/suggested_impl_notes.md
-forge memory list --json
-```
-
-`forge memory track` is idempotent. Re-running with different flags updates the existing entry.
-
-Optionally let the handoff agent mark checklist items at Stop time:
-
-```bash
-forge memory track docs/status/checklist.md --as checklist
-```
+`forge memory track` is idempotent — re-running with different flags updates the existing entry.
 
 After a session, review accumulated shadow proposals before promoting to `impl_notes.md`:
 
 ```bash
-forge memory shadows review --for docs/status/impl_notes.md --curate
-forge memory shadows review --for docs/status/impl_notes.md --show-latest
+forge memory shadows review --for docs/status/impl_notes.md --curate --session <name>
+forge memory shadows review --for docs/status/impl_notes.md --show-latest --session <name>
 ```
+
+This configures one session. For the Advanced Workflow below, set it up once on the planner — the `executor` and
+`reviewer` forks inherit tracked docs by default (`--inherit-memory all`), so you do not repeat tracking per session.
 
 ## Advanced Workflow
 

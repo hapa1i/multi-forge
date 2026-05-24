@@ -24,6 +24,13 @@ Documentation standards for Multi-Forge.
 | `docs/status/impl_notes.md` | Human-approved durable memory                | Promote only stable decisions, invariants, recurring bug causes, and operational constraints |
 | `docs/status/archive/`      | Completed proposal + checklist archives      | Store final proposal/checklist snapshots as `<name>/proposal.md` + `<name>/checklist.md`     |
 
+**How these docs are maintained (this repo).** `change_log.md` is tracked for **direct** handoff-agent updates
+(`forge memory track --as changelog`); `impl_notes.md` is tracked as a **shadow proposal**
+(`forge memory track --propose`) that the agent appends to and humans promote; `checklist.md` is **edited in-session**
+by the coding agent at your direction (not handoff-agent-tracked). `forge memory` tracking is session-scoped and
+inherited by forks — see [`docs/status/README.md`](../status/README.md#handoff-agent-setup) for the exact setup,
+including the `--session` requirement.
+
 Checklist files are per milestone/proposal, not permanent catch-all plans. When a checklist is complete, add the final
 change-log entry, promote durable notes, then archive on `main` after the final proposal merge unless the final feature
 PR is explicitly the closeout. Copy final proposal and checklist snapshots to `docs/status/archive/`, then start a fresh
