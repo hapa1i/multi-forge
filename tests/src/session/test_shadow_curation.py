@@ -98,8 +98,8 @@ class TestBuildCurationPrompt:
 
 class TestDocSlug:
     def test_basic_path(self) -> None:
-        slug = _doc_slug("docs/status/impl_notes.md")
-        assert slug.startswith("docs_status_impl_notes-")
+        slug = _doc_slug("docs/board/impl_notes.md")
+        assert slug.startswith("docs_board_impl_notes-")
         assert len(slug.split("-")[-1]) == 6
 
     def test_collision_resistance(self) -> None:

@@ -1,9 +1,9 @@
 # Runtime Abstraction Checklist
 
-Manual multi-session plan for executing `docs/proposals/runtime_abstraction.md`.
+Manual multi-session plan for executing [`card.md`](./card.md).
 
-`docs/status/checklist.md` tracks one active milestone/proposal at a time. After this proposal is fully executed, copy
-final proposal and checklist snapshots to `docs/status/archive/runtime_abstraction/` and start a fresh checklist.
+This card is currently parked in `todo/`. Move the whole `runtime_abstraction/` directory to `docs/board/doing/` when
+its execution branch is created, and to `docs/board/done/` after closeout.
 
 ## Maintenance
 
@@ -11,16 +11,15 @@ final proposal and checklist snapshots to `docs/status/archive/runtime_abstracti
 - Keep tasks high-level, with concrete assertions that prove completion.
 - Tick a task only when the assertion is satisfied and verification is recorded.
 - Add short blocker notes inline under the relevant phase.
-- Move completed-session details to `docs/status/change_log.md`; keep only active plan state here.
-- Promote durable lessons to `docs/status/impl_notes.md` after human review.
+- Move completed-session details to `docs/board/change_log.md`; keep only active plan state here.
+- Promote durable lessons to `docs/board/impl_notes.md` after human review.
 - Update design docs per-phase as code ships (design docs are normative, not aspirational).
-- Archive final proposal and checklist snapshots under `docs/status/archive/<name>/` after the proposal is fully
-  executed.
-- Check size periodically while a proposal is active:
+- Move the card directory to `docs/board/done/<slug>/` after the card is fully executed.
+- Check size periodically while a card is active:
 
 ```bash
-wc -l docs/status/checklist.md
-./scripts/count-tokens.py --model <agent-model> docs/status/checklist.md
+wc -l docs/board/todo/runtime_abstraction/checklist.md
+./scripts/count-tokens.py --model <agent-model> docs/board/todo/runtime_abstraction/checklist.md
 ```
 
 ## Current Focus
@@ -158,8 +157,8 @@ Phase 0 gaps carried forward:
 
 ## Open Decisions
 
-Tracks Forge-local execution decisions for this checklist. For broader proposal questions, see
-[`docs/proposals/runtime_abstraction.md` Open Questions](../proposals/runtime_abstraction.md#open-questions).
+Tracks Forge-local execution decisions for this checklist. For broader card questions, see
+[`card.md` Open Questions](./card.md#open-questions).
 
 - [ ] Should `forge session resume --review` become default for curated handoff workflows?
 - [ ] Should the resume-context command surface be `forge session context ...` instead of overloading

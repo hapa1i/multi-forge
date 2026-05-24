@@ -14,8 +14,8 @@ the notes that are worth carrying forward.
 - Check size periodically and prune stale notes before appending:
 
 ```bash
-wc -l docs/status/impl_notes.md
-./scripts/count-tokens.py --model <agent-model> docs/status/impl_notes.md
+wc -l docs/board/impl_notes.md
+./scripts/count-tokens.py --model <agent-model> docs/board/impl_notes.md
 ```
 
 ## What Belongs Here
@@ -32,7 +32,7 @@ wc -l docs/status/impl_notes.md
 - Pending tasks or phase plans.
 - Detailed command output.
 - Unverified hunches.
-- Duplicates of `docs/status/change_log.md`.
+- Duplicates of `docs/board/change_log.md`.
 
 ## Notes
 
@@ -49,8 +49,8 @@ The `forge memory` CLI (PR #1) replaced `forge session memory`. Key architecture
   -> handoff agent reads passports, filters by writer access, builds prompt, calls `run_claude_session()`. Detached
   failures are not retried.
 - **Shadow path encoding**: `derive_shadow_path()` encodes the immediate parent directory to avoid collisions
-  (`docs/status/notes.md` -> `.forge/memory/suggested_status_notes.md`). `check_shadow_path_collision()` catches
-  remaining edge cases.
+  (`docs/board/notes.md` -> `.forge/memory/suggested_board_notes.md`). `check_shadow_path_collision()` catches remaining
+  edge cases.
 - **Memory inheritance on fork**: `--inherit-memory all|none|shadowed`. Default `all` preserves existing behavior.
   Override-loss bug fixed: docs tracked via `forge memory track` (stored in overrides) were silently lost on fork
   because only `intent.memory` was deep-copied.

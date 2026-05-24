@@ -689,7 +689,7 @@ class TestResolveWithOverrides:
 
 class TestDeriveShadowPath:
     def test_basic_with_parent_prefix(self) -> None:
-        assert derive_shadow_path("docs/status/impl_notes.md") == ".forge/memory/suggested_status_impl_notes.md"
+        assert derive_shadow_path("docs/board/impl_notes.md") == ".forge/memory/suggested_board_impl_notes.md"
 
     def test_top_level_file_no_prefix(self) -> None:
         assert derive_shadow_path("README.md") == ".forge/memory/suggested_README.md"
@@ -713,14 +713,14 @@ class TestShadowPathCollision:
     def test_same_official_retrack_safe(self) -> None:
         existing = [
             DesignatedDoc(
-                path=".forge/memory/suggested_status_notes.md",
+                path=".forge/memory/suggested_board_notes.md",
                 strategy="suggested",
-                shadows="docs/status/notes.md",
+                shadows="docs/board/notes.md",
             ),
         ]
         result = check_shadow_path_collision(
-            ".forge/memory/suggested_status_notes.md",
-            "docs/status/notes.md",
+            ".forge/memory/suggested_board_notes.md",
+            "docs/board/notes.md",
             existing,
         )
         assert result is None
@@ -728,19 +728,19 @@ class TestShadowPathCollision:
     def test_derived_collision_different_officials(self) -> None:
         existing = [
             DesignatedDoc(
-                path=".forge/memory/suggested_status_notes.md",
+                path=".forge/memory/suggested_board_notes.md",
                 strategy="suggested",
-                shadows="a/status/notes.md",
+                shadows="a/board/notes.md",
             ),
         ]
         result = check_shadow_path_collision(
-            ".forge/memory/suggested_status_notes.md",
-            "b/status/notes.md",
+            ".forge/memory/suggested_board_notes.md",
+            "b/board/notes.md",
             existing,
         )
         assert result is not None
         assert "--shadow" in result
-        assert "a/status/notes.md" in result
+        assert "a/board/notes.md" in result
 
     def test_explicit_shadow_collision(self) -> None:
         existing = [

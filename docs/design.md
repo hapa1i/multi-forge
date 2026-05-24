@@ -1224,7 +1224,7 @@ checker → reviewer stages. The tagger is called once per event and its tags ro
 avoiding redundant classification.
 
 **Team extension**: The same library works for team hooks (`TeammateIdle`, `TaskCompleted`) by subscribing to different
-events. See [team_design.md](proposals/team_orchestration.md) §3.
+events. See [team_design.md](board/proposed/team_orchestration/card.md) §3.
 
 #### 4.1.3 Verification Policy (Feedback Loop)
 

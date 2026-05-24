@@ -1,6 +1,6 @@
 # Memory Enhancement
 
-Status: proposal, prerequisite candidate for runtime-abstraction dogfooding
+Status: done; historical card for the shipped memory enhancement
 
 ## Summary
 
@@ -10,9 +10,9 @@ Today, designated memory docs are configured per session under `intent.memory`. 
 project-level memory behavior hard to discover, audit, inherit, and review. The next iteration should make each memory
 doc carry its own contract in frontmatter, then let sessions resolve that contract into runtime execution state.
 
-This proposal is intentionally write-side first. The goal is to make memory updates, shadows, inheritance, and
-visibility usable enough to dogfood during runtime abstraction before Forge starts automatically feeding memory back
-into agent context.
+This card is intentionally write-side first. The goal is to make memory updates, shadows, inheritance, and visibility
+usable enough to dogfood during runtime abstraction before Forge starts automatically feeding memory back into agent
+context.
 
 ## Design Thesis
 
@@ -95,7 +95,7 @@ Manual edits remain allowed because the passport lives in a Markdown doc, but CL
 path:
 
 ```bash
-forge memory track docs/status/change_log.md \
+forge memory track docs/board/change_log.md \
   --intent "Compact completed-work record for implementation sessions" \
   --as changelog \
   --session planner
@@ -152,11 +152,11 @@ execute old behavior.
 
 ```bash
 forge memory enable --session planner
-forge memory track docs/status/change_log.md --as changelog --session planner
-forge memory track docs/status/impl_notes.md --propose --session planner
+forge memory track docs/board/change_log.md --as changelog --session planner
+forge memory track docs/board/impl_notes.md --propose --session planner
 forge memory list --session planner
 forge memory status --scope repo
-forge memory status --doc docs/status/impl_notes.md
+forge memory status --doc docs/board/impl_notes.md
 ```
 
 `forge memory` should default to project/repo context for visibility. Commands that mutate one session should require
@@ -183,7 +183,7 @@ Goal-oriented doc commands should also activate memory when needed. If a user ru
 
 ```text
 Enabled memory auto-update for session planner (mode=augment).
-Tracking docs/status/change_log.md as changelog.
+Tracking docs/board/change_log.md as changelog.
 ```
 
 ### Track, Untrack, And List
@@ -192,9 +192,9 @@ Use `track` / `untrack` as the primary verbs. This matches the user's mental mod
 handoff agent, much like Git tracks files for version control.
 
 ```bash
-forge memory track docs/status/change_log.md --as changelog --session planner
-forge memory track docs/status/impl_notes.md --propose --session planner
-forge memory untrack docs/status/change_log.md --session planner
+forge memory track docs/board/change_log.md --as changelog --session planner
+forge memory track docs/board/impl_notes.md --propose --session planner
+forge memory untrack docs/board/change_log.md --session planner
 forge memory list --session planner
 ```
 
@@ -205,7 +205,7 @@ suggestions there, and leaves the official doc human-approved.
 Default shadow path:
 
 ```text
-docs/status/impl_notes.md -> .forge/memory/suggested_impl_notes.md
+docs/board/impl_notes.md -> .forge/memory/suggested_impl_notes.md
 ```
 
 Users may override the derived shadow path with `--shadow <path>`, but they should not need to think about shadow paths
@@ -242,7 +242,7 @@ Add project/repo scoped visibility for direct updates and shadow proposals:
 forge memory status --scope project
 forge memory status --scope repo
 forge memory status --scope all
-forge memory status --doc docs/status/impl_notes.md
+forge memory status --doc docs/board/impl_notes.md
 ```
 
 Scope nomenclature mirrors `docs/design.md` §3's project identity hierarchy: `project` = current `forge_root` (the
@@ -263,12 +263,12 @@ The status table should distinguish:
 For Forge-owned local scratch paths, `track --propose` should create missing shadow docs automatically:
 
 ```bash
-forge memory track docs/status/impl_notes.md --propose --session planner
+forge memory track docs/board/impl_notes.md --propose --session planner
 ```
 
 This should derive `.forge/memory/suggested_impl_notes.md`, create `.forge/memory/`, and create the empty shadow doc
 when the path is under `.forge/memory/`. Keep the current no-file-creation rule for tracked official docs such as
-`docs/status/change_log.md` and `docs/status/impl_notes.md`.
+`docs/board/change_log.md` and `docs/board/impl_notes.md`.
 
 ### Shadow Accumulation And Review Visibility
 
@@ -276,7 +276,7 @@ Users need a first-class way to inspect what has accumulated in shadow docs:
 
 ```bash
 forge memory shadows list
-forge memory shadows show --for docs/status/impl_notes.md
+forge memory shadows show --for docs/board/impl_notes.md
 forge memory shadows show --scope repo
 ```
 
@@ -293,7 +293,7 @@ the read path that turns noisy proposals into a compact promotion surface.
 Raw shadow files are good append targets but poor human review surfaces. Add a read-only curated review path:
 
 ```bash
-forge memory shadows review --for docs/status/impl_notes.md --curate
+forge memory shadows review --for docs/board/impl_notes.md --curate
 forge memory shadows review --scope repo --curate
 ```
 

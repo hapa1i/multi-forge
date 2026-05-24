@@ -177,11 +177,12 @@ Run `forge <command> --help` for details on any command.
 
 ## Documentation
 
-| Audience         | Location                           | Contents                                          |
-| ---------------- | ---------------------------------- | ------------------------------------------------- |
-| **Users**        | [docs/end-user/](docs/end-user/)   | Tour, guides for sessions, proxies, policies, ... |
-| **Developers**   | [docs/developer/](docs/developer/) | Setup, coding standards, testing guidelines       |
-| **Architecture** | [docs/design.md](docs/design.md)   | System narrative, data flow, invariants           |
+| Audience         | Location                           | Contents                                             |
+| ---------------- | ---------------------------------- | ---------------------------------------------------- |
+| **Users**        | [docs/end-user/](docs/end-user/)   | Tour, guides for sessions, proxies, policies, ...    |
+| **Developers**   | [docs/developer/](docs/developer/) | Setup, coding standards, testing guidelines          |
+| **Architecture** | [docs/design.md](docs/design.md)   | System narrative, data flow, invariants              |
+| **Work Board**   | [docs/board/](docs/board/)         | Cards, checklists, change log, implementation memory |
 
 ## Contributing
 

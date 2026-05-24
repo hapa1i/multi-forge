@@ -5,7 +5,7 @@ Completed-work record for Forge implementation sessions.
 ## Maintenance
 
 - Updated by the handoff agent with `strategy=changelog`, and by humans when closing a phase.
-- Add compact entries for completed work only. Pending tasks belong in `docs/status/checklist.md`.
+- Add compact entries for completed work only. Pending tasks belong in card checklists.
 - Follow `docs/developer/documentation-guidelines.md`: each entry needs Goal, Key changes, and Verification.
 - Keep entries short. Do not list every file unless the file list is the point of the work.
 - Use newest-first order so active work stays near the top.
@@ -15,8 +15,8 @@ Completed-work record for Forge implementation sessions.
 - Check size before long sessions or when the file feels slow to scan:
 
 ```bash
-wc -l docs/status/change_log.md
-./scripts/count-tokens.py --model <agent-model> docs/status/change_log.md
+wc -l docs/board/change_log.md
+./scripts/count-tokens.py --model <agent-model> docs/board/change_log.md
 ```
 
 ## Entries
@@ -34,8 +34,7 @@ establish the proposal lifecycle pattern, and prepare for runtime-abstraction.
 
 **Key changes**:
 
-- Archived final memory enhancement proposal and checklist snapshots to
-  `docs/status/archive/memory_enhancement/{proposal,checklist}.md`.
+- Archived final memory enhancement card and checklist snapshots to `docs/board/done/memory_enhancement/`.
 - Updated `docs/design.md` section 5.6: replaced old `DesignatedDoc` model with passport-authoritative ownership, added
   sections for passport frontmatter (5.6.2), shadow curation (5.6.3), and memory inheritance (5.6.4). Added
   `forge memory shadows review` to command table.
@@ -43,14 +42,14 @@ establish the proposal lifecycle pattern, and prepare for runtime-abstraction.
   passport frontmatter and `forge memory` setup guidance.
 - Pruned `impl_notes.md`: replaced Phase 0 pre-migration system map (100+ lines) with compact shipped-architecture
   summary preserving durable decisions.
-- Established proposal lifecycle in `docs/developer/documentation-guidelines.md`: propose -> checklist -> implement
-  (with per-phase design-doc updates) -> archive proposal + checklist. Design docs are normative (track shipped code),
-  not aspirational. Updated archive format to folders with both proposal and checklist.
-- Updated `docs/status/README.md`: archive format, curation workflow, design-doc verification step in lifecycle.
-- Installed runtime-abstraction checklist as active `docs/status/checklist.md` with per-phase design-doc update rule.
+- Established card lifecycle in `docs/developer/documentation-guidelines.md`: propose -> todo -> doing -> done (with
+  per-phase design-doc updates). Design docs are normative (track shipped code), not aspirational.
+- Updated `docs/board/README.md`: board lanes, curation workflow, design-doc verification step in lifecycle.
+- Installed runtime-abstraction checklist under `docs/board/todo/runtime_abstraction/checklist.md` with per-phase
+  design-doc update rule.
 
-**Verification**: archived proposal+checklist at `docs/status/archive/memory_enhancement/`; design.md sections 5.6.2-5
-and `docs/end-user/handoff.md` reflect passport model; active checklist tracks runtime-abstraction phases 0-6.
+**Verification**: archived card+checklist at `docs/board/done/memory_enhancement/`; design.md sections 5.6.2-5 and
+`docs/end-user/handoff.md` reflect passport model; active checklist tracks runtime-abstraction phases 0-6.
 
 ## 2026-05-23
 
@@ -144,6 +143,6 @@ references, and helper reuse decisions before any code changes.
   old-model `designated_docs[]` references.
 - Decided 8 helpers + 2 patterns reuse privately behind new `forge memory` CLI; VALID_STRATEGIES moves to shared
   location in Phase 1; old commands become a non-executing tombstone diagnostic path.
-- Recorded all maps and decisions in `docs/status/impl_notes.md`.
+- Recorded all maps and decisions in `docs/board/impl_notes.md`.
 
 **Verification**: All six Phase 0 checklist tasks checked with verification notes.

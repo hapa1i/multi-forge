@@ -1,9 +1,8 @@
 # Memory Enhancement Checklist
 
-Archived multi-session plan for executing `docs/proposals/memory_enhancement.md`.
+Archived multi-session plan for executing [`card.md`](./card.md).
 
-This archived snapshot is paired with `proposal.md` in the same directory. `docs/status/checklist.md` now tracks the
-next active proposal.
+This completed snapshot is paired with `card.md` in the same directory.
 
 ## Maintenance
 
@@ -11,15 +10,14 @@ next active proposal.
 - Keep tasks high-level, with concrete assertions that prove completion.
 - Tick a task only when the assertion is satisfied and verification is recorded.
 - Add short blocker notes inline under the relevant phase.
-- Move completed-session details to `docs/status/change_log.md`; keep only active plan state here.
-- Promote durable lessons to `docs/status/impl_notes.md` after human review.
-- Archive final proposal and checklist snapshots under `docs/status/archive/<name>/` after the proposal or milestone is
-  fully executed.
-- Check size periodically while a proposal is active:
+- Move completed-session details to `docs/board/change_log.md`; keep only active plan state here.
+- Promote durable lessons to `docs/board/impl_notes.md` after human review.
+- Move the card directory to `docs/board/done/<slug>/` after the card or milestone is fully executed.
+- Check size periodically while a card is active:
 
 ```bash
-wc -l docs/status/checklist.md
-./scripts/count-tokens.py --model <agent-model> docs/status/checklist.md
+wc -l docs/board/done/memory_enhancement/checklist.md
+./scripts/count-tokens.py --model <agent-model> docs/board/done/memory_enhancement/checklist.md
 ```
 
 ## Current Focus
@@ -52,13 +50,13 @@ the authoritative contract and session manifests only as resolved participation 
   - Verification: show command (session_handoff.py), review_dir(), report listing (\_list_reports), artifact path
     pattern, and test_session_handoff_show.py mapped separately from update-side agent in impl_notes.md.
 - [x] Inventory old memory UX references.
-  - Assertion: docs, tests, skills, command help, README snippets, and status-doc setup examples that mention
-    `forge session memory` are listed with a keep/update/remove decision. Include, at minimum, `docs/status/README.md`,
+  - Assertion: docs, tests, skills, command help, README snippets, and board setup examples that mention
+    `forge session memory` are listed with a keep/update/remove decision. Include, at minimum, `docs/board/README.md`,
     `docs/design.md`, `docs/end-user/handoff.md`, `tests/integration/cli/`, `tests/src/cli/test_session_memory.py`,
     `src/skills/qa/resources/checklist/`, and `src/skills/walkthrough/resources/checklist.md`.
   - Verification: 8 UPDATE (including old-model YAML config in handoff.md, design_appendix.md G.2, and design.md
     DesignatedDoc schema), 2 REMOVE, 5 KEEP -- full inventory with line numbers in impl_notes.md. Includes
-    test_session_handoff_show.py (KEEP) and proposals/memory_enhancement.md (KEEP).
+    test_session_handoff_show.py (KEEP) and this card (KEEP).
 - [x] Decide which existing helpers stay private.
   - Assertion: reusable storage, validation, and handoff helpers are named, and public compatibility aliases are
     explicitly excluded.
@@ -180,7 +178,7 @@ the authoritative contract and session manifests only as resolved participation 
   - Assertion: proposal tracking derives `.forge/memory/suggested_<basename>.md` by default, implies `suggested`
     strategy when compatible, and supports explicit `--shadow <path>` overrides.
   - Verification: `--propose` and `--shadow` flags on `forge memory track`. `derive_shadow_path()` encodes parent
-    directory for disambiguation (e.g., `docs/status/notes.md` -> `.forge/memory/suggested_status_notes.md`).
+    directory for disambiguation (e.g., `docs/board/notes.md` -> `.forge/memory/suggested_board_notes.md`).
     `resolve_with_overrides()` extended with `shadow_path` parameter. Direct-to-shadow conversion with 3-key upsert.
 - [x] Auto-create Forge-owned shadow docs.
   - Assertion: missing shadow files under `.forge/memory/` are created with parent directories; missing official docs
@@ -257,8 +255,8 @@ passport override handling in the same slice.
   - Verification: `test_review_curate_requires_session`, `test_review_scope_all_curate_rejected`,
     `test_review_show_latest_requires_session`, `test_review_show_latest_rejects_scope_repo`.
 - [x] Keep official durable docs human-approved.
-  - Assertion: curation may produce a patch or promotion checklist, but never mutates `docs/status/impl_notes.md`
-    without explicit user approval.
+  - Assertion: curation may produce a patch or promotion checklist, but never mutates `docs/board/impl_notes.md` without
+    explicit user approval.
   - Verification: The Python orchestration never writes official docs (no file-write calls in `_review_curate()` or
     `run_shadow_curation()`). `test_review_curate_does_not_mutate_official` verifies this for the orchestration layer.
     The curation subprocess (`claude -p`) runs with write-capable tools but is instructed read-only via the prompt. Same
@@ -277,7 +275,7 @@ passport override handling in the same slice.
     and malformed-passport cases.
   - Verification: 6 tests in `TestPassportShow`, including no-passport JSON output. All pass.
 - [x] Update user and developer docs for the new memory model.
-  - Assertion: Phase 0's old-UX inventory has been applied. `docs/status/README.md`, `docs/end-user/handoff.md`,
+  - Assertion: Phase 0's old-UX inventory has been applied. `docs/board/README.md`, `docs/end-user/handoff.md`,
     walkthrough checklist, and QA checklist no longer teach `forge session memory`; they explain `forge memory`,
     passports, shadows, and idempotent `track`. `forge session set memory.auto_update.*` migrated to
     `forge memory enable`.
@@ -291,29 +289,29 @@ passport override handling in the same slice.
     through real `claude -p`, with narrow assertions and no official-doc mutation.
   - Verification: `test_real_claude_memory.py` added; collect-only and Ruff pass. Full execution requires Docker plus
     `ANTHROPIC_API_KEY`.
-- [x] Dogfood on the active status docs.
-  - Assertion: this branch uses `forge memory` to track `docs/status/change_log.md` directly and
-    `docs/status/impl_notes.md` through shadow proposals, with the first review-only report inspected before augment.
-  - Closeout verification: `docs/status/README.md` now documents the dogfood setup, review-only first run, shadow
-    curation workflow, and status-doc scoping used by runtime-abstraction sessions.
+- [x] Dogfood on the active board docs.
+  - Assertion: this branch uses `forge memory` to track `docs/board/change_log.md` directly and
+    `docs/board/impl_notes.md` through shadow proposals, with the first review-only report inspected before augment.
+  - Closeout verification: `docs/board/README.md` now documents the dogfood setup, review-only first run, shadow
+    curation workflow, and board scoping used by runtime-abstraction sessions.
 - [x] Record the outcome before returning to runtime abstraction.
-  - Assertion: `docs/status/change_log.md` has a compact final entry, durable lessons are promoted to
-    `docs/status/impl_notes.md`, and the runtime-abstraction branch can resume with the preserved checklist.
-  - Verification: final closeout entry recorded in `docs/status/change_log.md`; durable memory compacted in
-    `docs/status/impl_notes.md`; active checklist replaced with runtime-abstraction phases 0-6.
+  - Assertion: `docs/board/change_log.md` has a compact final entry, durable lessons are promoted to
+    `docs/board/impl_notes.md`, and the runtime-abstraction branch can resume with the preserved checklist.
+  - Verification: final closeout entry recorded in `docs/board/change_log.md`; durable memory compacted in
+    `docs/board/impl_notes.md`; active checklist replaced with runtime-abstraction phases 0-6.
 
 ## Open Decisions
 
-Tracks Forge-local execution decisions for this checklist. For proposal-level context, see archived `proposal.md` in
-this directory.
+Tracks Forge-local execution decisions for this checklist. For card-level context, see archived `card.md` in this
+directory.
 
 - [x] Should curation ship in the first memory PR, or should it become a follow-up after `track`/`status`/inheritance
   are dogfooded?
   - **Decision**: Ship with the first memory PR. Phase 5 is part of the same branch.
 - [x] Should the default shadow-path disambiguation encode parent directories or require explicit `--shadow` on
   collision?
-  - **Decision**: Encode the immediate parent directory in the shadow filename (e.g., `docs/status/notes.md` ->
-    `.forge/memory/suggested_status_notes.md`). Implemented in `derive_shadow_path()`. Collision checking via
+  - **Decision**: Encode the immediate parent directory in the shadow filename (e.g., `docs/board/notes.md` ->
+    `.forge/memory/suggested_board_notes.md`). Implemented in `derive_shadow_path()`. Collision checking via
     `check_shadow_path_collision()` catches remaining edge cases.
 - [x] Should `forge memory passport show|set` land with the first CLI surface, or wait until users hit advanced-edit
   needs?
