@@ -12,29 +12,30 @@ Documentation standards for Multi-Forge.
 - **Change logs** - Completed work record
 - **Evaluation results** - Update after evals/tests
 
-### Status Docs (`docs/status/`)
+### Work Board (`docs/board/`)
 
-`docs/status/` is the living implementation-memory surface for active multi-session work. See
-[`docs/status/README.md`](../status/README.md) for the current repo-specific contract.
+`docs/board/` is the living implementation-memory surface for multi-session work. See
+[`docs/board/README.md`](../board/README.md) for the current repo-specific contract.
 
-| File                        | Purpose                                      | Maintenance rule                                                                             |
-| --------------------------- | -------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `docs/status/checklist.md`  | One active milestone/proposal execution plan | Update during sessions; archive when the proposal is fully executed                          |
-| `docs/status/change_log.md` | Completed-work record                        | Keep compact; newest first; compact old tail entries before the file grows too large         |
-| `docs/status/impl_notes.md` | Human-approved durable memory                | Promote only stable decisions, invariants, recurring bug causes, and operational constraints |
-| `docs/status/archive/`      | Completed proposal + checklist archives      | Store final proposal/checklist snapshots as `<name>/proposal.md` + `<name>/checklist.md`     |
+| Path                                 | Purpose                                               | Maintenance rule                                                                             |
+| ------------------------------------ | ----------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `docs/board/proposed/<slug>/card.md` | Idea or design sketch not yet scheduled               | Move to `todo/` when accepted for execution                                                  |
+| `docs/board/todo/<slug>/card.md`     | Accepted work parked until an execution branch exists | Move to `doing/` when the branch is created                                                  |
+| `docs/board/doing/<slug>/card.md`    | Work currently in flight                              | Add/update `checklist.md` during implementation                                              |
+| `docs/board/done/<slug>/card.md`     | Completed work snapshot                               | Keep paired `checklist.md` when one existed                                                  |
+| `docs/board/change_log.md`           | Completed-work record                                 | Keep compact; newest first; compact old tail entries before the file grows too large         |
+| `docs/board/impl_notes.md`           | Human-approved durable memory                         | Promote only stable decisions, invariants, recurring bug causes, and operational constraints |
 
 **How these docs are maintained (this repo).** `change_log.md` is tracked for **direct** handoff-agent updates
 (`forge memory track --as changelog`); `impl_notes.md` is tracked as a **shadow proposal**
-(`forge memory track --propose`) that the agent appends to and humans promote; `checklist.md` is **edited in-session**
-by the coding agent at your direction (not handoff-agent-tracked). `forge memory` tracking is session-scoped and
-inherited by forks — see [`docs/status/README.md`](../status/README.md#handoff-agent-setup) for the exact setup,
-including the `--session` requirement.
+(`forge memory track --propose`) that the agent appends to and humans promote; card `checklist.md` files are **edited
+in-session** by the coding agent at your direction (not handoff-agent-tracked). `forge memory` tracking is
+session-scoped and inherited by forks in the current implementation — see
+[`docs/board/README.md`](../board/README.md#handoff-agent-setup) for the exact setup, including the `--session`
+requirement.
 
-Checklist files are per milestone/proposal, not permanent catch-all plans. When a checklist is complete, add the final
-change-log entry, promote durable notes, then archive on `main` after the final proposal merge unless the final feature
-PR is explicitly the closeout. Copy final proposal and checklist snapshots to `docs/status/archive/`, then start a fresh
-active checklist.
+Checklist files are per card, not permanent catch-all plans. When a card is complete, add the final change-log entry,
+promote durable notes, verify design docs, then move the card directory from `doing/<slug>/` to `done/<slug>/`.
 
 ### Coding Context Documents
 
@@ -44,46 +45,46 @@ active checklist.
   - **Maintenance Rule**: Update FIRST on refactors/moves
   - Must stay accurate; it's future-session context
 
-### Proposals (`docs/proposals/`)
+### Board Cards
 
-- Forward-looking design sketches for features not yet implemented or scheduled
-- May reference aspirational architecture, upstream capabilities, or research prototypes
-- No update cadence — refresh when the topic becomes active work
-- When a proposal becomes active, it drives a checklist; when execution completes, both are archived together
+- `card.md` files are forward-looking design sketches, accepted work items, active execution context, or completed
+  snapshots depending on their board lane.
+- Cards may reference aspirational architecture, upstream capabilities, or research prototypes.
+- Add `checklist.md` when a card needs an execution plan.
+- Move cards between lanes instead of copying proposal/checklist snapshots.
 
-### Proposal Lifecycle
+### Card Lifecycle
 
-Proposals drive the implementation cycle. The full lifecycle:
+Board cards drive the implementation cycle. The full lifecycle:
 
 ```text
-1. Propose  — write docs/proposals/<name>.md (aspirational design)
-2. Activate — create docs/status/checklist.md from the proposal
-3. Execute  — implement per-phase; update design docs per-phase as code ships
-4. Archive  — copy final proposal + checklist snapshots to docs/status/archive/<name>/
+1. Propose  — write docs/board/proposed/<slug>/card.md
+2. Schedule — move the card to docs/board/todo/<slug>/
+3. Execute  — move the card to docs/board/doing/<slug>/ when the branch exists; update checklist/design docs as code
+             ships
+4. Complete — move the card to docs/board/done/<slug>/ after verification and closeout
 ```
 
-**Design doc updates during execution.** Proposals are aspirational; design docs are normative (describe shipped code).
-During proposal execution, each checklist phase that changes normative architecture should include a design-doc update
-task. Design docs should reflect what's built, not the proposal's target state. A mid-proposal design doc may describe a
-hybrid state (old + new) — that's accurate and preferred over aspirational docs describing unbuilt features.
+**Design doc updates during execution.** Cards can be aspirational; design docs are normative (describe shipped code).
+During card execution, each checklist phase that changes normative architecture should include a design-doc update task.
+Design docs should reflect what's built, not the card's target state. A mid-card design doc may describe a hybrid state
+(old + new) — that's accurate and preferred over aspirational docs describing unbuilt features.
 
-**Archival.** When a proposal is fully executed, archive both the proposal and its checklist together under
-`docs/status/archive/<name>/` (with `proposal.md` and `checklist.md`). The source proposal may remain in
-`docs/proposals/` for discoverability, but the archived copy freezes the completed proposal state. After archival,
-design docs are the normative source; the archived proposal is historical context.
+**Completion.** When a card is fully executed, move the whole card directory to `docs/board/done/<slug>/`. After
+completion, design docs are the normative source; the done card is historical context.
 
 ### Design Documents (normative architecture)
 
 - Describe **shipped system** (what's built and how it works)
-- Must stay accurate — updated per-phase during proposal execution, not after
-- When a proposal changes architecture, the relevant design doc sections are updated as each phase ships
+- Must stay accurate — updated per-phase during card execution, not after
+- When a card changes architecture, the relevant design doc sections are updated as each phase ships
 - If design docs fall behind shipped code, track the gap as explicit checklist debt
 
 ---
 
 ## Documentation Rules
 
-**Rule 1**: Proposals = aspirational design; checklist = active execution plan; change log = completed work;
+**Rule 1**: Cards = work-item design/context; checklist = active execution plan; change log = completed work;
 implementation notes = human-approved durable memory; design docs = normative shipped architecture; AutoMem = evolving
 state
 
@@ -101,15 +102,16 @@ state
 
 ## Where to Document What
 
-| What                          | Where                         | When to Update                                           |
-| ----------------------------- | ----------------------------- | -------------------------------------------------------- |
-| Aspirational design           | `docs/proposals/`             | Refresh when topic becomes active; archive when complete |
-| Active execution plan         | `docs/status/checklist.md`    | During active milestone/proposal work                    |
-| Completed work                | `docs/status/change_log.md`   | At session/phase closeout                                |
-| Durable implementation memory | `docs/status/impl_notes.md`   | After human review                                       |
-| Normative architecture        | Design docs                   | Per-phase as code ships during proposal execution        |
-| Archived proposals+checklists | `docs/status/archive/<name>/` | After proposal is fully executed                         |
-| Current metrics               | AutoMem                       | On evolving facts                                        |
+| What                          | Where                                  | When to Update                                 |
+| ----------------------------- | -------------------------------------- | ---------------------------------------------- |
+| Aspirational design           | `docs/board/proposed/<slug>/card.md`   | Refresh when topic becomes active or scheduled |
+| Accepted/scheduled work       | `docs/board/todo/<slug>/card.md`       | Move to `doing/` when execution branch exists  |
+| Active execution plan         | `docs/board/doing/<slug>/checklist.md` | During active card work                        |
+| Completed work                | `docs/board/change_log.md`             | At session/phase closeout                      |
+| Durable implementation memory | `docs/board/impl_notes.md`             | After human review                             |
+| Normative architecture        | Design docs                            | Per-phase as code ships during card execution  |
+| Completed card snapshots      | `docs/board/done/<slug>/`              | After card is fully executed                   |
+| Current metrics               | AutoMem                                | On evolving facts                              |
 
 ---
 
@@ -141,11 +143,10 @@ Each phase SHOULD define acceptance criteria:
 
 ### Checklist Lifecycle
 
-1. **Start**: Create checklist from proposal with `[ ]` + acceptance test tables
+1. **Start**: Move the card to `doing/` and create a checklist with `[ ]` + acceptance test tables
 2. **During**: Update checkboxes; note blockers; update design docs per-phase as code ships
 3. **Complete**: Move completed-work details to `change_log`; promote durable memory to `impl_notes`; verify design docs
-   reflect all shipped changes; archive both proposal and checklist under `docs/status/archive/<name>/` after the final
-   merge to `main`; create the next active checklist
+   reflect all shipped changes; move the card directory to `docs/board/done/<slug>/` after the final merge to `main`
 
 ---
 
@@ -265,13 +266,13 @@ Agents: ~25k tokens; Read truncates >2k lines. Keep docs under these limits; use
 Run token/line checks before living docs become hard to load:
 
 ```bash
-wc -l docs/status/*.md
-./scripts/count-tokens.py --model <agent-model> docs/status/change_log.md
+wc -l docs/board/*.md
+./scripts/count-tokens.py --model <agent-model> docs/board/change_log.md
 ```
 
-For `docs/status/change_log.md`, compact the oldest tail entries first. Preserve dates, goals, decisions, verification,
+For `docs/board/change_log.md`, compact the oldest tail entries first. Preserve dates, goals, decisions, verification,
 and deferred items; remove verbose blow-by-blow details. If compaction is still not enough, move old detailed sections
 to an archive file and leave a dated summary in the active change log.
 
-For `docs/status/impl_notes.md`, prune obsolete or duplicated notes instead of appending forever. If a note is not
-useful for a future session's decisions, it probably belongs in the change log or nowhere.
+For `docs/board/impl_notes.md`, prune obsolete or duplicated notes instead of appending forever. If a note is not useful
+for a future session's decisions, it probably belongs in the change log or nowhere.

@@ -181,7 +181,7 @@ def derive_shadow_path(official_path: str) -> str:
     """Derive a default shadow file path for an official doc.
 
     Encodes the immediate parent directory to reduce collisions:
-    ``docs/status/notes.md`` -> ``.forge/memory/suggested_status_notes.md``.
+    ``docs/board/notes.md`` -> ``.forge/memory/suggested_board_notes.md``.
     Top-level files omit the parent prefix.
     """
     p = Path(official_path)

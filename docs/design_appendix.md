@@ -725,10 +725,11 @@ forge_memory:
 **CLI setup** (equivalent to the passport above):
 
 ```bash
-forge memory enable --review-only
-forge memory track docs/status/change_log.md --as changelog
-forge memory track docs/status/impl_notes.md --propose
-forge memory list --json
+forge memory enable --review-only --session planner
+forge memory track docs/board/change_log.md --as changelog --session planner
+forge memory track docs/board/impl_notes.md \
+  --propose --shadow .forge/memory/suggested_impl_notes.md --session planner
+forge memory list --json --session planner
 ```
 
 `forge memory track` is idempotent. Re-running with different flags updates the existing entry and rewrites the
@@ -737,11 +738,12 @@ passport. All docs are processed in one `claude -p` call with per-doc strategy i
 ### G.3 Worktree resolution (extends §5.6.5)
 
 Managed sessions always launch from `forge_root`. The handoff agent resolves designated doc paths relative to
-`forge_root`, so git-tracked docs (e.g., `docs/checklist.md`) target the correct branch when working in a worktree.
+`forge_root`, so git-tracked docs (for example, a card checklist under `docs/board/doing/<slug>/checklist.md`) target
+the correct branch when working in a worktree.
 
 Trackedness is controlled by path choice; the agent doesn't distinguish:
 
-- `docs/checklist.md` -> git-tracked, branch-specific (moves with the branch)
+- `docs/board/doing/<slug>/checklist.md` -> git-tracked, branch-specific (moves with the branch)
 - `.forge/memory/debugging.md` -> untracked, per-Forge-project (`.forge/` is in `.gitignore`)
 - `docs/suggested/coding_standards.md` -> git-tracked shadow doc (visible in PRs if desired)
 

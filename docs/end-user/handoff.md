@@ -43,8 +43,8 @@ signal-to-noise than incremental note-taking during a session.
 The agent edits tracked docs in-place. Use for operational documents the agent has authority to maintain.
 
 ```bash
-forge memory track docs/checklist.md --as checklist
-forge memory track docs/changelog.md --as changelog
+forge memory track docs/checklist.md --as checklist --session planner
+forge memory track docs/changelog.md --as changelog --session planner
 ```
 
 ### Mode 2: Shadow/propose (agent is advisor)
@@ -54,7 +54,7 @@ redundant proposals. Use for standards and guidelines where human curation matte
 
 ```bash
 forge memory track docs/developer/coding-standards.md \
-  --propose --shadow .forge/memory/suggested_standards.md
+  --propose --shadow .forge/memory/suggested_standards.md --session planner
 ```
 
 The shadow file contains `- [ ]` checkboxes with rationale. The human reviews and merges what's valuable into the
@@ -70,17 +70,17 @@ participation plus auto-update runtime state.
 
 ```bash
 # First run: inspect proposed edits before allowing writes
-forge memory enable --review-only
+forge memory enable --review-only --session planner
 
 # Track direct-update docs
-forge memory track docs/checklist.md --as checklist
-forge memory track docs/changelog.md --as changelog
+forge memory track docs/checklist.md --as checklist --session planner
+forge memory track docs/changelog.md --as changelog --session planner
 
 # Track a human-reviewed shadow proposal doc
 forge memory track docs/developer/coding-standards.md \
-  --propose --shadow .forge/memory/suggested_standards.md
+  --propose --shadow .forge/memory/suggested_standards.md --session planner
 
-forge memory list --json
+forge memory list --json --session planner
 ```
 
 Example passport written by `forge memory track`:
@@ -283,7 +283,7 @@ Checklist:
 - The file must exist before the agent runs (no file creation)
 - For shadow docs, the official doc must exist and the passport `shadow_path` must be valid
 - Check the strategy — does it match what you expect the agent to do?
-- Try `forge memory enable --review-only` to see what the agent would change without modifying files
+- Try `forge memory enable --review-only --session <name>` to see what the agent would change without modifying files
 
 ### "Wrong file was updated" (path issues)
 
