@@ -5,6 +5,11 @@ Provides deterministic bookkeeping so the agent never does arithmetic —
 it only classifies (pass/fail/skip) while this script handles structure,
 counting, and progress tracking.
 
+NOTE: src/skills/walkthrough/scripts/walkthrough-state.py is the canonical copy.
+src/skills/qa/scripts/walkthrough-state.py is generated from it by
+scripts/sync-walkthrough-state.py (sync-walkthrough-state pre-commit hook).
+Edit the walkthrough/ copy only.
+
 Usage (read-only):
     python3 walkthrough-state.py <checklist> index
     python3 walkthrough-state.py <checklist> step 6.3

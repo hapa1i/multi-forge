@@ -821,10 +821,11 @@ guided exploration, proxy/session creation, live Claude session, and cleanup. He
 (`resources/checklist.md` index + `resources/checklist/*.md`, 20 sections). Includes `human:guided` items for
 interactive verification. State tracking with `--from X.Y` resume. Separate skill prevents cross-mode contamination.
 
-**Deterministic bookkeeper** (`walkthrough-state.py`): Shared script (both skills) that parses checklist markdown into
-structured JSON. Seven commands: `index`, `step N.X`, `summary` (read-only) + `init`, `record`, `var`, `report` (state
-machine). Code blocks tagged `runnable` (`bash` = true, plain \`\`\`\`\`\`\`\` = display-only). State file uses SHA-256
-hash for drift detection. 58 unit tests.
+**Deterministic bookkeeper** (`walkthrough-state.py`): Canonical in walkthrough/, generated into qa/ by
+`scripts/sync-walkthrough-state.py` (pre-commit). Parses checklist markdown into structured JSON. Seven commands:
+`index`, `step N.X`, `summary` (read-only) + `init`, `record`, `var`, `report` (state machine). Code blocks tagged
+`runnable` (`bash` = true, plain \`\`\`\`\`\`\`\` = display-only). State file uses SHA-256 hash for drift detection. 58
+unit tests.
 
 ---
 

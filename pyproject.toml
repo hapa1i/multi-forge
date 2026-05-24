@@ -104,8 +104,9 @@ markers = [
 asyncio_mode = "auto"
 
 [tool.mypy]
-# qa/ ships a byte-identical copy of walkthrough-state.py (enforced by
-# test_walkthrough_state_sync.py). Exclude it to avoid a duplicate-module
+# qa/ ships a copy of walkthrough-state.py generated from the walkthrough/ copy
+# by scripts/sync-walkthrough-state.py (pre-commit) and verified by
+# test_walkthrough_state_sync.py. Exclude it to avoid a duplicate-module
 # collision; the walkthrough/ copy is the one type-checked.
 exclude = [
     'src/skills/qa/scripts/walkthrough-state\.py$',
