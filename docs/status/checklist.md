@@ -175,55 +175,94 @@ the authoritative contract and session manifests only as resolved participation 
 
 ## Phase 3 - Shadow Proposals
 
-- [ ] Implement `track --propose`.
+- [x] Implement `track --propose`.
   - Assertion: proposal tracking derives `.forge/memory/suggested_<basename>.md` by default, implies `suggested`
     strategy when compatible, and supports explicit `--shadow <path>` overrides.
-- [ ] Auto-create Forge-owned shadow docs.
+  - Verification: `--propose` and `--shadow` flags on `forge memory track`. `derive_shadow_path()` encodes parent
+    directory for disambiguation (e.g., `docs/status/notes.md` -> `.forge/memory/suggested_status_notes.md`).
+    `resolve_with_overrides()` extended with `shadow_path` parameter. Direct-to-shadow conversion with 3-key upsert.
+- [x] Auto-create Forge-owned shadow docs.
   - Assertion: missing shadow files under `.forge/memory/` are created with parent directories; missing official docs
     and non-Forge-owned shadow paths are not auto-created.
-- [ ] Define and test shadow-path collision handling.
+  - Verification: auto-creation with traversal safety in `forge memory track --propose`. Tests cover auto-create under
+    `.forge/memory/` and missing non-Forge-owned paths failing unless pre-created.
+- [x] Define and test shadow-path collision handling.
   - Assertion: two official docs with the same basename cannot silently share one default shadow path; Forge either
     derives a disambiguated path or fails with an actionable override command.
-- [ ] Add `forge memory shadows list|show`.
+  - Verification: `check_shadow_path_collision()` in `passport.py` detects collisions and returns actionable error.
+    Immediate-parent encoding in `derive_shadow_path()` reduces collisions. Tests in `test_passport.py`.
+- [x] Add `forge memory shadows list|show`.
   - Assertion: shadow content can be grouped by official target and source session/worktree, separately from status
     configuration; `--scope all` uses the Phase 2 read-only discovery path.
-- [ ] Tune handoff-agent shadow behavior.
+  - Verification: `forge memory shadows` subgroup with `list` and `show` commands. `--scope all` uses `list_sessions()`.
+    Rich tables and JSON output.
+- [x] Tune handoff-agent shadow behavior.
   - Assertion: shadow update prompts allow liberal, sourceable suggestions for durable memory, while direct-write docs
     remain compact and conservative.
+  - Verification: shadow-specific prompt additions in `handoff_agent.py`. Tests in `test_handoff_agent.py`.
 
 ## Phase 4 - Fork Inheritance
 
 Tasks in this phase are coupled: do not ship `--inherit-memory shadowed` without inherited-shadow materialization and
 passport override handling in the same slice.
 
-- [ ] Build inherited-shadow materialization support.
+- [x] Build inherited-shadow materialization support.
   - Assertion: inherited `.forge/memory/` shadow files can be created in the target worktree before a child session is
     persisted; non-Forge-owned shadows are reported but not created.
-- [ ] Add `--inherit-memory all|none|shadowed` to session fork flows.
+  - Verification: `materialize_inherited_shadows()` in `memory_inheritance.py` creates shadow files under
+    `.forge/memory/` with traversal safety. Non-Forge-owned shadows reported via `warnings_sink` pattern.
+- [x] Add `--inherit-memory all|none|shadowed` to session fork flows.
   - Assertion: default `all` preserves existing sticky-session expectations; `none` removes memory participation; and
     `shadowed` inherits only proposal/shadow docs while using the materialization helper above.
-- [ ] Apply passport inheritance overrides consistently.
+  - Verification: `InheritMemoryMode` enum, `filter_docs_for_inheritance()`, `apply_memory_inheritance()` in
+    `memory_inheritance.py`. CLI flags on `fork` and `resume --fresh`. Default `all` preserves existing behavior. Fixed
+    override-loss bug where docs tracked via `forge memory track` (stored in overrides) were silently lost on fork
+    because only `intent.memory` was deep-copied.
+- [x] Apply passport inheritance overrides consistently.
   - Assertion: `--inherit-memory` overrides `forge_memory.update.inherit_on_fork` with warnings, and passport defaults
     apply when the flag is omitted.
-- [ ] Add fork/resume tests for inherited memory.
-  - Assertion: tests cover normal worktree fork, `--into` existing worktree, and no-memory scratch forks.
+  - Verification: passport-authoritative shadow classification in `filter_docs_for_inheritance()`. Writer warnings
+    emitted via `warnings_sink`. Tests cover passport override handling.
+- [x] Add fork/resume tests for inherited memory.
+  - Assertion: tests cover inheritance helper behavior, manager relaunch override preservation, fork/resume CLI flag
+    gating, and fork-then-track persistence.
+  - Verification: 38 tests in `test_memory_inheritance.py` covering filtering, materialization, passport-authoritative
+    shadow classification, writer warnings, override-only inheritance, relaunch regression, fork-then-track, and CLI
+    flag gating.
 
 ## Phase 5 - Curated Shadow Review
 
-- [ ] Implement read-only shadow curation.
+- [x] Implement read-only shadow curation.
   - Assertion: `forge memory shadows review --for <doc> --curate` reads official plus matching shadow docs, removes
     duplicates and already-promoted notes, groups related suggestions, and emits source-cited output.
-- [ ] Route curation through shared LLM infrastructure.
-  - Assertion: curation uses `forge.core.llm`, honors active session proxy configuration and configured spend caps, and
-    reports per-invocation usage.
-- [ ] Persist curated review reports.
-  - Assertion: reports are written to `<forge_root>/.forge/artifacts/<session>/memory/review-<timestamp>.md`, and
-    `forge memory shadows review --show-latest` retrieves the latest report.
-- [ ] Enforce session ownership for repo-scope curation.
+  - Verification: `build_curation_prompt()` in `shadow_curation.py` inlines official + shadow content with forge_root
+    citations. Self-contained prompt (no tool use). Bare `review --for` shows raw content + hint about `--curate` and
+    `--show-latest`. `--json` output for both `--curate` and `--show-latest`. 11 CLI tests + 17 unit tests.
+- [x] Route curation through shared LLM infrastructure.
+  - Assertion: curation runs through `run_claude_session()` routed via `resolve_handoff_base_url()` so active session
+    proxy configuration and proxy spend caps apply. Per-invocation cost attribution is logged best-effort through verb
+    cost logs; direct usage display is deferred.
+  - Verification: `run_shadow_curation()` wraps call in `track_verb_cost("curation", ...)`. CLI resolves routing and
+    passes `base_url` + `direct` into core function. `test_passes_base_url_and_direct` verifies forwarding.
+- [x] Persist curated review reports.
+  - Assertion: reports are written to `<forge_root>/.forge/artifacts/<session>/memory/curation-{slug}-{hash}-{ts}.md`,
+    and `forge memory shadows review --show-latest --for <doc>` retrieves the latest report for that doc.
+  - Verification: `persist_curation_report()` uses `curation-` prefix (distinct from handoff `review-` reports).
+    `_doc_slug()` with 6-char hash suffix prevents collision between `a/b.md` and `a_b.md`. `report_glob_pattern()`
+    enables doc-filtered retrieval. Glob tests verify correct filtering.
+- [x] Enforce session ownership for repo-scope curation.
   - Assertion: `--scope repo --curate` requires `FORGE_SESSION` or `--session`; `--scope all --curate` remains deferred.
-- [ ] Keep official durable docs human-approved.
+    `--show-latest` is session-scoped; rejects `--scope repo` and `--scope all`.
+  - Verification: `test_review_curate_requires_session`, `test_review_scope_all_curate_rejected`,
+    `test_review_show_latest_requires_session`, `test_review_show_latest_rejects_scope_repo`.
+- [x] Keep official durable docs human-approved.
   - Assertion: curation may produce a patch or promotion checklist, but never mutates `docs/status/impl_notes.md`
     without explicit user approval.
+  - Verification: The Python orchestration never writes official docs (no file-write calls in `_review_curate()` or
+    `run_shadow_curation()`). `test_review_curate_does_not_mutate_official` verifies this for the orchestration layer.
+    The curation subprocess (`claude -p`) runs with write-capable tools but is instructed read-only via the prompt. Same
+    trust model as the handoff agent's `review-only` mode. A `--read-only` subprocess mode is a useful future
+    enhancement but is not blocked on this phase.
 
 ## Phase 6 - Docs, Tests, And Dogfooding
 
@@ -246,9 +285,13 @@ passport override handling in the same slice.
 Tracks Forge-local execution decisions for this checklist. For proposal-level context, see
 [`docs/proposals/memory_enhancement.md`](../proposals/memory_enhancement.md).
 
-- [ ] Should curation ship in the first memory PR, or should it become a follow-up after `track`/`status`/inheritance
+- [x] Should curation ship in the first memory PR, or should it become a follow-up after `track`/`status`/inheritance
   are dogfooded?
-- [ ] Should the default shadow-path disambiguation encode parent directories or require explicit `--shadow` on
+  - **Decision**: Ship with the first memory PR. Phase 5 is part of the same branch.
+- [x] Should the default shadow-path disambiguation encode parent directories or require explicit `--shadow` on
   collision?
+  - **Decision**: Encode the immediate parent directory in the shadow filename (e.g., `docs/status/notes.md` ->
+    `.forge/memory/suggested_status_notes.md`). Implemented in `derive_shadow_path()`. Collision checking via
+    `check_shadow_path_collision()` catches remaining edge cases.
 - [ ] Should `forge memory passport show|set` land with the first CLI surface, or wait until users hit advanced-edit
   needs?

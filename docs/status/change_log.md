@@ -27,6 +27,29 @@ wc -l docs/status/change_log.md
 
 ## 2026-05-23
 
+### Phase 5: Curated Shadow Review (Memory Enhancement)
+
+**Goal**: Add LLM-powered curation of shadow proposals so users can synthesize accumulated suggestions against the
+official doc, with source-cited output and persistent reports.
+
+**Key changes**:
+
+- Created `src/forge/session/shadow_curation.py` with `ShadowEntry` dataclass, `collect_shadow_entries()` (moved from
+  CLI layer), `build_curation_prompt()`, `_doc_slug()` with hash suffix for collision resistance,
+  `persist_curation_report()` with `curation-` prefix, `report_glob_pattern()`, and `run_shadow_curation()`
+  orchestrator.
+- Added `forge memory shadows review` command with `--curate`, `--show-latest`, `--for`, `--scope`, `--json` flags.
+  Mutual exclusivity, session ownership, and scope constraints enforced. Bare `review --for` shows raw content with
+  hint.
+- Refactored `_collect_shadow_entries()` in `memory.py` to delegate to session-layer `collect_shadow_entries()`, fixing
+  a layering inversion (CLI code was owning discovery logic). `shadows list` and `shadows show` now use `ShadowEntry`
+  attribute access instead of dict keys.
+- Routing resolved in CLI via `resolve_handoff_base_url()`, passes `base_url` + `direct` into core function. Cost
+  tracked via `track_verb_cost("curation", ...)`.
+
+**Verification**: 4,595 unit tests pass (17 new `test_shadow_curation.py` + 11 new `TestShadowsReview` in
+`test_memory.py`). All existing shadow tests pass after refactor. mypy and ruff clean.
+
 ### Phase 2: Top-Level CLI (Memory Enhancement)
 
 **Goal**: Replace `forge session memory` with a new top-level `forge memory` command group, wire passport infrastructure

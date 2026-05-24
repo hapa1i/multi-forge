@@ -31,6 +31,7 @@ from forge.session.passport import (
     synthesize_passport,
     write_passport,
 )
+from forge.session.shadow_curation import ShadowEntry
 from forge.session.validation import is_safe_designated_doc_path
 
 logger = logging.getLogger(__name__)
@@ -863,51 +864,12 @@ def shadows_group() -> None:
 def _collect_shadow_entries(
     scope: str,
     session_filter: str | None,
-) -> tuple[list[dict[str, object]], set[str]]:
-    """Collect shadow entries across sessions in *scope*."""
-    from forge.core.ops.session import list_sessions
-    from forge.session.effective import compute_effective_intent
-    from forge.session.manager import SessionManager
+) -> tuple[list[ShadowEntry], set[str]]:
+    """Thin wrapper around session-layer ``collect_shadow_entries``."""
+    from forge.session.shadow_curation import collect_shadow_entries
 
     ctx = ExecutionContext.from_cwd()
-    result = list_sessions(ctx=ctx, include_incognito=False, scope=scope)
-    manager = SessionManager()
-    entries: list[dict[str, object]] = []
-    scanned_roots: set[str] = set()
-
-    for item in result.sessions:
-        if session_filter and item.name != session_filter:
-            continue
-        entry = item.entry
-        fr = entry.forge_root or entry.worktree_path
-        if not fr:
-            continue
-        scanned_roots.add(fr)
-
-        try:
-            manifest = manager.get_session(item.name, forge_root=fr)
-            effective = compute_effective_intent(manifest)
-        except (ForgeSessionError, ForgeOpError, OSError):
-            logger.debug("Failed to read manifest for session %r in %s", item.name, fr, exc_info=True)
-            continue
-
-        if not effective.memory:
-            continue
-
-        for doc in effective.memory.designated_docs:
-            if doc.shadows is None:
-                continue
-            entries.append(
-                {
-                    "official": doc.shadows,
-                    "shadow_path": doc.path,
-                    "strategy": doc.strategy,
-                    "session": item.name,
-                    "forge_root": fr,
-                }
-            )
-
-    return entries, scanned_roots
+    return collect_shadow_entries(ctx=ctx, scope=scope, session_filter=session_filter)
 
 
 @shadows_group.command("list")
@@ -932,9 +894,9 @@ def shadows_list_cmd(session_name: str | None, scope: str, as_json: bool) -> Non
     grouped: dict[tuple[str, str, str], list[str]] = {}
     strategy_map: dict[tuple[str, str, str], str] = {}
     for entry in entries:
-        key = (str(entry["forge_root"]), str(entry["official"]), str(entry["shadow_path"]))
-        grouped.setdefault(key, []).append(str(entry["session"]))
-        strategy_map[key] = str(entry["strategy"])
+        key = (entry.forge_root, entry.official, entry.shadow_path)
+        grouped.setdefault(key, []).append(entry.session)
+        strategy_map[key] = entry.strategy
 
     if as_json:
         rows = [
@@ -993,7 +955,7 @@ def shadows_show_cmd(for_doc: str, session_name: str | None, scope: str) -> None
         console.print(f"[red]Error:[/red] {e}")
         sys.exit(1)
 
-    matches = [entry for entry in entries if entry["official"] == for_doc]
+    matches = [entry for entry in entries if entry.official == for_doc]
     if not matches:
         console.print(f"[dim]No shadow proposals found for {for_doc} (scope: {scope}).[/dim]")
         return
@@ -1001,8 +963,8 @@ def shadows_show_cmd(for_doc: str, session_name: str | None, scope: str) -> None
     # Deduplicate by (forge_root, shadow_path)
     seen: dict[tuple[str, str], list[str]] = {}
     for entry in matches:
-        key = (str(entry["forge_root"]), str(entry["shadow_path"]))
-        seen.setdefault(key, []).append(str(entry["session"]))
+        key = (entry.forge_root, entry.shadow_path)
+        seen.setdefault(key, []).append(entry.session)
 
     multi_root = len(scanned_roots) > 1
 
@@ -1024,3 +986,256 @@ def shadows_show_cmd(for_doc: str, session_name: str | None, scope: str) -> None
             else:
                 console.print("[dim](empty)[/dim]")
         console.print()
+
+
+@shadows_group.command("review")
+@click.option("--for", "for_doc", required=True, help="Official doc to review.")
+@click.option("--curate", is_flag=True, default=False, help="Run LLM curation.")
+@click.option("--show-latest", is_flag=True, default=False, help="Show latest curation report.")
+@click.option("--session", "-s", "session_name", default=None, help="Session name.")
+@click.option(
+    "--scope",
+    type=click.Choice(["project", "repo", "all"]),
+    default="project",
+    show_default=True,
+    help="Scope for shadow discovery.",
+)
+@click.option("--json", "as_json", is_flag=True, default=False, help="Emit JSON.")
+def shadows_review_cmd(
+    for_doc: str,
+    curate: bool,
+    show_latest: bool,
+    session_name: str | None,
+    scope: str,
+    as_json: bool,
+) -> None:
+    """Review shadow proposals for an official doc."""
+    if curate and show_latest:
+        raise click.ClickException("--curate and --show-latest are mutually exclusive.")
+
+    if show_latest:
+        _review_show_latest(for_doc, session_name, scope, as_json)
+        return
+
+    if curate:
+        _review_curate(for_doc, session_name, scope, as_json)
+        return
+
+    # Bare review: show raw content + hint
+    ctx = click.get_current_context()
+    ctx.invoke(shadows_show_cmd, for_doc=for_doc, session_name=session_name, scope=scope)
+    console.print("[dim]Tip: Use --curate to run LLM synthesis, --show-latest to view the last report.[/dim]")
+
+
+def _review_show_latest(
+    for_doc: str,
+    session_name: str | None,
+    scope: str,
+    as_json: bool,
+) -> None:
+    """Handle ``--show-latest``: session-scoped report retrieval."""
+    from forge.session.shadow_curation import curation_report_dir, report_glob_pattern
+
+    if scope != "project":
+        raise click.ClickException("Reports are session-scoped; --scope is not applicable with --show-latest.")
+
+    ctx = ExecutionContext.from_cwd()
+    try:
+        resolved = resolve_session(ctx=ctx, session_name=session_name)
+    except (ForgeSessionError, ForgeOpError) as e:
+        raise click.ClickException(f"Could not resolve session: {e}. Set FORGE_SESSION or pass --session.")
+
+    state = resolved.state
+    forge_root_str = state.forge_root or (state.worktree.path if state.worktree else None)
+    if not forge_root_str:
+        raise click.ClickException("Could not resolve forge_root for session.")
+    forge_root = Path(forge_root_str)
+
+    report_dir = curation_report_dir(forge_root, resolved.store.session_name)
+    pattern = report_glob_pattern(for_doc)
+    reports = sorted(report_dir.glob(pattern)) if report_dir.is_dir() else []
+
+    if not reports:
+        if as_json:
+            click.echo(json.dumps({"success": False, "reason": "no_reports", "official": for_doc}, indent=2))
+        else:
+            console.print(f"[dim]No curation reports found for {for_doc}.[/dim]")
+            console.print("[dim]Tip: Run with --curate to generate one.[/dim]")
+        return
+
+    latest = reports[-1]
+    content = latest.read_text(encoding="utf-8")
+
+    if as_json:
+        click.echo(
+            json.dumps(
+                {
+                    "success": True,
+                    "official": for_doc,
+                    "report_path": str(latest),
+                    "content": content,
+                },
+                indent=2,
+            )
+        )
+    else:
+        console.print(content)
+
+
+def _review_curate(
+    for_doc: str,
+    session_name: str | None,
+    scope: str,
+    as_json: bool,
+) -> None:
+    """Handle ``--curate``: run LLM curation."""
+    import os
+
+    from forge.session.handoff_agent import resolve_handoff_base_url
+    from forge.session.shadow_curation import (
+        collect_shadow_entries,
+        run_shadow_curation,
+    )
+
+    if scope == "all":
+        raise click.ClickException("Cross-project curation deferred; use --scope project or --scope repo.")
+
+    ctx = ExecutionContext.from_cwd()
+    try:
+        resolved = resolve_session(ctx=ctx, session_name=session_name)
+    except (ForgeSessionError, ForgeOpError) as e:
+        raise click.ClickException(f"Curation requires an active session: {e}. Set FORGE_SESSION or pass --session.")
+
+    state = resolved.state
+    forge_root_str = state.forge_root or (state.worktree.path if state.worktree else None)
+    if not forge_root_str:
+        raise click.ClickException("Could not resolve forge_root for session.")
+    forge_root = Path(forge_root_str)
+
+    from forge.session.effective import compute_effective_intent
+
+    effective = compute_effective_intent(state)
+
+    # Validate official doc path before reading
+    resolved_root = forge_root.resolve()
+    safety_err = is_safe_designated_doc_path(for_doc, forge_root, resolved_root)
+    if safety_err:
+        raise click.ClickException(f"Unsafe official doc path: {safety_err}")
+
+    # Anchor shadow discovery to the resolved session's forge_root so
+    # --session cross-project doesn't mix CWD shadows with another root's official doc.
+    session_ctx = ExecutionContext.from_cwd(cwd=forge_root)
+    try:
+        entries, _roots = collect_shadow_entries(ctx=session_ctx, scope=scope, session_filter=None)
+    except ForgeOpError as e:
+        raise click.ClickException(str(e))
+
+    matches = [entry for entry in entries if entry.official == for_doc]
+    if not matches:
+        if as_json:
+            click.echo(
+                json.dumps(
+                    {"success": True, "official": for_doc, "shadow_count": 0, "report_path": None, "scope": scope},
+                    indent=2,
+                )
+            )
+        else:
+            console.print(f"[dim]No shadow proposals found for {for_doc} (scope: {scope}).[/dim]")
+        return
+
+    # Read official doc from the resolved session's forge_root
+    official_abs = forge_root / for_doc
+    if not official_abs.is_file():
+        raise click.ClickException(f"Official doc not found: {official_abs}")
+    official_content = official_abs.read_text(encoding="utf-8")
+
+    # Populate shadow content and deduplicate, with path safety checks
+    seen: dict[tuple[str, str], ShadowEntry] = {}
+    for entry in matches:
+        entry_root = Path(entry.forge_root)
+        shadow_err = is_safe_designated_doc_path(entry.shadow_path, entry_root, entry_root.resolve())
+        if shadow_err:
+            logger.warning("Skipping unsafe shadow path: %s", shadow_err)
+            continue
+        key = (entry.forge_root, entry.shadow_path)
+        if key in seen:
+            existing = seen[key]
+            existing_sessions = existing.session.split(", ")
+            if entry.session not in existing_sessions:
+                seen[key] = ShadowEntry(
+                    official=entry.official,
+                    shadow_path=entry.shadow_path,
+                    strategy=entry.strategy,
+                    session=f"{existing.session}, {entry.session}",
+                    forge_root=entry.forge_root,
+                    content=existing.content,
+                )
+            continue
+        abs_path = entry_root / entry.shadow_path
+        content = ""
+        if abs_path.is_file():
+            content = abs_path.read_text(encoding="utf-8")
+        seen[key] = ShadowEntry(
+            official=entry.official,
+            shadow_path=entry.shadow_path,
+            strategy=entry.strategy,
+            session=entry.session,
+            forge_root=entry.forge_root,
+            content=content,
+        )
+
+    shadow_entries = list(seen.values())
+
+    # Resolve proxy routing
+    config = effective.memory.auto_update if effective.memory and effective.memory.auto_update else None
+    confirmed_proxy_url = None
+    if state.confirmed.started_with_proxy:
+        confirmed_proxy_url = state.confirmed.started_with_proxy.base_url
+
+    direct = config.direct if config else False
+    base_url = resolve_handoff_base_url(
+        proxy_id=config.proxy if config else None,
+        confirmed_proxy_base_url=confirmed_proxy_url,
+        env_base_url=os.environ.get("ANTHROPIC_BASE_URL"),
+        direct=direct,
+        subprocess_proxy=effective.subprocess_proxy,
+    )
+
+    if not as_json:
+        console.print(f"[dim]Curating {len(shadow_entries)} shadow source(s) for {for_doc}...[/dim]")
+
+    result = run_shadow_curation(
+        session_name=resolved.store.session_name,
+        forge_root=forge_root,
+        official_path=for_doc,
+        official_content=official_content,
+        shadow_entries=shadow_entries,
+        base_url=base_url,
+        direct=direct,
+        scope=scope,
+    )
+
+    if as_json:
+        click.echo(
+            json.dumps(
+                {
+                    "success": result.success,
+                    "official": for_doc,
+                    "report_path": str(result.report_path) if result.report_path else None,
+                    "shadow_count": len(shadow_entries),
+                    "scope": scope,
+                },
+                indent=2,
+            )
+        )
+        if not result.success:
+            sys.exit(1)
+    elif result.success:
+        console.print(result.stdout)
+        if result.report_path:
+            console.print(f"\n[dim]Report saved: {result.report_path}[/dim]")
+    else:
+        console.print("[red]Curation failed.[/red]")
+        if result.stdout:
+            console.print(result.stdout)
+        sys.exit(1)

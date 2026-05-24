@@ -816,6 +816,297 @@ class TestMemoryShadowsShow:
 
 
 # ---------------------------------------------------------------------------
+# shadows review
+# ---------------------------------------------------------------------------
+
+
+class TestShadowsReview:
+    def test_review_without_curate_shows_raw_with_hint(
+        self, runner: CliRunner, seeded_session: tuple[Path, str]
+    ) -> None:
+        forge_root = seeded_session[0]
+        runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--propose"])
+        # Write content to shadow
+        list_result = runner.invoke(main, ["memory", "list", "--json"])
+        shadow_path = json.loads(list_result.output)[0]["path"]
+        (forge_root / shadow_path).write_text("- [ ] Add caching notes\n", encoding="utf-8")
+
+        result = runner.invoke(main, ["memory", "shadows", "review", "--for", "docs/impl_notes.md"])
+        assert result.exit_code == 0, result.output
+        assert "caching notes" in result.output
+        assert "--curate" in result.output
+        assert "--show-latest" in result.output
+
+    def test_review_curate_requires_session(
+        self, runner: CliRunner, seeded_session: tuple[Path, str], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv("FORGE_SESSION", raising=False)
+        result = runner.invoke(main, ["memory", "shadows", "review", "--for", "docs/notes.md", "--curate"])
+        assert result.exit_code != 0
+        assert "session" in result.output.lower()
+
+    def test_review_curate_and_show_latest_exclusive(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        result = runner.invoke(
+            main, ["memory", "shadows", "review", "--for", "docs/notes.md", "--curate", "--show-latest"]
+        )
+        assert result.exit_code != 0
+        assert "mutually exclusive" in result.output.lower()
+
+    def test_review_scope_all_curate_rejected(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        result = runner.invoke(
+            main, ["memory", "shadows", "review", "--for", "docs/notes.md", "--curate", "--scope", "all"]
+        )
+        assert result.exit_code != 0
+        assert "deferred" in result.output.lower()
+
+    def test_review_show_latest_requires_session(
+        self, runner: CliRunner, seeded_session: tuple[Path, str], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv("FORGE_SESSION", raising=False)
+        result = runner.invoke(main, ["memory", "shadows", "review", "--for", "docs/notes.md", "--show-latest"])
+        assert result.exit_code != 0
+        assert "session" in result.output.lower()
+
+    def test_review_show_latest_rejects_scope_repo(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        result = runner.invoke(
+            main, ["memory", "shadows", "review", "--for", "docs/notes.md", "--show-latest", "--scope", "repo"]
+        )
+        assert result.exit_code != 0
+        assert "not applicable" in result.output.lower()
+
+    def test_review_show_latest_filters_by_doc(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        forge_root = seeded_session[0]
+        from forge.session.shadow_curation import persist_curation_report
+
+        # Create reports for two different docs
+        persist_curation_report(
+            forge_root=forge_root,
+            session_name="s1",
+            official_path="docs/impl_notes.md",
+            scope="project",
+            shadow_count=1,
+            content="Notes curation result.",
+        )
+        persist_curation_report(
+            forge_root=forge_root,
+            session_name="s1",
+            official_path="docs/other.md",
+            scope="project",
+            shadow_count=1,
+            content="Other curation result.",
+        )
+
+        result = runner.invoke(main, ["memory", "shadows", "review", "--for", "docs/impl_notes.md", "--show-latest"])
+        assert result.exit_code == 0, result.output
+        assert "Notes curation result" in result.output
+        assert "Other curation" not in result.output
+
+    def test_review_show_latest_no_reports(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        result = runner.invoke(main, ["memory", "shadows", "review", "--for", "docs/impl_notes.md", "--show-latest"])
+        assert result.exit_code == 0, result.output
+        assert "No curation reports" in result.output
+        assert "--curate" in result.output
+
+    def test_review_curate_no_shadows(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        result = runner.invoke(main, ["memory", "shadows", "review", "--for", "docs/impl_notes.md", "--curate"])
+        assert result.exit_code == 0, result.output
+        assert "No shadow" in result.output
+
+    def test_review_curate_does_not_mutate_official(
+        self, runner: CliRunner, seeded_session: tuple[Path, str], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        forge_root = seeded_session[0]
+        runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--propose"])
+        # Write shadow content
+        list_result = runner.invoke(main, ["memory", "list", "--json"])
+        shadow_path = json.loads(list_result.output)[0]["path"]
+        (forge_root / shadow_path).write_text("- [ ] Add new note\n", encoding="utf-8")
+
+        official_before = (forge_root / "docs/impl_notes.md").read_text()
+
+        # Mock run_claude_session to avoid real LLM call
+        mock_result = type(
+            "R",
+            (),
+            {
+                "success": True,
+                "returncode": 0,
+                "timed_out": False,
+                "error": None,
+                "stdout": "## Promote\n- Item",
+                "stderr": "",
+            },
+        )()
+        monkeypatch.setattr(
+            "forge.core.reactive.session_runner.run_claude_session",
+            lambda *a, **kw: mock_result,
+        )
+
+        runner.invoke(main, ["memory", "shadows", "review", "--for", "docs/impl_notes.md", "--curate"])
+
+        official_after = (forge_root / "docs/impl_notes.md").read_text()
+        assert official_before == official_after
+
+    def test_review_curate_json_output(
+        self, runner: CliRunner, seeded_session: tuple[Path, str], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        forge_root = seeded_session[0]
+        runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--propose"])
+        list_result = runner.invoke(main, ["memory", "list", "--json"])
+        shadow_path = json.loads(list_result.output)[0]["path"]
+        (forge_root / shadow_path).write_text("- [ ] Item\n", encoding="utf-8")
+
+        mock_result = type(
+            "R",
+            (),
+            {
+                "success": True,
+                "returncode": 0,
+                "timed_out": False,
+                "error": None,
+                "stdout": "## Promote\n- Item",
+                "stderr": "",
+            },
+        )()
+        monkeypatch.setattr(
+            "forge.core.reactive.session_runner.run_claude_session",
+            lambda *a, **kw: mock_result,
+        )
+
+        result = runner.invoke(
+            main, ["memory", "shadows", "review", "--for", "docs/impl_notes.md", "--curate", "--json"]
+        )
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["success"] is True
+        assert data["official"] == "docs/impl_notes.md"
+        assert "report_path" in data
+        assert data["shadow_count"] == 1
+
+    def test_review_scope_repo_reads_official_from_session_root(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Two forge roots in the same repo. --scope repo collects shadows from
+        both, but the official doc baseline comes from the resolved session's root."""
+        import subprocess
+
+        from forge.session import IndexStore, SessionStore, create_session_state
+        from forge.session.models import DesignatedDoc, MemoryIntent
+
+        project_root = tmp_path
+
+        # Need a git repo so ExecutionContext.from_cwd derives project_root correctly
+        subprocess.run(["git", "init", str(tmp_path)], capture_output=True, check=True)
+        subprocess.run(
+            ["git", "-C", str(tmp_path), "commit", "--allow-empty", "-m", "init"],
+            capture_output=True,
+            check=True,
+            env={
+                **__import__("os").environ,
+                "GIT_AUTHOR_NAME": "test",
+                "GIT_AUTHOR_EMAIL": "t@t",
+                "GIT_COMMITTER_NAME": "test",
+                "GIT_COMMITTER_EMAIL": "t@t",
+            },
+        )
+
+        # Root A: the session we'll curate from
+        root_a = tmp_path / "root_a"
+        root_a.mkdir()
+        (root_a / ".forge").mkdir(parents=True)
+        (root_a / "docs").mkdir()
+        (root_a / "docs" / "notes.md").write_text("# Official from root_a\n", encoding="utf-8")
+
+        state_a = create_session_state(
+            "sess-a",
+            proxy_template="litellm-openai",
+            proxy_base_url="http://localhost:8085",
+            worktree_path=str(root_a),
+        )
+        state_a.forge_root = str(root_a)
+        SessionStore(str(root_a), "sess-a").write(state_a)
+
+        # Root B: a sibling with its own shadow and a different official doc
+        root_b = tmp_path / "root_b"
+        root_b.mkdir()
+        (root_b / ".forge" / "memory").mkdir(parents=True)
+        (root_b / "docs").mkdir()
+        (root_b / "docs" / "notes.md").write_text("# Different official from root_b\n", encoding="utf-8")
+        (root_b / ".forge" / "memory" / "suggested_notes.md").write_text("- [ ] Shadow from root_b\n", encoding="utf-8")
+
+        state_b = create_session_state(
+            "sess-b",
+            proxy_template="litellm-openai",
+            proxy_base_url="http://localhost:8085",
+            worktree_path=str(root_b),
+        )
+        state_b.forge_root = str(root_b)
+        store_b = SessionStore(str(root_b), "sess-b")
+        store_b.write(state_b)
+        manifest_b = store_b.read()
+        manifest_b.intent.memory = MemoryIntent()
+        manifest_b.intent.memory.designated_docs.append(
+            DesignatedDoc(
+                path=".forge/memory/suggested_notes.md",
+                strategy="suggested",
+                shadows="docs/notes.md",
+            )
+        )
+        store_b.write(manifest_b)
+
+        # Register both sessions in the global index under the same project_root
+        index = IndexStore()
+        for name, root in [("sess-a", root_a), ("sess-b", root_b)]:
+            index.add_session(
+                name=name,
+                worktree_path=str(root),
+                project_root=str(project_root),
+                forge_root=str(root),
+                checkout_root=str(root),
+                relative_path=".",
+                is_incognito=False,
+                is_fork=False,
+                parent_session=None,
+            )
+
+        monkeypatch.setenv("FORGE_SESSION", "sess-a")
+        monkeypatch.chdir(root_a)
+
+        # Mock the LLM call, capture the prompt to verify official content source
+        captured_prompts: list[str] = []
+
+        def fake_run(prompt: str, **kw):
+            captured_prompts.append(prompt)
+            return type(
+                "R",
+                (),
+                {
+                    "success": True,
+                    "returncode": 0,
+                    "timed_out": False,
+                    "error": None,
+                    "stdout": "## Promote\n- Item from root_b",
+                    "stderr": "",
+                },
+            )()
+
+        monkeypatch.setattr("forge.core.reactive.session_runner.run_claude_session", fake_run)
+
+        result = runner.invoke(
+            main, ["memory", "shadows", "review", "--for", "docs/notes.md", "--curate", "--scope", "repo"]
+        )
+        assert result.exit_code == 0, result.output
+
+        # The prompt must contain root_a's official content, not root_b's
+        assert len(captured_prompts) == 1
+        prompt = captured_prompts[0]
+        assert "Official from root_a" in prompt
+        assert "Different official from root_b" not in prompt
+        # But the shadow from root_b should be included
+        assert "Shadow from root_b" in prompt
+
+
+# ---------------------------------------------------------------------------
 # alias
 # ---------------------------------------------------------------------------
 

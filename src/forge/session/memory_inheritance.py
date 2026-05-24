@@ -15,7 +15,12 @@ from pathlib import Path
 
 from .exceptions import PassportError
 from .models import DesignatedDoc, SessionState
-from .passport import Passport, check_writer_access, read_passport, resolve_passport_source
+from .passport import (
+    Passport,
+    check_writer_access,
+    read_passport,
+    resolve_passport_source,
+)
 from .validation import is_safe_designated_doc_path
 
 logger = logging.getLogger(__name__)
@@ -82,10 +87,7 @@ def _resolve_inheritance_docs(
         except FileNotFoundError:
             pass
         except PassportError as e:
-            warnings.append(
-                f"Malformed passport for {passport_source}: {e}. "
-                "Defaulting to inherit_on_fork=true."
-            )
+            warnings.append(f"Malformed passport for {passport_source}: {e}. " "Defaulting to inherit_on_fork=true.")
 
         if passport and passport.update.mode == "shadow-only":
             is_shadow = True
@@ -146,8 +148,7 @@ def filter_docs_for_inheritance(
             if cli_flag_explicit:
                 source = resolve_passport_source(item.doc)
                 warnings.append(
-                    f"--inherit-memory {mode.value} overrides "
-                    f"passport inherit_on_fork=false for {source}"
+                    f"--inherit-memory {mode.value} overrides " f"passport inherit_on_fork=false for {source}"
                 )
             else:
                 continue
@@ -187,13 +188,9 @@ def materialize_inherited_shadows(
             if was_created:
                 created.append(f"Inherited shadow created: {item.shadow_path}")
             elif not (target_forge_root / item.shadow_path).is_file():
-                skipped.append(
-                    f"Inherited shadow not auto-created (non-Forge-owned): {item.shadow_path}"
-                )
+                skipped.append(f"Inherited shadow not auto-created (non-Forge-owned): {item.shadow_path}")
         except ValueError:
-            skipped.append(
-                f"Inherited shadow not auto-created (non-Forge-owned): {item.shadow_path}"
-            )
+            skipped.append(f"Inherited shadow not auto-created (non-Forge-owned): {item.shadow_path}")
 
     return created, skipped
 
@@ -229,9 +226,7 @@ def apply_memory_inheritance(
         child_state.intent.memory = None
         return [], []
 
-    resolved, resolve_warnings = _resolve_inheritance_docs(
-        effective_memory.designated_docs, parent_forge_root
-    )
+    resolved, resolve_warnings = _resolve_inheritance_docs(effective_memory.designated_docs, parent_forge_root)
     selected, filter_warnings = filter_docs_for_inheritance(
         resolved,
         mode=mode,

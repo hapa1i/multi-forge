@@ -10,8 +10,8 @@ from __future__ import annotations
 import pytest
 
 from forge.session.memory_inheritance import (
-    InheritMemoryMode,
     InheritanceDoc,
+    InheritMemoryMode,
     apply_memory_inheritance,
     create_shadow_file,
     filter_docs_for_inheritance,
@@ -343,9 +343,7 @@ class TestApplyMemoryInheritance:
         assert parent.intent.memory is None
         parent.overrides = {
             "memory": {
-                "designated_docs": [
-                    {"path": "docs/checklist.md", "strategy": "checklist", "shadows": None}
-                ],
+                "designated_docs": [{"path": "docs/checklist.md", "strategy": "checklist", "shadows": None}],
                 "auto_update": {"enabled": True, "mode": "augment"},
             }
         }
@@ -383,9 +381,7 @@ class TestApplyMemoryInheritance:
     def test_shadowed_mode_filters_to_shadows(self, tmp_path):
         docs = [
             DesignatedDoc(path="docs/notes.md", strategy="generic"),
-            DesignatedDoc(
-                path=".forge/memory/suggested.md", strategy="suggested", shadows="docs/official.md"
-            ),
+            DesignatedDoc(path=".forge/memory/suggested.md", strategy="suggested", shadows="docs/official.md"),
         ]
         parent = _make_state("parent", designated_docs=docs)
         child = _make_state("child")
@@ -534,9 +530,7 @@ class TestRelaunchPreservesOverrides:
         def _add_memory_overrides(state):
             state.overrides = {
                 "memory": {
-                    "designated_docs": [
-                        {"path": "docs/tracked.md", "strategy": "checklist", "shadows": None}
-                    ],
+                    "designated_docs": [{"path": "docs/tracked.md", "strategy": "checklist", "shadows": None}],
                     "auto_update": {"enabled": True, "mode": "augment"},
                 }
             }
@@ -567,9 +561,7 @@ class TestRelaunchPreservesOverrides:
         def _add_overrides(state):
             state.overrides = {
                 "memory": {
-                    "designated_docs": [
-                        {"path": "docs/one.md", "strategy": "generic", "shadows": None}
-                    ],
+                    "designated_docs": [{"path": "docs/one.md", "strategy": "generic", "shadows": None}],
                 }
             }
 
