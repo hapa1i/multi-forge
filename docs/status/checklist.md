@@ -285,6 +285,11 @@ passport override handling in the same slice.
 - [x] Update `test_skill_content.py` assertions for QA checklist changes.
   - Assertion: `TestQaHandoffChecklist` assertions match the updated `16-handoff.md` content.
   - Verification: 3 tests pass. Shadow step checks `forge memory track docs/team-standards.md --propose`.
+- [x] Add real-Claude memory smoke tests.
+  - Assertion: slow Docker tests cover review-only handoff report persistence and shadow curation report persistence
+    through real `claude -p`, with narrow assertions and no official-doc mutation.
+  - Verification: `test_real_claude_memory.py` added; collect-only and Ruff pass. Full execution requires Docker plus
+    `ANTHROPIC_API_KEY`.
 - [ ] Dogfood on the active status docs.
   - Assertion: this branch uses `forge memory` to track `docs/status/change_log.md` directly and
     `docs/status/impl_notes.md` through shadow proposals, with the first review-only report inspected before augment.
