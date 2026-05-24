@@ -480,9 +480,9 @@ class TestQaHandoffChecklist:
         handoff_md = SKILLS_DIR / "qa" / "resources" / "checklist" / "16-handoff.md"
         content = handoff_md.read_text()
         step = content.split("### 16.3", 1)[1].split("### 16.4", 1)[0]
-        assert "forge session memory add-doc .forge/memory/suggested_standards.md" in step
-        assert "--strategy suggested" in step
-        assert "--shadows docs/team-standards.md" in step
+        assert "forge memory track docs/team-standards.md" in step
+        assert "--propose" in step
+        assert "--shadow .forge/memory/suggested_standards.md" in step
         assert "cmp -s docs/team-standards.md /tmp/team-standards.before" in step
 
     def test_handoff_includes_queued_startup_step(self):

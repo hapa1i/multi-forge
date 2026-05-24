@@ -15,7 +15,6 @@ from forge.session.shadow_curation import (
     run_shadow_curation,
 )
 
-
 # ---------------------------------------------------------------------------
 # build_curation_prompt
 # ---------------------------------------------------------------------------
@@ -187,9 +186,7 @@ class TestRunShadowCuration:
 
     @patch("forge.core.reactive.session_runner.run_claude_session")
     @patch("forge.core.reactive.cost_tracking.track_verb_cost")
-    def test_success_persists_report(
-        self, mock_cost: MagicMock, mock_run: MagicMock, tmp_path: Path
-    ) -> None:
+    def test_success_persists_report(self, mock_cost: MagicMock, mock_run: MagicMock, tmp_path: Path) -> None:
         mock_run.return_value = self._mock_result()
 
         entries = [
@@ -210,9 +207,7 @@ class TestRunShadowCuration:
 
     @patch("forge.core.reactive.session_runner.run_claude_session")
     @patch("forge.core.reactive.cost_tracking.track_verb_cost")
-    def test_passes_base_url_and_direct(
-        self, mock_cost: MagicMock, mock_run: MagicMock, tmp_path: Path
-    ) -> None:
+    def test_passes_base_url_and_direct(self, mock_cost: MagicMock, mock_run: MagicMock, tmp_path: Path) -> None:
         mock_run.return_value = self._mock_result()
 
         run_shadow_curation(
@@ -234,9 +229,7 @@ class TestRunShadowCuration:
 
     @patch("forge.core.reactive.session_runner.run_claude_session")
     @patch("forge.core.reactive.cost_tracking.track_verb_cost")
-    def test_failure_returns_no_report(
-        self, mock_cost: MagicMock, mock_run: MagicMock, tmp_path: Path
-    ) -> None:
+    def test_failure_returns_no_report(self, mock_cost: MagicMock, mock_run: MagicMock, tmp_path: Path) -> None:
         mock_run.return_value = self._mock_result(success=False)
 
         result = run_shadow_curation(
@@ -259,9 +252,7 @@ class TestRunShadowCuration:
 class TestCollectShadowEntries:
     """Direct unit tests for the session-layer shadow discovery function."""
 
-    def test_returns_shadow_entries_and_scanned_roots(
-        self, tmp_path: Path, monkeypatch: MagicMock
-    ) -> None:
+    def test_returns_shadow_entries_and_scanned_roots(self, tmp_path: Path, monkeypatch: MagicMock) -> None:
         from forge.core.ops.context import ExecutionContext
         from forge.session import IndexStore, SessionStore, create_session_state
         from forge.session.shadow_curation import collect_shadow_entries

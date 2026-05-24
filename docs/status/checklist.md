@@ -266,13 +266,25 @@ passport override handling in the same slice.
 
 ## Phase 6 - Docs, Tests, And Dogfooding
 
-- [ ] Update user and developer docs for the new memory model.
-  - Assertion: Phase 0's old-UX inventory has been applied. README/status docs/design/developer docs/end-user guides and
-    skill checklists no longer teach `forge session memory`; they explain `forge memory`, passports, shadows, first-run
-    review-only mode, idempotency, and clean-break migration.
-- [ ] Add targeted unit and CLI tests.
-  - Assertion: tests cover passport parsing, track/untrack idempotency, enable behavior, status scopes, shadow
-    auto-create, inheritance modes, and curation report ownership.
+- [x] Add `forge memory passport show` command (read-only).
+  - Assertion: `forge memory passport show <path>` displays all passport fields. `--json` emits structured output.
+    File-not-found, no-passport, and malformed-passport cases handled with helpful messages.
+  - Verification: `passport_group` + `passport_show_cmd` in `memory.py`. Resolves path relative to forge_root
+    (consistent with `track`/`list`). Rich table for human output, `dataclasses.asdict` for JSON. 5 tests pass.
+- [x] Add tests for `forge memory passport show`.
+  - Assertion: `TestPassportShow` in `test_memory.py` covers valid passport, JSON output, no-passport, file-not-found,
+    and malformed-passport cases.
+  - Verification: 6 tests in `TestPassportShow`, including no-passport JSON output. All pass.
+- [x] Update user and developer docs for the new memory model.
+  - Assertion: Phase 0's old-UX inventory has been applied. `docs/status/README.md`, `docs/end-user/handoff.md`,
+    walkthrough checklist, and QA checklist no longer teach `forge session memory`; they explain `forge memory`,
+    passports, shadows, and idempotent `track`. `forge session set memory.auto_update.*` migrated to
+    `forge memory enable`.
+  - Verification: `rg "forge session memory" docs/ src/skills/` returns only historical references (proposals, change
+    log, impl notes, completed checklist items). No stale teaching content.
+- [x] Update `test_skill_content.py` assertions for QA checklist changes.
+  - Assertion: `TestQaHandoffChecklist` assertions match the updated `16-handoff.md` content.
+  - Verification: 3 tests pass. Shadow step checks `forge memory track docs/team-standards.md --propose`.
 - [ ] Dogfood on the active status docs.
   - Assertion: this branch uses `forge memory` to track `docs/status/change_log.md` directly and
     `docs/status/impl_notes.md` through shadow proposals, with the first review-only report inspected before augment.
@@ -293,5 +305,7 @@ Tracks Forge-local execution decisions for this checklist. For proposal-level co
   - **Decision**: Encode the immediate parent directory in the shadow filename (e.g., `docs/status/notes.md` ->
     `.forge/memory/suggested_status_notes.md`). Implemented in `derive_shadow_path()`. Collision checking via
     `check_shadow_path_collision()` catches remaining edge cases.
-- [ ] Should `forge memory passport show|set` land with the first CLI surface, or wait until users hit advanced-edit
+- [x] Should `forge memory passport show|set` land with the first CLI surface, or wait until users hit advanced-edit
   needs?
+  - **Decision**: Split. Ship `forge memory passport show` in Phase 6 (read-only, simple). Defer `passport set` (write
+    semantics, conflict handling, rewrite logic) until users hit advanced-edit needs.

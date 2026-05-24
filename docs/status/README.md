@@ -13,23 +13,14 @@ This directory holds living implementation context for Forge.
 
 ## Handoff Agent Setup
 
-Seed the shadow doc before adding it to a session:
+For the first run, use `review-only` to inspect the handoff agent's proposed output before allowing writes:
 
 ```bash
-mkdir -p .forge/memory
-touch .forge/memory/suggested_impl_notes.md
-```
-
-For the first run, use `review-only` if you want to inspect the handoff agent's proposed output before allowing writes:
-
-```bash
-forge session set memory.auto_update.enabled true
-forge session set memory.auto_update.mode review-only
-forge session memory add-doc docs/status/change_log.md --strategy changelog
-forge session memory add-doc .forge/memory/suggested_impl_notes.md \
-  --strategy suggested \
-  --shadows docs/status/impl_notes.md
-forge session memory list-docs --json
+forge memory enable --review-only
+forge memory track docs/status/change_log.md --as changelog
+forge memory track docs/status/impl_notes.md \
+  --propose --shadow .forge/memory/suggested_impl_notes.md
+forge memory list --json
 ```
 
 After the first review-only run completes, inspect the agent's proposed output:
@@ -41,29 +32,26 @@ forge session handoff show --latest
 If the report looks good, switch to the normal augment mode:
 
 ```bash
-forge session set memory.auto_update.mode augment
+forge memory enable
 ```
 
-For established sessions, configure augment mode explicitly:
+For established sessions, augment mode is the default:
 
 ```bash
-forge session set memory.auto_update.enabled true
-forge session set memory.auto_update.mode augment
-forge session memory add-doc docs/status/change_log.md --strategy changelog
-forge session memory add-doc .forge/memory/suggested_impl_notes.md \
-  --strategy suggested \
-  --shadows docs/status/impl_notes.md
-forge session memory list-docs --json
+forge memory enable
+forge memory track docs/status/change_log.md --as changelog
+forge memory track docs/status/impl_notes.md \
+  --propose --shadow .forge/memory/suggested_impl_notes.md
+forge memory list --json
 ```
 
-`forge session memory add-doc` is not idempotent. If re-running setup, check `forge session memory list-docs --json`
-first, or run `forge session memory remove-doc <path>` before adding the same path again.
+`forge memory track` is idempotent. Re-running with different flags updates the existing entry.
 
 Keep `docs/status/checklist.md` manual until the runtime-abstraction plan stabilizes. If it becomes useful to let the
 handoff agent mark checklist items at Stop time, add it explicitly:
 
 ```bash
-forge session memory add-doc docs/status/checklist.md --strategy checklist
+forge memory track docs/status/checklist.md --as checklist
 ```
 
 ## Advanced Workflow
@@ -75,8 +63,8 @@ Compared with the shortest three-command workflow, the dogfood path adds three s
 
 - Create the planner with `--no-launch` so memory docs are attached before the first Stop event.
 - Run the first handoff-agent pass in `review-only`, inspect it, then switch to `augment`.
-- Use `--inline-plan` for worktree forks, and seed gitignored shadow docs in each worktree until Forge auto-creates
-  `.forge/memory/suggested_impl_notes.md` (see `docs/proposals/memory_enhancement.md`).
+- Use `--inline-plan` for worktree forks. `--propose` auto-creates shadow files for the planner; worktree forks inherit
+  and materialize them via `--inherit-memory`.
 
 ### 1. Planner
 
@@ -85,17 +73,11 @@ Create the planner without launching, attach memory docs, then start the plannin
 ```bash
 forge session start planner --proxy openrouter-openai --no-launch
 
-mkdir -p .forge/memory
-touch .forge/memory/suggested_impl_notes.md
-
-forge session set memory.auto_update.enabled true --session planner
-forge session set memory.auto_update.mode review-only --session planner
-forge session memory add-doc docs/status/change_log.md --strategy changelog --session planner
-forge session memory add-doc .forge/memory/suggested_impl_notes.md \
-  --strategy suggested \
-  --shadows docs/status/impl_notes.md \
-  --session planner
-forge session memory list-docs --json --session planner
+forge memory enable --review-only --session planner
+forge memory track docs/status/change_log.md --as changelog --session planner
+forge memory track docs/status/impl_notes.md \
+  --propose --shadow .forge/memory/suggested_impl_notes.md --session planner
+forge memory list --json --session planner
 
 forge session resume planner
 ```
@@ -104,7 +86,7 @@ After the planner exits, inspect the first proposed memory update before allowin
 
 ```bash
 forge session handoff show planner --latest
-forge session set memory.auto_update.mode augment --session planner
+forge memory enable --session planner
 ```
 
 ### 2. Supervised Executor
@@ -119,9 +101,6 @@ forge session fork planner \
   --supervise \
   --inline-plan \
   --no-launch
-
-mkdir -p ../multi-forge-executor/.forge/memory
-touch ../multi-forge-executor/.forge/memory/suggested_impl_notes.md
 
 forge session resume executor
 ```

@@ -1115,3 +1115,68 @@ class TestAlias:
     def test_mem_alias(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
         result = runner.invoke(main, ["mem", "list"])
         assert result.exit_code == 0, result.output
+
+
+# ---------------------------------------------------------------------------
+# passport show
+# ---------------------------------------------------------------------------
+
+
+class TestPassportShow:
+    def test_show_valid_passport(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        forge_root, _ = seeded_session
+        from forge.session.passport import synthesize_passport, write_passport
+
+        pp = synthesize_passport(strategy="changelog")
+        write_passport(forge_root / "docs/changelog.md", pp)
+
+        result = runner.invoke(main, ["memory", "passport", "show", "docs/changelog.md"])
+        assert result.exit_code == 0, result.output
+        assert "changelog" in result.output
+        assert "version" in result.output
+        assert "intent" in result.output
+
+    def test_show_json_output(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        forge_root, _ = seeded_session
+        from forge.session.passport import synthesize_passport, write_passport
+
+        pp = synthesize_passport(strategy="checklist")
+        write_passport(forge_root / "docs/checklist.md", pp)
+
+        result = runner.invoke(main, ["memory", "passport", "show", "docs/checklist.md", "--json"])
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["version"] == 1
+        assert data["update"]["strategy"] == "checklist"
+        assert "intent" in data
+        assert isinstance(data["captures"], list)
+
+    def test_show_no_passport(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        result = runner.invoke(main, ["memory", "passport", "show", "docs/checklist.md"])
+        assert result.exit_code == 0, result.output
+        assert "No passport" in result.output
+        assert "--as" in result.output
+
+    def test_show_no_passport_json(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        result = runner.invoke(main, ["memory", "passport", "show", "docs/checklist.md", "--json"])
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data == {
+            "success": False,
+            "reason": "no_passport",
+            "path": "docs/checklist.md",
+            "tip": "forge memory track docs/checklist.md --as <strategy>",
+        }
+
+    def test_show_file_not_found(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        result = runner.invoke(main, ["memory", "passport", "show", "docs/nonexistent.md"])
+        assert result.exit_code != 0
+        assert "not found" in (result.output or "").lower()
+
+    def test_show_malformed_passport(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        forge_root, _ = seeded_session
+        (forge_root / "docs/checklist.md").write_text(
+            "---\nforge_memory:\n  version: 99\n---\n# Doc\n", encoding="utf-8"
+        )
+        result = runner.invoke(main, ["memory", "passport", "show", "docs/checklist.md"])
+        assert result.exit_code != 0

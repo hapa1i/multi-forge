@@ -918,6 +918,7 @@ per-child handoff file in `$EDITOR` before launching Claude. `forge session memo
 | `forge memory status`         | Show memory doc status across sessions (`--scope`, `--doc`, `--json`)        |
 | `forge memory shadows list`   | List accumulated shadow proposals (`--scope`, `--session`, `--json`)         |
 | `forge memory shadows show`   | Show shadow proposal content (`--for <doc>`, `--scope`, `--session`)         |
+| `forge memory passport show`  | Show passport embedded in a memory doc (`--json`)                            |
 
 #### Proxy management
 

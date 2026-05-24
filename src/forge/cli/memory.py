@@ -1239,3 +1239,94 @@ def _review_curate(
         if result.stdout:
             console.print(result.stdout)
         sys.exit(1)
+
+
+# ---------------------------------------------------------------------------
+# passport subgroup
+# ---------------------------------------------------------------------------
+
+
+@memory.group("passport")
+def passport_group() -> None:
+    """Inspect memory-doc passports."""
+
+
+@passport_group.command("show")
+@click.argument("path")
+@click.option("--json", "as_json", is_flag=True, default=False, help="Emit JSON.")
+def passport_show_cmd(path: str, as_json: bool) -> None:
+    """Show the passport embedded in a memory doc."""
+    from dataclasses import asdict
+
+    try:
+        ctx = ExecutionContext.from_cwd()
+    except ForgeOpError as e:
+        raise click.ClickException(str(e)) from e
+
+    if ctx.forge_root is None:
+        raise click.ClickException("Not inside a Forge project. Run `forge extension enable` first.")
+
+    resolved_base = ctx.forge_root.resolve()
+    reason = is_safe_designated_doc_path(path, ctx.forge_root, resolved_base)
+    if reason:
+        raise click.ClickException(f"Invalid path: {reason}")
+
+    abs_path = (ctx.forge_root / path).resolve()
+
+    if not abs_path.is_file():
+        raise click.ClickException(f"File not found: {path}")
+
+    try:
+        passport = read_passport(abs_path)
+    except PassportError as e:
+        raise click.ClickException(f"Malformed passport in {path}: {e}") from e
+
+    if passport is None:
+        if as_json:
+            click.echo(
+                json.dumps(
+                    {
+                        "success": False,
+                        "reason": "no_passport",
+                        "path": path,
+                        "tip": f"forge memory track {path} --as <strategy>",
+                    },
+                    indent=2,
+                )
+            )
+            return
+        console.print(f"[dim]No passport found in {path}.[/dim]")
+        console.print(f"\n[dim]Tip: Add one with: forge memory track {path} --as <strategy>[/dim]")
+        return
+
+    if as_json:
+        raw = asdict(passport)
+        update = raw.get("update", {})
+        raw["update"] = {k: v for k, v in update.items() if v is not None}
+        click.echo(json.dumps(raw, indent=2))
+        return
+
+    from rich.table import Table
+
+    table = Table(show_header=True, header_style="bold")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value")
+
+    table.add_row("version", str(passport.version))
+    table.add_row("intent", passport.intent)
+    table.add_row("captures", ", ".join(passport.captures) if passport.captures else "(none)")
+    table.add_row("excludes", ", ".join(passport.excludes) if passport.excludes else "(none)")
+    table.add_row("strategy", passport.update.strategy)
+    table.add_row("mode", passport.update.mode)
+    table.add_row("writers", passport.update.writers)
+    table.add_row("inherit_on_fork", str(passport.update.inherit_on_fork))
+    if passport.update.compact_when:
+        table.add_row("compact_when", passport.update.compact_when)
+    if passport.update.shadow_path:
+        table.add_row("shadow_path", passport.update.shadow_path)
+    if passport.update.approval:
+        table.add_row("approval", passport.update.approval)
+    if passport.update.instruction:
+        table.add_row("instruction", passport.update.instruction)
+
+    console.print(table)
