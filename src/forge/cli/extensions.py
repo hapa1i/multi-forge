@@ -809,11 +809,11 @@ def disable_cmd(scope: str | None, uninstall_all: bool, yes: bool, force: bool) 
     except NoForgeInstallationError as e:
         console.print(f"[red]Error:[/red] {e}")
         sys.exit(1)
-    except ForgeInstallError as e:
-        console.print(f"[red]Error:[/red] {e}")
-        sys.exit(1)
     except TrackingCorruptedError as e:
         console.print(f"[bold red]Error:[/bold red] {e}")
+        sys.exit(1)
+    except ForgeInstallError as e:
+        console.print(f"[red]Error:[/red] {e}")
         sys.exit(1)
 
 

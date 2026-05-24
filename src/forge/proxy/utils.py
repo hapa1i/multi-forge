@@ -136,8 +136,9 @@ def proto_to_dict(obj: object) -> dict[str, object] | list[dict[str, object]] | 
 
     This is used for logging/pretty-printing only.
     """
-    if hasattr(obj, "to_dict") and callable(obj.to_dict):
-        result = obj.to_dict()
+    to_dict = getattr(obj, "to_dict", None)
+    if callable(to_dict):
+        result = to_dict()
         return result if isinstance(result, dict) else {"value": result}
 
     if isinstance(obj, (list, tuple)):

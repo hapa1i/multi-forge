@@ -251,6 +251,7 @@ def run_multi_review(
         if model_flag:
             cmd.extend(["--model", model_flag])
 
+        proc: subprocess.Popen[str] | None = None
         try:
             proc = subprocess.Popen(
                 cmd,
@@ -289,8 +290,9 @@ def run_multi_review(
 
         except subprocess.TimeoutExpired:
             try:
-                os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
-                proc.wait(timeout=5)
+                if proc is not None:
+                    os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+                    proc.wait(timeout=5)
             except (OSError, ProcessLookupError, subprocess.TimeoutExpired):
                 pass
             return ReviewResult(

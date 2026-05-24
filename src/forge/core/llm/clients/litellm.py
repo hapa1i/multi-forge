@@ -76,7 +76,7 @@ class LiteLLMClient:
             default_hyperparams: Default hyperparameters for all calls.
         """
         self._model = model
-        self._provider = provider
+        self._provider: ProviderType = provider
         self._credentials = credentials or CredentialManager.default()
         self._default_hyperparams = default_hyperparams
         self._client: AsyncOpenAI | None = None

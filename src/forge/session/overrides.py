@@ -73,7 +73,7 @@ def _collect_paths(cls: type | Any, prefix: str, paths: set[str]) -> None:
     try:
         hints = get_type_hints(cls)
     except Exception as e:
-        logger.debug("Cannot get type hints for %s: %s (using field names)", cls.__name__, e)
+        logger.debug("Cannot get type hints for %s: %s (using field names)", getattr(cls, "__name__", cls), e)
         hints = {}
 
     for f in fields(cls):
