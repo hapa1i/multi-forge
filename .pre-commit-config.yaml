@@ -60,21 +60,14 @@ repos:
       additional_dependencies: [".[jupyter]"]
 - repo: local
   hooks:
-  - id: sync-walkthrough-state
-    name: sync walkthrough-state.py (qa <- walkthrough)
-    language: system
-    entry: uv run --frozen python scripts/sync-walkthrough-state.py --check
-    files: ^src/skills/(qa|walkthrough)/scripts/walkthrough-state\.py$
-    pass_filenames: false
-    require_serial: true
   - id: mypy
     name: mypy
     language: system
     entry: uv run --frozen mypy
     types: [python]
     require_serial: true
-    # qa/ copy is generated from walkthrough/ by the sync-walkthrough-state hook;
-    # excluded here to avoid a mypy duplicate-module collision.
+    # Same-named standalone scripts in separate skill directories collide in
+    # mypy's module map during broad scans.
     exclude: ^src/skills/qa/scripts/walkthrough-state\.py$
   - id: pyright
     name: pyright

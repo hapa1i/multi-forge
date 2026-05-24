@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
-"""Parse a walkthrough checklist into structured JSON with state tracking.
+"""Parse the QA checklist into structured JSON with state tracking.
 
 Provides deterministic bookkeeping so the agent never does arithmetic —
 it only classifies (pass/fail/skip) while this script handles structure,
 counting, and progress tracking.
 
-NOTE: src/skills/walkthrough/scripts/walkthrough-state.py is the canonical copy.
-src/skills/qa/scripts/walkthrough-state.py is generated from it by
-scripts/sync-walkthrough-state.py (sync-walkthrough-state pre-commit hook).
-Edit the walkthrough/ copy only.
+This script is owned by the QA skill. The walkthrough skill carries a separate
+physical copy so each skill can evolve its checklist/state behavior independently.
 
 Usage (read-only):
     python3 walkthrough-state.py <checklist> index

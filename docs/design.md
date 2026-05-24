@@ -1718,7 +1718,8 @@ verification.
 
 - Share the pattern/convention, not the prompt — each skill is self-contained (no cross-mode confusion)
 - Checklist is single source of truth — editing it changes tests without SKILL.md modifications
-- `walkthrough-state.py` is the deterministic bookkeeper — agent classifies (pass/fail/skip), script counts
+- Each skill-local `walkthrough-state.py` is the deterministic bookkeeper — agent classifies (pass/fail/skip), and the
+  script counts
 - No per-checklist-item scripts — wrapper + lifecycle scripts are enough
 - `/forge:qa` tied to `full` install profile (Docker dependency)
 

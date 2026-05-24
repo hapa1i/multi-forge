@@ -568,7 +568,7 @@ src/skills/walkthrough/
 └── scripts/
     ├── setup-test-repo.sh           # Hermetic repo setup
     ├── run-in-repo.sh              # Safety wrapper (4 gates)
-    └── walkthrough-state.py        # Deterministic state machine (canonical)
+    └── walkthrough-state.py        # Deterministic state machine (walkthrough-owned)
 
 src/skills/qa/
 ├── SKILL.md                          # Full QA in Docker container
@@ -579,8 +579,11 @@ src/skills/qa/
 │   └── report-template.md           # Report template
 └── scripts/
     ├── start-container.sh           # Docker lifecycle
-    └── walkthrough-state.py        # Deterministic state machine (generated from walkthrough/)
+    └── walkthrough-state.py        # Deterministic state machine (QA-owned)
 ```
+
+The walkthrough and QA state scripts are separate physical copies. They currently share a lot of implementation shape,
+but each skill owns its copy so checklist/state behavior can change independently.
 
 ### Running
 
