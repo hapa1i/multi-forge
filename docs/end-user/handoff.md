@@ -2,9 +2,9 @@
 
 Shadow/propose mode and topic strategies available.
 
-The handoff agent is queued automatically when a session ends and runs on the next Forge CLI startup to update
-designated project documents based on what happened in the session. It reads the session transcript and writes updates
-to pre-existing files.
+The handoff agent is queued automatically when a session ends and runs on the next Forge CLI startup to update tracked
+memory docs based on what happened in the session. It reads the session transcript and writes updates to pre-existing
+official files or Forge-owned shadow proposal files.
 
 - Canonical architecture: [`docs/design.md` §5.6](../design.md)
 - Sessions (unit of work): [`sessions.md`](sessions.md)
@@ -27,7 +27,7 @@ After a session stops, the Stop hook enqueues a work marker. On next CLI startup
 subprocess that:
 
 1. Reads the session transcript
-2. Reads each designated document
+2. Reads each tracked memory doc
 3. Applies per-doc strategy instructions (add completed tasks, record errors, propose changes)
 4. Writes minimal updates to each file
 
@@ -40,14 +40,11 @@ signal-to-noise than incremental note-taking during a session.
 
 ### Mode 1: Direct update (agent is author)
 
-The agent edits designated docs in-place. Use for operational documents the agent has authority to maintain.
+The agent edits tracked docs in-place. Use for operational documents the agent has authority to maintain.
 
-```yaml
-designated_docs:
-  - path: docs/checklist.md
-    strategy: checklist
-  - path: docs/changelog.md
-    strategy: changelog
+```bash
+forge memory track docs/checklist.md --as checklist
+forge memory track docs/changelog.md --as changelog
 ```
 
 ### Mode 2: Shadow/propose (agent is advisor)
@@ -55,11 +52,9 @@ designated_docs:
 The agent writes suggestions to a **shadow file** for human review, reading the official document first to avoid
 redundant proposals. Use for standards and guidelines where human curation matters.
 
-```yaml
-designated_docs:
-  - path: .forge/memory/suggested_standards.md
-    strategy: suggested
-    shadows: docs/developer/coding-standards.md
+```bash
+forge memory track docs/developer/coding-standards.md \
+  --propose --shadow .forge/memory/suggested_standards.md
 ```
 
 The shadow file contains `- [ ]` checkboxes with rationale. The human reviews and merges what's valuable into the
@@ -69,47 +64,46 @@ official doc. Already-merged items are self-pruned on the next run.
 
 ## Configuration
 
-The handoff agent is configured in the session manifest under `intent.memory`:
+Use `forge memory` to enable the agent and track docs. The CLI writes a `forge_memory` passport into each tracked doc;
+that passport is the doc-level contract for strategy, mode, writer access, and inheritance. Session manifests store only
+participation plus auto-update runtime state.
+
+```bash
+# First run: inspect proposed edits before allowing writes
+forge memory enable --review-only
+
+# Track direct-update docs
+forge memory track docs/checklist.md --as checklist
+forge memory track docs/changelog.md --as changelog
+
+# Track a human-reviewed shadow proposal doc
+forge memory track docs/developer/coding-standards.md \
+  --propose --shadow .forge/memory/suggested_standards.md
+
+forge memory list --json
+```
+
+Example passport written by `forge memory track`:
 
 ```yaml
-# In forge.session.json (intent section)
-memory:
-  auto_update:
-    enabled: true
-    mode: augment           # "augment" (write updates) or "review-only" (dry run)
-    min_turns: 5            # Skip short sessions (below this threshold)
-    proxy: null             # Optional: route agent through specific proxy
-  designated_docs:
-    - path: docs/checklist.md
-      strategy: checklist
-    - path: docs/changelog.md
-      strategy: changelog
-    - path: .forge/memory/debugging.md
-      strategy: debugging
-    - path: .forge/memory/patterns.md
-      strategy: patterns
-    - path: .forge/memory/suggested_standards.md
-      strategy: suggested
-      shadows: docs/developer/coding-standards.md
+---
+forge_memory:
+  version: 1
+  intent: "Compact completed-work record."
+  captures: [completed work, verification]
+  excludes: [pending task plans, raw session summaries]
+  update:
+    strategy: changelog
+    mode: direct
+    writers: all-sessions
+    inherit_on_fork: true
+---
 ```
 
 ### Setting up via CLI
 
 ```bash
-# Enable handoff agent
-forge session set memory.auto_update.enabled true
-
-# Configure min_turns threshold
-forge session set memory.auto_update.min_turns 5
-
-# Use review-only mode (writes proposed edits to a review file; doesn't modify originals)
-forge session set memory.auto_update.mode review-only
-```
-
-Add and remove designated docs incrementally with the dedicated CLI verbs:
-
-```bash
-# List current designated docs (or --json for scripting)
+# List tracked docs (or --json for scripting)
 forge memory list --session planner
 
 # Track a direct-update doc
@@ -140,14 +134,14 @@ forge session handoff show --all            # List every report (paths + timesta
 ```
 
 In `review-only` mode this is where the proposed-but-not-applied changes appear; in `augment` mode it records the
-summary of what was actually written. The flat-JSON `forge session set memory.designated_docs '[...]'` path still works
-for bulk replacement, but the verbs above are the recommended setup path.
+summary of what was actually written. Use `forge memory track` / `untrack` for doc participation; legacy
+`memory.designated_docs[]` manifest entries are treated as compatibility state and should not be used for new setup.
 
 ---
 
 ## Strategies
 
-Each designated doc has a strategy that controls how the agent updates it.
+Each tracked memory doc has a strategy that controls how the agent updates it.
 
 ### Direct update strategies (Mode 1)
 
@@ -168,14 +162,15 @@ All direct strategies are **additive** — the agent does not remove, rewrite, o
 | ----------- | ------------------------------------------------------------------------------- |
 | `suggested` | Propose additions as `- [ ]` checkboxes with rationale; self-prune merged items |
 
-The `suggested` strategy **requires** the `shadows` field (path to the official document). The agent reads the official
+The `suggested` strategy uses `mode=shadow-only` plus a `shadow_path` in the doc passport. The agent reads the official
 doc first, then proposes only what's missing.
 
 ---
 
 ## File requirements
 
-**All designated docs must already exist.** The agent does not create files — it only updates existing ones.
+**Official docs must already exist.** The agent does not create official project docs for you. Forge-owned shadow files
+under `.forge/memory/` are created by `forge memory track --propose`; non-Forge-owned shadow paths must already exist.
 
 Before enabling the handoff agent, seed the files you want maintained:
 
@@ -187,28 +182,27 @@ mkdir -p .forge/memory
 echo "# Debugging Notes" > .forge/memory/debugging.md
 echo "# Architecture Patterns" > .forge/memory/patterns.md
 
-# Shadow docs (both the shadow AND official must exist)
-echo "# Suggested Standards" > .forge/memory/suggested_standards.md
+# Shadow docs (official doc must exist; Forge-owned shadow is created by track --propose)
 # docs/developer/coding-standards.md should already exist
 ```
 
-Missing files are silently skipped. For shadow docs, both the shadow file and the official doc must exist.
+Missing official files are skipped at runtime. `forge memory track` catches missing official docs up front.
 
 ---
 
 ## Path resolution
 
-Designated doc paths are **forge-root-relative**. When working in a git worktree, the agent edits the correct branch's
-content.
+Tracked memory doc paths are **forge-root-relative**. When working in a git worktree, the agent edits the correct
+branch's content.
 
 Transcript paths are stored as **forge-root-relative** paths and resolved against `forge_root` at runtime. Transcripts
 are artifacts stored at `<forge_root>/.forge/artifacts/`.
 
-| Path type        | Resolves against | Why                                |
-| ---------------- | ---------------- | ---------------------------------- |
-| `doc.path`       | `forge_root`     | Edits branch-specific content      |
-| `doc.shadows`    | `forge_root`     | Reads branch-specific official doc |
-| `transcript_rel` | `forge_root`     | Artifacts scoped to Forge project  |
+| Path type              | Resolves against | Why                               |
+| ---------------------- | ---------------- | --------------------------------- |
+| tracked official doc   | `forge_root`     | Edits branch-specific content     |
+| passport `shadow_path` | `forge_root`     | Writes branch-specific proposals  |
+| `transcript_rel`       | `forge_root`     | Artifacts scoped to Forge project |
 
 The `claude -p` subprocess runs with `cwd=forge_root`.
 
@@ -264,9 +258,9 @@ authoritative; session manifests store only participation state.
 | File existence       | Write target is missing, or a shadow entry's official doc is missing    |
 | Legacy manifest only | Passport-less entries violate old `suggested`/`shadows` coupling        |
 
-`forge memory track` validates these rules up front and writes or updates the passport. Manual JSON configs and older
-session manifests are still revalidated at runtime; invalid or missing docs are skipped with a log warning. If all docs
-are invalid or missing, the agent exits cleanly (not an error).
+`forge memory track` validates these rules up front and writes or updates the passport. Older session manifests are
+still revalidated at runtime; invalid or missing docs are skipped with a log warning. If all docs are invalid or
+missing, the agent exits cleanly (not an error).
 
 The transcript path is also validated (same safety checks) since it comes from CLI args / work queue markers.
 
@@ -278,22 +272,22 @@ The transcript path is also validated (same safety checks) since it comes from C
 
 Checklist:
 
-- `memory.auto_update.enabled` must be `true` in effective intent
+- `memory.auto_update.enabled` must be `true` in effective intent (`forge memory enable`)
 - Session must have ≥ `min_turns` conversation turns (default: 5)
 - `claude` CLI must be on PATH
-- `designated_docs` must be non-empty
+- At least one memory doc must be tracked for the session
 - At least one doc must exist on disk
 
 ### "File wasn't updated"
 
 - The file must exist before the agent runs (no file creation)
-- For shadow docs, the official doc (`shadows` target) must also exist
+- For shadow docs, the official doc must exist and the passport `shadow_path` must be valid
 - Check the strategy — does it match what you expect the agent to do?
-- Try `mode: review-only` to see what the agent would change without modifying files
+- Try `forge memory enable --review-only` to see what the agent would change without modifying files
 
 ### "Wrong file was updated" (path issues)
 
-- Designated docs resolve against `forge_root`
+- Tracked memory docs resolve against `forge_root`
 - If working in a worktree, verify the file exists at the Forge project root (not just the main repo)
 - Check `forge session show <name>` to see the forge_root path
 
@@ -309,19 +303,19 @@ forge handoff run --session-name <name> --worktree-path <path> --transcript-rel 
 
 ## Files to inspect (debugging)
 
-| File                                                     | Purpose                                         |
-| -------------------------------------------------------- | ----------------------------------------------- |
-| `<forge_root>/.forge/sessions/<name>/forge.session.json` | Session manifest (`intent.memory` config)       |
-| `<forge_root>/.forge/artifacts/<name>/transcripts/`      | Captured transcripts (agent input)              |
-| `~/.forge/pending-work/`                                 | Work queue markers (handoff-\<session_id>.json) |
-| `~/.forge/pending-work/failed/`                          | Poison markers (exceeded retry limit)           |
+| File                                                     | Purpose                                          |
+| -------------------------------------------------------- | ------------------------------------------------ |
+| `<forge_root>/.forge/sessions/<name>/forge.session.json` | Session manifest (participation + runtime state) |
+| `<forge_root>/.forge/artifacts/<name>/transcripts/`      | Captured transcripts (agent input)               |
+| `~/.forge/pending-work/`                                 | Work queue markers (handoff-\<session_id>.json)  |
+| `~/.forge/pending-work/failed/`                          | Poison markers (exceeded retry limit)            |
 
 ### Gotchas
 
 | Trap                                  | Explanation                                                               |
 | ------------------------------------- | ------------------------------------------------------------------------- |
-| "Handoff enabled but nothing happens" | `designated_docs` is empty — agent has nothing to update                  |
-| "Shadow doc not updating"             | Official doc (`shadows` target) must exist on disk                        |
+| "Handoff enabled but nothing happens" | No memory docs are tracked for the session                                |
+| "Shadow doc not updating"             | Official doc must exist and passport `shadow_path` must be valid          |
 | "Agent uses wrong model"              | Inherits session proxy by default; set `proxy` for explicit routing       |
 | "File created by agent"               | Agent never creates files — seed them first                               |
 | "Stale suggestions in shadow doc"     | Agent self-prunes merged items; run again after merging into official doc |

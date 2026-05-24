@@ -25,6 +25,33 @@ wc -l docs/status/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/documentation-guidelines.md` "Change Log Policy" for
 > the full spec.
 
+## 2026-05-24
+
+### Memory Enhancement Completion, Design Doc Sync, and Proposal Lifecycle
+
+**Goal**: Close out the memory enhancement proposal (PR #1), update design docs to reflect shipped passport model,
+establish the proposal lifecycle pattern, and prepare for runtime-abstraction.
+
+**Key changes**:
+
+- Archived final memory enhancement proposal and checklist snapshots to
+  `docs/status/archive/memory_enhancement/{proposal,checklist}.md`.
+- Updated `docs/design.md` section 5.6: replaced old `DesignatedDoc` model with passport-authoritative ownership, added
+  sections for passport frontmatter (5.6.2), shadow curation (5.6.3), and memory inheritance (5.6.4). Added
+  `forge memory shadows review` to command table.
+- Updated `docs/design_appendix.md` section G and `docs/end-user/handoff.md`: replaced old manifest-based examples with
+  passport frontmatter and `forge memory` setup guidance.
+- Pruned `impl_notes.md`: replaced Phase 0 pre-migration system map (100+ lines) with compact shipped-architecture
+  summary preserving durable decisions.
+- Established proposal lifecycle in `docs/developer/documentation-guidelines.md`: propose -> checklist -> implement
+  (with per-phase design-doc updates) -> archive proposal + checklist. Design docs are normative (track shipped code),
+  not aspirational. Updated archive format to folders with both proposal and checklist.
+- Updated `docs/status/README.md`: archive format, curation workflow, design-doc verification step in lifecycle.
+- Installed runtime-abstraction checklist as active `docs/status/checklist.md` with per-phase design-doc update rule.
+
+**Verification**: archived proposal+checklist at `docs/status/archive/memory_enhancement/`; design.md sections 5.6.2-5
+and `docs/end-user/handoff.md` reflect passport model; active checklist tracks runtime-abstraction phases 0-6.
+
 ## 2026-05-23
 
 ### Phase 5: Curated Shadow Review (Memory Enhancement)
