@@ -144,6 +144,23 @@ forge workflow analyze "What are the failure modes of the handoff agent?"
 
 See [workflows.md](workflows.md).
 
+### Model Selection -- Choosing Models for Each Role
+
+Forge templates default per role, not per "newest available." The supervisor judges what the executor produced — and
+those are different jobs that reward different capabilities. The same provider's flagship release can be the right pick
+for one role and the wrong pick for another:
+
+```bash
+# Planner/supervisor source on the proxy default Opus 4.6
+forge session start planner --proxy openrouter-anthropic
+
+# Executor on Opus 4.7, checked against the planner by a read-only supervisor
+forge session start exec --proxy openrouter-anthropic --model claude-opus-4-7 --supervise planner
+```
+
+See [model-selection.md](model-selection.md) for per-role recommendations, the structural reasons context fidelity
+varies across model versions, cost optimization order, and a release-validation checklist.
+
 ### Hooks -- Lifecycle & Artifacts
 
 Forge hooks capture session artifacts (plans, transcripts) and enforce policies at tool-use boundaries. Installed

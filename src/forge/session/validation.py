@@ -1,8 +1,9 @@
-"""Session name validation."""
+"""Session name and path validation."""
 
 from __future__ import annotations
 
 import re
+from pathlib import Path
 
 from .exceptions import InvalidSessionNameError
 
@@ -45,3 +46,22 @@ def validate_name(name: str) -> None:
 
     if "--" in name:
         raise InvalidSessionNameError("name cannot contain consecutive hyphens")
+
+
+# ---------------------------------------------------------------------------
+# Path safety validation
+# ---------------------------------------------------------------------------
+
+_UNSAFE_PATH_RE = re.compile(r"[`\x00-\x1f\x7f]")
+
+
+def is_safe_designated_doc_path(path: str, base: Path, resolved_base: Path) -> str | None:
+    """Check a single path for safety. Return rejection reason or None if safe."""
+    if Path(path).is_absolute():
+        return f"absolute path: {path}"
+    if _UNSAFE_PATH_RE.search(path):
+        return f"unsafe characters: {path!r}"
+    abs_path = (base / path).resolve()
+    if not abs_path.is_relative_to(resolved_base):
+        return f"escapes base directory: {path}"
+    return None

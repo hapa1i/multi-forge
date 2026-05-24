@@ -63,6 +63,14 @@ class TestRunClaudeSession:
         assert cmd == ["claude", "-p", "--resume", "abc-123"]
 
     @patch("forge.core.reactive.session_runner.subprocess.run")
+    def test_model_adds_flag(self, mock_run):
+        mock_run.return_value = MagicMock(stdout="", stderr="", returncode=0)
+        run_claude_session("prompt", resume_id="abc-123", model="opus")
+
+        cmd = mock_run.call_args[0][0]
+        assert cmd == ["claude", "-p", "--resume", "abc-123", "--model", "opus"]
+
+    @patch("forge.core.reactive.session_runner.subprocess.run")
     def test_base_url_set_in_env(self, mock_run):
         mock_run.return_value = MagicMock(stdout="", stderr="", returncode=0)
         run_claude_session("prompt", base_url="http://localhost:8085")
@@ -255,3 +263,22 @@ class TestRunClaudeSession:
 
         env = mock_run.call_args.kwargs["env"]
         assert env["CUSTOM_VAR"] == "value"
+
+    @patch("forge.core.reactive.session_runner.subprocess.run")
+    def test_unset_env_vars_removed_after_env_build(self, mock_run):
+        mock_run.return_value = MagicMock(stdout="", stderr="", returncode=0)
+        with patch.dict(
+            "os.environ",
+            {
+                "ANTHROPIC_MODEL": "opus",
+                "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-4-7",
+            },
+        ):
+            run_claude_session(
+                "prompt",
+                unset_env_vars=("ANTHROPIC_MODEL", "ANTHROPIC_DEFAULT_OPUS_MODEL"),
+            )
+
+        env = mock_run.call_args.kwargs["env"]
+        assert "ANTHROPIC_MODEL" not in env
+        assert "ANTHROPIC_DEFAULT_OPUS_MODEL" not in env

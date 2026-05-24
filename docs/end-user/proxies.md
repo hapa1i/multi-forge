@@ -182,6 +182,10 @@ model_alternatives:
     claude-opus-4-7: anthropic/claude-opus-4.7
 ```
 
+For per-role guidance on when to pin `--model claude-opus-4-7` vs leave the default 4.6 mapping in place — including the
+supervisor-vs-executor split, the structural reasons MRCR varies across model versions, and per-family cost +
+multi-needle retrieval data — see [model-selection.md](model-selection.md).
+
 ---
 
 ## Proxy lifecycle

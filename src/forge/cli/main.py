@@ -25,6 +25,7 @@ from .extensions import extensions  # noqa: E402
 from .guard import guard  # noqa: E402
 from .handoff import handoff  # noqa: E402
 from .hooks import hooks  # noqa: E402
+from .memory import memory as memory_cmd  # noqa: E402
 from .proxy import proxy  # noqa: E402
 from .search import search_cmd  # noqa: E402
 from .session import session  # noqa: E402
@@ -46,12 +47,14 @@ _ALIASES: dict[str, str] = {
     "ext": "extension",
     "extensions": "extension",  # backward compat (renamed from plural)
     "sess": "session",
+    "mem": "memory",
 }
 # Display aliases: canonical -> preferred short alias (shown in help)
 _DISPLAY_ALIASES: dict[str, str] = {
     "authentication": "auth",
     "extension": "ext",
     "session": "sess",
+    "memory": "mem",
 }
 
 
@@ -275,6 +278,7 @@ main.add_command(handoff)
 main.add_command(claude)
 main.add_command(config_cmd, name="config")
 main.add_command(hooks)
+main.add_command(memory_cmd, name="memory")
 main.add_command(extensions, name="extension")
 main.add_command(status_line)
 main.add_command(info_cmd, name="info")

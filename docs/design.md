@@ -440,6 +440,12 @@ running `claude -p --bare`), not by the shared resolver. `route` is present when
 can mean unresolved or opaque/non-model-specific routing (e.g., explicit base URL). `source` and `base_url` distinguish
 them.
 
+**Supervisor model scope:** When supervisor routing resolves to a proxy URL, the supervisor invokes
+`claude -p --model opus` and clears inherited Claude model-pin env vars (`ANTHROPIC_MODEL`,
+`ANTHROPIC_DEFAULT_*_MODEL`). This keeps executor/session `--model` pins local to the executor while allowing the
+supervisor to use the selected proxy's `opus` tier. Direct supervisors do not get this proxy-tier reset because there is
+no Forge proxy mapping to resolve.
+
 **Fail behavior by subprocess type:**
 
 | Subprocess | On unresolved | Rationale                                                        |
@@ -883,26 +889,36 @@ groups require an explicit subcommand. List/show commands support `--json` for s
 
 #### Session management
 
-| Command                                  | Purpose                                                                           |
-| ---------------------------------------- | --------------------------------------------------------------------------------- |
-| `forge session start [name]`             | Create and start a new session (auto-named if omitted)                            |
-| `forge session resume [name]`            | Reattach to an existing session (default), or derive a fresh child with `--fresh` |
-| `forge session fork <parent> [--name]`   | Fork a session (same dir by default; `--worktree` for isolation)                  |
-| `forge session show [session]`           | Show session details (`--json`, `--field`); accepts name or UUID                  |
-| `forge session list`                     | List sessions (`--scope repo\|project\|all`; default `repo`; `--json`)            |
-| `forge session set <key> <value>`        | Set a mid-session override                                                        |
-| `forge session reset [key]`              | Reset overrides to intent                                                         |
-| `forge session delete <name>...`         | Delete one or more sessions (`--all` for bulk deletion)                           |
-| `forge session clean --older-than N`     | Bulk-delete sessions older than N days                                            |
-| `forge session incognito [name]`         | Start an ephemeral session (auto-delete on exit)                                  |
-| `forge session shell [name]`             | Open shell in sidecar container                                                   |
-| `forge session memory list-docs`         | List designated memory docs (`--json`)                                            |
-| `forge session memory add-doc <path>`    | Add a designated memory doc (`--strategy`, `--shadows`)                           |
-| `forge session memory remove-doc <path>` | Remove a designated memory doc                                                    |
-| `forge session handoff show [name]`      | Inspect handoff-agent review reports (`--latest`, `--all`)                        |
+| Command                                | Purpose                                                                           |
+| -------------------------------------- | --------------------------------------------------------------------------------- |
+| `forge session start [name]`           | Create and start a new session (auto-named if omitted)                            |
+| `forge session resume [name]`          | Reattach to an existing session (default), or derive a fresh child with `--fresh` |
+| `forge session fork <parent> [--name]` | Fork a session (same dir by default; `--worktree` for isolation)                  |
+| `forge session show [session]`         | Show session details (`--json`, `--field`); accepts name or UUID                  |
+| `forge session list`                   | List sessions (`--scope repo\|project\|all`; default `repo`; `--json`)            |
+| `forge session set <key> <value>`      | Set a mid-session override                                                        |
+| `forge session reset [key]`            | Reset overrides to intent                                                         |
+| `forge session delete <name>...`       | Delete one or more sessions (`--all` for bulk deletion)                           |
+| `forge session clean --older-than N`   | Bulk-delete sessions older than N days                                            |
+| `forge session incognito [name]`       | Start an ephemeral session (auto-delete on exit)                                  |
+| `forge session shell [name]`           | Open shell in sidecar container                                                   |
+| `forge session handoff show [name]`    | Inspect handoff-agent review reports (`--latest`, `--all`)                        |
 
 Note: `session context` is a deprecated alias for `session show`. `session resume --fresh --review` opens the generated
-per-child handoff file in `$EDITOR` before launching Claude.
+per-child handoff file in `$EDITOR` before launching Claude. `forge session memory` is removed; use `forge memory`.
+
+#### Memory management
+
+| Command                       | Purpose                                                                      |
+| :---------------------------- | :--------------------------------------------------------------------------- |
+| `forge memory enable`         | Enable memory auto-update for handoff agent (`--session`)                    |
+| `forge memory track <path>`   | Track a memory doc (`--as <strategy>`, `--propose`, `--shadow`, `--session`) |
+| `forge memory untrack <path>` | Stop tracking a memory doc (`--session`)                                     |
+| `forge memory list`           | List tracked memory docs (`--session`, `--json`)                             |
+| `forge memory status`         | Show memory doc status across sessions (`--scope`, `--doc`, `--json`)        |
+| `forge memory shadows list`   | List accumulated shadow proposals (`--scope`, `--session`, `--json`)         |
+| `forge memory shadows show`   | Show shadow proposal content (`--for <doc>`, `--scope`, `--session`)         |
+| `forge memory passport show`  | Show passport embedded in a memory doc (`--json`)                            |
 
 #### Proxy management
 
@@ -1099,7 +1115,8 @@ before we hardcode a default. For now: `forge session set policy.supervisor.resu
 
 **Mechanism: "CLI-Fork Supervision"**
 
-The `policy-check` hook runs the supervisor via `claude -p --resume <supervisor_id>`:
+The `policy-check` hook runs the supervisor via `claude -p --resume <supervisor_id>` (plus `--model opus` for proxied
+supervisors):
 
 1. **Configure**: `forge session set policy.supervisor.resume_id <uuid>` (from planning session).
 2. **Check**: Runs at PreToolUse for Write/Edit, throttled via cache (default 30s).
@@ -1601,8 +1618,8 @@ Per-doc strategies control how each file is updated. Strategies are a `str → s
 
 **No file creation.** Designated docs must already exist; missing files are skipped. Humans choose which docs to
 maintain; the agent maintains them. This avoids the agent making structural choices (new files/templates) implicitly.
-Seed files before configuring them. `forge session memory add-doc` enforces this at configuration time; runtime skip
-handling remains for manual JSON overrides and stale manifests.
+Seed files before configuring them. `forge memory track` enforces this at configuration time; runtime skip handling
+remains for manual JSON overrides and stale manifests.
 
 Direct update strategies (Mode 1) include: `project-state`, `checklist`, `changelog`, `debugging`, `patterns`,
 `generic`. Shadow strategy (Mode 2): `suggested` (propose additions as checkboxes with rationale).

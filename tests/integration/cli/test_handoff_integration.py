@@ -314,7 +314,7 @@ class TestHandoffRunMultiDoc:
         mock_claude_workspace: ContainerLike,
         claude_capture_file: Callable[[str], str],
     ) -> None:
-        """memory add-doc → handoff review-only → session handoff show exposes the report."""
+        """memory track → handoff review-only → session handoff show exposes the report."""
         session_name = "memory-review"
         transcript_rel = f".forge/artifacts/{session_name}/transcripts/uuid-456.jsonl"
         _install_outputting_claude_mock(mock_claude_workspace)
@@ -327,12 +327,10 @@ class TestHandoffRunMultiDoc:
         mock_claude_workspace.write_file(f"/workspace/{transcript_rel}", _build_transcript())
 
         result = mock_claude_workspace.exec(
-            f"cd /workspace && forge session memory add-doc docs/state.md "
-            f"--strategy project-state --session {session_name}"
+            f"cd /workspace && forge memory track docs/state.md " f"--as project-state --session {session_name}"
         )
         assert result.returncode == 0, result.stderr
         for key, value in (
-            ("memory.auto_update.enabled", "true"),
             ("memory.auto_update.mode", "review-only"),
             ("memory.auto_update.min_turns", "1"),
         ):
@@ -341,13 +339,12 @@ class TestHandoffRunMultiDoc:
             )
             assert result.returncode == 0, result.stderr
 
-        list_result = mock_claude_workspace.exec(
-            f"cd /workspace && forge session memory list-docs --session {session_name} --json"
-        )
+        list_result = mock_claude_workspace.exec(f"cd /workspace && forge memory list --session {session_name} --json")
         assert list_result.returncode == 0, list_result.stderr
-        assert json.loads(list_result.stdout) == [
-            {"path": "docs/state.md", "strategy": "project-state", "shadows": None}
-        ]
+        docs = json.loads(list_result.stdout)
+        assert len(docs) == 1
+        assert docs[0]["path"] == "docs/state.md"
+        assert docs[0]["strategy"] == "project-state"
 
         result = mock_claude_workspace.exec(
             "cd /workspace && forge handoff run "

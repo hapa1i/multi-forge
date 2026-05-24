@@ -505,6 +505,8 @@ class SessionManager:
         token_estimate_multiplier: float = 1.0,
         resume_mode: str = "handoff",
         forge_root: str | None = None,
+        inherit_memory: str = "all",
+        inherit_memory_explicit: bool = False,
     ) -> tuple[SessionState, HandoffResult]:
         """Create a new session derived from a parent with context assembly.
 
@@ -575,6 +577,7 @@ class SessionManager:
 
         # --- Native mode: skip handoff, return early ---
         if resume_mode == "native":
+            inh_warnings_native: list[str] = []
             child_state = self._create_resume_child(
                 child_name=child_name,
                 parent_name=parent_name,
@@ -583,6 +586,9 @@ class SessionManager:
                 inherited_proxy=inherited_proxy,
                 parent_proxy_template=parent_proxy_template,
                 parent_proxy_base_url=parent_proxy_base_url,
+                inherit_memory=inherit_memory,
+                inherit_memory_explicit=inherit_memory_explicit,
+                warnings_sink=inh_warnings_native,
             )
             # Resolve parent transcript path for traceability (best-effort)
             transcript_artifact_path: str | None = None
@@ -612,6 +618,7 @@ class SessionManager:
                 transcript_artifact_path=transcript_artifact_path,
                 token_estimate=None,
                 lineage=[parent_name],
+                warnings=inh_warnings_native,
             )
 
             self._persist_resume_child(
@@ -663,6 +670,7 @@ class SessionManager:
         )
 
         # claude_session_id stays None until the SessionStart hook fires
+        inh_warnings_handoff: list[str] = []
         child_state = self._create_resume_child(
             child_name=child_name,
             parent_name=parent_name,
@@ -671,6 +679,9 @@ class SessionManager:
             inherited_proxy=inherited_proxy,
             parent_proxy_template=parent_proxy_template,
             parent_proxy_base_url=parent_proxy_base_url,
+            inherit_memory=inherit_memory,
+            inherit_memory_explicit=inherit_memory_explicit,
+            warnings_sink=inh_warnings_handoff,
         )
 
         child_state.confirmed.derivation = Derivation(
@@ -698,6 +709,7 @@ class SessionManager:
         if final_child_name != child_name:
             handoff_result.context_file = child_path(parent_artifact_root, parent_name, final_child_name)
             handoff_result.context_file_rel = child_path_rel(parent_name, final_child_name)
+        handoff_result.warnings.extend(inh_warnings_handoff)
         return child_state, handoff_result
 
     def _create_resume_child(
@@ -710,6 +722,9 @@ class SessionManager:
         inherited_proxy: str | None,
         parent_proxy_template: str | None,
         parent_proxy_base_url: str | None,
+        inherit_memory: str = "all",
+        inherit_memory_explicit: bool = False,
+        warnings_sink: list[str] | None = None,
     ) -> SessionState:
         """Create a child SessionState for resume (shared by native and handoff)."""
         child_state = create_session_state(
@@ -733,6 +748,21 @@ class SessionManager:
         child_state.is_fork = False  # Same worktree, context continuation (not a fork)
         # Propagate identity from parent
         child_state.forge_root = parent_entry.forge_root or parent_state.forge_root
+
+        from .memory_inheritance import InheritMemoryMode, apply_memory_inheritance
+
+        parent_fr = Path(parent_entry.forge_root or parent_entry.worktree_path)
+        _shadow_docs, inh_warnings = apply_memory_inheritance(
+            parent_state=parent_state,
+            child_state=child_state,
+            mode=InheritMemoryMode(inherit_memory),
+            parent_forge_root=parent_fr,
+            child_session_name=child_name,
+            cli_flag_explicit=inherit_memory_explicit,
+        )
+        if warnings_sink is not None:
+            warnings_sink.extend(inh_warnings)
+
         return child_state
 
     def _persist_resume_child(
@@ -885,6 +915,9 @@ class SessionManager:
         into_path: str | None = None,
         forge_root: str | None = None,
         force: bool = False,
+        inherit_memory: str = "all",
+        inherit_memory_explicit: bool = False,
+        warnings_sink: list[str] | None = None,
     ) -> tuple[SessionState, SessionState]:
         """Fork an existing session.
 
@@ -1147,6 +1180,23 @@ class SessionManager:
                     fork_relative_path = "."
 
         fork_state.forge_root = fork_forge_root
+
+        from .memory_inheritance import (
+            InheritMemoryMode,
+            apply_memory_inheritance,
+            materialize_inherited_shadows,
+        )
+
+        parent_fr = Path(parent_entry.forge_root or parent_entry.worktree_path)
+        inh_shadow_docs, inh_warnings = apply_memory_inheritance(
+            parent_state=parent,
+            child_state=fork_state,
+            mode=InheritMemoryMode(inherit_memory),
+            parent_forge_root=parent_fr,
+            child_session_name=fork_name,
+            cli_flag_explicit=inherit_memory_explicit,
+        )
+
         fork_resume_mode = "handoff" if (create_worktree or is_into) else "native"
         # For handoff-mode forks the per-child file is created lazily at launch
         # (see _generate_parent_handoff_context). We pre-record the reference
@@ -1228,6 +1278,15 @@ class SessionManager:
 
             fork_store.write(fork_state)
             wrote_manifest = True
+
+            is_cross_worktree = create_worktree or is_into
+            if is_cross_worktree and inh_shadow_docs:
+                target_fr = Path(fork_forge_root) if fork_forge_root else Path(fork_worktree_path)
+                mat_created, mat_skipped = materialize_inherited_shadows(inh_shadow_docs, target_fr)
+                inh_warnings.extend(mat_created + mat_skipped)
+
+            if warnings_sink is not None:
+                warnings_sink.extend(inh_warnings)
 
             self.index_store.add_from_state(
                 fork_state,

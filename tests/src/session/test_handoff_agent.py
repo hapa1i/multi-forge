@@ -14,7 +14,6 @@ import pytest
 
 from forge.core.reactive.session_runner import SessionResult
 from forge.session.handoff_agent import (
-    DOC_STRATEGIES,
     _stdout_indicates_permission_denied,
     _validate_designated_docs,
     build_multi_doc_prompt,
@@ -23,6 +22,24 @@ from forge.session.handoff_agent import (
     run_handoff_agent,
 )
 from forge.session.models import DesignatedDoc, HandoffConfig
+from forge.session.passport import (
+    STRATEGY_INSTRUCTIONS,
+    Passport,
+    PassportUpdate,
+    ResolvedDocSpec,
+    read_passport,
+    resolve_doc_spec,
+    resolve_passport_source,
+    write_passport,
+)
+
+DOC_STRATEGIES = STRATEGY_INSTRUCTIONS
+
+
+def _resolve_docs(docs: list[DesignatedDoc]) -> list[ResolvedDocSpec]:
+    """Convert DesignatedDocs to ResolvedDocSpecs (passport-less fallback)."""
+    return [resolve_doc_spec(doc, None) for doc in docs]
+
 
 # ---------------------------------------------------------------------------
 # Transcript fixtures
@@ -203,7 +220,7 @@ class TestBuildMultiDocPrompt:
         prompt = build_multi_doc_prompt(
             session_name="test",
             transcript_path="/abs/path/t.jsonl",
-            designated_docs=docs,
+            docs=_resolve_docs(docs),
         )
         assert "docs/checklist.md" in prompt
         assert "docs/changelog.md" in prompt
@@ -214,7 +231,7 @@ class TestBuildMultiDocPrompt:
         prompt = build_multi_doc_prompt(
             session_name="test",
             transcript_path="/abs/path/t.jsonl",
-            designated_docs=docs,
+            docs=_resolve_docs(docs),
         )
         assert "Mark completed tasks" in prompt
         assert "Do NOT remove" in prompt
@@ -225,7 +242,7 @@ class TestBuildMultiDocPrompt:
         prompt = build_multi_doc_prompt(
             session_name="test",
             transcript_path="/abs/path/t.jsonl",
-            designated_docs=docs,
+            docs=_resolve_docs(docs),
         )
         assert "accomplishments" in prompt
         assert "Do NOT modify or remove" in prompt
@@ -236,7 +253,7 @@ class TestBuildMultiDocPrompt:
         prompt = build_multi_doc_prompt(
             session_name="test",
             transcript_path="/abs/path/t.jsonl",
-            designated_docs=docs,
+            docs=_resolve_docs(docs),
         )
         assert "NEW information" in prompt
 
@@ -246,7 +263,7 @@ class TestBuildMultiDocPrompt:
         prompt = build_multi_doc_prompt(
             session_name="test",
             transcript_path="/abs/path/t.jsonl",
-            designated_docs=docs,
+            docs=_resolve_docs(docs),
         )
         assert "NEW information" in prompt
         assert "docs/foo.md" in prompt
@@ -258,7 +275,7 @@ class TestBuildMultiDocPrompt:
             session_name="test",
             transcript_path="/abs/path/t.jsonl",
             mode="review-only",
-            designated_docs=docs,
+            docs=_resolve_docs(docs),
         )
         assert "Do NOT modify any files" in prompt
 
@@ -268,7 +285,7 @@ class TestBuildMultiDocPrompt:
         prompt = build_multi_doc_prompt(
             session_name="my-session",
             transcript_path="/abs/path/t.jsonl",
-            designated_docs=docs,
+            docs=_resolve_docs(docs),
         )
         assert "my-session" in prompt
         assert "/abs/path/t.jsonl" in prompt
@@ -283,7 +300,7 @@ class TestBuildMultiDocPrompt:
         prompt = build_multi_doc_prompt(
             session_name="test",
             transcript_path="/abs/path/t.jsonl",
-            designated_docs=docs,
+            docs=_resolve_docs(docs),
         )
         assert ".forge/memory/project-state.md" in prompt
         assert "docs/checklist.md" in prompt
@@ -295,7 +312,7 @@ class TestBuildMultiDocPrompt:
         prompt = build_multi_doc_prompt(
             session_name="test",
             transcript_path="/abs/path/t.jsonl",
-            designated_docs=docs,
+            docs=_resolve_docs(docs),
         )
         assert "Only ADD information" not in prompt
         assert "per-file instructions" in prompt or "minimal edits" in prompt
@@ -314,7 +331,7 @@ class TestBuildMultiDocPrompt:
         prompt = build_multi_doc_prompt(
             session_name="test",
             transcript_path="/abs/path/t.jsonl",
-            designated_docs=docs,
+            docs=_resolve_docs(docs),
         )
         assert "docs/developer/coding-standards.md" in prompt
         assert ".forge/memory/suggested_standards.md" in prompt
@@ -331,7 +348,7 @@ class TestBuildMultiDocPrompt:
         prompt = build_multi_doc_prompt(
             session_name="test",
             transcript_path="/abs/path/t.jsonl",
-            designated_docs=docs,
+            docs=_resolve_docs(docs),
         )
         assert "Read the OFFICIAL document at `OFFICIAL.md` first" in prompt
 
@@ -341,7 +358,7 @@ class TestBuildMultiDocPrompt:
         prompt = build_multi_doc_prompt(
             session_name="test",
             transcript_path="/abs/path/t.jsonl",
-            designated_docs=docs,
+            docs=_resolve_docs(docs),
         )
         assert "proposes changes to" not in prompt
 
@@ -358,7 +375,7 @@ class TestBuildMultiDocPrompt:
         prompt = build_multi_doc_prompt(
             session_name="test",
             transcript_path="/abs/path/t.jsonl",
-            designated_docs=docs,
+            docs=_resolve_docs(docs),
         )
         # Direct doc: no shadow language
         assert "docs/checklist.md" in prompt
@@ -366,6 +383,32 @@ class TestBuildMultiDocPrompt:
         # Shadow doc: has shadow language
         assert "proposes changes to `STANDARDS.md`" in prompt
         assert "Read the OFFICIAL document" in prompt
+
+    def test_shadow_prompt_includes_liberal_framing(self) -> None:
+        """Shadow docs include liberal suggestion framing."""
+        docs = [
+            DesignatedDoc(
+                path=".forge/memory/suggested.md",
+                strategy="suggested",
+                shadows="OFFICIAL.md",
+            ),
+        ]
+        prompt = build_multi_doc_prompt(
+            session_name="test",
+            transcript_path="/abs/path/t.jsonl",
+            docs=_resolve_docs(docs),
+        )
+        assert "Write suggestions liberally" in prompt
+
+    def test_direct_doc_no_liberal_framing(self) -> None:
+        """Direct docs do NOT include liberal suggestion framing."""
+        docs = [DesignatedDoc(path="docs/checklist.md", strategy="checklist")]
+        prompt = build_multi_doc_prompt(
+            session_name="test",
+            transcript_path="/abs/path/t.jsonl",
+            docs=_resolve_docs(docs),
+        )
+        assert "Write suggestions liberally" not in prompt
 
 
 # ---------------------------------------------------------------------------
@@ -1320,3 +1363,324 @@ class TestRunHandoffAgentMultiDoc:
             assert "suggested.md" in prompt
             assert "STANDARDS.md" in prompt
             assert "proposes changes to" in prompt
+
+
+# ---------------------------------------------------------------------------
+# Passport ownership-split integration tests
+# ---------------------------------------------------------------------------
+
+
+def _write_passport_to_doc(path: Path, **update_kwargs: object) -> None:
+    """Write a passport with given update fields to a markdown file."""
+    passport = Passport(
+        version=1,
+        intent="Test doc",
+        update=PassportUpdate(**update_kwargs),  # type: ignore[arg-type]
+    )
+    write_passport(path, passport)
+
+
+class TestPassportOwnershipSplit:
+    """Prove that the manifest is just participation state and passport changes
+    take effect at stop time without re-running ``forge memory track``."""
+
+    def test_passport_strategy_overrides_manifest(self, tmp_path: Path) -> None:
+        """Passport strategy wins over DesignatedDoc.strategy."""
+        doc_path = tmp_path / "docs" / "changelog.md"
+        doc_path.parent.mkdir(parents=True)
+        doc_path.write_text("# Changelog\n")
+        _write_passport_to_doc(doc_path, strategy="changelog")
+
+        doc = DesignatedDoc(path="docs/changelog.md", strategy="generic")
+        passport = read_passport(tmp_path / resolve_passport_source(doc))
+        spec = resolve_doc_spec(doc, passport)
+
+        prompt = build_multi_doc_prompt(
+            session_name="test",
+            transcript_path="/t.jsonl",
+            docs=[spec],
+        )
+        assert "accomplishments" in prompt
+        assert "NEW information" not in prompt
+
+    def test_edited_passport_changes_strategy(self, tmp_path: Path) -> None:
+        """Editing a passport's strategy changes the handoff prompt without re-track."""
+        doc_path = tmp_path / "docs" / "notes.md"
+        doc_path.parent.mkdir(parents=True)
+        doc_path.write_text("# Notes\n")
+        _write_passport_to_doc(doc_path, strategy="changelog")
+
+        doc = DesignatedDoc(path="docs/notes.md", strategy="generic")
+
+        # First read: changelog strategy
+        passport = read_passport(tmp_path / resolve_passport_source(doc))
+        spec = resolve_doc_spec(doc, passport)
+        prompt1 = build_multi_doc_prompt(session_name="test", transcript_path="/t.jsonl", docs=[spec])
+        assert "accomplishments" in prompt1
+
+        # Edit passport to checklist
+        _write_passport_to_doc(doc_path, strategy="checklist")
+
+        # Second read: checklist strategy (no re-track)
+        passport2 = read_passport(tmp_path / resolve_passport_source(doc))
+        spec2 = resolve_doc_spec(doc, passport2)
+        prompt2 = build_multi_doc_prompt(session_name="test", transcript_path="/t.jsonl", docs=[spec2])
+        assert "Mark completed tasks" in prompt2
+        assert "accomplishments" not in prompt2
+
+    def test_edited_passport_shadow_path_changes_write_target(self, tmp_path: Path) -> None:
+        """Editing shadow_path in passport changes the effective write target."""
+        official = tmp_path / "docs" / "impl_notes.md"
+        official.parent.mkdir(parents=True)
+        official.write_text("# Notes\n")
+
+        old_shadow = tmp_path / ".forge" / "memory" / "old_shadow.md"
+        old_shadow.parent.mkdir(parents=True)
+        old_shadow.write_text("")
+
+        new_shadow = tmp_path / ".forge" / "memory" / "new_shadow.md"
+        new_shadow.write_text("")
+
+        _write_passport_to_doc(
+            official,
+            strategy="suggested",
+            mode="shadow-only",
+            shadow_path=".forge/memory/old_shadow.md",
+        )
+
+        doc = DesignatedDoc(
+            path=".forge/memory/old_shadow.md",
+            strategy="suggested",
+            shadows="docs/impl_notes.md",
+        )
+        passport = read_passport(tmp_path / resolve_passport_source(doc))
+        spec = resolve_doc_spec(doc, passport)
+        assert spec.write_path == ".forge/memory/old_shadow.md"
+
+        # Edit passport to new shadow path
+        _write_passport_to_doc(
+            official,
+            strategy="suggested",
+            mode="shadow-only",
+            shadow_path=".forge/memory/new_shadow.md",
+        )
+        passport2 = read_passport(tmp_path / resolve_passport_source(doc))
+        spec2 = resolve_doc_spec(doc, passport2)
+        assert spec2.write_path == ".forge/memory/new_shadow.md"
+
+    def test_passport_context_in_prompt(self, tmp_path: Path) -> None:
+        """Full passport contract (intent, captures, excludes, approval) in prompt."""
+        doc_path = tmp_path / "docs" / "notes.md"
+        doc_path.parent.mkdir(parents=True)
+        doc_path.write_text("# Notes\n")
+
+        passport = Passport(
+            version=1,
+            intent="Durable implementation memory",
+            captures=["stable decisions", "invariants"],
+            excludes=["raw summaries"],
+            update=PassportUpdate(
+                strategy="suggested",
+                instruction="Be concise and cite sources",
+                approval="human-promoted",
+                compact_when="over 200 lines",
+            ),
+        )
+        write_passport(doc_path, passport)
+
+        doc = DesignatedDoc(path="docs/notes.md")
+        p = read_passport(tmp_path / resolve_passport_source(doc))
+        spec = resolve_doc_spec(doc, p)
+        prompt = build_multi_doc_prompt(session_name="test", transcript_path="/t.jsonl", docs=[spec])
+        assert "Durable implementation memory" in prompt
+        assert "stable decisions" in prompt
+        assert "raw summaries" in prompt
+        assert "human-promoted" in prompt
+        assert "Be concise and cite sources" in prompt
+        assert "over 200 lines" in prompt
+
+
+class TestShadowFilePassportConflict:
+    """Official doc passport is authoritative; shadow file passport is ignored."""
+
+    def test_official_doc_passport_wins(self, tmp_path: Path) -> None:
+        official = tmp_path / "docs" / "impl_notes.md"
+        official.parent.mkdir(parents=True)
+        official.write_text("# Notes\n")
+        _write_passport_to_doc(official, strategy="changelog")
+
+        shadow = tmp_path / ".forge" / "memory" / "suggested.md"
+        shadow.parent.mkdir(parents=True)
+        shadow.write_text("# Shadow\n")
+        _write_passport_to_doc(shadow, strategy="checklist")
+
+        doc = DesignatedDoc(
+            path=".forge/memory/suggested.md",
+            strategy="generic",
+            shadows="docs/impl_notes.md",
+        )
+        source = resolve_passport_source(doc)
+        assert source == "docs/impl_notes.md"
+
+        passport = read_passport(tmp_path / source)
+        spec = resolve_doc_spec(doc, passport)
+        assert "accomplishments" in spec.strategy_instruction
+
+
+class TestWriterFiltering:
+    """Writer authorization in run_handoff_agent()."""
+
+    def _make_workspace(self, tmp_path: Path) -> Path:
+        workspace = tmp_path / "workspace"
+        workspace.mkdir()
+        (workspace / ".forge" / "artifacts" / "test-session" / "handoff").mkdir(parents=True)
+        transcript = workspace / ".forge" / "artifacts" / "test-session" / "transcript.jsonl"
+        transcript.write_text(
+            "\n".join(
+                json.dumps(
+                    {
+                        "requestId": f"req-{i}",
+                        "message": {"role": r, "content": [{"text": "x"}]},
+                    }
+                )
+                for i, r in enumerate(["user", "assistant"] * 6)  # 6 turns, above min_turns
+            )
+        )
+        return workspace
+
+    def test_unauthorized_session_skipped(self, tmp_path: Path) -> None:
+        workspace = self._make_workspace(tmp_path)
+        doc_path = workspace / "docs" / "changelog.md"
+        doc_path.parent.mkdir(parents=True)
+        doc_path.write_text("# Log\n")
+        _write_passport_to_doc(doc_path, strategy="changelog", writers="planner")
+
+        config = HandoffConfig(enabled=True, mode="augment", min_turns=1)
+        docs = [DesignatedDoc(path="docs/changelog.md", strategy="changelog")]
+
+        with patch("forge.session.handoff_agent.run_claude_session") as mock_run:
+            mock_run.return_value = SessionResult(stdout="done", stderr="", returncode=0)
+            run_handoff_agent(
+                session_name="executor",
+                forge_root=workspace,
+                transcript_snapshot_rel=".forge/artifacts/test-session/transcript.jsonl",
+                config=config,
+                designated_docs=docs,
+            )
+            mock_run.assert_not_called()
+
+    def test_authorized_session_proceeds(self, tmp_path: Path) -> None:
+        workspace = self._make_workspace(tmp_path)
+        doc_path = workspace / "docs" / "changelog.md"
+        doc_path.parent.mkdir(parents=True)
+        doc_path.write_text("# Log\n")
+        _write_passport_to_doc(doc_path, strategy="changelog", writers="planner")
+
+        config = HandoffConfig(enabled=True, mode="augment", min_turns=1)
+        docs = [DesignatedDoc(path="docs/changelog.md", strategy="changelog")]
+
+        with patch("forge.session.handoff_agent.run_claude_session") as mock_run:
+            mock_run.return_value = SessionResult(stdout="done", stderr="", returncode=0)
+            with patch("forge.session.handoff_agent.is_claude_available", return_value=True):
+                run_handoff_agent(
+                    session_name="planner",
+                    forge_root=workspace,
+                    transcript_snapshot_rel=".forge/artifacts/test-session/transcript.jsonl",
+                    config=config,
+                    designated_docs=docs,
+                )
+            mock_run.assert_called_once()
+
+
+class TestMalformedPassportSkipped:
+    """Malformed passport skips the doc, doesn't abort the whole handoff."""
+
+    def test_bad_passport_skipped_good_doc_proceeds(self, tmp_path: Path) -> None:
+        workspace = tmp_path / "workspace"
+        workspace.mkdir()
+        (workspace / ".forge" / "artifacts" / "sess" / "handoff").mkdir(parents=True)
+        transcript = workspace / ".forge" / "artifacts" / "sess" / "transcript.jsonl"
+        transcript.write_text(
+            "\n".join(
+                json.dumps(
+                    {
+                        "requestId": f"req-{i}",
+                        "message": {"role": r, "content": [{"text": "x"}]},
+                    }
+                )
+                for i, r in enumerate(["user", "assistant"] * 6)
+            )
+        )
+
+        # Bad passport doc
+        bad_doc = workspace / "docs" / "bad.md"
+        bad_doc.parent.mkdir(parents=True)
+        bad_doc.write_text("---\nforge_memory:\n  version: 99\n  intent: T\n---\n# Bad\n")
+
+        # Good doc (no passport)
+        good_doc = workspace / "docs" / "good.md"
+        good_doc.write_text("# Good doc\n")
+
+        config = HandoffConfig(enabled=True, mode="augment", min_turns=1)
+        docs = [
+            DesignatedDoc(path="docs/bad.md", strategy="generic"),
+            DesignatedDoc(path="docs/good.md", strategy="generic"),
+        ]
+
+        with patch("forge.session.handoff_agent.run_claude_session") as mock_run:
+            mock_run.return_value = SessionResult(stdout="done", stderr="", returncode=0)
+            with patch("forge.session.handoff_agent.is_claude_available", return_value=True):
+                run_handoff_agent(
+                    session_name="test-session",
+                    forge_root=workspace,
+                    transcript_snapshot_rel=".forge/artifacts/sess/transcript.jsonl",
+                    config=config,
+                    designated_docs=docs,
+                )
+            mock_run.assert_called_once()
+            prompt = mock_run.call_args[0][0]
+            assert "good.md" in prompt
+            assert "bad.md" not in prompt
+
+
+class TestPassportLessDocsWork:
+    """Docs without passport frontmatter work identically to pre-passport behavior."""
+
+    def test_no_passport_uses_designated_doc_strategy(self, tmp_path: Path) -> None:
+        workspace = tmp_path / "workspace"
+        workspace.mkdir()
+        (workspace / ".forge" / "artifacts" / "sess" / "handoff").mkdir(parents=True)
+        transcript = workspace / ".forge" / "artifacts" / "sess" / "transcript.jsonl"
+        transcript.write_text(
+            "\n".join(
+                json.dumps(
+                    {
+                        "requestId": f"req-{i}",
+                        "message": {"role": r, "content": [{"text": "x"}]},
+                    }
+                )
+                for i, r in enumerate(["user", "assistant"] * 6)
+            )
+        )
+
+        doc = workspace / "docs" / "changelog.md"
+        doc.parent.mkdir(parents=True)
+        doc.write_text("# Changelog\nNo passport here.\n")
+
+        config = HandoffConfig(enabled=True, mode="augment", min_turns=1)
+        docs = [DesignatedDoc(path="docs/changelog.md", strategy="changelog")]
+
+        with patch("forge.session.handoff_agent.run_claude_session") as mock_run:
+            mock_run.return_value = SessionResult(stdout="done", stderr="", returncode=0)
+            with patch("forge.session.handoff_agent.is_claude_available", return_value=True):
+                run_handoff_agent(
+                    session_name="test-session",
+                    forge_root=workspace,
+                    transcript_snapshot_rel=".forge/artifacts/sess/transcript.jsonl",
+                    config=config,
+                    designated_docs=docs,
+                )
+            mock_run.assert_called_once()
+            prompt = mock_run.call_args[0][0]
+            assert "accomplishments" in prompt
+            assert "changelog.md" in prompt

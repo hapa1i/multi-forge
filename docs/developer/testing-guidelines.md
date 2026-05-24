@@ -180,10 +180,11 @@ use the existing `slow` marker; do not add a separate paid marker.
 
 **Current real-Claude tests:**
 
-| File                        | What it tests                                                |
-| --------------------------- | ------------------------------------------------------------ |
-| `test_real_claude_hooks.py` | SessionStart hook sets UUID, Stop hook records transcript    |
-| `test_supervisor_e2e.py`    | Full plan -> fork -> wire supervisor -> on-demand check flow |
+| File                         | What it tests                                                |
+| ---------------------------- | ------------------------------------------------------------ |
+| `test_real_claude_hooks.py`  | SessionStart hook sets UUID, Stop hook records transcript    |
+| `test_real_claude_memory.py` | Memory handoff review-only and shadow curation smoke flows   |
+| `test_supervisor_e2e.py`     | Full plan -> fork -> wire supervisor -> on-demand check flow |
 
 ### Requirements
 

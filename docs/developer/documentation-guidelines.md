@@ -12,6 +12,22 @@ Documentation standards for Multi-Forge.
 - **Change logs** - Completed work record
 - **Evaluation results** - Update after evals/tests
 
+### Status Docs (`docs/status/`)
+
+`docs/status/` is the living implementation-memory surface for active multi-session work. See
+[`docs/status/README.md`](../status/README.md) for the current repo-specific contract.
+
+| File                        | Purpose                                      | Maintenance rule                                                                             |
+| --------------------------- | -------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `docs/status/checklist.md`  | One active milestone/proposal execution plan | Update during sessions; archive when the proposal is fully executed                          |
+| `docs/status/change_log.md` | Completed-work record                        | Keep compact; newest first; compact old tail entries before the file grows too large         |
+| `docs/status/impl_notes.md` | Human-approved durable memory                | Promote only stable decisions, invariants, recurring bug causes, and operational constraints |
+| `docs/status/archive/`      | Completed milestone/proposal checklists      | Move finished checklists here as `<proposal-or-milestone>.md`                                |
+
+Checklist files are per milestone/proposal, not permanent catch-all plans. When a checklist is complete, add the final
+change-log entry, promote durable notes, then archive on `main` after the final proposal merge unless the final feature
+PR is explicitly the closeout. Move the checklist to `docs/status/archive/`, then start a fresh active checklist.
+
 ### Coding Context Documents
 
 - **Design docs** - Aggregated coding reference
@@ -35,8 +51,8 @@ Documentation standards for Multi-Forge.
 
 ## Documentation Rules
 
-**Rule 1**: Checklist = current work; change log = completed work; design docs = target system; proposals = future
-sketches; AutoMem = evolving state
+**Rule 1**: Checklist = current milestone/proposal work; change log = completed work; implementation notes =
+human-approved durable memory; design docs = target system; proposals = future sketches; AutoMem = evolving state
 
 **Rule 2**: Verbosity has a cost; balance with clarity and intent.
 
@@ -52,12 +68,15 @@ sketches; AutoMem = evolving state
 
 ## Where to Document What
 
-| What                 | Where              | When to Update            |
-| -------------------- | ------------------ | ------------------------- |
-| Coding context       | Design docs        | FIRST, on refactors       |
-| Current metrics      | AutoMem            | On evolving facts         |
-| Target system design | Static design docs | On architecture changes   |
-| Future sketches      | `docs/proposals/`  | When topic becomes active |
+| What                          | Where                       | When to Update                                  |
+| ----------------------------- | --------------------------- | ----------------------------------------------- |
+| Coding context                | Design docs                 | FIRST, on refactors                             |
+| Active execution plan         | `docs/status/checklist.md`  | During active milestone/proposal work           |
+| Completed work                | `docs/status/change_log.md` | At session/phase closeout                       |
+| Durable implementation memory | `docs/status/impl_notes.md` | After human review                              |
+| Current metrics               | AutoMem                     | On evolving facts                               |
+| Target system design          | Static design docs          | On architecture changes                         |
+| Future sketches               | `docs/proposals/`           | Refresh and checklist when topic becomes active |
 
 ---
 
@@ -91,7 +110,8 @@ Each phase SHOULD define acceptance criteria:
 
 1. **Start**: Create tasks with `[ ]` + acceptance test tables
 2. **During**: Update checkboxes; note blockers
-3. **Complete**: Move notes to change_log; remove phase details; update focus
+3. **Complete**: Move completed-work details to `change_log`; promote durable memory to `impl_notes`; archive the
+   completed checklist under `docs/status/archive/` after the final merge to `main`; create the next active checklist
 
 ---
 
@@ -205,3 +225,19 @@ Agents: ~25k tokens; Read truncates >2k lines. Keep docs under these limits; use
 25,677 tokens | 99,378 chars | 1,924 lines
   method: anthropic API (claude-sonnet-4-6)
 ```
+
+### Living Doc Maintenance
+
+Run token/line checks before living docs become hard to load:
+
+```bash
+wc -l docs/status/*.md
+./scripts/count-tokens.py --model <agent-model> docs/status/change_log.md
+```
+
+For `docs/status/change_log.md`, compact the oldest tail entries first. Preserve dates, goals, decisions, verification,
+and deferred items; remove verbose blow-by-blow details. If compaction is still not enough, move old detailed sections
+to an archive file and leave a dated summary in the active change log.
+
+For `docs/status/impl_notes.md`, prune obsolete or duplicated notes instead of appending forever. If a note is not
+useful for a future session's decisions, it probably belongs in the change log or nowhere.

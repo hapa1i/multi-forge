@@ -207,6 +207,12 @@ The supervisor only blocks when the verdict is "divergent" with **high confidenc
 plan. Low confidence or missing citations produce a warning instead. Timeouts, errors, and unparseable responses also
 result in a warning, not a block.
 
+**Picking a supervisor model.** The supervisor reads the planner's full conversation via `--resume` and must locate and
+cite specific plan items — that's multi-needle retrieval over a long context, not code writing. SWE-bench Verified is
+the wrong benchmark for this role. For per-family supervisor picks (including the Opus 4.6 vs 4.7 split, when to
+cross-route to Gemini for mid-long or multimodal planning sessions, and DeepSeek V4 Pro as a cost-efficient
+alternative), see [model-selection.md](model-selection.md).
+
 ### Why supervision matters (beyond TDD)
 
 Deterministic policies like `tdd` enforce **process** — tests before implementation. The semantic supervisor enforces

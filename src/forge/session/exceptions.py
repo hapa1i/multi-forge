@@ -35,6 +35,19 @@ class SessionFileNotFoundError(ForgeSessionError):
         super().__init__(f"session file not found at '{path}'")
 
 
+class PassportError(ForgeSessionError):
+    """Raised for invalid memory-doc passport frontmatter."""
+
+    def __init__(self, field_path: str, reason: str, *, hint: str | None = None) -> None:
+        self.field_path = field_path
+        self.reason = reason
+        self.hint = hint
+        msg = f"{field_path}: {reason}"
+        if hint:
+            msg += f"\n  {hint}"
+        super().__init__(msg)
+
+
 class ManifestCorruptedError(ForgeSessionError):
     """Raised when manifest file exists but cannot be parsed."""
 

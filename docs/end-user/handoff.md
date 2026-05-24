@@ -110,22 +110,17 @@ Add and remove designated docs incrementally with the dedicated CLI verbs:
 
 ```bash
 # List current designated docs (or --json for scripting)
-forge session memory list-docs
+forge memory list --session planner
 
-# Add a direct-update doc (Mode 1)
-forge session memory add-doc docs/checklist.md --strategy checklist
+# Track a direct-update doc
+forge memory track docs/checklist.md --as checklist --session planner
 
-# Add a shadow/propose doc (Mode 2)
-forge session memory add-doc .forge/memory/suggested_standards.md \
-    --strategy suggested \
-    --shadows docs/developer/coding-standards.md
-
-# Remove one
-forge session memory remove-doc docs/checklist.md
+# Untrack
+forge memory untrack docs/checklist.md --session planner
 ```
 
-Each verb validates path safety and strategy/shadows consistency before persisting, so the agent never silently skips a
-doc the CLI accepted.
+Each verb validates path safety and passport mode/shadow-path consistency before persisting, so the agent never silently
+skips a doc the CLI accepted.
 
 ### Inspecting agent output
 
@@ -235,7 +230,7 @@ Next CLI startup (any forge command)
 Background process:
   → Reads session manifest → compute effective intent
   → Checks: enabled? min_turns met? claude available? mode valid?
-  → Validates designated_docs (path safety, strategy consistency, file existence)
+  → Validates tracked docs (path safety, passport validity, writer access, file existence)
   → Builds multi-doc prompt with per-doc strategy instructions
   → Runs: claude -p (stdin=prompt, cwd=forge_root, timeout=5min)
 ```
@@ -256,19 +251,20 @@ Priority chain: `proxy` -> `confirmed.started_with_proxy` -> `ANTHROPIC_BASE_URL
 
 ## Validation rules
 
-The agent validates designated docs before processing:
+The agent validates tracked docs before processing. For passported docs, the passport on the official doc is
+authoritative; session manifests store only participation state.
 
-| Rule              | Rejected if                                           |
-| ----------------- | ----------------------------------------------------- |
-| Absolute path     | `doc.path` or `doc.shadows` is absolute               |
-| Path traversal    | `../` escapes worktree directory                      |
-| Unsafe characters | Backticks, newlines, control chars (prompt injection) |
-| Strategy mismatch | `strategy=suggested` without `shadows`                |
-| Reverse mismatch  | `shadows` set with non-`suggested` strategy           |
-| Self-shadowing    | `doc.path == doc.shadows`                             |
-| Empty shadows     | `shadows=""` (must be non-empty or null)              |
+| Rule                 | Rejected or skipped if                                                  |
+| -------------------- | ----------------------------------------------------------------------- |
+| Path safety          | A write, official, or shadow path is absolute, unsafe, or escapes root  |
+| Passport validity    | `forge_memory` frontmatter is malformed or violates the passport schema |
+| Mode consistency     | `mode=shadow-only` lacks `shadow_path`, or `mode=direct` has one        |
+| Self-shadowing       | Shadow path resolves to the same file as the official doc               |
+| Writer authorization | Passport `writers` does not allow the current session                   |
+| File existence       | Write target is missing, or a shadow entry's official doc is missing    |
+| Legacy manifest only | Passport-less entries violate old `suggested`/`shadows` coupling        |
 
-`forge session memory add-doc` validates these rules up front, including file existence. Manual JSON configs and older
+`forge memory track` validates these rules up front and writes or updates the passport. Manual JSON configs and older
 session manifests are still revalidated at runtime; invalid or missing docs are skipped with a log warning. If all docs
 are invalid or missing, the agent exits cleanly (not an error).
 

@@ -126,7 +126,7 @@ forge session list --scope project  # Sessions in current Forge project only
 forge session list --scope all      # All sessions globally
 
 # Fork (conversation branching)
-forge session fork <parent> [--name <name>] [--incognito] [--branch <branch>] [--worktree] [--into <path>] [--supervise] [--supervisor-proxy <id>] [--no-supervisor-proxy] [--no-launch]
+forge session fork <parent> [--name <name>] [--model <claude-model>] [--incognito] [--branch <branch>] [--worktree] [--into <path>] [--supervise] [--supervisor-proxy <id>] [--no-supervisor-proxy] [--no-launch]
 
 # Delete
 forge session delete <name> [--keep-worktree] [--delete-branch] [--force] [--keep-transcripts]
@@ -525,22 +525,29 @@ The invariant: choosing a proxy chooses routing defaults (model family, context 
 forge session start review-pass --model claude-opus-4-7
 forge session start long-sonnet --model claude-sonnet-4-6[1m]
 forge session start review-pass --proxy openrouter-anthropic --model claude-opus-4-7
+forge session resume review-pass --model claude-opus-4.6
+forge session fork planner --name executor --model claude-opus-4.6
 ```
 
 `--model` behavior depends on the session routing mode:
 
-| Mode                                    | What `--model` does                                                 | `[1m]` support                 |
-| --------------------------------------- | ------------------------------------------------------------------- | ------------------------------ |
-| Direct (no `--proxy`)                   | Pins Claude Code's `ANTHROPIC_MODEL` directly                       | Yes                            |
-| Proxy + alternative configured          | Selects a `model_alternatives` entry; proxy routes to backend model | Yes (stripped at proxy lookup) |
-| Proxy + no alternative                  | Errors: "does not configure model alternative for ..."              | N/A                            |
-| Subprocess proxy (`--subprocess-proxy`) | Pins Claude Code env vars (main is direct; subprocesses inherit)    | Yes                            |
+| Mode                                    | What `--model` does                                                | `[1m]` support                 |
+| --------------------------------------- | ------------------------------------------------------------------ | ------------------------------ |
+| Direct (no `--proxy`)                   | Pins Claude Code's `ANTHROPIC_MODEL` directly                      | Yes                            |
+| Proxy + tier default or alternative     | Selects a tier or `model_alternatives` entry; proxy routes it      | Yes (stripped at proxy lookup) |
+| Proxy + no matching default/alternative | Errors: "does not configure model alternative or tier default ..." | N/A                            |
+| Subprocess proxy (`--subprocess-proxy`) | Pins Claude Code env vars (main is direct; subprocesses inherit)   | Yes                            |
 
-Rejected with `--sidecar` or `--host-proxy`.
+Rejected for sidecar or host-proxy launches.
 
 Forge stores the normalized model pin in the session intent and relaunches resume/fork children with the same
-`ANTHROPIC_MODEL` and `ANTHROPIC_DEFAULT_*_MODEL` environment variables. The stable `claude-opus`/`opus` aliases point
-at Claude Opus 4.6; use `claude-opus-4-7` explicitly for Opus 4.7.
+`ANTHROPIC_MODEL` and `ANTHROPIC_DEFAULT_*_MODEL` environment variables. `forge session resume --model ...` updates the
+current session's stored pin; `forge session fork --model ...` writes the pin to the child session. This is useful when
+moving a planner between Opus 4.7 execution and Opus 4.6 final review. The stable `claude-opus`/`opus` aliases point at
+Claude Opus 4.6; use `claude-opus-4-7` explicitly for Opus 4.7.
+
+For proxy-routed resume/fork overrides, pass `--proxy <proxy_id>` when the session has not yet been hook-confirmed with
+a specific proxy id; Forge needs the proxy id to validate tier defaults and `model_alternatives`.
 
 For proxy-mode `model_alternatives` configuration, see [proxies.md](proxies.md#model-alternatives).
 
@@ -548,6 +555,7 @@ For proxy-mode `model_alternatives` configuration, see [proxies.md](proxies.md#m
 
 ```bash
 forge session resume parent-session --fresh --proxy openrouter-gemini
+forge session resume parent-session --model claude-opus-4.6
 ```
 
 `--proxy` performs full proxy resolution (exact proxy_id match or active template lookup) with a healthcheck, then

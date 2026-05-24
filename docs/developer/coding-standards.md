@@ -51,16 +51,33 @@ Python coding conventions for Multi-Forge.
 
 ### Public surface (CLI commands/options, file formats, documented Python API)
 
-These are consumed by external users and automation. Breaking changes require:
+Multi-Forge is currently a research preview, as stated in `README.md`. Until a command, file format, or Python API is
+explicitly marked stable, prefer clear clean breaks over compatibility layers when the architecture benefits.
+
+Research-preview breaking changes require:
+
+- **Direct update**: update the command, schema, docs, tests, and examples to the new shape.
+- **No default shims**: do not keep old aliases, adapters, or compatibility wrappers unless the proposal explicitly
+  justifies them.
+- **Helpful failure**: removed CLI commands/options and rejected stale durable state should fail with an actionable
+  message that names the replacement command or reset path. A hidden tombstone command that only errors is acceptable
+  when it prevents a generic "unknown command" dead end; it must not execute old behavior.
+- **Clear reset/migration instructions**: tell users what to delete, recreate, or re-run.
+- **Changelog entry**: document the breaking change and the reset/migration path.
+
+Pre-OSS Forge installs are not supported in-place. New public `multi-forge` formats may intentionally reset ownership or
+schema shape when a proposal calls for it.
+
+Stable public surfaces, once declared stable or after a future 1.0 line, require:
 
 - **Deprecation period**: at least one minor release with a deprecation warning before removal.
 - **CLI aliases**: old command/option name kept as a hidden alias during the deprecation period when possible.
 - **File format migration**: schema version bump + `forge migrate` command or clear upgrade instructions.
 - **Changelog entry**: every breaking change documented with migration steps.
 
-Use visible CLI output (`click.echo("Deprecated: ...", err=True)` or Rich stderr) so users see command changes before
-they break. For documented Python APIs, use `FutureWarning` or a project-specific warning with `stacklevel=2`;
-`DeprecationWarning` is usually hidden outside `__main__`.
+For stable deprecations, use visible CLI output (`click.echo("Deprecated: ...", err=True)` or Rich stderr) so users see
+command changes before they break. For documented Python APIs, use `FutureWarning` or a project-specific warning with
+`stacklevel=2`; `DeprecationWarning` is usually hidden outside `__main__`.
 
 ### Internal surface (module-to-module, private APIs)
 
@@ -100,12 +117,15 @@ reads.
   shape. If pre-OSS files at the same path also used `1`, readers must distinguish by structure and either:
   - Reject with a clear reset/migration message for durable state, or
   - Discard and recreate runtime-only state (for example `active.json`).
-- Post-OSS schema changes require a version bump plus either:
+- Research-preview (`0.x`) schema changes may be clean breaks: bump the version or document the reset, reject stale
+  durable state with a clear message, and update docs/tests in the same change.
+- Known legacy state that is intentionally ignored must still be detected and surfaced with a one-time notice or
+  actionable warning. Do not let stale recognized config degrade into an apparently valid empty/default state.
+- Stable schema changes require a version bump plus either:
   - An explicit migration command (`forge migrate`), or
-  - A documented breaking release (users delete and recreate).
+  - A documented breaking release for intentionally non-migrated state.
 - Never use `strict=False` or silent entry skipping on durable state.
-- Pre-release (`0.x`) versions may break formats without a deprecation period, but still need strict shape validation
-  and clear changelog/reset instructions.
+- All schema breaks still need strict shape validation and clear changelog/reset instructions.
 
 #### System boundaries (external data)
 
