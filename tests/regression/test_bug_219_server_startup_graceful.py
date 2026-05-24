@@ -12,7 +12,7 @@ def test_server_main_allows_start_without_proxy_id(
 ) -> None:
     """Starting proxy without proxy id should not require registry and should allow --auto-port."""
 
-    from forge.proxy import server
+    import forge.proxy.server as server
 
     class _Tiers:
         haiku = "haiku-model"

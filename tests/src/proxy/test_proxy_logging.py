@@ -438,7 +438,7 @@ async def test_check_client_tool_failures_logs_raw_error_before_enrichment(
     import asyncio as _aio
     from unittest.mock import MagicMock
 
-    from forge.proxy import server
+    import forge.proxy.server as server
 
     captured: dict = {}
 
