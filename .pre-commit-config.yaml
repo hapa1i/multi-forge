@@ -37,13 +37,13 @@ repos:
          )
 
 - repo: https://github.com/astral-sh/ruff-pre-commit
-  rev: v0.15.12
+  rev: v0.15.14
   hooks:
     - id: ruff
       args: ['--fix', '--line-length', '120', '--exclude', '__init__.py']
 
 - repo: https://github.com/psf/black
-  rev: 26.3.1
+  rev: 26.5.1
   hooks:
     - id: black
       name: black
@@ -60,13 +60,29 @@ repos:
       additional_dependencies: [".[jupyter]"]
 - repo: local
   hooks:
+  - id: sync-walkthrough-state
+    name: sync walkthrough-state.py (qa <- walkthrough)
+    language: system
+    entry: uv run --frozen python scripts/sync-walkthrough-state.py --check
+    files: ^src/skills/(qa|walkthrough)/scripts/walkthrough-state\.py$
+    pass_filenames: false
+    require_serial: true
   - id: mypy
     name: mypy
     language: system
     entry: uv run --frozen mypy
     types: [python]
     require_serial: true
-    exclude: ^src/skills/
+    # qa/ copy is generated from walkthrough/ by the sync-walkthrough-state hook;
+    # excluded here to avoid a mypy duplicate-module collision.
+    exclude: ^src/skills/qa/scripts/walkthrough-state\.py$
+  - id: pyright
+    name: pyright
+    language: system
+    entry: uv run --frozen pyright
+    types: [python]
+    pass_filenames: false
+    require_serial: true
 - repo: https://github.com/hukkin/mdformat
   rev: 1.0.0
   hooks:

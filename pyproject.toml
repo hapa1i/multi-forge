@@ -1,6 +1,6 @@
 [project]
 name = "multi-forge"
-version = "0.2.0"
+version = "0.2.1"
 description = "Multi-runtime agent toolkit: proxy routing, cost control, session management, policy enforcement, and workflow orchestration"
 readme = "README.md"
 license = "Apache-2.0"
@@ -28,7 +28,7 @@ dependencies = [
     "dacite>=1.8.0",
     "click>=8.3.1",
     "coolname>=5.0.0,<6",
-    "rich>=13.0.0",
+    "rich>=13.9.0",
     "pydantic>=2.0.0",
     "openai>=1.0.0",
     "httpx>=0.25.0",
@@ -41,10 +41,10 @@ dependencies = [
     # Plain `fastapi` (no `[standard]` extras): Forge uses none of websockets/
     # uvloop/httptools/multipart/jinja2. `watchfiles` is declared explicitly
     # because Forge owns `--reload` (`forge proxy server --reload`).
-    "fastapi>=0.115.11",
+    "fastapi>=0.115.14",
     "uvicorn>=0.31.1",
     "watchfiles>=0.20",
-    "litellm[proxy]>=1.84.0",
+    "litellm[proxy]>=1.85.0",
 ]
 
 [project.scripts]
@@ -104,9 +104,12 @@ markers = [
 asyncio_mode = "auto"
 
 [tool.mypy]
-# Exclude extension scripts with optional dependencies
+# qa/ ships a copy of walkthrough-state.py generated from the walkthrough/ copy
+# by scripts/sync-walkthrough-state.py (pre-commit) and verified by
+# test_walkthrough_state_sync.py. Exclude it to avoid a duplicate-module
+# collision; the walkthrough/ copy is the one type-checked.
 exclude = [
-    "src/skills/",
+    'src/skills/qa/scripts/walkthrough-state\.py$',
 ]
 ignore_missing_imports = true
 
@@ -137,18 +140,19 @@ dev = [
     "pytest-cov>=4.1.0",
     "pytest-asyncio>=0.23.0",
     "pytest-mock>=3.15.1",
-    "ruff>=0.8.0",
+    "ruff>=0.15.0",
+    "black>=26.5.0",
     "mypy>=1.13.0",
     "pyright>=1.1.0",
     "pytest-rerunfailures>=14.0",
-    "pre-commit>=4.0.0",
+    "pre-commit>=4.5.0",
     "types-PyYAML>=6.0.0",
     "types-requests>=2.31.0",
     "python-dotenv>=1.2.1",
 ]
 provider-check = [
-    "anthropic>=0.52.0",
-    "google-genai>=2.3.0",
-    "openai>=1.0.0",
+    "anthropic>=0.100.0",
+    "google-genai>=2.5.0",
+    "openai>=2.0.0",
     "tiktoken>=0.12.0",
 ]

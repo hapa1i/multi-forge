@@ -263,9 +263,9 @@ def _ensure_template_credentials(template: str) -> None:
         credentials_for_template,
         format_missing_credential_error,
     )
-    from forge.core.auth.template_secrets import TEMPLATE_SECRETS
+    from forge.core.auth.template_secrets import TEMPLATE_ENV_VARS
 
-    required = TEMPLATE_SECRETS.get(template, [])
+    required = TEMPLATE_ENV_VARS.get(template, [])
     if not required:
         return
 
@@ -821,7 +821,8 @@ def _find_available_port(*, start_port: int, max_attempts: int) -> int:
 def _is_port_in_use(port: int) -> bool:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         try:
-            sock.bind(("", port))
+            # Probe loopback only; proxies bind 127.0.0.1 by default.
+            sock.bind(("127.0.0.1", port))
         except OSError:
             return True
         return False

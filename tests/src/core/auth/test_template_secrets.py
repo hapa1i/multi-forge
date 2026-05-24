@@ -7,7 +7,7 @@ from unittest.mock import patch
 import pytest
 
 from forge.core.auth.template_secrets import (
-    TEMPLATE_SECRETS,
+    TEMPLATE_ENV_VARS,
     get_secrets_for_template,
     resolve_env_or_credential,
 )
@@ -18,12 +18,12 @@ class TestTemplateSecrets:
 
     def test_remote_templates_require_base_url(self) -> None:
         for name in ("litellm-openai", "litellm-gemini", "litellm-anthropic"):
-            assert "LITELLM_BASE_URL" in TEMPLATE_SECRETS[name]
-            assert "LITELLM_API_KEY" in TEMPLATE_SECRETS[name]
+            assert "LITELLM_BASE_URL" in TEMPLATE_ENV_VARS[name]
+            assert "LITELLM_API_KEY" in TEMPLATE_ENV_VARS[name]
 
     def test_local_templates_require_provider_key(self) -> None:
-        assert "GEMINI_API_KEY" in TEMPLATE_SECRETS["litellm-gemini-local"]
-        assert "OPENAI_API_KEY" in TEMPLATE_SECRETS["litellm-openai-local"]
+        assert "GEMINI_API_KEY" in TEMPLATE_ENV_VARS["litellm-gemini-local"]
+        assert "OPENAI_API_KEY" in TEMPLATE_ENV_VARS["litellm-openai-local"]
 
     def test_openrouter_templates_require_api_key(self) -> None:
         for name in (
@@ -38,7 +38,7 @@ class TestTemplateSecrets:
             "openrouter-minimax",
             "openrouter-qwen",
         ):
-            assert "OPENROUTER_API_KEY" in TEMPLATE_SECRETS[name]
+            assert "OPENROUTER_API_KEY" in TEMPLATE_ENV_VARS[name]
 
 
 class TestResolveEnvOrCredential:

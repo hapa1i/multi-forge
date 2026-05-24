@@ -683,9 +683,9 @@ def _proxy_supports_model_pin(proxy_cfg: ProxyInstanceConfig, pin: DirectModelPi
     if not tier_model:
         return False
 
-    try:
-        from forge.core.models.catalog import ModelCatalogError, resolve_model_id
+    from forge.core.models.catalog import ModelCatalogError, resolve_model_id
 
+    try:
         default_model = resolve_model_id(str(tier_model)).removesuffix("-1m")
     except ModelCatalogError:
         return False
@@ -1284,6 +1284,7 @@ def start(
         _fr = _sess()._cwd_forge_root()
         existing = {n for n, _ in _sess().SessionManager().list_sessions(forge_root_filter=_fr)}
         name = _sess().generate_unique_name(existing)
+    assert name is not None  # generated above when None
 
     sys.exit(
         launch_new_session(
@@ -2303,6 +2304,7 @@ def incognito(
         _fr = _sess()._cwd_forge_root()
         existing = {n for n, _ in _sess().SessionManager().list_sessions(forge_root_filter=_fr)}
         name = _sess().generate_unique_name(existing)
+    assert name is not None  # generated above when None
 
     # Incognito cleanup is handled inside launch_new_session() so that
     # validation/creation failures don't trigger deletion of existing sessions.

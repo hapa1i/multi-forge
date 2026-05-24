@@ -601,6 +601,11 @@ def fork(
             "(ignored for same-directory forks).[/dim]"
         )
 
+    # Assigned only in the worktree-fork branch; pre-declared so the same-directory
+    # path leaves them bound (consumed under `if is_worktree_fork` guards below).
+    _fork_uuid: str | None = None
+    prompt_file: str | None = None
+
     # Worktree forks: Claude Code stores sessions at ~/.claude/projects/<encoded-cwd>/,
     # so --resume --fork-session cannot find the parent's conversation from a different
     # directory. Tested 2026-04-02 with Claude Code 2.1.90: all cross-CWD scenarios fail

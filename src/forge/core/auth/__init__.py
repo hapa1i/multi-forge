@@ -34,7 +34,7 @@ from forge.core.auth.secrets import (
     FileSecretsProvider,
 )
 from forge.core.auth.template_secrets import (
-    TEMPLATE_SECRETS,
+    TEMPLATE_ENV_VARS,
     resolve_env_or_credential,
 )
 
@@ -57,7 +57,7 @@ __all__ = [
     "FileSecretsProvider",
     "ChainSecretsProvider",
     # Template credential resolution
-    "TEMPLATE_SECRETS",
+    "TEMPLATE_ENV_VARS",
     "resolve_env_or_credential",
     # Credential file errors
     "CredentialVersionError",

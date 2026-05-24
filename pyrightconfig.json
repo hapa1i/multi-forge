@@ -1,0 +1,10 @@
+{
+  "typeCheckingMode": "standard",
+  "extraPaths": [
+    "src"
+  ],
+  "include": [
+    "src/forge",
+    "src/skills"
+  ]
+}

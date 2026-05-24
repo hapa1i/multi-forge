@@ -169,7 +169,7 @@ format_missing_credential_error(credential, *, missing_vars, template=None,
     context=None, extra_hint=None, profile=None, env_ignored=False) -> str
 ```
 
-`credentials_for_template()` bridges `TEMPLATE_SECRETS` (template → env var names) to `CREDENTIALS` (credential →
+`credentials_for_template()` bridges `TEMPLATE_ENV_VARS` (template → env var names) to `CREDENTIALS` (credential →
 metadata) via reverse lookup. `format_missing_credential_error()` produces actionable messages with signup URLs,
 `forge auth login` commands, and `not_needed_for` disambiguation (rendered only for `anthropic-api`).
 
@@ -821,10 +821,11 @@ guided exploration, proxy/session creation, live Claude session, and cleanup. He
 (`resources/checklist.md` index + `resources/checklist/*.md`, 20 sections). Includes `human:guided` items for
 interactive verification. State tracking with `--from X.Y` resume. Separate skill prevents cross-mode contamination.
 
-**Deterministic bookkeeper** (`walkthrough-state.py`): Shared script (both skills) that parses checklist markdown into
-structured JSON. Seven commands: `index`, `step N.X`, `summary` (read-only) + `init`, `record`, `var`, `report` (state
-machine). Code blocks tagged `runnable` (`bash` = true, plain \`\`\`\`\`\`\`\` = display-only). State file uses SHA-256
-hash for drift detection. 58 unit tests.
+**Deterministic bookkeeper** (`walkthrough-state.py`): Canonical in walkthrough/, generated into qa/ by
+`scripts/sync-walkthrough-state.py` (pre-commit). Parses checklist markdown into structured JSON. Seven commands:
+`index`, `step N.X`, `summary` (read-only) + `init`, `record`, `var`, `report` (state machine). Code blocks tagged
+`runnable` (`bash` = true, plain \`\`\`\`\`\`\`\` = display-only). State file uses SHA-256 hash for drift detection. 58
+unit tests.
 
 ---
 

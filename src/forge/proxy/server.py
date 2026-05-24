@@ -456,6 +456,11 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                 )
             logger.warning("[%s] %s", request_id, spend_warning)
 
+    num_messages = 0
+    num_tools = 0
+    tool_names: list[str] = []
+    has_system = False
+
     try:
         num_messages = len(request_data.messages) if request_data.messages else 0
         num_tools = len(request_data.tools) if request_data.tools else 0
@@ -1367,7 +1372,8 @@ def find_available_port(start_port: int, max_attempts: int = 10) -> int:
     for port in range(start_port, start_port + max_attempts):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
             try:
-                sock.bind(("", port))
+                # Probe loopback only; proxies bind 127.0.0.1 by default.
+                sock.bind(("127.0.0.1", port))
                 sock.close()
                 return port
             except OSError:
@@ -1468,13 +1474,13 @@ def main(
 
     # Strict proxy startup validation (B2.1.3)
     if effective_proxy_id is not None:
-        try:
-            from forge.proxy.proxy_startup import (
-                ProxyStartupContext,
-                ProxyStartupValidationError,
-                validate_proxy_startup,
-            )
+        from forge.proxy.proxy_startup import (
+            ProxyStartupContext,
+            ProxyStartupValidationError,
+            validate_proxy_startup,
+        )
 
+        try:
             validate_proxy_startup(
                 ctx=ProxyStartupContext(proxy_id=effective_proxy_id, template=template, port=actual_port)
             )

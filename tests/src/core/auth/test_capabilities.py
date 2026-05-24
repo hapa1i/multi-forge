@@ -13,7 +13,7 @@ from forge.core.auth.capabilities import (
     credentials_for_template,
     format_missing_credential_error,
 )
-from forge.core.auth.template_secrets import TEMPLATE_SECRETS
+from forge.core.auth.template_secrets import TEMPLATE_ENV_VARS
 
 TEMPLATE_DIR = Path("src/forge/config/defaults/templates")
 
@@ -31,10 +31,10 @@ class TestTemplateCoverage:
 
     def test_every_shipped_template_has_secrets(self):
         for name in _shipped_template_names():
-            assert name in TEMPLATE_SECRETS, f"Template '{name}' has no entry in TEMPLATE_SECRETS"
+            assert name in TEMPLATE_ENV_VARS, f"Template '{name}' has no entry in TEMPLATE_ENV_VARS"
 
     def test_every_template_maps_to_credential(self):
-        for template in TEMPLATE_SECRETS:
+        for template in TEMPLATE_ENV_VARS:
             creds = credentials_for_template(template)
             assert creds, f"Template '{template}' has no matching credential"
 
@@ -53,7 +53,7 @@ class TestTemplateCoverage:
             "litellm-openai-local": "openai-api",
         }
         for template, cred_name in expected.items():
-            if template not in TEMPLATE_SECRETS:
+            if template not in TEMPLATE_ENV_VARS:
                 pytest.skip(f"Template '{template}' not shipped")
             creds = credentials_for_template(template)
             assert any(
@@ -62,7 +62,7 @@ class TestTemplateCoverage:
 
     def test_litellm_remote_templates_use_litellm_remote_credential(self):
         remote_templates = [
-            t for t in TEMPLATE_SECRETS if t.startswith("litellm-") and "local" not in t and "test" not in t
+            t for t in TEMPLATE_ENV_VARS if t.startswith("litellm-") and "local" not in t and "test" not in t
         ]
         for template in remote_templates:
             creds = credentials_for_template(template)
@@ -74,7 +74,7 @@ class TestTemplateCoverage:
         assert credentials_for_template("nonexistent-template") == []
 
     def test_no_duplicate_credentials_per_template(self):
-        for template in TEMPLATE_SECRETS:
+        for template in TEMPLATE_ENV_VARS:
             creds = credentials_for_template(template)
             names = [c.name for c in creds]
             assert len(names) == len(set(names)), f"Template '{template}' has duplicate credential entries"
@@ -268,7 +268,8 @@ class TestFormatMissingCredentialError:
     def test_signup_url_included(self):
         cred = CREDENTIALS["gemini-api"]
         msg = format_missing_credential_error(cred, missing_vars=["GEMINI_API_KEY"])
-        assert "aistudio.google.com" in msg
+        assert cred.signup_url is not None
+        assert cred.signup_url in msg
 
     def test_no_signup_url_when_none(self):
         cred = CREDENTIALS["litellm-remote"]

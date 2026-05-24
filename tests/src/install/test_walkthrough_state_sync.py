@@ -1,8 +1,9 @@
 """Drift tripwire: walkthrough-state.py must be byte-identical in both locations.
 
-The QA skill (src/skills/qa/) and walkthrough skill (src/skills/walkthrough/)
-each have a copy of walkthrough-state.py. They must stay in sync — if one is
-updated, the other must be too.
+The walkthrough/ copy is canonical; the qa/ copy is generated from it by
+scripts/sync-walkthrough-state.py (the sync-walkthrough-state pre-commit hook).
+This test is the backstop that catches drift when the hook is bypassed
+(git commit --no-verify) or the qa/ copy is edited directly.
 """
 
 from __future__ import annotations
@@ -34,5 +35,6 @@ def test_walkthrough_state_py_identical() -> None:
 
     assert walkthrough_bytes == qa_bytes, (
         "walkthrough-state.py has drifted between walkthrough/ and qa/. "
-        "These files must be byte-identical. Update both when changing either."
+        "Edit the walkthrough/ copy, then run scripts/sync-walkthrough-state.py "
+        "(or let the sync-walkthrough-state pre-commit hook) to regenerate the qa/ copy."
     )

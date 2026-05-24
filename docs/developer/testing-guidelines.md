@@ -568,7 +568,7 @@ src/skills/walkthrough/
 └── scripts/
     ├── setup-test-repo.sh           # Hermetic repo setup
     ├── run-in-repo.sh              # Safety wrapper (4 gates)
-    └── walkthrough-state.py        # Deterministic state machine
+    └── walkthrough-state.py        # Deterministic state machine (canonical)
 
 src/skills/qa/
 ├── SKILL.md                          # Full QA in Docker container
@@ -579,7 +579,7 @@ src/skills/qa/
 │   └── report-template.md           # Report template
 └── scripts/
     ├── start-container.sh           # Docker lifecycle
-    └── walkthrough-state.py        # Deterministic state machine (byte-identical copy)
+    └── walkthrough-state.py        # Deterministic state machine (generated from walkthrough/)
 ```
 
 ### Running

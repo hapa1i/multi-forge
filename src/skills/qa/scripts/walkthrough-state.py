@@ -5,6 +5,11 @@ Provides deterministic bookkeeping so the agent never does arithmetic —
 it only classifies (pass/fail/skip) while this script handles structure,
 counting, and progress tracking.
 
+NOTE: src/skills/walkthrough/scripts/walkthrough-state.py is the canonical copy.
+src/skills/qa/scripts/walkthrough-state.py is generated from it by
+scripts/sync-walkthrough-state.py (sync-walkthrough-state pre-commit hook).
+Edit the walkthrough/ copy only.
+
 Usage (read-only):
     python3 walkthrough-state.py <checklist> index
     python3 walkthrough-state.py <checklist> step 6.3
@@ -27,7 +32,7 @@ import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import NotRequired, Optional, TypedDict
 
 SECTION_RE = re.compile(r"^## (\S+?)\.?\s+(.+)")
 SUBSECTION_RE = re.compile(r"^### (\S+)\s+(.+)")
@@ -42,6 +47,43 @@ INDEX_SECTION_RE = re.compile(r"^<!--\s*section:\s*(\S+)\s+(.+?)\s*-->")
 
 RESULT_CODES = {"p": "pass", "f": "fail", "s": "skip"}
 EXECUTION_ANNOTATIONS = {"auto", "human:confirm", "human:guided"}
+
+
+class CodeBlock(TypedDict):
+    code: str
+    runnable: bool
+
+
+class Subsection(TypedDict):
+    id: str
+    title: str
+    section_id: Optional[str]
+    section_title: Optional[str]
+    annotations: list[str]
+    annotation: Optional[str]
+    instructions: str
+    code_blocks: list[CodeBlock]
+    assertions: list[str]
+    prereqs: list[str]
+    next: Optional[str]
+    assertion_count: int
+    # Transient flag during fence parsing; popped before the subsection is returned.
+    _collecting_code: NotRequired[bool]
+
+
+class Section(TypedDict):
+    id: str
+    title: str
+    prereqs: list[str]
+    subsections: list[Subsection]
+    assertion_count: int
+
+
+class Checklist(TypedDict):
+    version: Optional[str]
+    total_assertions: int
+    sections: list[Section]
+    _all_subs: list[Subsection]
 
 
 def _primary_annotation(annotations: list[str]) -> str:
@@ -71,12 +113,12 @@ def _next_nonblank_line(lines: list[str], start: int) -> tuple[int | None, str |
     return None, None
 
 
-def _parse_checklist_lines(lines: list[str], *, extract_version: bool) -> dict:
-    version = None
-    sections = []
-    current_section = None
-    current_sub = None
-    all_subs = []
+def _parse_checklist_lines(lines: list[str], *, extract_version: bool) -> Checklist:
+    version: Optional[str] = None
+    sections: list[Section] = []
+    current_section: Optional[Section] = None
+    current_sub: Optional[Subsection] = None
+    all_subs: list[Subsection] = []
     # Prereqs seen outside a subsection body apply to the next ## heading.
     pending_prereqs: list[str] = []
 
@@ -150,6 +192,7 @@ def _parse_checklist_lines(lines: list[str], *, extract_version: bool) -> dict:
                 "title": m.group(2).strip(),
                 "prereqs": pending_prereqs,
                 "subsections": [],
+                "assertion_count": 0,
             }
             pending_prereqs = []
             sections.append(current_section)
@@ -168,6 +211,9 @@ def _parse_checklist_lines(lines: list[str], *, extract_version: bool) -> dict:
                 "instructions": "",
                 "code_blocks": [],
                 "assertions": [],
+                "prereqs": [],
+                "next": None,
+                "assertion_count": 0,
             }
             if current_section is not None:
                 current_section["subsections"].append(current_sub)
@@ -223,8 +269,8 @@ def _parse_checklist_lines(lines: list[str], *, extract_version: bool) -> dict:
     }
 
 
-def _parse_index_checklist(index_path: Path, index_lines: list[str]) -> dict:
-    version = None
+def _parse_index_checklist(index_path: Path, index_lines: list[str]) -> Checklist:
+    version: Optional[str] = None
     for line in index_lines:
         if version is None:
             m = VERSION_RE.match(line)
@@ -244,8 +290,8 @@ def _parse_index_checklist(index_path: Path, index_lines: list[str]) -> dict:
         sys.exit(1)
 
     seen_ids: set[str] = set()
-    sections: list[dict] = []
-    all_subs: list[dict] = []
+    sections: list[Section] = []
+    all_subs: list[Subsection] = []
 
     for section_id, relpath in entries:
         if section_id in seen_ids:
@@ -298,7 +344,7 @@ def _parse_index_checklist(index_path: Path, index_lines: list[str]) -> dict:
     }
 
 
-def parse_checklist(path: str) -> dict:
+def parse_checklist(path: str) -> Checklist:
     """Parse a checklist markdown file (or checklist index) into structured data."""
     p = Path(path)
     lines = p.read_text().splitlines()
@@ -314,7 +360,7 @@ def parse_checklist(path: str) -> dict:
 # --- Read-only commands (no state file) ---
 
 
-def cmd_index(data: dict) -> dict:
+def cmd_index(data: Checklist) -> dict:
     """Full index with sections, subsections, annotations, assertion counts."""
     sections = []
     for s in data["sections"]:
@@ -345,7 +391,7 @@ def cmd_index(data: dict) -> dict:
     }
 
 
-def cmd_step(data: dict, step_id: str) -> dict:
+def cmd_step(data: Checklist, step_id: str) -> dict:
     """Single step details."""
     for sub in data["_all_subs"]:
         if sub["id"] == step_id:
@@ -375,7 +421,7 @@ def cmd_step(data: dict, step_id: str) -> dict:
     sys.exit(1)
 
 
-def cmd_summary(data: dict) -> dict:
+def cmd_summary(data: Checklist) -> dict:
     """Summary template with expected counts per section."""
     sections = []
     for s in data["sections"]:
@@ -435,7 +481,7 @@ def checklist_hash(path: str) -> str:
     return f"sha256:{h.hexdigest()}"
 
 
-def step_hash(step: dict) -> str:
+def step_hash(step: Subsection) -> str:
     """Hash the structural content of a step that affects result validity.
 
     Includes: ID, title, annotation, assertion texts (normalized).
@@ -451,7 +497,7 @@ def step_hash(step: dict) -> str:
     return h.hexdigest()
 
 
-def _migrate_v1_to_v2(state: dict, data: dict, checklist_path: str) -> dict:
+def _migrate_v1_to_v2(state: dict, data: Checklist, checklist_path: str) -> dict:
     """Auto-migrate v1 state (global hash) to v2 (per-step hash).
 
     If the v1 global hash matches the current checklist, step hashes are
@@ -500,7 +546,7 @@ def write_state(path: str, state: dict) -> None:
     os.replace(tmp, path)
 
 
-def find_step(data: dict, step_id: str):
+def find_step(data: Checklist, step_id: str) -> Optional[Subsection]:
     """Find a subsection by ID."""
     for sub in data["_all_subs"]:
         if sub["id"] == step_id:
@@ -508,7 +554,7 @@ def find_step(data: dict, step_id: str):
     return None
 
 
-def find_section(data: dict, section_id: str):
+def find_section(data: Checklist, section_id: str) -> Optional[Section]:
     """Find a section by ID."""
     for section in data["sections"]:
         if section["id"] == section_id:
@@ -516,7 +562,7 @@ def find_section(data: dict, section_id: str):
     return None
 
 
-def resolve_step_id(data: dict, raw_id: str) -> str:
+def resolve_step_id(data: Checklist, raw_id: str) -> str:
     """Resolve a possibly section-level ID to a subsection ID.
 
     Accepts '3.1' (exact subsection), '3' (section -> first subsection),
@@ -544,7 +590,7 @@ def _section_status_keys(section_id: str) -> tuple[str, str]:
     return f"SECTION_{section_id}_STATUS", f"SECTION_{section_id}_SCOPE"
 
 
-def _section_state(data: dict, state: dict, section_id: str, *, run_scope: Optional[str] = None) -> dict:
+def _section_state(data: Checklist, state: dict, section_id: str, *, run_scope: Optional[str] = None) -> dict:
     """Classify a section using recorded step results in the current run scope."""
     section = find_section(data, section_id)
     if section is None:
@@ -591,7 +637,7 @@ def _section_state(data: dict, state: dict, section_id: str, *, run_scope: Optio
     }
 
 
-def _refresh_section_status_vars(data: dict, state: dict) -> None:
+def _refresh_section_status_vars(data: Checklist, state: dict) -> None:
     """Recompute derived SECTION_* vars from the currently valid step records."""
     vars_dict = state.setdefault("vars", {})
     for key in list(vars_dict):
@@ -608,7 +654,7 @@ def _refresh_section_status_vars(data: dict, state: dict) -> None:
                 vars_dict[scope_key] = run_scope
 
 
-def cmd_init(data: dict, checklist_path: str, state_path: str, mode: str, force: bool) -> dict:
+def cmd_init(data: Checklist, checklist_path: str, state_path: str, mode: str, force: bool) -> dict:
     """Create initial state file."""
     if Path(state_path).exists() and not force:
         print(f"Error: state file already exists: {state_path}", file=sys.stderr)
@@ -618,7 +664,7 @@ def cmd_init(data: dict, checklist_path: str, state_path: str, mode: str, force:
     first_step = data["_all_subs"][0]["id"] if data["_all_subs"] else None
     total_steps = len(data["_all_subs"])
 
-    state = {
+    state: dict[str, object] = {
         "schema_version": 2,
         "checklist_version": data["version"],
         "mode": mode,
@@ -641,7 +687,9 @@ def cmd_init(data: dict, checklist_path: str, state_path: str, mode: str, force:
     }
 
 
-def cmd_record(data: dict, checklist_path: str, state_path: str, step_id: str, results_csv: str, force: bool) -> dict:
+def cmd_record(
+    data: Checklist, checklist_path: str, state_path: str, step_id: str, results_csv: str, force: bool
+) -> dict:
     """Record assertion results for a step."""
     state = read_state(state_path)
 
@@ -754,7 +802,7 @@ def _step_prereq_status(state: dict, step_id: str, run_scope: Optional[str] = No
     return "passed"
 
 
-def cmd_prereq_check(data: dict, state_path: str, step_id: str) -> dict:
+def cmd_prereq_check(data: Checklist, state_path: str, step_id: str) -> dict:
     """Check prerequisites for a step. Returns ok/missing/statuses."""
     state = read_state(state_path)
 
@@ -820,7 +868,10 @@ def cmd_prereq_check(data: dict, state_path: str, step_id: str) -> dict:
         prereq_step = find_step(data, prereq_id)
         if prereq_step is None:
             continue
-        prereq_section = find_section(data, prereq_step["section_id"])
+        prereq_section_id = prereq_step["section_id"]
+        if prereq_section_id is None:
+            continue
+        prereq_section = find_section(data, prereq_section_id)
         if prereq_section is None:
             continue
         # Check if the prereq step's section prereqs are all satisfied
@@ -848,7 +899,7 @@ def cmd_prereq_check(data: dict, state_path: str, step_id: str) -> dict:
     }
 
 
-def cmd_report(data: dict, checklist_path: str, state_path: str) -> dict:
+def cmd_report(data: Checklist, checklist_path: str, state_path: str) -> dict:
     """Generate final summary by joining state with checklist structure."""
     state = read_state(state_path)
 
@@ -923,7 +974,7 @@ def cmd_report(data: dict, checklist_path: str, state_path: str) -> dict:
         total_fail += s_fail
         total_skip += s_skip
 
-    result = {
+    result: dict[str, object] = {
         "total": {
             "expected": data["total_assertions"],
             "pass": total_pass,
@@ -938,18 +989,19 @@ def cmd_report(data: dict, checklist_path: str, state_path: str) -> dict:
 
     # Attach warnings (agent decides how to present these)
     if changed_steps or unverified_steps or orphaned_steps:
-        result["warnings"] = {}
+        warnings: dict[str, object] = {}
         if changed_steps:
-            result["warnings"]["changed_steps"] = changed_steps
+            warnings["changed_steps"] = changed_steps
         if unverified_steps:
-            result["warnings"]["unverified_steps"] = unverified_steps
+            warnings["unverified_steps"] = unverified_steps
         if orphaned_steps:
-            result["warnings"]["orphaned_steps"] = orphaned_steps
+            warnings["orphaned_steps"] = orphaned_steps
+        result["warnings"] = warnings
 
     return result
 
 
-def cmd_validate(data: dict, checklist_path: str, state_path: str, from_step: str) -> dict:
+def cmd_validate(data: Checklist, checklist_path: str, state_path: str, from_step: str) -> dict:
     """Pre-flight validation for resume. Checks hashes and clears stale future steps.
 
     Steps before from_step: validate stored hash vs current checklist.
@@ -1129,6 +1181,9 @@ def main():
             print("Error: 'validate' requires --from <step_id>.", file=sys.stderr)
             sys.exit(1)
         result = cmd_validate(data, checklist_path, positional[0], from_step)
+    else:
+        # Unreachable: command was validated against COMMANDS above.
+        raise AssertionError(f"unhandled command: {command}")
 
     print(json.dumps(result, indent=2))
 

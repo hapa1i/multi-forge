@@ -15,7 +15,7 @@ import os
 
 logger = logging.getLogger(__name__)
 
-TEMPLATE_SECRETS: dict[str, list[str]] = {
+TEMPLATE_ENV_VARS: dict[str, list[str]] = {
     "litellm-openai": ["LITELLM_API_KEY", "LITELLM_BASE_URL"],
     "litellm-gemini": ["LITELLM_API_KEY", "LITELLM_BASE_URL"],
     "litellm-anthropic": ["LITELLM_API_KEY", "LITELLM_BASE_URL"],
@@ -87,7 +87,7 @@ def get_secrets_for_template(template: str) -> dict[str, str]:
     credential file. When ``auth_ignore_env`` is active, skips environment.
     Only includes values that resolve to non-empty strings.
     """
-    required = TEMPLATE_SECRETS.get(template, [])
+    required = TEMPLATE_ENV_VARS.get(template, [])
     if not required:
         return {}
 
@@ -95,18 +95,18 @@ def get_secrets_for_template(template: str) -> dict[str, str]:
     secrets: dict[str, str] = {}
     file_secrets: dict[str, str] | None = None
 
-    for key in required:
+    for var_name in required:
         if not ignore_env:
-            value = os.environ.get(key)
+            value = os.environ.get(var_name)
             if value:
-                secrets[key] = value
+                secrets[var_name] = value
                 continue
 
         if file_secrets is None:
             file_secrets = _get_file_secrets()
-        value = file_secrets.get(key)
+        value = file_secrets.get(var_name)
         if value:
-            logger.debug("Credential %s resolved from credential file", key)
-            secrets[key] = value
+            logger.debug("Credential %s resolved from credential file", var_name)
+            secrets[var_name] = value
 
     return secrets
