@@ -22,11 +22,12 @@ Documentation standards for Multi-Forge.
 | `docs/status/checklist.md`  | One active milestone/proposal execution plan | Update during sessions; archive when the proposal is fully executed                          |
 | `docs/status/change_log.md` | Completed-work record                        | Keep compact; newest first; compact old tail entries before the file grows too large         |
 | `docs/status/impl_notes.md` | Human-approved durable memory                | Promote only stable decisions, invariants, recurring bug causes, and operational constraints |
-| `docs/status/archive/`      | Completed milestone/proposal checklists      | Move finished checklists here as `<proposal-or-milestone>.md`                                |
+| `docs/status/archive/`      | Completed proposal + checklist archives      | Store final proposal/checklist snapshots as `<name>/proposal.md` + `<name>/checklist.md`     |
 
 Checklist files are per milestone/proposal, not permanent catch-all plans. When a checklist is complete, add the final
 change-log entry, promote durable notes, then archive on `main` after the final proposal merge unless the final feature
-PR is explicitly the closeout. Move the checklist to `docs/status/archive/`, then start a fresh active checklist.
+PR is explicitly the closeout. Copy final proposal and checklist snapshots to `docs/status/archive/`, then start a fresh
+active checklist.
 
 ### Coding Context Documents
 
@@ -41,18 +42,43 @@ PR is explicitly the closeout. Move the checklist to `docs/status/archive/`, the
 - Forward-looking design sketches for features not yet implemented or scheduled
 - May reference aspirational architecture, upstream capabilities, or research prototypes
 - No update cadence — refresh when the topic becomes active work
+- When a proposal becomes active, it drives a checklist; when execution completes, both are archived together
 
-### Static Design Documents (aspirational architecture)
+### Proposal Lifecycle
 
-- Describe **target system** (what we're building toward)
-- May reference unimplemented features
+Proposals drive the implementation cycle. The full lifecycle:
+
+```text
+1. Propose  — write docs/proposals/<name>.md (aspirational design)
+2. Activate — create docs/status/checklist.md from the proposal
+3. Execute  — implement per-phase; update design docs per-phase as code ships
+4. Archive  — copy final proposal + checklist snapshots to docs/status/archive/<name>/
+```
+
+**Design doc updates during execution.** Proposals are aspirational; design docs are normative (describe shipped code).
+During proposal execution, each checklist phase that changes normative architecture should include a design-doc update
+task. Design docs should reflect what's built, not the proposal's target state. A mid-proposal design doc may describe a
+hybrid state (old + new) — that's accurate and preferred over aspirational docs describing unbuilt features.
+
+**Archival.** When a proposal is fully executed, archive both the proposal and its checklist together under
+`docs/status/archive/<name>/` (with `proposal.md` and `checklist.md`). The source proposal may remain in
+`docs/proposals/` for discoverability, but the archived copy freezes the completed proposal state. After archival,
+design docs are the normative source; the archived proposal is historical context.
+
+### Design Documents (normative architecture)
+
+- Describe **shipped system** (what's built and how it works)
+- Must stay accurate — updated per-phase during proposal execution, not after
+- When a proposal changes architecture, the relevant design doc sections are updated as each phase ships
+- If design docs fall behind shipped code, track the gap as explicit checklist debt
 
 ---
 
 ## Documentation Rules
 
-**Rule 1**: Checklist = current milestone/proposal work; change log = completed work; implementation notes =
-human-approved durable memory; design docs = target system; proposals = future sketches; AutoMem = evolving state
+**Rule 1**: Proposals = aspirational design; checklist = active execution plan; change log = completed work;
+implementation notes = human-approved durable memory; design docs = normative shipped architecture; AutoMem = evolving
+state
 
 **Rule 2**: Verbosity has a cost; balance with clarity and intent.
 
@@ -68,15 +94,15 @@ human-approved durable memory; design docs = target system; proposals = future s
 
 ## Where to Document What
 
-| What                          | Where                       | When to Update                                  |
-| ----------------------------- | --------------------------- | ----------------------------------------------- |
-| Coding context                | Design docs                 | FIRST, on refactors                             |
-| Active execution plan         | `docs/status/checklist.md`  | During active milestone/proposal work           |
-| Completed work                | `docs/status/change_log.md` | At session/phase closeout                       |
-| Durable implementation memory | `docs/status/impl_notes.md` | After human review                              |
-| Current metrics               | AutoMem                     | On evolving facts                               |
-| Target system design          | Static design docs          | On architecture changes                         |
-| Future sketches               | `docs/proposals/`           | Refresh and checklist when topic becomes active |
+| What                          | Where                         | When to Update                                           |
+| ----------------------------- | ----------------------------- | -------------------------------------------------------- |
+| Aspirational design           | `docs/proposals/`             | Refresh when topic becomes active; archive when complete |
+| Active execution plan         | `docs/status/checklist.md`    | During active milestone/proposal work                    |
+| Completed work                | `docs/status/change_log.md`   | At session/phase closeout                                |
+| Durable implementation memory | `docs/status/impl_notes.md`   | After human review                                       |
+| Normative architecture        | Design docs                   | Per-phase as code ships during proposal execution        |
+| Archived proposals+checklists | `docs/status/archive/<name>/` | After proposal is fully executed                         |
+| Current metrics               | AutoMem                       | On evolving facts                                        |
 
 ---
 
@@ -108,10 +134,11 @@ Each phase SHOULD define acceptance criteria:
 
 ### Checklist Lifecycle
 
-1. **Start**: Create tasks with `[ ]` + acceptance test tables
-2. **During**: Update checkboxes; note blockers
-3. **Complete**: Move completed-work details to `change_log`; promote durable memory to `impl_notes`; archive the
-   completed checklist under `docs/status/archive/` after the final merge to `main`; create the next active checklist
+1. **Start**: Create checklist from proposal with `[ ]` + acceptance test tables
+2. **During**: Update checkboxes; note blockers; update design docs per-phase as code ships
+3. **Complete**: Move completed-work details to `change_log`; promote durable memory to `impl_notes`; verify design docs
+   reflect all shipped changes; archive both proposal and checklist under `docs/status/archive/<name>/` after the final
+   merge to `main`; create the next active checklist
 
 ---
 

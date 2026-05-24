@@ -1,9 +1,9 @@
-# Memory Enhancement Checklist
+# Runtime Abstraction Checklist
 
-Manual multi-session plan for executing `docs/proposals/memory_enhancement.md`.
+Manual multi-session plan for executing `docs/proposals/runtime_abstraction.md`.
 
-`docs/status/checklist.md` tracks one active milestone/proposal at a time. After this proposal is fully executed, move
-this file to `docs/status/archive/memory_enhancement.md` and start a fresh checklist for the next active proposal.
+`docs/status/checklist.md` tracks one active milestone/proposal at a time. After this proposal is fully executed, copy
+final proposal and checklist snapshots to `docs/status/archive/runtime_abstraction/` and start a fresh checklist.
 
 ## Maintenance
 
@@ -13,7 +13,9 @@ this file to `docs/status/archive/memory_enhancement.md` and start a fresh check
 - Add short blocker notes inline under the relevant phase.
 - Move completed-session details to `docs/status/change_log.md`; keep only active plan state here.
 - Promote durable lessons to `docs/status/impl_notes.md` after human review.
-- Archive the whole checklist under `docs/status/archive/` after the proposal or milestone is fully executed.
+- Update design docs per-phase as code ships (design docs are normative, not aspirational).
+- Archive final proposal and checklist snapshots under `docs/status/archive/<name>/` after the proposal is fully
+  executed.
 - Check size periodically while a proposal is active:
 
 ```bash
@@ -23,294 +25,145 @@ wc -l docs/status/checklist.md
 
 ## Current Focus
 
-Replace the old session-scoped memory UX with a clean top-level `forge memory` surface, using memory-doc passports as
-the authoritative contract and session manifests only as resolved participation state.
+Phase 1: stabilize curated handoff as a schema-backed, user-reviewable cross-runtime substrate. Keep CLI default
+behavior unchanged unless a separate default-change decision is recorded.
 
-## Phase 0 - Branch And Baseline
+## Phase 0 - Baseline Confirmation
 
-- [x] Preserve the runtime-abstraction checklist on an icebox branch.
-  - Assertion: `feat/runtime-abstraction` points at the previous runtime checklist state, while the active branch is
-    `feat/memory-enhancement`.
-  - Verification: branch split performed before replacing this checklist.
-- [x] Map the current `forge session memory` command implementation.
-  - Assertion: command registration, add/list/remove behavior, duplicate-path failure, session config writes, and test
-    coverage are identified before deleting the public command group. Include `src/forge/cli/session_memory.py`,
-    subgroup registration in `src/forge/cli/session.py`, `tests/src/cli/test_session_memory.py`, and integration
-    coverage that shells out to the old commands.
-  - Verification: CLI module (session_memory.py), registration (session.py:869-877), model (models.py:79-139, covering
-    HandoffConfig, DesignatedDoc, MemoryIntent), 13 tests (test_session_memory.py), and read-effective/write-override
-    persistence path all mapped in impl_notes.md.
-- [x] Map the Stop-time memory update path.
-  - Assertion: auto-update mode resolution, `review-only` report generation, augment writes, designated-doc strategy
-    prompts, and `src/forge/session/handoff_agent.py` update behavior are tied to concrete code references.
-  - Verification: full 5-step chain (stop hook, work queue, CLI startup fire-and-forget, CLI runner, agent core) with
-    code references and fire-and-forget queue semantics mapped in impl_notes.md.
-- [x] Map the handoff report/show surface.
-  - Assertion: `forge session handoff show --latest`, review artifact paths, and any CLI read paths are tied to concrete
-    code references separately from the update-side handoff agent.
-  - Verification: show command (session_handoff.py), review_dir(), report listing (\_list_reports), artifact path
-    pattern, and test_session_handoff_show.py mapped separately from update-side agent in impl_notes.md.
-- [x] Inventory old memory UX references.
-  - Assertion: docs, tests, skills, command help, README snippets, and status-doc setup examples that mention
-    `forge session memory` are listed with a keep/update/remove decision. Include, at minimum, `docs/status/README.md`,
-    `docs/design.md`, `docs/end-user/handoff.md`, `tests/integration/cli/`, `tests/src/cli/test_session_memory.py`,
-    `src/skills/qa/resources/checklist/`, and `src/skills/walkthrough/resources/checklist.md`.
-  - Verification: 8 UPDATE (including old-model YAML config in handoff.md, design_appendix.md G.2, and design.md
-    DesignatedDoc schema), 2 REMOVE, 5 KEEP -- full inventory with line numbers in impl_notes.md. Includes
-    test_session_handoff_show.py (KEEP) and proposals/memory_enhancement.md (KEEP).
-- [x] Decide which existing helpers stay private.
-  - Assertion: reusable storage, validation, and handoff helpers are named, and public compatibility aliases are
-    explicitly excluded.
-  - Verification: 8 helpers + 2 patterns named with reuse-privately decision; VALID_STRATEGIES moves to shared location
-    in Phase 1; tombstone diagnostic path replaces old commands (no alias). Decision in impl_notes.md.
+- [x] Confirm PR #8 cost-control and routing foundation state.
+  - Verification: Phase 0 foundations map to shipped code: subprocess routing in `src/forge/core/reactive/routing.py`
+    and `src/forge/review/routing.py`; proxy request cost logs/caps in `src/forge/proxy/cost_logger.py`,
+    `src/forge/proxy/server.py`, and `src/forge/config/schema.py`; session subprocess proxy inheritance in
+    `tests/src/session/test_subprocess_proxy_inheritance.py`.
+- [x] Record Phase 0 gaps before starting Phase 1 work.
+  - Verification: foundation is confirmed, with future gaps carried forward below.
 
-## Phase 1 - Passport Model
+Phase 0 gaps carried forward:
 
-- [x] Define the v1 memory strategy enum.
-  - Assertion: the supported `--as <strategy>` set is named in one shared place and used by passport validation, CLI
-    validation, and handoff prompts. Initial set: `project-state`, `checklist`, `changelog`, `debugging`, `patterns`,
-    `suggested`, and `generic`.
-  - Verification: `MemoryStrategy(str, Enum)` with `VALID_STRATEGY_NAMES` and `STRATEGY_INSTRUCTIONS` in
-    `src/forge/session/passport.py`. `session_memory.py` and `handoff_agent.py` both import from this shared source.
-    Inline `DOC_STRATEGIES` removed from runtime code; legacy prompt tests alias `STRATEGY_INSTRUCTIONS` locally.
-    `TestMemoryStrategy` covers enum/instruction shape.
-- [x] Add `forge_memory` frontmatter parsing and serialization.
-  - Assertion: parser preserves unrelated Markdown content, validates `version`, `intent`, `captures`, `excludes`, and
-    all `update` subfields from the proposal examples (`instruction`, `strategy`, `mode`, `writers`, `inherit_on_fork`,
-    `compact_when`, optional `shadow_path`, optional `approval`), and reports actionable errors for malformed passports.
-  - Verification: `extract_frontmatter()`, `parse_passport()`, `read_passport()`, `write_passport()`,
-    `serialize_passport()` in `passport.py`. `PassportError(field_path, reason, hint)` in `exceptions.py`. Strict
-    validation rejects unknown keys, validates all fields. Atomic write via `atomic_write_text()`. Omits None fields.
-    Round-trip test proves write-then-read identity. Focused tests cover frontmatter extraction, parsing, reading, and
-    writing.
-- [x] Implement passport-required-at-rest behavior.
-  - Assertion: `forge memory track` leaves every tracked official doc with a valid passport, synthesizes one from CLI
-    flags when possible, and fails with a concrete suggested command when required fields are missing.
-  - Verification: no passport + no `--as` fails with actionable command suggestion listing valid strategies; no passport
-    - `--as` synthesizes via `synthesize_passport()` and writes via `write_passport()` before persisting manifest entry.
-      `test_track_without_passport_and_without_as_fails` and `test_track_synthesizes_passport` verify both paths.
-- [x] Implement flag-vs-passport conflict handling.
-  - Assertion: CLI flags win for the current invocation, warnings name the overridden passport field, and persisted
-    updates are deterministic.
-  - Verification: `--as` override calls `resolve_with_overrides()`, rewrites passport file (not session-scoped), and
-    prints "Future sessions will use the new values." `read_passport()` after track confirms the rewritten strategy.
-    `test_track_as_flag_overrides_and_rewrites_passport` verifies round-trip.
-- [x] Keep ownership split between passport and session manifest.
-  - Assertion: the session manifest stores only participation and auto-update runtime state; Stop-time update logic
-    re-reads passport intent, instructions, writers, strategy, mode, shadow path, and inheritance.
-  - Verification target: a test edits a tracked doc's passport after session participation is configured but before the
-    Stop-time handoff update, then proves the handoff behavior follows the edited passport without re-running
-    `forge memory track`.
-  - Verification: `run_handoff_agent()` reads passports via `resolve_passport_source()`, filters by
-    `check_writer_access()`, resolves via `resolve_doc_spec()`, passes `list[ResolvedDocSpec]` to
-    `build_multi_doc_prompt()`. Prompt builder has no file I/O. Passport-less docs use DesignatedDoc fallbacks.
-    `TestPassportLessDocsWork` proves backward compat. Full passport contract (intent, captures, excludes, compact_when,
-    approval) appears in prompt context.
-- [x] Validate v1 writer semantics.
-  - Assertion: `all-sessions` and exact session-name writers work; lineage and role semantics are rejected or deferred
-    with clear errors.
-  - Verification: `validate_writer_spec()` and `check_writer_access()` in `passport.py`. `lineage:` and `role:` prefixes
-    rejected with deferral message. `none` rejected. Invalid session names rejected via `validation.validate_name()`. 10
-    tests across `TestWriterValidation` and `TestCheckWriterAccess`.
+- Team supervisor verb-cost snapshots remain future for `src/forge/guard/team/handlers.py`; track under Phase 4 usage
+  ledger callsites.
+- Review engine routing plans shipped, but review fan-out is still outside the invoker abstraction; track under Phase 4
+  `HeadlessInvoker` and fan-out migration.
+- Session and Claude launchers have subprocess-proxy environment wiring, but the durable runtime usage ledger remains
+  future; track under Phase 4 usage ledger callsites.
 
-## Phase 2 - Top-Level CLI
+## Phase 1 - Curated Handoff Reframe
 
-- [x] Add the canonical `forge memory` command group.
-  - Assertion: user-facing CLI help exposes `forge memory enable|track|untrack|list|status|shadows`; mutating commands
-    require `--session <name>` unless an active session is resolved.
-  - Verification: `src/forge/cli/memory.py` with 5 commands (enable, track, untrack, list, status) registered as
-    top-level `forge memory` in `main.py` with `mem` alias. `shadows` deferred to Phase 3. All commands accept
-    `--session` with `$FORGE_SESSION` fallback.
-- [x] Delete the old public `forge session memory` surface.
-  - Assertion: `src/forge/cli/session_memory.py` is removed or made private, subgroup registration is removed from
-    `src/forge/cli/session.py`, old command tests are deleted or rewritten for `forge memory`, docs no longer list the
-    old command table entries, there is no compatibility alias, and old invocations fail with a helpful replacement
-    message instead of a generic unknown-command dead end.
-  - Verification: `session_memory.py` replaced with hidden tombstone group (3 commands that error with replacement
-    guidance). Registration in `session.py:_register_subgroups()` unchanged (imports the same `memory_group` name). Old
-    13 tests replaced with 5 tombstone tests (bare group, help, and 3 command tombstones). `design.md` command table
-    updated to remove old entries and add `forge memory` section.
-- [x] Detect ignored legacy designated-doc config.
-  - Assertion: when a session manifest contains a non-empty legacy `intent.memory.designated_docs[]`, Forge ignores it
-    for behavior but emits a one-time notice or actionable warning that explains the clean break and points to
-    `forge memory enable` / `forge memory track`.
-  - Verification: `_check_legacy_docs()` counts missing vs malformed passports per-doc using
-    `resolve_passport_source(doc)`. Warning says "manifest-fallback behavior" (accurate: passport-less docs still work).
-    Separate counts for missing and malformed. 5 tests in `TestLegacyDetection` including shadow-doc passport source
-    resolution.
-- [x] Implement `forge memory enable`.
-  - Assertion: command sets `memory.auto_update.enabled=true`, defaults mode to `augment`, supports `--review-only`,
-    prints current tracked/shadowed docs, and is idempotent when re-run.
-  - Verification: leaf-key overrides (`memory.auto_update.enabled`, `memory.auto_update.mode`) preserve existing fields
-    like `min_turns`. 5 tests in `TestMemoryEnable` covering idempotency, review-only mode, doc count display.
-- [x] Implement idempotent `track`.
-  - Assertion: direct tracking adds or upserts a doc, updates strategy/mode when rerun, auto-enables memory for the
-    session when needed, validates `--as` against the v1 strategy enum, and never creates duplicate entries.
-  - Verification: 15 tests in `TestMemoryTrack` covering passport synthesis, flag-override rewrite with round-trip
-    verification, upsert without duplicates, auto-enable with min_turns preservation, shadow-only rejection, invalid
-    path/file/strategy rejection, output order, and custom intent.
-- [x] Implement idempotent `untrack`.
-  - Assertion: untracking removes direct and shadow participation as requested, succeeds clearly when the doc is absent,
-    and leaves passport frontmatter intact unless an explicit passport-edit command is added later.
-  - Verification: 4 tests in `TestMemoryUntrack` covering removal, absent-path success, leaves-others, and
-    passport-intact.
-- [x] Implement `list` and `status` visibility.
-  - Assertion: `forge memory list --session <name>` and `forge memory status --scope project|repo|all --doc <path>`
-    distinguish direct writers, shadow writers, handoff mode, strategy, session/worktree, and missing targets.
-  - Verification: `list` shows Rich table with Path/Strategy/Mode/Writers/Passport columns and reads passport info
-    per-doc (best-effort). `status` aggregates across sessions via `list_sessions()` with scope filtering. JSON output
-    includes `forge_root` and `session` for disambiguation. 9 tests across `TestMemoryList` and `TestMemoryStatus`.
-- [x] Implement cross-`forge_root` discovery for read-only `--scope all`.
-  - Assertion: `forge memory status --scope all` can discover readable Forge roots, handles missing or inaccessible
-    roots without failing the whole command, and clearly reports which roots were scanned.
-  - Verification: `status` uses `list_sessions(scope="all")` which returns sessions across all forge_roots. Inaccessible
-    manifests are skipped with debug log. JSON output includes `scanned_roots` array. Rich output shows root count.
-    `test_inaccessible_manifest_skipped` monkeypatches `SessionManager.get_session` to simulate failure.
-- [x] Keep CLI language outcome-oriented.
-  - Assertion: command output explains "tracks changelog directly" and "tracks impl_notes through a shadow proposal"
-    without requiring users to understand the passport YAML shape.
-  - Verification: `track` output says "Tracking docs/checklist.md directly as checklist" and "Updated tracking for
-    docs/changelog.md (strategy: debugging)". `enable` says "Memory auto-update enabled (mode: augment)". `untrack` says
-    "Untracked docs/checklist.md." No YAML shape references in user-facing output.
+- [ ] Reposition `ai-curated` / curated handoff in `docs/design.md` as the primary cross-runtime and cross-topology
+  transfer substrate, not merely a lossy fallback.
+  - Assertion: design text distinguishes native resume, native-relocate, and curated handoff by user agency and runtime
+    portability. This is a prose/schema reframe only; `structured` remains the CLI default unless an explicit default
+    change is approved.
+- [x] Verify `forge session resume --review` behavior.
+  - Note: this shipped before the runtime-abstraction checklist was activated; it is retained here as verified Phase 1
+    foundation.
+  - Assertion: handoff-mode resume opens the generated child handoff file in `$EDITOR`; native mode rejects `--review`
+    with an actionable error.
+  - Verification: `src/forge/cli/session_lifecycle.py` implements the `resume --review` option, native-mode rejection,
+    and `$EDITOR` launch for the generated child context; `docs/design.md` command reference documents the CLI contract;
+    `tests/src/cli/test_session_resume_review.py` covers the behavior.
+- [ ] Decide the resume-context command namespace before adding `regenerate|edit|diff`.
+  - Assertion: command contract avoids collision with memory-doc handoff reports under `forge session handoff show`.
+    Candidate surface: `forge session context regenerate|edit|diff`.
+- [ ] Define the Forge-owned curated handoff schema contract in docs.
+  - Assertion: schema records lineage, decisions with citations, current state, open questions, runtime hints, and user
+    notes overlay.
+- [ ] Implement the curated handoff schema in `src/forge/session/handoff.py`.
+  - Assertion: generated handoff markdown has stable sections for the schema fields; existing
+    `minimal|structured|full|ai-curated` strategies either emit that schema or document their compatibility fallback.
+- [ ] Add tests for schema output and artifact durability.
+  - Assertion: tests cover parent cache regeneration, per-child artifact preservation, and required schema sections for
+    curated output.
+- [ ] Define the user notes overlay convention.
+  - Assertion: docs/code state where user notes live, how they compose with generated content, and that regeneration
+    never overwrites authoritative user notes.
+- [ ] Decide how `ctx` relates to Forge handoff.
+  - Assertion: docs state whether `ctx` is only prior art, an import/export peer, or a future dependency.
+- [ ] Confirm Phase 1 schema is stable enough for Phase 5 target-runtime tuning.
+  - Assertion: Phase 5 can tune handoff presentation for Codex without changing transcript source artifacts or schema
+    semantics.
 
-## Phase 3 - Shadow Proposals
+## Phase 2 - Optional Audit Proxy
 
-- [x] Implement `track --propose`.
-  - Assertion: proposal tracking derives `.forge/memory/suggested_<basename>.md` by default, implies `suggested`
-    strategy when compatible, and supports explicit `--shadow <path>` overrides.
-  - Verification: `--propose` and `--shadow` flags on `forge memory track`. `derive_shadow_path()` encodes parent
-    directory for disambiguation (e.g., `docs/status/notes.md` -> `.forge/memory/suggested_status_notes.md`).
-    `resolve_with_overrides()` extended with `shadow_path` parameter. Direct-to-shadow conversion with 3-key upsert.
-- [x] Auto-create Forge-owned shadow docs.
-  - Assertion: missing shadow files under `.forge/memory/` are created with parent directories; missing official docs
-    and non-Forge-owned shadow paths are not auto-created.
-  - Verification: auto-creation with traversal safety in `forge memory track --propose`. Tests cover auto-create under
-    `.forge/memory/` and missing non-Forge-owned paths failing unless pre-created.
-- [x] Define and test shadow-path collision handling.
-  - Assertion: two official docs with the same basename cannot silently share one default shadow path; Forge either
-    derives a disambiguated path or fails with an actionable override command.
-  - Verification: `check_shadow_path_collision()` in `passport.py` detects collisions and returns actionable error.
-    Immediate-parent encoding in `derive_shadow_path()` reduces collisions. Tests in `test_passport.py`.
-- [x] Add `forge memory shadows list|show`.
-  - Assertion: shadow content can be grouped by official target and source session/worktree, separately from status
-    configuration; `--scope all` uses the Phase 2 read-only discovery path.
-  - Verification: `forge memory shadows` subgroup with `list` and `show` commands. `--scope all` uses `list_sessions()`.
-    Rich tables and JSON output.
-- [x] Tune handoff-agent shadow behavior.
-  - Assertion: shadow update prompts allow liberal, sourceable suggestions for durable memory, while direct-write docs
-    remain compact and conservative.
-  - Verification: shadow-specific prompt additions in `handoff_agent.py`. Tests in `test_handoff_agent.py`.
+- [ ] Add Anthropic passthrough proxy template design.
+  - Assertion: template is pure passthrough with explicit logging/intercept modes and no tier mapping confusion.
+- [ ] Define intercept modes: `passthrough`, `inspect`, `override`.
+  - Assertion: preflight reports which mode is active and what Forge can or cannot inspect.
+- [ ] Design full-body audit logging with redaction.
+  - Assertion: redaction policy covers headers, request bodies, response bodies, and tool payloads before
+    `audit_full_body` can be enabled.
+- [ ] Add audit CLI surface design.
+  - Assertion: `forge proxy audit show|diff` behavior is specified with safe defaults.
 
-## Phase 4 - Fork Inheritance
+## Phase 3 - Native-Relocate Spike
 
-Tasks in this phase are coupled: do not ship `--inherit-memory shadowed` without inherited-shadow materialization and
-passport override handling in the same slice.
+- [ ] Spike cross-CWD Claude JSONL relocation.
+  - Assertion: integration contract test proves Claude Code can resume relocated JSONL across CWD boundary without
+    signature-validation failure, while explicitly acknowledging the prior Claude Code 2.1.90 negative result documented
+    in `docs/design.md` §3.9.
+- [ ] Tie the spike to the current no-op and handoff-only guards.
+  - Assertion: checklist/test references cover the native-resume guard in `src/forge/session/manager.py` and the
+    worktree-fork handoff branch in `src/forge/cli/session_fork.py`.
+- [ ] Split native-relocate handling by code path.
+  - Assertion: `fork --worktree`, `fork --into`, and `resume --fresh --resume-mode native-relocate` each have an
+    explicit expected behavior before implementation.
+- [ ] Gate path rewriting separately.
+  - Assertion: absolute path rewriting is opt-in and disabled by default until tests prove it harmless.
+- [ ] Preserve derivation and GC invariants for relocated artifacts.
+  - Assertion: relocated JSONL, generated parent cache, and per-child handoff artifacts are traceable without orphaning
+    or overwriting user-edited child files.
+- [ ] Decide outcome of native-relocate.
+  - Assertion: either introduce opt-in `--resume-mode native-relocate` or record why curated handoff remains the only
+    cross-CWD path.
 
-- [x] Build inherited-shadow materialization support.
-  - Assertion: inherited `.forge/memory/` shadow files can be created in the target worktree before a child session is
-    persisted; non-Forge-owned shadows are reported but not created.
-  - Verification: `materialize_inherited_shadows()` in `memory_inheritance.py` creates shadow files under
-    `.forge/memory/` with traversal safety. Non-Forge-owned shadows reported via `warnings_sink` pattern.
-- [x] Add `--inherit-memory all|none|shadowed` to session fork flows.
-  - Assertion: default `all` preserves existing sticky-session expectations; `none` removes memory participation; and
-    `shadowed` inherits only proposal/shadow docs while using the materialization helper above.
-  - Verification: `InheritMemoryMode` enum, `filter_docs_for_inheritance()`, `apply_memory_inheritance()` in
-    `memory_inheritance.py`. CLI flags on `fork` and `resume --fresh`. Default `all` preserves existing behavior. Fixed
-    override-loss bug where docs tracked via `forge memory track` (stored in overrides) were silently lost on fork
-    because only `intent.memory` was deep-copied.
-- [x] Apply passport inheritance overrides consistently.
-  - Assertion: `--inherit-memory` overrides `forge_memory.update.inherit_on_fork` with warnings, and passport defaults
-    apply when the flag is omitted.
-  - Verification: passport-authoritative shadow classification in `filter_docs_for_inheritance()`. Writer warnings
-    emitted via `warnings_sink`. Tests cover passport override handling.
-- [x] Add fork/resume tests for inherited memory.
-  - Assertion: tests cover inheritance helper behavior, manager relaunch override preservation, fork/resume CLI flag
-    gating, and fork-then-track persistence.
-  - Verification: 38 tests in `test_memory_inheritance.py` covering filtering, materialization, passport-authoritative
-    shadow classification, writer warnings, override-only inheritance, relaunch regression, fork-then-track, and CLI
-    flag gating.
+## Phase 4 - Runtime Abstraction Core
 
-## Phase 5 - Curated Shadow Review
+- [ ] Introduce `HeadlessInvoker` interface and `ClaudeHeadlessInvoker`.
+  - Assertion: existing single headless callers of `run_claude_session()` keep user-visible behavior, timeout semantics,
+    environment routing, and fail-open/fail-closed choices.
+- [ ] Move review-engine fan-out behind invoker lifecycle management.
+  - Assertion: `src/forge/review/engine.py` parallel `subprocess.Popen()` fan-out, process-group cleanup, timeout
+    handling, cancellation, and deterministic result ordering are preserved and covered by tests.
+- [ ] Add runtime registry capability matrix.
+  - Assertion: registry answers installed, interactive, headless, hooks, usage, native resume, and scope capabilities.
+- [ ] Generalize existing `ActionContext` / `PolicyDecision` for runtime adapters.
+  - Assertion: current Claude hook adapter behavior is unchanged, runtime identity is represented explicitly, and Codex
+    adapter limitations are represented as capabilities instead of implied parity.
+- [ ] Define durable usage ledger schema.
+  - Assertion: `~/.forge/usage/events.jsonl` event schema covers runtime, provider, model, proxy, billing mode, tokens,
+    latency, status, and attribution ids.
+- [ ] Instrument usage ledger callsites in staged order.
+  - Assertion: workflow verbs (`src/forge/cli/workflow.py`), handoff agent (`src/forge/session/handoff_agent.py`),
+    review engine (`src/forge/review/engine.py`), semantic supervisor (`src/forge/guard/semantic/supervisor.py`), team
+    supervisor (`src/forge/guard/team/handlers.py`), Claude launcher (`src/forge/cli/claude.py`), and session launcher
+    (`src/forge/cli/session.py`) each have an explicit done/deferred status.
 
-- [x] Implement read-only shadow curation.
-  - Assertion: `forge memory shadows review --for <doc> --curate` reads official plus matching shadow docs, removes
-    duplicates and already-promoted notes, groups related suggestions, and emits source-cited output.
-  - Verification: `build_curation_prompt()` in `shadow_curation.py` inlines official + shadow content with forge_root
-    citations. Self-contained prompt (no tool use). Bare `review --for` shows raw content + hint about `--curate` and
-    `--show-latest`. `--json` output for both `--curate` and `--show-latest`. 11 CLI tests + 17 unit tests.
-- [x] Route curation through shared LLM infrastructure.
-  - Assertion: curation runs through `run_claude_session()` routed via `resolve_handoff_base_url()` so active session
-    proxy configuration and proxy spend caps apply. Per-invocation cost attribution is logged best-effort through verb
-    cost logs; direct usage display is deferred.
-  - Verification: `run_shadow_curation()` wraps call in `track_verb_cost("curation", ...)`. CLI resolves routing and
-    passes `base_url` + `direct` into core function. `test_passes_base_url_and_direct` verifies forwarding.
-- [x] Persist curated review reports.
-  - Assertion: reports are written to `<forge_root>/.forge/artifacts/<session>/memory/curation-{slug}-{hash}-{ts}.md`,
-    and `forge memory shadows review --show-latest --for <doc>` retrieves the latest report for that doc.
-  - Verification: `persist_curation_report()` uses `curation-` prefix (distinct from handoff `review-` reports).
-    `_doc_slug()` with 6-char hash suffix prevents collision between `a/b.md` and `a_b.md`. `report_glob_pattern()`
-    enables doc-filtered retrieval. Glob tests verify correct filtering.
-- [x] Enforce session ownership for repo-scope curation.
-  - Assertion: `--scope repo --curate` requires `FORGE_SESSION` or `--session`; `--scope all --curate` remains deferred.
-    `--show-latest` is session-scoped; rejects `--scope repo` and `--scope all`.
-  - Verification: `test_review_curate_requires_session`, `test_review_scope_all_curate_rejected`,
-    `test_review_show_latest_requires_session`, `test_review_show_latest_rejects_scope_repo`.
-- [x] Keep official durable docs human-approved.
-  - Assertion: curation may produce a patch or promotion checklist, but never mutates `docs/status/impl_notes.md`
-    without explicit user approval.
-  - Verification: The Python orchestration never writes official docs (no file-write calls in `_review_curate()` or
-    `run_shadow_curation()`). `test_review_curate_does_not_mutate_official` verifies this for the orchestration layer.
-    The curation subprocess (`claude -p`) runs with write-capable tools but is instructed read-only via the prompt. Same
-    trust model as the handoff agent's `review-only` mode. A `--read-only` subprocess mode is a useful future
-    enhancement but is not blocked on this phase.
+## Phase 5 - Cross-Runtime Resume
 
-## Phase 6 - Docs, Tests, And Dogfooding
+- [ ] Add `CodexHeadlessInvoker`.
+  - Assertion: uses `codex exec` JSONL output and captures usage events when available.
+- [ ] Add runtime/auth preflight for native Codex execution.
+  - Assertion: unsupported auth paths fail before launch with setup guidance.
+- [ ] Add target-runtime-aware curator.
+  - Assertion: consumes the stable Phase 1 handoff schema so output can be tuned for Codex without changing source
+    transcript artifacts or schema semantics.
+- [ ] Demonstrate Claude-to-Codex resume.
+  - Assertion: a documented workflow can plan in Claude and implement in Codex using curated handoff.
 
-- [x] Add `forge memory passport show` command (read-only).
-  - Assertion: `forge memory passport show <path>` displays all passport fields. `--json` emits structured output.
-    File-not-found, no-passport, and malformed-passport cases handled with helpful messages.
-  - Verification: `passport_group` + `passport_show_cmd` in `memory.py`. Resolves path relative to forge_root
-    (consistent with `track`/`list`). Rich table for human output, `dataclasses.asdict` for JSON. 5 tests pass.
-- [x] Add tests for `forge memory passport show`.
-  - Assertion: `TestPassportShow` in `test_memory.py` covers valid passport, JSON output, no-passport, file-not-found,
-    and malformed-passport cases.
-  - Verification: 6 tests in `TestPassportShow`, including no-passport JSON output. All pass.
-- [x] Update user and developer docs for the new memory model.
-  - Assertion: Phase 0's old-UX inventory has been applied. `docs/status/README.md`, `docs/end-user/handoff.md`,
-    walkthrough checklist, and QA checklist no longer teach `forge session memory`; they explain `forge memory`,
-    passports, shadows, and idempotent `track`. `forge session set memory.auto_update.*` migrated to
-    `forge memory enable`.
-  - Verification: `rg "forge session memory" docs/ src/skills/` returns only historical references (proposals, change
-    log, impl notes, completed checklist items). No stale teaching content.
-- [x] Update `test_skill_content.py` assertions for QA checklist changes.
-  - Assertion: `TestQaHandoffChecklist` assertions match the updated `16-handoff.md` content.
-  - Verification: 3 tests pass. Shadow step checks `forge memory track docs/team-standards.md --propose`.
-- [x] Add real-Claude memory smoke tests.
-  - Assertion: slow Docker tests cover review-only handoff report persistence and shadow curation report persistence
-    through real `claude -p`, with narrow assertions and no official-doc mutation.
-  - Verification: `test_real_claude_memory.py` added; collect-only and Ruff pass. Full execution requires Docker plus
-    `ANTHROPIC_API_KEY`.
-- [ ] Dogfood on the active status docs.
-  - Assertion: this branch uses `forge memory` to track `docs/status/change_log.md` directly and
-    `docs/status/impl_notes.md` through shadow proposals, with the first review-only report inspected before augment.
-- [ ] Record the outcome before returning to runtime abstraction.
-  - Assertion: `docs/status/change_log.md` has a compact final entry, durable lessons are promoted to
-    `docs/status/impl_notes.md`, and the runtime-abstraction branch can resume with the preserved checklist.
+## Phase 6 - Codex Frontend Beta
+
+- [ ] Evaluate Codex as an interactive frontend runtime.
+  - Assertion: decision is based on headless invocation, usage accounting, policy semantics, and curated handoff results
+    from earlier phases.
 
 ## Open Decisions
 
-Tracks Forge-local execution decisions for this checklist. For proposal-level context, see
-[`docs/proposals/memory_enhancement.md`](../proposals/memory_enhancement.md).
+Tracks Forge-local execution decisions for this checklist. For broader proposal questions, see
+[`docs/proposals/runtime_abstraction.md` Open Questions](../proposals/runtime_abstraction.md#open-questions).
 
-- [x] Should curation ship in the first memory PR, or should it become a follow-up after `track`/`status`/inheritance
-  are dogfooded?
-  - **Decision**: Ship with the first memory PR. Phase 5 is part of the same branch.
-- [x] Should the default shadow-path disambiguation encode parent directories or require explicit `--shadow` on
-  collision?
-  - **Decision**: Encode the immediate parent directory in the shadow filename (e.g., `docs/status/notes.md` ->
-    `.forge/memory/suggested_status_notes.md`). Implemented in `derive_shadow_path()`. Collision checking via
-    `check_shadow_path_collision()` catches remaining edge cases.
-- [x] Should `forge memory passport show|set` land with the first CLI surface, or wait until users hit advanced-edit
-  needs?
-  - **Decision**: Split. Ship `forge memory passport show` in Phase 6 (read-only, simple). Defer `passport set` (write
-    semantics, conflict handling, rewrite logic) until users hit advanced-edit needs.
+- [ ] Should `forge session resume --review` become default for curated handoff workflows?
+- [ ] Should the resume-context command surface be `forge session context ...` instead of overloading
+  `forge session handoff ...`?
+- [ ] Should Phase 1 remain prose/schema-only, or should it change the default strategy after schema tests land?
+- [ ] Where do proxy cost logs, audit logs, and the future usage ledger converge?
+- [ ] How should `FORGE_DEPTH` compose with future run-tree attribution ids?

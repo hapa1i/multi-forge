@@ -918,6 +918,7 @@ per-child handoff file in `$EDITOR` before launching Claude. `forge session memo
 | `forge memory status`         | Show memory doc status across sessions (`--scope`, `--doc`, `--json`)        |
 | `forge memory shadows list`   | List accumulated shadow proposals (`--scope`, `--session`, `--json`)         |
 | `forge memory shadows show`   | Show shadow proposal content (`--for <doc>`, `--scope`, `--session`)         |
+| `forge memory shadows review` | Review/curate shadow proposals (`--for`, `--curate`, `--show-latest`)        |
 | `forge memory passport show`  | Show passport embedded in a memory doc (`--json`)                            |
 
 #### Proxy management
@@ -1589,44 +1590,77 @@ memory:
 **Multi-agent workflow:** In parallel runs, each agent spawns its own handoff agent. `augment` mode stays additive (no
 overwrites).
 
-#### 5.6.2 Two operating modes
+#### 5.6.2 Memory doc passports
 
-The handoff agent has two distinct modes for designated docs:
+Each memory doc may include a `forge_memory` YAML frontmatter block -- the doc's **passport**. The passport is the
+authoritative contract for that doc's intent, update strategy, writer privileges, and inheritance behavior. Session
+manifests store only participation and auto-update runtime state; the handoff agent re-reads passports at Stop time.
+
+```yaml
+---
+forge_memory:
+  version: 1
+  intent: "Compact completed-work record for Forge implementation sessions."
+  captures: [completed work, verification, deferred follow-ups]
+  excludes: [pending task plans, raw session summaries]
+  update:
+    instruction: "Add compact newest-first entries with Goal, Key changes, and Verification."
+    strategy: changelog
+    mode: direct
+    writers: all-sessions
+    inherit_on_fork: true
+    compact_when: "approaching documentation size limits"
+---
+```
+
+**Ownership split**: passports own doc-level policy (strategy, intent, writers, inheritance). Session manifests own
+participation (which docs this session tracks) and auto-update runtime state (enabled, mode, min_turns). Editing a
+passport between sessions takes effect without re-running `forge memory track`.
+
+**Writer semantics**: `all-sessions` and exact session-name writers are supported. `lineage:` and `role:` prefixes are
+rejected with deferral messages. Writer access is checked at Stop time by the handoff agent.
+
+**Passport CLI**: `forge memory track --as <strategy>` synthesizes a passport for docs without one. `forge memory track`
+with flags on a doc that already has a passport overwrites the passport (flags win, warnings printed).
+`forge memory passport show <path>` displays passport fields.
+
+#### 5.6.3 Two operating modes
+
+The handoff agent has two distinct modes:
 
 **Mode 1: Direct Update** — agent updates the doc in place per strategy. Used for project docs the agent is allowed to
 maintain.
 
-**Mode 2: Shadow/Propose** — the agent is the proposer, the human is the author. It reads transcript + official doc,
-proposes additions to a shadow doc that aren't already in the official doc; the human reviews and merges at their own
-pace.
+**Mode 2: Shadow/Propose** — the agent is the proposer, the human is the author. `forge memory track --propose` derives
+a shadow path under `.forge/memory/` (encoding the immediate parent directory for disambiguation). The agent reads
+transcript + official doc, proposes additions to the shadow; the human reviews and merges at their own pace.
 
-The mode is determined by the `shadows` field on `DesignatedDoc`:
+Shadow curation: `forge memory shadows review --for <doc> --curate` runs an LLM pass that reads the official doc plus
+matching shadows, removes duplicates and already-promoted notes, groups related suggestions, and emits source-cited
+output. Curation reports persist at `.forge/artifacts/<session>/memory/curation-{slug}-{hash}-{ts}.md`. Curation never
+mutates official docs.
 
-```python
-@dataclass
-class DesignatedDoc:
-    path: str                       # Target file to write
-    strategy: str = "generic"       # How to update it
-    shadows: str | None = None      # If set: official doc this proposes changes for
-```
+#### 5.6.4 Memory inheritance on fork and fresh resume
 
-When `shadows` is set, the prompt reads the official doc first and proposes only what's missing (avoids redundancy).
+`forge session fork` and `forge session resume --fresh` support `--inherit-memory all|none|shadowed`. Default `all`
+preserves existing behavior. `none` removes memory participation. `shadowed` inherits only proposal/shadow docs.
+Inherited `.forge/memory/` shadow files are materialized in the target worktree; non-Forge-owned shadows are reported
+but not created. Passport `inherit_on_fork` defaults apply when the CLI flag is omitted.
 
-#### 5.6.3 Strategy registry
+#### 5.6.5 Strategy registry
 
-Per-doc strategies control how each file is updated. Strategies are a `str → str` dict (extend without code changes).
+Per-doc strategies control how each file is updated. Strategies are defined in `MemoryStrategy` enum in
+`src/forge/session/passport.py` (single source for CLI, passport, and handoff prompts).
 
 **No file creation.** Designated docs must already exist; missing files are skipped. Humans choose which docs to
-maintain; the agent maintains them. This avoids the agent making structural choices (new files/templates) implicitly.
-Seed files before configuring them. `forge memory track` enforces this at configuration time; runtime skip handling
-remains for manual JSON overrides and stale manifests.
+maintain; the agent maintains them. `forge memory track` enforces this at configuration time; runtime skip handling
+remains for stale manifests.
 
-Direct update strategies (Mode 1) include: `project-state`, `checklist`, `changelog`, `debugging`, `patterns`,
-`generic`. Shadow strategy (Mode 2): `suggested` (propose additions as checkboxes with rationale).
+Direct update strategies (Mode 1): `project-state`, `checklist`, `changelog`, `debugging`, `patterns`, `generic`. Shadow
+strategy (Mode 2): `suggested` (propose additions as checkboxes with rationale).
 
-The handoff agent resolves designated doc paths relative to `forge_root` (managed sessions always launch from
-`forge_root`), so git-tracked docs target the correct branch in worktrees. Trackedness is controlled by path choice --
-the agent doesn't distinguish.
+The handoff agent resolves designated doc paths relative to `forge_root`, so git-tracked docs target the correct branch
+in worktrees. Trackedness is controlled by path choice -- the agent doesn't distinguish.
 
 **Relationship to Claude Code auto-memory:** Complementary, not competitive. Auto-memory captures during sessions
 (incremental, free-form); the handoff agent synthesizes after sessions (retrospective, per-doc strategies). The handoff
@@ -1684,7 +1718,8 @@ verification.
 
 - Share the pattern/convention, not the prompt — each skill is self-contained (no cross-mode confusion)
 - Checklist is single source of truth — editing it changes tests without SKILL.md modifications
-- `walkthrough-state.py` is the deterministic bookkeeper — agent classifies (pass/fail/skip), script counts
+- Each skill-local `walkthrough-state.py` is the deterministic bookkeeper — agent classifies (pass/fail/skip), and the
+  script counts
 - No per-checklist-item scripts — wrapper + lifecycle scripts are enough
 - `/forge:qa` tied to `full` install profile (Docker dependency)
 

@@ -2,7 +2,7 @@
 
 import pytest
 
-from forge.proxy import server
+import forge.proxy.server as server
 
 
 @pytest.fixture(autouse=True)

@@ -139,7 +139,7 @@ def server_stubs(monkeypatch: pytest.MonkeyPatch):
     Patches reload, logging, and tool-failure checking.
     Returns the server module for additional per-test patching.
     """
-    from forge.proxy import server
+    import forge.proxy.server as server
 
     monkeypatch.setattr(server, "reload", lambda: None)
     monkeypatch.setattr(server, "log_request_response", lambda *a, **kw: None)

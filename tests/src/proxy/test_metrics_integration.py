@@ -270,7 +270,7 @@ def test_python_m_proxy_app_import_initializes_spend_caps(tmp_path: Path):
 
 @pytest.mark.asyncio
 async def test_non_streaming_records_metrics(monkeypatch):
-    from forge.proxy import server
+    import forge.proxy.server as server
 
     _stub_server(
         monkeypatch,
@@ -297,7 +297,7 @@ async def test_non_streaming_records_metrics(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_non_streaming_records_per_model(monkeypatch):
-    from forge.proxy import server
+    import forge.proxy.server as server
 
     _stub_server(monkeypatch, server)
 
@@ -310,7 +310,7 @@ async def test_non_streaming_records_per_model(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_non_streaming_records_per_tier(monkeypatch):
-    from forge.proxy import server
+    import forge.proxy.server as server
 
     _stub_server(monkeypatch, server)
 
@@ -324,7 +324,7 @@ async def test_non_streaming_records_per_tier(monkeypatch):
 @pytest.mark.asyncio
 async def test_failure_records_metrics(monkeypatch):
     """ToolCallError should increment total_failures and failures_by_type."""
-    from forge.proxy import server
+    import forge.proxy.server as server
     from forge.proxy.base_client import ToolCallError
 
     _stub_server(monkeypatch, server)
@@ -350,8 +350,8 @@ async def test_failure_records_metrics(monkeypatch):
 @pytest.mark.asyncio
 async def test_auth_refresh_records_metrics(monkeypatch):
     """Requests that succeed after credential refresh must still be counted."""
+    import forge.proxy.server as server
     from forge.core.llm.errors import AuthenticationError
-    from forge.proxy import server
 
     _stub_server(
         monkeypatch,
@@ -400,7 +400,7 @@ async def test_auth_refresh_records_metrics(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_metrics_accumulate(monkeypatch):
-    from forge.proxy import server
+    import forge.proxy.server as server
 
     _stub_server(
         monkeypatch,
@@ -425,7 +425,7 @@ async def test_metrics_accumulate(monkeypatch):
 @pytest.mark.asyncio
 async def test_strict_cap_counts_pydantic_message_content(monkeypatch):
     """Strict cap preflight should count validated Message objects, not only dicts."""
-    from forge.proxy import server
+    import forge.proxy.server as server
     from forge.proxy.cost_tracker import CostTracker
     from forge.proxy.data_models import MessagesRequest
 
@@ -450,7 +450,7 @@ async def test_strict_cap_counts_pydantic_message_content(monkeypatch):
 @pytest.mark.asyncio
 async def test_warn_cap_adds_header_and_allows_request(monkeypatch):
     """Warn mode should continue the request and surface a warning header."""
-    from forge.proxy import server
+    import forge.proxy.server as server
     from forge.proxy.cost_tracker import CostTracker
 
     _stub_server(monkeypatch, server)
@@ -467,7 +467,7 @@ async def test_warn_cap_adds_header_and_allows_request(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_cached_tokens_in_metrics(monkeypatch):
-    from forge.proxy import server
+    import forge.proxy.server as server
 
     _stub_server(
         monkeypatch,
@@ -489,7 +489,7 @@ async def test_cached_tokens_in_metrics(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_snapshot_json_serializable(monkeypatch):
-    from forge.proxy import server
+    import forge.proxy.server as server
 
     _stub_server(monkeypatch, server)
     await server.create_message(_make_request_data(stream=False), _DummyRawRequest())
@@ -500,7 +500,7 @@ async def test_snapshot_json_serializable(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_avg_latency_per_tier(monkeypatch):
-    from forge.proxy import server
+    import forge.proxy.server as server
 
     _stub_server(monkeypatch, server)
     await server.create_message(_make_request_data(stream=False, tier="sonnet"), _DummyRawRequest())

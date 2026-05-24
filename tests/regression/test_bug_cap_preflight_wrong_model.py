@@ -24,7 +24,7 @@ pytestmark = pytest.mark.regression
 @pytest.mark.asyncio
 async def test_bug_strict_cap_uses_resolved_model() -> None:
     """Strict cap preflight must receive the tier-resolved model, not the raw input."""
-    from forge.proxy import server
+    import forge.proxy.server as server
     from forge.proxy.data_models import MessagesRequest
 
     captured_models: list[str] = []

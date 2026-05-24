@@ -9,7 +9,7 @@ This directory holds living implementation context for Forge.
 | `change_log.md` | Completed-work record                     | Handoff agent may update with `strategy=changelog`; humans keep it compact |
 | `impl_notes.md` | Approved memory for future sessions       | Human-approved only; handoff agent proposes to a shadow doc                |
 | `checklist.md`  | Current milestone/proposal execution plan | Manual living checklist updated during and at the end of coding sessions   |
-| `archive/`      | Completed milestone/proposal checklists   | Move finished checklists here after the proposal is fully executed         |
+| `archive/`      | Completed proposal + checklist archives   | Store final `<name>/proposal.md` + `<name>/checklist.md` snapshots here    |
 
 ## Handoff Agent Setup
 
@@ -47,11 +47,17 @@ forge memory list --json
 
 `forge memory track` is idempotent. Re-running with different flags updates the existing entry.
 
-Keep `docs/status/checklist.md` manual until the runtime-abstraction plan stabilizes. If it becomes useful to let the
-handoff agent mark checklist items at Stop time, add it explicitly:
+Optionally let the handoff agent mark checklist items at Stop time:
 
 ```bash
 forge memory track docs/status/checklist.md --as checklist
+```
+
+After a session, review accumulated shadow proposals before promoting to `impl_notes.md`:
+
+```bash
+forge memory shadows review --for docs/status/impl_notes.md --curate
+forge memory shadows review --for docs/status/impl_notes.md --show-latest
 ```
 
 ## Advanced Workflow
@@ -124,8 +130,8 @@ forge session fork planner \
 the CWD boundary. `fork` does not yet have a review-edit flag; make the review-only intent explicit in the reviewer
 session prompt until the runtime-abstraction Phase 1 context commands land.
 
-Use `--strategy full` only when the executor or reviewer needs full transcript detail. Otherwise the default structured
-handoff plus `--inline-plan` keeps context smaller while preserving the approved plan.
+Use `--strategy full` only when the executor or reviewer needs full transcript detail. The default structured handoff
+plus `--inline-plan` keeps context smaller while preserving the approved plan.
 
 ## Scoping
 
@@ -147,8 +153,10 @@ conflicts in `change_log.md` are expected when branches interleave completed wor
 
 1. Add a final compact entry to `docs/status/change_log.md`.
 2. Promote durable lessons to `docs/status/impl_notes.md`.
-3. After the final merge to `main`, move the completed checklist to `docs/status/archive/<proposal-or-milestone>.md`.
-4. Start a fresh `docs/status/checklist.md` for the next active milestone/proposal.
+3. Verify design docs reflect all shipped changes (update any sections that fell behind).
+4. After the final merge to `main`, copy final proposal and checklist snapshots to
+   `docs/status/archive/<name>/proposal.md` + `docs/status/archive/<name>/checklist.md`.
+5. Start a fresh `docs/status/checklist.md` for the next active milestone/proposal.
 
 Archive on `main` after the final proposal merge unless there is a clear reason to include the archive move in the final
 feature PR. This keeps proposal completion explicit and avoids guessing which sub-branch is truly last.

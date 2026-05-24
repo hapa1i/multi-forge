@@ -192,7 +192,7 @@ def _stub_server(monkeypatch, server) -> None:
 @pytest.mark.asyncio
 async def test_bug_caps_warn_mode_surfaces_header_without_rejecting(monkeypatch):
     """Warn mode must allow the request and return X-Spend-Warning."""
-    from forge.proxy import server
+    import forge.proxy.server as server
     from forge.proxy.cost_tracker import CostTracker
 
     _stub_server(monkeypatch, server)

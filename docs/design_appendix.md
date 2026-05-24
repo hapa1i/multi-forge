@@ -676,10 +676,12 @@ installed script. The same principle applies to skill scripts.
 
 ## G. Memory Doc Reference
 
-Extracted from [design.md §5.6.3-5.6.6](design.md#56-designated-memory-docs). Philosophy, handoff agent concept, and two
-operating modes remain in design.md.
+Extracted from [design.md §5.6](design.md#56-designated-memory-docs). Passport model, operating modes, and handoff agent
+concept remain in design.md.
 
-### G.1 Strategy registry (from §5.6.3)
+### G.1 Strategy registry (from §5.6.5)
+
+Strategies are defined in `MemoryStrategy` enum (`src/forge/session/passport.py`).
 
 **Direct update strategies** (Mode 1):
 
@@ -698,36 +700,41 @@ operating modes remain in design.md.
 | ----------- | ---------------------------------------------------------------------- |
 | `suggested` | Propose additions to official doc as `- [ ]` checkboxes with rationale |
 
-### G.2 Example configuration (from §5.6.4)
+### G.2 Passport example (from §5.6.2)
+
+Memory doc passports are `forge_memory` YAML frontmatter blocks. The passport is the doc-level source of truth; session
+manifests store only participation.
 
 ```yaml
-memory:
-  auto_update:
-    enabled: true
-    min_turns: 5
-  designated_docs:
-    # Direct update (Mode 1) -- agent maintains these
-    - path: docs/checklist.md
-      strategy: checklist
-    - path: docs/changelog.md
-      strategy: changelog
-    - path: .forge/memory/debugging.md
-      strategy: debugging
-    - path: .forge/memory/patterns.md
-      strategy: patterns
-
-    # Shadow/propose (Mode 2) -- human reviews and merges
-    - path: .forge/memory/suggested_coding_standards.md
-      strategy: suggested
-      shadows: docs/developer/coding-standards.md
-    - path: .forge/memory/suggested_testing.md
-      strategy: suggested
-      shadows: docs/developer/testing-guidelines.md
+---
+forge_memory:
+  version: 1
+  intent: "Human-approved durable implementation memory for future Forge sessions."
+  captures: [stable decisions, non-obvious invariants, recurring bug causes]
+  excludes: [raw session summaries, pending tasks, unverified hunches]
+  update:
+    strategy: suggested
+    mode: shadow-only
+    writers: all-sessions
+    inherit_on_fork: true
+    approval: human-promoted
+    shadow_path: .forge/memory/suggested_impl_notes.md
+---
 ```
 
-All docs are processed in one `claude -p` call with per-doc strategy instructions (and official-doc-first for shadows).
+**CLI setup** (equivalent to the passport above):
 
-### G.3 Worktree resolution (from §5.6.5)
+```bash
+forge memory enable --review-only
+forge memory track docs/status/change_log.md --as changelog
+forge memory track docs/status/impl_notes.md --propose
+forge memory list --json
+```
+
+`forge memory track` is idempotent. Re-running with different flags updates the existing entry and rewrites the
+passport. All docs are processed in one `claude -p` call with per-doc strategy instructions.
+
+### G.3 Worktree resolution (extends §5.6.5)
 
 Managed sessions always launch from `forge_root`. The handoff agent resolves designated doc paths relative to
 `forge_root`, so git-tracked docs (e.g., `docs/checklist.md`) target the correct branch when working in a worktree.
@@ -746,7 +753,7 @@ transcript paths in the prompt must be **absolute**; designated doc paths remain
 > **Note:** Artifacts (transcripts/plans) consolidate at `forge_root` for per-project visibility. Designated docs are
 > working documents and belong with branch content.
 
-### G.4 Comparison with Claude Code auto-memory (from §5.6.6)
+### G.4 Comparison with Claude Code auto-memory (from §5.6.5)
 
 Claude Code (Feb 2026) ships **auto-memory**: Claude writes free-form notes to `~/.claude/projects/<project>/memory/`
 during sessions. `MEMORY.md` (first 200 lines) loads at startup; topic files load on demand.
@@ -821,11 +828,10 @@ guided exploration, proxy/session creation, live Claude session, and cleanup. He
 (`resources/checklist.md` index + `resources/checklist/*.md`, 20 sections). Includes `human:guided` items for
 interactive verification. State tracking with `--from X.Y` resume. Separate skill prevents cross-mode contamination.
 
-**Deterministic bookkeeper** (`walkthrough-state.py`): Canonical in walkthrough/, generated into qa/ by
-`scripts/sync-walkthrough-state.py` (pre-commit). Parses checklist markdown into structured JSON. Seven commands:
-`index`, `step N.X`, `summary` (read-only) + `init`, `record`, `var`, `report` (state machine). Code blocks tagged
-`runnable` (`bash` = true, plain \`\`\`\`\`\`\`\` = display-only). State file uses SHA-256 hash for drift detection. 58
-unit tests.
+**Deterministic bookkeeper** (`walkthrough-state.py`): Each checklist-driven skill keeps a local state script that
+parses its checklist markdown into structured JSON. Seven commands: `index`, `step N.X`, `summary` (read-only) + `init`,
+`record`, `var`, `report` (state machine). Code blocks tagged `runnable` (`bash` = true, plain \`\`\`\`\`\`\`\` =
+display-only). State file uses SHA-256 hash for drift detection. 58 unit tests.
 
 ---
 

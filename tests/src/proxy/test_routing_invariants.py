@@ -42,7 +42,7 @@ class DummyMessagesRequest:
 
 @pytest.mark.asyncio
 async def test_create_message_request_explicit_tier_wins(monkeypatch):
-    from forge.proxy import server
+    import forge.proxy.server as server
 
     # Avoid real reload/config reloading
     monkeypatch.setattr(server, "reload", lambda: None)
@@ -122,7 +122,7 @@ async def test_create_message_request_explicit_tier_wins(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_count_tokens_uses_proxy_default_tier(monkeypatch):
-    from forge.proxy import server
+    import forge.proxy.server as server
 
     monkeypatch.setattr(server, "reload", lambda: None)
 
@@ -189,7 +189,7 @@ async def test_count_tokens_uses_proxy_default_tier(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_count_tokens_fails_when_proxy_default_tier_missing(monkeypatch):
-    from forge.proxy import server
+    import forge.proxy.server as server
 
     monkeypatch.setattr(server, "reload", lambda: None)
 
