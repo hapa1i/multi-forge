@@ -34,17 +34,42 @@ consulted at both the Stop-hook enqueue site and the detached runner. Additive, 
     selector `src/forge/session/passport.py:681` `check_writer_access`; `MemoryStrategy` enum `:35`;
     `validate_writer_spec` `:641` (rejects `lineage:`/`role:`); incognito read `src/forge/session/shadow_curation.py:70`
     (`list_sessions(include_incognito=False)`). No `memory.yaml` references exist anywhere yet (net-new state).
-- [ ] Re-confirm the second incognito read the card cites as `memory.py:743`.
-  - Assertion: identify the exact file/line (likely `cli/memory.py` `status_cmd`) or correct the card reference. Do not
-    trust the citation as written.
-- [ ] Anchor Phase 1 test sites.
-  - Assertion: locate the Stop-hook enqueue test covering `commands.py:520` and the `run_cmd` test in
-    `tests/src/cli/test_handoff.py`; name them in the Slice-1 acceptance table.
-- [ ] Settle the two Slice-1 gating decisions (the rest defer to Phase 2/Open Decisions).
-  - Assertion: (a) scan-root default + how it is configured (project-config key vs fixed convention); (b) bare
-    `forge memory enable` semantics -- project config vs ambient session (see Phase 1 enable task). Incognito exclusion
-    is already decided by the card (Risks: resolver excludes `is_incognito`), not open. Record decisions before writing
-    resolver code.
+- [x] Re-confirm the second incognito read the card cites as `memory.py:743`.
+  - Verification: citation accurate. `src/forge/cli/memory.py:743` is
+    `list_sessions(ctx=ctx, include_incognito=False, scope=scope)` inside `status_cmd` (the `forge memory status`
+    command). The card's `memory.py:743` is shorthand for `cli/memory.py:743`; no correction needed. Both incognito
+    reads the resolver design relies on exist and pass `include_incognito=False`: `cli/memory.py:743` (status) and
+    `session/shadow_curation.py:70` (curation).
+- [x] Anchor Phase 1 test sites.
+  - Verification:
+    - **Enqueue gate** (`commands.py:520`) -> `tests/src/cli/test_artifact_hooks.py::TestStopHook` (asserts
+      `queued is True` at `:147`, marker file exists at `:160`). Covers the positive path; resolver swap must keep it
+      green and add a "project-enabled, session-silent" case.
+    - **run_cmd gate** (`handoff.py:64` `store.exists()` no-op, `:74-79` `enabled` check) -> NO existing coverage.
+      `tests/src/cli/test_handoff.py` holds only two proxy-resolution tests
+      (`test_handoff_run_uses_manifest_subprocess_proxy`, `test_handoff_run_prefers_marker_subprocess_proxy_snapshot`).
+      The Slice-1 "run_cmd gate uses resolver" and "run_cmd union/dedup" rows are **net-new tests**, not extensions.
+    - **Writer selection** -> `tests/src/session/test_handoff_agent.py::TestWriterFiltering` (existing, unchanged --
+      `run_handoff_agent` is not modified).
+- [x] Settle the two Slice-1 gating decisions (the rest defer to Phase 2/Open Decisions).
+  - Decision (a) **Scan roots**: always scan `.forge/memory/` + a configurable doc-tree root list (default `["docs/"]`,
+    overridable via a `roots:` key in `.forge/memory.yaml`). `roots:` REPLACES the doc-tree default; `.forge/memory/` is
+    always unioned in and cannot be configured away -- shadows are written there unconditionally (`derive_shadow_path`
+    hardcodes `.forge/memory/suggested_*.md`, `passport.py:180`), so dropping it would silently orphan shadow-propose
+    docs. Walk recursively within roots; exclude `.git/`, `node_modules/`, etc. `track` warns when a passported doc
+    falls outside the effective roots.
+  - Decision (b) **Bare `enable`**: project-scoped always; ignores ambient `$FORGE_SESSION`. `--session X` keeps the
+    current session-scoped behavior (sparse override via leaf keys `memory.auto_update.*`, `cli/memory.py:179-216`).
+    This is a behavior change: today bare `enable` resolves the ambient session (`enable_cmd` -> `resolve_session` at
+    `cli/memory.py:179`). Print a notice when bare `enable` runs with `$FORGE_SESSION` set; add a change_log entry + a
+    regression test pinning the `--session` path as still session-scoped.
+  - Decision (c) **Incognito** (already decided by the card, recorded for completeness): resolver returns `None` for
+    `is_incognito` sessions.
+  - Deferred OUT of Slice 1: **worktree activation copy** on `fork --worktree` and the **uncommitted-passport warning**
+    are fork-path concerns (`session_fork.py`, `memory_inheritance.py`) with no Slice-1 acceptance coverage. Auto-copy
+    by default also reverses the card's "inherits committed passports, but not the enable bit" consent model, so it
+    needs explicit sign-off rather than a quiet default. Slice-1 default stays: a new checkout requires
+    `forge memory enable`. Revisit later as an opt-in (e.g. `fork --worktree --copy-activation`).
 
 ## Phase 1 - Slice 1: Project Activation + Shared Gate (additive, no schema break)
 
@@ -66,6 +91,10 @@ consulted at both the Stop-hook enqueue site and the detached runner. Additive, 
   - Assertion: the enqueue gate (`commands.py:520`) and the detached `run_cmd` (`handoff.py:74-79`) both call the single
     resolver. Load-bearing: if the hook does not enqueue, the runner never runs, so a project enable is inert unless
     both sites consult it.
+  - Test note (Phase 0 finding): the run-side gate has NO existing coverage, so the `run_cmd` rows are net-new, not
+    extensions. Pin current behavior first -- add the negative case (activation resolves to `None`/disabled -> `run_cmd`
+    no-ops, `run_handoff_agent` not called) before the positive project-enabled case, so the gate cannot regress to
+    always-open during the resolver swap.
 - [ ] Stop discovery = scan + select.
   - Assertion: a session-layer discovery helper scans bounded memory roots for `forge_memory` frontmatter (unit-testable
     in isolation); `run_cmd` unions it with session `designated_docs` and de-dupes by passport source / write path at
@@ -89,21 +118,22 @@ consulted at both the Stop-hook enqueue site and the detached runner. Additive, 
 
 Acceptance tests (Slice 1):
 
-| Test                         | Fixture                                  | Assertion                                    | Test File                          |
-| ---------------------------- | ---------------------------------------- | -------------------------------------------- | ---------------------------------- |
-| resolver project-only        | project `memory.yaml`, session silent    | returns project `ActivationConfig`           | `test_memory_activation.py`        |
-| resolver sparse override     | project enabled, session `mode=review`   | merged; unset fields inherit project         | `test_memory_activation.py`        |
-| resolver unset vs false      | raw override `enabled` unset vs false    | distinguishes (tri-state, pre-materialize)   | `test_memory_activation.py`        |
-| resolver incognito           | `is_incognito` session                   | returns `None` (no enqueue)                  | `test_memory_activation.py`        |
-| discovery helper             | 2 in-root passports, 1 out-of-root       | only in-root passports returned              | `session/test_memory_discovery.py` |
-| scan bounding                | repo with `.git/`, `node_modules/`       | excluded from walk                           | `session/test_memory_discovery.py` |
-| run_cmd union/dedup          | scanned passports + session `designated` | passes ∪, de-duped, into `run_handoff_agent` | `cli/test_handoff.py`              |
-| enqueue gate uses resolver   | project-enabled, session silent          | Stop hook enqueues handoff marker            | (stop-hook enqueue test)           |
-| run_cmd gate uses resolver   | project-enabled, session silent          | `run_cmd` proceeds (not gated out)           | `cli/test_handoff.py`              |
-| enable writes project config | bare `enable`, no `--session`            | `.forge/memory.yaml` v1 written              | `cli/test_memory.py`               |
-| enable --session scoped      | `enable --session X`                     | writes session override, not project file    | `cli/test_memory.py`               |
-| bare enable ignores ambient  | `$FORGE_SESSION` set, bare `enable`      | writes project, not the ambient session      | `cli/test_memory.py`               |
-| unsupported version          | `memory.yaml` `version: 999`             | clear error, no silent default               | `cli/test_memory.py`               |
+| Test                         | Fixture                                    | Assertion                                            | Test File                              |
+| ---------------------------- | ------------------------------------------ | ---------------------------------------------------- | -------------------------------------- |
+| resolver project-only        | project `memory.yaml`, session silent      | returns project `ActivationConfig`                   | `test_memory_activation.py`            |
+| resolver sparse override     | project enabled, session `mode=review`     | merged; unset fields inherit project                 | `test_memory_activation.py`            |
+| resolver unset vs false      | raw override `enabled` unset vs false      | distinguishes (tri-state, pre-materialize)           | `test_memory_activation.py`            |
+| resolver incognito           | `is_incognito` session                     | returns `None` (no enqueue)                          | `test_memory_activation.py`            |
+| discovery helper             | 2 in-root passports, 1 out-of-root         | only in-root passports returned                      | `session/test_memory_discovery.py`     |
+| scan bounding                | repo with `.git/`, `node_modules/`         | excluded from walk                                   | `session/test_memory_discovery.py`     |
+| run_cmd union/dedup          | scanned passports + session `designated`   | passes ∪, de-duped, into `run_handoff_agent`         | `cli/test_handoff.py`                  |
+| enqueue gate uses resolver   | project-enabled, session silent            | Stop hook enqueues handoff marker                    | `test_artifact_hooks.py::TestStopHook` |
+| run_cmd gate uses resolver   | project-enabled, session silent            | `run_cmd` proceeds (not gated out)                   | `cli/test_handoff.py`                  |
+| run_cmd gate None -> no-op   | activation `None`/disabled, session silent | `run_cmd` returns early; no `run_handoff_agent` call | `cli/test_handoff.py`                  |
+| enable writes project config | bare `enable`, no `--session`              | `.forge/memory.yaml` v1 written                      | `cli/test_memory.py`                   |
+| enable --session scoped      | `enable --session X`                       | writes session override, not project file            | `cli/test_memory.py`                   |
+| bare enable ignores ambient  | `$FORGE_SESSION` set, bare `enable`        | writes project, not the ambient session              | `cli/test_memory.py`                   |
+| unsupported version          | `memory.yaml` `version: 999`               | clear error, no silent default                       | `cli/test_memory.py`                   |
 
 ## Phase 2 - Slice 2: Sessionless / Stateless `track`
 
@@ -145,15 +175,19 @@ Acceptance tests (Slice 2):
 Tracks Forge-local execution decisions. For broader card framing, see
 [`card.md` Open questions](./card.md#open-questions).
 
-- [ ] Scan roots default + config mechanism (`docs/` + `.forge/memory/`; project-config key vs fixed convention)? —
-  gates Slice 1.
-- [ ] Keep `writers: all-sessions` as the synthesized default, or default to a more conservative writer to bound blast
-  radius?
-- [ ] Exact CLI spelling that replaces `track --session` for manifest-only extras?
+- [x] Scan roots default + config mechanism (`docs/` + `.forge/memory/`; project-config key vs fixed convention)? --
+  SETTLED (Phase 0 decision a): always-on `.forge/memory/` + configurable doc-tree roots (default `["docs/"]`) via a
+  `roots:` key in `.forge/memory.yaml`.
+- [x] Keep `writers: all-sessions` as the synthesized default, or default to a more conservative writer to bound blast
+  radius? -- SETTLED: keep `all-sessions` (already the synthesized default; no code change). The blast-radius gate is
+  local activation + `--review-only` + `min_turns`, not a per-doc named writer.
+- [ ] Exact CLI spelling that replaces `track --session` for manifest-only extras? -- leaning `forge memory extra add`;
+  finalize in Slice 2 (not needed for Slice 1).
 - [ ] `fork --worktree`: copy the local `.forge/memory.yaml`, or only warn that the new checkout needs
-  `forge memory enable`?
+  `forge memory enable`? -- DEFERRED out of Slice 1 (fork-path; reverses the card's consent model as a default). Slice-1
+  default: new checkout requires `forge memory enable`.
 - [ ] Deprecate `--inherit-memory` for doc participation once git carries passports; warn on uncommitted passports
-  before a worktree fork?
+  before a worktree fork? -- still open (Slice 3).
 
 ## Closeout (per [work-board contract](../../../developer/work-board-contract.md#closeout))
 
