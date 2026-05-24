@@ -3,9 +3,13 @@
 This directory is Forge's lightweight implementation board. It keeps proposed work, scheduled work, active execution,
 completed work, and project memory in one place.
 
+The authoritative board workflow contract lives in
+[`docs/developer/work-board-contract.md`](../developer/work-board-contract.md). This README is a directory guide plus
+dogfood examples for people inspecting `docs/board/`.
+
 ## Layout
 
-| Path                      | Role                                                  | Rule                                                                       |
+| Path                      | Role                                                  | Next move                                                                  |
 | ------------------------- | ----------------------------------------------------- | -------------------------------------------------------------------------- |
 | `proposed/<slug>/card.md` | Idea or design sketch not yet scheduled               | Move to `todo/` when accepted for execution                                |
 | `todo/<slug>/card.md`     | Accepted work parked until an execution branch exists | Move to `doing/` when the branch is created                                |
@@ -19,6 +23,8 @@ when the card needs an execution plan; it is the in-session scratchpad for phase
 verification.
 
 ## Lane Semantics
+
+Summary only; see the [contract](../developer/work-board-contract.md#lanes) for the full operating rules.
 
 Moving a card across lanes is a workflow event:
 
@@ -165,28 +171,16 @@ conflicts in `change_log.md` are expected when branches interleave completed wor
 
 ## Card Lifecycle
 
-When a card is fully executed:
-
-1. Tick or close final checklist items.
-2. Add a final compact entry to `docs/board/change_log.md`.
-3. Promote durable lessons to `docs/board/impl_notes.md`.
-4. Verify design docs reflect all shipped changes.
-5. Move the card directory from `doing/<slug>/` to `done/<slug>/`.
+Closeout rules live in the [work-board contract](../developer/work-board-contract.md#closeout). In short: finish the
+checklist, record completed work, promote durable lessons after human review, sync design docs, then move
+`doing/<slug>/` to `done/<slug>/`.
 
 ## End-Of-Session Routine
 
-1. Tick completed checklist items only when their assertion is satisfied.
-2. Add one compact change-log entry with verification.
-3. Promote only durable lessons from `.forge/memory/suggested_impl_notes.md` into `impl_notes.md`.
-4. Leave transient status in the card checklist, not in implementation notes.
+Use the active card checklist as the in-session scratchpad. Leave transient status there, record completed work in
+`change_log.md`, and promote only durable lessons to `impl_notes.md` after human review.
 
 ## Size Checks
 
-Use these when a living board doc starts to feel bulky:
-
-```bash
-wc -l docs/board/*.md docs/board/*/*/*.md
-./scripts/count-tokens.py --model <agent-model> docs/board/change_log.md
-./scripts/count-tokens.py --model <agent-model> docs/board/impl_notes.md
-./scripts/count-tokens.py --model <agent-model> docs/board/doing/<slug>/checklist.md
-```
+Use the [work-board contract size checks](../developer/work-board-contract.md#size-checks) when a living board doc
+starts to feel bulky.
