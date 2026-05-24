@@ -263,9 +263,9 @@ def _ensure_template_credentials(template: str) -> None:
         credentials_for_template,
         format_missing_credential_error,
     )
-    from forge.core.auth.template_secrets import TEMPLATE_SECRETS
+    from forge.core.auth.template_secrets import TEMPLATE_ENV_VARS
 
-    required = TEMPLATE_SECRETS.get(template, [])
+    required = TEMPLATE_ENV_VARS.get(template, [])
     if not required:
         return
 

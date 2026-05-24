@@ -12,8 +12,8 @@ re-exports the public API for backward compatibility.
 from __future__ import annotations
 
 from forge.core.auth.template_secrets import (
-    TEMPLATE_SECRETS,
+    TEMPLATE_ENV_VARS,
     get_secrets_for_template,
 )
 
-__all__ = ["TEMPLATE_SECRETS", "get_secrets_for_template"]
+__all__ = ["TEMPLATE_ENV_VARS", "get_secrets_for_template"]

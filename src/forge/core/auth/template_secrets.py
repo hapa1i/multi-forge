@@ -15,7 +15,7 @@ import os
 
 logger = logging.getLogger(__name__)
 
-TEMPLATE_SECRETS: dict[str, list[str]] = {
+TEMPLATE_ENV_VARS: dict[str, list[str]] = {
     "litellm-openai": ["LITELLM_API_KEY", "LITELLM_BASE_URL"],
     "litellm-gemini": ["LITELLM_API_KEY", "LITELLM_BASE_URL"],
     "litellm-anthropic": ["LITELLM_API_KEY", "LITELLM_BASE_URL"],
@@ -87,7 +87,7 @@ def get_secrets_for_template(template: str) -> dict[str, str]:
     credential file. When ``auth_ignore_env`` is active, skips environment.
     Only includes values that resolve to non-empty strings.
     """
-    required = TEMPLATE_SECRETS.get(template, [])
+    required = TEMPLATE_ENV_VARS.get(template, [])
     if not required:
         return {}
 

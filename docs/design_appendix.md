@@ -169,7 +169,7 @@ format_missing_credential_error(credential, *, missing_vars, template=None,
     context=None, extra_hint=None, profile=None, env_ignored=False) -> str
 ```
 
-`credentials_for_template()` bridges `TEMPLATE_SECRETS` (template → env var names) to `CREDENTIALS` (credential →
+`credentials_for_template()` bridges `TEMPLATE_ENV_VARS` (template → env var names) to `CREDENTIALS` (credential →
 metadata) via reverse lookup. `format_missing_credential_error()` produces actionable messages with signup URLs,
 `forge auth login` commands, and `not_needed_for` disambiguation (rendered only for `anthropic-api`).
 

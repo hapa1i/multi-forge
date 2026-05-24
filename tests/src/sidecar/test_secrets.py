@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from forge.sidecar.secrets import TEMPLATE_SECRETS, get_secrets_for_template
+from forge.sidecar.secrets import TEMPLATE_ENV_VARS, get_secrets_for_template
 
 
 @pytest.fixture
@@ -128,31 +128,31 @@ class TestFileSecretsFallback:
 
 
 class TestTemplateSecretsMapping:
-    """Tests for the TEMPLATE_SECRETS mapping."""
+    """Tests for the TEMPLATE_ENV_VARS mapping."""
 
     def test_litellm_remote_templates_require_api_key_and_base_url(self) -> None:
         """LiteLLM remote templates require LITELLM_API_KEY and LITELLM_BASE_URL."""
         for template in ("litellm-openai", "litellm-gemini", "litellm-anthropic"):
-            assert "LITELLM_API_KEY" in TEMPLATE_SECRETS[template]
-            assert "LITELLM_BASE_URL" in TEMPLATE_SECRETS[template]
+            assert "LITELLM_API_KEY" in TEMPLATE_ENV_VARS[template]
+            assert "LITELLM_BASE_URL" in TEMPLATE_ENV_VARS[template]
 
     def test_local_litellm_uses_gemini_api_key(self) -> None:
         """Local LiteLLM (dev and test) uses personal GEMINI_API_KEY."""
-        assert "GEMINI_API_KEY" in TEMPLATE_SECRETS["litellm-gemini-local"]
-        assert "GEMINI_API_KEY" in TEMPLATE_SECRETS["litellm-gemini-test"]
+        assert "GEMINI_API_KEY" in TEMPLATE_ENV_VARS["litellm-gemini-local"]
+        assert "GEMINI_API_KEY" in TEMPLATE_ENV_VARS["litellm-gemini-test"]
 
     def test_local_gemini_flash_uses_gemini_api_key(self) -> None:
         """Local Gemini Flash uses personal GEMINI_API_KEY."""
-        assert "GEMINI_API_KEY" in TEMPLATE_SECRETS["litellm-gemini-flash-local"]
+        assert "GEMINI_API_KEY" in TEMPLATE_ENV_VARS["litellm-gemini-flash-local"]
 
     def test_local_openai_uses_openai_api_key(self) -> None:
         """Local OpenAI uses personal OPENAI_API_KEY."""
-        assert "OPENAI_API_KEY" in TEMPLATE_SECRETS["litellm-openai-local"]
+        assert "OPENAI_API_KEY" in TEMPLATE_ENV_VARS["litellm-openai-local"]
 
     def test_local_openai_codex_uses_openai_api_key(self) -> None:
         """Local OpenAI Codex uses personal OPENAI_API_KEY."""
-        assert "OPENAI_API_KEY" in TEMPLATE_SECRETS["litellm-openai-codex-local"]
+        assert "OPENAI_API_KEY" in TEMPLATE_ENV_VARS["litellm-openai-codex-local"]
 
     def test_local_anthropic_uses_anthropic_api_key(self) -> None:
         """Local Anthropic uses personal ANTHROPIC_API_KEY."""
-        assert "ANTHROPIC_API_KEY" in TEMPLATE_SECRETS["litellm-anthropic-local"]
+        assert "ANTHROPIC_API_KEY" in TEMPLATE_ENV_VARS["litellm-anthropic-local"]

@@ -3,7 +3,7 @@
 Single source of truth for Forge credential definitions. Each credential
 maps to one or more env vars and describes what features it unlocks.
 
-Dependency direction: this module imports TEMPLATE_SECRETS from
+Dependency direction: this module imports TEMPLATE_ENV_VARS from
 template_secrets.py (one-way). template_secrets.py must NOT import
 from this module.
 """
@@ -125,12 +125,12 @@ def credential_for_env_var(var_name: str) -> Credential | None:
 def credentials_for_template(template: str) -> list[Credential]:
     """Which credentials does a template need?
 
-    Bridges TEMPLATE_SECRETS (template -> env var names) to CREDENTIALS
+    Bridges TEMPLATE_ENV_VARS (template -> env var names) to CREDENTIALS
     (credential -> env var metadata) via reverse lookup.
     """
-    from forge.core.auth.template_secrets import TEMPLATE_SECRETS
+    from forge.core.auth.template_secrets import TEMPLATE_ENV_VARS
 
-    required_vars = TEMPLATE_SECRETS.get(template, [])
+    required_vars = TEMPLATE_ENV_VARS.get(template, [])
     if not required_vars:
         return []
 
