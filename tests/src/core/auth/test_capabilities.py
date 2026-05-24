@@ -268,7 +268,8 @@ class TestFormatMissingCredentialError:
     def test_signup_url_included(self):
         cred = CREDENTIALS["gemini-api"]
         msg = format_missing_credential_error(cred, missing_vars=["GEMINI_API_KEY"])
-        assert "aistudio.google.com" in msg
+        assert cred.signup_url is not None
+        assert cred.signup_url in msg
 
     def test_no_signup_url_when_none(self):
         cred = CREDENTIALS["litellm-remote"]

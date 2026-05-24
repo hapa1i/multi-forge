@@ -1372,7 +1372,8 @@ def find_available_port(start_port: int, max_attempts: int = 10) -> int:
     for port in range(start_port, start_port + max_attempts):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
             try:
-                sock.bind(("", port))
+                # Probe loopback only; proxies bind 127.0.0.1 by default.
+                sock.bind(("127.0.0.1", port))
                 sock.close()
                 return port
             except OSError:
