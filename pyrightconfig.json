@@ -4,9 +4,7 @@
     "src"
   ],
   "include": [
-    "src/forge"
-  ],
-  "exclude": [
+    "src/forge",
     "src/skills"
   ]
 }
