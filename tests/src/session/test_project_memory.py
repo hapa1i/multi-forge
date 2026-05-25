@@ -1,0 +1,418 @@
+"""Unit tests for project-scoped memory config I/O and the activation resolver.
+
+Scanner tests live alongside these once the scanner lands; this file covers
+the config schema (strict durable-state reader) and ``memory_activation()``
+three-tier merge semantics.
+"""
+
+from __future__ import annotations
+
+import pytest
+import yaml
+
+from forge.session.exceptions import ProjectMemoryConfigError
+from forge.session.models import HandoffConfig, MemoryIntent, create_session_state
+from forge.session.passport import synthesize_passport, write_passport
+from forge.session.project_memory import (
+    ProjectAutoUpdateConfig,
+    ProjectMemoryConfig,
+    get_project_memory_path,
+    memory_activation,
+    read_project_memory_config,
+    scan_passported_docs,
+    write_project_memory_config,
+)
+
+
+def _write_raw(tmp_path, text: str) -> None:
+    path = get_project_memory_path(tmp_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+
+
+def _state(*, is_incognito=False, intent_au=None, overrides=None):
+    state = create_session_state("test-session")
+    state.is_incognito = is_incognito
+    if intent_au is not None:
+        state.intent.memory = MemoryIntent(auto_update=intent_au)
+    state.overrides = overrides if overrides is not None else {}
+    return state
+
+
+# ---------------------------------------------------------------------------
+# Config I/O
+# ---------------------------------------------------------------------------
+
+
+def test_read_missing_returns_none(tmp_path):
+    assert read_project_memory_config(tmp_path) is None
+
+
+def test_read_valid_v1_roundtrip(tmp_path):
+    config = ProjectMemoryConfig(
+        version=1,
+        auto_update=ProjectAutoUpdateConfig(enabled=True, mode="review-only", min_turns=8, proxy="my-proxy"),
+        roots=["docs/", "notes/"],
+    )
+    write_project_memory_config(tmp_path, config)
+    assert read_project_memory_config(tmp_path) == config
+
+
+def test_read_unsupported_version_raises(tmp_path):
+    _write_raw(tmp_path, "version: 999\n")
+    with pytest.raises(ProjectMemoryConfigError, match="unsupported version"):
+        read_project_memory_config(tmp_path)
+
+
+def test_read_malformed_yaml_raises(tmp_path):
+    _write_raw(tmp_path, "{ unbalanced\n")
+    with pytest.raises(ProjectMemoryConfigError, match="malformed YAML"):
+        read_project_memory_config(tmp_path)
+
+
+def test_read_unknown_keys_raises(tmp_path):
+    _write_raw(tmp_path, "version: 1\nunknown_key: value\n")
+    with pytest.raises(ProjectMemoryConfigError, match="invalid config"):
+        read_project_memory_config(tmp_path)
+
+
+def test_read_non_dict_raises(tmp_path):
+    _write_raw(tmp_path, "- a\n- b\n")
+    with pytest.raises(ProjectMemoryConfigError, match="expected a mapping"):
+        read_project_memory_config(tmp_path)
+
+
+def test_write_creates_parent_dirs(tmp_path):
+    # .forge/ does not exist yet.
+    assert not (tmp_path / ".forge").exists()
+    write_project_memory_config(tmp_path, ProjectMemoryConfig(version=1))
+    assert get_project_memory_path(tmp_path).is_file()
+
+
+def test_write_roundtrip_safe_load(tmp_path):
+    write_project_memory_config(
+        tmp_path,
+        ProjectMemoryConfig(version=1, auto_update=ProjectAutoUpdateConfig(proxy="p")),
+    )
+    # safe_load would raise on Python object tags; this proves clean YAML.
+    raw = yaml.safe_load(get_project_memory_path(tmp_path).read_text(encoding="utf-8"))
+    assert isinstance(raw, dict)
+    assert raw["version"] == 1
+    assert raw["auto_update"]["proxy"] == "p"
+
+
+# ---------------------------------------------------------------------------
+# Resolver
+# ---------------------------------------------------------------------------
+
+
+def test_resolver_incognito_returns_none(tmp_path):
+    write_project_memory_config(
+        tmp_path, ProjectMemoryConfig(version=1, auto_update=ProjectAutoUpdateConfig(enabled=True))
+    )
+    assert memory_activation(_state(is_incognito=True), tmp_path) is None
+
+
+def test_resolver_session_override_enabled(tmp_path):
+    # No project config file; activation comes from the override alone.
+    state = _state(overrides={"memory": {"auto_update": {"enabled": True}}})
+    result = memory_activation(state, tmp_path)
+    assert result is not None
+    assert result.needs_project_scan is False
+
+
+def test_resolver_session_override_disabled(tmp_path):
+    write_project_memory_config(
+        tmp_path, ProjectMemoryConfig(version=1, auto_update=ProjectAutoUpdateConfig(enabled=True))
+    )
+    state = _state(overrides={"memory": {"auto_update": {"enabled": False}}})
+    assert memory_activation(state, tmp_path) is None
+
+
+def test_resolver_unset_falls_to_project(tmp_path):
+    write_project_memory_config(
+        tmp_path, ProjectMemoryConfig(version=1, auto_update=ProjectAutoUpdateConfig(enabled=True, mode="augment"))
+    )
+    result = memory_activation(_state(), tmp_path)
+    assert result is not None
+    assert result.mode == "augment"
+    assert result.needs_project_scan is True
+
+
+def test_resolver_unset_no_project(tmp_path):
+    assert memory_activation(_state(), tmp_path) is None
+
+
+def test_resolver_distinguishes_unset_from_false(tmp_path):
+    write_project_memory_config(
+        tmp_path, ProjectMemoryConfig(version=1, auto_update=ProjectAutoUpdateConfig(enabled=True))
+    )
+    # overrides has memory.auto_update but NO enabled leaf -> must inherit project True.
+    state = _state(overrides={"memory": {"auto_update": {"mode": "review-only"}}})
+    result = memory_activation(state, tmp_path)
+    assert result is not None
+    assert result.mode == "review-only"
+
+
+def test_resolver_session_mode_overrides_project(tmp_path):
+    write_project_memory_config(
+        tmp_path, ProjectMemoryConfig(version=1, auto_update=ProjectAutoUpdateConfig(enabled=True, mode="augment"))
+    )
+    state = _state(overrides={"memory": {"auto_update": {"mode": "review-only"}}})
+    result = memory_activation(state, tmp_path)
+    assert result is not None
+    assert result.mode == "review-only"
+
+
+def test_resolver_session_mode_only_inherits_enabled(tmp_path):
+    write_project_memory_config(
+        tmp_path,
+        ProjectMemoryConfig(version=1, auto_update=ProjectAutoUpdateConfig(enabled=True, mode="augment", min_turns=7)),
+    )
+    state = _state(overrides={"memory": {"auto_update": {"mode": "review-only"}}})
+    result = memory_activation(state, tmp_path)
+    assert result is not None
+    assert result.mode == "review-only"
+    assert result.min_turns == 7  # inherited from project
+
+
+def test_resolver_nested_override_membership(tmp_path):
+    write_project_memory_config(
+        tmp_path, ProjectMemoryConfig(version=1, auto_update=ProjectAutoUpdateConfig(enabled=True))
+    )
+    state = _state(overrides={"memory": {"auto_update": {"enabled": False}}})
+    assert memory_activation(state, tmp_path) is None
+
+
+def test_resolver_project_scan_not_suppressed(tmp_path):
+    write_project_memory_config(
+        tmp_path, ProjectMemoryConfig(version=1, auto_update=ProjectAutoUpdateConfig(enabled=True))
+    )
+    state = _state(overrides={"memory": {"auto_update": {"mode": "review-only"}}})
+    result = memory_activation(state, tmp_path)
+    assert result is not None
+    assert result.needs_project_scan is True
+
+
+def test_resolver_roots_from_project(tmp_path):
+    write_project_memory_config(
+        tmp_path,
+        ProjectMemoryConfig(version=1, auto_update=ProjectAutoUpdateConfig(enabled=True), roots=["docs/", "design/"]),
+    )
+    result = memory_activation(_state(), tmp_path)
+    assert result is not None
+    assert result.roots == ("docs/", "design/")
+
+
+def test_resolver_legacy_intent_auto_update_enabled(tmp_path):
+    # No project config; activation comes from intent (backward compat).
+    state = _state(intent_au=HandoffConfig(enabled=True, mode="augment"))
+    result = memory_activation(state, tmp_path)
+    assert result is not None
+    assert result.mode == "augment"
+    assert result.needs_project_scan is False
+
+
+def test_resolver_intent_enabled_false_falls_to_project(tmp_path):
+    write_project_memory_config(
+        tmp_path,
+        ProjectMemoryConfig(version=1, auto_update=ProjectAutoUpdateConfig(enabled=True, mode="review-only")),
+    )
+    # intent.auto_update.enabled defaults to False -> treated as unset, NOT explicit disable.
+    state = _state(intent_au=HandoffConfig(enabled=False))
+    result = memory_activation(state, tmp_path)
+    assert result is not None
+    assert result.mode == "review-only"  # project mode, not intent default "augment"
+
+
+def test_resolver_intent_overlaid_then_overrides_win(tmp_path):
+    state = _state(
+        intent_au=HandoffConfig(enabled=True, mode="augment", min_turns=9, proxy="intent-proxy"),
+        overrides={"memory": {"auto_update": {"mode": "review-only"}}},
+    )
+    result = memory_activation(state, tmp_path)
+    assert result is not None
+    assert result.mode == "review-only"  # override wins
+    assert result.min_turns == 9  # from intent overlay
+    assert result.proxy == "intent-proxy"  # from intent overlay
+
+
+# ---------------------------------------------------------------------------
+# Scanner
+# ---------------------------------------------------------------------------
+
+
+def _write_doc(tmp_path, rel, *, strategy="generic", writers="all-sessions", update_mode="direct", shadow_path=None):
+    """Write a markdown file with a valid forge_memory passport."""
+    path = tmp_path / rel
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("# Body\n", encoding="utf-8")
+    passport = synthesize_passport(strategy=strategy, update_mode=update_mode, shadow_path=shadow_path, writers=writers)
+    write_passport(path, passport)
+    return path
+
+
+def _write_plain(tmp_path, rel) -> None:
+    path = tmp_path / rel
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("# No passport\n", encoding="utf-8")
+
+
+def test_scan_finds_passported_doc(tmp_path):
+    _write_doc(tmp_path, "docs/changelog.md", strategy="changelog")
+    docs = scan_passported_docs(tmp_path, ["docs/"], "any-session")
+    assert [d.path for d in docs] == ["docs/changelog.md"]
+    assert docs[0].strategy == "changelog"
+
+
+def test_scan_skips_no_passport(tmp_path):
+    _write_plain(tmp_path, "docs/notes.md")
+    assert scan_passported_docs(tmp_path, ["docs/"], "any-session") == []
+
+
+def test_scan_always_includes_forge_memory(tmp_path):
+    _write_doc(tmp_path, ".forge/memory/state.md", strategy="project-state")
+    # roots does NOT mention .forge/memory; the scanner unions it in.
+    docs = scan_passported_docs(tmp_path, ["docs/"], "any-session")
+    assert ".forge/memory/state.md" in [d.path for d in docs]
+
+
+def test_scan_respects_roots(tmp_path):
+    _write_doc(tmp_path, "docs/in.md")
+    _write_doc(tmp_path, "other/out.md")
+    paths = [d.path for d in scan_passported_docs(tmp_path, ["docs/"], "any-session")]
+    assert "docs/in.md" in paths
+    assert "other/out.md" not in paths
+
+
+def test_scan_excludes_dotgit(tmp_path):
+    _write_doc(tmp_path, "docs/good.md")
+    _write_doc(tmp_path, ".git/bad.md")
+    _write_doc(tmp_path, "node_modules/pkg/bad.md")
+    paths = [d.path for d in scan_passported_docs(tmp_path, ["."], "any-session")]
+    assert "docs/good.md" in paths
+    assert ".git/bad.md" not in paths
+    assert "node_modules/pkg/bad.md" not in paths
+
+
+def test_scan_shadow_mode(tmp_path):
+    _write_doc(
+        tmp_path,
+        "docs/official.md",
+        strategy="suggested",
+        update_mode="shadow-only",
+        shadow_path=".forge/memory/suggested_official.md",
+    )
+    docs = scan_passported_docs(tmp_path, ["docs/"], "any-session")
+    assert len(docs) == 1
+    assert docs[0].path == ".forge/memory/suggested_official.md"
+    assert docs[0].shadows == "docs/official.md"
+    assert docs[0].strategy == "suggested"
+
+
+def test_scan_shadow_materialized(tmp_path):
+    _write_doc(
+        tmp_path,
+        "docs/official.md",
+        strategy="suggested",
+        update_mode="shadow-only",
+        shadow_path=".forge/memory/suggested_official.md",
+    )
+    scan_passported_docs(tmp_path, ["docs/"], "any-session")
+    assert (tmp_path / ".forge/memory/suggested_official.md").is_file()
+
+
+def test_scan_shadow_no_double_count(tmp_path):
+    # Official has a shadow-only passport; the materialized shadow has no
+    # passport, so it must not produce a second DesignatedDoc.
+    _write_doc(
+        tmp_path,
+        "docs/official.md",
+        strategy="suggested",
+        update_mode="shadow-only",
+        shadow_path=".forge/memory/suggested_official.md",
+    )
+    # Pre-materialize the empty shadow so it is in the candidate set this run.
+    (tmp_path / ".forge/memory").mkdir(parents=True, exist_ok=True)
+    (tmp_path / ".forge/memory/suggested_official.md").write_text("", encoding="utf-8")
+    docs = scan_passported_docs(tmp_path, ["docs/"], "any-session")
+    assert len(docs) == 1
+    assert docs[0].shadows == "docs/official.md"
+
+
+def test_scan_writer_filtering(tmp_path):
+    _write_doc(tmp_path, "docs/mine.md", writers="all-sessions")
+    _write_doc(tmp_path, "docs/theirs.md", writers="other-session")
+    paths = [d.path for d in scan_passported_docs(tmp_path, ["docs/"], "my-session")]
+    assert "docs/mine.md" in paths
+    assert "docs/theirs.md" not in paths
+
+
+def test_scan_malformed_passport_skips(tmp_path):
+    _write_doc(tmp_path, "docs/good.md")
+    bad = tmp_path / "docs/bad.md"
+    bad.write_text("---\nforge_memory:\n  version: not-an-int\n  intent: x\n---\n# Body\n", encoding="utf-8")
+    paths = [d.path for d in scan_passported_docs(tmp_path, ["docs/"], "any-session")]
+    assert "docs/good.md" in paths
+    assert "docs/bad.md" not in paths
+
+
+def test_scan_deterministic_order(tmp_path):
+    for name in ("c", "a", "b"):
+        _write_doc(tmp_path, f"docs/{name}.md")
+    paths = [d.path for d in scan_passported_docs(tmp_path, ["docs/"], "any-session")]
+    assert paths == sorted(paths)
+    assert paths == ["docs/a.md", "docs/b.md", "docs/c.md"]
+
+
+def test_scan_root_containment(tmp_path):
+    _write_doc(tmp_path, "docs/in.md")
+    # Absolute and parent-escaping roots are rejected (logged, skipped), not fatal.
+    paths = [d.path for d in scan_passported_docs(tmp_path, ["/etc", "../escape", "docs/"], "any-session")]
+    assert paths == ["docs/in.md"]
+
+
+def test_scan_paths_forge_root_relative(tmp_path):
+    _write_doc(tmp_path, "docs/direct.md")
+    _write_doc(
+        tmp_path,
+        "docs/shadowed.md",
+        strategy="suggested",
+        update_mode="shadow-only",
+        shadow_path=".forge/memory/suggested_shadowed.md",
+    )
+    for d in scan_passported_docs(tmp_path, ["docs/"], "any-session"):
+        assert not d.path.startswith("/")
+        if d.shadows is not None:
+            assert not d.shadows.startswith("/")
+
+
+def test_scan_cap_after_filtering(tmp_path):
+    # Plain files sort BEFORE passported ones; they must not consume the cap.
+    for i in range(5):
+        _write_plain(tmp_path, f"docs/a_plain_{i:02d}.md")
+    for i in range(55):
+        _write_doc(tmp_path, f"docs/z_pass_{i:02d}.md")
+    docs = scan_passported_docs(tmp_path, ["docs/"], "any-session")
+    assert len(docs) == 50  # cap honored
+    assert all(d.path.startswith("docs/z_pass_") for d in docs)  # plain files filtered out
+
+
+def test_scan_root_rejects_dotdot_component(tmp_path):
+    # `docs/..` resolves back inside forge_root but must be rejected so it
+    # cannot silently scan the whole repo. A real `docs/` root still works.
+    _write_doc(tmp_path, "docs/in.md")
+    _write_doc(tmp_path, "top.md")  # repo root; only reachable via a whole-repo scan
+    paths = [d.path for d in scan_passported_docs(tmp_path, ["docs/..", "docs/"], "any-session")]
+    assert "docs/in.md" in paths
+    assert "top.md" not in paths
+
+
+def test_scan_unsafe_shadow_path_skipped(tmp_path):
+    # Hand-authored shadow-only passports with absolute/escaping shadow_path
+    # must be skipped, not emitted with an out-of-tree DesignatedDoc.
+    _write_doc(
+        tmp_path, "docs/escaping.md", strategy="suggested", update_mode="shadow-only", shadow_path="../../escape.md"
+    )
+    _write_doc(tmp_path, "docs/absolute.md", strategy="suggested", update_mode="shadow-only", shadow_path="/tmp/x.md")
+    assert scan_passported_docs(tmp_path, ["docs/"], "any-session") == []

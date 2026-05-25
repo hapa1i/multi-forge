@@ -513,11 +513,21 @@ def stop() -> None:
         is not None
     )
 
-    # Enqueue handoff marker if auto_update is enabled (best-effort)
+    # Enqueue handoff marker if memory activation resolves (best-effort).
+    # A corrupt .forge/memory.yaml raises ProjectMemoryConfigError here; it is
+    # caught below so a bad project config never breaks the Stop hook.
     queued_handoff = False
     try:
-        effective = compute_effective_intent(manifest)
-        if effective.memory and effective.memory.auto_update and effective.memory.auto_update.enabled:
+        from forge.session.project_memory import memory_activation
+
+        if effective_forge_root is None:
+            logger.debug(
+                "Stop hook: no forge_root for session %s; skipping project-scoped memory config lookup",
+                manifest.name,
+            )
+        activation = memory_activation(manifest, effective_forge_root)
+        if activation is not None:
+            effective = compute_effective_intent(manifest)
             queued_handoff = (
                 enqueue_handoff_marker(
                     session_id=session_id,

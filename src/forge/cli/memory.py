@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -18,7 +19,11 @@ import click
 from forge.cli.session import console
 from forge.core.ops.context import ExecutionContext
 from forge.core.ops.session import ForgeOpError, resolve_session, set_session_override
-from forge.session.exceptions import ForgeSessionError, PassportError
+from forge.session.exceptions import (
+    ForgeSessionError,
+    PassportError,
+    ProjectMemoryConfigError,
+)
 from forge.session.models import DesignatedDoc
 from forge.session.passport import (
     VALID_STRATEGY_NAMES,
@@ -30,6 +35,12 @@ from forge.session.passport import (
     resolve_with_overrides,
     synthesize_passport,
     write_passport,
+)
+from forge.session.project_memory import (
+    ProjectAutoUpdateConfig,
+    ProjectMemoryConfig,
+    read_project_memory_config,
+    write_project_memory_config,
 )
 from forge.session.shadow_curation import ShadowEntry
 from forge.session.validation import is_safe_designated_doc_path
@@ -166,14 +177,75 @@ def memory() -> None:
 
 
 @memory.command("enable")
-@click.option("--session", "-s", "session_name", default=None, help="Target session (default: active session).")
+@click.option("--session", "-s", "session_name", default=None, help="Target session (omit for project-scoped).")
 @click.option("--review-only", is_flag=True, default=False, help="Enable in review-only mode (no edits).")
 def enable_cmd(session_name: str | None, review_only: bool) -> None:
     """Enable memory auto-update for the handoff agent.
 
-    Idempotent. Sets mode=augment by default, or mode=review-only
-    with --review-only. Shows tracked docs after enabling.
+    Without ``--session``, enables project-scoped activation for the whole
+    checkout (writes ``.forge/memory.yaml``), applying to every session here.
+    With ``--session``, sets a per-session override. Idempotent.
     """
+    target_mode = "review-only" if review_only else "augment"
+    if session_name is not None:
+        _enable_session_scoped(session_name, target_mode)
+    else:
+        _enable_project_scoped(target_mode)
+
+
+def _print_ambient_session_tip() -> None:
+    if os.environ.get("FORGE_SESSION"):
+        console.print(
+            "[dim]Tip: Project-scoped enable applies to all sessions in this checkout. "
+            "Use --session to target a specific session.[/dim]"
+        )
+
+
+def _enable_project_scoped(mode: str) -> None:
+    """Enable handoff for the whole checkout via ``.forge/memory.yaml``.
+
+    Does not consult ``$FORGE_SESSION``: project scope applies to all sessions.
+    """
+    ctx = ExecutionContext.from_cwd()
+    if ctx.forge_root is None:
+        console.print("[red]Error:[/red] Not inside a Forge project. Run 'forge extension enable' first.")
+        sys.exit(1)
+    forge_root = ctx.forge_root
+
+    try:
+        existing = read_project_memory_config(forge_root)
+    except ProjectMemoryConfigError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        sys.exit(1)
+
+    if existing is not None and existing.auto_update.enabled and existing.auto_update.mode == mode:
+        console.print(f"[dim]Memory auto-update already enabled for project (mode: {mode}).[/dim]")
+        _print_ambient_session_tip()
+        return
+
+    if existing is not None:
+        # Preserve roots/proxy/min_turns; only flip enable + mode.
+        old_mode = existing.auto_update.mode
+        was_enabled = existing.auto_update.enabled
+        existing.auto_update.enabled = True
+        existing.auto_update.mode = mode
+        write_project_memory_config(forge_root, existing)
+        if was_enabled:
+            console.print(f"Memory auto-update mode changed for project: {old_mode} -> {mode}.")
+        else:
+            console.print(f"Memory auto-update enabled for project (mode: {mode}).")
+    else:
+        write_project_memory_config(
+            forge_root,
+            ProjectMemoryConfig(version=1, auto_update=ProjectAutoUpdateConfig(enabled=True, mode=mode)),
+        )
+        console.print(f"Memory auto-update enabled for project (mode: {mode}).")
+
+    _print_ambient_session_tip()
+
+
+def _enable_session_scoped(session_name: str, mode: str) -> None:
+    """Enable handoff for a single session via a sparse manifest override."""
     try:
         ctx = ExecutionContext.from_cwd()
         resolved = resolve_session(ctx=ctx, session_name=session_name)
@@ -185,7 +257,6 @@ def enable_cmd(session_name: str | None, review_only: bool) -> None:
 
     state = resolved.state
     effective = compute_effective_intent(state)
-    target_mode = "review-only" if review_only else "augment"
     display_name = session_name or state.name
 
     already = False
@@ -194,12 +265,9 @@ def enable_cmd(session_name: str | None, review_only: bool) -> None:
     if effective.memory and effective.memory.auto_update and effective.memory.auto_update.enabled:
         already_enabled = True
         current_mode = effective.memory.auto_update.mode
-        if effective.memory.auto_update.mode == target_mode:
-            console.print(
-                f"[dim]Memory auto-update already enabled for session " f"{display_name} (mode: {target_mode}).[/dim]"
-            )
+        if effective.memory.auto_update.mode == mode:
+            console.print(f"[dim]Memory auto-update already enabled for session {display_name} (mode: {mode}).[/dim]")
             already = True
-        # Enabled with different mode -- update mode only
     if not already:
         try:
             set_session_override(
@@ -212,17 +280,15 @@ def enable_cmd(session_name: str | None, review_only: bool) -> None:
                 ctx=ctx,
                 session_name=session_name,
                 key="memory.auto_update.mode",
-                value_str=json.dumps(target_mode),
+                value_str=json.dumps(mode),
             )
         except ForgeOpError as e:
             console.print(f"[red]Error:[/red] {e}")
             sys.exit(1)
         if already_enabled and current_mode is not None:
-            console.print(
-                f"Memory auto-update mode changed for session {display_name}: " f"{current_mode} -> {target_mode}."
-            )
+            console.print(f"Memory auto-update mode changed for session {display_name}: {current_mode} -> {mode}.")
         else:
-            console.print(f"Memory auto-update enabled for session {display_name} (mode: {target_mode}).")
+            console.print(f"Memory auto-update enabled for session {display_name} (mode: {mode}).")
 
     docs = list(effective.memory.designated_docs) if effective.memory else []
     if docs:

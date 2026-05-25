@@ -69,41 +69,129 @@ def seeded_session(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Pat
 
 
 class TestMemoryEnable:
+    """Session-scoped enable (``--session``). Bare project-scoped enable is in
+    TestMemoryEnableProject below."""
+
     def test_enable_sets_auto_update(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
-        result = runner.invoke(main, ["memory", "enable"])
+        result = runner.invoke(main, ["memory", "enable", "--session", "s1"])
         assert result.exit_code == 0, result.output
         assert "enabled" in result.output
         assert "augment" in result.output
 
     def test_enable_idempotent(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
-        runner.invoke(main, ["memory", "enable"])
-        result = runner.invoke(main, ["memory", "enable"])
+        runner.invoke(main, ["memory", "enable", "--session", "s1"])
+        result = runner.invoke(main, ["memory", "enable", "--session", "s1"])
         assert result.exit_code == 0, result.output
         assert "already enabled" in result.output
 
     def test_enable_review_only(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
-        result = runner.invoke(main, ["memory", "enable", "--review-only"])
+        result = runner.invoke(main, ["memory", "enable", "--review-only", "--session", "s1"])
         assert result.exit_code == 0, result.output
         assert "review-only" in result.output
 
     def test_enable_changes_mode_message(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
-        runner.invoke(main, ["memory", "enable"])
-        result = runner.invoke(main, ["memory", "enable", "--review-only"])
+        runner.invoke(main, ["memory", "enable", "--session", "s1"])
+        result = runner.invoke(main, ["memory", "enable", "--review-only", "--session", "s1"])
         assert result.exit_code == 0, result.output
         assert "mode changed" in result.output
         assert "augment -> review-only" in result.output
 
     def test_enable_shows_no_docs_hint(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
-        result = runner.invoke(main, ["memory", "enable"])
+        result = runner.invoke(main, ["memory", "enable", "--session", "s1"])
         assert result.exit_code == 0, result.output
         assert "No docs tracked" in result.output
 
     def test_enable_shows_tracked_docs_count(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
         runner.invoke(main, ["memory", "track", "docs/checklist.md", "--as", "checklist"])
         # Re-enable to see the count
-        result = runner.invoke(main, ["memory", "enable", "--review-only"])
+        result = runner.invoke(main, ["memory", "enable", "--review-only", "--session", "s1"])
         assert result.exit_code == 0, result.output
         assert "1 doc(s)" in result.output
+
+
+class TestMemoryEnableProject:
+    """Bare ``forge memory enable`` writes checkout-scoped ``.forge/memory.yaml``."""
+
+    def test_enable_bare_writes_project_config(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        from forge.session.project_memory import read_project_memory_config
+
+        forge_root = seeded_session[0]
+        result = runner.invoke(main, ["memory", "enable"])
+        assert result.exit_code == 0, result.output
+        config = read_project_memory_config(forge_root)
+        assert config is not None
+        assert config.version == 1
+        assert config.auto_update.enabled is True
+        assert config.auto_update.mode == "augment"
+
+    def test_enable_bare_idempotent(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        runner.invoke(main, ["memory", "enable"])
+        result = runner.invoke(main, ["memory", "enable"])
+        assert result.exit_code == 0, result.output
+        assert "already enabled for project" in result.output
+
+    def test_enable_bare_mode_change(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        from forge.session.project_memory import (
+            ProjectAutoUpdateConfig,
+            ProjectMemoryConfig,
+            read_project_memory_config,
+            write_project_memory_config,
+        )
+
+        forge_root = seeded_session[0]
+        # Pre-existing config with custom roots/proxy/min_turns; mode change must preserve them.
+        write_project_memory_config(
+            forge_root,
+            ProjectMemoryConfig(
+                version=1,
+                auto_update=ProjectAutoUpdateConfig(enabled=True, mode="augment", min_turns=9, proxy="p"),
+                roots=["design/"],
+            ),
+        )
+        result = runner.invoke(main, ["memory", "enable", "--review-only"])
+        assert result.exit_code == 0, result.output
+        assert "augment -> review-only" in result.output
+        config = read_project_memory_config(forge_root)
+        assert config is not None
+        assert config.auto_update.mode == "review-only"
+        assert config.auto_update.min_turns == 9
+        assert config.auto_update.proxy == "p"
+        assert config.roots == ["design/"]
+
+    def test_enable_bare_review_only(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        from forge.session.project_memory import read_project_memory_config
+
+        forge_root = seeded_session[0]
+        result = runner.invoke(main, ["memory", "enable", "--review-only"])
+        assert result.exit_code == 0, result.output
+        config = read_project_memory_config(forge_root)
+        assert config is not None
+        assert config.auto_update.mode == "review-only"
+
+    def test_enable_session_still_works(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        from forge.session.project_memory import read_project_memory_config
+        from forge.session.store import SessionStore
+
+        forge_root = seeded_session[0]
+        result = runner.invoke(main, ["memory", "enable", "--session", "s1"])
+        assert result.exit_code == 0, result.output
+        # Session path writes a manifest override, NOT the project file.
+        assert read_project_memory_config(forge_root) is None
+        state = SessionStore(str(forge_root), "s1").read()
+        assert state.overrides["memory"]["auto_update"]["enabled"] is True
+
+    def test_enable_bare_ignores_ambient_session(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        from forge.session.project_memory import read_project_memory_config
+        from forge.session.store import SessionStore
+
+        forge_root = seeded_session[0]
+        # Fixture sets FORGE_SESSION=s1; bare enable must ignore it.
+        result = runner.invoke(main, ["memory", "enable"])
+        assert result.exit_code == 0, result.output
+        assert "Tip:" in result.output
+        state = SessionStore(str(forge_root), "s1").read()
+        assert "memory" not in state.overrides  # no session override written
+        assert read_project_memory_config(forge_root) is not None
 
 
 # ---------------------------------------------------------------------------

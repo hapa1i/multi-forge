@@ -71,16 +71,23 @@ def run_cmd(
         logger.warning("Failed to read session manifest for %s: %s", session_name, e)
         raise SystemExit(1)
 
-    if not effective.memory or not effective.memory.auto_update:
-        logger.info("Handoff not configured for session %s", session_name)
-        return
-
-    config = effective.memory.auto_update
-    if not config.enabled:
-        logger.info("Handoff disabled for session %s", session_name)
-        return
-
     from forge.session.handoff_agent import resolve_handoff_base_url, run_handoff_agent
+    from forge.session.models import HandoffConfig
+    from forge.session.passport import resolve_passport_source
+    from forge.session.project_memory import memory_activation, scan_passported_docs
+
+    activation = memory_activation(manifest, effective_root)
+    if activation is None:
+        logger.info("Handoff not activated for session %s", session_name)
+        return
+
+    config = HandoffConfig(
+        enabled=True,
+        mode=activation.mode,
+        min_turns=activation.min_turns,
+        proxy=activation.proxy,
+        direct=activation.direct,
+    )
 
     confirmed_proxy_url = None
     if manifest.confirmed.started_with_proxy:
@@ -94,7 +101,14 @@ def run_cmd(
         subprocess_proxy=subprocess_proxy or effective.subprocess_proxy,
     )
 
-    designated_docs = effective.memory.designated_docs if effective.memory else []
+    session_docs = list(effective.memory.designated_docs) if effective.memory else []
+    if activation.needs_project_scan:
+        scanned = scan_passported_docs(effective_root, activation.roots, session_name)
+        # De-dupe by (passport source, write path); session docs win on collision.
+        seen = {(resolve_passport_source(d), d.path) for d in session_docs}
+        designated_docs = session_docs + [d for d in scanned if (resolve_passport_source(d), d.path) not in seen]
+    else:
+        designated_docs = session_docs
 
     success = run_handoff_agent(
         session_name=session_name,

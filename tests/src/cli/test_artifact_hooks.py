@@ -165,6 +165,88 @@ class TestStopHook:
         assert marker_data["payload"]["session_name"] == "test-session"
         assert marker_data["payload"]["transcript_snapshot_rel"].endswith("/uuid-123.jsonl")
 
+    def _stop_with_transcript(self, store: SessionStore, tmp_path: Path, session_id: str) -> SessionStore:
+        transcript = tmp_path / "t.jsonl"
+        transcript.write_text("{}\n", encoding="utf-8")
+        manifest = store.read()
+        manifest.confirmed.transcript_path = str(transcript)
+        manifest.confirmed.claude_session_id = session_id
+        store.write(manifest)
+        return store
+
+    def test_stop_enqueues_handoff_with_project_config(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        from forge.core.workqueue import pending_work_dir
+        from forge.session.project_memory import (
+            ProjectAutoUpdateConfig,
+            ProjectMemoryConfig,
+            write_project_memory_config,
+        )
+
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("FORGE_HOME", str(tmp_path / ".forge-test"))
+        store = _write_manifest(tmp_path, monkeypatch)
+        self._stop_with_transcript(store, tmp_path, "uuid-h1")
+        write_project_memory_config(
+            tmp_path, ProjectMemoryConfig(version=1, auto_update=ProjectAutoUpdateConfig(enabled=True))
+        )
+
+        result = CliRunner().invoke(hooks, ["stop"], input=json.dumps({"hook_event_name": "Stop"}))
+
+        assert result.exit_code == 0
+        output = json.loads(result.output)
+        assert output["queued_handoff"] is True
+        assert (pending_work_dir() / "handoff-uuid-h1.json").is_file()
+
+    def test_stop_skips_handoff_when_session_disables(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        from forge.session.project_memory import (
+            ProjectAutoUpdateConfig,
+            ProjectMemoryConfig,
+            write_project_memory_config,
+        )
+
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("FORGE_HOME", str(tmp_path / ".forge-test"))
+        store = _write_manifest(tmp_path, monkeypatch)
+        self._stop_with_transcript(store, tmp_path, "uuid-h2")
+        manifest = store.read()
+        manifest.overrides = {"memory": {"auto_update": {"enabled": False}}}
+        store.write(manifest)
+        write_project_memory_config(
+            tmp_path, ProjectMemoryConfig(version=1, auto_update=ProjectAutoUpdateConfig(enabled=True))
+        )
+
+        result = CliRunner().invoke(hooks, ["stop"], input=json.dumps({"hook_event_name": "Stop"}))
+
+        assert result.exit_code == 0
+        output = json.loads(result.output)
+        assert output["queued_handoff"] is False
+
+    def test_stop_skips_handoff_incognito(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        from forge.session.project_memory import (
+            ProjectAutoUpdateConfig,
+            ProjectMemoryConfig,
+            write_project_memory_config,
+        )
+
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("FORGE_HOME", str(tmp_path / ".forge-test"))
+        store = _write_manifest(tmp_path, monkeypatch)
+        self._stop_with_transcript(store, tmp_path, "uuid-h3")
+        manifest = store.read()
+        manifest.is_incognito = True
+        store.write(manifest)
+        write_project_memory_config(
+            tmp_path, ProjectMemoryConfig(version=1, auto_update=ProjectAutoUpdateConfig(enabled=True))
+        )
+
+        result = CliRunner().invoke(hooks, ["stop"], input=json.dumps({"hook_event_name": "Stop"}))
+
+        assert result.exit_code == 0
+        output = json.loads(result.output)
+        # Stop marker still enqueued -> session resolved; handoff skipped purely due to incognito.
+        assert output["queued"] is True
+        assert output["queued_handoff"] is False
+
     def test_reconciles_child_uuid_when_fork_session_start_kept_parent_uuid(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:

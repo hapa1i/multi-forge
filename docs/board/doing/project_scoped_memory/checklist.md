@@ -23,8 +23,10 @@ wc -l docs/board/doing/project_scoped_memory/checklist.md
 
 ## Current Focus
 
-Slice 1: make project memory activation real via a checkout-local `.forge/memory.yaml` and one shared activation gate
-consulted at both the Stop-hook enqueue site and the detached runner. Additive, no schema break, no `track` change.
+Slice 1 **shipped** (see `change_log.md` 2026-05-24): checkout-local `.forge/memory.yaml` + one `memory_activation()`
+resolver consulted at both the Stop-hook enqueue site and the detached runner; bare `forge memory enable` is now
+project-scoped. Full `tests/src/session` + `tests/src/cli` unit suites green (2191 passed). Next: Slice 2 (sessionless
+`track`).
 
 ## Phase 0 - Baseline & Decisions
 
@@ -73,21 +75,25 @@ consulted at both the Stop-hook enqueue site and the detached runner. Additive, 
 
 ## Phase 1 - Slice 1: Project Activation + Shared Gate (additive, no schema break)
 
-- [ ] Add versioned project-scoped `<forge_root>/.forge/memory.yaml`.
+- [x] Add versioned project-scoped `<forge_root>/.forge/memory.yaml`.
   - Assertion: modeled on strict durable-state readers -- `SessionStore` (`store.py:40` `_SUPPORTED_SCHEMA_VERSIONS`,
     `:262-269` raises `ManifestCorruptedError` on unsupported version) and the session index (`index.py:109-116`,
     "Delete this file and retry"). NOT `runtime_config.py`, which is intentionally optional/fail-open/unversioned and
     ignores unknown keys -- the wrong precedent for Forge-owned durable state. Mandatory `version`, strict
     deserialization, clear unsupported-version error (coding-standards §5). Holds operational state only
     (`auto_update: {enabled, mode, min_turns, proxy}`); no `docs:` list.
-- [ ] Implement the shared resolver `memory_activation(session, project) -> ActivationConfig | None`.
+  - Shipped: `ProjectMemoryConfig`/`ProjectAutoUpdateConfig` + `read/write_project_memory_config` in
+    `src/forge/session/project_memory.py`; `ProjectMemoryConfigError` in `exceptions.py`.
+- [x] Implement the shared resolver `memory_activation(session, project) -> ActivationConfig | None`.
   - Assertion: project config plus a *sparse field-wise* session override; returns `None` for `is_incognito` sessions.
   - Implementation note: derive the session override from a tri-state source -- raw `intent`/`overrides` leaf-key
     presence (overrides are persisted per-leaf-key, e.g. `memory.auto_update.enabled`, `memory.py:208`). Do NOT read
     `compute_effective_intent()`: it materializes `HandoffConfig` defaults (`models.py:95-99`: `enabled=False`,
     `mode="augment"`, `min_turns=5`), collapsing "unset" into "explicit false/default". Both gates currently consume the
     materialized config (`handoff.py:69`, `memory.py:187`); the resolver must not.
-- [ ] Wire the resolver into **both** gates.
+  - Shipped: `memory_activation()` reads the raw `overrides` dict via `_get_override_leaf` (sparse, can disable) and
+    overlays `intent.memory.auto_update` as a whole block only when `enabled is True` (legacy; default `False` = unset).
+- [x] Wire the resolver into **both** gates.
   - Assertion: the enqueue gate (`commands.py:520`) and the detached `run_cmd` (`handoff.py:74-79`) both call the single
     resolver. Load-bearing: if the hook does not enqueue, the runner never runs, so a project enable is inert unless
     both sites consult it.
@@ -95,37 +101,50 @@ consulted at both the Stop-hook enqueue site and the detached runner. Additive, 
     extensions. Pin current behavior first -- add the negative case (activation resolves to `None`/disabled -> `run_cmd`
     no-ops, `run_handoff_agent` not called) before the positive project-enabled case, so the gate cannot regress to
     always-open during the resolver swap.
-- [ ] Stop discovery = scan + select.
+  - Shipped: enqueue gate uses `memory_activation(...) is not None` (best-effort try/except, debug-log when forge_root
+    None); `run_cmd` builds `HandoffConfig` from `ActivationConfig`; proxy-routing chain preserved (both legacy proxy
+    tests green).
+- [x] Stop discovery = scan + select.
   - Assertion: a session-layer discovery helper scans bounded memory roots for `forge_memory` frontmatter (unit-testable
     in isolation); `run_cmd` unions it with session `designated_docs` and de-dupes by passport source / write path at
     `handoff.py:97` (today `designated_docs = effective.memory.designated_docs`, passed to `run_handoff_agent` at
     `:106`). `run_handoff_agent` is unchanged -- selection stays via `check_writer_access` (already covered by
     `TestWriterFiltering` in `tests/src/session/test_handoff_agent.py`).
-- [ ] Bound the scan.
+  - Shipped: `scan_passported_docs()`; `run_cmd` unions + de-dupes by `(resolve_passport_source(d), d.path)`, session
+    docs win on collision.
+- [x] Bound the scan.
   - Assertion: walk only configured roots (default `docs/`, `.forge/memory/`); never `.git/`, `node_modules/`, etc.
-- [ ] `forge memory enable` (no `--session`) writes `.forge/memory.yaml`.
+  - Shipped: roots validated via `is_safe_designated_doc_path`; always unions `.forge/memory/`; skips
+    `.git/`/`node_modules/`/`__pycache__/`/`.venv/`/`.forge/sessions|artifacts`; deterministic sort; cap 50 after
+    filtering.
+- [x] `forge memory enable` (no `--session`) writes `.forge/memory.yaml`.
   - Assertion: `--review-only` sets review mode for the safe first run; consent output names the checkout; project-level
     enable removes the need for per-session enable/re-track for passported docs in this checkout.
-- [ ] Pin `enable` session-vs-project semantics (behavior change, not purely additive).
+  - Shipped: `_enable_project_scoped` writes the project config; mode-change preserves `roots`/`proxy`/`min_turns`.
+- [x] Pin `enable` session-vs-project semantics (behavior change, not purely additive).
   - Assertion: `enable --session X` stays session-scoped (writes the sparse override via leaf keys
     `memory.auto_update.*`, current behavior at `memory.py:179-216`). Bare `enable` writes project config and does NOT
     consult ambient `$FORGE_SESSION` (mirrors the bare-`track` rule). This shifts the meaning of in-session bare
     `enable` (today it targets the ambient session) -- call it out in the change_log. Regression test the `--session`
     path stays session-scoped.
-- [ ] Design docs: update `design.md §5.6` and `design_appendix.md §G`.
+  - Shipped: `_enable_session_scoped` keeps the override path; bare prints a `Tip:` when `$FORGE_SESSION` is set;
+    change_log entry added (2026-05-24).
+- [x] Design docs: update `design.md §5.6` and `design_appendix.md §G`.
   - Assertion: ownership is stated as passport (doc contract) vs project activation (checkout consent) vs session
     override (sparse). Reflects shipped Slice-1 behavior, not the full card target.
+  - Shipped: `design.md §5.6.6` (project-scoped activation) and `design_appendix.md §G.5` (config schema + resolver
+    merge table).
 
 Acceptance tests (Slice 1):
 
 | Test                         | Fixture                                    | Assertion                                            | Test File                              |
 | ---------------------------- | ------------------------------------------ | ---------------------------------------------------- | -------------------------------------- |
-| resolver project-only        | project `memory.yaml`, session silent      | returns project `ActivationConfig`                   | `test_memory_activation.py`            |
-| resolver sparse override     | project enabled, session `mode=review`     | merged; unset fields inherit project                 | `test_memory_activation.py`            |
-| resolver unset vs false      | raw override `enabled` unset vs false      | distinguishes (tri-state, pre-materialize)           | `test_memory_activation.py`            |
-| resolver incognito           | `is_incognito` session                     | returns `None` (no enqueue)                          | `test_memory_activation.py`            |
-| discovery helper             | 2 in-root passports, 1 out-of-root         | only in-root passports returned                      | `session/test_memory_discovery.py`     |
-| scan bounding                | repo with `.git/`, `node_modules/`         | excluded from walk                                   | `session/test_memory_discovery.py`     |
+| resolver project-only        | project `memory.yaml`, session silent      | returns project `ActivationConfig`                   | `session/test_project_memory.py`       |
+| resolver sparse override     | project enabled, session `mode=review`     | merged; unset fields inherit project                 | `session/test_project_memory.py`       |
+| resolver unset vs false      | raw override `enabled` unset vs false      | distinguishes (tri-state, pre-materialize)           | `session/test_project_memory.py`       |
+| resolver incognito           | `is_incognito` session                     | returns `None` (no enqueue)                          | `session/test_project_memory.py`       |
+| discovery helper             | 2 in-root passports, 1 out-of-root         | only in-root passports returned                      | `session/test_project_memory.py`       |
+| scan bounding                | repo with `.git/`, `node_modules/`         | excluded from walk                                   | `session/test_project_memory.py`       |
 | run_cmd union/dedup          | scanned passports + session `designated`   | passes ∪, de-duped, into `run_handoff_agent`         | `cli/test_handoff.py`                  |
 | enqueue gate uses resolver   | project-enabled, session silent            | Stop hook enqueues handoff marker                    | `test_artifact_hooks.py::TestStopHook` |
 | run_cmd gate uses resolver   | project-enabled, session silent            | `run_cmd` proceeds (not gated out)                   | `cli/test_handoff.py`                  |

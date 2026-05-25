@@ -783,6 +783,36 @@ input. It's outside the project root (containment guard), is free-form (hard to 
 and targets different information (preferences/patterns vs project state/standards). Occasional duplication is cheaper
 than cross-format deduplication. If overlap becomes painful, a small prompt tweak can address it.
 
+### G.5 Project memory config + activation resolver (from §5.6.6)
+
+`<forge_root>/.forge/memory.yaml` is checkout-scoped activation consent. Schema (v1):
+
+| Field                   | Type        | Default     | Meaning                                      |
+| ----------------------- | ----------- | ----------- | -------------------------------------------- |
+| `version`               | int         | (required)  | Schema version; only `1` is supported        |
+| `auto_update.enabled`   | bool        | `true`      | Run the handoff agent for all sessions here  |
+| `auto_update.mode`      | str         | `augment`   | `augment` (edit) or `review-only` (report)   |
+| `auto_update.min_turns` | int         | `5`         | Skip sessions shorter than this              |
+| `auto_update.proxy`     | str \| null | `null`      | Optional `proxy_id` for the handoff agent    |
+| `roots`                 | list[str]   | `["docs/"]` | Scan roots; `.forge/memory/` is always added |
+
+Read with `dacite(strict=True)` after a manual `version` check, mirroring `SessionStore` (not the fail-open
+`runtime_config.py`). Written via `dataclasses.asdict` + `yaml.safe_dump` so the file never carries Python object tags.
+
+**Resolver merge** (`memory_activation()`): three tiers with different semantics. `None` means "do not run".
+
+| Source            | Merge semantics     | Can disable? | Notes                                                       |
+| ----------------- | ------------------- | ------------ | ----------------------------------------------------------- |
+| Project config    | Whole `auto_update` | n/a          | Baseline when the file exists                               |
+| Session intent    | Whole block         | No           | Overlaid only when `enabled is True`; defaults ≠ user input |
+| Session overrides | Sparse per-leaf     | Yes          | Reads raw nested `overrides` dict; absent leaf = inherit    |
+
+The whole-block intent overlay (not per-leaf) is deliberate: `HandoffConfig` field defaults (`mode="augment"`,
+`min_turns=5`) are indistinguishable from explicit choices, so an inherited default must not override a project setting.
+Only `overrides.memory.auto_update.*` is truly sparse and may flip an active project config off. The resolver returns
+`ActivationConfig(mode, min_turns, proxy, direct, needs_project_scan, roots)`; `needs_project_scan` is true only when
+the project file exists and is enabled, so a session that merely tweaks mode/proxy does not suppress discovery.
+
 ---
 
 ## H. (Removed)

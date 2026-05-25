@@ -28,6 +28,35 @@ wc -l docs/board/change_log.md
 
 ## 2026-05-24
 
+### Phase 1 / Slice 1: Project-Scoped Memory Activation
+
+**Goal**: Activate the handoff agent once per checkout via `.forge/memory.yaml` instead of per-session
+`forge memory enable`, through a single resolver consulted at both activation gates.
+
+**Key changes**:
+
+- New `src/forge/session/project_memory.py`: versioned `ProjectMemoryConfig` (strict `dacite` reader modeled on
+  `SessionStore`, raises `ProjectMemoryConfigError`); the `memory_activation()` three-tier resolver (project baseline /
+  whole-block legacy intent overlay only when `enabled is True` / sparse per-leaf overrides, the only tier that can
+  disable); and `scan_passported_docs()` (root-contained via `_reject_unsafe_path`, which rejects absolute, escaping,
+  and `..`-traversal roots and shadow paths; deterministic; shadow-materializing; capped at 50 after filtering).
+- Both gates call the resolver: the Stop-hook enqueue site (`cli/hooks/commands.py`) and the detached runner
+  (`cli/handoff.py`). The runner unions scanned passports with session `designated_docs` (session wins, de-duped by
+  passport source + write path) while preserving the existing proxy-routing chain.
+- `forge memory enable` is now dual-path: bare writes project `.forge/memory.yaml`; `--session X` keeps the sparse
+  manifest override.
+- Design docs: added `design.md §5.6.6` and `design_appendix.md §G.5`.
+
+**Behavior change**: bare `forge memory enable` no longer targets the ambient `$FORGE_SESSION`; it enables the whole
+checkout (prints a `Tip:` when `$FORGE_SESSION` is set). Use `--session <name>` for the per-session override. Additive,
+no schema break; incognito sessions never activate.
+
+**Verification**: `tests/src/session/test_project_memory.py` (38: config I/O + resolver + scanner, incl. unsafe-root and
+unsafe-shadow-path rejection), `test_handoff.py` (+5 run_cmd; 2 legacy proxy tests still green),
+`test_artifact_hooks.py::TestStopHook` (+3), `test_memory.py` (`TestMemoryEnableProject` +6; `TestMemoryEnable` pinned
+to `--session`). Full `tests/src/session` + `tests/src/cli` unit suites: 2193 passed. mypy clean on touched files;
+`make pre-commit` clean.
+
 ### Memory Enhancement Completion, Design Doc Sync, and Proposal Lifecycle
 
 **Goal**: Close out the memory enhancement proposal (PR #1), update design docs to reflect shipped passport model,

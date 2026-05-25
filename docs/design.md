@@ -1670,6 +1670,45 @@ cheaper than cross-format deduplication.
 > Strategy tables, example config, worktree resolution details, and full auto-memory comparison in
 > [design_appendix.md §G](design_appendix.md#g-memory-doc-reference).
 
+#### 5.6.6 Project-scoped activation
+
+Handoff activation is checkout-scoped, not per-session. One `forge memory enable` writes
+`<forge_root>/.forge/memory.yaml` and turns on the handoff agent for every session in that checkout, so passported docs
+participate without a per-session `forge memory track`.
+
+```yaml
+# <forge_root>/.forge/memory.yaml
+version: 1
+auto_update:
+  enabled: true
+  mode: augment          # augment | review-only
+  min_turns: 5
+  proxy: null            # optional proxy_id for the handoff agent
+roots: ["docs/"]         # scan roots; .forge/memory/ is always included
+```
+
+The file is Forge-owned durable state: `version` is mandatory, reads are strict (unknown keys and unsupported versions
+raise `ProjectMemoryConfigError`), and a corrupt file fails the read rather than degrading to a default.
+
+**Activation resolver.** A single resolver (`memory_activation()` in `src/forge/session/project_memory.py`) decides
+whether the handoff agent runs, and both gates consult it: the Stop-hook enqueue site
+(`src/forge/cli/hooks/commands.py`) and the detached runner (`forge handoff run`). It merges three tiers:
+
+1. **Project config** — baseline `auto_update` block when `.forge/memory.yaml` exists.
+2. **Session intent** — `intent.memory.auto_update`, overlaid as a whole block only when its `enabled` is `True` (legacy
+   per-session enable). A `HandoffConfig` default `enabled=False` is treated as unset, not an explicit disable.
+3. **Session overrides** — sparse per-leaf `overrides.memory.auto_update.<field>`; the only tier that can explicitly
+   disable an active project config.
+
+Incognito sessions always resolve to "do not run". `forge memory enable --session <name>` still writes a sparse session
+override and leaves `.forge/memory.yaml` untouched; bare `enable` ignores `$FORGE_SESSION`.
+
+**Stop-time discovery.** When project activation is on, the detached runner scans the configured roots (plus
+`.forge/memory/`) for `forge_memory` passports the session is authorized to write, materializes shadow files for
+shadow-only passports, and unions the result with the session's `designated_docs` — session docs win on collision,
+de-duped by passport source and write path, capped at 50. The Stop hook only decides whether to enqueue; the scan runs
+in the background runner.
+
 ### 5.7 Test Infrastructure (Docker-based)
 
 **Runtime architecture (host-based)**: Proxy runs on host (`subprocess.Popen`), Claude Code runs on host. End users do
