@@ -23,11 +23,14 @@ wc -l docs/board/doing/project_scoped_memory/checklist.md
 
 ## Current Focus
 
-Slice 1 **shipped** (see `change_log.md` 2026-05-24): checkout-local `.forge/memory.yaml` + one `memory_activation()`
-resolver consulted at both the Stop-hook enqueue site and the detached runner; bare `forge memory enable` is now
-project-scoped. Full `tests/src/session` + `tests/src/cli` unit suites green (2191 passed). Next: Slice 2 — spec settled
-(see Phase 2): `track` becomes passport-only, and a new participation-only `forge memory extra add` is the session
-escape hatch (no passport writes; `--as` required; warns when the passport already governs).
+Slice 2 **shipped** (see `change_log.md` 2026-05-25): `forge memory track` is now passport-only and sessionless;
+`forge memory extra add` is the participation-only session escape hatch (`origin="extra"`, no passport); `--session` on
+`track` is a tombstone. `DesignatedDoc.origin` added/persisted/inherited; `list`/`status` expose it; `untrack` warns on
+remaining passports; legacy warning skips extras. Shadow discovery + collision moved off the manifest onto passport
+scans (`scan_shadow_passports`, `check_shadow_path_collision_in_roots`); dead `check_shadow_path_collision` removed.
+Full `tests/src -m "not integration"` green (4689 passed); `mypy` clean. Next: closeout (promote impl_notes after human
+review; move card to `done/` after merge), then Slice 3 (decommission/deprecate `designated_docs`, passport-removal
+path) remains deferred.
 
 ## Phase 0 - Baseline & Decisions
 
@@ -161,22 +164,22 @@ Verb taxonomy this slice locks in: **`track`** = make a doc project memory by wr
 git-tracked); **`extra add`** = include a doc for this session only (session-lifetime, no passport); **`enable`** = turn
 the runner on for this checkout/session. Each verb owns exactly one lifetime.
 
-- [ ] `track_cmd` becomes passport-only (stateless).
+- [x] `track_cmd` becomes passport-only (stateless).
   - Assertion: drop the participation write (`_write_docs` / `memory.designated_docs` override at `memory.py:70-78`) and
     the `_auto_enable_memory` call; stop calling `resolve_session` / `_current_docs`. Validate the path against
     `ctx.forge_root` (as `passport_show_cmd` does, `memory.py:1348`). Warn when the doc is outside the effective scan
     roots (`.forge/memory.yaml` `roots:` ∪ always-on `.forge/memory/`). `--propose`/`--shadow` still write the
     shadow-only passport, but no participation.
-- [ ] Bare `track` never consults the ambient session.
+- [x] Bare `track` never consults the ambient session.
   - Assertion: `forge memory track <doc>` is passport-only even when `$FORGE_SESSION` is set (mirrors bare `enable`; no
     invisible ambient-session behavior).
-- [ ] New `forge memory extra add <doc> --as <strategy> [--session <name>]` (participation-only escape hatch).
+- [x] New `forge memory extra add <doc> --as <strategy> [--session <name>]` (participation-only escape hatch).
   - Assertion: writes ONLY `memory.designated_docs` (reuse `_write_docs`); never calls
     `synthesize_passport`/`write_passport`/`resolve_with_overrides`. `--as` is REQUIRED — it is the `resolve_doc_spec`
     fallback strategy for passport-less docs (`handoff_agent.py:431`). Resolves ambient `$FORGE_SESSION` when
     `--session` is omitted and ECHOES the resolved session; errors (via `resolve_session`) outside a session with no
     `--session`. Drops `--intent`/`--writers`/`--propose`/`--shadow`.
-- [ ] `extra add` warns by reading the target's passport + `writers` (three-way; case B folded in).
+- [x] `extra add` warns by reading the target's passport + `writers` (three-way; case B folded in).
   - Assertion (A, redundant): passport present AND under a scan root AND `check_writer_access` authorizes the session ->
     warn "already project-discovered for this session; no extra needed."
   - Assertion (B, passport vetoes): passport present AND `writers` EXCLUDES the session -> warn "passport restricts
@@ -186,7 +189,7 @@ the runner on for this checkout/session. Each verb owns exactly one lifetime.
     with no warning (genuine session-only state, e.g. `docs/scratch.md`).
   - Invariant to assert + document: an `extra` cannot grant write access a passport denies (passport is authoritative
     for `writers` whether the doc arrives via scan or `designated_docs`).
-- [ ] `_check_legacy_docs` stops scolding intentional extras.
+- [x] `_check_legacy_docs` stops scolding intentional extras.
   - Mechanism: add an optional provenance field to `DesignatedDoc` (`models.py:103`) —
     `origin: Literal["extra"] | None = None` (named `origin`, not `source`: `resolve_passport_source` returns a path and
     `shadows` is the official source doc, so "source" is already taken). `extra add` sets `origin="extra"`; legacy
@@ -198,10 +201,10 @@ the runner on for this checkout/session. Each verb owns exactly one lifetime.
     entry with no passport still warns. Update the warning's remediation text — it currently names the REMOVED
     `track ... --session` spelling (`memory.py:104-106`); point it at `forge memory track <path> --as <strategy>`
     (passport-ize, project-level) or `forge memory extra add <path> --as <strategy>` (re-add as session-only).
-- [ ] Authoring no longer requires a session.
+- [x] Authoring no longer requires a session.
   - Assertion: `track` succeeds from a bare terminal; the removed `track --session` participation coupling fails
     helpfully (names `extra add`) per coding-standards §5 clean break + changelog entry.
-- [ ] Docs: rewrite `docs/board/README.md` "Handoff Agent Setup" + "Advanced Workflow" to passport-once +
+- [x] Docs: rewrite `docs/board/README.md` "Handoff Agent Setup" + "Advanced Workflow" to passport-once +
   per-checkout-enable (the card's Worked Example); update `design.md §5.6` with the verb taxonomy and the "extra cannot
   override passport writers" invariant.
 

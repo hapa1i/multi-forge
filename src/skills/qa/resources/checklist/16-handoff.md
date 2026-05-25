@@ -22,7 +22,9 @@ EOF
 forge memory enable --session test-session-1
 forge session set memory.auto_update.min_turns 1 --session test-session-1
 forge session set memory.designated_docs '[]' --session test-session-1
-forge memory track .forge/memory/debugging.md --as debugging --session test-session-1
+# Author a project passport (sessionless), then include the doc for this session.
+forge memory track .forge/memory/debugging.md --as debugging
+forge memory extra add .forge/memory/debugging.md --as debugging --session test-session-1
 forge memory list --json --session test-session-1 | jq -e '
   length == 1
   and any(.[]; .path == ".forge/memory/debugging.md" and .strategy == "debugging")
@@ -47,8 +49,8 @@ cat .forge/sessions/test-session-1/forge.session.json | jq '.overrides.memory'
 
 - [ ] Handoff config written to session overrides
 - [ ] `enabled`, `min_turns`, and `mode` values set
-- [ ] `forge memory track/list` configures an existing designated doc
-- [ ] `forge memory track` writes a passport into the tracked doc
+- [ ] `forge memory extra add/list` configures session participation for an existing doc
+- [ ] `forge memory track` writes a passport into the doc (sessionless)
 - [ ] Raw override includes one missing designated doc for runtime skip coverage
 - [ ] Config stores worktree-relative paths under `memory.designated_docs`
 
@@ -122,10 +124,12 @@ EOF
 
 forge memory enable --session test-session-1
 forge session set memory.designated_docs '[]' --session test-session-1
+# Author a shadow-only passport (sessionless), then register session participation
+# in the shadow surface (the session-scoped runner reads memory.designated_docs).
 forge memory track docs/team-standards.md \
   --propose \
-  --shadow .forge/memory/suggested_standards.md \
-  --session test-session-1
+  --shadow .forge/memory/suggested_standards.md
+forge session set memory.designated_docs '[{"path":".forge/memory/suggested_standards.md","strategy":"suggested","shadows":"docs/team-standards.md"}]' --session test-session-1
 forge memory list --session test-session-1
 
 mkdir -p .forge/artifacts/test-session-1/transcripts

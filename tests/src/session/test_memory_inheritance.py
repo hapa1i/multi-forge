@@ -285,6 +285,23 @@ class TestApplyMemoryInheritance:
         assert len(child.intent.memory.designated_docs) == 1
         assert child.intent.memory.designated_docs[0].path == "docs/notes.md"
 
+    def test_all_mode_preserves_origin(self, tmp_path):
+        """origin='extra' survives the asdict/from_dict round-trip during inheritance."""
+        docs = [DesignatedDoc(path="docs/notes.md", strategy="generic", origin="extra")]
+        parent = _make_state("parent", designated_docs=docs)
+        child = _make_state("child")
+
+        apply_memory_inheritance(
+            parent_state=parent,
+            child_state=child,
+            mode=InheritMemoryMode.ALL,
+            parent_forge_root=tmp_path,
+            child_session_name="child",
+            cli_flag_explicit=False,
+        )
+        assert child.intent.memory is not None
+        assert child.intent.memory.designated_docs[0].origin == "extra"
+
     def test_none_mode_clears_docs_and_auto_update(self, tmp_path):
         docs = [DesignatedDoc(path="docs/notes.md", strategy="generic")]
         auto_update = HandoffConfig(enabled=True, mode="augment")

@@ -390,6 +390,103 @@ class TestCollectShadowEntries:
         assert len(entries) == 1
         assert entries[0].session == "s2"
 
+    def _setup_project_shadow(self, tmp_path: Path) -> Path:
+        """Create a forge_root with a sessionless shadow-only passport (no manifest)."""
+        from forge.session.passport import synthesize_passport, write_passport
+
+        forge_root = tmp_path / "project"
+        forge_root.mkdir()
+        (forge_root / ".forge").mkdir(parents=True)
+        (forge_root / "docs").mkdir()
+        official = forge_root / "docs" / "notes.md"
+        official.write_text("# Notes\n")
+        write_passport(
+            official,
+            synthesize_passport(
+                strategy="suggested", update_mode="shadow-only", shadow_path=".forge/memory/suggested_notes.md"
+            ),
+        )
+        return forge_root
+
+    def _register_session(self, tmp_path: Path, forge_root: Path, name: str = "s1") -> None:
+        from forge.session import IndexStore, SessionStore, create_session_state
+
+        state = create_session_state(
+            name,
+            proxy_template="litellm-openai",
+            proxy_base_url="http://localhost:8085",
+            worktree_path=str(forge_root),
+        )
+        state.forge_root = str(forge_root)
+        SessionStore(str(forge_root), name).write(state)
+        IndexStore().add_session(
+            name=name,
+            worktree_path=str(forge_root),
+            project_root=str(tmp_path),
+            forge_root=str(forge_root),
+            checkout_root=str(forge_root),
+            relative_path=".",
+            is_incognito=False,
+            is_fork=False,
+            parent_session=None,
+        )
+
+    def test_discovers_project_origin_shadow_via_scan(self, tmp_path: Path, monkeypatch: MagicMock) -> None:
+        """A sessionless ``track --propose`` passport (no manifest entry) is discovered by scan."""
+        from forge.core.ops.context import ExecutionContext
+        from forge.session.shadow_curation import collect_shadow_entries
+
+        forge_root = self._setup_project_shadow(tmp_path)
+        self._register_session(tmp_path, forge_root)  # session exists but has no designated_docs
+
+        monkeypatch.chdir(forge_root)
+        ctx = ExecutionContext.from_cwd(cwd=forge_root)
+        entries, _ = collect_shadow_entries(ctx=ctx, scope="project", session_filter=None)
+
+        assert len(entries) == 1
+        assert entries[0].official == "docs/notes.md"
+        assert entries[0].shadow_path == ".forge/memory/suggested_notes.md"
+        assert entries[0].session == "(project)"
+
+    def test_project_scan_deduped_against_session_entry(self, tmp_path: Path, monkeypatch: MagicMock) -> None:
+        """A manifest shadow entry and a scanned passport sharing (root, shadow) collapse to the session entry."""
+        from forge.core.ops.context import ExecutionContext
+        from forge.session import SessionStore
+        from forge.session.models import DesignatedDoc, MemoryIntent
+        from forge.session.shadow_curation import collect_shadow_entries
+
+        forge_root = self._setup_project_shadow(tmp_path)
+        self._register_session(tmp_path, forge_root)
+        store = SessionStore(str(forge_root), "s1")
+        manifest = store.read()
+        manifest.intent.memory = MemoryIntent()
+        manifest.intent.memory.designated_docs.append(
+            DesignatedDoc(path=".forge/memory/suggested_notes.md", strategy="suggested", shadows="docs/notes.md")
+        )
+        store.write(manifest)
+
+        monkeypatch.chdir(forge_root)
+        ctx = ExecutionContext.from_cwd(cwd=forge_root)
+        entries, _ = collect_shadow_entries(ctx=ctx, scope="project", session_filter=None)
+
+        assert len(entries) == 1
+        assert entries[0].session == "s1"  # session entry wins; project scan is de-duped out
+
+    def test_scope_repo_unions_current_project_root(self, tmp_path: Path, monkeypatch: MagicMock) -> None:
+        """--scope repo includes the current project's passport-origin shadows."""
+        from forge.core.ops.context import ExecutionContext
+        from forge.session.shadow_curation import collect_shadow_entries
+
+        forge_root = self._setup_project_shadow(tmp_path)
+        self._register_session(tmp_path, forge_root)
+
+        monkeypatch.chdir(forge_root)
+        ctx = ExecutionContext.from_cwd(cwd=forge_root)
+        entries, roots = collect_shadow_entries(ctx=ctx, scope="repo", session_filter=None)
+
+        assert any(e.session == "(project)" and e.official == "docs/notes.md" for e in entries)
+        assert str(forge_root) in roots
+
 
 # ---------------------------------------------------------------------------
 # Import layering

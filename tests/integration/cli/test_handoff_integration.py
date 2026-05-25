@@ -314,7 +314,7 @@ class TestHandoffRunMultiDoc:
         mock_claude_workspace: ContainerLike,
         claude_capture_file: Callable[[str], str],
     ) -> None:
-        """memory track → handoff review-only → session handoff show exposes the report."""
+        """memory extra add + enable review-only → handoff → session handoff show exposes the report."""
         session_name = "memory-review"
         transcript_rel = f".forge/artifacts/{session_name}/transcripts/uuid-456.jsonl"
         _install_outputting_claude_mock(mock_claude_workspace)
@@ -327,17 +327,18 @@ class TestHandoffRunMultiDoc:
         mock_claude_workspace.write_file(f"/workspace/{transcript_rel}", _build_transcript())
 
         result = mock_claude_workspace.exec(
-            f"cd /workspace && forge memory track docs/state.md " f"--as project-state --session {session_name}"
+            f"cd /workspace && forge memory extra add docs/state.md " f"--as project-state --session {session_name}"
         )
         assert result.returncode == 0, result.stderr
-        for key, value in (
-            ("memory.auto_update.mode", "review-only"),
-            ("memory.auto_update.min_turns", "1"),
-        ):
-            result = mock_claude_workspace.exec(
-                f"cd /workspace && forge session set --session {session_name} {key} {value}"
-            )
-            assert result.returncode == 0, result.stderr
+        # Slice 2: extra add records participation; enable owns activation.
+        result = mock_claude_workspace.exec(
+            f"cd /workspace && forge memory enable --review-only --session {session_name}"
+        )
+        assert result.returncode == 0, result.stderr
+        result = mock_claude_workspace.exec(
+            f"cd /workspace && forge session set --session {session_name} memory.auto_update.min_turns 1"
+        )
+        assert result.returncode == 0, result.stderr
 
         list_result = mock_claude_workspace.exec(f"cd /workspace && forge memory list --session {session_name} --json")
         assert list_result.returncode == 0, list_result.stderr

@@ -104,6 +104,52 @@ def collect_shadow_entries(
                 )
             )
 
+    # Project-origin shadow-only passports (sessionless ``track --propose``).
+    # Slice 2 stopped indexing these in manifests, so scan passports under the
+    # scope-appropriate roots or ``shadows list/show/review`` go blind. Skip
+    # when filtering to a named session: project shadows belong to no session.
+    if session_filter is None:
+        from forge.session.exceptions import ProjectMemoryConfigError
+        from forge.session.project_memory import (
+            DEFAULT_SCAN_ROOTS,
+            read_project_memory_config,
+            scan_shadow_passports,
+        )
+
+        roots_to_scan: set[str] = set()
+        if scope == "project":
+            if ctx.forge_root is not None:
+                roots_to_scan.add(str(ctx.forge_root))
+        else:  # repo | all: union every session root plus the current project
+            roots_to_scan |= scanned_roots
+            if ctx.forge_root is not None:
+                roots_to_scan.add(str(ctx.forge_root))
+
+        seen_keys = {(e.forge_root, e.shadow_path) for e in entries}
+        for fr in sorted(roots_to_scan):
+            fr_path = Path(fr)
+            try:
+                cfg = read_project_memory_config(fr_path)
+            except ProjectMemoryConfigError:
+                logger.debug("Skipping project shadow scan for %s: corrupt memory.yaml", fr, exc_info=True)
+                continue
+            scan_roots = tuple(cfg.roots) if cfg is not None else DEFAULT_SCAN_ROOTS
+            for official_rel, shadow_path, strategy in scan_shadow_passports(fr_path, scan_roots):
+                key = (fr, shadow_path)
+                if key in seen_keys:
+                    continue
+                seen_keys.add(key)
+                scanned_roots.add(fr)
+                entries.append(
+                    ShadowEntry(
+                        official=official_rel,
+                        shadow_path=shadow_path,
+                        strategy=strategy,
+                        session="(project)",
+                        forge_root=fr,
+                    )
+                )
+
     return entries, scanned_roots
 
 

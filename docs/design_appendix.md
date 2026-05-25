@@ -725,15 +725,23 @@ forge_memory:
 **CLI setup** (equivalent to the passport above):
 
 ```bash
-forge memory enable --review-only --session planner
-forge memory track docs/board/change_log.md --as changelog --session planner
+# Passports are project-lifetime and sessionless:
+forge memory track docs/board/change_log.md --as changelog
 forge memory track docs/board/impl_notes.md \
-  --propose --shadow .forge/memory/suggested_impl_notes.md --session planner
-forge memory list --json --session planner
+  --propose --shadow .forge/memory/suggested_impl_notes.md
+
+# Activate the handoff agent for this checkout (or one session with --session):
+forge memory enable --review-only
+
+# Passports live in the docs; verify without a manifest (sessionless track writes no participation):
+forge memory passport show docs/board/change_log.md
+forge memory shadows list
 ```
 
-`forge memory track` is idempotent. Re-running with different flags updates the existing entry and rewrites the
-passport. All docs are processed in one `claude -p` call with per-doc strategy instructions.
+`forge memory track` is idempotent and sessionless: re-running with different flags updates the passport in place; with
+no flags on an already-passported doc it is a no-op. For one-session-only participation without a passport, use
+`forge memory extra add <path> --as <strategy> --session planner`. All docs are processed in one `claude -p` call with
+per-doc strategy instructions.
 
 ### G.3 Worktree resolution (extends §5.6.5)
 

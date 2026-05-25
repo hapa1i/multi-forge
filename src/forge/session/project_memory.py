@@ -16,7 +16,7 @@ Authority split:
 from __future__ import annotations
 
 import logging
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
@@ -277,6 +277,34 @@ _MEMORY_DIR_REL = ".forge/memory"
 _MAX_SCANNED_DOCS = 50
 
 
+def effective_scan_roots(roots: Sequence[str]) -> list[str]:
+    """Return *roots* plus the always-on ``.forge/memory/`` dir, sorted.
+
+    ``.forge/memory/`` holds shadow files and is always scanned even when a
+    project config narrows ``roots``.
+    """
+    return sorted(set(roots) | {_MEMORY_DIR_REL})
+
+
+def is_under_scan_roots(path: str, forge_root: Path, roots: Sequence[str]) -> bool:
+    """Return True if *path* resolves under any effective scan root.
+
+    Uses real path containment (resolve + ``is_relative_to``), not string
+    prefixes, so ``docs-extra/x.md`` is not treated as under ``docs/``. Unsafe
+    roots (absolute, escaping, or ``..``-traversal) are skipped to match
+    :func:`scan_passported_docs`, which rejects them before scanning.
+    """
+    forge_root = forge_root.resolve()
+    abs_path = (forge_root / path).resolve()
+    for root in effective_scan_roots(roots):
+        if _reject_unsafe_path(root, forge_root):
+            continue
+        root_dir = (forge_root / root).resolve()
+        if abs_path == root_dir or abs_path.is_relative_to(root_dir):
+            return True
+    return False
+
+
 def _is_excluded(rel_parts: tuple[str, ...]) -> bool:
     if any(part in _SCAN_EXCLUDE_DIRS for part in rel_parts):
         return True
@@ -327,7 +355,7 @@ def scan_passported_docs(forge_root: Path, roots: Sequence[str], session_name: s
     forge_root = forge_root.resolve()
 
     valid_roots: list[str] = []
-    for root in sorted(set(roots) | {_MEMORY_DIR_REL}):
+    for root in effective_scan_roots(roots):
         reason = _reject_unsafe_path(root, forge_root)
         if reason:
             logger.warning("Skipping unsafe scan root %r: %s", root, reason)
@@ -383,3 +411,87 @@ def scan_passported_docs(forge_root: Path, roots: Sequence[str], session_name: s
             logger.warning("Scan cap of %d reached; additional passported docs ignored", _MAX_SCANNED_DOCS)
             break
     return docs
+
+
+def _iter_shadow_passports(forge_root: Path, roots: Sequence[str]) -> Iterator[tuple[str, str, str]]:
+    """Yield ``(official_rel, shadow_path, strategy)`` for shadow-only passports.
+
+    Lazy so callers that only need the first match (collision check) can
+    short-circuit and skip the rest of the walk. Unlike :func:`scan_passported_docs`,
+    this does NOT filter by writer and does NOT materialize shadow files.
+    Malformed/unreadable passports and unsafe shadow paths are skipped (debug
+    log). Paths are forge-root-relative.
+    """
+    forge_root = forge_root.resolve()
+    seen: set[str] = set()
+    for root in effective_scan_roots(roots):
+        if _reject_unsafe_path(root, forge_root):
+            continue
+        root_dir = forge_root / root
+        if not root_dir.is_dir():
+            continue
+        for md in sorted(root_dir.rglob("*.md")):
+            if not md.is_file():
+                continue
+            try:
+                rel_path = md.relative_to(forge_root)
+            except ValueError:
+                continue
+            if _is_excluded(rel_path.parts):
+                continue
+            if not md.resolve().is_relative_to(forge_root):
+                continue  # symlink escaping the project
+            rel = rel_path.as_posix()
+            if rel in seen:
+                continue
+            seen.add(rel)
+            try:
+                passport = read_passport(forge_root / rel)
+            except PassportError as e:
+                logger.debug("Skipping malformed passport during shadow scan %s: %s", rel, e)
+                continue
+            except OSError as e:
+                logger.debug("Skipping unreadable doc during shadow scan %s: %s", rel, e)
+                continue
+            if passport is None or passport.update.mode != "shadow-only":
+                continue
+            shadow_path = passport.update.shadow_path or derive_shadow_path(rel)
+            if _reject_unsafe_path(shadow_path, forge_root):
+                continue
+            yield (rel, shadow_path, passport.update.strategy)
+
+
+def scan_shadow_passports(forge_root: Path, roots: Sequence[str]) -> list[tuple[str, str, str]]:
+    """Eagerly collect all shadow-only passports under *roots* (read-only).
+
+    Full discovery for ``forge memory shadows list/show/review``. Uncapped --
+    hiding valid shadows would be worse than the walk cost. For first-match
+    needs (collision), use :func:`_iter_shadow_passports` directly.
+    """
+    return list(_iter_shadow_passports(forge_root, roots))
+
+
+def check_shadow_path_collision_in_roots(
+    shadow_path: str,
+    official_path: str,
+    forge_root: Path,
+    roots: Sequence[str],
+) -> str | None:
+    """Detect a shadow-only passport that already claims *shadow_path*.
+
+    Short-circuits on the first *different* official doc whose passport
+    declares the same ``shadow_path``. Returns an actionable error message on
+    collision, ``None`` when safe. Re-authoring the same official doc is not a
+    collision. Malformed passports are skipped inside
+    :func:`_iter_shadow_passports`, so an unrelated bad doc cannot block authoring.
+    """
+    for existing_official, existing_shadow, _ in _iter_shadow_passports(forge_root, roots):
+        if existing_shadow != shadow_path:
+            continue
+        if existing_official == official_path:
+            continue  # same official re-authored -- upsert, not collision
+        return (
+            f"Shadow path {shadow_path} is already used for {existing_official}. "
+            "Use --shadow <path> to specify a different shadow path."
+        )
+    return None

@@ -16,10 +16,13 @@ from forge.session.passport import synthesize_passport, write_passport
 from forge.session.project_memory import (
     ProjectAutoUpdateConfig,
     ProjectMemoryConfig,
+    check_shadow_path_collision_in_roots,
     get_project_memory_path,
+    is_under_scan_roots,
     memory_activation,
     read_project_memory_config,
     scan_passported_docs,
+    scan_shadow_passports,
     write_project_memory_config,
 )
 
@@ -416,3 +419,151 @@ def test_scan_unsafe_shadow_path_skipped(tmp_path):
     )
     _write_doc(tmp_path, "docs/absolute.md", strategy="suggested", update_mode="shadow-only", shadow_path="/tmp/x.md")
     assert scan_passported_docs(tmp_path, ["docs/"], "any-session") == []
+
+
+# ---------------------------------------------------------------------------
+# is_under_scan_roots
+# ---------------------------------------------------------------------------
+
+
+def test_is_under_scan_roots_in_root(tmp_path):
+    assert is_under_scan_roots("docs/x.md", tmp_path, ("docs/",)) is True
+
+
+def test_is_under_scan_roots_always_includes_memory_dir(tmp_path):
+    # .forge/memory/ is unioned in even when roots is narrower.
+    assert is_under_scan_roots(".forge/memory/s.md", tmp_path, ("docs/",)) is True
+
+
+def test_is_under_scan_roots_sibling_false(tmp_path):
+    # Real containment, not string prefix: docs-extra is NOT under docs/.
+    assert is_under_scan_roots("docs-extra/x.md", tmp_path, ("docs/",)) is False
+
+
+def test_is_under_scan_roots_parent_escape_false(tmp_path):
+    assert is_under_scan_roots("../outside.md", tmp_path, ("docs/",)) is False
+
+
+def test_is_under_scan_roots_absolute_false(tmp_path):
+    assert is_under_scan_roots("/etc/passwd", tmp_path, ("docs/",)) is False
+
+
+def test_is_under_scan_roots_dot_root(tmp_path):
+    # An explicit "." root contains everything.
+    assert is_under_scan_roots("anything/x.md", tmp_path, (".",)) is True
+
+
+def test_is_under_scan_roots_skips_unsafe_root(tmp_path):
+    # A '..' root resolves to the parent and would falsely "contain" in-repo docs;
+    # it must be skipped (matching scan_passported_docs, which rejects it), so an
+    # in-docs path is NOT reported as under roots when '../' is the only doc root.
+    assert is_under_scan_roots("docs/x.md", tmp_path, ("../",)) is False
+
+
+# ---------------------------------------------------------------------------
+# scan_shadow_passports
+# ---------------------------------------------------------------------------
+
+
+def test_scan_shadow_passports_yields_shadow_only(tmp_path):
+    _write_doc(
+        tmp_path,
+        "docs/official.md",
+        strategy="suggested",
+        update_mode="shadow-only",
+        shadow_path=".forge/memory/suggested_official.md",
+    )
+    assert scan_shadow_passports(tmp_path, ["docs/"]) == [
+        ("docs/official.md", ".forge/memory/suggested_official.md", "suggested")
+    ]
+
+
+def test_scan_shadow_passports_ignores_direct(tmp_path):
+    _write_doc(tmp_path, "docs/direct.md", strategy="changelog")  # direct mode
+    assert scan_shadow_passports(tmp_path, ["docs/"]) == []
+
+
+def test_scan_shadow_passports_unfiltered_by_writer(tmp_path):
+    # Unlike scan_passported_docs, a writer restriction does NOT exclude it.
+    _write_doc(
+        tmp_path,
+        "docs/restricted.md",
+        strategy="suggested",
+        update_mode="shadow-only",
+        shadow_path=".forge/memory/suggested_restricted.md",
+        writers="other-session",
+    )
+    assert [r[0] for r in scan_shadow_passports(tmp_path, ["docs/"])] == ["docs/restricted.md"]
+
+
+def test_scan_shadow_passports_does_not_materialize(tmp_path):
+    _write_doc(
+        tmp_path,
+        "docs/official.md",
+        strategy="suggested",
+        update_mode="shadow-only",
+        shadow_path=".forge/memory/suggested_official.md",
+    )
+    scan_shadow_passports(tmp_path, ["docs/"])
+    # Read-only inspection must NOT create the shadow file.
+    assert not (tmp_path / ".forge/memory/suggested_official.md").exists()
+
+
+def test_scan_shadow_passports_skips_malformed(tmp_path):
+    _write_doc(
+        tmp_path,
+        "docs/good.md",
+        strategy="suggested",
+        update_mode="shadow-only",
+        shadow_path=".forge/memory/suggested_good.md",
+    )
+    (tmp_path / "docs/bad.md").write_text("---\nforge_memory:\n  version: not-an-int\n---\n# Body\n", encoding="utf-8")
+    assert [r[0] for r in scan_shadow_passports(tmp_path, ["docs/"])] == ["docs/good.md"]
+
+
+# ---------------------------------------------------------------------------
+# check_shadow_path_collision_in_roots
+# ---------------------------------------------------------------------------
+
+
+def test_collision_detected_for_different_official(tmp_path):
+    _write_doc(
+        tmp_path,
+        "docs/a.md",
+        strategy="suggested",
+        update_mode="shadow-only",
+        shadow_path=".forge/memory/shared.md",
+    )
+    msg = check_shadow_path_collision_in_roots(".forge/memory/shared.md", "docs/b.md", tmp_path, ("docs/",))
+    assert msg is not None
+    assert "docs/a.md" in msg
+
+
+def test_collision_none_for_same_official(tmp_path):
+    _write_doc(
+        tmp_path,
+        "docs/a.md",
+        strategy="suggested",
+        update_mode="shadow-only",
+        shadow_path=".forge/memory/shared.md",
+    )
+    # Re-authoring the same official doc is not a collision (upsert).
+    assert check_shadow_path_collision_in_roots(".forge/memory/shared.md", "docs/a.md", tmp_path, ("docs/",)) is None
+
+
+def test_collision_none_when_unused(tmp_path):
+    _write_doc(
+        tmp_path,
+        "docs/a.md",
+        strategy="suggested",
+        update_mode="shadow-only",
+        shadow_path=".forge/memory/a.md",
+    )
+    assert check_shadow_path_collision_in_roots(".forge/memory/other.md", "docs/b.md", tmp_path, ("docs/",)) is None
+
+
+def test_collision_skips_malformed_unrelated(tmp_path):
+    # A malformed unrelated passport must not raise; the check returns None.
+    (tmp_path / "docs").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "docs/bad.md").write_text("---\nforge_memory:\n  version: not-an-int\n---\n# Body\n", encoding="utf-8")
+    assert check_shadow_path_collision_in_roots(".forge/memory/x.md", "docs/b.md", tmp_path, ("docs/",)) is None

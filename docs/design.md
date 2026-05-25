@@ -909,17 +909,18 @@ per-child handoff file in `$EDITOR` before launching Claude. `forge session memo
 
 #### Memory management
 
-| Command                       | Purpose                                                                      |
-| :---------------------------- | :--------------------------------------------------------------------------- |
-| `forge memory enable`         | Enable memory auto-update for handoff agent (`--session`)                    |
-| `forge memory track <path>`   | Track a memory doc (`--as <strategy>`, `--propose`, `--shadow`, `--session`) |
-| `forge memory untrack <path>` | Stop tracking a memory doc (`--session`)                                     |
-| `forge memory list`           | List tracked memory docs (`--session`, `--json`)                             |
-| `forge memory status`         | Show memory doc status across sessions (`--scope`, `--doc`, `--json`)        |
-| `forge memory shadows list`   | List accumulated shadow proposals (`--scope`, `--session`, `--json`)         |
-| `forge memory shadows show`   | Show shadow proposal content (`--for <doc>`, `--scope`, `--session`)         |
-| `forge memory shadows review` | Review/curate shadow proposals (`--for`, `--curate`, `--show-latest`)        |
-| `forge memory passport show`  | Show passport embedded in a memory doc (`--json`)                            |
+| Command                         | Purpose                                                                                                    |
+| :------------------------------ | :--------------------------------------------------------------------------------------------------------- |
+| `forge memory enable`           | Enable memory auto-update: project-scoped (bare) or one session (`--session`)                              |
+| `forge memory track <path>`     | Author a project passport on a doc, sessionless (`--as`, `--intent`, `--writers`, `--propose`, `--shadow`) |
+| `forge memory extra add <path>` | Include a doc for one session only, no passport (`--as` required, `--session`)                             |
+| `forge memory untrack <path>`   | Remove session participation for a doc; passport untouched (`--session`)                                   |
+| `forge memory list`             | List tracked memory docs (`--session`, `--json`)                                                           |
+| `forge memory status`           | Show memory doc status across sessions (`--scope`, `--doc`, `--json`)                                      |
+| `forge memory shadows list`     | List accumulated shadow proposals (`--scope`, `--session`, `--json`)                                       |
+| `forge memory shadows show`     | Show shadow proposal content (`--for <doc>`, `--scope`, `--session`)                                       |
+| `forge memory shadows review`   | Review/curate shadow proposals (`--for`, `--curate`, `--show-latest`)                                      |
+| `forge memory passport show`    | Show passport embedded in a memory doc (`--json`)                                                          |
 
 #### Proxy management
 
@@ -1708,6 +1709,30 @@ override and leaves `.forge/memory.yaml` untouched; bare `enable` ignores `$FORG
 shadow-only passports, and unions the result with the session's `designated_docs` — session docs win on collision,
 de-duped by passport source and write path, capped at 50. The Stop hook only decides whether to enqueue; the scan runs
 in the background runner.
+
+#### 5.6.7 Write-side verb taxonomy
+
+Each memory verb owns exactly one lifetime:
+
+- **`forge memory track <path>`** authors a **passport** (project-lifetime, git-tracked frontmatter). It is sessionless:
+  it resolves `forge_root` from the cwd, never resolves or writes session state, and ignores `$FORGE_SESSION`.
+  Re-running with `--as`/`--writers` updates the passport; with no flags on an already-passported doc it is a no-op.
+  `--propose` authors a shadow-only passport and may materialize the declared shadow file. A passported doc outside the
+  scan roots is written but warns that project Stop-time discovery will skip it.
+- **`forge memory extra add <path>`** records **session-only participation** (`memory.designated_docs`, `origin: extra`)
+  with no passport. It is the deliberate inverse of `track`: it resolves the ambient session and echoes the resolved
+  name, and errors outside a session. `--as` is required; `--as suggested` is rejected unless the doc already has a
+  passport (a passport-less `suggested` doc without a shadow is skipped at Stop).
+- **`forge memory enable`** controls activation only (project `.forge/memory.yaml` or a `--session` override).
+
+**`extra` cannot override a passport's `writers`.** The handoff agent re-reads the passport at Stop and filters by
+`writers` regardless of how the doc entered the run, so an extra on a doc whose passport excludes the session is a no-op
+at Stop (the CLI warns at add time). `untrack` removes session participation only; a doc that still has a passport under
+the scan roots stays project-discovered (passport removal is a future slice).
+
+**Shadow discovery does not depend on the manifest.** Because sessionless `track --propose` writes no `designated_docs`
+entry, `forge memory shadows list/show/review` scan passports under the effective roots for shadow-only docs (unfiltered
+by writer), unioned with session manifest shadow entries and de-duped by `(forge_root, shadow_path)`.
 
 ### 5.7 Test Infrastructure (Docker-based)
 

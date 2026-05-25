@@ -319,6 +319,25 @@ def _has_passport_on_disk(doc: DesignatedDoc, forge_root: Path) -> bool:
         return False
 
 
+def _dedupe_specs(specs: list[ResolvedDocSpec]) -> list[ResolvedDocSpec]:
+    """Drop specs that resolve to the same ``(official_path, write_path)`` target.
+
+    One doc can enter the run twice and resolve to the same write path — e.g. a
+    session extra on a shadow-only-passported official plus the project scan's
+    shadow entry both map to the doc's shadow file. Without this, the prompt
+    gets duplicate sections and the agent can double-write. Keep the first.
+    """
+    deduped: list[ResolvedDocSpec] = []
+    seen: set[tuple[str | None, str]] = set()
+    for spec in specs:
+        key = (spec.official_path, spec.write_path)
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(spec)
+    return deduped
+
+
 def run_handoff_agent(
     *,
     session_name: str,
@@ -439,6 +458,8 @@ def run_handoff_agent(
             )
             continue
         ready_specs.append(spec)
+
+    ready_specs = _dedupe_specs(ready_specs)
 
     if not ready_specs:
         logger.info(

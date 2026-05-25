@@ -8,7 +8,7 @@ for runtime conversion.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 
 from forge.core.state import now_iso
 from forge.guard.team.config import TeamSupervisorConfig
@@ -119,11 +119,16 @@ class DesignatedDoc:
                  Path to the official document this doc proposes changes for.
                  The agent reads the official doc first, then writes suggestions
                  to this doc's path. Only valid with strategy="suggested".
+        origin: Provenance of this participation entry. "extra" marks a
+                session-only escape hatch added via ``forge memory extra add``
+                (no passport). ``None`` is project/passport participation or a
+                pre-Slice-2 manifest entry.
     """
 
     path: str
     strategy: str = "generic"
     shadows: str | None = None
+    origin: Literal["extra"] | None = None
 
 
 @dataclass

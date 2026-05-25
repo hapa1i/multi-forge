@@ -26,6 +26,36 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/work-board-contract.md` "Change Log Policy" for the
 > full spec.
 
+## 2026-05-25
+
+### Phase 1 / Slice 2: Sessionless `track` + participation-only `extra add`
+
+**Goal**: Split the welded lifetimes in `forge memory track` so each verb owns one lifetime — `track` authors a
+project-lifetime passport (sessionless), `extra add` records session-only participation (no passport), and `enable` owns
+activation.
+
+**Key changes**:
+
+- `forge memory track` is now passport-only and sessionless: resolves `forge_root` from cwd, never writes
+  `memory.designated_docs`, never auto-enables, ignores `$FORGE_SESSION`. It is a no-op (exit 0) on an
+  already-passported doc with no flags, warns when the doc is outside the scan roots, and degrades (warn, still authors)
+  on a corrupt `.forge/memory.yaml`. `--session`/`-s` is a hidden tombstone that errors and names `extra add`.
+- New `forge memory extra add <path> --as <strategy>`: session-scoped participation with `origin="extra"`, echoes the
+  resolved session, rejects `--as suggested` only when the target has no passport, and warns on writer-veto (case B) or
+  redundant-under-root (case A).
+- `DesignatedDoc.origin: Literal["extra"] | None` added, persisted, and inherited; `_check_legacy_docs` skips extras and
+  names both new verbs; `list`/`status` expose `origin`; `untrack` warns when a passport remains under the roots.
+- Shadow workflow no longer depends on the manifest: new `scan_shadow_passports()` and
+  `check_shadow_path_collision_in_roots()` in `project_memory.py`; `collect_shadow_entries()` unions project-origin
+  shadows (scope-correct roots) with session entries, de-duped by `(forge_root, shadow_path)`. Removed the now-dead
+  manifest-based `check_shadow_path_collision`.
+- Docs: `design.md` §4.0 table + new §5.6.7 verb taxonomy; `design_appendix.md §G.2`; board README; end-user
+  `handoff.md`; QA and walkthrough skill checklists.
+
+**Verification**: `tests/src/cli/test_memory.py` and
+`tests/src/session/{test_handoff_agent,test_memory_inheritance,test_project_memory,test_shadow_curation}.py` pass; full
+`tests/src -m "not integration"` green (4689 passed); `mypy` clean on touched modules.
+
 ## 2026-05-24
 
 ### Phase 1 / Slice 1: Project-Scoped Memory Activation

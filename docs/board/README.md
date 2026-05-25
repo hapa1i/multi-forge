@@ -36,10 +36,11 @@ Parking work means leaving it in `todo/`. `todo/` is not the active cursor; it i
 
 ## Handoff Agent Setup
 
-`forge memory enable` and `forge memory track` are **session-scoped mutations** in the current implementation; they
-write to a session manifest, so they need a target session. Pass `--session <name>`, or run them with `$FORGE_SESSION`
-set / inside an active session. The session must already exist; create one first with
-`forge session start <name> --no-launch` if needed. Project/repo-wide *reads* (`forge memory status`,
+`forge memory track` authors a **project passport** inside the doc (git-tracked, project-lifetime) and is
+**sessionless** — run it from any terminal in the checkout, no session required. `forge memory enable` turns the handoff
+agent on for the whole checkout (bare) or for one session (`--session <name>`). Per-session-only participation without a
+passport uses `forge memory extra add <path> --as <strategy> --session <name>`, which does need a target session
+(`--session`, `$FORGE_SESSION`, or an active session). Project/repo-wide *reads* (`forge memory status`,
 `forge memory shadows`) do not require a session.
 
 These board docs use three different update models:
@@ -53,11 +54,17 @@ These board docs use three different update models:
 For the first run, use `review-only` to inspect the handoff agent's proposed output before allowing writes:
 
 ```bash
-forge memory enable --review-only --session <name>
-forge memory track docs/board/change_log.md --as changelog --session <name>
+# Author project passports (sessionless — no session needed)
+forge memory track docs/board/change_log.md --as changelog
 forge memory track docs/board/impl_notes.md \
-  --propose --shadow .forge/memory/suggested_impl_notes.md --session <name>
-forge memory list --json --session <name>
+  --propose --shadow .forge/memory/suggested_impl_notes.md
+
+# Turn the handoff agent on for the whole checkout, review-only for the first run
+forge memory enable --review-only
+
+# Verify: passports are discoverable without a manifest entry
+forge memory shadows list
+forge memory passport show docs/board/change_log.md
 ```
 
 The explicit `--shadow` pins the proposal to `.forge/memory/suggested_impl_notes.md` (the source path referenced in
@@ -69,7 +76,7 @@ Inspect the proposed output, then switch to augment (write) mode:
 
 ```bash
 forge session handoff show <name> --latest
-forge memory enable --session <name>
+forge memory enable
 ```
 
 After a session, review accumulated shadow proposals before promoting to `impl_notes.md`:
@@ -79,8 +86,9 @@ forge memory shadows review --for docs/board/impl_notes.md --curate --session <n
 forge memory shadows review --for docs/board/impl_notes.md --show-latest --session <name>
 ```
 
-This configures one session. For the Advanced Workflow below, set it up once on the planner; the `executor` and
-`reviewer` forks inherit tracked docs by default (`--inherit-memory all`), so you do not repeat tracking per session.
+Passports are project-wide: author them once and every session in the checkout (including `executor` and `reviewer`
+forks) sees them via the Stop-time scan once project memory is enabled — no per-session re-tracking. Session-only extras
+added with `forge memory extra add` are also carried into forks by default (`--inherit-memory all`).
 
 ## Advanced Workflow
 
@@ -89,32 +97,33 @@ worktree, and one reviewer enters the executor's worktree with the planner's con
 
 Compared with the shortest three-command workflow, the dogfood path adds three safeguards:
 
-- Create the planner with `--no-launch` so memory docs are attached before the first Stop event.
+- Author passports and enable project memory before the first Stop event (passports are sessionless, so this needs no
+  running session).
 - Run the first handoff-agent pass in `review-only`, inspect it, then switch to `augment`.
 - Use `--inline-plan` for worktree forks. `--propose` auto-creates shadow files for the planner; worktree forks inherit
   and materialize them via `--inherit-memory`.
 
 ### 1. Planner
 
-Create the planner without launching, attach memory docs, then start the planning session:
+Author project passports and enable memory first (sessionless), then start the planning session:
 
 ```bash
-forge session start planner --proxy openrouter-openai --no-launch
-
-forge memory enable --review-only --session planner
-forge memory track docs/board/change_log.md --as changelog --session planner
+# Author project passports (sessionless — do this before any session runs)
+forge memory track docs/board/change_log.md --as changelog
 forge memory track docs/board/impl_notes.md \
-  --propose --shadow .forge/memory/suggested_impl_notes.md --session planner
-forge memory list --json --session planner
+  --propose --shadow .forge/memory/suggested_impl_notes.md
 
-forge session resume planner
+# Enable the handoff agent for the checkout (review-only first)
+forge memory enable --review-only
+
+forge session start planner --proxy openrouter-openai
 ```
 
 After the planner exits, inspect the first proposed memory update before allowing writes:
 
 ```bash
 forge session handoff show planner --latest
-forge memory enable --session planner
+forge memory enable
 ```
 
 ### 2. Supervised Executor

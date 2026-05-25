@@ -43,8 +43,8 @@ signal-to-noise than incremental note-taking during a session.
 The agent edits tracked docs in-place. Use for operational documents the agent has authority to maintain.
 
 ```bash
-forge memory track docs/checklist.md --as checklist --session planner
-forge memory track docs/changelog.md --as changelog --session planner
+forge memory track docs/checklist.md --as checklist
+forge memory track docs/changelog.md --as changelog
 ```
 
 ### Mode 2: Shadow/propose (agent is advisor)
@@ -54,7 +54,7 @@ redundant proposals. Use for standards and guidelines where human curation matte
 
 ```bash
 forge memory track docs/developer/coding-standards.md \
-  --propose --shadow .forge/memory/suggested_standards.md --session planner
+  --propose --shadow .forge/memory/suggested_standards.md
 ```
 
 The shadow file contains `- [ ]` checkboxes with rationale. The human reviews and merges what's valuable into the
@@ -64,23 +64,27 @@ official doc. Already-merged items are self-pruned on the next run.
 
 ## Configuration
 
-Use `forge memory` to enable the agent and track docs. The CLI writes a `forge_memory` passport into each tracked doc;
-that passport is the doc-level contract for strategy, mode, writer access, and inheritance. Session manifests store only
-participation plus auto-update runtime state.
+Use `forge memory` to enable the agent and author passports. `track` writes a `forge_memory` passport into each doc;
+that passport is the doc-level contract for strategy, mode, writer access, and inheritance. `track` is **sessionless**
+(project-lifetime); per-session participation without a passport comes from `forge memory extra add`. Session manifests
+store only participation plus auto-update runtime state.
 
 ```bash
-# First run: inspect proposed edits before allowing writes
-forge memory enable --review-only --session planner
+# First run: inspect proposed edits before allowing writes. Bare enable is
+# project-scoped (whole checkout); use --session planner to scope to one session.
+forge memory enable --review-only
 
-# Track direct-update docs
-forge memory track docs/checklist.md --as checklist --session planner
-forge memory track docs/changelog.md --as changelog --session planner
+# Author project passports (sessionless; runnable from a bare terminal)
+forge memory track docs/checklist.md --as checklist
+forge memory track docs/changelog.md --as changelog
 
-# Track a human-reviewed shadow proposal doc
+# Author a human-reviewed shadow proposal passport
 forge memory track docs/developer/coding-standards.md \
-  --propose --shadow .forge/memory/suggested_standards.md --session planner
+  --propose --shadow .forge/memory/suggested_standards.md
 
-forge memory list --json --session planner
+# Passports live in the docs; verify without a manifest (sessionless track writes no participation):
+forge memory passport show docs/checklist.md
+forge memory shadows list
 ```
 
 Example passport written by `forge memory track`:
@@ -106,11 +110,14 @@ forge_memory:
 # List tracked docs (or --json for scripting)
 forge memory list --session planner
 
-# Track a direct-update doc
-forge memory track docs/checklist.md --as checklist --session planner
+# Author a project passport (sessionless)
+forge memory track docs/checklist.md --as checklist
 
-# Untrack
-forge memory untrack docs/checklist.md --session planner
+# Include a doc for one session only, no passport
+forge memory extra add docs/scratch.md --as generic --session planner
+
+# Remove session participation (passport, if any, is left intact)
+forge memory untrack docs/scratch.md --session planner
 ```
 
 Each verb validates path safety and passport mode/shadow-path consistency before persisting, so the agent never silently
@@ -134,8 +141,9 @@ forge session handoff show --all            # List every report (paths + timesta
 ```
 
 In `review-only` mode this is where the proposed-but-not-applied changes appear; in `augment` mode it records the
-summary of what was actually written. Use `forge memory track` / `untrack` for doc participation; legacy
-`memory.designated_docs[]` manifest entries are treated as compatibility state and should not be used for new setup.
+summary of what was actually written. Use `forge memory track` to author project passports and `forge memory extra add`
+/ `untrack` for per-session participation; legacy hand-written `memory.designated_docs[]` manifest entries are treated
+as compatibility state and should not be used for new setup.
 
 ---
 
@@ -275,7 +283,7 @@ Checklist:
 - `memory.auto_update.enabled` must be `true` in effective intent (`forge memory enable`)
 - Session must have ≥ `min_turns` conversation turns (default: 5)
 - `claude` CLI must be on PATH
-- At least one memory doc must be tracked for the session
+- At least one memory doc must be discoverable: a passported doc under the scan roots, or a session extra
 - At least one doc must exist on disk
 
 ### "File wasn't updated"

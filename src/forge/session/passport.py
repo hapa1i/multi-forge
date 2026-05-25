@@ -191,29 +191,6 @@ def derive_shadow_path(official_path: str) -> str:
     return f".forge/memory/suggested_{p.stem}.md"
 
 
-def check_shadow_path_collision(
-    shadow_path: str,
-    official_path: str,
-    existing_docs: list[DesignatedDoc],
-) -> str | None:
-    """Check whether *shadow_path* collides with an existing manifest entry.
-
-    Returns an actionable error message on collision, ``None`` when safe.
-    Re-tracking the same official doc is not a collision (upsert).
-    """
-    for doc in existing_docs:
-        if doc.path != shadow_path:
-            continue
-        if doc.shadows is not None and doc.shadows == official_path:
-            continue  # same official re-tracked -- upsert, not collision
-        return (
-            f"Shadow path {shadow_path} is already used"
-            + (f" for {doc.shadows}" if doc.shadows else " as a direct doc")
-            + ". Use --shadow <path> to specify a different shadow path."
-        )
-    return None
-
-
 # ---------------------------------------------------------------------------
 # Doc resolution (passport-authoritative)
 # ---------------------------------------------------------------------------

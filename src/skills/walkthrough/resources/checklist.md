@@ -530,14 +530,14 @@ cat > .forge/memory/walkthrough-notes.md <<'EOF'
 # Walkthrough Notes
 EOF
 
-forge memory track .forge/memory/walkthrough-notes.md --as debugging --session walkthrough-demo
+forge memory extra add .forge/memory/walkthrough-notes.md --as debugging --session walkthrough-demo
 forge memory list --session walkthrough-demo
 forge memory list --json --session walkthrough-demo
 forge memory untrack .forge/memory/walkthrough-notes.md --session walkthrough-demo
 forge memory list --session walkthrough-demo
 ```
 
-- [ ] `track` succeeds for `.forge/memory/walkthrough-notes.md`
+- [ ] `extra add` succeeds for `.forge/memory/walkthrough-notes.md`
 - [ ] `list` shows the path with `debugging` strategy
 - [ ] `list --json` emits the same designated doc in JSON form
 - [ ] `untrack` succeeds and the final list no longer includes the doc
