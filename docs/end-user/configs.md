@@ -17,10 +17,11 @@ Configuration is split by ownership. Each type of setting has a single authorita
 ## Runtime config (`~/.forge/config.yaml`)
 
 Global Forge preferences. This file is **optional** — Forge works with built-in defaults when it's missing.
-`forge config` auto-creates the file on first access with documented defaults and comments.
+`forge config show` auto-creates the file on first access with documented defaults and comments. Bare `forge config`
+prints command help.
 
 ```bash
-# Shorthand for `forge config show`
+# Show config commands
 forge config
 
 # Auto-create with commented defaults, then view effective config

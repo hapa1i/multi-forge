@@ -25,6 +25,30 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/documentation-guidelines.md` "Change Log Policy" for
 > the full spec.
 
+## 2026-05-26
+
+### CLI command-shape cleanup: groups orient, leaves act
+
+**Goal**: Make confusing bare CLI invocations follow one documented rule before PR: non-leaf command groups print help,
+while leaf commands perform a sensible default action.
+
+**Key changes**:
+
+- Documented the command-shape invariant in `docs/developer/coding-standards.md` and `docs/design.md`: groups orient,
+  leaves act, removed group-level shortcuts may remain only as non-executing tombstones.
+- `forge config` now prints help; `forge config show` is the explicit command that displays and auto-creates
+  `~/.forge/config.yaml`. Updated `docs/end-user/configs.md` and design appendix references.
+- Replaced the group-level `forge search -q/--query` action with `forge search query <terms>`. The old `-q` path now
+  exits with a replacement tip instead of executing old behavior. Updated end-user docs, QA/walkthrough checklists, and
+  tests/integration references.
+- `forge proxy metrics` with multiple registered proxies now behaves like an acting leaf and shows all metrics
+  (equivalent to `--all`) instead of erroring. `--json` follows the same implicit-all behavior.
+
+**Verification**:
+`uv run pytest tests/src/cli/test_config_cli.py tests/src/cli/test_proxy_commands.py tests/src/cli/test_search.py -q`
+(146 passed); `make pre-commit`; smoke-checked `forge config`, `forge config -h`, `forge search -h`, and the
+`forge search -q` tombstone.
+
 ## 2026-05-25
 
 ### CLI tip consistency: shared recovery-output helpers

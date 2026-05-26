@@ -1513,6 +1513,40 @@ def _display_metrics(
     console.print()
 
 
+def _display_all_metrics(
+    console: Console,
+    proxies: list[ProxyEntry],
+    *,
+    json_output: bool,
+) -> None:
+    """Render metrics for every registered proxy."""
+    import json
+
+    if json_output:
+        results: dict[str, Any] = {}
+        for entry in proxies:
+            info = _fetch_proxy_info(entry.base_url)
+            results[entry.proxy_id] = info.metrics if info else None
+        console.print(json.dumps(results, indent=2))
+        return
+
+    show_sep = len(proxies) > 1
+    for i, entry in enumerate(proxies):
+        info = _fetch_proxy_info(entry.base_url)
+        if info is None:
+            if show_sep and i > 0:
+                console.print("[dim]" + "-" * 60 + "[/dim]")
+            console.print(f"\n[dim]{entry.proxy_id}: not reachable at {entry.base_url}[/dim]\n")
+        else:
+            _display_metrics(
+                console,
+                entry.proxy_id,
+                entry.base_url,
+                info,
+                show_separator=show_sep and i > 0,
+            )
+
+
 @proxy.command("metrics")
 @click.argument("proxy_id", required=False)
 @click.option("--json", "json_output", is_flag=True, help="Output raw JSON")
@@ -1538,33 +1572,10 @@ def metrics_cmd(proxy_id: str | None, json_output: bool, show_all: bool) -> None
         if not proxies:
             console.print("[dim]No proxies registered.[/dim]")
             return
-        if json_output:
-            # Collect all results into a single valid JSON object
-            results: dict[str, Any] = {}
-            for entry in proxies:
-                info = _fetch_proxy_info(entry.base_url)
-                results[entry.proxy_id] = info.metrics if info else None
-            console.print(json.dumps(results, indent=2))
-        else:
-            show_sep = len(proxies) > 1
-            for i, entry in enumerate(proxies):
-                info = _fetch_proxy_info(entry.base_url)
-                if info is None:
-                    if show_sep and i > 0:
-                        console.print("[dim]" + "-" * 60 + "[/dim]")
-                    console.print(f"\n[dim]{entry.proxy_id}: not reachable at {entry.base_url}[/dim]\n")
-                else:
-                    _display_metrics(
-                        console,
-                        entry.proxy_id,
-                        entry.base_url,
-                        info,
-                        show_separator=show_sep and i > 0,
-                    )
+        _display_all_metrics(console, proxies, json_output=json_output)
         return
 
     if not proxy_id:
-        # Default: show the single proxy if exactly one exists
         try:
             proxies = store.list_proxies()
         except ProxyRegistryCorruptedError as e:
@@ -1576,9 +1587,10 @@ def metrics_cmd(proxy_id: str | None, json_output: bool, show_all: bool) -> None
             console.print("[dim]No proxies registered.[/dim]")
             return
         else:
-            console.print("[red]Error:[/red] Multiple proxies exist. Specify a proxy_id or use --all.")
-            sys.exit(1)
+            _display_all_metrics(console, proxies, json_output=json_output)
+            return
 
+    assert proxy_id is not None
     try:
         registry = store.read()
     except ProxyRegistryCorruptedError as e:

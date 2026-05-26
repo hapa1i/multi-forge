@@ -1,13 +1,10 @@
 """Search CLI commands for Forge transcript search.
 
 Provides:
-- forge search -q <query>: Search transcripts, output JSON
+- forge search query <terms>: Search transcripts, output JSON
 - forge search rebuild-index: Full index rebuild (writes three stores)
 - forge search status: Show index statistics
 - forge search clean: Remove orphaned documents
-
-Query is passed via -q/--query option to avoid ambiguity with subcommand
-names (Click groups parse positional args before subcommand resolution).
 
 Stores are per-project at <forge_root>/.forge/search-index/:
 - documents.json (v2): metadata only
@@ -18,12 +15,14 @@ Stores are per-project at <forge_root>/.forge/search-index/:
 from __future__ import annotations
 
 import json
+import shlex
+import sys
 from pathlib import Path
 
 import click
 from rich.console import Console
 
-from forge.cli.output import print_tip
+from forge.cli.output import print_error_with_tip, print_tip
 from forge.core.paths import display_path
 from forge.core.state import SchemaVersionError
 from forge.search.bm25_store import BM25IndexData, BM25IndexStore
@@ -51,7 +50,46 @@ def _resolve_forge_root() -> Path:
     invoke_without_command=True,
     context_settings={"help_option_names": ["-h", "--help"]},
 )
-@click.option("-q", "--query", type=str, default=None, help="Search query")
+@click.option("-q", "--query", "legacy_query", type=str, default=None, hidden=True)
+@click.option("--limit", "-n", "legacy_limit", type=int, default=10, hidden=True)
+@click.option(
+    "--scope",
+    "legacy_scope",
+    type=click.Choice(["project", "all"]),
+    default="project",
+    hidden=True,
+)
+@click.pass_context
+def search_cmd(ctx: click.Context, legacy_query: str | None, legacy_limit: int, legacy_scope: str) -> None:
+    """Search session transcripts.
+
+    \b
+    Examples:
+      forge search query "timeout config"  Search for "timeout config"
+      forge search rebuild-index           Rebuild the search index
+      forge search status                  Show index statistics
+    """
+    if ctx.invoked_subcommand is not None:
+        return
+
+    if legacy_query is not None:
+        replacement = f"forge search query {shlex.quote(legacy_query)}"
+        if legacy_limit != 10:
+            replacement += f" -n {legacy_limit}"
+        if legacy_scope != "project":
+            replacement += f" --scope {legacy_scope}"
+        print_error_with_tip(
+            "forge search -q was removed; search is now an explicit subcommand.",
+            "Run:",
+            commands=[replacement],
+        )
+        sys.exit(1)
+
+    click.echo(ctx.get_help())
+
+
+@search_cmd.command("query")
+@click.argument("terms", nargs=-1, required=True)
 @click.option("--limit", "-n", type=int, default=10, help="Maximum results")
 @click.option(
     "--scope",
@@ -59,22 +97,9 @@ def _resolve_forge_root() -> Path:
     default="project",
     help="Search scope: current project (default) or all indexed projects",
 )
-@click.pass_context
-def search_cmd(ctx: click.Context, query: str | None, limit: int, scope: str) -> None:
-    """Search session transcripts.
-
-    \b
-    Examples:
-      forge search -q "timeout config"   Search for "timeout config"
-      forge search rebuild-index         Rebuild the search index
-      forge search status                Show index statistics
-    """
-    if ctx.invoked_subcommand is not None:
-        return
-
-    if query is None:
-        click.echo(ctx.get_help())
-        return
+def query_cmd(terms: tuple[str, ...], limit: int, scope: str) -> None:
+    """Search indexed session transcripts."""
+    query = " ".join(terms)
 
     _run_search(query, limit=limit, scope=scope)
 

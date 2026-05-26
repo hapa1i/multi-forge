@@ -180,7 +180,7 @@ See [handoff.md](handoff.md).
 Search across past session transcripts:
 
 ```bash
-forge search -q "proxy routing bug"
+forge search query "proxy routing bug"
 forge search rebuild-index
 ```
 

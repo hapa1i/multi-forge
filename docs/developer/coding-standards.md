@@ -150,6 +150,15 @@ Best-effort patterns MUST:
 - **Meaningful Messages**: Include context in error messages
 - **Context Managers**: Use `with` for cleanup
 
+### CLI command shape
+
+- **Groups orient**: non-leaf CLI groups print help when invoked without a subcommand. Do not hide work behind a bare
+  group command; use an explicit leaf such as `forge config show` or `forge search query`.
+- **Leaves act**: leaf commands should do the sensible action when optional arguments are omitted. For example,
+  `forge proxy metrics` may show all metrics instead of failing only because no proxy ID was supplied.
+- **Removed shortcuts are tombstones**: if an old group-level shortcut is removed, keep only a non-executing diagnostic
+  path when needed. It must exit non-zero and name the replacement command.
+
 ---
 
 ## 7. Code Comments

@@ -3,7 +3,7 @@
 Exercises real components end-to-end:
 - transcripts on disk under .forge/artifacts/**/transcripts/
 - `forge search rebuild-index` discovery + indexing
-- `forge search -q` query path + JSON output
+- `forge search query` query path + JSON output
 """
 
 from __future__ import annotations
@@ -60,7 +60,7 @@ class TestSearchE2E:
         rebuild = mock_claude_workspace.exec("cd /workspace && forge search rebuild-index", timeout=60)
         assert rebuild.returncode == 0, rebuild.stderr
 
-        query = mock_claude_workspace.exec("cd /workspace && forge search -q timeout", timeout=30)
+        query = mock_claude_workspace.exec("cd /workspace && forge search query timeout", timeout=30)
         assert query.returncode == 0, query.stderr
 
         data = json.loads(query.stdout)
