@@ -20,6 +20,7 @@ from rich.console import Console
 from rich.table import Table
 from rich.text import Text
 
+from forge.cli.output import print_tip
 from forge.core.paths import display_path
 from forge.guard.queries import (
     find_sessions_supervised_by,
@@ -100,7 +101,7 @@ def _resolve_guard_session(cwd: Path, explicit: str | None) -> tuple[SessionStor
         else:
             console.print(f"[red]Error:[/red] Multiple sessions in {display_path(cwd)}; specify one with --session.")
             console.print("  Sessions: " + ", ".join(candidates))
-            console.print(f"[dim]Tip: forge guard <command> --session {candidates[0]}[/dim]")
+            print_tip(f"Run 'forge guard <command> --session {candidates[0]}'.", blank_before=False, console=console)
             sys.exit(1)
 
     store = SessionStore(_resolve_forge_root(cwd), name)
@@ -228,7 +229,7 @@ def enable(bundles: tuple[str, ...], fail_mode: str, permissive: bool, session_n
             "\n[yellow]Warning:[/yellow] Policy configured but PreToolUse hook is not installed. "
             "Enforcement will not be active."
         )
-        console.print("[dim]Tip: Run 'forge extension enable' to install hooks.[/dim]")
+        print_tip("Run 'forge extension enable' to install hooks.", blank_before=False, console=console)
     if bundle_config:
         for bundle, cfg in bundle_config.items():
             cfg_str = ", ".join(f"{k}={v}" for k, v in cfg.items())
@@ -407,9 +408,9 @@ def status(as_json: bool, session_name: str | None) -> None:
     supervised = find_sessions_supervised_by(manifest.name, manifest.confirmed.claude_session_id, manifest.forge_root)
     if supervised:
         names = ", ".join(supervised)
-        console.print(
-            f"\n[dim]Tip: This session supervises: {names}. "
-            f"Check with: forge guard status --session {supervised[0]}[/dim]"
+        print_tip(
+            f"This session supervises: {names}. Run 'forge guard status --session {supervised[0]}' to check.",
+            console=console,
         )
 
 
@@ -837,7 +838,7 @@ def supervise_cmd(
 
         store.update(timeout_s=5.0, mutate=_suspend)
         console.print(f"Supervisor suspended for session [cyan]{name}[/cyan]")
-        console.print("[dim]Tip: Use --on to resume, --remove to delete.[/dim]")
+        print_tip("Use --on to resume, --remove to delete.", blank_before=False, console=console)
         return
 
     if on_flag:

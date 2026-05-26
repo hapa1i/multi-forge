@@ -27,6 +27,37 @@ wc -l docs/board/change_log.md
 
 ## 2026-05-25
 
+### CLI tip consistency: shared recovery-output helpers
+
+**Goal**: Make equivalent CLI failures tip identically — the reported bug was `forge session start <existing>` showing a
+recovery tip while `forge session fork ... --name <existing>` showed none.
+
+**Key changes**:
+
+- New leaf module `src/forge/cli/output.py`: `print_tip`, `print_error`, `print_error_with_tip`, and
+  `handle_session_error` (a type→tip dispatch holding only context-free recoveries — currently just
+  `SessionExistsError`). Imports only `rich` + `forge.session.exceptions`; never imported by `core/proxy/review`.
+- Renamed `_handle_error` → `handle_session_error` across `session.py` and its four importers (`session_lifecycle.py`,
+  `session_fork.py`, `session_manage.py`, `session_handoff.py`); `session.py` re-exports `console` +
+  `handle_session_error` from `output.py`.
+- §1 fix: `session fork` onto an existing name now routes through `handle_session_error`, emitting a
+  different-name/delete tip (no "resume" — meaningless for a fork-name collision). `start` keeps its richer
+  resume/delete wording as a call-site tip.
+- Added recovery tips to `session resume` (not-found → start), proxy `edit/set/validate` (→ create) and `delete/metrics`
+  (→ list), and backend `start/delete` (→ create).
+- **BREAKING**: `forge backend create <existing>` now prints red `Error:` + tip and exits 1 (was yellow + exit 0),
+  matching the session/proxy "already exists" shape. Reset path: run the suggested `forge backend start` instead.
+- Migrated the remaining Rich `console.print` `Tip:` sites in `src/forge/cli/**` onto the helpers and added an invariant
+  test that allows `[dim]Tip:` only in `output.py`.
+- Documented the convention in `CLAUDE.md` (UX Guidelines → Console Output Formatting): use the helpers for CLI Rich
+  recovery output, "Run '<command>'" vs "Use --flag", single quotes not backticks.
+
+**Verification**: 291 targeted CLI + regression tests pass (incl. `test_output.py`,
+`test_bug_fork_session_exists_tip.py`); `make pre-commit` clean on touched files (mypy + pyright pass repo-wide).
+
+**Out of scope**: Plain-text recovery hints inside `core/proxy/review` exception messages and `click.echo`/hook-JSON
+tips remain strings by design (layering).
+
 ### Auto-start proxies from templates for `--proxy` and `--supervisor-proxy`
 
 **Goal**: Stop `--supervisor-proxy <template>` (and `--proxy <template>`) from hard-failing with "not found in registry"

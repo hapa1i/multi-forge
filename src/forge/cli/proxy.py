@@ -37,6 +37,7 @@ from rich.console import Console
 from rich.syntax import Syntax
 from rich.table import Table
 
+from forge.cli.output import print_error_with_tip, print_tip
 from forge.cli.proxy_costs import costs_cmd
 from forge.config.loader import (
     get_proxy_file_path,
@@ -159,7 +160,7 @@ def list_cmd(as_json: bool) -> None:
 
     if not result.proxies:
         console.print("No proxies found.")
-        console.print("\n[dim]Tip: Run 'forge proxy template list' to see available templates.[/dim]")
+        print_tip("Run 'forge proxy template list' to see available templates.", console=console)
         return
 
     table = Table(title="Forge Proxies")
@@ -203,9 +204,14 @@ def list_cmd(as_json: bool) -> None:
         # Best-effort - don't fail proxy list if backend registry has issues
         pass
 
-    console.print("\n[dim]Tip: To use a proxy:[/dim]")
-    console.print("  forge claude start --proxy <proxy_id>")
-    console.print("  forge session start <name> --proxy <proxy_id>")
+    print_tip(
+        "To use a proxy:",
+        commands=[
+            "forge claude start --proxy <proxy_id>",
+            "forge session start <name> --proxy <proxy_id>",
+        ],
+        console=console,
+    )
 
 
 # --- Show ---
@@ -232,8 +238,11 @@ def show_cmd(proxy_id: str, raw: bool, as_json: bool) -> None:
         ctx = ExecutionContext.from_cwd()
         result = show_proxy_op(ctx=ctx, proxy_id=proxy_id)
     except ForgeOpError as e:
-        console.print(f"[red]Error:[/red] {e}")
-        console.print("\n[dim]Tip: Use 'forge proxy template show <name>' to show a template.[/dim]")
+        print_error_with_tip(
+            str(e),
+            "Run 'forge proxy template show <name>' to show a template.",
+            console=console,
+        )
         sys.exit(1)
 
     content = result.config_yaml or ""
@@ -340,7 +349,7 @@ def create_cmd(
         sys.exit(1)
     if not exists:
         console.print(f"[red]Error:[/red] Template '{template}' not found")
-        console.print("\n[dim]Tip: Run 'forge proxy template list' to see available templates.[/dim]")
+        print_tip("Run 'forge proxy template list' to see available templates.", console=console)
         sys.exit(1)
 
     proxy_name = name or template
@@ -385,8 +394,11 @@ def create_cmd(
         if name is not None:
             proxy_path = get_proxy_file_path(proxy_name)
             if proxy_path.exists():
-                console.print(f"[red]Error:[/red] Proxy '{proxy_name}' already exists")
-                console.print("[dim]Tip: Use 'forge proxy start' to start it, or 'forge proxy delete' first.[/dim]")
+                print_error_with_tip(
+                    f"Proxy '{proxy_name}' already exists",
+                    "Run 'forge proxy start' to start it, or 'forge proxy delete' to remove it first.",
+                    console=console,
+                )
                 sys.exit(1)
 
         if not json_output:
@@ -415,8 +427,11 @@ def create_cmd(
             console.print(f"[red]Failed to start server:[/red] {e}")
             err_str = str(e)
             if "dependency backend" not in err_str and "upstream URL" not in err_str:
-                console.print("\n[dim]Tip: Use --no-start to create the config without starting the server:[/dim]")
-                console.print(f"  forge proxy create {template} --name {proxy_name} --no-start")
+                print_tip(
+                    "Use --no-start to create the config without starting the server:",
+                    commands=[f"forge proxy create {template} --name {proxy_name} --no-start"],
+                    console=console,
+                )
             sys.exit(1)
 
         proxy_entry = result.proxy
@@ -458,12 +473,13 @@ def create_cmd(
                     console.print(f"  Log: {display_path(latest_log)}")
 
             if result.source == "adopt":
-                console.print(
-                    f"\n[dim]Tip: This proxy was not started by Forge. "
-                    f"Logs may be unavailable.\n"
-                    f"  Delete and recreate for full Forge management: "
-                    f"forge proxy delete {proxy_entry.proxy_id} && "
-                    f"forge proxy create {proxy_entry.template}[/dim]"
+                print_tip(
+                    "This proxy was not started by Forge. Logs may be unavailable.",
+                    "Delete and recreate for full Forge management:",
+                    commands=[
+                        f"forge proxy delete {proxy_entry.proxy_id} && " f"forge proxy create {proxy_entry.template}"
+                    ],
+                    console=console,
                 )
 
         if smoke_test:
@@ -486,8 +502,11 @@ def create_cmd(
     else:
         proxy_path = get_proxy_file_path(proxy_name)
         if proxy_path.exists():
-            console.print(f"[red]Error:[/red] Proxy '{proxy_name}' already exists")
-            console.print("[dim]Tip: Use 'forge proxy edit' to modify it, or 'forge proxy delete' first.[/dim]")
+            print_error_with_tip(
+                f"Proxy '{proxy_name}' already exists",
+                "Run 'forge proxy edit' to modify it, or 'forge proxy delete' to remove it first.",
+                console=console,
+            )
             sys.exit(1)
 
         try:
@@ -693,9 +712,12 @@ def stop_cmd(proxy_id: str, force: bool, kill_adopted: bool) -> None:
 
     entry = registry.proxies.get(proxy_id)
     if entry is None:
-        console.print(f"[red]Error:[/red] Proxy '{proxy_id}' not found in registry")
-        console.print("[dim]The proxy may not be running.[/dim]")
-        console.print("[dim]Tip: Run 'forge proxy list' to see configured proxies.[/dim]")
+        print_error_with_tip(
+            f"Proxy '{proxy_id}' not found in registry",
+            "The proxy may not be running.",
+            "Run 'forge proxy list' to see configured proxies.",
+            console=console,
+        )
         sys.exit(1)
 
     # Shared-port policy: refuse if other proxies share the same port
@@ -703,8 +725,11 @@ def stop_cmd(proxy_id: str, force: bool, kill_adopted: bool) -> None:
         sharing = _live_proxy_ids_on_port(registry, proxy_id, entry.port)
         if sharing:
             names = ", ".join(sharing[:5])
-            console.print(f"[red]Error:[/red] Cannot stop: other proxies share port {entry.port}: {names}")
-            console.print("[dim]Tip: Use --force to stop anyway, or delete individual proxies.[/dim]")
+            print_error_with_tip(
+                f"Cannot stop: other proxies share port {entry.port}: {names}",
+                "Use --force to stop anyway, or delete individual proxies.",
+                console=console,
+            )
             sys.exit(1)
 
     outcome = _stop_proxy_process(console, entry, kill_adopted=kill_adopted)
@@ -770,7 +795,11 @@ def edit_cmd(proxy_id: str) -> None:
 
     proxy_path = get_proxy_file_path(proxy_id)
     if not proxy_path.exists():
-        console.print(f"[red]Error:[/red] Proxy '{proxy_id}' not found at {display_path(proxy_path)}")
+        print_error_with_tip(
+            f"Proxy '{proxy_id}' not found at {display_path(proxy_path)}",
+            f"Run 'forge proxy create <template> --name {proxy_id}' to create it.",
+            console=console,
+        )
         sys.exit(1)
 
     editor = os.environ.get("EDITOR", "vim")
@@ -855,7 +884,11 @@ def set_cmd(proxy_id: str, key_value: str) -> None:
 
     proxy_path = get_proxy_file_path(proxy_id)
     if not proxy_path.exists():
-        console.print(f"[red]Error:[/red] Proxy '{proxy_id}' not found at {display_path(proxy_path)}")
+        print_error_with_tip(
+            f"Proxy '{proxy_id}' not found at {display_path(proxy_path)}",
+            f"Run 'forge proxy create <template> --name {proxy_id}' to create it.",
+            console=console,
+        )
         sys.exit(1)
 
     from ruamel.yaml import YAML
@@ -912,8 +945,10 @@ def set_cmd(proxy_id: str, key_value: str) -> None:
 
     console.print(f"[green]Set[/green] {key}={coerced_value} in proxy '{proxy_id}'")
     if key.startswith("costs."):
-        console.print(
-            "[dim]Tip: Cost config is read at proxy startup. Restart the proxy for this change to take effect.[/dim]"
+        print_tip(
+            "Cost config is read at proxy startup. Restart the proxy for this change to take effect.",
+            blank_before=False,
+            console=console,
         )
 
 
@@ -1123,7 +1158,11 @@ def _delete_single_proxy(
     proxy_dir = proxy_path.parent
 
     if entry is None and not proxy_dir.exists():
-        console.print(f"[red]Error:[/red] Proxy '{proxy_id}' not found")
+        print_error_with_tip(
+            f"Proxy '{proxy_id}' not found",
+            "Run 'forge proxy list' to see configured proxies.",
+            console=console,
+        )
         raise SystemExit(1)
 
     # Best-effort pre-check for UX (prompt message and session warnings).
@@ -1155,7 +1194,7 @@ def _delete_single_proxy(
             console.print(f"  - {s}")
         if len(referencing_sessions) > 5:
             console.print(f"  ... and {len(referencing_sessions) - 5} more")
-        console.print("\n[dim]Tip: Delete sessions first with " "'forge session delete <name>'[/dim]")
+        print_tip("Delete sessions first with 'forge session delete <name>'.", console=console)
 
     elif not shared_url_hint and entry is not None:
         console.print(f"[dim]Related sessions on {base_url_label}:[/dim] none")
@@ -1268,7 +1307,11 @@ def validate_cmd(proxy_id: str) -> None:
 
     proxy_path = get_proxy_file_path(proxy_id)
     if not proxy_path.exists():
-        console.print(f"[red]Error:[/red] Proxy '{proxy_id}' not found at {display_path(proxy_path)}")
+        print_error_with_tip(
+            f"Proxy '{proxy_id}' not found at {display_path(proxy_path)}",
+            f"Run 'forge proxy create <template> --name {proxy_id}' to create it.",
+            console=console,
+        )
         sys.exit(1)
 
     try:
@@ -1543,7 +1586,11 @@ def metrics_cmd(proxy_id: str | None, json_output: bool, show_all: bool) -> None
         sys.exit(1)
     maybe_entry = registry.proxies.get(proxy_id)
     if maybe_entry is None:
-        console.print(f"[red]Error:[/red] Proxy '{proxy_id}' not found in registry.")
+        print_error_with_tip(
+            f"Proxy '{proxy_id}' not found in registry.",
+            "Run 'forge proxy list' to see configured proxies.",
+            console=console,
+        )
         sys.exit(1)
     entry = maybe_entry
 
@@ -1630,7 +1677,7 @@ def template_list_cmd() -> None:
         table.add_row(name, source, description)
 
     console.print(table)
-    console.print("\n[dim]Tip: Run 'forge proxy create <template>' to create a proxy.[/dim]")
+    print_tip("Run 'forge proxy create <template>' to create a proxy.", console=console)
 
 
 @template_group.command("show")
@@ -1654,7 +1701,7 @@ def template_show_cmd(name: str, raw: bool) -> None:
 
     if not exists:
         console.print(f"[red]Error:[/red] Template '{name}' not found")
-        console.print("\n[dim]Tip: Run 'forge proxy template list' to see available templates.[/dim]")
+        print_tip("Run 'forge proxy template list' to see available templates.", console=console)
         sys.exit(1)
 
     content = read_template(name)
@@ -1703,7 +1750,7 @@ def template_edit_cmd(name: str) -> None:
     # edit requires a shipped template to seed from
     if not shipped_template_exists(name):
         console.print(f"[red]Error:[/red] No built-in template '{name}' to customize")
-        console.print("\n[dim]Tip: Run 'forge proxy template list' to see available templates.[/dim]")
+        print_tip("Run 'forge proxy template list' to see available templates.", console=console)
         sys.exit(1)
 
     user_path = get_user_template_path(name)

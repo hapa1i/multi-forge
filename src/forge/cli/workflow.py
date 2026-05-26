@@ -19,6 +19,7 @@ from typing import Any
 import click
 from rich.console import Console
 
+from forge.cli.output import print_tip
 from forge.proxy.proxies import ProxyResolutionError
 from forge.review.models import (
     NAMED_ROLES,
@@ -89,12 +90,13 @@ def _run_preflight(
         console.print("[red]Error:[/red] Workflow preflight failed:")
         for err in errors:
             console.print(f"  - {err}")
-        console.print(
-            "\n[dim]Tip: Check model availability with 'forge workflow list-models'.\n"
-            "Check proxy status: 'forge proxy list'\n"
-            "Check auth status: 'forge auth status'\n"
-            "Create a proxy: 'forge proxy create <template>'\n"
-            "Check worker runtime: 'command -v claude'[/dim]"
+        print_tip(
+            "Run 'forge workflow list-models' to check model availability.",
+            "Run 'forge proxy list' to check proxy status.",
+            "Run 'forge auth status' to check auth status.",
+            "Run 'forge proxy create <template>' to create a proxy.",
+            "Run 'command -v claude' to check worker runtime.",
+            console=console,
         )
     sys.exit(1)
 
@@ -234,9 +236,11 @@ def list_models(json_output: bool, available_only: bool) -> None:
         return
 
     if not availabilities:
-        console.print(
-            "[yellow]No models are currently ready.[/yellow]\n"
-            "[dim]Tip: Check 'forge proxy list' and 'forge auth status'.[/dim]"
+        console.print("[yellow]No models are currently ready.[/yellow]")
+        print_tip(
+            "Run 'forge proxy list' and 'forge auth status' to check routing and auth.",
+            blank_before=False,
+            console=console,
         )
         return
 

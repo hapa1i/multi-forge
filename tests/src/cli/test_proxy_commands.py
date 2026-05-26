@@ -337,6 +337,8 @@ tiers:
 
         assert result.exit_code != 0
         assert "not found" in result.output.lower()
+        assert "Tip:" in result.output
+        assert "forge proxy create" in result.output
 
 
 class TestProxySet:
@@ -497,6 +499,8 @@ tiers:
 
         assert result.exit_code != 0
         assert "not found" in result.output.lower()
+        assert "Tip:" in result.output
+        assert "forge proxy create" in result.output
 
     def test_set_port_type_coercion_failure(self, runner: CliRunner, temp_env: Path) -> None:
         """Set command errors when port value cannot be coerced to int."""
@@ -675,6 +679,8 @@ tiers:
 
         assert result.exit_code != 0
         assert "not found" in result.output.lower()
+        assert "Tip:" in result.output
+        assert "forge proxy list" in result.output
 
     def test_delete_aborts_before_config_removal_when_registry_update_fails(
         self, runner: CliRunner, temp_env: Path, monkeypatch: pytest.MonkeyPatch
@@ -1365,6 +1371,9 @@ class TestProxyCreateNoStart:
 
         assert result.exit_code != 0
         assert "exists" in result.output.lower()
+        assert "Tip:" in result.output
+        assert "forge proxy edit" in result.output
+        assert "forge proxy delete" in result.output
 
     def test_create_invalid_template_error(self, runner: CliRunner, temp_env: Path) -> None:
         """Create errors for unknown template."""
@@ -1611,6 +1620,8 @@ class TestProxyMetrics:
 
         assert result.exit_code != 0
         assert "not found" in result.output.lower()
+        assert "Tip:" in result.output
+        assert "forge proxy list" in result.output
 
     def test_metrics_proxy_unreachable(
         self, runner: CliRunner, temp_env: Path, monkeypatch: pytest.MonkeyPatch

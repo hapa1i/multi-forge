@@ -1245,6 +1245,9 @@ class TestSessionStart:
 
         assert result.exit_code == 1
         assert "already exists" in result.output
+        assert "Tip:" in result.output
+        assert "forge session resume duplicate-test" in result.output
+        assert "forge session delete duplicate-test" in result.output
 
     def test_start_without_name_auto_generates(self, runner: CliRunner, temp_env: Path) -> None:
         """Should auto-generate a name when none provided."""

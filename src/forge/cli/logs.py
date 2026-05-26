@@ -10,6 +10,7 @@ from pathlib import Path
 import click
 from rich.console import Console
 
+from forge.cli.output import print_tip
 from forge.core.logging import get_effective_log_level
 from forge.core.paths import display_path, get_forge_home
 
@@ -322,12 +323,22 @@ def _show_logs(logs_root: Path) -> None:
         console.print()
 
     if level == "off":
-        console.print("[dim]Tip: Enable debug logging with:[/dim]")
-        console.print("[dim]  forge config set log_level=debug     # persistent[/dim]")
-        console.print("[dim]  FORGE_DEBUG=1 forge <command>        # one-off[/dim]")
+        print_tip(
+            "Enable debug logging with:",
+            commands=[
+                "forge config set log_level=debug     # persistent",
+                "FORGE_DEBUG=1 forge <command>        # one-off",
+            ],
+            blank_before=False,
+            console=console,
+        )
     else:
-        console.print("[dim]Tip: Disable debug logging with:[/dim]")
-        console.print("[dim]  forge config set log_level=off[/dim]")
+        print_tip(
+            "Disable debug logging with:",
+            commands=["forge config set log_level=off"],
+            blank_before=False,
+            console=console,
+        )
 
     # Cleanup tips when there are files to manage
     if total_files > 0:
@@ -338,12 +349,20 @@ def _show_logs(logs_root: Path) -> None:
         except Exception:
             retention = 0
         if retention <= 0:
-            console.print("\n[dim]Tip: Clean up old logs:[/dim]")
-            console.print("[dim]  forge logs --clean                         # remove all[/dim]")
-            console.print("[dim]  forge logs --clean --older-than 30         # older than 30 days[/dim]")
-            console.print("[dim]  forge config set log_retention_days=30     # auto-cleanup on startup[/dim]")
+            print_tip(
+                "Clean up old logs:",
+                commands=[
+                    "forge logs --clean                         # remove all",
+                    "forge logs --clean --older-than 30         # older than 30 days",
+                    "forge config set log_retention_days=30     # auto-cleanup on startup",
+                ],
+                console=console,
+            )
         else:
-            console.print("\n[dim]Tip: forge logs --clean --older-than 7      # manual one-off cleanup[/dim]")
+            print_tip(
+                "Run 'forge logs --clean --older-than 7' for manual one-off cleanup.",
+                console=console,
+            )
 
     # Tip about tool failure telemetry when it's not enabled
     tool_failures_dir = logs_root / "tool_failures"
@@ -353,8 +372,11 @@ def _show_logs(logs_root: Path) -> None:
             from forge.runtime_config import get_runtime_config as _get_rc2
 
             if not _get_rc2().log_tool_failures:
-                console.print("\n[dim]Tip: Log non-Claude model tool misuse (e.g., invalid Read parameters):[/dim]")
-                console.print("[dim]  forge config set log_tool_failures=true[/dim]")
+                print_tip(
+                    "Log non-Claude model tool misuse (e.g., invalid Read parameters):",
+                    commands=["forge config set log_tool_failures=true"],
+                    console=console,
+                )
         except Exception:
             pass
 
@@ -375,7 +397,7 @@ def _show_logs(logs_root: Path) -> None:
                     f"[yellow]Note:[/yellow] {len(adopted)} adopted proxy(ies) "
                     f"({names}{suffix}) were not started by Forge and have no log files."
                 )
-                console.print("[dim]Tip: Delete and recreate proxies for full Forge logging.[/dim]")
+                print_tip("Delete and recreate proxies for full Forge logging.", blank_before=False, console=console)
         except Exception:
             pass
 

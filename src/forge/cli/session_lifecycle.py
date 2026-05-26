@@ -58,6 +58,7 @@ def _sess():  # type: ignore[return]
     return sys.modules["forge.cli.session"]
 
 
+from forge.cli.output import print_error_with_tip, print_tip  # noqa: E402
 from forge.cli.session import (  # noqa: E402
     ResolvedRouting,
     _apply_routing_override_to_state,
@@ -66,7 +67,6 @@ from forge.cli.session import (  # noqa: E402
     _get_effective_proxy_for_session,
     _get_launch_preferences,
     _get_runtime_base_url,
-    _handle_error,
     _hint_cross_project_session,
     _persist_routing_override,
     _print_routing_summary,
@@ -74,6 +74,7 @@ from forge.cli.session import (  # noqa: E402
     _resolve_launch_mode,
     _resolve_worktree_extension_root,
     console,
+    handle_session_error,
     logger,
 )
 from forge.cli.session import session as _session_untyped  # noqa: E402
@@ -218,7 +219,7 @@ def _warn_if_hooks_missing(project_path: Path) -> None:
         "State tracking, policy enforcement, verification, and search indexing "
         "will not be active."
     )
-    console.print("[dim]Tip: Run 'forge extension enable' to install hooks.[/dim]")
+    print_tip("Run 'forge extension enable' to install hooks.", blank_before=False, console=console)
 
 
 def _warn_if_version_outdated() -> None:
@@ -233,7 +234,7 @@ def _warn_if_version_outdated() -> None:
         f"[yellow]Warning:[/yellow] Claude Code {result.version} is below "
         f"minimum {result.minimum}. Some features may not work correctly."
     )
-    console.print("[dim]Tip: Run 'claude update' to upgrade.[/dim]")
+    print_tip("Run 'claude update' to upgrade.", blank_before=False, console=console)
 
 
 def _infer_launch_confirmation(
@@ -337,12 +338,10 @@ def _resolve_derivation_context_file(manifest: SessionState) -> Path | None:
     context_path = Path(derivation.context_file).expanduser()
     if _is_legacy_flat_handoff_path(context_path):
         parent = derivation.parent_session or manifest.parent_session or "<parent>"
-        console.print(
-            "[red]Error:[/red] Legacy handoff artifact format is no longer supported: " f"{display_path(context_path)}"
-        )
-        console.print(
-            "[dim]Tip: run "
-            f"'forge session resume {parent} --fresh' to regenerate a per-child handoff artifact.[/dim]"
+        print_error_with_tip(
+            f"Legacy handoff artifact format is no longer supported: {display_path(context_path)}",
+            f"Run 'forge session resume {parent} --fresh' to regenerate a per-child handoff artifact.",
+            console=console,
         )
         sys.exit(1)
     if not context_path.is_absolute():
@@ -632,7 +631,7 @@ def _print_post_exit_tip(manifest: SessionState) -> None:
     except Exception:
         logger.debug("Terminal line clear failed before post-exit tip", exc_info=True)
     resume_cmd = _resume_tip_command(manifest)
-    console.print(f"\n[dim]Tip: Reconnect to this conversation with:[/dim]\n" f"[dim]  {resume_cmd}[/dim]")
+    print_tip("Reconnect to this conversation with:", commands=[resume_cmd], console=console)
 
 
 def _resume_tip_command(manifest: SessionState) -> str:
@@ -654,12 +653,13 @@ def _resume_tip_command(manifest: SessionState) -> str:
 
 def _print_branch_exists_tip(e: BranchExistsError) -> None:
     """Print contextual tip for a branch that already exists."""
-    console.print(f"[red]Error:[/red] {e}")
     if e.worktree:
-        console.print("\n[dim]Tip: Use --branch to specify a different branch name.[/dim]")
+        print_error_with_tip(str(e), "Use --branch to specify a different branch name.", console=console)
     else:
-        console.print(
-            f"\n[dim]Tip: Delete with `git branch -d {e.branch}` or use --branch to specify a different name.[/dim]"
+        print_error_with_tip(
+            str(e),
+            f"Run 'git branch -d {e.branch}' to delete it, or use --branch to specify a different name.",
+            console=console,
         )
 
 
@@ -805,9 +805,11 @@ def _persist_direct_model_override(
             f"[yellow]Warning:[/yellow] Could not persist --model override for session "
             f"[green]{session_name}[/green]: {e}"
         )
-        console.print(
-            "[dim]Tip: If this command launches Claude, it will use the requested model for this run, "
-            "but future resumes may use the previous stored model. Retry after current Forge state updates finish.[/dim]"
+        print_tip(
+            "If this command launches Claude, it will use the requested model for this run, "
+            "but future resumes may use the previous stored model. Retry after current Forge state updates finish.",
+            blank_before=False,
+            console=console,
         )
     except (
         InvalidSessionNameError,
@@ -822,9 +824,11 @@ def _persist_direct_model_override(
             f"[yellow]Warning:[/yellow] Could not persist --model override for session "
             f"[green]{session_name}[/green]: {e}"
         )
-        console.print(
-            "[dim]Tip: If this command launches Claude, it will use the requested model for this run, "
-            "but future resumes may use the previous stored model. Check the session manifest before relying on this pin.[/dim]"
+        print_tip(
+            "If this command launches Claude, it will use the requested model for this run, "
+            "but future resumes may use the previous stored model. Check the session manifest before relying on this pin.",
+            blank_before=False,
+            console=console,
         )
 
 
@@ -992,16 +996,17 @@ def launch_new_session(
             claude_session_id=pre_seeded_uuid,
         )
     except SessionExistsError as e:
-        console.print(f"[red]Error:[/red] {e}")
-        console.print(f"\n[dim]Tip: Use 'forge session resume {name}' to continue,[/dim]")
-        console.print(f"[dim]or 'forge session delete {name}' to remove it first.[/dim]")
+        print_error_with_tip(
+            str(e),
+            f"Run 'forge session resume {name}' to continue, or 'forge session delete {name}' to remove it first.",
+            console=console,
+        )
         return 1
     except BranchExistsError as e:
         _print_branch_exists_tip(e)
         return 1
     except WorktreePathExistsError as e:
-        console.print(f"[red]Error:[/red] {e}")
-        console.print("\n[dim]Tip: Remove the directory or use a different session name.[/dim]")
+        print_error_with_tip(str(e), "Remove the directory or use a different session name.", console=console)
         return 1
     except InvalidBranchNameError as e:
         console.print(f"[red]Error:[/red] {e}")
@@ -1090,7 +1095,7 @@ def launch_new_session(
                 force_extensions=extensions,
             )
     elif extensions is True:
-        console.print("[dim]Tip: --extensions only applies with --worktree.[/dim]")
+        print_tip("--extensions only applies with --worktree.", blank_before=False, console=console)
     console.print()
 
     # --- no-launch early exit ---
@@ -1495,7 +1500,7 @@ def resume(
         sessions = manager.list_sessions(include_incognito=True)
         if not sessions:
             console.print("[dim]No sessions to resume.[/dim]")
-            console.print("\n[dim]Tip: Run 'forge session start <name>'.[/dim]")
+            print_tip("Run 'forge session start <name>'.", console=console)
             return
 
         name = _pick_session(sessions, manager, prompt="Select session to resume")
@@ -1508,10 +1513,14 @@ def resume(
         manifest = manager.get_session(name, forge_root=_fr)
     except SessionNotFoundError:
         if not _hint_cross_project_session(name, _fr):
-            console.print(f"[red]Error:[/red] session '{name}' not found")
+            print_error_with_tip(
+                f"session '{name}' not found",
+                f"Run 'forge session start {name}' to create it.",
+                console=console,
+            )
         sys.exit(1)
     except ForgeSessionError as e:
-        _handle_error(e)
+        handle_session_error(e)
         return
 
     _, validation_base_url, validation_proxy_id = _get_effective_proxy_for_session(manifest)
@@ -1539,9 +1548,9 @@ def resume(
         if effective_resume_mode == "native":
             ctx = click.get_current_context()
             if ctx.get_parameter_source("strategy") == click.core.ParameterSource.COMMANDLINE:
-                console.print("[dim]Tip: --strategy is ignored with --resume-mode native.[/dim]")
+                print_tip("--strategy is ignored with --resume-mode native.", blank_before=False, console=console)
             if ctx.get_parameter_source("depth") == click.core.ParameterSource.COMMANDLINE:
-                console.print("[dim]Tip: --depth is ignored with --resume-mode native.[/dim]")
+                print_tip("--depth is ignored with --resume-mode native.", blank_before=False, console=console)
 
         if effective_resume_mode == "native":
             # Native requires a hook-confirmed session (UUID + confirmed_by/transcript evidence).
@@ -1599,9 +1608,11 @@ def resume(
                 console.print(f"  Launcher PID: {active_entry.launcher_pid}")
             if active_entry.container_name:
                 console.print(f"  Container: {active_entry.container_name}")
-            console.print(
-                "[dim]Tip: Reconnect is only available after the previous launch has exited."
-                " Return to that launch if it is still running, or stop it cleanly and retry.[/dim]"
+            print_tip(
+                "Reconnect is only available after the previous launch has exited. "
+                "Return to that launch if it is still running, or stop it cleanly and retry.",
+                blank_before=False,
+                console=console,
             )
             sys.exit(1)
         elif active_entry is not None and force:
@@ -1769,9 +1780,10 @@ def _reconnect_in_place(
     dispatch) -- this function assumes the session is not active.
     """
     if not _is_resumable_session(manifest):
-        console.print("[red]Error:[/red] Cannot reconnect: no resumable Claude conversation was found.")
-        console.print(
-            f"[dim]Tip: Use 'forge session resume {name}' to reattach, or --fresh to start a new conversation.[/dim]"
+        print_error_with_tip(
+            "Cannot reconnect: no resumable Claude conversation was found.",
+            f"Run 'forge session resume {name}' to reattach, or use --fresh to start a new conversation.",
+            console=console,
         )
         sys.exit(1)
 
@@ -1845,7 +1857,7 @@ def _launch_as_child(
     try:
         parent, child = manager.relaunch_session(parent_name, forge_root=parent.forge_root)
     except ForgeSessionError as e:
-        _handle_error(e)
+        handle_session_error(e)
         return
 
     worktree_path = Path(child.worktree.path) if child.worktree else Path.cwd()
@@ -1990,10 +2002,12 @@ def _open_in_editor(file_path: Path, *, resume_session_name: str | None = None) 
             if resume_session_name
             else "forge session resume <child-name>"
         )
-        console.print(
-            f"[red]Aborted:[/red] editor exited with code {result.returncode}. Session not launched.\n"
-            f"[dim]Tip: The handoff file at {display_path(file_path)} is preserved; "
-            f"run '{resume_tip}' to launch with the current content.[/dim]"
+        console.print(f"[red]Aborted:[/red] editor exited with code {result.returncode}. Session not launched.")
+        print_tip(
+            f"The handoff file at {display_path(file_path)} is preserved. "
+            f"Run '{resume_tip}' to launch with the current content.",
+            blank_before=False,
+            console=console,
         )
         sys.exit(result.returncode)
 
@@ -2049,7 +2063,7 @@ def _resume_fresh(
             inherit_memory_explicit=inherit_memory_explicit,
         )
     except ForgeSessionError as e:
-        _handle_error(e)
+        handle_session_error(e)
         return
 
     child_worktree_path = Path(child_manifest.worktree.path) if child_manifest.worktree else Path.cwd()
@@ -2179,7 +2193,7 @@ def _resume_fresh_native(
             inherit_memory_explicit=inherit_memory_explicit,
         )
     except ForgeSessionError as e:
-        _handle_error(e)
+        handle_session_error(e)
         return
 
     child_worktree_path = Path(child_manifest.worktree.path) if child_manifest.worktree else Path.cwd()

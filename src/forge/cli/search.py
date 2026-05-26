@@ -23,6 +23,7 @@ from pathlib import Path
 import click
 from rich.console import Console
 
+from forge.cli.output import print_tip
 from forge.core.paths import display_path
 from forge.core.state import SchemaVersionError
 from forge.search.bm25_store import BM25IndexData, BM25IndexStore
@@ -391,7 +392,7 @@ def status_cmd() -> None:
     if not doc_store.exists():
         console.print("Search index: [yellow]not built[/yellow]")
         console.print(f"Index location: [dim]{display_path(index_dir)}[/dim]")
-        console.print("\n[dim]Tip: Run 'forge search rebuild-index' to build.[/dim]")
+        print_tip("Run 'forge search rebuild-index' to build.", console=console)
         return
 
     documents = doc_store.read()

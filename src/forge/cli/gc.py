@@ -8,6 +8,7 @@ import sys
 import click
 from rich.console import Console
 
+from forge.cli.output import print_tip
 from forge.core.ops.context import ExecutionContext
 from forge.core.ops.gc import CleanError, CleanReport, collect_clean_report, run_clean
 
@@ -78,7 +79,7 @@ def _print_report(report: CleanReport, verbose: bool, console: Console) -> None:
         console.print("[green]Nothing to clean.[/green]")
     else:
         console.print(f"Total: [cyan]{report.total_count}[/cyan] objects to clean\n")
-        console.print("[dim]Tip: Run with --yes to clean, or --verbose for details.[/dim]")
+        print_tip("Use --yes to clean, or --verbose for details.", blank_before=False, console=console)
 
 
 def _run_and_report(ctx: ExecutionContext, scope: str, report: CleanReport, console: Console) -> None:

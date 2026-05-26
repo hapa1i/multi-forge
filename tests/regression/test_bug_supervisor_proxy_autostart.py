@@ -37,11 +37,12 @@ def test_supervisor_proxy_template_autostarts_instead_of_erroring() -> None:
     from forge.proxy.proxies import ProxyNotFoundError
 
     started = MagicMock(proxy_id="openrouter-deepseek")
-    with patch(f"{_ORCH}.ProxyRegistryStore"), patch(
-        f"{_ORCH}.resolve_proxy", side_effect=ProxyNotFoundError("openrouter-deepseek")
-    ), patch(f"{_ORCH}.template_exists", return_value=True), patch(
-        f"{_ORCH}.start_proxy", return_value=MagicMock(proxy=started, source="spawn")
-    ) as start:
+    with (
+        patch(f"{_ORCH}.ProxyRegistryStore"),
+        patch(f"{_ORCH}.resolve_proxy", side_effect=ProxyNotFoundError("openrouter-deepseek")),
+        patch(f"{_ORCH}.template_exists", return_value=True),
+        patch(f"{_ORCH}.start_proxy", return_value=MagicMock(proxy=started, source="spawn")) as start,
+    ):
         proxy_id, was_started = ensure_supervisor_proxy("openrouter-deepseek")
 
     assert proxy_id == "openrouter-deepseek"
@@ -53,9 +54,11 @@ def test_unknown_supervisor_proxy_gives_actionable_error() -> None:
     """No proxy and no template -> actionable message, not the old registry jargon."""
     from forge.proxy.proxies import ProxyNotFoundError
 
-    with patch(f"{_ORCH}.ProxyRegistryStore"), patch(
-        f"{_ORCH}.resolve_proxy", side_effect=ProxyNotFoundError("typo-proxy")
-    ), patch(f"{_ORCH}.template_exists", return_value=False):
+    with (
+        patch(f"{_ORCH}.ProxyRegistryStore"),
+        patch(f"{_ORCH}.resolve_proxy", side_effect=ProxyNotFoundError("typo-proxy")),
+        patch(f"{_ORCH}.template_exists", return_value=False),
+    ):
         with pytest.raises(ValueError) as exc:
             ensure_supervisor_proxy("typo-proxy")
 

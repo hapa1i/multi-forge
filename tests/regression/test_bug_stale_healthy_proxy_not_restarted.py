@@ -36,11 +36,12 @@ def test_stale_healthy_template_entry_is_restarted() -> None:
     stale = MagicMock(proxy_id="proxy_1", pid=999999)  # registry says healthy, process is gone
     fresh = MagicMock(proxy_id="proxy_2")
 
-    with patch(f"{_ORCH}.ProxyRegistryStore"), patch(
-        f"{_ORCH}.resolve_proxy", return_value=stale
-    ), patch(f"{_ORCH}.template_exists", return_value=True), patch(
-        f"{_ORCH}.start_proxy", return_value=MagicMock(proxy=fresh, source="spawn")
-    ) as start:
+    with (
+        patch(f"{_ORCH}.ProxyRegistryStore"),
+        patch(f"{_ORCH}.resolve_proxy", return_value=stale),
+        patch(f"{_ORCH}.template_exists", return_value=True),
+        patch(f"{_ORCH}.start_proxy", return_value=MagicMock(proxy=fresh, source="spawn")) as start,
+    ):
         entry, started = ensure_proxy("litellm-openai")
 
     # The resolve hit must NOT short-circuit a dead entry: start_proxy respawns.
@@ -54,11 +55,12 @@ def test_live_template_entry_is_reused_not_respawned() -> None:
     """The companion case: start_proxy reports reuse, so started is False."""
     live = MagicMock(proxy_id="proxy_1", pid=4242)
 
-    with patch(f"{_ORCH}.ProxyRegistryStore"), patch(
-        f"{_ORCH}.resolve_proxy", return_value=live
-    ), patch(f"{_ORCH}.template_exists", return_value=True), patch(
-        f"{_ORCH}.start_proxy", return_value=MagicMock(proxy=live, source="reuse")
-    ) as start:
+    with (
+        patch(f"{_ORCH}.ProxyRegistryStore"),
+        patch(f"{_ORCH}.resolve_proxy", return_value=live),
+        patch(f"{_ORCH}.template_exists", return_value=True),
+        patch(f"{_ORCH}.start_proxy", return_value=MagicMock(proxy=live, source="reuse")) as start,
+    ):
         entry, started = ensure_proxy("litellm-openai")
 
     start.assert_called_once()
