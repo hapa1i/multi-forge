@@ -412,6 +412,13 @@ forge proxy edit <proxy_id>
 forge proxy delete <proxy_id>
 ```
 
+**Launch-time auto-start (lookup-or-start).** `--proxy` (session start/resume/fork, `forge claude`) and
+`--supervisor-proxy` (session start/fork, `forge guard supervise`) accept a template name. When the name is a template,
+the launcher routes through `ensure_proxy()` → `start_proxy()` (reuse a live proxy, else adopt/spawn) instead of a
+lookup-only `resolve_proxy()`. This makes a template name with no running proxy — or a registry entry marked `healthy`
+that is no longer reachable — start a live proxy rather than fail. A bare proxy_id is still presence-only (revive with
+`forge proxy start <id>`); a name matching neither a proxy nor a template fails with a `forge proxy template list` hint.
+
 **Key principle:** You do NOT edit internal templates/model catalog—only your proxy overlay.
 
 > **Configuration reference details** — proxy overlay schema, template inventory, confusion traps, secrets, runtime
@@ -874,9 +881,11 @@ The primary entry point for all Forge operations.
 **Command aliases:** `authentication` (canonical) has alias `auth`; `extension` (canonical) has alias `ext` and
 `extensions`; `session` (canonical) has alias `sess`. Full names always work; aliases are convenience shortcuts.
 
-**Command-shape policy:** Forge uses explicit verbs for all commands. `config` and `search` support
-`invoke_without_command` as convenience defaults (`config` shows effective config, `search -q` runs a query). All other
-groups require an explicit subcommand. List/show commands support `--json` for scripting.
+**Command-shape policy:** Forge uses explicit verbs for all commands. Non-leaf groups print help when invoked without a
+subcommand; they do not hide work behind bare group invocation. Leaf commands should do the sensible action when
+optional arguments are omitted (for example, `forge proxy metrics` shows all proxies when more than one is registered).
+Removed group-level shortcuts may remain only as non-executing tombstones that name the replacement. List/show commands
+support `--json` for scripting.
 
 #### Installation
 
@@ -998,7 +1007,7 @@ hints through `ModelSpec.prompt`. All workflow execution commands (panel, analyz
 
 | Command                      | Purpose                              |
 | ---------------------------- | ------------------------------------ |
-| `forge search -q <query>`    | Search transcripts                   |
+| `forge search query <query>` | Search transcripts                   |
 | `forge search rebuild-index` | Full index rebuild from artifacts    |
 | `forge search status`        | Show index statistics                |
 | `forge search clean`         | Remove orphaned documents from index |
@@ -1026,8 +1035,7 @@ hints through `ModelSpec.prompt`. All workflow execution commands (panel, analyz
 
 - **Narrow global config** -- `forge config` owns runtime preferences only; routing stays per-proxy and workflow state
   stays per-session
-- **Explicit verbs** -- all groups require a subcommand (`config` and `search` are the two exceptions with
-  `invoke_without_command` defaults)
+- **Explicit verbs** -- non-leaf groups print help; leaves perform the action
 - **Launch through Forge** -- `forge session start`, `forge session resume`, or `forge claude start --proxy` sets up env
   vars correctly
 

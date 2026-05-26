@@ -137,11 +137,27 @@ def populated_store(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> SearchDo
 
 
 class TestSearchCommand:
-    """Tests for forge search <query>."""
+    """Tests for forge search query <terms>."""
+
+    def test_bare_search_prints_help(self, runner: CliRunner) -> None:
+        """Bare non-leaf command orients users; query is the explicit action."""
+        result = runner.invoke(main, ["search"])
+        assert result.exit_code == 0
+        assert "Usage:" in result.output
+        assert "query" in result.output
+        assert "rebuild-index" in result.output
+
+    def test_legacy_q_errors_with_replacement_tip(self, runner: CliRunner) -> None:
+        """The old group-level -q path is a tombstone, not a compatibility alias."""
+        result = runner.invoke(main, ["search", "-q", "timeout config", "-n", "5", "--scope", "all"])
+        assert result.exit_code != 0
+        assert "forge search -q was removed" in result.output
+        assert "Tip:" in result.output
+        assert "forge search query 'timeout config' -n 5 --scope all" in result.output
 
     def test_search_outputs_json(self, runner: CliRunner, populated_store: SearchDocumentStore) -> None:
         """Search outputs valid JSON with results (project scope, the default)."""
-        result = runner.invoke(main, ["search", "-q", "timeout"])
+        result = runner.invoke(main, ["search", "query", "timeout"])
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert "results" in data
@@ -151,7 +167,7 @@ class TestSearchCommand:
 
     def test_search_no_results(self, runner: CliRunner, populated_store: SearchDocumentStore) -> None:
         """Search for nonexistent term returns empty results."""
-        result = runner.invoke(main, ["search", "-q", "xyznonexistent"])
+        result = runner.invoke(main, ["search", "query", "xyznonexistent"])
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert data["total_results"] == 0
@@ -159,7 +175,7 @@ class TestSearchCommand:
 
     def test_search_limit(self, runner: CliRunner, populated_store: SearchDocumentStore) -> None:
         """--limit flag caps results."""
-        result = runner.invoke(main, ["search", "-q", "timeout", "--limit", "1"])
+        result = runner.invoke(main, ["search", "query", "timeout", "--limit", "1"])
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert len(data["results"]) <= 1
@@ -173,7 +189,7 @@ class TestSearchCommand:
         (project / ".git").mkdir()
         monkeypatch.chdir(project)
 
-        result = runner.invoke(main, ["search", "-q", "anything"])
+        result = runner.invoke(main, ["search", "query", "anything"])
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert data["total_results"] == 0
@@ -190,7 +206,7 @@ class TestSearchCommand:
             "forge.session.index.IndexStore.list_sessions",
             return_value=[("other-session", SimpleNamespace(project_root=str(other_root)))],
         ):
-            result = runner.invoke(main, ["search", "-q", "timeout", "--scope", "all"])
+            result = runner.invoke(main, ["search", "query", "timeout", "--scope", "all"])
 
         assert result.exit_code == 0
         data = json.loads(result.output)
@@ -203,7 +219,7 @@ class TestSearchCommand:
     ) -> None:
         """--scope all should not claim the index is missing when indexed projects simply have no matches."""
         with patch("forge.session.index.IndexStore.list_sessions", return_value=[]):
-            result = runner.invoke(main, ["search", "-q", "xyznonexistent", "--scope", "all"])
+            result = runner.invoke(main, ["search", "query", "xyznonexistent", "--scope", "all"])
 
         assert result.exit_code == 0
         data = json.loads(result.output)
@@ -221,7 +237,7 @@ class TestSearchCommand:
         monkeypatch.chdir(project)
 
         with patch("forge.session.index.IndexStore.list_sessions", return_value=[]):
-            result = runner.invoke(main, ["search", "-q", "anything", "--scope", "all"])
+            result = runner.invoke(main, ["search", "query", "anything", "--scope", "all"])
 
         assert result.exit_code == 0
         data = json.loads(result.output)
@@ -242,7 +258,7 @@ class TestSearchCommand:
         store_dir.mkdir(parents=True)
         (store_dir / "bm25_index.json").write_text("not valid json {{{")
 
-        result = runner.invoke(main, ["search", "-q", "anything"])
+        result = runner.invoke(main, ["search", "query", "anything"])
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert data["total_results"] == 0
@@ -367,7 +383,7 @@ class TestEndToEndPipeline:
         assert "Indexed 2 transcripts" in result.output
 
         # Step 2: Search for "database timeout"
-        result = runner.invoke(main, ["search", "-q", "database timeout"])
+        result = runner.invoke(main, ["search", "query", "database timeout"])
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert data["total_results"] >= 1
@@ -375,7 +391,7 @@ class TestEndToEndPipeline:
         assert data["results"][0]["session_name"] == "db-work"
 
         # Step 3: Search for "authentication" — should find auth-work, not db-work
-        result = runner.invoke(main, ["search", "-q", "authentication"])
+        result = runner.invoke(main, ["search", "query", "authentication"])
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert data["total_results"] >= 1
@@ -416,7 +432,7 @@ class TestEndToEndPipeline:
         runner.invoke(main, ["search", "status"])
 
         # Now search should find the indexed transcript
-        result = runner.invoke(main, ["search", "-q", "memory leak"])
+        result = runner.invoke(main, ["search", "query", "memory leak"])
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert data["total_results"] >= 1

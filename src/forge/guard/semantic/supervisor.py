@@ -606,29 +606,38 @@ def should_supervisor_use_direct(source_state: SessionState) -> bool:
     return not source_state.confirmed.started_with_proxy
 
 
-def preflight_supervisor_proxy(supervisor_proxy: str) -> str:
-    """Validate supervisor proxy against the registry before state mutation.
+def ensure_supervisor_proxy(supervisor_proxy: str) -> tuple[str, bool]:
+    """Ensure the supervisor proxy is running, auto-starting from a template if needed.
 
-    Checks registry presence only, not liveness — a registered-but-stopped
-    proxy passes. Use ``forge proxy clean`` to prune stale entries.
+    Resolves ``supervisor_proxy`` against the proxy registry. If no live proxy matches but
+    a config template of the same name exists, starts it — so ``--supervisor-proxy
+    openrouter-deepseek`` works without a separate ``forge proxy create``. Runs before any
+    session/fork state mutation so a bad name doesn't leave half-created state.
 
-    Returns the resolved proxy_id. Raises ValueError if the proxy is not found.
-    Call this before creating sessions/forks so a bad proxy name doesn't leave
-    half-created state.
+    A registered-but-stopped proxy_id resolves without a restart (presence, not liveness).
+
+    Returns ``(proxy_id, started)`` where ``started`` is True only when this call launched
+    the proxy, so the caller can surface the same "Started proxy" notice as ``--proxy``.
+    Raises ValueError with an actionable message when the name matches neither a proxy nor
+    a template, when a matched template fails to start, or when the name is ambiguous
+    across multiple active proxies.
     """
     # Lazy import: guard → proxy dependency; kept lazy to avoid circular imports
-    from forge.proxy.proxies import (
-        ProxyRegistryStore,
-        ProxyResolutionError,
-        resolve_proxy,
-    )
+    from forge.proxy.proxies import AmbiguousProxyError, ProxyNotFoundError
+    from forge.proxy.proxy_orchestrator import ProxyStartError, ensure_proxy
 
-    registry = ProxyRegistryStore().read()
     try:
-        entry = resolve_proxy(registry, supervisor_proxy)
-    except ProxyResolutionError:
-        raise ValueError(f"Supervisor proxy '{supervisor_proxy}' not found in registry")
-    return entry.proxy_id or supervisor_proxy
+        entry, started = ensure_proxy(supervisor_proxy)
+    except AmbiguousProxyError as e:
+        raise ValueError(str(e)) from e
+    except ProxyNotFoundError as e:
+        raise ValueError(
+            f"Supervisor proxy '{supervisor_proxy}' is not running and no template named "
+            f"'{supervisor_proxy}' exists. Run 'forge proxy template list' to see templates."
+        ) from e
+    except ProxyStartError as e:
+        raise ValueError(f"Supervisor proxy '{supervisor_proxy}': failed to start from template: {e}") from e
+    return (entry.proxy_id or supervisor_proxy), started
 
 
 def apply_supervisor_routing(
@@ -644,7 +653,7 @@ def apply_supervisor_routing(
     """Apply explicit or auto-seeded supervisor routing to sup_config.
 
     When supervisor_proxy is given, stores it directly (caller must have
-    already validated via preflight_supervisor_proxy). When supervisor_direct
+    already validated via ensure_supervisor_proxy). When supervisor_direct
     is given, sets direct routing. Otherwise falls through to
     auto_seed_supervisor_proxy().
 

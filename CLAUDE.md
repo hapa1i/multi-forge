@@ -159,18 +159,48 @@ to this project's setup. When fixing errors, match the existing error message st
 
 ### Console Output Formatting
 
-**Tips and hints** — Use `Tip:` prefix with dim styling for helpful suggestions:
+**Use the `forge.cli.output` helpers for CLI Rich recovery output.** The CLI's recovery-output standard (the
+`Tip:`/`Error:` pairing) lives in one place so equivalent situations tip identically. All Rich-styled `Tip:` output in
+`src/forge/cli/**` should go through these helpers; tests enforce that `[dim]Tip:` appears only in `output.py`. When
+adding or changing recovery tips, reach for:
 
 ```python
-# Standard format for tips
-console.print("[dim]Tip: Use --force to override.[/dim]")
-console.print(f"\n[dim]Tip: Run 'forge session resume {name}' to continue.[/dim]")
+from forge.cli.output import print_tip, print_error, print_error_with_tip, handle_session_error
+
+# Error + recovery tip (the common "already exists" / "not found" shape)
+print_error_with_tip(
+    f"Proxy '{proxy_id}' not found at {display_path(proxy_path)}",
+    f"Run 'forge proxy create <template> --name {proxy_id}' to create it.",
+    console=console,  # pass your file's local console so width=200 tables stay aligned
+)
+
+# Typed ForgeSessionError → prints the error, looks up a context-free tip, sys.exits(1)
+except ForgeSessionError as e:
+    handle_session_error(e, console=console)
+
+# Multi-line / placeholder commands render as a copy-paste block
+print_error_with_tip(
+    f"Backend config already exists: {display_path(config_path)}",
+    "Start an instance with:",
+    commands=[f"forge backend start {adapter} --port 4000"],
+    console=console,
+)
 ```
+
+Always pass the call site's local `console`; only `output.py`'s own fallback is width-less.
+
+**Wording conventions** (the helpers preserve the literal `Tip:` / `Error:` prefixes):
+
+- **Commands → `Run '<full command>'`**; **flags/options → `Use --flag`** (e.g. `Run 'forge proxy start'`, but
+  `Use --force to override.`).
+- Inline commands in **single quotes**; never backticks (`` `git branch -d X` `` → `'git branch -d X'`).
+- Multi-line or placeholder commands go in the `commands=` copy-paste block, not inline prose.
 
 **Do NOT use:**
 
 - `Hint:` — inconsistent, slightly condescending tone
 - Unprefixed suggestions — harder for users to scan/recognize
+- Hand-rolled `[dim]Tip: …[/dim]` in CLI modules — use `print_tip` / `print_error_with_tip`
 
 **Other output categories** (no prefix needed):
 

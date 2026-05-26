@@ -25,8 +25,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import click
-from rich.console import Console
 
+from forge.cli.output import console
+from forge.cli.output import handle_session_error as handle_session_error
+from forge.cli.output import print_tip
 from forge.core.paths import display_path
 from forge.core.reactive.env import (
     FORGE_SUBPROCESS_BASE_URL_VAR,
@@ -50,9 +52,6 @@ from forge.session.exceptions import (
 )
 
 logger = logging.getLogger(__name__)
-
-# Shared console for Rich output
-console = Console()
 
 
 # --- Routing resolution ---
@@ -94,22 +93,24 @@ def _resolve_routing_from_cli(
 
     from forge.cli.claude import _get_context_limit_for_proxy, _healthcheck_proxy
     from forge.proxy.proxies import (
+        ProxyNotFoundError,
         ProxyRegistryCorruptedError,
-        ProxyRegistryStore,
         ProxyResolutionError,
-        resolve_proxy,
     )
+    from forge.proxy.proxy_orchestrator import ProxyStartError, ensure_proxy
 
-    store = ProxyRegistryStore()
     try:
-        registry = store.read()
+        entry, started = ensure_proxy(proxy_name)
     except ProxyRegistryCorruptedError as e:
         raise click.ClickException(str(e))
+    except (ProxyResolutionError, ProxyStartError) as e:
+        msg = str(e)
+        if isinstance(e, ProxyNotFoundError):
+            msg += "\nTip: Run 'forge proxy template list' to see available templates."
+        raise click.ClickException(msg)
 
-    try:
-        entry = resolve_proxy(registry, proxy_name)
-    except ProxyResolutionError as e:
-        raise click.ClickException(str(e))
+    if started:
+        console.print(f"[dim]Started proxy '{entry.proxy_id}' from template '{proxy_name}'.[/dim]")
 
     try:
         _healthcheck_proxy(
@@ -800,12 +801,6 @@ def _generate_parent_handoff_context(
     return handoff_result.context_file.resolve(), handoff_result.warnings
 
 
-def _handle_error(e: ForgeSessionError) -> None:
-    """Handle a ForgeSessionError and exit."""
-    console.print(f"[red]Error:[/red] {e}", style="red")
-    sys.exit(1)
-
-
 def _hint_cross_project_session(name: str, forge_root: str | None) -> bool:
     """Print a hint if a session exists in another forge_root.
 
@@ -823,7 +818,7 @@ def _hint_cross_project_session(name: str, forge_root: str | None) -> bool:
         other_root = entry.forge_root or entry.worktree_path
         if other_root and other_root != forge_root:
             console.print(f"[red]Error:[/red] session '{name}' not found in current project")
-            console.print(f"\n[dim]Tip: Session '{name}' exists in:[/dim]")
+            print_tip(f"Session '{name}' exists in:", console=console)
             console.print(
                 Text(display_path(other_root), style="dim", no_wrap=True),
                 soft_wrap=True,
@@ -832,7 +827,7 @@ def _hint_cross_project_session(name: str, forge_root: str | None) -> bool:
             return True
     except AmbiguousSessionError as e:
         console.print(f"[red]Error:[/red] session '{name}' not found in current project")
-        console.print(f"\n[dim]Tip: Session '{name}' exists in multiple projects:[/dim]")
+        print_tip(f"Session '{name}' exists in multiple projects:", console=console)
         for root in e.forge_roots:
             console.print(
                 Text(f"  - {display_path(root)}", style="dim", no_wrap=True),
@@ -865,7 +860,7 @@ def session() -> None:
 # Register subgroups attached to `session`. Done at module import so that
 # `forge session handoff show` resolves on first call. Imported here (not at
 # top of module) to avoid circular imports: session_handoff imports from this
-# module's namespace (`_cwd_forge_root`, `_handle_error`, `console`).
+# module's namespace (`_cwd_forge_root`, `handle_session_error`, `console`).
 def _register_subgroups() -> None:
     from forge.cli.session_handoff import handoff_group  # noqa: E402
     from forge.cli.session_memory import memory_group  # noqa: E402
@@ -876,9 +871,6 @@ def _register_subgroups() -> None:
 
 _register_subgroups()
 
-
-# sys is imported by _handle_error above; keep it available for the re-exported modules
-import sys  # noqa: E402
 
 # Re-export names that tests patch on forge.cli.session (originally top-level imports).
 # These must be in this module's namespace for patch("forge.cli.session.XXX") to work.

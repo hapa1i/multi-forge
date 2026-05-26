@@ -12,6 +12,7 @@ from pathlib import Path
 
 from rich.console import Console
 
+from forge.cli.output import print_tip
 from forge.core.paths import display_path
 
 console = Console()
@@ -47,7 +48,7 @@ def require_repo_root() -> Path:
         console.print(
             f"[red]Error:[/red] Must run from the repository root ({display_path(repo_root)}), " f"not a subdirectory"
         )
-        console.print(f"\n[dim]Tip: cd {display_path(hint)}[/dim]")
+        print_tip("Run from:", commands=[f"cd {display_path(hint)}"], console=console)
         sys.exit(1)
 
     return cwd
@@ -87,7 +88,7 @@ def require_main_repo_root() -> Path:
             "[red]Error:[/red] Cannot create worktrees from inside a child worktree. "
             f"Run from the main repository root ({display_path(main_root)})"
         )
-        console.print(f"\n[dim]Tip: cd {display_path(main_root)}[/dim]")
+        print_tip("Run from:", commands=[f"cd {display_path(main_root)}"], console=console)
         sys.exit(1)
 
     # Accept CWD at a Forge project root (nested or top-level)
@@ -100,7 +101,7 @@ def require_main_repo_root() -> Path:
         console.print(
             f"[red]Error:[/red] Must run from the repository root ({display_path(repo_root)}), " f"not a subdirectory"
         )
-        console.print(f"\n[dim]Tip: cd {display_path(repo_root)}[/dim]")
+        print_tip("Run from:", commands=[f"cd {display_path(repo_root)}"], console=console)
         sys.exit(1)
 
     return cwd

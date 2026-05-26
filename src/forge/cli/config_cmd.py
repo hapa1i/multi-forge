@@ -35,23 +35,23 @@ from forge.runtime_config import (
 )
 
 
-@click.group(invoke_without_command=True)
+@click.group(invoke_without_command=True, subcommand_metavar="[COMMAND] [ARGS]...")
 @click.pass_context
 def config(ctx: click.Context) -> None:
     """Manage Forge global configuration.
 
     \b
     Configuration file: ~/.forge/config.yaml
-    Auto-created with documented defaults on first access.
+    Auto-created with documented defaults by `forge config show`.
 
     \b
     Examples:
-        forge config                      # Show effective config
+        forge config show                 # Show effective config
         forge config set proxy_mode=sidecar
         forge config edit                 # Open in $EDITOR
     """
     if ctx.invoked_subcommand is None:
-        ctx.invoke(show_cmd)
+        click.echo(ctx.get_help())
 
 
 @config.command("show")

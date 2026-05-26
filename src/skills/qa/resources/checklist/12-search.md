@@ -31,13 +31,13 @@ forge search rebuild-index
 
 ```bash
 # Search for a keyword
-forge search -q "hello world"
+forge search query "hello world"
 
 # Limit results
-forge search -q "test" -n 3
+forge search query "test" -n 3
 
 # Search all projects
-forge search -q "hello world" --scope all
+forge search query "hello world" --scope all
 ```
 
 - [ ] Returns JSON results with session_name, score, snippet

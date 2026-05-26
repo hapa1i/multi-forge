@@ -970,26 +970,52 @@ class TestApplySupervisorRouting:
         assert sup_config.direct is True
         assert result == "direct"
 
-    def test_preflight_proxy_not_found_raises(self) -> None:
-        from forge.guard.semantic.supervisor import preflight_supervisor_proxy
-        from forge.proxy.proxies import ProxyResolutionError
+    def test_ensure_supervisor_proxy_no_proxy_or_template_raises(self) -> None:
+        from forge.guard.semantic.supervisor import ensure_supervisor_proxy
+        from forge.proxy.proxies import ProxyNotFoundError
 
-        with patch("forge.proxy.proxies.ProxyRegistryStore") as mock_store:
-            mock_store.return_value.read.return_value = MagicMock()
-            with patch("forge.proxy.proxies.resolve_proxy", side_effect=ProxyResolutionError("not found")):
-                with pytest.raises(ValueError, match="not found in registry"):
-                    preflight_supervisor_proxy("bad-proxy")
+        with patch("forge.proxy.proxy_orchestrator.ensure_proxy", side_effect=ProxyNotFoundError("bad-proxy")):
+            with pytest.raises(ValueError, match="no template named 'bad-proxy'"):
+                ensure_supervisor_proxy("bad-proxy")
 
-    def test_preflight_proxy_returns_resolved_id(self) -> None:
-        from forge.guard.semantic.supervisor import preflight_supervisor_proxy
+    def test_ensure_supervisor_proxy_returns_resolved_id(self) -> None:
+        from forge.guard.semantic.supervisor import ensure_supervisor_proxy
 
         mock_entry = MagicMock()
         mock_entry.proxy_id = "resolved-id"
-        with patch("forge.proxy.proxies.ProxyRegistryStore") as mock_store:
-            mock_store.return_value.read.return_value = MagicMock()
-            with patch("forge.proxy.proxies.resolve_proxy", return_value=mock_entry):
-                result = preflight_supervisor_proxy("my-proxy")
-        assert result == "resolved-id"
+        with patch("forge.proxy.proxy_orchestrator.ensure_proxy", return_value=(mock_entry, False)):
+            proxy_id, started = ensure_supervisor_proxy("my-proxy")
+        assert proxy_id == "resolved-id"
+        assert started is False
+
+    def test_ensure_supervisor_proxy_autostart_returns_started_id(self) -> None:
+        from forge.guard.semantic.supervisor import ensure_supervisor_proxy
+
+        mock_entry = MagicMock()
+        mock_entry.proxy_id = "openrouter-deepseek"
+        with patch("forge.proxy.proxy_orchestrator.ensure_proxy", return_value=(mock_entry, True)):
+            proxy_id, started = ensure_supervisor_proxy("openrouter-deepseek")
+        assert proxy_id == "openrouter-deepseek"
+        assert started is True
+
+    def test_ensure_supervisor_proxy_ambiguous_raises(self) -> None:
+        from forge.guard.semantic.supervisor import ensure_supervisor_proxy
+        from forge.proxy.proxies import AmbiguousProxyError
+
+        with patch(
+            "forge.proxy.proxy_orchestrator.ensure_proxy",
+            side_effect=AmbiguousProxyError("tmpl", ["a", "b"]),
+        ):
+            with pytest.raises(ValueError, match="ambiguous"):
+                ensure_supervisor_proxy("tmpl")
+
+    def test_ensure_supervisor_proxy_start_failure_raises(self) -> None:
+        from forge.guard.semantic.supervisor import ensure_supervisor_proxy
+        from forge.proxy.proxy_orchestrator import ProxyStartError
+
+        with patch("forge.proxy.proxy_orchestrator.ensure_proxy", side_effect=ProxyStartError("boom")):
+            with pytest.raises(ValueError, match="failed to start"):
+                ensure_supervisor_proxy("tmpl")
 
 
 class TestApplySupervisorToIntent:

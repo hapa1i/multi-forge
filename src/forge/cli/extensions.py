@@ -17,6 +17,7 @@ import click
 from rich.console import Console
 from rich.table import Table
 
+from forge.cli.output import print_tip
 from forge.core.paths import display_path
 from forge.install.exceptions import (
     ForgeInstallError,
@@ -179,11 +180,17 @@ def _print_completion_message(
             parts.append(f"{settings_actions} setting{'s' if settings_actions != 1 else ''}")
         console.print(f"\n[green]Extensions enabled.[/green] ({', '.join(parts)} updated)")
 
-    console.print("[dim]Tip: Customize permissions and env vars with 'forge claude preset edit'.[/dim]")
+    print_tip(
+        "Run 'forge claude preset edit' to customize permissions and env vars.",
+        blank_before=False,
+        console=console,
+    )
 
     if InstallModule.SKILLS.value in plan.modules:
-        console.print(
-            "[dim]Tip: Multi-model skills require proxy credentials. " "Run 'forge auth status' to check.[/dim]"
+        print_tip(
+            "Multi-model skills require proxy credentials. Run 'forge auth status' to check.",
+            blank_before=False,
+            console=console,
         )
 
     profile = InstallProfile(plan.profile)
@@ -191,7 +198,7 @@ def _print_completion_message(
     if gated:
         skill_list = ", ".join(f"/forge:{name}" for name, _ in gated)
         required = gated[0][1].value
-        console.print(f"\n[dim]Tip: Additional skills available with --profile {required}: {skill_list}[/dim]")
+        print_tip(f"Additional skills available with --profile {required}: {skill_list}", console=console)
 
 
 def _validate_anchor(anchor: Path) -> None:
@@ -321,7 +328,7 @@ def _print_plan(plan: InstallPlan, dry_run: bool = False) -> None:
         console.print(f"\n{prefix}[bold red]Conflicts detected:[/bold red]")
         for c in plan.conflicts:
             console.print(f"  [red]- {c}[/red]")
-        console.print("\n[dim]Tip: Use --force to override, or resolve conflicts manually.[/dim]")
+        print_tip("Use --force to override, or resolve conflicts manually.", console=console)
 
 
 def _uninstall_all_installations(tracking: TrackingStore, yes: bool) -> None:
@@ -507,7 +514,7 @@ def enable_cmd(
         version_check = check_minimum_version()
         if not version_check.ok:
             console.print(f"[red]Error:[/red] {version_check.reason}")
-            console.print("\n[dim]Tip: Run 'claude update' to upgrade.[/dim]")
+            print_tip("Run 'claude update' to upgrade.", console=console)
             sys.exit(1)
 
         anchor = Path(path) if path else None
@@ -597,14 +604,13 @@ def enable_cmd(
         raise
     except NoClaudeDirectoryError as e:
         console.print(f"[red]Error:[/red] {e}")
-        console.print(
-            "\n[dim]Tip: Use '--scope user' to enable globally, "
-            "or '--root <dir>' to target a specific directory.[/dim]"
+        print_tip(
+            "Use --scope user to enable globally, or --root <dir> to target a specific directory.", console=console
         )
         sys.exit(1)
     except SettingsConflictError as e:
         console.print(f"[red]Settings conflict:[/red] {e}")
-        console.print("\n[dim]Tip: Use --force to override.[/dim]")
+        print_tip("Use --force to override.", console=console)
         sys.exit(1)
     except ForgeInstallError as e:
         console.print(f"[red]Error:[/red] {e}")
@@ -647,7 +653,7 @@ def sync_cmd(scope: str | None, force: bool) -> None:
         version_check = check_minimum_version()
         if not version_check.ok:
             console.print(f"[red]Error:[/red] {version_check.reason}")
-            console.print("\n[dim]Tip: Run 'claude update' to upgrade.[/dim]")
+            print_tip("Run 'claude update' to upgrade.", console=console)
             sys.exit(1)
 
         if scope is None:
@@ -683,7 +689,7 @@ def sync_cmd(scope: str | None, force: bool) -> None:
         sys.exit(1)
     except NotInstalledError as e:
         console.print(f"[red]Error:[/red] {e}")
-        console.print("\n[dim]Tip: Run 'forge extension enable' first.[/dim]")
+        print_tip("Run 'forge extension enable' first.", console=console)
         sys.exit(1)
     except ForgeInstallError as e:
         console.print(f"[red]Error:[/red] {e}")
@@ -993,9 +999,9 @@ def status_cmd(scope: str | None, path: str | None, show_all: bool, as_json: boo
         if not local_installed:
             all_installations = tracking.list_installations()
             if all_installations:
-                console.print(
-                    f"\n[dim]Tip: {len(all_installations)} installation(s) exist elsewhere. "
-                    "Use 'forge info' to see all.[/dim]"
+                print_tip(
+                    f"{len(all_installations)} installation(s) exist elsewhere. Run 'forge info' to see all.",
+                    console=console,
                 )
             else:
-                console.print("\n[dim]Tip: Run 'forge extension enable' to set up Forge.[/dim]")
+                print_tip("Run 'forge extension enable' to set up Forge.", console=console)
