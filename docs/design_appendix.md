@@ -738,9 +738,10 @@ forge memory shadows list
 ```
 
 `forge memory track` is idempotent and sessionless: re-running with different flags updates the passport in place; with
-no flags on an already-passported doc it is a no-op. For one-session-only participation without a passport, use
-`forge memory extra add <path> --as <strategy> --session planner`. All docs are processed in one `claude -p` call with
-per-doc strategy instructions.
+no flags on an already-passported doc it is a no-op. `forge memory passport remove <path>` removes the passport and
+turns the file back into a normal doc, preserving unrelated frontmatter. For one-session-only participation without a
+passport, use `forge memory extra add <path> --as <strategy> --session planner`. All docs are processed in one
+`claude -p` call with per-doc strategy instructions.
 
 ### G.3 Worktree resolution (extends §5.6.5)
 

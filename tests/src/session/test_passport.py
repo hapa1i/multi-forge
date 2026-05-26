@@ -25,6 +25,7 @@ from forge.session.passport import (
     extract_frontmatter,
     parse_passport,
     read_passport,
+    remove_passport,
     resolve_doc_spec,
     resolve_passport_source,
     resolve_with_overrides,
@@ -423,6 +424,54 @@ class TestWritePassport:
         assert "approval" not in text
         assert "compact_when" not in text
         assert "instruction" not in text
+
+
+# ---------------------------------------------------------------------------
+# TestRemovePassport
+# ---------------------------------------------------------------------------
+
+
+class TestRemovePassport:
+    def test_removes_only_passport_when_only_frontmatter_key(self, tmp_path: Path) -> None:
+        doc = tmp_path / "doc.md"
+        body = "# Body\nContent\n"
+        doc.write_text("---\nforge_memory:\n  version: 1\n  intent: Test\n---\n" + body)
+
+        assert remove_passport(doc) is True
+        assert doc.read_text() == body
+
+    def test_preserves_unrelated_frontmatter_keys(self, tmp_path: Path) -> None:
+        doc = tmp_path / "doc.md"
+        doc.write_text("---\ntitle: Keep Me\nforge_memory:\n  version: 1\n  intent: Test\n---\n# Body\n")
+
+        assert remove_passport(doc) is True
+        text = doc.read_text()
+        assert text.startswith("---\n")
+        assert "title: Keep Me" in text
+        assert "forge_memory" not in text
+        assert "# Body\n" in text
+
+    def test_no_passport_returns_false(self, tmp_path: Path) -> None:
+        doc = tmp_path / "doc.md"
+        text = "---\ntitle: Normal Doc\n---\n# Body\n"
+        doc.write_text(text)
+
+        assert remove_passport(doc) is False
+        assert doc.read_text() == text
+
+    def test_removes_schema_invalid_passport_when_yaml_is_valid(self, tmp_path: Path) -> None:
+        doc = tmp_path / "doc.md"
+        doc.write_text("---\nforge_memory:\n  version: 99\n  intent: Newer\n---\n# Body\n")
+
+        assert remove_passport(doc) is True
+        assert doc.read_text() == "# Body\n"
+
+    def test_malformed_yaml_raises(self, tmp_path: Path) -> None:
+        doc = tmp_path / "doc.md"
+        doc.write_text("---\nforge_memory: [invalid: yaml\n---\n# Body\n")
+
+        with pytest.raises(PassportError, match="malformed YAML"):
+            remove_passport(doc)
 
 
 # ---------------------------------------------------------------------------

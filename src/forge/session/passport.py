@@ -542,6 +542,27 @@ def write_passport(path: Path, passport: Passport) -> None:
     atomic_write_text(path, new_text)
 
 
+def remove_passport(path: Path) -> bool:
+    """Remove ``forge_memory`` frontmatter from a markdown file.
+
+    Preserves unrelated frontmatter keys and the markdown body. Returns True
+    when a passport key was removed, False when no passport was present.
+    """
+    text = path.read_text(encoding="utf-8")
+    fm, body = extract_frontmatter(text)
+
+    if fm is None or "forge_memory" not in fm:
+        return False
+
+    del fm["forge_memory"]
+    if fm:
+        new_text = f"---\n{_dump_yaml(fm)}---\n{body}"
+    else:
+        new_text = body
+    atomic_write_text(path, new_text)
+    return True
+
+
 # ---------------------------------------------------------------------------
 # Passport synthesis (Phase 2 infrastructure)
 # ---------------------------------------------------------------------------

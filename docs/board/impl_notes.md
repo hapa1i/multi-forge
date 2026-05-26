@@ -51,8 +51,9 @@ The `forge memory` CLI (PR #1) replaced `forge session memory`. Key architecture
 - **Shadow path encoding**: `derive_shadow_path()` encodes the immediate parent directory to avoid collisions
   (`docs/board/notes.md` -> `.forge/memory/suggested_board_notes.md`). `check_shadow_path_collision()` catches remaining
   edge cases.
-- **Memory inheritance on fork**: `--inherit-memory all|none|shadowed`. Default `all` preserves existing behavior.
-  Override-loss bug fixed: docs tracked via `forge memory track` (stored in overrides) were silently lost on fork
-  because only `intent.memory` was deep-copied.
+- **Project memory on fork**: project docs are discovered live from passports at Stop time, not inherited through the
+  session manifest. `fork --worktree` copies `.forge/memory.yaml` by default; `--into` leaves the target checkout's
+  activation alone. Only session extras (`origin="extra"`) inherit via `--inherit-extras`; old `--inherit-memory` values
+  are tombstones.
 - **Curation artifacts**: `curation-` prefix (distinct from handoff `review-` reports) at
   `.forge/artifacts/<session>/memory/curation-{slug}-{hash}-{ts}.md`. Curation never mutates official docs.

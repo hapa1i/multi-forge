@@ -930,6 +930,7 @@ per-child handoff file in `$EDITOR` before launching Claude. `forge session memo
 | `forge memory shadows show`     | Show shadow proposal content (`--for <doc>`, `--scope`, `--session`)                                       |
 | `forge memory shadows review`   | Review/curate shadow proposals (`--for`, `--curate`, `--show-latest`)                                      |
 | `forge memory passport show`    | Show passport embedded in a memory doc (`--json`)                                                          |
+| `forge memory passport remove`  | Remove the project passport from a memory doc (`--json`)                                                   |
 
 #### Proxy management
 
@@ -1737,6 +1738,8 @@ Each memory verb owns exactly one lifetime:
   Re-running with `--as`/`--writers` updates the passport; with no flags on an already-passported doc it is a no-op.
   `--propose` authors a shadow-only passport and may materialize the declared shadow file. A passported doc outside the
   scan roots is written but warns that project Stop-time discovery will skip it.
+- **`forge memory passport remove <path>`** removes the doc's `forge_memory` passport while preserving unrelated YAML
+  frontmatter and the markdown body. It is sessionless and does not touch `.forge/memory.yaml` or session extras.
 - **`forge memory extra add <path>`** records **session-only participation** (`memory.designated_docs`, `origin: extra`)
   with no passport. It is the deliberate inverse of `track`: it resolves the ambient session and echoes the resolved
   name, and errors outside a session. `--as` is required; `--as suggested` is rejected unless the doc already has a
@@ -1746,7 +1749,7 @@ Each memory verb owns exactly one lifetime:
 **`extra` cannot override a passport's `writers`.** The handoff agent re-reads the passport at Stop and filters by
 `writers` regardless of how the doc entered the run, so an extra on a doc whose passport excludes the session is a no-op
 at Stop (the CLI warns at add time). `untrack` removes session participation only; a doc that still has a passport under
-the scan roots stays project-discovered (passport removal is a future slice).
+the scan roots stays project-discovered until `forge memory passport remove <path>` removes the passport.
 
 **Shadow discovery does not depend on the manifest.** Because sessionless `track --propose` writes no `designated_docs`
 entry, `forge memory shadows list/show/review` scan passports under the effective roots for shadow-only docs (unfiltered

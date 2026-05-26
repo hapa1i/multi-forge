@@ -1439,3 +1439,90 @@ class TestPassportShow:
         )
         result = runner.invoke(main, ["memory", "passport", "show", "docs/checklist.md"])
         assert result.exit_code != 0
+
+
+# ---------------------------------------------------------------------------
+# passport remove
+# ---------------------------------------------------------------------------
+
+
+class TestPassportRemove:
+    def test_remove_existing_passport(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        forge_root, _ = seeded_session
+        from forge.session.passport import (
+            read_passport,
+            synthesize_passport,
+            write_passport,
+        )
+
+        write_passport(forge_root / "docs/checklist.md", synthesize_passport(strategy="checklist"))
+
+        result = runner.invoke(main, ["memory", "passport", "remove", "docs/checklist.md"])
+        assert result.exit_code == 0, result.output
+        assert "Passport removed" in result.output
+        assert read_passport(forge_root / "docs/checklist.md") is None
+
+    def test_remove_no_passport_is_noop(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        result = runner.invoke(main, ["memory", "passport", "remove", "docs/checklist.md"])
+        assert result.exit_code == 0, result.output
+        assert "No passport" in result.output
+
+    def test_remove_preserves_other_frontmatter(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        forge_root, _ = seeded_session
+        (forge_root / "docs/checklist.md").write_text(
+            "---\ntitle: Keep Me\nforge_memory:\n  version: 1\n  intent: Test\n---\n# Doc\n",
+            encoding="utf-8",
+        )
+
+        result = runner.invoke(main, ["memory", "passport", "remove", "docs/checklist.md"])
+        assert result.exit_code == 0, result.output
+        text = (forge_root / "docs/checklist.md").read_text(encoding="utf-8")
+        assert "title: Keep Me" in text
+        assert "forge_memory" not in text
+        assert "# Doc\n" in text
+
+    def test_remove_schema_invalid_passport(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        forge_root, _ = seeded_session
+        (forge_root / "docs/checklist.md").write_text(
+            "---\nforge_memory:\n  version: 99\n  intent: Newer\n---\n# Doc\n",
+            encoding="utf-8",
+        )
+
+        result = runner.invoke(main, ["memory", "passport", "remove", "docs/checklist.md"])
+        assert result.exit_code == 0, result.output
+        assert (forge_root / "docs/checklist.md").read_text(encoding="utf-8") == "# Doc\n"
+
+    def test_remove_malformed_yaml_errors(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        forge_root, _ = seeded_session
+        (forge_root / "docs/checklist.md").write_text(
+            "---\nforge_memory: [invalid: yaml\n---\n# Doc\n",
+            encoding="utf-8",
+        )
+
+        result = runner.invoke(main, ["memory", "passport", "remove", "docs/checklist.md"])
+        assert result.exit_code != 0
+        assert "Malformed frontmatter" in result.output
+
+    def test_remove_json(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        forge_root, _ = seeded_session
+        from forge.session.passport import synthesize_passport, write_passport
+
+        write_passport(forge_root / "docs/checklist.md", synthesize_passport(strategy="checklist"))
+
+        result = runner.invoke(main, ["memory", "passport", "remove", "docs/checklist.md", "--json"])
+        assert result.exit_code == 0, result.output
+        assert json.loads(result.output) == {
+            "success": True,
+            "removed": True,
+            "path": "docs/checklist.md",
+        }
+
+    def test_remove_json_no_passport(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        result = runner.invoke(main, ["memory", "passport", "remove", "docs/checklist.md", "--json"])
+        assert result.exit_code == 0, result.output
+        assert json.loads(result.output) == {
+            "success": False,
+            "removed": False,
+            "path": "docs/checklist.md",
+            "reason": "no_passport",
+        }

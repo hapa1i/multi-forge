@@ -117,6 +117,9 @@ forge memory extra add docs/scratch.md --as generic --session planner
 
 # Remove session participation (passport, if any, is left intact)
 forge memory untrack docs/scratch.md --session planner
+
+# Remove the project passport so the doc is no longer discovered by scans
+forge memory passport remove docs/checklist.md
 ```
 
 Each verb validates path safety and passport mode/shadow-path consistency before persisting, so the agent never silently

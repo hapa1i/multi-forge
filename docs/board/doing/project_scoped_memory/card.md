@@ -141,9 +141,8 @@ cost is bounded frontmatter I/O at Stop, negligible beside the `claude -p` call 
 - **Per-session exclusivity gap.** Scan + `writers` cannot express "only session X writes this `all-sessions` doc, just
   this once" without changing the doc's contract for everyone. Retained per-session extras cover the inverse (a session
   adds a manifest-only doc the project scan does not adopt); true per-session narrowing is deferred.
-- **Decommissioning.** Pairs with a passport-removal path (`forge memory passport remove` or
-  `untrack --remove-passport`); today nothing removes a passport, so "this doc is no longer a memory doc" means
-  hand-editing.
+- **Decommissioning.** The shipped CLI uses `forge memory passport remove <path>` to remove a doc's project passport.
+  `forge memory untrack` remains session-participation-only.
 
 ## Staging
 

@@ -23,8 +23,8 @@ wc -l docs/board/doing/project_scoped_memory/checklist.md
 
 ## Current Focus
 
-Slices 1-3 **shipped** (see `change_log.md` 2026-05-24 through 2026-05-26). Remaining: passport removal path decision
-(deferred) and **closeout**.
+Slices 1-3 **shipped** (see `change_log.md` 2026-05-24 through 2026-05-26). Passport removal is now included. Remaining:
+**closeout**.
 
 ## Phase 0 - Baseline & Decisions
 
@@ -276,10 +276,13 @@ Forge-created worktrees; only session extras can be inherited.
   - Shipped: `memory_inheritance.py:62-63` filters to `origin="extra"` only; project docs are passport-discovered at
     Stop time.
 
-### Passport removal path (deferred)
+### Passport removal path
 
-- [ ] Decide: include `forge memory passport remove` / `untrack --remove-passport` in this slice or defer further.
-  - Note: orthogonal to inheritance retirement. Can ship Slice 3 without it.
+- [x] Add `forge memory passport remove`.
+  - Shipped: sessionless passport removal (`passport remove <path>`) removes only the `forge_memory` frontmatter key,
+    preserves unrelated frontmatter/body content, no-ops when no passport exists, and leaves `.forge/memory.yaml` plus
+    session extras untouched. `untrack` remains session-participation-only and points users to `passport remove` when a
+    passported doc remains project-discovered.
 
 ### Docs and design sync
 
@@ -294,21 +297,22 @@ Forge-created worktrees; only session extras can be inherited.
 
 Acceptance tests (Slice 3):
 
-| Test                                        | Fixture                              | Assertion                            | Test File                            |
-| ------------------------------------------- | ------------------------------------ | ------------------------------------ | ------------------------------------ |
-| activation helper copies config             | source `.forge/memory.yaml`, no dest | dest file written; copied path       | `session/test_project_memory.py`     |
-| activation helper skips existing dest       | source + dest both exist             | dest unchanged, no warning           | `session/test_project_memory.py`     |
-| activation helper corrupt source            | corrupt `.forge/memory.yaml`         | warning returned, no dest            | `session/test_project_memory.py`     |
-| worktree fork `--no-copy-memory-activation` | source present, flag set             | no dest file created                 | **coverage gap**                     |
-| `--into` no activation copy                 | source present, `--into` target      | no copy attempted                    | **coverage gap**                     |
-| `--inherit-extras` default                  | parent with `origin="extra"` docs    | child has extras                     | `session/test_memory_inheritance.py` |
-| `--no-inherit-extras` strips extras         | parent with extras, flag set         | child `designated_docs` empty        | `session/test_memory_inheritance.py` |
-| `--no-inherit-extras` ignores project docs  | non-extra/passported docs            | project docs are not manifest-copied | `session/test_memory_inheritance.py` |
-| `--inherit-memory` tombstone `all`          | `--inherit-memory all`               | error with replacement guidance      | `session/test_memory_inheritance.py` |
-| `--inherit-memory` tombstone `none`         | `--inherit-memory none`              | error with replacement guidance      | `session/test_memory_inheritance.py` |
-| `--inherit-memory` tombstone `shadowed`     | `--inherit-memory shadowed`          | error with replacement guidance      | `session/test_memory_inheritance.py` |
-| resume `--inherit-extras`                   | `resume --fresh` with extras         | child has extras                     | core coverage via inheritance helper |
-| resume `--no-inherit-extras`                | `resume --fresh` with extras, flag   | child `designated_docs` empty        | core coverage via inheritance helper |
+| Test                                        | Fixture                              | Assertion                            | Test File                                        |
+| ------------------------------------------- | ------------------------------------ | ------------------------------------ | ------------------------------------------------ |
+| activation helper copies config             | source `.forge/memory.yaml`, no dest | dest file written; copied path       | `session/test_project_memory.py`                 |
+| activation helper skips existing dest       | source + dest both exist             | dest unchanged, no warning           | `session/test_project_memory.py`                 |
+| activation helper corrupt source            | corrupt `.forge/memory.yaml`         | warning returned, no dest            | `session/test_project_memory.py`                 |
+| worktree fork `--no-copy-memory-activation` | source present, flag set             | no dest file created                 | **coverage gap**                                 |
+| `--into` no activation copy                 | source present, `--into` target      | no copy attempted                    | **coverage gap**                                 |
+| `--inherit-extras` default                  | parent with `origin="extra"` docs    | child has extras                     | `session/test_memory_inheritance.py`             |
+| `--no-inherit-extras` strips extras         | parent with extras, flag set         | child `designated_docs` empty        | `session/test_memory_inheritance.py`             |
+| `--no-inherit-extras` ignores project docs  | non-extra/passported docs            | project docs are not manifest-copied | `session/test_memory_inheritance.py`             |
+| `--inherit-memory` tombstone `all`          | `--inherit-memory all`               | error with replacement guidance      | `session/test_memory_inheritance.py`             |
+| `--inherit-memory` tombstone `none`         | `--inherit-memory none`              | error with replacement guidance      | `session/test_memory_inheritance.py`             |
+| `--inherit-memory` tombstone `shadowed`     | `--inherit-memory shadowed`          | error with replacement guidance      | `session/test_memory_inheritance.py`             |
+| resume `--inherit-extras`                   | `resume --fresh` with extras         | child has extras                     | core coverage via inheritance helper             |
+| resume `--no-inherit-extras`                | `resume --fresh` with extras, flag   | child `designated_docs` empty        | core coverage via inheritance helper             |
+| passport remove preserves frontmatter       | doc with passport + unrelated YAML   | only `forge_memory` removed          | `session/test_passport.py`, `cli/test_memory.py` |
 
 ## Open Decisions
 

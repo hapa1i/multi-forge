@@ -37,6 +37,7 @@ from forge.session.passport import (
     check_writer_access,
     derive_shadow_path,
     read_passport,
+    remove_passport,
     resolve_passport_source,
     resolve_with_overrides,
     synthesize_passport,
@@ -832,10 +833,10 @@ def _roots_or_default(forge_root: Path) -> tuple[str, ...] | None:
 def untrack_cmd(path: str, session_name: str | None) -> None:
     """Stop tracking a memory doc for this session. Passport frontmatter is left intact.
 
-    Slice 2: untrack is session-scoped -- it removes manifest participation
-    (extras and legacy entries) only. A doc that still has a passport under the
-    project scan roots stays project-discovered; removing the passport itself is
-    deferred to Slice 3.
+    Untrack is session-scoped -- it removes manifest participation (extras and
+    legacy entries) only. A doc that still has a passport under the project scan
+    roots stays project-discovered; use ``forge memory passport remove`` to turn
+    a passported doc back into a normal doc.
     """
     try:
         ctx = ExecutionContext.from_cwd()
@@ -884,8 +885,8 @@ def _warn_untrack_passport_remains(removed: list[DesignatedDoc], forge_root: Pat
             warned.add(official)
             console.print(
                 f"[yellow]Warning:[/yellow] {official} still has a passport and remains "
-                "project-discovered; removing the passport is deferred to Slice 3 "
-                "(hand-edit the frontmatter to fully untrack)."
+                "project-discovered. Run "
+                f"'forge memory passport remove {official}' to fully untrack it."
             )
 
 
@@ -1526,7 +1527,7 @@ def _review_curate(
 
 @memory.group("passport")
 def passport_group() -> None:
-    """Inspect memory-doc passports."""
+    """Inspect and remove memory-doc passports."""
 
 
 @passport_group.command("show")
@@ -1607,3 +1608,44 @@ def passport_show_cmd(path: str, as_json: bool) -> None:
         table.add_row("instruction", passport.update.instruction)
 
     console.print(table)
+
+
+@passport_group.command("remove")
+@click.argument("path")
+@click.option("--json", "as_json", is_flag=True, default=False, help="Emit JSON.")
+def passport_remove_cmd(path: str, as_json: bool) -> None:
+    """Remove the project-memory passport from a doc."""
+    try:
+        ctx = ExecutionContext.from_cwd()
+    except ForgeOpError as e:
+        raise click.ClickException(str(e)) from e
+
+    if ctx.forge_root is None:
+        raise click.ClickException("Not inside a Forge project. Run `forge extension enable` first.")
+
+    resolved_base = ctx.forge_root.resolve()
+    reason = is_safe_designated_doc_path(path, ctx.forge_root, resolved_base)
+    if reason:
+        raise click.ClickException(f"Invalid path: {reason}")
+
+    abs_path = (ctx.forge_root / path).resolve()
+    if not abs_path.is_file():
+        raise click.ClickException(f"File not found: {path}")
+
+    try:
+        removed = remove_passport(abs_path)
+    except PassportError as e:
+        raise click.ClickException(f"Malformed frontmatter in {path}: {e}") from e
+
+    if as_json:
+        payload: dict[str, object] = {"success": removed, "removed": removed, "path": path}
+        if not removed:
+            payload["reason"] = "no_passport"
+        click.echo(json.dumps(payload, indent=2))
+        return
+
+    if removed:
+        console.print(f"Passport removed from [cyan]{path}[/cyan].")
+        console.print("[dim]This doc is no longer project-discovered unless added as a session extra.[/dim]")
+    else:
+        console.print(f"[dim]No passport found in {path}.[/dim]")
