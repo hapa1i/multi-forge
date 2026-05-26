@@ -16,6 +16,7 @@ from pathlib import Path
 
 import click
 
+from forge.cli.output import print_tip
 from forge.cli.session import console
 from forge.core.ops.context import ExecutionContext
 from forge.core.ops.session import (
@@ -937,7 +938,7 @@ def list_cmd(session_name: str | None, as_json: bool) -> None:
 
     if not enriched:
         console.print("[dim]No tracked memory docs for this session.[/dim]")
-        console.print("[dim]Tip: forge memory track <path> --as <strategy>[/dim]")
+        print_tip("Run 'forge memory track <path> --as <strategy>'.", blank_before=False, console=console)
         return
 
     from rich.table import Table
@@ -1298,7 +1299,7 @@ def shadows_review_cmd(
     # Bare review: show raw content + hint
     ctx = click.get_current_context()
     ctx.invoke(shadows_show_cmd, for_doc=for_doc, session_name=session_name, scope=scope)
-    console.print("[dim]Tip: Use --curate to run LLM synthesis, --show-latest to view the last report.[/dim]")
+    print_tip("Use --curate to run LLM synthesis, --show-latest to view the last report.", console=console)
 
 
 def _review_show_latest(
@@ -1334,7 +1335,7 @@ def _review_show_latest(
             click.echo(json.dumps({"success": False, "reason": "no_reports", "official": for_doc}, indent=2))
         else:
             console.print(f"[dim]No curation reports found for {for_doc}.[/dim]")
-            console.print("[dim]Tip: Run with --curate to generate one.[/dim]")
+            print_tip("Use --curate to generate one.", blank_before=False, console=console)
         return
 
     latest = reports[-1]
@@ -1570,7 +1571,7 @@ def passport_show_cmd(path: str, as_json: bool) -> None:
             )
             return
         console.print(f"[dim]No passport found in {path}.[/dim]")
-        console.print(f"\n[dim]Tip: Add one with: forge memory track {path} --as <strategy>[/dim]")
+        print_tip(f"Run 'forge memory track {path} --as <strategy>' to add one.", console=console)
         return
 
     if as_json:

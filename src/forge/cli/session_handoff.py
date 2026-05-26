@@ -19,7 +19,8 @@ from pathlib import Path
 import click
 from rich.syntax import Syntax
 
-from forge.cli.session import _cwd_forge_root, _handle_error, console
+from forge.cli.output import print_error_with_tip, print_tip
+from forge.cli.session import _cwd_forge_root, console, handle_session_error
 from forge.session import ForgeSessionError, SessionManager
 from forge.session.handoff_agent import review_dir
 
@@ -60,9 +61,10 @@ def _resolve_session_forge_root(session_name: str | None) -> tuple[str, Path]:
                 return env_name, Path(env_entry.forge_root or env_entry.worktree_path)
 
         if current_root is None:
-            console.print(
-                "[red]Error:[/red] Not inside a Forge project, and no session name given.\n"
-                "[dim]Tip: run from a directory with .forge/ or pass an explicit session name.[/dim]"
+            print_error_with_tip(
+                "Not inside a Forge project, and no session name given.",
+                "Run from a directory with .forge/ or pass an explicit session name.",
+                console=console,
             )
             sys.exit(1)
         sessions = manager.list_sessions(
@@ -85,8 +87,8 @@ def _resolve_session_forge_root(session_name: str | None) -> tuple[str, Path]:
             forge_root=str(current_root) if current_root else None,
         )
     except ForgeSessionError as e:
-        _handle_error(e)
-        raise  # for mypy; _handle_error sys.exits
+        handle_session_error(e)
+        raise  # for mypy; handle_session_error sys.exits
 
     return session_name, Path(resolved_entry.forge_root or resolved_entry.worktree_path)
 
@@ -121,9 +123,7 @@ def show_cmd(session_name: str | None, show_latest: bool, show_all: bool) -> Non
 
     if not reports:
         console.print(f"[dim]No handoff reports found for session [cyan]{resolved_name}[/cyan].[/dim]")
-        console.print(
-            f"[dim]Tip: the handoff agent writes reports to " f"{review_dir(forge_root, resolved_name)}[/dim]"
-        )
+        print_tip(f"The handoff agent writes reports to {review_dir(forge_root, resolved_name)}.", console=console)
         return
 
     if show_all:

@@ -147,8 +147,11 @@ forge session reset [key] [--all] [--session <name>]
 forge session shell [name]
 ```
 
-If Forge still sees a live launch in `~/.forge/sessions/active.json`, `forge session delete` warns before removing the
-session. `--yes` skips the confirmation prompt; `--force` overrides dirty-worktree and corruption guards.
+If Forge still sees a live launch in `~/.forge/sessions/active.json`, `forge session delete <name>` refuses to delete
+the session (exit 1) and `forge session delete --all` skips the live ones (deleting the rest). Liveness self-heals, so a
+session whose launcher already exited deletes normally. `--force` deletes a running session anyway (Forge state is
+removed while Claude keeps running until the launch exits) and also overrides dirty-worktree and corruption guards.
+`--yes` only skips confirmation prompts; it does not override the active-session guard.
 
 ### Session cleanup
 
@@ -650,8 +653,12 @@ If you run sessions concurrently and both write code, use `--worktree` to avoid 
 
 1. Exact proxy_id match (any status)
 2. Active template match (healthy/starting only; fails if ambiguous)
+3. Auto-start from a config template of that name when nothing is running (reuse/adopt/spawn)
 
-All commands (`start`, `resume`, `fork`, `claude start`) use the same `resolve_proxy()` function with full healthcheck.
+All launch commands (`start`, `resume`, `fork`, `claude start`) use the same `ensure_proxy()` function: it resolves via
+the order above, auto-starts from a matching template when no proxy is running, then healthchecks. A name that matches
+neither a running proxy nor a template fails with a `forge proxy template list` hint. `--supervisor-proxy` resolves the
+same way.
 
 `--template` and `--base-url` are deprecated hidden aliases for `--proxy` (warn on use).
 

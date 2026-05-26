@@ -17,6 +17,7 @@ from typing import Any, cast
 import click
 from rich.table import Table
 
+from forge.cli.output import print_error_with_tip, print_tip
 from forge.core.ops.session_context import SessionContext
 from forge.core.paths import display_path
 from forge.core.state import parse_iso
@@ -39,13 +40,13 @@ from forge.cli.session import (  # noqa: E402
     _format_relative_time,
     _get_active_session_entry,
     _get_session_type,
-    _handle_error,
     _hint_cross_project_session,
     _print_active_delete_warning,
     _session_list_location,
     _session_scope_key,
     _template_display_label,
     console,
+    handle_session_error,
     logger,
 )
 from forge.cli.session import session as _session_untyped  # noqa: E402
@@ -97,7 +98,7 @@ __all__ = [
 @click.argument("names", nargs=-1)
 @click.option("--all", "-a", "delete_all", is_flag=True, help="Delete all sessions")
 @click.option("--yes", "-y", is_flag=True, help="Skip confirmation prompts")
-@click.option("--force", "-f", is_flag=True, help="Override dirty-worktree and corruption guards")
+@click.option("--force", "-f", is_flag=True, help="Override dirty-worktree, corruption, and active-session guards")
 @click.option("--keep-transcripts", "-k", is_flag=True, help="Keep transcript files")
 @click.option("--keep-worktree", "-K", is_flag=True, help="Preserve worktree directory")
 @click.option("--delete-branch", "-d", is_flag=True, help="Also delete git branch")
@@ -136,8 +137,11 @@ def delete(
 
     if delete_all:
         if _fr is None:
-            console.print("[red]Error:[/red] --all requires being inside a Forge project (directory with .forge/)")
-            console.print("[dim]Tip: Use explicit session names instead, or cd into a Forge project.[/dim]")
+            print_error_with_tip(
+                "--all requires being inside a Forge project (directory with .forge/)",
+                "Use explicit session names instead, or cd into a Forge project.",
+                console=console,
+            )
             sys.exit(1)
         all_sessions = manager.list_sessions(include_incognito=True, forge_root_filter=_fr)
         if not all_sessions:
@@ -150,10 +154,33 @@ def delete(
             for target in targets
             if (active_entry := _get_active_session_entry(target, forge_root=_fr)) is not None
         ]
+
+        # Active sessions are protected unless --force: skip the live ones and
+        # delete the rest rather than aborting the whole batch.
+        if active_targets and not force:
+            live_names = {target for target, _ in active_targets}
+            targets = [t for t in targets if t not in live_names]
+            console.print(f"[yellow]Skipping[/yellow] {len(live_names)} session(s) still running in Claude Code:")
+            for target, active_entry in active_targets:
+                details = [active_entry.launch_mode]
+                if active_entry.container_name:
+                    details.append(active_entry.container_name)
+                elif active_entry.launcher_pid is not None:
+                    details.append(f"pid {active_entry.launcher_pid}")
+                console.print(f"  - {target} ({', '.join(details)})")
+            print_tip(
+                "Exit those sessions first, or re-run with --force to delete them too.",
+                blank_before=False,
+                console=console,
+            )
+            if not targets:
+                return
+            console.print()
+
         console.print(f"About to delete [bold]all {len(targets)} session(s)[/bold]:")
         for t in targets:
             console.print(f"  - {t}")
-        if active_targets:
+        if active_targets and force:
             console.print()
             console.print(
                 "[yellow]Warning:[/yellow] "
@@ -171,7 +198,7 @@ def delete(
             )
         console.print()
         if not yes:
-            if not click.confirm("Are you sure you want to delete all sessions?"):
+            if not click.confirm(f"Are you sure you want to delete these {len(targets)} session(s)?"):
                 console.print("[dim]Cancelled[/dim]")
                 sys.exit(0)
     else:
@@ -218,6 +245,7 @@ def delete(
                 keep_worktree=keep_worktree,
                 delete_branch=delete_branch,
                 forge_root=actual_fr,
+                warn_active=not delete_all,
             )
             console.print(f"Deleted session [green]{name}[/green]")
             deleted += 1
@@ -228,14 +256,17 @@ def delete(
                 failed += 1
         except DirtyWorktreeError as e:
             if len(targets) == 1:
-                console.print(f"[red]Error:[/red] {e}")
-                console.print("\n[dim]Tip: Use --force to remove anyway, or commit/stash your changes first.[/dim]")
+                print_error_with_tip(
+                    str(e),
+                    "Use --force to remove anyway, or commit/stash your changes first.",
+                    console=console,
+                )
                 raise SystemExit(1)
             console.print(f"[red]Error:[/red] {name}: {e}")
             failed += 1
         except ForgeSessionError as e:
             if len(targets) == 1:
-                _handle_error(e)
+                handle_session_error(e)
             else:
                 console.print(f"[red]Error:[/red] {name}: {e}")
                 failed += 1
@@ -263,18 +294,37 @@ def _delete_single_session(
     keep_worktree: bool,
     delete_branch: bool,
     forge_root: str | None = None,
+    warn_active: bool = True,
 ) -> None:
     """Delete a single session, handling orphans and confirmation.
 
     Args:
         yes: Skip confirmation prompts (informational output stays visible).
-        force: Override dirty-worktree and corruption guards.
+        force: Override dirty-worktree, corruption, and active-session guards.
+        warn_active: Print the per-session live-launch warning. The --all path
+            passes False because it already summarizes active sessions, avoiding
+            a duplicate warning.
 
     Raises:
-        SystemExit: If user cancels or session not found.
+        SystemExit: If the user cancels, the session is not found, or it is still
+            running in Claude Code without --force.
         DirtyWorktreeError: If worktree has uncommitted changes and not force.
         ForgeSessionError: On other session errors.
     """
+    # Live sessions are protected before any deletion path (index-tracked or
+    # orphaned directory) so a running launch cannot lose its state without --force.
+    active_entry = _get_active_session_entry(name, forge_root=forge_root)
+    if active_entry is not None:
+        if warn_active:
+            _print_active_delete_warning(name, active_entry)
+        if not force:
+            print_error_with_tip(
+                "refusing to delete a session that is still running in Claude Code.",
+                "Exit that Claude Code session first, or pass --force to delete it anyway.",
+                console=console,
+            )
+            raise SystemExit(1)
+
     if not manager.session_exists(name, forge_root=forge_root):
         from forge.session.store import SessionStore
 
@@ -307,10 +357,6 @@ def _delete_single_session(
         console.print(f"[red]Error:[/red] session '{name}' not found")
         raise SystemExit(1)
 
-    # Informational output -- always visible (--yes only skips prompts, not info)
-    active_entry = _get_active_session_entry(name, forge_root=forge_root)
-    if active_entry is not None:
-        _print_active_delete_warning(name, active_entry)
     try:
         manifest = manager.get_session(name, forge_root=forge_root)
 
@@ -450,7 +496,7 @@ def list_sessions(include_incognito: bool, older_than: int | None, scope: str, a
             console.print(f"[dim]No sessions older than {older_than} days.[/dim]")
         else:
             console.print("[dim]No sessions found.[/dim]")
-            console.print("\n[dim]Tip: Run 'forge session start <name>'.[/dim]")
+            print_tip("Run 'forge session start <name>'.", console=console)
         return
 
     duplicate_names = {item.name for item in items if sum(1 for other in items if other.name == item.name) > 1}
@@ -484,18 +530,33 @@ def _print_session_list_tips(items: list) -> None:
 
     if count == 1:
         name = items[0].name if hasattr(items[0], "name") else "name"
-        console.print("\n[dim]Tip: Resume or start a session:[/dim]")
-        console.print(f"[dim]  forge session resume {name}                  # resume this session[/dim]")
-        console.print("[dim]  forge session start <name>                    # start a new session[/dim]")
+        print_tip(
+            "Resume or start a session:",
+            commands=[
+                f"forge session resume {name}                  # resume this session",
+                "forge session start <name>                    # start a new session",
+            ],
+            console=console,
+        )
     elif count > 0:
-        console.print("\n[dim]Tip: Work with sessions:[/dim]")
-        console.print("[dim]  forge session resume <name>                   # resume a session[/dim]")
-        console.print("[dim]  forge session show <name>                     # inspect session details[/dim]")
+        print_tip(
+            "Work with sessions:",
+            commands=[
+                "forge session resume <name>                   # resume a session",
+                "forge session show <name>                     # inspect session details",
+            ],
+            console=console,
+        )
 
-    console.print("\n[dim]Tip: Clean up sessions:[/dim]")
-    console.print("[dim]  forge session delete <name>                   # delete a specific session[/dim]")
-    console.print("[dim]  forge session clean --older-than 30           # bulk clean old sessions[/dim]")
-    console.print("[dim]  forge config set session_retention_days=90    # auto-cleanup on startup[/dim]")
+    print_tip(
+        "Clean up sessions:",
+        commands=[
+            "forge session delete <name>                   # delete a specific session",
+            "forge session clean --older-than 30           # bulk clean old sessions",
+            "forge config set session_retention_days=90    # auto-cleanup on startup",
+        ],
+        console=console,
+    )
 
 
 @session.command("clean")
@@ -1044,8 +1105,11 @@ def shell(name: str | None) -> None:
         if env_name:
             name = env_name
         else:
-            console.print("[red]Error:[/red] No session specified. Use a name or launch through Forge.")
-            console.print("\n[dim]Tip: Run 'forge session start <name> --sidecar'.[/dim]")
+            print_error_with_tip(
+                "No session specified. Use a name or launch through Forge.",
+                "Run 'forge session start <name> --sidecar'.",
+                console=console,
+            )
             sys.exit(1)
 
     _fr = _cwd_forge_root()
@@ -1057,7 +1121,7 @@ def shell(name: str | None) -> None:
     try:
         manifest = manager.get_session(name, forge_root=_fr)
     except ForgeSessionError as e:
-        _handle_error(e)
+        handle_session_error(e)
         return
 
     if not manifest.confirmed.is_sandboxed:
@@ -1112,7 +1176,7 @@ def set_override(key: str, value: str, session_name: str | None) -> None:
                     "[yellow]Warning:[/yellow] Verification configured but Stop hook is not installed. "
                     "Enforcement will not be active."
                 )
-                console.print("[dim]Tip: Run 'forge extension enable' to install hooks.[/dim]")
+                print_tip("Run 'forge extension enable' to install hooks.", blank_before=False, console=console)
     except ForgeOpError as e:
         console.print(f"[red]Error:[/red] {e}")
         sys.exit(1)

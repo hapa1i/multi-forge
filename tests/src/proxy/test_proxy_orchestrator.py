@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -161,6 +162,98 @@ def test_start_spawns_new_and_persists(
 
     registry = orch_registry.read()
     assert "proxy_spawned" in registry.proxies
+
+
+def test_start_persists_failed_reuse_status_before_spawn(
+    tmp_path, orch_stubs, orch_registry, orch_health, orchestrator, monkeypatch
+) -> None:
+    """A stale active entry must be marked unhealthy before a fresh proxy is spawned."""
+    registry_path = orch_registry.registry_path
+    registry_path.parent.mkdir(parents=True, exist_ok=True)
+    registry_path.write_text("""
+{
+  "version": 1,
+  "proxies": {
+    "proxy_1": {
+      "proxy_id": "proxy_1",
+      "template": "litellm-openai",
+      "base_url": "http://localhost:8085",
+      "port": 8085,
+      "pid": 123,
+      "created_at": "2025-12-20T00:00:00+00:00",
+      "last_seen_at": "2025-12-20T00:01:00+00:00",
+      "status": "healthy"
+    }
+  }
+}
+""".strip() + "\n")
+
+    monkeypatch.setattr(orchestrator, "_get_template_default_port", lambda _: 5555)
+    monkeypatch.setattr(orchestrator, "_is_port_in_use", lambda _: False)
+    monkeypatch.setattr(orchestrator, "_find_available_port", lambda **_: 7777)
+    monkeypatch.setattr(orchestrator, "_new_proxy_id", lambda existing=None: "proxy_2")
+    monkeypatch.setattr(orchestrator, "now_iso", lambda: "2025-12-21T00:00:00+00:00")
+    monkeypatch.setattr(
+        orchestrator,
+        "_spawn_proxy_process",
+        lambda **_: (_Proc(pid=4242), tmp_path / "stderr.log"),
+    )
+    orch_health(False)
+
+    result = start_proxy(template="litellm-openai")
+
+    assert result.source == "spawn"
+    assert result.proxy.proxy_id == "proxy_2"
+
+    registry = orch_registry.read()
+    assert registry.proxies["proxy_1"].status == "unhealthy"
+    assert registry.proxies["proxy_2"].status == "healthy"
+
+
+def test_start_does_not_persist_fresh_starting_reuse_failure(
+    tmp_path, orch_stubs, orch_registry, orch_health, orchestrator, monkeypatch
+) -> None:
+    """A concurrent in-progress start must not be downgraded to unhealthy."""
+    registry_path = orch_registry.registry_path
+    registry_path.parent.mkdir(parents=True, exist_ok=True)
+    registry_path.write_text("""
+{
+  "version": 1,
+  "proxies": {
+    "proxy_1": {
+      "proxy_id": "proxy_1",
+      "template": "litellm-openai",
+      "base_url": "http://localhost:8085",
+      "port": 8085,
+      "pid": null,
+      "created_at": "2999-01-01T00:00:00+00:00",
+      "last_seen_at": null,
+      "status": "starting"
+    }
+  }
+}
+""".strip() + "\n")
+
+    monkeypatch.setattr(orchestrator, "_get_template_default_port", lambda _: 5555)
+    monkeypatch.setattr(orchestrator, "_is_port_in_use", lambda _: False)
+    monkeypatch.setattr(orchestrator, "_find_available_port", lambda **_: 7777)
+    monkeypatch.setattr(orchestrator, "_new_proxy_id", lambda existing=None: "proxy_2")
+    monkeypatch.setattr(orchestrator, "now_iso", lambda: "2025-12-21T00:00:00+00:00")
+    monkeypatch.setattr(
+        orchestrator,
+        "_spawn_proxy_process",
+        lambda **_: (_Proc(pid=4242), tmp_path / "stderr.log"),
+    )
+    orch_health(False)
+
+    result = start_proxy(template="litellm-openai")
+
+    assert result.source == "spawn"
+    assert result.proxy.proxy_id == "proxy_2"
+
+    registry = orch_registry.read()
+    assert registry.proxies["proxy_1"].status == "starting"
+    assert registry.proxies["proxy_2"].status == "healthy"
 
 
 def test_start_timeout_terminates_process(tmp_path, orch_registry, orch_health, orchestrator, monkeypatch) -> None:
@@ -917,3 +1010,163 @@ class TestSmokeTestProxy:
         ok, detail = proxy_orchestrator.smoke_test_proxy(base_url="http://localhost:9999", timeout_s=1.0)
         assert ok is False
         assert "timed out" in detail.lower()
+
+
+# ---------------------------------------------------------------------------
+# ensure_proxy: resolve-or-autostart-from-template
+# ---------------------------------------------------------------------------
+
+_ORCH = "forge.proxy.proxy_orchestrator"
+
+
+class TestEnsureProxy:
+    """ensure_proxy() resolves an existing proxy or auto-starts one from a template."""
+
+    def test_returns_resolved_bare_proxy_id_without_start(self) -> None:
+        """A proxy_id that is not a template is returned as-is (presence, not liveness)."""
+        from forge.proxy.proxy_orchestrator import ensure_proxy
+
+        entry = MagicMock(proxy_id="p1")
+        store = MagicMock()
+        store.read.return_value = MagicMock(proxies={"p1": entry})
+        with (
+            patch(f"{_ORCH}.ProxyRegistryStore", return_value=store),
+            patch(f"{_ORCH}.resolve_proxy", return_value=entry),
+            patch(f"{_ORCH}.template_exists", return_value=False),
+            patch(f"{_ORCH}.start_proxy") as start,
+        ):
+            result, started = ensure_proxy("p1")
+
+        assert result is entry
+        assert started is False
+        start.assert_not_called()
+
+    def test_autostarts_when_template_exists(self) -> None:
+        from forge.proxy.proxies import ProxyNotFoundError
+        from forge.proxy.proxy_orchestrator import ensure_proxy
+
+        started_entry = MagicMock(proxy_id="openrouter-deepseek")
+        with (
+            patch(f"{_ORCH}.ProxyRegistryStore"),
+            patch(f"{_ORCH}.resolve_proxy", side_effect=ProxyNotFoundError("openrouter-deepseek")),
+            patch(f"{_ORCH}.template_exists", return_value=True),
+            patch(f"{_ORCH}.start_proxy", return_value=MagicMock(proxy=started_entry, source="spawn")) as start,
+        ):
+            result, started = ensure_proxy("openrouter-deepseek")
+
+        assert result is started_entry
+        assert started is True
+        assert start.call_args.kwargs["template"] == "openrouter-deepseek"
+
+    def test_no_template_reraises_not_found(self) -> None:
+        from forge.proxy.proxies import ProxyNotFoundError
+        from forge.proxy.proxy_orchestrator import ensure_proxy
+
+        with (
+            patch(f"{_ORCH}.ProxyRegistryStore"),
+            patch(f"{_ORCH}.resolve_proxy", side_effect=ProxyNotFoundError("nope")),
+            patch(f"{_ORCH}.template_exists", return_value=False),
+            patch(f"{_ORCH}.start_proxy") as start,
+        ):
+            with pytest.raises(ProxyNotFoundError):
+                ensure_proxy("nope")
+
+        start.assert_not_called()
+
+    def test_ambiguous_reraised_without_start_or_template_check(self) -> None:
+        from forge.proxy.proxies import AmbiguousProxyError
+        from forge.proxy.proxy_orchestrator import ensure_proxy
+
+        with (
+            patch(f"{_ORCH}.ProxyRegistryStore"),
+            patch(f"{_ORCH}.resolve_proxy", side_effect=AmbiguousProxyError("tmpl", ["a", "b"])),
+            patch(f"{_ORCH}.template_exists") as tmpl,
+            patch(f"{_ORCH}.start_proxy") as start,
+        ):
+            with pytest.raises(AmbiguousProxyError):
+                ensure_proxy("tmpl")
+
+        # Ambiguity is "too many", not "too few" -- never falls through to a template start.
+        tmpl.assert_not_called()
+        start.assert_not_called()
+
+    def test_autostarts_when_only_inactive_proxies_exist(self) -> None:
+        """A template whose proxies are all stopped still auto-starts (not an error)."""
+        from forge.proxy.proxies import ProxyNotFoundError
+        from forge.proxy.proxy_orchestrator import ensure_proxy
+
+        started_entry = MagicMock(proxy_id="proxy_2")
+        with (
+            patch(f"{_ORCH}.ProxyRegistryStore"),
+            patch(
+                f"{_ORCH}.resolve_proxy",
+                side_effect=ProxyNotFoundError("litellm-openai", inactive_ids=["proxy_1"]),
+            ),
+            patch(f"{_ORCH}.template_exists", return_value=True),
+            patch(f"{_ORCH}.start_proxy", return_value=MagicMock(proxy=started_entry, source="spawn")) as start,
+        ):
+            result, started = ensure_proxy("litellm-openai")
+
+        assert started is True
+        assert result is started_entry
+        assert start.call_args.kwargs["template"] == "litellm-openai"
+
+    def test_template_match_delegates_to_start_proxy_reuse(self) -> None:
+        """A template match goes through start_proxy(), which decides whether reuse is safe."""
+        from forge.proxy.proxy_orchestrator import ensure_proxy
+
+        live = MagicMock(proxy_id="proxy_1", pid=4242)
+        with (
+            patch(f"{_ORCH}.ProxyRegistryStore"),
+            patch(f"{_ORCH}.resolve_proxy", return_value=live),
+            patch(f"{_ORCH}.template_exists", return_value=True),
+            patch(f"{_ORCH}.start_proxy", return_value=MagicMock(proxy=live, source="reuse")) as start,
+        ):
+            result, started = ensure_proxy("litellm-openai")
+
+        assert result is live
+        assert started is False
+        start.assert_called_once()
+        assert start.call_args.kwargs["template"] == "litellm-openai"
+
+    def test_pidless_template_match_delegates_to_start_proxy(self) -> None:
+        """Pid-less template entries are healthchecked by start_proxy(), not trusted blindly."""
+        from forge.proxy.proxy_orchestrator import ensure_proxy
+
+        pidless = MagicMock(proxy_id="proxy_1", pid=None)
+        fresh = MagicMock(proxy_id="proxy_2")
+        with (
+            patch(f"{_ORCH}.ProxyRegistryStore"),
+            patch(f"{_ORCH}.resolve_proxy", return_value=pidless),
+            patch(f"{_ORCH}.template_exists", return_value=True),
+            patch(f"{_ORCH}.start_proxy", return_value=MagicMock(proxy=fresh, source="spawn")) as start,
+        ):
+            result, started = ensure_proxy("litellm-openai")
+
+        assert result is fresh
+        assert started is True
+        start.assert_called_once()
+        assert start.call_args.kwargs["template"] == "litellm-openai"
+
+    def test_restarts_stale_healthy_template_proxy(self) -> None:
+        """A template whose resolved entry has a dead pid is respawned, not returned.
+
+        resolve_proxy succeeds (trusts persisted status), but ensure_proxy still delegates
+        template names to start_proxy for a fresh healthcheck/reuse decision.
+        """
+        from forge.proxy.proxy_orchestrator import ensure_proxy
+
+        stale = MagicMock(proxy_id="proxy_1", pid=999999)
+        fresh = MagicMock(proxy_id="proxy_2")
+        with (
+            patch(f"{_ORCH}.ProxyRegistryStore"),
+            patch(f"{_ORCH}.resolve_proxy", return_value=stale),
+            patch(f"{_ORCH}.template_exists", return_value=True),
+            patch(f"{_ORCH}.start_proxy", return_value=MagicMock(proxy=fresh, source="spawn")) as start,
+        ):
+            result, started = ensure_proxy("litellm-openai")
+
+        start.assert_called_once()
+        assert start.call_args.kwargs["template"] == "litellm-openai"
+        assert result is fresh
+        assert started is True

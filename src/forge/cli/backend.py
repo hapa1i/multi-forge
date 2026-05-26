@@ -21,6 +21,7 @@ from forge.backend import BackendManager
 from forge.backend.adapters import get_adapter
 from forge.backend.creation import create_backend_config, get_backend_config_path
 from forge.backend.registry import BackendRegistryStore, is_pid_alive
+from forge.cli.output import print_error_with_tip, print_tip
 from forge.core.paths import display_path, get_forge_home
 
 
@@ -64,7 +65,7 @@ def list_cmd(as_json: bool) -> None:
 
     if not backends:
         console.print("No backends found.")
-        console.print("\n[dim]Tip: Run 'forge backend create litellm'.[/dim]")
+        print_tip("Run 'forge backend create litellm'.", console=console)
         return
 
     table = Table(title="Forge Backends")
@@ -146,7 +147,7 @@ def show_cmd(backend_id: str, raw: bool) -> None:
             console.print(syntax)
     else:
         console.print(f"\n[dim]No config found for adapter '{adapter_type}'.[/dim]")
-        console.print(f"[dim]Tip: Run 'forge backend create {adapter_type}'.[/dim]")
+        print_tip(f"Run 'forge backend create {adapter_type}'.", blank_before=False, console=console)
 
 
 @backend.command("create")
@@ -166,10 +167,13 @@ def create_cmd(adapter: str, config: Path | None) -> None:
 
     config_path = get_backend_config_path(adapter)
     if config_path.exists():
-        console.print(f"[yellow]Backend config already exists:[/yellow] {display_path(config_path)}")
-        console.print("\n[dim]Start an instance with:[/dim]")
-        console.print(f"  forge backend start {adapter} --port 4000")
-        return
+        print_error_with_tip(
+            f"Backend config already exists: {display_path(config_path)}",
+            "Start an instance with:",
+            commands=[f"forge backend start {adapter} --port 4000"],
+            console=console,
+        )
+        sys.exit(1)
 
     try:
         config_path = create_backend_config(
@@ -194,9 +198,12 @@ def start_cmd(adapter: str, port: int) -> None:
 
     config_path = get_backend_config_path(adapter)
     if not config_path.exists():
-        console.print(f"[red]Error:[/red] Backend config not found for '{adapter}'")
-        console.print("\n[dim]Create it first:[/dim]")
-        console.print(f"  forge backend create {adapter}")
+        print_error_with_tip(
+            f"Backend config not found for '{adapter}'",
+            "Create it first:",
+            commands=[f"forge backend create {adapter}"],
+            console=console,
+        )
         sys.exit(1)
 
     backend_id = f"{adapter}-{port}"
@@ -271,7 +278,12 @@ def delete_cmd(adapter: str, port: int | None, yes: bool, force: bool) -> None:
     else:
         backend_dir = get_forge_home() / "backends" / adapter
         if not backend_dir.exists():
-            console.print(f"[red]Error:[/red] Backend config not found for '{adapter}'")
+            print_error_with_tip(
+                f"Backend config not found for '{adapter}'",
+                "Create it first:",
+                commands=[f"forge backend create {adapter}"],
+                console=console,
+            )
             sys.exit(1)
 
         if not yes and not click.confirm(f"Delete backend config for '{adapter}' (stops all instances)?"):

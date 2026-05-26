@@ -434,7 +434,7 @@ bash "$SCRIPTS/run-in-repo.sh" forge search rebuild-index
 <!-- auto -->
 
 ```bash
-bash "$SCRIPTS/run-in-repo.sh" forge search -q "emoji"
+bash "$SCRIPTS/run-in-repo.sh" forge search query "emoji"
 ```
 
 - [ ] Returns JSON output

@@ -13,13 +13,13 @@ per-project BM25 index for fast lookup.
 
 ```bash
 # Search for a keyword or phrase
-forge search -q "timeout config"
+forge search query "timeout config"
 
 # Limit results
-forge search -q "proxy routing" -n 5
+forge search query "proxy routing" -n 5
 
 # Search across all indexed projects (not just current)
-forge search -q "auth refactor" --scope all
+forge search query "auth refactor" --scope all
 ```
 
 Results are JSON output with `session_name`, `session_id`, `score`, `snippet`, `transcript_path`, and `metadata`
@@ -52,10 +52,10 @@ Indexing is **incremental** — only new or modified transcripts are processed. 
 ### Search
 
 ```bash
-forge search -q <query> [-n <limit>] [--scope project|all]
+forge search query <query> [-n <limit>] [--scope project|all]
 ```
 
-- `-q` / `--query` — search terms (required)
+- `<query>` — search terms (quote phrases with spaces)
 - `-n` / `--limit` — max results to return
 - `--scope` — `project` (default, current project only) or `all` (all indexed projects)
 

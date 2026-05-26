@@ -18,7 +18,9 @@ from pathlib import Path
 import click
 from rich.console import Console
 from rich.table import Table
+from rich.text import Text
 
+from forge.cli.output import print_tip
 from forge.core.paths import display_path
 from forge.guard.queries import (
     find_sessions_supervised_by,
@@ -26,6 +28,7 @@ from forge.guard.queries import (
 )
 from forge.session import SessionStore
 from forge.session.effective import compute_effective_intent
+from forge.session.exceptions import AmbiguousSessionError, ForgeSessionError
 from forge.session.hooks.session_start import ENV_SESSION
 from forge.session.models import PolicyIntent, SessionState
 from forge.session.store import HOOK_LOCK_TIMEOUT_S, MANIFEST_FILENAME, get_sessions_dir
@@ -33,20 +36,12 @@ from forge.session.store import HOOK_LOCK_TIMEOUT_S, MANIFEST_FILENAME, get_sess
 console = Console()
 
 
-def _resolve_session_name(cwd: Path) -> str | None:
-    """Resolve current session: FORGE_SESSION env var, or auto-detect if exactly one exists."""
-    name = os.environ.get(ENV_SESSION)
-    if name:
-        return name
-
-    sessions_dir = get_sessions_dir(cwd)
+def _list_local_sessions(cwd: Path) -> list[str]:
+    """Return sorted names of sessions with a manifest in the local forge_root."""
+    sessions_dir = get_sessions_dir(_resolve_forge_root(cwd))
     if not sessions_dir.is_dir():
-        return None
-
-    candidates = [d.name for d in sessions_dir.iterdir() if d.is_dir() and (d / MANIFEST_FILENAME).exists()]
-    if len(candidates) == 1:
-        return candidates[0]
-    return None
+        return []
+    return sorted(d.name for d in sessions_dir.iterdir() if d.is_dir() and (d / MANIFEST_FILENAME).exists())
 
 
 def _resolve_forge_root(cwd: Path) -> str:
@@ -72,6 +67,51 @@ def _resolve_session_for_display(
 
     resolved = resolve_session_repo_wide(name, _resolve_forge_root(cwd))
     return resolved.store, resolved.state
+
+
+def _resolve_guard_session(cwd: Path, explicit: str | None) -> tuple[SessionStore, SessionState]:
+    """Resolve the guard target session as (store, state), or exit(1) with an actionable error.
+
+    Precedence: explicit --session > FORGE_SESSION > sole local session. The absent case
+    (zero local sessions) and the ambiguous case (multiple, none selected) produce distinct
+    messages so the caller isn't told "No session found" when several exist.
+    """
+    if explicit:
+        try:
+            return _resolve_session_for_display(explicit, cwd)
+        except AmbiguousSessionError as exc:
+            console.print(f"[red]Error:[/red] Session '{explicit}' exists in multiple projects:")
+            for root in exc.forge_roots:
+                console.print(Text(f"  - {display_path(root)}", style="dim", no_wrap=True), soft_wrap=True)
+            console.print("[dim]Run the command from the target project directory.[/dim]")
+            sys.exit(1)
+        except ForgeSessionError as exc:
+            console.print(f"[red]Error:[/red] Session '{explicit}' not found: {exc}")
+            sys.exit(1)
+
+    name = os.environ.get(ENV_SESSION)
+    if not name:
+        candidates = _list_local_sessions(cwd)
+        if len(candidates) == 1:
+            name = candidates[0]
+        elif not candidates:
+            console.print(f"[red]Error:[/red] No session found in {display_path(cwd)}")
+            console.print("  Run 'forge session start' first to create a session.")
+            sys.exit(1)
+        else:
+            console.print(f"[red]Error:[/red] Multiple sessions in {display_path(cwd)}; specify one with --session.")
+            console.print("  Sessions: " + ", ".join(candidates))
+            print_tip(f"Run 'forge guard <command> --session {candidates[0]}'.", blank_before=False, console=console)
+            sys.exit(1)
+
+    store = SessionStore(_resolve_forge_root(cwd), name)
+    try:
+        state = store.read()
+    except Exception:
+        console.print(f"[red]Error:[/red] No session found in {display_path(cwd)}")
+        console.print("  Run 'forge session start' first to create a session.")
+        sys.exit(1)
+    return store, state
 
 
 @click.group()
@@ -141,7 +181,8 @@ def list_bundles(as_json: bool) -> None:
     default=False,
     help="TDD permissive mode: warn instead of deny (sets bundle_config.tdd.strict=false)",
 )
-def enable(bundles: tuple[str, ...], fail_mode: str, permissive: bool) -> None:
+@click.option("--session", "-s", "session_name", help="Target session (default: auto-detect)")
+def enable(bundles: tuple[str, ...], fail_mode: str, permissive: bool, session_name: str | None) -> None:
     """Enable policy enforcement for the current session.
 
     \b
@@ -155,20 +196,7 @@ def enable(bundles: tuple[str, ...], fail_mode: str, permissive: bool) -> None:
         return
 
     cwd = Path.cwd().resolve()
-    session_name = _resolve_session_name(cwd)
-    if not session_name:
-        console.print(f"[red]Error:[/red] No session found in {display_path(cwd)}")
-        console.print("  Run 'forge session start' first to create a session.")
-        sys.exit(1)
-
-    store = SessionStore(_resolve_forge_root(cwd), session_name)
-
-    try:
-        store.read()  # Verify session exists
-    except Exception:
-        console.print(f"[red]Error:[/red] No session found in {display_path(cwd)}")
-        console.print("  Run 'forge session start' first to create a session.")
-        sys.exit(1)
+    store, _ = _resolve_guard_session(cwd, session_name)
 
     bundle_config: dict[str, dict[str, object]] = {}
     if permissive and "tdd" in bundles:
@@ -201,7 +229,7 @@ def enable(bundles: tuple[str, ...], fail_mode: str, permissive: bool) -> None:
             "\n[yellow]Warning:[/yellow] Policy configured but PreToolUse hook is not installed. "
             "Enforcement will not be active."
         )
-        console.print("[dim]Tip: Run 'forge extension enable' to install hooks.[/dim]")
+        print_tip("Run 'forge extension enable' to install hooks.", blank_before=False, console=console)
     if bundle_config:
         for bundle, cfg in bundle_config.items():
             cfg_str = ", ".join(f"{k}={v}" for k, v in cfg.items())
@@ -220,21 +248,11 @@ def enable(bundles: tuple[str, ...], fail_mode: str, permissive: bool) -> None:
 
 
 @guard.command(name="disable")
-def disable() -> None:
+@click.option("--session", "-s", "session_name", help="Target session (default: auto-detect)")
+def disable(session_name: str | None) -> None:
     """Disable policy enforcement for the current session."""
     cwd = Path.cwd().resolve()
-    session_name = _resolve_session_name(cwd)
-    if not session_name:
-        console.print(f"[red]Error:[/red] No session found in {display_path(cwd)}")
-        sys.exit(1)
-
-    store = SessionStore(_resolve_forge_root(cwd), session_name)
-
-    try:
-        store.read()  # Verify session exists
-    except Exception:
-        console.print(f"[red]Error:[/red] No session found in {display_path(cwd)}")
-        sys.exit(1)
+    store, _ = _resolve_guard_session(cwd, session_name)
 
     def _mutate(m: object) -> None:
         if not isinstance(m, SessionState):
@@ -260,26 +278,7 @@ def disable() -> None:
 def status(as_json: bool, session_name: str | None) -> None:
     """Show current policy configuration and state."""
     cwd = Path.cwd().resolve()
-
-    if session_name:
-        from forge.session.exceptions import ForgeSessionError
-
-        try:
-            store, manifest = _resolve_session_for_display(session_name, cwd)
-        except ForgeSessionError as e:
-            console.print(f"[red]Error:[/red] Session '{session_name}' not found: {e}")
-            sys.exit(1)
-    else:
-        name = _resolve_session_name(cwd)
-        if not name:
-            console.print(f"[red]Error:[/red] No session found in {display_path(cwd)}")
-            sys.exit(1)
-        store = SessionStore(_resolve_forge_root(cwd), name)
-        try:
-            manifest = store.read()
-        except Exception:
-            console.print(f"[red]Error:[/red] No session found in {display_path(cwd)}")
-            sys.exit(1)
+    _, manifest = _resolve_guard_session(cwd, session_name)
 
     try:
         effective = compute_effective_intent(manifest)
@@ -409,9 +408,9 @@ def status(as_json: bool, session_name: str | None) -> None:
     supervised = find_sessions_supervised_by(manifest.name, manifest.confirmed.claude_session_id, manifest.forge_root)
     if supervised:
         names = ", ".join(supervised)
-        console.print(
-            f"\n[dim]Tip: This session supervises: {names}. "
-            f"Check with: forge guard status --session {supervised[0]}[/dim]"
+        print_tip(
+            f"This session supervises: {names}. Run 'forge guard status --session {supervised[0]}' to check.",
+            console=console,
         )
 
 
@@ -821,27 +820,8 @@ def supervise_cmd(
         )
         sys.exit(1)
     cwd = Path.cwd().resolve()
-    name = session_name or _resolve_session_name(cwd)
-    if not name:
-        console.print("[red]Error:[/red] No session found. Start or specify one with --session.")
-        sys.exit(1)
-
-    from forge.session.exceptions import ForgeSessionError
-
-    if session_name:
-        try:
-            store, _ = _resolve_session_for_display(name, cwd)
-        except ForgeSessionError as e:
-            console.print(f"[red]Error:[/red] Session '{name}' not found: {e}")
-            sys.exit(1)
-    else:
-        store = SessionStore(_resolve_forge_root(cwd), name)
-
-    try:
-        store.read()
-    except (ForgeSessionError, FileNotFoundError):
-        console.print(f"[red]Error:[/red] Session '{name}' not found")
-        sys.exit(1)
+    store, _state = _resolve_guard_session(cwd, session_name)
+    name = _state.name
 
     if off:
         manifest = store.read()
@@ -858,7 +838,7 @@ def supervise_cmd(
 
         store.update(timeout_s=5.0, mutate=_suspend)
         console.print(f"Supervisor suspended for session [cyan]{name}[/cyan]")
-        console.print("[dim]Tip: Use --on to resume, --remove to delete.[/dim]")
+        print_tip("Use --on to resume, --remove to delete.", blank_before=False, console=console)
         return
 
     if on_flag:
@@ -938,17 +918,10 @@ def supervise_cmd(
         from forge.guard.semantic.supervisor import (
             apply_supervisor_routing,
             apply_supervisor_to_intent,
-            preflight_supervisor_proxy,
+            ensure_supervisor_proxy,
             validate_supervisor_target,
         )
         from forge.session.models import SupervisorConfig
-
-        if supervisor_proxy:
-            try:
-                supervisor_proxy = preflight_supervisor_proxy(supervisor_proxy)
-            except ValueError as e:
-                console.print(f"[red]Error:[/red] {e}")
-                sys.exit(1)
 
         manifest = store.read()
         # Validate supervisor target in the selected session's scope, not CWD.
@@ -960,6 +933,19 @@ def supervise_cmd(
         except ValueError as e:
             console.print(f"[red]Error:[/red] {e}")
             sys.exit(1)
+
+        # Resolve/auto-start the supervisor proxy only after the target validates, so a
+        # bad target can't leave a freshly started proxy running.
+        if supervisor_proxy:
+            try:
+                _sup_proxy_id, _sup_started = ensure_supervisor_proxy(supervisor_proxy)
+            except ValueError as e:
+                console.print(f"[red]Error:[/red] {e}")
+                sys.exit(1)
+            if _sup_started:
+                console.print(f"[dim]Started proxy '{_sup_proxy_id}' from template '{supervisor_proxy}'.[/dim]")
+            supervisor_proxy = _sup_proxy_id
+
         current_template = manifest.intent.proxy.template if manifest.intent.proxy else None
         current_proxy_id = None
         if manifest.intent.proxy and hasattr(manifest.intent.proxy, "proxy_id"):

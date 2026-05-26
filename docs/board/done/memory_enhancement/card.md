@@ -376,8 +376,8 @@ indexing engine.
 Possible UX:
 
 ```bash
-forge memory search -q "runtime handoff"
-forge search -q "runtime handoff" --source transcripts,memory
+forge memory search query "runtime handoff"
+forge search query "runtime handoff" --source transcripts,memory
 ```
 
 ### Read/Recall Side

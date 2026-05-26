@@ -56,6 +56,114 @@ activation.
 `tests/src/session/{test_handoff_agent,test_memory_inheritance,test_project_memory,test_shadow_curation}.py` pass; full
 `tests/src -m "not integration"` green (4689 passed); `mypy` clean on touched modules.
 
+## 2026-05-26
+
+### CLI command-shape cleanup: groups orient, leaves act
+
+**Goal**: Make confusing bare CLI invocations follow one documented rule before PR: non-leaf command groups print help,
+while leaf commands perform a sensible default action.
+
+**Key changes**:
+
+- Documented the command-shape invariant in `docs/developer/coding-standards.md` and `docs/design.md`: groups orient,
+  leaves act, removed group-level shortcuts may remain only as non-executing tombstones.
+- `forge config` now prints help; `forge config show` is the explicit command that displays and auto-creates
+  `~/.forge/config.yaml`. Updated `docs/end-user/configs.md` and design appendix references.
+- Replaced the group-level `forge search -q/--query` action with `forge search query <terms>`. The old `-q` path now
+  exits with a replacement tip instead of executing old behavior. Updated end-user docs, QA/walkthrough checklists, and
+  tests/integration references.
+- `forge proxy metrics` with multiple registered proxies now behaves like an acting leaf and shows all metrics
+  (equivalent to `--all`) instead of erroring. `--json` follows the same implicit-all behavior.
+
+**Verification**:
+`uv run pytest tests/src/cli/test_config_cli.py tests/src/cli/test_proxy_commands.py tests/src/cli/test_search.py -q`
+(146 passed); `make pre-commit`; smoke-checked `forge config`, `forge config -h`, `forge search -h`, and the
+`forge search -q` tombstone.
+
+## 2026-05-25
+
+### CLI tip consistency: shared recovery-output helpers
+
+**Goal**: Make equivalent CLI failures tip identically — the reported bug was `forge session start <existing>` showing a
+recovery tip while `forge session fork ... --name <existing>` showed none.
+
+**Key changes**:
+
+- New leaf module `src/forge/cli/output.py`: `print_tip`, `print_error`, `print_error_with_tip`, and
+  `handle_session_error` (a type→tip dispatch holding only context-free recoveries — currently just
+  `SessionExistsError`). Imports only `rich` + `forge.session.exceptions`; never imported by `core/proxy/review`.
+- Renamed `_handle_error` → `handle_session_error` across `session.py` and its four importers (`session_lifecycle.py`,
+  `session_fork.py`, `session_manage.py`, `session_handoff.py`); `session.py` re-exports `console` +
+  `handle_session_error` from `output.py`.
+- §1 fix: `session fork` onto an existing name now routes through `handle_session_error`, emitting a
+  different-name/delete tip (no "resume" — meaningless for a fork-name collision). `start` keeps its richer
+  resume/delete wording as a call-site tip.
+- Added recovery tips to `session resume` (not-found → start), proxy `edit/set/validate` (→ create) and `delete/metrics`
+  (→ list), and backend `start/delete` (→ create).
+- **BREAKING**: `forge backend create <existing>` now prints red `Error:` + tip and exits 1 (was yellow + exit 0),
+  matching the session/proxy "already exists" shape. Reset path: run the suggested `forge backend start` instead.
+- Migrated the remaining Rich `console.print` `Tip:` sites in `src/forge/cli/**` onto the helpers and added an invariant
+  test that allows `[dim]Tip:` only in `output.py`.
+- Documented the convention in `CLAUDE.md` (UX Guidelines → Console Output Formatting): use the helpers for CLI Rich
+  recovery output, "Run '<command>'" vs "Use --flag", single quotes not backticks.
+
+**Verification**: 291 targeted CLI + regression tests pass (incl. `test_output.py`,
+`test_bug_fork_session_exists_tip.py`); `make pre-commit` clean on touched files (mypy + pyright pass repo-wide).
+
+**Out of scope**: Plain-text recovery hints inside `core/proxy/review` exception messages and `click.echo`/hook-JSON
+tips remain strings by design (layering).
+
+### Auto-start proxies from templates for `--proxy` and `--supervisor-proxy`
+
+**Goal**: Stop `--supervisor-proxy <template>` (and `--proxy <template>`) from hard-failing with "not found in registry"
+when the named template exists but no proxy is running yet; bring the proxy up instead.
+
+**Key changes**:
+
+- Added `ensure_proxy()` (`src/forge/proxy/proxy_orchestrator.py`): resolves a proxy by id/template and starts one from
+  a matching config template when no *live* proxy is available (reuse/adopt/spawn via `start_proxy`). Liveness-aware — a
+  template entry recorded `healthy` but unreachable (e.g. after a reboot) is marked `unhealthy` before a replacement is
+  registered, so follow-up template lookups do not become ambiguous. Re-raises `AmbiguousProxyError` (multiple active —
+  pick one) and `ProxyNotFoundError` (no proxy and no template).
+- Renamed `preflight_supervisor_proxy` -> `ensure_supervisor_proxy`; it auto-starts via `ensure_proxy`, returns
+  `(proxy_id, started)`, and raises actionable `ValueError`s (no-template hint to `forge proxy template list`,
+  ambiguous, start-failure). Covers `--supervisor-proxy` on `session fork`, `session start`, and `guard supervise`.
+- Wired the launch routers `_resolve_routing_from_cli` (session start/resume/fork `--proxy`) and `forge claude --proxy`
+  onto `ensure_proxy`; all five `--proxy`/`--supervisor-proxy` paths print a dim "Started proxy X from template Y"
+  notice when they spin one up.
+- `forge guard supervise` now validates the target session *before* ensuring the proxy, so a bad target can't orphan a
+  freshly started proxy.
+- A registered-but-stopped (or stale-dead) proxy for a known template now auto-starts (was: "none are active" error).
+  Workflow `--proxy via` is intentionally excluded (different routing layer + one-shot lifecycle).
+- **Behavior break** (research preview): naming a template with no live proxy used to error; it now starts one. Unknown
+  names (no proxy, no template) still fail, now with a `forge proxy template list` hint. Updated `docs/design.md`
+  §3.6.3, `docs/end-user/proxies.md`, and `docs/end-user/sessions.md`.
+
+**Verification**: regression `test_bug_supervisor_proxy_autostart.py` + `test_bug_stale_healthy_proxy_not_restarted.py`;
+`TestEnsureProxy` (8 cases) in `test_proxy_orchestrator.py`; updated supervisor/claude/session CLI tests; 348 related
+proxy/guard/session/regression tests pass; `ruff check` on touched Python files and `git diff --check` clean.
+
+### Protect live sessions from deletion
+
+**Goal**: Stop `forge session delete` from silently discarding a session's Forge state while it is still running in
+Claude Code, and stop a session deleted mid-run from crashing the launcher with a traceback.
+
+**Key changes**:
+
+- `forge session delete <name>` now refuses to delete a session with a live launch (exit 1) unless `--force`; `--yes` no
+  longer overrides this guard. `forge session delete --all` skips live sessions and deletes the rest (`--force` includes
+  them). Liveness uses the self-healing active registry, so a crashed/exited launcher still deletes without `--force`.
+- The post-launch backfill (`_infer_launch_confirmation`) tolerates a manifest deleted mid-run: an `exists()` preflight
+  skips the locked write (so the lock layer cannot resurrect the session as a lock-only directory), and a
+  `SessionFileNotFoundError` guard covers the narrow delete race. The launcher prints a "was deleted during this run"
+  note instead of a traceback.
+- **Behavior break** (research preview): deleting an active session previously warned and proceeded; it now blocks
+  without `--force`. Updated `docs/end-user/sessions.md`.
+
+**Verification**: `tests/regression/test_bug_delete_live_session.py` (preflight + race branch) and the expanded
+`tests/src/cli/test_session_commands.py` delete matrix (single/`--all` x force/no-force x tracked/orphan);
+`make pre-commit` clean.
+
 ## 2026-05-24
 
 ### Phase 1 / Slice 1: Project-Scoped Memory Activation

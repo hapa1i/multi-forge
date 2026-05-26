@@ -189,10 +189,10 @@ log_level: off               # off | debug | info | warning
 ```
 
 - **Optional**: missing file = built-in defaults
-- **Auto-created on first access**: `forge config` / `forge config show` seeds the file with documented defaults
+- **Auto-created on first access**: `forge config show` seeds the file with documented defaults
 - **Fail-open**: invalid YAML warns, returns defaults
 - **Unknown keys**: warned, ignored (forward compatible)
-- **CLI**: `forge config` (show), `forge config show [--raw]`, `forge config set`, `forge config edit`,
+- **CLI**: `forge config` (help), `forge config show [--raw]`, `forge config set`, `forge config edit`,
   `forge config reset`; `%config` (read-only) in-session
 
 See [docs/end-user/configs.md](end-user/configs.md) for the full user guide.

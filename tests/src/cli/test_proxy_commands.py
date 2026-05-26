@@ -337,6 +337,8 @@ tiers:
 
         assert result.exit_code != 0
         assert "not found" in result.output.lower()
+        assert "Tip:" in result.output
+        assert "forge proxy create" in result.output
 
 
 class TestProxySet:
@@ -497,6 +499,8 @@ tiers:
 
         assert result.exit_code != 0
         assert "not found" in result.output.lower()
+        assert "Tip:" in result.output
+        assert "forge proxy create" in result.output
 
     def test_set_port_type_coercion_failure(self, runner: CliRunner, temp_env: Path) -> None:
         """Set command errors when port value cannot be coerced to int."""
@@ -675,6 +679,8 @@ tiers:
 
         assert result.exit_code != 0
         assert "not found" in result.output.lower()
+        assert "Tip:" in result.output
+        assert "forge proxy list" in result.output
 
     def test_delete_aborts_before_config_removal_when_registry_update_fails(
         self, runner: CliRunner, temp_env: Path, monkeypatch: pytest.MonkeyPatch
@@ -1365,6 +1371,9 @@ class TestProxyCreateNoStart:
 
         assert result.exit_code != 0
         assert "exists" in result.output.lower()
+        assert "Tip:" in result.output
+        assert "forge proxy edit" in result.output
+        assert "forge proxy delete" in result.output
 
     def test_create_invalid_template_error(self, runner: CliRunner, temp_env: Path) -> None:
         """Create errors for unknown template."""
@@ -1611,6 +1620,8 @@ class TestProxyMetrics:
 
         assert result.exit_code != 0
         assert "not found" in result.output.lower()
+        assert "Tip:" in result.output
+        assert "forge proxy list" in result.output
 
     def test_metrics_proxy_unreachable(
         self, runner: CliRunner, temp_env: Path, monkeypatch: pytest.MonkeyPatch
@@ -1644,19 +1655,48 @@ class TestProxyMetrics:
         assert result.exit_code == 0
         assert "test-proxy" in result.output
 
-    def test_metrics_multiple_proxies_requires_id(self, runner: CliRunner, temp_env: Path) -> None:
-        """Multiple proxies without proxy_id or --all is an error."""
+    def test_metrics_multiple_proxies_defaults_to_all(
+        self, runner: CliRunner, temp_env: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Leaf command with no args should do the sensible broad action."""
         _create_proxy_registry_from_entries(
             {
                 "p1": ProxyEntry(proxy_id="p1", template="t", base_url="http://localhost:8085", port=8085),
                 "p2": ProxyEntry(proxy_id="p2", template="t", base_url="http://localhost:8086", port=8086),
             }
         )
+        monkeypatch.setattr(
+            "forge.cli.proxy._fetch_proxy_info",
+            lambda _: _ProxyInfo(metrics=_SAMPLE_METRICS, template="t"),
+        )
 
         result = runner.invoke(main, ["proxy", "metrics"])
 
-        assert result.exit_code != 0
-        assert "--all" in result.output
+        assert result.exit_code == 0
+        assert "Proxy Metrics: p1" in result.output
+        assert "Proxy Metrics: p2" in result.output
+
+    def test_metrics_multiple_proxies_no_args_json_defaults_to_all(
+        self, runner: CliRunner, temp_env: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """`forge proxy metrics --json` should mirror implicit --all for multiple proxies."""
+        _create_proxy_registry_from_entries(
+            {
+                "p1": ProxyEntry(proxy_id="p1", template="t", base_url="http://localhost:8085", port=8085),
+                "p2": ProxyEntry(proxy_id="p2", template="t", base_url="http://localhost:8086", port=8086),
+            }
+        )
+        monkeypatch.setattr(
+            "forge.cli.proxy._fetch_proxy_info",
+            lambda _: _ProxyInfo(metrics=_SAMPLE_METRICS, template="t"),
+        )
+
+        result = runner.invoke(main, ["proxy", "metrics", "--json"])
+
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert data["p1"]["total_requests"] == 42
+        assert data["p2"]["total_requests"] == 42
 
     def test_metrics_corrupted_registry(self, runner: CliRunner, temp_env: Path) -> None:
         _create_proxy_registry_raw("not valid json")

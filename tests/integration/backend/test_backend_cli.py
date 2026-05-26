@@ -53,18 +53,19 @@ class TestBackendCLI:
         content = config_path.read_text()
         assert "model_list:" in content
 
-    def test_backend_create_idempotent(self, isolated_forge_home: Path) -> None:
-        """Verify backend create is idempotent (doesn't error on re-create)."""
+    def test_backend_create_already_exists(self, isolated_forge_home: Path) -> None:
+        """Verify backend create errors on duplicate with a recovery tip."""
         runner = CliRunner()
 
         # First create
         result1 = runner.invoke(main, ["backend", "create", "litellm"])
         assert result1.exit_code == 0
 
-        # Second create - should show "already exists" message
+        # Second create - should error with tip to start instead
         result2 = runner.invoke(main, ["backend", "create", "litellm"])
-        assert result2.exit_code == 0
+        assert result2.exit_code == 1
         assert "already exists" in result2.output
+        assert "forge backend start" in result2.output
 
     def test_backend_delete_removes_config(self, isolated_forge_home: Path) -> None:
         """Verify backend delete removes config directory."""

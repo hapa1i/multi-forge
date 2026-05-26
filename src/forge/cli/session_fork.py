@@ -12,6 +12,7 @@ from pathlib import Path
 
 import click
 
+from forge.cli.output import print_error_with_tip, print_tip
 from forge.cli.session_addendum import (
     resolve_addendum_content_for_proxy,
     write_managed_addendum,
@@ -50,13 +51,13 @@ from forge.cli.session import (  # noqa: E402
     _get_effective_proxy_for_session,
     _get_launch_preferences,
     _get_runtime_base_url,
-    _handle_error,
     _hint_cross_project_session,
     _persist_routing_override,
     _print_routing_summary,
     _resolve_session_artifact_root,
     _resolve_worktree_extension_root,
     console,
+    handle_session_error,
     logger,
 )
 from forge.cli.session_lifecycle import (  # noqa: E402
@@ -357,7 +358,7 @@ def fork(
                 console.print(f"[red]Error:[/red] session '{parent}' not found")
             sys.exit(1)
         except ForgeSessionError as e:
-            _handle_error(e)
+            handle_session_error(e)
             return
 
         if not direct:
@@ -413,12 +414,11 @@ def fork(
                                             "Proceeding anyway (--force)."
                                         )
                                     else:
-                                        console.print(
-                                            f"[red]Error:[/red] Parent transcript ({token_est:,} tokens) exceeds "
-                                            f"context limit ({context_limit_preflight:,})."
-                                        )
-                                        console.print(
-                                            "[dim]Tip: Use --strategy structured or --strategy ai-curated instead.[/dim]"
+                                        print_error_with_tip(
+                                            f"Parent transcript ({token_est:,} tokens) exceeds "
+                                            f"context limit ({context_limit_preflight:,}).",
+                                            "Use --strategy structured or --strategy ai-curated instead.",
+                                            console=console,
                                         )
                                         sys.exit(1)
         except ForgeSessionError:
@@ -426,13 +426,16 @@ def fork(
 
     # Preflight supervisor proxy BEFORE fork_session() to avoid half-created state
     if supervisor_proxy:
-        from forge.guard.semantic.supervisor import preflight_supervisor_proxy
+        from forge.guard.semantic.supervisor import ensure_supervisor_proxy
 
         try:
-            supervisor_proxy = preflight_supervisor_proxy(supervisor_proxy)
+            _sup_proxy_id, _sup_started = ensure_supervisor_proxy(supervisor_proxy)
         except ValueError as e:
             console.print(f"[red]Error:[/red] {e}")
             sys.exit(1)
+        if _sup_started:
+            console.print(f"[dim]Started proxy '{_sup_proxy_id}' from template '{supervisor_proxy}'.[/dim]")
+        supervisor_proxy = _sup_proxy_id
 
     inherit_memory_explicit = ctx.get_parameter_source("inherit_memory") == click.core.ParameterSource.COMMANDLINE
 
@@ -453,23 +456,23 @@ def fork(
             warnings_sink=fork_warnings,
         )
     except CannotForkIncognitoError as e:
-        console.print(f"[red]Error:[/red] {e}")
-        console.print("\n[dim]Tip: Incognito sessions cannot be forked.[/dim]")
+        print_error_with_tip(str(e), "Incognito sessions cannot be forked.", console=console)
         sys.exit(1)
     except BranchExistsError as e:
         _print_branch_exists_tip(e)
         sys.exit(1)
     except BranchInUseError as e:
-        console.print(f"[red]Error:[/red] {e}")
-        console.print("\n[dim]Tip: The branch is checked out in another worktree. Remove that worktree first.[/dim]")
+        print_error_with_tip(
+            str(e),
+            "The branch is checked out in another worktree. Remove that worktree first.",
+            console=console,
+        )
         sys.exit(1)
     except BranchNotMergedError as e:
-        console.print(f"[red]Error:[/red] {e}")
-        console.print("\n[dim]Tip: Merge or delete the branch manually before using --force.[/dim]")
+        print_error_with_tip(str(e), "Merge or delete the branch manually before using --force.", console=console)
         sys.exit(1)
     except WorktreePathExistsError as e:
-        console.print(f"[red]Error:[/red] {e}")
-        console.print("\n[dim]Tip: Remove the directory or use a different fork name.[/dim]")
+        print_error_with_tip(str(e), "Remove the directory or use a different fork name.", console=console)
         sys.exit(1)
     except InvalidBranchNameError as e:
         console.print(f"[red]Error:[/red] {e}")
@@ -479,7 +482,7 @@ def fork(
             console.print(f"[red]Error:[/red] session '{parent}' not found")
         sys.exit(1)
     except ForgeSessionError as e:
-        _handle_error(e)
+        handle_session_error(e)
         return
 
     for w in fork_warnings:
@@ -596,9 +599,10 @@ def fork(
 
     # Warn about --strategy/--inline-plan on same-directory forks (only if user explicitly set them)
     if not is_worktree_fork and (_strategy_explicit or _inline_plan_explicit):
-        console.print(
-            "[dim]Tip: --strategy/--inline-plan only apply to worktree forks "
-            "(ignored for same-directory forks).[/dim]"
+        print_tip(
+            "--strategy/--inline-plan only apply to worktree forks (ignored for same-directory forks).",
+            blank_before=False,
+            console=console,
         )
 
     # Assigned only in the worktree-fork branch; pre-declared so the same-directory
@@ -756,12 +760,12 @@ def fork(
                 force_extensions=extensions,
             )
     elif extensions is True:
-        console.print("[dim]Tip: --extensions only applies with --worktree.[/dim]")
+        print_tip("--extensions only applies with --worktree.", blank_before=False, console=console)
 
     if no_launch:
         console.print("[dim]Fork created (--no-launch: Claude not started)[/dim]")
         if is_worktree_fork:
-            console.print(f"\n[dim]Tip: {_resume_tip_command(fork_manifest)}[/dim]")
+            print_tip("Resume this fork with:", commands=[_resume_tip_command(fork_manifest)], console=console)
         sys.exit(0)
 
     runtime_base_url = _get_runtime_base_url(use_sidecar=use_sidecar, effective_url=effective_url)

@@ -46,12 +46,22 @@ class TestConfigShow:
         assert "proxy_mode: host" in result.output
         assert "Forge Runtime Config" not in result.output
 
-    def test_show_is_default_subcommand(self):
-        """forge config (no subcommand) behaves like forge config show."""
+    def test_bare_config_prints_help(self):
+        """Bare non-leaf command orients users; `show` is the explicit action."""
         runner = CliRunner()
         result = runner.invoke(config)
         assert result.exit_code == 0
-        assert "proxy_mode" in result.output
+        assert "Usage:" in result.output
+        assert "forge config show" in result.output
+        assert "Commands:" in result.output
+        assert "proxy_mode: host" not in result.output
+
+    def test_help_marks_subcommand_optional(self):
+        """Help usage should match the bare `forge config` help behavior."""
+        runner = CliRunner()
+        result = runner.invoke(config, ["--help"])
+        assert result.exit_code == 0
+        assert "Usage: config [OPTIONS] [COMMAND] [ARGS]..." in result.output
 
     def test_show_annotates_env_overrides(self, monkeypatch):
         """Env-overridden fields are annotated in show output."""

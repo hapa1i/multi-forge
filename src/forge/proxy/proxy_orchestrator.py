@@ -43,8 +43,17 @@ from forge.config.schema import (
 )
 from forge.core.auth.template_secrets import resolve_env_or_credential
 from forge.core.paths import get_forge_home
+from forge.core.process import is_pid_alive
 from forge.core.state import now_iso
-from forge.proxy.proxies import ProxyEntry, ProxyRegistry, ProxyRegistryStore
+from forge.proxy.proxies import (
+    AmbiguousProxyError,
+    ProxyEntry,
+    ProxyNotFoundError,
+    ProxyRegistry,
+    ProxyRegistryStore,
+    _is_orphaned_starting,
+    resolve_proxy,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -473,7 +482,11 @@ def start_proxy(
     #    Skip template-wide reuse when an explicit upstream URL is requested,
     #    since an existing proxy may point at a different gateway.
     reused = None
+    persist_failed_reuse_ids: set[str] = set()
     if not upstream_base_url:
+        persist_failed_reuse_ids = {
+            entry.proxy_id for entry in registry.proxies.values() if _should_persist_failed_reuse_status(entry)
+        }
         reused = _try_reuse_registered_proxy(
             registry=registry,
             template=template,
@@ -491,6 +504,25 @@ def start_proxy(
 
         store.update(timeout_s=5.0, mutate=_persist_reuse)
         return ProxyStartResult(proxy=reused, source="reuse")
+
+    # Persist failed reuse checks before spawning. _try_reuse_registered_proxy()
+    # marks unreachable candidates as "unhealthy" on the in-memory registry; if
+    # we leave the on-disk entries as "healthy", the fresh proxy we spawn below
+    # can make the next template lookup ambiguous.
+    unhealthy_ids = {
+        entry.proxy_id
+        for entry in registry.proxies.values()
+        if entry.template == template and entry.status == "unhealthy" and entry.proxy_id in persist_failed_reuse_ids
+    }
+    if unhealthy_ids:
+
+        def _persist_unhealthy(r: ProxyRegistry) -> None:
+            for proxy_id in unhealthy_ids:
+                entry = r.proxies.get(proxy_id)
+                if entry is not None and entry.template == template:
+                    entry.status = "unhealthy"
+
+        registry = store.update(timeout_s=5.0, mutate=_persist_unhealthy)
 
     target_port = port if port is not None else _get_template_default_port(template)
     target_base_url = _base_url(host, target_port)
@@ -651,6 +683,61 @@ def start_proxy(
 
     store.update(timeout_s=5.0, mutate=_mark_healthy)
     return ProxyStartResult(proxy=healthy_proxy, source="spawn")
+
+
+def _should_persist_failed_reuse_status(entry: ProxyEntry) -> bool:
+    """Return whether a failed reuse check should be written back as unhealthy."""
+    if entry.status != "starting":
+        return True
+    if entry.pid is not None:
+        return not is_pid_alive(entry.pid)
+    return _is_orphaned_starting(entry)
+
+
+def ensure_proxy(name: str, *, host: str = "localhost") -> tuple[ProxyEntry, bool]:
+    """Resolve a proxy by id/template, auto-starting from a matching template when needed.
+
+    Resolution:
+    1. ``AmbiguousProxyError`` (multiple active proxies for a template) is re-raised --
+       the user must name a specific proxy_id, not start another.
+    2. An exact proxy_id match is returned as-is: presence, not liveness, matching
+       ``resolve_proxy``. A dead proxy_id can only be revived with ``forge proxy start
+       <id>``.
+    3. A template name delegates to ``start_proxy()``. That path healthchecks registered
+       candidates, reuses a live proxy, or adopts/spawns a fresh one. This catches stale
+       entries that ``resolve_proxy`` would otherwise trust from persisted status.
+    4. No proxy but a config template named ``name`` exists: start it through the same
+       ``start_proxy()`` path.
+
+    Returns ``(entry, started)`` where ``started`` is True only when ``start_proxy``
+    adopted or spawned (not when it reused a live proxy), so callers can tell the user
+    about a new process.
+
+    Raises:
+        AmbiguousProxyError: Multiple active proxies share the template name.
+        ProxyNotFoundError: No proxy and no template named ``name``.
+        ProxyStartError: A template matched but the proxy failed to start.
+        ProxyRegistryCorruptedError: The registry exists but cannot be parsed.
+    """
+    registry = ProxyRegistryStore().read()
+    exact_proxy_id = name in registry.proxies
+    try:
+        resolved: ProxyEntry | None = resolve_proxy(registry, name)
+    except AmbiguousProxyError:
+        raise
+    except ProxyNotFoundError:
+        if not template_exists(name):
+            raise
+        resolved = None
+
+    # Exact proxy IDs preserve the existing presence-only contract, even when the
+    # proxy_id happens to share a name with a template.
+    if resolved is not None and exact_proxy_id:
+        return resolved, False
+
+    logger.info("Ensuring live proxy for template '%s'", name)
+    result = start_proxy(template=name, host=host)
+    return result.proxy, result.source != "reuse"
 
 
 def _validate_template_exists(template: str) -> None:
