@@ -1617,14 +1617,13 @@ forge_memory:
     strategy: changelog
     mode: direct
     writers: all-sessions
-    inherit_on_fork: true
     compact_when: "approaching documentation size limits"
 ---
 ```
 
-**Ownership split**: passports own doc-level policy (strategy, intent, writers, inheritance). Session manifests own
-participation (which docs this session tracks) and auto-update runtime state (enabled, mode, min_turns). Editing a
-passport between sessions takes effect without re-running `forge memory track`.
+**Ownership split**: passports own doc-level policy (strategy, intent, writers). Session manifests own participation
+(which docs this session tracks) and auto-update runtime state (enabled, mode, min_turns). Editing a passport between
+sessions takes effect without re-running `forge memory track`.
 
 **Writer semantics**: `all-sessions` and exact session-name writers are supported. `lineage:` and `role:` prefixes are
 rejected with deferral messages. Writer access is checked at Stop time by the handoff agent.
@@ -1651,10 +1650,21 @@ mutates official docs.
 
 #### 5.6.4 Memory inheritance on fork and fresh resume
 
-`forge session fork` and `forge session resume --fresh` support `--inherit-memory all|none|shadowed`. Default `all`
-preserves existing behavior. `none` removes memory participation. `shadowed` inherits only proposal/shadow docs.
-Inherited `.forge/memory/` shadow files are materialized in the target worktree; non-Forge-owned shadows are reported
-but not created. Passport `inherit_on_fork` defaults apply when the CLI flag is omitted.
+Memory inheritance is no longer a bulk mechanism. Project memory is discovered live from passports at Stop time; only
+session extras (`origin="extra"`, added via `forge memory extra add`) are inherited.
+
+**Fork activation copy.** `forge session fork --worktree` copies `.forge/memory.yaml` from the parent checkout into the
+new worktree by default. This ensures the child checkout has the same activation consent as the parent. Rules:
+
+- `--worktree`: copy by default (Forge-created checkout = continuation of the same work).
+- `--into`: do NOT copy (existing checkout may have its own activation).
+- Never overwrite an existing destination `.forge/memory.yaml`.
+- `--no-copy-memory-activation` suppresses the copy.
+- Corrupt source config: warn and skip (do not block the fork).
+
+**Extras inheritance.** `--inherit-extras` (default) carries `origin="extra"` entries from the parent's
+`designated_docs` into the child. `--no-inherit-extras` strips them. Project-discovered docs (passport-scanned) are not
+affected by this flag. Applies to both `fork` and `resume --fresh`.
 
 #### 5.6.5 Strategy registry
 

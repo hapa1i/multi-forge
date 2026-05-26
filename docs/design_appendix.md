@@ -716,7 +716,6 @@ forge_memory:
     strategy: suggested
     mode: shadow-only
     writers: all-sessions
-    inherit_on_fork: true
     approval: human-promoted
     shadow_path: .forge/memory/suggested_impl_notes.md
 ---

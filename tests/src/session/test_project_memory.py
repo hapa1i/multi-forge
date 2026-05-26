@@ -567,3 +567,94 @@ def test_collision_skips_malformed_unrelated(tmp_path):
     (tmp_path / "docs").mkdir(parents=True, exist_ok=True)
     (tmp_path / "docs/bad.md").write_text("---\nforge_memory:\n  version: not-an-int\n---\n# Body\n", encoding="utf-8")
     assert check_shadow_path_collision_in_roots(".forge/memory/x.md", "docs/b.md", tmp_path, ("docs/",)) is None
+
+
+# ---------------------------------------------------------------------------
+# copy_memory_activation (worktree fork activation copy)
+# ---------------------------------------------------------------------------
+
+
+class TestCopyMemoryActivation:
+    """Test the .forge/memory.yaml copy helper for worktree forks."""
+
+    def _write_config(self, forge_root, *, corrupt: bool = False):
+        (forge_root / ".forge").mkdir(parents=True, exist_ok=True)
+        path = forge_root / ".forge" / "memory.yaml"
+        if corrupt:
+            path.write_text("version: not-an-int\n", encoding="utf-8")
+        else:
+            path.write_text(yaml.safe_dump({"version": 1, "auto_update": {"enabled": True}}), encoding="utf-8")
+
+    def test_copies_when_source_exists_and_dest_absent(self, tmp_path):
+        from forge.session.project_memory import copy_memory_activation
+
+        source = tmp_path / "source"
+        dest = tmp_path / "dest"
+        source.mkdir()
+        dest.mkdir()
+        self._write_config(source)
+        (dest / ".forge").mkdir(parents=True, exist_ok=True)
+
+        result = copy_memory_activation(source, dest)
+
+        assert result.copied_path is not None
+        assert (dest / ".forge" / "memory.yaml").is_file()
+        assert result.warning is None
+
+    def test_skips_when_dest_exists(self, tmp_path):
+        from forge.session.project_memory import copy_memory_activation
+
+        source = tmp_path / "source"
+        dest = tmp_path / "dest"
+        source.mkdir()
+        dest.mkdir()
+        self._write_config(source)
+        self._write_config(dest)
+
+        result = copy_memory_activation(source, dest)
+
+        assert result.copied_path is None
+        assert result.warning is None
+
+    def test_skips_when_source_absent(self, tmp_path):
+        from forge.session.project_memory import copy_memory_activation
+
+        source = tmp_path / "source"
+        dest = tmp_path / "dest"
+        source.mkdir()
+        dest.mkdir()
+
+        result = copy_memory_activation(source, dest)
+
+        assert result.copied_path is None
+        assert result.warning is None
+
+    def test_warns_on_corrupt_source(self, tmp_path):
+        from forge.session.project_memory import copy_memory_activation
+
+        source = tmp_path / "source"
+        dest = tmp_path / "dest"
+        source.mkdir()
+        dest.mkdir()
+        self._write_config(source, corrupt=True)
+        (dest / ".forge").mkdir(parents=True, exist_ok=True)
+
+        result = copy_memory_activation(source, dest)
+
+        assert result.copied_path is None
+        assert result.warning is not None
+        assert "Corrupt" in result.warning
+
+    def test_creates_parent_dirs(self, tmp_path):
+        from forge.session.project_memory import copy_memory_activation
+
+        source = tmp_path / "source"
+        dest = tmp_path / "dest"
+        source.mkdir()
+        dest.mkdir()
+        self._write_config(source)
+
+        result = copy_memory_activation(source, dest)
+
+        assert result.copied_path is not None
+        assert (dest / ".forge" / "memory.yaml").is_file()

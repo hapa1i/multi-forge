@@ -505,8 +505,7 @@ class SessionManager:
         token_estimate_multiplier: float = 1.0,
         resume_mode: str = "handoff",
         forge_root: str | None = None,
-        inherit_memory: str = "all",
-        inherit_memory_explicit: bool = False,
+        inherit_extras: bool = True,
     ) -> tuple[SessionState, HandoffResult]:
         """Create a new session derived from a parent with context assembly.
 
@@ -586,8 +585,7 @@ class SessionManager:
                 inherited_proxy=inherited_proxy,
                 parent_proxy_template=parent_proxy_template,
                 parent_proxy_base_url=parent_proxy_base_url,
-                inherit_memory=inherit_memory,
-                inherit_memory_explicit=inherit_memory_explicit,
+                inherit_extras=inherit_extras,
                 warnings_sink=inh_warnings_native,
             )
             # Resolve parent transcript path for traceability (best-effort)
@@ -679,8 +677,7 @@ class SessionManager:
             inherited_proxy=inherited_proxy,
             parent_proxy_template=parent_proxy_template,
             parent_proxy_base_url=parent_proxy_base_url,
-            inherit_memory=inherit_memory,
-            inherit_memory_explicit=inherit_memory_explicit,
+            inherit_extras=inherit_extras,
             warnings_sink=inh_warnings_handoff,
         )
 
@@ -722,8 +719,7 @@ class SessionManager:
         inherited_proxy: str | None,
         parent_proxy_template: str | None,
         parent_proxy_base_url: str | None,
-        inherit_memory: str = "all",
-        inherit_memory_explicit: bool = False,
+        inherit_extras: bool = True,
         warnings_sink: list[str] | None = None,
     ) -> SessionState:
         """Create a child SessionState for resume (shared by native and handoff)."""
@@ -749,16 +745,12 @@ class SessionManager:
         # Propagate identity from parent
         child_state.forge_root = parent_entry.forge_root or parent_state.forge_root
 
-        from .memory_inheritance import InheritMemoryMode, apply_memory_inheritance
+        from .memory_inheritance import apply_memory_inheritance
 
-        parent_fr = Path(parent_entry.forge_root or parent_entry.worktree_path)
-        _shadow_docs, inh_warnings = apply_memory_inheritance(
+        inh_warnings = apply_memory_inheritance(
             parent_state=parent_state,
             child_state=child_state,
-            mode=InheritMemoryMode(inherit_memory),
-            parent_forge_root=parent_fr,
-            child_session_name=child_name,
-            cli_flag_explicit=inherit_memory_explicit,
+            inherit_extras=inherit_extras,
         )
         if warnings_sink is not None:
             warnings_sink.extend(inh_warnings)
@@ -915,8 +907,8 @@ class SessionManager:
         into_path: str | None = None,
         forge_root: str | None = None,
         force: bool = False,
-        inherit_memory: str = "all",
-        inherit_memory_explicit: bool = False,
+        inherit_extras: bool = True,
+        copy_memory_activation_flag: bool = True,
         warnings_sink: list[str] | None = None,
     ) -> tuple[SessionState, SessionState]:
         """Fork an existing session.
@@ -1181,20 +1173,21 @@ class SessionManager:
 
         fork_state.forge_root = fork_forge_root
 
-        from .memory_inheritance import (
-            InheritMemoryMode,
-            apply_memory_inheritance,
-            materialize_inherited_shadows,
-        )
+        if create_worktree and not is_into and copy_memory_activation_flag and fork_forge_root:
+            from .project_memory import copy_memory_activation
 
-        parent_fr = Path(parent_entry.forge_root or parent_entry.worktree_path)
-        inh_shadow_docs, inh_warnings = apply_memory_inheritance(
+            act_result = copy_memory_activation(Path(parent_forge_root), Path(fork_forge_root))
+            if act_result.warning and warnings_sink is not None:
+                warnings_sink.append(f"[warn]{act_result.warning}")
+            elif act_result.copied_path and warnings_sink is not None:
+                warnings_sink.append(f"Copied memory activation to {act_result.copied_path}")
+
+        from .memory_inheritance import apply_memory_inheritance
+
+        inh_warnings = apply_memory_inheritance(
             parent_state=parent,
             child_state=fork_state,
-            mode=InheritMemoryMode(inherit_memory),
-            parent_forge_root=parent_fr,
-            child_session_name=fork_name,
-            cli_flag_explicit=inherit_memory_explicit,
+            inherit_extras=inherit_extras,
         )
 
         fork_resume_mode = "handoff" if (create_worktree or is_into) else "native"
@@ -1278,12 +1271,6 @@ class SessionManager:
 
             fork_store.write(fork_state)
             wrote_manifest = True
-
-            is_cross_worktree = create_worktree or is_into
-            if is_cross_worktree and inh_shadow_docs:
-                target_fr = Path(fork_forge_root) if fork_forge_root else Path(fork_worktree_path)
-                mat_created, mat_skipped = materialize_inherited_shadows(inh_shadow_docs, target_fr)
-                inh_warnings.extend(mat_created + mat_skipped)
 
             if warnings_sink is not None:
                 warnings_sink.extend(inh_warnings)

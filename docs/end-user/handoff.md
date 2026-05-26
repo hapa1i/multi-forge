@@ -100,7 +100,6 @@ forge_memory:
     strategy: changelog
     mode: direct
     writers: all-sessions
-    inherit_on_fork: true
 ---
 ```
 
@@ -322,7 +321,7 @@ forge handoff run --session-name <name> --worktree-path <path> --transcript-rel 
 
 | Trap                                  | Explanation                                                               |
 | ------------------------------------- | ------------------------------------------------------------------------- |
-| "Handoff enabled but nothing happens" | No memory docs are tracked for the session                                |
+| "Handoff enabled but nothing happens" | No passported docs are under the scan roots, and no extras are added      |
 | "Shadow doc not updating"             | Official doc must exist and passport `shadow_path` must be valid          |
 | "Agent uses wrong model"              | Inherits session proxy by default; set `proxy` for explicit routing       |
 | "File created by agent"               | Agent never creates files — seed them first                               |

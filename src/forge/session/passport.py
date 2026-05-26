@@ -504,6 +504,7 @@ def _passport_to_dict(passport: Passport) -> dict[str, Any]:
     """Convert a Passport to a dict, omitting None-valued fields."""
     raw = asdict(passport)
     update = raw.get("update", {})
+    update.pop("inherit_on_fork", None)
     raw["update"] = {k: v for k, v in update.items() if v is not None}
     return raw
 

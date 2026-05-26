@@ -159,11 +159,23 @@ __all__ = ["fork"]
     help="Replace existing branch/worktree and skip budget preflight",
 )
 @click.option(
+    "--inherit-extras/--no-inherit-extras",
+    "inherit_extras",
+    default=True,
+    help="Inherit session extras into the fork (default: inherit)",
+)
+@click.option(
+    "--copy-memory-activation/--no-copy-memory-activation",
+    "copy_memory_activation",
+    default=True,
+    help="Copy .forge/memory.yaml to new worktree (default: copy)",
+)
+@click.option(
     "--inherit-memory",
-    "inherit_memory",
+    "inherit_memory_tombstone",
     type=click.Choice(["all", "none", "shadowed"]),
-    default="all",
-    help="Memory doc inheritance: all (default), none, or shadowed only",
+    default=None,
+    hidden=True,
 )
 @click.pass_context
 def fork(
@@ -185,7 +197,9 @@ def fork(
     supervisor_proxy: str | None,
     supervisor_direct: bool,
     force: bool,
-    inherit_memory: str,
+    inherit_extras: bool,
+    copy_memory_activation: bool,
+    inherit_memory_tombstone: str | None,
 ) -> None:
     """Fork an existing session.
 
@@ -204,6 +218,20 @@ def fork(
         forge session fork parent-session -n child-session     # Custom fork name
         forge session fork parent-session --no-proxy           # Fork, bypass proxy
     """
+    if inherit_memory_tombstone is not None:
+        _TOMBSTONE = {
+            "all": "No longer needed; passports are discovered from the project. "
+            "Use --inherit-extras if you meant session extras.",
+            "none": "Use --no-inherit-extras and --no-copy-memory-activation.",
+            "shadowed": "Shadow docs are passport-discovered; use 'forge memory track --propose'.",
+        }
+        print_error_with_tip(
+            "--inherit-memory is removed.",
+            _TOMBSTONE[inherit_memory_tombstone],
+            console=console,
+        )
+        sys.exit(1)
+
     if direct and proxy_name:
         console.print("[red]Error:[/red] --no-proxy and --proxy are mutually exclusive")
         sys.exit(1)
@@ -437,8 +465,6 @@ def fork(
             console.print(f"[dim]Started proxy '{_sup_proxy_id}' from template '{supervisor_proxy}'.[/dim]")
         supervisor_proxy = _sup_proxy_id
 
-    inherit_memory_explicit = ctx.get_parameter_source("inherit_memory") == click.core.ParameterSource.COMMANDLINE
-
     fork_warnings: list[str] = []
     try:
         parent_manifest, fork_manifest = manager.fork_session(
@@ -451,8 +477,8 @@ def fork(
             into_path=into_resolved,
             forge_root=_fr,
             force=force,
-            inherit_memory=inherit_memory,
-            inherit_memory_explicit=inherit_memory_explicit,
+            inherit_extras=inherit_extras,
+            copy_memory_activation_flag=copy_memory_activation,
             warnings_sink=fork_warnings,
         )
     except CannotForkIncognitoError as e:
@@ -486,7 +512,10 @@ def fork(
         return
 
     for w in fork_warnings:
-        console.print(f"[dim]{w}[/dim]")
+        if w.startswith("[warn]"):
+            console.print(f"[yellow]Warning:[/yellow] {w.removeprefix('[warn]')}")
+        else:
+            console.print(f"[dim]{w}[/dim]")
 
     # Persist routing override to manifest (ensures --no-launch retains proxy choice)
     fork_worktree_path = Path(fork_manifest.worktree.path) if fork_manifest.worktree else Path.cwd()

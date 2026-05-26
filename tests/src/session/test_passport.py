@@ -396,7 +396,23 @@ class TestWritePassport:
         assert restored.excludes == original.excludes
         assert restored.update.strategy == original.update.strategy
         assert restored.update.writers == original.update.writers
-        assert restored.update.inherit_on_fork is False
+        # inherit_on_fork is no longer serialized (retired in Slice 3);
+        # writing a passport with inherit_on_fork=False and reading it back
+        # yields the default True because the field is absent from the YAML.
+        assert restored.update.inherit_on_fork is True
+
+    def test_inherit_on_fork_not_serialized(self, tmp_path: Path) -> None:
+        """inherit_on_fork is parsed but never written back to new passports."""
+        doc = tmp_path / "doc.md"
+        doc.write_text("# Doc\n")
+        p = Passport(
+            version=1,
+            intent="Test",
+            update=PassportUpdate(inherit_on_fork=False),
+        )
+        write_passport(doc, p)
+        content = doc.read_text()
+        assert "inherit_on_fork" not in content
 
     def test_none_fields_omitted_from_output(self, tmp_path: Path) -> None:
         doc = tmp_path / "doc.md"

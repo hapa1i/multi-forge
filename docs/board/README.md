@@ -88,7 +88,7 @@ forge memory shadows review --for docs/board/impl_notes.md --show-latest --sessi
 
 Passports are project-wide: author them once and every session in the checkout (including `executor` and `reviewer`
 forks) sees them via the Stop-time scan once project memory is enabled — no per-session re-tracking. Session-only extras
-added with `forge memory extra add` are also carried into forks by default (`--inherit-memory all`).
+added with `forge memory extra add` are also carried into forks by default (`--inherit-extras`).
 
 ## Advanced Workflow
 
@@ -100,8 +100,8 @@ Compared with the shortest three-command workflow, the dogfood path adds three s
 - Author passports and enable project memory before the first Stop event (passports are sessionless, so this needs no
   running session).
 - Run the first handoff-agent pass in `review-only`, inspect it, then switch to `augment`.
-- Use `--inline-plan` for worktree forks. `--propose` auto-creates shadow files for the planner; worktree forks inherit
-  and materialize them via `--inherit-memory`.
+- Use `--inline-plan` for worktree forks. `--propose` auto-creates shadow files for the planner; worktree forks discover
+  shadow passports via the Stop-time scan (activation is copied automatically with `--worktree`).
 
 ### 1. Planner
 

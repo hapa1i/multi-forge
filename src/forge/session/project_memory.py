@@ -141,6 +141,52 @@ def write_project_memory_config(forge_root: Path, config: ProjectMemoryConfig) -
 
 
 # ---------------------------------------------------------------------------
+# Activation copy (worktree forks)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ActivationCopyResult:
+    """Outcome of copying ``.forge/memory.yaml`` to a child checkout."""
+
+    copied_path: Path | None = None
+    warning: str | None = None
+
+
+def copy_memory_activation(
+    source_forge_root: Path,
+    dest_forge_root: Path,
+) -> ActivationCopyResult:
+    """Copy ``.forge/memory.yaml`` from source to dest if applicable.
+
+    Never overwrites an existing destination file. Returns a structured
+    result so the caller can format messages.
+    """
+    import shutil
+
+    source = get_project_memory_path(source_forge_root)
+    if not source.is_file():
+        return ActivationCopyResult()
+
+    dest = get_project_memory_path(dest_forge_root)
+    if dest.is_file():
+        return ActivationCopyResult()
+
+    try:
+        read_project_memory_config(source_forge_root)
+    except ProjectMemoryConfigError as e:
+        return ActivationCopyResult(warning=f"Corrupt source memory config ({e}); skipping activation copy.")
+
+    try:
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, dest)
+    except OSError as e:
+        return ActivationCopyResult(warning=f"Could not copy memory activation: {e}")
+
+    return ActivationCopyResult(copied_path=dest)
+
+
+# ---------------------------------------------------------------------------
 # Activation resolver
 # ---------------------------------------------------------------------------
 

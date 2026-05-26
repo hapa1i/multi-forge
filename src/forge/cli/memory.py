@@ -1597,7 +1597,6 @@ def passport_show_cmd(path: str, as_json: bool) -> None:
     table.add_row("strategy", passport.update.strategy)
     table.add_row("mode", passport.update.mode)
     table.add_row("writers", passport.update.writers)
-    table.add_row("inherit_on_fork", str(passport.update.inherit_on_fork))
     if passport.update.compact_when:
         table.add_row("compact_when", passport.update.compact_when)
     if passport.update.shadow_path:
