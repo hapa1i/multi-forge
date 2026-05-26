@@ -192,9 +192,9 @@ def enable_cmd(session_name: str | None, review_only: bool) -> None:
 
 def _print_ambient_session_tip() -> None:
     if os.environ.get("FORGE_SESSION"):
-        console.print(
-            "[dim]Tip: Project-scoped enable applies to all sessions in this checkout. "
-            "Use --session to target a specific session.[/dim]"
+        print_tip(
+            "Project-scoped enable applies to all sessions in this checkout.",
+            "Use --session to target a specific session.",
         )
 
 
@@ -803,9 +803,12 @@ def _advise_extra(
     # Genuine session-only state (no passport, or passported-but-out-of-root):
     # if memory is off, nothing will process the extra yet.
     if not activation_on:
-        console.print(
-            "[dim]Tip: memory auto-update is not enabled here. Run 'forge memory enable' "
-            "(project) or 'forge memory enable --session <name>'.[/dim]"
+        print_tip(
+            "memory auto-update is not enabled here.",
+            commands=[
+                "forge memory enable              # project-scoped",
+                "forge memory enable --session <name>  # one session",
+            ],
         )
 
 
