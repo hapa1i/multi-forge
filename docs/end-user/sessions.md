@@ -147,8 +147,11 @@ forge session reset [key] [--all] [--session <name>]
 forge session shell [name]
 ```
 
-If Forge still sees a live launch in `~/.forge/sessions/active.json`, `forge session delete` warns before removing the
-session. `--yes` skips the confirmation prompt; `--force` overrides dirty-worktree and corruption guards.
+If Forge still sees a live launch in `~/.forge/sessions/active.json`, `forge session delete <name>` refuses to delete
+the session (exit 1) and `forge session delete --all` skips the live ones (deleting the rest). Liveness self-heals, so a
+session whose launcher already exited deletes normally. `--force` deletes a running session anyway (Forge state is
+removed while Claude keeps running until the launch exits) and also overrides dirty-worktree and corruption guards.
+`--yes` only skips confirmation prompts; it does not override the active-session guard.
 
 ### Session cleanup
 

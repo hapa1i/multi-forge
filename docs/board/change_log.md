@@ -25,6 +25,29 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/documentation-guidelines.md` "Change Log Policy" for
 > the full spec.
 
+## 2026-05-25
+
+### Protect live sessions from deletion
+
+**Goal**: Stop `forge session delete` from silently discarding a session's Forge state while it is still running in
+Claude Code, and stop a session deleted mid-run from crashing the launcher with a traceback.
+
+**Key changes**:
+
+- `forge session delete <name>` now refuses to delete a session with a live launch (exit 1) unless `--force`; `--yes` no
+  longer overrides this guard. `forge session delete --all` skips live sessions and deletes the rest (`--force` includes
+  them). Liveness uses the self-healing active registry, so a crashed/exited launcher still deletes without `--force`.
+- The post-launch backfill (`_infer_launch_confirmation`) tolerates a manifest deleted mid-run: an `exists()` preflight
+  skips the locked write (so the lock layer cannot resurrect the session as a lock-only directory), and a
+  `SessionFileNotFoundError` guard covers the narrow delete race. The launcher prints a "was deleted during this run"
+  note instead of a traceback.
+- **Behavior break** (research preview): deleting an active session previously warned and proceeded; it now blocks
+  without `--force`. Updated `docs/end-user/sessions.md`.
+
+**Verification**: `tests/regression/test_bug_delete_live_session.py` (preflight + race branch) and the expanded
+`tests/src/cli/test_session_commands.py` delete matrix (single/`--all` x force/no-force x tracked/orphan);
+`make pre-commit` clean.
+
 ## 2026-05-24
 
 ### Memory Enhancement Completion, Design Doc Sync, and Proposal Lifecycle

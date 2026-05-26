@@ -1331,8 +1331,8 @@ class TestSessionDelete:
 
         assert "Cancelled" in result.output
 
-    def test_delete_warns_when_session_is_active(self, runner: CliRunner, temp_env: Path) -> None:
-        """Delete confirmation should warn when runtime state says the session is live."""
+    def test_delete_blocks_active_session_without_force(self, runner: CliRunner, temp_env: Path) -> None:
+        """A live session is blocked before the confirm prompt unless --force."""
         runner.invoke(main, ["session", "start", "active-delete", "--no-launch"])
         ActiveSessionStore().upsert_session(
             "active-delete",
@@ -1342,15 +1342,18 @@ class TestSessionDelete:
             claude_session_id="uuid-live-123",
         )
 
-        result = runner.invoke(main, ["session", "delete", "active-delete"], input="n\n")
+        result = runner.invoke(main, ["session", "delete", "active-delete"])
 
-        assert result.exit_code == 0
+        assert result.exit_code == 1
         assert "appears to still be active" in result.output
-        assert "Launcher PID" in result.output
-        assert "Cancelled" in result.output
+        assert "still running in Claude Code" in result.output
+        assert "--force" in result.output
+        # Blocked before the confirmation prompt; session not deleted.
+        assert "Are you sure" not in result.output
+        assert "Deleted session" not in result.output
 
-    def test_delete_yes_shows_warning_but_skips_prompt(self, runner: CliRunner, temp_env: Path) -> None:
-        """--yes shows active-session warning (informational) but skips confirmation."""
+    def test_delete_yes_blocks_active_without_force(self, runner: CliRunner, temp_env: Path) -> None:
+        """--yes alone no longer deletes a live session; --force is required."""
         runner.invoke(main, ["session", "start", "forced-active-delete", "--no-launch"])
         ActiveSessionStore().upsert_session(
             "forced-active-delete",
@@ -1361,9 +1364,112 @@ class TestSessionDelete:
 
         result = runner.invoke(main, ["session", "delete", "forced-active-delete", "--yes"])
 
+        assert result.exit_code == 1
+        assert "appears to still be active" in result.output
+        assert "--force" in result.output
+        assert "Deleted session" not in result.output
+
+    def test_delete_force_deletes_active_session(self, runner: CliRunner, temp_env: Path) -> None:
+        """--force overrides the active-session guard and deletes (warning stays informational)."""
+        runner.invoke(main, ["session", "start", "force-active", "--no-launch"])
+        ActiveSessionStore().upsert_session(
+            "force-active",
+            worktree_path=str(temp_env),
+            launch_mode=LAUNCH_MODE_HOST,
+            launcher_pid=os.getpid(),
+        )
+
+        result = runner.invoke(main, ["session", "delete", "force-active", "--yes", "--force"])
+
         assert result.exit_code == 0
         assert "appears to still be active" in result.output
         assert "Deleted session" in result.output
+
+    def test_delete_orphan_blocks_active_session_without_force(self, runner: CliRunner, temp_env: Path) -> None:
+        """A live session whose index entry is gone (orphan dir) is still blocked unless --force."""
+        from forge.cli.session import _cwd_forge_root
+        from forge.session.index import IndexStore
+
+        runner.invoke(main, ["session", "start", "orphan-live", "--no-launch"])
+        fr = _cwd_forge_root()
+        ActiveSessionStore().upsert_session(
+            "orphan-live",
+            worktree_path=fr or str(temp_env),
+            forge_root=fr,
+            launch_mode=LAUNCH_MODE_HOST,
+            launcher_pid=os.getpid(),
+        )
+        # Drop the index entry, leaving the dir on disk + a live active entry.
+        IndexStore().remove_session("orphan-live")
+
+        result = runner.invoke(main, ["session", "delete", "orphan-live"])
+
+        assert result.exit_code == 1
+        assert "still running in Claude Code" in result.output
+        # Orphan cleanup must NOT run while the launch is live.
+        assert "Cleaned up orphaned" not in result.output
+
+    def test_delete_orphan_force_deletes_active_session(self, runner: CliRunner, temp_env: Path) -> None:
+        """--force lets orphan cleanup remove a live session's directory."""
+        from forge.cli.session import _cwd_forge_root
+        from forge.session.index import IndexStore
+
+        runner.invoke(main, ["session", "start", "orphan-force", "--no-launch"])
+        fr = _cwd_forge_root()
+        ActiveSessionStore().upsert_session(
+            "orphan-force",
+            worktree_path=fr or str(temp_env),
+            forge_root=fr,
+            launch_mode=LAUNCH_MODE_HOST,
+            launcher_pid=os.getpid(),
+        )
+        IndexStore().remove_session("orphan-force")
+
+        result = runner.invoke(main, ["session", "delete", "orphan-force", "--yes", "--force"])
+
+        assert result.exit_code == 0
+        assert "Cleaned up orphaned" in result.output
+
+    def test_delete_all_skips_active_sessions_without_force(self, runner: CliRunner, temp_env: Path) -> None:
+        """--all skips live sessions (deletes the rest) unless --force is given."""
+        runner.invoke(main, ["session", "start", "idle-one", "--no-launch"])
+        runner.invoke(main, ["session", "start", "live-one", "--no-launch"])
+        ActiveSessionStore().upsert_session(
+            "live-one",
+            worktree_path=str(temp_env),
+            launch_mode=LAUNCH_MODE_HOST,
+            launcher_pid=os.getpid(),
+        )
+
+        result = runner.invoke(main, ["session", "delete", "--all", "--yes"])
+
+        assert result.exit_code == 0
+        assert "Skipping" in result.output
+        assert "live-one" in result.output
+        assert "--force" in result.output
+
+        list_result = runner.invoke(main, ["session", "list"])
+        assert "idle-one" not in list_result.output
+        assert "live-one" in list_result.output
+
+    def test_delete_all_force_deletes_active_sessions(self, runner: CliRunner, temp_env: Path) -> None:
+        """--all --force deletes live sessions too."""
+        runner.invoke(main, ["session", "start", "live-a", "--no-launch"])
+        runner.invoke(main, ["session", "start", "live-b", "--no-launch"])
+        for nm in ("live-a", "live-b"):
+            ActiveSessionStore().upsert_session(
+                nm,
+                worktree_path=str(temp_env),
+                launch_mode=LAUNCH_MODE_HOST,
+                launcher_pid=os.getpid(),
+            )
+
+        result = runner.invoke(main, ["session", "delete", "--all", "--yes", "--force"])
+
+        assert result.exit_code == 0
+        list_result = runner.invoke(main, ["session", "list"])
+        assert "live-a" not in list_result.output
+        assert "live-b" not in list_result.output
 
     def test_delete_multiple_sessions(self, runner: CliRunner, temp_env: Path) -> None:
         """Should delete multiple sessions in one command."""
@@ -1447,8 +1553,8 @@ class TestSessionDelete:
         assert "all 2 session(s)" in result.output
         assert "Cancelled" in result.output
 
-    def test_delete_all_warns_about_active_sessions(self, runner: CliRunner, temp_env: Path) -> None:
-        """--all confirmation should summarize live sessions before deletion."""
+    def test_delete_all_reports_skipped_active_sessions(self, runner: CliRunner, temp_env: Path) -> None:
+        """--all (no --force) reports and skips live sessions, deleting only the rest."""
         runner.invoke(main, ["session", "start", "all-active-1", "--no-launch"])
         runner.invoke(main, ["session", "start", "all-active-2", "--no-launch"])
         ActiveSessionStore().upsert_session(
@@ -1461,8 +1567,10 @@ class TestSessionDelete:
         result = runner.invoke(main, ["session", "delete", "--all"], input="n\n")
 
         assert result.exit_code == 0
-        assert "appear to still be active" in result.output
+        assert "Skipping" in result.output
         assert "all-active-2" in result.output
+        # Only the idle session remains as a deletion candidate.
+        assert "all 1 session(s)" in result.output
         assert "Cancelled" in result.output
 
     def test_delete_dirty_worktree_shows_force_tip(self, runner: CliRunner, temp_env: Path) -> None:

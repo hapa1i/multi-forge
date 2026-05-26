@@ -270,7 +270,20 @@ def _infer_launch_confirmation(
         if state.confirmed.confirmed_by is None:
             state.confirmed.confirmed_by = "cli:launch:inferred"
 
-    store.update(timeout_s=5.0, mutate=_mutate)
+    # Preflight: if the session was deleted while Claude ran, skip the backfill.
+    # Entering store.update() would make the lock layer recreate the session dir
+    # to hold its lockfile (file_lock mkdir-parents), resurrecting a deleted
+    # session as a lock-only directory.
+    if not store.exists():
+        logger.debug("Skipping launch confirmation: session %r manifest already removed", manifest.name)
+        return
+
+    try:
+        store.update(timeout_s=5.0, mutate=_mutate)
+    except SessionFileNotFoundError:
+        # Deleted in the narrow window between the exists() check and the locked
+        # read; degrade quietly (no traceback).
+        logger.debug("Skipping launch confirmation: session %r manifest removed mid-run", manifest.name)
 
 
 def _resolve_manifest_prompt_file(manifest: SessionState) -> Path | None:
@@ -595,7 +608,10 @@ def _launch_claude_for_session(
     if exit_code == 0 and not fork_session:
         _sess()._infer_launch_confirmation(store=store, manifest=manifest, session_id=resume_id or session_id)
 
-    _print_post_exit_tip(manifest)
+    if store.exists():
+        _print_post_exit_tip(manifest)
+    elif not manifest.is_incognito and manifest.name:
+        console.print(f"\n[dim]Session '{manifest.name}' was deleted during this run.[/dim]")
 
     return exit_code
 

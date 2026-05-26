@@ -97,7 +97,7 @@ __all__ = [
 @click.argument("names", nargs=-1)
 @click.option("--all", "-a", "delete_all", is_flag=True, help="Delete all sessions")
 @click.option("--yes", "-y", is_flag=True, help="Skip confirmation prompts")
-@click.option("--force", "-f", is_flag=True, help="Override dirty-worktree and corruption guards")
+@click.option("--force", "-f", is_flag=True, help="Override dirty-worktree, corruption, and active-session guards")
 @click.option("--keep-transcripts", "-k", is_flag=True, help="Keep transcript files")
 @click.option("--keep-worktree", "-K", is_flag=True, help="Preserve worktree directory")
 @click.option("--delete-branch", "-d", is_flag=True, help="Also delete git branch")
@@ -150,10 +150,29 @@ def delete(
             for target in targets
             if (active_entry := _get_active_session_entry(target, forge_root=_fr)) is not None
         ]
+
+        # Active sessions are protected unless --force: skip the live ones and
+        # delete the rest rather than aborting the whole batch.
+        if active_targets and not force:
+            live_names = {target for target, _ in active_targets}
+            targets = [t for t in targets if t not in live_names]
+            console.print(f"[yellow]Skipping[/yellow] {len(live_names)} session(s) still running in Claude Code:")
+            for target, active_entry in active_targets:
+                details = [active_entry.launch_mode]
+                if active_entry.container_name:
+                    details.append(active_entry.container_name)
+                elif active_entry.launcher_pid is not None:
+                    details.append(f"pid {active_entry.launcher_pid}")
+                console.print(f"  - {target} ({', '.join(details)})")
+            console.print("[dim]Tip: exit those sessions first, or re-run with --force to delete them too.[/dim]")
+            if not targets:
+                return
+            console.print()
+
         console.print(f"About to delete [bold]all {len(targets)} session(s)[/bold]:")
         for t in targets:
             console.print(f"  - {t}")
-        if active_targets:
+        if active_targets and force:
             console.print()
             console.print(
                 "[yellow]Warning:[/yellow] "
@@ -171,7 +190,7 @@ def delete(
             )
         console.print()
         if not yes:
-            if not click.confirm("Are you sure you want to delete all sessions?"):
+            if not click.confirm(f"Are you sure you want to delete these {len(targets)} session(s)?"):
                 console.print("[dim]Cancelled[/dim]")
                 sys.exit(0)
     else:
@@ -218,6 +237,7 @@ def delete(
                 keep_worktree=keep_worktree,
                 delete_branch=delete_branch,
                 forge_root=actual_fr,
+                warn_active=not delete_all,
             )
             console.print(f"Deleted session [green]{name}[/green]")
             deleted += 1
@@ -263,18 +283,34 @@ def _delete_single_session(
     keep_worktree: bool,
     delete_branch: bool,
     forge_root: str | None = None,
+    warn_active: bool = True,
 ) -> None:
     """Delete a single session, handling orphans and confirmation.
 
     Args:
         yes: Skip confirmation prompts (informational output stays visible).
-        force: Override dirty-worktree and corruption guards.
+        force: Override dirty-worktree, corruption, and active-session guards.
+        warn_active: Print the per-session live-launch warning. The --all path
+            passes False because it already summarizes active sessions, avoiding
+            a duplicate warning.
 
     Raises:
-        SystemExit: If user cancels or session not found.
+        SystemExit: If the user cancels, the session is not found, or it is still
+            running in Claude Code without --force.
         DirtyWorktreeError: If worktree has uncommitted changes and not force.
         ForgeSessionError: On other session errors.
     """
+    # Live sessions are protected before any deletion path (index-tracked or
+    # orphaned directory) so a running launch cannot lose its state without --force.
+    active_entry = _get_active_session_entry(name, forge_root=forge_root)
+    if active_entry is not None:
+        if warn_active:
+            _print_active_delete_warning(name, active_entry)
+        if not force:
+            console.print("[red]Error:[/red] refusing to delete a session that is still running in Claude Code.")
+            console.print("[dim]Tip: exit that Claude Code session first, or pass --force to delete it anyway.[/dim]")
+            raise SystemExit(1)
+
     if not manager.session_exists(name, forge_root=forge_root):
         from forge.session.store import SessionStore
 
@@ -307,10 +343,6 @@ def _delete_single_session(
         console.print(f"[red]Error:[/red] session '{name}' not found")
         raise SystemExit(1)
 
-    # Informational output -- always visible (--yes only skips prompts, not info)
-    active_entry = _get_active_session_entry(name, forge_root=forge_root)
-    if active_entry is not None:
-        _print_active_delete_warning(name, active_entry)
     try:
         manifest = manager.get_session(name, forge_root=forge_root)
 
