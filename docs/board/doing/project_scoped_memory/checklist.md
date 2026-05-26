@@ -23,14 +23,9 @@ wc -l docs/board/doing/project_scoped_memory/checklist.md
 
 ## Current Focus
 
-Slice 2 **shipped** (see `change_log.md` 2026-05-25): `forge memory track` is now passport-only and sessionless;
-`forge memory extra add` is the participation-only session escape hatch (`origin="extra"`, no passport); `--session` on
-`track` is a tombstone. `DesignatedDoc.origin` added/persisted/inherited; `list`/`status` expose it; `untrack` warns on
-remaining passports; legacy warning skips extras. Shadow discovery + collision moved off the manifest onto passport
-scans (`scan_shadow_passports`, `check_shadow_path_collision_in_roots`); dead `check_shadow_path_collision` removed.
-Full `tests/src -m "not integration"` green (4689 passed); `mypy` clean. Next: closeout (promote impl_notes after human
-review; move card to `done/` after merge), then Slice 3 (decommission/deprecate `designated_docs`, passport-removal
-path) remains deferred.
+Slice 2 **shipped** (see `change_log.md` 2026-05-25). Slice 3 **active**: fork activation copy + retire
+`--inherit-memory`. Thesis: memory inheritance is no longer a thing -- project memory is discovered live from passports;
+activation follows Forge-created worktrees; only session extras can be inherited.
 
 ## Phase 0 - Baseline & Decisions
 
@@ -224,14 +219,83 @@ Acceptance tests (Slice 2):
 | legacy warning skips extras | extra entry (`origin="extra"`), no passport     | no "re-track to attach passports" warning              | `cli/test_memory.py`            |
 | legacy still warns          | legacy entry (`origin=None`), no passport       | warning still emitted; remediation names the new verbs | `cli/test_memory.py`            |
 
-## Phase 3 - Slice 3 (optional): Decommission / Deprecate `designated_docs`
+## Phase 3 - Slice 3: Fork activation copy + retire `--inherit-memory`
 
-- [ ] Decide: deprecate `designated_docs` or retain it as the per-session extras escape hatch.
-  - Assertion: decision recorded with rationale; if retained, it is the *only* per-session participation surface.
-- [ ] Add a passport-removal path.
-  - Assertion: `forge memory passport remove` (or `untrack --remove-passport`) makes "no longer a memory doc" a command,
-    not hand-editing.
-- [ ] If deprecating: helpful failure + changelog + reset guidance (coding-standards §5).
+Thesis: memory inheritance is no longer a thing. Project memory is discovered live from passports; activation follows
+Forge-created worktrees; only session extras can be inherited.
+
+### Fork activation copy
+
+- [ ] Copy `.forge/memory.yaml` into the new checkout on `fork --worktree` by default.
+  - Assertion: when source `.forge/memory.yaml` exists and destination does not, the file is copied after the worktree
+    is created. Print one dim line: `Copied memory activation to <path>`. No prompt.
+  - Location: `session_fork.py` (after worktree creation, before session launch).
+- [ ] `fork --into` does NOT copy activation.
+  - Assertion: target checkout already exists and may have its own local consent; no implicit copy. Consistent with
+    `--into` rules in `design.md` (target must already have Forge enabled).
+- [ ] Never overwrite an existing destination `.forge/memory.yaml`.
+  - Assertion: if destination file exists, skip copy silently. The destination checkout's activation is authoritative.
+- [ ] `--no-copy-memory-activation` opt-out flag on `fork --worktree`.
+  - Assertion: flag suppresses the copy; child checkout starts with no memory activation. Flag is a no-op when source
+    config does not exist.
+- [ ] Corrupt source config: warn and skip copy (do not block the fork).
+  - Assertion: `ProjectMemoryConfigError` during read -> warning printed, fork proceeds without activation copy.
+
+### Retire `--inherit-memory`
+
+- [ ] Replace `--inherit-memory all|none|shadowed` with `--inherit-extras` / `--no-inherit-extras` on both `fork` and
+  `resume --fresh`.
+  - Assertion: default inherits extras (`origin="extra"` entries in `designated_docs`). `--no-inherit-extras` strips
+    session extras from the child. Project-discovered docs (passport-scanned) are not affected by this flag -- they are
+    discovered live in the child checkout.
+  - Location: `memory_inheritance.py` (core logic), `session_fork.py` + `session_lifecycle.py` (CLI flags).
+- [ ] Simplify `memory_inheritance.py`: remove `InheritMemoryMode` enum and the `all|none|shadowed` branching.
+  - Assertion: `filter_docs_for_inheritance` and `apply_memory_inheritance` reduce to extras-only logic. Shadow
+    materialization (`materialize_inherited_shadows`) is removed -- shadows are passport-discovered in the child
+    checkout, not carried by manifest.
+- [ ] `--inherit-memory` becomes a helpful tombstone (coding-standards §5).
+  - Assertion: errors with actionable replacement guidance per value:
+    - `all`: "No longer needed; passports are discovered from the project. Use --inherit-extras if you meant session
+      extras."
+    - `none`: "Use --no-inherit-extras and --no-copy-memory-activation."
+    - `shadowed`: "Shadow docs are passport-discovered; use 'forge memory track --propose'."
+- [ ] `resume --fresh`: same `--inherit-extras` / `--no-inherit-extras` semantics.
+  - Assertion: `session_lifecycle.py` resume path uses the same extras-only inheritance as fork. `--inherit-memory`
+    tombstone applies here too.
+- [ ] `designated_docs` retained as extras backing store only.
+  - Assertion: decision recorded. `designated_docs` is the *only* per-session participation surface; it no longer
+    carries project-discovered docs or participates in inheritance of passport-scanned memory.
+
+### Passport removal path (deferred)
+
+- [ ] Decide: include `forge memory passport remove` / `untrack --remove-passport` in this slice or defer further.
+  - Note: orthogonal to inheritance retirement. Can ship Slice 3 without it.
+
+### Docs and design sync
+
+- [ ] Update `design.md §5.6.4` (memory inheritance on fork and fresh resume).
+  - Assertion: reflects the new model -- activation copy for Forge-created worktrees, extras-only inheritance. No
+    `--inherit-memory`. `--into` exception documented.
+- [ ] Update `docs/end-user/handoff.md` fork/resume memory sections.
+- [ ] Changelog entry with goal/key changes/verification.
+
+Acceptance tests (Slice 3):
+
+| Test                                        | Fixture                              | Assertion                           | Test File                            |
+| ------------------------------------------- | ------------------------------------ | ----------------------------------- | ------------------------------------ |
+| worktree fork copies activation             | source `.forge/memory.yaml`, no dest | dest file written; dim line printed | `session/test_memory_inheritance.py` |
+| worktree fork skips existing dest           | source + dest both exist             | dest unchanged, no error            | `session/test_memory_inheritance.py` |
+| worktree fork corrupt source                | corrupt `.forge/memory.yaml`         | warning, fork succeeds, no dest     | `session/test_memory_inheritance.py` |
+| worktree fork `--no-copy-memory-activation` | source present, flag set             | no dest file created                | `cli/test_session_commands.py`       |
+| `--into` no activation copy                 | source present, `--into` target      | no copy attempted                   | `cli/test_session_commands.py`       |
+| `--inherit-extras` default                  | fork with `origin="extra"` docs      | child has extras                    | `session/test_memory_inheritance.py` |
+| `--no-inherit-extras` strips extras         | fork with extras, flag set           | child `designated_docs` empty       | `session/test_memory_inheritance.py` |
+| `--no-inherit-extras` ignores project docs  | passported docs in roots             | not affected by flag                | `session/test_memory_inheritance.py` |
+| `--inherit-memory` tombstone `all`          | `--inherit-memory all`               | error with replacement guidance     | `cli/test_session_commands.py`       |
+| `--inherit-memory` tombstone `none`         | `--inherit-memory none`              | error with replacement guidance     | `cli/test_session_commands.py`       |
+| `--inherit-memory` tombstone `shadowed`     | `--inherit-memory shadowed`          | error with replacement guidance     | `cli/test_session_commands.py`       |
+| resume `--inherit-extras`                   | `resume --fresh` with extras         | child has extras                    | `cli/test_session_commands.py`       |
+| resume `--no-inherit-extras`                | `resume --fresh` with extras, flag   | child `designated_docs` empty       | `cli/test_session_commands.py`       |
 
 ## Open Decisions
 
@@ -249,11 +313,14 @@ Tracks Forge-local execution decisions. For broader card framing, see
   `memory.designated_docs`, never a passport); `--as` required; resolves+echoes ambient `$FORGE_SESSION`; three-way
   warning keyed on the passport's `writers` (cases A/B/C in Phase 2). Rejected `track --session --extra` because it
   re-conflates the two lifetimes the slice splits apart.
-- [ ] `fork --worktree`: copy the local `.forge/memory.yaml`, or only warn that the new checkout needs
-  `forge memory enable`? -- DEFERRED out of Slice 1 (fork-path; reverses the card's consent model as a default). Slice-1
-  default: new checkout requires `forge memory enable`.
-- [ ] Deprecate `--inherit-memory` for doc participation once git carries passports; warn on uncommitted passports
-  before a worktree fork? -- still open (Slice 3).
+- [x] `fork --worktree`: copy the local `.forge/memory.yaml`, or only warn that the new checkout needs
+  `forge memory enable`? -- SETTLED (Slice 3): copy by default for Forge-created worktrees (`fork --worktree`); skip for
+  `--into` (existing checkout, own consent). Never overwrite existing dest. `--no-copy-memory-activation` opt-out. The
+  consent surface is "I am using Forge to create a child worktree from this active checkout."
+- [x] Deprecate `--inherit-memory` for doc participation once git carries passports; warn on uncommitted passports
+  before a worktree fork? -- SETTLED (Slice 3): retire `--inherit-memory` entirely. Replace with narrower
+  `--inherit-extras` / `--no-inherit-extras` (extras only, not project memory). Old values become helpful tombstones.
+  Uncommitted passport warning deferred (orthogonal to inheritance retirement).
 
 ## Closeout (per [work-board contract](../../../developer/work-board-contract.md#closeout))
 
