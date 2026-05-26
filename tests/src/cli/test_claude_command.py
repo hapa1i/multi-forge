@@ -9,6 +9,7 @@ from unittest.mock import patch
 from click.testing import CliRunner
 
 from forge.cli.main import main
+from forge.proxy.proxies import ProxyEntry
 
 # Mock target: invoke_claude is imported inside start_cmd
 _INVOKE = "forge.session.claude.invoke.invoke_claude"
@@ -223,6 +224,13 @@ def test_extra_args_forwarded(tmp_path, monkeypatch):
 def test_proxy_launch_by_template_injects_resolved_proxy_addendum(tmp_path, monkeypatch):
     """Bare launcher resolves template names to proxy IDs before addendum lookup."""
     _setup_proxy_env(tmp_path, monkeypatch)
+    entry = ProxyEntry(
+        proxy_id="proxy_1",
+        template="litellm-openai",
+        base_url="http://localhost:8085",
+        port=8085,
+        status="healthy",
+    )
 
     captured = {}
 
@@ -236,6 +244,7 @@ def test_proxy_launch_by_template_injects_resolved_proxy_addendum(tmp_path, monk
         return 0
 
     with (
+        patch("forge.proxy.proxy_orchestrator.ensure_proxy", return_value=(entry, False)),
         patch("forge.cli.session_addendum.resolve_addendum_content_for_proxy", side_effect=fake_resolve),
         patch(_INVOKE, side_effect=fake_invoke),
     ):
@@ -343,6 +352,13 @@ def test_direct_launch_no_model_when_unconfigured(tmp_path, monkeypatch):
 def test_proxy_by_template_name(tmp_path, monkeypatch):
     """--proxy accepts a template name when exactly one active proxy uses it."""
     _setup_proxy_env(tmp_path, monkeypatch)
+    entry = ProxyEntry(
+        proxy_id="proxy_1",
+        template="litellm-openai",
+        base_url="http://localhost:8085",
+        port=8085,
+        status="healthy",
+    )
 
     captured = {}
 
@@ -350,7 +366,10 @@ def test_proxy_by_template_name(tmp_path, monkeypatch):
         captured["env_vars"] = env_vars or {}
         return 0
 
-    with patch(_INVOKE, side_effect=fake_invoke):
+    with (
+        patch("forge.proxy.proxy_orchestrator.ensure_proxy", return_value=(entry, False)),
+        patch(_INVOKE, side_effect=fake_invoke),
+    ):
         runner = CliRunner()
         result = runner.invoke(main, ["claude", "start", "--proxy", "litellm-openai"])
 
@@ -358,8 +377,13 @@ def test_proxy_by_template_name(tmp_path, monkeypatch):
     assert captured["env_vars"]["ANTHROPIC_BASE_URL"] == "http://localhost:8085"
 
 
-def test_proxy_template_inactive_only(tmp_path, monkeypatch):
-    """Template match fails when all matching proxies are stopped."""
+def test_proxy_unknown_name_errors(tmp_path, monkeypatch):
+    """An unknown --proxy (no matching proxy_id and no template) errors with a hint.
+
+    A stopped proxy whose template still exists now auto-starts instead (covered by
+    ensure_proxy unit tests); the only remaining hard failure is a name that matches
+    neither a proxy nor a template.
+    """
     forge_home = tmp_path / "forge_home"
     project_root = tmp_path / "project"
     project_root.mkdir()
@@ -370,14 +394,14 @@ def test_proxy_template_inactive_only(tmp_path, monkeypatch):
         template="litellm-openai",
         base_url="http://localhost:8085",
         port=8085,
-        status="stopped",
+        status="healthy",
     )
     monkeypatch.chdir(project_root)
 
     runner = CliRunner()
-    result = runner.invoke(main, ["claude", "start", "--proxy", "litellm-openai"])
+    result = runner.invoke(main, ["claude", "start", "--proxy", "totally-unknown-xyz"])
     assert result.exit_code == 1
-    assert "none are active" in result.output
+    assert "forge proxy template list" in result.output
 
 
 def test_proxy_template_ambiguous(tmp_path, monkeypatch):

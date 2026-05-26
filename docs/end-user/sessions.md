@@ -653,8 +653,12 @@ If you run sessions concurrently and both write code, use `--worktree` to avoid 
 
 1. Exact proxy_id match (any status)
 2. Active template match (healthy/starting only; fails if ambiguous)
+3. Auto-start from a config template of that name when nothing is running (reuse/adopt/spawn)
 
-All commands (`start`, `resume`, `fork`, `claude start`) use the same `resolve_proxy()` function with full healthcheck.
+All launch commands (`start`, `resume`, `fork`, `claude start`) use the same `ensure_proxy()` function: it resolves via
+the order above, auto-starts from a matching template when no proxy is running, then healthchecks. A name that matches
+neither a running proxy nor a template fails with a `forge proxy template list` hint. `--supervisor-proxy` resolves the
+same way.
 
 `--template` and `--base-url` are deprecated hidden aliases for `--proxy` (warn on use).
 

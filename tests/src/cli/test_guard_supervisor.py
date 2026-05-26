@@ -602,9 +602,9 @@ class TestSupervisorProxyFlags:
 
     @patch("forge.guard.semantic.supervisor.validate_supervisor_target", side_effect=_validate_supervisor_target)
     @patch("forge.guard.semantic.supervisor.apply_supervisor_routing")
-    @patch("forge.guard.semantic.supervisor.preflight_supervisor_proxy", return_value="litellm-gemini")
+    @patch("forge.guard.semantic.supervisor.ensure_supervisor_proxy", return_value=("litellm-gemini", False))
     def test_supervisor_proxy_passed_to_apply(
-        self, mock_preflight, mock_apply, mock_validate, temp_guard_env: Path
+        self, mock_ensure, mock_apply, mock_validate, temp_guard_env: Path
     ) -> None:
         project = temp_guard_env
         store = SessionStore(str(project), "test-session")
@@ -621,6 +621,6 @@ class TestSupervisorProxyFlags:
             )
 
         assert result.exit_code == 0, f"Expected exit 0, got {result.exit_code}: {result.output}"
-        mock_preflight.assert_called_once_with("litellm-gemini")
+        mock_ensure.assert_called_once_with("litellm-gemini")
         mock_apply.assert_called_once()
         assert mock_apply.call_args.kwargs.get("supervisor_proxy") == "litellm-gemini"

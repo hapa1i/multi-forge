@@ -964,13 +964,16 @@ def launch_new_session(
             console.print(f"[red]Error:[/red] {e}")
             return 1
     if supervisor_proxy:
-        from forge.guard.semantic.supervisor import preflight_supervisor_proxy
+        from forge.guard.semantic.supervisor import ensure_supervisor_proxy
 
         try:
-            supervisor_proxy = preflight_supervisor_proxy(supervisor_proxy)
+            _sup_proxy_id, _sup_started = ensure_supervisor_proxy(supervisor_proxy)
         except ValueError as e:
             console.print(f"[red]Error:[/red] {e}")
             return 1
+        if _sup_started:
+            console.print(f"[dim]Started proxy '{_sup_proxy_id}' from template '{supervisor_proxy}'.[/dim]")
+        supervisor_proxy = _sup_proxy_id
 
     pre_seeded_uuid = str(_uuid.uuid4())
     try:

@@ -20,10 +20,9 @@ from rich.console import Console
 
 from forge.core.paths import display_path
 from forge.proxy.proxies import (
+    ProxyNotFoundError,
     ProxyRegistryCorruptedError,
-    ProxyRegistryStore,
     ProxyResolutionError,
-    resolve_proxy,
 )
 from forge.session.direct_model import apply_direct_model_env
 
@@ -208,19 +207,21 @@ def start_cmd(
     proxy_display: str | None = None
 
     if proxy_id:
-        proxy_store = ProxyRegistryStore()
+        from forge.proxy.proxy_orchestrator import ProxyStartError, ensure_proxy
 
         try:
-            registry = proxy_store.read()
+            entry, started = ensure_proxy(proxy_id)
         except ProxyRegistryCorruptedError as e:
             click.echo(f"Error: {e}")
             sys.exit(1)
-
-        try:
-            entry = resolve_proxy(registry, proxy_id)
-        except ProxyResolutionError as e:
+        except (ProxyResolutionError, ProxyStartError) as e:
             click.echo(f"Error: {e}")
+            if isinstance(e, ProxyNotFoundError):
+                click.echo("Tip: Run 'forge proxy template list' to see available templates.")
             sys.exit(1)
+
+        if started:
+            console.print(f"[dim]Started proxy '{entry.proxy_id}' from template '{proxy_id}'.[/dim]")
 
         try:
             _healthcheck_proxy(

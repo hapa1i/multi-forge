@@ -119,6 +119,12 @@ forge proxy clean                # Clean up stale proxies
 forge proxy validate <proxy_id>  # Validate config
 ```
 
+**Auto-start from a template.** `--proxy` (on `forge session start/resume/fork` and `forge claude start`) and
+`--supervisor-proxy` (on `forge session start/fork` and `forge guard supervise`) accept a **template name** as well as a
+running proxy id. If no proxy is running for that name, Forge starts one from the matching template -- no separate
+`forge proxy create` needed -- and prints the proxy it started (stop it later with `forge proxy stop <proxy_id>`). A
+name that matches neither a running proxy nor a template fails with a hint to run `forge proxy template list`.
+
 ---
 
 ## OpenRouter (direct, no LiteLLM)

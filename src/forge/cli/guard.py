@@ -917,17 +917,10 @@ def supervise_cmd(
         from forge.guard.semantic.supervisor import (
             apply_supervisor_routing,
             apply_supervisor_to_intent,
-            preflight_supervisor_proxy,
+            ensure_supervisor_proxy,
             validate_supervisor_target,
         )
         from forge.session.models import SupervisorConfig
-
-        if supervisor_proxy:
-            try:
-                supervisor_proxy = preflight_supervisor_proxy(supervisor_proxy)
-            except ValueError as e:
-                console.print(f"[red]Error:[/red] {e}")
-                sys.exit(1)
 
         manifest = store.read()
         # Validate supervisor target in the selected session's scope, not CWD.
@@ -939,6 +932,19 @@ def supervise_cmd(
         except ValueError as e:
             console.print(f"[red]Error:[/red] {e}")
             sys.exit(1)
+
+        # Resolve/auto-start the supervisor proxy only after the target validates, so a
+        # bad target can't leave a freshly started proxy running.
+        if supervisor_proxy:
+            try:
+                _sup_proxy_id, _sup_started = ensure_supervisor_proxy(supervisor_proxy)
+            except ValueError as e:
+                console.print(f"[red]Error:[/red] {e}")
+                sys.exit(1)
+            if _sup_started:
+                console.print(f"[dim]Started proxy '{_sup_proxy_id}' from template '{supervisor_proxy}'.[/dim]")
+            supervisor_proxy = _sup_proxy_id
+
         current_template = manifest.intent.proxy.template if manifest.intent.proxy else None
         current_proxy_id = None
         if manifest.intent.proxy and hasattr(manifest.intent.proxy, "proxy_id"):

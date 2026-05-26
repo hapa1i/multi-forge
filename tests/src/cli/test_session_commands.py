@@ -3585,7 +3585,7 @@ class TestSupervisorProxyFlags:
                 ],
             )
         assert result.exit_code == 1
-        assert "not found" in result.output
+        assert "no template named" in result.output
         manager = SessionManager()
         sessions = {n for n, _ in manager.list_sessions()}
         assert "bad-proxy-test" not in sessions
@@ -3599,7 +3599,7 @@ class TestSupervisorProxyFlags:
             ["session", "fork", "fork-badproxy-parent", "--supervise", "--supervisor-proxy", "nonexistent-proxy"],
         )
         assert result.exit_code == 1
-        assert "not found" in result.output
+        assert "no template named" in result.output
         manager = SessionManager()
         sessions = {n for n, _ in manager.list_sessions()}
         assert "fork-badproxy-parent" in sessions  # parent still exists

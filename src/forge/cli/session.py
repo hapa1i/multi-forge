@@ -94,22 +94,24 @@ def _resolve_routing_from_cli(
 
     from forge.cli.claude import _get_context_limit_for_proxy, _healthcheck_proxy
     from forge.proxy.proxies import (
+        ProxyNotFoundError,
         ProxyRegistryCorruptedError,
-        ProxyRegistryStore,
         ProxyResolutionError,
-        resolve_proxy,
     )
+    from forge.proxy.proxy_orchestrator import ProxyStartError, ensure_proxy
 
-    store = ProxyRegistryStore()
     try:
-        registry = store.read()
+        entry, started = ensure_proxy(proxy_name)
     except ProxyRegistryCorruptedError as e:
         raise click.ClickException(str(e))
+    except (ProxyResolutionError, ProxyStartError) as e:
+        msg = str(e)
+        if isinstance(e, ProxyNotFoundError):
+            msg += "\nTip: Run 'forge proxy template list' to see available templates."
+        raise click.ClickException(msg)
 
-    try:
-        entry = resolve_proxy(registry, proxy_name)
-    except ProxyResolutionError as e:
-        raise click.ClickException(str(e))
+    if started:
+        console.print(f"[dim]Started proxy '{entry.proxy_id}' from template '{proxy_name}'.[/dim]")
 
     try:
         _healthcheck_proxy(
