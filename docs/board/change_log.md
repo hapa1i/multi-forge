@@ -26,6 +26,48 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/work-board-contract.md` "Change Log Policy" for the
 > full spec.
 
+## 2026-05-26
+
+### Phase 1 / Slice 3: Fork activation copy + retire `--inherit-memory`
+
+**Goal**: Make memory activation follow Forge-created worktrees by default and replace the multi-mode `--inherit-memory`
+flag with a narrower extras-only inheritance model.
+
+**Key changes**:
+
+- `fork --worktree` copies `.forge/memory.yaml` from parent to child checkout by default (never overwrites existing;
+  `--no-copy-memory-activation` opt-out; corrupt source warns and skips). `--into` forks skip the copy.
+- Replaced `--inherit-memory all|none|shadowed` with `--inherit-extras` / `--no-inherit-extras` on both `fork` and
+  `resume --fresh`. Default inherits `origin="extra"` entries only; project-discovered docs are not affected.
+- Simplified `memory_inheritance.py`: removed `InheritMemoryMode` enum and multi-mode branching; extras-only filter.
+- `--inherit-memory` is now a hidden tombstone with per-value replacement guidance.
+- Docs: updated `design.md §5.6.4`, `docs/end-user/handoff.md` fork/resume memory sections.
+
+**Verification**: `test_memory_inheritance.py` (25 tests) + `test_project_memory.py::TestCopyMemoryActivation` (5 tests)
+pass; full `tests/src -m "not integration"` green (4718 passed).
+
+### CLI command-shape cleanup: groups orient, leaves act
+
+**Goal**: Make confusing bare CLI invocations follow one documented rule before PR: non-leaf command groups print help,
+while leaf commands perform a sensible default action.
+
+**Key changes**:
+
+- Documented the command-shape invariant in `docs/developer/coding-standards.md` and `docs/design.md`: groups orient,
+  leaves act, removed group-level shortcuts may remain only as non-executing tombstones.
+- `forge config` now prints help; `forge config show` is the explicit command that displays and auto-creates
+  `~/.forge/config.yaml`. Updated `docs/end-user/configs.md` and design appendix references.
+- Replaced the group-level `forge search -q/--query` action with `forge search query <terms>`. The old `-q` path now
+  exits with a replacement tip instead of executing old behavior. Updated end-user docs, QA/walkthrough checklists, and
+  tests/integration references.
+- `forge proxy metrics` with multiple registered proxies now behaves like an acting leaf and shows all metrics
+  (equivalent to `--all`) instead of erroring. `--json` follows the same implicit-all behavior.
+
+**Verification**:
+`uv run pytest tests/src/cli/test_config_cli.py tests/src/cli/test_proxy_commands.py tests/src/cli/test_search.py -q`
+(146 passed); `make pre-commit`; smoke-checked `forge config`, `forge config -h`, `forge search -h`, and the
+`forge search -q` tombstone.
+
 ## 2026-05-25
 
 ### Phase 1 / Slice 2: Sessionless `track` + participation-only `extra add`
@@ -55,32 +97,6 @@ activation.
 **Verification**: `tests/src/cli/test_memory.py` and
 `tests/src/session/{test_handoff_agent,test_memory_inheritance,test_project_memory,test_shadow_curation}.py` pass; full
 `tests/src -m "not integration"` green (4689 passed); `mypy` clean on touched modules.
-
-## 2026-05-26
-
-### CLI command-shape cleanup: groups orient, leaves act
-
-**Goal**: Make confusing bare CLI invocations follow one documented rule before PR: non-leaf command groups print help,
-while leaf commands perform a sensible default action.
-
-**Key changes**:
-
-- Documented the command-shape invariant in `docs/developer/coding-standards.md` and `docs/design.md`: groups orient,
-  leaves act, removed group-level shortcuts may remain only as non-executing tombstones.
-- `forge config` now prints help; `forge config show` is the explicit command that displays and auto-creates
-  `~/.forge/config.yaml`. Updated `docs/end-user/configs.md` and design appendix references.
-- Replaced the group-level `forge search -q/--query` action with `forge search query <terms>`. The old `-q` path now
-  exits with a replacement tip instead of executing old behavior. Updated end-user docs, QA/walkthrough checklists, and
-  tests/integration references.
-- `forge proxy metrics` with multiple registered proxies now behaves like an acting leaf and shows all metrics
-  (equivalent to `--all`) instead of erroring. `--json` follows the same implicit-all behavior.
-
-**Verification**:
-`uv run pytest tests/src/cli/test_config_cli.py tests/src/cli/test_proxy_commands.py tests/src/cli/test_search.py -q`
-(146 passed); `make pre-commit`; smoke-checked `forge config`, `forge config -h`, `forge search -h`, and the
-`forge search -q` tombstone.
-
-## 2026-05-25
 
 ### CLI tip consistency: shared recovery-output helpers
 

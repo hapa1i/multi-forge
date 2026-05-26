@@ -215,6 +215,38 @@ The `claude -p` subprocess runs with `cwd=forge_root`.
 
 ---
 
+## Memory on fork and resume
+
+When you fork a session or resume with `--fresh`, memory propagation follows two separate rules:
+
+### Activation copy (worktree forks)
+
+`forge session fork --worktree` copies `.forge/memory.yaml` from the parent checkout into the new worktree by default.
+This ensures the child checkout has the same handoff-agent activation as the parent without requiring a separate
+`forge memory enable`.
+
+- `--into` forks do **not** copy activation (the existing checkout may have its own).
+- An existing destination `.forge/memory.yaml` is never overwritten.
+- Suppress the copy with `--no-copy-memory-activation`.
+
+### Extras inheritance (fork and resume --fresh)
+
+Session extras (docs added via `forge memory extra add`) are inherited by default. Project-discovered docs (passported
+docs under the scan roots) are **not** inherited -- they are discovered live in the child checkout at Stop time.
+
+```bash
+# Default: child inherits session extras from parent
+forge session fork parent-session --worktree
+
+# Strip session extras from the child
+forge session fork parent-session --worktree --no-inherit-extras
+
+# Same flags work on resume --fresh
+forge session resume parent-session --fresh --no-inherit-extras
+```
+
+---
+
 ## Execution flow
 
 ```
