@@ -468,13 +468,13 @@ class TestDebateTemplateEquivalence:
 
 
 class TestQaHandoffChecklist:
-    def test_handoff_setup_sets_designated_docs(self):
+    def test_handoff_setup_uses_passports(self):
         handoff_md = SKILLS_DIR / "qa" / "resources" / "checklist" / "16-handoff.md"
         content = handoff_md.read_text()
         step = content.split("### 16.1", 1)[1].split("### 16.2", 1)[0]
-        assert "memory.designated_docs" in step
-        assert '".forge/memory/debugging.md"' in step
-        assert '".forge/memory/patterns.md"' in step
+        assert "forge memory track" in step
+        assert "forge memory enable --session" in step
+        assert "forge memory list" in step
 
     def test_handoff_includes_shadow_doc_step(self):
         handoff_md = SKILLS_DIR / "qa" / "resources" / "checklist" / "16-handoff.md"

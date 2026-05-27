@@ -23,8 +23,15 @@ wc -l docs/board/doing/project_scoped_memory/checklist.md
 
 ## Current Focus
 
-Slices 1-3 **shipped** (see `change_log.md` 2026-05-24 through 2026-05-26). Passport removal is now included. Remaining:
-**closeout**.
+Slices 1-3 shipped the initial three-layer model. **Slices 4-7** simplified to two primitives (passports + session
+activation), removing checkout config (`.forge/memory.yaml`), extras, session doc lists, and multi-flag inheritance. See
+`change_log.md` 2026-05-26 "Slices 4-7" entry.
+
+**Remaining: closeout** (`git mv doing/ -> done/` after final merge to `main`).
+
+**Shipped model**: passports select docs (project-scoped, git-tracked frontmatter); `memory.auto_update.enabled` decides
+whether the memory writer runs (session-scoped). `--memory on|off` on fork/resume/start. No `.forge/memory.yaml`, no
+`designated_docs`, no extras, no `--inherit-extras`.
 
 ## Phase 0 - Baseline & Decisions
 
@@ -70,6 +77,9 @@ Slices 1-3 **shipped** (see `change_log.md` 2026-05-24 through 2026-05-26). Pass
     by default also reverses the card's "inherits committed passports, but not the enable bit" consent model, so it
     needs explicit sign-off rather than a quiet default. Slice-1 default stays: a new checkout requires
     `forge memory enable`. Revisit later as an opt-in (e.g. `fork --worktree --copy-activation`).
+
+> **Note:** Phases 1-3 (Slices 1-3) were superseded by Slices 4-7 (two-primitive simplification). Retained for
+> historical context. See Current Focus above for the shipped model.
 
 ## Phase 1 - Slice 1: Project Activation + Shared Gate (additive, no schema break)
 
@@ -341,7 +351,9 @@ Tracks Forge-local execution decisions. For broader card framing, see
 
 ## Closeout (per [work-board contract](../../../developer/work-board-contract.md#closeout))
 
-- [ ] Final compact `change_log.md` entry with verification.
-- [ ] Promote durable lessons to `impl_notes.md` after human review.
-- [ ] Verify `design.md §5.6`, `design_appendix.md §G`, and `docs/board/README.md` reflect all shipped changes.
+- [x] Final compact `change_log.md` entry with verification.
+- [x] Promote durable lessons to `impl_notes.md` after human review.
+- [x] Verify `design.md §5.6`, `design_appendix.md §G`, and `docs/board/README.md` reflect all shipped changes.
+- [x] Create `docs/board/todo/memory_substrate/card.md` (intermediate card).
+- [x] Update `docs/board/todo/runtime_abstraction/card.md` to reference memory substrate.
 - [ ] `git mv` the card directory `doing/ -> done/` after final merge to `main`.

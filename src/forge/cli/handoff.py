@@ -71,23 +71,21 @@ def run_cmd(
         logger.warning("Failed to read session manifest for %s: %s", session_name, e)
         raise SystemExit(1)
 
-    from forge.session.handoff_agent import resolve_handoff_base_url, run_handoff_agent
-    from forge.session.models import HandoffConfig
-    from forge.session.passport import resolve_passport_source
-    from forge.session.project_memory import memory_activation, scan_passported_docs
+    import dataclasses
 
-    activation = memory_activation(manifest, effective_root)
-    if activation is None:
+    from forge.session.handoff_agent import resolve_handoff_base_url, run_handoff_agent
+    from forge.session.project_memory import (
+        DEFAULT_SCAN_ROOTS,
+        is_memory_enabled,
+        scan_passported_docs,
+    )
+
+    if not is_memory_enabled(manifest, effective):
         logger.info("Handoff not activated for session %s", session_name)
         return
 
-    config = HandoffConfig(
-        enabled=True,
-        mode=activation.mode,
-        min_turns=activation.min_turns,
-        proxy=activation.proxy,
-        direct=activation.direct,
-    )
+    assert effective.memory is not None and effective.memory.auto_update is not None
+    config = dataclasses.replace(effective.memory.auto_update, enabled=True)
 
     confirmed_proxy_url = None
     if manifest.confirmed.started_with_proxy:
@@ -101,14 +99,7 @@ def run_cmd(
         subprocess_proxy=subprocess_proxy or effective.subprocess_proxy,
     )
 
-    session_docs = list(effective.memory.designated_docs) if effective.memory else []
-    if activation.needs_project_scan:
-        scanned = scan_passported_docs(effective_root, activation.roots, session_name)
-        # De-dupe by (passport source, write path); session docs win on collision.
-        seen = {(resolve_passport_source(d), d.path) for d in session_docs}
-        designated_docs = session_docs + [d for d in scanned if (resolve_passport_source(d), d.path) not in seen]
-    else:
-        designated_docs = session_docs
+    designated_docs = scan_passported_docs(effective_root, DEFAULT_SCAN_ROOTS, session_name)
 
     success = run_handoff_agent(
         session_name=session_name,

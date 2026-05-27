@@ -1033,18 +1033,6 @@ class TestValidateDesignatedDocs:
         result = _validate_designated_docs(docs, tmp_path)
         assert len(result) == 1
 
-    def test_accepts_passport_less_extra(self, tmp_path: Path) -> None:
-        """A session extra (origin=extra, non-suggested strategy, no shadows) is retained for Stop.
-
-        At Stop the handoff agent has no passport for it and falls back to
-        ``doc.strategy`` (resolve_doc_spec), so validation must keep it.
-        """
-        docs = [DesignatedDoc(path="docs/scratch.md", strategy="generic", origin="extra")]
-        result = _validate_designated_docs(docs, tmp_path)
-        assert len(result) == 1
-        assert result[0].strategy == "generic"
-        assert result[0].origin == "extra"
-
     # Strategy consistency
 
     def test_rejects_suggested_without_shadows(self, tmp_path: Path) -> None:
@@ -1720,20 +1708,6 @@ class TestDedupeSpecs:
                 shadow_path=".forge/memory/sug_x.md",
             ),
         )
-
-    def test_extra_and_scan_collapse_to_one(self) -> None:
-        """A session extra on a shadow-only official + the project scan's shadow entry."""
-        passport = self._shadow_only_passport()
-        extra_doc = DesignatedDoc(path="docs/x.md", strategy="suggested", origin="extra")
-        scan_doc = DesignatedDoc(path=".forge/memory/sug_x.md", strategy="suggested", shadows="docs/x.md")
-
-        specs = [resolve_doc_spec(extra_doc, passport), resolve_doc_spec(scan_doc, passport)]
-        # Both resolve to the same (official, write) target.
-        assert {(s.official_path, s.write_path) for s in specs} == {("docs/x.md", ".forge/memory/sug_x.md")}
-
-        deduped = _dedupe_specs(specs)
-        assert len(deduped) == 1
-        assert deduped[0].write_path == ".forge/memory/sug_x.md"
 
     def test_distinct_targets_kept(self) -> None:
         a = resolve_doc_spec(DesignatedDoc(path="docs/a.md", strategy="generic"), None)

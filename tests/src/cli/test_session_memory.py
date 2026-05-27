@@ -35,4 +35,4 @@ class TestTombstone:
     def test_remove_doc_tombstone(self, runner: CliRunner) -> None:
         result = runner.invoke(main, ["session", "memory", "remove-doc", "x.md"])
         assert result.exit_code != 0
-        assert "forge memory untrack" in result.output
+        assert "forge memory passport remove" in result.output

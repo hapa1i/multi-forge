@@ -62,13 +62,9 @@ def collect_shadow_entries(
     Returns (entries, scanned_roots). Each entry carries the forge_root
     for repo-scope deduplication and file reads.
     """
-    from forge.core.ops.session import ForgeOpError, list_sessions
-    from forge.session.effective import compute_effective_intent
-    from forge.session.exceptions import ForgeSessionError
-    from forge.session.manager import SessionManager
+    from forge.core.ops.session import list_sessions
 
     result = list_sessions(ctx=ctx, include_incognito=False, scope=scope)
-    manager = SessionManager()
     entries: list[ShadowEntry] = []
     scanned_roots: set[str] = set()
 
@@ -81,38 +77,12 @@ def collect_shadow_entries(
             continue
         scanned_roots.add(fr)
 
-        try:
-            manifest = manager.get_session(item.name, forge_root=fr)
-            effective = compute_effective_intent(manifest)
-        except (ForgeSessionError, ForgeOpError, OSError):
-            logger.debug("Failed to read manifest for session %r in %s", item.name, fr, exc_info=True)
-            continue
-
-        if not effective.memory:
-            continue
-
-        for doc in effective.memory.designated_docs:
-            if doc.shadows is None:
-                continue
-            entries.append(
-                ShadowEntry(
-                    official=doc.shadows,
-                    shadow_path=doc.path,
-                    strategy=doc.strategy,
-                    session=item.name,
-                    forge_root=fr,
-                )
-            )
-
-    # Project-origin shadow-only passports (sessionless ``track --propose``).
-    # Slice 2 stopped indexing these in manifests, so scan passports under the
-    # scope-appropriate roots or ``shadows list/show/review`` go blind. Skip
-    # when filtering to a named session: project shadows belong to no session.
+    # Shadow docs are discovered via passport scan, not session manifests.
+    # Scan passported shadow docs under the scope-appropriate roots.
+    # Skip when filtering to a named session: project shadows belong to no session.
     if session_filter is None:
-        from forge.session.exceptions import ProjectMemoryConfigError
         from forge.session.project_memory import (
             DEFAULT_SCAN_ROOTS,
-            read_project_memory_config,
             scan_shadow_passports,
         )
 
@@ -120,7 +90,7 @@ def collect_shadow_entries(
         if scope == "project":
             if ctx.forge_root is not None:
                 roots_to_scan.add(str(ctx.forge_root))
-        else:  # repo | all: union every session root plus the current project
+        else:
             roots_to_scan |= scanned_roots
             if ctx.forge_root is not None:
                 roots_to_scan.add(str(ctx.forge_root))
@@ -128,13 +98,7 @@ def collect_shadow_entries(
         seen_keys = {(e.forge_root, e.shadow_path) for e in entries}
         for fr in sorted(roots_to_scan):
             fr_path = Path(fr)
-            try:
-                cfg = read_project_memory_config(fr_path)
-            except ProjectMemoryConfigError:
-                logger.debug("Skipping project shadow scan for %s: corrupt memory.yaml", fr, exc_info=True)
-                continue
-            scan_roots = tuple(cfg.roots) if cfg is not None else DEFAULT_SCAN_ROOTS
-            for official_rel, shadow_path, strategy in scan_shadow_passports(fr_path, scan_roots):
+            for official_rel, shadow_path, strategy in scan_shadow_passports(fr_path, DEFAULT_SCAN_ROOTS):
                 key = (fr, shadow_path)
                 if key in seen_keys:
                     continue

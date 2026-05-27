@@ -702,8 +702,8 @@ Strategies are defined in `MemoryStrategy` enum (`src/forge/session/passport.py`
 
 ### G.2 Passport example (from §5.6.2)
 
-Memory doc passports are `forge_memory` YAML frontmatter blocks. The passport is the doc-level source of truth; session
-manifests store only participation.
+Memory doc passports are `forge_memory` YAML frontmatter blocks. The passport is the doc-level source of truth for
+strategy, writers, and update mode.
 
 ```yaml
 ---
@@ -729,19 +729,18 @@ forge memory track docs/board/change_log.md --as changelog
 forge memory track docs/board/impl_notes.md \
   --propose --shadow .forge/memory/suggested_impl_notes.md
 
-# Activate the handoff agent for this checkout (or one session with --session):
-forge memory enable --review-only
+# Enable memory for a session:
+forge memory enable --session planner
 
-# Passports live in the docs; verify without a manifest (sessionless track writes no participation):
+# Verify:
 forge memory passport show docs/board/change_log.md
-forge memory shadows list
+forge memory list
 ```
 
 `forge memory track` is idempotent and sessionless: re-running with different flags updates the passport in place; with
 no flags on an already-passported doc it is a no-op. `forge memory passport remove <path>` removes the passport and
-turns the file back into a normal doc, preserving unrelated frontmatter. For one-session-only participation without a
-passport, use `forge memory extra add <path> --as <strategy> --session planner`. All docs are processed in one
-`claude -p` call with per-doc strategy instructions.
+turns the file back into a normal doc, preserving unrelated frontmatter. One-off doc updates that don't need a passport
+are ordinary agent instructions. All docs are processed in one `claude -p` call with per-doc strategy instructions.
 
 ### G.3 Worktree resolution (extends §5.6.5)
 
@@ -791,35 +790,26 @@ input. It's outside the project root (containment guard), is free-form (hard to 
 and targets different information (preferences/patterns vs project state/standards). Occasional duplication is cheaper
 than cross-format deduplication. If overlap becomes painful, a small prompt tweak can address it.
 
-### G.5 Project memory config + activation resolver (from §5.6.6)
+### G.5 Session activation (from §5.6.6)
 
-`<forge_root>/.forge/memory.yaml` is checkout-scoped activation consent. Schema (v1):
+Memory activation is session-scoped. The effective `memory.auto_update.enabled` (intent + overrides via
+`compute_effective_intent()`) is the sole gate. No checkout-level config file.
 
-| Field                   | Type        | Default     | Meaning                                      |
-| ----------------------- | ----------- | ----------- | -------------------------------------------- |
-| `version`               | int         | (required)  | Schema version; only `1` is supported        |
-| `auto_update.enabled`   | bool        | `true`      | Run the handoff agent for all sessions here  |
-| `auto_update.mode`      | str         | `augment`   | `augment` (edit) or `review-only` (report)   |
-| `auto_update.min_turns` | int         | `5`         | Skip sessions shorter than this              |
-| `auto_update.proxy`     | str \| null | `null`      | Optional `proxy_id` for the handoff agent    |
-| `roots`                 | list[str]   | `["docs/"]` | Scan roots; `.forge/memory/` is always added |
+| Field                   | Type        | Default   | Meaning                                    |
+| ----------------------- | ----------- | --------- | ------------------------------------------ |
+| `auto_update.enabled`   | bool        | `false`   | Whether the memory writer runs at Stop     |
+| `auto_update.mode`      | str         | `augment` | `augment` (edit) or `review-only` (report) |
+| `auto_update.min_turns` | int         | `5`       | Skip sessions shorter than this            |
+| `auto_update.proxy`     | str \| null | `null`    | Optional `proxy_id` for the handoff agent  |
 
-Read with `dacite(strict=True)` after a manual `version` check, mirroring `SessionStore` (not the fail-open
-`runtime_config.py`). Written via `dataclasses.asdict` + `yaml.safe_dump` so the file never carries Python object tags.
+Scan roots are hardcoded: `DEFAULT_SCAN_ROOTS = ("docs/",)` plus always `.forge/memory/`. Configurable roots deferred.
 
-**Resolver merge** (`memory_activation()`): three tiers with different semantics. `None` means "do not run".
+**Stale `.forge/memory.yaml`**: existing checkouts may have this file from a previous version. It is no longer read.
+Safe to delete.
 
-| Source            | Merge semantics     | Can disable? | Notes                                                       |
-| ----------------- | ------------------- | ------------ | ----------------------------------------------------------- |
-| Project config    | Whole `auto_update` | n/a          | Baseline when the file exists                               |
-| Session intent    | Whole block         | No           | Overlaid only when `enabled is True`; defaults ≠ user input |
-| Session overrides | Sparse per-leaf     | Yes          | Reads raw nested `overrides` dict; absent leaf = inherit    |
-
-The whole-block intent overlay (not per-leaf) is deliberate: `HandoffConfig` field defaults (`mode="augment"`,
-`min_turns=5`) are indistinguishable from explicit choices, so an inherited default must not override a project setting.
-Only `overrides.memory.auto_update.*` is truly sparse and may flip an active project config off. The resolver returns
-`ActivationConfig(mode, min_turns, proxy, direct, needs_project_scan, roots)`; `needs_project_scan` is true only when
-the project file exists and is enabled, so a session that merely tweaks mode/proxy does not suppress discovery.
+**Stale `designated_docs` in manifests**: old session manifests may contain `designated_docs` entries. These are
+stripped on read with a one-time `logger.warning()` per coding-standards §5. The field no longer exists on
+`MemoryIntent`.
 
 ---
 

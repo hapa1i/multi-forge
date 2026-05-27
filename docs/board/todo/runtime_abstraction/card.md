@@ -32,13 +32,13 @@ Forge sits at several boundaries where Claude-Code-shaped workflows cross betwee
 each boundary, Forge's role is to give the user **agency** -- visibility, the ability to intervene, control over what
 propagates -- where the default would otherwise be opacity or external control.
 
-| Boundary                                            | What's at stake                                                 | Forge's intervention surface                                          |
-| --------------------------------------------------- | --------------------------------------------------------------- | --------------------------------------------------------------------- |
-| Wire (request/response with model provider)         | Unobserved harness/provider drift in defaults, prompts, routing | Proxy capture + parameter pinning + prompt augmentation               |
-| Cost / spend                                        | Runaway API or subscription credit consumption                  | Spend caps + per-verb attribution + usage ledger                      |
-| Session topology (same runtime, cross-CWD/worktree) | Reasoning continuity vs portability                             | Native resume / native-relocate / curated handoff strategies          |
-| Runtime (Claude Code / Codex / Gemini)              | Different internal state formats, different operator quirks     | Runtime registry + `HeadlessInvoker` + curated handoff as interchange |
-| Knowledge across sessions                           | Loss of context, decisions, intent                              | Designated memory docs + handoff agent                                |
+| Boundary                                            | What's at stake                                                 | Forge's intervention surface                                                                    |
+| --------------------------------------------------- | --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Wire (request/response with model provider)         | Unobserved harness/provider drift in defaults, prompts, routing | Proxy capture + parameter pinning + prompt augmentation                                         |
+| Cost / spend                                        | Runaway API or subscription credit consumption                  | Spend caps + per-verb attribution + usage ledger                                                |
+| Session topology (same runtime, cross-CWD/worktree) | Reasoning continuity vs portability                             | Native resume / native-relocate / curated handoff strategies                                    |
+| Runtime (Claude Code / Codex / Gemini)              | Different internal state formats, different operator quirks     | Runtime registry + `HeadlessInvoker` + transfer context as interchange (see `memory_substrate`) |
+| Knowledge across sessions                           | Loss of context, decisions, intent                              | Passported memory docs + memory writer (see `memory_substrate` card)                            |
 
 The runtime abstraction is one application of this frame: it gives the user agency over **which runtime executes their
 work** without forcing them to commit to one. Other applications in this proposal -- the optional always-on audit proxy,

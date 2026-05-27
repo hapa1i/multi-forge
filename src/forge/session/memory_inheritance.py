@@ -1,16 +1,16 @@
-"""Memory doc inheritance for fork and resume --fresh.
+"""Memory activation inheritance for fork and resume --fresh.
 
-Handles selective inheritance of designated memory docs when deriving child
-sessions. Only session extras (``origin="extra"``) are inherited; project
-memory is discovered live from passports at Stop time.
+Copies parent's memory activation (``auto_update``) to the child session.
+Memory docs are passport-discovered at Stop time, not inherited.
 """
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 from pathlib import Path
 
-from .models import SessionState
+from .models import HandoffConfig, MemoryIntent, SessionState
 from .validation import is_safe_designated_doc_path
 
 logger = logging.getLogger(__name__)
@@ -40,34 +40,39 @@ def apply_memory_inheritance(
     *,
     parent_state: SessionState,
     child_state: SessionState,
-    inherit_extras: bool = True,
+    memory_flag: bool | None = None,
 ) -> list[str]:
-    """Filter and assign child memory from parent effective state.
+    """Copy parent's memory activation to the child session.
 
-    Only session extras (``origin="extra"``) are carried forward. Project
-    docs are passport-discovered in the child checkout, not inherited.
+    Constructs a fresh ``MemoryIntent(auto_update=...)`` from the parent's
+    effective config. Only ``auto_update`` is inherited; other ``MemoryIntent``
+    fields (auto_recall, tags, etc.) do not leak into the child.
 
-    Returns a list of warning strings (currently empty; keeps interface
-    extensible).
+    Args:
+        memory_flag: ``True`` forces memory on, ``False`` forces off,
+            ``None`` inherits parent's activation state.
+
+    Returns a list of warning strings (currently empty; extensible).
     """
     from .effective import compute_effective_intent
 
     effective_intent = compute_effective_intent(parent_state)
     effective_memory = effective_intent.memory
+    parent_auto = effective_memory.auto_update if effective_memory else None
 
-    if effective_memory is None:
-        child_state.intent.memory = None
-        return []
-
-    extras = [d for d in effective_memory.designated_docs if d.origin == "extra"]
-    effective_memory.designated_docs = extras if inherit_extras else []
-
-    has_docs = bool(effective_memory.designated_docs)
-    has_auto_update = effective_memory.auto_update is not None
-
-    if not has_docs and not has_auto_update:
-        child_state.intent.memory = None
+    if memory_flag is True:
+        base = parent_auto or HandoffConfig()
+        child_state.intent.memory = MemoryIntent(
+            auto_update=dataclasses.replace(base, enabled=True),
+        )
+    elif memory_flag is False:
+        child_state.intent.memory = MemoryIntent(
+            auto_update=HandoffConfig(enabled=False),
+        )
     else:
-        child_state.intent.memory = effective_memory
+        if parent_auto is not None:
+            child_state.intent.memory = MemoryIntent(auto_update=parent_auto)
+        else:
+            child_state.intent.memory = None
 
     return []

@@ -64,16 +64,11 @@ official doc. Already-merged items are self-pruned on the next run.
 
 ## Configuration
 
-Use `forge memory` to enable the agent and author passports. `track` writes a `forge_memory` passport into each doc;
-that passport is the doc-level contract for strategy, mode, writer access, and inheritance. `track` is **sessionless**
-(project-lifetime); per-session participation without a passport comes from `forge memory extra add`. Session manifests
-store only participation plus auto-update runtime state.
+Use `forge memory` to author passports and enable the agent. `track` writes a `forge_memory` passport into each doc;
+that passport is the doc-level contract for strategy, mode, and writer access. `track` is **sessionless** (project-
+lifetime). Memory activation is **session-scoped** -- each session decides whether the memory writer runs.
 
 ```bash
-# First run: inspect proposed edits before allowing writes. Bare enable is
-# project-scoped (whole checkout); use --session planner to scope to one session.
-forge memory enable --review-only
-
 # Author project passports (sessionless; runnable from a bare terminal)
 forge memory track docs/checklist.md --as checklist
 forge memory track docs/changelog.md --as changelog
@@ -82,9 +77,12 @@ forge memory track docs/changelog.md --as changelog
 forge memory track docs/developer/coding-standards.md \
   --propose --shadow .forge/memory/suggested_standards.md
 
-# Passports live in the docs; verify without a manifest (sessionless track writes no participation):
-forge memory passport show docs/checklist.md
-forge memory shadows list
+# Enable memory for a session (or start with --memory on):
+forge memory enable --session planner
+forge session start planner --memory on     # equivalent at start time
+
+# Verify passported docs:
+forge memory list
 ```
 
 Example passport written by `forge memory track`:
@@ -106,24 +104,22 @@ forge_memory:
 ### Setting up via CLI
 
 ```bash
-# List tracked docs (or --json for scripting)
-forge memory list --session planner
+# List passported docs under scan roots (sessionless)
+forge memory list
 
 # Author a project passport (sessionless)
 forge memory track docs/checklist.md --as checklist
 
-# Include a doc for one session only, no passport
-forge memory extra add docs/scratch.md --as generic --session planner
-
-# Remove session participation (passport, if any, is left intact)
-forge memory untrack docs/scratch.md --session planner
-
 # Remove the project passport so the doc is no longer discovered by scans
 forge memory passport remove docs/checklist.md
+
+# Enable/disable memory for a session
+forge memory enable --session planner
+forge memory disable --session planner
 ```
 
-Each verb validates path safety and passport mode/shadow-path consistency before persisting, so the agent never silently
-skips a doc the CLI accepted.
+One-off doc updates that don't need a passport are ordinary agent instructions -- just ask the agent to update a file
+before it stops.
 
 ### Inspecting agent output
 
@@ -143,9 +139,7 @@ forge session handoff show --all            # List every report (paths + timesta
 ```
 
 In `review-only` mode this is where the proposed-but-not-applied changes appear; in `augment` mode it records the
-summary of what was actually written. Use `forge memory track` to author project passports and `forge memory extra add`
-/ `untrack` for per-session participation; legacy hand-written `memory.designated_docs[]` manifest entries are treated
-as compatibility state and should not be used for new setup.
+summary of what was actually written.
 
 ---
 
@@ -220,33 +214,18 @@ The `claude -p` subprocess runs with `cwd=forge_root`.
 
 ## Memory on fork and resume
 
-When you fork a session or resume with `--fresh`, memory propagation follows two separate rules:
-
-### Activation copy (worktree forks)
-
-`forge session fork --worktree` copies `.forge/memory.yaml` from the parent checkout into the new worktree by default.
-This ensures the child checkout has the same handoff-agent activation as the parent without requiring a separate
-`forge memory enable`.
-
-- `--into` forks do **not** copy activation (the existing checkout may have its own).
-- An existing destination `.forge/memory.yaml` is never overwritten.
-- Suppress the copy with `--no-copy-memory-activation`.
-
-### Extras inheritance (fork and resume --fresh)
-
-Session extras (docs added via `forge memory extra add`) are inherited by default. Project-discovered docs (passported
-docs under the scan roots) are **not** inherited -- they are discovered live in the child checkout at Stop time.
+Children inherit the parent's memory activation by default. The `--memory` flag overrides:
 
 ```bash
-# Default: child inherits session extras from parent
-forge session fork parent-session --worktree
+forge session fork parent-session --worktree                 # inherit parent's on/off
+forge session fork parent-session --worktree --memory on     # force on in child
+forge session fork parent-session --worktree --memory off    # force off in child
 
-# Strip session extras from the child
-forge session fork parent-session --worktree --no-inherit-extras
-
-# Same flags work on resume --fresh
-forge session resume parent-session --fresh --no-inherit-extras
+forge session resume parent-session --fresh --memory off     # requires --fresh
 ```
+
+Memory docs are not inherited -- they are discovered from passports at Stop time in whatever checkout the child runs in.
+Passports are git-tracked, so worktree forks see the same docs as the parent.
 
 ---
 
@@ -288,7 +267,7 @@ Priority chain: `proxy` -> `confirmed.started_with_proxy` -> `ANTHROPIC_BASE_URL
 ## Validation rules
 
 The agent validates tracked docs before processing. For passported docs, the passport on the official doc is
-authoritative; session manifests store only participation state.
+authoritative; session manifests store only activation and runtime state.
 
 | Rule                 | Rejected or skipped if                                                  |
 | -------------------- | ----------------------------------------------------------------------- |
@@ -317,7 +296,7 @@ Checklist:
 - `memory.auto_update.enabled` must be `true` in effective intent (`forge memory enable`)
 - Session must have ≥ `min_turns` conversation turns (default: 5)
 - `claude` CLI must be on PATH
-- At least one memory doc must be discoverable: a passported doc under the scan roots, or a session extra
+- At least one memory doc must be discoverable: a passported doc under the scan roots
 - At least one doc must exist on disk
 
 ### "File wasn't updated"
@@ -345,18 +324,18 @@ forge handoff run --session-name <name> --worktree-path <path> --transcript-rel 
 
 ## Files to inspect (debugging)
 
-| File                                                     | Purpose                                          |
-| -------------------------------------------------------- | ------------------------------------------------ |
-| `<forge_root>/.forge/sessions/<name>/forge.session.json` | Session manifest (participation + runtime state) |
-| `<forge_root>/.forge/artifacts/<name>/transcripts/`      | Captured transcripts (agent input)               |
-| `~/.forge/pending-work/`                                 | Work queue markers (handoff-\<session_id>.json)  |
-| `~/.forge/pending-work/failed/`                          | Poison markers (exceeded retry limit)            |
+| File                                                     | Purpose                                         |
+| -------------------------------------------------------- | ----------------------------------------------- |
+| `<forge_root>/.forge/sessions/<name>/forge.session.json` | Session manifest (activation + runtime state)   |
+| `<forge_root>/.forge/artifacts/<name>/transcripts/`      | Captured transcripts (agent input)              |
+| `~/.forge/pending-work/`                                 | Work queue markers (handoff-\<session_id>.json) |
+| `~/.forge/pending-work/failed/`                          | Poison markers (exceeded retry limit)           |
 
 ### Gotchas
 
 | Trap                                  | Explanation                                                               |
 | ------------------------------------- | ------------------------------------------------------------------------- |
-| "Handoff enabled but nothing happens" | No passported docs are under the scan roots, and no extras are added      |
+| "Handoff enabled but nothing happens" | No passported docs are under the scan roots (`docs/` + `.forge/memory/`)  |
 | "Shadow doc not updating"             | Official doc must exist and passport `shadow_path` must be valid          |
 | "Agent uses wrong model"              | Inherits session proxy by default; set `proxy` for explicit routing       |
 | "File created by agent"               | Agent never creates files — seed them first                               |

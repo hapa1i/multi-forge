@@ -274,15 +274,26 @@ class TestCollectShadowEntries:
     """Direct unit tests for the session-layer shadow discovery function."""
 
     def test_returns_shadow_entries_and_scanned_roots(self, tmp_path: Path, monkeypatch: MagicMock) -> None:
+        """Shadow entries are discovered via passport scan, not session manifests."""
         from forge.core.ops.context import ExecutionContext
         from forge.session import IndexStore, SessionStore, create_session_state
+        from forge.session.passport import synthesize_passport, write_passport
         from forge.session.shadow_curation import collect_shadow_entries
 
         forge_root = tmp_path / "project"
         forge_root.mkdir()
         (forge_root / ".forge").mkdir(parents=True)
         (forge_root / "docs").mkdir()
-        (forge_root / "docs" / "notes.md").write_text("# Notes\n")
+        official = forge_root / "docs" / "notes.md"
+        official.write_text("# Notes\n")
+        write_passport(
+            official,
+            synthesize_passport(
+                strategy="suggested",
+                update_mode="shadow-only",
+                shadow_path=".forge/memory/suggested_notes.md",
+            ),
+        )
         shadow_dir = forge_root / ".forge" / "memory"
         shadow_dir.mkdir(parents=True)
         (shadow_dir / "suggested_notes.md").write_text("- proposal\n")
@@ -296,8 +307,7 @@ class TestCollectShadowEntries:
         state.forge_root = str(forge_root)
         SessionStore(str(forge_root), "s1").write(state)
 
-        index = IndexStore()
-        index.add_session(
+        IndexStore().add_session(
             name="s1",
             worktree_path=str(forge_root),
             project_root=str(tmp_path),
@@ -309,24 +319,6 @@ class TestCollectShadowEntries:
             parent_session=None,
         )
 
-        # Add a shadow doc to the session manifest
-        from forge.session.models import DesignatedDoc
-
-        store = SessionStore(str(forge_root), "s1")
-        manifest = store.read()
-        if manifest.intent.memory is None:
-            from forge.session.models import MemoryIntent
-
-            manifest.intent.memory = MemoryIntent()
-        manifest.intent.memory.designated_docs.append(
-            DesignatedDoc(
-                path=".forge/memory/suggested_notes.md",
-                strategy="suggested",
-                shadows="docs/notes.md",
-            )
-        )
-        store.write(manifest)
-
         monkeypatch.chdir(forge_root)
         ctx = ExecutionContext.from_cwd(cwd=forge_root)
         entries, roots = collect_shadow_entries(ctx=ctx, scope="project", session_filter=None)
@@ -337,23 +329,32 @@ class TestCollectShadowEntries:
         assert entry.official == "docs/notes.md"
         assert entry.shadow_path == ".forge/memory/suggested_notes.md"
         assert entry.strategy == "suggested"
-        assert entry.session == "s1"
+        assert entry.session == "(project)"
         assert entry.forge_root == str(forge_root)
         assert str(forge_root) in roots
 
-    def test_filters_by_session(self, tmp_path: Path, monkeypatch: MagicMock) -> None:
+    def test_session_filter_skips_passport_scan(self, tmp_path: Path, monkeypatch: MagicMock) -> None:
+        """session_filter suppresses the passport scan -- project shadows belong to no session."""
         from forge.core.ops.context import ExecutionContext
         from forge.session import IndexStore, SessionStore, create_session_state
-        from forge.session.models import DesignatedDoc, MemoryIntent
+        from forge.session.passport import synthesize_passport, write_passport
         from forge.session.shadow_curation import collect_shadow_entries
 
         forge_root = tmp_path / "project"
         forge_root.mkdir()
         (forge_root / ".forge").mkdir(parents=True)
         (forge_root / "docs").mkdir()
-        (forge_root / "docs" / "notes.md").write_text("# Notes\n")
+        official = forge_root / "docs" / "notes.md"
+        official.write_text("# Notes\n")
+        write_passport(
+            official,
+            synthesize_passport(
+                strategy="suggested",
+                update_mode="shadow-only",
+                shadow_path=".forge/memory/suggested_notes.md",
+            ),
+        )
 
-        index = IndexStore()
         for name in ("s1", "s2"):
             state = create_session_state(
                 name,
@@ -362,16 +363,8 @@ class TestCollectShadowEntries:
                 worktree_path=str(forge_root),
             )
             state.forge_root = str(forge_root)
-            store = SessionStore(str(forge_root), name)
-            store.write(state)
-            manifest = store.read()
-            if manifest.intent.memory is None:
-                manifest.intent.memory = MemoryIntent()
-            manifest.intent.memory.designated_docs.append(
-                DesignatedDoc(path=".forge/memory/s.md", strategy="suggested", shadows="docs/notes.md")
-            )
-            store.write(manifest)
-            index.add_session(
+            SessionStore(str(forge_root), name).write(state)
+            IndexStore().add_session(
                 name=name,
                 worktree_path=str(forge_root),
                 project_root=str(tmp_path),
@@ -387,8 +380,8 @@ class TestCollectShadowEntries:
         ctx = ExecutionContext.from_cwd(cwd=forge_root)
         entries, _ = collect_shadow_entries(ctx=ctx, scope="project", session_filter="s2")
 
-        assert len(entries) == 1
-        assert entries[0].session == "s2"
+        # Passport scan is skipped when session_filter is set
+        assert len(entries) == 0
 
     def _setup_project_shadow(self, tmp_path: Path) -> Path:
         """Create a forge_root with a sessionless shadow-only passport (no manifest)."""
@@ -448,29 +441,22 @@ class TestCollectShadowEntries:
         assert entries[0].shadow_path == ".forge/memory/suggested_notes.md"
         assert entries[0].session == "(project)"
 
-    def test_project_scan_deduped_against_session_entry(self, tmp_path: Path, monkeypatch: MagicMock) -> None:
-        """A manifest shadow entry and a scanned passport sharing (root, shadow) collapse to the session entry."""
+    def test_passport_scan_deduplicates_same_shadow_across_roots(self, tmp_path: Path, monkeypatch: MagicMock) -> None:
+        """When the same forge_root appears via multiple sessions, each shadow passport is emitted once."""
         from forge.core.ops.context import ExecutionContext
-        from forge.session import SessionStore
-        from forge.session.models import DesignatedDoc, MemoryIntent
         from forge.session.shadow_curation import collect_shadow_entries
 
         forge_root = self._setup_project_shadow(tmp_path)
-        self._register_session(tmp_path, forge_root)
-        store = SessionStore(str(forge_root), "s1")
-        manifest = store.read()
-        manifest.intent.memory = MemoryIntent()
-        manifest.intent.memory.designated_docs.append(
-            DesignatedDoc(path=".forge/memory/suggested_notes.md", strategy="suggested", shadows="docs/notes.md")
-        )
-        store.write(manifest)
+        # Register two sessions pointing at the same forge_root
+        self._register_session(tmp_path, forge_root, name="s1")
+        self._register_session(tmp_path, forge_root, name="s2")
 
         monkeypatch.chdir(forge_root)
         ctx = ExecutionContext.from_cwd(cwd=forge_root)
         entries, _ = collect_shadow_entries(ctx=ctx, scope="project", session_filter=None)
 
         assert len(entries) == 1
-        assert entries[0].session == "s1"  # session entry wins; project scan is de-duped out
+        assert entries[0].session == "(project)"
 
     def test_scope_repo_unions_current_project_root(self, tmp_path: Path, monkeypatch: MagicMock) -> None:
         """--scope repo includes the current project's passport-origin shadows."""

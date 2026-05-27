@@ -107,8 +107,8 @@ class TestRealClaudeMemory:
         _write_transcript(forge_workspace, transcript_rel)
 
         for command in (
+            "cd /workspace && forge memory track docs/state.md --as project-state",
             f"cd /workspace && forge memory enable --review-only --session {session_name}",
-            f"cd /workspace && forge memory extra add docs/state.md --as project-state --session {session_name}",
             f"cd /workspace && forge session set --session {session_name} memory.auto_update.min_turns 1",
         ):
             result = forge_workspace.exec(command)

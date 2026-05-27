@@ -28,6 +28,31 @@ wc -l docs/board/change_log.md
 
 ## 2026-05-26
 
+### Phase 1 / Slices 4-7: Simplify memory to passports + session activation
+
+**Goal**: Reduce the memory system from three layers (passports, checkout activation, session participation) to two
+primitives: passports select docs, session activation decides whether the memory writer runs. Research-preview clean
+break.
+
+**Key changes**:
+
+- Removed `.forge/memory.yaml` (checkout-scoped activation), `forge memory extra add`, `forge memory untrack`,
+  `DesignatedDoc.origin`, `MemoryIntent.designated_docs` (field removed from manifest schema), session-scoped doc lists,
+  `--inherit-extras`/`--no-inherit-extras`, `--inherit-memory` tombstones, `--no-copy-memory-activation`,
+  `ProjectMemoryConfig`, `memory_activation()` three-tier resolver, `copy_memory_activation()`.
+- Added `forge memory disable`, `--memory on|off` on `fork`/`resume --fresh`/`start`.
+- `forge memory enable`/`disable` are session-scoped only (resolve `$FORGE_SESSION` or `--session`).
+- `forge memory list` is a sessionless passport scan (no writer filtering, no session needed).
+- Stop hook and handoff runner check `effective.memory.auto_update.enabled` directly (incognito guard preserved).
+- Handoff runner uses `scan_passported_docs()` as sole doc source (no doc fusion).
+- `apply_memory_inheritance()` constructs a fresh `MemoryIntent(auto_update=...)` from parent; `--memory on` reuses
+  parent config, `--memory off` writes explicit `HandoffConfig(enabled=False)`, `None` inherits.
+- `strip_preview_memory_doc_lists()` sanitizer warns-and-strips stale `designated_docs` from old manifests per
+  coding-standards section 5.
+- Stale `.forge/memory.yaml` is now ignored; safe to delete.
+
+**Verification**: 4645 unit tests pass; `make pre-commit` clean.
+
 ### Phase 1 / Slice 3: Fork activation copy + retire `--inherit-memory`
 
 **Goal**: Make memory activation follow Forge-created worktrees by default and replace the multi-mode `--inherit-memory`

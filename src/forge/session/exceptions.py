@@ -76,19 +76,6 @@ class IndexCorruptedError(ForgeSessionError):
         super().__init__(f"index at '{path}': {reason}")
 
 
-class ProjectMemoryConfigError(ForgeSessionError):
-    """Raised when project memory config (.forge/memory.yaml) is unreadable.
-
-    Covers malformed YAML, non-mapping documents, unknown keys, and
-    unsupported schema versions. Durable state is a strict contract.
-    """
-
-    def __init__(self, path: str, reason: str) -> None:
-        self.path = path
-        self.reason = reason
-        super().__init__(f"project memory config at '{path}': {reason}")
-
-
 class CannotForkIncognitoError(ForgeSessionError):
     """Raised when attempting to fork from an incognito session."""
 

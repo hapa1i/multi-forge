@@ -38,22 +38,22 @@ wc -l docs/board/impl_notes.md
 
 ### Memory System Architecture (shipped)
 
-The `forge memory` CLI (PR #1) replaced `forge session memory`. Key architecture decisions for future sessions:
+Two primitives: passports select docs (project-scoped, git-tracked frontmatter); session activation decides whether the
+memory writer runs (`memory.auto_update.enabled`). No checkout-level config, no session-scoped doc lists.
 
-- **Passport-authoritative ownership**: memory-doc passports (`forge_memory` YAML frontmatter) are the source of truth
-  for strategy, writers, intent, and inheritance. Session manifests store only participation and auto-update runtime
-  state. Stop-time handoff re-reads passports, so editing a passport between sessions takes effect without re-tracking.
+- **Passports are the sole doc source**: `forge_memory` YAML frontmatter in docs declares strategy, writers, intent.
+  Stop-time `scan_passported_docs()` discovers them under hardcoded roots (`docs/` + `.forge/memory/`). No manifest doc
+  lists; `DesignatedDoc` is a runtime-only type for the scanner -> handoff pipeline.
+- **Session activation**: `forge memory enable/disable --session` or `--memory on|off` at start/fork/resume. Both gates
+  (Stop hook, detached runner) check `effective.memory.auto_update.enabled` directly. Incognito never enqueues.
 - **Tombstone for old CLI**: `forge session memory` is a hidden tombstone group that errors with replacement guidance.
-  It must not execute old behavior. Registration path unchanged in `session.py:_register_subgroups()`.
-- **Stop-time update chain**: stop hook -> work queue marker -> fire-and-forget `forge handoff run` via detached Popen
-  -> handoff agent reads passports, filters by writer access, builds prompt, calls `run_claude_session()`. Detached
-  failures are not retried.
-- **Shadow path encoding**: `derive_shadow_path()` encodes the immediate parent directory to avoid collisions
-  (`docs/board/notes.md` -> `.forge/memory/suggested_board_notes.md`). `check_shadow_path_collision()` catches remaining
-  edge cases.
-- **Project memory on fork**: project docs are discovered live from passports at Stop time, not inherited through the
-  session manifest. `fork --worktree` copies `.forge/memory.yaml` by default; `--into` leaves the target checkout's
-  activation alone. Only session extras (`origin="extra"`) inherit via `--inherit-extras`; old `--inherit-memory` values
-  are tombstones.
+- **Stop-time chain**: stop hook -> work queue marker -> fire-and-forget `forge handoff run` -> passport scan -> writer
+  filter -> `run_claude_session()`. Detached failures are not retried.
+- **Shadow path encoding**: `derive_shadow_path()` encodes the immediate parent directory to avoid collisions.
+  `check_shadow_path_collision_in_roots()` catches remaining edge cases.
+- **Fork/resume**: children inherit parent's `auto_update` by default; `--memory on|off` overrides. No doc inheritance.
+  Passports are git-tracked and discovered live in the child checkout.
 - **Curation artifacts**: `curation-` prefix (distinct from handoff `review-` reports) at
   `.forge/artifacts/<session>/memory/curation-{slug}-{hash}-{ts}.md`. Curation never mutates official docs.
+- **Stale state**: old `.forge/memory.yaml` is ignored (safe to delete). Old `designated_docs` in manifests are stripped
+  on read with a logger warning per coding-standards section 5.

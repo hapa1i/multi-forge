@@ -521,8 +521,8 @@ bash "$SCRIPTS/run-in-repo.sh" forge session list
 
 <!-- human:guided -->
 
-In your **Terminal** window, try the lightweight memory-doc setup commands. This does not run the handoff agent; it only
-verifies that session memory docs can be added, inspected, and removed without editing raw JSON.
+In your **Terminal** window, try the memory passport and activation commands. This does not run the handoff agent; it
+verifies that passports and session activation work without editing raw JSON.
 
 ```
 mkdir -p .forge/memory
@@ -530,17 +530,20 @@ cat > .forge/memory/walkthrough-notes.md <<'EOF'
 # Walkthrough Notes
 EOF
 
-forge memory extra add .forge/memory/walkthrough-notes.md --as debugging --session walkthrough-demo
-forge memory list --session walkthrough-demo
-forge memory list --json --session walkthrough-demo
-forge memory untrack .forge/memory/walkthrough-notes.md --session walkthrough-demo
-forge memory list --session walkthrough-demo
+forge memory track .forge/memory/walkthrough-notes.md --as debugging
+forge memory list
+forge memory list --json
+forge memory enable --session walkthrough-demo
+forge memory status
+forge memory passport remove .forge/memory/walkthrough-notes.md
+forge memory list
 ```
 
-- [ ] `extra add` succeeds for `.forge/memory/walkthrough-notes.md`
+- [ ] `track` writes a passport into the doc
 - [ ] `list` shows the path with `debugging` strategy
-- [ ] `list --json` emits the same designated doc in JSON form
-- [ ] `untrack` succeeds and the final list no longer includes the doc
+- [ ] `list --json` emits the passported doc in JSON form
+- [ ] `enable --session` sets activation for the session
+- [ ] `passport remove` succeeds and the final list no longer includes the doc
 
 ---
 

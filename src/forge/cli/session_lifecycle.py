@@ -884,6 +884,7 @@ def launch_new_session(
     supervisor_direct: bool = False,
     subprocess_proxy: str | None = None,
     direct_model: str | None = None,
+    memory_flag: bool | None = None,
 ) -> int:
     """Create a new session and launch Claude.
 
@@ -1017,6 +1018,23 @@ def launch_new_session(
     except FileNotFoundError as e:
         console.print(f"[red]Error:[/red] {e}", style="red")
         return 1
+
+    # --- set memory activation (if requested) ---
+    if memory_flag is True:
+        from forge.session.models import HandoffConfig, MemoryIntent
+        from forge.session.store import SessionStore as _MemStore
+
+        _mem_forge_root = manifest.forge_root or str(Path.cwd())
+
+        def _set_memory(m: SessionState) -> None:
+            if m.intent.memory is None:
+                m.intent.memory = MemoryIntent(auto_update=HandoffConfig(enabled=True))
+            elif m.intent.memory.auto_update is None:
+                m.intent.memory.auto_update = HandoffConfig(enabled=True)
+            else:
+                m.intent.memory.auto_update.enabled = True
+
+        manifest = _MemStore(_mem_forge_root, manifest.name).update(timeout_s=5.0, mutate=_set_memory)
 
     # --- set subprocess proxy (if requested) ---
     if subprocess_proxy:
@@ -1228,6 +1246,13 @@ def launch_new_session(
     default=None,
     help="Route subprocesses (supervisor, panel, handoff) through this proxy while main session is direct",
 )
+@click.option(
+    "--memory",
+    "memory_flag",
+    type=click.Choice(["on", "off"]),
+    default=None,
+    help="Enable/disable memory auto-update for this session (default: off).",
+)
 def start(
     name: str | None,
     proxy_name: str | None,
@@ -1248,6 +1273,7 @@ def start(
     supervisor_proxy: str | None,
     supervisor_direct: bool,
     subprocess_proxy: str | None,
+    memory_flag: str | None,
 ) -> None:
     """Create and start a new session.
 
@@ -1335,6 +1361,7 @@ def start(
             supervisor_direct=supervisor_direct,
             subprocess_proxy=subprocess_proxy,
             direct_model=direct_model,
+            memory_flag={"on": True, "off": False}.get(memory_flag) if memory_flag else None,
         )
     )
 
@@ -1408,17 +1435,11 @@ def start(
     help="Bypass active-session guard (launches as new child)",
 )
 @click.option(
-    "--inherit-extras/--no-inherit-extras",
-    "inherit_extras",
-    default=True,
-    help="Inherit session extras for fresh resume (default: inherit)",
-)
-@click.option(
-    "--inherit-memory",
-    "inherit_memory_tombstone",
-    type=click.Choice(["all", "none", "shadowed"]),
+    "--memory",
+    "memory_flag",
+    type=click.Choice(["on", "off"]),
     default=None,
-    hidden=True,
+    help="Override child memory activation (default: inherit parent).",
 )
 @click.pass_context
 def resume(
@@ -1434,8 +1455,7 @@ def resume(
     resume_mode: str | None,
     review: bool,
     force: bool,
-    inherit_extras: bool,
-    inherit_memory_tombstone: str | None,
+    memory_flag: str | None,
 ) -> None:
     """Resume a session.
 
@@ -1458,20 +1478,6 @@ def resume(
       forge session resume my-session --proxy my-proxy   # Reattach with different routing
       forge session resume my-session --fresh --no-proxy # Fresh conversation, direct mode
     """
-    if inherit_memory_tombstone is not None:
-        _TOMBSTONE = {
-            "all": "No longer needed; passports are discovered from the project. "
-            "Use --inherit-extras if you meant session extras.",
-            "none": "Use --no-inherit-extras and --no-copy-memory-activation.",
-            "shadowed": "Shadow docs are passport-discovered; use 'forge memory track --propose'.",
-        }
-        print_error_with_tip(
-            "--inherit-memory is removed.",
-            _TOMBSTONE[inherit_memory_tombstone],
-            console=console,
-        )
-        sys.exit(1)
-
     if direct and proxy_name:
         console.print("[red]Error:[/red] --no-proxy and --proxy are mutually exclusive")
         sys.exit(1)
@@ -1486,8 +1492,6 @@ def resume(
             console.print(f"[red]Error:[/red] {e}")
             sys.exit(1)
 
-    _inherit_extras_explicit = ctx.get_parameter_source("inherit_extras") == click.core.ParameterSource.COMMANDLINE
-
     if resume_mode and not fresh:
         console.print("[red]Error:[/red] --resume-mode requires --fresh")
         sys.exit(1)
@@ -1496,8 +1500,10 @@ def resume(
         console.print("[red]Error:[/red] --child-name requires --fresh")
         sys.exit(1)
 
-    if _inherit_extras_explicit and not fresh:
-        console.print("[red]Error:[/red] --inherit-extras/--no-inherit-extras requires --fresh")
+    if memory_flag and not fresh:
+        console.print(
+            "[red]Error:[/red] --memory requires --fresh (creates a new child session). Add --fresh or omit --memory."
+        )
         sys.exit(1)
 
     if review and not fresh:
@@ -1591,7 +1597,7 @@ def resume(
                 routing=routing,
                 direct=direct,
                 direct_model_override=normalized_direct_model,
-                inherit_extras=inherit_extras,
+                memory_flag={"on": True, "off": False}.get(memory_flag) if memory_flag else None,
             )
         else:
             _resume_fresh(
@@ -1605,7 +1611,7 @@ def resume(
                 direct=direct,
                 review=review,
                 direct_model_override=normalized_direct_model,
-                inherit_extras=inherit_extras,
+                memory_flag={"on": True, "off": False}.get(memory_flag) if memory_flag else None,
             )
     elif not _has_confirmed_claude_session(manifest):
         _launch_in_place(
@@ -2043,7 +2049,7 @@ def _resume_fresh(
     direct: bool,
     review: bool = False,
     direct_model_override: str | None = None,
-    inherit_extras: bool = True,
+    memory_flag: bool | None = None,
 ) -> None:
     """Create a fresh child session with context assembled from parent.
 
@@ -2077,7 +2083,7 @@ def _resume_fresh(
             context_limit=context_limit,
             token_estimate_multiplier=token_multiplier,
             forge_root=parent_state.forge_root,
-            inherit_extras=inherit_extras,
+            memory_flag=memory_flag,
         )
     except ForgeSessionError as e:
         handle_session_error(e)
@@ -2179,7 +2185,7 @@ def _resume_fresh_native(
     routing: ResolvedRouting | None,
     direct: bool,
     direct_model_override: str | None = None,
-    inherit_extras: bool = True,
+    memory_flag: bool | None = None,
 ) -> None:
     """Create a child session with native conversation resume.
 
@@ -2205,7 +2211,7 @@ def _resume_fresh_native(
             child_name=child_name,
             resume_mode="native",
             forge_root=parent_state.forge_root,
-            inherit_extras=inherit_extras,
+            memory_flag=memory_flag,
         )
     except ForgeSessionError as e:
         handle_session_error(e)

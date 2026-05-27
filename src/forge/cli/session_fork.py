@@ -159,23 +159,11 @@ __all__ = ["fork"]
     help="Replace existing branch/worktree and skip budget preflight",
 )
 @click.option(
-    "--inherit-extras/--no-inherit-extras",
-    "inherit_extras",
-    default=True,
-    help="Inherit session extras into the fork (default: inherit)",
-)
-@click.option(
-    "--copy-memory-activation/--no-copy-memory-activation",
-    "copy_memory_activation",
-    default=True,
-    help="Copy .forge/memory.yaml to new worktree (default: copy)",
-)
-@click.option(
-    "--inherit-memory",
-    "inherit_memory_tombstone",
-    type=click.Choice(["all", "none", "shadowed"]),
+    "--memory",
+    "memory_flag",
+    type=click.Choice(["on", "off"]),
     default=None,
-    hidden=True,
+    help="Override child memory activation (default: inherit parent).",
 )
 @click.pass_context
 def fork(
@@ -197,9 +185,7 @@ def fork(
     supervisor_proxy: str | None,
     supervisor_direct: bool,
     force: bool,
-    inherit_extras: bool,
-    copy_memory_activation: bool,
-    inherit_memory_tombstone: str | None,
+    memory_flag: str | None,
 ) -> None:
     """Fork an existing session.
 
@@ -218,20 +204,6 @@ def fork(
         forge session fork parent-session -n child-session     # Custom fork name
         forge session fork parent-session --no-proxy           # Fork, bypass proxy
     """
-    if inherit_memory_tombstone is not None:
-        _TOMBSTONE = {
-            "all": "No longer needed; passports are discovered from the project. "
-            "Use --inherit-extras if you meant session extras.",
-            "none": "Use --no-inherit-extras and --no-copy-memory-activation.",
-            "shadowed": "Shadow docs are passport-discovered; use 'forge memory track --propose'.",
-        }
-        print_error_with_tip(
-            "--inherit-memory is removed.",
-            _TOMBSTONE[inherit_memory_tombstone],
-            console=console,
-        )
-        sys.exit(1)
-
     if direct and proxy_name:
         console.print("[red]Error:[/red] --no-proxy and --proxy are mutually exclusive")
         sys.exit(1)
@@ -477,8 +449,7 @@ def fork(
             into_path=into_resolved,
             forge_root=_fr,
             force=force,
-            inherit_extras=inherit_extras,
-            copy_memory_activation_flag=copy_memory_activation,
+            memory_flag={"on": True, "off": False}.get(memory_flag) if memory_flag else None,
             warnings_sink=fork_warnings,
         )
     except CannotForkIncognitoError as e:

@@ -36,71 +36,50 @@ Parking work means leaving it in `todo/`. `todo/` is not the active cursor; it i
 
 ## Project Memory
 
-The board dogfoods Forge memory with two project docs and one human-owned scratchpad:
+Forge memory has two primitives: **passports** select which docs the memory writer updates, and **session activation**
+decides whether it runs.
 
 | Doc                       | Update model                           | How it is maintained                      |
 | ------------------------- | -------------------------------------- | ----------------------------------------- |
-| `change_log.md`           | Handoff agent, direct write at Stop    | Passported as `changelog`                 |
-| `impl_notes.md`           | Handoff agent, shadow proposal at Stop | Passported as `suggested` / `shadow-only` |
+| `change_log.md`           | Memory writer, direct write at Stop    | Passported as `changelog`                 |
+| `impl_notes.md`           | Memory writer, shadow proposal at Stop | Passported as `suggested` / `shadow-only` |
 | card `checklist.md` files | In-session agent, at your direction    | Edited as normal files during the session |
 
-The memory model has three separate lifetimes. Keep them separate:
+| Command                        | Writes           | Meaning                                           |
+| ------------------------------ | ---------------- | ------------------------------------------------- |
+| `forge memory track <doc>`     | The markdown doc | Adds or updates the doc's `forge_memory` passport |
+| `forge memory passport remove` | The markdown doc | Removes the passport; stops project discovery     |
+| `forge memory enable`          | Session manifest | Enables the memory writer for a session           |
+| `forge memory disable`         | Session manifest | Disables the memory writer for a session          |
 
-| Command                         | Writes               | Meaning                                                           |
-| ------------------------------- | -------------------- | ----------------------------------------------------------------- |
-| `forge memory track <doc>`      | The markdown doc     | Adds or updates the doc's `forge_memory` passport; sessionless    |
-| `forge memory passport remove`  | The markdown doc     | Removes the passport; the doc stops being project-discovered      |
-| `forge memory enable`           | `.forge/memory.yaml` | Enables the handoff agent for this checkout                       |
-| `forge memory enable --session` | The session manifest | Overrides activation for one session                              |
-| `forge memory extra add`        | The session manifest | Adds one-session-only participation, no passport                  |
-| `forge memory untrack`          | The session manifest | Removes session participation; does not remove a project passport |
-
-`.forge/memory.yaml` is local activation/config, not a doc registry:
-
-```yaml
-version: 1
-auto_update:
-  enabled: true
-  mode: review-only
-  min_turns: 5
-  proxy: null
-roots:
-  - docs/
-```
-
-Forge discovers project memory by scanning `roots` (plus the always-on `.forge/memory/` shadow area) for passports. Do
-not add a `docs:` list to `memory.yaml`.
+Forge discovers docs by scanning hardcoded roots (`docs/` plus `.forge/memory/`) for passports at Stop time.
 
 ### Setup
 
-Run this once in a checkout before the first Stop event you want captured:
+Passport your docs once (sessionless). Then enable memory per session:
 
 ```bash
 forge memory track docs/board/change_log.md --as changelog
 forge memory track docs/board/impl_notes.md \
   --propose --shadow .forge/memory/suggested_impl_notes.md
 
-forge memory enable --review-only
+# Start a session with memory on:
+forge session start planner --memory on
 
-forge memory passport show docs/board/change_log.md
-forge memory shadows list
+# Or enable for an existing session:
+forge memory enable --session planner
 ```
 
-The explicit `--shadow` keeps durable proposals at `.forge/memory/suggested_impl_notes.md`, matching the source path
-referenced in `impl_notes.md`. Without it, Forge would derive `.forge/memory/suggested_board_impl_notes.md`.
-
-After the first session, inspect the review-only handoff output and then allow direct writes:
+After the first session, inspect the output:
 
 ```bash
-forge session handoff show <session> --latest
-forge memory enable
+forge session handoff show planner --latest
 ```
 
 Review and curate implementation-note proposals before promoting anything into `impl_notes.md`:
 
 ```bash
-forge memory shadows review --for docs/board/impl_notes.md --curate --session <session>
-forge memory shadows review --for docs/board/impl_notes.md --show-latest --session <session>
+forge memory shadows review --for docs/board/impl_notes.md --curate --session planner
 ```
 
 To stop a board doc from being project memory, remove its passport:
@@ -108,6 +87,8 @@ To stop a board doc from being project memory, remove its passport:
 ```bash
 forge memory passport remove docs/board/change_log.md
 ```
+
+One-off doc updates that don't need a passport are ordinary agent instructions.
 
 ## Dogfood Workflow: Planner, Supervised Executor, Reviewer
 
@@ -117,9 +98,8 @@ guard, and a reviewer inspects the executor's worktree with the planner's contex
 The important memory behavior:
 
 - Passports are git-tracked, so worktree forks see the same board memory contract.
-- `forge session fork --worktree` copies `.forge/memory.yaml` by default, so the executor worktree is activated too.
+- Children inherit the parent's memory activation by default (`--memory on|off` overrides).
 - The executor can update `change_log.md` and shadow `impl_notes.md` at Stop without per-session `track`.
-- `fork --into` does not copy `.forge/memory.yaml`; it enters an existing checkout and uses that checkout's activation.
 
 ### 1. Planner
 
@@ -129,17 +109,14 @@ Prepare memory, then start a planning session:
 forge memory track docs/board/change_log.md --as changelog
 forge memory track docs/board/impl_notes.md \
   --propose --shadow .forge/memory/suggested_impl_notes.md
-forge memory enable --review-only
 
-forge session start planner --proxy openrouter-openai
+forge session start planner --memory on --proxy openrouter-openai
 ```
 
-Have the planner produce and approve the plan. After the planner stops, inspect the first handoff report and then switch
-the checkout to write mode:
+Have the planner produce and approve the plan. After the planner stops, inspect the handoff report:
 
 ```bash
 forge session handoff show planner --latest
-forge memory enable
 ```
 
 ### 2. Supervised Executor
@@ -170,8 +147,8 @@ during implementation, use the supervisor reload flow instead of removing superv
 %guard supervise on
 ```
 
-When the executor stops, project memory runs in the executor checkout. Because `--worktree` copied activation and git
-carried the passports, the executor can update `docs/board/change_log.md` and write proposals to its own
+When the executor stops, the memory writer runs in the executor checkout. The executor inherited memory activation from
+the planner, and git carried the passports, so it can update `docs/board/change_log.md` and write proposals to its own
 `.forge/memory/suggested_impl_notes.md`.
 
 ### 3. Reviewer
@@ -186,10 +163,9 @@ forge session fork planner \
   --inline-plan
 ```
 
-`--into` uses resume handoff because native Claude resume is scoped to the original CWD. It does not copy
-`.forge/memory.yaml`, but in this flow the target is the executor worktree, which was already activated by the
-`--worktree` fork. Make the reviewer prompt explicitly review-oriented until the runtime-abstraction context commands
-land.
+`--into` uses resume handoff because native Claude resume is scoped to the original CWD. The reviewer session inherits
+the planner's memory activation. Make the reviewer prompt explicitly review-oriented until the runtime-abstraction
+context commands land.
 
 Use `--strategy full` only when the executor or reviewer needs complete transcript detail. The default structured
 handoff plus `--inline-plan` keeps context smaller while preserving the approved plan.
@@ -203,7 +179,6 @@ These docs intentionally use git-tracked and gitignored locations to define scop
 | `docs/board/<lane>/<slug>/checklist.md` | One proposal or feature branch | Lives with the card executing the work                                              |
 | `docs/board/change_log.md`              | Project lifetime               | Merged with feature PRs; newest-first merge conflicts are integration signals       |
 | `docs/board/impl_notes.md`              | Project lifetime               | Human-promoted durable memory merged with feature PRs                               |
-| `.forge/memory.yaml`                    | Per checkout                   | Local consent/config for running the handoff agent                                  |
 | `.forge/memory/suggested_impl_notes.md` | Per worktree, per machine      | Gitignored shadow proposals; each parallel worktree accumulates its own suggestions |
 
 Sub-branches off a feature branch inherit that feature's card checklist and can tick items independently. Merge

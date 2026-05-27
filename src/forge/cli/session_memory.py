@@ -16,9 +16,7 @@ def memory_group() -> None:
 @memory_group.command("list-docs", hidden=True)
 @click.argument("args", nargs=-1, type=click.UNPROCESSED)
 def _tombstone_list(**_: object) -> None:
-    raise click.ClickException(
-        "forge session memory list-docs has been removed.\n" "Use: forge memory list --session <name>"
-    )
+    raise click.ClickException("forge session memory list-docs has been removed.\n" "Use: forge memory list")
 
 
 @memory_group.command("add-doc", hidden=True)
@@ -26,8 +24,7 @@ def _tombstone_list(**_: object) -> None:
 def _tombstone_add(**_: object) -> None:
     raise click.ClickException(
         "forge session memory add-doc has been removed.\n"
-        "Use: forge memory extra add <path> --as <strategy> --session <name> (session participation), "
-        "or forge memory track <path> --as <strategy> (project passport)."
+        "Use: forge memory track <path> --as <strategy> (project passport)."
     )
 
 
@@ -35,5 +32,5 @@ def _tombstone_add(**_: object) -> None:
 @click.argument("args", nargs=-1, type=click.UNPROCESSED)
 def _tombstone_remove(**_: object) -> None:
     raise click.ClickException(
-        "forge session memory remove-doc has been removed.\n" "Use: forge memory untrack <path> --session <name>"
+        "forge session memory remove-doc has been removed.\n" "Use: forge memory passport remove <path>"
     )

@@ -1,10 +1,13 @@
 """Docker-based E2E tests for `forge handoff run`.
 
 Tests the full chain inside a Docker container with real filesystem:
-CLI → SessionStore → effective intent → path validation → prompt → claude -p.
+CLI -> SessionStore -> effective intent -> passport scan -> prompt -> claude -p.
 
 The mock claude binary captures both args and stdin (the prompt), so we can
 verify the exact prompt content sent to the agent.
+
+Docs are discovered via ``forge_memory`` passport frontmatter under hardcoded
+scan roots (``docs/`` + ``.forge/memory/``), not from session manifests.
 """
 
 from __future__ import annotations
@@ -16,7 +19,6 @@ from dataclasses import asdict
 import pytest
 
 from forge.session.models import (
-    DesignatedDoc,
     HandoffConfig,
     MemoryIntent,
     create_session_state,
@@ -40,12 +42,46 @@ TRANSCRIPT_REL = ".forge/artifacts/handoff-test/transcripts/uuid-123.jsonl"
 # ---------------------------------------------------------------------------
 
 
+def _passported_content(
+    strategy: str,
+    content: str,
+    *,
+    shadow_path: str | None = None,
+) -> str:
+    """Prepend ``forge_memory`` passport frontmatter to markdown content."""
+    if shadow_path is not None:
+        return (
+            "---\n"
+            "forge_memory:\n"
+            "  version: 1\n"
+            '  intent: "Test doc"\n'
+            "  update:\n"
+            f"    strategy: {strategy}\n"
+            "    mode: shadow-only\n"
+            "    writers: all-sessions\n"
+            f"    shadow_path: {shadow_path}\n"
+            "---\n"
+            f"{content}"
+        )
+    return (
+        "---\n"
+        "forge_memory:\n"
+        "  version: 1\n"
+        '  intent: "Test doc"\n'
+        "  update:\n"
+        f"    strategy: {strategy}\n"
+        "    mode: direct\n"
+        "    writers: all-sessions\n"
+        "---\n"
+        f"{content}"
+    )
+
+
 def _build_manifest(
     *,
     handoff_enabled: bool = True,
     min_turns: int = 1,
     mode: str = "augment",
-    designated_docs: list[DesignatedDoc] | None = None,
 ) -> dict:
     """Build a session manifest dict with handoff config."""
     manifest = create_session_state(
@@ -59,7 +95,6 @@ def _build_manifest(
             mode=mode,
             min_turns=min_turns,
         ),
-        designated_docs=designated_docs or [],
     )
     return asdict(manifest)
 
@@ -134,7 +169,7 @@ exit "${FORGE_MOCK_CLAUDE_EXIT_CODE:-0}"
 
 
 class TestHandoffRunMultiDoc:
-    """E2E: forge handoff run with designated_docs."""
+    """E2E: forge handoff run with passported docs discovered via scan."""
 
     def _setup_session(
         self,
@@ -143,7 +178,11 @@ class TestHandoffRunMultiDoc:
         manifest_dict: dict | None = None,
         target_files: dict[str, str] | None = None,
     ) -> None:
-        """Create session manifest, transcript, and optional target files."""
+        """Create session manifest, transcript, and optional target files.
+
+        ``target_files`` values may already contain passport frontmatter
+        (use ``_passported_content()`` to prepend it).
+        """
         # Write manifest
         manifest = manifest_dict or _build_manifest()
         workspace.mkdir(f"/workspace/.forge/sessions/{SESSION_NAME}", parents=True)
@@ -157,7 +196,7 @@ class TestHandoffRunMultiDoc:
         workspace.exec(f"mkdir -p $(dirname {transcript_path})")
         workspace.write_file(transcript_path, _build_transcript())
 
-        # Write target doc files (for non-creatable strategies)
+        # Write target doc files (content may include passport frontmatter)
         if target_files:
             for path, content in target_files.items():
                 workspace.exec(f"mkdir -p $(dirname /workspace/{path})")
@@ -181,20 +220,13 @@ class TestHandoffRunMultiDoc:
         claude_capture_file: Callable[[str], str],
         claude_invocations: Callable[[], list[str]],
     ) -> None:
-        """Full chain: manifest with designated_docs → multi-doc prompt to claude -p."""
+        """Full chain: passported docs under scan roots -> multi-doc prompt to claude -p."""
         self._setup_session(
             mock_claude_workspace,
-            manifest_dict=_build_manifest(
-                designated_docs=[
-                    DesignatedDoc(path="docs/checklist.md", strategy="checklist"),
-                    DesignatedDoc(path="docs/changelog.md", strategy="changelog"),
-                    DesignatedDoc(path=".forge/memory/project-state.md", strategy="project-state"),
-                ],
-            ),
             target_files={
-                "docs/checklist.md": "# Checklist\n- [ ] task 1\n",
-                "docs/changelog.md": "# Change Log\n## 2026-01-01\nInitial.\n",
-                ".forge/memory/project-state.md": "# Project State\n",
+                "docs/checklist.md": _passported_content("checklist", "# Checklist\n- [ ] task 1\n"),
+                "docs/changelog.md": _passported_content("changelog", "# Change Log\n## 2026-01-01\nInitial.\n"),
+                ".forge/memory/project-state.md": _passported_content("project-state", "# Project State\n"),
             },
         )
 
@@ -213,13 +245,15 @@ class TestHandoffRunMultiDoc:
         assert "Mark completed tasks" in prompt  # checklist strategy
         assert "accomplishments" in prompt  # changelog strategy
 
-    def test_no_designated_docs_skips_cleanly(
+    def test_no_passported_docs_skips_cleanly(
         self,
         mock_claude_workspace: ContainerLike,
         claude_invocations: Callable[[], list[str]],
     ) -> None:
-        """No designated_docs → exit 0, no claude -p call (nothing to update)."""
-        self._setup_session(mock_claude_workspace, manifest_dict=_build_manifest())
+        """No passported docs under scan roots -> exit 0, no claude -p call."""
+        # Ensure docs/ exists but has no passported files
+        self._setup_session(mock_claude_workspace)
+        mock_claude_workspace.exec("mkdir -p /workspace/docs")
 
         exit_code = self._run_handoff(mock_claude_workspace)
         assert exit_code == 0
@@ -227,24 +261,20 @@ class TestHandoffRunMultiDoc:
         invocations = claude_invocations()
         assert not any("claude -p" in inv for inv in invocations)
 
-    def test_missing_docs_filtered(
+    def test_only_passported_docs_in_prompt(
         self,
         mock_claude_workspace: ContainerLike,
         claude_capture_file: Callable[[str], str],
     ) -> None:
-        """Docs that don't exist on disk are filtered from the prompt."""
+        """Only passported docs appear in the prompt; non-passported are ignored."""
         self._setup_session(
             mock_claude_workspace,
-            manifest_dict=_build_manifest(
-                designated_docs=[
-                    DesignatedDoc(path="docs/nonexistent.md", strategy="checklist"),
-                    DesignatedDoc(path="docs/checklist.md", strategy="checklist"),
-                ],
-            ),
             target_files={
-                "docs/checklist.md": "# Checklist\n",
+                # Passported: discovered by scanner
+                "docs/checklist.md": _passported_content("checklist", "# Checklist\n"),
+                # No passport: invisible to scanner
+                "docs/plain.md": "# Plain doc\nNo frontmatter.\n",
             },
-            # Note: docs/nonexistent.md NOT created — should be filtered
         )
 
         exit_code = self._run_handoff(mock_claude_workspace)
@@ -252,35 +282,27 @@ class TestHandoffRunMultiDoc:
 
         prompt = claude_capture_file("/tmp/claude_stdin_*.log")
         assert "docs/checklist.md" in prompt
-        assert "docs/nonexistent.md" not in prompt
+        assert "docs/plain.md" not in prompt
 
-    def test_no_file_creation_for_missing_docs(
+    def test_empty_scan_roots_no_claude_call(
         self,
         mock_claude_workspace: ContainerLike,
         claude_invocations: Callable[[], list[str]],
     ) -> None:
-        """Missing docs are skipped — no directory creation, no claude -p call."""
-        self._setup_session(
-            mock_claude_workspace,
-            manifest_dict=_build_manifest(
-                designated_docs=[
-                    DesignatedDoc(path=".forge/memory/project-state.md", strategy="project-state"),
-                ],
-            ),
-        )
+        """Empty docs/ dir and no .forge/memory/ -> no scan results, no claude -p call."""
+        self._setup_session(mock_claude_workspace)
 
-        # Verify directory doesn't exist
+        # Create empty docs/ dir (no passported files)
+        mock_claude_workspace.exec("mkdir -p /workspace/docs")
+
+        # .forge/memory/ should not exist
         check = mock_claude_workspace.exec("test -d /workspace/.forge/memory && echo yes || echo no")
         assert "no" in check.stdout
 
         exit_code = self._run_handoff(mock_claude_workspace)
         assert exit_code == 0
 
-        # Directory still should NOT exist (no file creation)
-        check = mock_claude_workspace.exec("test -d /workspace/.forge/memory && echo yes || echo no")
-        assert "no" in check.stdout
-
-        # No claude -p call (all docs missing)
+        # No claude -p call (scanner found nothing)
         invocations = claude_invocations()
         assert not any("claude -p" in inv for inv in invocations)
 
@@ -289,17 +311,12 @@ class TestHandoffRunMultiDoc:
         mock_claude_workspace: ContainerLike,
         claude_capture_file: Callable[[str], str],
     ) -> None:
-        """Review-only mode → prompt says 'Do NOT modify any files'."""
+        """Review-only mode -> prompt says 'Do NOT modify any files'."""
         self._setup_session(
             mock_claude_workspace,
-            manifest_dict=_build_manifest(
-                mode="review-only",
-                designated_docs=[
-                    DesignatedDoc(path="docs/state.md", strategy="project-state"),
-                ],
-            ),
+            manifest_dict=_build_manifest(mode="review-only"),
             target_files={
-                "docs/state.md": "# State\n",
+                "docs/state.md": _passported_content("project-state", "# State\n"),
             },
         )
 
@@ -314,7 +331,7 @@ class TestHandoffRunMultiDoc:
         mock_claude_workspace: ContainerLike,
         claude_capture_file: Callable[[str], str],
     ) -> None:
-        """memory extra add + enable review-only → handoff → session handoff show exposes the report."""
+        """memory track + enable review-only -> handoff -> session handoff show exposes the report."""
         session_name = "memory-review"
         transcript_rel = f".forge/artifacts/{session_name}/transcripts/uuid-456.jsonl"
         _install_outputting_claude_mock(mock_claude_workspace)
@@ -326,11 +343,10 @@ class TestHandoffRunMultiDoc:
         mock_claude_workspace.exec(f"mkdir -p /workspace/$(dirname {transcript_rel})")
         mock_claude_workspace.write_file(f"/workspace/{transcript_rel}", _build_transcript())
 
-        result = mock_claude_workspace.exec(
-            f"cd /workspace && forge memory extra add docs/state.md " f"--as project-state --session {session_name}"
-        )
+        # Author a passport on the doc (sessionless)
+        result = mock_claude_workspace.exec("cd /workspace && forge memory track docs/state.md --as project-state")
         assert result.returncode == 0, result.stderr
-        # Slice 2: extra add records participation; enable owns activation.
+
         result = mock_claude_workspace.exec(
             f"cd /workspace && forge memory enable --review-only --session {session_name}"
         )
@@ -340,7 +356,8 @@ class TestHandoffRunMultiDoc:
         )
         assert result.returncode == 0, result.stderr
 
-        list_result = mock_claude_workspace.exec(f"cd /workspace && forge memory list --session {session_name} --json")
+        # Verify the passported doc shows up in the project-level list
+        list_result = mock_claude_workspace.exec("cd /workspace && forge memory list --json")
         assert list_result.returncode == 0, list_result.stderr
         docs = json.loads(list_result.stdout)
         assert len(docs) == 1
@@ -372,21 +389,15 @@ class TestHandoffRunMultiDoc:
         mock_claude_workspace: ContainerLike,
         claude_capture_file: Callable[[str], str],
     ) -> None:
-        """Shadow doc: prompt reads official doc first, proposes changes to shadow."""
+        """Shadow doc: passport on official doc -> prompt reads official, proposes to shadow."""
+        shadow_path = ".forge/memory/suggested.md"
         self._setup_session(
             mock_claude_workspace,
-            manifest_dict=_build_manifest(
-                designated_docs=[
-                    DesignatedDoc(
-                        path=".forge/memory/suggested.md",
-                        strategy="suggested",
-                        shadows="STANDARDS.md",
-                    ),
-                ],
-            ),
             target_files={
-                ".forge/memory/suggested.md": "# Suggested\n",
-                "STANDARDS.md": "# Standards\n",
+                # Passport lives on the official doc with shadow-only mode
+                "docs/STANDARDS.md": _passported_content("suggested", "# Standards\n", shadow_path=shadow_path),
+                # Shadow file must exist for the prompt builder
+                shadow_path: "# Suggested\n",
             },
         )
 
@@ -394,7 +405,7 @@ class TestHandoffRunMultiDoc:
         assert exit_code == 0
 
         prompt = claude_capture_file("/tmp/claude_stdin_*.log")
-        assert "proposes changes to `STANDARDS.md`" in prompt
+        assert "proposes changes to `docs/STANDARDS.md`" in prompt
         assert "Read the OFFICIAL document" in prompt
 
 

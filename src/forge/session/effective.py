@@ -82,6 +82,13 @@ def compute_effective_intent(
     else:
         merged = intent_dict
 
+    # Defensive: strip removed designated_docs from merged dict. Primary guard
+    # is store.strip_preview_memory_doc_lists(); this covers code paths that
+    # construct a merged dict without going through SessionStore.read().
+    mem = merged.get("memory")
+    if isinstance(mem, dict):
+        mem.pop("designated_docs", None)
+
     if strict:
         try:
             return dacite.from_dict(
@@ -95,9 +102,6 @@ def compute_effective_intent(
             expected = _infer_expected_type(e)
             raise InvalidOverrideValueError(key, expected, actual) from e
 
-    # Non-strict mode: best-effort conversion.
-    # Note: With strict v3 manifests and strict override validation, this should
-    # generally not encounter unknown keys.
     return dacite.from_dict(
         data_class=SessionIntent,
         data=merged,

@@ -918,19 +918,18 @@ per-child handoff file in `$EDITOR` before launching Claude. `forge session memo
 
 #### Memory management
 
-| Command                         | Purpose                                                                                                    |
-| :------------------------------ | :--------------------------------------------------------------------------------------------------------- |
-| `forge memory enable`           | Enable memory auto-update: project-scoped (bare) or one session (`--session`)                              |
-| `forge memory track <path>`     | Author a project passport on a doc, sessionless (`--as`, `--intent`, `--writers`, `--propose`, `--shadow`) |
-| `forge memory extra add <path>` | Include a doc for one session only, no passport (`--as` required, `--session`)                             |
-| `forge memory untrack <path>`   | Remove session participation for a doc; passport untouched (`--session`)                                   |
-| `forge memory list`             | List tracked memory docs (`--session`, `--json`)                                                           |
-| `forge memory status`           | Show memory doc status across sessions (`--scope`, `--doc`, `--json`)                                      |
-| `forge memory shadows list`     | List accumulated shadow proposals (`--scope`, `--session`, `--json`)                                       |
-| `forge memory shadows show`     | Show shadow proposal content (`--for <doc>`, `--scope`, `--session`)                                       |
-| `forge memory shadows review`   | Review/curate shadow proposals (`--for`, `--curate`, `--show-latest`)                                      |
-| `forge memory passport show`    | Show passport embedded in a memory doc (`--json`)                                                          |
-| `forge memory passport remove`  | Remove the project passport from a memory doc (`--json`)                                                   |
+| Command                        | Purpose                                                                                                    |
+| :----------------------------- | :--------------------------------------------------------------------------------------------------------- |
+| `forge memory track <path>`    | Author a project passport on a doc, sessionless (`--as`, `--intent`, `--writers`, `--propose`, `--shadow`) |
+| `forge memory enable`          | Enable memory auto-update for a session (`--session`, resolves `$FORGE_SESSION`)                           |
+| `forge memory disable`         | Disable memory auto-update for a session (`--session`, resolves `$FORGE_SESSION`)                          |
+| `forge memory list`            | List passported memory docs under scan roots (`--json`)                                                    |
+| `forge memory status`          | Show memory activation across sessions (`--scope`, `--json`)                                               |
+| `forge memory shadows list`    | List accumulated shadow proposals (`--scope`, `--session`, `--json`)                                       |
+| `forge memory shadows show`    | Show shadow proposal content (`--for <doc>`, `--scope`, `--session`)                                       |
+| `forge memory shadows review`  | Review/curate shadow proposals (`--for`, `--curate`, `--show-latest`)                                      |
+| `forge memory passport show`   | Show passport embedded in a memory doc (`--json`)                                                          |
+| `forge memory passport remove` | Remove the project passport from a memory doc (`--json`)                                                   |
 
 #### Proxy management
 
@@ -1588,7 +1587,7 @@ The agent runs `claude -p` (headless prompt mode) on the full session transcript
 selecting what mattered with full-session hindsight (higher signal than incremental capture).
 
 ```yaml
-# In session intent or project config
+# In session intent (set via forge memory enable or --memory on)
 memory:
   auto_update:
     enabled: true
@@ -1603,8 +1602,8 @@ overwrites).
 #### 5.6.2 Memory doc passports
 
 Each memory doc may include a `forge_memory` YAML frontmatter block -- the doc's **passport**. The passport is the
-authoritative contract for that doc's intent, update strategy, writer privileges, and inheritance behavior. Session
-manifests store only participation and auto-update runtime state; the handoff agent re-reads passports at Stop time.
+authoritative contract for that doc's intent, update strategy, and writer privileges. The memory writer re-reads
+passports at Stop time.
 
 ```yaml
 ---
@@ -1622,9 +1621,9 @@ forge_memory:
 ---
 ```
 
-**Ownership split**: passports own doc-level policy (strategy, intent, writers). Session manifests own participation
-(which docs this session tracks) and auto-update runtime state (enabled, mode, min_turns). Editing a passport between
-sessions takes effect without re-running `forge memory track`.
+**Ownership split**: passports own doc-level policy (strategy, intent, writers). Session manifests own activation state
+(enabled, mode, min_turns). There are no session-scoped doc lists; all docs are discovered from passports at Stop time.
+Editing a passport between sessions takes effect without re-running `forge memory track`.
 
 **Writer semantics**: `all-sessions` and exact session-name writers are supported. `lineage:` and `role:` prefixes are
 rejected with deferral messages. Writer access is checked at Stop time by the handoff agent.
@@ -1649,23 +1648,25 @@ matching shadows, removes duplicates and already-promoted notes, groups related 
 output. Curation reports persist at `.forge/artifacts/<session>/memory/curation-{slug}-{hash}-{ts}.md`. Curation never
 mutates official docs.
 
-#### 5.6.4 Memory inheritance on fork and fresh resume
+#### 5.6.4 Memory activation on fork and fresh resume
 
-Memory inheritance is no longer a bulk mechanism. Project memory is discovered live from passports at Stop time; only
-session extras (`origin="extra"`, added via `forge memory extra add`) are inherited.
+Children inherit the parent's memory activation by default. The `--memory` flag overrides:
 
-**Fork activation copy.** `forge session fork --worktree` copies `.forge/memory.yaml` from the parent checkout into the
-new worktree by default. This ensures the child checkout has the same activation consent as the parent. Rules:
+```bash
+forge session fork parent                    # inherit parent's memory on/off
+forge session fork parent --memory on        # force memory on in child
+forge session fork parent --memory off       # force memory off in child
 
-- `--worktree`: copy by default (Forge-created checkout = continuation of the same work).
-- `--into`: do NOT copy (existing checkout may have its own activation).
-- Never overwrite an existing destination `.forge/memory.yaml`.
-- `--no-copy-memory-activation` suppresses the copy.
-- Corrupt source config: warn and skip (do not block the fork).
+forge session resume parent --fresh          # inherit parent's memory on/off
+forge session resume parent --fresh --memory off
+```
 
-**Extras inheritance.** `--inherit-extras` (default) carries `origin="extra"` entries from the parent's
-`designated_docs` into the child. `--no-inherit-extras` strips them. Project-discovered docs (passport-scanned) are not
-affected by this flag. Applies to both `fork` and `resume --fresh`.
+Inheritance copies only `auto_update` (enabled, mode, min_turns, proxy). Other `MemoryIntent` fields do not propagate.
+`--memory off` writes an explicit `HandoffConfig(enabled=False)` so the child is deliberately off even if later defaults
+change. `--memory on` reuses the parent's non-enabled config (mode, proxy, min_turns) or `HandoffConfig` defaults.
+
+Memory docs are not inherited. Passports are git-tracked and discovered live at Stop time in whatever checkout the child
+session runs in. This applies equally to same-checkout forks, `--worktree`, and `--into`.
 
 #### 5.6.5 Strategy registry
 
@@ -1690,70 +1691,39 @@ cheaper than cross-format deduplication.
 > Strategy tables, example config, worktree resolution details, and full auto-memory comparison in
 > [design_appendix.md §G](design_appendix.md#g-memory-doc-reference).
 
-#### 5.6.6 Project-scoped activation
+#### 5.6.6 Session-scoped activation
 
-Handoff activation is checkout-scoped, not per-session. One `forge memory enable` writes
-`<forge_root>/.forge/memory.yaml` and turns on the handoff agent for every session in that checkout, so passported docs
-participate without a per-session `forge memory track`.
+Memory activation is session-scoped. Each session decides whether the memory writer runs via
+`intent.memory.auto_update.enabled` (or an override). There is no checkout-level config file.
 
-```yaml
-# <forge_root>/.forge/memory.yaml
-version: 1
-auto_update:
-  enabled: true
-  mode: augment          # augment | review-only
-  min_turns: 5
-  proxy: null            # optional proxy_id for the handoff agent
-roots: ["docs/"]         # scan roots; .forge/memory/ is always included
+```bash
+forge memory enable                    # resolves $FORGE_SESSION
+forge memory enable --session planner  # named session
+forge memory disable --session planner
+forge session start planner --memory on
 ```
 
-The file is Forge-owned durable state: `version` is mandatory, reads are strict (unknown keys and unsupported versions
-raise `ProjectMemoryConfigError`), and a corrupt file fails the read rather than degrading to a default.
+Both gates (Stop-hook enqueue in `src/forge/cli/hooks/commands.py` and the detached runner `forge handoff run`) check
+`effective.memory.auto_update.enabled` directly. Incognito sessions never enqueue regardless of activation state.
 
-**Activation resolver.** A single resolver (`memory_activation()` in `src/forge/session/project_memory.py`) decides
-whether the handoff agent runs, and both gates consult it: the Stop-hook enqueue site
-(`src/forge/cli/hooks/commands.py`) and the detached runner (`forge handoff run`). It merges three tiers:
-
-1. **Project config** — baseline `auto_update` block when `.forge/memory.yaml` exists.
-2. **Session intent** — `intent.memory.auto_update`, overlaid as a whole block only when its `enabled` is `True` (legacy
-   per-session enable). A `HandoffConfig` default `enabled=False` is treated as unset, not an explicit disable.
-3. **Session overrides** — sparse per-leaf `overrides.memory.auto_update.<field>`; the only tier that can explicitly
-   disable an active project config.
-
-Incognito sessions always resolve to "do not run". `forge memory enable --session <name>` still writes a sparse session
-override and leaves `.forge/memory.yaml` untouched; bare `enable` ignores `$FORGE_SESSION`.
-
-**Stop-time discovery.** When project activation is on, the detached runner scans the configured roots (plus
+**Stop-time discovery.** When activation is on, the detached runner scans hardcoded roots (`docs/` plus
 `.forge/memory/`) for `forge_memory` passports the session is authorized to write, materializes shadow files for
-shadow-only passports, and unions the result with the session's `designated_docs` — session docs win on collision,
-de-duped by passport source and write path, capped at 50. The Stop hook only decides whether to enqueue; the scan runs
-in the background runner.
+shadow-only passports, and passes the result to `run_handoff_agent()`. Capped at 50 docs after filtering. The Stop hook
+only decides whether to enqueue; the scan runs in the background runner.
 
-#### 5.6.7 Write-side verb taxonomy
+**Scan roots** are hardcoded: `DEFAULT_SCAN_ROOTS = ("docs/",)` plus always `.forge/memory/`. Configurable roots are
+deferred.
 
-Each memory verb owns exactly one lifetime:
+#### 5.6.7 CLI verbs
 
-- **`forge memory track <path>`** authors a **passport** (project-lifetime, git-tracked frontmatter). It is sessionless:
-  it resolves `forge_root` from the cwd, never resolves or writes session state, and ignores `$FORGE_SESSION`.
-  Re-running with `--as`/`--writers` updates the passport; with no flags on an already-passported doc it is a no-op.
-  `--propose` authors a shadow-only passport and may materialize the declared shadow file. A passported doc outside the
-  scan roots is written but warns that project Stop-time discovery will skip it.
-- **`forge memory passport remove <path>`** removes the doc's `forge_memory` passport while preserving unrelated YAML
-  frontmatter and the markdown body. It is sessionless and does not touch `.forge/memory.yaml` or session extras.
-- **`forge memory extra add <path>`** records **session-only participation** (`memory.designated_docs`, `origin: extra`)
-  with no passport. It is the deliberate inverse of `track`: it resolves the ambient session and echoes the resolved
-  name, and errors outside a session. `--as` is required; `--as suggested` is rejected unless the doc already has a
-  passport (a passport-less `suggested` doc without a shadow is skipped at Stop).
-- **`forge memory enable`** controls activation only (project `.forge/memory.yaml` or a `--session` override).
+- **`forge memory track <path>`** authors a **passport** (project-lifetime, git-tracked frontmatter). Sessionless.
+  `--propose` authors a shadow-only passport. A passported doc outside the scan roots is written but warns.
+- **`forge memory passport remove <path>`** removes the passport, preserving unrelated frontmatter.
+- **`forge memory enable`** / **`disable`** sets session activation (`memory.auto_update.enabled`). Resolves
+  `$FORGE_SESSION` when `--session` is omitted; errors outside a session without `--session`.
+- **`forge memory list`** shows passported docs under scan roots (sessionless scan, no writer filtering).
 
-**`extra` cannot override a passport's `writers`.** The handoff agent re-reads the passport at Stop and filters by
-`writers` regardless of how the doc entered the run, so an extra on a doc whose passport excludes the session is a no-op
-at Stop (the CLI warns at add time). `untrack` removes session participation only; a doc that still has a passport under
-the scan roots stays project-discovered until `forge memory passport remove <path>` removes the passport.
-
-**Shadow discovery does not depend on the manifest.** Because sessionless `track --propose` writes no `designated_docs`
-entry, `forge memory shadows list/show/review` scan passports under the effective roots for shadow-only docs (unfiltered
-by writer), unioned with session manifest shadow entries and de-duped by `(forge_root, shadow_path)`.
+**Shadow discovery** scans passports under the scan roots for shadow-only docs (unfiltered by writer).
 
 ### 5.7 Test Infrastructure (Docker-based)
 

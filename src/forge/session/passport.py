@@ -664,7 +664,7 @@ def validate_writer_spec(writer: str) -> None:
         raise PassportError(
             "forge_memory.update.writers",
             "'none' is not a valid writer spec",
-            hint="use 'forge memory untrack' to remove participation",
+            hint="use 'forge memory passport remove' to remove the passport",
         )
 
     try:

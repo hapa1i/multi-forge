@@ -176,19 +176,15 @@ class TestStopHook:
 
     def test_stop_enqueues_handoff_with_project_config(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         from forge.core.workqueue import pending_work_dir
-        from forge.session.project_memory import (
-            ProjectAutoUpdateConfig,
-            ProjectMemoryConfig,
-            write_project_memory_config,
-        )
+        from forge.session.models import HandoffConfig, MemoryIntent
 
         monkeypatch.chdir(tmp_path)
         monkeypatch.setenv("FORGE_HOME", str(tmp_path / ".forge-test"))
         store = _write_manifest(tmp_path, monkeypatch)
         self._stop_with_transcript(store, tmp_path, "uuid-h1")
-        write_project_memory_config(
-            tmp_path, ProjectMemoryConfig(version=1, auto_update=ProjectAutoUpdateConfig(enabled=True))
-        )
+        manifest = store.read()
+        manifest.intent.memory = MemoryIntent(auto_update=HandoffConfig(enabled=True))
+        store.write(manifest)
 
         result = CliRunner().invoke(hooks, ["stop"], input=json.dumps({"hook_event_name": "Stop"}))
 
@@ -198,22 +194,16 @@ class TestStopHook:
         assert (pending_work_dir() / "handoff-uuid-h1.json").is_file()
 
     def test_stop_skips_handoff_when_session_disables(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        from forge.session.project_memory import (
-            ProjectAutoUpdateConfig,
-            ProjectMemoryConfig,
-            write_project_memory_config,
-        )
+        from forge.session.models import HandoffConfig, MemoryIntent
 
         monkeypatch.chdir(tmp_path)
         monkeypatch.setenv("FORGE_HOME", str(tmp_path / ".forge-test"))
         store = _write_manifest(tmp_path, monkeypatch)
         self._stop_with_transcript(store, tmp_path, "uuid-h2")
         manifest = store.read()
+        manifest.intent.memory = MemoryIntent(auto_update=HandoffConfig(enabled=True))
         manifest.overrides = {"memory": {"auto_update": {"enabled": False}}}
         store.write(manifest)
-        write_project_memory_config(
-            tmp_path, ProjectMemoryConfig(version=1, auto_update=ProjectAutoUpdateConfig(enabled=True))
-        )
 
         result = CliRunner().invoke(hooks, ["stop"], input=json.dumps({"hook_event_name": "Stop"}))
 
@@ -222,11 +212,7 @@ class TestStopHook:
         assert output["queued_handoff"] is False
 
     def test_stop_skips_handoff_incognito(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        from forge.session.project_memory import (
-            ProjectAutoUpdateConfig,
-            ProjectMemoryConfig,
-            write_project_memory_config,
-        )
+        from forge.session.models import HandoffConfig, MemoryIntent
 
         monkeypatch.chdir(tmp_path)
         monkeypatch.setenv("FORGE_HOME", str(tmp_path / ".forge-test"))
@@ -234,10 +220,8 @@ class TestStopHook:
         self._stop_with_transcript(store, tmp_path, "uuid-h3")
         manifest = store.read()
         manifest.is_incognito = True
+        manifest.intent.memory = MemoryIntent(auto_update=HandoffConfig(enabled=True))
         store.write(manifest)
-        write_project_memory_config(
-            tmp_path, ProjectMemoryConfig(version=1, auto_update=ProjectAutoUpdateConfig(enabled=True))
-        )
 
         result = CliRunner().invoke(hooks, ["stop"], input=json.dumps({"hook_event_name": "Stop"}))
 
