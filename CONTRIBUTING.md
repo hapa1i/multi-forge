@@ -35,7 +35,7 @@ The full developer guide lives in [`docs/developer/`](docs/developer/):
 - [Coding Standards](docs/developer/coding-standards.md) — Python conventions, type safety, comments
 - [Testing Guidelines](docs/developer/testing-guidelines.md) — test organization, fixtures, Docker
 - [Documentation Guidelines](docs/developer/documentation-guidelines.md) — doc structure, writing style
-- [Work Board Contract](docs/developer/work-board-contract.md) — board lanes, checklists, closeout
+- [Work Board Contract](docs/developer/board-contract.md) — board lanes, checklists, closeout
 
 ## Reporting Issues
 

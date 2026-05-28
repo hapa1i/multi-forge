@@ -349,11 +349,11 @@ Tracks Forge-local execution decisions. For broader card framing, see
   `--inherit-extras` / `--no-inherit-extras` (extras only, not project memory). Old values become helpful tombstones.
   Uncommitted passport warning deferred (orthogonal to inheritance retirement).
 
-## Closeout (per [work-board contract](../../../developer/work-board-contract.md#closeout))
+## Closeout (per [work-board contract](../../../developer/board-contract.md#closeout))
 
 - [x] Final compact `change_log.md` entry with verification.
 - [x] Promote durable lessons to `impl_notes.md` after human review.
 - [x] Verify `design.md §5.6`, `design_appendix.md §G`, and `docs/board/README.md` reflect all shipped changes.
 - [x] Create `docs/board/todo/memory_substrate/card.md` (intermediate card).
 - [x] Update `docs/board/todo/runtime_abstraction/card.md` to reference memory substrate.
-- [ ] `git mv` the card directory `doing/ -> done/` after final merge to `main`.
+- [x] `git mv` the card directory `doing/ -> done/` after final merge to `main`.

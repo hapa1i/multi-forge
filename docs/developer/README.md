@@ -180,7 +180,7 @@ Forge uses files instead of a database:
 | [coding-standards.md](coding-standards.md)                 | Python conventions, type safety, async        |
 | [testing-guidelines.md](testing-guidelines.md)             | Test organization, Docker fixtures, real>mock |
 | [documentation-guidelines.md](documentation-guidelines.md) | Doc writing, authority map, size limits       |
-| [work-board-contract.md](work-board-contract.md)           | Board lanes, checklists, closeout contract    |
+| [board-contract.md](board-contract.md)                     | Board lanes, checklists, closeout contract    |
 
 ## Project Docs
 
