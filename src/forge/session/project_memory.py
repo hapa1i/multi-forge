@@ -279,6 +279,6 @@ def check_shadow_path_collision_in_roots(
             continue  # same official re-authored -- upsert, not collision
         return (
             f"Shadow path {shadow_path} is already used for {existing_official}. "
-            "Use --shadow <path> to specify a different shadow path."
+            "Use --shadow-path <path> to specify a different shadow path."
         )
     return None

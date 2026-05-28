@@ -733,7 +733,7 @@ def resolve_with_overrides(
     if shadow_path is not None and shadow_path != resolved.update.shadow_path:
         old = resolved.update.shadow_path
         if old:
-            warnings.append(f"CLI --shadow {shadow_path} overrides passport shadow_path '{old}'")
+            warnings.append(f"CLI --shadow-path {shadow_path} overrides passport shadow_path '{old}'")
         resolved.update.shadow_path = shadow_path
 
     if writers is not None and writers != resolved.update.writers:

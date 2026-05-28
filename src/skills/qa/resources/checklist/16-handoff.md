@@ -108,7 +108,7 @@ EOF
 # Author a shadow-only passport (sessionless).
 forge memory track docs/team-standards.md \
   --propose \
-  --shadow .forge/memory/suggested_standards.md
+  --shadow-path .forge/memory/suggested_standards.md
 
 forge memory list --json | jq -e '
   any(.[]; .path == ".forge/memory/suggested_standards.md" and .strategy == "suggested")

@@ -60,8 +60,7 @@ Passport your docs once (sessionless). Then enable memory per session:
 
 ```bash
 forge memory track docs/board/change_log.md --as changelog
-forge memory track docs/board/impl_notes.md \
-  --propose --shadow .forge/memory/suggested_impl_notes.md
+forge memory track docs/board/impl_notes.md --propose --shadow-path .forge/memory/suggested_impl_notes.md
 
 # Start a session with memory on:
 forge session start planner --memory on
@@ -107,8 +106,7 @@ Prepare memory, then start a planning session:
 
 ```bash
 forge memory track docs/board/change_log.md --as changelog
-forge memory track docs/board/impl_notes.md \
-  --propose --shadow .forge/memory/suggested_impl_notes.md
+forge memory track docs/board/impl_notes.md --propose --shadow-path .forge/memory/suggested_impl_notes.md
 
 forge session start planner --memory on --proxy openrouter-openai
 ```
@@ -142,9 +140,9 @@ While the executor runs, the supervisor checks file edits against the planner's 
 during implementation, use the supervisor reload flow instead of removing supervision:
 
 ```text
-%guard supervise off
-%guard supervise reload
-%guard supervise on
+%policy supervise off
+%policy supervise reload
+%policy supervise on
 ```
 
 When the executor stops, the memory writer runs in the executor checkout. The executor inherited memory activation from

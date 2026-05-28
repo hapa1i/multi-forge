@@ -54,7 +54,7 @@ redundant proposals. Use for standards and guidelines where human curation matte
 
 ```bash
 forge memory track docs/developer/coding-standards.md \
-  --propose --shadow .forge/memory/suggested_standards.md
+  --propose --shadow-path .forge/memory/suggested_standards.md
 ```
 
 The shadow file contains `- [ ]` checkboxes with rationale. The human reviews and merges what's valuable into the
@@ -75,7 +75,7 @@ forge memory track docs/changelog.md --as changelog
 
 # Author a human-reviewed shadow proposal passport
 forge memory track docs/developer/coding-standards.md \
-  --propose --shadow .forge/memory/suggested_standards.md
+  --propose --shadow-path .forge/memory/suggested_standards.md
 
 # Enable memory for a session (or start with --memory on):
 forge memory enable --session planner

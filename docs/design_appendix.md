@@ -341,7 +341,7 @@ scope rationale remain in design.md.
 | -------------------- | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
 | Session / plan       | `%session list`, `%plan`                                                                                       | --                                                            |
 | Proxy                | `%proxy list`, `%proxy show` (read-only)                                                                       | `%proxy create`, `%proxy edit`, `%proxy set`, `%proxy delete` |
-| Guard / verification | `%guard status`, `%guard enable`, `%guard disable`, `%guard check`, `%guard supervise`, `%cancel-verification` | --                                                            |
+| Guard / verification | `%policy status`, `%policy enable`, `%policy disable`, `%policy check`, `%policy supervise`, `%cancel-verification` | --                                                            |
 | Cleanup              | `%clean [--scope repo\|project\|all]` (read-only report)                                                       | destructive cleanup (use `forge clean --yes` from terminal)   |
 | Utilities / config   | `%h`, `%help`, `%config`                                                                                       | --                                                            |
 
@@ -358,12 +358,12 @@ Shared commands (mirrors CLI syntax):
 - `%plan` (shows the current session's recorded plan file path)
 - `%proxy list` (read-only: shows available proxies)
 - `%proxy show <id>` (read-only: shows proxy details and tier mappings)
-- `%guard status` (shows current policy config and state)
-- `%guard enable --bundle tdd [--permissive]` (enables policy enforcement)
-- `%guard disable` (disables all policies for the session)
-- `%guard check [--staged] [--bundle <name>]` (diagnostic policy evaluation against git diff)
-- `%guard supervise <target>` (set supervisor), `off` (suspend), `on` (resume), `remove` (delete)
-- `%guard supervise reload [path]` (reload latest approved plan, or from explicit path)
+- `%policy status` (shows current policy config and state)
+- `%policy enable --bundle tdd [--permissive]` (enables policy enforcement)
+- `%policy disable` (disables all policies for the session)
+- `%policy check [--staged] [--bundle <name>]` (diagnostic policy evaluation against git diff)
+- `%policy supervise <target>` (set supervisor), `off` (suspend), `on` (resume), `remove` (delete)
+- `%policy supervise reload [path]` (reload latest approved plan, or from explicit path)
 - `%cancel-verification` (bypasses the active Stop-hook verification loop)
 - `%clean [--scope repo|project|all]` (read-only: shows orphaned state report, default scope=project)
 
@@ -727,7 +727,7 @@ forge_memory:
 # Passports are project-lifetime and sessionless:
 forge memory track docs/board/change_log.md --as changelog
 forge memory track docs/board/impl_notes.md \
-  --propose --shadow .forge/memory/suggested_impl_notes.md
+  --propose --shadow-path .forge/memory/suggested_impl_notes.md
 
 # Enable memory for a session:
 forge memory enable --session planner

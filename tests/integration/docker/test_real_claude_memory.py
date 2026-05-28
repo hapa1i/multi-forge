@@ -158,7 +158,7 @@ class TestRealClaudeMemory:
 
         track_result = forge_workspace.exec(
             "cd /workspace && forge memory track "
-            f"{official_path} --propose --shadow {shadow_path} --session {session_name}"
+            f"{official_path} --propose --shadow-path {shadow_path} --session {session_name}"
         )
         assert track_result.returncode == 0, track_result.stderr
 

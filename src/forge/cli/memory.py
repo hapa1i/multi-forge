@@ -202,7 +202,7 @@ def _set_memory_activation(session_name: str, *, enabled: bool, mode: str | None
 @click.option("--intent", default=None, help="Doc intent description for passport synthesis.")
 @click.option("--writers", default=None, help="Writer spec (default: all-sessions).")
 @click.option("--propose", is_flag=True, default=False, help="Author a shadow-only passport (proposal mode).")
-@click.option("--shadow", "shadow_override", default=None, help="Explicit shadow file path (use with --propose).")
+@click.option("--shadow-path", "shadow_override", default=None, help="Explicit shadow file path (use with --propose).")
 @click.option("--session", "-s", "session_name", default=None, hidden=True, help="(removed) track is sessionless.")
 def track_cmd(
     path: str,
@@ -234,7 +234,7 @@ def track_cmd(
 
     # Early flag-combination validation
     if shadow_override and not propose:
-        raise click.ClickException("--shadow requires --propose.")
+        raise click.ClickException("--shadow-path requires --propose.")
     if propose and strategy is not None and strategy != "suggested":
         raise click.ClickException(f"--propose requires strategy 'suggested'. Got '{strategy}'.")
 

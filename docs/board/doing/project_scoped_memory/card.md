@@ -165,7 +165,7 @@ passport setup plus a per-checkout activation step; sessions carry no memory com
 ```bash
 forge memory track docs/board/change_log.md --as changelog          # writes passport into the doc
 forge memory track docs/board/impl_notes.md \
-  --propose --shadow .forge/memory/suggested_impl_notes.md           # shadow-only passport
+  --propose --shadow-path .forge/memory/suggested_impl_notes.md      # shadow-only passport
 git add docs/board/change_log.md docs/board/impl_notes.md
 git commit -m "chore: project memory passports"
 forge memory enable --review-only                                     # local activation, safe first run

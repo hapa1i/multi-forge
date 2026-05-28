@@ -370,7 +370,7 @@ class TestMemoryTrackPropose:
         custom = ".forge/memory/custom_shadow.md"
         (forge_root / custom).parent.mkdir(parents=True, exist_ok=True)
         (forge_root / custom).write_text("", encoding="utf-8")
-        result = runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--propose", "--shadow", custom])
+        result = runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--propose", "--shadow-path", custom])
         assert result.exit_code == 0, result.output
         from forge.session.passport import read_passport
 
@@ -378,7 +378,7 @@ class TestMemoryTrackPropose:
         assert pp is not None and pp.update.shadow_path == custom
 
     def test_shadow_without_propose_fails(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
-        result = runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--shadow", ".forge/memory/x.md"])
+        result = runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--shadow-path", ".forge/memory/x.md"])
         assert result.exit_code != 0
         assert "--propose" in result.output
 
@@ -386,7 +386,7 @@ class TestMemoryTrackPropose:
         self, runner: CliRunner, seeded_session: tuple[Path, str]
     ) -> None:
         result = runner.invoke(
-            main, ["memory", "track", "docs/impl_notes.md", "--propose", "--shadow", "docs/nonexistent.md"]
+            main, ["memory", "track", "docs/impl_notes.md", "--propose", "--shadow-path", "docs/nonexistent.md"]
         )
         assert result.exit_code != 0
         assert "does not exist" in result.output
@@ -429,7 +429,7 @@ class TestMemoryTrackPropose:
         custom = ".forge/memory/new_shadow.md"
         (forge_root / custom).parent.mkdir(parents=True, exist_ok=True)
         (forge_root / custom).write_text("", encoding="utf-8")
-        result = runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--propose", "--shadow", custom])
+        result = runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--propose", "--shadow-path", custom])
         assert result.exit_code == 0, result.output
         pp = read_passport(forge_root / "docs/impl_notes.md")
         assert pp is not None and pp.update.shadow_path == custom
@@ -437,7 +437,7 @@ class TestMemoryTrackPropose:
     def test_auto_create_rejects_traversal(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
         result = runner.invoke(
             main,
-            ["memory", "track", "docs/impl_notes.md", "--propose", "--shadow", ".forge/memory/../../etc/passwd"],
+            ["memory", "track", "docs/impl_notes.md", "--propose", "--shadow-path", ".forge/memory/../../etc/passwd"],
         )
         assert result.exit_code != 0
 
@@ -451,19 +451,21 @@ class TestMemoryTrackPropose:
         # docs/changelog.md -> suggested_docs_changelog.md; docs/sub/changelog.md -> suggested_sub_changelog.md.
         # Force a real collision with an explicit shadow path.
         used = ".forge/memory/suggested_docs_changelog.md"
-        result = runner.invoke(main, ["memory", "track", "docs/sub/changelog.md", "--propose", "--shadow", used])
+        result = runner.invoke(main, ["memory", "track", "docs/sub/changelog.md", "--propose", "--shadow-path", used])
         assert result.exit_code != 0
-        assert "--shadow" in result.output
+        assert "--shadow-path" in result.output
 
     def test_propose_explicit_shadow_collision_fails(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
         runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--propose"])
-        result = runner.invoke(main, ["memory", "track", "docs/changelog.md", "--propose", "--shadow", self.DERIVED])
+        result = runner.invoke(
+            main, ["memory", "track", "docs/changelog.md", "--propose", "--shadow-path", self.DERIVED]
+        )
         assert result.exit_code != 0
-        assert "--shadow" in result.output
+        assert "--shadow-path" in result.output
 
     def test_propose_self_shadow_fails(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
         result = runner.invoke(
-            main, ["memory", "track", "docs/impl_notes.md", "--propose", "--shadow", "docs/impl_notes.md"]
+            main, ["memory", "track", "docs/impl_notes.md", "--propose", "--shadow-path", "docs/impl_notes.md"]
         )
         assert result.exit_code != 0
         assert "same as the official" in result.output

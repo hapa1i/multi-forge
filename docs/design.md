@@ -413,7 +413,7 @@ forge proxy delete <proxy_id>
 ```
 
 **Launch-time auto-start (lookup-or-start).** `--proxy` (session start/resume/fork, `forge claude`) and
-`--supervisor-proxy` (session start/fork, `forge guard supervise`) accept a template name. When the name is a template,
+`--supervisor-proxy` (session start/fork, `forge policy supervise`) accept a template name. When the name is a template,
 the launcher routes through `ensure_proxy()` → `start_proxy()` (reuse a live proxy, else adopt/spawn) instead of a
 lookup-only `resolve_proxy()`. This makes a template name with no running proxy — or a registry entry marked `healthy`
 that is no longer reachable — start a live proxy rather than fail. A bare proxy_id is still presence-only (revive with
@@ -918,18 +918,18 @@ per-child handoff file in `$EDITOR` before launching Claude. `forge session memo
 
 #### Memory management
 
-| Command                        | Purpose                                                                                                    |
-| :----------------------------- | :--------------------------------------------------------------------------------------------------------- |
-| `forge memory track <path>`    | Author a project passport on a doc, sessionless (`--as`, `--intent`, `--writers`, `--propose`, `--shadow`) |
-| `forge memory enable`          | Enable memory auto-update for a session (`--session`, resolves `$FORGE_SESSION`)                           |
-| `forge memory disable`         | Disable memory auto-update for a session (`--session`, resolves `$FORGE_SESSION`)                          |
-| `forge memory list`            | List passported memory docs under scan roots (`--json`)                                                    |
-| `forge memory status`          | Show memory activation across sessions (`--scope`, `--json`)                                               |
-| `forge memory shadows list`    | List accumulated shadow proposals (`--scope`, `--session`, `--json`)                                       |
-| `forge memory shadows show`    | Show shadow proposal content (`--for <doc>`, `--scope`, `--session`)                                       |
-| `forge memory shadows review`  | Review/curate shadow proposals (`--for`, `--curate`, `--show-latest`)                                      |
-| `forge memory passport show`   | Show passport embedded in a memory doc (`--json`)                                                          |
-| `forge memory passport remove` | Remove the project passport from a memory doc (`--json`)                                                   |
+| Command                        | Purpose                                                                                                         |
+| :----------------------------- | :-------------------------------------------------------------------------------------------------------------- |
+| `forge memory track <path>`    | Author a project passport on a doc, sessionless (`--as`, `--intent`, `--writers`, `--propose`, `--shadow-path`) |
+| `forge memory enable`          | Enable memory auto-update for a session (`--session`, resolves `$FORGE_SESSION`)                                |
+| `forge memory disable`         | Disable memory auto-update for a session (`--session`, resolves `$FORGE_SESSION`)                               |
+| `forge memory list`            | List passported memory docs under scan roots (`--json`)                                                         |
+| `forge memory status`          | Show memory activation across sessions (`--scope`, `--json`)                                                    |
+| `forge memory shadows list`    | List accumulated shadow proposals (`--scope`, `--json`)                                                         |
+| `forge memory shadows show`    | Show shadow proposal content (`--for <doc>`, `--scope`)                                                         |
+| `forge memory shadows review`  | Review/curate shadow proposals (`--for`, `--curate`, `--show-latest`)                                           |
+| `forge memory passport show`   | Show passport embedded in a memory doc (`--json`)                                                               |
+| `forge memory passport remove` | Remove the project passport from a memory doc (`--json`)                                                        |
 
 #### Proxy management
 
@@ -976,17 +976,17 @@ per-child handoff file in `$EDITOR` before launching Claude. `forge session memo
 
 | Command                                       | Purpose                                       |
 | --------------------------------------------- | --------------------------------------------- |
-| `forge guard enable --bundle <name>`          | Enable policy enforcement for current session |
-| `forge guard disable`                         | Disable policy enforcement                    |
-| `forge guard status`                          | Show current policy state (`--json`)          |
-| `forge guard list`                            | List available bundles and rules (`--json`)   |
-| `forge guard check --bundle <name> -f <path>` | Evaluate policies on demand                   |
-| `forge guard supervisor -f <path> -r <id>`    | Evaluate file against approved plan           |
-| `forge guard supervise <target>`              | Set persistent supervisor for session         |
-| `forge guard supervise --off / --on`          | Suspend/resume supervisor (preserves config)  |
-| `forge guard supervise --remove`              | Remove supervisor entirely                    |
-| `forge guard supervise --reload`              | Reload latest relevant approved plan          |
-| `forge guard supervise --reload-from <path>`  | Reload plan from explicit file                |
+| `forge policy enable --bundle <name>`          | Enable policy enforcement for current session |
+| `forge policy disable`                         | Disable policy enforcement                    |
+| `forge policy status`                          | Show current policy state (`--json`)          |
+| `forge policy list`                            | List available bundles and rules (`--json`)   |
+| `forge policy check --bundle <name> -f <path>` | Evaluate policies on demand                   |
+| `forge policy supervisor -f <path> -r <id>`    | Evaluate file against approved plan           |
+| `forge policy supervise <target>`              | Set persistent supervisor for session         |
+| `forge policy supervise --off / --on`          | Suspend/resume supervisor (preserves config)  |
+| `forge policy supervise --remove`              | Remove supervisor entirely                    |
+| `forge policy supervise --reload`              | Reload latest relevant approved plan          |
+| `forge policy supervise --reload-from <path>`  | Reload plan from explicit file                |
 
 #### Workflow
 
@@ -1161,10 +1161,10 @@ ambiguities.
 
 **Supervisor stuck playbook:** When the supervisor blocks because the plan evolved:
 
-- `%guard supervise off` (suspend, config preserved)
+- `%policy supervise off` (suspend, config preserved)
 - Make the approved changes
-- `%guard supervise reload` (searches current session, forks, then target) or `%guard supervise reload <path>`
-- `%guard supervise on` (resume with updated plan context)
+- `%policy supervise reload` (searches current session, forks, then target) or `%policy supervise reload <path>`
+- `%policy supervise on` (resume with updated plan context)
 
 **The underspecification problem (biggest failure mode):** Supervision catches explicit divergence (plan says X, agent
 did Y, citations are clear). Underspecification is harder: the plan is silent, the model picks a plausible default, and
@@ -1192,8 +1192,8 @@ rerun).
 installing hooks:
 
 ```bash
-forge guard check supervisor --file src/forge/session/store.py
-forge guard check tdd --diff HEAD~1
+forge policy check supervisor --file src/forge/session/store.py
+forge policy check tdd --diff HEAD~1
 ```
 
 The same evaluation function runs in both modes (hook-triggered and CLI-triggered).
@@ -1502,21 +1502,21 @@ both CLI commands and policy classes—no workflow registry, no declarative conf
 1. **Guard** — deterministic/semantic policies evaluated against an action context.
 
    - Hook surface: `forge hook …` invokes Guard policies automatically.
-   - Manual surface: `forge guard check …` runs Guard policies on demand (after a hook blocks you, or in CI).
+   - Manual surface: `forge policy check …` runs Guard policies on demand (after a hook blocks you, or in CI).
 
    **Stuck playbook (target UX):** When a PreToolUse policy blocks repeatedly, give the human an escape hatch without
    uninstalling hooks.
 
-   - **Disable enforcement in-session:** `%guard disable` (hook becomes a no-op for this session)
+   - **Disable enforcement in-session:** `%policy disable` (hook becomes a no-op for this session)
    - **Fix the issue:** work with the agent or edit manually while enforcement is disabled
    - **Confirm you're unblocked (optional):**
-     - `%guard check` (planned): defaults to `git diff` (unstaged). Supports `--staged`.
-     - Terminal fallback: `git diff | forge guard check --bundle tdd --bundle coding_standards --diff`
+     - `%policy check` (planned): defaults to `git diff` (unstaged). Supports `--staged`.
+     - Terminal fallback: `git diff | forge policy check --bundle tdd --bundle coding_standards --diff`
    - **Re-enable enforcement:**
-     - `%guard enable` (planned): with no bundles, restores the session's configured bundles from intent.
-     - `%guard enable tdd coding_standards`: explicitly sets bundles for the session.
+     - `%policy enable` (planned): with no bundles, restores the session's configured bundles from intent.
+     - `%policy enable tdd coding_standards`: explicitly sets bundles for the session.
 
-   `forge guard check` (and `%guard check`) are diagnostics; you're unstuck once enforcement is re-enabled and the next
+   `forge policy check` (and `%policy check`) are diagnostics; you're unstuck once enforcement is re-enabled and the next
    Write/Edit passes the hook.
 
 2. **Run** -- multi-step workflow runners (fan-out, debate, etc.).

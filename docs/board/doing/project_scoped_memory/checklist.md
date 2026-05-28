@@ -172,7 +172,7 @@ the runner on for this checkout/session. Each verb owns exactly one lifetime.
   - Assertion: drop the participation write (`_write_docs` / `memory.designated_docs` override at `memory.py:70-78`) and
     the `_auto_enable_memory` call; stop calling `resolve_session` / `_current_docs`. Validate the path against
     `ctx.forge_root` (as `passport_show_cmd` does, `memory.py:1348`). Warn when the doc is outside the effective scan
-    roots (`.forge/memory.yaml` `roots:` ∪ always-on `.forge/memory/`). `--propose`/`--shadow` still write the
+    roots (`.forge/memory.yaml` `roots:` ∪ always-on `.forge/memory/`). `--propose`/`--shadow-path` still write the
     shadow-only passport, but no participation.
 - [x] Bare `track` never consults the ambient session.
   - Assertion: `forge memory track <doc>` is passport-only even when `$FORGE_SESSION` is set (mirrors bare `enable`; no
@@ -182,7 +182,7 @@ the runner on for this checkout/session. Each verb owns exactly one lifetime.
     `synthesize_passport`/`write_passport`/`resolve_with_overrides`. `--as` is REQUIRED — it is the `resolve_doc_spec`
     fallback strategy for passport-less docs (`handoff_agent.py:431`). Resolves ambient `$FORGE_SESSION` when
     `--session` is omitted and ECHOES the resolved session; errors (via `resolve_session`) outside a session with no
-    `--session`. Drops `--intent`/`--writers`/`--propose`/`--shadow`.
+    `--session`. Drops `--intent`/`--writers`/`--propose`/`--shadow-path`.
 - [x] `extra add` warns by reading the target's passport + `writers` (three-way; case B folded in).
   - Assertion (A, redundant): passport present AND under a scan root AND `check_writer_access` authorizes the session ->
     warn "already project-discovered for this session; no extra needed."
