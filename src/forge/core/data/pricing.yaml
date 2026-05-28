@@ -5,11 +5,11 @@
 # cached_input = price for prompt-cache HIT tokens (a subset of input_tokens).
 # Cost formula: (input - cached) * input + cached * cached_input + output * output
 schema_version: 1
-updated_at: "2026-05-12"
+updated_at: "2026-05-28"
 
 models:
   # --- Anthropic ---
-  claude-opus-4-7:
+  claude-opus-4-8:
     input: 5.00
     output: 25.00
     cached_input: 0.50

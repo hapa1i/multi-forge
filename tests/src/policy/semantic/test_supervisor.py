@@ -564,7 +564,7 @@ class TestSupervisorResumeTargetResolution:
             "os.environ",
             {
                 "ANTHROPIC_MODEL": "opus",
-                "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-4-7",
+                "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-4-8",
             },
         ):
             invoke_supervisor(_make_config(resume_id=raw_uuid, proxy="openrouter-anthropic"), _make_context())

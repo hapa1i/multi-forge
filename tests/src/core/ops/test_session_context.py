@@ -167,13 +167,13 @@ class TestGetSessionContext:
         monkeypatch.delenv("ACTIVE_TEMPLATE", raising=False)
         monkeypatch.delenv("ANTHROPIC_BASE_URL", raising=False)
         monkeypatch.setenv("ANTHROPIC_MODEL", "opus")
-        monkeypatch.setenv("ANTHROPIC_DEFAULT_OPUS_MODEL", "claude-opus-4-7")
+        monkeypatch.setenv("ANTHROPIC_DEFAULT_OPUS_MODEL", "claude-opus-4-8")
 
         ctx = get_session_context(None)
 
         assert ctx.proxy.is_direct is True
         assert ctx.model_family == "anthropic"
-        assert ctx.main_model == "claude-opus-4-7"
+        assert ctx.main_model == "claude-opus-4-8"
 
     def test_no_session_ignores_stale_direct_model_default_without_tier(self, monkeypatch):
         monkeypatch.delenv("FORGE_SESSION", raising=False)
@@ -263,7 +263,7 @@ class TestGetSessionContext:
         state = create_session_state(
             "direct-session",
             worktree_path=str(worktree),
-            direct_model="claude-opus-4-7",
+            direct_model="claude-opus-4-8",
         )
 
         SessionStore(str(worktree), "direct-session").write(state)
@@ -275,8 +275,8 @@ class TestGetSessionContext:
         data = ctx.to_dict()
         assert ctx.proxy.is_direct is True
         assert ctx.model_family == "anthropic"
-        assert ctx.main_model == "claude-opus-4-7"
-        assert data["main_model"] == "claude-opus-4-7"
+        assert ctx.main_model == "claude-opus-4-8"
+        assert data["main_model"] == "claude-opus-4-8"
 
     def test_uuid_resolution_falls_back_to_manifest_scan_when_index_is_stale(self, tmp_path: Path):
         worktree = tmp_path / "repo"

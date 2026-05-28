@@ -474,7 +474,7 @@ forge proxy delete openrouter-test --force 2>/dev/null || true
 ```
 
 - [ ] Template YAML includes `model_alternatives` section under opus tier
-- [ ] Opus alternative maps `claude-opus-4-7` to `anthropic/claude-opus-4.7`
+- [ ] Opus alternative maps `claude-opus-4-8` to `anthropic/claude-opus-4.8`
 - [ ] Proxy instance inherits `model_alternatives` from template
 - [ ] `openrouter-test` proxy cleaned up
 

@@ -271,7 +271,7 @@ class TestRunClaudeSession:
             "os.environ",
             {
                 "ANTHROPIC_MODEL": "opus",
-                "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-4-7",
+                "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-4-8",
             },
         ):
             run_claude_session(

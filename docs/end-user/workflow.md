@@ -52,7 +52,7 @@ Routing is **capability-based**: models declare what they are (family, provider 
 runtime from proxy templates and credentials. The preferred proxy is a catalog hint, not a hard requirement -- any
 compatible proxy found in the registry will work.
 
-Selectable direct Claude workers include `claude-opus-4.6`, `claude-opus-4.6-1m`, and `claude-opus-4.7`. Additional OSS
+Selectable direct Claude workers include `claude-opus-4.6`, `claude-opus-4.6-1m`, and `claude-opus-4.8`. Additional OSS
 models include `deepseek-v4-pro`, `minimax-m2.7`, `qwen3.6-max-preview`, `kimi-k2.6`, and `glm-5.1`. Use `--proxy` to
 route all workers through a specific proxy:
 
@@ -61,7 +61,7 @@ route all workers through a specific proxy:
 forge workflow panel src/ --code -m gpt-5.5,deepseek-v4-pro --proxy openrouter-openai
 
 # Explicit direct Claude workers
-forge workflow panel src/ --code -m claude-opus-4.6,claude-opus-4.7
+forge workflow panel src/ --code -m claude-opus-4.6,claude-opus-4.8
 ```
 
 Check which models are locally routable with `forge workflow list-models`. Models are grouped by primary credential and

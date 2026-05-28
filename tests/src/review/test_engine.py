@@ -215,7 +215,7 @@ class TestRunMultiReview:
         monkeypatch.setenv("FORGE_SUBPROCESS_PROXY", "openrouter")
         monkeypatch.setenv("ANTHROPIC_BASE_URL", "http://inherited:8080")
 
-        direct_route = _route(provider="direct", model_ref="claude-opus-4-7")
+        direct_route = _route(provider="direct", model_ref="claude-opus-4-8")
         direct_result = _routing_result(route=direct_route, base_url=None, source="direct")
         plan = _plan(direct_result)
 
@@ -223,10 +223,10 @@ class TestRunMultiReview:
             "review",
             models=[
                 _spec(
-                    name="claude-opus-4.7",
+                    name="claude-opus-4.8",
                     family="anthropic",
                     preferred_proxy=None,
-                    provider_refs=(("direct", "claude-opus-4-7"),),
+                    provider_refs=(("direct", "claude-opus-4-8"),),
                 )
             ],
             routing_plan=plan,
@@ -236,7 +236,7 @@ class TestRunMultiReview:
         env = mock_popen_cls.call_args.kwargs["env"]
         assert "--model" not in cmd
         assert env["ANTHROPIC_MODEL"] == "opus"
-        assert env["ANTHROPIC_DEFAULT_OPUS_MODEL"] == "claude-opus-4-7"
+        assert env["ANTHROPIC_DEFAULT_OPUS_MODEL"] == "claude-opus-4-8"
         assert "ANTHROPIC_BASE_URL" not in env
         assert "FORGE_SUBPROCESS_PROXY" not in env
 

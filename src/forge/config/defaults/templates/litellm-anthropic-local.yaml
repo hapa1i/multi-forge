@@ -28,6 +28,6 @@ proxy:
       opus: anthropic/claude-opus-4-6
     model_alternatives:
       opus:
-        claude-opus-4-7: anthropic/claude-opus-4-7
+        claude-opus-4-8: anthropic/claude-opus-4-8
     prompt_caching: passthrough
     error_hints: true

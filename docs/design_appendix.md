@@ -33,7 +33,7 @@ proxy:
         max_tokens: 4096
     model_alternatives:                   # Per-tier alternative backend mappings
       opus:
-        claude-opus-4-7: anthropic/claude-opus-4-7
+        claude-opus-4-8: anthropic/claude-opus-4-8
 ```
 
 **Note:** All hyperparameters are per-tier because each model has different limits and optimal defaults.

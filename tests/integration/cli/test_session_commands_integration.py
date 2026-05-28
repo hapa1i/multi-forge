@@ -147,7 +147,7 @@ class TestSessionStart:
 
     def test_start_with_direct_model_pins_claude_env(self, mock_claude_workspace: ContainerLike) -> None:
         """--model is stored as direct intent and launched through Claude Code env pins."""
-        result = mock_claude_workspace.exec("cd /workspace && forge session start model-test --model opus-4-7")
+        result = mock_claude_workspace.exec("cd /workspace && forge session start model-test --model opus-4-8")
 
         assert result.returncode == 0, result.stderr
         assert "Routing: direct" in result.stdout
@@ -155,7 +155,7 @@ class TestSessionStart:
         manifest = json.loads(
             mock_claude_workspace.read_file("/workspace/.forge/sessions/model-test/forge.session.json")
         )
-        assert manifest["intent"]["launch"]["direct_model"] == "claude-opus-4-7"
+        assert manifest["intent"]["launch"]["direct_model"] == "claude-opus-4-8"
 
         invocations = mock_claude_workspace.read_file("/tmp/claude_invocations.log")
         assert "--model" not in invocations
@@ -164,7 +164,7 @@ class TestSessionStart:
         assert env_path
         env_text = mock_claude_workspace.read_file(env_path)
         assert "ANTHROPIC_MODEL=opus" in env_text
-        assert "ANTHROPIC_DEFAULT_OPUS_MODEL=claude-opus-4-7" in env_text
+        assert "ANTHROPIC_DEFAULT_OPUS_MODEL=claude-opus-4-8" in env_text
         assert "ANTHROPIC_BASE_URL=" not in env_text
 
 

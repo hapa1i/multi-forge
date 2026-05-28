@@ -51,16 +51,16 @@ class TestReviewCodeSkill:
     def test_references_exist(self):
         refs = SKILLS_DIR / "review" / "references"
         assert (refs / "claude-4.6.md").exists()
-        assert (refs / "claude-4.7.md").exists()
+        assert (refs / "claude-4.8.md").exists()
         assert (refs / "gpt-5.5.md").exists()
         assert (refs / "gemini-3.1.md").exists()
 
     def test_model_guides_are_standalone(self):
         refs = SKILLS_DIR / "review" / "references"
-        guide_names = ("claude-4.6.md", "claude-4.7.md", "gpt-5.5.md", "gemini-3.1.md")
+        guide_names = ("claude-4.6.md", "claude-4.8.md", "gpt-5.5.md", "gemini-3.1.md")
         cross_guide_phrases = (
             "4.6 guide",
-            "4.7 guide",
+            "4.8 guide",
             "gpt-5.5 guide",
             "gemini 3.1 guide",
             "other guide",

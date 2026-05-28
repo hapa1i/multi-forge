@@ -102,13 +102,13 @@ class TestDefaultModels:
         assert spec.family == "anthropic"
         assert spec.provider_refs == (("direct", ANTHROPIC_DEFAULT),)
 
-    def test_explicit_claude_47_is_selectable_not_default(self):
-        assert "claude-opus-4.7" in AVAILABLE_MODELS
-        assert "claude-opus-4.7" not in DEFAULT_MODELS
+    def test_explicit_claude_48_is_selectable_not_default(self):
+        assert "claude-opus-4.8" in AVAILABLE_MODELS
+        assert "claude-opus-4.8" not in DEFAULT_MODELS
 
-        spec = AVAILABLE_MODELS["claude-opus-4.7"]
+        spec = AVAILABLE_MODELS["claude-opus-4.8"]
         assert spec.family == "anthropic"
-        assert spec.provider_refs == (("direct", "claude-opus-4-7"),)
+        assert spec.provider_refs == (("direct", "claude-opus-4-8"),)
         assert spec.prompt is not None
         assert spec.prompt_mode == "prefix"
         assert "file:line" in spec.prompt
@@ -173,13 +173,13 @@ class TestResolveModelSpecs:
         assert [s.name for s in specs] == [OPENAI_DEFAULT, "claude-opus"]
 
     def test_specific_direct_claude_versions_have_distinct_specs(self):
-        specs = resolve_model_specs("claude-opus-4.6,claude-opus-4.7")
+        specs = resolve_model_specs("claude-opus-4.6,claude-opus-4.8")
 
-        assert [s.name for s in specs] == ["claude-opus-4.6", "claude-opus-4.7"]
-        assert [s.effective_worker_id for s in specs] == ["claude-opus-4.6", "claude-opus-4.7"]
+        assert [s.name for s in specs] == ["claude-opus-4.6", "claude-opus-4.8"]
+        assert [s.effective_worker_id for s in specs] == ["claude-opus-4.6", "claude-opus-4.8"]
         # Direct model refs live in provider_refs
         assert specs[0].provider_refs == (("direct", "claude-opus-4-6"),)
-        assert specs[1].provider_refs == (("direct", "claude-opus-4-7"),)
+        assert specs[1].provider_refs == (("direct", "claude-opus-4-8"),)
 
     def test_unknown_model_raises(self):
         with pytest.raises(ValueError, match="nonexistent"):
@@ -195,7 +195,7 @@ class TestResolveModelSpecs:
         assert "claude-opus" in names
         assert "claude-opus-4.6" in names
         assert "claude-opus-4.6-1m" in names
-        assert "claude-opus-4.7" in names
+        assert "claude-opus-4.8" in names
         assert "deepseek-v4-pro" in names
         assert "minimax-m2.7" in names
 
@@ -283,7 +283,7 @@ class TestCheckModelAvailability:
         return_value="sk-test",
     )
     def test_explicit_direct_worker_ready_with_key(self, _mock_cred):
-        result = check_model_availability([AVAILABLE_MODELS["claude-opus-4.7"]])
+        result = check_model_availability([AVAILABLE_MODELS["claude-opus-4.8"]])
 
         assert result[0].status == "ready"
 

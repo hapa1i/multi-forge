@@ -154,8 +154,8 @@ for one role and the wrong pick for another:
 # Planner/supervisor source on the proxy default Opus 4.6
 forge session start planner --proxy openrouter-anthropic
 
-# Executor on Opus 4.7, checked against the planner by a read-only supervisor
-forge session start exec --proxy openrouter-anthropic --model claude-opus-4-7 --supervise planner
+# Executor on Opus 4.8, checked against the planner by a read-only supervisor
+forge session start exec --proxy openrouter-anthropic --model claude-opus-4-8 --supervise planner
 ```
 
 See [model-selection.md](model-selection.md) for per-role recommendations, the structural reasons context fidelity

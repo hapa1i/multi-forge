@@ -102,7 +102,7 @@ session pins. You do not need separate proxies just to compare two Claude versio
 forge session start planner --proxy openrouter-anthropic
 
 # Executor pinned to an alternative exposed by the same proxy
-forge session start exec --proxy openrouter-anthropic --model claude-opus-4-7 --supervise planner
+forge session start exec --proxy openrouter-anthropic --model claude-opus-4-8 --supervise planner
 ```
 
 The executor's `--model` pin changes routing for that session's main Claude process. Proxied supervisor calls clear
@@ -128,7 +128,7 @@ do not pass `--supervisor-proxy`, so override only when you want non-default rou
 
 ### Model-Pin Scope
 
-Model pins are intentionally session-local for proxied supervisors. If you pin `--model claude-opus-4-7` on the
+Model pins are intentionally session-local for proxied supervisors. If you pin `--model claude-opus-4-8` on the
 executor, the supervisor does not reuse that pin; it requests the configured supervisor proxy's `opus` tier.
 
 For same-worktree final review, you can move the planner itself to a different model before resuming it:
@@ -218,7 +218,7 @@ The validation loop:
 
 ```bash
 # Pin the candidate on an executor session
-forge session start trial --proxy openrouter-anthropic --model claude-opus-4-7
+forge session start trial --proxy openrouter-anthropic --model claude-opus-4-8
 
 # Run supervisor evaluation on representative diffs
 forge policy supervisor -f src/forge/session/store.py -r <trial-session-id> \

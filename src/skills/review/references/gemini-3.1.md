@@ -495,9 +495,9 @@ You are precise, analytical, and persistent.
 
 ---
 
-## Key Differences: Gemini 3.1 Pro vs GPT-5.5 vs Claude 4.7
+## Key Differences: Gemini 3.1 Pro vs GPT-5.5 vs Claude 4.8
 
-| Aspect            | Gemini 3.1 Pro                       | GPT-5.5                                  | Claude Opus 4.7                           |
+| Aspect            | Gemini 3.1 Pro                       | GPT-5.5                                  | Claude Opus 4.8                           |
 | ----------------- | ------------------------------------ | ---------------------------------------- | ----------------------------------------- |
 | Default reasoning | `high` (dynamic, 3 tiers)            | `medium`                                 | Thinking off unless `adaptive` set        |
 | Thinking control  | `thinking_level` (low/medium/high)   | `reasoning.effort` (none to xhigh)       | `thinking: {"type": "adaptive"}` + effort |
