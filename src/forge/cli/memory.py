@@ -224,6 +224,16 @@ def track_cmd(
     suggestions to a shadow file instead of editing the doc directly.
 
     For one-off updates without a passport, instruct the agent directly.
+
+    \b
+    Strategies (--as):
+      changelog      Add accomplishments not already recorded
+      checklist      Mark completed tasks [x], add newly discovered tasks
+      debugging      Record error causes, solutions, and workarounds
+      generic        Add any new information missing from the file
+      patterns       Record architecture patterns and conventions
+      project-state  Update current focus, decisions, and handoff notes
+      suggested      Propose additions as checkboxes (use with --propose)
     """
     # Tombstone: track no longer takes a session (clean break, coding-standards §5).
     if session_name is not None:
