@@ -65,6 +65,12 @@ Use `pytest`, not `unittest`. Mirror source paths in `tests/src/` (for example, 
 `test_bug_<id>_<description>.py` and mark them `regression`. Every bug fix should include a regression test, and broken
 tests should be fixed or removed rather than skipped.
 
+## Release Process
+
+Version lives in `pyproject.toml`. PyPI publishing is automated: push an annotated `v*` tag to trigger the
+`.github/workflows/publish.yml` workflow (trusted publishing via OIDC). After tagging, create a GitHub release with
+`gh release create`. No local PyPI credentials are needed.
+
 ## Commit & Pull Request Guidelines
 
 Recent history follows conventional prefixes such as `feat:`, `fix:`, `docs:`, and `chore:` with short imperative

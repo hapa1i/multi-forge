@@ -43,6 +43,22 @@ pre-commit run --all-files
 - **`main`**: Primary branch. All PRs target `main`.
 - **Feature branches**: Branch from `main`, PR back into `main`.
 
+## Release Process
+
+Version is in `pyproject.toml`. Publishing is tag-triggered via GitHub Actions (trusted publishing, no local credentials
+needed):
+
+```bash
+# 1. Bump version in pyproject.toml on main
+# 2. Create an annotated tag and push
+git tag -a v0.X.Y -m "Release v0.X.Y"
+git push origin v0.X.Y
+# 3. Create a GitHub release
+gh release create v0.X.Y --title "v0.X.Y" --notes "..."
+```
+
+The `Publish to PyPI` workflow (`.github/workflows/publish.yml`) builds and publishes on any `v*` tag push.
+
 ## Work Board Quick Semantics
 
 The authoritative board workflow is in `docs/developer/work-board-contract.md`. In short: `todo/` means accepted but
