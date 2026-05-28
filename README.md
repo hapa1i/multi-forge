@@ -1,7 +1,7 @@
 # Multi-Forge
 
 <p align="left">
-  <img src="assets/logo.jpg" alt="Dusk" width=320">
+  <img src="assets/logo.jpg" alt="Dusk" width=240">
 </p>
 
 [![PyPI](https://img.shields.io/pypi/v/multi-forge)](https://pypi.org/project/multi-forge/)
@@ -55,7 +55,7 @@ Running `claude` directly bypasses session tracking. When you launch through For
 | Hook-driven artifacts  | No                | Yes -- plan snapshots, transcript capture     |
 | Policy enforcement     | No                | Yes -- TDD, coding standards, supervisor      |
 | Search across sessions | No                | Yes -- `forge search` indexes transcripts     |
-| Handoff agent          | No                | Yes -- auto-updates project docs on exit      |
+| Project memory         | No                | Yes -- passported docs auto-updated on exit   |
 
 Even without a proxy, `forge session start` gives you session tracking, hooks, and the status line (direct mode is the
 default). The proxy adds multi-model routing on top. (`forge claude start` is also available as a bare launcher with
@@ -168,6 +168,7 @@ inside Claude Code for an interactive walkthrough.
 | ---------------------- | -------------------------------------------- |
 | `forge claude`         | Bare launch, settings preset management      |
 | `forge session`        | Named sessions, worktrees, resume, fork      |
+| `forge memory`         | Project memory passports, shadow proposals   |
 | `forge proxy`          | Model routing, templates, tier mappings      |
 | `forge authentication` | Credential management (`credentials.yaml`)   |
 | `forge policy`         | Policy enforcement, plan supervision         |
