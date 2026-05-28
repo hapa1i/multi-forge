@@ -4,8 +4,8 @@
 Proxy** regime in `docs/design.md`.
 
 - Canonical architecture: [`docs/design.md`](../design.md)
-- Proxies (proxy endpoints): [`proxies.md`](proxies.md)
-- Configuration system: [`configs.md`](configs.md)
+- Proxies (proxy endpoints): [`proxy.md`](proxy.md)
+- Configuration system: [`config.md`](config.md)
 
 ---
 
@@ -500,7 +500,7 @@ The planner session stays intact throughout — it can be forked multiple times 
 
 Sessions can record which proxy they started with, but they do **not** control routing.
 
-**Key principle:** Proxies own routing. Sessions own workflow. See [proxies.md](proxies.md) for routing configuration.
+**Key principle:** Proxies own routing. Sessions own workflow. See [proxy.md](proxy.md) for routing configuration.
 
 ### Launch Claude with a proxy
 
@@ -552,7 +552,7 @@ Claude Opus 4.6; use `claude-opus-4-7` explicitly for Opus 4.7.
 For proxy-routed resume/fork overrides, pass `--proxy <proxy_id>` when the session has not yet been hook-confirmed with
 a specific proxy id; Forge needs the proxy id to validate tier defaults and `model_alternatives`.
 
-For proxy-mode `model_alternatives` configuration, see [proxies.md](proxies.md#model-alternatives).
+For proxy-mode `model_alternatives` configuration, see [proxy.md](proxy.md#model-alternatives).
 
 ### Resume with a routing override
 
@@ -626,7 +626,7 @@ forge policy status                                 # Show current policy state
 - temperature/max_tokens defaults
 
 Attempting to set proxy-owned keys is rejected. To change routing defaults, use a different proxy or edit your proxy
-overlay. See [proxies.md](proxies.md) for proxy configuration.
+overlay. See [proxy.md](proxy.md) for proxy configuration.
 
 ---
 

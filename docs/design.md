@@ -1,6 +1,6 @@
 # Forge Design (Unified Architecture)
 
-- **Session manager usage**: [session-management.md](end-user/sessions.md) (session management guide)
+- **Session manager usage**: [session.md](end-user/session.md) (session management guide)
 - **Handoff agent usage**: [handoff.md](end-user/handoff.md) (automatic memory docs guide)
 - **Search usage**: [search.md](end-user/search.md) (transcript search guide)
 - **Skills usage**: [skills.md](end-user/skills.md) (review, understand, panel guide)

@@ -341,7 +341,7 @@ class TestChallengeSkill:
 class TestQaWorkflowChecklist:
     def test_extensions_prereqs_are_step_level_for_partial_runs(self):
         """Section 2 prereqs should not pull clean-state checks after install."""
-        extensions_md = SKILLS_DIR / "qa" / "resources" / "checklist" / "2-extensions.md"
+        extensions_md = SKILLS_DIR / "qa" / "resources" / "checklist" / "2-extension.md"
         content = extensions_md.read_text()
         first_line = content.splitlines()[0]
         assert first_line == "<!-- prereq: 0.3, 1.1 -->"

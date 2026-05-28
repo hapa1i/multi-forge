@@ -195,7 +195,7 @@ log_level: off               # off | debug | info | warning
 - **CLI**: `forge config` (help), `forge config show [--raw]`, `forge config set`, `forge config edit`,
   `forge config reset`; `%config` (read-only) in-session
 
-See [docs/end-user/configs.md](end-user/configs.md) for the full user guide.
+See [docs/end-user/config.md](end-user/config.md) for the full user guide.
 
 ### A.7a Claude settings preset (`~/.forge/claude.preset.json`)
 
@@ -226,7 +226,7 @@ User-editable JSON merged into Claude Code `settings.json` by `forge extension e
 - **CLI**: `forge claude preset` (show), `forge claude preset show [--raw]`, `forge claude preset edit`,
   `forge claude preset reset [--yes]`
 
-See [docs/end-user/configs.md](end-user/configs.md) for the full user guide.
+See [docs/end-user/config.md](end-user/config.md) for the full user guide.
 
 ### A.8 Status line guidance (§3.6.11)
 

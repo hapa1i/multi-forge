@@ -6,11 +6,11 @@ Hooks are Forge’s “glue” layer: they observe Claude Code lifecycle events 
 **artifacts** so sessions are inspectable and auditable.
 
 - Canonical architecture: [`docs/design.md`](../design.md)
-- Sessions (unit of work): [`sessions.md`](sessions.md)
-- Proxies (proxy endpoints): [`proxies.md`](proxies.md)
-- Configuration: [`configs.md`](configs.md)
-- Policies (policy commands): [`policies.md`](policies.md)
-- Workflows (forge workflow): [`workflows.md`](workflows.md)
+- Sessions (unit of work): [`session.md`](session.md)
+- Proxies (proxy endpoints): [`proxy.md`](proxy.md)
+- Configuration: [`config.md`](config.md)
+- Policies (policy commands): [`policy.md`](policy.md)
+- Workflows (forge workflow): [`workflow.md`](workflow.md)
 
 ---
 

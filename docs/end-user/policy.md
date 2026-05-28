@@ -4,9 +4,9 @@ Policies enforce coding rules at Write/Edit boundaries. When Claude Code is abou
 evaluates registered policies and blocks or warns based on the result.
 
 - Canonical architecture: [`docs/design.md` §4.1](../design.md)
-- Sessions (policy is session-owned): [`sessions.md`](sessions.md)
-- Hooks (enforcement mechanism): [`hooks.md`](hooks.md)
-- Workflows (multi-model gating via `--check`): [`workflows.md`](workflows.md)
+- Sessions (policy is session-owned): [`session.md`](session.md)
+- Hooks (enforcement mechanism): [`hook.md`](hook.md)
+- Workflows (multi-model gating via `--check`): [`workflow.md`](workflow.md)
 
 ---
 
@@ -171,7 +171,7 @@ session config even when enforcement is disabled — useful for verifying fixes 
 > **Note:** `%policy enable/disable` applies session overrides that persist until changed or reset. The CLI command
 > `forge policy enable/disable` mutates the session intent.
 
-For the full list of `%` commands, see [`hooks.md`](hooks.md#in-session-commands--commands).
+For the full list of `%` commands, see [`hook.md`](hook.md#in-session-commands--commands).
 
 ---
 
@@ -230,7 +230,7 @@ genuinely didn't account for something (a dependency, an interface constraint), 
 conflict. This forces **explicit plan evolution** via `%policy supervise reload` instead of silent improvisation. Each
 reload is an auditable moment where the plan's authority changed.
 
-**Explicit deviation.** When a multi-model review (see [`workflows.md`](workflows.md)) recommends an improvement that
+**Explicit deviation.** When a multi-model review (see [`workflow.md`](workflow.md)) recommends an improvement that
 wasn't in the plan, you can turn the supervisor off (`%policy supervise off`), apply the change, and optionally reload
 an updated plan. The deviation goes through *you* — not silently absorbed by the executor.
 
@@ -296,7 +296,7 @@ Policy violation(s):
 - Check that policies are enabled: `forge policy status`
 - Policies only evaluate on `Write` and `Edit` tool calls — `Bash`, `Read`, etc. are not checked
 - Verify the hook is installed: check your settings file for `PreToolUse` entries with `forge hook policy-check` (see
-  [`hooks.md`](hooks.md) for which settings file applies to your scope)
+  [`hook.md`](hook.md) for which settings file applies to your scope)
 
 ### Blocked but tests were written
 

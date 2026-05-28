@@ -8,9 +8,9 @@ This page explains the stable selection process. Provider benchmarks, pricing, c
 change quickly; use provider documentation and `forge proxy template show <name> --raw` as the dated source of truth
 before changing a team default.
 
-- Proxy templates and tier mappings: [`proxies.md`](proxies.md)
+- Proxy templates and tier mappings: [`proxy.md`](proxy.md)
 - Skill model-family detection: [`skills.md`](skills.md#model-aware-resource-selection)
-- Supervisor configuration: [`policies.md`](policies.md#semantic-supervisor-advanced)
+- Supervisor configuration: [`policy.md`](policy.md#semantic-supervisor-advanced)
 - Auth and credentials: [`authentication.md`](authentication.md#which-auth-do-i-need)
 
 ---

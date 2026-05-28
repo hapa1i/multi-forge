@@ -5,8 +5,8 @@
 To use different models, change reasoning effort, or switch providers: create or customize a proxy.
 
 - Canonical architecture: [`docs/design.md`](../design.md)
-- Configuration overview: [`configs.md`](configs.md)
-- Sessions (workflow settings): [`sessions.md`](sessions.md)
+- Configuration overview: [`config.md`](config.md)
+- Sessions (workflow settings): [`session.md`](session.md)
 
 ---
 

@@ -8,7 +8,7 @@ Configuration is split by ownership. Each type of setting has a single authorita
 | Model routing, reasoning effort, temperature     | `~/.forge/proxies/<id>/proxy.yaml` | `forge proxy set/edit`                 |
 | Claude Code hooks, status line, permissions, env | `~/.forge/claude.preset.json`      | `forge claude preset ...`              |
 | Policy, memory, verification settings            | Session manifest                   | `forge session set`                    |
-| Multi-model review and analysis                  | N/A (uses proxy/session config)    | [workflows.md](workflows.md)           |
+| Multi-model review and analysis                  | N/A (uses proxy/session config)    | [workflow.md](workflow.md)             |
 | Automatic doc updates after sessions             | Session manifest (`memory.*`)      | [handoff.md](handoff.md)               |
 | API keys and credentials                         | `~/.forge/credentials.yaml`        | [authentication.md](authentication.md) |
 
@@ -72,7 +72,7 @@ CLI invocations and new sessions, but **already-running proxies do not pick up c
 `log_tool_failures` on a live proxy, run `forge proxy stop <id> && forge proxy start <id>`.
 
 **In-session access (read-only):** Type `%config` in the Claude prompt to see effective config. See
-[hooks.md](hooks.md#in-session-commands--commands) for all `%` commands.
+[hook.md](hook.md#in-session-commands--commands) for all `%` commands.
 
 ---
 
@@ -149,7 +149,7 @@ convenience fallback for bootstrapping proxy creation. Once `proxy.yaml` exists,
 
 Model routing and hyperparameters. Each proxy is a self-contained YAML file — no merge with templates at runtime.
 
-See [proxies.md](proxies.md).
+See [proxy.md](proxy.md).
 
 ---
 
@@ -200,4 +200,4 @@ For worktree forks, the `docker/certs/` directory is automatically copied from t
 | Model catalog   | `src/forge/core/data/model_catalog.yaml` |
 | Proxy templates | `src/forge/config/defaults/templates/`   |
 
-To customize routing, create a proxy from a template and edit it. See [proxies.md](proxies.md).
+To customize routing, create a proxy from a template and edit it. See [proxy.md](proxy.md).

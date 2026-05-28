@@ -81,7 +81,7 @@ while leaf commands perform a sensible default action.
 - Documented the command-shape invariant in `docs/developer/coding-standards.md` and `docs/design.md`: groups orient,
   leaves act, removed group-level shortcuts may remain only as non-executing tombstones.
 - `forge config` now prints help; `forge config show` is the explicit command that displays and auto-creates
-  `~/.forge/config.yaml`. Updated `docs/end-user/configs.md` and design appendix references.
+  `~/.forge/config.yaml`. Updated `docs/end-user/config.md` and design appendix references.
 - Replaced the group-level `forge search -q/--query` action with `forge search query <terms>`. The old `-q` path now
   exits with a replacement tip instead of executing old behavior. Updated end-user docs, QA/walkthrough checklists, and
   tests/integration references.
@@ -178,7 +178,7 @@ when the named template exists but no proxy is running yet; bring the proxy up i
   Workflow `--proxy via` is intentionally excluded (different routing layer + one-shot lifecycle).
 - **Behavior break** (research preview): naming a template with no live proxy used to error; it now starts one. Unknown
   names (no proxy, no template) still fail, now with a `forge proxy template list` hint. Updated `docs/design.md`
-  §3.6.3, `docs/end-user/proxies.md`, and `docs/end-user/sessions.md`.
+  §3.6.3, `docs/end-user/proxy.md`, and `docs/end-user/session.md`.
 
 **Verification**: regression `test_bug_supervisor_proxy_autostart.py` + `test_bug_stale_healthy_proxy_not_restarted.py`;
 `TestEnsureProxy` (8 cases) in `test_proxy_orchestrator.py`; updated supervisor/claude/session CLI tests; 348 related
@@ -199,7 +199,7 @@ Claude Code, and stop a session deleted mid-run from crashing the launcher with 
   `SessionFileNotFoundError` guard covers the narrow delete race. The launcher prints a "was deleted during this run"
   note instead of a traceback.
 - **Behavior break** (research preview): deleting an active session previously warned and proceeded; it now blocks
-  without `--force`. Updated `docs/end-user/sessions.md`.
+  without `--force`. Updated `docs/end-user/session.md`.
 
 **Verification**: `tests/regression/test_bug_delete_live_session.py` (preflight + race branch) and the expanded
 `tests/src/cli/test_session_commands.py` delete matrix (single/`--all` x force/no-force x tracked/orphan);

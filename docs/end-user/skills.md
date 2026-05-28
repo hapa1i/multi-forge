@@ -4,8 +4,8 @@ Forge installs skills that teach Claude how to compose Forge capabilities into w
 `/forge:<name>` in a Claude Code session.
 
 - Canonical architecture: [`docs/design.md`](../design.md) SS5.5
-- Workflow CLI (engine): [`workflows.md`](workflows.md)
-- Session context (model detection): [`sessions.md`](sessions.md)
+- Workflow CLI (engine): [`workflow.md`](workflow.md)
+- Session context (model detection): [`session.md`](session.md)
 
 ---
 

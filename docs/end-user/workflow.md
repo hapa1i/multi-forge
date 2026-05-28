@@ -4,8 +4,8 @@ Run structured analysis across multiple models. `forge workflow` provides four w
 parallel `claude -p` subprocesses and collect results for synthesis.
 
 - Canonical architecture: [`docs/design.md`](../design.md)
-- Proxies (model routing): [`proxies.md`](proxies.md)
-- Policies (automatic gating): [`policies.md`](policies.md)
+- Proxies (model routing): [`proxy.md`](proxy.md)
+- Policies (automatic gating): [`policy.md`](policy.md)
 
 All workflow runners require the local Claude Code CLI (`claude`) on `PATH`, because Forge uses `claude -p` as the
 worker runtime even when the selected model is routed through an OpenRouter or LiteLLM proxy. Verify this from the same
@@ -205,8 +205,8 @@ Other subcommands (`analyze`, `debate`) always run blinded -- no session context
 
 ## Workflows and supervision
 
-Review workflows and the semantic supervisor (see [`policies.md`](policies.md)) answer different questions about the
-same code:
+Review workflows and the semantic supervisor (see [`policy.md`](policy.md)) answer different questions about the same
+code:
 
 | Signal         | Question                    | Perspective    |
 | -------------- | --------------------------- | -------------- |

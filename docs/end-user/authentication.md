@@ -9,8 +9,8 @@ variables manually.
 **These are NOT your Claude Code login** — Claude Code authenticates separately (OAuth, Max plan, etc.). Forge
 credentials are for proxy routing and headless subprocesses (`supervisor`, `handoff agent`, `direct panel workers`).
 
-- Runtime config: [`configs.md`](configs.md)
-- Proxy templates (which providers to use): [`proxies.md`](proxies.md)
+- Runtime config: [`config.md`](config.md)
+- Proxy templates (which providers to use): [`proxy.md`](proxy.md)
 
 ---
 

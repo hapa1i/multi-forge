@@ -57,7 +57,7 @@ forge proxy start openrouter-anthropic --smoke-test
 forge session start --proxy openrouter-anthropic
 ```
 
-See [proxies.md](proxies.md) for templates, tier mappings, and per-tier hyperparameter tuning. See
+See [proxy.md](proxy.md) for templates, tier mappings, and per-tier hyperparameter tuning. See
 [authentication.md](authentication.md#which-auth-do-i-need) for which credentials each workflow needs.
 
 ### D. Resume when context fills up
@@ -102,7 +102,7 @@ forge session resume my-feature                                # Reattach to con
 forge session show my-feature                                  # Session details
 ```
 
-See [sessions.md](sessions.md) for worktrees, fork, incognito, and `%` commands.
+See [session.md](session.md) for worktrees, fork, incognito, and `%` commands.
 
 ### Policies -- Code Quality Gates
 
@@ -117,7 +117,7 @@ forge policy supervise --on                             # Resume
 forge policy supervise --reload                         # Reload plan after changes
 ```
 
-See [policies.md](policies.md).
+See [policy.md](policy.md).
 
 ### Skills -- Review, Understand, Panel
 
@@ -142,7 +142,7 @@ forge workflow debate "Should we rewrite the core in Rust?"
 forge workflow analyze "What are the failure modes of the handoff agent?"
 ```
 
-See [workflows.md](workflows.md).
+See [workflow.md](workflow.md).
 
 ### Model Selection -- Choosing Models for Each Role
 
@@ -166,7 +166,7 @@ varies across model versions, cost optimization order, and a release-validation 
 Forge hooks capture session artifacts (plans, transcripts) and enforce policies at tool-use boundaries. Installed
 automatically by `forge extension enable`.
 
-See [hooks.md](hooks.md).
+See [hook.md](hook.md).
 
 ### Handoff Agent -- Automatic Memory Docs
 
@@ -197,7 +197,7 @@ forge config set context_limit=1000000
 forge claude preset edit
 ```
 
-See [configs.md](configs.md).
+See [config.md](config.md).
 
 ### Verification -- Installation Testing
 

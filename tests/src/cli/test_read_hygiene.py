@@ -36,7 +36,7 @@ class TestIsSkillInstructionFile:
         assert not _is_skill_instruction_file("/home/user/.claude/skills/qa/resources/checklist.md")
 
     def test_ignores_nested_checklist(self):
-        assert not _is_skill_instruction_file("/home/user/.claude/skills/qa/resources/checklist/6-hooks.md")
+        assert not _is_skill_instruction_file("/home/user/.claude/skills/qa/resources/checklist/6-hook.md")
 
     def test_ignores_report_template(self):
         assert not _is_skill_instruction_file("/home/user/.claude/skills/qa/resources/report-template.md")
