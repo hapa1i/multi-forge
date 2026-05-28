@@ -18,6 +18,7 @@ IndexStore.add_session). The directory name IS the session name.
 from __future__ import annotations
 
 import json
+import logging
 import shutil
 from dataclasses import fields, is_dataclass
 from pathlib import Path
@@ -45,6 +46,36 @@ SESSIONS_DIR = "sessions"
 
 HOOK_LOCK_TIMEOUT_S = 0.2
 CLI_LOCK_TIMEOUT_S = 5.0
+
+_store_logger = logging.getLogger(__name__)
+
+
+def strip_preview_memory_doc_lists(data: dict[str, Any], session_name: str = "") -> None:
+    """Strip removed ``designated_docs`` from pre-simplification manifests.
+
+    Session manifests no longer persist per-session doc lists. Old manifests
+    written before the simplification may contain ``designated_docs`` in
+    ``intent.memory`` or ``overrides.memory``. This strips them before dacite
+    so strict deserialization succeeds. Non-empty lists trigger a warning per
+    coding-standards section 5.
+    """
+    had_nonempty = False
+    for section in ("intent", "overrides"):
+        section_obj = data.get(section)
+        if not isinstance(section_obj, dict):
+            continue
+        mem = section_obj.get("memory")
+        if isinstance(mem, dict) and "designated_docs" in mem:
+            docs = mem.pop("designated_docs")
+            if docs:
+                had_nonempty = True
+    if had_nonempty:
+        _store_logger.warning(
+            "Session '%s' had session-scoped memory docs (designated_docs), "
+            "no longer supported; stripped on read. "
+            "Project docs via passports are unaffected.",
+            session_name,
+        )
 
 
 # --- Free functions — use these for path construction everywhere (avoid drift) ---
@@ -150,6 +181,7 @@ class SessionStore:
         except OSError as e:
             raise ManifestCorruptedError(str(self._manifest_path), f"read error: {e}")
 
+        strip_preview_memory_doc_lists(data, session_name=self._session_name)
         self._validate_data(data)
 
         try:

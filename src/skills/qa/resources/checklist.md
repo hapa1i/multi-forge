@@ -26,25 +26,25 @@
 
 <!-- section: 1 checklist/1-preflight.md -->
 
-- [2. Claude Code Extensions (`forge extension enable`)](checklist/2-extensions.md)
+- [2. Claude Code Extensions (`forge extension`)](checklist/2-extension.md)
 
-<!-- section: 2 checklist/2-extensions.md -->
+<!-- section: 2 checklist/2-extension.md -->
 
-- [3. Authentication (`forge authentication`)](checklist/3-auth.md)
+- [3. Authentication (`forge authentication`)](checklist/3-authentication.md)
 
-<!-- section: 3 checklist/3-auth.md -->
+<!-- section: 3 checklist/3-authentication.md -->
 
-- [4. Proxy Management](checklist/4-proxy.md)
+- [4. Proxy Management (`forge proxy`)](checklist/4-proxy.md)
 
 <!-- section: 4 checklist/4-proxy.md -->
 
-- [5. Session Management](checklist/5-session.md)
+- [5. Session Management (`forge session`)](checklist/5-session.md)
 
 <!-- section: 5 checklist/5-session.md -->
 
-- [6. Hooks Testing](checklist/6-hooks.md)
+- [6. Hooks (`forge hook`)](checklist/6-hook.md)
 
-<!-- section: 6 checklist/6-hooks.md -->
+<!-- section: 6 checklist/6-hook.md -->
 
 - [7. Cost Tracking & Spend Caps](checklist/7-costs.md)
 
@@ -70,9 +70,9 @@
 
 <!-- section: 12 checklist/12-search.md -->
 
-- [13. Policy/Guard (`forge guard`)](checklist/13-guard.md)
+- [13. Policy (`forge policy`)](checklist/13-policy.md)
 
-<!-- section: 13 checklist/13-guard.md -->
+<!-- section: 13 checklist/13-policy.md -->
 
 - [14. Workflow Runners (`forge workflow`)](checklist/14-workflow.md)
 

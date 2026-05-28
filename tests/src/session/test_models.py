@@ -570,12 +570,12 @@ class TestDesignatedDoc:
     def test_shadow_doc(self) -> None:
         """DesignatedDoc with shadows field for shadow/propose mode."""
         doc = DesignatedDoc(
-            path=".forge/memory/suggested_standards.md",
-            strategy="suggested",
+            path=".forge/memory/shadow_standards.md",
+            strategy="generic",
             shadows="docs/developer/coding-standards.md",
         )
         assert doc.shadows == "docs/developer/coding-standards.md"
-        assert doc.strategy == "suggested"
+        assert doc.strategy == "generic"
 
     def test_path_is_relative(self) -> None:
         """Path should be worktree-relative, not absolute."""
@@ -583,91 +583,6 @@ class TestDesignatedDoc:
         from pathlib import Path
 
         assert not Path(doc.path).is_absolute()
-
-
-class TestMemoryIntentWithDesignatedDocs:
-    """Test MemoryIntent with designated_docs."""
-
-    def test_default_empty_list(self) -> None:
-        """MemoryIntent should have empty designated_docs by default."""
-        memory = MemoryIntent()
-        assert memory.designated_docs == []
-
-    def test_with_designated_docs(self) -> None:
-        """MemoryIntent can include designated documents."""
-        docs = [
-            DesignatedDoc(path="docs/checklist.md", strategy="checklist"),
-            DesignatedDoc(path="docs/changelog.md", strategy="changelog"),
-        ]
-        memory = MemoryIntent(designated_docs=docs)
-        assert len(memory.designated_docs) == 2
-        assert memory.designated_docs[0].strategy == "checklist"
-        assert memory.designated_docs[1].strategy == "changelog"
-
-    def test_dacite_round_trip_with_designated_docs(self) -> None:
-        """MemoryIntent with designated_docs survives dacite serialization."""
-        from dataclasses import asdict
-
-        import dacite
-
-        memory = MemoryIntent(
-            designated_docs=[
-                DesignatedDoc(path="docs/checklist.md", strategy="checklist"),
-                DesignatedDoc(path=".forge/memory/project-state.md", strategy="project-state"),
-            ],
-        )
-        data = asdict(memory)
-        restored = dacite.from_dict(MemoryIntent, data, config=dacite.Config(strict=True))
-        assert len(restored.designated_docs) == 2
-        assert restored.designated_docs[0].path == "docs/checklist.md"
-        assert restored.designated_docs[0].strategy == "checklist"
-        assert restored.designated_docs[1].strategy == "project-state"
-
-    def test_dacite_round_trip_with_shadows(self) -> None:
-        """DesignatedDoc.shadows survives dacite serialization."""
-        from dataclasses import asdict
-
-        import dacite
-
-        memory = MemoryIntent(
-            designated_docs=[
-                DesignatedDoc(path="docs/checklist.md", strategy="checklist"),
-                DesignatedDoc(
-                    path=".forge/memory/suggested_standards.md",
-                    strategy="suggested",
-                    shadows="docs/developer/coding-standards.md",
-                ),
-            ],
-        )
-        data = asdict(memory)
-        restored = dacite.from_dict(MemoryIntent, data, config=dacite.Config(strict=True))
-        assert restored.designated_docs[0].shadows is None
-        assert restored.designated_docs[1].shadows == "docs/developer/coding-standards.md"
-        assert restored.designated_docs[1].strategy == "suggested"
-
-    def test_dacite_from_dict_missing_designated_docs(self) -> None:
-        """Old manifests without designated_docs should deserialize to empty list."""
-        import dacite
-
-        data = {
-            "auto_recall": False,
-            "tags": [],
-            "strategy": "summary",
-            "max_chars": 6000,
-            "generated_file": None,
-            "auto_update": None,
-        }
-        restored = dacite.from_dict(MemoryIntent, data, config=dacite.Config(strict=True))
-        assert restored.designated_docs == []
-
-    def test_designated_docs_with_auto_update(self) -> None:
-        """Both designated_docs and auto_update can coexist."""
-        docs = [DesignatedDoc(path="docs/checklist.md", strategy="checklist")]
-        config = HandoffConfig(enabled=True, min_turns=3)
-        memory = MemoryIntent(designated_docs=docs, auto_update=config)
-        assert len(memory.designated_docs) == 1
-        assert memory.auto_update is not None
-        assert memory.auto_update.enabled is True
 
 
 class TestConstants:

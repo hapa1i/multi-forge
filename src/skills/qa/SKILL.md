@@ -90,7 +90,7 @@ stop.
 | extensions | 2       | resume      | 10      |
 | auth       | 3       | config      | 11      |
 | proxy      | 4       | search      | 12      |
-| session    | 5       | guard       | 13      |
+| session    | 5       | policy      | 13      |
 | hooks      | 6       | workflow    | 14      |
 | costs      | 7       | skills      | 15      |
 |            |         | handoff     | 16      |
@@ -665,7 +665,7 @@ It covers 21 categories:
 | resume      | 10      | No           |
 | config      | 11      | No           |
 | search      | 12      | No           |
-| guard       | 13      | No           |
+| policy      | 13      | No           |
 | workflow    | 14      | No           |
 | skills      | 15      | No           |
 | handoff     | 16      | No           |

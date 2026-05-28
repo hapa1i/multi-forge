@@ -159,11 +159,11 @@ __all__ = ["fork"]
     help="Replace existing branch/worktree and skip budget preflight",
 )
 @click.option(
-    "--inherit-memory",
-    "inherit_memory",
-    type=click.Choice(["all", "none", "shadowed"]),
-    default="all",
-    help="Memory doc inheritance: all (default), none, or shadowed only",
+    "--memory",
+    "memory_flag",
+    type=click.Choice(["on", "off"]),
+    default=None,
+    help="Override child memory activation (default: inherit parent).",
 )
 @click.pass_context
 def fork(
@@ -185,7 +185,7 @@ def fork(
     supervisor_proxy: str | None,
     supervisor_direct: bool,
     force: bool,
-    inherit_memory: str,
+    memory_flag: str | None,
 ) -> None:
     """Fork an existing session.
 
@@ -426,7 +426,7 @@ def fork(
 
     # Preflight supervisor proxy BEFORE fork_session() to avoid half-created state
     if supervisor_proxy:
-        from forge.guard.semantic.supervisor import ensure_supervisor_proxy
+        from forge.policy.semantic.supervisor import ensure_supervisor_proxy
 
         try:
             _sup_proxy_id, _sup_started = ensure_supervisor_proxy(supervisor_proxy)
@@ -436,8 +436,6 @@ def fork(
         if _sup_started:
             console.print(f"[dim]Started proxy '{_sup_proxy_id}' from template '{supervisor_proxy}'.[/dim]")
         supervisor_proxy = _sup_proxy_id
-
-    inherit_memory_explicit = ctx.get_parameter_source("inherit_memory") == click.core.ParameterSource.COMMANDLINE
 
     fork_warnings: list[str] = []
     try:
@@ -451,8 +449,7 @@ def fork(
             into_path=into_resolved,
             forge_root=_fr,
             force=force,
-            inherit_memory=inherit_memory,
-            inherit_memory_explicit=inherit_memory_explicit,
+            memory_flag={"on": True, "off": False}.get(memory_flag) if memory_flag else None,
             warnings_sink=fork_warnings,
         )
     except CannotForkIncognitoError as e:
@@ -486,7 +483,10 @@ def fork(
         return
 
     for w in fork_warnings:
-        console.print(f"[dim]{w}[/dim]")
+        if w.startswith("[warn]"):
+            console.print(f"[yellow]Warning:[/yellow] {w.removeprefix('[warn]')}")
+        else:
+            console.print(f"[dim]{w}[/dim]")
 
     # Persist routing override to manifest (ensures --no-launch retains proxy choice)
     fork_worktree_path = Path(fork_manifest.worktree.path) if fork_manifest.worktree else Path.cwd()
@@ -500,7 +500,7 @@ def fork(
 
     # --- wire supervisor (if --supervise flag set) ---
     if supervise_target:
-        from forge.guard.semantic.supervisor import (
+        from forge.policy.semantic.supervisor import (
             apply_supervisor_routing,
             apply_supervisor_to_intent,
         )

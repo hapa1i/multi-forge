@@ -11,8 +11,8 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from forge.core.state import now_iso
-from forge.guard.team.config import TeamSupervisorConfig
-from forge.guard.types import FailMode
+from forge.policy.team.config import TeamSupervisorConfig
+from forge.policy.types import FailMode
 
 from .config import LAUNCH_MODE_HOST, LAUNCH_MODE_SIDECAR
 
@@ -101,24 +101,17 @@ class HandoffConfig:
 
 @dataclass
 class DesignatedDoc:
-    """A document the handoff agent should update after session stop.
+    """Runtime type for a doc the memory writer should update.
+
+    Not persisted in session manifests. Produced by ``scan_passported_docs()``
+    and consumed by ``run_handoff_agent()``.
 
     Fields:
         path: Worktree-relative path (e.g., "docs/checklist.md").
               Must NOT be absolute. Resolved against worktree_path at runtime.
-        strategy: Built-in augmentation strategy:
-                  "project-state" — handoff notes (skip if missing)
-                  "checklist" — mark completed tasks, add discovered tasks
-                  "changelog" — add accomplishments not already recorded
-                  "debugging" — record error causes, solutions, workarounds
-                  "patterns" — record architecture patterns and conventions
-                  "suggested" — propose additions as checkboxes (requires shadows)
-                  "generic" — read and add missing information (default)
-                  Unknown values fall back to "generic" behavior.
+        strategy: Built-in augmentation strategy (see MemoryStrategy enum).
         shadows: When set, switches to shadow/propose mode (Mode 2).
                  Path to the official document this doc proposes changes for.
-                 The agent reads the official doc first, then writes suggestions
-                 to this doc's path. Only valid with strategy="suggested".
     """
 
     path: str
@@ -135,7 +128,6 @@ class MemoryIntent:
     strategy: str = "summary"  # "summary", "full", or "off"
     max_chars: int = 6000
     generated_file: str | None = None  # e.g., ".claude/forge.context.generated.md"
-    designated_docs: list[DesignatedDoc] = field(default_factory=list)
     auto_update: HandoffConfig | None = None
 
 

@@ -17,15 +17,14 @@ Run tests before submitting:
 
 ```bash
 make test-unit        # Fast unit tests (~30s)
-make lint             # Ruff linter
-make type-check       # mypy
+make pre-commit       # All hooks: ruff, black, isort, mypy, pyright, mdformat
 ```
 
 ## Submitting Changes
 
 1. Branch from `main`
 2. Make your changes with tests
-3. Run `make test-unit` and `make lint`
+3. Run `make test-unit` and `make pre-commit`
 4. Open a PR targeting `main`
 
 ## Developer Guide
@@ -36,6 +35,7 @@ The full developer guide lives in [`docs/developer/`](docs/developer/):
 - [Coding Standards](docs/developer/coding-standards.md) — Python conventions, type safety, comments
 - [Testing Guidelines](docs/developer/testing-guidelines.md) — test organization, fixtures, Docker
 - [Documentation Guidelines](docs/developer/documentation-guidelines.md) — doc structure, writing style
+- [Work Board Contract](docs/developer/board-contract.md) — board lanes, checklists, closeout
 
 ## Reporting Issues
 

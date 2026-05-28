@@ -38,13 +38,16 @@ class MemoryStrategy(str, Enum):
     PROJECT_STATE = "project-state"
     CHECKLIST = "checklist"
     CHANGELOG = "changelog"
-    DEBUGGING = "debugging"
-    PATTERNS = "patterns"
-    SUGGESTED = "suggested"
     GENERIC = "generic"
 
 
 VALID_STRATEGY_NAMES: frozenset[str] = frozenset(s.value for s in MemoryStrategy)
+
+_REMOVED_STRATEGIES: dict[str, str] = {
+    "suggested": "Shadow mode is now orthogonal to strategy. Use --propose with any strategy.",
+    "debugging": "Use 'generic' and scope via the passport's intent/captures fields.",
+    "patterns": "Use 'generic' and scope via the passport's intent/captures fields.",
+}
 
 STRATEGY_INSTRUCTIONS: dict[str, str] = {
     "project-state": (
@@ -62,27 +65,6 @@ STRATEGY_INSTRUCTIONS: dict[str, str] = {
         "Follow the existing entry format. "
         "Do NOT modify or remove existing entries. "
         "If the file does not exist, skip it and report that it was missing."
-    ),
-    "debugging": (
-        "Record error causes, solutions, and workarounds encountered in this session. "
-        "Group entries by topic (build errors, runtime errors, test failures, etc.). "
-        "Do NOT duplicate entries that are already documented. "
-        "If the file does not exist, skip it and report that it was missing."
-    ),
-    "patterns": (
-        "Record architecture patterns, conventions, and recurring techniques observed "
-        "in this session. Include code idioms, design patterns, and naming conventions. "
-        "Do NOT duplicate patterns that are already documented. "
-        "If the file does not exist, skip it and report that it was missing."
-    ),
-    "suggested": (
-        "Propose additions to the official document as `- [ ]` checkboxes, each with "
-        "a brief rationale and source reference (session name, file changed, or "
-        "conversation context). Be liberal: include any potentially durable information "
-        "missing from the official doc -- the human will prune during review. "
-        "Remove any checkboxes whose content has already been merged "
-        "into the official document (self-prune). "
-        "Do NOT duplicate suggestions that are already present in either file."
     ),
     "generic": (
         "Read the file and add any NEW information from this session that is missing. "
@@ -181,37 +163,14 @@ def derive_shadow_path(official_path: str) -> str:
     """Derive a default shadow file path for an official doc.
 
     Encodes the immediate parent directory to reduce collisions:
-    ``docs/board/notes.md`` -> ``.forge/memory/suggested_board_notes.md``.
+    ``docs/board/notes.md`` -> ``.forge/memory/shadow_board_notes.md``.
     Top-level files omit the parent prefix.
     """
     p = Path(official_path)
     parent = p.parent.name
     if parent and parent != ".":
-        return f".forge/memory/suggested_{parent}_{p.stem}.md"
-    return f".forge/memory/suggested_{p.stem}.md"
-
-
-def check_shadow_path_collision(
-    shadow_path: str,
-    official_path: str,
-    existing_docs: list[DesignatedDoc],
-) -> str | None:
-    """Check whether *shadow_path* collides with an existing manifest entry.
-
-    Returns an actionable error message on collision, ``None`` when safe.
-    Re-tracking the same official doc is not a collision (upsert).
-    """
-    for doc in existing_docs:
-        if doc.path != shadow_path:
-            continue
-        if doc.shadows is not None and doc.shadows == official_path:
-            continue  # same official re-tracked -- upsert, not collision
-        return (
-            f"Shadow path {shadow_path} is already used"
-            + (f" for {doc.shadows}" if doc.shadows else " as a direct doc")
-            + ". Use --shadow <path> to specify a different shadow path."
-        )
-    return None
+        return f".forge/memory/shadow_{parent}_{p.stem}.md"
+    return f".forge/memory/shadow_{p.stem}.md"
 
 
 # ---------------------------------------------------------------------------
@@ -410,6 +369,13 @@ def _parse_update(data: Any) -> PassportUpdate:
             "forge_memory.update.strategy",
             f"must be a string (got {type(strategy).__name__})",
         )
+    removed_hint = _REMOVED_STRATEGIES.get(strategy)
+    if removed_hint:
+        raise PassportError(
+            "forge_memory.update.strategy",
+            f"strategy '{strategy}' was removed",
+            hint=removed_hint,
+        )
     if strategy not in VALID_STRATEGY_NAMES:
         raise PassportError(
             "forge_memory.update.strategy",
@@ -527,6 +493,7 @@ def _passport_to_dict(passport: Passport) -> dict[str, Any]:
     """Convert a Passport to a dict, omitting None-valued fields."""
     raw = asdict(passport)
     update = raw.get("update", {})
+    update.pop("inherit_on_fork", None)
     raw["update"] = {k: v for k, v in update.items() if v is not None}
     return raw
 
@@ -564,6 +531,27 @@ def write_passport(path: Path, passport: Passport) -> None:
     atomic_write_text(path, new_text)
 
 
+def remove_passport(path: Path) -> bool:
+    """Remove ``forge_memory`` frontmatter from a markdown file.
+
+    Preserves unrelated frontmatter keys and the markdown body. Returns True
+    when a passport key was removed, False when no passport was present.
+    """
+    text = path.read_text(encoding="utf-8")
+    fm, body = extract_frontmatter(text)
+
+    if fm is None or "forge_memory" not in fm:
+        return False
+
+    del fm["forge_memory"]
+    if fm:
+        new_text = f"---\n{_dump_yaml(fm)}---\n{body}"
+    else:
+        new_text = body
+    atomic_write_text(path, new_text)
+    return True
+
+
 # ---------------------------------------------------------------------------
 # Passport synthesis (Phase 2 infrastructure)
 # ---------------------------------------------------------------------------
@@ -572,9 +560,6 @@ _DEFAULT_INTENTS: dict[str, str] = {
     "project-state": "Current project focus and handoff state",
     "checklist": "Active task tracking",
     "changelog": "Completed-work record",
-    "debugging": "Error causes, solutions, and workarounds",
-    "patterns": "Architecture patterns and conventions",
-    "suggested": "Proposed additions for human review",
     "generic": "Project documentation",
 }
 
@@ -592,6 +577,13 @@ def synthesize_passport(
     Auto-generates intent from strategy when not provided.
     Always writes an explicit ``update`` section.
     """
+    removed_hint = _REMOVED_STRATEGIES.get(strategy)
+    if removed_hint:
+        raise PassportError(
+            "forge_memory.update.strategy",
+            f"strategy '{strategy}' was removed",
+            hint=removed_hint,
+        )
     if strategy not in VALID_STRATEGY_NAMES:
         raise PassportError(
             "forge_memory.update.strategy",
@@ -665,7 +657,7 @@ def validate_writer_spec(writer: str) -> None:
         raise PassportError(
             "forge_memory.update.writers",
             "'none' is not a valid writer spec",
-            hint="use 'forge memory untrack' to remove participation",
+            hint="use 'forge memory passport remove' to remove the passport",
         )
 
     try:
@@ -709,13 +701,20 @@ def resolve_with_overrides(
     warnings: list[str] = []
 
     if strategy is not None and strategy != resolved.update.strategy:
+        removed_hint = _REMOVED_STRATEGIES.get(strategy)
+        if removed_hint:
+            raise PassportError(
+                "forge_memory.update.strategy",
+                f"strategy '{strategy}' was removed",
+                hint=removed_hint,
+            )
         if strategy not in VALID_STRATEGY_NAMES:
             raise PassportError(
                 "forge_memory.update.strategy",
                 f"unknown strategy '{strategy}'",
                 hint=f"valid strategies: {', '.join(sorted(VALID_STRATEGY_NAMES))}",
             )
-        warnings.append(f"CLI --as {strategy} overrides passport strategy '{resolved.update.strategy}'")
+        warnings.append(f"CLI --strategy {strategy} overrides passport strategy '{resolved.update.strategy}'")
         resolved.update.strategy = strategy
 
     if update_mode is not None and update_mode != resolved.update.mode:
@@ -734,7 +733,7 @@ def resolve_with_overrides(
     if shadow_path is not None and shadow_path != resolved.update.shadow_path:
         old = resolved.update.shadow_path
         if old:
-            warnings.append(f"CLI --shadow {shadow_path} overrides passport shadow_path '{old}'")
+            warnings.append(f"CLI --shadow-path {shadow_path} overrides passport shadow_path '{old}'")
         resolved.update.shadow_path = shadow_path
 
     if writers is not None and writers != resolved.update.writers:

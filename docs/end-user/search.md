@@ -4,8 +4,8 @@ Search past session transcripts by keyword. Forge indexes transcripts automatica
 per-project BM25 index for fast lookup.
 
 - Canonical architecture: [`docs/design.md`](../design.md)
-- Sessions (unit of work): [`sessions.md`](sessions.md)
-- Hooks (lifecycle events): [`hooks.md`](hooks.md)
+- Sessions (unit of work): [`session.md`](session.md)
+- Hooks (lifecycle events): [`hook.md`](hook.md)
 
 ---
 

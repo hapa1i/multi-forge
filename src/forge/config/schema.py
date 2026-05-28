@@ -10,7 +10,7 @@ The schema is hierarchical:
     │   ├── openai: ProviderConfig
     │   └── litellm: ProviderConfig
     ├── session: SessionConfig
-    └── (future: mcp, guard, status, etc.)
+    └── (future: mcp, policy, status, etc.)
 
 Usage:
     from forge.config import config
@@ -432,7 +432,7 @@ class ForgeConfig:
     proxy: ProxyConfig = field(default_factory=ProxyConfig)
     session: SessionConfig = field(default_factory=SessionConfig)
 
-    # Future: mcp, guard, status
+    # Future: mcp, policy, status
 
     def to_dict(self) -> dict[str, Any]:
         """Convert config to nested dict (for serialization)."""

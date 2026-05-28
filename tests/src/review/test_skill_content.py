@@ -341,7 +341,7 @@ class TestChallengeSkill:
 class TestQaWorkflowChecklist:
     def test_extensions_prereqs_are_step_level_for_partial_runs(self):
         """Section 2 prereqs should not pull clean-state checks after install."""
-        extensions_md = SKILLS_DIR / "qa" / "resources" / "checklist" / "2-extensions.md"
+        extensions_md = SKILLS_DIR / "qa" / "resources" / "checklist" / "2-extension.md"
         content = extensions_md.read_text()
         first_line = content.splitlines()[0]
         assert first_line == "<!-- prereq: 0.3, 1.1 -->"
@@ -468,13 +468,13 @@ class TestDebateTemplateEquivalence:
 
 
 class TestQaHandoffChecklist:
-    def test_handoff_setup_sets_designated_docs(self):
+    def test_handoff_setup_uses_passports(self):
         handoff_md = SKILLS_DIR / "qa" / "resources" / "checklist" / "16-handoff.md"
         content = handoff_md.read_text()
         step = content.split("### 16.1", 1)[1].split("### 16.2", 1)[0]
-        assert "memory.designated_docs" in step
-        assert '".forge/memory/debugging.md"' in step
-        assert '".forge/memory/patterns.md"' in step
+        assert "forge memory track" in step
+        assert "forge memory enable --session" in step
+        assert "forge memory list" in step
 
     def test_handoff_includes_shadow_doc_step(self):
         handoff_md = SKILLS_DIR / "qa" / "resources" / "checklist" / "16-handoff.md"
@@ -482,7 +482,7 @@ class TestQaHandoffChecklist:
         step = content.split("### 16.3", 1)[1].split("### 16.4", 1)[0]
         assert "forge memory track docs/team-standards.md" in step
         assert "--propose" in step
-        assert "--shadow .forge/memory/suggested_standards.md" in step
+        assert "--shadow-path .forge/memory/shadow_standards.md" in step
         assert "cmp -s docs/team-standards.md /tmp/team-standards.before" in step
 
     def test_handoff_includes_queued_startup_step(self):

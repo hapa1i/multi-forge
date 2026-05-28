@@ -33,26 +33,26 @@ echo '{"prompt": "%proxy list"}' | FORGE_SESSION=test-session-1 forge hook user-
 
 - [ ] Returns proxy list (read-only)
 
-### 9.4 Test %guard commands
+### 9.4 Test %policy commands
 
 <!-- auto -->
 
 ```bash
-# Guard status
-echo '{"prompt": "%guard status"}' | FORGE_SESSION=test-session-1 forge hook user-prompt-submit
+# Policy status
+echo '{"prompt": "%policy status"}' | FORGE_SESSION=test-session-1 forge hook user-prompt-submit
 
-# Guard enable
-echo '{"prompt": "%guard enable --bundle tdd"}' | FORGE_SESSION=test-session-1 forge hook user-prompt-submit
+# Policy enable
+echo '{"prompt": "%policy enable --bundle tdd"}' | FORGE_SESSION=test-session-1 forge hook user-prompt-submit
 
-# Guard disable
-echo '{"prompt": "%guard disable"}' | FORGE_SESSION=test-session-1 forge hook user-prompt-submit
+# Policy disable
+echo '{"prompt": "%policy disable"}' | FORGE_SESSION=test-session-1 forge hook user-prompt-submit
 ```
 
-- [ ] `%guard status` returns policy state
-- [ ] `%guard enable` enables TDD enforcement
-- [ ] `%guard disable` disables all policy
+- [ ] `%policy status` returns policy state
+- [ ] `%policy enable` enables TDD enforcement
+- [ ] `%policy disable` disables all policy
 
-### 9.5 Test %guard check (Phase 18)
+### 9.5 Test %policy check (Phase 18)
 
 <!-- auto -->
 
@@ -60,32 +60,32 @@ echo '{"prompt": "%guard disable"}' | FORGE_SESSION=test-session-1 forge hook us
 cd $FORGE_TEST_REPO
 
 # Create a test file to generate a diff
-echo 'def hello(): pass' > src/test_guard_check.py
-git add src/test_guard_check.py && git commit -m "placeholder"
-echo 'def hello(): return "world"' > src/test_guard_check.py
+echo 'def hello(): pass' > src/test_policy_check.py
+git add src/test_policy_check.py && git commit -m "placeholder"
+echo 'def hello(): return "world"' > src/test_policy_check.py
 
 # Check unstaged changes against TDD bundle (should deny: impl without tests)
-echo '{"prompt": "%guard check --bundle tdd"}' | FORGE_SESSION=test-session-1 forge hook user-prompt-submit
+echo '{"prompt": "%policy check --bundle tdd"}' | FORGE_SESSION=test-session-1 forge hook user-prompt-submit
 
 # Check staged changes
-git add src/test_guard_check.py
-echo '{"prompt": "%guard check --bundle tdd --staged"}' | FORGE_SESSION=test-session-1 forge hook user-prompt-submit
+git add src/test_policy_check.py
+echo '{"prompt": "%policy check --bundle tdd --staged"}' | FORGE_SESSION=test-session-1 forge hook user-prompt-submit
 
 # With explicit bundle override
-echo '{"prompt": "%guard check --bundle coding_standards"}' | FORGE_SESSION=test-session-1 forge hook user-prompt-submit
+echo '{"prompt": "%policy check --bundle coding_standards"}' | FORGE_SESSION=test-session-1 forge hook user-prompt-submit
 
 # Clean up the test file (revert the commit + remove the file)
 git reset --hard HEAD~1
-rm -f src/test_guard_check.py
+rm -f src/test_policy_check.py
 
 # Ensure no unstaged changes remain (Forge may have modified settings.local.json etc.)
 git checkout -- . 2>/dev/null || true
 
 # Now verify "no changes" path
-echo '{"prompt": "%guard check --bundle tdd"}' | FORGE_SESSION=test-session-1 forge hook user-prompt-submit
+echo '{"prompt": "%policy check --bundle tdd"}' | FORGE_SESSION=test-session-1 forge hook user-prompt-submit
 ```
 
-- [ ] `%guard check` returns JSON with `passed`, `files_checked`, `bundles` fields
+- [ ] `%policy check` returns JSON with `passed`, `files_checked`, `bundles` fields
 - [ ] Impl-only file denied by TDD bundle (`passed: false`)
 - [ ] `--staged` flag evaluates staged changes instead of unstaged
 - [ ] `--bundle` override selects specific bundle

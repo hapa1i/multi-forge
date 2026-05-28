@@ -1,6 +1,6 @@
 # Forge Design (Unified Architecture)
 
-- **Session manager usage**: [session-management.md](end-user/sessions.md) (session management guide)
+- **Session manager usage**: [session.md](end-user/session.md) (session management guide)
 - **Handoff agent usage**: [handoff.md](end-user/handoff.md) (automatic memory docs guide)
 - **Search usage**: [search.md](end-user/search.md) (transcript search guide)
 - **Skills usage**: [skills.md](end-user/skills.md) (review, understand, panel guide)
@@ -22,7 +22,7 @@ These components run independently but share code (libraries/config).
 | **Forge Session**   | Session isolation, Worktrees       | `src/forge/session/`        |
 | **Forge Skills**    | Agent workflows (Review, Planning) | `src/skills/` + `forge` CLI |
 | **Forge Status**    | Visual feedback & Dashboard        | `src/forge/status/`         |
-| **Forge Policy**    | Policy enforcement (TDD, safety)   | `src/forge/guard/`          |
+| **Forge Policy**    | Policy enforcement (TDD, safety)   | `src/forge/policy/`         |
 | **Commands/Agents** | Claude Code extensions             | `src/{commands,agents}/`    |
 | **Hooks**           | Lifecycle events (Claude Code)     | `src/forge/cli/hooks/`      |
 
@@ -350,7 +350,7 @@ To avoid writer conflicts:
   - proxy-owned snapshot/cache files (if any)
 - Status:
   - read state; do not invent truth
-- Guard:
+- Policy:
   - reads state; enforces policy decisions at well-defined boundaries (hooks, proxy)
   - writes only hook-owned confirmed state (e.g., `confirmed.policy`) when running as a hook adapter
 
@@ -413,7 +413,7 @@ forge proxy delete <proxy_id>
 ```
 
 **Launch-time auto-start (lookup-or-start).** `--proxy` (session start/resume/fork, `forge claude`) and
-`--supervisor-proxy` (session start/fork, `forge guard supervise`) accept a template name. When the name is a template,
+`--supervisor-proxy` (session start/fork, `forge policy supervise`) accept a template name. When the name is a template,
 the launcher routes through `ensure_proxy()` → `start_proxy()` (reuse a live proxy, else adopt/spawn) instead of a
 lookup-only `resolve_proxy()`. This makes a template name with no running proxy — or a registry entry marked `healthy`
 that is no longer reachable — start a live proxy rather than fail. A bare proxy_id is still presence-only (revive with
@@ -918,17 +918,18 @@ per-child handoff file in `$EDITOR` before launching Claude. `forge session memo
 
 #### Memory management
 
-| Command                       | Purpose                                                                      |
-| :---------------------------- | :--------------------------------------------------------------------------- |
-| `forge memory enable`         | Enable memory auto-update for handoff agent (`--session`)                    |
-| `forge memory track <path>`   | Track a memory doc (`--as <strategy>`, `--propose`, `--shadow`, `--session`) |
-| `forge memory untrack <path>` | Stop tracking a memory doc (`--session`)                                     |
-| `forge memory list`           | List tracked memory docs (`--session`, `--json`)                             |
-| `forge memory status`         | Show memory doc status across sessions (`--scope`, `--doc`, `--json`)        |
-| `forge memory shadows list`   | List accumulated shadow proposals (`--scope`, `--session`, `--json`)         |
-| `forge memory shadows show`   | Show shadow proposal content (`--for <doc>`, `--scope`, `--session`)         |
-| `forge memory shadows review` | Review/curate shadow proposals (`--for`, `--curate`, `--show-latest`)        |
-| `forge memory passport show`  | Show passport embedded in a memory doc (`--json`)                            |
+| Command                        | Purpose                                                                                                               |
+| :----------------------------- | :-------------------------------------------------------------------------------------------------------------------- |
+| `forge memory track <path>`    | Author a project passport on a doc, sessionless (`--strategy`, `--intent`, `--writers`, `--propose`, `--shadow-path`) |
+| `forge memory enable`          | Enable memory auto-update for a session (`--session`, resolves `$FORGE_SESSION`)                                      |
+| `forge memory disable`         | Disable memory auto-update for a session (`--session`, resolves `$FORGE_SESSION`)                                     |
+| `forge memory list`            | List passported memory docs under scan roots (`--json`)                                                               |
+| `forge memory status`          | Show memory activation across sessions (`--scope`, `--json`)                                                          |
+| `forge memory shadows list`    | List accumulated shadow proposals (`--scope`, `--json`)                                                               |
+| `forge memory shadows show`    | Show shadow proposal content (`--for <doc>`, `--scope`)                                                               |
+| `forge memory shadows review`  | Review/curate shadow proposals (`--for`, `--curate`, `--show-latest`)                                                 |
+| `forge memory passport show`   | Show passport embedded in a memory doc (`--json`)                                                                     |
+| `forge memory passport remove` | Remove the project passport from a memory doc (`--json`)                                                              |
 
 #### Proxy management
 
@@ -973,19 +974,19 @@ per-child handoff file in `$EDITOR` before launching Claude. `forge session memo
 
 #### Policy enforcement
 
-| Command                                       | Purpose                                       |
-| --------------------------------------------- | --------------------------------------------- |
-| `forge guard enable --bundle <name>`          | Enable policy enforcement for current session |
-| `forge guard disable`                         | Disable policy enforcement                    |
-| `forge guard status`                          | Show current policy state (`--json`)          |
-| `forge guard list`                            | List available bundles and rules (`--json`)   |
-| `forge guard check --bundle <name> -f <path>` | Evaluate policies on demand                   |
-| `forge guard supervisor -f <path> -r <id>`    | Evaluate file against approved plan           |
-| `forge guard supervise <target>`              | Set persistent supervisor for session         |
-| `forge guard supervise --off / --on`          | Suspend/resume supervisor (preserves config)  |
-| `forge guard supervise --remove`              | Remove supervisor entirely                    |
-| `forge guard supervise --reload`              | Reload latest relevant approved plan          |
-| `forge guard supervise --reload-from <path>`  | Reload plan from explicit file                |
+| Command                                        | Purpose                                       |
+| ---------------------------------------------- | --------------------------------------------- |
+| `forge policy enable --bundle <name>`          | Enable policy enforcement for current session |
+| `forge policy disable`                         | Disable policy enforcement                    |
+| `forge policy status`                          | Show current policy state (`--json`)          |
+| `forge policy list`                            | List available bundles and rules (`--json`)   |
+| `forge policy check --bundle <name> -f <path>` | Evaluate policies on demand                   |
+| `forge policy supervisor -f <path> -r <id>`    | Evaluate file against approved plan           |
+| `forge policy supervise <target>`              | Set persistent supervisor for session         |
+| `forge policy supervise --off / --on`          | Suspend/resume supervisor (preserves config)  |
+| `forge policy supervise --remove`              | Remove supervisor entirely                    |
+| `forge policy supervise --reload`              | Reload latest relevant approved plan          |
+| `forge policy supervise --reload-from <path>`  | Reload plan from explicit file                |
 
 #### Workflow
 
@@ -1043,7 +1044,7 @@ hints through `ModelSpec.prompt`. All workflow execution commands (panel, analyz
 
 Forge Policy is an **enforcement system** with three types:
 
-1. **Deterministic Policy (Guard)**: Static checks, file mapping, dependency rules (Fast/Free).
+1. **Deterministic Policy**: Static checks, file mapping, dependency rules (Fast/Free).
 2. **Semantic Policy (Supervisor)**: LLM-based alignment checks against plans (Smart/Context-aware).
 3. **Verification Policy**: Outcome-based checks at session boundaries (Feedback loop).
 
@@ -1065,7 +1066,7 @@ At minimum:
 - **Intent**: every policy declares *why* it exists — shown to models on deny so they can distinguish good workarounds
   (satisfy the goal) from bad ones (defeat it)
 
-#### 4.1.1 Deterministic Policy (Forge Guard)
+#### 4.1.1 Deterministic Policy (Forge Policy)
 
 Forge Policy is designed to support **deterministic policies first**.
 
@@ -1160,10 +1161,10 @@ ambiguities.
 
 **Supervisor stuck playbook:** When the supervisor blocks because the plan evolved:
 
-- `%guard supervise off` (suspend, config preserved)
+- `%policy supervise off` (suspend, config preserved)
 - Make the approved changes
-- `%guard supervise reload` (searches current session, forks, then target) or `%guard supervise reload <path>`
-- `%guard supervise on` (resume with updated plan context)
+- `%policy supervise reload` (searches current session, forks, then target) or `%policy supervise reload <path>`
+- `%policy supervise on` (resume with updated plan context)
 
 **The underspecification problem (biggest failure mode):** Supervision catches explicit divergence (plan says X, agent
 did Y, citations are clear). Underspecification is harder: the plan is silent, the model picks a plausible default, and
@@ -1191,8 +1192,8 @@ rerun).
 installing hooks:
 
 ```bash
-forge guard check supervisor --file src/forge/session/store.py
-forge guard check tdd --diff HEAD~1
+forge policy check supervisor --file src/forge/session/store.py
+forge policy check tdd --diff HEAD~1
 ```
 
 The same evaluation function runs in both modes (hook-triggered and CLI-triggered).
@@ -1204,8 +1205,8 @@ context keeps the original plan in view.
 
 **Reactive Patterns (Shared Library)**
 
-Several components react to hook events via external processing: semantic supervisor (`guard/semantic/supervisor.py`),
-handoff agent (`session/handoff_agent.py`), deterministic policies (`guard/deterministic/`), and the planned workflow
+Several components react to hook events via external processing: semantic supervisor (`policy/semantic/supervisor.py`),
+handoff agent (`session/handoff_agent.py`), deterministic policies (`policy/deterministic/`), and the planned workflow
 policy. The shared pattern: take hook context, classify/evaluate, return a decision or side-effect. Three node types
 cover current and planned use cases:
 
@@ -1425,12 +1426,12 @@ a policy-grade verdict (JSON + exit code).
 
 Skills vary in what they execute. Four types cover all current and planned cases:
 
-| Type            | Execution                                   | Examples                                   |
-| --------------- | ------------------------------------------- | ------------------------------------------ |
-| Pure Python     | Deterministic function                      | TDD guard, pattern matching, `run_tests()` |
-| Single LLM      | `core.llm` API call                         | Tagger, checker                            |
-| Claude session  | `claude -p [--bare]` subprocess (has tools) | Supervisor, reviewer, handoff agent        |
-| Pure text (.md) | Markdown instructions sent to `claude -p`   | Review resources, analyze, debate prompts  |
+| Type            | Execution                                   | Examples                                    |
+| --------------- | ------------------------------------------- | ------------------------------------------- |
+| Pure Python     | Deterministic function                      | TDD policy, pattern matching, `run_tests()` |
+| Single LLM      | `core.llm` API call                         | Tagger, checker                             |
+| Claude session  | `claude -p [--bare]` subprocess (has tools) | Supervisor, reviewer, handoff agent         |
+| Pure text (.md) | Markdown instructions sent to `claude -p`   | Review resources, analyze, debate prompts   |
 
 Claude session subprocesses use `--bare` when `ANTHROPIC_API_KEY` is in the environment (skips hooks, LSP, plugin sync,
 skill walks for faster startup). `--bare` disables OAuth/keychain auth, so it is only safe when an explicit API key is
@@ -1498,25 +1499,25 @@ both CLI commands and policy classes—no workflow registry, no declarative conf
 
 **CLI surfaces (normative):** Forge uses two related command surfaces:
 
-1. **Guard** — deterministic/semantic policies evaluated against an action context.
+1. **Policy** — deterministic/semantic policies evaluated against an action context.
 
-   - Hook surface: `forge hook …` invokes Guard policies automatically.
-   - Manual surface: `forge guard check …` runs Guard policies on demand (after a hook blocks you, or in CI).
+   - Hook surface: `forge hook …` invokes policies automatically.
+   - Manual surface: `forge policy check …` runs policies on demand (after a hook blocks you, or in CI).
 
    **Stuck playbook (target UX):** When a PreToolUse policy blocks repeatedly, give the human an escape hatch without
    uninstalling hooks.
 
-   - **Disable enforcement in-session:** `%guard disable` (hook becomes a no-op for this session)
+   - **Disable enforcement in-session:** `%policy disable` (hook becomes a no-op for this session)
    - **Fix the issue:** work with the agent or edit manually while enforcement is disabled
    - **Confirm you're unblocked (optional):**
-     - `%guard check` (planned): defaults to `git diff` (unstaged). Supports `--staged`.
-     - Terminal fallback: `git diff | forge guard check --bundle tdd --bundle coding_standards --diff`
+     - `%policy check` (planned): defaults to `git diff` (unstaged). Supports `--staged`.
+     - Terminal fallback: `git diff | forge policy check --bundle tdd --bundle coding_standards --diff`
    - **Re-enable enforcement:**
-     - `%guard enable` (planned): with no bundles, restores the session's configured bundles from intent.
-     - `%guard enable tdd coding_standards`: explicitly sets bundles for the session.
+     - `%policy enable` (planned): with no bundles, restores the session's configured bundles from intent.
+     - `%policy enable tdd coding_standards`: explicitly sets bundles for the session.
 
-   `forge guard check` (and `%guard check`) are diagnostics; you're unstuck once enforcement is re-enabled and the next
-   Write/Edit passes the hook.
+   `forge policy check` (and `%policy check`) are diagnostics; you're unstuck once enforcement is re-enabled and the
+   next Write/Edit passes the hook.
 
 2. **Run** -- multi-step workflow runners (fan-out, debate, etc.).
 
@@ -1524,7 +1525,7 @@ both CLI commands and policy classes—no workflow registry, no declarative conf
    - Gate mode: `forge workflow <workflow> --check` forces a policy-grade verdict contract (structured JSON + exit
      code).
 
-**No auto-promotion:** A workflow does not automatically appear in Guard. If a Guard policy wants to use a workflow, it
+**No auto-promotion:** A workflow does not automatically appear as a Policy. If a Policy wants to use a workflow, it
 invokes the workflow's `--check` surface explicitly.
 
 **Workflow runners unify skills and policies.** The same runner is usable from:
@@ -1586,7 +1587,7 @@ The agent runs `claude -p` (headless prompt mode) on the full session transcript
 selecting what mattered with full-session hindsight (higher signal than incremental capture).
 
 ```yaml
-# In session intent or project config
+# In session intent (set via forge memory enable or --memory on)
 memory:
   auto_update:
     enabled: true
@@ -1601,8 +1602,8 @@ overwrites).
 #### 5.6.2 Memory doc passports
 
 Each memory doc may include a `forge_memory` YAML frontmatter block -- the doc's **passport**. The passport is the
-authoritative contract for that doc's intent, update strategy, writer privileges, and inheritance behavior. Session
-manifests store only participation and auto-update runtime state; the handoff agent re-reads passports at Stop time.
+authoritative contract for that doc's intent, update strategy, and writer privileges. The memory writer re-reads
+passports at Stop time.
 
 ```yaml
 ---
@@ -1616,21 +1617,20 @@ forge_memory:
     strategy: changelog
     mode: direct
     writers: all-sessions
-    inherit_on_fork: true
     compact_when: "approaching documentation size limits"
 ---
 ```
 
-**Ownership split**: passports own doc-level policy (strategy, intent, writers, inheritance). Session manifests own
-participation (which docs this session tracks) and auto-update runtime state (enabled, mode, min_turns). Editing a
-passport between sessions takes effect without re-running `forge memory track`.
+**Ownership split**: passports own doc-level policy (strategy, intent, writers). Session manifests own activation state
+(enabled, mode, min_turns). There are no session-scoped doc lists; all docs are discovered from passports at Stop time.
+Editing a passport between sessions takes effect without re-running `forge memory track`.
 
 **Writer semantics**: `all-sessions` and exact session-name writers are supported. `lineage:` and `role:` prefixes are
 rejected with deferral messages. Writer access is checked at Stop time by the handoff agent.
 
-**Passport CLI**: `forge memory track --as <strategy>` synthesizes a passport for docs without one. `forge memory track`
-with flags on a doc that already has a passport overwrites the passport (flags win, warnings printed).
-`forge memory passport show <path>` displays passport fields.
+**Passport CLI**: `forge memory track --strategy <strategy>` synthesizes a passport for docs without one.
+`forge memory track` with flags on a doc that already has a passport overwrites the passport (flags win, warnings
+printed). `forge memory passport show <path>` displays passport fields.
 
 #### 5.6.3 Two operating modes
 
@@ -1648,12 +1648,25 @@ matching shadows, removes duplicates and already-promoted notes, groups related 
 output. Curation reports persist at `.forge/artifacts/<session>/memory/curation-{slug}-{hash}-{ts}.md`. Curation never
 mutates official docs.
 
-#### 5.6.4 Memory inheritance on fork and fresh resume
+#### 5.6.4 Memory activation on fork and fresh resume
 
-`forge session fork` and `forge session resume --fresh` support `--inherit-memory all|none|shadowed`. Default `all`
-preserves existing behavior. `none` removes memory participation. `shadowed` inherits only proposal/shadow docs.
-Inherited `.forge/memory/` shadow files are materialized in the target worktree; non-Forge-owned shadows are reported
-but not created. Passport `inherit_on_fork` defaults apply when the CLI flag is omitted.
+Children inherit the parent's memory activation by default. The `--memory` flag overrides:
+
+```bash
+forge session fork parent                    # inherit parent's memory on/off
+forge session fork parent --memory on        # force memory on in child
+forge session fork parent --memory off       # force memory off in child
+
+forge session resume parent --fresh          # inherit parent's memory on/off
+forge session resume parent --fresh --memory off
+```
+
+Inheritance copies only `auto_update` (enabled, mode, min_turns, proxy). Other `MemoryIntent` fields do not propagate.
+`--memory off` writes an explicit `HandoffConfig(enabled=False)` so the child is deliberately off even if later defaults
+change. `--memory on` reuses the parent's non-enabled config (mode, proxy, min_turns) or `HandoffConfig` defaults.
+
+Memory docs are not inherited. Passports are git-tracked and discovered live at Stop time in whatever checkout the child
+session runs in. This applies equally to same-checkout forks, `--worktree`, and `--into`.
 
 #### 5.6.5 Strategy registry
 
@@ -1664,8 +1677,8 @@ Per-doc strategies control how each file is updated. Strategies are defined in `
 maintain; the agent maintains them. `forge memory track` enforces this at configuration time; runtime skip handling
 remains for stale manifests.
 
-Direct update strategies (Mode 1): `project-state`, `checklist`, `changelog`, `debugging`, `patterns`, `generic`. Shadow
-strategy (Mode 2): `suggested` (propose additions as checkboxes with rationale).
+Direct update strategies: `project-state`, `checklist`, `changelog`, `generic`. Shadow mode (`--propose`) works with any
+strategy.
 
 The handoff agent resolves designated doc paths relative to `forge_root`, so git-tracked docs target the correct branch
 in worktrees. Trackedness is controlled by path choice -- the agent doesn't distinguish.
@@ -1677,6 +1690,40 @@ cheaper than cross-format deduplication.
 
 > Strategy tables, example config, worktree resolution details, and full auto-memory comparison in
 > [design_appendix.md §G](design_appendix.md#g-memory-doc-reference).
+
+#### 5.6.6 Session-scoped activation
+
+Memory activation is session-scoped. Each session decides whether the memory writer runs via
+`intent.memory.auto_update.enabled` (or an override). There is no checkout-level config file.
+
+```bash
+forge memory enable                    # resolves $FORGE_SESSION
+forge memory enable --session planner  # named session
+forge memory disable --session planner
+forge session start planner --memory on
+```
+
+Both gates (Stop-hook enqueue in `src/forge/cli/hooks/commands.py` and the detached runner `forge handoff run`) check
+`effective.memory.auto_update.enabled` directly. Incognito sessions never enqueue regardless of activation state.
+
+**Stop-time discovery.** When activation is on, the detached runner scans hardcoded roots (`docs/` plus
+`.forge/memory/`) for `forge_memory` passports the session is authorized to write, materializes shadow files for
+shadow-only passports, and passes the result to `run_handoff_agent()`. Capped at 50 docs after filtering. The Stop hook
+only decides whether to enqueue; the scan runs in the background runner.
+
+**Scan roots** are hardcoded: `DEFAULT_SCAN_ROOTS = ("docs/",)` plus always `.forge/memory/`. Configurable roots are
+deferred.
+
+#### 5.6.7 CLI verbs
+
+- **`forge memory track <path>`** authors a **passport** (project-lifetime, git-tracked frontmatter). Sessionless.
+  `--propose` authors a shadow-only passport. A passported doc outside the scan roots is written but warns.
+- **`forge memory passport remove <path>`** removes the passport, preserving unrelated frontmatter.
+- **`forge memory enable`** / **`disable`** sets session activation (`memory.auto_update.enabled`). Resolves
+  `$FORGE_SESSION` when `--session` is omitted; errors outside a session without `--session`.
+- **`forge memory list`** shows passported docs under scan roots (sessionless scan, no writer filtering).
+
+**Shadow discovery** scans passports under the scan roots for shadow-only docs (unfiltered by writer).
 
 ### 5.7 Test Infrastructure (Docker-based)
 
@@ -1749,7 +1796,7 @@ multi-forge/
 │   │   ├── session/     # Session manager
 │   │   ├── install/     # Installer system
 │   │   ├── proxy/       # Proxy - uses core.llm
-│   │   ├── guard/       # Guard - uses core.llm
+│   │   ├── policy/      # Policy - uses core.llm
 │   │   └── status/      # Status dashboard
 │   │
 │   ├── commands/        # Slash commands (installed to ~/.claude/commands)

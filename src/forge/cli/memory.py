@@ -1,15 +1,14 @@
 """``forge memory`` -- top-level memory doc management.
 
-Replaces ``forge session memory`` (Phase 2 of the memory enhancement proposal).
-Each command manages doc participation in session manifests and passport
-frontmatter. The handoff agent re-reads passports at stop time for the
-authoritative contract (Phase 1 design: passport-authoritative).
+Two primitives: passports select docs (project-scoped, git-tracked),
+session activation decides whether the memory writer runs.
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -18,19 +17,31 @@ import click
 from forge.cli.output import print_tip
 from forge.cli.session import console
 from forge.core.ops.context import ExecutionContext
-from forge.core.ops.session import ForgeOpError, resolve_session, set_session_override
-from forge.session.exceptions import ForgeSessionError, PassportError
-from forge.session.models import DesignatedDoc
+from forge.core.ops.session import (
+    ForgeOpError,
+    resolve_session,
+    set_session_override,
+)
+from forge.session.exceptions import (
+    ForgeSessionError,
+    PassportError,
+)
 from forge.session.passport import (
+    _REMOVED_STRATEGIES,
     VALID_STRATEGY_NAMES,
     Passport,
-    check_shadow_path_collision,
     derive_shadow_path,
     read_passport,
+    remove_passport,
     resolve_passport_source,
     resolve_with_overrides,
     synthesize_passport,
     write_passport,
+)
+from forge.session.project_memory import (
+    DEFAULT_SCAN_ROOTS,
+    check_shadow_path_collision_in_roots,
+    is_under_scan_roots,
 )
 from forge.session.shadow_curation import ShadowEntry
 from forge.session.validation import is_safe_designated_doc_path
@@ -41,65 +52,6 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------
-
-
-def _current_docs(*, ctx: ExecutionContext, session_name: str | None) -> tuple[list[DesignatedDoc], Path]:
-    """Return (effective designated_docs, forge_root) for the resolved session."""
-    resolved = resolve_session(ctx=ctx, session_name=session_name)
-    state = resolved.state
-    from forge.session.effective import compute_effective_intent
-
-    effective = compute_effective_intent(state)
-    docs = list(effective.memory.designated_docs) if effective.memory else []
-    forge_root_str = state.forge_root or (state.worktree.path if state.worktree else None)
-    if forge_root_str is None:
-        raise ForgeOpError("Could not resolve forge_root for session.")
-    return docs, Path(forge_root_str)
-
-
-def _write_docs(*, ctx: ExecutionContext, session_name: str | None, docs: list[DesignatedDoc]) -> None:
-    """Persist docs as an override on ``memory.designated_docs``."""
-    payload = [{"path": d.path, "strategy": d.strategy, "shadows": d.shadows} for d in docs]
-    set_session_override(
-        ctx=ctx,
-        session_name=session_name,
-        key="memory.designated_docs",
-        value_str=json.dumps(payload),
-    )
-
-
-def _check_legacy_docs(docs: list[DesignatedDoc], forge_root: Path) -> list[str]:
-    """Return warning lines if docs lack passports or have malformed ones.
-
-    Separates missing from malformed for actionable guidance.
-    Uses ``resolve_passport_source(doc)`` so shadow entries check the official doc.
-    """
-    if not docs:
-        return []
-    missing = 0
-    malformed = 0
-    for doc in docs:
-        passport_path = forge_root / resolve_passport_source(doc)
-        try:
-            if read_passport(passport_path) is None:
-                missing += 1
-        except FileNotFoundError:
-            missing += 1
-        except PassportError:
-            malformed += 1
-    warnings: list[str] = []
-    if missing:
-        warnings.append(
-            f"{missing} of {len(docs)} tracked doc(s) have no passport "
-            "(manifest-fallback behavior). Re-track to attach passports: "
-            "forge memory track <path> --as <strategy> --session <name>"
-        )
-    if malformed:
-        warnings.append(
-            f"{malformed} of {len(docs)} tracked doc(s) have malformed passports. "
-            "Fix the YAML frontmatter in the affected files."
-        )
-    return warnings
 
 
 def _auto_create_shadow(shadow_path: str, forge_root: Path) -> bool:
@@ -117,32 +69,6 @@ def _auto_create_shadow(shadow_path: str, forge_root: Path) -> bool:
         raise click.ClickException(f"Invalid shadow path: {e}") from e
 
 
-def _auto_enable_memory(*, ctx: ExecutionContext, session_name: str | None, effective_memory: object) -> bool:
-    """Enable memory auto-update if not yet enabled. Returns True if enabled."""
-    from forge.session.models import MemoryIntent
-
-    needs_enable = True
-    if isinstance(effective_memory, MemoryIntent) and effective_memory.auto_update:
-        needs_enable = not effective_memory.auto_update.enabled
-
-    if not needs_enable:
-        return False
-
-    set_session_override(
-        ctx=ctx,
-        session_name=session_name,
-        key="memory.auto_update.enabled",
-        value_str="true",
-    )
-    set_session_override(
-        ctx=ctx,
-        session_name=session_name,
-        key="memory.auto_update.mode",
-        value_str='"augment"',
-    )
-    return True
-
-
 # ---------------------------------------------------------------------------
 # Group
 # ---------------------------------------------------------------------------
@@ -150,14 +76,14 @@ def _auto_enable_memory(*, ctx: ExecutionContext, session_name: str | None, effe
 
 @click.group("memory")
 def memory() -> None:
-    """Manage project memory docs and handoff agent tracking.
+    """Manage project memory docs.
 
     \b
     Examples:
-        forge memory enable --session planner
-        forge memory track docs/changelog.md --as changelog --session planner
-        forge memory list --session planner
-        forge memory status --scope repo
+        forge memory track docs/changelog.md --strategy changelog    # author a passport (sessionless)
+        forge memory enable --session planner                  # enable memory for a session
+        forge memory list                                      # show passported docs
+        forge memory status --scope repo                       # show activation across sessions
     """
 
 
@@ -167,14 +93,47 @@ def memory() -> None:
 
 
 @memory.command("enable")
-@click.option("--session", "-s", "session_name", default=None, help="Target session (default: active session).")
+@click.option("--session", "-s", "session_name", default=None, help="Target session (default: ambient $FORGE_SESSION).")
 @click.option("--review-only", is_flag=True, default=False, help="Enable in review-only mode (no edits).")
 def enable_cmd(session_name: str | None, review_only: bool) -> None:
-    """Enable memory auto-update for the handoff agent.
+    """Enable memory auto-update for a session.
 
-    Idempotent. Sets mode=augment by default, or mode=review-only
-    with --review-only. Shows tracked docs after enabling.
+    Sets ``memory.auto_update.enabled`` on the session manifest.
+    Resolves ``$FORGE_SESSION`` when ``--session`` is omitted.
     """
+    target_mode = "review-only" if review_only else "augment"
+    resolved_name = session_name or os.environ.get("FORGE_SESSION")
+    if not resolved_name:
+        console.print(
+            "[red]Error:[/red] Memory activation is session-scoped. "
+            "Use --session <name> or run inside a Forge session ($FORGE_SESSION)."
+        )
+        sys.exit(1)
+    _set_memory_activation(resolved_name, enabled=True, mode=target_mode)
+
+
+@memory.command("disable")
+@click.option("--session", "-s", "session_name", default=None, help="Target session (default: ambient $FORGE_SESSION).")
+def disable_cmd(session_name: str | None) -> None:
+    """Disable memory auto-update for a session.
+
+    Sets ``memory.auto_update.enabled=false`` on the session manifest.
+    Resolves ``$FORGE_SESSION`` when ``--session`` is omitted.
+    """
+    resolved_name = session_name or os.environ.get("FORGE_SESSION")
+    if not resolved_name:
+        console.print(
+            "[red]Error:[/red] Memory activation is session-scoped. "
+            "Use --session <name> or run inside a Forge session ($FORGE_SESSION)."
+        )
+        sys.exit(1)
+    _set_memory_activation(resolved_name, enabled=False)
+
+
+def _set_memory_activation(session_name: str, *, enabled: bool, mode: str | None = None) -> None:
+    """Write memory activation state to a session manifest override."""
+    import json
+
     try:
         ctx = ExecutionContext.from_cwd()
         resolved = resolve_session(ctx=ctx, session_name=session_name)
@@ -186,58 +145,45 @@ def enable_cmd(session_name: str | None, review_only: bool) -> None:
 
     state = resolved.state
     effective = compute_effective_intent(state)
-    target_mode = "review-only" if review_only else "augment"
     display_name = session_name or state.name
 
-    already = False
-    current_mode: str | None = None
-    already_enabled = False
-    if effective.memory and effective.memory.auto_update and effective.memory.auto_update.enabled:
-        already_enabled = True
-        current_mode = effective.memory.auto_update.mode
-        if effective.memory.auto_update.mode == target_mode:
-            console.print(
-                f"[dim]Memory auto-update already enabled for session " f"{display_name} (mode: {target_mode}).[/dim]"
-            )
-            already = True
-        # Enabled with different mode -- update mode only
-    if not already:
-        try:
-            set_session_override(
-                ctx=ctx,
-                session_name=session_name,
-                key="memory.auto_update.enabled",
-                value_str="true",
-            )
+    current_enabled = (
+        effective.memory is not None
+        and effective.memory.auto_update is not None
+        and effective.memory.auto_update.enabled
+    )
+
+    if enabled and current_enabled and mode:
+        current_mode = effective.memory.auto_update.mode if effective.memory and effective.memory.auto_update else None
+        if current_mode == mode:
+            console.print(f"[dim]Memory auto-update already enabled for session {display_name} (mode: {mode}).[/dim]")
+            return
+    elif not enabled and not current_enabled:
+        console.print(f"[dim]Memory auto-update already disabled for session {display_name}.[/dim]")
+        return
+
+    try:
+        set_session_override(
+            ctx=ctx,
+            session_name=session_name,
+            key="memory.auto_update.enabled",
+            value_str=json.dumps(enabled),
+        )
+        if mode and enabled:
             set_session_override(
                 ctx=ctx,
                 session_name=session_name,
                 key="memory.auto_update.mode",
-                value_str=json.dumps(target_mode),
+                value_str=json.dumps(mode),
             )
-        except ForgeOpError as e:
-            console.print(f"[red]Error:[/red] {e}")
-            sys.exit(1)
-        if already_enabled and current_mode is not None:
-            console.print(
-                f"Memory auto-update mode changed for session {display_name}: " f"{current_mode} -> {target_mode}."
-            )
-        else:
-            console.print(f"Memory auto-update enabled for session {display_name} (mode: {target_mode}).")
+    except ForgeOpError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        sys.exit(1)
 
-    docs = list(effective.memory.designated_docs) if effective.memory else []
-    if docs:
-        console.print(f"\n[dim]Currently tracking {len(docs)} doc(s).[/dim]")
+    if enabled:
+        console.print(f"Memory auto-update enabled for session {display_name} (mode: {mode}).")
     else:
-        console.print(
-            f"\n[dim]No docs tracked yet. "
-            f"Use: forge memory track <path> --as <strategy> --session {display_name}[/dim]"
-        )
-
-    forge_root_str = state.forge_root or (state.worktree.path if state.worktree else None)
-    if forge_root_str and docs:
-        for w in _check_legacy_docs(docs, Path(forge_root_str)):
-            console.print(f"[yellow]Warning:[/yellow] {w}")
+        console.print(f"Memory auto-update disabled for session {display_name}.")
 
 
 # ---------------------------------------------------------------------------
@@ -248,17 +194,18 @@ def enable_cmd(session_name: str | None, review_only: bool) -> None:
 @memory.command("track")
 @click.argument("path")
 @click.option(
-    "--as",
+    "--strategy",
     "strategy",
-    type=click.Choice(sorted(VALID_STRATEGY_NAMES)),
+    type=str,
     default=None,
     help="Augmentation strategy.",
 )
 @click.option("--intent", default=None, help="Doc intent description for passport synthesis.")
 @click.option("--writers", default=None, help="Writer spec (default: all-sessions).")
-@click.option("--propose", is_flag=True, default=False, help="Track via shadow proposal (shadow-only mode).")
-@click.option("--shadow", "shadow_override", default=None, help="Explicit shadow file path (use with --propose).")
-@click.option("--session", "-s", "session_name", default=None, help="Target session (default: active session).")
+@click.option("--propose", is_flag=True, default=False, help="Author a shadow-only passport (proposal mode).")
+@click.option("--shadow-path", "shadow_override", default=None, help="Explicit shadow file path (use with --propose).")
+@click.option("--as", "removed_as", type=str, default=None, hidden=True, help="(removed) renamed to --strategy.")
+@click.option("--session", "-s", "session_name", default=None, hidden=True, help="(removed) track is sessionless.")
 def track_cmd(
     path: str,
     strategy: str | None,
@@ -266,29 +213,57 @@ def track_cmd(
     writers: str | None,
     propose: bool,
     shadow_override: str | None,
+    removed_as: str | None,
     session_name: str | None,
 ) -> None:
-    """Track a memory doc for handoff agent updates.
+    """Author a project-memory passport on a doc (project-lifetime, sessionless).
 
-    Adds the doc to the session's tracked list. If the doc has no passport,
-    one is synthesized from the provided flags (--as is required in that case).
-    Re-running updates the configuration without duplicating the entry.
+    Writes ``forge_memory`` frontmatter so every session in this checkout treats
+    the doc as memory. Runnable from a bare terminal: it does not resolve or
+    require a session. Re-running with --strategy/--writers updates the passport;
+    with no flags on an already-passported doc it is a no-op.
 
-    Use --propose to track via shadow proposals: the handoff agent writes
-    suggestions to a shadow file instead of editing the official doc directly.
+    Use --propose to author a shadow-only passport: the handoff agent writes
+    suggestions to a shadow file instead of editing the doc directly.
+
+    For one-off updates without a passport, instruct the agent directly.
+
+    \b
+    Strategies (--strategy):
+      changelog      Add accomplishments not already recorded
+      checklist      Mark completed tasks [x], add newly discovered tasks
+      generic        Add any new information missing from the file
+      project-state  Update current focus, decisions, and handoff notes
     """
+    # Tombstone: --as was renamed to --strategy (coding-standards §5).
+    if removed_as is not None:
+        raise click.ClickException("--as was renamed to --strategy.")
+
+    # Tombstone: track no longer takes a session (clean break, coding-standards §5).
+    if session_name is not None:
+        raise click.ClickException(
+            "track authors project passports and does not take a session.\n"
+            "For one-off updates, instruct the agent directly."
+        )
+
+    # Strategy validation: removed strategies get helpful hints, unknown get a list.
+    if strategy is not None:
+        removed_hint = _REMOVED_STRATEGIES.get(strategy)
+        if removed_hint:
+            raise click.ClickException(f"Strategy '{strategy}' was removed. {removed_hint}")
+        if strategy not in VALID_STRATEGY_NAMES:
+            raise click.ClickException(
+                f"Unknown strategy '{strategy}'. " f"Valid strategies: {', '.join(sorted(VALID_STRATEGY_NAMES))}"
+            )
+
     # Early flag-combination validation
     if shadow_override and not propose:
-        raise click.ClickException("--shadow requires --propose.")
-    if propose and strategy is not None and strategy != "suggested":
-        raise click.ClickException(f"--propose requires strategy 'suggested'. Got '{strategy}'.")
+        raise click.ClickException("--shadow-path requires --propose.")
 
-    try:
-        ctx = ExecutionContext.from_cwd()
-        docs, forge_root = _current_docs(ctx=ctx, session_name=session_name)
-    except ForgeOpError as e:
-        console.print(f"[red]Error:[/red] {e}")
-        sys.exit(1)
+    ctx = ExecutionContext.from_cwd()
+    if ctx.forge_root is None:
+        raise click.ClickException("Not inside a Forge project. Run `forge extension enable` first.")
+    forge_root = ctx.forge_root
 
     resolved_base = forge_root.resolve()
     reason = is_safe_designated_doc_path(path, forge_root, resolved_base)
@@ -305,9 +280,12 @@ def track_cmd(
     except PassportError as e:
         raise click.ClickException(f"Malformed passport in {path}: {e}") from e
 
+    # Scan roots power the out-of-root warning and the collision check. A
+    # corrupt config must not block authoring (system-boundary warn+degrade).
+    roots = _resolve_scan_roots()
+
     if propose:
         _track_propose(
-            ctx=ctx,
             path=path,
             abs_path=abs_path,
             passport=passport,
@@ -315,116 +293,133 @@ def track_cmd(
             intent=intent,
             writers=writers,
             shadow_override=shadow_override,
-            session_name=session_name,
-            docs=docs,
             forge_root=forge_root,
+            roots=roots,
         )
         return
 
-    # Shadow-only passport without --propose: honor the passport's shadow_path
+    # Shadow-only passport without --propose: honor the passport's shadow_path.
     if passport and passport.update.mode == "shadow-only":
-        shadow_path = passport.update.shadow_path
-        if not shadow_path:
-            raise click.ClickException(
-                f"Passport in {path} has mode 'shadow-only' but no shadow_path. "
-                "Fix the passport or re-track with --propose."
-            )
-        collision = check_shadow_path_collision(shadow_path, path, docs)
-        if collision:
-            raise click.ClickException(collision)
-
-        messages: list[str] = []
-        has_flags = strategy is not None or writers is not None
-        effective_passport = passport
-        if has_flags:
-            try:
-                resolved_pp, pp_warnings = resolve_with_overrides(
-                    passport,
-                    strategy=strategy,
-                    writers=writers,
-                )
-            except PassportError as exc:
-                raise click.ClickException(str(exc)) from exc
-            if pp_warnings:
-                write_passport(abs_path, resolved_pp)
-                effective_passport = resolved_pp
-                for w in pp_warnings:
-                    messages.append(f"[yellow]Warning:[/yellow] {w}")
-                messages.append(f"Passport updated in {path}. Future sessions will use the new values.")
-
-        created = _auto_create_shadow(shadow_path, forge_root)
-        shadow_abs = (forge_root / shadow_path).resolve()
-        if not shadow_abs.is_file():
-            raise click.ClickException(f"Shadow file does not exist: {shadow_path}")
-        if created:
-            messages.append(f"Shadow file created: {shadow_path}.")
-        doc = DesignatedDoc(path=shadow_path, strategy=effective_passport.update.strategy, shadows=path)
-        _upsert_and_finish(
-            ctx=ctx,
-            session_name=session_name,
-            docs=docs,
-            doc=doc,
-            official_path=path,
-            shadow_path=shadow_path,
-            messages=messages,
+        _track_existing_shadow_only(
+            path=path,
+            abs_path=abs_path,
+            passport=passport,
+            strategy=strategy,
+            writers=writers,
+            forge_root=forge_root,
+            roots=roots,
         )
         return
 
-    # --- Direct tracking flow (unchanged from Phase 2) ---
-    direct_messages: list[str] = []
+    # --- Direct passport authoring ---
     has_flags = strategy is not None or writers is not None
-    direct_passport: Passport | None = passport
 
     if passport is None and strategy is None:
         raise click.ClickException(
             f"This doc has no passport. Provide a strategy:\n"
-            f"  forge memory track {path} --as <strategy> --session <name>\n\n"
+            f"  forge memory track {path} --strategy <strategy>\n\n"
             f"Valid strategies: {', '.join(sorted(VALID_STRATEGY_NAMES))}"
         )
 
     if passport is None:
         try:
-            direct_passport = synthesize_passport(
+            new_pp = synthesize_passport(
                 strategy=strategy,  # type: ignore[arg-type]  # checked above
                 intent=intent,
                 writers=writers or "all-sessions",
             )
-            write_passport(abs_path, direct_passport)
+            write_passport(abs_path, new_pp)
         except PassportError as e:
             raise click.ClickException(str(e)) from e
-        direct_messages.append(f"Passport created for {path} (strategy: {strategy}).")
-    elif has_flags:
-        try:
-            resolved_pp, warnings = resolve_with_overrides(
-                passport,
-                strategy=strategy,
-                writers=writers,
-            )
-        except PassportError as e:
-            raise click.ClickException(str(e)) from e
-        if warnings:
-            write_passport(abs_path, resolved_pp)
-            direct_passport = resolved_pp
-            for w in warnings:
-                direct_messages.append(f"[yellow]Warning:[/yellow] {w}")
-            direct_messages.append(f"Passport updated in {path}. Future sessions will use the new values.")
+        console.print(f"Passport created for [cyan]{path}[/cyan] (strategy: {strategy}).")
+        _warn_if_out_of_root(path, forge_root, roots)
+        return
 
-    assert direct_passport is not None
-    doc = DesignatedDoc(path=path, strategy=direct_passport.update.strategy)
-    _upsert_and_finish(
-        ctx=ctx,
-        session_name=session_name,
-        docs=docs,
-        doc=doc,
-        official_path=path,
-        shadow_path=None,
-        messages=direct_messages,
+    # Existing direct passport.
+    if not has_flags:
+        console.print(f"Passport already present in [cyan]{path}[/cyan] (strategy: {passport.update.strategy}).")
+        _warn_if_out_of_root(path, forge_root, roots)
+        return
+
+    try:
+        resolved_pp, warnings = resolve_with_overrides(passport, strategy=strategy, writers=writers)
+    except PassportError as e:
+        raise click.ClickException(str(e)) from e
+    if warnings:
+        write_passport(abs_path, resolved_pp)
+        for w in warnings:
+            console.print(f"[yellow]Warning:[/yellow] {w}")
+        console.print(f"Passport updated in [cyan]{path}[/cyan]. Future sessions will use the new values.")
+    else:
+        console.print(f"Passport already present in [cyan]{path}[/cyan] (strategy: {passport.update.strategy}).")
+    _warn_if_out_of_root(path, forge_root, roots)
+
+
+def _resolve_scan_roots() -> tuple[str, ...]:
+    """Return the effective scan roots (hardcoded defaults)."""
+    return DEFAULT_SCAN_ROOTS
+
+
+def _warn_if_out_of_root(path: str, forge_root: Path, roots: tuple[str, ...]) -> None:
+    """Warn when a passported doc lies outside the scan roots."""
+    if is_under_scan_roots(path, forge_root, roots):
+        return
+    console.print(
+        f"[yellow]Warning:[/yellow] {path} is outside the default scan roots ({', '.join(roots)}). "
+        "The passport is written, but Stop-time memory will not process it."
     )
+
+
+def _track_existing_shadow_only(
+    *,
+    path: str,
+    abs_path: Path,
+    passport: Passport,
+    strategy: str | None,
+    writers: str | None,
+    forge_root: Path,
+    roots: tuple[str, ...],
+) -> None:
+    """Honor an existing shadow-only passport (no --propose).
+
+    Ensures the declared shadow file exists and applies any flag overrides.
+    Passport-only and sessionless: no manifest write, no auto-enable.
+    """
+    shadow_path = passport.update.shadow_path
+    if not shadow_path:
+        raise click.ClickException(
+            f"Passport in {path} has mode 'shadow-only' but no shadow_path. "
+            "Fix the passport or re-run with --propose."
+        )
+
+    has_flags = strategy is not None or writers is not None
+    updated = False
+    if has_flags:
+        try:
+            resolved_pp, pp_warnings = resolve_with_overrides(passport, strategy=strategy, writers=writers)
+        except PassportError as exc:
+            raise click.ClickException(str(exc)) from exc
+        if pp_warnings:
+            write_passport(abs_path, resolved_pp)
+            updated = True
+            for w in pp_warnings:
+                console.print(f"[yellow]Warning:[/yellow] {w}")
+
+    created = _auto_create_shadow(shadow_path, forge_root)
+    shadow_abs = (forge_root / shadow_path).resolve()
+    if not shadow_abs.is_file():
+        raise click.ClickException(f"Shadow file does not exist: {shadow_path}")
+    if created:
+        console.print(f"Shadow file created: {shadow_path}.")
+    if updated:
+        console.print(f"Passport updated in [cyan]{path}[/cyan] (shadow-only proposals at {shadow_path}).")
+    else:
+        console.print(f"Passport already present in [cyan]{path}[/cyan] (shadow-only proposals at {shadow_path}).")
+    _warn_if_out_of_root(path, forge_root, roots)
 
 
 def _track_propose(
     *,
-    ctx: ExecutionContext,
     path: str,
     abs_path: Path,
     passport: Passport | None,
@@ -432,12 +427,14 @@ def _track_propose(
     intent: str | None,
     writers: str | None,
     shadow_override: str | None,
-    session_name: str | None,
-    docs: list[DesignatedDoc],
     forge_root: Path,
+    roots: tuple[str, ...],
 ) -> None:
-    """Handle ``track --propose`` flow."""
-    effective_strategy = strategy or "suggested"
+    """Author a shadow-only passport and materialize its shadow file.
+
+    Passport-only and sessionless: never resolves a session.
+    """
+    new_passport_strategy = strategy or "generic"
     shadow_path = shadow_override or derive_shadow_path(path)
 
     # Validate shadow path
@@ -452,7 +449,7 @@ def _track_propose(
     if resolved_shadow == resolved_official:
         raise click.ClickException("Shadow path cannot be the same as the official doc.")
 
-    collision = check_shadow_path_collision(shadow_path, path, docs)
+    collision = check_shadow_path_collision_in_roots(shadow_path, path, forge_root, roots)
     if collision:
         raise click.ClickException(collision)
 
@@ -462,22 +459,15 @@ def _track_propose(
     if not shadow_abs.is_file():
         raise click.ClickException(f"Shadow file does not exist: {shadow_path}")
 
-    messages: list[str] = []
-    if created:
-        messages.append(f"Shadow file created: {shadow_path}.")
-
-    # Check for direct→shadow conversion
-    converting = any(d.path == path and d.shadows is None for d in docs)
-    if converting:
-        messages.insert(0, "[yellow]Warning:[/yellow] Converting direct tracking to shadow proposal.")
-
-    # Passport handling: synthesize or update
+    # Passport handling: synthesize or update.
+    # For existing passports, pass strategy only when the user explicitly provided --strategy
+    # so the passport's own strategy is preserved by default.
     if isinstance(passport, Passport) and passport.update.mode == "shadow-only":
-        # Already shadow-only — apply overrides if any
+        # Already shadow-only -- apply overrides if any
         try:
             resolved_pp, pp_warnings = resolve_with_overrides(
                 passport,
-                strategy=effective_strategy if effective_strategy != passport.update.strategy else None,
+                strategy=strategy,
                 shadow_path=shadow_path if shadow_path != passport.update.shadow_path else None,
                 writers=writers,
             )
@@ -486,14 +476,16 @@ def _track_propose(
         if pp_warnings:
             write_passport(abs_path, resolved_pp)
             for w in pp_warnings:
-                messages.append(f"[yellow]Warning:[/yellow] {w}")
-            messages.append(f"Passport updated in {path}. Future sessions will use the new values.")
+                console.print(f"[yellow]Warning:[/yellow] {w}")
+            console.print(f"Passport updated in [cyan]{path}[/cyan]. Future sessions will use the new values.")
+        else:
+            console.print(f"Passport already present in [cyan]{path}[/cyan] (shadow-only proposals at {shadow_path}).")
     elif isinstance(passport, Passport):
         # Convert existing direct passport to shadow-only
         try:
             resolved_pp, pp_warnings = resolve_with_overrides(
                 passport,
-                strategy=effective_strategy,
+                strategy=strategy,
                 update_mode="shadow-only",
                 shadow_path=shadow_path,
                 writers=writers,
@@ -502,13 +494,13 @@ def _track_propose(
             raise click.ClickException(str(e)) from e
         write_passport(abs_path, resolved_pp)
         for w in pp_warnings:
-            messages.append(f"[yellow]Warning:[/yellow] {w}")
-        messages.append(f"Passport updated in {path}. Future sessions will use the new values.")
+            console.print(f"[yellow]Warning:[/yellow] {w}")
+        console.print(f"Passport in [cyan]{path}[/cyan] converted to shadow-only proposals at {shadow_path}.")
     else:
-        # No passport — synthesize
+        # No passport -- synthesize with default strategy
         try:
             new_pp = synthesize_passport(
-                strategy=effective_strategy,
+                strategy=new_passport_strategy,
                 intent=intent,
                 update_mode="shadow-only",
                 shadow_path=shadow_path,
@@ -517,116 +509,14 @@ def _track_propose(
             write_passport(abs_path, new_pp)
         except PassportError as e:
             raise click.ClickException(str(e)) from e
-        messages.append(f"Passport created for {path} (strategy: {effective_strategy}, mode: shadow-only).")
+        console.print(
+            f"Shadow-only passport written for [cyan]{path}[/cyan] "
+            f"(strategy: {new_passport_strategy}, proposals at {shadow_path})."
+        )
 
-    doc = DesignatedDoc(path=shadow_path, strategy=effective_strategy, shadows=path)
-    _upsert_and_finish(
-        ctx=ctx,
-        session_name=session_name,
-        docs=docs,
-        doc=doc,
-        official_path=path,
-        shadow_path=shadow_path,
-        messages=messages,
-    )
-
-
-def _upsert_and_finish(
-    *,
-    ctx: ExecutionContext,
-    session_name: str | None,
-    docs: list[DesignatedDoc],
-    doc: DesignatedDoc,
-    official_path: str,
-    shadow_path: str | None,
-    messages: list[str],
-) -> None:
-    """Upsert doc into the manifest, persist, auto-enable, and print output."""
-    was_update = False
-    new_docs: list[DesignatedDoc] = []
-    for d in docs:
-        is_match = False
-        if shadow_path:
-            # Shadow upsert: match same shadow, same official, or direct→shadow conversion
-            is_match = (
-                d.path == shadow_path
-                or (d.shadows is not None and d.shadows == official_path)
-                or (d.path == official_path and d.shadows is None)
-            )
-        else:
-            is_match = d.path == official_path
-        if is_match:
-            if not was_update:
-                new_docs.append(doc)
-                was_update = True
-            # else: drop duplicate matches
-        else:
-            new_docs.append(d)
-    if not was_update:
-        new_docs.append(doc)
-
-    try:
-        _write_docs(ctx=ctx, session_name=session_name, docs=new_docs)
-    except ForgeOpError as e:
-        console.print(f"[red]Error:[/red] {e}")
-        sys.exit(1)
-
-    from forge.session.effective import compute_effective_intent as _compute
-
-    resolved_session = resolve_session(ctx=ctx, session_name=session_name)
-    effective_after = _compute(resolved_session.state)
-    auto_enabled = _auto_enable_memory(
-        ctx=ctx,
-        session_name=session_name,
-        effective_memory=effective_after.memory,
-    )
-
-    if shadow_path:
-        if was_update:
-            console.print(f"Updated tracking for [cyan]{official_path}[/cyan] " f"(shadow proposal at {shadow_path}).")
-        else:
-            console.print(f"Tracking [cyan]{official_path}[/cyan] through shadow proposal " f"at {shadow_path}.")
-    else:
-        if was_update:
-            console.print(f"Updated tracking for [cyan]{official_path}[/cyan] " f"(strategy: {doc.strategy}).")
-        else:
-            console.print(f"Tracking [cyan]{official_path}[/cyan] directly as {doc.strategy}.")
-    for msg in messages:
-        console.print(msg)
-    if auto_enabled:
-        console.print("Memory auto-update enabled (mode: augment).")
-
-
-# ---------------------------------------------------------------------------
-# untrack
-# ---------------------------------------------------------------------------
-
-
-@memory.command("untrack")
-@click.argument("path")
-@click.option("--session", "-s", "session_name", default=None, help="Target session (default: active session).")
-def untrack_cmd(path: str, session_name: str | None) -> None:
-    """Stop tracking a memory doc. Passport frontmatter is left intact."""
-    try:
-        ctx = ExecutionContext.from_cwd()
-        docs, _ = _current_docs(ctx=ctx, session_name=session_name)
-    except ForgeOpError as e:
-        console.print(f"[red]Error:[/red] {e}")
-        sys.exit(1)
-
-    before = len(docs)
-    docs = [d for d in docs if d.path != path and d.shadows != path]
-    if len(docs) == before:
-        console.print(f"[dim]Not tracked: {path}[/dim]")
-        return
-
-    try:
-        _write_docs(ctx=ctx, session_name=session_name, docs=docs)
-    except ForgeOpError as e:
-        console.print(f"[red]Error:[/red] {e}")
-        sys.exit(1)
-
-    console.print(f"Untracked [cyan]{path}[/cyan].")
+    if created:
+        console.print(f"Shadow file created: {shadow_path}.")
+    _warn_if_out_of_root(path, forge_root, roots)
 
 
 # ---------------------------------------------------------------------------
@@ -635,29 +525,33 @@ def untrack_cmd(path: str, session_name: str | None) -> None:
 
 
 @memory.command("list")
-@click.option("--session", "-s", "session_name", default=None, help="Target session (default: active session).")
 @click.option("--json", "as_json", is_flag=True, default=False, help="Emit JSON.")
-def list_cmd(session_name: str | None, as_json: bool) -> None:
-    """List tracked memory docs for the session."""
-    try:
-        ctx = ExecutionContext.from_cwd()
-        docs, forge_root = _current_docs(ctx=ctx, session_name=session_name)
-    except ForgeOpError as e:
-        console.print(f"[red]Error:[/red] {e}")
-        sys.exit(1)
+def list_cmd(as_json: bool) -> None:
+    """List passported memory docs under scan roots."""
+    import json
 
-    # Read passport info per doc (best-effort)
+    from forge.session.project_memory import (
+        scan_all_passported_docs,
+        scan_stale_passports,
+    )
+
+    ctx = ExecutionContext.from_cwd()
+    if ctx.forge_root is None:
+        console.print("[red]Error:[/red] Not inside a Forge project.")
+        sys.exit(1)
+    forge_root = ctx.forge_root
+
+    docs = scan_all_passported_docs(forge_root, DEFAULT_SCAN_ROOTS)
+
     enriched: list[dict[str, object]] = []
     for doc in docs:
         passport_path = forge_root / resolve_passport_source(doc)
-        has_passport = False
         pp_strategy = doc.strategy
         pp_mode = "direct"
         pp_writers = "all-sessions"
         try:
             pp = read_passport(passport_path)
             if pp is not None:
-                has_passport = True
                 pp_strategy = pp.update.strategy
                 pp_mode = pp.update.mode
                 pp_writers = pp.update.writers
@@ -670,17 +564,23 @@ def list_cmd(session_name: str | None, as_json: bool) -> None:
                 "strategy": pp_strategy,
                 "mode": pp_mode,
                 "writers": pp_writers,
-                "has_passport": has_passport,
             }
         )
 
+    stale = scan_stale_passports(forge_root, DEFAULT_SCAN_ROOTS)
+
     if as_json:
         click.echo(json.dumps(enriched, indent=2))
+        for rel, strategy, hint in stale:
+            console.print(f"[yellow]Warning:[/yellow] {rel}: strategy '{strategy}' was removed. {hint}")
         return
 
     if not enriched:
-        console.print("[dim]No tracked memory docs for this session.[/dim]")
-        print_tip("Run 'forge memory track <path> --as <strategy>'.", blank_before=False, console=console)
+        if not stale:
+            console.print("[dim]No passported memory docs found under scan roots.[/dim]")
+            print_tip("Run 'forge memory track <path> --strategy <strategy>'.", blank_before=False, console=console)
+        for rel, strategy, hint in stale:
+            console.print(f"[yellow]Warning:[/yellow] {rel}: strategy '{strategy}' was removed. {hint}")
         return
 
     from rich.table import Table
@@ -694,7 +594,6 @@ def list_cmd(session_name: str | None, as_json: bool) -> None:
     table.add_column("Strategy")
     table.add_column("Mode")
     table.add_column("Writers")
-    table.add_column("Passport")
     for entry in enriched:
         row = [str(entry["path"])]
         if has_shadows:
@@ -704,14 +603,13 @@ def list_cmd(session_name: str | None, as_json: bool) -> None:
                 str(entry["strategy"]),
                 str(entry["mode"]),
                 str(entry["writers"]),
-                "yes" if entry["has_passport"] else "no",
             ]
         )
         table.add_row(*row)
     console.print(table)
 
-    for w in _check_legacy_docs(docs, forge_root):
-        console.print(f"[yellow]Warning:[/yellow] {w}")
+    for rel, strategy, hint in stale:
+        console.print(f"[yellow]Warning:[/yellow] {rel}: strategy '{strategy}' was removed. {hint}")
 
 
 # ---------------------------------------------------------------------------
@@ -727,14 +625,11 @@ def list_cmd(session_name: str | None, as_json: bool) -> None:
     show_default=True,
     help="Scope for discovery.",
 )
-@click.option("--doc", "doc_filter", default=None, help="Filter to a specific doc path.")
 @click.option("--json", "as_json", is_flag=True, default=False, help="Emit JSON.")
-def status_cmd(scope: str, doc_filter: str | None, as_json: bool) -> None:
-    """Show memory doc status across sessions.
+def status_cmd(scope: str, as_json: bool) -> None:
+    """Show memory activation status across sessions."""
+    import json
 
-    Aggregates which sessions track each doc, their strategies,
-    update modes, and writer specs.
-    """
     from forge.core.ops.session import list_sessions
     from forge.session.effective import compute_effective_intent
     from forge.session.manager import SessionManager
@@ -748,14 +643,12 @@ def status_cmd(scope: str, doc_filter: str | None, as_json: bool) -> None:
 
     manager = SessionManager()
     entries: list[dict[str, object]] = []
-    scanned_roots: set[str] = set()
 
     for item in result.sessions:
         entry = item.entry
         fr = entry.forge_root or entry.worktree_path
         if not fr:
             continue
-        scanned_roots.add(fr)
 
         try:
             manifest = manager.get_session(item.name, forge_root=fr)
@@ -764,92 +657,42 @@ def status_cmd(scope: str, doc_filter: str | None, as_json: bool) -> None:
             logger.debug("Failed to read manifest for session %r in %s", item.name, fr, exc_info=True)
             continue
 
-        if not effective.memory:
-            continue
-
-        forge_root_path = Path(fr)
-        for doc in effective.memory.designated_docs:
-            if doc_filter and doc.path != doc_filter and doc.shadows != doc_filter:
-                continue
-
-            # Best-effort passport read
-            pp_strategy = doc.strategy
-            pp_mode = "direct"
-            pp_writers = "all-sessions"
-            has_passport = False
-            passport_error: str | None = None
-            passport_path = forge_root_path / resolve_passport_source(doc)
-            try:
-                pp = read_passport(passport_path)
-                if pp is not None:
-                    has_passport = True
-                    pp_strategy = pp.update.strategy
-                    pp_mode = pp.update.mode
-                    pp_writers = pp.update.writers
-            except FileNotFoundError:
-                pass
-            except PassportError as e:
-                passport_error = str(e)
-
-            entries.append(
-                {
-                    "path": doc.path,
-                    "shadows": doc.shadows,
-                    "session": item.name,
-                    "forge_root": fr,
-                    "strategy": pp_strategy,
-                    "mode": pp_mode,
-                    "writers": pp_writers,
-                    "has_passport": has_passport,
-                    "passport_error": passport_error,
-                }
-            )
+        auto = effective.memory.auto_update if effective.memory else None
+        entries.append(
+            {
+                "session": item.name,
+                "forge_root": fr,
+                "enabled": bool(auto and auto.enabled),
+                "mode": auto.mode if auto else None,
+                "min_turns": auto.min_turns if auto else None,
+            }
+        )
 
     if as_json:
-        click.echo(json.dumps({"entries": entries, "scanned_roots": sorted(scanned_roots)}, indent=2))
+        click.echo(json.dumps({"sessions": entries}, indent=2))
         return
 
     if not entries:
-        console.print(f"[dim]No tracked memory docs found (scope: {scope}).[/dim]")
-        if scanned_roots:
-            console.print(f"[dim]Scanned {len(scanned_roots)} root(s).[/dim]")
+        console.print(f"[dim]No sessions found (scope: {scope}).[/dim]")
         return
 
     from rich.table import Table
 
-    # Group by forge_root when multiple roots
-    multi_root = len(scanned_roots) > 1
-
-    has_shadows = any(e["shadows"] for e in entries)
-
     table = Table(show_header=True, header_style="bold")
-    table.add_column("Doc Path", style="cyan")
-    if has_shadows:
-        table.add_column("Official", style="dim")
-    table.add_column("Session")
-    if multi_root:
-        table.add_column("Forge Root", style="dim")
-    table.add_column("Strategy")
+    table.add_column("Session", style="cyan")
+    table.add_column("Memory")
     table.add_column("Mode")
-    table.add_column("Writers")
-    table.add_column("Passport")
+    table.add_column("Min Turns")
 
-    for row_data in sorted(entries, key=lambda x: (str(x["path"]), str(x["session"]))):
-        passport_col = "yes" if row_data["has_passport"] else "no"
-        if row_data["passport_error"]:
-            passport_col = "error"
-        row = [str(row_data["path"])]
-        if has_shadows:
-            row.append(str(row_data["shadows"] or ""))
-        row.append(str(row_data["session"]))
-        if multi_root:
-            row.append(str(row_data["forge_root"]))
-        row.extend([str(row_data["strategy"]), str(row_data["mode"]), str(row_data["writers"]), passport_col])
-        table.add_row(*row)
-
+    for row_data in sorted(entries, key=lambda x: str(x["session"])):
+        enabled = row_data["enabled"]
+        table.add_row(
+            str(row_data["session"]),
+            "[green]on[/green]" if enabled else "[dim]off[/dim]",
+            str(row_data["mode"] or "—"),
+            str(row_data["min_turns"] or "—"),
+        )
     console.print(table)
-    if multi_root:
-        console.print(f"\n[dim]Scanned {len(scanned_roots)} root(s).[/dim]")
 
 
 # ---------------------------------------------------------------------------
@@ -874,7 +717,6 @@ def _collect_shadow_entries(
 
 
 @shadows_group.command("list")
-@click.option("--session", "-s", "session_name", default=None, help="Filter to a session.")
 @click.option(
     "--scope",
     type=click.Choice(["project", "repo", "all"]),
@@ -883,10 +725,10 @@ def _collect_shadow_entries(
     help="Scope for discovery.",
 )
 @click.option("--json", "as_json", is_flag=True, default=False, help="Emit JSON.")
-def shadows_list_cmd(session_name: str | None, scope: str, as_json: bool) -> None:
-    """List shadow proposals across sessions."""
+def shadows_list_cmd(scope: str, as_json: bool) -> None:
+    """List shadow proposals discovered from passports."""
     try:
-        entries, scanned_roots = _collect_shadow_entries(scope, session_name)
+        entries, scanned_roots = _collect_shadow_entries(scope, None)
     except ForgeOpError as e:
         console.print(f"[red]Error:[/red] {e}")
         sys.exit(1)
@@ -940,7 +782,6 @@ def shadows_list_cmd(session_name: str | None, scope: str, as_json: bool) -> Non
 
 @shadows_group.command("show")
 @click.option("--for", "for_doc", required=True, help="Official doc to show shadow content for.")
-@click.option("--session", "-s", "session_name", default=None, help="Filter to a session.")
 @click.option(
     "--scope",
     type=click.Choice(["project", "repo", "all"]),
@@ -948,10 +789,10 @@ def shadows_list_cmd(session_name: str | None, scope: str, as_json: bool) -> Non
     show_default=True,
     help="Scope for discovery.",
 )
-def shadows_show_cmd(for_doc: str, session_name: str | None, scope: str) -> None:
+def shadows_show_cmd(for_doc: str, scope: str) -> None:
     """Show shadow proposal content for an official doc."""
     try:
-        entries, scanned_roots = _collect_shadow_entries(scope, session_name)
+        entries, scanned_roots = _collect_shadow_entries(scope, None)
     except ForgeOpError as e:
         console.print(f"[red]Error:[/red] {e}")
         sys.exit(1)
@@ -1037,7 +878,7 @@ def shadows_review_cmd(
 
     # Bare review: show raw content + hint
     ctx = click.get_current_context()
-    ctx.invoke(shadows_show_cmd, for_doc=for_doc, session_name=session_name, scope=scope)
+    ctx.invoke(shadows_show_cmd, for_doc=for_doc, scope=scope)
     print_tip("Use --curate to run LLM synthesis, --show-latest to view the last report.", console=console)
 
 
@@ -1262,7 +1103,7 @@ def _review_curate(
 
 @memory.group("passport")
 def passport_group() -> None:
-    """Inspect memory-doc passports."""
+    """Inspect and remove memory-doc passports."""
 
 
 @passport_group.command("show")
@@ -1303,14 +1144,14 @@ def passport_show_cmd(path: str, as_json: bool) -> None:
                         "success": False,
                         "reason": "no_passport",
                         "path": path,
-                        "tip": f"forge memory track {path} --as <strategy>",
+                        "tip": f"forge memory track {path} --strategy <strategy>",
                     },
                     indent=2,
                 )
             )
             return
         console.print(f"[dim]No passport found in {path}.[/dim]")
-        print_tip(f"Run 'forge memory track {path} --as <strategy>' to add one.", console=console)
+        print_tip(f"Run 'forge memory track {path} --strategy <strategy>' to add one.", console=console)
         return
 
     if as_json:
@@ -1333,7 +1174,6 @@ def passport_show_cmd(path: str, as_json: bool) -> None:
     table.add_row("strategy", passport.update.strategy)
     table.add_row("mode", passport.update.mode)
     table.add_row("writers", passport.update.writers)
-    table.add_row("inherit_on_fork", str(passport.update.inherit_on_fork))
     if passport.update.compact_when:
         table.add_row("compact_when", passport.update.compact_when)
     if passport.update.shadow_path:
@@ -1344,3 +1184,44 @@ def passport_show_cmd(path: str, as_json: bool) -> None:
         table.add_row("instruction", passport.update.instruction)
 
     console.print(table)
+
+
+@passport_group.command("remove")
+@click.argument("path")
+@click.option("--json", "as_json", is_flag=True, default=False, help="Emit JSON.")
+def passport_remove_cmd(path: str, as_json: bool) -> None:
+    """Remove the project-memory passport from a doc."""
+    try:
+        ctx = ExecutionContext.from_cwd()
+    except ForgeOpError as e:
+        raise click.ClickException(str(e)) from e
+
+    if ctx.forge_root is None:
+        raise click.ClickException("Not inside a Forge project. Run `forge extension enable` first.")
+
+    resolved_base = ctx.forge_root.resolve()
+    reason = is_safe_designated_doc_path(path, ctx.forge_root, resolved_base)
+    if reason:
+        raise click.ClickException(f"Invalid path: {reason}")
+
+    abs_path = (ctx.forge_root / path).resolve()
+    if not abs_path.is_file():
+        raise click.ClickException(f"File not found: {path}")
+
+    try:
+        removed = remove_passport(abs_path)
+    except PassportError as e:
+        raise click.ClickException(f"Malformed frontmatter in {path}: {e}") from e
+
+    if as_json:
+        payload: dict[str, object] = {"success": removed, "removed": removed, "path": path}
+        if not removed:
+            payload["reason"] = "no_passport"
+        click.echo(json.dumps(payload, indent=2))
+        return
+
+    if removed:
+        console.print(f"Passport removed from [cyan]{path}[/cyan].")
+        console.print("[dim]This doc is no longer project-discovered unless added as a session extra.[/dim]")
+    else:
+        console.print(f"[dim]No passport found in {path}.[/dim]")

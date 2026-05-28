@@ -230,7 +230,7 @@ your-skill-name/
 **SKILL.md naming:**
 
 - Must be exactly `SKILL.md` (case-sensitive)
-- No variations accepted (SKILL.MD, skill.md, etc.)
+- No variations accepted (SKILL.MD, skills.md, etc.)
 
 **Skill folder naming:**
 

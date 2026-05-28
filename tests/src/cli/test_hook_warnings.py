@@ -140,9 +140,9 @@ class TestHookDetectionFromForgeRoot:
 
 class TestGuardEnableWarning:
     def test_guard_enable_warns_when_no_hook(self, runner: CliRunner, temp_env: Path) -> None:
-        runner.invoke(main, ["session", "start", "guard-warn", "--no-launch"])
+        runner.invoke(main, ["session", "start", "policy-warn", "--no-launch"])
 
-        result = runner.invoke(main, ["guard", "enable", "--bundle", "tdd"])
+        result = runner.invoke(main, ["policy", "enable", "--bundle", "tdd"])
 
         assert result.exit_code == 0
         assert "Policy enabled" in result.output
@@ -150,9 +150,9 @@ class TestGuardEnableWarning:
 
     def test_guard_enable_no_warning_when_hooks_present(self, runner: CliRunner, temp_env: Path) -> None:
         _install_hook(temp_env, "PreToolUse", "forge hook policy-check")
-        runner.invoke(main, ["session", "start", "guard-clean", "--no-launch"])
+        runner.invoke(main, ["session", "start", "policy-clean", "--no-launch"])
 
-        result = runner.invoke(main, ["guard", "enable", "--bundle", "tdd"])
+        result = runner.invoke(main, ["policy", "enable", "--bundle", "tdd"])
 
         assert result.exit_code == 0
         assert "hook is not installed" not in result.output

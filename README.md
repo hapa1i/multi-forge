@@ -1,5 +1,9 @@
 # Multi-Forge
 
+<p align="left">
+  <img src="assets/logo.jpg" alt="Dusk" width=320">
+</p>
+
 [![PyPI](https://img.shields.io/pypi/v/multi-forge)](https://pypi.org/project/multi-forge/)
 [![Python](https://img.shields.io/pypi/pyversions/multi-forge)](https://pypi.org/project/multi-forge/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
@@ -166,7 +170,7 @@ inside Claude Code for an interactive walkthrough.
 | `forge session`        | Named sessions, worktrees, resume, fork      |
 | `forge proxy`          | Model routing, templates, tier mappings      |
 | `forge authentication` | Credential management (`credentials.yaml`)   |
-| `forge guard`          | Policy enforcement, plan supervision         |
+| `forge policy`         | Policy enforcement, plan supervision         |
 | `forge workflow`       | Workflow runners (panel, analyze, debate)    |
 | `forge search`         | Transcript search across sessions            |
 | `forge config`         | Runtime preferences (`~/.forge/config.yaml`) |

@@ -104,10 +104,10 @@ PY
 
 
 def _run_supervisor_check(workspace: ContainerLike, *, mode: str) -> tuple[int, dict[str, Any], str]:
-    """Run ``forge guard supervisor`` through the deterministic resume harness."""
+    """Run ``forge policy supervisor`` through the deterministic resume harness."""
     result = workspace.exec(
         f"cd /workspace && FORGE_TEST_SUPERVISOR_MODE={mode} "
-        f"forge guard supervisor -f src/demo.py -r {SUPERVISOR_RESUME_ID} --json"
+        f"forge policy supervisor -f src/demo.py -r {SUPERVISOR_RESUME_ID} --json"
     )
     invocations = workspace.read_file("/tmp/claude_invocations.log")
 

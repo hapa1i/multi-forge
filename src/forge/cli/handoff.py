@@ -71,16 +71,21 @@ def run_cmd(
         logger.warning("Failed to read session manifest for %s: %s", session_name, e)
         raise SystemExit(1)
 
-    if not effective.memory or not effective.memory.auto_update:
-        logger.info("Handoff not configured for session %s", session_name)
-        return
-
-    config = effective.memory.auto_update
-    if not config.enabled:
-        logger.info("Handoff disabled for session %s", session_name)
-        return
+    import dataclasses
 
     from forge.session.handoff_agent import resolve_handoff_base_url, run_handoff_agent
+    from forge.session.project_memory import (
+        DEFAULT_SCAN_ROOTS,
+        is_memory_enabled,
+        scan_passported_docs,
+    )
+
+    if not is_memory_enabled(manifest, effective):
+        logger.info("Handoff not activated for session %s", session_name)
+        return
+
+    assert effective.memory is not None and effective.memory.auto_update is not None
+    config = dataclasses.replace(effective.memory.auto_update, enabled=True)
 
     confirmed_proxy_url = None
     if manifest.confirmed.started_with_proxy:
@@ -94,7 +99,7 @@ def run_cmd(
         subprocess_proxy=subprocess_proxy or effective.subprocess_proxy,
     )
 
-    designated_docs = effective.memory.designated_docs if effective.memory else []
+    designated_docs = scan_passported_docs(effective_root, DEFAULT_SCAN_ROOTS, session_name)
 
     success = run_handoff_agent(
         session_name=session_name,

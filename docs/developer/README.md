@@ -135,10 +135,7 @@ workspace.write_file("$HOME/.forge/config.yaml", content)
 **Run `make pre-commit` before every commit**
 
 ```bash
-make lint                     # Ruff linter only
-make format                   # Ruff formatter
-make type-check               # mypy only
-make pre-commit               # All pre-commit hooks (ruff, black, isort, mypy, mdformat, gitleaks)
+make pre-commit               # All pre-commit hooks (ruff, black, isort, mypy, pyright, mdformat, gitleaks)
 ```
 
 ## Architecture
@@ -152,7 +149,7 @@ Multi-Forge follows a "glue" approach -- connecting specialized tools rather tha
 | Session Manager | `src/forge/session/` | Named sessions, worktrees, artifacts       |
 | Installer       | `src/forge/install/` | Extension installer and tracking           |
 | Proxy           | `src/forge/proxy/`   | Model routing, tier mappings               |
-| Guard           | `src/forge/guard/`   | Policy enforcement (TDD, coding standards) |
+| Policy          | `src/forge/policy/`  | Policy enforcement (TDD, coding standards) |
 | Core Libraries  | `src/forge/core/`    | Shared auth, models, state, LLM client     |
 
 ### Key Concepts
@@ -182,7 +179,8 @@ Forge uses files instead of a database:
 | ---------------------------------------------------------- | --------------------------------------------- |
 | [coding-standards.md](coding-standards.md)                 | Python conventions, type safety, async        |
 | [testing-guidelines.md](testing-guidelines.md)             | Test organization, Docker fixtures, real>mock |
-| [documentation-guidelines.md](documentation-guidelines.md) | Doc structure, change log format, size limits |
+| [documentation-guidelines.md](documentation-guidelines.md) | Doc writing, authority map, size limits       |
+| [board-contract.md](board-contract.md)                     | Board lanes, checklists, closeout contract    |
 
 ## Project Docs
 

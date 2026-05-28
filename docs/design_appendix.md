@@ -195,7 +195,7 @@ log_level: off               # off | debug | info | warning
 - **CLI**: `forge config` (help), `forge config show [--raw]`, `forge config set`, `forge config edit`,
   `forge config reset`; `%config` (read-only) in-session
 
-See [docs/end-user/configs.md](end-user/configs.md) for the full user guide.
+See [docs/end-user/config.md](end-user/config.md) for the full user guide.
 
 ### A.7a Claude settings preset (`~/.forge/claude.preset.json`)
 
@@ -226,7 +226,7 @@ User-editable JSON merged into Claude Code `settings.json` by `forge extension e
 - **CLI**: `forge claude preset` (show), `forge claude preset show [--raw]`, `forge claude preset edit`,
   `forge claude preset reset [--yes]`
 
-See [docs/end-user/configs.md](end-user/configs.md) for the full user guide.
+See [docs/end-user/config.md](end-user/config.md) for the full user guide.
 
 ### A.8 Status line guidance (§3.6.11)
 
@@ -337,13 +337,13 @@ scope rationale remain in design.md.
 
 ### B.1 Scope policy table
 
-| Category             | Allowed via `%`                                                                                                | Not allowed via `%`                                           |
-| -------------------- | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| Session / plan       | `%session list`, `%plan`                                                                                       | --                                                            |
-| Proxy                | `%proxy list`, `%proxy show` (read-only)                                                                       | `%proxy create`, `%proxy edit`, `%proxy set`, `%proxy delete` |
-| Guard / verification | `%guard status`, `%guard enable`, `%guard disable`, `%guard check`, `%guard supervise`, `%cancel-verification` | --                                                            |
-| Cleanup              | `%clean [--scope repo\|project\|all]` (read-only report)                                                       | destructive cleanup (use `forge clean --yes` from terminal)   |
-| Utilities / config   | `%h`, `%help`, `%config`                                                                                       | --                                                            |
+| Category              | Allowed via `%`                                                                                                     | Not allowed via `%`                                           |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| Session / plan        | `%session list`, `%plan`                                                                                            | --                                                            |
+| Proxy                 | `%proxy list`, `%proxy show` (read-only)                                                                            | `%proxy create`, `%proxy edit`, `%proxy set`, `%proxy delete` |
+| Policy / verification | `%policy status`, `%policy enable`, `%policy disable`, `%policy check`, `%policy supervise`, `%cancel-verification` | --                                                            |
+| Cleanup               | `%clean [--scope repo\|project\|all]` (read-only report)                                                            | destructive cleanup (use `forge clean --yes` from terminal)   |
+| Utilities / config    | `%h`, `%help`, `%config`                                                                                            | --                                                            |
 
 ### B.2 Current shipped commands
 
@@ -358,12 +358,12 @@ Shared commands (mirrors CLI syntax):
 - `%plan` (shows the current session's recorded plan file path)
 - `%proxy list` (read-only: shows available proxies)
 - `%proxy show <id>` (read-only: shows proxy details and tier mappings)
-- `%guard status` (shows current policy config and state)
-- `%guard enable --bundle tdd [--permissive]` (enables policy enforcement)
-- `%guard disable` (disables all policies for the session)
-- `%guard check [--staged] [--bundle <name>]` (diagnostic policy evaluation against git diff)
-- `%guard supervise <target>` (set supervisor), `off` (suspend), `on` (resume), `remove` (delete)
-- `%guard supervise reload [path]` (reload latest approved plan, or from explicit path)
+- `%policy status` (shows current policy config and state)
+- `%policy enable --bundle tdd [--permissive]` (enables policy enforcement)
+- `%policy disable` (disables all policies for the session)
+- `%policy check [--staged] [--bundle <name>]` (diagnostic policy evaluation against git diff)
+- `%policy supervise <target>` (set supervisor), `off` (suspend), `on` (resume), `remove` (delete)
+- `%policy supervise reload [path]` (reload latest approved plan, or from explicit path)
 - `%cancel-verification` (bypasses the active Stop-hook verification loop)
 - `%clean [--scope repo|project|all]` (read-only: shows orphaned state report, default scope=project)
 
@@ -433,7 +433,7 @@ verification loop, and action context remain in design.md.
 | ------------------ | ----------------------------------- | ------------------------------------------------------------------------------------- |
 | Session runner     | `supervisor.py`, `handoff_agent.py` | `run_claude_session(prompt, resume_id?, model?, base_url?, timeout, unset_env_vars?)` |
 | Proxy resolution   | both                                | `resolve_base_url(proxy_id?, explicit_url?, fallbacks)`                               |
-| Throttle cache     | `guard/store.py`                    | `ThrottleCache(ttl).check(key) / .update(key, value)`                                 |
+| Throttle cache     | `policy/store.py`                   | `ThrottleCache(ttl).check(key) / .update(key, value)`                                 |
 | Structured output  | `verdict.py`                        | `extract_json_verdict(stdout, schema)`                                                |
 | Tagger             | new                                 | `tag_action(context, model, prompt) -> tags[]`                                        |
 | Env builder        | both                                | `build_claude_env(base_url?) -> dict`                                                 |
@@ -470,13 +470,13 @@ user rather than working around the check.
 
 ### D.3 Policy definition ownership (from §4.1.6)
 
-| Setting                                        | Owner   | Location                           |
-| ---------------------------------------------- | ------- | ---------------------------------- |
-| Supervisor model (which model to use as guard) | Proxy   | `~/.forge/proxies/<id>/proxy.yaml` |
-| Throttling settings (check frequency)          | Proxy   | `~/.forge/proxies/<id>/proxy.yaml` |
-| TDD mode (off/permissive/strict)               | Session | Session file `intent.tdd_mode`     |
-| Policy enabled/disabled                        | Session | Session file `intent.policy_mode`  |
-| Verification config                            | Session | Session file `intent.verification` |
+| Setting                                             | Owner   | Location                           |
+| --------------------------------------------------- | ------- | ---------------------------------- |
+| Supervisor model (which model to use as supervisor) | Proxy   | `~/.forge/proxies/<id>/proxy.yaml` |
+| Throttling settings (check frequency)               | Proxy   | `~/.forge/proxies/<id>/proxy.yaml` |
+| TDD mode (off/permissive/strict)                    | Session | Session file `intent.tdd_mode`     |
+| Policy enabled/disabled                             | Session | Session file `intent.policy_mode`  |
+| Verification config                                 | Session | Session file `intent.verification` |
 
 ### D.4 Policy state ownership (from §4.1.6)
 
@@ -683,27 +683,21 @@ concept remain in design.md.
 
 Strategies are defined in `MemoryStrategy` enum (`src/forge/session/passport.py`).
 
-**Direct update strategies** (Mode 1):
+**Direct update strategies:**
 
 | Strategy        | Behavior                                      |
 | --------------- | --------------------------------------------- |
 | `project-state` | Update focus, active work, decisions, handoff |
 | `checklist`     | Mark `[x]` completed, add discovered tasks    |
 | `changelog`     | Add accomplishments, follow existing format   |
-| `debugging`     | Record error causes + solutions               |
-| `patterns`      | Record architecture patterns + conventions    |
 | `generic`       | Add any new information (default fallback)    |
 
-**Shadow strategy** (Mode 2):
-
-| Strategy    | Behavior                                                               |
-| ----------- | ---------------------------------------------------------------------- |
-| `suggested` | Propose additions to official doc as `- [ ]` checkboxes with rationale |
+Shadow mode (`--propose`) is orthogonal to strategy: any strategy works with `--propose`.
 
 ### G.2 Passport example (from §5.6.2)
 
-Memory doc passports are `forge_memory` YAML frontmatter blocks. The passport is the doc-level source of truth; session
-manifests store only participation.
+Memory doc passports are `forge_memory` YAML frontmatter blocks. The passport is the doc-level source of truth for
+strategy, writers, and update mode.
 
 ```yaml
 ---
@@ -713,27 +707,34 @@ forge_memory:
   captures: [stable decisions, non-obvious invariants, recurring bug causes]
   excludes: [raw session summaries, pending tasks, unverified hunches]
   update:
-    strategy: suggested
+    strategy: generic
     mode: shadow-only
     writers: all-sessions
-    inherit_on_fork: true
     approval: human-promoted
-    shadow_path: .forge/memory/suggested_impl_notes.md
+    shadow_path: .forge/memory/shadow_impl_notes.md
 ---
 ```
 
 **CLI setup** (equivalent to the passport above):
 
 ```bash
-forge memory enable --review-only --session planner
-forge memory track docs/board/change_log.md --as changelog --session planner
+# Passports are project-lifetime and sessionless:
+forge memory track docs/board/change_log.md --strategy changelog
 forge memory track docs/board/impl_notes.md \
-  --propose --shadow .forge/memory/suggested_impl_notes.md --session planner
-forge memory list --json --session planner
+  --propose --shadow-path .forge/memory/shadow_impl_notes.md
+
+# Enable memory for a session:
+forge memory enable --session planner
+
+# Verify:
+forge memory passport show docs/board/change_log.md
+forge memory list
 ```
 
-`forge memory track` is idempotent. Re-running with different flags updates the existing entry and rewrites the
-passport. All docs are processed in one `claude -p` call with per-doc strategy instructions.
+`forge memory track` is idempotent and sessionless: re-running with different flags updates the passport in place; with
+no flags on an already-passported doc it is a no-op. `forge memory passport remove <path>` removes the passport and
+turns the file back into a normal doc, preserving unrelated frontmatter. One-off doc updates that don't need a passport
+are ordinary agent instructions. All docs are processed in one `claude -p` call with per-doc strategy instructions.
 
 ### G.3 Worktree resolution (extends §5.6.5)
 
@@ -782,6 +783,27 @@ standards evolution.
 input. It's outside the project root (containment guard), is free-form (hard to dedupe against structured strategies),
 and targets different information (preferences/patterns vs project state/standards). Occasional duplication is cheaper
 than cross-format deduplication. If overlap becomes painful, a small prompt tweak can address it.
+
+### G.5 Session activation (from §5.6.6)
+
+Memory activation is session-scoped. The effective `memory.auto_update.enabled` (intent + overrides via
+`compute_effective_intent()`) is the sole gate. No checkout-level config file.
+
+| Field                   | Type        | Default   | Meaning                                    |
+| ----------------------- | ----------- | --------- | ------------------------------------------ |
+| `auto_update.enabled`   | bool        | `false`   | Whether the memory writer runs at Stop     |
+| `auto_update.mode`      | str         | `augment` | `augment` (edit) or `review-only` (report) |
+| `auto_update.min_turns` | int         | `5`       | Skip sessions shorter than this            |
+| `auto_update.proxy`     | str \| null | `null`    | Optional `proxy_id` for the handoff agent  |
+
+Scan roots are hardcoded: `DEFAULT_SCAN_ROOTS = ("docs/",)` plus always `.forge/memory/`. Configurable roots deferred.
+
+**Stale `.forge/memory.yaml`**: existing checkouts may have this file from a previous version. It is no longer read.
+Safe to delete.
+
+**Stale `designated_docs` in manifests**: old session manifests may contain `designated_docs` entries. These are
+stripped on read with a one-time `logger.warning()` per coding-standards §5. The field no longer exists on
+`MemoryIntent`.
 
 ---
 
@@ -841,7 +863,7 @@ display-only). State file uses SHA-256 hash for drift detection. 58 unit tests.
 
 `AnthropicClient` deferred; currently uses `OpenAIClient` for all providers via LiteLLM.
 
-**Purpose:** Unified async-first LLM client abstraction for Proxy, Guard, and Skills components.
+**Purpose:** Unified async-first LLM client abstraction for Proxy, Policy, and Skills components.
 
 ### J.1 Design principles
 
@@ -904,7 +926,7 @@ class SyncAdapter:
     def ask(self, prompt: str, *, system: str | None = None) -> str: ...
 ```
 
-> **Trap:** Guard uses `SyncAdapter`; Proxy is async. Don't import sync Guard logic into Proxy -- `asyncio.run()`
+> **Trap:** Policy uses `SyncAdapter`; Proxy is async. Don't import sync Policy logic into Proxy -- `asyncio.run()`
 > crashes in running loop. Use async-first at boundaries.
 
 ### J.7 Unsupported parameter policy

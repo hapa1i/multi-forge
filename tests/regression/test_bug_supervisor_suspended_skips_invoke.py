@@ -11,8 +11,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from forge.guard.semantic.supervisor import SemanticSupervisorPolicy
-from forge.guard.types import ActionContext
+from forge.policy.semantic.supervisor import SemanticSupervisorPolicy
+from forge.policy.types import ActionContext
 from forge.session.models import SupervisorConfig
 
 pytestmark = pytest.mark.regression
@@ -31,7 +31,7 @@ def _make_context() -> ActionContext:
 
 
 class TestSuspendedSupervisorSkipsInvoke:
-    @patch("forge.guard.semantic.supervisor.invoke_supervisor")
+    @patch("forge.policy.semantic.supervisor.invoke_supervisor")
     def test_suspended_evaluate_does_not_invoke(self, mock_invoke: MagicMock) -> None:
         """Suspended supervisor's _evaluate() returns allow without subprocess call."""
         config = SupervisorConfig(resume_id="planner-uuid", suspended=True)

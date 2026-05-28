@@ -6,7 +6,8 @@ Completed-work record for Forge implementation sessions.
 
 - Updated by the handoff agent with `strategy=changelog`, and by humans when closing a phase.
 - Add compact entries for completed work only. Pending tasks belong in card checklists.
-- Follow `docs/developer/documentation-guidelines.md`: each entry needs Goal, Key changes, and Verification.
+- Follow `docs/developer/work-board-contract.md` "Change Log Policy": each entry needs Goal, Key changes, and
+  Verification.
 - Keep entries short. Do not list every file unless the file list is the point of the work.
 - Use newest-first order so active work stays near the top.
 - When this file approaches the documentation size limits, compact the oldest entries at the bottom into a dated summary
@@ -22,10 +23,74 @@ wc -l docs/board/change_log.md
 ## Entries
 
 > Format: `## YYYY-MM-DD`, then `### Phase X.Y: Short Title`, with `**Goal**:`, `**Key changes**:` as bullets, and
-> `**Verification**:`. Use newest-first order. See `docs/developer/documentation-guidelines.md` "Change Log Policy" for
-> the full spec.
+> `**Verification**:`. Use newest-first order. See `docs/developer/work-board-contract.md` "Change Log Policy" for the
+> full spec.
+
+## 2026-05-28
+
+### Simplify memory strategies: 7 to 4, shadow mode orthogonal
+
+**Goal**: Reduce strategy enum from 7 to 4 by removing redundant entries, make shadow mode orthogonal to strategy, and
+rename `--as` to `--strategy`.
+
+**Key changes**:
+
+- Removed `debugging`, `patterns` strategies (topic scoping via passport `intent`/`captures` fields instead).
+- Removed `suggested` strategy (shadow mode is now orthogonal -- `--propose` works with any strategy).
+- Renamed `--as` to `--strategy`; `--as` is a hidden tombstone with rename guidance.
+- Shadow path prefix changed from `suggested_*` to `shadow_*` in `derive_shadow_path()`.
+- Shadow framing in `build_multi_doc_prompt()` now includes proposal-format instructions (checkboxes, rationale,
+  self-prune) that were previously in the `suggested` strategy instruction.
+- Stale passports with removed strategies rejected with actionable hints (`_REMOVED_STRATEGIES`).
+- `_validate_designated_docs()` empty-shadows guard applies unconditionally; `suggested` coupling removed.
+- `--propose` preserves existing passport strategy unless `--strategy` is explicitly passed.
+
+**Verification**: full unit suite passes; `make pre-commit` clean.
 
 ## 2026-05-26
+
+### Phase 1 / Slices 4-7: Simplify memory to passports + session activation
+
+**Goal**: Reduce the memory system from three layers (passports, checkout activation, session participation) to two
+primitives: passports select docs, session activation decides whether the memory writer runs. Research-preview clean
+break.
+
+**Key changes**:
+
+- Removed `.forge/memory.yaml` (checkout-scoped activation), `forge memory extra add`, `forge memory untrack`,
+  `DesignatedDoc.origin`, `MemoryIntent.designated_docs` (field removed from manifest schema), session-scoped doc lists,
+  `--inherit-extras`/`--no-inherit-extras`, `--inherit-memory` tombstones, `--no-copy-memory-activation`,
+  `ProjectMemoryConfig`, `memory_activation()` three-tier resolver, `copy_memory_activation()`.
+- Added `forge memory disable`, `--memory on|off` on `fork`/`resume --fresh`/`start`.
+- `forge memory enable`/`disable` are session-scoped only (resolve `$FORGE_SESSION` or `--session`).
+- `forge memory list` is a sessionless passport scan (no writer filtering, no session needed).
+- Stop hook and handoff runner check `effective.memory.auto_update.enabled` directly (incognito guard preserved).
+- Handoff runner uses `scan_passported_docs()` as sole doc source (no doc fusion).
+- `apply_memory_inheritance()` constructs a fresh `MemoryIntent(auto_update=...)` from parent; `--memory on` reuses
+  parent config, `--memory off` writes explicit `HandoffConfig(enabled=False)`, `None` inherits.
+- `strip_preview_memory_doc_lists()` sanitizer warns-and-strips stale `designated_docs` from old manifests per
+  coding-standards section 5.
+- Stale `.forge/memory.yaml` is now ignored; safe to delete.
+
+**Verification**: 4645 unit tests pass; `make pre-commit` clean.
+
+### Phase 1 / Slice 3: Fork activation copy + retire `--inherit-memory`
+
+**Goal**: Make memory activation follow Forge-created worktrees by default and replace the multi-mode `--inherit-memory`
+flag with a narrower extras-only inheritance model.
+
+**Key changes**:
+
+- `fork --worktree` copies `.forge/memory.yaml` from parent to child checkout by default (never overwrites existing;
+  `--no-copy-memory-activation` opt-out; corrupt source warns and skips). `--into` forks skip the copy.
+- Replaced `--inherit-memory all|none|shadowed` with `--inherit-extras` / `--no-inherit-extras` on both `fork` and
+  `resume --fresh`. Default inherits `origin="extra"` entries only; project-discovered docs are not affected.
+- Simplified `memory_inheritance.py`: removed `InheritMemoryMode` enum and multi-mode branching; extras-only filter.
+- `--inherit-memory` is now a hidden tombstone with per-value replacement guidance.
+- Docs: updated `design.md §5.6.4`, `docs/end-user/handoff.md` fork/resume memory sections.
+
+**Verification**: `test_memory_inheritance.py` (25 tests) + `test_project_memory.py::TestCopyMemoryActivation` (5 tests)
+pass; full `tests/src -m "not integration"` green (4718 passed).
 
 ### CLI command-shape cleanup: groups orient, leaves act
 
@@ -37,7 +102,7 @@ while leaf commands perform a sensible default action.
 - Documented the command-shape invariant in `docs/developer/coding-standards.md` and `docs/design.md`: groups orient,
   leaves act, removed group-level shortcuts may remain only as non-executing tombstones.
 - `forge config` now prints help; `forge config show` is the explicit command that displays and auto-creates
-  `~/.forge/config.yaml`. Updated `docs/end-user/configs.md` and design appendix references.
+  `~/.forge/config.yaml`. Updated `docs/end-user/config.md` and design appendix references.
 - Replaced the group-level `forge search -q/--query` action with `forge search query <terms>`. The old `-q` path now
   exits with a replacement tip instead of executing old behavior. Updated end-user docs, QA/walkthrough checklists, and
   tests/integration references.
@@ -50,6 +115,34 @@ while leaf commands perform a sensible default action.
 `forge search -q` tombstone.
 
 ## 2026-05-25
+
+### Phase 1 / Slice 2: Sessionless `track` + participation-only `extra add`
+
+**Goal**: Split the welded lifetimes in `forge memory track` so each verb owns one lifetime — `track` authors a
+project-lifetime passport (sessionless), `extra add` records session-only participation (no passport), and `enable` owns
+activation.
+
+**Key changes**:
+
+- `forge memory track` is now passport-only and sessionless: resolves `forge_root` from cwd, never writes
+  `memory.designated_docs`, never auto-enables, ignores `$FORGE_SESSION`. It is a no-op (exit 0) on an
+  already-passported doc with no flags, warns when the doc is outside the scan roots, and degrades (warn, still authors)
+  on a corrupt `.forge/memory.yaml`. `--session`/`-s` is a hidden tombstone that errors and names `extra add`.
+- New `forge memory extra add <path> --as <strategy>`: session-scoped participation with `origin="extra"`, echoes the
+  resolved session, rejects `--as suggested` only when the target has no passport, and warns on writer-veto (case B) or
+  redundant-under-root (case A).
+- `DesignatedDoc.origin: Literal["extra"] | None` added, persisted, and inherited; `_check_legacy_docs` skips extras and
+  names both new verbs; `list`/`status` expose `origin`; `untrack` warns when a passport remains under the roots.
+- Shadow workflow no longer depends on the manifest: new `scan_shadow_passports()` and
+  `check_shadow_path_collision_in_roots()` in `project_memory.py`; `collect_shadow_entries()` unions project-origin
+  shadows (scope-correct roots) with session entries, de-duped by `(forge_root, shadow_path)`. Removed the now-dead
+  manifest-based `check_shadow_path_collision`.
+- Docs: `design.md` §4.0 table + new §5.6.7 verb taxonomy; `design_appendix.md §G.2`; board README; end-user
+  `handoff.md`; QA and walkthrough skill checklists.
+
+**Verification**: `tests/src/cli/test_memory.py` and
+`tests/src/session/{test_handoff_agent,test_memory_inheritance,test_project_memory,test_shadow_curation}.py` pass; full
+`tests/src -m "not integration"` green (4689 passed); `mypy` clean on touched modules.
 
 ### CLI tip consistency: shared recovery-output helpers
 
@@ -96,21 +189,21 @@ when the named template exists but no proxy is running yet; bring the proxy up i
   pick one) and `ProxyNotFoundError` (no proxy and no template).
 - Renamed `preflight_supervisor_proxy` -> `ensure_supervisor_proxy`; it auto-starts via `ensure_proxy`, returns
   `(proxy_id, started)`, and raises actionable `ValueError`s (no-template hint to `forge proxy template list`,
-  ambiguous, start-failure). Covers `--supervisor-proxy` on `session fork`, `session start`, and `guard supervise`.
+  ambiguous, start-failure). Covers `--supervisor-proxy` on `session fork`, `session start`, and `policy supervise`.
 - Wired the launch routers `_resolve_routing_from_cli` (session start/resume/fork `--proxy`) and `forge claude --proxy`
   onto `ensure_proxy`; all five `--proxy`/`--supervisor-proxy` paths print a dim "Started proxy X from template Y"
   notice when they spin one up.
-- `forge guard supervise` now validates the target session *before* ensuring the proxy, so a bad target can't orphan a
+- `forge policy supervise` now validates the target session *before* ensuring the proxy, so a bad target can't orphan a
   freshly started proxy.
 - A registered-but-stopped (or stale-dead) proxy for a known template now auto-starts (was: "none are active" error).
   Workflow `--proxy via` is intentionally excluded (different routing layer + one-shot lifecycle).
 - **Behavior break** (research preview): naming a template with no live proxy used to error; it now starts one. Unknown
   names (no proxy, no template) still fail, now with a `forge proxy template list` hint. Updated `docs/design.md`
-  §3.6.3, `docs/end-user/proxies.md`, and `docs/end-user/sessions.md`.
+  §3.6.3, `docs/end-user/proxy.md`, and `docs/end-user/session.md`.
 
 **Verification**: regression `test_bug_supervisor_proxy_autostart.py` + `test_bug_stale_healthy_proxy_not_restarted.py`;
 `TestEnsureProxy` (8 cases) in `test_proxy_orchestrator.py`; updated supervisor/claude/session CLI tests; 348 related
-proxy/guard/session/regression tests pass; `ruff check` on touched Python files and `git diff --check` clean.
+proxy/policy/session/regression tests pass; `ruff check` on touched Python files and `git diff --check` clean.
 
 ### Protect live sessions from deletion
 
@@ -127,13 +220,42 @@ Claude Code, and stop a session deleted mid-run from crashing the launcher with 
   `SessionFileNotFoundError` guard covers the narrow delete race. The launcher prints a "was deleted during this run"
   note instead of a traceback.
 - **Behavior break** (research preview): deleting an active session previously warned and proceeded; it now blocks
-  without `--force`. Updated `docs/end-user/sessions.md`.
+  without `--force`. Updated `docs/end-user/session.md`.
 
 **Verification**: `tests/regression/test_bug_delete_live_session.py` (preflight + race branch) and the expanded
 `tests/src/cli/test_session_commands.py` delete matrix (single/`--all` x force/no-force x tracked/orphan);
 `make pre-commit` clean.
 
 ## 2026-05-24
+
+### Phase 1 / Slice 1: Project-Scoped Memory Activation
+
+**Goal**: Activate the handoff agent once per checkout via `.forge/memory.yaml` instead of per-session
+`forge memory enable`, through a single resolver consulted at both activation gates.
+
+**Key changes**:
+
+- New `src/forge/session/project_memory.py`: versioned `ProjectMemoryConfig` (strict `dacite` reader modeled on
+  `SessionStore`, raises `ProjectMemoryConfigError`); the `memory_activation()` three-tier resolver (project baseline /
+  whole-block legacy intent overlay only when `enabled is True` / sparse per-leaf overrides, the only tier that can
+  disable); and `scan_passported_docs()` (root-contained via `_reject_unsafe_path`, which rejects absolute, escaping,
+  and `..`-traversal roots and shadow paths; deterministic; shadow-materializing; capped at 50 after filtering).
+- Both gates call the resolver: the Stop-hook enqueue site (`cli/hooks/commands.py`) and the detached runner
+  (`cli/handoff.py`). The runner unions scanned passports with session `designated_docs` (session wins, de-duped by
+  passport source + write path) while preserving the existing proxy-routing chain.
+- `forge memory enable` is now dual-path: bare writes project `.forge/memory.yaml`; `--session X` keeps the sparse
+  manifest override.
+- Design docs: added `design.md §5.6.6` and `design_appendix.md §G.5`.
+
+**Behavior change**: bare `forge memory enable` no longer targets the ambient `$FORGE_SESSION`; it enables the whole
+checkout (prints a `Tip:` when `$FORGE_SESSION` is set). Use `--session <name>` for the per-session override. Additive,
+no schema break; incognito sessions never activate.
+
+**Verification**: `tests/src/session/test_project_memory.py` (38: config I/O + resolver + scanner, incl. unsafe-root and
+unsafe-shadow-path rejection), `test_handoff.py` (+5 run_cmd; 2 legacy proxy tests still green),
+`test_artifact_hooks.py::TestStopHook` (+3), `test_memory.py` (`TestMemoryEnableProject` +6; `TestMemoryEnable` pinned
+to `--session`). Full `tests/src/session` + `tests/src/cli` unit suites: 2193 passed. mypy clean on touched files;
+`make pre-commit` clean.
 
 ### Memory Enhancement Completion, Design Doc Sync, and Proposal Lifecycle
 

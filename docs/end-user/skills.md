@@ -4,8 +4,8 @@ Forge installs skills that teach Claude how to compose Forge capabilities into w
 `/forge:<name>` in a Claude Code session.
 
 - Canonical architecture: [`docs/design.md`](../design.md) SS5.5
-- Workflow CLI (engine): [`workflows.md`](workflows.md)
-- Session context (model detection): [`sessions.md`](sessions.md)
+- Workflow CLI (engine): [`workflow.md`](workflow.md)
+- Session context (model detection): [`session.md`](session.md)
 
 ---
 
@@ -131,7 +131,7 @@ Selectable direct Claude workers include `claude-opus-4.6`, `claude-opus-4.6-1m`
 `--models claude-opus-4.6,claude-opus-4.7` when you want both stable Opus 4.6 and bounded-review Opus 4.7 in the panel.
 
 **Requirements:** GPT-5.5 and Gemini require active proxies; Claude Opus requires `ANTHROPIC_API_KEY`. See
-[auth.md](auth.md#which-auth-do-i-need) for setup.
+[authentication.md](authentication.md#which-auth-do-i-need) for setup.
 
 ---
 
@@ -162,7 +162,7 @@ key disagreements, and an evidence-weighted recommendation.
 | `claude-opus`            | NEUTRAL | Analyst -- balanced view | Direct Anthropic        |
 
 **Requirements:** GPT-5.5 and Gemini require active proxies; Claude Opus requires `ANTHROPIC_API_KEY`. See
-[auth.md](auth.md#which-auth-do-i-need) for setup.
+[authentication.md](authentication.md#which-auth-do-i-need) for setup.
 
 ---
 

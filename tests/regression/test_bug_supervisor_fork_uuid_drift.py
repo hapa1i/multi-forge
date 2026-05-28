@@ -1,4 +1,4 @@
-"""Regression: Stop must reconcile native fork UUID drift before guard cleanup.
+"""Regression: Stop must reconcile native fork UUID drift before policy cleanup.
 
 Bug ID: supervisor-fork-uuid-drift
 Root cause:
@@ -12,7 +12,7 @@ Root cause:
 Fix:
 - Stop and StopFailure treat the hook payload session_id/transcript_path as
   authoritative and sync both manifest and index.
-Affected files: src/forge/cli/hooks/commands.py, src/forge/guard/semantic/supervisor.py
+Affected files: src/forge/cli/hooks/commands.py, src/forge/policy/semantic/supervisor.py
 """
 
 from __future__ import annotations
@@ -55,27 +55,27 @@ def test_native_fork_stop_reconciles_child_uuid_in_manifest_and_index(
     """A child Stop event should replace a stale parent UUID on same-dir forks."""
     runner = CliRunner()
 
-    start_result = runner.invoke(main, ["session", "start", "guard-planner", "--no-launch"])
+    start_result = runner.invoke(main, ["session", "start", "policy-planner", "--no-launch"])
     assert start_result.exit_code == 0
 
     manager = SessionManager()
-    parent_store = manager.get_session_store("guard-planner")
+    parent_store = manager.get_session_store("policy-planner")
     parent_store.update(timeout_s=5.0, mutate=lambda m: setattr(m.confirmed, "claude_session_id", "parent-uuid"))
 
     fork_result = runner.invoke(
         main,
-        ["session", "fork", "guard-planner", "--name", "guard-supervisor", "--no-launch"],
+        ["session", "fork", "policy-planner", "--name", "policy-supervisor", "--no-launch"],
     )
     assert fork_result.exit_code == 0
 
-    child_store = manager.get_session_store("guard-supervisor")
+    child_store = manager.get_session_store("policy-supervisor")
     child_manifest = child_store.read()
     assert child_manifest.is_fork is True
-    assert child_manifest.parent_session == "guard-planner"
+    assert child_manifest.parent_session == "policy-planner"
     assert child_manifest.confirmed.claude_session_id is None
 
     with patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke:
-        resume_result = runner.invoke(main, ["session", "resume", "guard-supervisor"])
+        resume_result = runner.invoke(main, ["session", "resume", "policy-supervisor"])
 
     assert resume_result.exit_code == 0
     assert mock_invoke.call_args is not None
@@ -84,7 +84,7 @@ def test_native_fork_stop_reconciles_child_uuid_in_manifest_and_index(
 
     # Reproduce the drift: SessionStart records the inherited parent UUID for
     # the fork target before Stop reports the materialized child conversation.
-    monkeypatch.setenv("FORGE_SESSION", "guard-supervisor")
+    monkeypatch.setenv("FORGE_SESSION", "policy-supervisor")
     monkeypatch.setenv("FORGE_FORGE_ROOT", str(session_project))
     start_hook = handle_session_start(
         HookInput(
@@ -96,7 +96,7 @@ def test_native_fork_stop_reconciles_child_uuid_in_manifest_and_index(
     )
     assert start_hook.success
     assert child_store.read().confirmed.claude_session_id == "parent-uuid"
-    assert IndexStore().get_session("guard-supervisor", forge_root=str(session_project)).claude_session_id == (
+    assert IndexStore().get_session("policy-supervisor", forge_root=str(session_project)).claude_session_id == (
         "parent-uuid"
     )
 
@@ -118,6 +118,6 @@ def test_native_fork_stop_reconciles_child_uuid_in_manifest_and_index(
     assert updated.confirmed.claude_session_id == "child-uuid"
     assert updated.confirmed.transcript_path == str(child_transcript)
     assert updated.confirmed.confirmed_by == "hook:stop"
-    assert IndexStore().get_session("guard-supervisor", forge_root=str(session_project)).claude_session_id == (
+    assert IndexStore().get_session("policy-supervisor", forge_root=str(session_project)).claude_session_id == (
         "child-uuid"
     )

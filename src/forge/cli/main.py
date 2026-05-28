@@ -22,10 +22,10 @@ from .backend import backend  # noqa: E402
 from .claude import claude  # noqa: E402
 from .config_cmd import config as config_cmd  # noqa: E402
 from .extensions import extensions  # noqa: E402
-from .guard import guard  # noqa: E402
 from .handoff import handoff  # noqa: E402
 from .hooks import hooks  # noqa: E402
 from .memory import memory as memory_cmd  # noqa: E402
+from .policy import policy  # noqa: E402
 from .proxy import proxy  # noqa: E402
 from .search import search_cmd  # noqa: E402
 from .session import session  # noqa: E402
@@ -48,6 +48,7 @@ _ALIASES: dict[str, str] = {
     "extensions": "extension",  # backward compat (renamed from plural)
     "sess": "session",
     "mem": "memory",
+    "cfg": "config",
 }
 # Display aliases: canonical -> preferred short alias (shown in help)
 _DISPLAY_ALIASES: dict[str, str] = {
@@ -55,6 +56,7 @@ _DISPLAY_ALIASES: dict[str, str] = {
     "extension": "ext",
     "session": "sess",
     "memory": "mem",
+    "config": "cfg",
 }
 
 
@@ -273,7 +275,7 @@ main.add_command(auth, name="authentication")
 main.add_command(backend)
 main.add_command(session)
 main.add_command(proxy)
-main.add_command(guard)
+main.add_command(policy)
 main.add_command(handoff)
 main.add_command(claude)
 main.add_command(config_cmd, name="config")

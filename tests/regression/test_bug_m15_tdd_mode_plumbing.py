@@ -1,4 +1,4 @@
-"""Regression test for M15: tdd_mode not plumbed into guard engine.
+"""Regression test for M15: tdd_mode not plumbed into policy engine.
 
 Bug: get_bundle_policies("tdd") always instantiated TDDEnforcementPolicy with
 strict=True regardless of session config. Users could not express "permissive"
@@ -10,15 +10,15 @@ bundle_config. The config parameter was ignored.
 Fix: Added bundle_config parameter to build_engine(), threaded config={"strict": ...}
 through to get_bundle_policies() which passes it to TDDEnforcementPolicy(strict=...).
 
-Fixed in: src/forge/guard/deterministic/registry.py, src/forge/guard/engine.py
+Fixed in: src/forge/policy/deterministic/registry.py, src/forge/policy/engine.py
 (action plan Step 8a, M15)
 """
 
 import pytest
 
-from forge.guard.deterministic.registry import get_bundle_policies
-from forge.guard.deterministic.tdd import TDDEnforcementPolicy
-from forge.guard.engine import build_engine
+from forge.policy.deterministic.registry import get_bundle_policies
+from forge.policy.deterministic.tdd import TDDEnforcementPolicy
+from forge.policy.engine import build_engine
 
 pytestmark = pytest.mark.regression
 

@@ -2,7 +2,7 @@
 
 Bug: Claude Code was launched from worktree.path (checkout root) instead of
 forge_root for nested projects. This caused .claude/settings.local.json to
-be invisible, breaking hooks and direct commands (%guard status, %help).
+be invisible, breaking hooks and direct commands (%policy status, %help).
 
 Root cause: launch paths, transcript lookups, and supervisor source_cwd all
 used state.worktree.path directly. Fix: resolve_claude_project_root() helper.

@@ -1,278 +1,169 @@
 # Documentation Guidelines
 
-Documentation standards for Multi-Forge.
+Documentation writing and maintenance standards for Multi-Forge.
+
+This file explains how to write and maintain docs. The board workflow itself is defined in
+[`board-contract.md`](board-contract.md).
+
+---
+
+## Authority Map
+
+Use one authoritative source per domain:
+
+| Domain                                        | Authority                                   |
+| --------------------------------------------- | ------------------------------------------- |
+| Repository overview                           | `README.md`                                 |
+| Shipped architecture and ownership            | `docs/design.md`, `docs/design_appendix.md` |
+| Documentation writing and maintenance         | This file                                   |
+| Work-board lanes, cards, checklists, closeout | `docs/developer/board-contract.md`          |
+| Coding style and durable-state rules          | `docs/developer/coding-standards.md`        |
+| Test policy                                   | `docs/developer/testing-guidelines.md`      |
+| User-facing behavior                          | `docs/end-user/*`                           |
+
+`docs/board/README.md` is a directory guide with examples. It is not the normative board contract.
 
 ---
 
 ## Living vs Static Documents
 
-### Living Documents (update regularly)
+### Living Documents
 
-- **Implementation checklists** - Current tasks
-- **Change logs** - Completed work record
-- **Evaluation results** - Update after evals/tests
+Living docs change as work happens:
 
-### Work Board (`docs/board/`)
+- active card checklists
+- `docs/board/change_log.md`
+- `docs/board/impl_notes.md`
+- evaluation and manual-test results
+- design docs when shipped architecture changes
 
-`docs/board/` is the living implementation-memory surface for multi-session work. See
-[`docs/board/README.md`](../board/README.md) for the current repo-specific contract.
-
-| Path                                 | Purpose                                               | Maintenance rule                                                                             |
-| ------------------------------------ | ----------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `docs/board/proposed/<slug>/card.md` | Idea or design sketch not yet scheduled               | Move to `todo/` when accepted for execution                                                  |
-| `docs/board/todo/<slug>/card.md`     | Accepted work parked until an execution branch exists | Move to `doing/` when the branch is created                                                  |
-| `docs/board/doing/<slug>/card.md`    | Work currently in flight                              | Add/update `checklist.md` during implementation                                              |
-| `docs/board/done/<slug>/card.md`     | Completed work snapshot                               | Keep paired `checklist.md` when one existed                                                  |
-| `docs/board/change_log.md`           | Completed-work record                                 | Keep compact; newest first; compact old tail entries before the file grows too large         |
-| `docs/board/impl_notes.md`           | Human-approved durable memory                         | Promote only stable decisions, invariants, recurring bug causes, and operational constraints |
-
-**How these docs are maintained (this repo).** `change_log.md` is tracked for **direct** handoff-agent updates
-(`forge memory track --as changelog`); `impl_notes.md` is tracked as a **shadow proposal**
-(`forge memory track --propose`) that the agent appends to and humans promote; card `checklist.md` files are **edited
-in-session** by the coding agent at your direction (not handoff-agent-tracked). `forge memory` tracking is
-session-scoped and inherited by forks in the current implementation — see
-[`docs/board/README.md`](../board/README.md#handoff-agent-setup) for the exact setup, including the `--session`
-requirement.
-
-Checklist files are per card, not permanent catch-all plans. When a card is complete, add the final change-log entry,
-promote durable notes, verify design docs, then move the card directory from `doing/<slug>/` to `done/<slug>/`.
+Maintain board files according to [`board-contract.md`](board-contract.md).
 
 ### Coding Context Documents
 
-- **Design docs** - Aggregated coding reference
-  - Architecture context
-  - Consolidates key contracts, file locations, patterns
-  - **Maintenance Rule**: Update FIRST on refactors/moves
-  - Must stay accurate; it's future-session context
+Design docs and agent context files are future-session context. They must be accurate, compact enough to load, and
+specific enough for agents to act on without guessing.
 
-### Board Cards
+Update design docs when architecture, file ownership, config ownership, auth resolution, installer behavior,
+proxy/session semantics, workflow prerequisites, or end-user behavior changes.
 
-- `card.md` files are forward-looking design sketches, accepted work items, active execution context, or completed
-  snapshots depending on their board lane.
-- Cards may reference aspirational architecture, upstream capabilities, or research prototypes.
-- Add `checklist.md` when a card needs an execution plan.
-- Move cards between lanes instead of copying proposal/checklist snapshots.
+---
 
-### Card Lifecycle
+## Design Documents
 
-Board cards drive the implementation cycle. The full lifecycle:
+Design docs are normative architecture docs. This section defines writing expectations; card-execution procedure lives
+in [`board-contract.md` Design Doc Sync](board-contract.md#design-doc-sync).
 
-```text
-1. Propose  — write docs/board/proposed/<slug>/card.md
-2. Schedule — move the card to docs/board/todo/<slug>/
-3. Execute  — move the card to docs/board/doing/<slug>/ when the branch exists; update checklist/design docs as code
-             ships
-4. Complete — move the card to docs/board/done/<slug>/ after verification and closeout
-```
+- Describe shipped behavior, not desired future behavior.
+- If a card is mid-execution, document the hybrid shipped state accurately.
 
-**Design doc updates during execution.** Cards can be aspirational; design docs are normative (describe shipped code).
-During card execution, each checklist phase that changes normative architecture should include a design-doc update task.
-Design docs should reflect what's built, not the card's target state. A mid-card design doc may describe a hybrid state
-(old + new) — that's accurate and preferred over aspirational docs describing unbuilt features.
+Design-doc code blocks should show the gist, not full implementations:
 
-**Completion.** When a card is fully executed, move the whole card directory to `docs/board/done/<slug>/`. After
-completion, design docs are the normative source; the done card is historical context.
+- Show signatures and key logic flow.
+- Use `...` for obvious detail.
+- Prefer terse examples over long comments.
+- Link to full specs or implementation files when precision matters.
 
-### Design Documents (normative architecture)
+Cards may contain aspirational target architecture. Design docs should not.
 
-- Describe **shipped system** (what's built and how it works)
-- Must stay accurate — updated per-phase during card execution, not after
-- When a card changes architecture, the relevant design doc sections are updated as each phase ships
-- If design docs fall behind shipped code, track the gap as explicit checklist debt
+---
+
+## Where To Document What
+
+| What                          | Where                                       | When to update                             |
+| ----------------------------- | ------------------------------------------- | ------------------------------------------ |
+| Aspirational proposal         | `docs/board/proposed/<slug>/card.md`        | When drafting or revising a proposal       |
+| Accepted/scheduled work       | `docs/board/todo/<slug>/card.md`            | When work is accepted but not active       |
+| Active execution plan         | `docs/board/doing/<slug>/checklist.md`      | During active card work                    |
+| Completed work                | `docs/board/change_log.md`                  | At phase/card closeout                     |
+| Durable implementation memory | `docs/board/impl_notes.md`                  | After human review                         |
+| Normative architecture        | `docs/design.md`, `docs/design_appendix.md` | As code ships                              |
+| End-user behavior             | `docs/end-user/*`                           | When user-facing setup or behavior changes |
+| Setup/development workflow    | `docs/developer/*`                          | When maintainer workflow changes           |
+
+The board-specific rules for these files live in [`board-contract.md`](board-contract.md).
 
 ---
 
 ## Documentation Rules
 
-**Rule 1**: Cards = work-item design/context; checklist = active execution plan; change log = completed work;
-implementation notes = human-approved durable memory; design docs = normative shipped architecture; AutoMem = evolving
-state
+**Rule 1: One authority per topic.** Link to the authority instead of copying its rules into another doc.
 
-**Rule 2**: Verbosity has a cost; balance with clarity and intent.
+**Rule 2: Cards are context; design docs are contract.** Cards may point forward. Design docs must describe the shipped
+system.
 
-**Rule 3**: Design-doc code blocks show the **gist**, not full implementations:
+**Rule 3: Verbosity has a cost.** Prefer concise, specific docs over exhaustive narration.
 
-- Show signatures + key logic flow
-- Use `...` for obvious details
-- Prefer terse one-liners over long comments
-- Link to full specs
-- Goal: convey architecture, not copy-paste code
+**Rule 4: Code is how; docs are what and why.** Avoid listing every file or implementation detail unless the file list
+is itself the point.
 
----
-
-## Where to Document What
-
-| What                          | Where                                  | When to Update                                 |
-| ----------------------------- | -------------------------------------- | ---------------------------------------------- |
-| Aspirational design           | `docs/board/proposed/<slug>/card.md`   | Refresh when topic becomes active or scheduled |
-| Accepted/scheduled work       | `docs/board/todo/<slug>/card.md`       | Move to `doing/` when execution branch exists  |
-| Active execution plan         | `docs/board/doing/<slug>/checklist.md` | During active card work                        |
-| Completed work                | `docs/board/change_log.md`             | At session/phase closeout                      |
-| Durable implementation memory | `docs/board/impl_notes.md`             | After human review                             |
-| Normative architecture        | Design docs                            | Per-phase as code ships during card execution  |
-| Completed card snapshots      | `docs/board/done/<slug>/`              | After card is fully executed                   |
-| Current metrics               | AutoMem                                | On evolving facts                              |
-
----
-
-## Checklist Policy
-
-### TDD-First Acceptance Criteria
-
-Each phase SHOULD define acceptance criteria:
-
-1. **Testable**: Verified by a specific test
-2. **Measurable**: Numeric thresholds or boolean outcomes
-3. **Fixture-grounded**: References fixtures when relevant
-
-**Acceptance test table**:
-
-```markdown
-| Test | Fixture | Assertion | Test File |
-| ---- | ------- | --------- | --------- |
-| Policy blocks write | git_repo | PreToolUse returns deny | `test_guard.py` |
-| Stop hook fast | mock | Execution < 100ms | `test_stop_hook.py` |
-```
-
-**Anti-patterns**:
-
-| Avoid                  | Instead                                                 |
-| ---------------------- | ------------------------------------------------------- |
-| "Hook works correctly" | "Stop hook completes in \<100ms with transcript copied" |
-| "Tests pass"           | "58 guard tests pass; mypy clean"                       |
-
-### Checklist Lifecycle
-
-1. **Start**: Move the card to `doing/` and create a checklist with `[ ]` + acceptance test tables
-2. **During**: Update checkboxes; note blockers; update design docs per-phase as code ships
-3. **Complete**: Move completed-work details to `change_log`; promote durable memory to `impl_notes`; verify design docs
-   reflect all shipped changes; move the card directory to `docs/board/done/<slug>/` after the final merge to `main`
-
----
-
-## Change Log Policy
-
-### Entry Structure (Required)
-
-Each entry MUST include:
-
-1. **Goal** (1 sentence): Objective
-2. **Key Changes** (bullets): Added/modified/deleted
-3. **Verification** (1 line): How validated
-
-Each entry MAY include (when relevant):
-
-- **Design decisions**: Key choices + rationale
-- **Files created/modified**: Only for major refactors (>10 files) — summarize by package
-- **Deferred items**: Explicitly not done
-
-### Entry Format
-
-```markdown
-## YYYY-MM-DD
-
-### Phase X.Y: Short Title
-
-**Goal**: One sentence describing the objective.
-
-**Key changes**:
-
-- Bullets: WHAT changed (code shows HOW)
-- New files
-- Key decisions
-
-**Verification**: How validated (e.g., "58 tests pass; mypy clean")
-
-**Deferred**: Items postponed (optional)
-```
-
-### Detail Level Guidelines
-
-| Entry Type            | Target Lines | Content                                    |
-| --------------------- | ------------ | ------------------------------------------ |
-| Bug fix               | 5-10         | Goal + fix + verification                  |
-| Feature completion    | 15-25        | Goal + key changes + tests added           |
-| Phase completion      | 25-40        | Goal + major changes + acceptance criteria |
-| Architecture refactor | 40-60 max    | Include package summaries, migration notes |
-
-**Consistency matters**: Similar work should have similar detail. If one bug fix is 5 lines, another shouldn't be 50.
-
-**Anti-pattern**: Listing every file modified. If >10 files, summarize by package (e.g., "Updated 14 files in
-`src/guard/` and `tests/src/guard/`").
-
-**Rule of thumb**: If it can't be summarized in 40 lines, it's too detailed. Code is HOW; docs are WHAT/WHY.
+**Rule 5: Update docs with the change.** Do not leave "docs later" as invisible debt; put it in the checklist if it
+cannot happen in the same patch.
 
 ---
 
 ## Writing Style
 
-Docs are read by humans and AI agents; be direct and specific.
+Docs are read by humans and AI agents. Be direct and specific.
 
 ### Principles
 
-1. **Say the thing.** Say it once; no preambles, repetition, or summaries.
-2. **Specifics over gestures.** "Improves performance" is vague; "p99 200ms→45ms" isn't. If you don't have the number,
-   say so.
-3. **Earn every sentence.** If it doesn't add new info, merge or cut.
-4. **Plain language wins.** "Use" not "utilize." Prefer plain meaning over fancy synonyms.
-5. **Structure follows content.** Bullets for parallel items. Prose for arguments. Tables for comparisons.
+1. **Say the thing.** Say it once; no preambles, repetition, or summary paragraphs on short docs.
+2. **Specifics over gestures.** "p99 200ms -> 45ms" beats "improves performance."
+3. **Earn every sentence.** If it does not add new information, merge or cut it.
+4. **Plain language wins.** Use "use" instead of "utilize."
+5. **Structure follows content.** Use bullets for parallel items, prose for arguments, and tables for comparisons.
 
 ### Vocabulary Hygiene
 
 Avoid AI filler words:
 
-- **Always cut**: delve, tapestry, vibrant, myriad, plethora, utilize, unlock, groundbreaking, revolutionary,
-  transformative
-- **Check context**: robust (ML/stats), seamless (failover), leverage (existing infra), comprehensive (test suite)
-- **Replace metaphors with specifics**: name the work/scale/practice/criteria
+- Always cut: delve, tapestry, vibrant, myriad, plethora, utilize, unlock, groundbreaking, revolutionary,
+  transformative.
+- Check context: robust, seamless, leverage, comprehensive.
+- Replace metaphors with concrete names for the work, scale, practice, or criteria.
 
-### Structural Tells to Avoid
+### Structural Tells To Avoid
 
-- Every section opening with "X is a Y that Z" (definition → elaboration)
-- Opening paragraphs that restate the heading (echo effect)
-- Uniform paragraph/section lengths — vary with importance
-- Summary paragraphs on short documents — the reader remembers
-- "Furthermore," / "Moreover," / "Additionally," as paragraph openers (filler transitions)
+- Every section opening with "X is a Y that Z."
+- Opening paragraphs that restate the heading.
+- Uniform paragraph and section lengths.
+- Summary paragraphs on short documents.
+- "Furthermore," "Moreover," and "Additionally," as paragraph openers.
 
-### When Writing for AI Consumption
+---
 
-CLAUDE.md files and design docs are AI context. Write for machine parsability too:
+## Writing For AI Consumption
 
-- **Be specific over general.** "Run `uv run pytest tests/src -v`" beats "run the tests."
-- **State constraints, not aspirations.** "Never skip tests" beats "we value testing". Include must-NOT constraints.
-- **Frontload actionable content.** Put important rules first.
-- **Use exact identifiers.** Say `forge session start`, not "the session command." Avoid "it"/"this" when ambiguous.
-- **Tag code blocks with language.** Agents parse tagged blocks more reliably.
-- **Keep files within context limits.** A 25K-token doc degrades performance; split or archive.
+`CLAUDE.md`, `AGENTS.md`, design docs, and board checklists are AI context. Make them easy to parse:
+
+- Frontload actionable constraints.
+- Use exact identifiers, paths, commands, and file names.
+- State must/must-not constraints instead of aspirations.
+- Prefer `uv run pytest tests/src/foo.py` over "run tests."
+- Avoid ambiguous pronouns when a command or file path is available.
+- Tag fenced code blocks with a language.
+- Keep files under context limits; split or archive bulky docs.
 
 ---
 
 ## Size Limits
 
-### Maximum Document Size (Hard Limits)
-
-Agents: ~25k tokens; Read truncates >2k lines. Keep docs under these limits; use
-[count-tokens.py](../../scripts/count-tokens.py) with `--model` matching the coding agent's model for accurate counts
-(the agent knows its own model ID):
+Agents degrade when docs grow too large. Use [`scripts/count-tokens.py`](../../scripts/count-tokens.py) with the
+relevant model:
 
 ```bash
 ./scripts/count-tokens.py --model claude-sonnet-4-6 docs/design.md
-25,677 tokens | 99,378 chars | 1,924 lines
-  method: anthropic API (claude-sonnet-4-6)
 ```
 
-### Living Doc Maintenance
+Hard guidance:
 
-Run token/line checks before living docs become hard to load:
+- Keep individual agent/context docs below roughly 25k tokens.
+- Avoid files longer than 2k lines; many readers and tools truncate around there.
+- Split reference details into appendix files when the main doc becomes slow to scan.
 
-```bash
-wc -l docs/board/*.md
-./scripts/count-tokens.py --model <agent-model> docs/board/change_log.md
-```
+---
 
-For `docs/board/change_log.md`, compact the oldest tail entries first. Preserve dates, goals, decisions, verification,
-and deferred items; remove verbose blow-by-blow details. If compaction is still not enough, move old detailed sections
-to an archive file and leave a dated summary in the active change log.
+## Living Doc Maintenance
 
-For `docs/board/impl_notes.md`, prune obsolete or duplicated notes instead of appending forever. If a note is not useful
-for a future session's decisions, it probably belongs in the change log or nowhere.
+For board living-doc size checks and compaction rules, use [`board-contract.md`](board-contract.md#size-checks).

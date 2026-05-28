@@ -110,9 +110,13 @@ def build_multi_doc_prompt(
             lines.append(f"1. Read the OFFICIAL document at `{spec.official_path}` first.")
             lines.append(f"2. Read this shadow document at `{spec.write_path}` (if it exists).")
             lines.append(
-                "3. Write suggestions liberally. Include anything potentially useful "
-                "that is not already in the official doc. The human will review and "
-                "promote selectively."
+                "3. Propose additions as `- [ ]` checkboxes, each with a brief rationale "
+                "and source reference (session name, file changed, or context). "
+                "Be liberal: include anything potentially useful that is not already in "
+                "the official doc -- the human will review and promote selectively. "
+                "Remove checkboxes whose content has been merged into the official "
+                "document (self-prune). "
+                "Do NOT duplicate suggestions already present in either file."
             )
         else:
             lines.append(f"### `{spec.write_path}`")
@@ -255,10 +259,8 @@ def _validate_designated_docs(
     Guards (per doc):
     1. Path safety: reject absolute, unsafe chars, traversal
        (applied to both ``path`` and ``shadows``).
-    2. Strategy consistency (passport-less docs only): ``suggested``
-       requires ``shadows``; ``shadows`` requires ``suggested``.
-       Passported docs skip this check -- passport resolution
-       (``resolve_doc_spec``) handles mode/strategy independently.
+    2. Empty shadows: reject ``shadows=""`` unconditionally.
+    3. Self-shadow: reject when ``path == shadows``.
 
     Args:
         designated_docs: List of docs to validate.
@@ -275,29 +277,16 @@ def _validate_designated_docs(
             logger.warning("Skipping designated_doc (%s): %s", doc.path, reason)
             continue
 
+        if doc.shadows is not None and doc.shadows == "":
+            logger.warning("Skipping designated_doc %s: 'shadows' must be non-empty", doc.path)
+            continue
+
         if doc.shadows is not None:
             reason = is_safe_designated_doc_path(doc.shadows, forge_root, resolved_base)
             if reason:
                 logger.warning("Skipping designated_doc shadows (%s): %s", doc.shadows, reason)
                 continue
 
-        # Strategy/shadows coupling: only enforced for passport-less docs.
-        # Passported docs resolve mode/strategy through resolve_doc_spec().
-        has_passport = _has_passport_on_disk(doc, forge_root)
-        if not has_passport:
-            if doc.strategy == "suggested" and not doc.shadows:
-                logger.warning(
-                    "Skipping designated_doc %s: strategy 'suggested' requires non-empty 'shadows'",
-                    doc.path,
-                )
-                continue
-            if doc.shadows is not None and doc.strategy != "suggested":
-                logger.warning(
-                    "Skipping designated_doc %s: 'shadows' requires strategy 'suggested' (got %r)",
-                    doc.path,
-                    doc.strategy,
-                )
-                continue
         if doc.shadows and doc.path == doc.shadows:
             logger.warning(
                 "Skipping designated_doc %s: 'path' and 'shadows' must differ",
@@ -309,14 +298,23 @@ def _validate_designated_docs(
     return valid
 
 
-def _has_passport_on_disk(doc: DesignatedDoc, forge_root: Path) -> bool:
-    """Best-effort check for passport existence (no validation)."""
-    passport_path = forge_root / resolve_passport_source(doc)
-    try:
-        pp = read_passport(passport_path)
-        return pp is not None
-    except (FileNotFoundError, PassportError):
-        return False
+def _dedupe_specs(specs: list[ResolvedDocSpec]) -> list[ResolvedDocSpec]:
+    """Drop specs that resolve to the same ``(official_path, write_path)`` target.
+
+    One doc can enter the run twice and resolve to the same write path — e.g. a
+    session extra on a shadow-only-passported official plus the project scan's
+    shadow entry both map to the doc's shadow file. Without this, the prompt
+    gets duplicate sections and the agent can double-write. Keep the first.
+    """
+    deduped: list[ResolvedDocSpec] = []
+    seen: set[tuple[str | None, str]] = set()
+    for spec in specs:
+        key = (spec.official_path, spec.write_path)
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(spec)
+    return deduped
 
 
 def run_handoff_agent(
@@ -439,6 +437,8 @@ def run_handoff_agent(
             )
             continue
         ready_specs.append(spec)
+
+    ready_specs = _dedupe_specs(ready_specs)
 
     if not ready_specs:
         logger.info(

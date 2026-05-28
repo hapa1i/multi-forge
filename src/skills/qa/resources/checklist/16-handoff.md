@@ -2,7 +2,7 @@
 
 ## 16. Handoff Agent
 
-### 16.1 Configure Direct Handoff Targets
+### 16.1 Configure Memory and Passports
 
 <!-- requires: api_key -->
 
@@ -11,46 +11,34 @@
 ```bash
 cd $FORGE_TEST_REPO
 
-# Seed one real target doc. The CLI validates existence, so the intentionally
-# missing doc used for runtime-skip coverage is injected below via raw override.
+# Seed target docs with content.
 mkdir -p .forge/memory
 cat > .forge/memory/debugging.md <<'EOF'
 # Debugging Notes
 EOF
 
-# Enable handoff agent for the session and configure explicit designated docs.
-forge memory enable --session test-session-1
-forge session set memory.auto_update.min_turns 1 --session test-session-1
-forge session set memory.designated_docs '[]' --session test-session-1
-forge memory track .forge/memory/debugging.md --as debugging --session test-session-1
-forge memory list --json --session test-session-1 | jq -e '
-  length == 1
-  and any(.[]; .path == ".forge/memory/debugging.md" and .strategy == "debugging")
-'
-
-# Verify track wrote a passport into the tracked doc.
+# Author a project passport (sessionless).
+forge memory track .forge/memory/debugging.md --strategy generic
 head -5 .forge/memory/debugging.md | grep -q 'forge_memory'
 
-# Inject one missing doc directly to validate the agent's runtime skip path.
-# This represents stale/manual config; `forge memory track` would reject it.
-forge session set memory.designated_docs '[{"path":".forge/memory/debugging.md","strategy":"debugging","shadows":null},{"path":".forge/memory/patterns.md","strategy":"patterns","shadows":null}]' --session test-session-1
-forge memory list --session test-session-1
-forge memory list --json --session test-session-1 | jq -e '
-  length == 2
-  and any(.[]; .path == ".forge/memory/debugging.md" and .strategy == "debugging")
-  and any(.[]; .path == ".forge/memory/patterns.md" and .strategy == "patterns")
+# Enable memory for the session.
+forge memory enable --session test-session-1
+forge session set memory.auto_update.min_turns 1 --session test-session-1
+
+# List passported docs (sessionless scan).
+forge memory list --json | jq -e '
+  length >= 1
+  and any(.[]; .path == ".forge/memory/debugging.md" and .strategy == "generic")
 '
 
-# Verify config
+# Verify session config.
 cat .forge/sessions/test-session-1/forge.session.json | jq '.overrides.memory'
 ```
 
-- [ ] Handoff config written to session overrides
-- [ ] `enabled`, `min_turns`, and `mode` values set
-- [ ] `forge memory track/list` configures an existing designated doc
-- [ ] `forge memory track` writes a passport into the tracked doc
-- [ ] Raw override includes one missing designated doc for runtime skip coverage
-- [ ] Config stores worktree-relative paths under `memory.designated_docs`
+- [ ] `forge memory track` writes a passport into the doc (sessionless)
+- [ ] `forge memory enable --session` sets activation override
+- [ ] `forge memory list` discovers passported docs via scan
+- [ ] Handoff config written to session overrides (`enabled`, `min_turns`)
 
 ### 16.2 Run Handoff Manually (Direct Update)
 
@@ -88,16 +76,13 @@ ls .forge/artifacts/test-session-1/handoff/review-*.md
 forge session handoff show test-session-1 --latest
 
 test "$AFTER_LINES" -gt "$BEFORE_LINES"
-test ! -e .forge/memory/patterns.md
 ```
 
-- [ ] Missing designated docs are skipped (not created)
-- [ ] Worktree-relative doc paths resolve correctly in the test repo
 - [ ] `forge handoff run` succeeds with the transcript artifact path provided
-- [ ] Existing designated docs are updated with session takeaways
+- [ ] Passported docs are discovered via scan and updated with session takeaways
 - [ ] Handoff agent stdout is persisted and visible via `forge session handoff show --latest`
 
-### 16.3 Shadow Handoff (`suggested` + `shadows`)
+### 16.3 Shadow Handoff (`--propose` + shadow mode)
 
 <!-- prereq: 16.1 -->
 
@@ -108,7 +93,7 @@ test ! -e .forge/memory/patterns.md
 ```bash
 cd $FORGE_TEST_REPO
 
-# Create a shadow doc pair and switch designated_docs to the suggested/shadows surface.
+# Create a shadow doc pair via passport.
 mkdir -p .forge/memory docs
 cat > docs/team-standards.md <<'EOF'
 # Team Standards
@@ -116,17 +101,18 @@ cat > docs/team-standards.md <<'EOF'
 - Prefer small, reviewable patches.
 EOF
 
-cat > .forge/memory/suggested_standards.md <<'EOF'
+cat > .forge/memory/shadow_standards.md <<'EOF'
 # Suggested Standards
 EOF
 
-forge memory enable --session test-session-1
-forge session set memory.designated_docs '[]' --session test-session-1
+# Author a shadow-only passport (sessionless).
 forge memory track docs/team-standards.md \
   --propose \
-  --shadow .forge/memory/suggested_standards.md \
-  --session test-session-1
-forge memory list --session test-session-1
+  --shadow-path .forge/memory/shadow_standards.md
+
+forge memory list --json | jq -e '
+  any(.[]; .path == ".forge/memory/shadow_standards.md" and .strategy == "generic")
+'
 
 mkdir -p .forge/artifacts/test-session-1/transcripts
 cat > .forge/artifacts/test-session-1/transcripts/manual-handoff-shadow.jsonl <<'EOF'
@@ -137,22 +123,22 @@ cat > .forge/artifacts/test-session-1/transcripts/manual-handoff-shadow.jsonl <<
 EOF
 
 cp docs/team-standards.md /tmp/team-standards.before
-SHADOW_BEFORE=$(wc -l < .forge/memory/suggested_standards.md)
+SHADOW_BEFORE=$(wc -l < .forge/memory/shadow_standards.md)
 
 forge handoff run \
   --session-name test-session-1 \
   --worktree-path $FORGE_TEST_REPO \
   --transcript-rel .forge/artifacts/test-session-1/transcripts/manual-handoff-shadow.jsonl
 
-SHADOW_AFTER=$(wc -l < .forge/memory/suggested_standards.md)
+SHADOW_AFTER=$(wc -l < .forge/memory/shadow_standards.md)
 
-cat .forge/memory/suggested_standards.md
+cat .forge/memory/shadow_standards.md
 
 cmp -s docs/team-standards.md /tmp/team-standards.before
 test "$SHADOW_AFTER" -gt "$SHADOW_BEFORE"
 ```
 
-- [ ] `designated_docs` accepts `strategy: suggested` with `shadows`
+- [ ] Shadow-only passport discovered via scan
 - [ ] Handoff runs successfully against the shadow doc pair
 - [ ] Shadow file gains proposed additions for later human review
 - [ ] Official document is not edited in-place
@@ -168,9 +154,8 @@ test "$SHADOW_AFTER" -gt "$SHADOW_BEFORE"
 ```bash
 cd $FORGE_TEST_REPO
 
-# Restore direct-update config for the queued-path test.
+# Ensure direct-update config for the queued-path test.
 forge session set memory.auto_update.mode augment --session test-session-1
-forge session set memory.designated_docs '[{"path":".forge/memory/debugging.md","strategy":"debugging","shadows":null},{"path":".forge/memory/patterns.md","strategy":"patterns","shadows":null}]' --session test-session-1
 
 cat > .forge/memory/debugging.md <<'EOF'
 # Debugging Notes
@@ -221,7 +206,7 @@ test "$AFTER_LINES" -gt "$BEFORE_LINES"
 - [ ] Stop hook reports `queued_handoff: true`
 - [ ] Handoff marker is created under `~/.forge/pending-work/`
 - [ ] A later Forge CLI startup processes the queued handoff automatically
-- [ ] Background handoff updates the designated doc without a direct `forge handoff run`
+- [ ] Background handoff updates passported docs without a direct `forge handoff run`
 - [ ] Pending handoff marker is gone after processing completes
 
 ---

@@ -29,15 +29,11 @@ make test                   # Full suite
 # uv run pytest tests/integration -v
 
 # Code quality (run `make pre-commit` before every commit)
-make lint                  # Run ruff linter
-make format                # Run ruff formatter
-make type-check            # Run mypy
-make pre-commit            # All pre-commit hooks
+make pre-commit            # All hooks: ruff, black, isort, mypy, pyright, mdformat, gitleaks
 make clean                 # Remove caches
 
-# Alternative: Direct tool usage
+# Direct tool usage (read-only checks; let pre-commit own formatting)
 uv run ruff check src/
-uv run ruff format src/
 uv run mypy src/
 pre-commit run --all-files
 ```
@@ -46,6 +42,13 @@ pre-commit run --all-files
 
 - **`main`**: Primary branch. All PRs target `main`.
 - **Feature branches**: Branch from `main`, PR back into `main`.
+
+## Work Board Quick Semantics
+
+The authoritative board workflow is in `docs/developer/work-board-contract.md`. In short: `todo/` means accepted but
+parked. When asked to work on a `todo/` card, create or switch to its execution branch, move the card directory to
+`docs/board/doing/<slug>/`, and create/update `checklist.md`. `doing/` is active work; `done/` means shipped, verified,
+design docs synced, and closeout recorded.
 
 ## Git Hooks
 
@@ -72,7 +75,7 @@ src/forge/
 │   └── hooks/  # Hook handlers invoked by Claude Code
 ├── config/     # Configuration loading and proxy templates
 ├── core/       # Shared libraries (auth, models, state, llm, workqueue, reactive)
-├── guard/      # Policy enforcement (TDD, coding standards, semantic supervisor)
+├── policy/      # Policy enforcement (TDD, coding standards, semantic supervisor)
 ├── install/    # Extension installer and tracking
 ├── proxy/      # Model routing proxy
 ├── review/     # Multi-model review engine (fan-out, adversarial)
@@ -142,12 +145,24 @@ fact_id, orchestration) unless explicitly asked. When in doubt, ask before renam
 ## Guidelines (load into context)
 
 @docs/developer/coding-standards.md @docs/developer/testing-guidelines.md @docs/developer/documentation-guidelines.md
+@docs/developer/work-board-contract.md
 
-## Key Design Documents
+## Platform & Environment
+
+**macOS (Darwin)** - Use GNU tools instead of BSD versions:
+
+- gsed not sed (different -i syntax)
+- gawk' not 'awk'
+- ggrep not grep (for '-p perl regex) - can also use rg
+- gdate not date (for'--date parsing)
+- greadlink -f' not readlink (BSD lacks -f\*)
+
+## Key Documents
 
 - `docs/design.md` - Unified design and migration plan (canonical)
 - `docs/design_appendix.md` - Reference details (schemas, config tables)
-- `docs/board/README.md` - Work-board contract for cards, checklists, change log, and implementation notes
+- `docs/developer/work-board-contract.md` - Work-board lane, checklist, and closeout contract
+- `docs/board/README.md` - Board directory guide and dogfood examples
 - `docs/end-user/` - End-user guides (sessions, proxies, hooks, configs)
 
 ## UX Guidelines

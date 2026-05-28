@@ -1,7 +1,7 @@
 # Makefile for Multi-Forge
 # Provides standard targets for testing, linting, and development
 
-.PHONY: help deps test-unit test-integration test-regression test lint format type-check pre-commit clean clean-docker clean-all
+.PHONY: help deps test-unit test-integration test-regression test pre-commit pre-commit-md clean clean-docker clean-all
 
 # Ensure dev dependencies are installed (fast no-op when already synced)
 # Dev deps live in [dependency-groups] dev, which uv includes by default.
@@ -17,10 +17,8 @@ help:
 	@echo "  make test-regression    - Run regression tests (fast, no Docker required)"
 	@echo "  make test               - Run both unit and integration tests"
 	@echo ""
-	@echo "  make lint               - Run ruff linter"
-	@echo "  make format             - Run ruff formatter"
-	@echo "  make type-check         - Run mypy type checker"
-	@echo "  make pre-commit         - Run all pre-commit hooks"
+	@echo "  make pre-commit         - Run all pre-commit hooks (ruff, black, isort, mypy, pyright)"
+	@echo "  make pre-commit-md      - Run pre-commit hooks on Markdown files only"
 	@echo ""
 	@echo "  make clean              - Remove caches and build artifacts"
 	@echo "  make clean-docker       - Remove forge Docker test images"
@@ -46,25 +44,14 @@ test-regression: deps
 test: test-unit test-integration
 	@echo "All tests complete!"
 
-# Run ruff linter
-lint: deps
-	@echo "Running ruff linter..."
-	uv run ruff check src/ tests/
-
-# Run ruff formatter
-format: deps
-	@echo "Running ruff formatter..."
-	uv run ruff format src/ tests/
-
-# Run mypy type checker
-type-check: deps
-	@echo "Running mypy type checker..."
-	uv run mypy src/ tests/
-
 # Run all pre-commit hooks
 pre-commit: deps
 	@echo "Running pre-commit hooks..."
-	pre-commit run --all-files
+	uv run pre-commit run --all-files
+
+pre-commit-md: deps
+	@echo "Running pre-commit hooks for all not-ignored md files..."
+	uv run pre-commit run --files $$(git ls-files -- '*.md') $$(git ls-files --others --exclude-standard -- '*.md')
 
 # Clean caches and build artifacts
 clean:

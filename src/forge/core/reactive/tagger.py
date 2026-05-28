@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import logging
 
-from forge.guard.types import ActionContext
+from forge.policy.types import ActionContext
 
 _log = logging.getLogger(__name__)
 

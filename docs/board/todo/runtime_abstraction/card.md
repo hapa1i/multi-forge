@@ -32,13 +32,13 @@ Forge sits at several boundaries where Claude-Code-shaped workflows cross betwee
 each boundary, Forge's role is to give the user **agency** -- visibility, the ability to intervene, control over what
 propagates -- where the default would otherwise be opacity or external control.
 
-| Boundary                                            | What's at stake                                                 | Forge's intervention surface                                          |
-| --------------------------------------------------- | --------------------------------------------------------------- | --------------------------------------------------------------------- |
-| Wire (request/response with model provider)         | Unobserved harness/provider drift in defaults, prompts, routing | Proxy capture + parameter pinning + prompt augmentation               |
-| Cost / spend                                        | Runaway API or subscription credit consumption                  | Spend caps + per-verb attribution + usage ledger                      |
-| Session topology (same runtime, cross-CWD/worktree) | Reasoning continuity vs portability                             | Native resume / native-relocate / curated handoff strategies          |
-| Runtime (Claude Code / Codex / Gemini)              | Different internal state formats, different operator quirks     | Runtime registry + `HeadlessInvoker` + curated handoff as interchange |
-| Knowledge across sessions                           | Loss of context, decisions, intent                              | Designated memory docs + handoff agent                                |
+| Boundary                                            | What's at stake                                                 | Forge's intervention surface                                                                    |
+| --------------------------------------------------- | --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Wire (request/response with model provider)         | Unobserved harness/provider drift in defaults, prompts, routing | Proxy capture + parameter pinning + prompt augmentation                                         |
+| Cost / spend                                        | Runaway API or subscription credit consumption                  | Spend caps + per-verb attribution + usage ledger                                                |
+| Session topology (same runtime, cross-CWD/worktree) | Reasoning continuity vs portability                             | Native resume / native-relocate / curated handoff strategies                                    |
+| Runtime (Claude Code / Codex / Gemini)              | Different internal state formats, different operator quirks     | Runtime registry + `HeadlessInvoker` + transfer context as interchange (see `memory_substrate`) |
+| Knowledge across sessions                           | Loss of context, decisions, intent                              | Passported memory docs + memory writer (see `memory_substrate` card)                            |
 
 The runtime abstraction is one application of this frame: it gives the user agency over **which runtime executes their
 work** without forcing them to commit to one. Other applications in this proposal -- the optional always-on audit proxy,
@@ -415,15 +415,15 @@ This shows which command or workflow caused which provider/model call, and what 
 
 The first instrumentation points are small enough to ship before the runtime abstraction:
 
-| Callsite            | File                                     | Purpose                        | PR #8 status                                     |
-| ------------------- | ---------------------------------------- | ------------------------------ | ------------------------------------------------ |
-| Workflow verbs      | `src/forge/cli/workflow.py`              | Panel/analyze/debate/consensus | Initial verb-cost snapshots shipped              |
-| Handoff agent       | `src/forge/session/handoff_agent.py`     | Post-session doc updates       | Initial verb-cost snapshots shipped              |
-| Semantic supervisor | `src/forge/guard/semantic/supervisor.py` | Plan alignment checks          | Initial verb-cost snapshots shipped              |
-| Team supervisor     | `src/forge/guard/team/handlers.py`       | Work divergence checks         | Still future                                     |
-| Review engine       | `src/forge/review/engine.py`             | Multi-model fan-out            | Routing plan shipped; invoker abstraction future |
-| Claude launcher     | `src/forge/cli/claude.py`                | Bare Claude Code launch        | Still future                                     |
-| Session launcher    | `src/forge/cli/session.py`               | Managed Forge session launch   | Subprocess proxy env shipped; ledger future      |
+| Callsite            | File                                      | Purpose                        | PR #8 status                                     |
+| ------------------- | ----------------------------------------- | ------------------------------ | ------------------------------------------------ |
+| Workflow verbs      | `src/forge/cli/workflow.py`               | Panel/analyze/debate/consensus | Initial verb-cost snapshots shipped              |
+| Handoff agent       | `src/forge/session/handoff_agent.py`      | Post-session doc updates       | Initial verb-cost snapshots shipped              |
+| Semantic supervisor | `src/forge/policy/semantic/supervisor.py` | Plan alignment checks          | Initial verb-cost snapshots shipped              |
+| Team supervisor     | `src/forge/policy/team/handlers.py`       | Work divergence checks         | Still future                                     |
+| Review engine       | `src/forge/review/engine.py`              | Multi-model fan-out            | Routing plan shipped; invoker abstraction future |
+| Claude launcher     | `src/forge/cli/claude.py`                 | Bare Claude Code launch        | Still future                                     |
+| Session launcher    | `src/forge/cli/session.py`                | Managed Forge session launch   | Subprocess proxy env shipped; ledger future      |
 
 ### Cost Caps
 
