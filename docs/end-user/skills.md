@@ -131,7 +131,7 @@ Selectable direct Claude workers include `claude-opus-4.6`, `claude-opus-4.6-1m`
 `--models claude-opus-4.6,claude-opus-4.7` when you want both stable Opus 4.6 and bounded-review Opus 4.7 in the panel.
 
 **Requirements:** GPT-5.5 and Gemini require active proxies; Claude Opus requires `ANTHROPIC_API_KEY`. See
-[auth.md](auth.md#which-auth-do-i-need) for setup.
+[authentication.md](authentication.md#which-auth-do-i-need) for setup.
 
 ---
 
@@ -162,7 +162,7 @@ key disagreements, and an evidence-weighted recommendation.
 | `claude-opus`            | NEUTRAL | Analyst -- balanced view | Direct Anthropic        |
 
 **Requirements:** GPT-5.5 and Gemini require active proxies; Claude Opus requires `ANTHROPIC_API_KEY`. See
-[auth.md](auth.md#which-auth-do-i-need) for setup.
+[authentication.md](authentication.md#which-auth-do-i-need) for setup.
 
 ---
 

@@ -11,7 +11,7 @@ before changing a team default.
 - Proxy templates and tier mappings: [`proxies.md`](proxies.md)
 - Skill model-family detection: [`skills.md`](skills.md#model-aware-resource-selection)
 - Supervisor configuration: [`policies.md`](policies.md#semantic-supervisor-advanced)
-- Auth and credentials: [`auth.md`](auth.md#which-auth-do-i-need)
+- Auth and credentials: [`authentication.md`](authentication.md#which-auth-do-i-need)
 
 ---
 

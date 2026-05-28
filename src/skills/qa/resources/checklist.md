@@ -30,9 +30,9 @@
 
 <!-- section: 2 checklist/2-extensions.md -->
 
-- [3. Authentication (`forge authentication`)](checklist/3-auth.md)
+- [3. Authentication (`forge authentication`)](checklist/3-authentication.md)
 
-<!-- section: 3 checklist/3-auth.md -->
+<!-- section: 3 checklist/3-authentication.md -->
 
 - [4. Proxy Management](checklist/4-proxy.md)
 

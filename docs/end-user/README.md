@@ -58,7 +58,7 @@ forge session start --proxy openrouter-anthropic
 ```
 
 See [proxies.md](proxies.md) for templates, tier mappings, and per-tier hyperparameter tuning. See
-[auth.md](auth.md#which-auth-do-i-need) for which credentials each workflow needs.
+[authentication.md](authentication.md#which-auth-do-i-need) for which credentials each workflow needs.
 
 ### D. Resume when context fills up
 
@@ -85,7 +85,7 @@ forge authentication login               # Prompt for API keys, store in ~/.forg
 forge authentication status              # Show where each credential comes from (env, file, missing)
 ```
 
-See [auth.md](auth.md) for profiles and credential resolution.
+See [authentication.md](authentication.md) for profiles and credential resolution.
 
 ## Feature Guides
 
