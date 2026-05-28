@@ -525,9 +525,9 @@ The invariant: choosing a proxy chooses routing defaults (model family, context 
 ### Pin a Claude model (`--model`)
 
 ```bash
-forge session start review-pass --model claude-opus-4-7
+forge session start review-pass --model claude-opus-4-8
 forge session start long-sonnet --model claude-sonnet-4-6[1m]
-forge session start review-pass --proxy openrouter-anthropic --model claude-opus-4-7
+forge session start review-pass --proxy openrouter-anthropic --model claude-opus-4-8
 forge session resume review-pass --model claude-opus-4.6
 forge session fork planner --name executor --model claude-opus-4.6
 ```
@@ -546,8 +546,8 @@ Rejected for sidecar or host-proxy launches.
 Forge stores the normalized model pin in the session intent and relaunches resume/fork children with the same
 `ANTHROPIC_MODEL` and `ANTHROPIC_DEFAULT_*_MODEL` environment variables. `forge session resume --model ...` updates the
 current session's stored pin; `forge session fork --model ...` writes the pin to the child session. This is useful when
-moving a planner between Opus 4.7 execution and Opus 4.6 final review. The stable `claude-opus`/`opus` aliases point at
-Claude Opus 4.6; use `claude-opus-4-7` explicitly for Opus 4.7.
+moving a planner between Opus 4.8 execution and Opus 4.6 final review. The stable `claude-opus`/`opus` aliases point at
+Claude Opus 4.6; use `claude-opus-4-8` explicitly for Opus 4.8.
 
 For proxy-routed resume/fork overrides, pass `--proxy <proxy_id>` when the session has not yet been hook-confirmed with
 a specific proxy id; Forge needs the proxy id to validate tier defaults and `model_alternatives`.

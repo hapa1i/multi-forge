@@ -127,8 +127,8 @@ consensus findings, unique insights, and conflicts.
 | `gemini-3.1-pro-preview` | Balanced analysis, large context    | openrouter-gemini       |
 | `claude-opus`            | Stable Claude Opus 4.6 reasoning    | Direct Anthropic        |
 
-Selectable direct Claude workers include `claude-opus-4.6`, `claude-opus-4.6-1m`, and `claude-opus-4.7`. Use
-`--models claude-opus-4.6,claude-opus-4.7` when you want both stable Opus 4.6 and bounded-review Opus 4.7 in the panel.
+Selectable direct Claude workers include `claude-opus-4.6`, `claude-opus-4.6-1m`, and `claude-opus-4.8`. Use
+`--models claude-opus-4.6,claude-opus-4.8` when you want both stable Opus 4.6 and bounded-review Opus 4.8 in the panel.
 
 **Requirements:** GPT-5.5 and Gemini require active proxies; Claude Opus requires `ANTHROPIC_API_KEY`. See
 [authentication.md](authentication.md#which-auth-do-i-need) for setup.
@@ -225,7 +225,7 @@ available instead of reporting `none`.
 **No manual configuration needed.** The right instructions are selected automatically based on which proxy you're
 connected to.
 
-For per-role guidance on which family to choose for `/forge:review` (one-shot capability gains favor Opus 4.7) vs
+For per-role guidance on which family to choose for `/forge:review` (one-shot capability gains favor Opus 4.8) vs
 `/forge:panel` (mix families for diverse independent perspectives) vs the supervisor (multi-needle retrieval favors Opus
 4.6, with Gemini useful for mid-long or multimodal planner contexts), see [model-selection.md](model-selection.md).
 

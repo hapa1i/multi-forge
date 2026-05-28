@@ -868,7 +868,7 @@ models:
     tags: []
 
   # ---------------------------------------------------------------------------
-  # Claude Models (4.7 + 4.6 + 4.5 series)
+  # Claude Models (4.8 + 4.6 + 4.5 series)
   # ---------------------------------------------------------------------------
 
   # --- Claude 4.6 Series ---
@@ -897,11 +897,11 @@ models:
     intelligence_score: 98
     tags: []
 
-  # --- Claude 4.7 Series ---
-  # Opus 4.7 is intentionally opt-in. Keep opus/claude-opus defaults on 4.6
+  # --- Claude 4.8 Series ---
+  # Opus 4.8 is intentionally opt-in. Keep opus/claude-opus defaults on 4.6
   # until this profile is proven safe for resume-heavy and referent-heavy flows.
-  claude-opus-4-7:
-    friendly_name: Claude Opus 4.7
+  claude-opus-4-8:
+    friendly_name: Claude Opus 4.8
     context_window_tokens: 1000000
     max_output_tokens: 128000
     max_thinking_tokens: 128000
@@ -923,7 +923,7 @@ models:
     litellm_reasoning_efforts: [low, medium, high, xhigh]
     default_reasoning_effort: high
     token_estimate_multiplier: 1.35
-    intelligence_score: 99
+    intelligence_score: 100
     tags: [bounded-review, opt-in]
 
   claude-sonnet-4-6:
@@ -1449,12 +1449,12 @@ aliases:
   opus-4-6-1m: claude-opus-4-6-1m
   opus: claude-opus-4-6
 
-  # Opus 4.7 (explicit opt-in only)
-  anthropic/claude-opus-4-7: claude-opus-4-7
-  anthropic/claude-opus-4.7: claude-opus-4-7
-  claude-opus-4.7: claude-opus-4-7
-  opus-4-7: claude-opus-4-7
-  opus-4.7: claude-opus-4-7
+  # Opus 4.8 (explicit opt-in only)
+  anthropic/claude-opus-4-8: claude-opus-4-8
+  anthropic/claude-opus-4.8: claude-opus-4-8
+  claude-opus-4.8: claude-opus-4-8
+  opus-4-8: claude-opus-4-8
+  opus-4.8: claude-opus-4-8
 
   # Sonnet 4.6
   anthropic/claude-sonnet-4-6: claude-sonnet-4-6

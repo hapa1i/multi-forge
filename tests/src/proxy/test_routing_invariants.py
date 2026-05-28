@@ -337,7 +337,7 @@ class TestOpenRouterModelMapping:
 
         assert map_model_name("google/gemini-3.1-pro-preview") == "google/gemini-3.1-pro-preview"
         assert map_model_name("anthropic/claude-sonnet-4.6") == "anthropic/claude-sonnet-4.6"
-        assert map_model_name("anthropic/claude-opus-4.7") == "anthropic/claude-opus-4.7"
+        assert map_model_name("anthropic/claude-opus-4.8") == "anthropic/claude-opus-4.8"
         assert map_model_name("qwen/qwen3.6-flash") == "qwen/qwen3.6-flash"
         assert map_model_name("qwen/qwen3.6-plus") == "qwen/qwen3.6-plus"
         assert map_model_name("minimax/minimax-m2.5") == "minimax/minimax-m2.5"

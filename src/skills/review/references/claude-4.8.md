@@ -1,8 +1,8 @@
-# Claude 4.7 Prompting Guide (Opus 4.7)
+# Claude 4.8 Prompting Guide (Opus 4.8)
 
 > Synthesized from
 > [Anthropic Claude Docs](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices),
-> [What's New in Claude Opus 4.7](https://platform.claude.com/docs/en/about-claude/models/whats-new-claude-4-7),
+> [What's New in Claude Opus 4.8](https://platform.claude.com/docs/en/about-claude/models/whats-new-claude-4-8),
 > [Anthropic Migration Guide](https://platform.claude.com/docs/en/about-claude/models/migration-guide),
 > [Anthropic Effort](https://platform.claude.com/docs/en/build-with-claude/effort),
 > [Anthropic Adaptive Thinking](https://platform.claude.com/docs/en/build-with-claude/adaptive-thinking), and
@@ -10,26 +10,40 @@
 
 ## Overview
 
-Claude 4.7 currently means **Claude Opus 4.7**. As of May 2026, Anthropic has not released Sonnet 4.7 or Haiku 4.7. Use
+Claude 4.8 currently means **Claude Opus 4.8**. As of May 2026, Anthropic has not released Sonnet 4.8 or Haiku 4.8. Use
 Sonnet 4.6 for the best speed/intelligence tradeoff and Haiku 4.5 for low-latency work.
 
-Claude Opus 4.7 was released April 16, 2026 as Anthropic's most capable generally available model for complex reasoning
-and agentic coding. It keeps the 1M context window and 128K synchronous Messages API max output of Opus 4.6, while
-adding 300K Batch API output through a beta header. It changes how prompts should be tuned:
+Claude Opus 4.8 was released May 28, 2026 as Anthropic's most capable generally available model for complex reasoning
+and agentic coding. It is a fast-follow on Opus 4.7 (41 days later) and **inherits Opus 4.7's API contract**, 1M context
+window, and 128K synchronous Messages API max output. Code that already runs on Opus 4.7 needs no API changes.
+
+**Inherited from Opus 4.7** (unchanged, and still the core of how you prompt this model):
 
 - **More literal instruction following** - instructions are applied exactly, especially at lower effort
-- **New `xhigh` effort level** - recommended for most coding and agentic workloads
+- **`xhigh` effort level** - recommended for most coding and agentic workloads (introduced in 4.7)
 - **Strict effort behavior** - `low` and `medium` really mean scoped, cost-sensitive work
 - **Extended thinking mode removed** - any `thinking: {"type": "enabled"}` configuration returns 400
 - **Adaptive thinking off by default** - explicitly set `thinking: {"type": "adaptive"}` to enable thinking
 - **Sampling parameters removed** - non-default `temperature`, `top_p`, or `top_k` returns 400
-- **Task budgets beta** - advisory token budget across a full agentic loop
-- **300K Batch API output beta** - Message Batches can exceed the standard 128K synchronous output cap
+- **Task budgets beta** and **300K Batch API output beta** - carried over from 4.7
 - **Thinking content omitted by default** - opt into summarized thinking display if your product needs it
-- **Updated tokenizer** - same text can use up to about 35% more tokens than Opus 4.6
+- **4.7-era tokenizer** - same text can use up to about 35% more tokens than Opus 4.6 (token use is similar to 4.7)
 - **Fewer tool calls and subagents by default** - more internal reasoning, less automatic fan-out
 
-**Key mindset shift:** Claude Opus 4.7 is more capable, more autonomous, and more literal. Do not rely on vague "be
+**New in Opus 4.8** (since 4.7):
+
+- **Mid-conversation system messages** - send a `role: "system"` message immediately after a user turn to append
+  instructions later without restating the full system prompt; preserves prompt-cache hits on earlier turns. No beta
+  header required.
+- **Fast mode (research preview)** - set `speed: "fast"` for up to ~2.5x higher output tokens/sec at premium pricing
+  ($10 / $50 per Mtok input/output) on the Claude API.
+- **Lower prompt-cache minimum** - prompts as short as **1,024 tokens** are now cacheable (down from the 4.7 minimum),
+  so shorter prompts create cache entries with no code change.
+- **Documented refusal `stop_details`** - refusal responses carry a category your app can branch on.
+- **Behavioral gains over 4.7** - better tool triggering (fewer skipped required tool calls), better compaction recovery
+  and long-context handling, and adaptive thinking that wastes fewer tokens at the same effort level.
+
+**Key mindset shift:** Claude Opus 4.8 is more capable, more autonomous, and more literal. Do not rely on vague "be
 thorough" prompting or inherited 4.6 scaffolding. State the exact scope, choose effort deliberately, and use prompt
 language to decide when the model should reason, use tools, spawn subagents, or report every finding.
 
@@ -37,11 +51,11 @@ language to decide when the model should reason, use tools, spawn subagents, or 
 
 | Model          | Best For                                                                       |
 | -------------- | ------------------------------------------------------------------------------ |
-| **Opus 4.7**   | Hard coding, long-horizon agents, code review, and large-context reasoning     |
+| **Opus 4.8**   | Hard coding, long-horizon agents, code review, and large-context reasoning     |
 | **Sonnet 4.6** | Default for fast, cost-efficient coding, analysis, and everyday tool workflows |
 | **Haiku 4.5**  | Lowest-latency routing, extraction, classification, and simple tool calls      |
 
-**Rule of thumb:** Use Sonnet 4.6 by default for ordinary work. Use Opus 4.7 when failure is expensive, the task spans
+**Rule of thumb:** Use Sonnet 4.6 by default for ordinary work. Use Opus 4.8 when failure is expensive, the task spans
 many files or many steps, the model must verify its own work, or code-review recall matters more than cost.
 
 ## Core API Parameters
@@ -50,7 +64,7 @@ many files or many steps, the model must verify its own work, or code-review rec
 
 ```python
 response = client.messages.create(
-    model="claude-opus-4-7",
+    model="claude-opus-4-8",
     max_tokens=64000,
     thinking={"type": "adaptive"},
     output_config={"effort": "xhigh"},
@@ -60,20 +74,20 @@ response = client.messages.create(
 
 ### Adaptive Thinking
 
-Claude Opus 4.7 supports **adaptive thinking only**. The old `enabled` extended thinking mode is rejected:
+Claude Opus 4.8 supports **adaptive thinking only**. The old `enabled` extended thinking mode is rejected:
 
 ```python
-# Before: Opus 4.6. Not accepted on Opus 4.7, even without budget_tokens.
+# Before: Opus 4.6. Not accepted on Opus 4.8, even without budget_tokens.
 thinking = {"type": "enabled", "budget_tokens": 32000}
 
-# After: Opus 4.7
+# After: Opus 4.8
 thinking = {"type": "adaptive"}
 output_config = {"effort": "high"}
 ```
 
 Important details:
 
-- Adaptive thinking is **off by default** on Opus 4.7. Omit `thinking` only when you want the lowest latency.
+- Adaptive thinking is **off by default** on Opus 4.8. Omit `thinking` only when you want the lowest latency.
 - Any `thinking: {"type": "enabled"}` configuration returns a 400 error, with or without `budget_tokens`.
 - Interleaved thinking is automatically enabled with adaptive mode.
 - Thinking and final output share the `max_tokens` cap, so large effort levels need a large `max_tokens`.
@@ -86,12 +100,12 @@ Important details:
 | `low`    | Most efficient. Strictly scoped. May under-think moderately complex work.          | Small edits, simple routing, cheap subagents                  |
 | `medium` | Balanced cost/performance. More literal and narrower than Opus 4.6 medium.         | Cost-sensitive agents, scoped analysis                        |
 | `high`   | High capability. Same as omitting effort. Minimum for intelligence-sensitive work. | Complex Q&A, difficult coding, review, large-context analysis |
-| `xhigh`  | **New in 4.7.** Extended capability for long-horizon work.                         | Most coding and agentic workflows                             |
+| `xhigh`  | Extended capability for long-horizon work (introduced in 4.7).                     | Most coding and agentic workflows                             |
 | `max`    | Maximum capability. Can show diminishing returns and overthinking.                 | Hardest architecture, deep audits, final verification         |
 
 **Default:** `high`.
 
-**Anthropic's 4.7 guidance:**
+**Anthropic's effort guidance:**
 
 - Start with `xhigh` for coding and agentic workflows.
 - Use at least `high` for most intelligence-sensitive tasks.
@@ -99,7 +113,7 @@ Important details:
 - Test `max` for the hardest work, but measure whether it improves quality enough to justify token use.
 - At `xhigh` or `max`, start with `max_tokens` of at least 64K and tune from there.
 
-**Critical difference from 4.6:** Opus 4.7 respects low effort strictly. If you run complex work at `low` or `medium`
+**Critical difference from 4.6:** Opus 4.8 respects low effort strictly. If you run complex work at `low` or `medium`
 and observe shallow reasoning, raise effort first. If you must keep low effort for latency, targeted reasoning guidance
 can help:
 
@@ -107,12 +121,12 @@ can help:
 This task involves multi-step reasoning. Think carefully through the problem before responding.
 ```
 
-That sentence was often counterproductive on 4.6 because effort already controlled thinking depth. On 4.7, it is useful
+That sentence was often counterproductive on 4.6 because effort already controlled thinking depth. On 4.8, it is useful
 only as a narrow low-effort rescue, not as a blanket system-prompt habit.
 
 ### Steering Thinking Frequency
 
-Large system prompts can make Opus 4.7 think more often than needed. Steer adaptive thinking directly:
+Large system prompts can make Opus 4.8 think more often than needed. Steer adaptive thinking directly:
 
 ```
 Thinking adds latency and should only be used when it will meaningfully improve answer quality,
@@ -123,7 +137,7 @@ Conversely, if `medium` effort under-thinks hard work, raise effort before addin
 
 ### Thinking Display
 
-Thinking content is omitted by default on Opus 4.7. Claude may still think, and those thinking tokens are still billed,
+Thinking content is omitted by default on Opus 4.8. Claude may still think, and those thinking tokens are still billed,
 but the thinking text is not returned in the API response unless you opt in:
 
 ```python
@@ -138,9 +152,9 @@ Billing is still based on generated tokens.
 
 ### Sampling Parameters
 
-Starting with Claude Opus 4.7, do **not** set non-default sampling parameters:
+Starting with Claude Opus 4.8, do **not** set non-default sampling parameters:
 
-| Parameter     | 4.7 Behavior                  | Migration                          |
+| Parameter     | 4.8 Behavior                  | Migration                          |
 | ------------- | ----------------------------- | ---------------------------------- |
 | `temperature` | Non-default values return 400 | Omit it. Use prompt instructions.  |
 | `top_p`       | Non-default values return 400 | Omit it. Use examples/constraints. |
@@ -153,15 +167,15 @@ outputs. Use stricter output formats, examples, and validation instead.
 
 | Model      | Context Window | Max Output (Messages API) | Reliable Knowledge Cutoff | Training Data Cutoff |
 | ---------- | -------------- | ------------------------- | ------------------------- | -------------------- |
-| Opus 4.7   | 1M tokens      | 128K                      | Jan 2026                  | Jan 2026             |
+| Opus 4.8   | 1M tokens      | 128K                      | Jan 2026                  | Jan 2026             |
 | Sonnet 4.6 | 1M tokens      | 64K                       | May 2025                  | May 2025             |
 | Haiku 4.5  | 200K tokens    | 64K                       | Feb 2025                  | Jul 2025             |
 
-Opus 4.7's 1M context window is available at standard API pricing with no long-context premium.
+Opus 4.8's 1M context window is available at standard API pricing with no long-context premium.
 
 ### Batch API Extended Output (Beta)
 
-On the Message Batches API, Claude Opus 4.7, Opus 4.6, and Sonnet 4.6 support up to **300K output tokens** with the
+On the Message Batches API, Claude Opus 4.8, Opus 4.6, and Sonnet 4.6 support up to **300K output tokens** with the
 `output-300k-2026-03-24` beta header.
 
 Important constraints:
@@ -173,8 +187,9 @@ Important constraints:
 
 ### Tokenization Change
 
-Opus 4.7 uses a new tokenizer. Anthropic says token counts can be up to about 35% higher than Opus 4.6, depending on
-content, so assume some increase until representative requests prove otherwise. Consequences:
+Opus 4.8 uses the same tokenizer introduced with Opus 4.7. Token counts can be up to about 35% higher than Opus 4.6
+(token use is similar to 4.7), depending on content, so assume some increase versus 4.6 until representative requests
+prove otherwise. Consequences:
 
 - Re-run `/v1/messages/count_tokens` against representative requests.
 - Add headroom to `max_tokens`, especially near compaction triggers.
@@ -207,14 +222,14 @@ Practical rules:
 ## Context Compaction (Beta)
 
 Server-side compaction remains the recommended context-management strategy for long-running conversations and agentic
-workflows that approach context limits. It is especially important on Opus 4.7 because the new tokenizer can change
-token counts and task budgets may need to survive multiple compacted turns.
+workflows that approach context limits. It is especially important on Opus 4.8 because the 4.7-era tokenizer can change
+token counts versus 4.6 and task budgets may need to survive multiple compacted turns.
 
 Enable it with the beta header `compact-2026-01-12` and a `context_management.edits` entry:
 
 ```python
 response = client.beta.messages.create(
-    model="claude-opus-4-7",
+    model="claude-opus-4-8",
     max_tokens=4096,
     messages=messages,
     context_management={"edits": [{"type": "compact_20260112"}]},
@@ -236,9 +251,9 @@ response = client.beta.messages.create(
 
 ## Key Behavioral Differences from Claude 4.6
 
-| Aspect                | Claude Opus 4.7 Behavior                                                                 |
+| Aspect                | Claude Opus 4.8 Behavior                                                                 |
 | --------------------- | ---------------------------------------------------------------------------------------- |
-| Model lineup          | Opus 4.7 only. No Sonnet 4.7 or Haiku 4.7 yet.                                           |
+| Model lineup          | Opus 4.8 only. No Sonnet 4.8 or Haiku 4.8 yet.                                           |
 | Reasoning control     | Adaptive thinking only; `thinking: {"type": "enabled"}` rejected.                        |
 | Effort                | Adds `xhigh`; `low`/`medium` are stricter and can under-think hard tasks.                |
 | Sampling              | Non-default `temperature`, `top_p`, `top_k` return 400.                                  |
@@ -288,7 +303,7 @@ Use a small number of examples for format and tone. Keep them diverse enough tha
 
 ### Fewer Tool Calls by Default
 
-Opus 4.7 often reasons more and calls fewer tools than Opus 4.6. This can improve quality per tool call, but it can hurt
+Opus 4.8 often reasons more and calls fewer tools than Opus 4.6. This can improve quality per tool call, but it can hurt
 workflows where ground truth lives outside the model. Increase tool use by:
 
 1. Raising effort to `high` or `xhigh`.
@@ -304,7 +319,7 @@ that the claim is an inference from the inspected evidence.
 
 ### User-Facing Progress Updates
 
-Opus 4.7 gives better updates during long agentic traces. Remove old scaffolding such as "after every 3 tool calls,
+Opus 4.8 gives better updates during long agentic traces. Remove old scaffolding such as "after every 3 tool calls,
 summarize progress" and re-baseline. If the defaults still do not fit:
 
 ```xml
@@ -318,7 +333,7 @@ summarize progress" and re-baseline. If the defaults still do not fit:
 
 ### Interactive Coding Products
 
-Opus 4.7 may use more tokens in interactive coding than in autonomous one-shot tasks because it reasons after user
+Opus 4.8 may use more tokens in interactive coding than in autonomous one-shot tasks because it reasons after user
 turns. Anthropic recommends:
 
 - Use `xhigh` or `high` effort for coding products.
@@ -326,11 +341,11 @@ turns. Anthropic recommends:
 - Put the full task, intent, constraints, and acceptance criteria in the first human turn.
 - Avoid progressive underspecified instructions when token efficiency matters.
 
-## Prompting Principles for 4.7
+## Prompting Principles for 4.8
 
 ### 1. Be Literal About Scope
 
-Opus 4.7 will not infer broad scope from a narrow instruction. If a rule applies everywhere, say so:
+Opus 4.8 will not infer broad scope from a narrow instruction. If a rule applies everywhere, say so:
 
 ```xml
 <scope>
@@ -342,7 +357,7 @@ Do not apply them only to the first example.
 Avoid repeated emphasis. One clear instruction is usually enough. Repetition can make the model over-weight a rule and
 ignore nuance.
 
-This is the biggest prompting change from Opus 4.6: earlier Claude models often generalized a rule stated once. Opus 4.7
+This is the biggest prompting change from Opus 4.6: earlier Claude models often generalized a rule stated once. Opus 4.8
 is more likely to apply the rule exactly where you named it and stop there.
 
 ### 2. Replace Vague Thoroughness with Effort
@@ -364,7 +379,7 @@ or reconciling contradictory evidence. For simple factual or mechanical requests
 
 ### 3. Define Tool Triggers
 
-Because Opus 4.7 uses tools less often by default, tell it when tools are required:
+Because Opus 4.8 uses tools less often by default, tell it when tools are required:
 
 ```xml
 <tool_usage>
@@ -377,7 +392,7 @@ Because Opus 4.7 uses tools less often by default, tell it when tools are requir
 
 ### 4. Tell It When to Fan Out
 
-Opus 4.7 spawns fewer subagents by default. Be explicit:
+Opus 4.8 spawns fewer subagents by default. Be explicit:
 
 ```xml
 <delegation_policy>
@@ -390,7 +405,7 @@ Opus 4.7 spawns fewer subagents by default. Be explicit:
 
 ### 5. Specify Verbosity Positively
 
-Opus 4.7 varies response length by perceived complexity. If your product needs a stable style, show the target:
+Opus 4.8 varies response length by perceived complexity. If your product needs a stable style, show the target:
 
 ```xml
 <response_style>
@@ -403,7 +418,7 @@ Positive examples work better than long lists of "do not over-explain" prohibiti
 
 ### 6. Tune Tone Explicitly
 
-Opus 4.7 is more direct and opinionated than Opus 4.6. If you need warmth:
+Opus 4.8 is more direct and opinionated than Opus 4.6. If you need warmth:
 
 ```xml
 <tone>
@@ -418,7 +433,7 @@ If you need a neutral enterprise voice, ask for it directly rather than relying 
 
 ## Preventing Overengineering
 
-Opus 4.7's literal instruction following makes scope constraints more reliable, not less necessary. State exactly what
+Opus 4.8's literal instruction following makes scope constraints more reliable, not less necessary. State exactly what
 kind of initiative is welcome and what counts as scope drift:
 
 ```xml
@@ -444,10 +459,10 @@ Do not propose unrelated refactors or style preferences unless they directly aff
 
 ## Code Review Harnesses
 
-This is one of the most important 4.7-specific changes for review workflows.
+This is one of the most important review-workflow considerations on Opus 4.8 (the behavior carried over from 4.7).
 
-Opus 4.7 is better at finding bugs, but older prompts can accidentally reduce reported recall. When a prompt says "only
-report high-severity issues," "be conservative," or "do not nitpick," Opus 4.7 may identify a real bug and then silently
+Opus 4.8 is better at finding bugs, but older prompts can accidentally reduce reported recall. When a prompt says "only
+report high-severity issues," "be conservative," or "do not nitpick," Opus 4.8 may identify a real bug and then silently
 drop it because it judges the issue below the stated bar.
 
 For a finding-discovery pass, use coverage-oriented language:
@@ -477,7 +492,7 @@ avoid claims about unopened code, cite exact paths/lines, and return findings fi
 
 ## Frontend and Design Defaults
 
-Opus 4.7 has stronger design instincts than Opus 4.6, but it tends to default to warm editorial styling:
+Opus 4.8 has stronger design instincts than Opus 4.6, but it tends to default to warm editorial styling:
 
 Generic negative instructions are weak:
 
@@ -522,12 +537,13 @@ Based on the material above, answer the following:
 [Specific task]
 ```
 
-4.7-specific rules:
+Opus 4.8 rules:
 
 - Prefer precise file ranges and relevant excerpts over entire folders.
 - Use compaction for long conversations, but preserve decisions, unresolved tasks, and file ownership.
-- Keep broad instructions explicit about every source or section they apply to; 4.7 will not reliably generalize them.
-- Re-run token counting after migrating to 4.7 because tokenization changed.
+- Keep broad instructions explicit about every source or section they apply to; Opus 4.8 will not reliably generalize
+  them.
+- Re-run token counting if migrating from Opus 4.6, because the 4.7-era tokenizer counts differently.
 
 ---
 
@@ -535,7 +551,7 @@ Based on the material above, answer the following:
 
 Assistant message prefilling remains unavailable. Use structured outputs, tools, and direct prompt instructions instead:
 
-| Previous Pattern                 | 4.7 Pattern                                   |
+| Previous Pattern                 | 4.8 Pattern                                   |
 | -------------------------------- | --------------------------------------------- |
 | Prefill `{` for JSON             | `output_config.format` or structured outputs  |
 | Prefill enum/classification text | Tool with enum field or strict schema         |
@@ -560,9 +576,9 @@ the schema rather than relying on prose alone.
 
 ### What Changed
 
-| Aspect             | Claude Opus 4.6                         | Claude Opus 4.7                                   |
+| Aspect             | Claude Opus 4.6                         | Claude Opus 4.8                                   |
 | ------------------ | --------------------------------------- | ------------------------------------------------- |
-| Model availability | Opus and Sonnet 4.6                     | Opus 4.7 only                                     |
+| Model availability | Opus and Sonnet 4.6                     | Opus 4.8 only                                     |
 | Thinking modes     | Adaptive recommended; manual deprecated | Adaptive only; manual rejected                    |
 | Effort levels      | low, medium, high, max                  | low, medium, high, xhigh, max                     |
 | Effort behavior    | More forgiving at low/medium            | Lower effort strictly narrows work                |
@@ -574,7 +590,7 @@ the schema rather than relying on prose alone.
 
 ### Migration Checklist
 
-01. **Change model ID** to `claude-opus-4-7`.
+01. **Change model ID** to `claude-opus-4-8`.
 02. **Remove `thinking: {"type": "enabled"}` entirely** and use adaptive thinking when thinking is needed.
 03. **Set effort deliberately**: start `xhigh` for coding/agents, `high` for intelligence-sensitive work.
 04. **Omit sampling parameters**: remove non-default `temperature`, `top_p`, and `top_k`.
@@ -583,13 +599,13 @@ the schema rather than relying on prose alone.
 07. **Re-run token counts** against real prompts and adjust cost expectations.
 08. **Remove old progress-update scaffolding** and re-baseline.
 09. **Audit literal instructions**: ensure broad rules say exactly what they apply to.
-10. **Retune code-review thresholds** so 4.7 does not silently drop lower-severity findings.
+10. **Retune code-review thresholds** so Opus 4.8 does not silently drop lower-severity findings.
 11. **Add tool/subagent triggers** for workflows that require evidence gathering or fan-out.
 12. **Use task budgets only after measuring** representative task token usage.
 
 ---
 
-## Complete Example: 4.7 Coding and Review Assistant
+## Complete Example: 4.8 Coding and Review Assistant
 
 ```xml
 <role>
@@ -642,9 +658,9 @@ betas=["task-budgets-2026-03-13"]
 
 ---
 
-## Key Differences: Claude 4.7 vs GPT-5.5 vs Gemini 3.1 Pro
+## Key Differences: Claude 4.8 vs GPT-5.5 vs Gemini 3.1 Pro
 
-| Aspect                 | Claude Opus 4.7                                | GPT-5.5                          | Gemini 3.1 Pro                   |
+| Aspect                 | Claude Opus 4.8                                | GPT-5.5                          | Gemini 3.1 Pro                   |
 | ---------------------- | ---------------------------------------------- | -------------------------------- | -------------------------------- |
 | Default reasoning      | Off unless `thinking` set; effort high         | `reasoning.effort` medium        | Dynamic thinking high            |
 | Thinking control       | Adaptive + effort; no manual budgets           | `reasoning.effort` none to xhigh | `thinking_level` low/medium/high |
@@ -662,7 +678,7 @@ betas=["task-budgets-2026-03-13"]
 
 ## Pro Tips
 
-01. **Use Opus 4.7 only where it pays off** - hard coding, code review, long agents, and large-context reasoning.
+01. **Use Opus 4.8 only where it pays off** - hard coding, code review, long agents, and large-context reasoning.
 
 02. **Start coding agents at `xhigh`** - Anthropic recommends it for coding and agentic use cases; use at least `high`
     for intelligence-sensitive work.
@@ -674,9 +690,9 @@ betas=["task-budgets-2026-03-13"]
 
 05. **Use `max_tokens >= 64K` for `xhigh`/`max`** - thinking, tools, and output share the cap.
 
-06. **Re-baseline before adding scaffolding** - 4.7 often no longer needs 4.6-era progress or validation text.
+06. **Re-baseline before adding scaffolding** - 4.8 often no longer needs 4.6-era progress or validation text.
 
-07. **Make scope global when it is global** - 4.7 applies instructions literally, so name every target the rule covers.
+07. **Make scope global when it is global** - 4.8 applies instructions literally, so name every target the rule covers.
 
 08. **For review, optimize discovery before filtering** - otherwise conservative prompts can hide real bugs.
 
@@ -685,14 +701,14 @@ betas=["task-budgets-2026-03-13"]
 10. **Measure tokens after migration** - tokenizer counts changed; use compaction, task budgets, and Batch API extended
     output deliberately.
 
-11. **Specify frontend style concretely** - otherwise Opus 4.7 may drift into its cream/serif/terracotta house style.
+11. **Specify frontend style concretely** - otherwise Opus 4.8 may drift into its cream/serif/terracotta house style.
 
 ---
 
 ## Sources
 
 - [Anthropic: Prompting Best Practices](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices)
-- [Anthropic: What's New in Claude Opus 4.7](https://platform.claude.com/docs/en/about-claude/models/whats-new-claude-4-7)
+- [Anthropic: What's New in Claude Opus 4.8](https://platform.claude.com/docs/en/about-claude/models/whats-new-claude-4-8)
 - [Anthropic: Migration Guide](https://platform.claude.com/docs/en/about-claude/models/migration-guide)
 - [Anthropic: Models Overview](https://platform.claude.com/docs/en/about-claude/models/overview)
 - [Anthropic: Batch Processing](https://platform.claude.com/docs/en/build-with-claude/batch-processing)
@@ -700,8 +716,8 @@ betas=["task-budgets-2026-03-13"]
 - [Anthropic: Adaptive Thinking](https://platform.claude.com/docs/en/build-with-claude/adaptive-thinking)
 - [Anthropic: Task Budgets](https://platform.claude.com/docs/en/build-with-claude/task-budgets)
 - [Anthropic: Compaction](https://platform.claude.com/docs/en/build-with-claude/compaction)
-- [Anthropic: Introducing Claude Opus 4.7](https://www.anthropic.com/news/claude-opus-4-7)
-- [Claude: Working with Claude Opus 4.7](https://claude.com/resources/tutorials/working-with-claude-opus-4-7)
+- [Anthropic: Introducing Claude Opus 4.8](https://www.anthropic.com/news/claude-opus-4-8)
+- [Claude: Working with Claude Opus 4.8](https://claude.com/resources/tutorials/working-with-claude-opus-4-8)
 - [OpenAI: GPT-5.5 Model](https://developers.openai.com/api/docs/models/gpt-5.5)
 - [OpenAI: Models](https://developers.openai.com/api/docs/models)
 - [Google DeepMind: Gemini 3.1 Pro](https://deepmind.google/models/gemini/pro/)

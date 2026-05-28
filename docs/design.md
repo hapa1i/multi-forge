@@ -999,7 +999,7 @@ per-child handoff file in `$EDITOR` before launching Claude. `forge session memo
 | `forge workflow list-models`         | Show available model backends              |
 
 Workflow model specs support proxy-backed workers and explicit direct Claude workers. The stable `claude-opus` worker is
-kept on Claude Opus 4.6; newer direct workers such as `claude-opus-4.7` are opt-in and can attach per-worker prompt
+kept on Claude Opus 4.6; newer direct workers such as `claude-opus-4.8` are opt-in and can attach per-worker prompt
 hints through `ModelSpec.prompt`. All workflow execution commands (panel, analyze, debate, consensus) accept
 `--proxy <proxy_id>` to route proxy-backed workers through a specific proxy, overriding preferred_proxy and route scan
 (§3.6.12). Direct workers (e.g., `claude-opus`) remain on Anthropic routing regardless of `--proxy`.

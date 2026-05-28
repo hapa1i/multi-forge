@@ -97,10 +97,10 @@ def test_resume_token_estimate_multiplier_skips_proxy_config_lookup(temp_env: Pa
 
 
 def test_resume_token_estimate_multiplier_uses_direct_pin(temp_env: Path) -> None:
-    """Direct 4.7 resume checks keep the model-specific tokenizer margin."""
+    """Direct 4.8 resume checks keep the model-specific tokenizer margin."""
     from forge.cli import session_lifecycle
 
-    parent = create_session_state("parent", worktree_path=str(temp_env), direct_model="claude-opus-4-7")
+    parent = create_session_state("parent", worktree_path=str(temp_env), direct_model="claude-opus-4-8")
 
     multiplier = session_lifecycle._resume_token_estimate_multiplier(
         parent_state=parent,
@@ -1075,18 +1075,18 @@ class TestSessionStart:
     def test_start_with_model(self, runner: CliRunner, temp_env: Path) -> None:
         """--model pins direct Claude sessions through env vars."""
         with patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke:
-            result = runner.invoke(main, ["session", "start", "model-test", "--model", "opus-4-7"])
+            result = runner.invoke(main, ["session", "start", "model-test", "--model", "opus-4-8"])
 
         assert result.exit_code == 0
         assert mock_invoke.call_args is not None
         kwargs = mock_invoke.call_args.kwargs
         assert kwargs["model"] is None
         assert kwargs["env_vars"]["ANTHROPIC_MODEL"] == "opus"
-        assert kwargs["env_vars"]["ANTHROPIC_DEFAULT_OPUS_MODEL"] == "claude-opus-4-7"
+        assert kwargs["env_vars"]["ANTHROPIC_DEFAULT_OPUS_MODEL"] == "claude-opus-4-8"
 
         state = SessionStore(str(temp_env), "model-test").read()
         assert state.intent.launch is not None
-        assert state.intent.launch.direct_model == "claude-opus-4-7"
+        assert state.intent.launch.direct_model == "claude-opus-4-8"
 
     def test_start_with_proxy_injects_model_addendum(self, runner: CliRunner, temp_env: Path) -> None:
         """Proxy-routed managed launches append the model-family prompt addendum."""
@@ -1107,13 +1107,13 @@ class TestSessionStart:
     def test_start_with_model_no_launch_stores_normalized_pin(self, runner: CliRunner, temp_env: Path) -> None:
         result = runner.invoke(
             main,
-            ["session", "start", "model-no-launch", "--model", "claude-opus-4-7[1m]", "--no-launch"],
+            ["session", "start", "model-no-launch", "--model", "claude-opus-4-8[1m]", "--no-launch"],
         )
 
         assert result.exit_code == 0
         state = SessionStore(str(temp_env), "model-no-launch").read()
         assert state.intent.launch is not None
-        assert state.intent.launch.direct_model == "claude-opus-4-7[1m]"
+        assert state.intent.launch.direct_model == "claude-opus-4-8[1m]"
 
     def test_start_with_sonnet_model_sets_sonnet_env(self, runner: CliRunner, temp_env: Path) -> None:
         with patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke:
@@ -1136,7 +1136,7 @@ class TestSessionStart:
                     "start",
                     "model-subprocess",
                     "--model",
-                    "opus-4-7",
+                    "opus-4-8",
                     "--subprocess-proxy",
                     "openrouter-anthropic",
                 ],
@@ -1145,7 +1145,7 @@ class TestSessionStart:
         assert result.exit_code == 0
         kwargs = mock_invoke.call_args.kwargs
         assert kwargs["env_vars"]["FORGE_SUBPROCESS_PROXY"] == "openrouter-anthropic"
-        assert kwargs["env_vars"]["ANTHROPIC_DEFAULT_OPUS_MODEL"] == "claude-opus-4-7"
+        assert kwargs["env_vars"]["ANTHROPIC_DEFAULT_OPUS_MODEL"] == "claude-opus-4-8"
 
     @pytest.mark.parametrize("flag", ["--sidecar", "--host-proxy"])
     def test_start_with_model_rejects_sidecar_and_host_proxy(
@@ -1154,7 +1154,7 @@ class TestSessionStart:
         temp_env: Path,
         flag: str,
     ) -> None:
-        args = ["session", "start", "bad-model", "--model", "opus-4-7", flag]
+        args = ["session", "start", "bad-model", "--model", "opus-4-8", flag]
 
         result = runner.invoke(main, args)
 
@@ -1162,7 +1162,7 @@ class TestSessionStart:
         assert "--model" in result.output
 
     def test_start_with_unknown_model_rejects_before_create(self, runner: CliRunner, temp_env: Path) -> None:
-        result = runner.invoke(main, ["session", "start", "bad-model", "--model", "claude-opus-4.7.1"])
+        result = runner.invoke(main, ["session", "start", "bad-model", "--model", "claude-opus-4.8.1"])
 
         assert result.exit_code == 1
         assert "Unknown direct Claude model" in result.output
@@ -1181,7 +1181,7 @@ class TestSessionStart:
             port=8095,
             upstream_base_url="https://openrouter.ai/api/v1",
             tiers=TierModels(haiku="h", sonnet="s", opus="o"),
-            model_alternatives={"opus": {"claude-opus-4-7": "anthropic/claude-opus-4.7"}},
+            model_alternatives={"opus": {"claude-opus-4-8": "anthropic/claude-opus-4.8"}},
         )
         routing = session_cli.ResolvedRouting(
             template="openrouter-anthropic",
@@ -1195,12 +1195,12 @@ class TestSessionStart:
         ):
             result = runner.invoke(
                 main,
-                ["session", "start", "model-proxy-ok", "--proxy", "test-or-proxy", "--model", "claude-opus-4-7"],
+                ["session", "start", "model-proxy-ok", "--proxy", "test-or-proxy", "--model", "claude-opus-4-8"],
             )
 
         assert result.exit_code == 0, result.output
         env_vars = mock_invoke.call_args.kwargs["env_vars"]
-        assert env_vars["ANTHROPIC_DEFAULT_OPUS_MODEL"] == "claude-opus-4-7"
+        assert env_vars["ANTHROPIC_DEFAULT_OPUS_MODEL"] == "claude-opus-4-8"
 
     def test_start_with_model_and_proxy_rejects_unconfigured_alternative(
         self, runner: CliRunner, temp_env: Path
@@ -1229,7 +1229,7 @@ class TestSessionStart:
         ):
             result = runner.invoke(
                 main,
-                ["session", "start", "model-proxy-bad", "--proxy", "test-or-openai", "--model", "claude-opus-4-7"],
+                ["session", "start", "model-proxy-bad", "--proxy", "test-or-openai", "--model", "claude-opus-4-8"],
             )
 
         assert result.exit_code == 1
@@ -3341,7 +3341,7 @@ class TestProxyDirectFlags:
 
     def test_proxy_routed_resume_ignores_stored_direct_model_env(self, runner: CliRunner, temp_env: Path) -> None:
         """--proxy on resume should not inject a stored direct-model pin."""
-        runner.invoke(main, ["session", "start", "proxy-resume-parent", "--model", "opus-4-7", "--no-launch"])
+        runner.invoke(main, ["session", "start", "proxy-resume-parent", "--model", "opus-4-8", "--no-launch"])
         routing = session_cli.ResolvedRouting(
             template="litellm-openai",
             base_url="http://localhost:9999",
@@ -3363,7 +3363,7 @@ class TestProxyDirectFlags:
 
     def test_proxy_routed_fork_ignores_stored_direct_model_env(self, runner: CliRunner, temp_env: Path) -> None:
         """--proxy on fork should not inject an inherited direct-model pin."""
-        runner.invoke(main, ["session", "start", "proxy-fork-parent", "--model", "opus-4-7", "--no-launch"])
+        runner.invoke(main, ["session", "start", "proxy-fork-parent", "--model", "opus-4-8", "--no-launch"])
         store = SessionStore(str(temp_env), "proxy-fork-parent")
 
         def _confirm_parent(m: object) -> None:

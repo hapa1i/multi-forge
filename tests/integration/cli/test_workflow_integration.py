@@ -168,13 +168,13 @@ class TestRunMultiReviewE2E:
     ) -> None:
         result = mock_claude_workspace.exec(
             "cd /workspace && FORGE_SUBPROCESS_PROXY=openrouter ANTHROPIC_BASE_URL=http://stale "
-            "forge workflow panel --models claude-opus-4.6,claude-opus-4.7 -p 'ping' --timeout 5 --json",
+            "forge workflow panel --models claude-opus-4.6,claude-opus-4.8 -p 'ping' --timeout 5 --json",
             timeout=30,
         )
         assert result.returncode == 0, result.stderr
 
         data = json.loads(result.stdout)
-        assert set(data["results"]) == {"claude-opus-4.6", "claude-opus-4.7"}
+        assert set(data["results"]) == {"claude-opus-4.6", "claude-opus-4.8"}
         assert data["successful"] == 2
 
         _assert_invocation_count(mock_claude_workspace, 2)
@@ -185,7 +185,7 @@ class TestRunMultiReviewE2E:
         env_texts = _read_capture_files(mock_claude_workspace, "/tmp/claude_env_*.log")
         assert len(env_texts) == 2
         assert sum("ANTHROPIC_DEFAULT_OPUS_MODEL=claude-opus-4-6" in text for text in env_texts) == 1
-        assert sum("ANTHROPIC_DEFAULT_OPUS_MODEL=claude-opus-4-7" in text for text in env_texts) == 1
+        assert sum("ANTHROPIC_DEFAULT_OPUS_MODEL=claude-opus-4-8" in text for text in env_texts) == 1
         for env_text in env_texts:
             assert "ANTHROPIC_MODEL=opus" in env_text
             assert "ANTHROPIC_BASE_URL=" not in env_text
@@ -193,10 +193,10 @@ class TestRunMultiReviewE2E:
 
         stdin_texts = _read_capture_files(mock_claude_workspace, "/tmp/claude_stdin_*.log")
         assert len(stdin_texts) == 2
-        hinted = [text for text in stdin_texts if "Claude Opus 4.7 bounded-review worker" in text]
+        hinted = [text for text in stdin_texts if "Claude Opus 4.8 bounded-review worker" in text]
         assert len(hinted) == 1
         assert "file:line" in hinted[0]
-        plain = [text for text in stdin_texts if "Claude Opus 4.7 bounded-review worker" not in text]
+        plain = [text for text in stdin_texts if "Claude Opus 4.8 bounded-review worker" not in text]
         assert len(plain) == 1
         assert all("ping" in text for text in stdin_texts)
 

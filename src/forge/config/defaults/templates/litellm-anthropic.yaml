@@ -1,10 +1,10 @@
 # Template: litellm-anthropic
 # Anthropic Claude via remote/shared LiteLLM
 #
-# Access to Claude Opus 4.6/4.7, Sonnet 4.6, and Haiku 4.5.
+# Access to Claude Opus 4.6/4.8, Sonnet 4.6, and Haiku 4.5.
 # Requires LITELLM_API_KEY and LITELLM_BASE_URL in .env (or environment).
 #
-# Use --model claude-opus-4-7 to select Opus 4.7 instead of the 4.6 default.
+# Use --model claude-opus-4-8 to select Opus 4.8 instead of the 4.6 default.
 # prompt_caching: passthrough respects Anthropic's 4-breakpoint cache_control limit.
 
 proxy:
@@ -19,6 +19,6 @@ proxy:
       opus: anthropic/claude-opus-4-6
     model_alternatives:
       opus:
-        claude-opus-4-7: anthropic/claude-opus-4-7
+        claude-opus-4-8: anthropic/claude-opus-4-8
     prompt_caching: passthrough
     error_hints: true

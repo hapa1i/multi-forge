@@ -44,12 +44,12 @@ and stop.
 | `gemini-3.1-pro-preview` | Balanced analysis, large context    | openrouter-gemini proxy |
 | `claude-opus`            | Stable Claude Opus 4.6 reasoning    | Direct Anthropic        |
 
-Selectable direct Claude workers include `claude-opus-4.6`, `claude-opus-4.6-1m`, and `claude-opus-4.7`. Use
-`claude-opus-4.7` as a bounded review/quorum worker when the prompt has a concrete target and should require file:line
-evidence. You can include both 4.6 and 4.7 in one panel, for example:
+Selectable direct Claude workers include `claude-opus-4.6`, `claude-opus-4.6-1m`, and `claude-opus-4.8`. Use
+`claude-opus-4.8` as a bounded review/quorum worker when the prompt has a concrete target and should require file:line
+evidence. You can include both 4.6 and 4.8 in one panel, for example:
 
 ```bash
-forge workflow panel src/ --code --models claude-opus-4.6,claude-opus-4.7 --json --cwd "$(pwd)"
+forge workflow panel src/ --code --models claude-opus-4.6,claude-opus-4.8 --json --cwd "$(pwd)"
 ```
 
 ---

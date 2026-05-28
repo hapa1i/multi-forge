@@ -28,6 +28,32 @@ wc -l docs/board/change_log.md
 
 ## 2026-05-28
 
+### Rename Claude Opus 4.7 → 4.8 (retain 4.6)
+
+**Goal**: Make Opus 4.8 (released 2026-05-28) replace every Opus 4.7 reference, while leaving Opus 4.6 — a distinct,
+still-default model — untouched.
+
+**Key changes**:
+
+- Catalog + pricing: `claude-opus-4-7` → `claude-opus-4-8` (entry, 5 aliases, `friendly_name`); researched 4.8 specs
+  kept ($5/$25/$0.50, 1M context, 128K output, adaptive-only, fixed temperature, `xhigh`); `intelligence_score` 99→100;
+  `pricing.yaml` `updated_at` bumped. The `opus`/`claude-opus` defaults and proxy tier mappings stay on 4.6 — 4.8 is
+  opt-in (`--model claude-opus-4-8`), inheriting 4.7's role.
+- Review workflow: `claude-opus-4.8` ModelSpec + `_CLAUDE_48_BOUNDED_REVIEW_PROMPT`; three Anthropic proxy templates'
+  `model_alternatives.opus` repointed.
+- Review guide `references/claude-4.7.md` → `claude-4.8.md`, rewritten against the live 4.8 docs (release date, from-4.7
+  migration framing, dropped "new xhigh"; added mid-conversation system messages, fast mode, 1,024-token cache minimum,
+  refusal `stop_details`; kept inherited constraints and 4.6 comparisons).
+- Did NOT add a `max` effort tier (pre-existing cross-model Anthropic effort Forge omits; would fail `_EFFORT_RANK`
+  validation). Left `glm-4.7-flash`, Sonnet/Haiku versions, and `### 4.7` QA section headings untouched.
+- Tests moved in lockstep (catalog/pricing/review/proxy/session/config/supervisor); cosmetic test renames; negative
+  tests now `claude-opus-4.8.1`; new `claude-opus-4-8` pricing test.
+
+**Verification**: full unit suite green (4649 passed; the lone failure is a pre-existing COLUMNS-width-dependent test in
+`test_session_resume_review.py`, reproduced identically on `origin/main`); integration tests pass; `make pre-commit`
+clean; built-wheel clean-install smoke confirms catalog/pricing/guide load via `importlib.resources` and `opus` still
+resolves to `claude-opus-4-6`.
+
 ### Simplify memory strategies: 7 to 4, shadow mode orthogonal
 
 **Goal**: Reduce strategy enum from 7 to 4 by removing redundant entries, make shadow mode orthogonal to strategy, and

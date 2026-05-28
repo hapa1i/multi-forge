@@ -672,7 +672,7 @@ def _resume_token_estimate_multiplier(
     """Return a model-specific heuristic multiplier for fresh full-resume checks."""
     if effective_proxy_ref is not None:
         # v1 only applies tokenizer safety margins to direct Claude pins. Avoid
-        # proxy config I/O in the resume hot path until proxy-routed 4.7 needs it.
+        # proxy config I/O in the resume hot path until proxy-routed 4.8 needs it.
         return 1.0
 
     from forge.runtime_config import get_default_direct_model
@@ -1203,7 +1203,7 @@ def launch_new_session(
     "direct_model",
     type=str,
     default=None,
-    help="Pin the Claude model for direct sessions (for example: claude-opus-4-7 or claude-sonnet-4-6[1m])",
+    help="Pin the Claude model for direct sessions (for example: claude-opus-4-8 or claude-sonnet-4-6[1m])",
 )
 @click.option("--sidecar", is_flag=True, help="Run with bundled proxy in Docker container")
 @click.option("--host-proxy", is_flag=True, help="Use host proxy (overrides config)")
@@ -1387,7 +1387,7 @@ def start(
     "direct_model",
     type=str,
     default=None,
-    help="Pin the Claude model for this and future resumes (for example: claude-opus-4-6 or claude-opus-4-7)",
+    help="Pin the Claude model for this and future resumes (for example: claude-opus-4-6 or claude-opus-4-8)",
 )
 @click.option(
     "--fresh",
@@ -2291,7 +2291,7 @@ def _resume_fresh_native(
     "direct_model",
     type=str,
     default=None,
-    help="Pin the Claude model for this incognito session (for example: claude-opus-4-6 or claude-opus-4-7)",
+    help="Pin the Claude model for this incognito session (for example: claude-opus-4-6 or claude-opus-4-8)",
 )
 @click.option("--system-prompt", "-s", help="Append system prompt text")
 @click.option(

@@ -63,16 +63,16 @@ def test_resume_child_inherits_direct_model_pin(tmp_path: Path) -> None:
         name="parent",
         worktree_path=str(project),
         direct=True,
-        direct_model="claude-opus-4-7",
+        direct_model="claude-opus-4-8",
     )
 
     child, _handoff = manager.resume_session("parent", child_name="child")
 
     assert child.intent.launch is not None
-    assert child.intent.launch.direct_model == "claude-opus-4-7"
+    assert child.intent.launch.direct_model == "claude-opus-4-8"
     persisted = SessionStore(str(project), "child").read()
     assert persisted.intent.launch is not None
-    assert persisted.intent.launch.direct_model == "claude-opus-4-7"
+    assert persisted.intent.launch.direct_model == "claude-opus-4-8"
 
 
 def test_fork_child_inherits_subprocess_proxy(tmp_path: Path) -> None:
@@ -98,16 +98,16 @@ def test_fork_child_inherits_direct_model_pin(tmp_path: Path) -> None:
         name="parent",
         worktree_path=str(project),
         direct=True,
-        direct_model="claude-opus-4-7",
+        direct_model="claude-opus-4-8",
     )
 
     _parent, fork = manager.fork_session("parent", "fork")
 
     assert fork.intent.launch is not None
-    assert fork.intent.launch.direct_model == "claude-opus-4-7"
+    assert fork.intent.launch.direct_model == "claude-opus-4-8"
     persisted = SessionStore(str(project), "fork").read()
     assert persisted.intent.launch is not None
-    assert persisted.intent.launch.direct_model == "claude-opus-4-7"
+    assert persisted.intent.launch.direct_model == "claude-opus-4-8"
 
 
 def test_worktree_fork_child_inherits_direct_model_pin(tmp_path: Path) -> None:
@@ -120,7 +120,7 @@ def test_worktree_fork_child_inherits_direct_model_pin(tmp_path: Path) -> None:
         name="parent",
         worktree_path=str(project),
         direct=True,
-        direct_model="claude-opus-4-7",
+        direct_model="claude-opus-4-8",
     )
 
     _parent, fork = manager.fork_session("parent", "fork", create_worktree=True)
@@ -128,10 +128,10 @@ def test_worktree_fork_child_inherits_direct_model_pin(tmp_path: Path) -> None:
     assert fork.worktree is not None
     assert fork.worktree.is_worktree is True
     assert fork.intent.launch is not None
-    assert fork.intent.launch.direct_model == "claude-opus-4-7"
+    assert fork.intent.launch.direct_model == "claude-opus-4-8"
     persisted = SessionStore(fork.forge_root or fork.worktree.path, "fork").read()
     assert persisted.intent.launch is not None
-    assert persisted.intent.launch.direct_model == "claude-opus-4-7"
+    assert persisted.intent.launch.direct_model == "claude-opus-4-8"
 
 
 def test_relaunch_child_inherits_subprocess_proxy(tmp_path: Path) -> None:
@@ -157,13 +157,13 @@ def test_relaunch_child_inherits_direct_model_pin(tmp_path: Path) -> None:
         name="parent",
         worktree_path=str(project),
         direct=True,
-        direct_model="claude-opus-4-7",
+        direct_model="claude-opus-4-8",
     )
 
     _parent, child = manager.relaunch_session("parent", child_name="child")
 
     assert child.intent.launch is not None
-    assert child.intent.launch.direct_model == "claude-opus-4-7"
+    assert child.intent.launch.direct_model == "claude-opus-4-8"
     persisted = SessionStore(str(project), "child").read()
     assert persisted.intent.launch is not None
-    assert persisted.intent.launch.direct_model == "claude-opus-4-7"
+    assert persisted.intent.launch.direct_model == "claude-opus-4-8"

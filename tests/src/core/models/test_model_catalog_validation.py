@@ -336,8 +336,8 @@ class TestCatalogEffortRankAlignment:
         )
 
 
-class TestClaude47CatalogProfile:
-    """Tests for the explicit Claude Opus 4.7 catalog profile."""
+class TestClaude48CatalogProfile:
+    """Tests for the explicit Claude Opus 4.8 catalog profile."""
 
     def test_opus_aliases_remain_stable_on_46(self):
         catalog = load_model_catalog(force_reload=True)
@@ -345,14 +345,14 @@ class TestClaude47CatalogProfile:
         assert catalog.resolve("opus") == "claude-opus-4-6"
         assert catalog.resolve("claude-opus") == "claude-opus-4-6"
 
-    def test_opus_47_aliases_and_metadata(self):
+    def test_opus_48_aliases_and_metadata(self):
         catalog = load_model_catalog(force_reload=True)
 
-        assert catalog.resolve("opus-4-7") == "claude-opus-4-7"
-        assert catalog.resolve("claude-opus-4.7") == "claude-opus-4-7"
-        assert catalog.resolve("anthropic/claude-opus-4.7") == "claude-opus-4-7"
+        assert catalog.resolve("opus-4-8") == "claude-opus-4-8"
+        assert catalog.resolve("claude-opus-4.8") == "claude-opus-4-8"
+        assert catalog.resolve("anthropic/claude-opus-4.8") == "claude-opus-4-8"
 
-        spec = catalog.get("claude-opus-4-7")
+        spec = catalog.get("claude-opus-4-8")
         assert spec.thinking_modes == ("adaptive",)
         assert spec.supports_sampling_overrides is False
         assert spec.supports_1m_context is True

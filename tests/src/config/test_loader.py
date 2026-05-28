@@ -192,7 +192,7 @@ class TestLoadConfig:
         assert config.proxy.openrouter.tiers.sonnet == "anthropic/claude-sonnet-4.6"
         assert config.proxy.openrouter.tiers.opus == "anthropic/claude-opus-4.6"
         assert config.proxy.openrouter.base_url == "https://openrouter.ai/api/v1"
-        assert config.proxy.openrouter.model_alternatives == {"opus": {"claude-opus-4-7": "anthropic/claude-opus-4.7"}}
+        assert config.proxy.openrouter.model_alternatives == {"opus": {"claude-opus-4-8": "anthropic/claude-opus-4.8"}}
 
     def test_openrouter_config_placed_on_correct_field(self):
         """OpenRouter config should land on proxy.openrouter, not proxy.litellm."""

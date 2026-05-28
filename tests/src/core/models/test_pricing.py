@@ -33,6 +33,12 @@ class TestGetPricing:
         assert p.input_per_mtok == 5.0
         assert p.output_per_mtok == 25.0
 
+    def test_known_model_opus_48(self):
+        p = get_pricing("claude-opus-4-8")
+        assert p.input_per_mtok == 5.0
+        assert p.output_per_mtok == 25.0
+        assert p.cached_input_per_mtok == 0.50
+
     def test_known_model_haiku(self):
         p = get_pricing("claude-haiku-4-5-20251001")
         assert p.input_per_mtok == 1.0

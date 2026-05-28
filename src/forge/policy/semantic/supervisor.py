@@ -446,7 +446,7 @@ def invoke_supervisor(
             )
         # Keep executor model pins from leaking into the read-only supervisor.
         # With a proxy URL, `--model opus` routes through the proxy's opus tier,
-        # so alternatives like claude-opus-4-7 remain opt-in for the executor.
+        # so alternatives like claude-opus-4-8 remain opt-in for the executor.
         model = "opus" if base_url else None
         unset_env_vars = _CLAUDE_MODEL_PIN_ENV_VARS if base_url else None
 

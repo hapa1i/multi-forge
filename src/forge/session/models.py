@@ -72,7 +72,7 @@ class LaunchIntent:
 
     mode: str = LAUNCH_MODE_HOST  # "host" or "sidecar"
     sidecar: SidecarLaunchIntent | None = None
-    direct_model: str | None = None  # Claude Code env-ready direct model pin (e.g. claude-opus-4-7[1m])
+    direct_model: str | None = None  # Claude Code env-ready direct model pin (e.g. claude-opus-4-8[1m])
 
 
 @dataclass

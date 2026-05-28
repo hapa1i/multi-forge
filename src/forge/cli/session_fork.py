@@ -102,7 +102,7 @@ __all__ = ["fork"]
     "direct_model",
     type=str,
     default=None,
-    help="Pin the Claude model for this fork and future resumes (for example: claude-opus-4-6 or claude-opus-4-7)",
+    help="Pin the Claude model for this fork and future resumes (for example: claude-opus-4-6 or claude-opus-4-8)",
 )
 @click.option("--incognito", "-i", is_flag=True, help="Auto-delete fork on exit")
 @click.option("--worktree", "-w", is_flag=True, help="Create git worktree for fork isolation")

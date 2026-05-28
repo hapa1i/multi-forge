@@ -14,7 +14,7 @@ def _ensure_runtime(monkeypatch):
         tiers = type("T", (), {"haiku": "h-model", "sonnet": "s-model", "opus": "o-model"})()
         model_alternatives = {
             "opus": {
-                "claude-opus-4-7": "anthropic/claude-opus-4.7",
+                "claude-opus-4-8": "anthropic/claude-opus-4.8",
             },
         }
 
@@ -36,8 +36,8 @@ class TestResolveModelWithAlternatives:
     """Tests for _resolve_model_with_alternatives shared helper."""
 
     def test_routes_to_alternative_when_matched(self):
-        result = server._resolve_model_with_alternatives("opus", "claude-opus-4-7", "o-model")
-        assert result == "anthropic/claude-opus-4.7"
+        result = server._resolve_model_with_alternatives("opus", "claude-opus-4-8", "o-model")
+        assert result == "anthropic/claude-opus-4.8"
 
     def test_routes_to_fallback_when_no_match(self):
         result = server._resolve_model_with_alternatives("opus", "claude-opus-4-6", "o-model")
@@ -52,8 +52,8 @@ class TestResolveModelWithAlternatives:
         assert result == "s-model"
 
     def test_strips_1m_suffix_before_lookup(self):
-        result = server._resolve_model_with_alternatives("opus", "claude-opus-4-7[1m]", "o-model")
-        assert result == "anthropic/claude-opus-4.7"
+        result = server._resolve_model_with_alternatives("opus", "claude-opus-4-8[1m]", "o-model")
+        assert result == "anthropic/claude-opus-4.8"
 
     def test_provider_error_degrades_to_fallback(self, monkeypatch):
         def _broken_provider(name=None):
@@ -61,5 +61,5 @@ class TestResolveModelWithAlternatives:
 
         proxy_cfg = server.config.proxy
         monkeypatch.setattr(proxy_cfg, "get_provider", _broken_provider)
-        result = server._resolve_model_with_alternatives("opus", "claude-opus-4-7", "o-model")
+        result = server._resolve_model_with_alternatives("opus", "claude-opus-4-8", "o-model")
         assert result == "o-model"

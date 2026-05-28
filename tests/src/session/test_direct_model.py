@@ -11,15 +11,15 @@ from forge.session.direct_model import (
 )
 
 
-def test_resolves_opus_47_alias_to_env_pin() -> None:
-    pin = resolve_direct_model_pin("opus-4-7")
+def test_resolves_opus_48_alias_to_env_pin() -> None:
+    pin = resolve_direct_model_pin("opus-4-8")
 
-    assert pin.canonical_model == "claude-opus-4-7"
-    assert pin.env_model == "claude-opus-4-7"
+    assert pin.canonical_model == "claude-opus-4-8"
+    assert pin.env_model == "claude-opus-4-8"
     assert pin.tier == "opus"
     assert pin.env() == {
         "ANTHROPIC_MODEL": "opus",
-        "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-4-7",
+        "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-4-8",
     }
 
 
@@ -43,7 +43,7 @@ def test_normalizes_catalog_1m_alias_to_claude_code_suffix() -> None:
 
 def test_rejects_unknown_direct_model() -> None:
     with pytest.raises(ValueError, match="Unknown direct Claude model"):
-        resolve_direct_model_pin("claude-opus-4.7.1")
+        resolve_direct_model_pin("claude-opus-4.8.1")
 
 
 def test_rejects_non_claude_model() -> None:
@@ -54,12 +54,12 @@ def test_rejects_non_claude_model() -> None:
 def test_apply_direct_model_env_updates_mapping() -> None:
     env_vars: dict[str, str] = {}
 
-    error = apply_direct_model_env(env_vars, "opus-4-7")
+    error = apply_direct_model_env(env_vars, "opus-4-8")
 
     assert error is None
     assert env_vars == {
         "ANTHROPIC_MODEL": "opus",
-        "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-4-7",
+        "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-4-8",
     }
 
 

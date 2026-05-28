@@ -78,8 +78,8 @@ class MultiReviewOutput:
         return sum(1 for r in self.results if not r.success)
 
 
-_CLAUDE_47_BOUNDED_REVIEW_PROMPT = """\
-You are the Claude Opus 4.7 bounded-review worker in a Forge quorum.
+_CLAUDE_48_BOUNDED_REVIEW_PROMPT = """\
+You are the Claude Opus 4.8 bounded-review worker in a Forge quorum.
 
 Use the provided target and prompt as the complete task scope. Prefer concrete
 evidence over broad narrative: cite file:line locations for every substantive
@@ -188,13 +188,13 @@ def _build_available_models() -> dict[str, ModelSpec]:
             provider_refs=(("direct", "claude-opus-4-6[1m]"),),
             description="Stable Claude Opus 4.6 direct worker with 1M context pin",
         ),
-        "claude-opus-4.7": ModelSpec(
-            name="claude-opus-4.7",
-            model_id="claude-opus-4.7",
+        "claude-opus-4.8": ModelSpec(
+            name="claude-opus-4.8",
+            model_id="claude-opus-4.8",
             family="anthropic",
-            provider_refs=(("direct", "claude-opus-4-7"),),
+            provider_refs=(("direct", "claude-opus-4-8"),),
             description="Bounded single-shot review and quorum dissent",
-            prompt=_CLAUDE_47_BOUNDED_REVIEW_PROMPT,
+            prompt=_CLAUDE_48_BOUNDED_REVIEW_PROMPT,
             prompt_mode="prefix",
         ),
     }

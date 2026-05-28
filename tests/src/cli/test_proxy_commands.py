@@ -398,8 +398,8 @@ tier_overrides:
         content = proxy_file.read_text()
         assert "reasoning_effort: high" in content
 
-    def test_set_rejects_claude_47_unsupported_static_temperature(self, runner: CliRunner, temp_env: Path) -> None:
-        """Set command validates unsupported 4.7 tier overrides before writing."""
+    def test_set_rejects_claude_48_unsupported_static_temperature(self, runner: CliRunner, temp_env: Path) -> None:
+        """Set command validates unsupported 4.8 tier overrides before writing."""
         proxy_yaml = """\
 template: litellm-anthropic
 provider: litellm
@@ -409,7 +409,7 @@ upstream_base_url: https://litellm.test.example.com
 tiers:
   haiku: claude-haiku-4-5-20251001
   sonnet: claude-sonnet-4-6
-  opus: claude-opus-4-7
+  opus: claude-opus-4-8
 """
         proxy_file = _create_proxy_file(temp_env, "opus-47-test", proxy_yaml)
 

@@ -169,8 +169,8 @@ Anthropic proxy templates (`openrouter-anthropic`, `litellm-anthropic`, `litellm
 # Default: opus tier routes to Claude Opus 4.6
 forge session start my-session --proxy openrouter-anthropic
 
-# Select Opus 4.7 instead
-forge session start my-session --proxy openrouter-anthropic --model claude-opus-4-7
+# Select Opus 4.8 instead
+forge session start my-session --proxy openrouter-anthropic --model claude-opus-4-8
 ```
 
 The proxy resolves the alternative at request time -- Claude Code sends the model name, the proxy looks up
@@ -185,10 +185,10 @@ To add or edit alternatives, use `forge proxy edit <proxy_id>`:
 ```yaml
 model_alternatives:
   opus:
-    claude-opus-4-7: anthropic/claude-opus-4.7
+    claude-opus-4-8: anthropic/claude-opus-4.8
 ```
 
-For per-role guidance on when to pin `--model claude-opus-4-7` vs leave the default 4.6 mapping in place — including the
+For per-role guidance on when to pin `--model claude-opus-4-8` vs leave the default 4.6 mapping in place — including the
 supervisor-vs-executor split, the structural reasons MRCR varies across model versions, and per-family cost +
 multi-needle retrieval data — see [model-selection.md](model-selection.md).
 
