@@ -15,8 +15,8 @@ import re
 from typing import Any
 
 from forge.core.reactive.structured_output import extract_json_from_response
-from forge.guard.types import ActionContext, PolicyDecision, Severity, Violation
-from forge.guard.workflow.config import CheckerConfig, FilterConfig, ReviewerConfig
+from forge.policy.types import ActionContext, PolicyDecision, Severity, Violation
+from forge.policy.workflow.config import CheckerConfig, FilterConfig, ReviewerConfig
 
 _log = logging.getLogger(__name__)
 

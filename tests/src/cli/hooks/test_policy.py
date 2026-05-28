@@ -157,7 +157,7 @@ class TestPersistPolicyState:
     def _make_result(self) -> MagicMock:
         return MagicMock()
 
-    @patch("forge.guard.store.build_policy_state_update")
+    @patch("forge.policy.store.build_policy_state_update")
     def test_writes_policy_to_manifest(self, mock_build: MagicMock) -> None:
         """_persist_policy_state calls store.update with a mutate function."""
         mock_build.return_value = {
@@ -181,7 +181,7 @@ class TestPersistPolicyState:
         assert "mutate" in call_kwargs
         assert callable(call_kwargs["mutate"])
 
-    @patch("forge.guard.store.build_policy_state_update")
+    @patch("forge.policy.store.build_policy_state_update")
     def test_mutate_sets_confirmed_fields(self, mock_build: MagicMock) -> None:
         """The mutate function sets confirmed_at and confirmed_by."""
         from forge.core.state import now_iso
@@ -216,7 +216,7 @@ class TestPersistPolicyState:
         assert state.confirmed.confirmed_by == "hook:policy-check"
         assert state.confirmed.confirmed_at is not None
 
-    @patch("forge.guard.store.build_policy_state_update")
+    @patch("forge.policy.store.build_policy_state_update")
     def test_mutate_passes_existing_state(self, mock_build: MagicMock) -> None:
         """Existing policy state from manifest is forwarded to build_policy_state_update."""
         from forge.core.state import now_iso
@@ -260,7 +260,7 @@ class TestPersistPolicyState:
         existing = call_args[1].get("existing_state") if call_args[1] else call_args[0][2]
         assert existing is not None
 
-    @patch("forge.guard.store.build_policy_state_update")
+    @patch("forge.policy.store.build_policy_state_update")
     def test_mutate_rejects_non_session_state(self, mock_build: MagicMock) -> None:
         """Mutate function raises TypeError for wrong type."""
         mock_build.return_value = {

@@ -157,7 +157,7 @@ proxy routing.
 ```mermaid
 flowchart TB
     subgraph Writers["Component Ownership"]
-        subgraph ForgeSession["Session + Guard CLI write:"]
+        subgraph ForgeSession["Session + Policy CLI write:"]
             W1["~/.forge/sessions/active.json"]
             W2["~/.forge/sessions/index.json"]
             W3["intent + overrides in session manifest"]
@@ -201,8 +201,8 @@ flowchart TB
     style ForgeCLI fill:#f8bbd9
 ```
 
-**Guard split:** `forge guard enable/disable` mutates `intent.policy`; the policy-check hook writes `confirmed.policy`;
-and `%guard ...` direct commands mutate session overrides.
+**Policy split:** `forge policy enable/disable` mutates `intent.policy`; the policy-check hook writes
+`confirmed.policy`; and `%policy ...` direct commands mutate session overrides.
 
 ---
 
@@ -317,7 +317,7 @@ flowchart LR
         P1["Foundation<br/>(installer, tracking, extensions)"]
         P2["Sessions + Proxies<br/>(worktrees, sidecar, full proxy files)"]
         P3["Auth + Credentials"]
-        P4["Hooks + Guard<br/>(direct commands, verification, workflow policy)"]
+        P4["Hooks + Policy<br/>(direct commands, verification, workflow policy)"]
         P5["Deferred work<br/>(stop pipeline, queue, search, handoff)"]
         P6["Workflow runners<br/>(review, panel, analyze, debate)"]
         P7["Status line + runtime config"]

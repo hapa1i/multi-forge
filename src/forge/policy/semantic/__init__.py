@@ -15,11 +15,11 @@ Throttling and caching prevent excessive LLM calls:
 - Fail-open on timeout/error (configurable)
 """
 
-from forge.guard.semantic.supervisor import (
+from forge.policy.semantic.supervisor import (
     SemanticSupervisorPolicy,
     invoke_supervisor,
 )
-from forge.guard.semantic.verdict import (
+from forge.policy.semantic.verdict import (
     SupervisorVerdict,
     parse_supervisor_verdict,
     verdict_to_decision,

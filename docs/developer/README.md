@@ -149,7 +149,7 @@ Multi-Forge follows a "glue" approach -- connecting specialized tools rather tha
 | Session Manager | `src/forge/session/` | Named sessions, worktrees, artifacts       |
 | Installer       | `src/forge/install/` | Extension installer and tracking           |
 | Proxy           | `src/forge/proxy/`   | Model routing, tier mappings               |
-| Guard           | `src/forge/guard/`   | Policy enforcement (TDD, coding standards) |
+| Policy          | `src/forge/policy/`  | Policy enforcement (TDD, coding standards) |
 | Core Libraries  | `src/forge/core/`    | Shared auth, models, state, LLM client     |
 
 ### Key Concepts

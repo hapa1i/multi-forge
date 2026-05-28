@@ -18,10 +18,10 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from forge.guard.engine import build_engine
-from forge.guard.semantic.supervisor import SemanticSupervisorPolicy
-from forge.guard.semantic.verdict import verdict_to_decision
-from forge.guard.types import ActionContext, PolicyDecision, Violation
+from forge.policy.engine import build_engine
+from forge.policy.semantic.supervisor import SemanticSupervisorPolicy
+from forge.policy.semantic.verdict import verdict_to_decision
+from forge.policy.types import ActionContext, PolicyDecision, Violation
 from forge.session.models import SupervisorConfig, create_session_state
 
 # --- Fixtures ---
@@ -118,7 +118,7 @@ class TestSupervisorAppliesTo:
 class TestSupervisorEvaluate:
     """Tests for SemanticSupervisorPolicy._evaluate() with mocked invoke_supervisor."""
 
-    @patch("forge.guard.semantic.supervisor.invoke_supervisor")
+    @patch("forge.policy.semantic.supervisor.invoke_supervisor")
     def test_aligned_verdict_allows(self, mock_invoke: MagicMock) -> None:
         mock_invoke.return_value = _allow_decision()
         policy = SemanticSupervisorPolicy(config=_make_config())
@@ -126,21 +126,21 @@ class TestSupervisorEvaluate:
         assert result.decision == "allow"
         mock_invoke.assert_called_once()
 
-    @patch("forge.guard.semantic.supervisor.invoke_supervisor")
+    @patch("forge.policy.semantic.supervisor.invoke_supervisor")
     def test_divergent_high_confidence_denies(self, mock_invoke: MagicMock) -> None:
         mock_invoke.return_value = _deny_decision()
         policy = SemanticSupervisorPolicy(config=_make_config())
         result = policy.evaluate(_make_context())
         assert result.decision == "deny"
 
-    @patch("forge.guard.semantic.supervisor.invoke_supervisor")
+    @patch("forge.policy.semantic.supervisor.invoke_supervisor")
     def test_divergent_low_confidence_warns(self, mock_invoke: MagicMock) -> None:
         mock_invoke.return_value = _warn_decision("Possible divergence (confidence: 40%)")
         policy = SemanticSupervisorPolicy(config=_make_config())
         result = policy.evaluate(_make_context())
         assert result.decision == "warn"
 
-    @patch("forge.guard.semantic.supervisor.invoke_supervisor")
+    @patch("forge.policy.semantic.supervisor.invoke_supervisor")
     def test_timeout_allows_with_warning(self, mock_invoke: MagicMock) -> None:
         """Supervisor timeout should fail-open with warning."""
         mock_invoke.return_value = PolicyDecision(
@@ -153,7 +153,7 @@ class TestSupervisorEvaluate:
         assert result.decision == "allow"
         assert len(result.warnings) > 0
 
-    @patch("forge.guard.semantic.supervisor.invoke_supervisor")
+    @patch("forge.policy.semantic.supervisor.invoke_supervisor")
     def test_clean_allow_is_cached(self, mock_invoke: MagicMock) -> None:
         """Clean allows (no warnings) should be cached."""
         mock_invoke.return_value = _allow_decision()
@@ -168,7 +168,7 @@ class TestSupervisorEvaluate:
         assert mock_invoke.call_count == 1
         assert result.cached is True
 
-    @patch("forge.guard.semantic.supervisor.invoke_supervisor")
+    @patch("forge.policy.semantic.supervisor.invoke_supervisor")
     def test_warn_outcome_not_cached(self, mock_invoke: MagicMock) -> None:
         """Warn outcomes should NOT be cached (M26 fix)."""
         mock_invoke.return_value = _warn_decision()
@@ -182,7 +182,7 @@ class TestSupervisorEvaluate:
         policy.evaluate(_make_context())
         assert mock_invoke.call_count == 2
 
-    @patch("forge.guard.semantic.supervisor.invoke_supervisor")
+    @patch("forge.policy.semantic.supervisor.invoke_supervisor")
     def test_allow_with_warnings_not_cached(self, mock_invoke: MagicMock) -> None:
         """Allow-with-warnings (e.g., timeout) should NOT be cached (M26 fix)."""
         mock_invoke.return_value = PolicyDecision(
@@ -197,7 +197,7 @@ class TestSupervisorEvaluate:
         # Both calls should invoke supervisor (nothing cached)
         assert mock_invoke.call_count == 2
 
-    @patch("forge.guard.semantic.supervisor.invoke_supervisor")
+    @patch("forge.policy.semantic.supervisor.invoke_supervisor")
     def test_deny_not_cached(self, mock_invoke: MagicMock) -> None:
         """Denials should NOT be cached (allows re-evaluation after fix)."""
         mock_invoke.return_value = _deny_decision()
@@ -207,7 +207,7 @@ class TestSupervisorEvaluate:
         policy.evaluate(_make_context())
         assert mock_invoke.call_count == 2
 
-    @patch("forge.guard.semantic.supervisor.invoke_supervisor")
+    @patch("forge.policy.semantic.supervisor.invoke_supervisor")
     def test_cache_expires_after_throttle(self, mock_invoke: MagicMock) -> None:
         """Cached entries should expire after the throttle window."""
         mock_invoke.return_value = _allow_decision()
@@ -281,10 +281,10 @@ class TestSupervisorState:
 class TestSupervisorDepthGuard:
     """Verify invoke_supervisor skips at FORGE_DEPTH >= MAX_DEPTH."""
 
-    @patch("forge.guard.semantic.supervisor.run_claude_session")
+    @patch("forge.policy.semantic.supervisor.run_claude_session")
     def test_skips_supervisor_at_max_depth(self, mock_run: MagicMock) -> None:
         """At FORGE_DEPTH=2, supervisor should return allow without spawning."""
-        from forge.guard.semantic.supervisor import invoke_supervisor
+        from forge.policy.semantic.supervisor import invoke_supervisor
 
         with patch.dict("os.environ", {"FORGE_DEPTH": "2"}):
             result = invoke_supervisor(_make_config(), _make_context())
@@ -293,11 +293,11 @@ class TestSupervisorDepthGuard:
         assert any("FORGE_DEPTH" in w for w in result.warnings)
         mock_run.assert_not_called()
 
-    @patch("forge.guard.semantic.supervisor.run_claude_session")
+    @patch("forge.policy.semantic.supervisor.run_claude_session")
     def test_runs_supervisor_below_max_depth(self, mock_run: MagicMock) -> None:
         """At FORGE_DEPTH=1, supervisor should proceed normally."""
         from forge.core.reactive.session_runner import SessionResult
-        from forge.guard.semantic.supervisor import invoke_supervisor
+        from forge.policy.semantic.supervisor import invoke_supervisor
 
         mock_run.return_value = SessionResult(
             stdout='```json\n{"verdict": "aligned", "confidence": 0.9, "violations": []}\n```',
@@ -315,11 +315,11 @@ class TestSupervisorDepthGuard:
 class TestSupervisorResumeTargetResolution:
     """Tests for resolving supervisor resume targets."""
 
-    @patch("forge.guard.semantic.supervisor.run_claude_session")
+    @patch("forge.policy.semantic.supervisor.run_claude_session")
     def test_resolves_forge_session_name_to_uuid(self, mock_run: MagicMock) -> None:
         """A Forge session name should resolve to its confirmed Claude UUID."""
         from forge.core.reactive.session_runner import SessionResult
-        from forge.guard.semantic.supervisor import invoke_supervisor
+        from forge.policy.semantic.supervisor import invoke_supervisor
 
         mock_run.return_value = SessionResult(
             stdout='```json\n{"verdict": "aligned", "confidence": 0.9, "violations": []}\n```',
@@ -341,11 +341,11 @@ class TestSupervisorResumeTargetResolution:
     def test_stale_manifest_uuid_uses_latest_resumable_transcript_uuid(self) -> None:
         """A stale same-dir fork target should use the verified child UUID when available."""
         from forge.core.reactive.session_runner import SessionResult
-        from forge.guard.semantic.supervisor import invoke_supervisor
+        from forge.policy.semantic.supervisor import invoke_supervisor
 
         session_state = create_session_state(
-            "guard-supervisor",
-            parent_session="guard-planner",
+            "policy-supervisor",
+            parent_session="policy-planner",
             is_fork=True,
             worktree_path="/workspace",
             worktree_branch="main",
@@ -356,22 +356,22 @@ class TestSupervisorResumeTargetResolution:
             "transcripts": [
                 {
                     "session_id": "child-uuid",
-                    "copied_path": ".forge/artifacts/guard-supervisor/transcripts/child-uuid.jsonl",
+                    "copied_path": ".forge/artifacts/policy-supervisor/transcripts/child-uuid.jsonl",
                 }
             ]
         }
 
         with (
             patch("forge.session.manager.SessionManager.get_session", return_value=session_state),
-            patch("forge.guard.semantic.supervisor._raw_claude_transcript_exists", return_value=True),
-            patch("forge.guard.semantic.supervisor.run_claude_session") as mock_run,
+            patch("forge.policy.semantic.supervisor._raw_claude_transcript_exists", return_value=True),
+            patch("forge.policy.semantic.supervisor.run_claude_session") as mock_run,
         ):
             mock_run.return_value = SessionResult(
                 stdout='```json\n{"verdict": "aligned", "confidence": 0.9, "violations": []}\n```',
                 stderr="",
                 returncode=0,
             )
-            result = invoke_supervisor(_make_config(resume_id="guard-supervisor"), _make_context())
+            result = invoke_supervisor(_make_config(resume_id="policy-supervisor"), _make_context())
 
         assert result.decision == "allow"
         mock_run.assert_called_once()
@@ -379,11 +379,11 @@ class TestSupervisorResumeTargetResolution:
 
     def test_stale_manifest_uuid_without_resumable_child_fails_open(self) -> None:
         """A suspicious supervisor target should not block from the wrong parent context."""
-        from forge.guard.semantic.supervisor import invoke_supervisor
+        from forge.policy.semantic.supervisor import invoke_supervisor
 
         session_state = create_session_state(
-            "guard-supervisor",
-            parent_session="guard-planner",
+            "policy-supervisor",
+            parent_session="policy-planner",
             is_fork=True,
             worktree_path="/workspace",
             worktree_branch="main",
@@ -394,17 +394,17 @@ class TestSupervisorResumeTargetResolution:
             "transcripts": [
                 {
                     "session_id": "child-uuid",
-                    "copied_path": ".forge/artifacts/guard-supervisor/transcripts/child-uuid.jsonl",
+                    "copied_path": ".forge/artifacts/policy-supervisor/transcripts/child-uuid.jsonl",
                 }
             ]
         }
 
         with (
             patch("forge.session.manager.SessionManager.get_session", return_value=session_state),
-            patch("forge.guard.semantic.supervisor._raw_claude_transcript_exists", return_value=False),
-            patch("forge.guard.semantic.supervisor.run_claude_session") as mock_run,
+            patch("forge.policy.semantic.supervisor._raw_claude_transcript_exists", return_value=False),
+            patch("forge.policy.semantic.supervisor.run_claude_session") as mock_run,
         ):
-            result = invoke_supervisor(_make_config(resume_id="guard-supervisor"), _make_context())
+            result = invoke_supervisor(_make_config(resume_id="policy-supervisor"), _make_context())
 
         assert result.decision == "allow"
         assert result.warnings is not None
@@ -413,14 +413,14 @@ class TestSupervisorResumeTargetResolution:
 
     def test_fork_target_pointing_at_parent_uuid_fails_open(self) -> None:
         """A fork target must not invoke the supervisor using the parent's UUID."""
-        from forge.guard.semantic.supervisor import invoke_supervisor
+        from forge.policy.semantic.supervisor import invoke_supervisor
 
-        parent_state = create_session_state("guard-planner", worktree_path="/workspace", worktree_branch="main")
+        parent_state = create_session_state("policy-planner", worktree_path="/workspace", worktree_branch="main")
         parent_state.confirmed.claude_session_id = "parent-uuid"
 
         session_state = create_session_state(
-            "guard-supervisor",
-            parent_session="guard-planner",
+            "policy-supervisor",
+            parent_session="policy-planner",
             is_fork=True,
             worktree_path="/workspace",
             worktree_branch="main",
@@ -429,13 +429,13 @@ class TestSupervisorResumeTargetResolution:
         session_state.confirmed.claude_session_id = "parent-uuid"
 
         def get_session(name: str, forge_root: str | None = None):
-            return parent_state if name == "guard-planner" else session_state
+            return parent_state if name == "policy-planner" else session_state
 
         with (
             patch("forge.session.manager.SessionManager.get_session", side_effect=get_session),
-            patch("forge.guard.semantic.supervisor.run_claude_session") as mock_run,
+            patch("forge.policy.semantic.supervisor.run_claude_session") as mock_run,
         ):
-            result = invoke_supervisor(_make_config(resume_id="guard-supervisor"), _make_context())
+            result = invoke_supervisor(_make_config(resume_id="policy-supervisor"), _make_context())
 
         assert result.decision == "allow"
         assert result.warnings is not None
@@ -444,14 +444,14 @@ class TestSupervisorResumeTargetResolution:
 
     def test_validate_rejects_fork_target_pointing_at_parent_uuid(self) -> None:
         """Wiring should reject a supervisor fork that still has the parent's UUID."""
-        from forge.guard.semantic.supervisor import validate_supervisor_target
+        from forge.policy.semantic.supervisor import validate_supervisor_target
 
-        parent_state = create_session_state("guard-planner", worktree_path="/workspace", worktree_branch="main")
+        parent_state = create_session_state("policy-planner", worktree_path="/workspace", worktree_branch="main")
         parent_state.confirmed.claude_session_id = "parent-uuid"
 
         session_state = create_session_state(
-            "guard-supervisor",
-            parent_session="guard-planner",
+            "policy-supervisor",
+            parent_session="policy-planner",
             is_fork=True,
             worktree_path="/workspace",
             worktree_branch="main",
@@ -461,16 +461,16 @@ class TestSupervisorResumeTargetResolution:
         session_state.confirmed.confirmed_by = "hook:SessionStart:startup"
 
         def get_session(name: str, forge_root: str | None = None):
-            return parent_state if name == "guard-planner" else session_state
+            return parent_state if name == "policy-planner" else session_state
 
         with patch("forge.session.manager.SessionManager.get_session", side_effect=get_session):
             with pytest.raises(ValueError, match="points at its parent Claude UUID"):
-                validate_supervisor_target("guard-supervisor", forge_root="/workspace")
+                validate_supervisor_target("policy-supervisor", forge_root="/workspace")
 
-    @patch("forge.guard.semantic.supervisor.run_claude_session")
+    @patch("forge.policy.semantic.supervisor.run_claude_session")
     def test_missing_confirmed_uuid_fails_open(self, mock_run: MagicMock) -> None:
         """A Forge session without a confirmed UUID should fail open with a warning."""
-        from forge.guard.semantic.supervisor import invoke_supervisor
+        from forge.policy.semantic.supervisor import invoke_supervisor
 
         session_state = MagicMock()
         session_state.confirmed.claude_session_id = None
@@ -484,11 +484,11 @@ class TestSupervisorResumeTargetResolution:
         ]
         mock_run.assert_not_called()
 
-    @patch("forge.guard.semantic.supervisor.run_claude_session")
+    @patch("forge.policy.semantic.supervisor.run_claude_session")
     def test_resolved_target_includes_source_cwd(self, mock_run: MagicMock) -> None:
         """Forge session resolution should include the source worktree path as CWD."""
         from forge.core.reactive.session_runner import SessionResult
-        from forge.guard.semantic.supervisor import invoke_supervisor
+        from forge.policy.semantic.supervisor import invoke_supervisor
 
         mock_run.return_value = SessionResult(
             stdout='```json\n{"verdict": "aligned", "confidence": 0.9, "violations": []}\n```',
@@ -505,11 +505,11 @@ class TestSupervisorResumeTargetResolution:
 
         assert mock_run.call_args.kwargs["cwd"] == "/original/checkout"
 
-    @patch("forge.guard.semantic.supervisor.run_claude_session")
+    @patch("forge.policy.semantic.supervisor.run_claude_session")
     def test_resolved_target_raw_uuid_no_cwd(self, mock_run: MagicMock) -> None:
         """Raw UUID targets should not set source_cwd (no resolution possible)."""
         from forge.core.reactive.session_runner import SessionResult
-        from forge.guard.semantic.supervisor import invoke_supervisor
+        from forge.policy.semantic.supervisor import invoke_supervisor
 
         mock_run.return_value = SessionResult(
             stdout='```json\n{"verdict": "aligned", "confidence": 0.9, "violations": []}\n```',
@@ -522,11 +522,11 @@ class TestSupervisorResumeTargetResolution:
 
         assert mock_run.call_args.kwargs["cwd"] is None
 
-    @patch("forge.guard.semantic.supervisor.run_claude_session")
+    @patch("forge.policy.semantic.supervisor.run_claude_session")
     def test_fork_session_passed_to_run_claude(self, mock_run: MagicMock) -> None:
         """invoke_supervisor should pass fork_session from config to run_claude_session."""
         from forge.core.reactive.session_runner import SessionResult
-        from forge.guard.semantic.supervisor import invoke_supervisor
+        from forge.policy.semantic.supervisor import invoke_supervisor
 
         mock_run.return_value = SessionResult(
             stdout='```json\n{"verdict": "aligned", "confidence": 0.9, "violations": []}\n```',
@@ -541,8 +541,8 @@ class TestSupervisorResumeTargetResolution:
         invoke_supervisor(_make_config(resume_id=raw_uuid, fork_session=False), _make_context())
         assert mock_run.call_args.kwargs["fork_session"] is False
 
-    @patch("forge.guard.semantic.supervisor.resolve_subprocess_routing")
-    @patch("forge.guard.semantic.supervisor.run_claude_session")
+    @patch("forge.policy.semantic.supervisor.resolve_subprocess_routing")
+    @patch("forge.policy.semantic.supervisor.run_claude_session")
     def test_proxied_supervisor_uses_proxy_opus_tier_without_executor_model_pin(
         self,
         mock_run: MagicMock,
@@ -550,7 +550,7 @@ class TestSupervisorResumeTargetResolution:
     ) -> None:
         """Executor --model pins should not leak into proxied supervisor calls."""
         from forge.core.reactive.session_runner import SessionResult
-        from forge.guard.semantic.supervisor import invoke_supervisor
+        from forge.policy.semantic.supervisor import invoke_supervisor
 
         mock_resolve.return_value = SimpleNamespace(base_url="http://localhost:8095")
         mock_run.return_value = SessionResult(
@@ -575,12 +575,12 @@ class TestSupervisorResumeTargetResolution:
         assert "ANTHROPIC_MODEL" in kwargs["unset_env_vars"]
         assert "ANTHROPIC_DEFAULT_OPUS_MODEL" in kwargs["unset_env_vars"]
 
-    @patch("forge.guard.semantic.supervisor.resolve_subprocess_routing")
-    @patch("forge.guard.semantic.supervisor.run_claude_session")
+    @patch("forge.policy.semantic.supervisor.resolve_subprocess_routing")
+    @patch("forge.policy.semantic.supervisor.run_claude_session")
     def test_direct_mode_skips_routing_resolver(self, mock_run: MagicMock, mock_resolve: MagicMock) -> None:
         """direct=True should not consult proxy/env routing before invoking Claude."""
         from forge.core.reactive.session_runner import SessionResult
-        from forge.guard.semantic.supervisor import invoke_supervisor
+        from forge.policy.semantic.supervisor import invoke_supervisor
 
         mock_run.return_value = SessionResult(
             stdout='```json\n{"verdict": "aligned", "confidence": 0.9, "violations": []}\n```',
@@ -604,7 +604,7 @@ class TestSupervisorResumeTargetResolution:
 class TestSupervisorEngineIntegration:
     """Tests for supervisor integration with PolicyEngine."""
 
-    @patch("forge.guard.semantic.supervisor.invoke_supervisor")
+    @patch("forge.policy.semantic.supervisor.invoke_supervisor")
     def test_supervisor_plus_tdd_both_allow(self, mock_invoke: MagicMock) -> None:
         """When both supervisor and TDD allow, final decision is allow."""
         mock_invoke.return_value = _allow_decision()
@@ -620,7 +620,7 @@ class TestSupervisorEngineIntegration:
         result = engine.evaluate(ctx_src)
         assert result.final_decision == "allow"
 
-    @patch("forge.guard.semantic.supervisor.invoke_supervisor")
+    @patch("forge.policy.semantic.supervisor.invoke_supervisor")
     def test_supervisor_deny_blocks(self, mock_invoke: MagicMock) -> None:
         """Supervisor deny should block even if TDD allows."""
         mock_invoke.return_value = _deny_decision()
@@ -636,7 +636,7 @@ class TestSupervisorEngineIntegration:
         result = engine.evaluate(ctx_src)
         assert result.final_decision == "deny"
 
-    @patch("forge.guard.semantic.supervisor.invoke_supervisor")
+    @patch("forge.policy.semantic.supervisor.invoke_supervisor")
     def test_supervisor_warns_surfaces_warnings(self, mock_invoke: MagicMock) -> None:
         """Supervisor warn should surface via all_warnings."""
         mock_invoke.return_value = _warn_decision("Possible divergence from plan")
@@ -647,7 +647,7 @@ class TestSupervisorEngineIntegration:
         assert result.final_decision == "warn"
         assert any("divergence" in w.lower() for w in result.all_warnings)
 
-    @patch("forge.guard.semantic.supervisor.invoke_supervisor")
+    @patch("forge.policy.semantic.supervisor.invoke_supervisor")
     def test_empty_bundles_supervisor_only(self, mock_invoke: MagicMock) -> None:
         """Supervisor should run even with empty bundles (gating fix verification)."""
         mock_invoke.return_value = _allow_decision()
@@ -658,7 +658,7 @@ class TestSupervisorEngineIntegration:
         assert result.final_decision == "allow"
         mock_invoke.assert_called_once()
 
-    @patch("forge.guard.semantic.supervisor.invoke_supervisor")
+    @patch("forge.policy.semantic.supervisor.invoke_supervisor")
     def test_state_persists_through_engine(self, mock_invoke: MagicMock) -> None:
         """Engine should collect and restore supervisor state."""
         mock_invoke.return_value = _allow_decision()
@@ -679,7 +679,7 @@ class TestFailOpenWithWarning:
 
     def test_empty_response_produces_warn(self) -> None:
         """Empty supervisor response should map to warn decision."""
-        from forge.guard.semantic.verdict import parse_supervisor_verdict
+        from forge.policy.semantic.verdict import parse_supervisor_verdict
 
         verdict = parse_supervisor_verdict("")
         decision = verdict_to_decision(verdict)
@@ -688,7 +688,7 @@ class TestFailOpenWithWarning:
 
     def test_unparseable_response_produces_warn(self) -> None:
         """Unparseable supervisor response should map to warn decision."""
-        from forge.guard.semantic.verdict import parse_supervisor_verdict
+        from forge.policy.semantic.verdict import parse_supervisor_verdict
 
         verdict = parse_supervisor_verdict("This is not JSON at all.")
         decision = verdict_to_decision(verdict)
@@ -702,7 +702,7 @@ class TestFailOpenWithWarning:
 class TestPolicyStateGeneralization:
     """Verify generic policy_states round-trip through engine."""
 
-    @patch("forge.guard.semantic.supervisor.invoke_supervisor")
+    @patch("forge.policy.semantic.supervisor.invoke_supervisor")
     def test_policy_states_round_trip(self, mock_invoke: MagicMock) -> None:
         """policy_states should round-trip through engine restore → evaluate → collect."""
         mock_invoke.return_value = _allow_decision()
@@ -747,8 +747,8 @@ class TestPolicyStateGeneralization:
         Regression test: when TDD's applies_to() returns False (e.g., writing to docs/),
         its state should not be lost from the merged policy_states.
         """
-        from forge.guard.store import build_policy_state_update
-        from forge.guard.types import CompositeDecision
+        from forge.policy.store import build_policy_state_update
+        from forge.policy.types import CompositeDecision
 
         # Simulate: TDD didn't run (wrote to docs/), only provenance collected
         engine_state: dict[str, dict[str, Any]] = {}  # No stateful policies collected
@@ -781,7 +781,7 @@ class TestValidateSupervisorTarget:
     """Tests for validate_supervisor_target()."""
 
     def test_valid_target_with_uuid_and_confirmation(self) -> None:
-        from forge.guard.semantic.supervisor import validate_supervisor_target
+        from forge.policy.semantic.supervisor import validate_supervisor_target
 
         state = MagicMock()
         state.confirmed.claude_session_id = "uuid-1234"
@@ -793,7 +793,7 @@ class TestValidateSupervisorTarget:
         assert result is state
 
     def test_missing_session_raises(self) -> None:
-        from forge.guard.semantic.supervisor import validate_supervisor_target
+        from forge.policy.semantic.supervisor import validate_supervisor_target
 
         with (
             patch(
@@ -805,7 +805,7 @@ class TestValidateSupervisorTarget:
             validate_supervisor_target("nonexistent")
 
     def test_no_claude_uuid_raises(self) -> None:
-        from forge.guard.semantic.supervisor import validate_supervisor_target
+        from forge.policy.semantic.supervisor import validate_supervisor_target
 
         state = MagicMock()
         state.confirmed.claude_session_id = None
@@ -818,7 +818,7 @@ class TestValidateSupervisorTarget:
 
     def test_pre_seeded_uuid_without_evidence_raises(self) -> None:
         """Pre-seeded UUID alone (no hook confirmation, no transcript) is rejected."""
-        from forge.guard.semantic.supervisor import validate_supervisor_target
+        from forge.policy.semantic.supervisor import validate_supervisor_target
 
         state = MagicMock()
         state.confirmed.claude_session_id = "pre-seeded-uuid"
@@ -834,7 +834,7 @@ class TestValidateSupervisorTarget:
 
     def test_transcript_on_disk_is_valid_evidence(self, tmp_path) -> None:
         """A transcript file on disk counts as conversation evidence."""
-        from forge.guard.semantic.supervisor import validate_supervisor_target
+        from forge.policy.semantic.supervisor import validate_supervisor_target
 
         transcript = tmp_path / "transcript.jsonl"
         transcript.write_text("{}\n")
@@ -853,7 +853,7 @@ class TestAutoSeedSupervisorProxy:
     """Tests for auto_seed_supervisor_proxy()."""
 
     def test_different_routing_returns_proxy(self) -> None:
-        from forge.guard.semantic.supervisor import auto_seed_supervisor_proxy
+        from forge.policy.semantic.supervisor import auto_seed_supervisor_proxy
 
         state = MagicMock()
         state.confirmed.started_with_proxy.proxy_id = "proxy-123"
@@ -863,7 +863,7 @@ class TestAutoSeedSupervisorProxy:
         assert result == "proxy-123"
 
     def test_same_routing_returns_none(self) -> None:
-        from forge.guard.semantic.supervisor import auto_seed_supervisor_proxy
+        from forge.policy.semantic.supervisor import auto_seed_supervisor_proxy
 
         state = MagicMock()
         state.confirmed.started_with_proxy.proxy_id = "proxy-123"
@@ -875,7 +875,7 @@ class TestAutoSeedSupervisorProxy:
         assert result is None
 
     def test_no_confirmed_proxy_returns_none(self) -> None:
-        from forge.guard.semantic.supervisor import auto_seed_supervisor_proxy
+        from forge.policy.semantic.supervisor import auto_seed_supervisor_proxy
 
         state = MagicMock()
         state.confirmed.started_with_proxy = None
@@ -884,7 +884,7 @@ class TestAutoSeedSupervisorProxy:
         assert result is None
 
     def test_falls_back_to_template_when_no_proxy_id(self) -> None:
-        from forge.guard.semantic.supervisor import auto_seed_supervisor_proxy
+        from forge.policy.semantic.supervisor import auto_seed_supervisor_proxy
 
         state = MagicMock()
         state.confirmed.started_with_proxy.proxy_id = None
@@ -900,7 +900,7 @@ class TestApplySupervisorRouting:
     """Tests for apply_supervisor_routing()."""
 
     def test_explicit_proxy_overrides_auto_seed(self) -> None:
-        from forge.guard.semantic.supervisor import apply_supervisor_routing
+        from forge.policy.semantic.supervisor import apply_supervisor_routing
         from forge.session.models import SupervisorConfig
 
         state = MagicMock()
@@ -908,7 +908,7 @@ class TestApplySupervisorRouting:
         state.confirmed.started_with_proxy.template = "litellm-openai"
         sup_config = SupervisorConfig()
 
-        with patch("forge.guard.semantic.supervisor.auto_seed_supervisor_proxy") as mock_seed:
+        with patch("forge.policy.semantic.supervisor.auto_seed_supervisor_proxy") as mock_seed:
             result = apply_supervisor_routing(
                 sup_config,
                 state,
@@ -919,21 +919,21 @@ class TestApplySupervisorRouting:
         assert result == "pre-validated-proxy"
 
     def test_explicit_direct_overrides_auto_seed(self) -> None:
-        from forge.guard.semantic.supervisor import apply_supervisor_routing
+        from forge.policy.semantic.supervisor import apply_supervisor_routing
         from forge.session.models import SupervisorConfig
 
         state = MagicMock()
         state.confirmed.started_with_proxy.proxy_id = "planner-proxy"
         sup_config = SupervisorConfig()
 
-        with patch("forge.guard.semantic.supervisor.auto_seed_supervisor_proxy") as mock_seed:
+        with patch("forge.policy.semantic.supervisor.auto_seed_supervisor_proxy") as mock_seed:
             result = apply_supervisor_routing(sup_config, state, supervisor_direct=True)
             mock_seed.assert_not_called()
         assert sup_config.direct is True
         assert result == "direct"
 
     def test_neither_flag_falls_through_to_auto_seed(self) -> None:
-        from forge.guard.semantic.supervisor import apply_supervisor_routing
+        from forge.policy.semantic.supervisor import apply_supervisor_routing
         from forge.session.models import SupervisorConfig
 
         state = MagicMock()
@@ -953,7 +953,7 @@ class TestApplySupervisorRouting:
 
     def test_auto_seed_direct_returns_direct_string(self) -> None:
         """When source was direct (no proxy), display string should be 'direct'."""
-        from forge.guard.semantic.supervisor import apply_supervisor_routing
+        from forge.policy.semantic.supervisor import apply_supervisor_routing
         from forge.session.models import SupervisorConfig
 
         state = MagicMock()
@@ -971,7 +971,7 @@ class TestApplySupervisorRouting:
         assert result == "direct"
 
     def test_ensure_supervisor_proxy_no_proxy_or_template_raises(self) -> None:
-        from forge.guard.semantic.supervisor import ensure_supervisor_proxy
+        from forge.policy.semantic.supervisor import ensure_supervisor_proxy
         from forge.proxy.proxies import ProxyNotFoundError
 
         with patch("forge.proxy.proxy_orchestrator.ensure_proxy", side_effect=ProxyNotFoundError("bad-proxy")):
@@ -979,7 +979,7 @@ class TestApplySupervisorRouting:
                 ensure_supervisor_proxy("bad-proxy")
 
     def test_ensure_supervisor_proxy_returns_resolved_id(self) -> None:
-        from forge.guard.semantic.supervisor import ensure_supervisor_proxy
+        from forge.policy.semantic.supervisor import ensure_supervisor_proxy
 
         mock_entry = MagicMock()
         mock_entry.proxy_id = "resolved-id"
@@ -989,7 +989,7 @@ class TestApplySupervisorRouting:
         assert started is False
 
     def test_ensure_supervisor_proxy_autostart_returns_started_id(self) -> None:
-        from forge.guard.semantic.supervisor import ensure_supervisor_proxy
+        from forge.policy.semantic.supervisor import ensure_supervisor_proxy
 
         mock_entry = MagicMock()
         mock_entry.proxy_id = "openrouter-deepseek"
@@ -999,7 +999,7 @@ class TestApplySupervisorRouting:
         assert started is True
 
     def test_ensure_supervisor_proxy_ambiguous_raises(self) -> None:
-        from forge.guard.semantic.supervisor import ensure_supervisor_proxy
+        from forge.policy.semantic.supervisor import ensure_supervisor_proxy
         from forge.proxy.proxies import AmbiguousProxyError
 
         with patch(
@@ -1010,7 +1010,7 @@ class TestApplySupervisorRouting:
                 ensure_supervisor_proxy("tmpl")
 
     def test_ensure_supervisor_proxy_start_failure_raises(self) -> None:
-        from forge.guard.semantic.supervisor import ensure_supervisor_proxy
+        from forge.policy.semantic.supervisor import ensure_supervisor_proxy
         from forge.proxy.proxy_orchestrator import ProxyStartError
 
         with patch("forge.proxy.proxy_orchestrator.ensure_proxy", side_effect=ProxyStartError("boom")):
@@ -1022,7 +1022,7 @@ class TestApplySupervisorToIntent:
     """Tests for apply_supervisor_to_intent()."""
 
     def test_sets_supervisor_and_enables_policy(self) -> None:
-        from forge.guard.semantic.supervisor import apply_supervisor_to_intent
+        from forge.policy.semantic.supervisor import apply_supervisor_to_intent
 
         manifest = MagicMock()
         manifest.intent.policy = None
@@ -1034,7 +1034,7 @@ class TestApplySupervisorToIntent:
         assert manifest.intent.policy.supervisor is sup_config
 
     def test_preserves_existing_policy_fields(self) -> None:
-        from forge.guard.semantic.supervisor import apply_supervisor_to_intent
+        from forge.policy.semantic.supervisor import apply_supervisor_to_intent
         from forge.session.models import PolicyIntent
 
         manifest = MagicMock()
@@ -1049,8 +1049,8 @@ class TestApplySupervisorToIntent:
         assert manifest.intent.policy.supervisor is sup_config
 
     def test_clears_policy_enabled_override(self) -> None:
-        """Wiring supervisor clears a prior %guard disable override."""
-        from forge.guard.semantic.supervisor import apply_supervisor_to_intent
+        """Wiring supervisor clears a prior %policy disable override."""
+        from forge.policy.semantic.supervisor import apply_supervisor_to_intent
         from forge.session.models import PolicyIntent
 
         manifest = MagicMock()
@@ -1067,7 +1067,7 @@ class TestApplySupervisorToIntent:
 
     def test_no_overrides_dict_does_not_crash(self) -> None:
         """Works when overrides is None or empty."""
-        from forge.guard.semantic.supervisor import apply_supervisor_to_intent
+        from forge.policy.semantic.supervisor import apply_supervisor_to_intent
         from forge.session.models import PolicyIntent
 
         manifest = MagicMock()
@@ -1083,14 +1083,14 @@ class TestShouldSupervisorUseDirect:
     """Tests for should_supervisor_use_direct()."""
 
     def test_direct_mode_planner_returns_true(self) -> None:
-        from forge.guard.semantic.supervisor import should_supervisor_use_direct
+        from forge.policy.semantic.supervisor import should_supervisor_use_direct
 
         state = MagicMock()
         state.confirmed.started_with_proxy = None
         assert should_supervisor_use_direct(state) is True
 
     def test_proxied_planner_returns_false(self) -> None:
-        from forge.guard.semantic.supervisor import should_supervisor_use_direct
+        from forge.policy.semantic.supervisor import should_supervisor_use_direct
 
         state = MagicMock()
         state.confirmed.started_with_proxy = MagicMock()
@@ -1112,7 +1112,7 @@ class TestSupervisorSuspended:
         policy = SemanticSupervisorPolicy(config=_make_config(suspended=False))
         assert policy.applies_to(_make_context("Write")) is True
 
-    @patch("forge.guard.semantic.supervisor.invoke_supervisor")
+    @patch("forge.policy.semantic.supervisor.invoke_supervisor")
     def test_evaluate_suspended_returns_allow_without_invoke(self, mock_invoke: MagicMock) -> None:
         policy = SemanticSupervisorPolicy(config=_make_config(suspended=True))
         result = policy.evaluate(_make_context())
@@ -1120,7 +1120,7 @@ class TestSupervisorSuspended:
         assert not result.warnings
         mock_invoke.assert_not_called()
 
-    @patch("forge.guard.semantic.supervisor.invoke_supervisor")
+    @patch("forge.policy.semantic.supervisor.invoke_supervisor")
     def test_evaluate_not_configured_preserves_warning(self, mock_invoke: MagicMock) -> None:
         """Missing config still produces the 'not configured' warning."""
         policy = SemanticSupervisorPolicy(config=_make_config(resume_id=None))
@@ -1137,13 +1137,13 @@ class TestLoadPlanOverride:
     """Tests for _load_plan_override()."""
 
     def test_no_override_returns_none(self) -> None:
-        from forge.guard.semantic.supervisor import _load_plan_override
+        from forge.policy.semantic.supervisor import _load_plan_override
 
         config = _make_config(plan_override_path=None)
         assert _load_plan_override(config) is None
 
     def test_reads_file_content(self, tmp_path) -> None:
-        from forge.guard.semantic.supervisor import _load_plan_override
+        from forge.policy.semantic.supervisor import _load_plan_override
 
         plan = tmp_path / "plan.md"
         plan.write_text("# My Plan\nDo the thing.")
@@ -1151,13 +1151,13 @@ class TestLoadPlanOverride:
         assert _load_plan_override(config) == "# My Plan\nDo the thing."
 
     def test_missing_file_returns_none(self, tmp_path) -> None:
-        from forge.guard.semantic.supervisor import _load_plan_override
+        from forge.policy.semantic.supervisor import _load_plan_override
 
         config = _make_config(plan_override_path=str(tmp_path / "nonexistent.md"))
         assert _load_plan_override(config) is None
 
     def test_empty_file_returns_none(self, tmp_path) -> None:
-        from forge.guard.semantic.supervisor import _load_plan_override
+        from forge.policy.semantic.supervisor import _load_plan_override
 
         plan = tmp_path / "empty.md"
         plan.write_text("")
@@ -1165,7 +1165,7 @@ class TestLoadPlanOverride:
         assert _load_plan_override(config) is None
 
     def test_relative_path_resolves_from_forge_root(self, tmp_path) -> None:
-        from forge.guard.semantic.supervisor import _load_plan_override
+        from forge.policy.semantic.supervisor import _load_plan_override
 
         (tmp_path / "plans").mkdir()
         plan = tmp_path / "plans" / "plan.md"
@@ -1177,12 +1177,12 @@ class TestLoadPlanOverride:
 class TestPlanOverridePrompt:
     """Tests for plan override injection into the supervisor prompt."""
 
-    @patch("forge.guard.semantic.supervisor.run_claude_session")
-    @patch("forge.guard.semantic.supervisor._resolve_resume_target")
+    @patch("forge.policy.semantic.supervisor.run_claude_session")
+    @patch("forge.policy.semantic.supervisor._resolve_resume_target")
     def test_invoke_with_plan_override_prepends_preamble(
         self, mock_resolve: MagicMock, mock_run: MagicMock, tmp_path
     ) -> None:
-        from forge.guard.semantic.supervisor import (
+        from forge.policy.semantic.supervisor import (
             _PLAN_OVERRIDE_PREAMBLE,
             invoke_supervisor,
         )
@@ -1201,10 +1201,10 @@ class TestPlanOverridePrompt:
         assert "# Updated Plan\nNew requirements." in prompt_sent
         assert "supersedes" in prompt_sent.lower()
 
-    @patch("forge.guard.semantic.supervisor.run_claude_session")
-    @patch("forge.guard.semantic.supervisor._resolve_resume_target")
+    @patch("forge.policy.semantic.supervisor.run_claude_session")
+    @patch("forge.policy.semantic.supervisor._resolve_resume_target")
     def test_invoke_without_override_no_preamble(self, mock_resolve: MagicMock, mock_run: MagicMock) -> None:
-        from forge.guard.semantic.supervisor import invoke_supervisor
+        from forge.policy.semantic.supervisor import invoke_supervisor
 
         mock_resolve.return_value = MagicMock(resume_id="uuid-123", warning=None, source_cwd=None)
         mock_run.return_value = MagicMock(success=True, stdout='{"verdict":"aligned","confidence":0.9,"violations":[]}')
@@ -1219,7 +1219,7 @@ class TestPlanOverridePrompt:
 class TestPlanOverrideCache:
     """Tests for cache key differentiation with plan_override_path."""
 
-    @patch("forge.guard.semantic.supervisor.invoke_supervisor")
+    @patch("forge.policy.semantic.supervisor.invoke_supervisor")
     def test_different_plan_override_produces_cache_miss(self, mock_invoke: MagicMock, tmp_path) -> None:
         """Changing plan_override_path on the same policy must miss the cache."""
         mock_invoke.return_value = _allow_decision()
@@ -1245,7 +1245,7 @@ class TestPlanOverrideCache:
         policy.evaluate(_make_context())
         assert mock_invoke.call_count == 2
 
-    @patch("forge.guard.semantic.supervisor.invoke_supervisor")
+    @patch("forge.policy.semantic.supervisor.invoke_supervisor")
     def test_same_plan_path_edited_produces_cache_miss(self, mock_invoke: MagicMock, tmp_path) -> None:
         """In-place edit of the plan file (different mtime/size) must miss cache."""
         import time

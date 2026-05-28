@@ -11,8 +11,8 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from forge.core.state import now_iso
-from forge.guard.team.config import TeamSupervisorConfig
-from forge.guard.types import FailMode
+from forge.policy.team.config import TeamSupervisorConfig
+from forge.policy.types import FailMode
 
 from .config import LAUNCH_MODE_HOST, LAUNCH_MODE_SIDECAR
 

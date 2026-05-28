@@ -1,1 +1,1 @@
-# Tests for guard module
+# Tests for policy module

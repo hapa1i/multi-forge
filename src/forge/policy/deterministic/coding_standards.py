@@ -10,8 +10,8 @@ from __future__ import annotations
 
 import re
 
-from forge.guard.deterministic.base import DeterministicPolicy
-from forge.guard.types import ActionContext, PolicyDecision, Violation
+from forge.policy.deterministic.base import DeterministicPolicy
+from forge.policy.types import ActionContext, PolicyDecision, Violation
 
 # Patterns indicating TYPE_CHECKING workarounds
 TYPE_CHECKING_PATTERNS = [

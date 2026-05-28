@@ -6,7 +6,7 @@ found in registry" whenever a *template* of that name existed but no proxy was r
 yet. The user reasonably expected Forge to bring the proxy up.
 
 Root cause: ``preflight_supervisor_proxy`` (now ``ensure_supervisor_proxy``,
-src/forge/guard/semantic/supervisor.py) resolved only against the runtime registry and
+src/forge/policy/semantic/supervisor.py) resolved only against the runtime registry and
 hard-failed on a miss -- it never fell back to the matching template.
 
 Fix: ``ensure_supervisor_proxy`` delegates to ``ensure_proxy``
@@ -21,7 +21,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from forge.guard.semantic.supervisor import ensure_supervisor_proxy
+from forge.policy.semantic.supervisor import ensure_supervisor_proxy
 
 pytestmark = pytest.mark.regression
 

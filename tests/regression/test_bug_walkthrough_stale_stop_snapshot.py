@@ -6,7 +6,7 @@ with `overwrite=False`, so the first-turn snapshot stayed frozen forever.
 
 Walkthrough impact: section 10 rebuilt the search index from
 `.forge/artifacts/.../transcripts/<uuid>.jsonl`, but that file only contained
-the initial "hello!" turn and not the later guard demo content.
+the initial "hello!" turn and not the later policy demo content.
 
 Fix: refresh the transcript artifact on repeated Stop/StopFailure captures so
 manual rebuilds and async indexing see the latest session content.
@@ -102,7 +102,7 @@ def test_rebuild_index_sees_latest_turn_after_repeated_stop(
     _append_text_entry(
         transcript,
         role="assistant",
-        text="I cannot add an emoji here because the guard blocks it, but I can help with a compliant greeting.",
+        text="I cannot add an emoji here because the policy blocks it, but I can help with a compliant greeting.",
         timestamp="2026-03-20T17:30:05.000Z",
     )
 

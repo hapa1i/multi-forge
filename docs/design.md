@@ -22,7 +22,7 @@ These components run independently but share code (libraries/config).
 | **Forge Session**   | Session isolation, Worktrees       | `src/forge/session/`        |
 | **Forge Skills**    | Agent workflows (Review, Planning) | `src/skills/` + `forge` CLI |
 | **Forge Status**    | Visual feedback & Dashboard        | `src/forge/status/`         |
-| **Forge Policy**    | Policy enforcement (TDD, safety)   | `src/forge/guard/`          |
+| **Forge Policy**    | Policy enforcement (TDD, safety)   | `src/forge/policy/`         |
 | **Commands/Agents** | Claude Code extensions             | `src/{commands,agents}/`    |
 | **Hooks**           | Lifecycle events (Claude Code)     | `src/forge/cli/hooks/`      |
 
@@ -350,7 +350,7 @@ To avoid writer conflicts:
   - proxy-owned snapshot/cache files (if any)
 - Status:
   - read state; do not invent truth
-- Guard:
+- Policy:
   - reads state; enforces policy decisions at well-defined boundaries (hooks, proxy)
   - writes only hook-owned confirmed state (e.g., `confirmed.policy`) when running as a hook adapter
 
@@ -974,8 +974,8 @@ per-child handoff file in `$EDITOR` before launching Claude. `forge session memo
 
 #### Policy enforcement
 
-| Command                                       | Purpose                                       |
-| --------------------------------------------- | --------------------------------------------- |
+| Command                                        | Purpose                                       |
+| ---------------------------------------------- | --------------------------------------------- |
 | `forge policy enable --bundle <name>`          | Enable policy enforcement for current session |
 | `forge policy disable`                         | Disable policy enforcement                    |
 | `forge policy status`                          | Show current policy state (`--json`)          |
@@ -1044,7 +1044,7 @@ hints through `ModelSpec.prompt`. All workflow execution commands (panel, analyz
 
 Forge Policy is an **enforcement system** with three types:
 
-1. **Deterministic Policy (Guard)**: Static checks, file mapping, dependency rules (Fast/Free).
+1. **Deterministic Policy**: Static checks, file mapping, dependency rules (Fast/Free).
 2. **Semantic Policy (Supervisor)**: LLM-based alignment checks against plans (Smart/Context-aware).
 3. **Verification Policy**: Outcome-based checks at session boundaries (Feedback loop).
 
@@ -1066,7 +1066,7 @@ At minimum:
 - **Intent**: every policy declares *why* it exists — shown to models on deny so they can distinguish good workarounds
   (satisfy the goal) from bad ones (defeat it)
 
-#### 4.1.1 Deterministic Policy (Forge Guard)
+#### 4.1.1 Deterministic Policy (Forge Policy)
 
 Forge Policy is designed to support **deterministic policies first**.
 
@@ -1205,8 +1205,8 @@ context keeps the original plan in view.
 
 **Reactive Patterns (Shared Library)**
 
-Several components react to hook events via external processing: semantic supervisor (`guard/semantic/supervisor.py`),
-handoff agent (`session/handoff_agent.py`), deterministic policies (`guard/deterministic/`), and the planned workflow
+Several components react to hook events via external processing: semantic supervisor (`policy/semantic/supervisor.py`),
+handoff agent (`session/handoff_agent.py`), deterministic policies (`policy/deterministic/`), and the planned workflow
 policy. The shared pattern: take hook context, classify/evaluate, return a decision or side-effect. Three node types
 cover current and planned use cases:
 
@@ -1426,12 +1426,12 @@ a policy-grade verdict (JSON + exit code).
 
 Skills vary in what they execute. Four types cover all current and planned cases:
 
-| Type            | Execution                                   | Examples                                   |
-| --------------- | ------------------------------------------- | ------------------------------------------ |
-| Pure Python     | Deterministic function                      | TDD guard, pattern matching, `run_tests()` |
-| Single LLM      | `core.llm` API call                         | Tagger, checker                            |
-| Claude session  | `claude -p [--bare]` subprocess (has tools) | Supervisor, reviewer, handoff agent        |
-| Pure text (.md) | Markdown instructions sent to `claude -p`   | Review resources, analyze, debate prompts  |
+| Type            | Execution                                   | Examples                                    |
+| --------------- | ------------------------------------------- | ------------------------------------------- |
+| Pure Python     | Deterministic function                      | TDD policy, pattern matching, `run_tests()` |
+| Single LLM      | `core.llm` API call                         | Tagger, checker                             |
+| Claude session  | `claude -p [--bare]` subprocess (has tools) | Supervisor, reviewer, handoff agent         |
+| Pure text (.md) | Markdown instructions sent to `claude -p`   | Review resources, analyze, debate prompts   |
 
 Claude session subprocesses use `--bare` when `ANTHROPIC_API_KEY` is in the environment (skips hooks, LSP, plugin sync,
 skill walks for faster startup). `--bare` disables OAuth/keychain auth, so it is only safe when an explicit API key is
@@ -1499,10 +1499,10 @@ both CLI commands and policy classes—no workflow registry, no declarative conf
 
 **CLI surfaces (normative):** Forge uses two related command surfaces:
 
-1. **Guard** — deterministic/semantic policies evaluated against an action context.
+1. **Policy** — deterministic/semantic policies evaluated against an action context.
 
-   - Hook surface: `forge hook …` invokes Guard policies automatically.
-   - Manual surface: `forge policy check …` runs Guard policies on demand (after a hook blocks you, or in CI).
+   - Hook surface: `forge hook …` invokes policies automatically.
+   - Manual surface: `forge policy check …` runs policies on demand (after a hook blocks you, or in CI).
 
    **Stuck playbook (target UX):** When a PreToolUse policy blocks repeatedly, give the human an escape hatch without
    uninstalling hooks.
@@ -1516,8 +1516,8 @@ both CLI commands and policy classes—no workflow registry, no declarative conf
      - `%policy enable` (planned): with no bundles, restores the session's configured bundles from intent.
      - `%policy enable tdd coding_standards`: explicitly sets bundles for the session.
 
-   `forge policy check` (and `%policy check`) are diagnostics; you're unstuck once enforcement is re-enabled and the next
-   Write/Edit passes the hook.
+   `forge policy check` (and `%policy check`) are diagnostics; you're unstuck once enforcement is re-enabled and the
+   next Write/Edit passes the hook.
 
 2. **Run** -- multi-step workflow runners (fan-out, debate, etc.).
 
@@ -1525,7 +1525,7 @@ both CLI commands and policy classes—no workflow registry, no declarative conf
    - Gate mode: `forge workflow <workflow> --check` forces a policy-grade verdict contract (structured JSON + exit
      code).
 
-**No auto-promotion:** A workflow does not automatically appear in Guard. If a Guard policy wants to use a workflow, it
+**No auto-promotion:** A workflow does not automatically appear as a Policy. If a Policy wants to use a workflow, it
 invokes the workflow's `--check` surface explicitly.
 
 **Workflow runners unify skills and policies.** The same runner is usable from:
@@ -1796,7 +1796,7 @@ multi-forge/
 │   │   ├── session/     # Session manager
 │   │   ├── install/     # Installer system
 │   │   ├── proxy/       # Proxy - uses core.llm
-│   │   ├── guard/       # Guard - uses core.llm
+│   │   ├── policy/      # Policy - uses core.llm
 │   │   └── status/      # Status dashboard
 │   │
 │   ├── commands/        # Slash commands (installed to ~/.claude/commands)

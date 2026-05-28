@@ -222,7 +222,7 @@ class TestLiteLLMSyncAdapter:
     """Sync adapter tests (not async)."""
 
     def test_sync_adapter_ask(self):
-        """Test SyncAdapter.ask() for Guard use case."""
+        """Test SyncAdapter.ask() for Policy use case."""
         client = SyncAdapter(get_client("openai/gpt-4o-mini"))
         response = client.ask(
             "What is 2+2? Reply with just the number.",

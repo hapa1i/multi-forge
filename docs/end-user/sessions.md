@@ -449,7 +449,7 @@ forge session fork planner --into /path/to/executor-worktree --inline-plan
 
 The `--supervise` flag wires the parent as a semantic supervisor. Every code change is checked against the approved plan
 at `PreToolUse` time. Supervisor config persists through `forge session resume`. You can also wire supervision on
-existing sessions with `forge guard supervise <session>` or `%guard supervise <session>` in-session.
+existing sessions with `forge policy supervise <session>` or `%policy supervise <session>` in-session.
 
 **Supervisor routing:** By default, the supervisor inherits the planner's proxy. Use `--supervisor-proxy` or
 `--no-supervisor-proxy` to override:
@@ -465,31 +465,31 @@ forge session fork planner --worktree --supervise --no-supervisor-proxy
 forge session start executor --supervise planner --supervisor-proxy openrouter-gemini
 
 # Or change supervisor routing on an existing session
-forge guard supervise planner --supervisor-proxy openrouter-gemini
+forge policy supervise planner --supervisor-proxy openrouter-gemini
 ```
 
 **Supervisor lifecycle controls:**
 
 ```bash
 # Suspend supervision (preserves config — resume_id, proxy, timeouts)
-forge guard supervise --off
-%guard supervise off
+forge policy supervise --off
+%policy supervise off
 
 # Resume suspended supervisor
-forge guard supervise --on
-%guard supervise on
+forge policy supervise --on
+%policy supervise on
 
 # Remove supervisor entirely
-forge guard supervise --remove
-%guard supervise remove
+forge policy supervise --remove
+%policy supervise remove
 
 # Reload plan when it evolves (searches current session, forks, target)
-forge guard supervise --reload
-%guard supervise reload
+forge policy supervise --reload
+%policy supervise reload
 
 # Reload from explicit file
-forge guard supervise --reload-from ~/.claude/plans/updated-plan.md
-%guard supervise reload /path/to/plan.md
+forge policy supervise --reload-from ~/.claude/plans/updated-plan.md
+%policy supervise reload /path/to/plan.md
 ```
 
 The planner session stays intact throughout — it can be forked multiple times for different executors or reviewers.
@@ -596,22 +596,22 @@ forge session reset memory.tags
 forge session reset --all
 ```
 
-**Policy/TDD enforcement** is managed separately via the Guard CLI, not session set:
+**Policy/TDD enforcement** is managed separately via the Policy CLI, not session set:
 
 ```bash
-forge guard list                                   # Show available bundles and rules
-forge guard enable --bundle tdd                    # Enable TDD enforcement
-forge guard enable --bundle tdd --permissive       # Warn instead of block
-forge guard enable --bundle coding_standards       # Enable coding standards
-forge guard disable                                # Disable all policy
-forge guard status                                 # Show current policy state
+forge policy list                                   # Show available bundles and rules
+forge policy enable --bundle tdd                    # Enable TDD enforcement
+forge policy enable --bundle tdd --permissive       # Warn instead of block
+forge policy enable --bundle coding_standards       # Enable coding standards
+forge policy disable                                # Disable all policy
+forge policy status                                 # Show current policy state
 ```
 
 ### Ownership boundaries (session vs proxy)
 
 **Session-owned** (you CAN toggle):
 
-- policy enforcement (`forge guard enable/disable`)
+- policy enforcement (`forge policy enable/disable`)
 - memory behavior (`memory.*`) — see [`handoff.md`](handoff.md) for automatic doc updates
 - artifact capture settings
 - worktree association

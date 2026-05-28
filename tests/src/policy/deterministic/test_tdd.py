@@ -1,12 +1,12 @@
-"""Tests for guard/deterministic/tdd.py."""
+"""Tests for policy/deterministic/tdd.py."""
 
 import pytest
 
-from forge.guard.deterministic.tdd import (
+from forge.policy.deterministic.tdd import (
     NoSkipTestsPolicy,
     TDDEnforcementPolicy,
 )
-from forge.guard.types import ActionContext
+from forge.policy.types import ActionContext
 
 
 class TestTDDEnforcementPolicy:

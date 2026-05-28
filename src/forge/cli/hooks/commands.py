@@ -52,9 +52,9 @@ from .direct_commands import (
     _handle_cmd_cancel_verification,
     _handle_cmd_clean,
     _handle_cmd_config,
-    _handle_cmd_guard,
     _handle_cmd_help,
     _handle_cmd_plan,
+    _handle_cmd_policy,
     _handle_cmd_proxy,
     _handle_cmd_session,
     _parse_direct_command,
@@ -1120,8 +1120,8 @@ def policy_check() -> None:
         print("[forge] Policy check: cannot build action context", file=sys.stderr)
         sys.exit(0)
 
-    from forge.guard.engine import build_engine
-    from forge.guard.types import FailMode
+    from forge.policy.engine import build_engine
+    from forge.policy.types import FailMode
 
     fail_mode: FailMode = effective.policy.fail_mode or "open"
     bundles = effective.policy.bundles or []
@@ -1143,7 +1143,7 @@ def policy_check() -> None:
 
     # Register semantic supervisor before restore_state so cached state is restored with it.
     if has_supervisor:
-        from forge.guard.semantic.supervisor import SemanticSupervisorPolicy
+        from forge.policy.semantic.supervisor import SemanticSupervisorPolicy
 
         supervisor_policy = SemanticSupervisorPolicy(config=effective.policy.supervisor)
         engine.register(supervisor_policy)
@@ -1324,8 +1324,8 @@ def user_prompt_submit() -> None:
         _handle_cmd_plan(args)
         return
 
-    if cmd == "guard":
-        _handle_cmd_guard(data, args)
+    if cmd == "policy":
+        _handle_cmd_policy(data, args)
         return
 
     if cmd == "config":
@@ -1544,7 +1544,7 @@ def teammate_idle() -> None:
     if not config or not config.enabled:
         sys.exit(0)
 
-    from forge.guard.team.handlers import handle_teammate_idle
+    from forge.policy.team.handlers import handle_teammate_idle
 
     cache_key = _safe_cache_key(data.get("session_id"))
     exit_code, feedback = _run_team_handler(cache_key, lambda cache: handle_teammate_idle(data, config, cache))
@@ -1579,7 +1579,7 @@ def task_completed() -> None:
     if not config or not config.enabled:
         sys.exit(0)
 
-    from forge.guard.team.handlers import handle_task_completed
+    from forge.policy.team.handlers import handle_task_completed
 
     cache_key = _safe_cache_key(data.get("session_id"))
     exit_code, feedback = _run_team_handler(cache_key, lambda cache: handle_task_completed(data, config, cache))

@@ -14,21 +14,21 @@ evaluates registered policies and blocks or warns based on the result.
 
 ```bash
 # Enable TDD enforcement for the current session
-forge guard enable --bundle tdd
+forge policy enable --bundle tdd
 
 # Check what's active
-forge guard status
+forge policy status
 
 # Disable all policies
-forge guard disable
+forge policy disable
 ```
 
 Or from within a Claude Code session (no terminal needed):
 
 ```
-%guard enable --bundle tdd
-%guard status
-%guard disable
+%policy enable --bundle tdd
+%policy status
+%policy disable
 ```
 
 ---
@@ -64,7 +64,7 @@ have been touched) persists in the session manifest between hook invocations.
 Enable with permissive mode to warn instead of block:
 
 ```bash
-forge guard enable --bundle tdd --permissive
+forge policy enable --bundle tdd --permissive
 ```
 
 ### `coding_standards` — Code conventions
@@ -79,7 +79,7 @@ forge guard enable --bundle tdd --permissive
 Config-driven pipelines that classify code changes via a cheap LLM tagger, then route through filter → checker →
 reviewer stages. Only actions flagged as "architectural" or "migration" reach the expensive reviewer.
 
-> **Note:** The `workflow` bundle is not available via `forge guard enable`. Enable it by setting `policy.bundles` and
+> **Note:** The `workflow` bundle is not available via `forge policy enable`. Enable it by setting `policy.bundles` and
 > `policy.bundle_config` in the session manifest (e.g., via `forge session set`). See [`design.md` §4.1.2](../design.md)
 > for the configuration schema.
 
@@ -87,42 +87,42 @@ reviewer stages. Only actions flagged as "architectural" or "migration" reach th
 
 ## CLI reference
 
-### `forge guard enable`
+### `forge policy enable`
 
 ```bash
-forge guard enable --bundle <name> [--bundle <name>] [--fail-mode open|closed] [--permissive]
+forge policy enable --bundle <name> [--bundle <name>] [--fail-mode open|closed] [--permissive]
 ```
 
 - `--bundle` / `-b` — bundle to enable (repeatable). Values: `tdd`, `coding_standards`
 - `--fail-mode` — `open` (default: allow on engine errors) or `closed` (deny on engine errors)
 - `--permissive` — TDD permissive mode: warn instead of deny (`bundle_config.tdd.strict=false`)
 
-### `forge guard disable`
+### `forge policy disable`
 
 ```bash
-forge guard disable
+forge policy disable
 ```
 
 Disables all policy enforcement for the current session.
 
-### `forge guard status`
+### `forge policy status`
 
 ```bash
-forge guard status
+forge policy status
 ```
 
 Shows: enabled/disabled, active bundles, fail mode, active rules, and per-policy state (e.g., which test files have been
 touched for TDD).
 
-### `forge guard check`
+### `forge policy check`
 
 Evaluate policies on demand against a file or git diff. Unlike hook-triggered checks, this runs explicitly and defaults
 to fail-mode=closed.
 
 ```bash
-forge guard check --bundle <name> --file <path>
-forge guard check --bundle <name> --bundle <name> -f src/foo.py --json
-git diff | forge guard check --bundle coding_standards --diff
+forge policy check --bundle <name> --file <path>
+forge policy check --bundle <name> --bundle <name> -f src/foo.py --json
+git diff | forge policy check --bundle coding_standards --diff
 ```
 
 - `--bundle` / `-b` — bundle to evaluate (repeatable, required)
@@ -133,13 +133,13 @@ git diff | forge guard check --bundle coding_standards --diff
 
 Exit codes: 0 (passed or warnings only), 1 (policy violation), 2 (usage error or engine failure).
 
-### `forge guard supervisor`
+### `forge policy supervisor`
 
 Evaluate a file against an approved plan via the semantic supervisor. Fail-closed with 3-way exit codes.
 
 ```bash
-forge guard supervisor -f src/foo.py -r <session-uuid>
-forge guard supervisor -f src/foo.py -r <session-uuid> --proxy openrouter-openai --json
+forge policy supervisor -f src/foo.py -r <session-uuid>
+forge policy supervisor -f src/foo.py -r <session-uuid> --proxy openrouter-openai --json
 ```
 
 - `--file` / `-f` — file to evaluate (required)
@@ -156,20 +156,20 @@ Exit codes: 0 (aligned), 1 (divergent), 2 (could not evaluate — infra failure,
 
 These work inside Claude Code without switching to a terminal:
 
-| Command                                     | Effect                                                    |
-| ------------------------------------------- | --------------------------------------------------------- |
-| `%guard status`                             | Show policy config and state                              |
-| `%guard enable --bundle tdd`                | Enable TDD enforcement                                    |
-| `%guard enable --bundle tdd --permissive`   | Enable TDD in warn-only mode                              |
-| `%guard disable`                            | Disable all policies                                      |
-| `%guard check [--staged] [--bundle <name>]` | Evaluate git diff against policies (diagnostic, not gate) |
+| Command                                      | Effect                                                    |
+| -------------------------------------------- | --------------------------------------------------------- |
+| `%policy status`                             | Show policy config and state                              |
+| `%policy enable --bundle tdd`                | Enable TDD enforcement                                    |
+| `%policy enable --bundle tdd --permissive`   | Enable TDD in warn-only mode                              |
+| `%policy disable`                            | Disable all policies                                      |
+| `%policy check [--staged] [--bundle <name>]` | Evaluate git diff against policies (diagnostic, not gate) |
 
-`%guard check` runs `git diff` (or `git diff --staged` with `--staged`), splits per file, evaluates each file against
+`%policy check` runs `git diff` (or `git diff --staged` with `--staged`), splits per file, evaluates each file against
 the specified bundles (or session-configured bundles if omitted), and reports pass/fail with violations. It reads
 session config even when enforcement is disabled — useful for verifying fixes before re-enabling.
 
-> **Note:** `%guard enable/disable` applies session overrides that persist until changed or reset. The CLI command
-> `forge guard enable/disable` mutates the session intent.
+> **Note:** `%policy enable/disable` applies session overrides that persist until changed or reset. The CLI command
+> `forge policy enable/disable` mutates the session intent.
 
 For the full list of `%` commands, see [`hooks.md`](hooks.md#in-session-commands--commands).
 
@@ -227,12 +227,12 @@ specific plan section and explain the divergence, giving the executor enough inf
 
 **Surfacing plan gaps.** Supervision works bidirectionally. When the executor hits a supervisor block and the plan
 genuinely didn't account for something (a dependency, an interface constraint), the executor stops and surfaces the
-conflict. This forces **explicit plan evolution** via `%guard supervise reload` instead of silent improvisation. Each
+conflict. This forces **explicit plan evolution** via `%policy supervise reload` instead of silent improvisation. Each
 reload is an auditable moment where the plan's authority changed.
 
 **Explicit deviation.** When a multi-model review (see [`workflows.md`](workflows.md)) recommends an improvement that
-wasn't in the plan, you can turn the supervisor off (`%guard supervise off`), apply the change, and optionally reload an
-updated plan. The deviation goes through *you* — not silently absorbed by the executor.
+wasn't in the plan, you can turn the supervisor off (`%policy supervise off`), apply the change, and optionally reload
+an updated plan. The deviation goes through *you* — not silently absorbed by the executor.
 
 ---
 
@@ -241,10 +241,10 @@ updated plan. The deviation goes through *you* — not silently absorbed by the 
 When a policy blocks the agent repeatedly and you need to unblock:
 
 ```
-1. Disable enforcement   →  %guard disable
+1. Disable enforcement   →  %policy disable
 2. Fix the issue         →  (work with agent or edit manually)
-3. Verify fix passes     →  %guard check                      (optional)
-4. Re-enable enforcement →  %guard enable --bundle tdd
+3. Verify fix passes     →  %policy check                      (optional)
+4. Re-enable enforcement →  %policy enable --bundle tdd
 ```
 
 Step 3 is diagnostic — it evaluates without gating. If the check passes, re-enabling enforcement (step 4) lets the next
@@ -254,16 +254,16 @@ Write/Edit proceed.
 
 ```bash
 # Disable
-forge guard disable
+forge policy disable
 
 # Check a specific file
-forge guard check --bundle tdd --file src/foo.py
+forge policy check --bundle tdd --file src/foo.py
 
 # Check all unstaged changes
-git diff | forge guard check --bundle tdd --diff
+git diff | forge policy check --bundle tdd --diff
 
 # Re-enable
-forge guard enable --bundle tdd
+forge policy enable --bundle tdd
 ```
 
 ---
@@ -284,8 +284,8 @@ Policy violation(s):
 **To unblock:**
 
 - Write tests first (the TDD way)
-- Switch to permissive mode: `%guard enable --bundle tdd --permissive`
-- Disable policies entirely: `%guard disable`
+- Switch to permissive mode: `%policy enable --bundle tdd --permissive`
+- Disable policies entirely: `%policy disable`
 
 ---
 
@@ -293,7 +293,7 @@ Policy violation(s):
 
 ### Policies not evaluating
 
-- Check that policies are enabled: `forge guard status`
+- Check that policies are enabled: `forge policy status`
 - Policies only evaluate on `Write` and `Edit` tool calls — `Bash`, `Read`, etc. are not checked
 - Verify the hook is installed: check your settings file for `PreToolUse` entries with `forge hook policy-check` (see
   [`hooks.md`](hooks.md) for which settings file applies to your scope)
@@ -303,7 +303,7 @@ Policy violation(s):
 The TDD policy tracks state across hook invocations. If you wrote tests in a *previous* session, the current session
 doesn't know about it (state is session-scoped).
 
-- Check state: `%guard status` shows `tests_touched` set
+- Check state: `%policy status` shows `tests_touched` set
 - If starting fresh: write at least one test file in the current session before `src/` files
 
 ### Supervisor timeout
@@ -318,8 +318,8 @@ The semantic supervisor has a 45s default timeout. If it exceeds this:
 
 ## Inspecting policy decisions
 
-`forge guard status` shows the current policy config and evaluation counts. For the full decision audit trail (verdicts,
-violations, citations, timestamps), use:
+`forge policy status` shows the current policy config and evaluation counts. For the full decision audit trail
+(verdicts, violations, citations, timestamps), use:
 
 ```bash
 forge session show <name> --field confirmed.policy

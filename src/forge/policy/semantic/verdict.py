@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from typing import Any, Literal
 
 from forge.core.reactive.structured_output import extract_json_from_response
-from forge.guard.types import PolicyDecision, Severity, Violation
+from forge.policy.types import PolicyDecision, Severity, Violation
 
 _log = logging.getLogger(__name__)
 

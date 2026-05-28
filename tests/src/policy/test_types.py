@@ -1,8 +1,8 @@
-"""Tests for guard/types.py."""
+"""Tests for policy/types.py."""
 
 import pytest
 
-from forge.guard.types import (
+from forge.policy.types import (
     ActionContext,
     CompositeDecision,
     PolicyDecision,

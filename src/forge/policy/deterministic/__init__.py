@@ -7,12 +7,12 @@ that run synchronously without LLM invocation. They include:
 - Coding standards bundle: no-TYPE_CHECKING, no-backward-compat
 """
 
-from forge.guard.deterministic.coding_standards import (
+from forge.policy.deterministic.coding_standards import (
     NoBackwardCompatPolicy,
     NoTypeCheckingPolicy,
 )
-from forge.guard.deterministic.registry import get_bundle_policies
-from forge.guard.deterministic.tdd import (
+from forge.policy.deterministic.registry import get_bundle_policies
+from forge.policy.deterministic.tdd import (
     NoSkipTestsPolicy,
     TDDEnforcementPolicy,
 )

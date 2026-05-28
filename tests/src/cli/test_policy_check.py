@@ -1,4 +1,4 @@
-"""Tests for forge guard check CLI command."""
+"""Tests for forge policy check CLI command."""
 
 from __future__ import annotations
 
@@ -12,19 +12,19 @@ from forge.cli.main import main
 class TestGuardCheckHelp:
     def test_help_exits_zero(self):
         runner = CliRunner()
-        result = runner.invoke(main, ["guard", "check", "--help"])
+        result = runner.invoke(main, ["policy", "check", "--help"])
         assert result.exit_code == 0
         assert "Evaluate policies on demand" in result.output
 
     def test_no_bundle_fails(self):
         """--bundle is required."""
         runner = CliRunner()
-        result = runner.invoke(main, ["guard", "check", "--file", __file__])
+        result = runner.invoke(main, ["policy", "check", "--file", __file__])
         assert result.exit_code != 0
 
     def test_no_file_or_diff_fails(self):
         runner = CliRunner()
-        result = runner.invoke(main, ["guard", "check", "--bundle", "tdd"])
+        result = runner.invoke(main, ["policy", "check", "--bundle", "tdd"])
         assert result.exit_code == 2
 
 
@@ -38,7 +38,7 @@ class TestGuardCheckFile:
         runner = CliRunner()
         result = runner.invoke(
             main,
-            ["guard", "check", "--bundle", "tdd", "--file", str(test_file)],
+            ["policy", "check", "--bundle", "tdd", "--file", str(test_file)],
         )
         assert result.exit_code == 0
         assert "passed" in result.output.lower()
@@ -52,7 +52,7 @@ class TestGuardCheckFile:
         runner = CliRunner()
         result = runner.invoke(
             main,
-            ["guard", "check", "--bundle", "tdd", "--file", str(src_file)],
+            ["policy", "check", "--bundle", "tdd", "--file", str(src_file)],
         )
         # TDD enforcement requires tests before impl — deny on fresh engine
         assert result.exit_code == 1
@@ -66,7 +66,7 @@ class TestGuardCheckFile:
         runner = CliRunner()
         result = runner.invoke(
             main,
-            ["guard", "check", "--bundle", "tdd", "--file", str(test_file), "--json"],
+            ["policy", "check", "--bundle", "tdd", "--file", str(test_file), "--json"],
         )
         assert result.exit_code == 0
         data = json.loads(result.output)
@@ -84,7 +84,7 @@ class TestGuardCheckFile:
         runner = CliRunner()
         result = runner.invoke(
             main,
-            ["guard", "check", "--bundle", "tdd", "--file", str(src_file), "--json"],
+            ["policy", "check", "--bundle", "tdd", "--file", str(src_file), "--json"],
         )
         assert result.exit_code == 1
         data = json.loads(result.output)
@@ -102,7 +102,7 @@ class TestGuardCheckFile:
         result = runner.invoke(
             main,
             [
-                "guard",
+                "policy",
                 "check",
                 "--bundle",
                 "tdd",
@@ -125,7 +125,7 @@ class TestGuardCheckFile:
         runner = CliRunner()
         result = runner.invoke(
             main,
-            ["guard", "check", "--bundle", "tdd", "--file", str(test_file), "--json"],
+            ["policy", "check", "--bundle", "tdd", "--file", str(test_file), "--json"],
         )
         data = json.loads(result.output)
         # On clean allow: both passed and clean are True
@@ -137,30 +137,30 @@ class TestExtractPathFromDiff:
     """Unit tests for _extract_path_from_diff helper."""
 
     def test_standard_git_diff(self):
-        from forge.cli.guard import _extract_path_from_diff
+        from forge.cli.policy import _extract_path_from_diff
 
         diff = "+++ b/src/foo.py\n"
         assert _extract_path_from_diff(diff) == "src/foo.py"
 
     def test_strips_trailing_timestamp(self):
-        from forge.cli.guard import _extract_path_from_diff
+        from forge.cli.policy import _extract_path_from_diff
 
         diff = "+++ b/src/foo.py\t2026-02-12 10:30:00.000000000 +0000\n"
         assert _extract_path_from_diff(diff) == "src/foo.py"
 
     def test_dev_null_returns_none(self):
-        from forge.cli.guard import _extract_path_from_diff
+        from forge.cli.policy import _extract_path_from_diff
 
         diff = "+++ /dev/null\n"
         assert _extract_path_from_diff(diff) is None
 
     def test_no_match_returns_none(self):
-        from forge.cli.guard import _extract_path_from_diff
+        from forge.cli.policy import _extract_path_from_diff
 
         assert _extract_path_from_diff("just some text") is None
 
     def test_first_file_in_multi_file_diff(self):
-        from forge.cli.guard import _extract_path_from_diff
+        from forge.cli.policy import _extract_path_from_diff
 
         diff = "+++ b/first.py\n--- a/second.py\n+++ b/second.py\n"
         assert _extract_path_from_diff(diff) == "first.py"
@@ -179,7 +179,7 @@ class TestGuardCheckDiff:
         runner = CliRunner()
         result = runner.invoke(
             main,
-            ["guard", "check", "--bundle", "tdd", "--diff", "--json"],
+            ["policy", "check", "--bundle", "tdd", "--diff", "--json"],
             input=diff,
         )
         data = json.loads(result.output)
@@ -199,7 +199,7 @@ class TestGuardCheckDiff:
         runner = CliRunner()
         result = runner.invoke(
             main,
-            ["guard", "check", "--bundle", "tdd", "--diff", "--json"],
+            ["policy", "check", "--bundle", "tdd", "--diff", "--json"],
             input=diff,
         )
         data = json.loads(result.output)
@@ -217,7 +217,7 @@ class TestGuardCheckDiff:
         runner = CliRunner()
         result = runner.invoke(
             main,
-            ["guard", "check", "--bundle", "coding_standards", "--diff", "--json"],
+            ["policy", "check", "--bundle", "coding_standards", "--diff", "--json"],
             input=diff,
         )
         data = json.loads(result.output)
@@ -235,7 +235,7 @@ class TestGuardCheckFailMode:
         runner = CliRunner()
         result = runner.invoke(
             main,
-            ["guard", "check", "--bundle", "tdd", "--file", str(src_file), "--json"],
+            ["policy", "check", "--bundle", "tdd", "--file", str(src_file), "--json"],
         )
         # TDD denies src without tests
         assert result.exit_code == 1
@@ -249,7 +249,7 @@ class TestGuardCheckFailMode:
         runner = CliRunner()
         result = runner.invoke(
             main,
-            ["guard", "check", "--bundle", "tdd", "--file", str(test_file), "--json"],
+            ["policy", "check", "--bundle", "tdd", "--file", str(test_file), "--json"],
         )
         data = json.loads(result.output)
         # no-skip-tests should flag this

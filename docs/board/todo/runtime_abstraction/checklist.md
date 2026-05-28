@@ -39,7 +39,7 @@ behavior unchanged unless a separate default-change decision is recorded.
 
 Phase 0 gaps carried forward:
 
-- Team supervisor verb-cost snapshots remain future for `src/forge/guard/team/handlers.py`; track under Phase 4 usage
+- Team supervisor verb-cost snapshots remain future for `src/forge/policy/team/handlers.py`; track under Phase 4 usage
   ledger callsites.
 - Review engine routing plans shipped, but review fan-out is still outside the invoker abstraction; track under Phase 4
   `HeadlessInvoker` and fan-out migration.
@@ -133,8 +133,8 @@ Phase 0 gaps carried forward:
     latency, status, and attribution ids.
 - [ ] Instrument usage ledger callsites in staged order.
   - Assertion: workflow verbs (`src/forge/cli/workflow.py`), handoff agent (`src/forge/session/handoff_agent.py`),
-    review engine (`src/forge/review/engine.py`), semantic supervisor (`src/forge/guard/semantic/supervisor.py`), team
-    supervisor (`src/forge/guard/team/handlers.py`), Claude launcher (`src/forge/cli/claude.py`), and session launcher
+    review engine (`src/forge/review/engine.py`), semantic supervisor (`src/forge/policy/semantic/supervisor.py`), team
+    supervisor (`src/forge/policy/team/handlers.py`), Claude launcher (`src/forge/cli/claude.py`), and session launcher
     (`src/forge/cli/session.py`) each have an explicit done/deferred status.
 
 ## Phase 5 - Cross-Runtime Resume

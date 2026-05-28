@@ -10,10 +10,10 @@ import logging
 from typing import Any
 
 from forge.core.reactive import ThrottleCache, compute_cache_key, tag_action
-from forge.guard.deterministic.base import StatefulDeterministicPolicy
-from forge.guard.types import ActionContext, PolicyDecision
-from forge.guard.workflow.branches import Branch
-from forge.guard.workflow.config import WorkflowConfig
+from forge.policy.deterministic.base import StatefulDeterministicPolicy
+from forge.policy.types import ActionContext, PolicyDecision
+from forge.policy.workflow.branches import Branch
+from forge.policy.workflow.config import WorkflowConfig
 
 _log = logging.getLogger(__name__)
 

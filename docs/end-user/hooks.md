@@ -9,7 +9,7 @@ Hooks are Forge’s “glue” layer: they observe Claude Code lifecycle events 
 - Sessions (unit of work): [`sessions.md`](sessions.md)
 - Proxies (proxy endpoints): [`proxies.md`](proxies.md)
 - Configuration: [`configs.md`](configs.md)
-- Policies (guard commands): [`policies.md`](policies.md)
+- Policies (policy commands): [`policies.md`](policies.md)
 - Workflows (forge workflow): [`workflows.md`](workflows.md)
 
 ---
@@ -57,7 +57,7 @@ Hooks are intentionally restricted.
 - write **confirmed facts** into the session file (under `confirmed.*`)
   - Session located via hook resolution: `FORGE_FORK_NAME` -> `FORGE_SESSION` -> UUID lookup
 - capture **artifacts** (approved plans, transcripts) into `<forge_root>/.forge/artifacts/...`
-- apply **session overrides** through direct `%` commands handled by `UserPromptSubmit` (for example `%guard ...`,
+- apply **session overrides** through direct `%` commands handled by `UserPromptSubmit` (for example `%policy ...`,
   `%cancel-verification`)
 - emit machine-readable output for debugging
 
@@ -185,9 +185,9 @@ Purpose: track subagent activity in session confirmed state.
 
 ### policy-check (PreToolUse:Write/Edit)
 
-Purpose: evaluate TDD/Guard policies before file writes.
+Purpose: evaluate TDD/policy bundles before file writes.
 
-- enforces policy bundles (TDD, coding standards) when enabled via `forge guard enable`
+- enforces policy bundles (TDD, coding standards) when enabled via `forge policy enable`
 
 ### read-hygiene (PreToolUse:Read)
 
@@ -212,22 +212,22 @@ for the full list.
 Type these directly in the Claude prompt to interact with Forge without switching to a terminal. Commands starting with
 `%` are intercepted by the `UserPromptSubmit` hook and handled by Forge.
 
-| Command                                     | Effect                                                    |
-| ------------------------------------------- | --------------------------------------------------------- |
-| `%h` / `%help`                              | Show command help                                         |
-| `%config`                                   | Show effective runtime config (read-only)                 |
-| `%session list`                             | List sessions                                             |
-| `%plan`                                     | Show the current session's recorded plan file path        |
-| `%proxy list`                               | List proxies (read-only)                                  |
-| `%proxy show <id>`                          | Show proxy details (read-only)                            |
-| `%guard status`                             | Show policy config and state                              |
-| `%guard enable --bundle tdd [--permissive]` | Enable policy enforcement                                 |
-| `%guard disable`                            | Disable all policies                                      |
-| `%guard check [--staged] [--bundle <name>]` | Evaluate git diff against policies (diagnostic, not gate) |
-| `%cancel-verification`                      | Bypass active verification loop                           |
+| Command                                      | Effect                                                    |
+| -------------------------------------------- | --------------------------------------------------------- |
+| `%h` / `%help`                               | Show command help                                         |
+| `%config`                                    | Show effective runtime config (read-only)                 |
+| `%session list`                              | List sessions                                             |
+| `%plan`                                      | Show the current session's recorded plan file path        |
+| `%proxy list`                                | List proxies (read-only)                                  |
+| `%proxy show <id>`                           | Show proxy details (read-only)                            |
+| `%policy status`                             | Show policy config and state                              |
+| `%policy enable --bundle tdd [--permissive]` | Enable policy enforcement                                 |
+| `%policy disable`                            | Disable all policies                                      |
+| `%policy check [--staged] [--bundle <name>]` | Evaluate git diff against policies (diagnostic, not gate) |
+| `%cancel-verification`                       | Bypass active verification loop                           |
 
-> **Note:** `%guard enable/disable` applies session overrides that persist until changed or reset. The CLI
-> `forge guard enable/disable` mutates session intent. `%guard check` is read-only — it evaluates but doesn't change
+> **Note:** `%policy enable/disable` applies session overrides that persist until changed or reset. The CLI
+> `forge policy enable/disable` mutates session intent. `%policy check` is read-only — it evaluates but doesn't change
 > enforcement state.
 
 > **Note:** `%` commands only work in interactive Claude sessions. They do NOT fire in `claude --print` mode.

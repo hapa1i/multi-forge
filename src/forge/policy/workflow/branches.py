@@ -8,9 +8,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from forge.guard.types import ActionContext, PolicyDecision
-from forge.guard.workflow.config import BranchConfig
-from forge.guard.workflow.stages import CheckerStage, FilterStage, ReviewerStage
+from forge.policy.types import ActionContext, PolicyDecision
+from forge.policy.workflow.config import BranchConfig
+from forge.policy.workflow.stages import CheckerStage, FilterStage, ReviewerStage
 
 
 @dataclass

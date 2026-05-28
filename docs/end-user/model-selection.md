@@ -51,10 +51,10 @@ available at the same proxy. You do not have to choose once for all roles.
 
 ## Supervisor Requirements
 
-The semantic supervisor (`forge guard supervise`) runs `claude -p --resume <planner_uuid> --fork-session` on Write/Edit,
-throttled by policy settings. When routed through a proxy, Forge passes `--model opus` and clears inherited executor
-model pins so the supervisor uses that proxy's `opus` tier. Its job is to read the planner's conversation, locate the
-relevant plan section for the action being taken, and emit a verdict with cited evidence.
+The semantic supervisor (`forge policy supervise`) runs `claude -p --resume <planner_uuid> --fork-session` on
+Write/Edit, throttled by policy settings. When routed through a proxy, Forge passes `--model opus` and clears inherited
+executor model pins so the supervisor uses that proxy's `opus` tier. Its job is to read the planner's conversation,
+locate the relevant plan section for the action being taken, and emit a verdict with cited evidence.
 
 This is **not** code writing. Coding leaderboards are useful context, but they are not sufficient for choosing a
 supervisor. Validate these dimensions locally:
@@ -116,10 +116,10 @@ supervisor through another proxy and validate the result:
 
 ```bash
 # Executor on one proxy, supervisor on another
-forge guard supervise planner --session exec --supervisor-proxy openrouter-gemini
+forge policy supervise planner --session exec --supervisor-proxy openrouter-gemini
 
 # Cost-conscious supervisor candidate in warn-only workflows
-forge guard supervise planner --session exec --supervisor-proxy openrouter-deepseek
+forge policy supervise planner --session exec --supervisor-proxy openrouter-deepseek
 ```
 
 This is the side-channel architecture pattern: executor and supervisor use different proxies intentionally.
@@ -221,7 +221,7 @@ The validation loop:
 forge session start trial --proxy openrouter-anthropic --model claude-opus-4-7
 
 # Run supervisor evaluation on representative diffs
-forge guard supervisor -f src/forge/session/store.py -r <trial-session-id> \
+forge policy supervisor -f src/forge/session/store.py -r <trial-session-id> \
   --proxy openrouter-anthropic --json
 
 # Compare verdict quality, citation accuracy, and false-positive rate
@@ -239,7 +239,7 @@ strengths matter.
 | Role            | CLI entry point                                    | Implementation                                               |
 | --------------- | -------------------------------------------------- | ------------------------------------------------------------ |
 | Executor        | `forge session start [--proxy <id>] [--model <m>]` | `src/forge/session/manager.py`, `src/forge/cli/session.py`   |
-| Supervisor      | `forge guard supervise <target>`                   | `src/forge/guard/semantic/supervisor.py`                     |
+| Supervisor      | `forge policy supervise <target>`                  | `src/forge/policy/semantic/supervisor.py`                    |
 | `/forge:review` | `src/skills/review/SKILL.md` (Claude Code skill)   | `src/forge/core/ops/session_context.py` for family detection |
 | `/forge:panel`  | `forge workflow panel ...`                         | `src/forge/review/engine.py`, `src/forge/review/models.py`   |
 | `/forge:debate` | `forge workflow debate ...`                        | `src/forge/review/engine.py` (adversarial runner)            |

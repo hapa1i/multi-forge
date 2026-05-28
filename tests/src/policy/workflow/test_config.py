@@ -1,11 +1,11 @@
-"""Tests for forge.guard.workflow.config."""
+"""Tests for forge.policy.workflow.config."""
 
 from __future__ import annotations
 
 import dacite
 import pytest
 
-from forge.guard.workflow.config import (
+from forge.policy.workflow.config import (
     BranchConfig,
     CheckerConfig,
     FilterConfig,

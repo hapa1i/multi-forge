@@ -1,4 +1,4 @@
-"""Tests for forge guard status command."""
+"""Tests for forge policy status command."""
 
 from __future__ import annotations
 
@@ -63,25 +63,25 @@ def runner():
 
 class TestStatusBasic:
     def test_help(self, runner: CliRunner):
-        result = runner.invoke(main, ["guard", "status", "--help"])
+        result = runner.invoke(main, ["policy", "status", "--help"])
         assert result.exit_code == 0
         assert "--session" in result.output
 
     def test_no_session_error(self, runner: CliRunner, env: Path):
-        result = runner.invoke(main, ["guard", "status"])
+        result = runner.invoke(main, ["policy", "status"])
         assert result.exit_code == 1
         assert "No session found" in result.output
 
     def test_no_policy(self, runner: CliRunner, env: Path):
         _seed_session(str(env), "test-session")
-        result = runner.invoke(main, ["guard", "status"])
+        result = runner.invoke(main, ["policy", "status"])
         assert result.exit_code == 0
         assert "No (not configured)" in result.output
 
     def test_with_bundles(self, runner: CliRunner, env: Path):
         policy = PolicyIntent(enabled=True, bundles=["tdd"])
         _seed_session(str(env), "test-session", policy=policy)
-        result = runner.invoke(main, ["guard", "status"])
+        result = runner.invoke(main, ["policy", "status"])
         assert result.exit_code == 0
         assert "tdd" in result.output
 
@@ -91,7 +91,7 @@ class TestStatusSessionFlag:
         policy = PolicyIntent(enabled=True, bundles=["tdd"])
         _seed_session(str(env), "planner")
         _seed_session(str(env), "executor", policy=policy)
-        result = runner.invoke(main, ["guard", "status", "--session", "executor"])
+        result = runner.invoke(main, ["policy", "status", "--session", "executor"])
         assert result.exit_code == 0
         assert "tdd" in result.output
 
@@ -106,13 +106,13 @@ class TestStatusSessionFlag:
         policy = PolicyIntent(enabled=True, bundles=["coding_standards"])
         _seed_session(str(other_root), "executor", project_root=project_root, policy=policy)
 
-        result = runner.invoke(main, ["guard", "status", "--session", "executor"])
+        result = runner.invoke(main, ["policy", "status", "--session", "executor"])
         assert result.exit_code == 0
         assert "coding_standards" in result.output
 
     def test_not_found(self, runner: CliRunner, env: Path):
         _seed_session(str(env), "planner")
-        result = runner.invoke(main, ["guard", "status", "--session", "nonexistent"])
+        result = runner.invoke(main, ["policy", "status", "--session", "nonexistent"])
         assert result.exit_code == 1
         assert "not found" in result.output
 
@@ -128,7 +128,7 @@ class TestStatusSessionFlag:
         _seed_session(str(env), "shared", project_root=project_root, policy=policy_a)
         _seed_session(str(other_root), "shared", project_root=project_root, policy=policy_b)
 
-        result = runner.invoke(main, ["guard", "status", "--session", "shared"])
+        result = runner.invoke(main, ["policy", "status", "--session", "shared"])
         assert result.exit_code == 0
         assert "tdd" in result.output
 
@@ -139,13 +139,13 @@ class TestStatusSessionFlag:
         (other_project / ".forge").mkdir()
         _seed_session(str(other_project), "foreign", project_root=str(other_project))
 
-        result = runner.invoke(main, ["guard", "status", "--session", "foreign"])
+        result = runner.invoke(main, ["policy", "status", "--session", "foreign"])
         assert result.exit_code == 1
 
     def test_json_output(self, runner: CliRunner, env: Path):
         policy = PolicyIntent(enabled=True, bundles=["tdd"])
         _seed_session(str(env), "target", policy=policy)
-        result = runner.invoke(main, ["guard", "status", "--session", "target", "--json"])
+        result = runner.invoke(main, ["policy", "status", "--session", "target", "--json"])
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert data["session_name"] == "target"
@@ -163,7 +163,7 @@ class TestSupervisedTip:
         _seed_session(project_root, "executor", project_root=project_root, policy=policy)
 
         monkeypatch.setenv("FORGE_SESSION", "planner")
-        result = runner.invoke(main, ["guard", "status"])
+        result = runner.invoke(main, ["policy", "status"])
         assert result.exit_code == 0
         assert "This session supervises: executor" in result.output
 
@@ -183,7 +183,7 @@ class TestSupervisedTip:
         _seed_session(project_root, "leaf", project_root=project_root, policy=leaf_policy)
 
         monkeypatch.setenv("FORGE_SESSION", "middle")
-        result = runner.invoke(main, ["guard", "status"])
+        result = runner.invoke(main, ["policy", "status"])
         assert result.exit_code == 0
         assert "This session supervises: leaf" in result.output
 
@@ -198,7 +198,7 @@ class TestSupervisedTip:
         _seed_session(project_root, "executor", project_root=project_root, policy=policy)
 
         monkeypatch.setenv("FORGE_SESSION", "planner")
-        result = runner.invoke(main, ["guard", "status"])
+        result = runner.invoke(main, ["policy", "status"])
         assert result.exit_code == 0
         assert "This session supervises: executor" in result.output
 
@@ -217,7 +217,7 @@ class TestSupervisedTip:
         _seed_session(project_root, "executor", project_root=project_root, policy=policy)
 
         monkeypatch.setenv("FORGE_SESSION", "planner")
-        result = runner.invoke(main, ["guard", "status"])
+        result = runner.invoke(main, ["policy", "status"])
         assert result.exit_code == 0
         assert "This session supervises" not in result.output
 
@@ -232,7 +232,7 @@ class TestSupervisedTip:
             _seed_session(project_root, name, project_root=project_root, policy=policy)
 
         monkeypatch.setenv("FORGE_SESSION", "planner")
-        result = runner.invoke(main, ["guard", "status"])
+        result = runner.invoke(main, ["policy", "status"])
         assert result.exit_code == 0
         assert "exec-1" in result.output
         assert "exec-2" in result.output
@@ -247,7 +247,7 @@ class TestSupervisedTip:
         _seed_session(project_root, "executor", project_root=project_root, policy=policy)
 
         monkeypatch.setenv("FORGE_SESSION", "planner")
-        result = runner.invoke(main, ["guard", "status", "--json"])
+        result = runner.invoke(main, ["policy", "status", "--json"])
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert "supervised_sessions" in data
@@ -271,5 +271,5 @@ class TestSupervisedTip:
         )
 
         monkeypatch.setenv("FORGE_SESSION", "planner")
-        result = runner.invoke(main, ["guard", "status"])
+        result = runner.invoke(main, ["policy", "status"])
         assert result.exit_code == 0

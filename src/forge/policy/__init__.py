@@ -1,11 +1,11 @@
-"""Forge Guard: Policy enforcement engine.
+"""Forge Policy: Policy enforcement engine.
 
 This module provides policy enforcement at Claude Code hook boundaries,
 supporting both deterministic policies (TDD, coding standards) and
 semantic policies (LLM-based supervisor).
 """
 
-from forge.guard.types import (
+from forge.policy.types import (
     ActionContext,
     CompositeDecision,
     DecisionType,

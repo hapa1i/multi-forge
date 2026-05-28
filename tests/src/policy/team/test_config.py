@@ -1,10 +1,10 @@
-"""Tests for forge.guard.team.config and PolicyIntent integration."""
+"""Tests for forge.policy.team.config and PolicyIntent integration."""
 
 from __future__ import annotations
 
 import dacite
 
-from forge.guard.team.config import TeamSupervisorConfig
+from forge.policy.team.config import TeamSupervisorConfig
 from forge.session.models import PolicyIntent
 
 

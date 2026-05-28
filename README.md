@@ -170,7 +170,7 @@ inside Claude Code for an interactive walkthrough.
 | `forge session`        | Named sessions, worktrees, resume, fork      |
 | `forge proxy`          | Model routing, templates, tier mappings      |
 | `forge authentication` | Credential management (`credentials.yaml`)   |
-| `forge guard`          | Policy enforcement, plan supervision         |
+| `forge policy`         | Policy enforcement, plan supervision         |
 | `forge workflow`       | Workflow runners (panel, analyze, debate)    |
 | `forge search`         | Transcript search across sessions            |
 | `forge config`         | Runtime preferences (`~/.forge/config.yaml`) |

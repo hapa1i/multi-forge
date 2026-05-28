@@ -959,7 +959,7 @@ def launch_new_session(
     # Validate supervisor target and proxy BEFORE creating the session to avoid half-created state
     _supervisor_source_state = None
     if supervise_target:
-        from forge.guard.semantic.supervisor import validate_supervisor_target
+        from forge.policy.semantic.supervisor import validate_supervisor_target
 
         try:
             _supervisor_source_state = validate_supervisor_target(
@@ -969,7 +969,7 @@ def launch_new_session(
             console.print(f"[red]Error:[/red] {e}")
             return 1
     if supervisor_proxy:
-        from forge.guard.semantic.supervisor import ensure_supervisor_proxy
+        from forge.policy.semantic.supervisor import ensure_supervisor_proxy
 
         try:
             _sup_proxy_id, _sup_started = ensure_supervisor_proxy(supervisor_proxy)
@@ -1050,7 +1050,7 @@ def launch_new_session(
 
     # --- wire supervisor (if requested) ---
     if supervise_target and _supervisor_source_state is not None:
-        from forge.guard.semantic.supervisor import (
+        from forge.policy.semantic.supervisor import (
             apply_supervisor_routing,
             apply_supervisor_to_intent,
         )

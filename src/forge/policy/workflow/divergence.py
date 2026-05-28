@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from forge.guard.workflow.config import (
+from forge.policy.workflow.config import (
     BranchConfig,
     CheckerConfig,
     FilterConfig,

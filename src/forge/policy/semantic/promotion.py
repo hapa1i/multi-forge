@@ -10,8 +10,8 @@ promotion flow (creating a dedicated supervisor session) is not yet implemented.
 
 Preferred approach (available now):
     forge session fork planner --name executor --supervise   # At fork time
-    forge guard supervise planner                            # On existing session
-    %guard supervise planner                                 # In-session
+    forge policy supervise planner                            # On existing session
+    %policy supervise planner                                 # In-session
 
 Manual approach (still works):
     forge session set policy.supervisor.resume_id <name-or-uuid>

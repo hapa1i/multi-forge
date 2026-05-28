@@ -243,7 +243,7 @@ def _run_policy_check(
     with (
         patch("forge.cli.hooks.commands.resolve_session_store", return_value=mock_store),
         patch("forge.cli.hooks.commands.compute_effective_intent", return_value=effective),
-        patch("forge.guard.engine.build_engine", return_value=mock_engine),
+        patch("forge.policy.engine.build_engine", return_value=mock_engine),
         patch("forge.cli.hooks.commands._persist_policy_state"),
         patch("forge.runtime_config.get_runtime_config", return_value=rc),
     ):

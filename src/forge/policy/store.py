@@ -11,7 +11,7 @@ import logging
 from typing import Any
 
 from forge.core.state import now_iso
-from forge.guard.types import CompositeDecision, PolicyDecision, Violation
+from forge.policy.types import CompositeDecision, PolicyDecision, Violation
 
 _log = logging.getLogger(__name__)
 

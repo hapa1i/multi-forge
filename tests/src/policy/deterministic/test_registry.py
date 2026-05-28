@@ -8,9 +8,9 @@ from __future__ import annotations
 
 import pytest
 
-from forge.guard.deterministic.registry import get_bundle_policies
-from forge.guard.deterministic.tdd import TDDEnforcementPolicy
-from forge.guard.engine import build_engine
+from forge.policy.deterministic.registry import get_bundle_policies
+from forge.policy.deterministic.tdd import TDDEnforcementPolicy
+from forge.policy.engine import build_engine
 
 
 class TestGetBundlePoliciesConfig:

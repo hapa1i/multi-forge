@@ -25,7 +25,7 @@
 | Session Resume        | 0     | 0     | 0     | 0     |
 | Runtime Config        | 0     | 0     | 0     | 0     |
 | Search                | 0     | 0     | 0     | 0     |
-| Guard                 | 0     | 0     | 0     | 0     |
+| Policy                | 0     | 0     | 0     | 0     |
 | Workflow Runners      | 0     | 0     | 0     | 0     |
 | Skills                | 0     | 0     | 0     | 0     |
 | Handoff               | 0     | 0     | 0     | 0     |

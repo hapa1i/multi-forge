@@ -13,16 +13,16 @@ from __future__ import annotations
 
 from typing import Any
 
-from forge.guard.deterministic.coding_standards import (
+from forge.policy.deterministic.coding_standards import (
     NoBackwardCompatPolicy,
     NoEmojiPolicy,
     NoTypeCheckingPolicy,
 )
-from forge.guard.deterministic.tdd import (
+from forge.policy.deterministic.tdd import (
     NoSkipTestsPolicy,
     TDDEnforcementPolicy,
 )
-from forge.guard.protocols import Policy
+from forge.policy.protocols import Policy
 
 # Bundle name -> list of policy classes
 # Each class is instantiated fresh when get_bundle_policies() is called
@@ -98,8 +98,8 @@ def _build_workflow_policies(config: dict[str, Any] | None) -> list[Policy]:
     """
     import dacite
 
-    from forge.guard.workflow.config import WorkflowConfig
-    from forge.guard.workflow.policy import WorkflowPolicy
+    from forge.policy.workflow.config import WorkflowConfig
+    from forge.policy.workflow.policy import WorkflowPolicy
 
     if not config:
         return []

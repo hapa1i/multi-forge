@@ -1,6 +1,6 @@
 """Repo-wide session resolution.
 
-Shared two-tier resolver used by session CLI commands and guard CLI.
+Shared two-tier resolver used by session CLI commands and policy CLI.
 Resolves a named session with current-project preference, falling back
 to a repo-scoped scan when the session lives in a sibling forge_root.
 """

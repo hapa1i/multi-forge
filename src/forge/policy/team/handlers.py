@@ -18,8 +18,8 @@ from forge.core.reactive.proxy import lookup_proxy_base_url
 from forge.core.reactive.session_runner import run_claude_session
 from forge.core.reactive.structured_output import extract_json_from_response
 from forge.core.state import now_iso
-from forge.guard.team.config import TeamSupervisorConfig
-from forge.guard.team.prompts import (
+from forge.policy.team.config import TeamSupervisorConfig
+from forge.policy.team.prompts import (
     IDLE_TAGGER_PROMPT,
     TASK_TAGGER_PROMPT,
     TEAM_SUPERVISOR_PROMPT,

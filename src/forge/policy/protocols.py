@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any, Protocol, runtime_checkable
 
-from forge.guard.types import ActionContext, PolicyDecision
+from forge.policy.types import ActionContext, PolicyDecision
 
 
 @runtime_checkable

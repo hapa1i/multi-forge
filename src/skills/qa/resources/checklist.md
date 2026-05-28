@@ -70,9 +70,9 @@
 
 <!-- section: 12 checklist/12-search.md -->
 
-- [13. Policy/Guard (`forge guard`)](checklist/13-guard.md)
+- [13. Policy (`forge policy`)](checklist/13-policy.md)
 
-<!-- section: 13 checklist/13-guard.md -->
+<!-- section: 13 checklist/13-policy.md -->
 
 - [14. Workflow Runners (`forge workflow`)](checklist/14-workflow.md)
 

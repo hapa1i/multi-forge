@@ -1,6 +1,6 @@
-"""Tests for guard/semantic/verdict.py."""
+"""Tests for policy/semantic/verdict.py."""
 
-from forge.guard.semantic.verdict import (
+from forge.policy.semantic.verdict import (
     SupervisorVerdict,
     parse_supervisor_verdict,
     verdict_to_decision,

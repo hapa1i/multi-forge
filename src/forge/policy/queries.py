@@ -1,7 +1,7 @@
 """Read-only queries about supervisor relationships and session policy state.
 
-Used by both the CLI (``forge guard status``) and direct commands
-(``%guard status``) to display supervisor metadata and discover
+Used by both the CLI (``forge policy status``) and direct commands
+(``%policy status``) to display supervisor metadata and discover
 supervised sessions.
 """
 

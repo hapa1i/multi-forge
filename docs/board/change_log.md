@@ -168,11 +168,11 @@ when the named template exists but no proxy is running yet; bring the proxy up i
   pick one) and `ProxyNotFoundError` (no proxy and no template).
 - Renamed `preflight_supervisor_proxy` -> `ensure_supervisor_proxy`; it auto-starts via `ensure_proxy`, returns
   `(proxy_id, started)`, and raises actionable `ValueError`s (no-template hint to `forge proxy template list`,
-  ambiguous, start-failure). Covers `--supervisor-proxy` on `session fork`, `session start`, and `guard supervise`.
+  ambiguous, start-failure). Covers `--supervisor-proxy` on `session fork`, `session start`, and `policy supervise`.
 - Wired the launch routers `_resolve_routing_from_cli` (session start/resume/fork `--proxy`) and `forge claude --proxy`
   onto `ensure_proxy`; all five `--proxy`/`--supervisor-proxy` paths print a dim "Started proxy X from template Y"
   notice when they spin one up.
-- `forge guard supervise` now validates the target session *before* ensuring the proxy, so a bad target can't orphan a
+- `forge policy supervise` now validates the target session *before* ensuring the proxy, so a bad target can't orphan a
   freshly started proxy.
 - A registered-but-stopped (or stale-dead) proxy for a known template now auto-starts (was: "none are active" error).
   Workflow `--proxy via` is intentionally excluded (different routing layer + one-shot lifecycle).
@@ -182,7 +182,7 @@ when the named template exists but no proxy is running yet; bring the proxy up i
 
 **Verification**: regression `test_bug_supervisor_proxy_autostart.py` + `test_bug_stale_healthy_proxy_not_restarted.py`;
 `TestEnsureProxy` (8 cases) in `test_proxy_orchestrator.py`; updated supervisor/claude/session CLI tests; 348 related
-proxy/guard/session/regression tests pass; `ruff check` on touched Python files and `git diff --check` clean.
+proxy/policy/session/regression tests pass; `ruff check` on touched Python files and `git diff --check` clean.
 
 ### Protect live sessions from deletion
 

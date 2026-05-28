@@ -1,12 +1,12 @@
-"""Tests for forge.guard.workflow.branches."""
+"""Tests for forge.policy.workflow.branches."""
 
 from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from forge.guard.types import ActionContext, PolicyDecision
-from forge.guard.workflow.branches import Branch
-from forge.guard.workflow.config import (
+from forge.policy.types import ActionContext, PolicyDecision
+from forge.policy.workflow.branches import Branch
+from forge.policy.workflow.config import (
     BranchConfig,
     CheckerConfig,
     FilterConfig,

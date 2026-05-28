@@ -16,13 +16,13 @@ from typing import Any, Literal, cast
 from forge.core.reactive.routing import resolve_subprocess_routing
 from forge.core.reactive.session_runner import run_claude_session
 from forge.core.reactive.throttle import ThrottleCache, compute_cache_key
-from forge.guard.deterministic.base import DeterministicPolicy
-from forge.guard.semantic.verdict import (
+from forge.policy.deterministic.base import DeterministicPolicy
+from forge.policy.semantic.verdict import (
     SupervisorVerdict,
     parse_supervisor_verdict,
     verdict_to_decision,
 )
-from forge.guard.types import ActionContext, PolicyDecision
+from forge.policy.types import ActionContext, PolicyDecision
 from forge.session.manager import SessionManager
 from forge.session.models import PolicyIntent, SessionState, SupervisorConfig
 
@@ -622,7 +622,7 @@ def ensure_supervisor_proxy(supervisor_proxy: str) -> tuple[str, bool]:
     a template, when a matched template fails to start, or when the name is ambiguous
     across multiple active proxies.
     """
-    # Lazy import: guard → proxy dependency; kept lazy to avoid circular imports
+    # Lazy import: policy → proxy dependency; kept lazy to avoid circular imports
     from forge.proxy.proxies import AmbiguousProxyError, ProxyNotFoundError
     from forge.proxy.proxy_orchestrator import ProxyStartError, ensure_proxy
 
@@ -689,7 +689,7 @@ def apply_supervisor_to_intent(
 
     Also enables policy enforcement, which is required for the hook to
     evaluate supervisor checks (commands.py:1049 exits early otherwise).
-    Clears any ``policy.enabled`` override so a prior ``%guard disable``
+    Clears any ``policy.enabled`` override so a prior ``%policy disable``
     doesn't shadow the intent (overrides take precedence in effective.py).
 
     Writes to intent rather than overrides so that supervision persists
@@ -731,7 +731,7 @@ def resolve_supervisor_reload_plan_path(
     Search order: current session -> related forks -> supervisor target.
     Only approved snapshots (ExitPlanMode artifacts) are considered.
     """
-    from forge.guard.queries import read_scoped_supervisor_target
+    from forge.policy.queries import read_scoped_supervisor_target
     from forge.session.index import IndexStore
     from forge.session.plan_resolution import latest_snapshot_path, resolve_plan_info
     from forge.session.store import SessionStore

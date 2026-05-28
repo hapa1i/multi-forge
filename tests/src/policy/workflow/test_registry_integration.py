@@ -4,14 +4,14 @@ from __future__ import annotations
 
 import pytest
 
-from forge.guard.deterministic.registry import (
+from forge.policy.deterministic.registry import (
     get_all_bundles,
     get_bundle_for_policy,
     get_bundle_policies,
     get_policy_ids_for_bundle,
 )
-from forge.guard.engine import build_engine
-from forge.guard.workflow.divergence import build_divergence_config
+from forge.policy.engine import build_engine
+from forge.policy.workflow.divergence import build_divergence_config
 
 pytestmark = pytest.mark.integration
 

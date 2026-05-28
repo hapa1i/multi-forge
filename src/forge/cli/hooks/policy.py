@@ -26,7 +26,7 @@ def _build_action_context(
     Returns:
         ActionContext or None if required fields missing
     """
-    from forge.guard.types import ActionContext
+    from forge.policy.types import ActionContext
 
     tool_input = data.get("tool_input", {})
     if not isinstance(tool_input, dict):
@@ -78,7 +78,7 @@ def _persist_policy_state(
 
     Updates decision log and generic policy_states from stateful policies.
     """
-    from forge.guard.store import build_policy_state_update
+    from forge.policy.store import build_policy_state_update
     from forge.session.models import PolicyConfirmed
 
     collected_state = engine.get_collected_state()

@@ -1,7 +1,7 @@
-"""Regression tests for M7: %guard commands must write overrides, not mutate intent.
+"""Regression tests for M7: %policy commands must write overrides, not mutate intent.
 
-Bug: UserPromptSubmit %guard enable/disable mutated SessionState.intent.policy in-place.
-Fix: %guard writes SessionState.overrides.policy instead, preserving intent as the baseline.
+Bug: UserPromptSubmit %policy enable/disable mutated SessionState.intent.policy in-place.
+Fix: %policy writes SessionState.overrides.policy instead, preserving intent as the baseline.
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ def _make_store(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> SessionStore
 
 
 def test_guard_enable_sets_overrides_not_intent(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """%guard enable tdd sets overrides.policy and preserves intent.policy."""
+    """%policy enable tdd sets overrides.policy and preserves intent.policy."""
     store = _make_store(tmp_path, monkeypatch)
     manifest = create_session_state(
         "test-session",
@@ -36,7 +36,7 @@ def test_guard_enable_sets_overrides_not_intent(tmp_path: Path, monkeypatch: pyt
     store.write(manifest)
 
     runner = CliRunner()
-    payload = {"prompt": "%guard enable tdd", "transcript_path": ""}
+    payload = {"prompt": "%policy enable tdd", "transcript_path": ""}
     result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
 
     assert result.exit_code == 0
@@ -53,7 +53,7 @@ def test_guard_enable_sets_overrides_not_intent(tmp_path: Path, monkeypatch: pyt
 
 
 def test_guard_disable_preserves_intent_baseline(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """%guard disable after baseline intent preserves intent and sets overrides.enabled=False."""
+    """%policy disable after baseline intent preserves intent and sets overrides.enabled=False."""
     store = _make_store(tmp_path, monkeypatch)
     manifest = create_session_state(
         "test-session",
@@ -64,7 +64,7 @@ def test_guard_disable_preserves_intent_baseline(tmp_path: Path, monkeypatch: py
     store.write(manifest)
 
     runner = CliRunner()
-    payload = {"prompt": "%guard disable", "transcript_path": ""}
+    payload = {"prompt": "%policy disable", "transcript_path": ""}
     runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
 
     updated = store.read()

@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
 
-from forge.guard.types import ActionContext, PolicyDecision, Violation
+from forge.policy.types import ActionContext, PolicyDecision, Violation
 
 
 class DeterministicPolicy(ABC):

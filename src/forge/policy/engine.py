@@ -11,8 +11,8 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from forge.core.state import now_iso
-from forge.guard.protocols import Policy, StatefulPolicy
-from forge.guard.types import (
+from forge.policy.protocols import Policy, StatefulPolicy
+from forge.policy.types import (
     ActionContext,
     CompositeDecision,
     DecisionType,
@@ -204,7 +204,7 @@ def build_engine(
     Returns:
         Configured PolicyEngine
     """
-    from forge.guard.deterministic.registry import get_bundle_policies
+    from forge.policy.deterministic.registry import get_bundle_policies
 
     engine = PolicyEngine(fail_mode=fail_mode)
 

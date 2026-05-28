@@ -605,7 +605,7 @@ class TestProxyDirectCommands:
 
 
 class TestGuardCommands:
-    """Test %guard enable/disable use overrides (not intent mutation)."""
+    """Test %policy enable/disable use overrides (not intent mutation)."""
 
     def _make_session(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> SessionStore:
         """Helper: create a session store with a minimal manifest."""
@@ -624,11 +624,11 @@ class TestGuardCommands:
         return store
 
     def test_guard_enable_sets_overrides(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        """%guard enable tdd sets policy overrides, not intent (M7 regression)."""
+        """%policy enable tdd sets policy overrides, not intent (M7 regression)."""
         store = self._make_session(tmp_path, monkeypatch)
 
         runner = CliRunner()
-        payload = {"prompt": "%guard enable tdd", "transcript_path": ""}
+        payload = {"prompt": "%policy enable tdd", "transcript_path": ""}
         result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
 
         assert result.exit_code == 0
@@ -646,12 +646,12 @@ class TestGuardCommands:
         assert updated.intent.policy is None or updated.intent.policy.enabled is None
 
     def test_guard_enable_multiple_bundles(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        """%guard enable tdd coding_standards sets both bundles (M7 regression)."""
+        """%policy enable tdd coding_standards sets both bundles (M7 regression)."""
         store = self._make_session(tmp_path, monkeypatch)
 
         runner = CliRunner()
         payload = {
-            "prompt": "%guard enable tdd coding_standards",
+            "prompt": "%policy enable tdd coding_standards",
             "transcript_path": "",
         }
         result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
@@ -663,12 +663,12 @@ class TestGuardCommands:
         assert set(policy_overrides["bundles"]) == {"tdd", "coding_standards"}
 
     def test_guard_enable_with_fail_mode(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        """%guard enable tdd --fail-mode closed sets fail_mode override (M7 regression)."""
+        """%policy enable tdd --fail-mode closed sets fail_mode override (M7 regression)."""
         store = self._make_session(tmp_path, monkeypatch)
 
         runner = CliRunner()
         payload = {
-            "prompt": "%guard enable tdd --fail-mode closed",
+            "prompt": "%policy enable tdd --fail-mode closed",
             "transcript_path": "",
         }
         result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
@@ -680,11 +680,11 @@ class TestGuardCommands:
         assert policy_overrides["fail_mode"] == "closed"
 
     def test_guard_disable_sets_override(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        """%guard disable sets policy.enabled=False as override (M7 regression)."""
+        """%policy disable sets policy.enabled=False as override (M7 regression)."""
         store = self._make_session(tmp_path, monkeypatch)
 
         runner = CliRunner()
-        payload = {"prompt": "%guard disable", "transcript_path": ""}
+        payload = {"prompt": "%policy disable", "transcript_path": ""}
         result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
 
         assert result.exit_code == 0
@@ -700,7 +700,7 @@ class TestGuardCommands:
         assert updated.intent.policy is None or updated.intent.policy.enabled is None
 
     def test_guard_disable_preserves_intent(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        """%guard disable after enable preserves the enable override baseline (M7 regression)."""
+        """%policy disable after enable preserves the enable override baseline (M7 regression)."""
         from forge.session import SessionStore, create_session_state
         from forge.session.models import PolicyIntent
 
@@ -718,8 +718,8 @@ class TestGuardCommands:
         store.write(manifest)
 
         runner = CliRunner()
-        # Disable guard
-        payload = {"prompt": "%guard disable", "transcript_path": ""}
+        # Disable policy
+        payload = {"prompt": "%policy disable", "transcript_path": ""}
         runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
 
         updated = store.read()
@@ -731,11 +731,11 @@ class TestGuardCommands:
         assert updated.intent.policy.bundles == ["tdd"]
 
     def test_guard_enable_no_bundles_blocks_with_usage(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        """%guard enable with no bundles shows usage."""
+        """%policy enable with no bundles shows usage."""
         self._make_session(tmp_path, monkeypatch)
 
         runner = CliRunner()
-        payload = {"prompt": "%guard enable", "transcript_path": ""}
+        payload = {"prompt": "%policy enable", "transcript_path": ""}
         result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
 
         assert result.exit_code == 0
@@ -822,32 +822,32 @@ class TestExtractAddedLines:
     """Tests for extract_added_lines utility."""
 
     def test_extracts_added_lines_only(self) -> None:
-        from forge.guard.types import extract_added_lines
+        from forge.policy.types import extract_added_lines
 
         diff = "@@ -1,3 +1,4 @@\n" " context line\n" "-removed line\n" "+added line\n" "+another added\n"
         result = extract_added_lines(diff)
         assert result == "added line\nanother added"
 
     def test_skips_plus_plus_plus_header(self) -> None:
-        from forge.guard.types import extract_added_lines
+        from forge.policy.types import extract_added_lines
 
         diff = "+++ b/src/foo.py\n+real content\n"
         assert extract_added_lines(diff) == "real content"
 
     def test_empty_diff(self) -> None:
-        from forge.guard.types import extract_added_lines
+        from forge.policy.types import extract_added_lines
 
         assert extract_added_lines("") == ""
 
     def test_no_additions(self) -> None:
-        from forge.guard.types import extract_added_lines
+        from forge.policy.types import extract_added_lines
 
         diff = "@@ -1,2 +1,1 @@\n context\n-removed\n"
         assert extract_added_lines(diff) == ""
 
 
 class TestGuardCheck:
-    """Tests for %guard check direct command."""
+    """Tests for %policy check direct command."""
 
     def _make_session(
         self,
@@ -903,7 +903,7 @@ class TestGuardCheck:
         monkeypatch.delenv("FORGE_SESSION", raising=False)
 
         runner = CliRunner()
-        payload = {"prompt": "%guard check", "transcript_path": ""}
+        payload = {"prompt": "%policy check", "transcript_path": ""}
         result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
 
         assert result.exit_code == 0
@@ -918,7 +918,7 @@ class TestGuardCheck:
         self._make_session(tmp_path, monkeypatch)
 
         runner = CliRunner()
-        payload = {"prompt": "%guard check", "transcript_path": ""}
+        payload = {"prompt": "%policy check", "transcript_path": ""}
         result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
 
         assert result.exit_code == 0
@@ -940,7 +940,7 @@ class TestGuardCheck:
         (tests_dir / "test_foo.py").write_text("def test_foo():\n    assert True\n")
 
         runner = CliRunner()
-        payload = {"prompt": "%guard check --bundle tdd", "transcript_path": ""}
+        payload = {"prompt": "%policy check --bundle tdd", "transcript_path": ""}
         result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
 
         assert result.exit_code == 0
@@ -963,7 +963,7 @@ class TestGuardCheck:
         (src_dir / "foo.py").write_text("def compute():\n    return 42\n")
 
         runner = CliRunner()
-        payload = {"prompt": "%guard check --bundle tdd", "transcript_path": ""}
+        payload = {"prompt": "%policy check --bundle tdd", "transcript_path": ""}
         result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
 
         assert result.exit_code == 0
@@ -990,7 +990,7 @@ class TestGuardCheck:
         (src_dir / "foo.py").write_text("def compute():\n    return 42\n")
 
         runner = CliRunner()
-        payload = {"prompt": "%guard check --bundle tdd", "transcript_path": ""}
+        payload = {"prompt": "%policy check --bundle tdd", "transcript_path": ""}
         result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
 
         assert result.exit_code == 0
@@ -1022,7 +1022,7 @@ class TestGuardCheck:
         (src_dir / "bar.py").write_text("x = 1\n")
 
         runner = CliRunner()
-        payload = {"prompt": "%guard check --staged --bundle tdd", "transcript_path": ""}
+        payload = {"prompt": "%policy check --staged --bundle tdd", "transcript_path": ""}
         result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
 
         assert result.exit_code == 0
@@ -1045,7 +1045,7 @@ class TestGuardCheck:
         (tests_dir / "test_foo.py").write_text("def test_foo():\n    pass\n")
 
         runner = CliRunner()
-        payload = {"prompt": "%guard check", "transcript_path": ""}
+        payload = {"prompt": "%policy check", "transcript_path": ""}
         result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
 
         assert result.exit_code == 0
@@ -1055,7 +1055,7 @@ class TestGuardCheck:
         assert out["bundles"] == ["tdd"]
 
     def test_check_disabled_session_still_uses_bundles(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Even with policy disabled, %guard check still reads session bundles (diagnostic)."""
+        """Even with policy disabled, %policy check still reads session bundles (diagnostic)."""
         self._make_git_repo(tmp_path)
         self._make_session(tmp_path, monkeypatch, policy_enabled=False)
 
@@ -1068,7 +1068,7 @@ class TestGuardCheck:
         (tests_dir / "test_foo.py").write_text("def test_foo():\n    pass\n")
 
         runner = CliRunner()
-        payload = {"prompt": "%guard check", "transcript_path": ""}
+        payload = {"prompt": "%policy check", "transcript_path": ""}
         result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
 
         assert result.exit_code == 0
@@ -1092,7 +1092,7 @@ class TestGuardCheck:
         runner = CliRunner()
         # Session has tdd, but we override with coding_standards
         payload = {
-            "prompt": "%guard check --bundle coding_standards",
+            "prompt": "%policy check --bundle coding_standards",
             "transcript_path": "",
         }
         result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
@@ -1110,7 +1110,7 @@ class TestGuardCheck:
         monkeypatch.setenv("FORGE_SESSION", "test-session")
 
         runner = CliRunner()
-        payload = {"prompt": "%guard check --bundle tdd", "transcript_path": ""}
+        payload = {"prompt": "%policy check --bundle tdd", "transcript_path": ""}
         result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
 
         assert result.exit_code == 0
@@ -1129,7 +1129,7 @@ class TestGuardCheck:
         manifest_path.write_text("not valid json{{{")
 
         runner = CliRunner()
-        payload = {"prompt": "%guard check", "transcript_path": ""}
+        payload = {"prompt": "%policy check", "transcript_path": ""}
         result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
 
         assert result.exit_code == 0
@@ -1149,7 +1149,7 @@ class TestGuardCheck:
         subprocess.run(["git", "commit", "-m", "add test"], cwd=str(tmp_path), capture_output=True, check=True)
         (tests_dir / "test_foo.py").write_text("def test_foo():\n    assert True\n")
 
-        from forge.guard.engine import PolicyEngine
+        from forge.policy.engine import PolicyEngine
 
         def boom(self_engine, context):
             raise RuntimeError("policy engine exploded")
@@ -1157,7 +1157,7 @@ class TestGuardCheck:
         monkeypatch.setattr(PolicyEngine, "evaluate", boom)
 
         runner = CliRunner()
-        payload = {"prompt": "%guard check --bundle tdd", "transcript_path": ""}
+        payload = {"prompt": "%policy check --bundle tdd", "transcript_path": ""}
         result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
 
         assert result.exit_code == 0
@@ -1167,7 +1167,7 @@ class TestGuardCheck:
         assert out["files_checked"] == 1
 
     def test_check_appears_in_help(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        """%help includes guard check."""
+        """%help includes policy check."""
         monkeypatch.chdir(tmp_path)
 
         runner = CliRunner()
@@ -1180,7 +1180,7 @@ class TestGuardCheck:
 
 
 class TestGuardSuperviseToggle:
-    """Test %guard supervise off/on/remove/reload toggle commands."""
+    """Test %policy supervise off/on/remove/reload toggle commands."""
 
     def _make_supervised_session(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *, suspended: bool = False
@@ -1225,7 +1225,7 @@ class TestGuardSuperviseToggle:
         store = self._make_supervised_session(tmp_path, monkeypatch)
 
         runner = CliRunner()
-        payload = {"prompt": "%guard supervise off", "transcript_path": ""}
+        payload = {"prompt": "%policy supervise off", "transcript_path": ""}
         result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
 
         assert result.exit_code == 0
@@ -1242,7 +1242,7 @@ class TestGuardSuperviseToggle:
         store = self._make_supervised_session(tmp_path, monkeypatch, suspended=True)
 
         runner = CliRunner()
-        payload = {"prompt": "%guard supervise on", "transcript_path": ""}
+        payload = {"prompt": "%policy supervise on", "transcript_path": ""}
         result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
 
         assert result.exit_code == 0
@@ -1258,7 +1258,7 @@ class TestGuardSuperviseToggle:
         self._make_bare_session(tmp_path, monkeypatch)
 
         runner = CliRunner()
-        payload = {"prompt": "%guard supervise on", "transcript_path": ""}
+        payload = {"prompt": "%policy supervise on", "transcript_path": ""}
         result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
 
         assert result.exit_code == 0
@@ -1269,7 +1269,7 @@ class TestGuardSuperviseToggle:
         store = self._make_supervised_session(tmp_path, monkeypatch)
 
         runner = CliRunner()
-        payload = {"prompt": "%guard supervise remove", "transcript_path": ""}
+        payload = {"prompt": "%policy supervise remove", "transcript_path": ""}
         result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
 
         assert result.exit_code == 0
@@ -1286,7 +1286,7 @@ class TestGuardSuperviseToggle:
         self._make_bare_session(tmp_path, monkeypatch)
 
         runner = CliRunner()
-        payload = {"prompt": "%guard supervise off", "transcript_path": ""}
+        payload = {"prompt": "%policy supervise off", "transcript_path": ""}
         result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
 
         assert result.exit_code == 0
@@ -1299,7 +1299,7 @@ class TestGuardSuperviseToggle:
         plan.write_text("# The Plan")
 
         runner = CliRunner()
-        payload = {"prompt": f"%guard supervise reload {plan}", "transcript_path": ""}
+        payload = {"prompt": f"%policy supervise reload {plan}", "transcript_path": ""}
         result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
 
         assert result.exit_code == 0
@@ -1315,7 +1315,7 @@ class TestGuardSuperviseToggle:
         self._make_supervised_session(tmp_path, monkeypatch)
 
         runner = CliRunner()
-        payload = {"prompt": "%guard supervise reload a b", "transcript_path": ""}
+        payload = {"prompt": "%policy supervise reload a b", "transcript_path": ""}
         result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
 
         assert result.exit_code == 0
@@ -1328,7 +1328,7 @@ class TestGuardSuperviseToggle:
         plan.write_text("# The Plan")
 
         runner = CliRunner()
-        payload = {"prompt": f"%guard supervise reload {plan}", "transcript_path": ""}
+        payload = {"prompt": f"%policy supervise reload {plan}", "transcript_path": ""}
         result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
 
         assert result.exit_code == 0
@@ -1339,7 +1339,7 @@ class TestGuardSuperviseToggle:
         self._make_supervised_session(tmp_path, monkeypatch, suspended=True)
 
         runner = CliRunner()
-        payload = {"prompt": "%guard supervise", "transcript_path": ""}
+        payload = {"prompt": "%policy supervise", "transcript_path": ""}
         result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
 
         assert result.exit_code == 0
@@ -1355,7 +1355,7 @@ class TestGuardSuperviseToggle:
         store.update(timeout_s=5.0, mutate=_set_plan)
 
         runner = CliRunner()
-        payload = {"prompt": "%guard supervise", "transcript_path": ""}
+        payload = {"prompt": "%policy supervise", "transcript_path": ""}
         result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
 
         assert result.exit_code == 0

@@ -1,7 +1,7 @@
-"""Tests for guard/engine.py."""
+"""Tests for policy/engine.py."""
 
-from forge.guard.engine import PolicyEngine, build_engine
-from forge.guard.types import ActionContext, PolicyDecision, Violation
+from forge.policy.engine import PolicyEngine, build_engine
+from forge.policy.types import ActionContext, PolicyDecision, Violation
 
 
 class MockPolicy:
@@ -215,7 +215,7 @@ class TestBuildEngine:
         assert len(engine.policies) == 2
 
         # TDDEnforcementPolicy should be non-strict (permissive)
-        from forge.guard.deterministic.tdd import TDDEnforcementPolicy
+        from forge.policy.deterministic.tdd import TDDEnforcementPolicy
 
         tdd_policy = next(p for p in engine.policies if isinstance(p, TDDEnforcementPolicy))
         assert tdd_policy.strict is False
@@ -224,7 +224,7 @@ class TestBuildEngine:
         """Default TDD is strict when no bundle_config provided."""
         engine = build_engine(["tdd"])
 
-        from forge.guard.deterministic.tdd import TDDEnforcementPolicy
+        from forge.policy.deterministic.tdd import TDDEnforcementPolicy
 
         tdd_policy = next(p for p in engine.policies if isinstance(p, TDDEnforcementPolicy))
         assert tdd_policy.strict is True

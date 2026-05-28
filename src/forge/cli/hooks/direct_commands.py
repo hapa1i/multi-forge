@@ -33,7 +33,7 @@ def _parse_direct_command(prompt: str) -> tuple[str, list[str]] | None:
     Examples:
     - `%help`
     - `%session list`
-    - `%guard enable tdd`
+    - `%policy enable tdd`
     - `%proxy show my-proxy`
     """
 
@@ -71,7 +71,7 @@ def _handle_cmd_help() -> None:
                 "- %clean [--scope repo|project|all]\n"
                 "- %plan\n"
                 "- %config (show runtime config)\n"
-                "- %guard status | enable | disable | check\n"
+                "- %policy status | enable | disable | check\n"
                 "- %cancel-verification (bypass verification loop)\n"
                 "- %h/%help\n"
                 "\n"
@@ -382,15 +382,15 @@ def _handle_cmd_config(data: dict[str, Any], argv: list[str]) -> None:
     click.echo(json.dumps({"decision": "block", "reason": "\n".join(lines)}))
 
 
-def _handle_cmd_guard(data: dict[str, Any], argv: list[str]) -> None:
-    """Handle `%guard ...` commands (mirrors CLI syntax).
+def _handle_cmd_policy(data: dict[str, Any], argv: list[str]) -> None:
+    """Handle `%policy ...` commands (mirrors CLI syntax).
 
     Supported:
 
-    - `%guard status`: show policy configuration and state
-    - `%guard enable --bundle tdd`: enable with specified bundles
-    - `%guard disable`: disable policy enforcement
-    - `%guard check [--staged] [--bundle tdd]`: evaluate git diff against policies
+    - `%policy status`: show policy configuration and state
+    - `%policy enable --bundle tdd`: enable with specified bundles
+    - `%policy disable`: disable policy enforcement
+    - `%policy check [--staged] [--bundle tdd]`: evaluate git diff against policies
 
     Always emits `{decision:block}` when handled.
     """
@@ -399,7 +399,7 @@ def _handle_cmd_guard(data: dict[str, Any], argv: list[str]) -> None:
             json.dumps(
                 {
                     "decision": "block",
-                    "reason": "Usage: %guard status | enable | disable | check | supervise",
+                    "reason": "Usage: %policy status | enable | disable | check | supervise",
                 }
             )
         )
@@ -408,31 +408,31 @@ def _handle_cmd_guard(data: dict[str, Any], argv: list[str]) -> None:
     sub = argv[0].lower()
 
     if sub == "status":
-        _handle_guard_status()
+        _handle_policy_status()
         return
 
     if sub == "enable":
-        _handle_guard_enable(argv[1:])
+        _handle_policy_enable(argv[1:])
         return
 
     if sub == "disable":
-        _handle_guard_disable()
+        _handle_policy_disable()
         return
 
     if sub == "check":
-        _handle_guard_check(argv[1:])
+        _handle_policy_check(argv[1:])
         return
 
     if sub == "supervise":
-        _handle_guard_supervise(argv[1:])
+        _handle_policy_supervise(argv[1:])
         return
 
     click.echo(
-        json.dumps({"decision": "block", "reason": "Usage: %guard status | enable | disable | check | supervise"})
+        json.dumps({"decision": "block", "reason": "Usage: %policy status | enable | disable | check | supervise"})
     )
 
 
-def _handle_guard_status() -> None:
+def _handle_policy_status() -> None:
     """Show policy configuration and state."""
     cwd = Path.cwd().resolve()
     store = resolve_session_store(cwd)
@@ -474,7 +474,7 @@ def _handle_guard_status() -> None:
             if sup.suspended:
                 lines.append("    Status: suspended")
             try:
-                from forge.guard.queries import read_scoped_supervisor_target
+                from forge.policy.queries import read_scoped_supervisor_target
 
                 ts = read_scoped_supervisor_target(sup_resume, sup.forge_root, manifest.forge_root)
                 if ts is not None:
@@ -507,7 +507,7 @@ def _handle_guard_status() -> None:
 
     # Supervised-sessions tip
     try:
-        from forge.guard.queries import find_sessions_supervised_by
+        from forge.policy.queries import find_sessions_supervised_by
 
         supervised = find_sessions_supervised_by(
             manifest.name, manifest.confirmed.claude_session_id, manifest.forge_root
@@ -515,7 +515,8 @@ def _handle_guard_status() -> None:
         if supervised:
             names = ", ".join(supervised)
             lines.append(
-                f"\nTip: This session supervises: {names}. " f"Check with: forge guard status --session {supervised[0]}"
+                f"\nTip: This session supervises: {names}. "
+                f"Check with: forge policy status --session {supervised[0]}"
             )
     except Exception:
         pass
@@ -523,7 +524,7 @@ def _handle_guard_status() -> None:
     click.echo(json.dumps({"decision": "block", "reason": "\n".join(lines)}))
 
 
-def _handle_guard_enable(argv: list[str]) -> None:
+def _handle_policy_enable(argv: list[str]) -> None:
     """Enable policy with specified bundles.
 
     Uses overrides (not intent mutation) to preserve the original session baseline.
@@ -561,7 +562,7 @@ def _handle_guard_enable(argv: list[str]) -> None:
             json.dumps(
                 {
                     "decision": "block",
-                    "reason": "Usage: %guard enable --bundle tdd [--bundle coding_standards] [--permissive]",
+                    "reason": "Usage: %policy enable --bundle tdd [--bundle coding_standards] [--permissive]",
                 }
             )
         )
@@ -609,7 +610,7 @@ def _handle_guard_enable(argv: list[str]) -> None:
     )
 
 
-def _handle_guard_disable() -> None:
+def _handle_policy_disable() -> None:
     """Disable policy enforcement.
 
     Uses overrides (not intent mutation) to preserve the original session baseline.
@@ -643,18 +644,18 @@ def _handle_guard_disable() -> None:
     click.echo(json.dumps({"decision": "block", "reason": "Policy enforcement disabled"}))
 
 
-def _handle_guard_supervise(argv: list[str]) -> None:
+def _handle_policy_supervise(argv: list[str]) -> None:
     """Configure or show the semantic supervisor.
 
     Writes to intent (not overrides) so supervisor config survives
     ``resume --fresh`` which deepcopies ``intent.policy`` into child sessions.
 
-    - ``%guard supervise <target>``: set supervisor
-    - ``%guard supervise off``: suspend (preserves config)
-    - ``%guard supervise on``: resume suspended supervisor
-    - ``%guard supervise remove``: remove supervisor entirely
-    - ``%guard supervise reload [path]``: reload latest relevant approved plan
-    - ``%guard supervise``: show current config
+    - ``%policy supervise <target>``: set supervisor
+    - ``%policy supervise off``: suspend (preserves config)
+    - ``%policy supervise on``: resume suspended supervisor
+    - ``%policy supervise remove``: remove supervisor entirely
+    - ``%policy supervise reload [path]``: reload latest relevant approved plan
+    - ``%policy supervise``: show current config
     """
     from forge.session.models import SessionState
 
@@ -672,7 +673,7 @@ def _handle_guard_supervise(argv: list[str]) -> None:
 
     cmd = argv[0].lower() if argv else ""
 
-    # %guard supervise off — suspend
+    # %policy supervise off — suspend
     if cmd == "off":
         has_sup = (
             manifest.intent.policy and manifest.intent.policy.supervisor and manifest.intent.policy.supervisor.resume_id
@@ -697,7 +698,7 @@ def _handle_guard_supervise(argv: list[str]) -> None:
         )
         return
 
-    # %guard supervise on — resume
+    # %policy supervise on — resume
     if cmd == "on":
 
         def _resume(m: object) -> None:
@@ -714,7 +715,7 @@ def _handle_guard_supervise(argv: list[str]) -> None:
                 json.dumps(
                     {
                         "decision": "block",
-                        "reason": "No supervisor configured. Use '%guard supervise <target>' to set one.",
+                        "reason": "No supervisor configured. Use '%policy supervise <target>' to set one.",
                     }
                 )
             )
@@ -728,7 +729,7 @@ def _handle_guard_supervise(argv: list[str]) -> None:
         click.echo(json.dumps({"decision": "block", "reason": "Supervisor resumed"}))
         return
 
-    # %guard supervise remove — destructive
+    # %policy supervise remove — destructive
     if cmd == "remove":
         has_sup = manifest.intent.policy and manifest.intent.policy.supervisor
         if not has_sup:
@@ -749,10 +750,10 @@ def _handle_guard_supervise(argv: list[str]) -> None:
         click.echo(json.dumps({"decision": "block", "reason": "Supervisor removed"}))
         return
 
-    # %guard supervise reload [path]
+    # %policy supervise reload [path]
     if cmd == "reload":
         if len(argv) > 2:
-            click.echo(json.dumps({"decision": "block", "reason": "Usage: %guard supervise reload [path]"}))
+            click.echo(json.dumps({"decision": "block", "reason": "Usage: %policy supervise reload [path]"}))
             return
 
         from forge.session.effective import compute_effective_intent
@@ -776,7 +777,7 @@ def _handle_guard_supervise(argv: list[str]) -> None:
             plan_path = str(resolved)
             source_desc = str(resolved)
         else:
-            from forge.guard.semantic.supervisor import (
+            from forge.policy.semantic.supervisor import (
                 resolve_supervisor_reload_plan_path,
             )
 
@@ -813,11 +814,11 @@ def _handle_guard_supervise(argv: list[str]) -> None:
         click.echo(json.dumps({"decision": "block", "reason": f"Supervisor plan updated from {source_desc}"}))
         return
 
-    # %guard supervise <target> — set supervisor
+    # %policy supervise <target> — set supervisor
     if argv:
         target = argv[0]
 
-        from forge.guard.semantic.supervisor import (
+        from forge.policy.semantic.supervisor import (
             apply_supervisor_to_intent,
             auto_seed_supervisor_proxy,
             should_supervisor_use_direct,
@@ -866,7 +867,7 @@ def _handle_guard_supervise(argv: list[str]) -> None:
         click.echo(json.dumps({"decision": "block", "reason": msg}))
         return
 
-    # %guard supervise (no args) — show current config
+    # %policy supervise (no args) — show current config
     from forge.session.effective import compute_effective_intent
 
     effective = compute_effective_intent(manifest)
@@ -901,7 +902,7 @@ def _handle_guard_supervise(argv: list[str]) -> None:
     click.echo(json.dumps({"decision": "block", "reason": "\n".join(lines)}))
 
 
-# --- %guard check helpers ---
+# --- %policy check helpers ---
 
 # Primary split boundary: diff --git a/<path> b/<path>
 _DIFF_GIT_HEADER_RE = re.compile(r"^diff --git a/(.+?) b/(.+?)$", re.MULTILINE)
@@ -970,7 +971,7 @@ def _sort_tests_first(file_diffs: list[tuple[str, str]]) -> list[tuple[str, str]
     return sorted(file_diffs, key=_sort_key)
 
 
-def _handle_guard_check(argv: list[str]) -> None:
+def _handle_policy_check(argv: list[str]) -> None:
     """Run policy evaluation against the current git diff.
 
     Runs ``git diff`` (or ``git diff --staged``) in-process, splits into
@@ -979,8 +980,8 @@ def _handle_guard_check(argv: list[str]) -> None:
     """
     import subprocess
 
-    from forge.guard.engine import build_engine
-    from forge.guard.types import ActionContext, extract_added_lines
+    from forge.policy.engine import build_engine
+    from forge.policy.types import ActionContext, extract_added_lines
 
     bundles: list[str] = []
     staged = False
@@ -1032,7 +1033,7 @@ def _handle_guard_check(argv: list[str]) -> None:
                 {
                     "decision": "block",
                     "passed": False,
-                    "reason": "No bundles configured. Use --bundle or enable via %guard enable.",
+                    "reason": "No bundles configured. Use --bundle or enable via %policy enable.",
                 }
             )
         )

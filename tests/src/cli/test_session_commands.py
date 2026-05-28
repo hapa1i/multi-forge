@@ -3569,7 +3569,7 @@ class TestSupervisorProxyFlags:
         """Bad --supervisor-proxy should fail before creating session state."""
         from unittest.mock import MagicMock
 
-        with patch("forge.guard.semantic.supervisor.validate_supervisor_target") as mock_validate:
+        with patch("forge.policy.semantic.supervisor.validate_supervisor_target") as mock_validate:
             mock_state = MagicMock()
             mock_state.confirmed.started_with_proxy = None
             mock_state.forge_root = None
@@ -3862,7 +3862,7 @@ class TestCwdGuardWiring:
             patch("forge.cli.guards.require_main_repo_root") as mock_mrr,
             patch("forge.cli.session.invoke_claude", return_value=0),
         ):
-            runner.invoke(main, ["session", "start", "guard-test"])
+            runner.invoke(main, ["session", "start", "policy-test"])
         mock_rr.assert_called_once()
         mock_mrr.assert_not_called()
 
@@ -3879,11 +3879,11 @@ class TestCwdGuardWiring:
 
             mock_wt.return_value = WorktreeResult(
                 worktree_path=str(temp_env / "wt"),
-                branch="guard-wt-test",
+                branch="policy-wt-test",
                 created_branch=True,
             )
             (temp_env / "wt").mkdir()
-            runner.invoke(main, ["session", "start", "guard-wt-test", "--worktree", "--no-proxy", "--no-launch"])
+            runner.invoke(main, ["session", "start", "policy-wt-test", "--worktree", "--no-proxy", "--no-launch"])
         mock_mrr.assert_called_once()
         mock_rr.assert_not_called()
 
@@ -3933,5 +3933,5 @@ class TestCwdGuardWiring:
             patch("forge.cli.guards.require_repo_root", return_value=temp_env) as mock_rr,
             patch("forge.cli.session.invoke_claude", return_value=0),
         ):
-            runner.invoke(main, ["session", "incognito", "guard-incog", "--no-proxy"])
+            runner.invoke(main, ["session", "incognito", "policy-incog", "--no-proxy"])
         mock_rr.assert_called_once()

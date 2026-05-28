@@ -75,7 +75,7 @@ src/forge/
 │   └── hooks/  # Hook handlers invoked by Claude Code
 ├── config/     # Configuration loading and proxy templates
 ├── core/       # Shared libraries (auth, models, state, llm, workqueue, reactive)
-├── guard/      # Policy enforcement (TDD, coding standards, semantic supervisor)
+├── policy/      # Policy enforcement (TDD, coding standards, semantic supervisor)
 ├── install/    # Extension installer and tracking
 ├── proxy/      # Model routing proxy
 ├── review/     # Multi-model review engine (fan-out, adversarial)
@@ -146,6 +146,16 @@ fact_id, orchestration) unless explicitly asked. When in doubt, ask before renam
 
 @docs/developer/coding-standards.md @docs/developer/testing-guidelines.md @docs/developer/documentation-guidelines.md
 @docs/developer/work-board-contract.md
+
+## Platform & Environment
+
+**macOS (Darwin)** - Use GNU tools instead of BSD versions:
+
+- gsed not sed (different -i syntax)
+- gawk' not 'awk'
+- ggrep not grep (for '-p perl regex) - can also use rg
+- gdate not date (for'--date parsing)
+- greadlink -f' not readlink (BSD lacks -f\*)
 
 ## Key Documents
 

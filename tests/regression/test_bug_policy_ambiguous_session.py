@@ -1,11 +1,11 @@
-"""Regression: `forge guard` terminal session resolution must distinguish zero vs many.
+"""Regression: `forge policy` terminal session resolution must distinguish zero vs many.
 
 Bug: `_resolve_session_name` returned None for BOTH "zero local sessions" and "multiple
-local sessions, none selected", so `forge guard status`/`enable`/`disable` printed
+local sessions, none selected", so `forge policy status`/`enable`/`disable` printed
 "No session found in <path>" even when several sessions existed. From a plain terminal
-(no FORGE_SESSION) in a project with >1 session, guard appeared broken.
+(no FORGE_SESSION) in a project with >1 session, policy appeared broken.
 
-Fix (src/forge/cli/guard.py, `_resolve_guard_session`): ambiguity now reports the candidate
+Fix (src/forge/cli/policy.py, `_resolve_policy_session`): ambiguity now reports the candidate
 session names and points to `--session`; the true zero-session case keeps "No session found".
 `enable`/`disable` gained the `--session/-s` flag (previously only `status` had it).
 """
@@ -71,7 +71,7 @@ def test_status_ambiguous_is_not_no_session_found(runner: CliRunner, env: Path) 
     _seed_session(str(env), "planner")
     _seed_session(str(env), "executor")
 
-    result = runner.invoke(main, ["guard", "status"])
+    result = runner.invoke(main, ["policy", "status"])
 
     assert result.exit_code != 0
     assert "Multiple sessions" in result.output
@@ -83,7 +83,7 @@ def test_status_ambiguous_is_not_no_session_found(runner: CliRunner, env: Path) 
 
 def test_status_zero_sessions_still_says_no_session_found(runner: CliRunner, env: Path) -> None:
     """The genuine empty case keeps the original message (distinct from ambiguity)."""
-    result = runner.invoke(main, ["guard", "status"])
+    result = runner.invoke(main, ["policy", "status"])
 
     assert result.exit_code != 0
     assert "No session found" in result.output
@@ -94,7 +94,7 @@ def test_enable_session_flag_targets_named_session(runner: CliRunner, env: Path)
     _seed_session(str(env), "planner")
     _seed_session(str(env), "executor")
 
-    result = runner.invoke(main, ["guard", "enable", "--bundle", "tdd", "--session", "executor"])
+    result = runner.invoke(main, ["policy", "enable", "--bundle", "tdd", "--session", "executor"])
 
     assert result.exit_code == 0, result.output
     executor = SessionStore(str(env), "executor").read()
@@ -110,7 +110,7 @@ def test_disable_session_flag_targets_named_session(runner: CliRunner, env: Path
     _seed_session(str(env), "planner")
     _seed_session(str(env), "executor", policy=PolicyIntent(enabled=True, bundles=["tdd"]))
 
-    result = runner.invoke(main, ["guard", "disable", "--session", "executor"])
+    result = runner.invoke(main, ["policy", "disable", "--session", "executor"])
 
     assert result.exit_code == 0, result.output
     executor = SessionStore(str(env), "executor").read()
@@ -123,7 +123,7 @@ def test_enable_without_flag_reports_ambiguity(runner: CliRunner, env: Path) -> 
     _seed_session(str(env), "planner")
     _seed_session(str(env), "executor")
 
-    result = runner.invoke(main, ["guard", "enable", "--bundle", "tdd"])
+    result = runner.invoke(main, ["policy", "enable", "--bundle", "tdd"])
 
     assert result.exit_code != 0
     assert "Multiple sessions" in result.output

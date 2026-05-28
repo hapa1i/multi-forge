@@ -1,4 +1,4 @@
-"""Tests for forge.guard.workflow.stages."""
+"""Tests for forge.policy.workflow.stages."""
 
 from __future__ import annotations
 
@@ -7,9 +7,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from forge.guard.types import ActionContext
-from forge.guard.workflow.config import CheckerConfig, FilterConfig, ReviewerConfig
-from forge.guard.workflow.stages import (
+from forge.policy.types import ActionContext
+from forge.policy.workflow.config import CheckerConfig, FilterConfig, ReviewerConfig
+from forge.policy.workflow.stages import (
     CheckerStage,
     FilterStage,
     ReviewerStage,

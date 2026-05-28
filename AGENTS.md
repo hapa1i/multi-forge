@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-`src/forge/` contains the Python app, split by domain (`cli/`, `session/`, `proxy/`, `guard/`, `core/`, `install/`,
+`src/forge/` contains the Python app, split by domain (`cli/`, `session/`, `proxy/`, `policy/`, `core/`, `install/`,
 `search/`, `review/`, `sidecar/`, `backend/`, `logs/`). Agent assets live in `src/skills/`, `src/commands/`, and
 `src/agents/`. Tests are split by scope: `tests/src/` mirrors `src/forge/`, `tests/integration/` covers end-to-end and
 Docker-backed flows, `tests/regression/` holds bug reproductions, and `tests/fixtures/` provides shared helpers. Keep
@@ -39,7 +39,7 @@ Use `uv` for dependencies and `make` for the standard workflow:
 - For targeted reruns, use direct `pytest` only after `make` has prepared prerequisites; integration flows depend on the
   setup performed by `make test-integration`.
 
-## OSS Release & UX Verification
+## Release & UX Verification
 
 Editable installs can hide packaging and clean-environment bugs. For changes that affect `pyproject.toml`,
 `scripts/setup.sh`, installer code, bundled extensions (`src/skills/`, `src/commands/`, `src/agents/`), or runtime files
@@ -72,3 +72,7 @@ subjects; issue references are appended when relevant, for example
 `fix: session resume fails for nested worktree forks (#12)`. Branch from `main` and open PRs back to `main`. Before
 requesting review, run `make pre-commit` and the relevant test targets, summarize behavior changes, list verification
 commands, and link the issue. Include terminal output or screenshots when CLI-visible behavior changes.
+
+## Platform & Environment
+
+**macOS (Darwin)** - Use GNU tools instead of BSD versions: gsed, gawk, ggrep (can also use rg), gdate, greadlink

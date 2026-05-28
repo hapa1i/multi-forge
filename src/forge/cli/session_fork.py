@@ -426,7 +426,7 @@ def fork(
 
     # Preflight supervisor proxy BEFORE fork_session() to avoid half-created state
     if supervisor_proxy:
-        from forge.guard.semantic.supervisor import ensure_supervisor_proxy
+        from forge.policy.semantic.supervisor import ensure_supervisor_proxy
 
         try:
             _sup_proxy_id, _sup_started = ensure_supervisor_proxy(supervisor_proxy)
@@ -500,7 +500,7 @@ def fork(
 
     # --- wire supervisor (if --supervise flag set) ---
     if supervise_target:
-        from forge.guard.semantic.supervisor import (
+        from forge.policy.semantic.supervisor import (
             apply_supervisor_routing,
             apply_supervisor_to_intent,
         )

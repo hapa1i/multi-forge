@@ -1,8 +1,8 @@
-"""Tests for forge.guard.workflow.divergence."""
+"""Tests for forge.policy.workflow.divergence."""
 
 from __future__ import annotations
 
-from forge.guard.workflow.divergence import (
+from forge.policy.workflow.divergence import (
     DIVERGENCE_CHECKER_PROMPT,
     DIVERGENCE_REVIEWER_PROMPT,
     DIVERGENCE_TAGGER_PROMPT,

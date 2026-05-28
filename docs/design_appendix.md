@@ -337,13 +337,13 @@ scope rationale remain in design.md.
 
 ### B.1 Scope policy table
 
-| Category             | Allowed via `%`                                                                                                | Not allowed via `%`                                           |
-| -------------------- | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| Session / plan       | `%session list`, `%plan`                                                                                       | --                                                            |
-| Proxy                | `%proxy list`, `%proxy show` (read-only)                                                                       | `%proxy create`, `%proxy edit`, `%proxy set`, `%proxy delete` |
-| Guard / verification | `%policy status`, `%policy enable`, `%policy disable`, `%policy check`, `%policy supervise`, `%cancel-verification` | --                                                            |
-| Cleanup              | `%clean [--scope repo\|project\|all]` (read-only report)                                                       | destructive cleanup (use `forge clean --yes` from terminal)   |
-| Utilities / config   | `%h`, `%help`, `%config`                                                                                       | --                                                            |
+| Category              | Allowed via `%`                                                                                                     | Not allowed via `%`                                           |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| Session / plan        | `%session list`, `%plan`                                                                                            | --                                                            |
+| Proxy                 | `%proxy list`, `%proxy show` (read-only)                                                                            | `%proxy create`, `%proxy edit`, `%proxy set`, `%proxy delete` |
+| Policy / verification | `%policy status`, `%policy enable`, `%policy disable`, `%policy check`, `%policy supervise`, `%cancel-verification` | --                                                            |
+| Cleanup               | `%clean [--scope repo\|project\|all]` (read-only report)                                                            | destructive cleanup (use `forge clean --yes` from terminal)   |
+| Utilities / config    | `%h`, `%help`, `%config`                                                                                            | --                                                            |
 
 ### B.2 Current shipped commands
 
@@ -433,7 +433,7 @@ verification loop, and action context remain in design.md.
 | ------------------ | ----------------------------------- | ------------------------------------------------------------------------------------- |
 | Session runner     | `supervisor.py`, `handoff_agent.py` | `run_claude_session(prompt, resume_id?, model?, base_url?, timeout, unset_env_vars?)` |
 | Proxy resolution   | both                                | `resolve_base_url(proxy_id?, explicit_url?, fallbacks)`                               |
-| Throttle cache     | `guard/store.py`                    | `ThrottleCache(ttl).check(key) / .update(key, value)`                                 |
+| Throttle cache     | `policy/store.py`                   | `ThrottleCache(ttl).check(key) / .update(key, value)`                                 |
 | Structured output  | `verdict.py`                        | `extract_json_verdict(stdout, schema)`                                                |
 | Tagger             | new                                 | `tag_action(context, model, prompt) -> tags[]`                                        |
 | Env builder        | both                                | `build_claude_env(base_url?) -> dict`                                                 |
@@ -470,13 +470,13 @@ user rather than working around the check.
 
 ### D.3 Policy definition ownership (from §4.1.6)
 
-| Setting                                        | Owner   | Location                           |
-| ---------------------------------------------- | ------- | ---------------------------------- |
-| Supervisor model (which model to use as guard) | Proxy   | `~/.forge/proxies/<id>/proxy.yaml` |
-| Throttling settings (check frequency)          | Proxy   | `~/.forge/proxies/<id>/proxy.yaml` |
-| TDD mode (off/permissive/strict)               | Session | Session file `intent.tdd_mode`     |
-| Policy enabled/disabled                        | Session | Session file `intent.policy_mode`  |
-| Verification config                            | Session | Session file `intent.verification` |
+| Setting                                             | Owner   | Location                           |
+| --------------------------------------------------- | ------- | ---------------------------------- |
+| Supervisor model (which model to use as supervisor) | Proxy   | `~/.forge/proxies/<id>/proxy.yaml` |
+| Throttling settings (check frequency)               | Proxy   | `~/.forge/proxies/<id>/proxy.yaml` |
+| TDD mode (off/permissive/strict)                    | Session | Session file `intent.tdd_mode`     |
+| Policy enabled/disabled                             | Session | Session file `intent.policy_mode`  |
+| Verification config                                 | Session | Session file `intent.verification` |
 
 ### D.4 Policy state ownership (from §4.1.6)
 
@@ -869,7 +869,7 @@ display-only). State file uses SHA-256 hash for drift detection. 58 unit tests.
 
 `AnthropicClient` deferred; currently uses `OpenAIClient` for all providers via LiteLLM.
 
-**Purpose:** Unified async-first LLM client abstraction for Proxy, Guard, and Skills components.
+**Purpose:** Unified async-first LLM client abstraction for Proxy, Policy, and Skills components.
 
 ### J.1 Design principles
 
@@ -932,7 +932,7 @@ class SyncAdapter:
     def ask(self, prompt: str, *, system: str | None = None) -> str: ...
 ```
 
-> **Trap:** Guard uses `SyncAdapter`; Proxy is async. Don't import sync Guard logic into Proxy -- `asyncio.run()`
+> **Trap:** Policy uses `SyncAdapter`; Proxy is async. Don't import sync Policy logic into Proxy -- `asyncio.run()`
 > crashes in running loop. Use async-first at boundaries.
 
 ### J.7 Unsupported parameter policy

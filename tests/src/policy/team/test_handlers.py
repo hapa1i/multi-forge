@@ -1,4 +1,4 @@
-"""Tests for forge.guard.team.handlers and CLI cache helpers."""
+"""Tests for forge.policy.team.handlers and CLI cache helpers."""
 
 from __future__ import annotations
 
@@ -7,8 +7,8 @@ from unittest.mock import MagicMock, patch
 from forge.cli.hooks.commands import _safe_cache_key
 from forge.core.reactive.session_runner import SessionResult
 from forge.core.state import now_iso
-from forge.guard.team.config import TeamSupervisorConfig
-from forge.guard.team.handlers import (
+from forge.policy.team.config import TeamSupervisorConfig
+from forge.policy.team.handlers import (
     _classify_event,
     _is_fresh,
     _run_supervisor,
@@ -122,7 +122,7 @@ class TestClassifyEvent:
 
 
 class TestRunSupervisor:
-    @patch("forge.guard.team.handlers.run_claude_session")
+    @patch("forge.policy.team.handlers.run_claude_session")
     def test_aligned_allows(self, mock_session):
         mock_session.return_value = SessionResult(
             stdout='{"verdict": "aligned", "confidence": 0.9}',
@@ -133,7 +133,7 @@ class TestRunSupervisor:
         assert exit_code == 0
         assert feedback == ""
 
-    @patch("forge.guard.team.handlers.run_claude_session")
+    @patch("forge.policy.team.handlers.run_claude_session")
     def test_divergent_blocks(self, mock_session):
         mock_session.return_value = SessionResult(
             stdout='{"verdict": "divergent", "feedback": "Missing tests"}',
@@ -144,7 +144,7 @@ class TestRunSupervisor:
         assert exit_code == 2
         assert "Missing tests" in feedback
 
-    @patch("forge.guard.team.handlers.run_claude_session")
+    @patch("forge.policy.team.handlers.run_claude_session")
     def test_subprocess_failure_allows(self, mock_session):
         mock_session.return_value = SessionResult(
             stdout="",
@@ -155,7 +155,7 @@ class TestRunSupervisor:
         exit_code, _ = _run_supervisor(_config(), "alice", "team", "idle", "")
         assert exit_code == 0
 
-    @patch("forge.guard.team.handlers.run_claude_session")
+    @patch("forge.policy.team.handlers.run_claude_session")
     def test_parse_failure_allows(self, mock_session):
         mock_session.return_value = SessionResult(
             stdout="not json",
@@ -165,7 +165,7 @@ class TestRunSupervisor:
         exit_code, _ = _run_supervisor(_config(), "alice", "team", "idle", "")
         assert exit_code == 0
 
-    @patch("forge.guard.team.handlers.run_claude_session")
+    @patch("forge.policy.team.handlers.run_claude_session")
     def test_missing_verdict_allows(self, mock_session):
         mock_session.return_value = SessionResult(
             stdout='{"confidence": 0.5}',
@@ -182,7 +182,7 @@ class TestRunSupervisor:
 class TestRunSupervisorDepthGuard:
     """Verify _run_supervisor skips at FORGE_DEPTH >= MAX_DEPTH."""
 
-    @patch("forge.guard.team.handlers.run_claude_session")
+    @patch("forge.policy.team.handlers.run_claude_session")
     def test_skips_at_max_depth(self, mock_run: MagicMock):
         """At FORGE_DEPTH=2, _run_supervisor should return (0, '') without spawning."""
         with patch.dict("os.environ", {"FORGE_DEPTH": "2"}):
@@ -191,7 +191,7 @@ class TestRunSupervisorDepthGuard:
         assert feedback == ""
         mock_run.assert_not_called()
 
-    @patch("forge.guard.team.handlers.run_claude_session")
+    @patch("forge.policy.team.handlers.run_claude_session")
     def test_runs_below_max_depth(self, mock_run: MagicMock):
         """At FORGE_DEPTH=1, _run_supervisor should proceed normally."""
         mock_run.return_value = SessionResult(
@@ -209,21 +209,21 @@ class TestRunSupervisorDepthGuard:
 
 
 class TestHandleTeammateIdle:
-    @patch("forge.guard.team.handlers._classify_event", return_value="routine")
+    @patch("forge.policy.team.handlers._classify_event", return_value="routine")
     def test_routine_allows(self, _mock_classify):
         cache: dict = {}
         exit_code, _ = handle_teammate_idle(_idle_event(), _config(), cache)
         assert exit_code == 0
 
-    @patch("forge.guard.team.handlers._run_supervisor", return_value=(2, "Fix the tests"))
-    @patch("forge.guard.team.handlers._classify_event", return_value="needs-review")
+    @patch("forge.policy.team.handlers._run_supervisor", return_value=(2, "Fix the tests"))
+    @patch("forge.policy.team.handlers._classify_event", return_value="needs-review")
     def test_needs_review_escalates(self, _mock_classify, _mock_supervisor):
         cache: dict = {}
         exit_code, feedback = handle_teammate_idle(_idle_event(), _config(), cache)
         assert exit_code == 2
         assert "Fix the tests" in feedback
 
-    @patch("forge.guard.team.handlers._classify_event", return_value="needs-review")
+    @patch("forge.policy.team.handlers._classify_event", return_value="needs-review")
     def test_no_supervisor_allows(self, _mock_classify):
         cache: dict = {}
         exit_code, _ = handle_teammate_idle(_idle_event(), _config(resume_id=None), cache)
@@ -239,22 +239,22 @@ class TestHandleTeammateIdle:
 
 
 class TestHandleTaskCompleted:
-    @patch("forge.guard.team.handlers._classify_event", return_value="routine")
+    @patch("forge.policy.team.handlers._classify_event", return_value="routine")
     def test_routine_allows(self, _mock_classify):
         cache: dict = {}
         exit_code, _ = handle_task_completed(_task_event(), _config(), cache)
         assert exit_code == 0
 
-    @patch("forge.guard.team.handlers._run_supervisor", return_value=(2, "Needs rework"))
-    @patch("forge.guard.team.handlers._classify_event", return_value="needs-review")
+    @patch("forge.policy.team.handlers._run_supervisor", return_value=(2, "Needs rework"))
+    @patch("forge.policy.team.handlers._classify_event", return_value="needs-review")
     def test_needs_review_blocks(self, _mock_classify, _mock_supervisor):
         cache: dict = {}
         exit_code, feedback = handle_task_completed(_task_event(), _config(), cache)
         assert exit_code == 2
         assert "Needs rework" in feedback
 
-    @patch("forge.guard.team.handlers._run_supervisor", return_value=(2, "Still bad"))
-    @patch("forge.guard.team.handlers._classify_event", return_value="needs-review")
+    @patch("forge.policy.team.handlers._run_supervisor", return_value=(2, "Still bad"))
+    @patch("forge.policy.team.handlers._classify_event", return_value="needs-review")
     def test_escape_hatch_auto_allows(self, _mock_classify, _mock_supervisor):
         """After max_blocks_per_task, auto-allow."""
         cache = {
@@ -267,8 +267,8 @@ class TestHandleTaskCompleted:
         assert exit_code == 0
         _mock_classify.assert_not_called()
 
-    @patch("forge.guard.team.handlers._run_supervisor", return_value=(2, "Bad"))
-    @patch("forge.guard.team.handlers._classify_event", return_value="needs-review")
+    @patch("forge.policy.team.handlers._run_supervisor", return_value=(2, "Bad"))
+    @patch("forge.policy.team.handlers._classify_event", return_value="needs-review")
     def test_block_count_increments(self, _mock_classify, _mock_supervisor):
         cache: dict = {}
         handle_task_completed(_task_event(), _config(), cache)
@@ -279,7 +279,7 @@ class TestHandleTaskCompleted:
         handle_task_completed(_task_event(), _config(), cache)
         assert cache["executor:task-001"]["block_count"] == 2
 
-    @patch("forge.guard.team.handlers._classify_event", return_value="routine")
+    @patch("forge.policy.team.handlers._classify_event", return_value="routine")
     def test_optional_teammate_name(self, _mock_classify):
         """TaskCompleted may have no teammate_name."""
         event = {"task_id": "task-001", "task_subject": "Fix bug"}

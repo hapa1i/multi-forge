@@ -445,11 +445,11 @@ This returns JSON with:
 | 2 (Install)        | "Extensions installed. The wrapper enforced 4 safety gates before running the install."                                                                                     |
 | 3 (Verify)         | "Hooks, skills, commands all landed correctly. Pre-existing settings survived the install."                                                                                 |
 | 4 (Untouched)      | "Real system confirmed untouched -- all timestamps match the baseline."                                                                                                     |
-| 5 (CLI)            | "You've seen the Forge CLI surface -- sessions, proxies, config, guard, all managed through `forge`."                                                                       |
+| 5 (CLI)            | "You've seen the Forge CLI surface -- sessions, proxies, config, policy, all managed through `forge`."                                                                      |
 | 6 (Proxy/Session)  | "Proxies route API calls; sessions track your workspace. Together they let you switch models without changing code."                                                        |
 | 7 (Session B)      | "A live Claude session with Forge hooks, status line, and % commands active."                                                                                               |
 | 8 (% Commands)     | "Direct commands let you control Forge from inside a Claude session without leaving the conversation."                                                                      |
-| 9 (Guard Policy)   | "The guard enforces coding policies at tool boundaries. Deny messages include intent (why the policy exists) so models comply with the goal, not just the check."           |
+| 9 (Policy)         | "The policy engine enforces coding policies at tool boundaries. Deny messages include intent (why the policy exists) so models comply with the goal, not just the check."   |
 | 10 (Search)        | "Search indexes your session transcripts for later retrieval. The BM25 engine works per-project -- no external service needed."                                             |
 | 11 (Session State) | "The session manifest captures intent (what you wanted), overrides (live changes), and confirmed (what hooks observed). Forking shows how sessions derive from each other." |
 | 12 (Sidecar)       | "Sidecar bundles proxy + Claude in Docker -- lifecycle coupling, port isolation, no host proxy needed."                                                                     |

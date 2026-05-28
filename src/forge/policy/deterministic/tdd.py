@@ -9,11 +9,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from forge.guard.deterministic.base import (
+from forge.policy.deterministic.base import (
     DeterministicPolicy,
     StatefulDeterministicPolicy,
 )
-from forge.guard.types import ActionContext, PolicyDecision, Violation
+from forge.policy.types import ActionContext, PolicyDecision, Violation
 
 # Patterns that indicate test skipping
 SKIP_PATTERNS = [

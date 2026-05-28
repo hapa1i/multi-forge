@@ -15,7 +15,7 @@ Usage:
         if event.type == "text_delta":
             print(event.text, end="")
 
-    # Sync usage (Guard)
+    # Sync usage (Policy)
     from forge.core.llm import get_client, SyncAdapter
 
     client = SyncAdapter(get_client("openai/gpt-5.2"))

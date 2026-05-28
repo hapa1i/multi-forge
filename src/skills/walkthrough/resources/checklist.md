@@ -177,7 +177,7 @@ Compare every value against the Section 0 snapshot. They must all match exactly.
 bash "$SCRIPTS/run-in-repo.sh" forge -h
 ```
 
-- [ ] Help output shows available subcommands (session, proxy, config, guard, etc.)
+- [ ] Help output shows available subcommands (session, proxy, config, policy, etc.)
 
 ### 5.2 Try Commands in Your Terminal
 
@@ -300,7 +300,7 @@ Look at the **status bar** at the bottom of Session B. You should see two lines 
 In **Session B**, type `%help` as your prompt.
 
 - [ ] %help shows a list of available direct commands
-- [ ] Commands include %session, %proxy, %guard, %help
+- [ ] Commands include %session, %proxy, %policy, %help
 
 ### 8.2 Try %session list
 
@@ -315,13 +315,13 @@ In **Session B**, type `%session list` as your prompt.
 
 <!-- prereq: 7.1 -->
 
-## 9. Guard Policy Demo
+## 9. Policy Demo
 
-### 9.1 Enable Guard Policy
+### 9.1 Enable Policy
 
 <!-- auto -->
 
-Enable the `coding_standards` guard bundle on the walkthrough session. Set bundles before enabling so the policy is
+Enable the `coding_standards` policy bundle on the walkthrough session. Set bundles before enabling so the policy is
 ready when the flag flips.
 
 ```bash
@@ -348,7 +348,7 @@ Create a new file src/greeting.py with a function that returns a greeting string
 Watch what happens -- the deny message now includes **Intent** (why the policy exists) and a **Note** telling the model
 to comply with the intent, not just the literal check:
 
-1. Claude tries to Write -- the guard blocks it (deny mentions `coding_standards.no-emoji`)
+1. Claude tries to Write -- the policy blocks it (deny mentions `coding_standards.no-emoji`)
 2. The deny includes `Intent:` explaining that emoji break monospace alignment (including Unicode escapes)
 3. The deny includes a `Note:` telling Claude to try a compliant approach first, and ask the user if there is a genuine
    conflict
@@ -363,7 +363,7 @@ to comply with the intent, not just the literal check:
 - **Bypasses intent**: Claude uses a Unicode escape (`\U0001F680`) or `chr()` to produce emoji at runtime. This means
   the intent was not persuasive enough for this model. Note it as a finding.
 
-- [ ] Guard blocked the Write attempt (deny message mentions emoji)
+- [ ] Policy blocked the Write attempt (deny message mentions emoji)
 
 - [ ] Deny message includes `Intent:` line
 
@@ -379,7 +379,7 @@ to comply with the intent, not just the literal check:
 
 <!-- human:guided -->
 
-Exit **Session B** now -- the guard demo is complete and we need the session transcript for search. Type `/exit` in
+Exit **Session B** now -- the policy demo is complete and we need the session transcript for search. Type `/exit` in
 Session B (preferred -- ensures the Stop hook completes cleanly). If `/exit` doesn't work, press **Ctrl+C** twice.
 
 The Stop hook fires on exit, copying the conversation transcript to `.forge/artifacts/` and enqueueing search indexing
@@ -427,7 +427,7 @@ bash "$SCRIPTS/run-in-repo.sh" forge search rebuild-index
 - [ ] Index rebuilt from `.forge/artifacts/`
 - [ ] Reports at least 1 transcript indexed
 
-### 10.5 Search for Guard Demo Content
+### 10.5 Search for Policy Demo Content
 
 <!-- prereq: 10.1 -->
 
@@ -438,7 +438,7 @@ bash "$SCRIPTS/run-in-repo.sh" forge search query "emoji"
 ```
 
 - [ ] Returns JSON output
-- [ ] total_results >= 1 (finds the guard demo transcript)
+- [ ] total_results >= 1 (finds the policy demo transcript)
 
 ### 10.6 Search Status (After Index)
 

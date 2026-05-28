@@ -92,7 +92,7 @@ One-off doc updates that don't need a passport are ordinary agent instructions.
 ## Dogfood Workflow: Planner, Supervised Executor, Reviewer
 
 Use this flow when a planner owns the approved plan, an executor implements in an isolated worktree under supervisor
-guard, and a reviewer inspects the executor's worktree with the planner's context.
+policy, and a reviewer inspects the executor's worktree with the planner's context.
 
 The important memory behavior:
 

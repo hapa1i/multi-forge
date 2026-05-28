@@ -1,13 +1,13 @@
-"""Tests for guard/deterministic/coding_standards.py."""
+"""Tests for policy/deterministic/coding_standards.py."""
 
 import pytest
 
-from forge.guard.deterministic.coding_standards import (
+from forge.policy.deterministic.coding_standards import (
     NoBackwardCompatPolicy,
     NoEmojiPolicy,
     NoTypeCheckingPolicy,
 )
-from forge.guard.types import ActionContext
+from forge.policy.types import ActionContext
 
 
 class TestNoTypeCheckingPolicy:

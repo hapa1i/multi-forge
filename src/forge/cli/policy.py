@@ -1,4 +1,4 @@
-"""Guard CLI commands for policy management.
+"""Policy CLI commands for policy management.
 
 Commands for managing policy enforcement:
 - enable: Enable policy bundles for the current session
@@ -22,7 +22,7 @@ from rich.text import Text
 
 from forge.cli.output import print_tip
 from forge.core.paths import display_path
-from forge.guard.queries import (
+from forge.policy.queries import (
     find_sessions_supervised_by,
     read_scoped_supervisor_target,
 )
@@ -69,8 +69,8 @@ def _resolve_session_for_display(
     return resolved.store, resolved.state
 
 
-def _resolve_guard_session(cwd: Path, explicit: str | None) -> tuple[SessionStore, SessionState]:
-    """Resolve the guard target session as (store, state), or exit(1) with an actionable error.
+def _resolve_policy_session(cwd: Path, explicit: str | None) -> tuple[SessionStore, SessionState]:
+    """Resolve the policy target session as (store, state), or exit(1) with an actionable error.
 
     Precedence: explicit --session > FORGE_SESSION > sole local session. The absent case
     (zero local sessions) and the ambiguous case (multiple, none selected) produce distinct
@@ -101,7 +101,7 @@ def _resolve_guard_session(cwd: Path, explicit: str | None) -> tuple[SessionStor
         else:
             console.print(f"[red]Error:[/red] Multiple sessions in {display_path(cwd)}; specify one with --session.")
             console.print("  Sessions: " + ", ".join(candidates))
-            print_tip(f"Run 'forge guard <command> --session {candidates[0]}'.", blank_before=False, console=console)
+            print_tip(f"Run 'forge policy <command> --session {candidates[0]}'.", blank_before=False, console=console)
             sys.exit(1)
 
     store = SessionStore(_resolve_forge_root(cwd), name)
@@ -115,23 +115,23 @@ def _resolve_guard_session(cwd: Path, explicit: str | None) -> tuple[SessionStor
 
 
 @click.group()
-def guard() -> None:
+def policy() -> None:
     """Manage policy enforcement for the current session.
 
     \b
     Examples:
-        forge guard enable --bundle tdd        # Enable TDD policy
-        forge guard status                     # Show policy state
-        forge guard check --bundle tdd -f src/foo.py  # On-demand check
+        forge policy enable --bundle tdd        # Enable TDD policy
+        forge policy status                     # Show policy state
+        forge policy check --bundle tdd -f src/foo.py  # On-demand check
     """
     pass
 
 
-@guard.command(name="list")
+@policy.command(name="list")
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
 def list_bundles(as_json: bool) -> None:
     """List available policy bundles and their rules."""
-    from forge.guard.deterministic.registry import BUNDLES, get_bundle_policies
+    from forge.policy.deterministic.registry import BUNDLES, get_bundle_policies
 
     if as_json:
         import json
@@ -160,7 +160,7 @@ def list_bundles(as_json: bool) -> None:
         console.print()
 
 
-@guard.command(name="enable")
+@policy.command(name="enable")
 @click.option(
     "--bundle",
     "-b",
@@ -187,8 +187,8 @@ def enable(bundles: tuple[str, ...], fail_mode: str, permissive: bool, session_n
 
     \b
     Examples:
-        forge guard enable --bundle tdd --bundle coding_standards
-        forge guard enable --bundle tdd --permissive
+        forge policy enable --bundle tdd --bundle coding_standards
+        forge policy enable --bundle tdd --permissive
     """
     if not bundles:
         console.print("[yellow]Warning:[/yellow] No bundles specified. Use --bundle to enable policies.")
@@ -196,7 +196,7 @@ def enable(bundles: tuple[str, ...], fail_mode: str, permissive: bool, session_n
         return
 
     cwd = Path.cwd().resolve()
-    store, _ = _resolve_guard_session(cwd, session_name)
+    store, _ = _resolve_policy_session(cwd, session_name)
 
     bundle_config: dict[str, dict[str, object]] = {}
     if permissive and "tdd" in bundles:
@@ -235,7 +235,7 @@ def enable(bundles: tuple[str, ...], fail_mode: str, permissive: bool, session_n
             cfg_str = ", ".join(f"{k}={v}" for k, v in cfg.items())
             console.print(f"  {bundle}: {cfg_str}")
 
-    from forge.guard.deterministic.registry import get_policy_ids_for_bundle
+    from forge.policy.deterministic.registry import get_policy_ids_for_bundle
 
     rules = []
     for bundle in bundles:
@@ -247,12 +247,12 @@ def enable(bundles: tuple[str, ...], fail_mode: str, permissive: bool, session_n
             console.print(f"    - {rule}")
 
 
-@guard.command(name="disable")
+@policy.command(name="disable")
 @click.option("--session", "-s", "session_name", help="Target session (default: auto-detect)")
 def disable(session_name: str | None) -> None:
     """Disable policy enforcement for the current session."""
     cwd = Path.cwd().resolve()
-    store, _ = _resolve_guard_session(cwd, session_name)
+    store, _ = _resolve_policy_session(cwd, session_name)
 
     def _mutate(m: object) -> None:
         if not isinstance(m, SessionState):
@@ -272,13 +272,13 @@ def disable(session_name: str | None) -> None:
     console.print("[green]Policy enforcement disabled[/green]")
 
 
-@guard.command(name="status")
+@policy.command(name="status")
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
 @click.option("--session", "-s", "session_name", help="Target session (default: auto-detect)")
 def status(as_json: bool, session_name: str | None) -> None:
     """Show current policy configuration and state."""
     cwd = Path.cwd().resolve()
-    _, manifest = _resolve_guard_session(cwd, session_name)
+    _, manifest = _resolve_policy_session(cwd, session_name)
 
     try:
         effective = compute_effective_intent(manifest)
@@ -409,7 +409,7 @@ def status(as_json: bool, session_name: str | None) -> None:
     if supervised:
         names = ", ".join(supervised)
         print_tip(
-            f"This session supervises: {names}. Run 'forge guard status --session {supervised[0]}' to check.",
+            f"This session supervises: {names}. Run 'forge policy status --session {supervised[0]}' to check.",
             console=console,
         )
 
@@ -430,7 +430,7 @@ def _extract_path_from_diff(diff: str) -> str | None:
     return None
 
 
-@guard.command(name="check")
+@policy.command(name="check")
 @click.option(
     "--bundle",
     "-b",
@@ -479,12 +479,12 @@ def check(
 
     \b
     Examples:
-        forge guard check --bundle tdd --file src/foo.py
-        forge guard check --bundle tdd --bundle coding_standards -f src/foo.py --json
-        git diff | forge guard check --bundle coding_standards --diff
+        forge policy check --bundle tdd --file src/foo.py
+        forge policy check --bundle tdd --bundle coding_standards -f src/foo.py --json
+        git diff | forge policy check --bundle coding_standards --diff
     """
-    from forge.guard.engine import build_engine
-    from forge.guard.types import ActionContext, extract_added_lines
+    from forge.policy.engine import build_engine
+    from forge.policy.types import ActionContext, extract_added_lines
 
     if not file_path and not use_diff:
         console.print("[red]Error:[/red] Provide --file or --diff")
@@ -494,7 +494,7 @@ def check(
 
     if use_diff:
         if sys.stdin.isatty():
-            console.print("[red]Error:[/red] --diff requires input on stdin (e.g., git diff | forge guard check ...)")
+            console.print("[red]Error:[/red] --diff requires input on stdin (e.g., git diff | forge policy check ...)")
             sys.exit(2)
         raw_input = sys.stdin.read()
         tool_name = "Edit"
@@ -600,7 +600,7 @@ def check(
 _INFRA_FAILURE_PREFIXES = ("Supervisor error:", "Supervisor skipped")
 
 
-@guard.command(name="supervisor")
+@policy.command(name="supervisor")
 @click.option(
     "--file",
     "-f",
@@ -646,23 +646,23 @@ def supervisor_cmd(
 ) -> None:
     """Evaluate a single file against a supervisor plan (one-shot).
 
-    For persistent supervisor configuration, use 'forge guard supervise' instead.
+    For persistent supervisor configuration, use 'forge policy supervise' instead.
 
     Fail-closed: exit 0 (aligned), exit 1 (divergent), exit 2 (could not evaluate).
 
     \b
     Examples:
-        forge guard supervisor -f src/foo.py -r abc-123 --json
-        forge guard supervisor -f src/foo.py -r planning-session --json
-        forge guard supervisor -f src/foo.py -r abc-123 --proxy openrouter-openai
-        forge guard supervisor -f src/foo.py -r abc-123 --no-proxy
+        forge policy supervisor -f src/foo.py -r abc-123 --json
+        forge policy supervisor -f src/foo.py -r planning-session --json
+        forge policy supervisor -f src/foo.py -r abc-123 --proxy openrouter-openai
+        forge policy supervisor -f src/foo.py -r abc-123 --no-proxy
     """
     if direct and proxy_name:
         console.print("[red]Error:[/red] --no-proxy and --proxy are mutually exclusive")
         sys.exit(1)
 
-    from forge.guard.semantic.supervisor import SUPERVISOR_INTENT, invoke_supervisor
-    from forge.guard.types import ActionContext
+    from forge.policy.semantic.supervisor import SUPERVISOR_INTENT, invoke_supervisor
+    from forge.policy.types import ActionContext
     from forge.session.models import SupervisorConfig
 
     target = Path(file_path)
@@ -765,7 +765,7 @@ def supervisor_cmd(
     sys.exit(exit_code)
 
 
-@guard.command(name="supervise")
+@policy.command(name="supervise")
 @click.argument("target", required=False)
 @click.option("--off", is_flag=True, help="Suspend supervisor (preserves config)")
 @click.option("--on", "on_flag", is_flag=True, help="Resume suspended supervisor")
@@ -795,17 +795,17 @@ def supervise_cmd(
     """Configure the semantic supervisor for the current session.
 
     Sets durable plan supervision that persists through session resume.
-    Use 'forge guard supervisor' for one-shot file evaluation instead.
+    Use 'forge policy supervisor' for one-shot file evaluation instead.
 
     \b
     Examples:
-        forge guard supervise planner           # Set planner as supervisor
-        forge guard supervise --off             # Suspend (preserves config)
-        forge guard supervise --on              # Resume
-        forge guard supervise --remove          # Remove entirely
-        forge guard supervise --reload          # Reload latest relevant approved plan
-        forge guard supervise --reload-from p   # Reload plan from explicit file
-        forge guard supervise                   # Show current config
+        forge policy supervise planner           # Set planner as supervisor
+        forge policy supervise --off             # Suspend (preserves config)
+        forge policy supervise --on              # Resume
+        forge policy supervise --remove          # Remove entirely
+        forge policy supervise --reload          # Reload latest relevant approved plan
+        forge policy supervise --reload-from p   # Reload plan from explicit file
+        forge policy supervise                   # Show current config
     """
     if supervisor_proxy and supervisor_direct:
         console.print("[red]Error:[/red] --supervisor-proxy and --no-supervisor-proxy are mutually exclusive")
@@ -820,7 +820,7 @@ def supervise_cmd(
         )
         sys.exit(1)
     cwd = Path.cwd().resolve()
-    store, _state = _resolve_guard_session(cwd, session_name)
+    store, _state = _resolve_policy_session(cwd, session_name)
     name = _state.name
 
     if off:
@@ -847,7 +847,7 @@ def supervise_cmd(
             manifest.intent.policy and manifest.intent.policy.supervisor and manifest.intent.policy.supervisor.resume_id
         )
         if not has_sup:
-            console.print("No supervisor configured. Use 'forge guard supervise <target>' to set one.")
+            console.print("No supervisor configured. Use 'forge policy supervise <target>' to set one.")
             return
 
         def _resume_sup(m: SessionState) -> None:
@@ -890,7 +890,7 @@ def supervise_cmd(
             plan_path = str(resolved)
             source_desc = str(resolved)
         else:
-            from forge.guard.semantic.supervisor import (
+            from forge.policy.semantic.supervisor import (
                 resolve_supervisor_reload_plan_path,
             )
 
@@ -915,7 +915,7 @@ def supervise_cmd(
         return
 
     if target:
-        from forge.guard.semantic.supervisor import (
+        from forge.policy.semantic.supervisor import (
             apply_supervisor_routing,
             apply_supervisor_to_intent,
             ensure_supervisor_proxy,
@@ -927,9 +927,9 @@ def supervise_cmd(
         # Validate supervisor target in the selected session's scope, not CWD.
         # When --session points to a cross-worktree session, _resolve_forge_root(cwd)
         # would search the wrong project.
-        _guard_fr = manifest.forge_root or _resolve_forge_root(cwd)
+        _policy_fr = manifest.forge_root or _resolve_forge_root(cwd)
         try:
-            source_state = validate_supervisor_target(target, forge_root=_guard_fr)
+            source_state = validate_supervisor_target(target, forge_root=_policy_fr)
         except ValueError as e:
             console.print(f"[red]Error:[/red] {e}")
             sys.exit(1)
@@ -952,7 +952,7 @@ def supervise_cmd(
             current_proxy_id = manifest.intent.proxy.proxy_id  # type: ignore[union-attr]
         current_direct = not bool(manifest.intent.proxy)
 
-        sup_config = SupervisorConfig(resume_id=target, forge_root=source_state.forge_root or _guard_fr)
+        sup_config = SupervisorConfig(resume_id=target, forge_root=source_state.forge_root or _policy_fr)
         routing_display = apply_supervisor_routing(
             sup_config,
             source_state,

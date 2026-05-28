@@ -1,10 +1,10 @@
-"""Fixtures for guard module tests."""
+"""Fixtures for policy module tests."""
 
 from __future__ import annotations
 
 import pytest
 
-from forge.guard.types import ActionContext
+from forge.policy.types import ActionContext
 
 
 @pytest.fixture

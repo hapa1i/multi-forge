@@ -109,12 +109,12 @@ See [sessions.md](sessions.md) for worktrees, fork, incognito, and `%` commands.
 Enable TDD enforcement, coding standards checks, or a semantic supervisor that verifies alignment with your plan:
 
 ```bash
-forge guard enable --bundle tdd                        # Deterministic TDD policy
-forge guard supervise planner                          # Semantic plan supervision
+forge policy enable --bundle tdd                        # Deterministic TDD policy
+forge policy supervise planner                          # Semantic plan supervision
 forge session fork planner --name executor --supervise # Wire at fork time
-forge guard supervise --off                            # Suspend (preserves config)
-forge guard supervise --on                             # Resume
-forge guard supervise --reload                         # Reload plan after changes
+forge policy supervise --off                            # Suspend (preserves config)
+forge policy supervise --on                             # Resume
+forge policy supervise --reload                         # Reload plan after changes
 ```
 
 See [policies.md](policies.md).

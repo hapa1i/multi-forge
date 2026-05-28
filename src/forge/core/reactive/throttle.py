@@ -1,6 +1,6 @@
 """Generic TTL-based throttle cache.
 
-Extracted from forge.guard.store supervisor cache functions.
+Extracted from forge.policy.store supervisor cache functions.
 Provides a reusable cache for deduplicating expensive calls
 (LLM invocations, subprocess spawns) within a time window.
 """

@@ -1,18 +1,18 @@
 <!-- prereq: 0.3, 5.1 -->
 
-## 13. Policy/Guard (`forge guard`)
+## 13. Policy (`forge policy`)
 
-### 13.1 Guard Status
+### 13.1 Policy Status
 
 <!-- auto -->
 
 ```bash
-forge guard status
+forge policy status
 ```
 
 - [ ] Shows enabled/disabled state
 - [ ] Shows active bundles (if any)
-- [ ] Shows fail mode (if guard was previously enabled; omitted when never configured)
+- [ ] Shows fail mode (if policy was previously enabled; omitted when never configured)
 
 ### 13.2 Enable TDD Enforcement
 
@@ -20,10 +20,10 @@ forge guard status
 
 ```bash
 # Enable TDD bundle
-forge guard enable --bundle tdd
+forge policy enable --bundle tdd
 
 # Verify
-forge guard status
+forge policy status
 ```
 
 - [ ] TDD bundle activated
@@ -35,10 +35,10 @@ forge guard status
 
 ```bash
 # Enable TDD in warn-only mode
-forge guard enable --bundle tdd --permissive
+forge policy enable --bundle tdd --permissive
 
 # Verify
-forge guard status
+forge policy status
 ```
 
 - [ ] TDD in permissive mode (warns instead of blocks)
@@ -48,9 +48,9 @@ forge guard status
 <!-- auto -->
 
 ```bash
-forge guard enable --bundle coding_standards
+forge policy enable --bundle coding_standards
 
-forge guard status
+forge policy status
 ```
 
 - [ ] Coding standards bundle activated
@@ -63,13 +63,13 @@ forge guard status
 ```bash
 # Create a second commit so HEAD~1 is valid
 echo 'print("new")' >> src/main.py
-git add -A && git commit -q -m "add code for guard diff test"
+git add -A && git commit -q -m "add code for policy diff test"
 
 # Check a diff against policies
-git diff HEAD~1 | forge guard check --bundle tdd --bundle coding_standards --diff
+git diff HEAD~1 | forge policy check --bundle tdd --bundle coding_standards --diff
 
 # Check with JSON output
-git diff HEAD~1 | forge guard check --bundle tdd --diff --json
+git diff HEAD~1 | forge policy check --bundle tdd --diff --json
 ```
 
 - [ ] Evaluates diff against specified bundles
@@ -81,10 +81,10 @@ git diff HEAD~1 | forge guard check --bundle tdd --diff --json
 
 ```bash
 # Verify CLI is wired up
-forge guard supervisor --help
+forge policy supervisor --help
 
 # Missing file produces clear error (exit 2)
-forge guard supervisor -f /nonexistent/file.py -r 00000000-0000-0000-0000-000000000000 --json
+forge policy supervisor -f /nonexistent/file.py -r 00000000-0000-0000-0000-000000000000 --json
 echo "exit: $?"
 ```
 
@@ -108,12 +108,12 @@ Claude launch is unavailable in this environment, mark this step `Skip` rather t
 ```bash
 cd $FORGE_TEST_REPO
 
-forge session delete guard-planner --force 2>/dev/null || true
-forge session delete guard-supervisor --force 2>/dev/null || true
-forge session delete guard-executor --force 2>/dev/null || true
+forge session delete policy-planner --force 2>/dev/null || true
+forge session delete policy-supervisor --force 2>/dev/null || true
+forge session delete policy-executor --force 2>/dev/null || true
 rm -f src/supervisor_demo.py
 
-forge session start guard-planner --proxy "$FORGE_QA_OPENAI_PROXY"
+forge session start policy-planner --proxy "$FORGE_QA_OPENAI_PROXY"
 ```
 
 In Claude, type:
@@ -160,8 +160,8 @@ ls ~/.claude/plans/
 ```bash
 cd $FORGE_TEST_REPO
 
-forge session fork guard-planner --name guard-supervisor --no-launch
-forge session resume guard-supervisor
+forge session fork policy-planner --name policy-supervisor --no-launch
+forge session resume policy-supervisor
 ```
 
 In Claude, paste:
@@ -181,10 +181,10 @@ Then exit:
 ```bash
 cd $FORGE_TEST_REPO
 
-forge session fork guard-planner --name guard-executor --no-proxy --no-launch
-forge guard supervise guard-supervisor --session guard-executor --supervisor-proxy "$FORGE_QA_OPENAI_PROXY"
-FORGE_SESSION=guard-executor forge guard status
-forge session resume guard-executor
+forge session fork policy-planner --name policy-executor --no-proxy --no-launch
+forge policy supervise policy-supervisor --session policy-executor --supervisor-proxy "$FORGE_QA_OPENAI_PROXY"
+FORGE_SESSION=policy-executor forge policy status
+forge session resume policy-executor
 ```
 
 In Claude, paste:
@@ -210,15 +210,15 @@ After Claude finishes, exit:
 cd $FORGE_TEST_REPO
 
 cat src/supervisor_demo.py
-forge guard supervisor -f src/supervisor_demo.py -r guard-supervisor --json
+forge policy supervisor -f src/supervisor_demo.py -r policy-supervisor --json
 echo "exit: $?"
 ```
 
 - [ ] Planner and supervisor sessions launch successfully; the planner has an approved plan and the supervisor session
   materializes with a confirmed Claude session
-- [ ] Executor forks planner with `--no-proxy`, `forge guard supervise` wires `guard-supervisor`, `forge guard status`
-  shows `Supervisor: Configured`, and the executor implements the exact tiny planned file
-- [ ] `forge guard supervisor -f src/supervisor_demo.py -r guard-supervisor --json` returns structured output for the
+- [ ] Executor forks planner with `--no-proxy`, `forge policy supervise` wires `policy-supervisor`,
+  `forge policy status` shows `Supervisor: Configured`, and the executor implements the exact tiny planned file
+- [ ] `forge policy supervisor -f src/supervisor_demo.py -r policy-supervisor --json` returns structured output for the
   real tiny task (expected: aligned / exit 0)
 
 ### 13.8 Disable Policies
@@ -226,9 +226,9 @@ echo "exit: $?"
 <!-- auto -->
 
 ```bash
-forge guard disable
+forge policy disable
 
-forge guard status
+forge policy status
 ```
 
 - [ ] All policies disabled

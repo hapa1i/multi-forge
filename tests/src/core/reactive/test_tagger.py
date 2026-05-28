@@ -5,7 +5,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 from forge.core.reactive.tagger import _parse_tags, tag_action
-from forge.guard.types import ActionContext
+from forge.policy.types import ActionContext
 
 
 def _make_context(**kwargs: object) -> ActionContext:

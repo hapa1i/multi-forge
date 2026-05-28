@@ -415,15 +415,15 @@ This shows which command or workflow caused which provider/model call, and what 
 
 The first instrumentation points are small enough to ship before the runtime abstraction:
 
-| Callsite            | File                                     | Purpose                        | PR #8 status                                     |
-| ------------------- | ---------------------------------------- | ------------------------------ | ------------------------------------------------ |
-| Workflow verbs      | `src/forge/cli/workflow.py`              | Panel/analyze/debate/consensus | Initial verb-cost snapshots shipped              |
-| Handoff agent       | `src/forge/session/handoff_agent.py`     | Post-session doc updates       | Initial verb-cost snapshots shipped              |
-| Semantic supervisor | `src/forge/guard/semantic/supervisor.py` | Plan alignment checks          | Initial verb-cost snapshots shipped              |
-| Team supervisor     | `src/forge/guard/team/handlers.py`       | Work divergence checks         | Still future                                     |
-| Review engine       | `src/forge/review/engine.py`             | Multi-model fan-out            | Routing plan shipped; invoker abstraction future |
-| Claude launcher     | `src/forge/cli/claude.py`                | Bare Claude Code launch        | Still future                                     |
-| Session launcher    | `src/forge/cli/session.py`               | Managed Forge session launch   | Subprocess proxy env shipped; ledger future      |
+| Callsite            | File                                      | Purpose                        | PR #8 status                                     |
+| ------------------- | ----------------------------------------- | ------------------------------ | ------------------------------------------------ |
+| Workflow verbs      | `src/forge/cli/workflow.py`               | Panel/analyze/debate/consensus | Initial verb-cost snapshots shipped              |
+| Handoff agent       | `src/forge/session/handoff_agent.py`      | Post-session doc updates       | Initial verb-cost snapshots shipped              |
+| Semantic supervisor | `src/forge/policy/semantic/supervisor.py` | Plan alignment checks          | Initial verb-cost snapshots shipped              |
+| Team supervisor     | `src/forge/policy/team/handlers.py`       | Work divergence checks         | Still future                                     |
+| Review engine       | `src/forge/review/engine.py`              | Multi-model fan-out            | Routing plan shipped; invoker abstraction future |
+| Claude launcher     | `src/forge/cli/claude.py`                 | Bare Claude Code launch        | Still future                                     |
+| Session launcher    | `src/forge/cli/session.py`                | Managed Forge session launch   | Subprocess proxy env shipped; ledger future      |
 
 ### Cost Caps
 
