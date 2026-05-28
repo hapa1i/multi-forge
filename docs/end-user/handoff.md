@@ -43,8 +43,8 @@ signal-to-noise than incremental note-taking during a session.
 The agent edits tracked docs in-place. Use for operational documents the agent has authority to maintain.
 
 ```bash
-forge memory track docs/checklist.md --as checklist
-forge memory track docs/changelog.md --as changelog
+forge memory track docs/checklist.md --strategy checklist
+forge memory track docs/changelog.md --strategy changelog
 ```
 
 ### Mode 2: Shadow/propose (agent is advisor)
@@ -54,7 +54,7 @@ redundant proposals. Use for standards and guidelines where human curation matte
 
 ```bash
 forge memory track docs/developer/coding-standards.md \
-  --propose --shadow-path .forge/memory/suggested_standards.md
+  --propose --shadow-path .forge/memory/shadow_standards.md
 ```
 
 The shadow file contains `- [ ]` checkboxes with rationale. The human reviews and merges what's valuable into the
@@ -70,12 +70,12 @@ lifetime). Memory activation is **session-scoped** -- each session decides wheth
 
 ```bash
 # Author project passports (sessionless; runnable from a bare terminal)
-forge memory track docs/checklist.md --as checklist
-forge memory track docs/changelog.md --as changelog
+forge memory track docs/checklist.md --strategy checklist
+forge memory track docs/changelog.md --strategy changelog
 
 # Author a human-reviewed shadow proposal passport
 forge memory track docs/developer/coding-standards.md \
-  --propose --shadow-path .forge/memory/suggested_standards.md
+  --propose --shadow-path .forge/memory/shadow_standards.md
 
 # Enable memory for a session (or start with --memory on):
 forge memory enable --session planner
@@ -108,7 +108,7 @@ forge_memory:
 forge memory list
 
 # Author a project passport (sessionless)
-forge memory track docs/checklist.md --as checklist
+forge memory track docs/checklist.md --strategy checklist
 
 # Remove the project passport so the doc is no longer discovered by scans
 forge memory passport remove docs/checklist.md
@@ -147,27 +147,19 @@ summary of what was actually written.
 
 Each tracked memory doc has a strategy that controls how the agent updates it.
 
-### Direct update strategies (Mode 1)
+### Direct update strategies
 
 | Strategy        | What the agent does                                              |
 | --------------- | ---------------------------------------------------------------- |
 | `project-state` | Update current focus, active work, decisions, handoff notes      |
 | `checklist`     | Mark completed tasks `[x]`, add newly discovered tasks           |
 | `changelog`     | Add accomplishments not already recorded, follow existing format |
-| `debugging`     | Record error causes, solutions, and workarounds grouped by topic |
-| `patterns`      | Record architecture patterns, conventions, and code idioms       |
 | `generic`       | Add any new information missing from the file (default fallback) |
 
 All direct strategies are **additive** — the agent does not remove, rewrite, or restructure existing content.
 
-### Shadow strategy (Mode 2)
-
-| Strategy    | What the agent does                                                             |
-| ----------- | ------------------------------------------------------------------------------- |
-| `suggested` | Propose additions as `- [ ]` checkboxes with rationale; self-prune merged items |
-
-The `suggested` strategy uses `mode=shadow-only` plus a `shadow_path` in the doc passport. The agent reads the official
-doc first, then proposes only what's missing.
+Shadow mode (`--propose`) is orthogonal to strategy: any strategy works with `--propose`. The agent reads the official
+doc first, then proposes only what's missing as `- [ ]` checkboxes with rationale in the shadow file.
 
 ---
 
@@ -182,9 +174,6 @@ Before enabling the handoff agent, seed the files you want maintained:
 # Direct update docs
 echo "# Implementation Checklist" > docs/checklist.md
 echo "# Change Log" > docs/changelog.md
-mkdir -p .forge/memory
-echo "# Debugging Notes" > .forge/memory/debugging.md
-echo "# Architecture Patterns" > .forge/memory/patterns.md
 
 # Shadow docs (official doc must exist; Forge-owned shadow is created by track --propose)
 # docs/developer/coding-standards.md should already exist

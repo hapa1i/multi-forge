@@ -27,6 +27,7 @@ from forge.session.exceptions import (
     PassportError,
 )
 from forge.session.passport import (
+    _REMOVED_STRATEGIES,
     VALID_STRATEGY_NAMES,
     Passport,
     derive_shadow_path,
@@ -79,7 +80,7 @@ def memory() -> None:
 
     \b
     Examples:
-        forge memory track docs/changelog.md --as changelog    # author a passport (sessionless)
+        forge memory track docs/changelog.md --strategy changelog    # author a passport (sessionless)
         forge memory enable --session planner                  # enable memory for a session
         forge memory list                                      # show passported docs
         forge memory status --scope repo                       # show activation across sessions
@@ -193,9 +194,9 @@ def _set_memory_activation(session_name: str, *, enabled: bool, mode: str | None
 @memory.command("track")
 @click.argument("path")
 @click.option(
-    "--as",
+    "--strategy",
     "strategy",
-    type=click.Choice(sorted(VALID_STRATEGY_NAMES)),
+    type=str,
     default=None,
     help="Augmentation strategy.",
 )
@@ -203,6 +204,7 @@ def _set_memory_activation(session_name: str, *, enabled: bool, mode: str | None
 @click.option("--writers", default=None, help="Writer spec (default: all-sessions).")
 @click.option("--propose", is_flag=True, default=False, help="Author a shadow-only passport (proposal mode).")
 @click.option("--shadow-path", "shadow_override", default=None, help="Explicit shadow file path (use with --propose).")
+@click.option("--as", "removed_as", type=str, default=None, hidden=True, help="(removed) renamed to --strategy.")
 @click.option("--session", "-s", "session_name", default=None, hidden=True, help="(removed) track is sessionless.")
 def track_cmd(
     path: str,
@@ -211,13 +213,14 @@ def track_cmd(
     writers: str | None,
     propose: bool,
     shadow_override: str | None,
+    removed_as: str | None,
     session_name: str | None,
 ) -> None:
     """Author a project-memory passport on a doc (project-lifetime, sessionless).
 
     Writes ``forge_memory`` frontmatter so every session in this checkout treats
     the doc as memory. Runnable from a bare terminal: it does not resolve or
-    require a session. Re-running with --as/--writers updates the passport;
+    require a session. Re-running with --strategy/--writers updates the passport;
     with no flags on an already-passported doc it is a no-op.
 
     Use --propose to author a shadow-only passport: the handoff agent writes
@@ -226,15 +229,16 @@ def track_cmd(
     For one-off updates without a passport, instruct the agent directly.
 
     \b
-    Strategies (--as):
+    Strategies (--strategy):
       changelog      Add accomplishments not already recorded
       checklist      Mark completed tasks [x], add newly discovered tasks
-      debugging      Record error causes, solutions, and workarounds
       generic        Add any new information missing from the file
-      patterns       Record architecture patterns and conventions
       project-state  Update current focus, decisions, and handoff notes
-      suggested      Propose additions as checkboxes (use with --propose)
     """
+    # Tombstone: --as was renamed to --strategy (coding-standards §5).
+    if removed_as is not None:
+        raise click.ClickException("--as was renamed to --strategy.")
+
     # Tombstone: track no longer takes a session (clean break, coding-standards §5).
     if session_name is not None:
         raise click.ClickException(
@@ -242,11 +246,19 @@ def track_cmd(
             "For one-off updates, instruct the agent directly."
         )
 
+    # Strategy validation: removed strategies get helpful hints, unknown get a list.
+    if strategy is not None:
+        removed_hint = _REMOVED_STRATEGIES.get(strategy)
+        if removed_hint:
+            raise click.ClickException(f"Strategy '{strategy}' was removed. {removed_hint}")
+        if strategy not in VALID_STRATEGY_NAMES:
+            raise click.ClickException(
+                f"Unknown strategy '{strategy}'. " f"Valid strategies: {', '.join(sorted(VALID_STRATEGY_NAMES))}"
+            )
+
     # Early flag-combination validation
     if shadow_override and not propose:
         raise click.ClickException("--shadow-path requires --propose.")
-    if propose and strategy is not None and strategy != "suggested":
-        raise click.ClickException(f"--propose requires strategy 'suggested'. Got '{strategy}'.")
 
     ctx = ExecutionContext.from_cwd()
     if ctx.forge_root is None:
@@ -305,7 +317,7 @@ def track_cmd(
     if passport is None and strategy is None:
         raise click.ClickException(
             f"This doc has no passport. Provide a strategy:\n"
-            f"  forge memory track {path} --as <strategy>\n\n"
+            f"  forge memory track {path} --strategy <strategy>\n\n"
             f"Valid strategies: {', '.join(sorted(VALID_STRATEGY_NAMES))}"
         )
 
@@ -422,7 +434,7 @@ def _track_propose(
 
     Passport-only and sessionless: never resolves a session.
     """
-    effective_strategy = strategy or "suggested"
+    new_passport_strategy = strategy or "generic"
     shadow_path = shadow_override or derive_shadow_path(path)
 
     # Validate shadow path
@@ -447,13 +459,15 @@ def _track_propose(
     if not shadow_abs.is_file():
         raise click.ClickException(f"Shadow file does not exist: {shadow_path}")
 
-    # Passport handling: synthesize or update
+    # Passport handling: synthesize or update.
+    # For existing passports, pass strategy only when the user explicitly provided --strategy
+    # so the passport's own strategy is preserved by default.
     if isinstance(passport, Passport) and passport.update.mode == "shadow-only":
-        # Already shadow-only — apply overrides if any
+        # Already shadow-only -- apply overrides if any
         try:
             resolved_pp, pp_warnings = resolve_with_overrides(
                 passport,
-                strategy=effective_strategy if effective_strategy != passport.update.strategy else None,
+                strategy=strategy,
                 shadow_path=shadow_path if shadow_path != passport.update.shadow_path else None,
                 writers=writers,
             )
@@ -471,7 +485,7 @@ def _track_propose(
         try:
             resolved_pp, pp_warnings = resolve_with_overrides(
                 passport,
-                strategy=effective_strategy,
+                strategy=strategy,
                 update_mode="shadow-only",
                 shadow_path=shadow_path,
                 writers=writers,
@@ -483,10 +497,10 @@ def _track_propose(
             console.print(f"[yellow]Warning:[/yellow] {w}")
         console.print(f"Passport in [cyan]{path}[/cyan] converted to shadow-only proposals at {shadow_path}.")
     else:
-        # No passport — synthesize
+        # No passport -- synthesize with default strategy
         try:
             new_pp = synthesize_passport(
-                strategy=effective_strategy,
+                strategy=new_passport_strategy,
                 intent=intent,
                 update_mode="shadow-only",
                 shadow_path=shadow_path,
@@ -497,7 +511,7 @@ def _track_propose(
             raise click.ClickException(str(e)) from e
         console.print(
             f"Shadow-only passport written for [cyan]{path}[/cyan] "
-            f"(strategy: {effective_strategy}, proposals at {shadow_path})."
+            f"(strategy: {new_passport_strategy}, proposals at {shadow_path})."
         )
 
     if created:
@@ -516,7 +530,10 @@ def list_cmd(as_json: bool) -> None:
     """List passported memory docs under scan roots."""
     import json
 
-    from forge.session.project_memory import scan_all_passported_docs
+    from forge.session.project_memory import (
+        scan_all_passported_docs,
+        scan_stale_passports,
+    )
 
     ctx = ExecutionContext.from_cwd()
     if ctx.forge_root is None:
@@ -550,13 +567,20 @@ def list_cmd(as_json: bool) -> None:
             }
         )
 
+    stale = scan_stale_passports(forge_root, DEFAULT_SCAN_ROOTS)
+
     if as_json:
         click.echo(json.dumps(enriched, indent=2))
+        for rel, strategy, hint in stale:
+            console.print(f"[yellow]Warning:[/yellow] {rel}: strategy '{strategy}' was removed. {hint}")
         return
 
     if not enriched:
-        console.print("[dim]No passported memory docs found under scan roots.[/dim]")
-        print_tip("Run 'forge memory track <path> --as <strategy>'.", blank_before=False, console=console)
+        if not stale:
+            console.print("[dim]No passported memory docs found under scan roots.[/dim]")
+            print_tip("Run 'forge memory track <path> --strategy <strategy>'.", blank_before=False, console=console)
+        for rel, strategy, hint in stale:
+            console.print(f"[yellow]Warning:[/yellow] {rel}: strategy '{strategy}' was removed. {hint}")
         return
 
     from rich.table import Table
@@ -583,6 +607,9 @@ def list_cmd(as_json: bool) -> None:
         )
         table.add_row(*row)
     console.print(table)
+
+    for rel, strategy, hint in stale:
+        console.print(f"[yellow]Warning:[/yellow] {rel}: strategy '{strategy}' was removed. {hint}")
 
 
 # ---------------------------------------------------------------------------
@@ -1117,14 +1144,14 @@ def passport_show_cmd(path: str, as_json: bool) -> None:
                         "success": False,
                         "reason": "no_passport",
                         "path": path,
-                        "tip": f"forge memory track {path} --as <strategy>",
+                        "tip": f"forge memory track {path} --strategy <strategy>",
                     },
                     indent=2,
                 )
             )
             return
         console.print(f"[dim]No passport found in {path}.[/dim]")
-        print_tip(f"Run 'forge memory track {path} --as <strategy>' to add one.", console=console)
+        print_tip(f"Run 'forge memory track {path} --strategy <strategy>' to add one.", console=console)
         return
 
     if as_json:

@@ -570,12 +570,12 @@ class TestDesignatedDoc:
     def test_shadow_doc(self) -> None:
         """DesignatedDoc with shadows field for shadow/propose mode."""
         doc = DesignatedDoc(
-            path=".forge/memory/suggested_standards.md",
-            strategy="suggested",
+            path=".forge/memory/shadow_standards.md",
+            strategy="generic",
             shadows="docs/developer/coding-standards.md",
         )
         assert doc.shadows == "docs/developer/coding-standards.md"
-        assert doc.strategy == "suggested"
+        assert doc.strategy == "generic"
 
     def test_path_is_relative(self) -> None:
         """Path should be worktree-relative, not absolute."""

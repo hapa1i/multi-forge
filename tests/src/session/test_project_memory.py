@@ -8,6 +8,7 @@ from forge.session.project_memory import (
     is_under_scan_roots,
     scan_passported_docs,
     scan_shadow_passports,
+    scan_stale_passports,
 )
 
 # ---------------------------------------------------------------------------
@@ -72,27 +73,27 @@ def test_scan_shadow_mode(tmp_path):
     _write_doc(
         tmp_path,
         "docs/official.md",
-        strategy="suggested",
+        strategy="generic",
         update_mode="shadow-only",
-        shadow_path=".forge/memory/suggested_official.md",
+        shadow_path=".forge/memory/shadow_official.md",
     )
     docs = scan_passported_docs(tmp_path, ["docs/"], "any-session")
     assert len(docs) == 1
-    assert docs[0].path == ".forge/memory/suggested_official.md"
+    assert docs[0].path == ".forge/memory/shadow_official.md"
     assert docs[0].shadows == "docs/official.md"
-    assert docs[0].strategy == "suggested"
+    assert docs[0].strategy == "generic"
 
 
 def test_scan_shadow_materialized(tmp_path):
     _write_doc(
         tmp_path,
         "docs/official.md",
-        strategy="suggested",
+        strategy="generic",
         update_mode="shadow-only",
-        shadow_path=".forge/memory/suggested_official.md",
+        shadow_path=".forge/memory/shadow_official.md",
     )
     scan_passported_docs(tmp_path, ["docs/"], "any-session")
-    assert (tmp_path / ".forge/memory/suggested_official.md").is_file()
+    assert (tmp_path / ".forge/memory/shadow_official.md").is_file()
 
 
 def test_scan_shadow_no_double_count(tmp_path):
@@ -101,13 +102,13 @@ def test_scan_shadow_no_double_count(tmp_path):
     _write_doc(
         tmp_path,
         "docs/official.md",
-        strategy="suggested",
+        strategy="generic",
         update_mode="shadow-only",
-        shadow_path=".forge/memory/suggested_official.md",
+        shadow_path=".forge/memory/shadow_official.md",
     )
     # Pre-materialize the empty shadow so it is in the candidate set this run.
     (tmp_path / ".forge/memory").mkdir(parents=True, exist_ok=True)
-    (tmp_path / ".forge/memory/suggested_official.md").write_text("", encoding="utf-8")
+    (tmp_path / ".forge/memory/shadow_official.md").write_text("", encoding="utf-8")
     docs = scan_passported_docs(tmp_path, ["docs/"], "any-session")
     assert len(docs) == 1
     assert docs[0].shadows == "docs/official.md"
@@ -150,9 +151,9 @@ def test_scan_paths_forge_root_relative(tmp_path):
     _write_doc(
         tmp_path,
         "docs/shadowed.md",
-        strategy="suggested",
+        strategy="generic",
         update_mode="shadow-only",
-        shadow_path=".forge/memory/suggested_shadowed.md",
+        shadow_path=".forge/memory/shadow_shadowed.md",
     )
     for d in scan_passported_docs(tmp_path, ["docs/"], "any-session"):
         assert not d.path.startswith("/")
@@ -185,9 +186,9 @@ def test_scan_unsafe_shadow_path_skipped(tmp_path):
     # Hand-authored shadow-only passports with absolute/escaping shadow_path
     # must be skipped, not emitted with an out-of-tree DesignatedDoc.
     _write_doc(
-        tmp_path, "docs/escaping.md", strategy="suggested", update_mode="shadow-only", shadow_path="../../escape.md"
+        tmp_path, "docs/escaping.md", strategy="generic", update_mode="shadow-only", shadow_path="../../escape.md"
     )
-    _write_doc(tmp_path, "docs/absolute.md", strategy="suggested", update_mode="shadow-only", shadow_path="/tmp/x.md")
+    _write_doc(tmp_path, "docs/absolute.md", strategy="generic", update_mode="shadow-only", shadow_path="/tmp/x.md")
     assert scan_passported_docs(tmp_path, ["docs/"], "any-session") == []
 
 
@@ -239,12 +240,12 @@ def test_scan_shadow_passports_yields_shadow_only(tmp_path):
     _write_doc(
         tmp_path,
         "docs/official.md",
-        strategy="suggested",
+        strategy="generic",
         update_mode="shadow-only",
-        shadow_path=".forge/memory/suggested_official.md",
+        shadow_path=".forge/memory/shadow_official.md",
     )
     assert scan_shadow_passports(tmp_path, ["docs/"]) == [
-        ("docs/official.md", ".forge/memory/suggested_official.md", "suggested")
+        ("docs/official.md", ".forge/memory/shadow_official.md", "generic")
     ]
 
 
@@ -258,9 +259,9 @@ def test_scan_shadow_passports_unfiltered_by_writer(tmp_path):
     _write_doc(
         tmp_path,
         "docs/restricted.md",
-        strategy="suggested",
+        strategy="generic",
         update_mode="shadow-only",
-        shadow_path=".forge/memory/suggested_restricted.md",
+        shadow_path=".forge/memory/shadow_restricted.md",
         writers="other-session",
     )
     assert [r[0] for r in scan_shadow_passports(tmp_path, ["docs/"])] == ["docs/restricted.md"]
@@ -270,22 +271,22 @@ def test_scan_shadow_passports_does_not_materialize(tmp_path):
     _write_doc(
         tmp_path,
         "docs/official.md",
-        strategy="suggested",
+        strategy="generic",
         update_mode="shadow-only",
-        shadow_path=".forge/memory/suggested_official.md",
+        shadow_path=".forge/memory/shadow_official.md",
     )
     scan_shadow_passports(tmp_path, ["docs/"])
     # Read-only inspection must NOT create the shadow file.
-    assert not (tmp_path / ".forge/memory/suggested_official.md").exists()
+    assert not (tmp_path / ".forge/memory/shadow_official.md").exists()
 
 
 def test_scan_shadow_passports_skips_malformed(tmp_path):
     _write_doc(
         tmp_path,
         "docs/good.md",
-        strategy="suggested",
+        strategy="generic",
         update_mode="shadow-only",
-        shadow_path=".forge/memory/suggested_good.md",
+        shadow_path=".forge/memory/shadow_good.md",
     )
     (tmp_path / "docs/bad.md").write_text("---\nforge_memory:\n  version: not-an-int\n---\n# Body\n", encoding="utf-8")
     assert [r[0] for r in scan_shadow_passports(tmp_path, ["docs/"])] == ["docs/good.md"]
@@ -300,7 +301,7 @@ def test_collision_detected_for_different_official(tmp_path):
     _write_doc(
         tmp_path,
         "docs/a.md",
-        strategy="suggested",
+        strategy="generic",
         update_mode="shadow-only",
         shadow_path=".forge/memory/shared.md",
     )
@@ -313,7 +314,7 @@ def test_collision_none_for_same_official(tmp_path):
     _write_doc(
         tmp_path,
         "docs/a.md",
-        strategy="suggested",
+        strategy="generic",
         update_mode="shadow-only",
         shadow_path=".forge/memory/shared.md",
     )
@@ -325,7 +326,7 @@ def test_collision_none_when_unused(tmp_path):
     _write_doc(
         tmp_path,
         "docs/a.md",
-        strategy="suggested",
+        strategy="generic",
         update_mode="shadow-only",
         shadow_path=".forge/memory/a.md",
     )
@@ -337,3 +338,28 @@ def test_collision_skips_malformed_unrelated(tmp_path):
     (tmp_path / "docs").mkdir(parents=True, exist_ok=True)
     (tmp_path / "docs/bad.md").write_text("---\nforge_memory:\n  version: not-an-int\n---\n# Body\n", encoding="utf-8")
     assert check_shadow_path_collision_in_roots(".forge/memory/x.md", "docs/b.md", tmp_path, ("docs/",)) is None
+
+
+def test_scan_stale_finds_removed_strategies(tmp_path):
+    """scan_stale_passports detects docs with removed strategies."""
+    (tmp_path / "docs").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "docs/debug.md").write_text(
+        "---\nforge_memory:\n  version: 1\n  intent: debug notes\n"
+        "  update:\n    strategy: debugging\n---\n# Debug\n",
+        encoding="utf-8",
+    )
+    _write_doc(tmp_path, "docs/changelog.md", strategy="changelog")
+    stale = scan_stale_passports(tmp_path, ["docs/"])
+    assert len(stale) == 1
+    rel, strategy, hint = stale[0]
+    assert rel == "docs/debug.md"
+    assert strategy == "debugging"
+    assert "generic" in hint
+
+
+def test_scan_stale_ignores_valid_strategies(tmp_path):
+    """scan_stale_passports returns empty for valid strategies."""
+    _write_doc(tmp_path, "docs/changelog.md", strategy="changelog")
+    _write_doc(tmp_path, "docs/notes.md", strategy="generic")
+    stale = scan_stale_passports(tmp_path, ["docs/"])
+    assert stale == []

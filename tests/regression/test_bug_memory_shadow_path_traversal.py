@@ -40,7 +40,7 @@ def test_stale_designated_docs_stripped_on_read(tmp_path: Path) -> None:
     if intent.get("memory") is None:
         intent["memory"] = {}
     intent["memory"]["designated_docs"] = [
-        {"path": "/etc/passwd", "strategy": "suggested", "shadows": "docs/impl_notes.md"}
+        {"path": "/etc/passwd", "strategy": "generic", "shadows": "docs/impl_notes.md"}
     ]
     with open(manifest_path, "w", encoding="utf-8") as f:
         json.dump(raw, f)

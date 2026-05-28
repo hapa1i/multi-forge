@@ -24,7 +24,7 @@ def _tombstone_list(**_: object) -> None:
 def _tombstone_add(**_: object) -> None:
     raise click.ClickException(
         "forge session memory add-doc has been removed.\n"
-        "Use: forge memory track <path> --as <strategy> (project passport)."
+        "Use: forge memory track <path> --strategy <strategy> (project passport)."
     )
 
 

@@ -14,6 +14,7 @@ import pytest
 from forge.session.exceptions import PassportError
 from forge.session.models import DesignatedDoc
 from forge.session.passport import (
+    _REMOVED_STRATEGIES,
     PASSPORT_VERSION,
     STRATEGY_INSTRUCTIONS,
     VALID_STRATEGY_NAMES,
@@ -40,8 +41,8 @@ from forge.session.passport import (
 
 
 class TestMemoryStrategy:
-    def test_has_exactly_seven_values(self) -> None:
-        assert len(MemoryStrategy) == 7
+    def test_has_exactly_four_values(self) -> None:
+        assert len(MemoryStrategy) == 4
 
     def test_valid_strategy_names_matches_enum(self) -> None:
         assert VALID_STRATEGY_NAMES == frozenset(s.value for s in MemoryStrategy)
@@ -125,16 +126,16 @@ class TestParsePassport:
             "version": 1,
             "intent": "Proposed notes for human review",
             "update": {
-                "strategy": "suggested",
+                "strategy": "generic",
                 "mode": "shadow-only",
-                "shadow_path": ".forge/memory/suggested.md",
+                "shadow_path": ".forge/memory/shadow.md",
                 "writers": "all-sessions",
                 "approval": "human-promoted",
             },
         }
         p = parse_passport(data)
         assert p.update.mode == "shadow-only"
-        assert p.update.shadow_path == ".forge/memory/suggested.md"
+        assert p.update.shadow_path == ".forge/memory/shadow.md"
         assert p.update.approval == "human-promoted"
 
     def test_unknown_approval_raises(self) -> None:
@@ -191,7 +192,7 @@ class TestParsePassport:
         data = {
             "version": 1,
             "intent": "Test",
-            "update": {"strategy": "suggested", "mode": "shadow-only"},
+            "update": {"strategy": "generic", "mode": "shadow-only"},
         }
         with pytest.raises(PassportError, match="shadow_path.*required"):
             parse_passport(data)
@@ -274,6 +275,18 @@ class TestParsePassport:
             "update": {"writers": "IN-VALID"},
         }
         with pytest.raises(PassportError, match="invalid session name"):
+            parse_passport(data)
+
+    @pytest.mark.parametrize("removed_strategy", ["suggested", "debugging", "patterns"])
+    def test_removed_strategy_raises_with_hint(self, removed_strategy: str) -> None:
+        """Removed strategies produce a PassportError with a migration hint."""
+        assert removed_strategy in _REMOVED_STRATEGIES  # guard: keep test in sync
+        data = {
+            "version": 1,
+            "intent": "Test",
+            "update": {"strategy": removed_strategy},
+        }
+        with pytest.raises(PassportError, match=removed_strategy):
             parse_passport(data)
 
 
@@ -492,12 +505,12 @@ class TestSynthesizePassport:
 
     def test_shadow_only_mode_with_shadow_path(self) -> None:
         p = synthesize_passport(
-            strategy="suggested",
+            strategy="generic",
             update_mode="shadow-only",
-            shadow_path=".forge/memory/suggested.md",
+            shadow_path=".forge/memory/shadow.md",
         )
         assert p.update.mode == "shadow-only"
-        assert p.update.shadow_path == ".forge/memory/suggested.md"
+        assert p.update.shadow_path == ".forge/memory/shadow.md"
 
     def test_always_has_explicit_update_section(self) -> None:
         p = synthesize_passport(strategy="generic")
@@ -527,8 +540,8 @@ class TestResolvePassportSource:
 
     def test_shadow_doc_returns_shadows(self) -> None:
         doc = DesignatedDoc(
-            path=".forge/memory/suggested.md",
-            strategy="suggested",
+            path=".forge/memory/shadow.md",
+            strategy="generic",
             shadows="docs/impl_notes.md",
         )
         assert resolve_passport_source(doc) == "docs/impl_notes.md"
@@ -563,14 +576,14 @@ class TestResolveDocSpec:
     def test_shadow_doc_with_passport_shadow_path_overrides(self) -> None:
         doc = DesignatedDoc(
             path=".forge/memory/old_shadow.md",
-            strategy="suggested",
+            strategy="generic",
             shadows="docs/impl_notes.md",
         )
         passport = Passport(
             version=1,
             intent="Durable memory",
             update=PassportUpdate(
-                strategy="suggested",
+                strategy="generic",
                 mode="shadow-only",
                 shadow_path=".forge/memory/new_shadow.md",
             ),
@@ -582,7 +595,7 @@ class TestResolveDocSpec:
     def test_passported_shadow_manifest_direct_mode_writes_official_doc(self) -> None:
         doc = DesignatedDoc(
             path=".forge/memory/shadow.md",
-            strategy="suggested",
+            strategy="generic",
             shadows="docs/impl_notes.md",
         )
         passport = Passport(
@@ -619,7 +632,7 @@ class TestResolveDocSpec:
     def test_passport_less_doc_produces_valid_fallback(self) -> None:
         doc = DesignatedDoc(
             path=".forge/memory/shadow.md",
-            strategy="suggested",
+            strategy="generic",
             shadows="docs/official.md",
         )
         spec = resolve_doc_spec(doc, None)
@@ -661,7 +674,7 @@ class TestResolveWithOverrides:
             version=1,
             intent="Test",
             update=PassportUpdate(
-                strategy="suggested",
+                strategy="generic",
                 mode="direct",
                 shadow_path=None,
             ),
@@ -677,7 +690,7 @@ class TestResolveWithOverrides:
             version=1,
             intent="Test",
             update=PassportUpdate(
-                strategy="suggested",
+                strategy="generic",
                 mode="shadow-only",
                 shadow_path=".forge/memory/shadow.md",
             ),
@@ -723,7 +736,7 @@ class TestResolveWithOverrides:
             version=1,
             intent="Test",
             update=PassportUpdate(
-                strategy="suggested",
+                strategy="generic",
                 mode="shadow-only",
                 shadow_path=".forge/memory/old.md",
             ),
@@ -753,16 +766,16 @@ class TestResolveWithOverrides:
 
 class TestDeriveShadowPath:
     def test_basic_with_parent_prefix(self) -> None:
-        assert derive_shadow_path("docs/board/impl_notes.md") == ".forge/memory/suggested_board_impl_notes.md"
+        assert derive_shadow_path("docs/board/impl_notes.md") == ".forge/memory/shadow_board_impl_notes.md"
 
     def test_top_level_file_no_prefix(self) -> None:
-        assert derive_shadow_path("README.md") == ".forge/memory/suggested_README.md"
+        assert derive_shadow_path("README.md") == ".forge/memory/shadow_README.md"
 
     def test_single_parent_dir(self) -> None:
-        assert derive_shadow_path("docs/checklist.md") == ".forge/memory/suggested_docs_checklist.md"
+        assert derive_shadow_path("docs/checklist.md") == ".forge/memory/shadow_docs_checklist.md"
 
     def test_deeply_nested_uses_immediate_parent(self) -> None:
-        assert derive_shadow_path("a/b/c/deep/notes.md") == ".forge/memory/suggested_deep_notes.md"
+        assert derive_shadow_path("a/b/c/deep/notes.md") == ".forge/memory/shadow_deep_notes.md"
 
 
 # ---------------------------------------------------------------------------

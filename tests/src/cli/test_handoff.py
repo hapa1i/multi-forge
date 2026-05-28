@@ -163,9 +163,9 @@ def test_run_cmd_passport_strategy_used(tmp_path: Path) -> None:
 def test_run_cmd_shadow_doc_scanned(tmp_path: Path) -> None:
     """Shadow doc discovered via passport scan is passed through to the agent."""
     root = tmp_path.resolve()
-    shadow = ".forge/memory/suggested_official.md"
+    shadow = ".forge/memory/shadow_official.md"
     _write_handoff_session(root)
-    _write_passport_doc(root, "docs/official.md", strategy="suggested", update_mode="shadow-only", shadow_path=shadow)
+    _write_passport_doc(root, "docs/official.md", strategy="generic", update_mode="shadow-only", shadow_path=shadow)
     # Create the shadow file so scan_passported_docs can discover it
     (root / shadow).parent.mkdir(parents=True, exist_ok=True)
     (root / shadow).write_text("# Shadow\n", encoding="utf-8")

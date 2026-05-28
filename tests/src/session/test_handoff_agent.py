@@ -162,9 +162,6 @@ class TestDocStrategies:
             "project-state",
             "checklist",
             "changelog",
-            "debugging",
-            "patterns",
-            "suggested",
             "generic",
         }
         assert set(DOC_STRATEGIES.keys()) == expected
@@ -176,32 +173,11 @@ class TestDocStrategies:
             assert len(instruction) > 0, f"{name} is empty"
 
     def test_no_remove_instructions(self) -> None:
-        """Strategy instructions must not encourage destructive edits.
-
-        Exception: 'suggested' strategy explicitly removes merged items (self-prune).
-        """
+        """Strategy instructions must not encourage destructive edits."""
         for name, instruction in DOC_STRATEGIES.items():
-            if name == "suggested":
-                continue  # self-prune is intentional for shadow docs
             lower = instruction.lower()
             assert "remove them" not in lower, f"{name} contains 'remove them'"
             assert "delete" not in lower, f"{name} contains 'delete'"
-
-    def test_debugging_strategy_defined(self) -> None:
-        """Debugging strategy records error causes and solutions."""
-        assert "error" in DOC_STRATEGIES["debugging"].lower()
-        assert "solutions" in DOC_STRATEGIES["debugging"].lower()
-
-    def test_patterns_strategy_defined(self) -> None:
-        """Patterns strategy records architecture patterns and conventions."""
-        assert "pattern" in DOC_STRATEGIES["patterns"].lower()
-        assert "convention" in DOC_STRATEGIES["patterns"].lower()
-
-    def test_suggested_strategy_defined(self) -> None:
-        """Suggested strategy proposes checkboxes and self-prunes merged items."""
-        text = DOC_STRATEGIES["suggested"]
-        assert "- [ ]" in text
-        assert "self-prune" in text.lower() or "remove" in text.lower()
 
 
 # ---------------------------------------------------------------------------
@@ -324,8 +300,8 @@ class TestBuildMultiDocPrompt:
         """Shadow doc prompt references the official document path."""
         docs = [
             DesignatedDoc(
-                path=".forge/memory/suggested_standards.md",
-                strategy="suggested",
+                path=".forge/memory/shadow_standards.md",
+                strategy="generic",
                 shadows="docs/developer/coding-standards.md",
             )
         ]
@@ -335,14 +311,14 @@ class TestBuildMultiDocPrompt:
             docs=_resolve_docs(docs),
         )
         assert "docs/developer/coding-standards.md" in prompt
-        assert ".forge/memory/suggested_standards.md" in prompt
+        assert ".forge/memory/shadow_standards.md" in prompt
 
     def test_shadow_prompt_reads_official_first(self) -> None:
         """Shadow doc prompt instructs reading the official doc first."""
         docs = [
             DesignatedDoc(
-                path=".forge/memory/suggested.md",
-                strategy="suggested",
+                path=".forge/memory/shadow.md",
+                strategy="generic",
                 shadows="OFFICIAL.md",
             )
         ]
@@ -368,8 +344,8 @@ class TestBuildMultiDocPrompt:
         docs = [
             DesignatedDoc(path="docs/checklist.md", strategy="checklist"),
             DesignatedDoc(
-                path=".forge/memory/suggested.md",
-                strategy="suggested",
+                path=".forge/memory/shadow.md",
+                strategy="generic",
                 shadows="STANDARDS.md",
             ),
         ]
@@ -389,8 +365,8 @@ class TestBuildMultiDocPrompt:
         """Shadow docs include liberal suggestion framing."""
         docs = [
             DesignatedDoc(
-                path=".forge/memory/suggested.md",
-                strategy="suggested",
+                path=".forge/memory/shadow.md",
+                strategy="generic",
                 shadows="OFFICIAL.md",
             ),
         ]
@@ -399,7 +375,8 @@ class TestBuildMultiDocPrompt:
             transcript_path="/abs/path/t.jsonl",
             docs=_resolve_docs(docs),
         )
-        assert "Write suggestions liberally" in prompt
+        assert "Propose additions as `- [ ]` checkboxes" in prompt
+        assert "self-prune" in prompt.lower()
 
     def test_direct_doc_no_liberal_framing(self) -> None:
         """Direct docs do NOT include liberal suggestion framing."""
@@ -409,7 +386,7 @@ class TestBuildMultiDocPrompt:
             transcript_path="/abs/path/t.jsonl",
             docs=_resolve_docs(docs),
         )
-        assert "Write suggestions liberally" not in prompt
+        assert "Propose additions as `- [ ]` checkboxes" not in prompt
 
 
 # ---------------------------------------------------------------------------
@@ -989,8 +966,8 @@ class TestValidateDesignatedDocs:
         """Traversal in shadows paths is rejected."""
         docs = [
             DesignatedDoc(
-                path=".forge/memory/suggested.md",
-                strategy="suggested",
+                path=".forge/memory/shadow.md",
+                strategy="generic",
                 shadows="../../etc/passwd",
             )
         ]
@@ -1001,8 +978,8 @@ class TestValidateDesignatedDocs:
         """Absolute shadows paths are rejected."""
         docs = [
             DesignatedDoc(
-                path=".forge/memory/suggested.md",
-                strategy="suggested",
+                path=".forge/memory/shadow.md",
+                strategy="generic",
                 shadows="/etc/passwd",
             )
         ]
@@ -1013,8 +990,8 @@ class TestValidateDesignatedDocs:
         """Unsafe characters in shadows paths are rejected."""
         docs = [
             DesignatedDoc(
-                path=".forge/memory/suggested.md",
-                strategy="suggested",
+                path=".forge/memory/shadow.md",
+                strategy="generic",
                 shadows="STANDARDS`\nINJECT.md",
             )
         ]
@@ -1022,11 +999,11 @@ class TestValidateDesignatedDocs:
         assert len(result) == 0
 
     def test_valid_shadow_doc(self, tmp_path: Path) -> None:
-        """Valid suggested + shadows combination passes."""
+        """Valid shadow + shadows combination passes."""
         docs = [
             DesignatedDoc(
-                path=".forge/memory/suggested_standards.md",
-                strategy="suggested",
+                path=".forge/memory/shadow_standards.md",
+                strategy="generic",
                 shadows="docs/developer/coding-standards.md",
             )
         ]
@@ -1035,45 +1012,21 @@ class TestValidateDesignatedDocs:
 
     # Strategy consistency
 
-    def test_rejects_suggested_without_shadows(self, tmp_path: Path) -> None:
-        """strategy=suggested without shadows is rejected."""
-        docs = [DesignatedDoc(path=".forge/memory/suggested.md", strategy="suggested")]
-        result = _validate_designated_docs(docs, tmp_path)
-        assert len(result) == 0
-
-    def test_rejects_suggested_with_empty_shadows(self, tmp_path: Path) -> None:
-        """strategy=suggested with shadows="" is rejected (must be non-empty)."""
-        docs = [
-            DesignatedDoc(
-                path=".forge/memory/suggested.md",
-                strategy="suggested",
-                shadows="",
-            )
-        ]
-        result = _validate_designated_docs(docs, tmp_path)
-        assert len(result) == 0
-
-    def test_rejects_shadows_with_non_suggested_strategy(self, tmp_path: Path) -> None:
-        """shadows set with a non-suggested strategy is rejected."""
-        docs = [
-            DesignatedDoc(
-                path="docs/checklist.md",
-                strategy="checklist",
-                shadows="STANDARDS.md",
-            )
-        ]
-        result = _validate_designated_docs(docs, tmp_path)
-        assert len(result) == 0
-
     def test_rejects_self_shadowing(self, tmp_path: Path) -> None:
         """path == shadows is rejected (redundant self-reference)."""
         docs = [
             DesignatedDoc(
                 path="docs/standards.md",
-                strategy="suggested",
+                strategy="generic",
                 shadows="docs/standards.md",
             )
         ]
+        result = _validate_designated_docs(docs, tmp_path)
+        assert len(result) == 0
+
+    def test_rejects_empty_shadows_unconditionally(self, tmp_path: Path) -> None:
+        """Empty shadows string is rejected regardless of passport existence."""
+        docs = [DesignatedDoc(path="doc.md", strategy="generic", shadows="")]
         result = _validate_designated_docs(docs, tmp_path)
         assert len(result) == 0
 
@@ -1323,13 +1276,13 @@ class TestRunHandoffAgentMultiDoc:
         """Shadow doc is skipped when the official doc (shadows target) doesn't exist."""
         # Create the shadow doc but NOT the official doc
         (workspace / ".forge" / "memory").mkdir(parents=True, exist_ok=True)
-        (workspace / ".forge" / "memory" / "suggested.md").write_text("# Suggested\n")
+        (workspace / ".forge" / "memory" / "shadow.md").write_text("# Shadow\n")
         # STANDARDS.md does NOT exist
 
         docs = [
             DesignatedDoc(
-                path=".forge/memory/suggested.md",
-                strategy="suggested",
+                path=".forge/memory/shadow.md",
+                strategy="generic",
                 shadows="STANDARDS.md",
             )
         ]
@@ -1345,13 +1298,13 @@ class TestRunHandoffAgentMultiDoc:
         """Shadow doc is included when both shadow and official docs exist."""
         # Create both the shadow doc and the official doc
         (workspace / ".forge" / "memory").mkdir(parents=True, exist_ok=True)
-        (workspace / ".forge" / "memory" / "suggested.md").write_text("# Suggested\n")
+        (workspace / ".forge" / "memory" / "shadow.md").write_text("# Shadow\n")
         (workspace / "STANDARDS.md").write_text("# Standards\n")
 
         docs = [
             DesignatedDoc(
-                path=".forge/memory/suggested.md",
-                strategy="suggested",
+                path=".forge/memory/shadow.md",
+                strategy="generic",
                 shadows="STANDARDS.md",
             )
         ]
@@ -1361,7 +1314,7 @@ class TestRunHandoffAgentMultiDoc:
 
             args, _ = mock_run.call_args
             prompt = args[0]
-            assert "suggested.md" in prompt
+            assert "shadow.md" in prompt
             assert "STANDARDS.md" in prompt
             assert "proposes changes to" in prompt
 
@@ -1444,14 +1397,14 @@ class TestPassportOwnershipSplit:
 
         _write_passport_to_doc(
             official,
-            strategy="suggested",
+            strategy="generic",
             mode="shadow-only",
             shadow_path=".forge/memory/old_shadow.md",
         )
 
         doc = DesignatedDoc(
             path=".forge/memory/old_shadow.md",
-            strategy="suggested",
+            strategy="generic",
             shadows="docs/impl_notes.md",
         )
         passport = read_passport(tmp_path / resolve_passport_source(doc))
@@ -1461,7 +1414,7 @@ class TestPassportOwnershipSplit:
         # Edit passport to new shadow path
         _write_passport_to_doc(
             official,
-            strategy="suggested",
+            strategy="generic",
             mode="shadow-only",
             shadow_path=".forge/memory/new_shadow.md",
         )
@@ -1481,7 +1434,7 @@ class TestPassportOwnershipSplit:
             captures=["stable decisions", "invariants"],
             excludes=["raw summaries"],
             update=PassportUpdate(
-                strategy="suggested",
+                strategy="generic",
                 instruction="Be concise and cite sources",
                 approval="human-promoted",
                 compact_when="over 200 lines",
@@ -1510,13 +1463,13 @@ class TestShadowFilePassportConflict:
         official.write_text("# Notes\n")
         _write_passport_to_doc(official, strategy="changelog")
 
-        shadow = tmp_path / ".forge" / "memory" / "suggested.md"
+        shadow = tmp_path / ".forge" / "memory" / "shadow.md"
         shadow.parent.mkdir(parents=True)
         shadow.write_text("# Shadow\n")
         _write_passport_to_doc(shadow, strategy="checklist")
 
         doc = DesignatedDoc(
-            path=".forge/memory/suggested.md",
+            path=".forge/memory/shadow.md",
             strategy="generic",
             shadows="docs/impl_notes.md",
         )
@@ -1701,7 +1654,7 @@ class TestDedupeSpecs:
             version=1,
             intent="x",
             update=PassportUpdate(
-                strategy="suggested",
+                strategy="generic",
                 mode="shadow-only",
                 writers="all-sessions",
                 inherit_on_fork=True,

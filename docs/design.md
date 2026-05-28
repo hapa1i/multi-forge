@@ -918,18 +918,18 @@ per-child handoff file in `$EDITOR` before launching Claude. `forge session memo
 
 #### Memory management
 
-| Command                        | Purpose                                                                                                         |
-| :----------------------------- | :-------------------------------------------------------------------------------------------------------------- |
-| `forge memory track <path>`    | Author a project passport on a doc, sessionless (`--as`, `--intent`, `--writers`, `--propose`, `--shadow-path`) |
-| `forge memory enable`          | Enable memory auto-update for a session (`--session`, resolves `$FORGE_SESSION`)                                |
-| `forge memory disable`         | Disable memory auto-update for a session (`--session`, resolves `$FORGE_SESSION`)                               |
-| `forge memory list`            | List passported memory docs under scan roots (`--json`)                                                         |
-| `forge memory status`          | Show memory activation across sessions (`--scope`, `--json`)                                                    |
-| `forge memory shadows list`    | List accumulated shadow proposals (`--scope`, `--json`)                                                         |
-| `forge memory shadows show`    | Show shadow proposal content (`--for <doc>`, `--scope`)                                                         |
-| `forge memory shadows review`  | Review/curate shadow proposals (`--for`, `--curate`, `--show-latest`)                                           |
-| `forge memory passport show`   | Show passport embedded in a memory doc (`--json`)                                                               |
-| `forge memory passport remove` | Remove the project passport from a memory doc (`--json`)                                                        |
+| Command                        | Purpose                                                                                                               |
+| :----------------------------- | :-------------------------------------------------------------------------------------------------------------------- |
+| `forge memory track <path>`    | Author a project passport on a doc, sessionless (`--strategy`, `--intent`, `--writers`, `--propose`, `--shadow-path`) |
+| `forge memory enable`          | Enable memory auto-update for a session (`--session`, resolves `$FORGE_SESSION`)                                      |
+| `forge memory disable`         | Disable memory auto-update for a session (`--session`, resolves `$FORGE_SESSION`)                                     |
+| `forge memory list`            | List passported memory docs under scan roots (`--json`)                                                               |
+| `forge memory status`          | Show memory activation across sessions (`--scope`, `--json`)                                                          |
+| `forge memory shadows list`    | List accumulated shadow proposals (`--scope`, `--json`)                                                               |
+| `forge memory shadows show`    | Show shadow proposal content (`--for <doc>`, `--scope`)                                                               |
+| `forge memory shadows review`  | Review/curate shadow proposals (`--for`, `--curate`, `--show-latest`)                                                 |
+| `forge memory passport show`   | Show passport embedded in a memory doc (`--json`)                                                                     |
+| `forge memory passport remove` | Remove the project passport from a memory doc (`--json`)                                                              |
 
 #### Proxy management
 
@@ -1628,9 +1628,9 @@ Editing a passport between sessions takes effect without re-running `forge memor
 **Writer semantics**: `all-sessions` and exact session-name writers are supported. `lineage:` and `role:` prefixes are
 rejected with deferral messages. Writer access is checked at Stop time by the handoff agent.
 
-**Passport CLI**: `forge memory track --as <strategy>` synthesizes a passport for docs without one. `forge memory track`
-with flags on a doc that already has a passport overwrites the passport (flags win, warnings printed).
-`forge memory passport show <path>` displays passport fields.
+**Passport CLI**: `forge memory track --strategy <strategy>` synthesizes a passport for docs without one.
+`forge memory track` with flags on a doc that already has a passport overwrites the passport (flags win, warnings
+printed). `forge memory passport show <path>` displays passport fields.
 
 #### 5.6.3 Two operating modes
 
@@ -1677,8 +1677,8 @@ Per-doc strategies control how each file is updated. Strategies are defined in `
 maintain; the agent maintains them. `forge memory track` enforces this at configuration time; runtime skip handling
 remains for stale manifests.
 
-Direct update strategies (Mode 1): `project-state`, `checklist`, `changelog`, `debugging`, `patterns`, `generic`. Shadow
-strategy (Mode 2): `suggested` (propose additions as checkboxes with rationale).
+Direct update strategies: `project-state`, `checklist`, `changelog`, `generic`. Shadow mode (`--propose`) works with any
+strategy.
 
 The handoff agent resolves designated doc paths relative to `forge_root`, so git-tracked docs target the correct branch
 in worktrees. Trackedness is controlled by path choice -- the agent doesn't distinguish.

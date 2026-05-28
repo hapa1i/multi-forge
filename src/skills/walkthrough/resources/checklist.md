@@ -530,7 +530,7 @@ cat > .forge/memory/walkthrough-notes.md <<'EOF'
 # Walkthrough Notes
 EOF
 
-forge memory track .forge/memory/walkthrough-notes.md --as debugging
+forge memory track .forge/memory/walkthrough-notes.md --strategy generic
 forge memory list
 forge memory list --json
 forge memory enable --session walkthrough-demo
@@ -540,7 +540,7 @@ forge memory list
 ```
 
 - [ ] `track` writes a passport into the doc
-- [ ] `list` shows the path with `debugging` strategy
+- [ ] `list` shows the path with `generic` strategy
 - [ ] `list --json` emits the passported doc in JSON form
 - [ ] `enable --session` sets activation for the session
 - [ ] `passport remove` succeeds and the final list no longer includes the doc

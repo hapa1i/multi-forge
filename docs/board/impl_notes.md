@@ -8,7 +8,7 @@ the notes that are worth carrying forward.
 ## Maintenance
 
 - Updated by humans after reviewing proposed notes, not directly by the handoff agent.
-- Source for proposed additions: `.forge/memory/suggested_impl_notes.md`.
+- Source for proposed additions: `.forge/memory/shadow_impl_notes.md`.
 - Keep notes durable and actionable. Prefer bullets with links to the source doc, issue, test, or file.
 - Remove or rewrite notes when they become obsolete.
 - Check size periodically and prune stale notes before appending:

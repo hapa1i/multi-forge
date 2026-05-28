@@ -34,16 +34,16 @@ class TestBuildCurationPrompt:
         entries = [
             ShadowEntry(
                 official="docs/notes.md",
-                shadow_path=".forge/memory/suggested_notes.md",
-                strategy="suggested",
+                shadow_path=".forge/memory/shadow_notes.md",
+                strategy="generic",
                 session="s1",
                 forge_root="/project",
                 content="- [ ] Add caching docs",
             ),
             ShadowEntry(
                 official="docs/notes.md",
-                shadow_path=".forge/memory/suggested_notes.md",
-                strategy="suggested",
+                shadow_path=".forge/memory/shadow_notes.md",
+                strategy="generic",
                 session="s2",
                 forge_root="/other-root",
                 content="- [ ] Add auth docs",
@@ -73,8 +73,8 @@ class TestBuildCurationPrompt:
         entries = [
             ShadowEntry(
                 official="docs/notes.md",
-                shadow_path=".forge/memory/suggested_notes.md",
-                strategy="suggested",
+                shadow_path=".forge/memory/shadow_notes.md",
+                strategy="generic",
                 session="s1",
                 forge_root="/project",
                 content="````\nshadow proposal\n````",
@@ -211,7 +211,7 @@ class TestRunShadowCuration:
         mock_run.return_value = self._mock_result()
 
         entries = [
-            ShadowEntry("docs/n.md", ".forge/memory/s.md", "suggested", "s1", str(tmp_path), "content"),
+            ShadowEntry("docs/n.md", ".forge/memory/s.md", "generic", "s1", str(tmp_path), "content"),
         ]
         result = run_shadow_curation(
             session_name="s1",
@@ -289,14 +289,14 @@ class TestCollectShadowEntries:
         write_passport(
             official,
             synthesize_passport(
-                strategy="suggested",
+                strategy="generic",
                 update_mode="shadow-only",
-                shadow_path=".forge/memory/suggested_notes.md",
+                shadow_path=".forge/memory/shadow_notes.md",
             ),
         )
         shadow_dir = forge_root / ".forge" / "memory"
         shadow_dir.mkdir(parents=True)
-        (shadow_dir / "suggested_notes.md").write_text("- proposal\n")
+        (shadow_dir / "shadow_notes.md").write_text("- proposal\n")
 
         state = create_session_state(
             "s1",
@@ -327,8 +327,8 @@ class TestCollectShadowEntries:
         entry = entries[0]
         assert isinstance(entry, ShadowEntry)
         assert entry.official == "docs/notes.md"
-        assert entry.shadow_path == ".forge/memory/suggested_notes.md"
-        assert entry.strategy == "suggested"
+        assert entry.shadow_path == ".forge/memory/shadow_notes.md"
+        assert entry.strategy == "generic"
         assert entry.session == "(project)"
         assert entry.forge_root == str(forge_root)
         assert str(forge_root) in roots
@@ -349,9 +349,9 @@ class TestCollectShadowEntries:
         write_passport(
             official,
             synthesize_passport(
-                strategy="suggested",
+                strategy="generic",
                 update_mode="shadow-only",
-                shadow_path=".forge/memory/suggested_notes.md",
+                shadow_path=".forge/memory/shadow_notes.md",
             ),
         )
 
@@ -396,7 +396,7 @@ class TestCollectShadowEntries:
         write_passport(
             official,
             synthesize_passport(
-                strategy="suggested", update_mode="shadow-only", shadow_path=".forge/memory/suggested_notes.md"
+                strategy="generic", update_mode="shadow-only", shadow_path=".forge/memory/shadow_notes.md"
             ),
         )
         return forge_root
@@ -438,7 +438,7 @@ class TestCollectShadowEntries:
 
         assert len(entries) == 1
         assert entries[0].official == "docs/notes.md"
-        assert entries[0].shadow_path == ".forge/memory/suggested_notes.md"
+        assert entries[0].shadow_path == ".forge/memory/shadow_notes.md"
         assert entries[0].session == "(project)"
 
     def test_passport_scan_deduplicates_same_shadow_across_roots(self, tmp_path: Path, monkeypatch: MagicMock) -> None:

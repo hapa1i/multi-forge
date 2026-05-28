@@ -26,6 +26,27 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/work-board-contract.md` "Change Log Policy" for the
 > full spec.
 
+## 2026-05-28
+
+### Simplify memory strategies: 7 to 4, shadow mode orthogonal
+
+**Goal**: Reduce strategy enum from 7 to 4 by removing redundant entries, make shadow mode orthogonal to strategy, and
+rename `--as` to `--strategy`.
+
+**Key changes**:
+
+- Removed `debugging`, `patterns` strategies (topic scoping via passport `intent`/`captures` fields instead).
+- Removed `suggested` strategy (shadow mode is now orthogonal -- `--propose` works with any strategy).
+- Renamed `--as` to `--strategy`; `--as` is a hidden tombstone with rename guidance.
+- Shadow path prefix changed from `suggested_*` to `shadow_*` in `derive_shadow_path()`.
+- Shadow framing in `build_multi_doc_prompt()` now includes proposal-format instructions (checkboxes, rationale,
+  self-prune) that were previously in the `suggested` strategy instruction.
+- Stale passports with removed strategies rejected with actionable hints (`_REMOVED_STRATEGIES`).
+- `_validate_designated_docs()` empty-shadows guard applies unconditionally; `suggested` coupling removed.
+- `--propose` preserves existing passport strategy unless `--strategy` is explicitly passed.
+
+**Verification**: full unit suite passes; `make pre-commit` clean.
+
 ## 2026-05-26
 
 ### Phase 1 / Slices 4-7: Simplify memory to passports + session activation

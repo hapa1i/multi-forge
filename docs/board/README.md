@@ -42,7 +42,7 @@ decides whether it runs.
 | Doc                       | Update model                           | How it is maintained                      |
 | ------------------------- | -------------------------------------- | ----------------------------------------- |
 | `change_log.md`           | Memory writer, direct write at Stop    | Passported as `changelog`                 |
-| `impl_notes.md`           | Memory writer, shadow proposal at Stop | Passported as `suggested` / `shadow-only` |
+| `impl_notes.md`           | Memory writer, shadow proposal at Stop | Passported as `generic`, shadow mode      |
 | card `checklist.md` files | In-session agent, at your direction    | Edited as normal files during the session |
 
 | Command                        | Writes           | Meaning                                           |
@@ -59,8 +59,8 @@ Forge discovers docs by scanning hardcoded roots (`docs/` plus `.forge/memory/`)
 Passport your docs once (sessionless). Then enable memory per session:
 
 ```bash
-forge memory track docs/board/change_log.md --as changelog
-forge memory track docs/board/impl_notes.md --propose --shadow-path .forge/memory/suggested_impl_notes.md
+forge memory track docs/board/change_log.md --strategy changelog
+forge memory track docs/board/impl_notes.md --propose --shadow-path .forge/memory/shadow_impl_notes.md
 
 # Start a session with memory on:
 forge session start planner --memory on
@@ -105,8 +105,8 @@ The important memory behavior:
 Prepare memory, then start a planning session:
 
 ```bash
-forge memory track docs/board/change_log.md --as changelog
-forge memory track docs/board/impl_notes.md --propose --shadow-path .forge/memory/suggested_impl_notes.md
+forge memory track docs/board/change_log.md --strategy changelog
+forge memory track docs/board/impl_notes.md --propose --shadow-path .forge/memory/shadow_impl_notes.md
 
 forge session start planner --memory on --proxy openrouter-openai
 ```
@@ -147,7 +147,7 @@ during implementation, use the supervisor reload flow instead of removing superv
 
 When the executor stops, the memory writer runs in the executor checkout. The executor inherited memory activation from
 the planner, and git carried the passports, so it can update `docs/board/change_log.md` and write proposals to its own
-`.forge/memory/suggested_impl_notes.md`.
+`.forge/memory/shadow_impl_notes.md`.
 
 ### 3. Reviewer
 
@@ -177,7 +177,7 @@ These docs intentionally use git-tracked and gitignored locations to define scop
 | `docs/board/<lane>/<slug>/checklist.md` | One proposal or feature branch | Lives with the card executing the work                                              |
 | `docs/board/change_log.md`              | Project lifetime               | Merged with feature PRs; newest-first merge conflicts are integration signals       |
 | `docs/board/impl_notes.md`              | Project lifetime               | Human-promoted durable memory merged with feature PRs                               |
-| `.forge/memory/suggested_impl_notes.md` | Per worktree, per machine      | Gitignored shadow proposals; each parallel worktree accumulates its own suggestions |
+| `.forge/memory/shadow_impl_notes.md`    | Per worktree, per machine      | Gitignored shadow proposals; each parallel worktree accumulates its own suggestions |
 
 Sub-branches off a feature branch inherit that feature's card checklist and can tick items independently. Merge
 conflicts in `change_log.md` are expected when branches interleave completed work.

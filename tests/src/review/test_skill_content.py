@@ -482,7 +482,7 @@ class TestQaHandoffChecklist:
         step = content.split("### 16.3", 1)[1].split("### 16.4", 1)[0]
         assert "forge memory track docs/team-standards.md" in step
         assert "--propose" in step
-        assert "--shadow-path .forge/memory/suggested_standards.md" in step
+        assert "--shadow-path .forge/memory/shadow_standards.md" in step
         assert "cmp -s docs/team-standards.md /tmp/team-standards.before" in step
 
     def test_handoff_includes_queued_startup_step(self):

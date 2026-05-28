@@ -683,22 +683,16 @@ concept remain in design.md.
 
 Strategies are defined in `MemoryStrategy` enum (`src/forge/session/passport.py`).
 
-**Direct update strategies** (Mode 1):
+**Direct update strategies:**
 
 | Strategy        | Behavior                                      |
 | --------------- | --------------------------------------------- |
 | `project-state` | Update focus, active work, decisions, handoff |
 | `checklist`     | Mark `[x]` completed, add discovered tasks    |
 | `changelog`     | Add accomplishments, follow existing format   |
-| `debugging`     | Record error causes + solutions               |
-| `patterns`      | Record architecture patterns + conventions    |
 | `generic`       | Add any new information (default fallback)    |
 
-**Shadow strategy** (Mode 2):
-
-| Strategy    | Behavior                                                               |
-| ----------- | ---------------------------------------------------------------------- |
-| `suggested` | Propose additions to official doc as `- [ ]` checkboxes with rationale |
+Shadow mode (`--propose`) is orthogonal to strategy: any strategy works with `--propose`.
 
 ### G.2 Passport example (from §5.6.2)
 
@@ -713,11 +707,11 @@ forge_memory:
   captures: [stable decisions, non-obvious invariants, recurring bug causes]
   excludes: [raw session summaries, pending tasks, unverified hunches]
   update:
-    strategy: suggested
+    strategy: generic
     mode: shadow-only
     writers: all-sessions
     approval: human-promoted
-    shadow_path: .forge/memory/suggested_impl_notes.md
+    shadow_path: .forge/memory/shadow_impl_notes.md
 ---
 ```
 
@@ -725,9 +719,9 @@ forge_memory:
 
 ```bash
 # Passports are project-lifetime and sessionless:
-forge memory track docs/board/change_log.md --as changelog
+forge memory track docs/board/change_log.md --strategy changelog
 forge memory track docs/board/impl_notes.md \
-  --propose --shadow-path .forge/memory/suggested_impl_notes.md
+  --propose --shadow-path .forge/memory/shadow_impl_notes.md
 
 # Enable memory for a session:
 forge memory enable --session planner

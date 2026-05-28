@@ -18,7 +18,7 @@ cat > .forge/memory/debugging.md <<'EOF'
 EOF
 
 # Author a project passport (sessionless).
-forge memory track .forge/memory/debugging.md --as debugging
+forge memory track .forge/memory/debugging.md --strategy generic
 head -5 .forge/memory/debugging.md | grep -q 'forge_memory'
 
 # Enable memory for the session.
@@ -28,7 +28,7 @@ forge session set memory.auto_update.min_turns 1 --session test-session-1
 # List passported docs (sessionless scan).
 forge memory list --json | jq -e '
   length >= 1
-  and any(.[]; .path == ".forge/memory/debugging.md" and .strategy == "debugging")
+  and any(.[]; .path == ".forge/memory/debugging.md" and .strategy == "generic")
 '
 
 # Verify session config.
@@ -82,7 +82,7 @@ test "$AFTER_LINES" -gt "$BEFORE_LINES"
 - [ ] Passported docs are discovered via scan and updated with session takeaways
 - [ ] Handoff agent stdout is persisted and visible via `forge session handoff show --latest`
 
-### 16.3 Shadow Handoff (`suggested` + `shadows`)
+### 16.3 Shadow Handoff (`--propose` + shadow mode)
 
 <!-- prereq: 16.1 -->
 
@@ -101,17 +101,17 @@ cat > docs/team-standards.md <<'EOF'
 - Prefer small, reviewable patches.
 EOF
 
-cat > .forge/memory/suggested_standards.md <<'EOF'
+cat > .forge/memory/shadow_standards.md <<'EOF'
 # Suggested Standards
 EOF
 
 # Author a shadow-only passport (sessionless).
 forge memory track docs/team-standards.md \
   --propose \
-  --shadow-path .forge/memory/suggested_standards.md
+  --shadow-path .forge/memory/shadow_standards.md
 
 forge memory list --json | jq -e '
-  any(.[]; .path == ".forge/memory/suggested_standards.md" and .strategy == "suggested")
+  any(.[]; .path == ".forge/memory/shadow_standards.md" and .strategy == "generic")
 '
 
 mkdir -p .forge/artifacts/test-session-1/transcripts
@@ -123,16 +123,16 @@ cat > .forge/artifacts/test-session-1/transcripts/manual-handoff-shadow.jsonl <<
 EOF
 
 cp docs/team-standards.md /tmp/team-standards.before
-SHADOW_BEFORE=$(wc -l < .forge/memory/suggested_standards.md)
+SHADOW_BEFORE=$(wc -l < .forge/memory/shadow_standards.md)
 
 forge handoff run \
   --session-name test-session-1 \
   --worktree-path $FORGE_TEST_REPO \
   --transcript-rel .forge/artifacts/test-session-1/transcripts/manual-handoff-shadow.jsonl
 
-SHADOW_AFTER=$(wc -l < .forge/memory/suggested_standards.md)
+SHADOW_AFTER=$(wc -l < .forge/memory/shadow_standards.md)
 
-cat .forge/memory/suggested_standards.md
+cat .forge/memory/shadow_standards.md
 
 cmp -s docs/team-standards.md /tmp/team-standards.before
 test "$SHADOW_AFTER" -gt "$SHADOW_BEFORE"

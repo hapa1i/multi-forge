@@ -344,7 +344,9 @@ class TestHandoffRunMultiDoc:
         mock_claude_workspace.write_file(f"/workspace/{transcript_rel}", _build_transcript())
 
         # Author a passport on the doc (sessionless)
-        result = mock_claude_workspace.exec("cd /workspace && forge memory track docs/state.md --as project-state")
+        result = mock_claude_workspace.exec(
+            "cd /workspace && forge memory track docs/state.md --strategy project-state"
+        )
         assert result.returncode == 0, result.stderr
 
         result = mock_claude_workspace.exec(
@@ -390,12 +392,12 @@ class TestHandoffRunMultiDoc:
         claude_capture_file: Callable[[str], str],
     ) -> None:
         """Shadow doc: passport on official doc -> prompt reads official, proposes to shadow."""
-        shadow_path = ".forge/memory/suggested.md"
+        shadow_path = ".forge/memory/shadow.md"
         self._setup_session(
             mock_claude_workspace,
             target_files={
                 # Passport lives on the official doc with shadow-only mode
-                "docs/STANDARDS.md": _passported_content("suggested", "# Standards\n", shadow_path=shadow_path),
+                "docs/STANDARDS.md": _passported_content("generic", "# Standards\n", shadow_path=shadow_path),
                 # Shadow file must exist for the prompt builder
                 shadow_path: "# Suggested\n",
             },

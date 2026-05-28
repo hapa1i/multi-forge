@@ -107,7 +107,7 @@ class TestRealClaudeMemory:
         _write_transcript(forge_workspace, transcript_rel)
 
         for command in (
-            "cd /workspace && forge memory track docs/state.md --as project-state",
+            "cd /workspace && forge memory track docs/state.md --strategy project-state",
             f"cd /workspace && forge memory enable --review-only --session {session_name}",
             f"cd /workspace && forge session set --session {session_name} memory.auto_update.min_turns 1",
         ):
@@ -147,7 +147,7 @@ class TestRealClaudeMemory:
     def test_real_shadow_curation_smoke(self, forge_workspace: ContainerLike) -> None:
         session_name = "real-memory-curation"
         official_path = "docs/official.md"
-        shadow_path = ".forge/memory/suggested_official.md"
+        shadow_path = ".forge/memory/shadow_official.md"
         setup_real_claude(forge_workspace, session_name=session_name)
 
         forge_workspace.exec("mkdir -p /workspace/docs")
