@@ -1,7 +1,7 @@
-"""Handoff agent CLI commands.
+"""Memory writer CLI commands.
 
 Commands:
-- forge handoff run: Execute the handoff agent for a session (background process)
+- forge handoff run: Execute the memory writer for a session (background process)
 """
 
 from __future__ import annotations
@@ -73,7 +73,7 @@ def run_cmd(
 
     import dataclasses
 
-    from forge.session.handoff_agent import resolve_handoff_base_url, run_handoff_agent
+    from forge.session.memory_writer import resolve_writer_base_url, run_memory_writer
     from forge.session.project_memory import (
         DEFAULT_SCAN_ROOTS,
         is_memory_enabled,
@@ -91,7 +91,7 @@ def run_cmd(
     if manifest.confirmed.started_with_proxy:
         confirmed_proxy_url = manifest.confirmed.started_with_proxy.base_url
 
-    base_url = resolve_handoff_base_url(
+    base_url = resolve_writer_base_url(
         proxy_id=config.proxy,
         confirmed_proxy_base_url=confirmed_proxy_url,
         env_base_url=os.environ.get("ANTHROPIC_BASE_URL"),
@@ -101,7 +101,7 @@ def run_cmd(
 
     designated_docs = scan_passported_docs(effective_root, DEFAULT_SCAN_ROOTS, session_name)
 
-    success = run_handoff_agent(
+    success = run_memory_writer(
         session_name=session_name,
         forge_root=effective_root,
         transcript_snapshot_rel=transcript_rel,

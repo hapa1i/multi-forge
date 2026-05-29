@@ -1,7 +1,7 @@
 """Tests for worktree extension auto-install and fork handoff flags.
 
 Covers _detect_parent_extensions(), _auto_install_extensions(),
-and _generate_parent_handoff_context() from forge.cli.session.
+and _generate_parent_transfer_context() from forge.cli.session.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ import pytest
 from forge.cli.session import (
     _auto_install_extensions,
     _detect_parent_extensions,
-    _generate_parent_handoff_context,
+    _generate_parent_transfer_context,
     _resolve_worktree_extension_root,
 )
 from forge.install.models import Installation
@@ -296,7 +296,7 @@ class TestResolveWorktreeExtensionRoot:
 
 
 class TestGenerateParentHandoffContext:
-    """Test _generate_parent_handoff_context strategy and inline_plan threading."""
+    """Test _generate_parent_transfer_context strategy and inline_plan threading."""
 
     def _make_fork_state(self, tmp_path: Path, parent_name: str = "planner") -> SessionState:
         """Create a fork manifest pointing at a parent session."""
@@ -322,8 +322,8 @@ class TestGenerateParentHandoffContext:
         state.confirmed.claude_session_id = "parent-uuid"
         return state
 
-    def test_strategy_threads_to_process_handoff(self, tmp_path: Path) -> None:
-        """Strategy parameter reaches process_handoff."""
+    def test_strategy_threads_to_assemble_transfer_context(self, tmp_path: Path) -> None:
+        """Strategy parameter reaches assemble_transfer_context."""
         fork_state = self._make_fork_state(tmp_path)
         parent_state = self._make_parent_state(tmp_path)
 
@@ -331,10 +331,10 @@ class TestGenerateParentHandoffContext:
         mock_manager.get_session.return_value = parent_state
         mock_manager.resolve_project_root.return_value = str(tmp_path / "parent-wt")
 
-        with patch("forge.session.handoff.process_handoff") as mock_handoff:
+        with patch("forge.session.transfer.assemble_transfer_context") as mock_handoff:
             mock_handoff.return_value = MagicMock(context_file=None, warnings=[])
 
-            _generate_parent_handoff_context(
+            _generate_parent_transfer_context(
                 manager=mock_manager,
                 manifest=fork_state,
                 strategy="full",
@@ -354,9 +354,9 @@ class TestGenerateParentHandoffContext:
         mock_manager.get_session.return_value = parent_state
         mock_manager.resolve_project_root.return_value = str(tmp_path / "parent-wt")
 
-        with patch("forge.session.handoff.process_handoff") as mock_handoff:
+        with patch("forge.session.transfer.assemble_transfer_context") as mock_handoff:
             mock_handoff.return_value = MagicMock(context_file=None, warnings=[])
-            _generate_parent_handoff_context(manager=mock_manager, manifest=fork_state)
+            _generate_parent_transfer_context(manager=mock_manager, manifest=fork_state)
 
         call_kwargs = mock_handoff.call_args[1]
         assert call_kwargs["strategy"].value == "structured"
@@ -371,9 +371,9 @@ class TestGenerateParentHandoffContext:
         mock_manager.get_session.return_value = parent_state
         mock_manager.resolve_project_root.return_value = str(tmp_path / "parent-wt")
 
-        with patch("forge.session.handoff.process_handoff") as mock_handoff:
+        with patch("forge.session.transfer.assemble_transfer_context") as mock_handoff:
             mock_handoff.return_value = MagicMock(context_file=None, warnings=[])
-            _generate_parent_handoff_context(manager=mock_manager, manifest=fork_state, strategy="nonexistent")
+            _generate_parent_transfer_context(manager=mock_manager, manifest=fork_state, strategy="nonexistent")
 
         call_kwargs = mock_handoff.call_args[1]
         assert call_kwargs["strategy"].value == "structured"
@@ -387,9 +387,9 @@ class TestGenerateParentHandoffContext:
         mock_manager.get_session.return_value = parent_state
         mock_manager.resolve_project_root.return_value = str(tmp_path / "main-repo")
 
-        with patch("forge.session.handoff.process_handoff") as mock_handoff:
+        with patch("forge.session.transfer.assemble_transfer_context") as mock_handoff:
             mock_handoff.return_value = MagicMock(context_file=None, warnings=[])
-            _generate_parent_handoff_context(manager=mock_manager, manifest=fork_state)
+            _generate_parent_transfer_context(manager=mock_manager, manifest=fork_state)
 
         call_kwargs = mock_handoff.call_args[1]
         assert str(call_kwargs["forge_root"]) == str(tmp_path / "main-repo")
@@ -407,9 +407,9 @@ class TestGenerateParentHandoffContext:
         mock_manager.get_session.return_value = parent_state
         mock_manager.resolve_project_root.return_value = str(tmp_path / "main-repo")
 
-        with patch("forge.session.handoff.process_handoff") as mock_handoff:
+        with patch("forge.session.transfer.assemble_transfer_context") as mock_handoff:
             mock_handoff.return_value = MagicMock(context_file=None, warnings=[])
-            _generate_parent_handoff_context(manager=mock_manager, manifest=fork_state)
+            _generate_parent_transfer_context(manager=mock_manager, manifest=fork_state)
 
         call_kwargs = mock_handoff.call_args[1]
         assert call_kwargs["forge_root"] == nested_root

@@ -2,7 +2,7 @@
 
 Low-level parsing of Claude Code transcript files. Used by:
 - forge.search.extractor (content extraction for search indexing)
-- forge.session.handoff (context assembly for session resume)
+- forge.session.transfer (context assembly for session resume)
 
 Only parsing primitives live here — extraction/summarization logic stays
 in each consumer module since they produce different output formats.

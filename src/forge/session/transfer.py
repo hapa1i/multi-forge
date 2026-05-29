@@ -1,11 +1,10 @@
-"""Session handoff strategies for context assembly.
+"""Transfer context assembly for session resume/fork.
 
 Resume-phase context processing: when resuming a session, process the parent's
 transcript artifacts to assemble a context document for the child session.
 
-Note: "handoff" here means resume-context assembly. The separate handoff agent
-(``handoff_agent.py``) is the Stop-time memory-doc updater -- different concept
-despite the shared name. See ``handoff_agent.py`` docstring for that one.
+The memory writer (``memory_writer.py``) is the Stop-time doc updater --
+a separate concept.
 
 Strategies:
 - minimal: Lineage pointer only (no transcript parsing)
@@ -119,12 +118,12 @@ def _resolve_plan_content(
 
 
 @dataclass
-class HandoffResult:
+class TransferResult:
     """Result of processing parent context for resume.
 
     ``context_file`` and ``context_file_rel`` point at the file the caller
-    should append to the child's system prompt. When ``process_handoff`` is
-    called with ``child_name``, this is ``children/<child>.md`` (per-child,
+    should append to the child's system prompt. When ``assemble_transfer_context``
+    is called with ``child_name``, this is ``children/<child>.md`` (per-child,
     durable). Otherwise it is ``generated.md`` (parent-scoped cache).
     """
 
@@ -299,7 +298,7 @@ def _format_plan_and_artifacts(
     artifacts_path: str | None,
     plan_content: str | None,
 ) -> list[str]:
-    """Format the plan and artifacts section for handoff output."""
+    """Format the plan and artifacts section for transfer output."""
     lines = ["---", "", "## Artifacts", ""]
 
     if plan_content:
@@ -720,7 +719,7 @@ def resolve_lineage(
     return lineage
 
 
-def process_handoff(
+def assemble_transfer_context(
     *,
     parent_name: str,
     parent_state: SessionState,
@@ -732,13 +731,13 @@ def process_handoff(
     inline_plan: bool = False,
     parent_worktree_root: Path | None = None,
     child_name: str | None = None,
-) -> HandoffResult:
+) -> TransferResult:
     """Process parent context for resume and generate context file.
 
     Writes the parent-scoped cache at ``<parent>/generated.md``. When
     ``child_name`` is provided, also copies that cache into
     ``<parent>/children/<child>.md`` (the per-child authoritative file) and
-    returns the child path in ``HandoffResult.context_file``. If the child
+    returns the child path in ``TransferResult.context_file``. If the child
     file already exists, ``ensure_child`` leaves it alone -- regenerating the
     parent cache never disturbs an existing child file.
 
@@ -756,12 +755,12 @@ def process_handoff(
         parent_worktree_root: Parent's worktree path (for latest_plan_path resolution).
             Derived from parent_state.worktree.path if None.
         child_name: When provided, ``ensure_child`` is called so
-            ``HandoffResult.context_file`` points at the per-child file.
+            ``TransferResult.context_file`` points at the per-child file.
             When omitted, points at the parent-scoped ``generated.md`` (caller
             handles the child copy itself).
 
     Returns:
-        HandoffResult with the launch-time context file path and metadata.
+        TransferResult with the launch-time context file path and metadata.
     """
     warnings: list[str] = []
 
@@ -871,7 +870,7 @@ def process_handoff(
         context_file = cache_file
         context_file_rel = generated_path_rel(parent_name)
 
-    return HandoffResult(
+    return TransferResult(
         context_file=context_file,
         context_file_rel=context_file_rel,
         transcript_artifact_path=artifacts_path,  # Actual transcript JSONL path

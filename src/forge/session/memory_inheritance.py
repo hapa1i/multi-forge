@@ -10,7 +10,7 @@ import dataclasses
 import logging
 from pathlib import Path
 
-from .models import HandoffConfig, MemoryIntent, SessionState
+from .models import MemoryIntent, MemoryWriterConfig, SessionState
 from .validation import is_safe_designated_doc_path
 
 logger = logging.getLogger(__name__)
@@ -61,13 +61,13 @@ def apply_memory_inheritance(
     parent_auto = effective_memory.auto_update if effective_memory else None
 
     if memory_flag is True:
-        base = parent_auto or HandoffConfig()
+        base = parent_auto or MemoryWriterConfig()
         child_state.intent.memory = MemoryIntent(
             auto_update=dataclasses.replace(base, enabled=True),
         )
     elif memory_flag is False:
         child_state.intent.memory = MemoryIntent(
-            auto_update=HandoffConfig(enabled=False),
+            auto_update=MemoryWriterConfig(enabled=False),
         )
     else:
         if parent_auto is not None:

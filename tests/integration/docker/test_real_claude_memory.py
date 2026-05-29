@@ -137,12 +137,12 @@ class TestRealClaudeMemory:
         report_path = report_result.stdout.strip()
         assert report_path
         report = forge_workspace.read_file(report_path)
-        assert f"# Handoff Agent Report -- {session_name}" in report
+        assert f"# Memory Writer Report -- {session_name}" in report
         assert "**Mode**: review-only" in report
 
         show_result = forge_workspace.exec(f"cd /workspace && forge session handoff show {session_name} --latest")
         assert show_result.returncode == 0, show_result.stderr
-        assert "Handoff Agent Report" in show_result.stdout
+        assert "Memory Writer Report" in show_result.stdout
 
     def test_real_shadow_curation_smoke(self, forge_workspace: ContainerLike) -> None:
         session_name = "real-memory-curation"

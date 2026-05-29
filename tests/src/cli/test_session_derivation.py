@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from forge.cli.session import _persist_fork_handoff_derivation
+from forge.cli.session import _persist_fork_transfer_derivation
 from forge.session.models import Derivation, create_session_state
 from forge.session.store import SessionStore
 
 
-def test_persist_fork_handoff_derivation_records_strategy_and_context(tmp_path: Path) -> None:
+def test_persist_fork_transfer_derivation_records_strategy_and_context(tmp_path: Path) -> None:
     """Worktree fork handoff metadata is persisted after the CLI creates context."""
     worktree = tmp_path / "child-worktree"
     worktree.mkdir()
@@ -32,7 +32,7 @@ def test_persist_fork_handoff_derivation_records_strategy_and_context(tmp_path: 
     )
     SessionStore(str(worktree), "child").write(manifest)
 
-    updated = _persist_fork_handoff_derivation(
+    updated = _persist_fork_transfer_derivation(
         manifest=manifest,
         strategy="structured",
         context_path=context,

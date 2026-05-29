@@ -946,7 +946,7 @@ def _review_curate(
     """Handle ``--curate``: run LLM curation."""
     import os
 
-    from forge.session.handoff_agent import resolve_handoff_base_url
+    from forge.session.memory_writer import resolve_writer_base_url
     from forge.session.shadow_curation import (
         collect_shadow_entries,
         run_shadow_curation,
@@ -1048,7 +1048,7 @@ def _review_curate(
         confirmed_proxy_url = state.confirmed.started_with_proxy.base_url
 
     direct = config.direct if config else False
-    base_url = resolve_handoff_base_url(
+    base_url = resolve_writer_base_url(
         proxy_id=config.proxy if config else None,
         confirmed_proxy_base_url=confirmed_proxy_url,
         env_base_url=os.environ.get("ANTHROPIC_BASE_URL"),

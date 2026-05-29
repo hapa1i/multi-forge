@@ -34,12 +34,6 @@ from .exceptions import (
     SessionExistsError,
     SessionNotFoundError,
 )
-from .handoff import (
-    HandoffResult,
-    ResumeStrategy,
-    estimate_transcript_tokens,
-    process_handoff,
-)
 from .index import IndexStore
 from .models import (
     Derivation,
@@ -51,6 +45,12 @@ from .models import (
 )
 from .prev_sessions import child_path, child_path_rel, ensure_child, generated_path
 from .store import SessionStore
+from .transfer import (
+    ResumeStrategy,
+    TransferResult,
+    assemble_transfer_context,
+    estimate_transcript_tokens,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -506,7 +506,7 @@ class SessionManager:
         resume_mode: str = "handoff",
         forge_root: str | None = None,
         memory_flag: bool | None = None,
-    ) -> tuple[SessionState, HandoffResult]:
+    ) -> tuple[SessionState, TransferResult]:
         """Create a new session derived from a parent with context assembly.
 
         Creates a new child session in the parent's worktree with context assembled
@@ -610,7 +610,7 @@ class SessionManager:
                 parent_project_root=parent_entry.project_root,
             )
 
-            handoff_result = HandoffResult(
+            handoff_result = TransferResult(
                 context_file=None,
                 context_file_rel=None,
                 transcript_artifact_path=transcript_artifact_path,
@@ -657,7 +657,7 @@ class SessionManager:
             except SessionNotFoundError:
                 return None
 
-        handoff_result = process_handoff(
+        handoff_result = assemble_transfer_context(
             parent_name=parent_name,
             parent_state=parent_state,
             forge_root=parent_artifact_root,
@@ -1182,7 +1182,7 @@ class SessionManager:
 
         fork_resume_mode = "handoff" if (create_worktree or is_into) else "native"
         # For handoff-mode forks the per-child file is created lazily at launch
-        # (see _generate_parent_handoff_context). We pre-record the reference
+        # (see _generate_parent_transfer_context). We pre-record the reference
         # here so GC knows the fork's child file belongs to this session, even
         # if launch happens later.
         fork_context_file_rel = child_path_rel(parent_name, fork_name) if fork_resume_mode == "handoff" else None

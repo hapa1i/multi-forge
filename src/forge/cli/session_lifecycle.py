@@ -89,7 +89,7 @@ from forge.cli.session_addendum import (  # noqa: E402
 # Functions below are accessed through _sess() because tests patch them
 # on forge.cli.session. Direct imports would bypass those patches.
 # _auto_install_extensions, _build_session_env, _cwd_forge_root,
-# _detect_parent_extensions, _generate_parent_handoff_context,
+# _detect_parent_extensions, _generate_parent_transfer_context,
 # _prepare_sidecar_prompt_file, _resolve_context_limit
 
 __all__ = [
@@ -118,7 +118,7 @@ __all__ = [
     "_get_deferred_same_dir_fork_resume_id",
     "_resolve_manifest_prompt_file",
     "_infer_launch_confirmation",
-    "_persist_fork_handoff_derivation",
+    "_persist_fork_transfer_derivation",
     "_warn_if_hooks_missing",
     "_warn_if_version_outdated",
 ]
@@ -295,13 +295,13 @@ def _resolve_manifest_prompt_file(manifest: SessionState) -> Path | None:
     return prompt_path.resolve() if prompt_path.exists() else None
 
 
-def _persist_fork_handoff_derivation(
+def _persist_fork_transfer_derivation(
     *,
     manifest: SessionState,
     strategy: str,
     context_path: Path | None,
 ) -> SessionState:
-    """Persist handoff-specific derivation details for a worktree fork."""
+    """Persist transfer-specific derivation details for a worktree fork."""
     worktree_path = Path(manifest.worktree.path) if manifest.worktree else Path.cwd()
     forge_root = Path(manifest.forge_root) if manifest.forge_root else worktree_path
 
@@ -1021,16 +1021,16 @@ def launch_new_session(
 
     # --- set memory activation (if requested) ---
     if memory_flag is True:
-        from forge.session.models import HandoffConfig, MemoryIntent
+        from forge.session.models import MemoryIntent, MemoryWriterConfig
         from forge.session.store import SessionStore as _MemStore
 
         _mem_forge_root = manifest.forge_root or str(Path.cwd())
 
         def _set_memory(m: SessionState) -> None:
             if m.intent.memory is None:
-                m.intent.memory = MemoryIntent(auto_update=HandoffConfig(enabled=True))
+                m.intent.memory = MemoryIntent(auto_update=MemoryWriterConfig(enabled=True))
             elif m.intent.memory.auto_update is None:
-                m.intent.memory.auto_update = HandoffConfig(enabled=True)
+                m.intent.memory.auto_update = MemoryWriterConfig(enabled=True)
             else:
                 m.intent.memory.auto_update.enabled = True
 
@@ -1728,7 +1728,9 @@ def _launch_in_place(
             prompt_files.append(persisted_context)
             launch_action = "Start fresh Claude session with parent context"
         else:
-            fork_context, prompt_warnings = _sess()._generate_parent_handoff_context(manager=manager, manifest=manifest)
+            fork_context, prompt_warnings = _sess()._generate_parent_transfer_context(
+                manager=manager, manifest=manifest
+            )
             if fork_context is not None:
                 prompt_files.append(fork_context)
                 launch_action = "Start fresh Claude session with parent context"

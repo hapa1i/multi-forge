@@ -76,19 +76,19 @@ class LaunchIntent:
 
 
 @dataclass
-class HandoffConfig:
-    """Handoff agent configuration for automatic memory doc updates.
+class MemoryWriterConfig:
+    """Memory writer configuration for automatic memory doc updates.
 
-    The handoff agent runs after session stop to update designated
+    The memory writer runs after session stop to update designated
     project memory documents (e.g., project-state.md) using ``claude -p``.
 
     Fields:
-        enabled: Whether the handoff agent should run on session stop.
+        enabled: Whether the memory writer should run on session stop.
         mode: "augment" (add missing info) or "review-only" (report only, no edits).
-        proxy: Optional proxy (proxy_id or template name) to route the agent's
+        proxy: Optional proxy (proxy_id or template name) to route the writer's
                LLM calls through. If None, inherits the session's confirmed proxy.
         direct: When True, force direct Anthropic routing regardless of session proxy.
-        min_turns: Minimum conversation turns before triggering handoff.
+        min_turns: Minimum conversation turns before triggering the writer.
                    Sessions below this threshold are skipped (too short to be useful).
     """
 
@@ -104,7 +104,7 @@ class DesignatedDoc:
     """Runtime type for a doc the memory writer should update.
 
     Not persisted in session manifests. Produced by ``scan_passported_docs()``
-    and consumed by ``run_handoff_agent()``.
+    and consumed by ``run_memory_writer()``.
 
     Fields:
         path: Worktree-relative path (e.g., "docs/checklist.md").
@@ -128,7 +128,7 @@ class MemoryIntent:
     strategy: str = "summary"  # "summary", "full", or "off"
     max_chars: int = 6000
     generated_file: str | None = None  # e.g., ".claude/forge.context.generated.md"
-    auto_update: HandoffConfig | None = None
+    auto_update: MemoryWriterConfig | None = None
 
 
 @dataclass

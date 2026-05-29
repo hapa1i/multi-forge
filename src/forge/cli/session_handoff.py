@@ -1,13 +1,13 @@
-"""``forge session handoff show`` -- inspect handoff-agent review reports.
+"""``forge session handoff show`` -- inspect memory writer review reports.
 
-The handoff agent (``handoff_agent.py``) runs detached from the Stop work
-queue, so its stdout vanishes to ``DEVNULL``. To make the agent's proposed
-or applied changes visible, ``run_handoff_agent`` persists each run's output
+The memory writer (``memory_writer.py``) runs detached from the Stop work
+queue, so its stdout vanishes to ``DEVNULL``. To make the writer's proposed
+or applied changes visible, ``run_memory_writer`` persists each run's output
 to ``<forge_root>/.forge/artifacts/<session>/handoff/review-<timestamp>.md``.
 This module surfaces that file via ``forge session handoff show``.
 
-Note: this is the memory-doc agent's review surface, not the resume-context
-file. See ``forge.session.handoff`` for the resume-context generator.
+Note: this is the memory writer's review surface, not the resume-context
+file. See ``forge.session.transfer`` for the resume-context generator.
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ from rich.syntax import Syntax
 from forge.cli.output import print_error_with_tip, print_tip
 from forge.cli.session import _cwd_forge_root, console, handle_session_error
 from forge.session import ForgeSessionError, SessionManager
-from forge.session.handoff_agent import review_dir
+from forge.session.memory_writer import memory_report_dir
 
 
 @click.group("handoff")
@@ -95,7 +95,7 @@ def _resolve_session_forge_root(session_name: str | None) -> tuple[str, Path]:
 
 def _list_reports(forge_root: Path, session_name: str) -> list[Path]:
     """Return review-*.md files sorted oldest -> newest."""
-    target = review_dir(forge_root, session_name)
+    target = memory_report_dir(forge_root, session_name)
     if not target.is_dir():
         return []
     return sorted(
@@ -123,7 +123,9 @@ def show_cmd(session_name: str | None, show_latest: bool, show_all: bool) -> Non
 
     if not reports:
         console.print(f"[dim]No handoff reports found for session [cyan]{resolved_name}[/cyan].[/dim]")
-        print_tip(f"The handoff agent writes reports to {review_dir(forge_root, resolved_name)}.", console=console)
+        print_tip(
+            f"The handoff agent writes reports to {memory_report_dir(forge_root, resolved_name)}.", console=console
+        )
         return
 
     if show_all:

@@ -701,7 +701,7 @@ def _resolve_session_artifact_root(*, manager: SessionManager, state: SessionSta
     return Path(manager.resolve_project_root(worktree_path))
 
 
-def _generate_parent_handoff_context(
+def _generate_parent_transfer_context(
     *,
     manager: SessionManager,
     manifest: SessionState,
@@ -709,7 +709,7 @@ def _generate_parent_handoff_context(
     strategy: str = "structured",
     inline_plan: bool = False,
 ) -> tuple[Path | None, list[str]]:
-    """Generate a fresh parent-context handoff file for a forked session.
+    """Generate a fresh parent transfer-context file for a forked session.
 
     Writes ``<fork_forge_root>/.forge/prev_sessions/<parent>/generated.md`` (the
     regeneratable cache) and copies it into ``children/<fork_name>.md`` (the
@@ -769,7 +769,7 @@ def _generate_parent_handoff_context(
 
     project_root = _resolve_session_artifact_root(manager=manager, state=parent_state)
 
-    from forge.session.handoff import ResumeStrategy, process_handoff
+    from forge.session.transfer import ResumeStrategy, assemble_transfer_context
 
     try:
         resume_strategy = ResumeStrategy(strategy)
@@ -784,7 +784,7 @@ def _generate_parent_handoff_context(
         except ForgeSessionError:
             return None
 
-    handoff_result = process_handoff(
+    transfer_result = assemble_transfer_context(
         parent_name=manifest.parent_session,
         parent_state=parent_state,
         forge_root=project_root,
@@ -796,9 +796,9 @@ def _generate_parent_handoff_context(
         inline_plan=inline_plan,
         child_name=manifest.name,
     )
-    if handoff_result.context_file is None:
-        return None, handoff_result.warnings
-    return handoff_result.context_file.resolve(), handoff_result.warnings
+    if transfer_result.context_file is None:
+        return None, transfer_result.warnings
+    return transfer_result.context_file.resolve(), transfer_result.warnings
 
 
 def _hint_cross_project_session(name: str, forge_root: str | None) -> bool:

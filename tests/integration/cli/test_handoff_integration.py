@@ -19,8 +19,8 @@ from dataclasses import asdict
 import pytest
 
 from forge.session.models import (
-    HandoffConfig,
     MemoryIntent,
+    MemoryWriterConfig,
     create_session_state,
 )
 from tests.fixtures.docker import ContainerLike
@@ -90,7 +90,7 @@ def _build_manifest(
         proxy_base_url=PROXY_URL,
     )
     manifest.intent.memory = MemoryIntent(
-        auto_update=HandoffConfig(
+        auto_update=MemoryWriterConfig(
             enabled=handoff_enabled,
             mode=mode,
             min_turns=min_turns,
@@ -382,7 +382,7 @@ class TestHandoffRunMultiDoc:
 
         show_result = mock_claude_workspace.exec(f"cd /workspace && forge session handoff show {session_name} --latest")
         assert show_result.returncode == 0, show_result.stderr
-        assert "Handoff Agent Report -- memory-review" in show_result.stdout
+        assert "Memory Writer Report -- memory-review" in show_result.stdout
         assert "Mode**: review-only" in show_result.stdout
         assert "Review proposal: add the latest session fact to docs/state.md." in show_result.stdout
 

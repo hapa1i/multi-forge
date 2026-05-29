@@ -100,25 +100,36 @@ Keep names (already self-descriptive / generic): `build_multi_doc_prompt()`, `co
 
 Rename the session-layer files and types. Largest blast radius — every importer updates atomically in one commit.
 
-- [ ] `git mv` session files:
+- [x] `git mv` session files:
   - `session/handoff_agent.py` → `session/memory_writer.py`
   - `session/handoff.py` → `session/transfer.py`
-- [ ] Rename public types/functions in the new files (see type table). Includes `review_dir()` → `memory_report_dir()`
+- [x] Rename public types/functions in the new files (see type table). Includes `review_dir()` → `memory_report_dir()`
   (the returned path stays `.forge/artifacts/<session>/handoff/` — see Phase 3 path note).
-- [ ] Rename internal symbols carrying the conflated term:
+- [x] Rename internal symbols carrying the conflated term:
   - `cli/session.py:_generate_parent_handoff_context` → `_generate_parent_transfer_context` (+ local `handoff_result`
     vars in that function)
-- [ ] Update all importers in `src/forge/` (atomic — every caller in same commit).
+  - `cli/session_lifecycle.py:_persist_fork_handoff_derivation` → `_persist_fork_transfer_derivation` (+ `__all__`)
+- [x] Update all importers in `src/forge/` (atomic — every caller in same commit).
   - Assertion: `grep -rn "from forge.session.handoff\b\|from forge.session.handoff_agent\b" src/forge/` = 0 hits
   - Assertion: `grep -rn "HandoffConfig\|HandoffResult\|run_handoff_agent\|process_handoff" src/forge/` = 0 hits
-- [ ] Update + rename test files (include the regression/integration tests the original card omitted):
+  - Also updated stale prose refs in `prev_sessions.py`, `plan_resolution.py`, `core/transcript.py`,
+    `shadow_curation.py`, `cli/session_handoff.py` docstring, `cli/session_lifecycle.py` comment
+- [x] Update + rename test files (14 files total):
   - `tests/src/session/test_handoff_agent.py` → `test_memory_writer.py`
   - `tests/src/session/test_handoff.py` → `test_transfer.py`
   - `tests/src/cli/test_handoff.py` → `test_memory_writer_cli.py`
-  - `tests/regression/test_bug_21x_fork_launch_handoff.py` (imports `process_handoff`) — update imports/symbols
-  - `tests/regression/test_bug_21x_handoff_output_root.py` (imports `process_handoff`) — update imports/symbols
-  - `tests/regression/test_bug_handoff_forge_root.py` — update fixtures/imports as needed
-  - `tests/integration/cli/test_handoff_integration.py` (uses `HandoffConfig`) — update imports/symbols
+  - `tests/regression/test_bug_21x_fork_launch_handoff.py` — updated imports/symbols
+  - `tests/regression/test_bug_21x_handoff_output_root.py` — updated imports/symbols
+  - `tests/regression/test_bug_prev_sessions_parent_scope.py` — updated imports/symbols
+  - `tests/regression/test_bug_handoff_forge_root.py` — no change (marker kind only)
+  - `tests/integration/cli/test_handoff_integration.py` — updated `HandoffConfig` → `MemoryWriterConfig`
+  - `tests/src/cli/test_artifact_hooks.py` — updated `HandoffConfig` → `MemoryWriterConfig`
+  - `tests/src/cli/test_session_commands.py` — updated patch targets
+  - `tests/src/cli/test_session_derivation.py` — updated `_persist_fork_transfer_derivation`
+  - `tests/src/cli/test_session_extensions.py` — updated imports + patch targets
+  - `tests/src/cli/test_session_resume_review.py` — updated `HandoffResult` → `TransferResult`
+  - `tests/src/session/test_memory_inheritance.py` — updated `HandoffConfig` → `MemoryWriterConfig`
+  - `tests/src/session/test_models.py` — updated `HandoffConfig` → `MemoryWriterConfig`
 
 ### Acceptance
 

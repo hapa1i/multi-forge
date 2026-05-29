@@ -45,7 +45,7 @@ def _seed_session_with_reports(
     for i in range(report_count):
         # Different timestamps so sorting is well-defined
         f = review / f"review-2026010{i}-120000.md"
-        f.write_text(f"# Handoff Agent Report\n\nrun {i}\n", encoding="utf-8")
+        f.write_text(f"# Memory Writer Report\n\nrun {i}\n", encoding="utf-8")
         reports.append(f)
     return forge_root, reports
 
