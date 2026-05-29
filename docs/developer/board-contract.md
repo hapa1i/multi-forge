@@ -68,7 +68,7 @@ Acceptance tables should be fixture-grounded:
 ```markdown
 | Test | Fixture | Assertion | Test File |
 | ---- | ------- | --------- | --------- |
-| Stop hook enqueues handoff | project memory enabled, session silent | handoff marker exists | `tests/src/cli/test_artifact_hooks.py` |
+| Stop hook enqueues memory-writer work | project memory enabled, session silent | handoff marker exists | `tests/src/cli/test_artifact_hooks.py` |
 ```
 
 Avoid vague assertions like "works correctly." Name the observable behavior.
@@ -92,9 +92,9 @@ During card execution:
 | ------------------------------------ | -------------------------------------------- | -------------------------------------------------------------------------------------------- |
 | `docs/board/change_log.md`           | Completed-work record                        | Newest first, compact, includes goal/key changes/verification                                |
 | `docs/board/impl_notes.md`           | Human-approved durable implementation memory | Promote only stable decisions, invariants, recurring bug causes, and operational constraints |
-| `.forge/memory/shadow_impl_notes.md` | Shadow proposals for `impl_notes.md`         | Handoff agent may append; humans review and promote                                          |
+| `.forge/memory/shadow_impl_notes.md` | Shadow proposals for `impl_notes.md`         | Memory writer may append; humans review and promote                                          |
 
-Card checklists are edited directly during implementation. Do not track card checklists as handoff-agent memory docs.
+Card checklists are edited directly during implementation. Do not track card checklists as memory-writer memory docs.
 
 ## Change Log Policy
 

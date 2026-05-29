@@ -521,7 +521,7 @@ bash "$SCRIPTS/run-in-repo.sh" forge session list
 
 <!-- human:guided -->
 
-In your **Terminal** window, try the memory passport and activation commands. This does not run the handoff agent; it
+In your **Terminal** window, try the memory passport and activation commands. This does not run the memory writer; it
 verifies that passports and session activation work without editing raw JSON.
 
 ```

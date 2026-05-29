@@ -4,7 +4,7 @@ Completed-work record for Forge implementation sessions.
 
 ## Maintenance
 
-- Updated by the handoff agent with `strategy=changelog`, and by humans when closing a phase.
+- Updated by the memory writer with `strategy=changelog`, and by humans when closing a phase.
 - Add compact entries for completed work only. Pending tasks belong in card checklists.
 - Follow `docs/developer/board-contract.md` "Change Log Policy": each entry needs Goal, Key changes, and
   Verification.

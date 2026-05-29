@@ -23,7 +23,7 @@ before changing a team default.
 | **Supervisor** (judges diffs vs plan) | Prefer the validated long-context default for that proxy's `opus` tier      | The job is retrieving and citing the right plan item             |
 | **One-shot review**                   | Try newer/high-capability models freely                                     | The context is bounded and easier to validate                    |
 | **Panel / debate**                    | Mix providers and model families                                            | Different defaults expose different bugs                         |
-| **Handoff agent**                     | Prefer a cheaper summarization-capable model after a review-only smoke test | Single-transcript synthesis is usually cost-sensitive            |
+| **Memory writer**                     | Prefer a cheaper summarization-capable model after a review-only smoke test | Single-transcript synthesis is usually cost-sensitive            |
 | **Cost-conscious supervision**        | Use warn-only mode until local validation proves blocker quality            | False-positive blocks are more expensive than missed suggestions |
 
 The rule of thumb: **pin models per role, then validate locally**. Do not promote a newly released model to a
@@ -42,7 +42,7 @@ That matters because Forge roles stress different failure modes:
 1. **Supervisor**: long-context retrieval, citation fidelity, and confidence calibration.
 2. **Executor**: coding quality, tool discipline, latency, and instruction following.
 3. **One-shot reviewer**: bounded-context reasoning and bug finding.
-4. **Handoff agent**: summarization quality and cost.
+4. **Memory writer**: summarization quality and cost.
 
 Forge's `model_alternatives` field in proxy templates exists so you can keep more than one version of a vendor's model
 available at the same proxy. You do not have to choose once for all roles.
@@ -83,7 +83,7 @@ Use this matrix with the current template catalog and provider docs:
 | OpenAI/Codex-family models      | Code review, code-focused execution, panel diversity        | Citation fidelity in fail-closed supervision        |
 | Gemini-family models            | Cross-family supervision, large-context review, low latency | Gateway-specific cache/context limits               |
 | DeepSeek/Kimi/Qwen/GLM/MiniMax  | Cost-conscious warn-only checks, panel dissent, bulk tasks  | Promoting to sole blocker without repo-local trials |
-| Cheap/fast models in any family | Handoff agent, taggers, pre-checks                          | High-consequence enforcement                        |
+| Cheap/fast models in any family | Memory writer, taggers, pre-checks                          | High-consequence enforcement                        |
 
 Treat this as a starting posture, not a benchmark table. Record the exact model version, provider route, source date,
 and local validation result whenever you change a proxy default.
@@ -243,7 +243,7 @@ strengths matter.
 | `/forge:review` | `src/skills/review/SKILL.md` (Claude Code skill)   | `src/forge/core/ops/session_context.py` for family detection |
 | `/forge:panel`  | `forge workflow panel ...`                         | `src/forge/review/engine.py`, `src/forge/review/models.py`   |
 | `/forge:debate` | `forge workflow debate ...`                        | `src/forge/review/engine.py` (adversarial runner)            |
-| Handoff agent   | Runs at Stop hook + async work queue               | `src/forge/session/handoff_agent.py`                         |
+| Memory writer   | Runs at Stop hook + async work queue               | `src/forge/session/memory_writer.py`                         |
 
 For the panel and debate model catalog, see `src/forge/review/models.py`. To add a new model alternative or change the
 default tier mapping, edit the proxy template under `src/forge/config/defaults/templates/` and reset proxies that use it

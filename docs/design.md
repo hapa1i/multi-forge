@@ -1,7 +1,7 @@
 # Forge Design (Unified Architecture)
 
 - **Session manager usage**: [session.md](end-user/session.md) (session management guide)
-- **Handoff agent usage**: [handoff.md](end-user/handoff.md) (automatic memory docs guide)
+- **Memory writer usage**: [memory.md](end-user/memory.md) (automatic memory docs guide)
 - **Search usage**: [search.md](end-user/search.md) (transcript search guide)
 - **Skills usage**: [skills.md](end-user/skills.md) (review, understand, panel guide)
 - **Visual diagrams**: [diagrams.md](diagrams.md) (architecture diagrams)
@@ -112,8 +112,8 @@ project_root    (logical repo -- git identity, shared across worktrees)
 - **`session resume`, `session fork`**: project-scoped. Cannot resolve cross-project because Claude Code's `--resume`
   and CWD namespace are tied to the project directory. Hints where the session lives on cross-project miss.
 - **`session clean`**: global by default (no `forge_root` filter).
-- **Artifacts, handoff, search**: Forge-project-scoped (all under `<forge_root>/.forge/`).
-- **Cross-project resume** (handoff mode only): allowed within the same logical repo
+- **Artifacts, transfer, search**: Forge-project-scoped (all under `<forge_root>/.forge/`).
+- **Cross-project resume** (transfer mode only): allowed within the same logical repo
   (`parent_project_root == child.project_root`). Reads parent artifacts by absolute path via `parent_forge_root` in the
   derivation record. **Native resume** (`--resume-mode native`) requires the same `forge_root` -- Claude Code cannot
   `--resume` across CWD boundaries (see §3.9).
@@ -130,15 +130,15 @@ the current project's `.claude/`. Forge's project model (N sessions per Forge pr
 this.
 
 When sessions cross **Forge project boundaries** (worktree forks, `fork --into`, resume), Forge uses **file-based
-handoff**: `process_handoff()` reads the parent's transcript artifacts and generates a portable context file at
-`<forge_root>/.forge/prev_sessions/<parent>/generated.md`, then copies it to the launch-time child artifact at
+transfer**: `assemble_transfer_context()` reads the parent's transcript artifacts and generates a portable context file
+at `<forge_root>/.forge/prev_sessions/<parent>/generated.md`, then copies it to the launch-time child artifact at
 `<forge_root>/.forge/prev_sessions/<parent>/children/<child>.md`, appended via `--append-system-prompt-file`. This is an
-accepted tradeoff: handoff files are lossy compared to native `--resume` (structured summary vs full conversation), but
+accepted tradeoff: transfer files are lossy compared to native `--resume` (structured summary vs full conversation), but
 they enable branch isolation and cross-worktree workflows.
 
 The `--strategy` knob controls fidelity: `minimal` (lineage pointer) → `structured` (conversation skeleton, default) →
 `full` (complete transcript) → `ai-curated` (LLM-selected highlights). `--inline-plan` embeds the approved plan content
-(from ExitPlanMode snapshots) directly into the handoff file — critical for review and supervision workflows where the
+(from ExitPlanMode snapshots) directly into the transfer file — critical for review and supervision workflows where the
 reader cannot access the original plan file.
 
 Checkouts are **shared resources** (like proxies): multiple sessions can live in the same checkout. `delete_session()`
@@ -160,7 +160,7 @@ another, while keeping artifacts and the working directory shared.
 
 **Why proxies, not session overrides:** Per-session routing is impossible without a session identifier in requests (see
 §3). Sessions within a Forge project share the working directory; artifacts (plans, reviews) are captured per-session
-for cross-session handoff. Worktrees are used when sessions write concurrently.
+for cross-session transfer. Worktrees are used when sessions write concurrently.
 
 ### 3.2 Contract files (authoritative paths)
 
@@ -242,8 +242,8 @@ preferences.
 subprocess_proxy: openrouter-anthropic
 ```
 
-This supports direct-mode main sessions that still need panel, supervisor, or handoff subprocesses routed through a
-proxy for API-key auth and cost visibility. It is session-owned launch intent, not a proxy-owned tier/model override.
+This supports direct-mode main sessions that still need panel, supervisor, or memory-writer subprocesses routed through
+a proxy for API-key auth and cost visibility. It is session-owned launch intent, not a proxy-owned tier/model override.
 Resume, fork, and relaunch children inherit it unless the launch path explicitly chooses different routing.
 
 **`confirmed.started_with_proxy`**: the proxy this session is running with (set at start, immutable for the run):
@@ -427,7 +427,7 @@ that is no longer reachable — start a live proxy rather than fail. A bare prox
 
 #### 3.6.12 Subprocess routing resolution (normative)
 
-All Forge subprocesses (workflow workers, supervisor, handoff agent) resolve proxy routing through a single shared
+All Forge subprocesses (workflow workers, supervisor, memory writer) resolve proxy routing through a single shared
 function (`resolve_subprocess_routing()`). This replaced four ad-hoc resolution paths that each implemented different
 fallback chains with different semantics.
 
@@ -455,11 +455,11 @@ no Forge proxy mapping to resolve.
 
 **Fail behavior by subprocess type:**
 
-| Subprocess | On unresolved | Rationale                                                        |
-| ---------- | ------------- | ---------------------------------------------------------------- |
-| Workflows  | Fail closed   | User asked for this work; partial results worse than an error    |
-| Supervisor | Fail open     | Blocking the coding session is worse than skipping a check       |
-| Handoff    | Fail open     | Async/best-effort; benefits future sessions, not the current one |
+| Subprocess    | On unresolved | Rationale                                                        |
+| ------------- | ------------- | ---------------------------------------------------------------- |
+| Workflows     | Fail closed   | User asked for this work; partial results worse than an error    |
+| Supervisor    | Fail open     | Blocking the coding session is worse than skipping a check       |
+| Memory writer | Fail open     | Async/best-effort; benefits future sessions, not the current one |
 
 **Per-invocation routing plan:** Workflow commands resolve routing for all workers **once** at invocation start as a
 frozen `WorkerRoutingPlan`. No per-worker resolution at runtime. This prevents registry drift during parallel fan-out
@@ -550,7 +550,7 @@ Notes:
 When context nears limits, `forge session resume --fresh` creates a new session with context assembled from the parent.
 It's **two-phase**: raw artifacts stay immutable; context assembly is flexible.
 
-**Phase 1: Handoff (parent session end)**
+**Phase 1: Capture (parent session end)**
 
 The Stop hook captures everything to artifacts — this is the **source of truth**:
 
@@ -567,16 +567,16 @@ The hook also updates designated memory docs if work was completed.
 
 The resume command supports two **resume modes** (`--resume-mode`):
 
-- **`handoff`** (default): Assembles parent context into a markdown file passed via `--append-system-prompt-file`. Lossy
-  but survives `/compact` (lives in the system prompt). Size controlled by `--strategy`.
+- **`transfer`** (default): Assembles parent context into a markdown file passed via `--append-system-prompt-file`.
+  Lossy but survives `/compact` (lives in the system prompt). Size controlled by `--strategy`.
 - **`native`**: Uses `--resume --fork-session` to carry full conversation history. Lossless but lost on `/compact`. No
   context file generated. Requires the parent to have a confirmed `claude_session_id`.
 
 > **Why not native for worktree forks?** Claude Code stores sessions at `~/.claude/projects/<encoded-cwd>/`. `--resume`
 > from a different CWD cannot find the session JSONL. Tested with Claude Code 2.1.90 (Apr 2026): all cross-CWD scenarios
-> fail with "No conversation found." Worktree forks use handoff only.
+> fail with "No conversation found." Worktree forks use transfer only.
 
-**Handoff mode strategies** (`--resume-mode handoff`, default):
+**Transfer mode strategies** (`--resume-mode transfer`, default):
 
 ```bash
 forge session resume <parent> --fresh --strategy <strategy> [--depth N]
@@ -646,8 +646,8 @@ derivation:
   parent_project_root: /abs/path/to/repo               # Must match child's project_root
   parent_transcript: .forge/artifacts/feature-auth-v1/transcript.jsonl
   inherited_proxy: litellm-anthropic     # From parent's proxy intent, if inherited
-  resume_mode: handoff                  # "native" or "handoff" (authoritative)
-  strategy: structured                  # null when resume_mode=native or handoff context not generated yet
+  resume_mode: transfer                 # "native" or "transfer" (authoritative)
+  strategy: structured                  # null when resume_mode=native or transfer context not generated yet
   depth: 1
   resumed_at: 2025-01-02T15:30:00Z
   # Lineage chain (computed from parent pointers)
@@ -655,8 +655,8 @@ derivation:
 ```
 
 Same-directory forks use `resume_mode: native`, `strategy: null`, `depth: 1`, and lineage containing the parent.
-Worktree and `--into` forks start with `resume_mode: handoff`; the CLI enriches `strategy` and `context_file` when it
-generates a handoff context file.
+Worktree and `--into` forks start with `resume_mode: transfer`; the CLI enriches `strategy` and `context_file` when it
+generates a transfer context file.
 
 **Cross-project resume:** `parent_forge_root` tells the child where the parent's artifacts live (may differ from the
 child's `forge_root` when the parent was in a different checkout). `parent_project_root` must equal the child's
@@ -665,13 +665,13 @@ child's `forge_root` when the parent was in a different checkout). `parent_proje
 **Context assembly (what child loads at start):**
 
 1. Designated memory docs (always, via CLAUDE.md)
-2. Processed handoff: `<forge_root>/.forge/prev_sessions/<parent>/children/<child>.md` (strategy-dependent)
+2. Processed transfer: `<forge_root>/.forge/prev_sessions/<parent>/children/<child>.md` (strategy-dependent)
 3. Lineage reference: pointer to raw artifacts for deep reads
 
 **Why two phases?**
 
 - Raw artifacts preserve the full history for debugging and audit
-- **Handoff** writes a portable, strategy-dependent view of that history
+- **Transfer** writes a portable, strategy-dependent view of that history
 - **Resume** assembles context — user controls the fidelity/size trade-off
 - Same raw data can produce different views for different needs
 
@@ -739,12 +739,12 @@ Stop Pipeline:
   2. run_verification()     Check completion promise → returns allow|block
 
   [Async - enqueued, fire and forget]
-  3. enqueue_handoff_work() Mark session for handoff agent + indexing
+  3. enqueue memory-writer work  Mark session for the memory writer + indexing
 
   return verification_decision
 ```
 
-The handoff agent runs **async** to avoid blocking exit. Memory doc updates are eventually consistent—fine since they
+The memory writer runs **async** to avoid blocking exit. Memory doc updates are eventually consistent—fine since they
 benefit future sessions.
 
 **Idempotency rules** (verification can trigger Stop multiple times per session):
@@ -758,9 +758,10 @@ benefit future sessions.
 **Async enqueue:** The Stop hook enqueues a marker via `enqueue_stop_marker()` for deferred processing. See §3.13 (Async
 Work Queue) for the queue contract, schema, and processing model.
 
-This keeps the Stop hook fast (\<100ms) while ensuring handoff + indexing happen soon.
+This keeps the Stop hook fast (\<100ms) while ensuring memory-writer work + indexing happen soon.
 
-Design rule: hooks emit machine-readable JSON; no `systemMessage` required (handoff agent replaces manual reminders).
+Design rule: hooks emit machine-readable JSON; no `systemMessage` required (the memory writer replaces manual
+reminders).
 
 > See [diagrams.md §5: Hook Deployment Model](diagrams.md#5-hook-deployment-model).
 
@@ -811,7 +812,7 @@ This avoids duplicating business logic between terminal and in-session entry poi
 ### 3.13 Async work queue
 
 A **general-purpose, file-based queue** for deferred work. Producers enqueue markers; CLI startup processes them
-opportunistically. This is a core primitive used by the Stop pipeline, search indexing, and handoff agent.
+opportunistically. This is a core primitive used by the Stop pipeline, search indexing, and the memory writer.
 
 **Module:** `forge.core.workqueue`
 
@@ -911,10 +912,10 @@ support `--json` for scripting.
 | `forge session clean --older-than N`   | Bulk-delete sessions older than N days                                            |
 | `forge session incognito [name]`       | Start an ephemeral session (auto-delete on exit)                                  |
 | `forge session shell [name]`           | Open shell in sidecar container                                                   |
-| `forge session handoff show [name]`    | Inspect handoff-agent review reports (`--latest`, `--all`)                        |
 
 Note: `session context` is a deprecated alias for `session show`. `session resume --fresh --review` opens the generated
-per-child handoff file in `$EDITOR` before launching Claude. `forge session memory` is removed; use `forge memory`.
+per-child transfer context file in `$EDITOR` before launching Claude. `forge session memory` is removed; use
+`forge memory`.
 
 #### Memory management
 
@@ -925,6 +926,7 @@ per-child handoff file in `$EDITOR` before launching Claude. `forge session memo
 | `forge memory disable`         | Disable memory auto-update for a session (`--session`, resolves `$FORGE_SESSION`)                                     |
 | `forge memory list`            | List passported memory docs under scan roots (`--json`)                                                               |
 | `forge memory status`          | Show memory activation across sessions (`--scope`, `--json`)                                                          |
+| `forge memory report show`     | Inspect memory writer review reports for a session (`--latest`, `--all`)                                              |
 | `forge memory shadows list`    | List accumulated shadow proposals (`--scope`, `--json`)                                                               |
 | `forge memory shadows show`    | Show shadow proposal content (`--for <doc>`, `--scope`)                                                               |
 | `forge memory shadows review`  | Review/curate shadow proposals (`--for`, `--curate`, `--show-latest`)                                                 |
@@ -1026,11 +1028,11 @@ hints through `ModelSpec.prompt`. All workflow execution commands (panel, analyz
 
 #### Internal (hidden from `forge --help`)
 
-| Command             | Purpose                                    |
-| ------------------- | ------------------------------------------ |
-| `forge hook <name>` | Hook dispatcher (SessionStart, Stop, etc.) |
-| `forge status-line` | Generate status line output                |
-| `forge handoff run` | Run handoff agent for completed session    |
+| Command                   | Purpose                                       |
+| ------------------------- | --------------------------------------------- |
+| `forge hook <name>`       | Hook dispatcher (SessionStart, Stop, etc.)    |
+| `forge status-line`       | Generate status line output                   |
+| `forge memory-writer run` | Run the memory writer for a completed session |
 
 **Design principles:**
 
@@ -1206,15 +1208,15 @@ context keeps the original plan in view.
 **Reactive Patterns (Shared Library)**
 
 Several components react to hook events via external processing: semantic supervisor (`policy/semantic/supervisor.py`),
-handoff agent (`session/handoff_agent.py`), deterministic policies (`policy/deterministic/`), and the planned workflow
-policy. The shared pattern: take hook context, classify/evaluate, return a decision or side-effect. Three node types
-cover current and planned use cases:
+the memory writer (`session/memory_writer.py`), deterministic policies (`policy/deterministic/`), and the planned
+workflow policy. The shared pattern: take hook context, classify/evaluate, return a decision or side-effect. Three node
+types cover current and planned use cases:
 
 | Node type      | Execution                         | Examples                                  | Cost        |
 | -------------- | --------------------------------- | ----------------------------------------- | ----------- |
 | Code           | Deterministic Python function     | TDD enforcement, path gating, file checks | Free        |
 | LLM call       | Stateless API call via `core.llm` | Tagger (classification), checker          | ~$0.001     |
-| Claude session | `claude -p [--resume]` subprocess | Supervisor, handoff agent                 | ~$0.01-0.05 |
+| Claude session | `claude -p [--resume]` subprocess | Supervisor, memory writer                 | ~$0.01-0.05 |
 
 **Library, not framework**: Utilities live in a shared Python library (`core/reactive/`). Hook handlers are plain Python
 functions that import what they need. No YAML workflow engine, no declarative config layer — the same developers who
@@ -1430,7 +1432,7 @@ Skills vary in what they execute. Four types cover all current and planned cases
 | --------------- | ------------------------------------------- | ------------------------------------------- |
 | Pure Python     | Deterministic function                      | TDD policy, pattern matching, `run_tests()` |
 | Single LLM      | `core.llm` API call                         | Tagger, checker                             |
-| Claude session  | `claude -p [--bare]` subprocess (has tools) | Supervisor, reviewer, handoff agent         |
+| Claude session  | `claude -p [--bare]` subprocess (has tools) | Supervisor, reviewer, memory writer         |
 | Pure text (.md) | Markdown instructions sent to `claude -p`   | Review resources, analyze, debate prompts   |
 
 Claude session subprocesses use `--bare` when `ANTHROPIC_API_KEY` is in the environment (skips hooks, LSP, plugin sync,
@@ -1561,12 +1563,15 @@ review/evaluation skills are adversarial-compatible (runner checks for `{stance_
 Cross-session continuity via designated markdown files that sessions keep updated—no knowledge graphs or async
 synthesis.
 
-> **Naming note: "handoff" refers to two unrelated things in Forge.** The **handoff agent** (this section) is the
-> Stop-time worker that updates memory docs. **Resume handoff** (§3.9) is the parent-context file generated by
-> `forge session resume --fresh`. Different concept, different file location
-> (`<forge_root>/.forge/prev_sessions/<parent>/children/<child>.md`), different lifecycle. See
-> `docs/end-user/handoff.md` for the user-facing distinction and `forge session handoff show` for inspecting agent
-> output.
+Forge memory has three layers; this section covers **project memory** -- the designated docs the memory writer curates:
+
+| Layer               | What it holds                                           | Location                  |
+| ------------------- | ------------------------------------------------------- | ------------------------- |
+| **Raw memory**      | Transcripts, plans, artifacts, reports (§3.8)           | `.forge/artifacts/`       |
+| **Project memory**  | Passported docs (changelog, impl notes) -- this section | `docs/`, `.forge/memory/` |
+| **Transfer memory** | Curated context for fork/resume (§3.9)                  | `.forge/prev_sessions/`   |
+
+The **memory writer** curates project memory at Stop time; **transfer** (§3.9) assembles context for a child session.
 
 The simplest memory system is:
 
@@ -1575,16 +1580,16 @@ The simplest memory system is:
 3. Sessions update them before ending
 4. Next session gets current state
 
-#### 5.6.1 Handoff agent (automated doc maintenance)
+#### 5.6.1 Memory writer (automated doc maintenance)
 
-A headless agent runs at session end to fill gaps automatically:
+The memory writer runs at session end to fill gaps automatically:
 
 ```
-Stop hook → spawn headless agent → agent reads transcript + current docs → updates
+Stop hook → spawn memory writer → reads transcript + current docs → updates
 ```
 
-The agent runs `claude -p` (headless prompt mode) on the full session transcript. It operates **retrospectively**,
-selecting what mattered with full-session hindsight (higher signal than incremental capture).
+The memory writer runs `claude -p` (headless prompt mode) on the full session transcript. It operates
+**retrospectively**, selecting what mattered with full-session hindsight (higher signal than incremental capture).
 
 ```yaml
 # In session intent (set via forge memory enable or --memory on)
@@ -1596,7 +1601,7 @@ memory:
     min_turns: 5               # skip for very short sessions
 ```
 
-**Multi-agent workflow:** In parallel runs, each agent spawns its own handoff agent. `augment` mode stays additive (no
+**Multi-agent workflow:** In parallel runs, each agent spawns its own memory writer. `augment` mode stays additive (no
 overwrites).
 
 #### 5.6.2 Memory doc passports
@@ -1626,7 +1631,7 @@ forge_memory:
 Editing a passport between sessions takes effect without re-running `forge memory track`.
 
 **Writer semantics**: `all-sessions` and exact session-name writers are supported. `lineage:` and `role:` prefixes are
-rejected with deferral messages. Writer access is checked at Stop time by the handoff agent.
+rejected with deferral messages. Writer access is checked at Stop time by the memory writer.
 
 **Passport CLI**: `forge memory track --strategy <strategy>` synthesizes a passport for docs without one.
 `forge memory track` with flags on a doc that already has a passport overwrites the passport (flags win, warnings
@@ -1634,7 +1639,7 @@ printed). `forge memory passport show <path>` displays passport fields.
 
 #### 5.6.3 Two operating modes
 
-The handoff agent has two distinct modes:
+The memory writer has two distinct modes:
 
 **Mode 1: Direct Update** — agent updates the doc in place per strategy. Used for project docs the agent is allowed to
 maintain.
@@ -1662,8 +1667,9 @@ forge session resume parent --fresh --memory off
 ```
 
 Inheritance copies only `auto_update` (enabled, mode, min_turns, proxy). Other `MemoryIntent` fields do not propagate.
-`--memory off` writes an explicit `HandoffConfig(enabled=False)` so the child is deliberately off even if later defaults
-change. `--memory on` reuses the parent's non-enabled config (mode, proxy, min_turns) or `HandoffConfig` defaults.
+`--memory off` writes an explicit `MemoryWriterConfig(enabled=False)` so the child is deliberately off even if later
+defaults change. `--memory on` reuses the parent's non-enabled config (mode, proxy, min_turns) or `MemoryWriterConfig`
+defaults.
 
 Memory docs are not inherited. Passports are git-tracked and discovered live at Stop time in whatever checkout the child
 session runs in. This applies equally to same-checkout forks, `--worktree`, and `--into`.
@@ -1671,7 +1677,7 @@ session runs in. This applies equally to same-checkout forks, `--worktree`, and 
 #### 5.6.5 Strategy registry
 
 Per-doc strategies control how each file is updated. Strategies are defined in `MemoryStrategy` enum in
-`src/forge/session/passport.py` (single source for CLI, passport, and handoff prompts).
+`src/forge/session/passport.py` (single source for CLI, passport, and memory-writer prompts).
 
 **No file creation.** Designated docs must already exist; missing files are skipped. Humans choose which docs to
 maintain; the agent maintains them. `forge memory track` enforces this at configuration time; runtime skip handling
@@ -1680,12 +1686,12 @@ remains for stale manifests.
 Direct update strategies: `project-state`, `checklist`, `changelog`, `generic`. Shadow mode (`--propose`) works with any
 strategy.
 
-The handoff agent resolves designated doc paths relative to `forge_root`, so git-tracked docs target the correct branch
-in worktrees. Trackedness is controlled by path choice -- the agent doesn't distinguish.
+The memory writer resolves designated doc paths relative to `forge_root`, so git-tracked docs target the correct branch
+in worktrees. Trackedness is controlled by path choice -- the writer doesn't distinguish.
 
 **Relationship to Claude Code auto-memory:** Complementary, not competitive. Auto-memory captures during sessions
-(incremental, free-form); the handoff agent synthesizes after sessions (retrospective, per-doc strategies). The handoff
-agent deliberately does not read auto-memory — different targets, different information, occasional duplication is
+(incremental, free-form); the memory writer synthesizes after sessions (retrospective, per-doc strategies). The memory
+writer deliberately does not read auto-memory — different targets, different information, occasional duplication is
 cheaper than cross-format deduplication.
 
 > Strategy tables, example config, worktree resolution details, and full auto-memory comparison in
@@ -1703,12 +1709,12 @@ forge memory disable --session planner
 forge session start planner --memory on
 ```
 
-Both gates (Stop-hook enqueue in `src/forge/cli/hooks/commands.py` and the detached runner `forge handoff run`) check
-`effective.memory.auto_update.enabled` directly. Incognito sessions never enqueue regardless of activation state.
+Both gates (Stop-hook enqueue in `src/forge/cli/hooks/commands.py` and the detached runner `forge memory-writer run`)
+check `effective.memory.auto_update.enabled` directly. Incognito sessions never enqueue regardless of activation state.
 
 **Stop-time discovery.** When activation is on, the detached runner scans hardcoded roots (`docs/` plus
 `.forge/memory/`) for `forge_memory` passports the session is authorized to write, materializes shadow files for
-shadow-only passports, and passes the result to `run_handoff_agent()`. Capped at 50 docs after filtering. The Stop hook
+shadow-only passports, and passes the result to `run_memory_writer()`. Capped at 50 docs after filtering. The Stop hook
 only decides whether to enqueue; the scan runs in the background runner.
 
 **Scan roots** are hardcoded: `DEFAULT_SCAN_ROOTS = ("docs/",)` plus always `.forge/memory/`. Configurable roots are

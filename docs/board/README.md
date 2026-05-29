@@ -14,8 +14,8 @@ This README is a directory guide plus dogfood examples for people inspecting `do
 | `todo/<slug>/card.md`     | Accepted work parked until an execution branch exists | Move to `doing/` when the branch is created                                |
 | `doing/<slug>/card.md`    | Work currently in flight                              | Add or update `checklist.md` during implementation                         |
 | `done/<slug>/card.md`     | Completed work snapshot                               | Keep paired `checklist.md` when one existed                                |
-| `change_log.md`           | Completed-work record                                 | Handoff agent may update with `strategy=changelog`; humans keep it compact |
-| `impl_notes.md`           | Approved memory for future sessions                   | Human-approved only; handoff agent proposes to a shadow doc                |
+| `change_log.md`           | Completed-work record                                 | Memory writer may update with `strategy=changelog`; humans keep it compact |
+| `impl_notes.md`           | Approved memory for future sessions                   | Human-approved only; memory writer proposes to a shadow doc                |
 
 Every work item is a card directory. `card.md` holds the durable problem framing and design. `checklist.md` is added
 when the card needs an execution plan; it is the in-session scratchpad for phases, assertions, blockers, and
@@ -71,7 +71,7 @@ forge memory enable --session planner
 After the first session, inspect the output:
 
 ```bash
-forge session handoff show planner --latest
+forge memory report show planner --latest
 ```
 
 Review and curate implementation-note proposals before promoting anything into `impl_notes.md`:
@@ -110,16 +110,16 @@ forge memory track docs/board/impl_notes.md --propose --shadow-path .forge/memor
 forge session start planner --memory on --proxy openrouter-openai
 ```
 
-Have the planner produce and approve the plan. After the planner stops, inspect the handoff report:
+Have the planner produce and approve the plan. After the planner stops, inspect the memory report:
 
 ```bash
-forge session handoff show planner --latest
+forge memory report show planner --latest
 ```
 
 ### 2. Supervised Executor
 
 Fork the planner into a dedicated worktree. `--supervise` makes the planner session the executor's plan supervisor, and
-`--inline-plan` embeds the approved plan into the executor handoff file.
+`--inline-plan` embeds the approved plan into the executor transfer context file.
 
 ```bash
 forge session fork planner \
@@ -160,12 +160,12 @@ forge session fork planner \
   --inline-plan
 ```
 
-`--into` uses resume handoff because native Claude resume is scoped to the original CWD. The reviewer session inherits
+`--into` uses resume transfer because native Claude resume is scoped to the original CWD. The reviewer session inherits
 the planner's memory activation. Make the reviewer prompt explicitly review-oriented until the runtime-abstraction
 context commands land.
 
 Use `--strategy full` only when the executor or reviewer needs complete transcript detail. The default structured
-handoff plus `--inline-plan` keeps context smaller while preserving the approved plan.
+transfer plus `--inline-plan` keeps context smaller while preserving the approved plan.
 
 ## Scoping
 

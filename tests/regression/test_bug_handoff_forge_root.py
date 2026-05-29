@@ -1,12 +1,12 @@
 """Regression: handoff marker must include forge_root for nested projects.
 
 Bug: enqueue_handoff_marker() only passed worktree_path, which the detached
-handoff agent used as forge_root. For nested Forge projects (forge_root !=
+memory writer used as forge_root. For nested Forge projects (forge_root !=
 checkout_root), the agent would look for the session manifest in the wrong
 directory.
 
 Fix: All three enqueue functions accept forge_root. Hook callers pass
-store.forge_root. The handoff CLI (--root) and main.py handler forward it.
+store.forge_root. The memory-writer CLI (--root) and main.py handler forward it.
 """
 
 from __future__ import annotations

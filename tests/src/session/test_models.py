@@ -490,7 +490,7 @@ class TestMemoryWriterConfig:
         assert config.min_turns == 3
 
 
-class TestMemoryIntentWithHandoff:
+class TestMemoryIntentWithMemoryWriter:
     """Test MemoryIntent with auto_update (MemoryWriterConfig) field."""
 
     def test_default_no_auto_update(self) -> None:
@@ -499,9 +499,9 @@ class TestMemoryIntentWithHandoff:
         assert memory.auto_update is None
 
     def test_with_auto_update(self) -> None:
-        """MemoryIntent can include handoff agent configuration."""
-        handoff = MemoryWriterConfig(enabled=True, min_turns=3)
-        memory = MemoryIntent(auto_update=handoff)
+        """MemoryIntent can include memory writer configuration."""
+        writer = MemoryWriterConfig(enabled=True, min_turns=3)
+        memory = MemoryIntent(auto_update=writer)
         assert memory.auto_update is not None
         assert memory.auto_update.enabled is True
         assert memory.auto_update.min_turns == 3

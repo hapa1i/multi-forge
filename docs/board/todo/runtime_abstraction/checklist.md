@@ -27,6 +27,15 @@ wc -l docs/board/todo/runtime_abstraction/checklist.md
 Phase 1: stabilize curated handoff as a schema-backed, user-reviewable cross-runtime substrate. Keep CLI default
 behavior unchanged unless a separate default-change decision is recorded.
 
+**Deferred prerequisite (memory_substrate reconciliation, 2026-05-29):**
+
+- [ ] Reconcile this card's "curated handoff" vocabulary with the shipped **transfer** taxonomy, and retarget the
+  proposed `forge session handoff regenerate|edit|diff` surface (now removed/tombstoned in favor of `forge memory ...`)
+  before implementing the schema. The doc-updater is the **memory writer**; resume/fork context is **transfer**. Align
+  with `docs/design.md` §3.9 (transfer) and §5.6 (memory writer). The concrete code surfaces in this card were repointed
+  to `memory_writer.py`/`transfer.py` on 2026-05-29; the conceptual vocabulary was intentionally left for this card to
+  own when it executes.
+
 ## Phase 0 - Baseline Confirmation
 
 - [x] Confirm PR #8 cost-control and routing foundation state.
@@ -67,7 +76,7 @@ Phase 0 gaps carried forward:
 - [ ] Define the Forge-owned curated handoff schema contract in docs.
   - Assertion: schema records lineage, decisions with citations, current state, open questions, runtime hints, and user
     notes overlay.
-- [ ] Implement the curated handoff schema in `src/forge/session/handoff.py`.
+- [ ] Implement the curated handoff schema in `src/forge/session/transfer.py`.
   - Assertion: generated handoff markdown has stable sections for the schema fields; existing
     `minimal|structured|full|ai-curated` strategies either emit that schema or document their compatibility fallback.
 - [ ] Add tests for schema output and artifact durability.
@@ -132,7 +141,7 @@ Phase 0 gaps carried forward:
   - Assertion: `~/.forge/usage/events.jsonl` event schema covers runtime, provider, model, proxy, billing mode, tokens,
     latency, status, and attribution ids.
 - [ ] Instrument usage ledger callsites in staged order.
-  - Assertion: workflow verbs (`src/forge/cli/workflow.py`), handoff agent (`src/forge/session/handoff_agent.py`),
+  - Assertion: workflow verbs (`src/forge/cli/workflow.py`), memory writer (`src/forge/session/memory_writer.py`),
     review engine (`src/forge/review/engine.py`), semantic supervisor (`src/forge/policy/semantic/supervisor.py`), team
     supervisor (`src/forge/policy/team/handlers.py`), Claude launcher (`src/forge/cli/claude.py`), and session launcher
     (`src/forge/cli/session.py`) each have an explicit done/deferred status.

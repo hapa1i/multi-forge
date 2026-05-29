@@ -2,12 +2,13 @@
 
 ## Current Focus
 
-**Phase 4 (docs sync) is next.** Phases 0–3 are done. Phase 3's remaining two items — `handoff_timeout` →
-`memory_writer_timeout` and the preset/capabilities wording — are implemented and verified on the working tree (not yet
-committed). Full unit+regression green except two pre-existing, unrelated failures
-(`test_session_resume_review.py::...test_editor_nonzero_aborts_launch`,
-`test_removal_patching_system.py::...test_forge_info_no_traceback`) that reproduce identically with the Phase 3 changes
-stashed. Remaining: commit Phase 3, then Phase 4 (docs sync) and Phase 5 (closeout).
+**Phase 5 (closeout) is next.** Phases 0–4 are done. Phase 3 committed as `7fefbef`; Phase 4 (docs sync) is complete on
+the working tree with a single `docs:` commit pending — every current/normative doc, end-user guide, diagram, skill, and
+three test prose/path touches now use the memory-writer/transfer vocabulary, the 3-layer taxonomy table is in design.md
+§5.6, and the obsolete "Naming note" block is gone. Intentional KEEPs (`kind="handoff"`, `enqueue_handoff_marker`, the
+`handoff/` artifact path, `queued_handoff` field) are unchanged. Two pre-existing unrelated failures noted under Phase 3
+are independent of this card. Remaining: commit Phase 4, then Phase 5 closeout (change_log entry, impl_notes promotion,
+move card to `done/`).
 
 ## Summary
 
@@ -186,7 +187,7 @@ Rename the session-layer files and types. Largest blast radius — every importe
 
 ---
 
-## Phase 3: Config and durable-state rename — COMPLETE (verified 2026-05-29; commit pending)
+## Phase 3: Config and durable-state rename — COMPLETE (committed 7fefbef)
 
 Breaking changes — strict stale-state handling per coding-standards §5.
 
@@ -223,38 +224,60 @@ Breaking changes — strict stale-state handling per coding-standards §5.
 
 ---
 
-## Phase 4: Documentation sync
+## Phase 4: Documentation sync — COMPLETE (working tree; single `docs:` commit pending)
 
-- [ ] `docs/design.md`:
-  - §3.9 Session Resume: `--resume-mode handoff` → `transfer`; `derivation.resume_mode` value; "resume handoff" wording
-  - §3.10 Hook handlers / §3.13 Work queue: memory-writer wording (marker kind kept — note it)
-  - §5.6 + §5.6.1–5.6.7: "handoff agent" → "memory writer" throughout; update command table
-    (`forge session handoff show` → `forge memory report show`)
-  - Add the raw / project / transfer taxonomy table (from `card.md`)
-  - Remove the §5.6 "Naming note" disambiguation block (no longer needed)
-- [ ] `docs/design_appendix.md`: §C.3 (marker kinds), §G (memory doc reference)
-- [ ] `docs/diagrams.md`: node `W6b "designated project docs (handoff agent)"` → "memory writer"; edge
-  `fork / resume handoff` → "transfer". Marker-kind refs (`enqueues stop/index/handoff`, deferred-work queue list) stay
-  (kind kept per Phase 3).
-- [ ] `docs/end-user/handoff.md` → `docs/end-user/memory.md` (verified: no existing `memory.md`, rename is safe).
-  - Update inbound links + writer wording: `docs/end-user/{session.md,hook.md,README.md,config.md,authentication.md}`
-    and `docs/design.md`
-- [ ] `docs/board/impl_notes.md`: memory-system architecture section (writer vs transfer vocabulary)
-- [ ] Skill resources referencing handoff (`grep src/skills/`)
-- [ ] Regression test docstrings referencing handoff concepts
-- [ ] Fix stale contract references: the file is `docs/developer/board-contract.md`, but these cite
-  `work-board-contract.md` — `CLAUDE.md` (×3, incl. the `@docs/developer/…` context-load directive, which is therefore
-  **silently failing to load the board contract** into agent context), `AGENTS.md:15`, `docs/board/README.md:7` (link
-  text only; href already points at `board-contract.md`), and `docs/board/change_log.md:9,26`. (Tangential to the
-  rename, found during review.)
+Synced every current/normative doc to the shipped memory-writer/transfer vocabulary. Historical snapshots
+(`change_log.md` dated entries, `done/**`, this card's own `card.md`) intentionally retain "handoff" as accurate record.
+
+- [x] `docs/design.md`: §3.9 "Phase 1: Handoff" → "Phase 1: Capture"; `--resume-mode handoff` → `transfer`;
+  `resume_mode` value + "resume handoff"/"handoff file(s)" wording → transfer; §3.10/§3.13 narrative "enqueue
+  memory-writer work" (the real `enqueue_handoff_marker` / `kind="handoff"` stay only where the marker itself is
+  discussed); §4.0 moved `forge session handoff show` → `forge memory report show` into the memory-management table;
+  §5.6 "Naming note" block removed and replaced with the 3-layer taxonomy table (raw / project / transfer); stale
+  symbols fixed (`process_handoff`→`assemble_transfer_context`, `run_handoff_agent`→`run_memory_writer`,
+  `HandoffConfig`→`MemoryWriterConfig`, `handoff_agent.py`→`memory_writer.py`).
+- [x] `docs/design_appendix.md`: `handoff_timeout`→`memory_writer_timeout`; §C.3 marker row description → "Spawn the
+  memory writer" (KEEP `kind="handoff"`); `handoff_agent.py`→`memory_writer.py`; §G strategy wording.
+- [x] `docs/diagrams.md`: node `Handoff` / `W6b` → "Memory Writer" / "(memory writer)"; edge "resume handoff" → "resume
+  transfer". Marker edge `enqueues stop/index/handoff` KEPT (kind).
+- [x] `git mv docs/end-user/handoff.md docs/end-user/memory.md`; title → "Forge Memory Writer"; disambiguation block →
+  one-line transfer pointer; CLI refs → `forge memory report show` / `forge memory-writer run`. KEEP marker prose +
+  `handoff/` path. Repointed 5 inbound links (`design.md`, end-user `README.md`/`hook.md`/`config.md`/`session.md`).
+- [x] `docs/end-user/*` sweep: `config.md` `memory_writer_timeout` row; `session.md` resume-mode + transfer wording;
+  `hook.md`, `authentication.md`, `README.md`, `model-selection.md` (incl. `handoff_agent.py`→`memory_writer.py` path).
+- [x] Current board + agent-context docs (review finding): `docs/board/impl_notes.md` (vocabulary);
+  `docs/board/README.md` (`forge memory report show`, transfer wording); `docs/developer/board-contract.md`
+  (memory-writer wording; KEEP "handoff marker exists" example); `CLAUDE.md:127` `resume/handoff`→`resume/transfer`;
+  `change_log.md:7` maintenance header (dated entries below stay historical).
+- [x] `docs/board/todo/runtime_abstraction/**` (parked future work): fixed stale code/command surfaces
+  (`handoff_agent.py`→`memory_writer.py`, `session/handoff.py`→`session/transfer.py`, concrete component refs) and added
+  a deferred checklist item to reconcile the aspirational "curated handoff" vocabulary +
+  `forge session handoff regenerate|edit|diff` surface with this taxonomy when that card executes. The "curated handoff"
+  thesis is left intact.
+- [x] Skills full rename: `git mv 16-handoff.md` → `16-memory.md` + QA index link/section comment;
+  `## 16. Handoff Agent` → `## 16. Memory Writer` + subsection/prose; `SKILL.md` category token + skip note + reference
+  table; `report-template.md`; `5-session.md`/`10-resume.md` transfer wording; `walkthrough/resources/checklist.md:524`.
+  KEEP fixture filenames, `handoff-${SESSION_ID}.json` marker, `handoff/` path, `queued_handoff` field.
+- [x] Test prose/paths: `test_skill_content.py` (`16-memory.md` ×3, `TestQaMemoryWriterChecklist`, `memory_md` var,
+  `test_memory_*` methods; KEEP `queued_handoff` + the `"forge handoff run" not in code` negative assertion);
+  `test_models.py` class+docstring+var; `test_bug_handoff_forge_root.py` docstring (KEEP file name + marker symbol).
+
+> The Phase 4 plan's "fix stale `work-board-contract.md` references" line was already resolved by `226bba5` (it touched
+> `CLAUDE.md`, `AGENTS.md`, `docs/board/README.md`, `docs/board/change_log.md`); the only remaining mention is this
+> checklist's own description, so the item is dropped rather than re-ticked under this commit.
 
 ### Acceptance
 
-| Test                     | Fixture | Assertion                                                                                                                                      | Test File |
-| ------------------------ | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
-| No stale "handoff agent" | n/a     | `rg -n "handoff agent" docs/design.md docs/design_appendix.md docs/end-user docs/developer docs/diagrams.md` = 0 hits                          | manual    |
-| No stale resume wording  | n/a     | `rg -n "resume.*handoff\|--resume-mode handoff" docs/design.md docs/design_appendix.md docs/end-user docs/developer docs/diagrams.md` = 0 hits | manual    |
-| Design doc accurate      | n/a     | taxonomy table present; command table shows `forge memory report show`                                                                         | review    |
+| Test                     | Fixture | Assertion                                                                                                                                                                               | Test File |
+| ------------------------ | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
+| No stale "handoff agent" | n/a     | `rg -ni "handoff[ -]agent" docs/design.md docs/design_appendix.md docs/diagrams.md docs/end-user docs/developer docs/board/impl_notes.md docs/board/README.md CLAUDE.md src/skills` = 0 | manual    |
+| No stale symbols         | n/a     | `rg -n "process_handoff\|run_handoff_agent\|resolve_handoff_base_url\|handoff_agent\.py\|HandoffConfig\|HandoffResult"` over current docs = 0                                           | manual    |
+| No stale resume wording  | n/a     | `rg -ni -- "--resume-mode handoff\|resume_mode: handoff"` over current docs = 0                                                                                                         | manual    |
+| Renamed CLI in docs      | n/a     | `rg -ni "forge session handoff show\|forge handoff run"` over current docs + `src/skills` = 0                                                                                           | manual    |
+| Renames landed           | n/a     | `memory.md` / `16-memory.md` exist; `handoff.md` / `16-handoff.md` gone                                                                                                                 | manual    |
+| KEEPs intact             | n/a     | `kind="handoff"`, `enqueue_handoff_marker`, `artifacts/<session>/handoff`, `queued_handoff` unchanged in `src/forge/`                                                                   | manual    |
+| Design doc accurate      | n/a     | §5.6 taxonomy table present; "Naming note" block removed; command table shows `forge memory report show`                                                                                | review    |
+| Touched tests green      | repo    | `uv run pytest tests/src/review/test_skill_content.py tests/src/session/test_models.py tests/regression/test_bug_handoff_forge_root.py` passes (142)                                    | all       |
 
 ---
 

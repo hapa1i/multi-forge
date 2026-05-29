@@ -7,12 +7,12 @@ How to use Forge features. Each guide is self-contained; start here for the over
 Running `claude` directly works, but you lose session tracking. Forge wraps Claude Code to add:
 
 - **Session tracking** -- named sessions with artifacts, plans, and transcripts
-- **Session resume** -- structured or AI-curated handoff when context fills up
+- **Session resume** -- structured or AI-curated transfer when context fills up
 - **Hook-driven capture** -- plan snapshots, transcript archival on exit
 - **Status line** -- proxy, session, and policy info in the Claude UI
 - **Policy enforcement** -- TDD, coding standards, semantic supervisor
 - **Search** -- `forge search` across past sessions
-- **Handoff agent** -- auto-updates project docs on session exit
+- **Memory writer** -- auto-updates project docs on session exit
 
 These features require launching through Forge because they depend on `FORGE_SESSION` being set, hooks being wired, and
 the session manifest existing. Running `claude` directly bypasses all of this.
@@ -139,7 +139,7 @@ The CLI engine behind skills. Fan out reviews to multiple models, get adversaria
 ```bash
 forge workflow panel src/forge/session/ --code
 forge workflow debate "Should we rewrite the core in Rust?"
-forge workflow analyze "What are the failure modes of the handoff agent?"
+forge workflow analyze "What are the failure modes of the memory writer?"
 ```
 
 See [workflow.md](workflow.md).
@@ -168,12 +168,12 @@ automatically by `forge extension enable`.
 
 See [hook.md](hook.md).
 
-### Handoff Agent -- Automatic Memory Docs
+### Memory Writer -- Automatic Memory Docs
 
-A headless agent is queued at session end and runs on the next Forge CLI startup to update designated project docs
+The memory writer is queued at session end and runs on the next Forge CLI startup to update designated project docs
 (checklists, changelogs, pattern files) based on what happened in the session.
 
-See [handoff.md](handoff.md).
+See [memory.md](memory.md).
 
 ### Search -- Transcript Search
 
