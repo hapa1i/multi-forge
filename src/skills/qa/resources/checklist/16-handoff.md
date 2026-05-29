@@ -62,7 +62,7 @@ EOF
 
 BEFORE_LINES=$(wc -l < .forge/memory/debugging.md)
 
-forge handoff run \
+forge memory-writer run \
   --session-name test-session-1 \
   --worktree-path $FORGE_TEST_REPO \
   --transcript-rel .forge/artifacts/test-session-1/transcripts/manual-handoff-direct.jsonl
@@ -73,14 +73,14 @@ echo "before=$BEFORE_LINES after=$AFTER_LINES"
 cat .forge/memory/debugging.md
 
 ls .forge/artifacts/test-session-1/handoff/review-*.md
-forge session handoff show test-session-1 --latest
+forge memory report show test-session-1 --latest
 
 test "$AFTER_LINES" -gt "$BEFORE_LINES"
 ```
 
-- [ ] `forge handoff run` succeeds with the transcript artifact path provided
+- [ ] `forge memory-writer run` succeeds with the transcript artifact path provided
 - [ ] Passported docs are discovered via scan and updated with session takeaways
-- [ ] Handoff agent stdout is persisted and visible via `forge session handoff show --latest`
+- [ ] Handoff agent stdout is persisted and visible via `forge memory report show --latest`
 
 ### 16.3 Shadow Handoff (`--propose` + shadow mode)
 
@@ -125,7 +125,7 @@ EOF
 cp docs/team-standards.md /tmp/team-standards.before
 SHADOW_BEFORE=$(wc -l < .forge/memory/shadow_standards.md)
 
-forge handoff run \
+forge memory-writer run \
   --session-name test-session-1 \
   --worktree-path $FORGE_TEST_REPO \
   --transcript-rel .forge/artifacts/test-session-1/transcripts/manual-handoff-shadow.jsonl
@@ -206,7 +206,7 @@ test "$AFTER_LINES" -gt "$BEFORE_LINES"
 - [ ] Stop hook reports `queued_handoff: true`
 - [ ] Handoff marker is created under `~/.forge/pending-work/`
 - [ ] A later Forge CLI startup processes the queued handoff automatically
-- [ ] Background handoff updates passported docs without a direct `forge handoff run`
+- [ ] Background handoff updates passported docs without a direct `forge memory-writer run`
 - [ ] Pending handoff marker is gone after processing completes
 
 ---

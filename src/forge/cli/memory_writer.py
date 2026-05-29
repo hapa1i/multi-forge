@@ -1,7 +1,7 @@
 """Memory writer CLI commands.
 
 Commands:
-- forge handoff run: Execute the memory writer for a session (background process)
+- forge memory-writer run: Execute the memory writer for a session (background process)
 """
 
 from __future__ import annotations
@@ -15,12 +15,12 @@ import click
 logger = logging.getLogger(__name__)
 
 
-@click.group(hidden=True)
-def handoff() -> None:
-    """Manage handoff agent operations."""
+@click.group("memory-writer", hidden=True)
+def memory_writer() -> None:
+    """Manage memory writer operations."""
 
 
-@handoff.command("run")
+@memory_writer.command("run")
 @click.option("--session-name", required=True, help="Forge session name")
 @click.option(
     "--worktree-path",
@@ -44,10 +44,10 @@ def run_cmd(
     subprocess_proxy: str | None,
     forge_root: str | None,
 ) -> None:
-    """Run the handoff agent for a completed session.
+    """Run the memory writer for a completed session.
 
     This is typically invoked by the work queue handler as a background process,
-    not directly by users. It reads the session manifest, checks if handoff is
+    not directly by users. It reads the session manifest, checks if memory is
     enabled, and spawns claude -p to update project memory documents.
     """
     worktree = Path(worktree_path).resolve()
@@ -81,7 +81,7 @@ def run_cmd(
     )
 
     if not is_memory_enabled(manifest, effective):
-        logger.info("Handoff not activated for session %s", session_name)
+        logger.info("Memory writer not activated for session %s", session_name)
         return
 
     assert effective.memory is not None and effective.memory.auto_update is not None

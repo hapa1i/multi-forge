@@ -16,7 +16,7 @@ Supports two modes:
 Each run persists its stdout to
 ``<forge_root>/.forge/artifacts/<session>/handoff/review-<timestamp>.md`` so
 users can inspect proposed/applied changes -- surfaced via
-``forge session handoff show``.
+``forge memory report show``.
 """
 
 from __future__ import annotations
@@ -326,7 +326,7 @@ def run_memory_writer(
 ) -> bool:
     """Run the memory writer as a ``claude -p`` subprocess.
 
-    This is the main entry point called by ``forge handoff run``.
+    This is the main entry point called by ``forge memory-writer run``.
 
     Args:
         session_name: Forge session name.
@@ -529,7 +529,7 @@ def _persist_review_report(
     Returns the absolute path of the written file. The work queue spawns the
     agent detached so stdout/stderr go to DEVNULL; this file is the only way
     users can inspect what the agent proposed or applied. See
-    ``forge session handoff show``.
+    ``forge memory report show``.
     """
     from datetime import datetime, timezone
 

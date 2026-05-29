@@ -1,4 +1,4 @@
-"""Tests for the hidden handoff CLI."""
+"""Tests for the hidden memory-writer CLI (forge memory-writer run)."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 from click.testing import CliRunner
 
-from forge.cli.handoff import handoff
+from forge.cli.memory_writer import memory_writer
 from forge.session.models import (
     MemoryIntent,
     MemoryWriterConfig,
@@ -33,7 +33,7 @@ def test_handoff_run_uses_manifest_subprocess_proxy(tmp_path: Path) -> None:
         patch("forge.session.memory_writer.run_memory_writer", return_value=True),
     ):
         result = CliRunner().invoke(
-            handoff,
+            memory_writer,
             [
                 "run",
                 "--session-name",
@@ -58,7 +58,7 @@ def test_handoff_run_prefers_marker_subprocess_proxy_snapshot(tmp_path: Path) ->
         patch("forge.session.memory_writer.run_memory_writer", return_value=True),
     ):
         result = CliRunner().invoke(
-            handoff,
+            memory_writer,
             [
                 "run",
                 "--session-name",
@@ -99,7 +99,7 @@ def _write_passport_doc(
 
 def _run(root: Path):
     return CliRunner().invoke(
-        handoff,
+        memory_writer,
         ["run", "--session-name", "session", "--worktree-path", str(root), "--transcript-rel", "transcript.jsonl"],
     )
 

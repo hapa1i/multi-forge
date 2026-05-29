@@ -1,4 +1,4 @@
-"""Docker-based E2E tests for `forge handoff run`.
+"""Docker-based E2E tests for `forge memory-writer run`.
 
 Tests the full chain inside a Docker container with real filesystem:
 CLI -> SessionStore -> effective intent -> passport scan -> prompt -> claude -p.
@@ -169,7 +169,7 @@ exit "${FORGE_MOCK_CLAUDE_EXIT_CODE:-0}"
 
 
 class TestHandoffRunMultiDoc:
-    """E2E: forge handoff run with passported docs discovered via scan."""
+    """E2E: forge memory-writer run with passported docs discovered via scan."""
 
     def _setup_session(
         self,
@@ -203,9 +203,9 @@ class TestHandoffRunMultiDoc:
                 workspace.write_file(f"/workspace/{path}", content)
 
     def _run_handoff(self, workspace: ContainerLike, timeout: int = 30) -> int:
-        """Run forge handoff run and return exit code."""
+        """Run forge memory-writer run and return exit code."""
         result = workspace.exec(
-            f"cd /workspace && forge handoff run "
+            f"cd /workspace && forge memory-writer run "
             f"--session-name {SESSION_NAME} "
             f"--worktree-path /workspace "
             f"--transcript-rel {TRANSCRIPT_REL} "
@@ -331,7 +331,7 @@ class TestHandoffRunMultiDoc:
         mock_claude_workspace: ContainerLike,
         claude_capture_file: Callable[[str], str],
     ) -> None:
-        """memory track + enable review-only -> handoff -> session handoff show exposes the report."""
+        """memory track + enable review-only -> memory-writer run -> memory report show exposes the report."""
         session_name = "memory-review"
         transcript_rel = f".forge/artifacts/{session_name}/transcripts/uuid-456.jsonl"
         _install_outputting_claude_mock(mock_claude_workspace)
@@ -367,7 +367,7 @@ class TestHandoffRunMultiDoc:
         assert docs[0]["strategy"] == "project-state"
 
         result = mock_claude_workspace.exec(
-            "cd /workspace && forge handoff run "
+            "cd /workspace && forge memory-writer run "
             f"--session-name {session_name} "
             "--worktree-path /workspace "
             f"--transcript-rel {transcript_rel} "
@@ -380,7 +380,7 @@ class TestHandoffRunMultiDoc:
         assert "Do NOT modify any files" in prompt
         assert "docs/state.md" in prompt
 
-        show_result = mock_claude_workspace.exec(f"cd /workspace && forge session handoff show {session_name} --latest")
+        show_result = mock_claude_workspace.exec(f"cd /workspace && forge memory report show {session_name} --latest")
         assert show_result.returncode == 0, show_result.stderr
         assert "Memory Writer Report -- memory-review" in show_result.stdout
         assert "Mode**: review-only" in show_result.stdout
@@ -412,7 +412,7 @@ class TestHandoffRunMultiDoc:
 
 
 class TestHandoffRunDisabled:
-    """E2E: forge handoff run when handoff is disabled or not configured."""
+    """E2E: forge memory-writer run when handoff is disabled or not configured."""
 
     def _setup_session(self, workspace: ContainerLike, manifest_dict: dict) -> None:
         """Create session manifest and transcript."""
@@ -437,7 +437,7 @@ class TestHandoffRunDisabled:
         )
 
         result = mock_claude_workspace.exec(
-            f"cd /workspace && forge handoff run "
+            f"cd /workspace && forge memory-writer run "
             f"--session-name {SESSION_NAME} "
             f"--worktree-path /workspace "
             f"--transcript-rel {TRANSCRIPT_REL}"
@@ -460,7 +460,7 @@ class TestHandoffRunDisabled:
         workspace.write_file(transcript_path, _build_transcript())
 
         result = workspace.exec(
-            f"cd /workspace && forge handoff run "
+            f"cd /workspace && forge memory-writer run "
             f"--session-name nonexistent-session "
             f"--worktree-path /workspace "
             f"--transcript-rel {TRANSCRIPT_REL}"
@@ -482,7 +482,7 @@ class TestHandoffRunDisabled:
         )
 
         result = mock_claude_workspace.exec(
-            f"cd /workspace && forge handoff run "
+            f"cd /workspace && forge memory-writer run "
             f"--session-name {SESSION_NAME} "
             f"--worktree-path /workspace "
             f"--transcript-rel {TRANSCRIPT_REL}"

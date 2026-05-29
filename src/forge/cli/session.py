@@ -857,10 +857,10 @@ def session() -> None:
     pass
 
 
-# Register subgroups attached to `session`. Done at module import so that
-# `forge session handoff show` resolves on first call. Imported here (not at
-# top of module) to avoid circular imports: session_handoff imports from this
-# module's namespace (`_cwd_forge_root`, `handle_session_error`, `console`).
+# Register subgroups attached to `session` at import time so the
+# `forge session handoff` and `forge session memory` tombstone groups resolve.
+# Deferred (not a top-of-module import) to keep subgroup registration out of the
+# import path and avoid import-order fragility across the session CLI surface.
 def _register_subgroups() -> None:
     from forge.cli.session_handoff import handoff_group  # noqa: E402
     from forge.cli.session_memory import memory_group  # noqa: E402

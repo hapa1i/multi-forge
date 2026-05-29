@@ -22,9 +22,9 @@ from .backend import backend  # noqa: E402
 from .claude import claude  # noqa: E402
 from .config_cmd import config as config_cmd  # noqa: E402
 from .extensions import extensions  # noqa: E402
-from .handoff import handoff  # noqa: E402
 from .hooks import hooks  # noqa: E402
 from .memory import memory as memory_cmd  # noqa: E402
+from .memory_writer import memory_writer  # noqa: E402
 from .policy import policy  # noqa: E402
 from .proxy import proxy  # noqa: E402
 from .search import search_cmd  # noqa: E402
@@ -158,11 +158,11 @@ def _process_pending_work_best_effort() -> None:
             index_store = IndexStateStore(forge_root=forge_root)
             index_store.mark_indexed(transcript_abs)
 
-        def _handoff_handler(marker: Marker) -> None:
-            """Spawn a detached background process to run the handoff agent.
+        def _memory_writer_handler(marker: Marker) -> None:
+            """Spawn a detached background process to run the memory writer.
 
             The handler returns immediately (fast path for CLI startup).
-            The actual handoff work happens in the background subprocess.
+            The actual memory-writer work happens in the background subprocess.
 
             Fire-and-forget: if the background process fails, the marker is
             already deleted. This is intentionally weaker reliability than
@@ -174,7 +174,7 @@ def _process_pending_work_best_effort() -> None:
             payload = marker.payload
             cmd = [
                 "forge",
-                "handoff",
+                "memory-writer",
                 "run",
                 "--session-name",
                 payload["session_name"],
@@ -201,7 +201,9 @@ def _process_pending_work_best_effort() -> None:
         handlers: dict[str, WorkHandler] = {
             "stop": _noop_stop_handler,
             "index": _index_handler,
-            "handoff": _handoff_handler,
+            # Marker kind stays "handoff" (work-queue routing key, ephemeral); only
+            # the handler/command surface is renamed to memory-writer.
+            "handoff": _memory_writer_handler,
         }
 
         # Limit to 5 items per startup to avoid blocking CLI when many
@@ -276,7 +278,7 @@ main.add_command(backend)
 main.add_command(session)
 main.add_command(proxy)
 main.add_command(policy)
-main.add_command(handoff)
+main.add_command(memory_writer)
 main.add_command(claude)
 main.add_command(config_cmd, name="config")
 main.add_command(hooks)

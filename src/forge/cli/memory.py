@@ -1225,3 +1225,11 @@ def passport_remove_cmd(path: str, as_json: bool) -> None:
         console.print("[dim]This doc is no longer project-discovered unless added as a session extra.[/dim]")
     else:
         console.print(f"[dim]No passport found in {path}.[/dim]")
+
+
+# Registered at module bottom via a late import to avoid deepening the
+# memory -> session -> session_handoff import cycle (memory.py already imports
+# forge.cli.session at module top). Mirrors session.py's _register_subgroups.
+from forge.cli.memory_report import report_group  # noqa: E402
+
+memory.add_command(report_group)

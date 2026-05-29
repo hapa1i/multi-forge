@@ -118,7 +118,7 @@ class TestRealClaudeMemory:
 
         exit_code, stdout, stderr = _run_with_anthropic_key(
             forge_workspace,
-            "cd /workspace && forge handoff run "
+            "cd /workspace && forge memory-writer run "
             f"--session-name {session_name} "
             "--worktree-path /workspace "
             f"--transcript-rel {transcript_rel} "
@@ -140,7 +140,7 @@ class TestRealClaudeMemory:
         assert f"# Memory Writer Report -- {session_name}" in report
         assert "**Mode**: review-only" in report
 
-        show_result = forge_workspace.exec(f"cd /workspace && forge session handoff show {session_name} --latest")
+        show_result = forge_workspace.exec(f"cd /workspace && forge memory report show {session_name} --latest")
         assert show_result.returncode == 0, show_result.stderr
         assert "Memory Writer Report" in show_result.stdout
 
