@@ -3,9 +3,8 @@
 This directory is Forge's lightweight implementation board. It keeps proposed work, scheduled work, active execution,
 completed work, and project memory in one place.
 
-The authoritative board workflow contract lives in
-[`docs/developer/board-contract.md`](../developer/board-contract.md). This README is a directory guide plus dogfood
-examples for people inspecting `docs/board/`.
+The authoritative board workflow contract lives in [`docs/developer/board-contract.md`](../developer/board-contract.md).
+This README is a directory guide plus dogfood examples for people inspecting `docs/board/`.
 
 ## Layout
 

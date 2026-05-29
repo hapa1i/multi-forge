@@ -236,13 +236,13 @@ class TestDerivationStrategies:
         assert d.strategy == "custom"
 
     def test_strategy_nullable_for_native(self) -> None:
-        """Strategy should be None when resume_mode is native (no handoff ran)."""
+        """Strategy should be None when resume_mode is native (no context assembly ran)."""
         d = Derivation(parent_session="test", resume_mode="native", strategy=None)
         assert d.strategy is None
         assert d.resume_mode == "native"
 
     def test_resume_mode_default_none(self) -> None:
-        """resume_mode defaults to None (legacy handoff)."""
+        """resume_mode defaults to None (legacy; treated as transfer)."""
         d = Derivation(parent_session="test")
         assert d.resume_mode is None
 

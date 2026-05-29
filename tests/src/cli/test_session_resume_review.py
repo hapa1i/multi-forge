@@ -32,7 +32,7 @@ class TestReviewFlagValidation:
             ["session", "resume", "some-session", "--fresh", "--review", "--resume-mode", "native"],
         )
         assert result.exit_code == 1
-        assert "--review is only meaningful in handoff mode" in result.output
+        assert "--review is only meaningful in transfer mode" in result.output
 
 
 class TestReviewFlagEditorInvocation:
@@ -312,7 +312,7 @@ class TestReviewRelaunch:
         child_manifest.forge_root = str(tmp_path)
         child_manifest.confirmed.derivation = Derivation(
             parent_session="p1",
-            resume_mode="handoff",
+            resume_mode="transfer",
             context_file=".forge/prev_sessions/p1/children/child-1.md",
         )
         SessionStore(str(tmp_path), "child-1").write(child_manifest)

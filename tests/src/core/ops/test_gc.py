@@ -203,7 +203,7 @@ class TestDetectOrphanHandoffFiles:
         live_state.forge_root = str(fr)
         live_state.confirmed.derivation = Derivation(
             parent_session="parent",
-            resume_mode="handoff",
+            resume_mode="transfer",
             context_file=".forge/prev_sessions/parent/children/live-child.md",
         )
         SessionStore(str(fr), "live-child").write(live_state)
@@ -233,6 +233,8 @@ class TestDetectOrphanHandoffFiles:
         child_state.forge_root = str(child_root)
         child_state.confirmed.derivation = Derivation(
             parent_session="parent",
+            # Legacy "handoff" value retained intentionally: GC keys off context_file,
+            # not the resume_mode token, so it must handle pre-rename manifests too.
             resume_mode="handoff",
             context_file=".forge/prev_sessions/parent/children/child.md",
         )

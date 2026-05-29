@@ -3007,10 +3007,10 @@ class TestSessionResume:
 
 
 class TestResumeNativeMode:
-    """Tests for --resume-mode native|handoff on forge session resume."""
+    """Tests for --resume-mode native|transfer on forge session resume."""
 
-    def test_resume_fresh_default_is_handoff(self, runner: CliRunner, temp_env: Path) -> None:
-        """--fresh without --resume-mode should use handoff (assembled context)."""
+    def test_resume_fresh_default_is_transfer(self, runner: CliRunner, temp_env: Path) -> None:
+        """--fresh without --resume-mode should use transfer (assembled context)."""
         with patch("forge.cli.session.invoke_claude", return_value=0):
             runner.invoke(main, ["session", "start", "native-test"])
 
@@ -3019,10 +3019,20 @@ class TestResumeNativeMode:
 
         assert result.exit_code == 0
         kwargs = mock_invoke.call_args.kwargs
-        # Handoff mode uses session_id (new session), not resume_id
+        # Transfer mode uses session_id (new session), not resume_id
         assert kwargs.get("session_id") is not None
         assert kwargs.get("resume_id") is None
         assert kwargs.get("fork_session") is False
+
+    def test_resume_fresh_handoff_value_rejected(self, runner: CliRunner, temp_env: Path) -> None:
+        """The old --resume-mode handoff value is rejected with rename guidance."""
+        with patch("forge.cli.session.invoke_claude", return_value=0):
+            runner.invoke(main, ["session", "start", "rename-test"])
+
+        result = runner.invoke(main, ["session", "resume", "rename-test", "--fresh", "--resume-mode", "handoff"])
+
+        assert result.exit_code != 0
+        assert "renamed to 'transfer'" in result.output
 
     def test_resume_fresh_native_uses_resume_fork_session(self, runner: CliRunner, temp_env: Path) -> None:
         """--fresh --resume-mode native should use --resume --fork-session."""

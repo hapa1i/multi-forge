@@ -331,10 +331,11 @@ class Derivation:
         parent_session: Parent session name (same as SessionState.parent_session).
         parent_transcript: Repo-relative path to parent's transcript artifact.
         inherited_proxy: Template from parent's started_with_proxy (if any).
-        resume_mode: "native" (--resume --fork-session) or "handoff" (assembled context).
-            None = legacy (handoff). Authoritative field for how context was transferred.
+        resume_mode: "native" (--resume --fork-session) or "transfer" (assembled context).
+            None and legacy "handoff" are tolerated as transfer (no reader branches on a
+            loaded parent's mode token). Authoritative field for how context was transferred.
         strategy: Context assembly strategy (minimal|structured|full|ai-curated).
-            Only set when resume_mode is "handoff" (or legacy None). Null for native resumes.
+            Only set when resume_mode is "transfer" (or legacy "handoff"/None). Null for native resumes.
         depth: How many ancestors were traversed (1 = parent only).
         resumed_at: ISO8601 timestamp when resume was executed.
         lineage: Ancestry chain from parent to oldest ancestor traversed.

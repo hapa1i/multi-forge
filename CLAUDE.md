@@ -61,8 +61,8 @@ The `Publish to PyPI` workflow (`.github/workflows/publish.yml`) builds and publ
 
 ## Work Board Quick Semantics
 
-The authoritative board workflow is in `docs/developer/board-contract.md`. In short: `todo/` means accepted but
-parked. When asked to work on a `todo/` card, create or switch to its execution branch, move the card directory to
+The authoritative board workflow is in `docs/developer/board-contract.md`. In short: `todo/` means accepted but parked.
+When asked to work on a `todo/` card, create or switch to its execution branch, move the card directory to
 `docs/board/doing/<slug>/`, and create/update `checklist.md`. `doing/` is active work; `done/` means shipped, verified,
 design docs synced, and closeout recorded.
 

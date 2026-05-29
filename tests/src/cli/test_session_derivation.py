@@ -10,7 +10,7 @@ from forge.session.store import SessionStore
 
 
 def test_persist_fork_transfer_derivation_records_strategy_and_context(tmp_path: Path) -> None:
-    """Worktree fork handoff metadata is persisted after the CLI creates context."""
+    """Worktree fork transfer metadata is persisted after the CLI creates context."""
     worktree = tmp_path / "child-worktree"
     worktree.mkdir()
     context = worktree / ".forge" / "handoff" / "child.md"
@@ -39,7 +39,7 @@ def test_persist_fork_transfer_derivation_records_strategy_and_context(tmp_path:
     )
 
     assert updated.confirmed.derivation is not None
-    assert updated.confirmed.derivation.resume_mode == "handoff"
+    assert updated.confirmed.derivation.resume_mode == "transfer"
     assert updated.confirmed.derivation.strategy == "structured"
     assert updated.confirmed.derivation.context_file == ".forge/handoff/child.md"
 

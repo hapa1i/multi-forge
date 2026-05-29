@@ -317,7 +317,7 @@ def _persist_fork_transfer_derivation(
             from forge.session.models import Derivation
 
             m.confirmed.derivation = Derivation(parent_session=m.parent_session or "")
-        m.confirmed.derivation.resume_mode = "handoff"
+        m.confirmed.derivation.resume_mode = "transfer"
         m.confirmed.derivation.strategy = strategy
         m.confirmed.derivation.context_file = context_file
 
@@ -327,6 +327,22 @@ def _persist_fork_transfer_derivation(
 def _is_legacy_flat_handoff_path(path: Path) -> bool:
     """Return True for pre-0.2.0 ``.forge/prev_sessions/<parent>.md`` artifacts."""
     return path.suffix == ".md" and path.parent.name == "prev_sessions"
+
+
+def _validate_resume_mode(_ctx: click.Context, _param: click.Parameter, value: str | None) -> str | None:
+    """Validate ``--resume-mode``; the flag is optional, so pass ``None`` through.
+
+    Accepts ``native`` / ``transfer``. The old value ``handoff`` was renamed to
+    ``transfer``; reject it with actionable guidance rather than Click's generic
+    "invalid choice" error.
+    """
+    if value is None:
+        return None
+    if value == "handoff":
+        raise click.BadParameter("'handoff' was renamed to 'transfer'. Use --resume-mode transfer.")
+    if value not in {"native", "transfer"}:
+        raise click.BadParameter(f"{value!r} is not one of 'native', 'transfer'.")
+    return value
 
 
 def _resolve_derivation_context_file(manifest: SessionState) -> Path | None:
@@ -1418,15 +1434,15 @@ def start(
 @click.option(
     "--resume-mode",
     "resume_mode",
-    type=click.Choice(["native", "handoff"]),
+    callback=_validate_resume_mode,
     default=None,
-    help="Context transfer: native (full conversation via --fork-session) or handoff (assembled summary). Default: handoff.",
+    help="Context transfer: native (full conversation via --fork-session) or transfer (assembled summary). Default: transfer.",
 )
 @click.option(
     "--review",
     is_flag=True,
     default=False,
-    help="Open the generated child context in $EDITOR before launch (only with --fresh handoff mode).",
+    help="Open the generated child context in $EDITOR before launch (only with --fresh transfer mode).",
 )
 @click.option(
     "--force",
@@ -1512,7 +1528,7 @@ def resume(
 
     if review and resume_mode == "native":
         console.print(
-            "[red]Error:[/red] --review is only meaningful in handoff mode; "
+            "[red]Error:[/red] --review is only meaningful in transfer mode; "
             "native resume carries the parent conversation verbatim with no editable artifact."
         )
         sys.exit(1)
@@ -1569,7 +1585,7 @@ def resume(
             sys.exit(1)
 
     if fresh:
-        effective_resume_mode = resume_mode or "handoff"
+        effective_resume_mode = resume_mode or "transfer"
 
         # Warn about handoff-only flags with native mode
         if effective_resume_mode == "native":
@@ -1586,7 +1602,7 @@ def resume(
                 console.print(
                     "[red]Error:[/red] --resume-mode native requires a parent with a confirmed "
                     "Claude session (hook-confirmed or transcript-backed). "
-                    "Use --resume-mode handoff for transcript-artifact-based resume."
+                    "Use --resume-mode transfer for transcript-artifact-based resume."
                 )
                 sys.exit(1)
             _resume_fresh_native(

@@ -66,7 +66,7 @@ class TestForkIntoRelativePath:
         assert fork.worktree.owns_worktree is False
         assert fork.confirmed.derivation is not None
         assert fork.confirmed.derivation.parent_session == "parent"
-        assert fork.confirmed.derivation.resume_mode == "handoff"
+        assert fork.confirmed.derivation.resume_mode == "transfer"
         assert fork.confirmed.derivation.strategy is None
         assert fork.confirmed.derivation.depth == 1
         assert fork.confirmed.derivation.lineage == ["parent"]
