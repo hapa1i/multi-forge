@@ -28,17 +28,19 @@ wc -l docs/board/change_log.md
 
 ## 2026-05-28
 
-### Rename Claude Opus 4.7 → 4.8 (retain 4.6)
+### Add Claude Opus 4.8 (retain 4.6 + 4.7)
 
-**Goal**: Make Opus 4.8 (released 2026-05-28) replace every Opus 4.7 reference, while leaving Opus 4.6 — a distinct,
-still-default model — untouched.
+**Goal**: Add Opus 4.8 (released 2026-05-28) as the opt-in Anthropic alternative without shrinking the registry. The
+catalog and pricing keep Opus 4.6 (default) and Opus 4.7 (prior opt-in) as distinct models; 4.8 takes over 4.7's opt-in
+*role* in selections (review, templates, docs), not its place in the registry.
 
 **Key changes**:
 
-- Catalog + pricing: `claude-opus-4-7` → `claude-opus-4-8` (entry, 5 aliases, `friendly_name`); researched 4.8 specs
-  kept ($5/$25/$0.50, 1M context, 128K output, adaptive-only, fixed temperature, `xhigh`); `intelligence_score` 99→100;
+- Catalog + pricing: **added** `claude-opus-4-8` (entry, 5 aliases, `friendly_name`) alongside the retained
+  `claude-opus-4-7` and `claude-opus-4-6` — three distinct registry models (`intelligence_score` 98 / 99 / 100).
+  Researched 4.8 specs ($5/$25/$0.50, 1M context, 128K output, adaptive-only, fixed temperature, `xhigh`);
   `pricing.yaml` `updated_at` bumped. The `opus`/`claude-opus` defaults and proxy tier mappings stay on 4.6 — 4.8 is
-  opt-in (`--model claude-opus-4-8`), inheriting 4.7's role.
+  opt-in (`--model claude-opus-4-8`), taking over 4.7's role.
 - Review workflow: `claude-opus-4.8` ModelSpec + `_CLAUDE_48_BOUNDED_REVIEW_PROMPT`; three Anthropic proxy templates'
   `model_alternatives.opus` repointed.
 - Review guide `references/claude-4.7.md` → `claude-4.8.md`, rewritten against the live 4.8 docs (release date, from-4.7
@@ -53,6 +55,12 @@ still-default model — untouched.
 `test_session_resume_review.py`, reproduced identically on `origin/main`); integration tests pass; `make pre-commit`
 clean; built-wheel clean-install smoke confirms catalog/pricing/guide load via `importlib.resources` and `opus` still
 resolves to `claude-opus-4-6`.
+
+**Additive correction (2026-05-29)**: the initial change renamed `claude-opus-4-7` → `claude-opus-4-8`, dropping 4.7
+from the registry. Re-added `claude-opus-4-7` as a distinct catalog model (`intelligence_score` 99, `friendly_name`
+`Claude Opus 4.7`) with its 5 aliases (pricing unchanged), so catalog/pricing stay additive; 4.8 keeps 4.7's opt-in role
+in review/templates/docs. Verified: model-catalog unit suite green (128 tests); 4.6/4.7/4.8 resolve with
+`intelligence_score` 98/99/100 and `opus` still defaulting to 4.6.
 
 ### Simplify memory strategies: 7 to 4, shadow mode orthogonal
 

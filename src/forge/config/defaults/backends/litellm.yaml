@@ -6,6 +6,7 @@
 #     - gemini/gemini-3.1-pro-preview (Gemini 3.1 Pro - latest with thinking)
 #     - gemini/gemini-3.1-pro-preview-customtools (optimized for custom tools + bash)
 #     - gemini/gemini-3-flash-preview (Gemini 3 Flash - fast, cheap)
+#     - gemini/gemini-3.5-flash (Gemini 3.5 Flash - fast, cheap)
 #     - gemini/gemini-2.5-flash (fast, cheap)
 #     - gemini/gemini-2.5-pro (powerful)
 #
@@ -38,6 +39,12 @@ model_list:
       model: gemini/gemini-3-flash-preview
       api_key: os.environ/GEMINI_API_KEY
 
+  # Gemini 3.5 Flash - fast and cheap
+  - model_name: gemini/gemini-3.5-flash
+    litellm_params:
+      model: gemini/gemini-3.5-flash
+      api_key: os.environ/GEMINI_API_KEY
+
   # Gemini 2.5 Flash - fast and cheap
   - model_name: gemini/gemini-2.5-flash
     litellm_params:
@@ -64,6 +71,11 @@ model_list:
   - model_name: gemini-3-flash-preview
     litellm_params:
       model: gemini/gemini-3-flash-preview
+      api_key: os.environ/GEMINI_API_KEY
+
+  - model_name: gemini-3.5-flash
+    litellm_params:
+      model: gemini/gemini-3.5-flash
       api_key: os.environ/GEMINI_API_KEY
 
   - model_name: gemini-2.5-flash

@@ -1,5 +1,5 @@
 # Template: openrouter-gemini-flash
-# Gemini 2.5 Flash via OpenRouter (cheap, all tiers use Flash)
+# Gemini 3.5 Flash via OpenRouter (cheap, all tiers use Flash)
 #
 # Requires OPENROUTER_API_KEY in .env (or environment).
 #
@@ -12,9 +12,9 @@ proxy:
 
   openrouter:
     tiers:
-      haiku: google/gemini-2.5-flash
-      sonnet: google/gemini-2.5-flash
-      opus: google/gemini-2.5-flash
+      haiku: google/gemini-3.5-flash
+      sonnet: google/gemini-3.5-flash
+      opus: google/gemini-3.5-flash
     tier_overrides:
       haiku:
         reasoning_effort: low
