@@ -2,7 +2,11 @@
 
 ## Current Focus
 
-Phase 0 complete (baseline verified this session). Decisions resolved. Ready for Phase 1.
+**Phase 3 (config + preset wording) — the narrow remainder.** Phases 0–2 are committed (`c5b4822` session layer,
+`971741c` CLI surface, `af742f5` resume_mode value). Phase 2b also carried three items the card had slotted under Phase
+3 — the `resume_mode` durable value, marker-kind-kept, and artifact-path-kept — so Phase 3's *remaining* work is just:
+rename `handoff_timeout` → `memory_writer_timeout`, and update preset/capabilities wording. Then Phase 4 (docs sync) and
+Phase 5 (closeout).
 
 ## Summary
 
@@ -96,7 +100,7 @@ Keep names (already self-descriptive / generic): `build_multi_doc_prompt()`, `co
 
 ---
 
-## Phase 1: Session-layer rename (core types + files)
+## Phase 1: Session-layer rename (core types + files) — COMPLETE (committed c5b4822)
 
 Rename the session-layer files and types. Largest blast radius — every importer updates atomically in one commit.
 
@@ -146,22 +150,28 @@ Rename the session-layer files and types. Largest blast radius — every importe
 
 ---
 
-## Phase 2: CLI-layer rename (commands + runner)
+## Phase 2: CLI-layer rename (commands + runner) — COMPLETE (committed 971741c + af742f5)
 
-- [ ] `git mv src/forge/cli/handoff.py` → `src/forge/cli/memory_writer.py`; rename `forge handoff run` →
+> **Landed as two commits.** 2a (`971741c`) = CLI surface; 2b (`af742f5`) = the `--resume-mode` value rename, which also
+> carried three durable-state items the card had slotted under Phase 3 (see Phase 3 notes).
+
+- [x] `git mv src/forge/cli/handoff.py` → `src/forge/cli/memory_writer.py`; renamed `forge handoff run` →
   `forge memory-writer run` (hidden top-level command).
-  - Update the **detached-spawn command string in `cli/main.py`** (the work-queue startup processor) and the hidden
-    command registration. (There is **no** preset/hook-settings entry invoking `forge handoff run` — do not look for
-    one.)
-- [ ] Create `src/forge/cli/memory_report.py` with a `report_group` (`show`), register it under the top-level
-  `forge memory` group (`cli/memory.py`). Move the report-display logic from `cli/session_handoff.py`.
-  - Result: `forge memory report show` (with `--latest`, `--all`, name/UUID resolution, matching the old surface).
-- [ ] Tombstone `forge session handoff show`: convert `cli/session_handoff.py`'s `handoff_group` to a tombstone group
-  that exits non-zero with `Run 'forge memory report show'`. (Do not delete the registration — keep an actionable
-  diagnostic per coding-standards §5 / §6.)
-- [ ] Rename `--resume-mode handoff` → `--resume-mode transfer` in `cli/session_lifecycle.py`. Old value `handoff` is a
-  rejected/tombstoned choice with guidance (durable-state acceptance handled in Phase 3).
-- [ ] Update all CLI tests; rename `tests/src/cli/test_session_handoff_show.py` → `test_memory_report.py`.
+  - Verified: `cli/memory_writer.py:18` `@click.group("memory-writer", hidden=True)` + `.command("run")`; the detached
+    work-queue spawn argv in `cli/main.py:177` is now `"memory-writer"`. Handler keyed by the kept marker kind
+    (`main.py:206` `"handoff": _memory_writer_handler`).
+- [x] Created `src/forge/cli/memory_report.py` with a `report_group` (`show`), registered under the top-level
+  `forge memory` group; report-display logic moved off `cli/session_handoff.py`.
+  - Verified: `cli/memory.py:1233-1235` imports `report_group` + `memory.add_command(report_group)`;
+    `forge memory report show` supports name/UUID + `--latest`/`--all`.
+- [x] Tombstoned `forge session handoff show`: `cli/session_handoff.py:23-27` `_tombstone_show` raises
+  `ClickException("...Use: forge memory report show")`; registration kept (actionable diagnostic per §5/§6).
+- [x] Renamed `--resume-mode handoff` → `--resume-mode transfer` (`cli/session_lifecycle.py`).
+  - Verified: `_validate_resume_mode` (`:332`) rejects `handoff` with
+    `BadParameter("'handoff' was renamed to 'transfer'. Use --resume-mode transfer.")`; `effective_resume_mode` defaults
+    to `transfer`.
+- [x] Renamed CLI tests; `tests/src/cli/test_session_handoff_show.py` → `test_memory_report.py` (git rename verified);
+  `test_memory_writer_cli.py` + `tests/integration/cli/test_handoff_integration.py` repointed.
 
 ### Acceptance
 
@@ -175,26 +185,28 @@ Rename the session-layer files and types. Largest blast radius — every importe
 
 ---
 
-## Phase 3: Config and durable-state rename
+## Phase 3: Config and durable-state rename — PARTIAL (3/5 landed in Phase 2a/2b)
 
 Breaking changes — strict stale-state handling per coding-standards §5.
 
-- [ ] `handoff_timeout` → `memory_writer_timeout` in `runtime_config.py:70`.
-  - Runtime config is a user-edited system-boundary file; unknown keys warn+ignore per coding-standards §5 / system
-    boundaries (`_dict_to_runtime_config` at `runtime_config.py:262`). Detect `handoff_timeout` on load: warn with
+- [ ] **← remaining** `handoff_timeout` → `memory_writer_timeout` in `runtime_config.py:70`.
+  - Not started: still `handoff_timeout` at `runtime_config.py:70,116,117`, commented default `:399`, and read at
+    `session/memory_writer.py:50`. Runtime config is a user-edited system-boundary file; unknown keys warn+ignore per
+    coding-standards §5 (`_dict_to_runtime_config` at `runtime_config.py:262`). Detect `handoff_timeout` on load: warn
     `"handoff_timeout is renamed to memory_writer_timeout"`, ignore the old key. Make `forge config set handoff_timeout`
     and `forge config reset handoff_timeout` fail with actionable guidance naming the new key.
-- [ ] `confirmed.derivation.resume_mode` value `"handoff"` → `"transfer"`. Durable state — old manifests carry
-  `"handoff"`. Handle per §5: accept-and-migrate on read (preferred — manifests are long-lived) or reject with a clear
-  reset message. Add a regression test for an old-value manifest.
-- [ ] Work queue marker kind `handoff`: **keep as-is** (internal + ephemeral; markers are processed-then-deleted, so a
-  kind rename risks stranding in-flight markers across upgrade for no user-visible gain). Record this decision; revisit
-  only if the queue gains durability.
-- [ ] Artifact path `.forge/artifacts/<session>/handoff/`: **keep** (renaming orphans existing artifacts). Note the
-  intentional mismatch: `memory_report_dir()` returns a `…/handoff/` path. Add a code comment so a future reader does
-  not "fix" one without the other.
-- [ ] Update `install/preset.py` permission **comments** and `capabilities.py:60` credential **description string**
-  (memory writer wording). These are strings/comments, not functional permission entries.
+- [x] `confirmed.derivation.resume_mode` value `"handoff"` → `"transfer"` — **done in Phase 2b (`af742f5`)**.
+  - Chose accept-and-tolerate over reject: `session/models.py:334-348` reads legacy `"handoff"`/`None` as transfer with
+    no reader branching; writers emit `"transfer"`. Regression `tests/regression/test_bug_resume_mode_rename.py` covers
+    an old-value manifest.
+- [x] Work queue marker kind `handoff`: **kept as-is** — decision recorded in Phase 2a.
+  - Verified: `cli/main.py:204-206` keeps `kind="handoff"` (ephemeral routing key) with an explanatory comment.
+- [x] Artifact path `.forge/artifacts/<session>/handoff/`: **kept** — done in Phase 2a.
+  - Verified: `session/memory_writer.py:515-516` keeps the `…/handoff/` path with a comment flagging the intentional
+    mismatch vs the renamed `memory_report_dir()`.
+- [ ] **← remaining** Update `install/preset.py` permission **comments** and `capabilities.py:60` credential
+  **description string** (memory writer wording). These are strings/comments, not functional permission entries.
+  - Not started: still "handoff agent" at `install/preset.py:9,38` and `core/auth/capabilities.py:60`.
   - Assertion: `forge extension enable` still installs the same functional permission set (Write/Edit).
 
 ### Acceptance
