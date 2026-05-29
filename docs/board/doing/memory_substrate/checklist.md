@@ -2,11 +2,12 @@
 
 ## Current Focus
 
-**Phase 3 (config + preset wording) — the narrow remainder.** Phases 0–2 are committed (`c5b4822` session layer,
-`971741c` CLI surface, `af742f5` resume_mode value). Phase 2b also carried three items the card had slotted under Phase
-3 — the `resume_mode` durable value, marker-kind-kept, and artifact-path-kept — so Phase 3's *remaining* work is just:
-rename `handoff_timeout` → `memory_writer_timeout`, and update preset/capabilities wording. Then Phase 4 (docs sync) and
-Phase 5 (closeout).
+**Phase 4 (docs sync) is next.** Phases 0–3 are done. Phase 3's remaining two items — `handoff_timeout` →
+`memory_writer_timeout` and the preset/capabilities wording — are implemented and verified on the working tree (not yet
+committed). Full unit+regression green except two pre-existing, unrelated failures
+(`test_session_resume_review.py::...test_editor_nonzero_aborts_launch`,
+`test_removal_patching_system.py::...test_forge_info_no_traceback`) that reproduce identically with the Phase 3 changes
+stashed. Remaining: commit Phase 3, then Phase 4 (docs sync) and Phase 5 (closeout).
 
 ## Summary
 
@@ -185,16 +186,17 @@ Rename the session-layer files and types. Largest blast radius — every importe
 
 ---
 
-## Phase 3: Config and durable-state rename — PARTIAL (3/5 landed in Phase 2a/2b)
+## Phase 3: Config and durable-state rename — COMPLETE (verified 2026-05-29; commit pending)
 
 Breaking changes — strict stale-state handling per coding-standards §5.
 
-- [ ] **← remaining** `handoff_timeout` → `memory_writer_timeout` in `runtime_config.py:70`.
-  - Not started: still `handoff_timeout` at `runtime_config.py:70,116,117`, commented default `:399`, and read at
-    `session/memory_writer.py:50`. Runtime config is a user-edited system-boundary file; unknown keys warn+ignore per
-    coding-standards §5 (`_dict_to_runtime_config` at `runtime_config.py:262`). Detect `handoff_timeout` on load: warn
-    `"handoff_timeout is renamed to memory_writer_timeout"`, ignore the old key. Make `forge config set handoff_timeout`
-    and `forge config reset handoff_timeout` fail with actionable guidance naming the new key.
+- [x] `handoff_timeout` → `memory_writer_timeout` in `runtime_config.py` (field, validation, default-content comment).
+  - Done: field/validation renamed; read site updated at `session/memory_writer.py:50`. Added `_RENAMED_KEYS` map;
+    `_dict_to_runtime_config` emits a targeted "was renamed to 'memory_writer_timeout' … is ignored" warning (old value
+    degrades to default, not migrated) instead of the generic unknown-key line. `forge config set/reset handoff_timeout`
+    fail via `print_error_with_tip` naming the new key; both also auto-prune a lingering `handoff_timeout` on write so
+    following the tip converges the file (the `edit` raw surface is left alone). Tests: `test_runtime_config.py`
+    (warned-and-ignored + new-key-works) and `test_config_cli.py` (reject + stale-prune for both set and reset).
 - [x] `confirmed.derivation.resume_mode` value `"handoff"` → `"transfer"` — **done in Phase 2b (`af742f5`)**.
   - Chose accept-and-tolerate over reject: `session/models.py:334-348` reads legacy `"handoff"`/`None` as transfer with
     no reader branching; writers emit `"transfer"`. Regression `tests/regression/test_bug_resume_mode_rename.py` covers
@@ -204,10 +206,11 @@ Breaking changes — strict stale-state handling per coding-standards §5.
 - [x] Artifact path `.forge/artifacts/<session>/handoff/`: **kept** — done in Phase 2a.
   - Verified: `session/memory_writer.py:515-516` keeps the `…/handoff/` path with a comment flagging the intentional
     mismatch vs the renamed `memory_report_dir()`.
-- [ ] **← remaining** Update `install/preset.py` permission **comments** and `capabilities.py:60` credential
-  **description string** (memory writer wording). These are strings/comments, not functional permission entries.
-  - Not started: still "handoff agent" at `install/preset.py:9,38` and `core/auth/capabilities.py:60`.
-  - Assertion: `forge extension enable` still installs the same functional permission set (Write/Edit).
+- [x] Updated `install/preset.py` permission **comments** (`:9,38`) and `capabilities.py:60` credential **description
+  string** to "memory writer". Functional permission set unchanged (Write/Edit).
+  - Done: grep gate `rg "handoff agent" src/forge/install/preset.py src/forge/core/auth/capabilities.py` = 0. Test
+    mirrors updated: `test_capabilities.py::test_unlocks_features_shown` asserts "memory writer";
+    `test_preset.py::test_has_write_edit_permissions` docstring updated (perms assertion unchanged).
 
 ### Acceptance
 

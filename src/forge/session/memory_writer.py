@@ -47,7 +47,7 @@ logger = logging.getLogger(__name__)
 def _default_timeout() -> int:
     from forge.runtime_config import get_runtime_config
 
-    return get_runtime_config().handoff_timeout
+    return get_runtime_config().memory_writer_timeout
 
 
 MULTI_DOC_PROMPT_TEMPLATE = """\

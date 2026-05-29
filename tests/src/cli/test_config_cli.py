@@ -167,6 +167,27 @@ class TestConfigSet:
         assert result.exit_code == 1
         assert "Invalid value" in result.output
 
+    def test_set_renamed_key_rejected(self):
+        """Setting the old name errors and names the new key."""
+        runner = CliRunner()
+        result = runner.invoke(config, ["set", "handoff_timeout=99"])
+        assert result.exit_code == 1
+        assert "renamed" in result.output
+        assert "memory_writer_timeout" in result.output
+
+    def test_set_new_key_prunes_stale_alias(self):
+        """Following the rename tip removes the lingering old key (no permanent warning)."""
+        home = get_forge_home()
+        (home / "config.yaml").write_text("handoff_timeout: 600\n")
+        runner = CliRunner()
+        result = runner.invoke(config, ["set", "memory_writer_timeout=600"])
+        assert result.exit_code == 0
+        import yaml
+
+        data = yaml.safe_load((home / "config.yaml").read_text())
+        assert data["memory_writer_timeout"] == 600
+        assert "handoff_timeout" not in data
+
 
 class TestConfigAutoCreate:
     """Tests for auto-creation of config file on first access."""
@@ -255,3 +276,26 @@ class TestConfigReset:
         result = runner.invoke(config, ["reset", "proxy_mode"])
         assert result.exit_code == 0
         assert not (home / "config.yaml").exists()
+
+    def test_reset_renamed_key_rejected(self):
+        """Resetting the old name errors and names the new key."""
+        (get_forge_home() / "config.yaml").write_text("memory_writer_timeout: 120\n")
+        runner = CliRunner()
+        result = runner.invoke(config, ["reset", "handoff_timeout"])
+        assert result.exit_code == 1
+        assert "renamed" in result.output
+        assert "memory_writer_timeout" in result.output
+
+    def test_reset_new_key_prunes_stale_alias(self):
+        """Resetting the new key also clears a lingering old alias."""
+        home = get_forge_home()
+        (home / "config.yaml").write_text("proxy_mode: sidecar\nhandoff_timeout: 600\nmemory_writer_timeout: 120\n")
+        runner = CliRunner()
+        result = runner.invoke(config, ["reset", "memory_writer_timeout"])
+        assert result.exit_code == 0
+        import yaml
+
+        data = yaml.safe_load((home / "config.yaml").read_text())
+        assert "memory_writer_timeout" not in data
+        assert "handoff_timeout" not in data
+        assert data["proxy_mode"] == "sidecar"

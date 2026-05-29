@@ -57,7 +57,7 @@ CREDENTIALS: dict[str, Credential] = {
         name="anthropic-api",
         env_vars=(EnvVar("ANTHROPIC_API_KEY"),),
         unlocks_features=(
-            "Forge subprocesses (supervisor, handoff agent)",
+            "Forge subprocesses (supervisor, memory writer)",
             "direct Anthropic panel/debate workers",
             "litellm-anthropic-local proxy",
         ),

@@ -16,6 +16,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from collections.abc import MutableMapping
 from dataclasses import fields
 from pathlib import Path
 from typing import Any
@@ -24,8 +25,10 @@ import click
 from rich.console import Console
 from rich.syntax import Syntax
 
+from forge.cli.output import print_error_with_tip
 from forge.core.paths import display_path
 from forge.runtime_config import (
+    _RENAMED_KEYS,
     RuntimeConfig,
     ensure_config,
     get_config_path,
@@ -107,6 +110,15 @@ def set_cmd(key_value: str) -> None:
 
     key, value = key_value.split("=", 1)
 
+    if key in _RENAMED_KEYS:
+        new_key = _RENAMED_KEYS[key]
+        print_error_with_tip(
+            f"'{key}' was renamed to '{new_key}'.",
+            f"Run 'forge config set {new_key}={value}' instead.",
+            console=console,
+        )
+        sys.exit(1)
+
     known_fields = {f.name: f for f in fields(RuntimeConfig)}
     if key not in known_fields:
         console.print(f"[red]Error:[/red] Unknown config key: '{key}'")
@@ -129,6 +141,7 @@ def set_cmd(key_value: str) -> None:
     else:
         data = {}
 
+    _prune_renamed_keys(data, console)
     data[key] = coerced_value
 
     try:
@@ -240,6 +253,14 @@ def reset_cmd(key: str | None = None, yes: bool = False, force: bool = False) ->
         return
 
     known_fields = {f.name for f in fields(RuntimeConfig)}
+    if key in _RENAMED_KEYS:
+        new_key = _RENAMED_KEYS[key]
+        print_error_with_tip(
+            f"'{key}' was renamed to '{new_key}'.",
+            f"Run 'forge config reset {new_key}' instead.",
+            console=console,
+        )
+        sys.exit(1)
     if key not in known_fields:
         console.print(f"[red]Error:[/red] Unknown config key: '{key}'")
         console.print(f"\n[dim]Available keys: {', '.join(sorted(known_fields))}[/dim]")
@@ -252,23 +273,49 @@ def reset_cmd(key: str | None = None, yes: bool = False, force: bool = False) ->
     with open(config_path) as f:
         data = ruamel.load(f) or {}
 
+    pruned = _prune_renamed_keys(data, console)
+
     if key not in data:
-        console.print(f"[dim]Key '{key}' not in config (already using default).[/dim]")
+        # Requested key already at default; still persist any stale-alias cleanup.
+        if pruned:
+            _persist_or_clear(data, config_path)
+        else:
+            console.print(f"[dim]Key '{key}' not in config (already using default).[/dim]")
         return
 
     del data[key]
-
-    if data:
-        write_runtime_config(dict(data))
-    else:
-        config_path.unlink()
-        reset_runtime_config()
+    _persist_or_clear(data, config_path)
 
     default_val = getattr(RuntimeConfig(), key)
     console.print(f"[green]Reset[/green] {key} (default: {default_val})")
 
 
 # --- Helpers ---
+
+
+def _prune_renamed_keys(data: MutableMapping[str, Any], console: Console) -> bool:
+    """Drop dead renamed-config keys from ``data`` so they stop re-warning on load.
+
+    Returns True if any were removed. Called on the set/reset write paths (not
+    ``edit``, the raw surface) so following the rename tip converges the file.
+    """
+    removed = [old for old in _RENAMED_KEYS if old in data]
+    for old in removed:
+        del data[old]
+    if removed:
+        new_names = ", ".join(_RENAMED_KEYS[old] for old in removed)
+        console.print(f"[dim]Removed stale key(s): {', '.join(removed)} (renamed to {new_names})[/dim]")
+    return bool(removed)
+
+
+def _persist_or_clear(data: MutableMapping[str, Any], config_path: Path) -> None:
+    """Write ``data`` back, or remove the config file when nothing remains."""
+    if data:
+        write_runtime_config(dict(data))
+    else:
+        config_path.unlink()
+        reset_runtime_config()
+
 
 _COERCE_ERROR = object()
 
