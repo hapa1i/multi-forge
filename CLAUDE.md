@@ -4,9 +4,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Multi-Forge is a toolkit for Claude Code enhancement that consolidates multiple AI developer tools (proxy, session
-manager, status line, TDD guard) into a unified monorepo. The architecture follows a "glue approach" - building
-connective tissue between specialized tools rather than a monolithic application.
+Multi-Forge consolidates multiple AI developer tools (proxy, session manager, status line, TDD guard) into a unified
+monorepo. The architecture is a "glue approach" — connective tissue between specialized tools, not a monolith.
 
 ## Development Commands
 
@@ -37,6 +36,13 @@ uv run ruff check src/
 uv run mypy src/
 pre-commit run --all-files
 ```
+
+**Run integration tests when needed.** Docker is expected to be running locally — `make test-integration` is routine,
+not special-occasion. For changes touching hooks, session start/resume/fork, the memory writer, proxy runtime, or the
+installer, run the relevant integration tests before finishing; unit tests never exercise the `claude -p` / Docker paths
+these flows use. Stay cost-conscious by targeting files
+(`./scripts/test-integration.sh tests/integration/.../test_*.py`) instead of the full suite. See
+[testing-guidelines.md](docs/developer/testing-guidelines.md#when-to-run-integration-tests).
 
 ## Git Branching
 
@@ -165,13 +171,8 @@ fact_id, orchestration) unless explicitly asked. When in doubt, ask before renam
 
 ## Platform & Environment
 
-**macOS (Darwin)** - Use GNU tools instead of BSD versions:
-
-- gsed not sed (different -i syntax)
-- gawk' not 'awk'
-- ggrep not grep (for '-p perl regex) - can also use rg
-- gdate not date (for'--date parsing)
-- greadlink -f' not readlink (BSD lacks -f\*)
+**macOS (Darwin)** — use GNU tools, not BSD: `gsed` (not `sed`; different `-i` syntax), `gawk`, `ggrep` (or `rg`; perl
+regex), `gdate` (`--date` parsing), `greadlink -f` (BSD lacks `-f`).
 
 ## Key Documents
 
@@ -185,15 +186,14 @@ fact_id, orchestration) unless explicitly asked. When in doubt, ask before renam
 
 ### Error Handling
 
-Keep user-facing error messages simple and accurate. Do not suggest installation methods or workarounds that don't apply
-to this project's setup. When fixing errors, match the existing error message style in the codebase.
+Keep user-facing error messages simple and accurate. Don't suggest installation methods or workarounds that don't apply
+here. When fixing errors, match the existing error-message style.
 
 ### Console Output Formatting
 
-**Use the `forge.cli.output` helpers for CLI Rich recovery output.** The CLI's recovery-output standard (the
-`Tip:`/`Error:` pairing) lives in one place so equivalent situations tip identically. All Rich-styled `Tip:` output in
-`src/forge/cli/**` should go through these helpers; tests enforce that `[dim]Tip:` appears only in `output.py`. When
-adding or changing recovery tips, reach for:
+**Use the `forge.cli.output` helpers for CLI Rich recovery output** so equivalent situations tip identically. All Rich
+`Tip:` output in `src/forge/cli/**` must go through them; tests enforce that `[dim]Tip:` appears only in `output.py`.
+Reach for:
 
 ```python
 from forge.cli.output import print_tip, print_error, print_error_with_tip, handle_session_error
