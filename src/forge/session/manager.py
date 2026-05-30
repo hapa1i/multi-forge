@@ -9,6 +9,7 @@ The CLI layer should be thin and delegate to this class for all operations.
 from __future__ import annotations
 
 import logging
+import re
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
@@ -17,7 +18,11 @@ from forge.core.naming import generate_unique_name
 from forge.core.state import now_iso
 
 from .artifacts import resolve_artifact_path
-from .claude.paths import find_project_root
+from .claude.paths import (
+    find_project_root,
+    get_transcript_path,
+    resolve_claude_project_root,
+)
 from .config import (
     DEFAULT_PROXY_BASE_URL,
     DEFAULT_PROXY_TEMPLATE,
@@ -54,6 +59,13 @@ from .transfer import (
 
 logger = logging.getLogger(__name__)
 
+_UUID_RE = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
+
+
+def _append_unique_string(values: list[str], value: Any) -> None:
+    if isinstance(value, str) and value and value not in values:
+        values.append(value)
+
 
 def _inherited_launch_intent(parent_state: SessionState) -> LaunchIntent | None:
     """Return the launch intent a derived session should inherit."""
@@ -71,7 +83,15 @@ def _inherited_launch_intent(parent_state: SessionState) -> LaunchIntent | None:
 
 def _tracked_transcript_session_ids(state: SessionState) -> list[str]:
     """Return distinct Claude session IDs referenced by transcript artifacts."""
-    transcripts = state.confirmed.artifacts.get("transcripts")
+    return _tracked_transcript_session_ids_from_artifacts(state.confirmed.artifacts)
+
+
+def _tracked_transcript_session_ids_from_artifacts(artifacts: Any) -> list[str]:
+    """Return distinct Claude session IDs referenced by transcript artifact metadata."""
+    if not isinstance(artifacts, dict):
+        return []
+
+    transcripts = artifacts.get("transcripts")
     if not isinstance(transcripts, list):
         return []
 
@@ -79,10 +99,94 @@ def _tracked_transcript_session_ids(state: SessionState) -> list[str]:
     for artifact in transcripts:
         if not isinstance(artifact, dict):
             continue
-        session_id = artifact.get("session_id")
-        if isinstance(session_id, str) and session_id and session_id not in session_ids:
-            session_ids.append(session_id)
+        _append_unique_string(session_ids, artifact.get("session_id"))
     return session_ids
+
+
+def _tracked_derivation_transcript_session_ids(
+    derivation: Derivation | dict[str, Any] | None,
+) -> list[str]:
+    """Extract UUIDs from derivation transcript pointers, when present."""
+    if derivation is None:
+        return []
+
+    if isinstance(derivation, Derivation):
+        parent_transcript = derivation.parent_transcript
+    elif isinstance(derivation, dict):
+        parent_transcript = derivation.get("parent_transcript")
+    else:
+        return []
+
+    session_ids: list[str] = []
+    if isinstance(parent_transcript, str):
+        # Conservative by design: derivation points at archived artifacts, but a
+        # live raw transcript with the same UUID is still treated as shared.
+        for match in _UUID_RE.findall(parent_transcript):
+            _append_unique_string(session_ids, match)
+    return session_ids
+
+
+def _referenced_transcript_session_ids(
+    state: SessionState | None,
+    raw_data: dict[str, Any] | None = None,
+    *,
+    index_session_id: str | None = None,
+) -> list[str]:
+    """Return all transcript UUIDs a session manifest or index entry references."""
+    session_ids: list[str] = []
+    _append_unique_string(session_ids, index_session_id)
+
+    if state is not None:
+        _append_unique_string(session_ids, state.confirmed.claude_session_id)
+        for session_id in _tracked_transcript_session_ids(state):
+            _append_unique_string(session_ids, session_id)
+        for session_id in _tracked_derivation_transcript_session_ids(state.confirmed.derivation):
+            _append_unique_string(session_ids, session_id)
+        return session_ids
+
+    if not isinstance(raw_data, dict):
+        return session_ids
+
+    confirmed = raw_data.get("confirmed")
+    if not isinstance(confirmed, dict):
+        return session_ids
+
+    _append_unique_string(session_ids, confirmed.get("claude_session_id"))
+    for session_id in _tracked_transcript_session_ids_from_artifacts(confirmed.get("artifacts")):
+        _append_unique_string(session_ids, session_id)
+    for session_id in _tracked_derivation_transcript_session_ids(confirmed.get("derivation")):
+        _append_unique_string(session_ids, session_id)
+    return session_ids
+
+
+def _add_unique_project_root(roots: list[str], value: Any) -> None:
+    if not isinstance(value, str) or not value:
+        return
+    normalized = str(Path(value).expanduser().resolve())
+    if normalized not in roots:
+        roots.append(normalized)
+
+
+def _transcript_cleanup_project_root(state: SessionState | None, fallback_root: str) -> str:
+    """Return the Claude project root whose raw transcript files should be cleaned."""
+    if state is not None:
+        if state.confirmed.claude_project_root:
+            return str(Path(state.confirmed.claude_project_root).expanduser().resolve())
+        if state.worktree or state.forge_root:
+            return str(Path(resolve_claude_project_root(state)).expanduser().resolve())
+    return str(Path(fallback_root).expanduser().resolve())
+
+
+def _candidate_transcript_project_roots(state: SessionState | None, entry: SessionIndexEntry) -> list[str]:
+    """Return possible Claude project roots for a session, newest source first."""
+    roots: list[str] = []
+    if state is not None:
+        _add_unique_project_root(roots, state.confirmed.claude_project_root)
+        if state.worktree or state.forge_root:
+            _add_unique_project_root(roots, resolve_claude_project_root(state))
+    _add_unique_project_root(roots, entry.forge_root or entry.worktree_path)
+    _add_unique_project_root(roots, entry.worktree_path)
+    return roots
 
 
 def _latest_transcript_artifact_path(state: SessionState) -> str | None:
@@ -1402,6 +1506,63 @@ class SessionManager:
             if str(Path(entry.worktree_path).resolve()) == normalized and name != exclude
         ]
 
+    def _find_shared_transcript_sessions(
+        self,
+        project_root: str,
+        session_ids: list[str],
+        *,
+        exclude_name: str,
+        exclude_forge_root: str,
+    ) -> dict[str, list[str]]:
+        """Find other sessions that still reference the raw transcript UUIDs.
+
+        Same-directory native forks can temporarily share a Claude conversation
+        UUID until the fork receives a real turn. Treat raw transcripts like
+        worktrees: shared resources must survive deleting one alias.
+        """
+        target_paths = {
+            session_id: str(get_transcript_path(project_root, session_id).resolve()) for session_id in session_ids
+        }
+        if not target_paths:
+            return {}
+
+        normalized_exclude_root = str(Path(exclude_forge_root).resolve())
+        shared: dict[str, list[str]] = {session_id: [] for session_id in target_paths}
+
+        for other_name, other_entry in self.index_store.list_sessions():
+            other_forge_root = other_entry.forge_root or other_entry.worktree_path
+            if other_name == exclude_name and str(Path(other_forge_root).resolve()) == normalized_exclude_root:
+                continue
+
+            other_state: SessionState | None = None
+            other_raw: dict[str, Any] | None = None
+            other_store = SessionStore(other_forge_root, other_name)
+            if other_store.exists():
+                try:
+                    other_state = other_store.read()
+                except (ManifestCorruptedError, ManifestValidationError):
+                    other_raw = other_store.read_raw()
+
+            other_ids = _referenced_transcript_session_ids(
+                other_state,
+                other_raw,
+                index_session_id=other_entry.claude_session_id,
+            )
+            if not other_ids:
+                continue
+
+            candidate_roots = _candidate_transcript_project_roots(other_state, other_entry)
+            for session_id in target_paths:
+                if session_id not in other_ids:
+                    continue
+                for root in candidate_roots:
+                    other_path = str(get_transcript_path(root, session_id).resolve())
+                    if other_path == target_paths[session_id]:
+                        shared[session_id].append(other_name)
+                        break
+
+        return {session_id: names for session_id, names in shared.items() if names}
+
     def delete_session(
         self,
         name: str,
@@ -1521,12 +1682,43 @@ class SessionManager:
                 raise ForgeSessionError(cleanup_result.errors[0])
 
         if delete_transcripts and _claude_session_id:
-            _artifact_ids = _tracked_transcript_session_ids(state) if state else [_claude_session_id]
-            cleanup_session(
-                project_root=entry.forge_root or entry.worktree_path,
-                claude_session_id=_claude_session_id,
-                artifact_session_ids=_artifact_ids,
+            if state:
+                _artifact_ids = _tracked_transcript_session_ids(state)
+            else:
+                _artifact_ids = []
+                raw_confirmed = (_raw_data or {}).get("confirmed")
+                if isinstance(raw_confirmed, dict):
+                    _artifact_ids = _tracked_transcript_session_ids_from_artifacts(raw_confirmed.get("artifacts"))
+
+            _cleanup_ids: list[str] = []
+            for _session_id in [_claude_session_id, *_artifact_ids]:
+                _append_unique_string(_cleanup_ids, _session_id)
+
+            _transcript_project_root = _transcript_cleanup_project_root(state, entry.forge_root or entry.worktree_path)
+            shared_ids = self._find_shared_transcript_sessions(
+                _transcript_project_root,
+                _cleanup_ids,
+                exclude_name=name,
+                exclude_forge_root=entry_forge_root,
             )
+
+            _filtered_claude_session_id = None if _claude_session_id in shared_ids else _claude_session_id
+            _filtered_artifact_ids = [session_id for session_id in _artifact_ids if session_id not in shared_ids]
+
+            if shared_ids:
+                logger.info(
+                    "Skipping transcript cleanup for shared Claude session id(s): %s",
+                    ", ".join(
+                        f"{session_id} ({', '.join(referencing[:3])})" for session_id, referencing in shared_ids.items()
+                    ),
+                )
+
+            if _filtered_claude_session_id or _filtered_artifact_ids:
+                cleanup_session(
+                    project_root=_transcript_project_root,
+                    claude_session_id=_filtered_claude_session_id,
+                    artifact_session_ids=_filtered_artifact_ids,
+                )
 
         self.index_store.remove_session(name, forge_root=entry_forge_root)
 
