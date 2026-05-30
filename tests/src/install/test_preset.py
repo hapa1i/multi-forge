@@ -57,7 +57,7 @@ class TestBuiltinPreset:
         assert "env" not in preset
 
     def test_has_write_edit_permissions(self) -> None:
-        """Handoff agent's claude -p subprocess needs Write/Edit to modify files."""
+        """The memory writer's claude -p subprocess needs Write/Edit to modify files."""
         preset = get_builtin_preset()
         allow = preset["permissions"]["allow"]
         assert "Write" in allow

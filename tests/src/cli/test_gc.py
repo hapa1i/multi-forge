@@ -14,7 +14,7 @@ def _make_report(scope: str = "repo", total: int = 0) -> CleanReport:
     """Build a CleanReport with optional orphans."""
     cats = [
         OrphanCategory("session_dirs", "Orphan session dirs", total, ["/fake/path"] * total),
-        OrphanCategory("handoff_files", "Orphan handoff files", 0, []),
+        OrphanCategory("transfer_files", "Orphan transfer files", 0, []),
         OrphanCategory("active_entries", "Stale active entries", 0, []),
         OrphanCategory("work_queue", "Stale work queue", 0, []),
         OrphanCategory("proxies", "Stale proxy entries", 0, []),

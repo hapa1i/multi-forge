@@ -1,20 +1,20 @@
-"""Regression: process_handoff output_root separates read/write paths.
+"""Regression: assemble_transfer_context output_root separates read/write paths.
 
 Bug ID: 21x-handoff-output-root
-Root cause: _generate_parent_handoff_context passed the fork's worktree as
-project_root to process_handoff. Transcript artifacts live under the parent's
-worktree, so the lookup failed and the handoff file was generated with no
-conversation content.
-Fix: Added output_root parameter to process_handoff so transcript lookup uses
-the parent's project_root while the context file is written to the fork's
-output_root.
-Affected files: src/forge/session/handoff.py, src/forge/cli/session.py
+Root cause: _generate_parent_transfer_context passed the fork's worktree as
+project_root to assemble_transfer_context. Transcript artifacts live under the
+parent's worktree, so the lookup failed and the transfer file was generated
+with no conversation content.
+Fix: Added output_root parameter to assemble_transfer_context so transcript
+lookup uses the parent's project_root while the context file is written to the
+fork's output_root.
+Affected files: src/forge/session/transfer.py, src/forge/cli/session.py
 """
 
 import pytest
 
-from forge.session.handoff import ResumeStrategy, process_handoff
 from forge.session.models import SessionState
+from forge.session.transfer import ResumeStrategy, assemble_transfer_context
 
 pytestmark = pytest.mark.regression
 
@@ -41,7 +41,7 @@ def test_output_root_writes_context_to_separate_directory(tmp_path):
 
     parent_state = _minimal_parent_state(str(parent_dir))
 
-    result = process_handoff(
+    result = assemble_transfer_context(
         parent_name="parent",
         parent_state=parent_state,
         forge_root=parent_dir,
@@ -67,7 +67,7 @@ def test_output_root_none_defaults_to_project_root(tmp_path):
 
     parent_state = _minimal_parent_state(str(parent_dir))
 
-    result = process_handoff(
+    result = assemble_transfer_context(
         parent_name="parent",
         parent_state=parent_state,
         forge_root=parent_dir,

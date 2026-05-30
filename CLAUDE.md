@@ -4,9 +4,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Multi-Forge is a toolkit for Claude Code enhancement that consolidates multiple AI developer tools (proxy, session
-manager, status line, TDD guard) into a unified monorepo. The architecture follows a "glue approach" - building
-connective tissue between specialized tools rather than a monolithic application.
+Multi-Forge consolidates multiple AI developer tools (proxy, session manager, status line, TDD guard) into a unified
+monorepo. The architecture is a "glue approach" — connective tissue between specialized tools, not a monolith.
 
 ## Development Commands
 
@@ -38,6 +37,13 @@ uv run mypy src/
 pre-commit run --all-files
 ```
 
+**Run integration tests when needed.** Docker is expected to be running locally — `make test-integration` is routine,
+not special-occasion. For changes touching hooks, session start/resume/fork, the memory writer, proxy runtime, or the
+installer, run the relevant integration tests before finishing; unit tests never exercise the `claude -p` / Docker paths
+these flows use. Stay cost-conscious by targeting files
+(`./scripts/test-integration.sh tests/integration/.../test_*.py`) instead of the full suite. See
+[testing-guidelines.md](docs/developer/testing-guidelines.md#when-to-run-integration-tests).
+
 ## Git Branching
 
 - **`main`**: Primary branch. All PRs target `main`.
@@ -61,8 +67,8 @@ The `Publish to PyPI` workflow (`.github/workflows/publish.yml`) builds and publ
 
 ## Work Board Quick Semantics
 
-The authoritative board workflow is in `docs/developer/work-board-contract.md`. In short: `todo/` means accepted but
-parked. When asked to work on a `todo/` card, create or switch to its execution branch, move the card directory to
+The authoritative board workflow is in `docs/developer/board-contract.md`. In short: `todo/` means accepted but parked.
+When asked to work on a `todo/` card, create or switch to its execution branch, move the card directory to
 `docs/board/doing/<slug>/`, and create/update `checklist.md`. `doing/` is active work; `done/` means shipped, verified,
 design docs synced, and closeout recorded.
 
@@ -118,7 +124,7 @@ src/forge/
 ## Implementation Status
 
 Test suite has ~3,900 tests with Docker-based isolation. Key capabilities: multi-model proxy routing, session management
-with resume/handoff, policy engine (TDD + semantic supervisor), search, workflow runners (fan-out, adversarial), skills
+with resume/transfer, policy engine (TDD + semantic supervisor), search, workflow runners (fan-out, adversarial), skills
 architecture, and interactive manual testing (`/forge:smoke-test`, `/forge:walkthrough`, `/forge:qa`).
 
 **Install profiles**: `standard` (default) includes most skills. `full` adds `/forge:qa` (Docker-based QA).
@@ -161,23 +167,18 @@ fact_id, orchestration) unless explicitly asked. When in doubt, ask before renam
 ## Guidelines (load into context)
 
 @docs/developer/coding-standards.md @docs/developer/testing-guidelines.md @docs/developer/documentation-guidelines.md
-@docs/developer/work-board-contract.md
+@docs/developer/board-contract.md
 
 ## Platform & Environment
 
-**macOS (Darwin)** - Use GNU tools instead of BSD versions:
-
-- gsed not sed (different -i syntax)
-- gawk' not 'awk'
-- ggrep not grep (for '-p perl regex) - can also use rg
-- gdate not date (for'--date parsing)
-- greadlink -f' not readlink (BSD lacks -f\*)
+**macOS (Darwin)** — use GNU tools, not BSD: `gsed` (not `sed`; different `-i` syntax), `gawk`, `ggrep` (or `rg`; perl
+regex), `gdate` (`--date` parsing), `greadlink -f` (BSD lacks `-f`).
 
 ## Key Documents
 
 - `docs/design.md` - Unified design and migration plan (canonical)
 - `docs/design_appendix.md` - Reference details (schemas, config tables)
-- `docs/developer/work-board-contract.md` - Work-board lane, checklist, and closeout contract
+- `docs/developer/board-contract.md` - Work-board lane, checklist, and closeout contract
 - `docs/board/README.md` - Board directory guide and dogfood examples
 - `docs/end-user/` - End-user guides (sessions, proxies, hooks, configs)
 
@@ -185,15 +186,14 @@ fact_id, orchestration) unless explicitly asked. When in doubt, ask before renam
 
 ### Error Handling
 
-Keep user-facing error messages simple and accurate. Do not suggest installation methods or workarounds that don't apply
-to this project's setup. When fixing errors, match the existing error message style in the codebase.
+Keep user-facing error messages simple and accurate. Don't suggest installation methods or workarounds that don't apply
+here. When fixing errors, match the existing error-message style.
 
 ### Console Output Formatting
 
-**Use the `forge.cli.output` helpers for CLI Rich recovery output.** The CLI's recovery-output standard (the
-`Tip:`/`Error:` pairing) lives in one place so equivalent situations tip identically. All Rich-styled `Tip:` output in
-`src/forge/cli/**` should go through these helpers; tests enforce that `[dim]Tip:` appears only in `output.py`. When
-adding or changing recovery tips, reach for:
+**Use the `forge.cli.output` helpers for CLI Rich recovery output** so equivalent situations tip identically. All Rich
+`Tip:` output in `src/forge/cli/**` must go through them; tests enforce that `[dim]Tip:` appears only in `output.py`.
+Reach for:
 
 ```python
 from forge.cli.output import print_tip, print_error, print_error_with_tip, handle_session_error

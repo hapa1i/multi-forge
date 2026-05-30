@@ -467,27 +467,27 @@ class TestDebateTemplateEquivalence:
         assert _CODE_DEBATE_EVALUATION_TEMPLATE == canonical
 
 
-class TestQaHandoffChecklist:
-    def test_handoff_setup_uses_passports(self):
-        handoff_md = SKILLS_DIR / "qa" / "resources" / "checklist" / "16-handoff.md"
-        content = handoff_md.read_text()
+class TestQaMemoryWriterChecklist:
+    def test_memory_setup_uses_passports(self):
+        memory_md = SKILLS_DIR / "qa" / "resources" / "checklist" / "16-memory.md"
+        content = memory_md.read_text()
         step = content.split("### 16.1", 1)[1].split("### 16.2", 1)[0]
         assert "forge memory track" in step
         assert "forge memory enable --session" in step
         assert "forge memory list" in step
 
-    def test_handoff_includes_shadow_doc_step(self):
-        handoff_md = SKILLS_DIR / "qa" / "resources" / "checklist" / "16-handoff.md"
-        content = handoff_md.read_text()
+    def test_memory_includes_shadow_doc_step(self):
+        memory_md = SKILLS_DIR / "qa" / "resources" / "checklist" / "16-memory.md"
+        content = memory_md.read_text()
         step = content.split("### 16.3", 1)[1].split("### 16.4", 1)[0]
         assert "forge memory track docs/team-standards.md" in step
         assert "--propose" in step
         assert "--shadow-path .forge/memory/shadow_standards.md" in step
         assert "cmp -s docs/team-standards.md /tmp/team-standards.before" in step
 
-    def test_handoff_includes_queued_startup_step(self):
-        handoff_md = SKILLS_DIR / "qa" / "resources" / "checklist" / "16-handoff.md"
-        content = handoff_md.read_text()
+    def test_memory_includes_queued_startup_step(self):
+        memory_md = SKILLS_DIR / "qa" / "resources" / "checklist" / "16-memory.md"
+        content = memory_md.read_text()
         step = content.split("### 16.4", 1)[1].split("\n---", 1)[0]
         code = step.split("```bash", 1)[1].split("```", 1)[0]
         assert "forge hook stop" in step

@@ -1,7 +1,7 @@
 """Shared subprocess routing primitives.
 
 Defines ``ModelRoute`` and ``RoutingResult`` used by all subprocess
-types (workflow workers, supervisor, handoff agent). The resolution
+types (workflow workers, supervisor, memory writer). The resolution
 chain in ``resolve_subprocess_routing()`` replaces ad-hoc resolution
 in each subprocess launcher.
 
@@ -302,7 +302,7 @@ def resolve_subprocess_routing(
         routes: Derived model routes for compatibility and route scan.
         require_route: When True (workflows), opaque session proxy without
             a matching route is treated as unresolved. When False
-            (supervisor, handoff), it is accepted as-is.
+            (supervisor, memory writer), it is accepted as-is.
         use_environment: When False, skip ambient FORGE_SUBPROCESS_PROXY
             and ANTHROPIC_BASE_URL lookups. Useful for callers that need
             to preserve their own explicit fallback ordering.

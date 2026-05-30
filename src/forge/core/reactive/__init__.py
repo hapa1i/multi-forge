@@ -2,7 +2,7 @@
 
 Provides utilities for subprocess management, caching, structured output
 extraction, and LLM-based classification. These are the building blocks
-for the semantic supervisor, handoff agent, and WorkflowPolicy.
+for the semantic supervisor, memory writer, and WorkflowPolicy.
 
 Note: ``proxy.py`` is intentionally NOT re-exported here because it
 lazy-imports ``forge.proxy.proxies`` (a top-level component). Consumers

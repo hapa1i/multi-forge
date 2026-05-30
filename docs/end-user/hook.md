@@ -141,7 +141,7 @@ Purpose: persist a transcript copy at stable boundaries and enqueue deferred wor
   - `<forge_root>/.forge/artifacts/{session_name}/transcripts/{session_id}.jsonl`
 - append an entry to `confirmed.artifacts.transcripts[]`
 - enqueue search indexing work for `<forge_root>/.forge/search-index/`
-- enqueue handoff agent marker (if `memory.auto_update.enabled`). See [`handoff.md`](handoff.md).
+- enqueue memory-writer marker (if `memory.auto_update.enabled`). See [`memory.md`](memory.md).
 
 ### pre-compact (PreCompact)
 

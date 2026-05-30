@@ -2,7 +2,7 @@
 
 Detects and removes orphaned Forge state:
 - Session directories not in the global index
-- Handoff files for sessions not in the index
+- Transfer files for sessions not in the index
 - Stale active-session entries (dead PIDs)
 - Stale work-queue markers (session gone or worktree gone)
 - Stale proxy entries (dead PIDs, orphaned "starting" state)
@@ -217,7 +217,7 @@ def _build_worktree_reference_set(ctx: ExecutionContext, scope: str, scope_roots
     return result
 
 
-def _build_handoff_context_reference_set(ref_set: set[tuple[str, str]]) -> set[str]:
+def _build_transfer_context_reference_set(ref_set: set[tuple[str, str]]) -> set[str]:
     """Build absolute paths referenced by session derivation context_file fields."""
     from forge.session import SessionStore
 
@@ -226,7 +226,7 @@ def _build_handoff_context_reference_set(ref_set: set[tuple[str, str]]) -> set[s
         try:
             state = SessionStore(forge_root, name).read()
         except Exception:
-            _log.debug("Could not read session manifest for handoff GC: %s (%s)", name, forge_root, exc_info=True)
+            _log.debug("Could not read session manifest for transfer GC: %s (%s)", name, forge_root, exc_info=True)
             continue
 
         derivation = state.confirmed.derivation
@@ -270,7 +270,7 @@ def _detect_orphan_session_dirs(ref_set: set[tuple[str, str]], forge_roots: set[
     )
 
 
-def _detect_orphan_handoff_files(ref_set: set[tuple[str, str]], forge_roots: set[Path]) -> OrphanCategory:
+def _detect_orphan_transfer_files(ref_set: set[tuple[str, str]], forge_roots: set[Path]) -> OrphanCategory:
     """Find orphaned resume-context artifacts under ``prev_sessions/``.
 
     Walks the per-parent layout (``<parent>/generated.md`` +
@@ -291,7 +291,7 @@ def _detect_orphan_handoff_files(ref_set: set[tuple[str, str]], forge_roots: set
     from forge.session import prev_sessions as _ps
 
     orphans: list[str] = []
-    referenced_context_files = _build_handoff_context_reference_set(ref_set)
+    referenced_context_files = _build_transfer_context_reference_set(ref_set)
 
     for forge_root in forge_roots:
         prev_root = _ps.prev_sessions_root(forge_root)
@@ -323,8 +323,8 @@ def _detect_orphan_handoff_files(ref_set: set[tuple[str, str]], forge_roots: set
             orphans.append(str(legacy_file))
 
     return OrphanCategory(
-        category="handoff_files",
-        description="Orphaned resume-context artifacts (handoff files)",
+        category="transfer_files",
+        description="Orphaned resume-context artifacts (transfer files)",
         count=len(orphans),
         items=sorted(orphans),
     )
@@ -569,7 +569,7 @@ def collect_clean_report(*, ctx: ExecutionContext, scope: str = "repo") -> Clean
 
     categories = [
         _detect_orphan_session_dirs(ref_set, scope_roots),
-        _detect_orphan_handoff_files(ref_set, scope_roots),
+        _detect_orphan_transfer_files(ref_set, scope_roots),
         _detect_stale_active_entries(scope_roots),
         _detect_stale_work_queue(worktree_ref_set, scope_roots),
         _detect_stale_proxies(),
@@ -603,8 +603,8 @@ def run_clean(*, ctx: ExecutionContext, scope: str = "repo") -> CleanResult:
         cleaned = 0
         if category.category == "session_dirs":
             cleaned = _clean_session_dirs(category.items, result)
-        elif category.category == "handoff_files":
-            cleaned = _clean_handoff_files(category.items, result)
+        elif category.category == "transfer_files":
+            cleaned = _clean_transfer_files(category.items, result)
         elif category.category == "active_entries":
             cleaned = _clean_active_entries(category.items)
         elif category.category == "work_queue":
@@ -646,7 +646,7 @@ def _clean_files(items: list[str], result: CleanResult) -> int:
     return cleaned
 
 
-def _clean_handoff_files(items: list[str], result: CleanResult) -> int:
+def _clean_transfer_files(items: list[str], result: CleanResult) -> int:
     """Remove orphaned resume-context artifacts.
 
     Items may be:

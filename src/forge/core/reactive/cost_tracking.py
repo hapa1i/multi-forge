@@ -1,6 +1,6 @@
 """Verb-level cost attribution via proxy metric snapshot deltas.
 
-Wraps subprocess invocations (panel, supervisor, handoff, etc.) to
+Wraps subprocess invocations (panel, supervisor, memory-writer, etc.) to
 measure cost by snapshotting proxy metrics before and after execution.
 Results are logged to PID-sharded verb JSONL files.
 
@@ -200,7 +200,7 @@ def track_verb_cost(verb: str, proxy_base_urls: list[str]):
     """Snapshot proxy metrics across all proxies before/after a verb invocation.
 
     Args:
-        verb: Origin label ("panel", "supervisor", "handoff", etc.)
+        verb: Origin label ("panel", "supervisor", "memory-writer", etc.)
         proxy_base_urls: ALL proxy base URLs this verb will use.
             Direct workers (no proxy) are excluded — only proxied
             requests have cost data at the proxy level.

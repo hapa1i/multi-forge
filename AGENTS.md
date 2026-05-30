@@ -12,11 +12,11 @@ docs in `docs/`, runtime images in `docker/`, and automation scripts in `scripts
 
 Use the repo docs as the source of truth for their domains: `README.md` for the overview, `docs/developer/` for setup,
 and `CLAUDE.md` for agent context. `docs/developer/coding-standards.md`, `testing-guidelines.md`,
-`documentation-guidelines.md`, and `work-board-contract.md` define code style, test policy, doc writing, and board
-workflow rules. `docs/board/README.md` is a board directory guide with examples, not the authority. Update
-`docs/design.md` and `docs/design_appendix.md` when architecture or file ownership changes. When changing config
-ownership, auth resolution, installer behavior, proxy/session semantics, or workflow prerequisites, also update the
-relevant `docs/end-user/*` guide so wheel-installed users get the right Day 1 path.
+`documentation-guidelines.md`, and `board-contract.md` define code style, test policy, doc writing, and board workflow
+rules. `docs/board/README.md` is a board directory guide with examples, not the authority. Update `docs/design.md` and
+`docs/design_appendix.md` when architecture or file ownership changes. When changing config ownership, auth resolution,
+installer behavior, proxy/session semantics, or workflow prerequisites, also update the relevant `docs/end-user/*` guide
+so wheel-installed users get the right Day 1 path.
 
 Board quick semantics: `todo/` means accepted but parked; starting a todo card means create or switch to the execution
 branch, move the card directory to `doing/`, and create/update its `checklist.md`. `doing/` is active work; `done/`
@@ -63,7 +63,9 @@ Ruff and mypy; pre-commit also runs isort, Black, and gitleaks.
 Use `pytest`, not `unittest`. Mirror source paths in `tests/src/` (for example, `src/forge/session/store.py` maps to
 `tests/src/session/test_store.py`). Mark integration files with `pytest.mark.integration`. Name regression files
 `test_bug_<id>_<description>.py` and mark them `regression`. Every bug fix should include a regression test, and broken
-tests should be fixed or removed rather than skipped.
+tests should be fixed or removed rather than skipped. Docker is expected to be running locally: run integration tests
+(target relevant files via `./scripts/test-integration.sh <path>`, not the full suite) for changes touching hooks,
+sessions, the memory writer, proxy runtime, or the installer — don't defer them to closeout.
 
 ## Release Process
 

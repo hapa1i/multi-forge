@@ -322,7 +322,7 @@ HeadlessResult
 Initial implementations:
 
 - `ClaudeHeadlessInvoker`: wraps `forge.core.reactive.session_runner.run_claude_session()` (today's shared subprocess
-  runner used by supervisor, team supervisor, and handoff agent) plus the parallel fan-out behavior in
+  runner used by supervisor, team supervisor, and the memory writer) plus the parallel fan-out behavior in
   `forge.review.engine`.
 - `CodexHeadlessInvoker`: uses `codex exec`, `--json`, and `codex exec resume` where useful.
 - `GeminiHeadlessInvoker`: uses `gemini -p --output-format json`.
@@ -418,7 +418,7 @@ The first instrumentation points are small enough to ship before the runtime abs
 | Callsite            | File                                      | Purpose                        | PR #8 status                                     |
 | ------------------- | ----------------------------------------- | ------------------------------ | ------------------------------------------------ |
 | Workflow verbs      | `src/forge/cli/workflow.py`               | Panel/analyze/debate/consensus | Initial verb-cost snapshots shipped              |
-| Handoff agent       | `src/forge/session/handoff_agent.py`      | Post-session doc updates       | Initial verb-cost snapshots shipped              |
+| Memory writer       | `src/forge/session/memory_writer.py`      | Post-session doc updates       | Initial verb-cost snapshots shipped              |
 | Semantic supervisor | `src/forge/policy/semantic/supervisor.py` | Plan alignment checks          | Initial verb-cost snapshots shipped              |
 | Team supervisor     | `src/forge/policy/team/handlers.py`       | Work divergence checks         | Still future                                     |
 | Review engine       | `src/forge/review/engine.py`              | Multi-model fan-out            | Routing plan shipped; invoker abstraction future |
@@ -638,7 +638,7 @@ peer-tool integration once the contract is stable.
 
 **Required for cross-runtime resume:**
 
-- A curator (handoff agent) that reads the parent transcript and produces a runtime-neutral handoff document.
+- A curator (memory writer) that reads the parent transcript and produces a runtime-neutral handoff document.
 - A `--target-runtime` option on the curator so handoffs can be tuned for the destination's conventions (terseness, tool
   naming, model style). Parallel to today's per-model-family system prompt addendums
   (`src/forge/cli/session_addendum.py`).
@@ -684,7 +684,7 @@ Initial target matrix:
 | Usage source                                                   | Transcript/status/proxy fallback | JSONL usage events                              | JSON stats                     |
 | Native resume (within runtime, within CWD)                     | `claude --resume`                | `codex exec resume`                             | Capability-check first         |
 | Curated handoff *input* (accept context doc at start)          | `--append-system-prompt-file`    | Initial user message                            | Initial message                |
-| Curated handoff *output* (generate curation of own transcript) | Yes (handoff agent)              | Yes (via headless invoker)                      | Yes (via headless invoker)     |
+| Curated handoff *output* (generate curation of own transcript) | Yes (memory writer)              | Yes (via headless invoker)                      | Yes (via headless invoker)     |
 | Always-on proxy compatible                                     | Yes (host or sidecar)            | Yes (host or sidecar)                           | TBD per CLI                    |
 | Request inspectable by Forge                                   | Only through Forge proxy/sidecar | Only through Forge proxy/sidecar; direct opaque | Route-dependent; direct opaque |
 | Gateway route                                                  | Anthropic-compatible base URLs   | Native CLI or first-class ChatGPT LiteLLM route | API/Vertex route only          |

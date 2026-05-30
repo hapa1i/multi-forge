@@ -14,6 +14,7 @@ Usage:
     count-tokens docs/design.md                        # default: claude-opus-4-6
     count-tokens --model gemini-2.5-flash file.md      # Gemini API
     count-tokens --model gpt-4 file.md                 # tiktoken (local)
+    count-tokens --model claude-opus-4-8               # Note the same tokenizer as claude-opus-4-6
     cat file.txt | count-tokens                        # stdin
     count-tokens -q file.txt                           # quiet: number only
 """

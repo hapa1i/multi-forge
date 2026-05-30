@@ -76,19 +76,19 @@ class LaunchIntent:
 
 
 @dataclass
-class HandoffConfig:
-    """Handoff agent configuration for automatic memory doc updates.
+class MemoryWriterConfig:
+    """Memory writer configuration for automatic memory doc updates.
 
-    The handoff agent runs after session stop to update designated
+    The memory writer runs after session stop to update designated
     project memory documents (e.g., project-state.md) using ``claude -p``.
 
     Fields:
-        enabled: Whether the handoff agent should run on session stop.
+        enabled: Whether the memory writer should run on session stop.
         mode: "augment" (add missing info) or "review-only" (report only, no edits).
-        proxy: Optional proxy (proxy_id or template name) to route the agent's
+        proxy: Optional proxy (proxy_id or template name) to route the writer's
                LLM calls through. If None, inherits the session's confirmed proxy.
         direct: When True, force direct Anthropic routing regardless of session proxy.
-        min_turns: Minimum conversation turns before triggering handoff.
+        min_turns: Minimum conversation turns before triggering the writer.
                    Sessions below this threshold are skipped (too short to be useful).
     """
 
@@ -104,7 +104,7 @@ class DesignatedDoc:
     """Runtime type for a doc the memory writer should update.
 
     Not persisted in session manifests. Produced by ``scan_passported_docs()``
-    and consumed by ``run_handoff_agent()``.
+    and consumed by ``run_memory_writer()``.
 
     Fields:
         path: Worktree-relative path (e.g., "docs/checklist.md").
@@ -128,7 +128,7 @@ class MemoryIntent:
     strategy: str = "summary"  # "summary", "full", or "off"
     max_chars: int = 6000
     generated_file: str | None = None  # e.g., ".claude/forge.context.generated.md"
-    auto_update: HandoffConfig | None = None
+    auto_update: MemoryWriterConfig | None = None
 
 
 @dataclass
@@ -331,10 +331,11 @@ class Derivation:
         parent_session: Parent session name (same as SessionState.parent_session).
         parent_transcript: Repo-relative path to parent's transcript artifact.
         inherited_proxy: Template from parent's started_with_proxy (if any).
-        resume_mode: "native" (--resume --fork-session) or "handoff" (assembled context).
-            None = legacy (handoff). Authoritative field for how context was transferred.
+        resume_mode: "native" (--resume --fork-session) or "transfer" (assembled context).
+            None and legacy "handoff" are tolerated as transfer (no reader branches on a
+            loaded parent's mode token). Authoritative field for how context was transferred.
         strategy: Context assembly strategy (minimal|structured|full|ai-curated).
-            Only set when resume_mode is "handoff" (or legacy None). Null for native resumes.
+            Only set when resume_mode is "transfer" (or legacy "handoff"/None). Null for native resumes.
         depth: How many ancestors were traversed (1 = parent only).
         resumed_at: ISO8601 timestamp when resume was executed.
         lineage: Ancestry chain from parent to oldest ancestor traversed.

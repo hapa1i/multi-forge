@@ -118,6 +118,26 @@ make clean                  # remove caches
 - Uses `litellm-gemini-test` for isolation
 - Fails loudly on missing prereqs ("never skip")
 
+### When to Run Integration Tests
+
+Docker is expected to be running locally — `make test-integration` is a routine command, not a special occasion. Run
+integration tests (not just unit) before finishing any change that touches:
+
+- hooks (`src/forge/cli/hooks/`), session lifecycle (start/resume/fork), or the memory writer
+- proxy runtime, routing, or auth resolution
+- the installer or bundled extensions
+
+Unit tests run on the host and never exercise the real `claude -p` subprocess, Docker, or wheel-install paths these
+flows depend on. A green unit run is not enough signal for these areas — don't defer the integration run to closeout.
+
+Stay cost-conscious: run the **relevant** integration files, not the whole suite, when the change is scoped.
+
+```bash
+./scripts/test-integration.sh tests/integration/cli/test_handoff_integration.py -v
+```
+
+Reserve the full `make test-integration` (~2-3 min) for pre-release or broad, cross-cutting changes.
+
 ### Advanced: Direct pytest (after `make` ran once)
 
 **WARNING:** Direct `pytest` assumes `make` ran; integration fails if LiteLLM isn't on 4001.

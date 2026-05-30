@@ -34,12 +34,6 @@ from .exceptions import (
     SessionExistsError,
     SessionNotFoundError,
 )
-from .handoff import (
-    HandoffResult,
-    ResumeStrategy,
-    estimate_transcript_tokens,
-    process_handoff,
-)
 from .index import IndexStore
 from .models import (
     Derivation,
@@ -51,6 +45,12 @@ from .models import (
 )
 from .prev_sessions import child_path, child_path_rel, ensure_child, generated_path
 from .store import SessionStore
+from .transfer import (
+    ResumeStrategy,
+    TransferResult,
+    assemble_transfer_context,
+    estimate_transcript_tokens,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -503,10 +503,10 @@ class SessionManager:
         depth: int = 1,
         context_limit: int | None = None,
         token_estimate_multiplier: float = 1.0,
-        resume_mode: str = "handoff",
+        resume_mode: str = "transfer",
         forge_root: str | None = None,
         memory_flag: bool | None = None,
-    ) -> tuple[SessionState, HandoffResult]:
+    ) -> tuple[SessionState, TransferResult]:
         """Create a new session derived from a parent with context assembly.
 
         Creates a new child session in the parent's worktree with context assembled
@@ -526,10 +526,10 @@ class SessionManager:
             depth: How many ancestors to traverse (1 = parent only).
             context_limit: Context limit for budget check (required for full strategy).
             token_estimate_multiplier: Optional model-specific multiplier for heuristic budget checks.
-            resume_mode: "handoff" (assemble context file) or "native" (skip assembly).
+            resume_mode: "transfer" (assemble context file) or "native" (skip assembly).
 
         Returns:
-            Tuple of (child session state, handoff result).
+            Tuple of (child session state, transfer result).
 
         Raises:
             SessionNotFoundError: If parent session doesn't exist.
@@ -537,7 +537,7 @@ class SessionManager:
             InvalidSessionNameError: If name is invalid.
             ContextBudgetExceededError: If full strategy exceeds context limit.
         """
-        if resume_mode not in {"handoff", "native"}:
+        if resume_mode not in {"transfer", "native"}:
             raise ValueError(f"Unsupported resume_mode: {resume_mode}")
 
         parent_entry = self.index_store.get_session(parent_name, forge_root=forge_root)
@@ -574,7 +574,7 @@ class SessionManager:
         # within the same CWD's .claude/ project. For now, child always inherits
         # parent's forge_root, so this is a no-op.
 
-        # --- Native mode: skip handoff, return early ---
+        # --- Native mode: skip transfer, return early ---
         if resume_mode == "native":
             inh_warnings_native: list[str] = []
             child_state = self._create_resume_child(
@@ -610,7 +610,7 @@ class SessionManager:
                 parent_project_root=parent_entry.project_root,
             )
 
-            handoff_result = HandoffResult(
+            transfer_result = TransferResult(
                 context_file=None,
                 context_file_rel=None,
                 transcript_artifact_path=transcript_artifact_path,
@@ -627,9 +627,9 @@ class SessionManager:
                 project_root=project_root,
                 name_was_auto=name_was_auto,
             )
-            return child_state, handoff_result
+            return child_state, transfer_result
 
-        # --- Handoff mode: assemble context from parent history ---
+        # --- Transfer mode: assemble context from parent history ---
         try:
             resume_strategy = ResumeStrategy(strategy)
         except ValueError:
@@ -657,7 +657,7 @@ class SessionManager:
             except SessionNotFoundError:
                 return None
 
-        handoff_result = process_handoff(
+        transfer_result = assemble_transfer_context(
             parent_name=parent_name,
             parent_state=parent_state,
             forge_root=parent_artifact_root,
@@ -668,7 +668,7 @@ class SessionManager:
         )
 
         # claude_session_id stays None until the SessionStart hook fires
-        inh_warnings_handoff: list[str] = []
+        inh_warnings_transfer: list[str] = []
         child_state = self._create_resume_child(
             child_name=child_name,
             parent_name=parent_name,
@@ -678,19 +678,19 @@ class SessionManager:
             parent_proxy_template=parent_proxy_template,
             parent_proxy_base_url=parent_proxy_base_url,
             memory_flag=memory_flag,
-            warnings_sink=inh_warnings_handoff,
+            warnings_sink=inh_warnings_transfer,
         )
 
         child_state.confirmed.derivation = Derivation(
             parent_session=parent_name,
-            parent_transcript=handoff_result.transcript_artifact_path,
+            parent_transcript=transfer_result.transcript_artifact_path,
             inherited_proxy=inherited_proxy,
-            resume_mode="handoff",
+            resume_mode="transfer",
             strategy=strategy,
             depth=depth,
             resumed_at=timestamp,
-            lineage=handoff_result.lineage,
-            context_file=handoff_result.context_file_rel,
+            lineage=transfer_result.lineage,
+            context_file=transfer_result.context_file_rel,
             parent_forge_root=parent_entry.forge_root or parent_entry.worktree_path,
             parent_project_root=parent_entry.project_root,
         )
@@ -704,10 +704,10 @@ class SessionManager:
             name_was_auto=name_was_auto,
         )
         if final_child_name != child_name:
-            handoff_result.context_file = child_path(parent_artifact_root, parent_name, final_child_name)
-            handoff_result.context_file_rel = child_path_rel(parent_name, final_child_name)
-        handoff_result.warnings.extend(inh_warnings_handoff)
-        return child_state, handoff_result
+            transfer_result.context_file = child_path(parent_artifact_root, parent_name, final_child_name)
+            transfer_result.context_file_rel = child_path_rel(parent_name, final_child_name)
+        transfer_result.warnings.extend(inh_warnings_transfer)
+        return child_state, transfer_result
 
     def _create_resume_child(
         self,
@@ -722,7 +722,7 @@ class SessionManager:
         memory_flag: bool | None = None,
         warnings_sink: list[str] | None = None,
     ) -> SessionState:
-        """Create a child SessionState for resume (shared by native and handoff)."""
+        """Create a child SessionState for resume (shared by native and transfer)."""
         child_state = create_session_state(
             name=child_name,
             proxy_template=inherited_proxy or parent_proxy_template,
@@ -767,7 +767,7 @@ class SessionManager:
         project_root: Path,
         name_was_auto: bool,
     ) -> str:
-        """Write child session to disk and index (shared by native and handoff).
+        """Write child session to disk and index (shared by native and transfer).
 
         Race protection: if an auto-generated name collides at add_from_state
         (concurrent resume), retry once with a fresh timestamp suffix.
@@ -796,7 +796,7 @@ class SessionManager:
                     raise
 
                 derivation = child_state.confirmed.derivation
-                if derivation is not None and derivation.resume_mode == "handoff":
+                if derivation is not None and derivation.resume_mode == "transfer":
                     orphan_context = child_path(Path(parent_forge_root), parent_name, child_name)
                     generated_context = generated_path(Path(parent_forge_root), parent_name)
                     try:
@@ -811,7 +811,7 @@ class SessionManager:
 
                 child_name = self._generate_resume_name(parent_name, forge_root=parent_forge_root)
                 child_state.name = child_name
-                if derivation is not None and derivation.resume_mode == "handoff":
+                if derivation is not None and derivation.resume_mode == "transfer":
                     ensure_child(Path(parent_forge_root), parent_name, child_name)
                     derivation.context_file = child_path_rel(parent_name, child_name)
 
@@ -1180,12 +1180,12 @@ class SessionManager:
             memory_flag=memory_flag,
         )
 
-        fork_resume_mode = "handoff" if (create_worktree or is_into) else "native"
-        # For handoff-mode forks the per-child file is created lazily at launch
-        # (see _generate_parent_handoff_context). We pre-record the reference
+        fork_resume_mode = "transfer" if (create_worktree or is_into) else "native"
+        # For transfer-mode forks the per-child file is created lazily at launch
+        # (see _generate_parent_transfer_context). We pre-record the reference
         # here so GC knows the fork's child file belongs to this session, even
         # if launch happens later.
-        fork_context_file_rel = child_path_rel(parent_name, fork_name) if fork_resume_mode == "handoff" else None
+        fork_context_file_rel = child_path_rel(parent_name, fork_name) if fork_resume_mode == "transfer" else None
         fork_state.confirmed.derivation = Derivation(
             parent_session=parent_name,
             parent_transcript=_latest_transcript_artifact_path(parent),

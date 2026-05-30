@@ -101,7 +101,7 @@ forge session start test-session-parent --proxy "$FORGE_QA_OPENAI_PROXY"
 
 # Fork the parent session (default: same directory, no worktree).
 # Claude should resume the conversation via --fork-session.
-# Disable auto-memory so "where were we?" tests Forge handoff, not CC memory.
+# Disable auto-memory so "where were we?" tests Forge transfer, not CC memory.
 # Ask "where were we?" to confirm, then exit (/exit).
 CLAUDE_CODE_DISABLE_AUTO_MEMORY=1 forge session fork test-session-parent --name test-session-forked
 
@@ -129,11 +129,11 @@ cat "$FORGE_TEST_REPO/.forge/sessions/test-session-forked/forge.session.json" | 
 
 Fork the parent session again, this time with `--worktree` for code isolation. The fork gets its own git worktree and
 branch. Because conversations are project-scoped, the fork starts a fresh Claude session in the new worktree and
-automatically injects a parent handoff context file. Ask "where were we?" to confirm the parent context is present, then
-exit (`/exit`).
+automatically injects a parent transfer context file. Ask "where were we?" to confirm the parent context is present,
+then exit (`/exit`).
 
 Note: `fork --worktree` gives the forked session its own Forge root in the new worktree. The fork manifest and parent
-handoff context should both live under the forked worktree's `.forge/` directory.
+transfer context should both live under the forked worktree's `.forge/` directory.
 
 ```
 # Clean up from previous runs
@@ -143,8 +143,8 @@ git worktree remove "$WORKTREE_PATH" --force 2>/dev/null || true
 git branch -D test-session-forked-wt 2>/dev/null || true
 
 # Fork with --worktree (creates isolated worktree + branch).
-# Starts fresh Claude with parent handoff context (no --resume attempt).
-# Disable auto-memory so "where were we?" tests Forge handoff, not CC memory.
+# Starts fresh Claude with parent transfer context (no --resume attempt).
+# Disable auto-memory so "where were we?" tests Forge transfer, not CC memory.
 # Ask "where were we?" to confirm parent context, then exit (/exit).
 CLAUDE_CODE_DISABLE_AUTO_MEMORY=1 forge session fork test-session-parent --name test-session-forked-wt --worktree --extensions
 
@@ -160,12 +160,12 @@ cat "$WORKTREE_PATH/.forge/prev_sessions/test-session-parent/children/test-sessi
 - [ ] Worktree fork created at `${FORGE_TEST_REPO}-test-session-forked-wt`
 - [ ] `forge session show` reports type as Fork with worktree info
 - [ ] Fork output shows `Extensions:` line confirming auto-install in worktree
-- [ ] Fork output shows `Context:` line with parent handoff file
+- [ ] Fork output shows `Context:` line with parent transfer file
 - [ ] Asking "where were we?" reflects parent context
 - [ ] Manifest at `${FORGE_TEST_REPO}-test-session-forked-wt/.forge/sessions/test-session-forked-wt/`
 - [ ] Manifest has `is_fork: true`, `parent_session`, `is_worktree: true`
 - [ ] `confirmed.claude_session_id` is populated
-- [ ] Parent handoff file exists at
+- [ ] Parent transfer file exists at
   `${FORGE_TEST_REPO}-test-session-forked-wt/.forge/prev_sessions/test-session-parent/children/test-session-forked-wt.md`
 
 ### 5.8 Incognito Session
@@ -331,10 +331,10 @@ forge session show
 
 <!-- auto -->
 
-Verify that `--strategy` controls handoff content density on worktree forks.
+Verify that `--strategy` controls transfer content density on worktree forks.
 
 ```bash
-# Setup: create parent with a mock transcript for handoff generation
+# Setup: create parent with a mock transcript for transfer generation
 forge session delete test-strat-parent --force 2>/dev/null || true
 forge session delete test-fork-strat-min --force 2>/dev/null || true
 forge session delete test-fork-strat-struct --force 2>/dev/null || true
@@ -345,7 +345,7 @@ git branch -D test-fork-strat-struct 2>/dev/null || true
 
 forge session start test-strat-parent --no-launch
 
-# Inject a fixture transcript so handoff has content to assemble
+# Inject a fixture transcript so transfer has content to assemble
 PARENT_JSON=".forge/sessions/test-strat-parent/forge.session.json"
 TDIR=".forge/artifacts/test-strat-parent/transcripts"
 mkdir -p "$TDIR"
@@ -360,20 +360,20 @@ jq --arg tp "$PWD/$TDIR/fixture.jsonl" \
 
 # Fork with --strategy minimal
 forge session fork test-strat-parent --name test-fork-strat-min --worktree --strategy minimal --no-launch
-HANDOFF_MIN="${FORGE_TEST_REPO}-test-fork-strat-min/.forge/prev_sessions/test-strat-parent/children/test-fork-strat-min.md"
-test -f "$HANDOFF_MIN" && echo "MIN_HANDOFF=true" || echo "MIN_HANDOFF=false"
-wc -l < "$HANDOFF_MIN"
+TRANSFER_MIN="${FORGE_TEST_REPO}-test-fork-strat-min/.forge/prev_sessions/test-strat-parent/children/test-fork-strat-min.md"
+test -f "$TRANSFER_MIN" && echo "MIN_TRANSFER=true" || echo "MIN_TRANSFER=false"
+wc -l < "$TRANSFER_MIN"
 
 # Fork with --strategy structured
 forge session fork test-strat-parent --name test-fork-strat-struct --worktree --strategy structured --no-launch
-HANDOFF_STRUCT="${FORGE_TEST_REPO}-test-fork-strat-struct/.forge/prev_sessions/test-strat-parent/children/test-fork-strat-struct.md"
-test -f "$HANDOFF_STRUCT" && echo "STRUCT_HANDOFF=true" || echo "STRUCT_HANDOFF=false"
-wc -l < "$HANDOFF_STRUCT"
+TRANSFER_STRUCT="${FORGE_TEST_REPO}-test-fork-strat-struct/.forge/prev_sessions/test-strat-parent/children/test-fork-strat-struct.md"
+test -f "$TRANSFER_STRUCT" && echo "STRUCT_TRANSFER=true" || echo "STRUCT_TRANSFER=false"
+wc -l < "$TRANSFER_STRUCT"
 ```
 
-- [ ] Minimal handoff file created at expected path
-- [ ] Structured handoff file created at expected path
-- [ ] Structured handoff contains more content than minimal (higher line count)
+- [ ] Minimal transfer file created at expected path
+- [ ] Structured transfer file created at expected path
+- [ ] Structured transfer contains more content than minimal (higher line count)
 
 ### 5.14 Fork with `--inline-plan`
 
@@ -381,7 +381,7 @@ wc -l < "$HANDOFF_STRUCT"
 
 <!-- auto -->
 
-Verify that `--inline-plan` inlines approved plan content in the handoff context file.
+Verify that `--inline-plan` inlines approved plan content in the transfer context file.
 
 ```bash
 # Setup: create parent with a mock plan via confirmed.latest_plan_path
@@ -406,18 +406,18 @@ PARENT_JSON=".forge/sessions/test-plan-parent/forge.session.json"
 jq '.confirmed.latest_plan_path = ".claude/plans/test-plan.md" | .confirmed.claude_session_id = "fixture-plan"' \
   "$PARENT_JSON" > /tmp/p.json && mv /tmp/p.json "$PARENT_JSON"
 
-# Fork with --inline-plan (plan content should appear in handoff)
+# Fork with --inline-plan (plan content should appear in transfer)
 forge session fork test-plan-parent --name test-fork-plan --worktree --inline-plan --no-launch
 
-HANDOFF="${FORGE_TEST_REPO}-test-fork-plan/.forge/prev_sessions/test-plan-parent/children/test-fork-plan.md"
-test -f "$HANDOFF" && echo "HANDOFF_EXISTS=true" || echo "HANDOFF_EXISTS=false"
-grep -c "Approved Plan" "$HANDOFF"
-grep -c "greet function" "$HANDOFF"
+TRANSFER="${FORGE_TEST_REPO}-test-fork-plan/.forge/prev_sessions/test-plan-parent/children/test-fork-plan.md"
+test -f "$TRANSFER" && echo "TRANSFER_EXISTS=true" || echo "TRANSFER_EXISTS=false"
+grep -c "Approved Plan" "$TRANSFER"
+grep -c "greet function" "$TRANSFER"
 ```
 
-- [ ] Handoff file created in worktree fork
-- [ ] Handoff contains plan heading ("Approved Plan")
-- [ ] Handoff contains plan details ("greet function")
+- [ ] Transfer file created in worktree fork
+- [ ] Transfer contains plan heading ("Approved Plan")
+- [ ] Transfer contains plan details ("greet function")
 
 ### 5.15 Fork `--into` (Existing Worktree)
 
@@ -451,8 +451,8 @@ cd "$TARGET_WORKTREE" && forge extension enable --scope local
 cd "$FORGE_TEST_REPO"
 
 # Fork the parent session into the existing worktree.
-# Claude will launch with parent handoff context.
-# Disable auto-memory so "where were we?" tests Forge handoff, not CC memory.
+# Claude will launch with parent transfer context.
+# Disable auto-memory so "where were we?" tests Forge transfer, not CC memory.
 # Ask "where were we?" to confirm parent context, then exit (/exit).
 CLAUDE_CODE_DISABLE_AUTO_MEMORY=1 forge session fork test-session-parent --name test-fork-into --into "$TARGET_WORKTREE"
 
@@ -467,7 +467,7 @@ cat "$TARGET_WORKTREE/.forge/sessions/test-fork-into/forge.session.json" | \
 - [ ] `forge session show` reports type as Fork with worktree info
 - [ ] Manifest at `${FORGE_TEST_REPO}-test-into-target/.forge/sessions/test-fork-into/` (target's forge_root)
 - [ ] Manifest has `is_fork: true`, `is_worktree: true`, `owns_worktree: false`
-- [ ] Parent handoff context file present in target worktree
+- [ ] Parent transfer context file present in target worktree
 - [ ] Asking "where were we?" reflects parent context from 5.6
 
 ### 5.16 Subprocess Proxy (Direct + Proxied Subprocesses)

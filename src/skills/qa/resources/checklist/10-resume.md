@@ -76,18 +76,18 @@ cat .forge/sessions/test-resumed-minimal/forge.session.json | jq '.confirmed.der
 
 <!-- human:guided -->
 
-In the **container shell**, resume with `--strategy structured`. Claude will launch — verify the handoff file was
+In the **container shell**, resume with `--strategy structured`. Claude will launch — verify the transfer file was
 created, then exit.
 
 ```
 # Resume with structured strategy (conversation skeleton)
 forge session resume test-session-1 --fresh --strategy structured --child-name test-resumed-structured
 
-# Check processed handoff
+# Check processed transfer
 cat .forge/prev_sessions/test-session-1/generated.md
 ```
 
-- [ ] Handoff file created at `.forge/prev_sessions/<parent>/children/<child>.md`
+- [ ] Transfer file created at `.forge/prev_sessions/<parent>/children/<child>.md`
 - [ ] Contains conversation skeleton with truncated tool results
 
 ### 10.4 Resume with Full Strategy
@@ -105,7 +105,7 @@ fail if the transcript is too large for the proxy context window.
 # Resume with full strategy (complete transcript)
 forge session resume test-session-1 --fresh --strategy full --child-name test-resumed-full
 
-# Check the handoff
+# Check the transfer
 cat .forge/prev_sessions/test-session-1/generated.md
 ```
 
@@ -135,7 +135,7 @@ cat .forge/prev_sessions/test-session-1/generated.md
 
 - [ ] Parent transcript fixture from 10.1 exists
 - [ ] Security warning shown about sending transcript content to OpenRouter
-- [ ] Default OpenRouter QA profile: handoff shows `Strategy: ai-curated` and LLM-selected highlights
+- [ ] Default OpenRouter QA profile: transfer shows `Strategy: ai-curated` and LLM-selected highlights
 - [ ] If OpenRouter auth is unavailable, fallback to structured is acceptable and the warning explains the auth failure
 - [ ] No warning about missing remote LiteLLM infrastructure in the default OpenRouter QA profile
 - [ ] No `No transcript available; using minimal strategy` warning

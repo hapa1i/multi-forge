@@ -2069,7 +2069,7 @@ class TestSessionFork:
             patch("forge.cli.session.SessionManager") as mock_manager_cls,
             patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
             patch(
-                "forge.cli.session._generate_parent_handoff_context",
+                "forge.cli.session._generate_parent_transfer_context",
                 return_value=(context_file, []),
             ),
         ):
@@ -2127,7 +2127,7 @@ class TestSessionFork:
             patch("forge.cli.session.SessionManager") as mock_manager_cls,
             patch("forge.cli.session._resolve_routing_from_cli", return_value=_proxy_routing()),
             patch("forge.config.loader.load_proxy_instance_config", return_value=_proxy_cfg()),
-            patch("forge.cli.session._generate_parent_handoff_context", return_value=(context_file, [])),
+            patch("forge.cli.session._generate_parent_transfer_context", return_value=(context_file, [])),
             patch("forge.sidecar.docker.is_docker_available", return_value=True),
             patch("forge.sidecar.get_secrets_for_template", return_value={}),
             patch("forge.sidecar.run_sidecar_session", return_value=0),
@@ -2184,7 +2184,7 @@ class TestSessionFork:
             patch("forge.cli.session.SessionManager") as mock_manager_cls,
             patch("forge.cli.session.invoke_claude") as mock_invoke,
             patch("forge.cli.session._auto_install_extensions") as mock_auto,
-            patch("forge.cli.session._generate_parent_handoff_context", return_value=(None, [])),
+            patch("forge.cli.session._generate_parent_transfer_context", return_value=(None, [])),
         ):
             mock_manager = mock_manager_cls.return_value
             mock_manager.fork_session.return_value = (parent, fork_state)
@@ -2275,7 +2275,7 @@ class TestSessionFork:
             patch("forge.cli.session.SessionManager") as mock_manager_cls,
             patch("forge.cli.session.invoke_claude", return_value=0),
             patch(
-                "forge.cli.session._generate_parent_handoff_context",
+                "forge.cli.session._generate_parent_transfer_context",
                 return_value=(None, []),
             ),
         ):
@@ -2339,7 +2339,7 @@ class TestSessionFork:
             patch("forge.cli.session.SessionManager") as mock_manager_cls,
             patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
             patch(
-                "forge.cli.session._generate_parent_handoff_context",
+                "forge.cli.session._generate_parent_transfer_context",
                 return_value=(None, []),
             ),
         ):
@@ -2522,7 +2522,7 @@ class TestSessionFork:
             patch("forge.cli.session.SessionManager") as mock_manager_cls,
             patch("forge.cli.session.invoke_claude") as mock_invoke,
             patch(
-                "forge.cli.session._generate_parent_handoff_context",
+                "forge.cli.session._generate_parent_transfer_context",
                 return_value=(context_file, []),
             ),
         ):
@@ -2588,7 +2588,7 @@ class TestSessionFork:
             patch("forge.cli.session.invoke_claude") as mock_invoke,
             patch("forge.cli.session._auto_install_extensions", return_value=False),
             patch(
-                "forge.cli.session._generate_parent_handoff_context",
+                "forge.cli.session._generate_parent_transfer_context",
                 return_value=(context_file, []),
             ),
         ):
@@ -2655,7 +2655,7 @@ class TestSessionFork:
             patch("forge.cli.session._warn_if_version_outdated"),
             patch("forge.cli.session._auto_install_extensions", return_value=False),
             patch(
-                "forge.cli.session._generate_parent_handoff_context",
+                "forge.cli.session._generate_parent_transfer_context",
                 return_value=(context_file, []),
             ),
         ):
@@ -2821,7 +2821,7 @@ class TestSessionForkIntoPreflight:
             patch("forge.cli.session.SessionManager") as mock_manager_cls,
             patch("forge.cli.session.invoke_claude") as mock_invoke,
             patch("forge.cli.session._auto_install_extensions") as mock_auto,
-            patch("forge.cli.session._generate_parent_handoff_context", return_value=(None, [])),
+            patch("forge.cli.session._generate_parent_transfer_context", return_value=(None, [])),
             patch("forge.install.tracking.TrackingStore") as mock_tracking_cls,
             patch("subprocess.run") as mock_run,
         ):
@@ -3007,10 +3007,10 @@ class TestSessionResume:
 
 
 class TestResumeNativeMode:
-    """Tests for --resume-mode native|handoff on forge session resume."""
+    """Tests for --resume-mode native|transfer on forge session resume."""
 
-    def test_resume_fresh_default_is_handoff(self, runner: CliRunner, temp_env: Path) -> None:
-        """--fresh without --resume-mode should use handoff (assembled context)."""
+    def test_resume_fresh_default_is_transfer(self, runner: CliRunner, temp_env: Path) -> None:
+        """--fresh without --resume-mode should use transfer (assembled context)."""
         with patch("forge.cli.session.invoke_claude", return_value=0):
             runner.invoke(main, ["session", "start", "native-test"])
 
@@ -3019,10 +3019,20 @@ class TestResumeNativeMode:
 
         assert result.exit_code == 0
         kwargs = mock_invoke.call_args.kwargs
-        # Handoff mode uses session_id (new session), not resume_id
+        # Transfer mode uses session_id (new session), not resume_id
         assert kwargs.get("session_id") is not None
         assert kwargs.get("resume_id") is None
         assert kwargs.get("fork_session") is False
+
+    def test_resume_fresh_handoff_value_rejected(self, runner: CliRunner, temp_env: Path) -> None:
+        """The old --resume-mode handoff value is rejected with rename guidance."""
+        with patch("forge.cli.session.invoke_claude", return_value=0):
+            runner.invoke(main, ["session", "start", "rename-test"])
+
+        result = runner.invoke(main, ["session", "resume", "rename-test", "--fresh", "--resume-mode", "handoff"])
+
+        assert result.exit_code != 0
+        assert "renamed to 'transfer'" in result.output
 
     def test_resume_fresh_native_uses_resume_fork_session(self, runner: CliRunner, temp_env: Path) -> None:
         """--fresh --resume-mode native should use --resume --fork-session."""
@@ -3065,7 +3075,7 @@ class TestResumeNativeMode:
 
         with (
             patch("forge.cli.session.invoke_claude", return_value=0),
-            patch("forge.session.manager.process_handoff") as mock_handoff,
+            patch("forge.session.manager.assemble_transfer_context") as mock_handoff,
         ):
             result = runner.invoke(main, ["session", "resume", "native-nogen", "--fresh", "--resume-mode", "native"])
 

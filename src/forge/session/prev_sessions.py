@@ -1,6 +1,6 @@
 """Path layout for resume/fork context files (prev_sessions).
 
-Centralizes the on-disk layout so process_handoff, SessionManager, fork paths,
+Centralizes the on-disk layout so assemble_transfer_context, SessionManager, fork paths,
 and GC stay in sync.
 
 Layout::
@@ -73,7 +73,7 @@ def ensure_child(forge_root: Path, parent_name: str, child_name: str) -> Path:
     not affect it.
 
     Raises ``FileNotFoundError`` if neither the child file nor the parent
-    cache exists -- the caller is responsible for running ``process_handoff``
+    cache exists -- the caller is responsible for running ``assemble_transfer_context``
     first.
     """
     target = child_path(forge_root, parent_name, child_name)
@@ -83,7 +83,7 @@ def ensure_child(forge_root: Path, parent_name: str, child_name: str) -> Path:
     source = generated_path(forge_root, parent_name)
     if not source.is_file():
         raise FileNotFoundError(
-            f"Cannot copy parent cache to child: {source} does not exist. " "Run process_handoff() first."
+            f"Cannot copy parent cache to child: {source} does not exist. " "Run assemble_transfer_context() first."
         )
 
     target.parent.mkdir(parents=True, exist_ok=True)

@@ -1,4 +1,4 @@
-"""Tests for the hidden handoff CLI."""
+"""Tests for the hidden memory-writer CLI (forge memory-writer run)."""
 
 from __future__ import annotations
 
@@ -7,10 +7,11 @@ from unittest.mock import patch
 
 from click.testing import CliRunner
 
-from forge.cli.handoff import handoff
+from forge.cli.main import main
+from forge.cli.memory_writer import memory_writer
 from forge.session.models import (
-    HandoffConfig,
     MemoryIntent,
+    MemoryWriterConfig,
     create_session_state,
 )
 from forge.session.passport import synthesize_passport, write_passport
@@ -20,7 +21,7 @@ from forge.session.store import SessionStore
 def _write_handoff_session(worktree: Path, *, subprocess_proxy: str | None = None) -> None:
     manifest = create_session_state("session")
     manifest.intent.subprocess_proxy = subprocess_proxy
-    manifest.intent.memory = MemoryIntent(auto_update=HandoffConfig(enabled=True))
+    manifest.intent.memory = MemoryIntent(auto_update=MemoryWriterConfig(enabled=True))
     SessionStore(str(worktree), "session").write(manifest)
 
 
@@ -29,11 +30,11 @@ def test_handoff_run_uses_manifest_subprocess_proxy(tmp_path: Path) -> None:
     _write_handoff_session(tmp_path, subprocess_proxy="openrouter-subprocess")
 
     with (
-        patch("forge.session.handoff_agent.resolve_handoff_base_url", return_value="http://proxy") as mock_resolve,
-        patch("forge.session.handoff_agent.run_handoff_agent", return_value=True),
+        patch("forge.session.memory_writer.resolve_writer_base_url", return_value="http://proxy") as mock_resolve,
+        patch("forge.session.memory_writer.run_memory_writer", return_value=True),
     ):
         result = CliRunner().invoke(
-            handoff,
+            memory_writer,
             [
                 "run",
                 "--session-name",
@@ -54,11 +55,11 @@ def test_handoff_run_prefers_marker_subprocess_proxy_snapshot(tmp_path: Path) ->
     _write_handoff_session(tmp_path, subprocess_proxy="manifest-proxy")
 
     with (
-        patch("forge.session.handoff_agent.resolve_handoff_base_url", return_value="http://proxy") as mock_resolve,
-        patch("forge.session.handoff_agent.run_handoff_agent", return_value=True),
+        patch("forge.session.memory_writer.resolve_writer_base_url", return_value="http://proxy") as mock_resolve,
+        patch("forge.session.memory_writer.run_memory_writer", return_value=True),
     ):
         result = CliRunner().invoke(
-            handoff,
+            memory_writer,
             [
                 "run",
                 "--session-name",
@@ -99,7 +100,7 @@ def _write_passport_doc(
 
 def _run(root: Path):
     return CliRunner().invoke(
-        handoff,
+        memory_writer,
         ["run", "--session-name", "session", "--worktree-path", str(root), "--transcript-rel", "transcript.jsonl"],
     )
 
@@ -109,8 +110,8 @@ def test_run_cmd_manifest_activation(tmp_path: Path) -> None:
     root = tmp_path.resolve()
     _write_handoff_session(root)
     with (
-        patch("forge.session.handoff_agent.resolve_handoff_base_url", return_value="http://proxy"),
-        patch("forge.session.handoff_agent.run_handoff_agent", return_value=True) as mock_run,
+        patch("forge.session.memory_writer.resolve_writer_base_url", return_value="http://proxy"),
+        patch("forge.session.memory_writer.run_memory_writer", return_value=True) as mock_run,
     ):
         result = _run(root)
     assert result.exit_code == 0, result.output
@@ -121,8 +122,8 @@ def test_run_cmd_disabled_returns_early(tmp_path: Path) -> None:
     root = tmp_path.resolve()
     _write_plain_session(root)  # no project config, no session memory -> activation None
     with (
-        patch("forge.session.handoff_agent.resolve_handoff_base_url", return_value="http://proxy"),
-        patch("forge.session.handoff_agent.run_handoff_agent", return_value=True) as mock_run,
+        patch("forge.session.memory_writer.resolve_writer_base_url", return_value="http://proxy"),
+        patch("forge.session.memory_writer.run_memory_writer", return_value=True) as mock_run,
     ):
         result = _run(root)
     assert result.exit_code == 0, result.output
@@ -135,8 +136,8 @@ def test_run_cmd_scans_passported_docs(tmp_path: Path) -> None:
     _write_handoff_session(root)
     _write_passport_doc(root, "docs/changelog.md", strategy="changelog")
     with (
-        patch("forge.session.handoff_agent.resolve_handoff_base_url", return_value="http://proxy"),
-        patch("forge.session.handoff_agent.run_handoff_agent", return_value=True) as mock_run,
+        patch("forge.session.memory_writer.resolve_writer_base_url", return_value="http://proxy"),
+        patch("forge.session.memory_writer.run_memory_writer", return_value=True) as mock_run,
     ):
         result = _run(root)
     assert result.exit_code == 0, result.output
@@ -150,8 +151,8 @@ def test_run_cmd_passport_strategy_used(tmp_path: Path) -> None:
     _write_handoff_session(root)
     _write_passport_doc(root, "docs/changelog.md", strategy="changelog")
     with (
-        patch("forge.session.handoff_agent.resolve_handoff_base_url", return_value="http://proxy"),
-        patch("forge.session.handoff_agent.run_handoff_agent", return_value=True) as mock_run,
+        patch("forge.session.memory_writer.resolve_writer_base_url", return_value="http://proxy"),
+        patch("forge.session.memory_writer.run_memory_writer", return_value=True) as mock_run,
     ):
         result = _run(root)
     assert result.exit_code == 0, result.output
@@ -170,11 +171,30 @@ def test_run_cmd_shadow_doc_scanned(tmp_path: Path) -> None:
     (root / shadow).parent.mkdir(parents=True, exist_ok=True)
     (root / shadow).write_text("# Shadow\n", encoding="utf-8")
     with (
-        patch("forge.session.handoff_agent.resolve_handoff_base_url", return_value="http://proxy"),
-        patch("forge.session.handoff_agent.run_handoff_agent", return_value=True) as mock_run,
+        patch("forge.session.memory_writer.resolve_writer_base_url", return_value="http://proxy"),
+        patch("forge.session.memory_writer.run_memory_writer", return_value=True) as mock_run,
     ):
         result = _run(root)
     assert result.exit_code == 0, result.output
     docs = mock_run.call_args.kwargs["designated_docs"]
     assert len(docs) == 1
     assert docs[0].shadows == "docs/official.md"
+
+
+class TestOldHandoffRunTombstone:
+    """The old ``forge handoff run`` path is a tombstone pointing at the new command."""
+
+    def test_old_command_is_tombstoned(self) -> None:
+        result = CliRunner().invoke(main, ["handoff", "run"])
+        assert result.exit_code != 0
+        assert "forge memory-writer run" in result.output
+
+    def test_tombstone_tolerates_old_flags(self) -> None:
+        """Old --session-name/--worktree-path flags reach the rename message, not Click's 'No such option'."""
+        result = CliRunner().invoke(
+            main,
+            ["handoff", "run", "--session-name", "s", "--worktree-path", "/tmp", "--transcript-rel", "x.jsonl"],
+        )
+        assert result.exit_code != 0
+        assert "forge memory-writer run" in result.output
+        assert "No such option" not in result.output

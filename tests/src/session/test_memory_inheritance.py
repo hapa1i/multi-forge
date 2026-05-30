@@ -12,8 +12,8 @@ from forge.session.memory_inheritance import (
     create_shadow_file,
 )
 from forge.session.models import (
-    HandoffConfig,
     MemoryIntent,
+    MemoryWriterConfig,
     create_session_state,
 )
 
@@ -57,7 +57,7 @@ class TestApplyMemoryInheritance:
     def test_inherits_parent_auto_update(self):
         parent = create_session_state(name="parent")
         parent.intent.memory = MemoryIntent(
-            auto_update=HandoffConfig(enabled=True, mode="augment"),
+            auto_update=MemoryWriterConfig(enabled=True, mode="augment"),
         )
         child = create_session_state(name="child")
 
@@ -92,10 +92,10 @@ class TestApplyMemoryInheritance:
         assert child.intent.memory.auto_update.enabled is True
 
     def test_memory_flag_off_forces_disabled(self):
-        """memory_flag=False produces an explicit HandoffConfig(enabled=False), not None."""
+        """memory_flag=False produces an explicit MemoryWriterConfig(enabled=False), not None."""
         parent = create_session_state(name="parent")
         parent.intent.memory = MemoryIntent(
-            auto_update=HandoffConfig(enabled=True, mode="augment"),
+            auto_update=MemoryWriterConfig(enabled=True, mode="augment"),
         )
         child = create_session_state(name="child")
 
@@ -110,10 +110,10 @@ class TestApplyMemoryInheritance:
         assert child.intent.memory.auto_update.enabled is False
 
     def test_memory_flag_on_uses_parent_config(self):
-        """memory_flag=True inherits parent's mode and other HandoffConfig fields."""
+        """memory_flag=True inherits parent's mode and other MemoryWriterConfig fields."""
         parent = create_session_state(name="parent")
         parent.intent.memory = MemoryIntent(
-            auto_update=HandoffConfig(enabled=True, mode="review-only", min_turns=10),
+            auto_update=MemoryWriterConfig(enabled=True, mode="review-only", min_turns=10),
         )
         child = create_session_state(name="child")
 
@@ -131,7 +131,7 @@ class TestApplyMemoryInheritance:
         assert au.min_turns == 10
 
     def test_memory_flag_on_no_parent_uses_defaults(self):
-        """memory_flag=True with no parent auto_update falls back to HandoffConfig defaults."""
+        """memory_flag=True with no parent auto_update falls back to MemoryWriterConfig defaults."""
         parent = create_session_state(name="parent")
         assert parent.intent.memory is None
         child = create_session_state(name="child")
@@ -146,7 +146,7 @@ class TestApplyMemoryInheritance:
         au = child.intent.memory.auto_update
         assert au is not None
         assert au.enabled is True
-        # Defaults from HandoffConfig
+        # Defaults from MemoryWriterConfig
         assert au.mode == "augment"
         assert au.min_turns == 5
 
@@ -156,7 +156,7 @@ class TestApplyMemoryInheritance:
         parent.intent.memory = MemoryIntent(
             auto_recall=True,
             tags=["x"],
-            auto_update=HandoffConfig(enabled=True, mode="augment"),
+            auto_update=MemoryWriterConfig(enabled=True, mode="augment"),
         )
         child = create_session_state(name="child")
 

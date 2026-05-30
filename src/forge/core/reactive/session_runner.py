@@ -2,7 +2,7 @@
 
 Provides a unified interface for running ``claude -p`` as a subprocess
 with structured result handling. Used by the semantic supervisor
-(``claude -p --resume``) and handoff agent (``claude -p``).
+(``claude -p --resume``) and the memory writer (``claude -p``).
 
 For interactive sessions (stdin/stdout inherited), use
 ``forge.session.claude.invoke.invoke_claude()`` instead.
@@ -29,7 +29,7 @@ class SessionResult:
 
     The runner never raises — all errors are captured in the ``error`` field.
     Callers inspect ``success`` and ``error`` to decide their own fail
-    behavior (fail-open warnings for supervisor, return False for handoff).
+    behavior (fail-open warnings for supervisor, return False for the memory writer).
     """
 
     stdout: str

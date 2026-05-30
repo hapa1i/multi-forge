@@ -7,7 +7,7 @@ Store and manage API keys for Forge proxy routing and subprocesses. Forge keeps 
 variables manually.
 
 **These are NOT your Claude Code login** — Claude Code authenticates separately (OAuth, Max plan, etc.). Forge
-credentials are for proxy routing and headless subprocesses (`supervisor`, `handoff agent`, `direct panel workers`).
+credentials are for proxy routing and headless subprocesses (`supervisor`, `memory writer`, `direct panel workers`).
 
 - Runtime config: [`config.md`](config.md)
 - Proxy templates (which providers to use): [`proxy.md`](proxy.md)

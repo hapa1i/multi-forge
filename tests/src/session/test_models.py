@@ -9,9 +9,9 @@ from forge.session.models import (
     INDEX_VERSION,
     SCHEMA_VERSION,
     DesignatedDoc,
-    HandoffConfig,
     LaunchIntent,
     MemoryIntent,
+    MemoryWriterConfig,
     ProxyIntent,
     SessionConfirmed,
     SessionIndex,
@@ -463,12 +463,12 @@ class TestSessionConfirmedWithVerification:
         assert confirmed.verification.last_result == "failed"
 
 
-class TestHandoffConfig:
-    """Test HandoffConfig dataclass."""
+class TestMemoryWriterConfig:
+    """Test MemoryWriterConfig dataclass."""
 
     def test_default_values(self) -> None:
-        """HandoffConfig should have sensible defaults."""
-        config = HandoffConfig()
+        """MemoryWriterConfig should have sensible defaults."""
+        config = MemoryWriterConfig()
         assert config.enabled is False
         assert config.mode == "augment"
         assert config.proxy is None
@@ -476,8 +476,8 @@ class TestHandoffConfig:
         assert config.min_turns == 5
 
     def test_custom_values(self) -> None:
-        """HandoffConfig can be fully customized."""
-        config = HandoffConfig(
+        """MemoryWriterConfig can be fully customized."""
+        config = MemoryWriterConfig(
             enabled=True,
             mode="review-only",
             proxy="litellm-haiku",
@@ -490,8 +490,8 @@ class TestHandoffConfig:
         assert config.min_turns == 3
 
 
-class TestMemoryIntentWithHandoff:
-    """Test MemoryIntent with auto_update (HandoffConfig) field."""
+class TestMemoryIntentWithMemoryWriter:
+    """Test MemoryIntent with auto_update (MemoryWriterConfig) field."""
 
     def test_default_no_auto_update(self) -> None:
         """MemoryIntent should have no auto_update by default."""
@@ -499,9 +499,9 @@ class TestMemoryIntentWithHandoff:
         assert memory.auto_update is None
 
     def test_with_auto_update(self) -> None:
-        """MemoryIntent can include handoff agent configuration."""
-        handoff = HandoffConfig(enabled=True, min_turns=3)
-        memory = MemoryIntent(auto_update=handoff)
+        """MemoryIntent can include memory writer configuration."""
+        writer = MemoryWriterConfig(enabled=True, min_turns=3)
+        memory = MemoryIntent(auto_update=writer)
         assert memory.auto_update is not None
         assert memory.auto_update.enabled is True
         assert memory.auto_update.min_turns == 3
@@ -514,7 +514,7 @@ class TestMemoryIntentWithHandoff:
 
         memory = MemoryIntent(
             auto_recall=True,
-            auto_update=HandoffConfig(enabled=True, mode="review-only"),
+            auto_update=MemoryWriterConfig(enabled=True, mode="review-only"),
         )
         data = asdict(memory)
         restored = dacite.from_dict(MemoryIntent, data, config=dacite.Config(strict=True))

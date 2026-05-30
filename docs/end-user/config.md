@@ -9,7 +9,7 @@ Configuration is split by ownership. Each type of setting has a single authorita
 | Claude Code hooks, status line, permissions, env | `~/.forge/claude.preset.json`      | `forge claude preset ...`              |
 | Policy, memory, verification settings            | Session manifest                   | `forge session set`                    |
 | Multi-model review and analysis                  | N/A (uses proxy/session config)    | [workflow.md](workflow.md)             |
-| Automatic doc updates after sessions             | Session manifest (`memory.*`)      | [handoff.md](handoff.md)               |
+| Automatic doc updates after sessions             | Session manifest (`memory.*`)      | [memory.md](memory.md)                 |
 | API keys and credentials                         | `~/.forge/credentials.yaml`        | [authentication.md](authentication.md) |
 
 ---
@@ -56,7 +56,7 @@ Available settings:
 | `user_agent_claude_code_version` | *(empty)*              | Version in User-Agent header sent to upstream LLM providers                                                                                                    |
 | `context_limit`                  | `200000`               | Fallback auto-compact window for proxy mode (passed as `CLAUDE_CODE_AUTO_COMPACT_WINDOW`)                                                                      |
 | `status_timeout`                 | `2.0`                  | Status line proxy/git call timeout (seconds)                                                                                                                   |
-| `handoff_timeout`                | `300`                  | Handoff agent timeout (seconds)                                                                                                                                |
+| `memory_writer_timeout`          | `300`                  | Memory writer timeout (seconds)                                                                                                                                |
 | `log_level`                      | `off`                  | File logging level (`off`, `debug`, `info`, `warning`)                                                                                                         |
 | `policy_summary_feedback`        | `on`                   | Post-evaluation summary lines and additionalContext (`on`/`off`)                                                                                               |
 | `log_tool_failures`              | `false`                | Log tool failures to `~/.forge/logs/tool_failures/` (proxy; includes tool inputs/errors)                                                                       |
@@ -101,7 +101,7 @@ Built-in defaults include only Forge infrastructure:
 
 - `hooks`: Forge hook wiring (`forge hook ...`)
 - `statusLine`: `forge status-line`
-- `permissions`: Write/Edit (required by handoff agent)
+- `permissions`: Write/Edit (required by the memory writer)
 
 Forge merges only four setting families from the preset: `hooks`, `statusLine`, `env`, and `permissions`.
 

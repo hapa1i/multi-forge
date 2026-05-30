@@ -1,15 +1,12 @@
-"""Handoff agent for automatic memory doc updates.
+"""Memory writer for automatic memory doc updates.
 
-The handoff agent runs after session stop (via work queue) to update
+The memory writer runs after session stop (via work queue) to update
 designated project memory documents. It spawns ``claude -p`` as a headless
 subprocess that reads the session transcript and writes updates to
 configured designated docs.
 
-Note: this is the memory-doc maintenance agent, not the resume-context
-generator. The resume handoff (parent->child context for ``forge session
-resume --fresh``) is in ``handoff.py``. Despite the shared name they are
-different concepts; see ``docs/end-user/handoff.md`` for the user-facing
-distinction.
+Transfer context assembly (parent->child context for ``forge session
+resume --fresh``) is in ``transfer.py`` -- a separate concept.
 
 Supports two modes:
 - **Direct update (Mode 1)**: Agent edits designated docs in-place.
@@ -19,7 +16,7 @@ Supports two modes:
 Each run persists its stdout to
 ``<forge_root>/.forge/artifacts/<session>/handoff/review-<timestamp>.md`` so
 users can inspect proposed/applied changes -- surfaced via
-``forge session handoff show``.
+``forge memory report show``.
 """
 
 from __future__ import annotations
@@ -33,7 +30,7 @@ from forge.core.reactive.session_runner import run_claude_session
 from forge.core.transcript import parse_jsonl_transcript
 from forge.session.claude.invoke import is_claude_available
 from forge.session.exceptions import PassportError
-from forge.session.models import DesignatedDoc, HandoffConfig
+from forge.session.models import DesignatedDoc, MemoryWriterConfig
 from forge.session.passport import (
     Passport,
     ResolvedDocSpec,
@@ -50,7 +47,7 @@ logger = logging.getLogger(__name__)
 def _default_timeout() -> int:
     from forge.runtime_config import get_runtime_config
 
-    return get_runtime_config().handoff_timeout
+    return get_runtime_config().memory_writer_timeout
 
 
 MULTI_DOC_PROMPT_TEMPLATE = """\
@@ -86,7 +83,7 @@ def build_multi_doc_prompt(
     mode: str = "augment",
     docs: list[ResolvedDocSpec],
 ) -> str:
-    """Build a multi-doc prompt for the handoff agent.
+    """Build a multi-doc prompt for the memory writer.
 
     Generates a single prompt that instructs ``claude -p`` to update
     multiple designated documents with per-doc strategies. For shadow docs
@@ -180,7 +177,7 @@ def count_conversation_turns(transcript_path: Path) -> int:
     return sum(1 for e in entries if e.get("type") == "human")
 
 
-def resolve_handoff_base_url(
+def resolve_writer_base_url(
     proxy_id: str | None,
     confirmed_proxy_base_url: str | None = None,
     env_base_url: str | None = None,
@@ -188,25 +185,25 @@ def resolve_handoff_base_url(
     direct: bool = False,
     subprocess_proxy: str | None = None,
 ) -> str | None:
-    """Resolve ANTHROPIC_BASE_URL for the handoff agent.
+    """Resolve ANTHROPIC_BASE_URL for the memory writer.
 
     When direct=True, short-circuits the entire chain and returns None
     (forces direct Anthropic routing regardless of session proxy).
 
     Delegates to ``resolve_subprocess_routing()`` with fail-open semantics.
-    The handoff's proxy_id is soft (preferred, not strict) because handoff
+    The writer's proxy_id is soft (preferred, not strict) because the writer
     is async/best-effort — using the session's confirmed proxy is better
     than failing.
 
     Priority chain (when not direct):
-    1. proxy_id -> preferred_proxy (handoff config, soft)
+    1. proxy_id -> preferred_proxy (writer config, soft)
     2. subprocess_proxy -> persisted session subprocess proxy (soft)
     3. confirmed_proxy_base_url -> session's confirmed proxy
     4. env_base_url -> current ANTHROPIC_BASE_URL
     5. None -> Anthropic direct
 
     Args:
-        proxy_id: Optional proxy from HandoffConfig. Soft: falls through
+        proxy_id: Optional proxy from MemoryWriterConfig. Soft: falls through
             on miss (unlike workflow's strict --proxy).
         confirmed_proxy_base_url: Base URL from session's confirmed proxy.
         env_base_url: Fallback base URL from environment.
@@ -317,26 +314,26 @@ def _dedupe_specs(specs: list[ResolvedDocSpec]) -> list[ResolvedDocSpec]:
     return deduped
 
 
-def run_handoff_agent(
+def run_memory_writer(
     *,
     session_name: str,
     forge_root: Path,
     transcript_snapshot_rel: str,
-    config: HandoffConfig,
+    config: MemoryWriterConfig,
     base_url: str | None = None,
     timeout_seconds: int | None = None,
     designated_docs: list[DesignatedDoc] | None = None,
 ) -> bool:
-    """Run the handoff agent as a ``claude -p`` subprocess.
+    """Run the memory writer as a ``claude -p`` subprocess.
 
-    This is the main entry point called by ``forge handoff run``.
+    This is the main entry point called by ``forge memory-writer run``.
 
     Args:
         session_name: Forge session name.
         forge_root: Forge project root (where .forge/ lives). Designated doc paths
                     resolve against this directory. Also used as cwd for the subprocess.
         transcript_snapshot_rel: Forge-root-relative path to transcript artifact.
-        config: HandoffConfig with mode, min_turns, proxy_id.
+        config: MemoryWriterConfig with mode, min_turns, proxy_id.
         base_url: Resolved ANTHROPIC_BASE_URL (or None for direct).
         timeout_seconds: Max seconds for the agent to run.
         designated_docs: List of docs to update. If None or empty, the agent
@@ -350,18 +347,18 @@ def run_handoff_agent(
     # Validate transcript path (system boundary: CLI args / marker payload)
     reason = is_safe_designated_doc_path(transcript_snapshot_rel, project_root, project_root.resolve())
     if reason:
-        logger.warning("Handoff agent: unsafe transcript path (%s)", reason)
+        logger.warning("Memory writer: unsafe transcript path (%s)", reason)
         return False
     transcript_abs = (project_root / transcript_snapshot_rel).resolve()
 
     if not transcript_abs.is_file():
-        logger.warning("Handoff agent: transcript not found at %s", transcript_abs)
+        logger.warning("Memory writer: transcript not found at %s", transcript_abs)
         return False
 
     turn_count = count_conversation_turns(transcript_abs)
     if turn_count < config.min_turns:
         logger.info(
-            "Handoff skipped: session %s had %d turns (min_turns=%d)",
+            "Memory writer skipped: session %s had %d turns (min_turns=%d)",
             session_name,
             turn_count,
             config.min_turns,
@@ -370,16 +367,16 @@ def run_handoff_agent(
 
     _VALID_MODES = {"augment", "review-only"}
     if config.mode not in _VALID_MODES:
-        logger.warning("Handoff agent: unknown mode %r (expected %s)", config.mode, _VALID_MODES)
+        logger.warning("Memory writer: unknown mode %r (expected %s)", config.mode, _VALID_MODES)
         return False
 
     if not is_claude_available():
-        logger.warning("Handoff agent: claude CLI not found in PATH")
+        logger.warning("Memory writer: claude CLI not found in PATH")
         return False
 
     if not designated_docs:
         logger.info(
-            "No designated_docs configured; handoff agent has nothing to update " "(session %s)",
+            "No designated_docs configured; memory writer has nothing to update (session %s)",
             session_name,
         )
         return True
@@ -455,7 +452,7 @@ def run_handoff_agent(
     )
 
     logger.info(
-        "Running handoff agent for session %s (mode=%s, turns=%d)",
+        "Running memory writer for session %s (mode=%s, turns=%d)",
         session_name,
         config.mode,
         turn_count,
@@ -468,7 +465,7 @@ def run_handoff_agent(
     effective_timeout = timeout_seconds if timeout_seconds is not None else _default_timeout()
     tracking_url = base_url
 
-    with track_verb_cost("handoff", [tracking_url] if tracking_url else []):
+    with track_verb_cost("memory-writer", [tracking_url] if tracking_url else []):
         result = run_claude_session(
             prompt,
             base_url=base_url,
@@ -479,7 +476,7 @@ def run_handoff_agent(
 
     if not result.success:
         detail = result.error or (result.stderr[:500] if result.stderr else f"exit {result.returncode}")
-        logger.warning("Handoff agent for %s failed: %s", session_name, detail)
+        logger.warning("Memory writer for %s failed: %s", session_name, detail)
         return False
 
     # Persist the agent's stdout to a per-session review file so users can
@@ -496,25 +493,26 @@ def run_handoff_agent(
         )
     except OSError as e:
         # Best-effort: don't fail the agent if the review file can't be written
-        logger.warning("Could not persist handoff review file for %s: %s", session_name, e)
+        logger.warning("Could not persist memory writer review file for %s: %s", session_name, e)
 
     # Only check for permission denial in augment mode. review-only mode
     # explicitly tells Claude "Do NOT modify any files", so a compliant
     # response like "I cannot modify files" is expected, not an error.
     if config.mode == "augment" and _stdout_indicates_permission_denied(result.stdout):
         logger.warning(
-            "Handoff agent for %s: Claude lacked Write/Edit permissions — no files modified. "
+            "Memory writer for %s: Claude lacked Write/Edit permissions — no files modified. "
             "Run 'forge claude preset edit' to add Write/Edit to permissions.allow.",
             session_name,
         )
         return False
 
-    logger.info("Handoff agent completed for session %s", session_name)
+    logger.info("Memory writer completed for session %s", session_name)
     return True
 
 
-def review_dir(forge_root: Path, session_name: str) -> Path:
-    """Return the directory where handoff agent review reports live."""
+def memory_report_dir(forge_root: Path, session_name: str) -> Path:
+    """Return the directory where memory writer review reports live."""
+    # Path intentionally kept as …/handoff/ to avoid orphaning existing artifacts
     return forge_root / ".forge" / "artifacts" / session_name / "handoff"
 
 
@@ -530,12 +528,12 @@ def _persist_review_report(
 
     Returns the absolute path of the written file. The work queue spawns the
     agent detached so stdout/stderr go to DEVNULL; this file is the only way
-    users can inspect what the agent proposed or applied. See ``forge session
-    handoff show``.
+    users can inspect what the agent proposed or applied. See
+    ``forge memory report show``.
     """
     from datetime import datetime, timezone
 
-    output_dir = review_dir(forge_root, session_name)
+    output_dir = memory_report_dir(forge_root, session_name)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     now = datetime.now(timezone.utc)
@@ -543,7 +541,7 @@ def _persist_review_report(
     target = output_dir / f"review-{stamp}.md"
 
     header = (
-        f"# Handoff Agent Report -- {session_name}\n\n"
+        f"# Memory Writer Report -- {session_name}\n\n"
         f"**Mode**: {mode}\n"
         f"**Timestamp**: {now.isoformat()}\n"
         f"**Turns**: {turn_count}\n\n"

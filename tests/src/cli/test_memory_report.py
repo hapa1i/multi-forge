@@ -1,4 +1,4 @@
-"""Tests for ``forge session handoff show`` (D2 review surface)."""
+"""Tests for ``forge memory report show`` (memory writer report surface)."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ def runner() -> CliRunner:
 def _seed_session_with_reports(
     tmp_path: Path, session_name: str = "my-session", report_count: int = 0
 ) -> tuple[Path, list[Path]]:
-    """Create a session in the index and seed N handoff review files."""
+    """Create a session in the index and seed N memory writer review files."""
     from forge.session import IndexStore
 
     forge_root = tmp_path / "project"
@@ -39,13 +39,14 @@ def _seed_session_with_reports(
         parent_session=None,
     )
 
+    # Artifact path retains the ".../handoff/" segment (kept by design; see plan Phase 3).
     review = forge_root / ".forge" / "artifacts" / session_name / "handoff"
     review.mkdir(parents=True, exist_ok=True)
     reports: list[Path] = []
     for i in range(report_count):
         # Different timestamps so sorting is well-defined
         f = review / f"review-2026010{i}-120000.md"
-        f.write_text(f"# Handoff Agent Report\n\nrun {i}\n", encoding="utf-8")
+        f.write_text(f"# Memory Writer Report\n\nrun {i}\n", encoding="utf-8")
         reports.append(f)
     return forge_root, reports
 
@@ -53,16 +54,14 @@ def _seed_session_with_reports(
 class TestShowCommand:
     def test_no_reports_emits_friendly_message(self, runner: CliRunner, tmp_path: Path) -> None:
         forge_root, _ = _seed_session_with_reports(tmp_path, "s1", report_count=0)
-        with patch("forge.cli.session.SessionManager"), patch("forge.cli.session_handoff.SessionManager"):
-            # _resolve_session_forge_root expects manager state matching the seeded session
-            from forge.session import SessionManager
+        from forge.session import SessionManager
 
-            real_manager = SessionManager()
-            with patch("forge.cli.session_handoff.SessionManager", return_value=real_manager):
-                with patch("forge.cli.session_handoff._cwd_forge_root", return_value=forge_root):
-                    result = runner.invoke(main, ["session", "handoff", "show", "s1"])
+        real_manager = SessionManager()
+        with patch("forge.cli.memory_report.SessionManager", return_value=real_manager):
+            with patch("forge.cli.memory_report._cwd_forge_root", return_value=forge_root):
+                result = runner.invoke(main, ["memory", "report", "show", "s1"])
         assert result.exit_code == 0, result.output
-        assert "No handoff reports found" in result.output
+        assert "No memory reports found" in result.output
 
     def test_shows_latest_by_default(self, runner: CliRunner, tmp_path: Path) -> None:
         forge_root, reports = _seed_session_with_reports(tmp_path, "s1", report_count=3)
@@ -70,9 +69,9 @@ class TestShowCommand:
         from forge.session import SessionManager
 
         real_manager = SessionManager()
-        with patch("forge.cli.session_handoff.SessionManager", return_value=real_manager):
-            with patch("forge.cli.session_handoff._cwd_forge_root", return_value=forge_root):
-                result = runner.invoke(main, ["session", "handoff", "show", "s1"])
+        with patch("forge.cli.memory_report.SessionManager", return_value=real_manager):
+            with patch("forge.cli.memory_report._cwd_forge_root", return_value=forge_root):
+                result = runner.invoke(main, ["memory", "report", "show", "s1"])
 
         assert result.exit_code == 0, result.output
         # Latest is the highest-numbered (run 2)
@@ -87,16 +86,16 @@ class TestShowCommand:
         from forge.session import SessionManager
 
         real_manager = SessionManager()
-        with patch("forge.cli.session_handoff.SessionManager", return_value=real_manager):
-            with patch("forge.cli.session_handoff._cwd_forge_root", return_value=forge_root):
-                result = runner.invoke(main, ["session", "handoff", "show", "s1", "--all"])
+        with patch("forge.cli.memory_report.SessionManager", return_value=real_manager):
+            with patch("forge.cli.memory_report._cwd_forge_root", return_value=forge_root):
+                result = runner.invoke(main, ["memory", "report", "show", "s1", "--all"])
 
         assert result.exit_code == 0, result.output
         for report in reports:
             assert report.name in result.output
 
     def test_latest_and_all_mutually_exclusive(self, runner: CliRunner) -> None:
-        result = runner.invoke(main, ["session", "handoff", "show", "s1", "--latest", "--all"])
+        result = runner.invoke(main, ["memory", "report", "show", "s1", "--latest", "--all"])
         assert result.exit_code != 0
         assert "mutually exclusive" in result.output
 
@@ -104,9 +103,9 @@ class TestShowCommand:
         from forge.session import SessionManager
 
         real_manager = SessionManager()
-        with patch("forge.cli.session_handoff.SessionManager", return_value=real_manager):
-            with patch("forge.cli.session_handoff._cwd_forge_root", return_value=None):
-                result = runner.invoke(main, ["session", "handoff", "show"])
+        with patch("forge.cli.memory_report.SessionManager", return_value=real_manager):
+            with patch("forge.cli.memory_report._cwd_forge_root", return_value=None):
+                result = runner.invoke(main, ["memory", "report", "show"])
         assert result.exit_code != 0
         assert "Not inside a Forge project" in result.output
 
@@ -121,10 +120,26 @@ class TestShowCommand:
         from forge.session import SessionManager
 
         real_manager = SessionManager()
-        with patch("forge.cli.session_handoff.SessionManager", return_value=real_manager):
-            with patch("forge.cli.session_handoff._cwd_forge_root", return_value=forge_root):
-                result = runner.invoke(main, ["session", "handoff", "show"])
+        with patch("forge.cli.memory_report.SessionManager", return_value=real_manager):
+            with patch("forge.cli.memory_report._cwd_forge_root", return_value=forge_root):
+                result = runner.invoke(main, ["memory", "report", "show"])
 
         assert result.exit_code == 0, result.output
         assert "current" in result.output
         assert "run 0" in result.output
+
+
+class TestOldHandoffShowTombstone:
+    """The old ``forge session handoff show`` path is a tombstone pointing at the new command."""
+
+    def test_old_command_is_tombstoned(self, runner: CliRunner) -> None:
+        result = runner.invoke(main, ["session", "handoff", "show"])
+        assert result.exit_code != 0
+        assert "forge memory report show" in result.output
+
+    def test_tombstone_tolerates_old_flags(self, runner: CliRunner) -> None:
+        """--latest/--all and a session name reach the rename message, not Click's 'No such option'."""
+        result = runner.invoke(main, ["session", "handoff", "show", "my-session", "--latest"])
+        assert result.exit_code != 0
+        assert "forge memory report show" in result.output
+        assert "No such option" not in result.output

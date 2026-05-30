@@ -14,8 +14,8 @@ from forge.core.ops.gc import (
     CleanError,
     CleanReport,
     _detect_dead_installations,
-    _detect_orphan_handoff_files,
     _detect_orphan_session_dirs,
+    _detect_orphan_transfer_files,
     _detect_stale_active_entries,
     _detect_stale_work_queue,
     _path_in_roots,
@@ -157,7 +157,7 @@ class TestDetectOrphanSessionDirs:
 
 
 # ---------------------------------------------------------------------------
-# _detect_orphan_handoff_files
+# _detect_orphan_transfer_files
 # ---------------------------------------------------------------------------
 
 
@@ -174,7 +174,7 @@ class TestDetectOrphanHandoffFiles:
         (parent_dir / "generated.md").write_text("# Cache")
 
         ref_set = {("parent", str(fr))}
-        result = _detect_orphan_handoff_files(ref_set, {fr})
+        result = _detect_orphan_transfer_files(ref_set, {fr})
         assert result.count == 0
 
     def test_detects_orphan_parent_dir(self, tmp_path: Path) -> None:
@@ -186,7 +186,7 @@ class TestDetectOrphanHandoffFiles:
         (orphan_parent / "generated.md").write_text("# Stale cache")
 
         ref_set = {("alpha", str(fr))}
-        result = _detect_orphan_handoff_files(ref_set, {fr})
+        result = _detect_orphan_transfer_files(ref_set, {fr})
         assert result.count == 1
         assert "deleted-parent" in result.items[0]
 
@@ -203,7 +203,7 @@ class TestDetectOrphanHandoffFiles:
         live_state.forge_root = str(fr)
         live_state.confirmed.derivation = Derivation(
             parent_session="parent",
-            resume_mode="handoff",
+            resume_mode="transfer",
             context_file=".forge/prev_sessions/parent/children/live-child.md",
         )
         SessionStore(str(fr), "live-child").write(live_state)
@@ -217,7 +217,7 @@ class TestDetectOrphanHandoffFiles:
         (children_dir / "deleted-child.md").write_text("# Orphan child")
 
         ref_set = {("parent", str(fr)), ("live-child", str(fr))}
-        result = _detect_orphan_handoff_files(ref_set, {fr})
+        result = _detect_orphan_transfer_files(ref_set, {fr})
         assert result.count == 1
         assert "deleted-child.md" in result.items[0]
 
@@ -233,6 +233,8 @@ class TestDetectOrphanHandoffFiles:
         child_state.forge_root = str(child_root)
         child_state.confirmed.derivation = Derivation(
             parent_session="parent",
+            # Legacy "handoff" value retained intentionally: GC keys off context_file,
+            # not the resume_mode token, so it must handle pre-rename manifests too.
             resume_mode="handoff",
             context_file=".forge/prev_sessions/parent/children/child.md",
         )
@@ -248,7 +250,7 @@ class TestDetectOrphanHandoffFiles:
         stale_child.write_text("# Stale context")
 
         ref_set = {("parent", str(parent_root)), ("child", str(child_root))}
-        result = _detect_orphan_handoff_files(ref_set, {parent_root, child_root})
+        result = _detect_orphan_transfer_files(ref_set, {parent_root, child_root})
 
         assert str(parent_dir) not in result.items
         assert str(live_child) not in result.items
@@ -266,7 +268,7 @@ class TestDetectOrphanHandoffFiles:
         stale.write_text("# Stale context")
 
         ref_set = {("parent", str(fr)), ("native-child", str(fr))}
-        result = _detect_orphan_handoff_files(ref_set, {fr})
+        result = _detect_orphan_transfer_files(ref_set, {fr})
 
         assert result.count == 1
         assert result.items == [str(stale)]
@@ -282,7 +284,7 @@ class TestDetectOrphanHandoffFiles:
         (prev_dir / "old-deleted.md").write_text("# Legacy")
 
         ref_set = {("alpha", str(fr))}
-        result = _detect_orphan_handoff_files(ref_set, {fr})
+        result = _detect_orphan_transfer_files(ref_set, {fr})
         assert result.count == 2
 
     def test_ignores_non_md_files(self, tmp_path: Path) -> None:
@@ -291,7 +293,7 @@ class TestDetectOrphanHandoffFiles:
         prev_dir.mkdir(parents=True)
         (prev_dir / "data.json").write_text("{}")
 
-        result = _detect_orphan_handoff_files(set(), {fr})
+        result = _detect_orphan_transfer_files(set(), {fr})
         assert result.count == 0
 
 
@@ -513,7 +515,7 @@ class TestRunClean:
 
         assert result.deleted_count >= 1
         assert not orphan_parent.exists()
-        assert "handoff_files" in result.categories_cleaned
+        assert "transfer_files" in result.categories_cleaned
 
     def test_cleans_legacy_flat_handoff_file(self, tmp_path: Path) -> None:
         # Legacy pre-0.2.0 flat <parent>.md files at the top of prev_sessions/.
@@ -531,7 +533,7 @@ class TestRunClean:
 
         assert result.deleted_count >= 1
         assert not legacy.exists()
-        assert "handoff_files" in result.categories_cleaned
+        assert "transfer_files" in result.categories_cleaned
 
     def test_cleans_empty_dirs_after_child_unlink(self, tmp_path: Path) -> None:
         # Removing the last orphan child should also prune empty children/ and
@@ -548,7 +550,7 @@ class TestRunClean:
         ctx = _make_ctx(tmp_path, forge_root=fr)
         result = run_clean(ctx=ctx, scope="repo")
 
-        assert "handoff_files" in result.categories_cleaned
+        assert "transfer_files" in result.categories_cleaned
         # children/ removed; parent dir removed because only generated.md remained
         assert not children_dir.exists()
         assert not parent_dir.exists()
@@ -702,7 +704,7 @@ class TestCrossRootNameReuse:
         (orphan_dir / "generated.md").write_text("stale")
 
         ref_set = {("alpha", str(fr_a))}
-        result = _detect_orphan_handoff_files(ref_set, {fr_a, fr_b})
+        result = _detect_orphan_transfer_files(ref_set, {fr_a, fr_b})
         assert result.count == 1
         assert "proj-b" in result.items[0]
 
@@ -820,7 +822,7 @@ def _make_report_with_orphans(total: int) -> CleanReport:
 
     cats = [
         OrphanCategory("session_dirs", "Orphan session dirs", total, ["/fake"] * total),
-        OrphanCategory("handoff_files", "Orphan handoff files", 0, []),
+        OrphanCategory("transfer_files", "Orphan transfer files", 0, []),
         OrphanCategory("active_entries", "Stale active entries", 0, []),
         OrphanCategory("work_queue", "Stale work queue", 0, []),
         OrphanCategory("proxies", "Stale proxy entries", 0, []),

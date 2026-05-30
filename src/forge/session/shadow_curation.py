@@ -274,7 +274,7 @@ def run_shadow_curation(
 ) -> CurationResult:
     """Build prompt, call LLM, persist report.
 
-    The caller (CLI) resolves routing via ``resolve_handoff_base_url()``
+    The caller (CLI) resolves routing via ``resolve_writer_base_url()``
     and passes ``base_url`` + ``direct``.
     """
     from forge.core.reactive.cost_tracking import track_verb_cost

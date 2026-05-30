@@ -28,10 +28,10 @@ import pytest
 from click.testing import CliRunner
 
 from forge.cli.main import main
-from forge.cli.session import _generate_parent_handoff_context
+from forge.cli.session import _generate_parent_transfer_context
 from forge.session import SessionManager, SessionStore, create_session_state
-from forge.session.handoff import ResumeStrategy, process_handoff
 from forge.session.hooks import HookInput, handle_session_start
+from forge.session.transfer import ResumeStrategy, assemble_transfer_context
 
 pytestmark = pytest.mark.regression
 
@@ -98,7 +98,7 @@ def test_structured_handoff_handles_requestless_legacy_entries(tmp_path: Path) -
     )
     parent_state.confirmed.transcript_path = str(transcript)
 
-    result = process_handoff(
+    result = assemble_transfer_context(
         parent_name="legacy-parent",
         parent_state=parent_state,
         forge_root=parent_dir,
@@ -262,7 +262,7 @@ def test_worktree_fork_handoff_regenerates_stale_context(tmp_path: Path) -> None
     assert fork_state.worktree is not None
     fork_state.worktree.is_worktree = True
 
-    context_path, warnings = _generate_parent_handoff_context(manager=manager, manifest=fork_state)
+    context_path, warnings = _generate_parent_transfer_context(manager=manager, manifest=fork_state)
 
     expected_child = fork_dir / ".forge" / "prev_sessions" / "stale-parent" / "children" / "stale-child.md"
     assert context_path is not None
@@ -313,7 +313,7 @@ def test_worktree_fork_handoff_writes_to_nested_forge_root(tmp_path: Path) -> No
     fork_state.worktree.is_worktree = True
     fork_state.forge_root = str(nested_forge_root)
 
-    context_path, warnings = _generate_parent_handoff_context(
+    context_path, warnings = _generate_parent_transfer_context(
         manager=manager,
         manifest=fork_state,
         parent_state=parent_state,

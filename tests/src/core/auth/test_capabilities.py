@@ -280,7 +280,7 @@ class TestFormatMissingCredentialError:
         cred = CREDENTIALS["anthropic-api"]
         msg = format_missing_credential_error(cred, missing_vars=["ANTHROPIC_API_KEY"])
         assert "supervisor" in msg
-        assert "handoff agent" in msg
+        assert "memory writer" in msg
 
     def test_note_shown(self):
         cred = CREDENTIALS["anthropic-api"]

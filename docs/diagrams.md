@@ -32,7 +32,7 @@ flowchart TB
         Hooks["Hooks<br/>(confirmed facts + artifacts)"]
         Queue["Work Queue Processor<br/>(CLI startup)"]
         SearchIdx["Search Indexer"]
-        Handoff["Handoff Agent<br/>(background doc updates)"]
+        MemoryWriter["Memory Writer<br/>(background doc updates)"]
         Status["Status Line"]
     end
 
@@ -57,7 +57,7 @@ flowchart TB
     Hooks -->|enqueues stop/index/handoff| WQ
     Queue -->|reads markers| WQ
     Queue --> SearchIdx
-    Queue --> Handoff
+    Queue --> MemoryWriter
     SearchIdx -->|writes| SEARCH
     Orchestrator -->|writes| PR
 
@@ -175,7 +175,7 @@ flowchart TB
 
         subgraph Deferred["Deferred workers write:"]
             W6[".forge/search-index/*"]
-            W6b["designated project docs<br/>(handoff agent)"]
+            W6b["designated project docs<br/>(memory writer)"]
         end
 
         subgraph ForgeProxy["Proxy orchestrator writes:"]
@@ -284,7 +284,7 @@ flowchart TB
         Feedback["Independent review"]
     end
 
-    Planning -->|fork / resume handoff| Execution
+    Planning -->|fork / resume transfer| Execution
     Planning -->|plan artifacts| Review
     Execution -->|changes| Review
     Review -->|feedback| Execution
@@ -318,7 +318,7 @@ flowchart LR
         P2["Sessions + Proxies<br/>(worktrees, sidecar, full proxy files)"]
         P3["Auth + Credentials"]
         P4["Hooks + Policy<br/>(direct commands, verification, workflow policy)"]
-        P5["Deferred work<br/>(stop pipeline, queue, search, handoff)"]
+        P5["Deferred work<br/>(stop pipeline, queue, search, memory writer)"]
         P6["Workflow runners<br/>(review, panel, analyze, debate)"]
         P7["Status line + runtime config"]
     end

@@ -28,7 +28,7 @@
 | Policy                | 0     | 0     | 0     | 0     |
 | Workflow Runners      | 0     | 0     | 0     | 0     |
 | Skills                | 0     | 0     | 0     | 0     |
-| Handoff               | 0     | 0     | 0     | 0     |
+| Memory Writer         | 0     | 0     | 0     | 0     |
 | System Info           | 0     | 0     | 0     | 0     |
 | Disable (Incremental) | 0     | 0     | 0     | 0     |
 | Uninstall (Complete)  | 0     | 0     | 0     | 0     |
