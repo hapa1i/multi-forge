@@ -2,13 +2,12 @@
 
 ## Current Focus
 
-**Phase 5 (closeout) is next.** Phases 0–4 are done. Phase 3 committed as `7fefbef`; Phase 4 (docs sync) is complete on
-the working tree with a single `docs:` commit pending — every current/normative doc, end-user guide, diagram, skill, and
-three test prose/path touches now use the memory-writer/transfer vocabulary, the 3-layer taxonomy table is in design.md
-§5.6, and the obsolete "Naming note" block is gone. Intentional KEEPs (`kind="handoff"`, `enqueue_handoff_marker`, the
-`handoff/` artifact path, `queued_handoff` field) are unchanged. Two pre-existing unrelated failures noted under Phase 3
-are independent of this card. Remaining: commit Phase 4, then Phase 5 closeout (change_log entry, impl_notes promotion,
-move card to `done/`).
+**Card complete (Phases 0–5 done).** The "handoff" naming conflation is resolved into **memory writer** (Stop-time doc
+curation) and **transfer** (resume/fork context). Code, CLI, config, durable state, docs, skills, and internal naming
+all use the new vocabulary; residual `handoff` in `src/forge/` is **39 intentional KEEPs** (marker kind/id, artifact
+path, tombstone, legacy-value migration, `queued_handoff` field, generic passport "project-state" wording). Shipped on
+`feat/memory-substrate` → PR #8; the unrelated gemini-3.5-flash catalog work was split to PR #9. Closeout recorded in
+`change_log.md` (2026-05-29) and `impl_notes.md`; card moved to `done/`.
 
 ## Summary
 
@@ -283,11 +282,16 @@ Synced every current/normative doc to the shipped memory-writer/transfer vocabul
 
 ## Phase 5: Closeout
 
-- [ ] `make pre-commit` clean
-- [ ] `uv run pytest tests/src tests/regression -m "not integration"` passes; integration handoff/memory tests pass
-- [ ] Re-run blast-radius grep: residual `handoff` in `src/forge/` only where intentionally kept (marker kind, artifact
-  path) — diff against the Phase 0 snapshot
-- [ ] Add `change_log.md` entry (Goal / Key changes / Verification)
-- [ ] Promote durable lessons to `impl_notes.md` (writer-vs-transfer taxonomy; the `session_memory` tombstone collision;
-  `resume_mode` durable-value rename)
-- [ ] Move card to `docs/board/done/memory_substrate/`
+- [x] `make pre-commit` clean (run after the closeout edits).
+- [x] `uv run pytest tests/src tests/regression -m "not integration"` passes (4902 passed);
+  `test_handoff_integration.py` (10) green. The 2 failures (`test_editor_nonzero_aborts_launch`,
+  `test_forge_info_no_traceback`) reproduce on `origin/main` (f8c07d9) — pre-existing, unrelated to this card.
+- [x] Re-ran blast-radius grep: residual `handoff` in `src/forge/` is **39** (from 207 at Phase 0), all intentional
+  KEEPs. The grep surfaced ~40 internal misses the earlier phases left — `handoff_result` vars (manager.py,
+  session_lifecycle.py), the GC transfer-context subsystem (incl. the user-visible `forge clean` category key
+  `handoff_files→transfer_files`), the cost verb (`handoff→memory-writer`), and `core/reactive` docstrings — all fixed
+  this phase; coupled tests (`test_gc.py` ×2, `test_session_resume_review.py`) updated.
+- [x] Added `change_log.md` entry (2026-05-29).
+- [x] Promoted durable lessons to `impl_notes.md` ("Memory vocabulary: memory writer vs transfer" — taxonomy, KEEPs,
+  `session_memory` tombstone collision, `resume_mode` durable-value pattern).
+- [x] Moved card to `docs/board/done/memory_substrate/`.

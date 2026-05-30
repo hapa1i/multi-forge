@@ -57,3 +57,29 @@ memory writer runs (`memory.auto_update.enabled`). No checkout-level config, no 
   `.forge/artifacts/<session>/memory/curation-{slug}-{hash}-{ts}.md`. Curation never mutates official docs.
 - **Stale state**: old `.forge/memory.yaml` is ignored (safe to delete). Old `designated_docs` in manifests are stripped
   on read with a logger warning per coding-standards section 5.
+
+### Memory vocabulary: memory writer vs transfer (memory_substrate rename)
+
+The `memory_substrate` card split the overloaded "handoff" term into two concepts. Keep them distinct in future work:
+
+- **Memory writer** — Stop-time project-doc curation: `session/memory_writer.py` (`run_memory_writer`,
+  `resolve_writer_base_url`, `memory_report_dir`), `MemoryWriterConfig`, `memory_writer_timeout`,
+  `forge memory-writer run`, `forge memory report show`.
+- **Transfer** — resume/fork context assembly: `session/transfer.py` (`assemble_transfer_context`, `TransferResult`),
+  `--resume-mode transfer`.
+- **3-layer memory taxonomy** (design.md §5.6): raw memory (`.forge/artifacts/`), project memory (passported docs under
+  `docs/`, `.forge/memory/`), transfer memory (`.forge/prev_sessions/`).
+
+**Intentional KEEPs — do NOT rename these to memory-writer/transfer; they are durable state, routing keys, or
+fixtures:** work-queue marker `kind="handoff"` + `enqueue_handoff_marker()` (ephemeral routing key); the
+`.forge/artifacts/<session>/handoff/` artifact path (kept even though `review_dir()` became `memory_report_dir()` — see
+the intentional-mismatch comment in `memory_writer.py`); the `queued_handoff` Stop-hook JSON field; QA fixture filenames
+(`manual-handoff-*.jsonl`); and the industry-English "design-to-code handoff" in the skills-writing guide.
+
+**CLI tombstone collision (gotcha):** the report command is `forge memory report show` (new `cli/memory_report.py`), not
+`forge session memory show`, because `forge session memory` was already an occupied tombstone group. Before renaming a
+CLI surface, check whether the target path is already a tombstone.
+
+**Durable-value rename pattern (resume_mode):** `confirmed.derivation.resume_mode` migrated `"handoff"` → `"transfer"`
+via accept-and-tolerate, not reject — readers map legacy `"handoff"`/`None` to transfer with no branching; writers emit
+`"transfer"`. Regression: `tests/regression/test_bug_resume_mode_rename.py`.
