@@ -123,7 +123,7 @@ __all__ = ["fork"]
     "--inline-plan",
     is_flag=True,
     default=False,
-    help="For worktree/--into forks, embed approved plan text in the handoff; default is a parent plan-path reference",
+    help="For worktree/--into forks, embed approved plan text in the transfer; default is a parent plan-path reference",
 )
 @click.option(
     "--into",
@@ -614,7 +614,7 @@ def fork(
     # so --resume --fork-session cannot find the parent's conversation from a different
     # directory. Tested 2026-04-02 with Claude Code 2.1.90: all cross-CWD scenarios fail
     # with "No conversation found." See scripts/experiments/native-resume/.
-    # Use handoff (assembled context via --append-system-prompt-file) instead.
+    # Use transfer (assembled context via --append-system-prompt-file) instead.
     if is_worktree_fork:
         worktree_path = Path(fork_manifest.worktree.path)  # type: ignore[union-attr]
         fork_context, prompt_warnings = _sess()._generate_parent_transfer_context(
@@ -651,7 +651,7 @@ def fork(
                 context_path=fork_context,
             )
         except Exception:
-            logger.warning("Failed to persist fork derivation handoff details", exc_info=True)
+            logger.warning("Failed to persist fork derivation transfer details", exc_info=True)
 
         _fork_uuid = str(_uuid.uuid4())
         try:

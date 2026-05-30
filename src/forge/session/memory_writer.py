@@ -465,7 +465,7 @@ def run_memory_writer(
     effective_timeout = timeout_seconds if timeout_seconds is not None else _default_timeout()
     tracking_url = base_url
 
-    with track_verb_cost("handoff", [tracking_url] if tracking_url else []):
+    with track_verb_cost("memory-writer", [tracking_url] if tracking_url else []):
         result = run_claude_session(
             prompt,
             base_url=base_url,

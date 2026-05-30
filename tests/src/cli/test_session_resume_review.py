@@ -1,6 +1,6 @@
 """Tests for ``forge session resume --review`` (D4 from runtime abstraction Phase 1).
 
-Verifies the --review flag opens the per-child handoff file in $EDITOR before
+Verifies the --review flag opens the per-child transfer file in $EDITOR before
 launching Claude, and that the flag rejects incompatible combinations.
 """
 
@@ -36,7 +36,7 @@ class TestReviewFlagValidation:
 
 
 class TestReviewFlagEditorInvocation:
-    """--review should open the per-child handoff file in $EDITOR before launch."""
+    """--review should open the per-child transfer file in $EDITOR before launch."""
 
     def test_editor_is_invoked_with_child_file_path(
         self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -366,5 +366,5 @@ class TestReviewRelaunch:
 
         output = capsys.readouterr().out
         assert exc.value.code == 1
-        assert "Legacy handoff artifact format is no longer supported" in output
+        assert "Legacy transfer artifact format is no longer supported" in output
         assert "forge session resume p1 --fresh" in output

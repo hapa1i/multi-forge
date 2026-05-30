@@ -223,7 +223,7 @@ def track_cmd(
     require a session. Re-running with --strategy/--writers updates the passport;
     with no flags on an already-passported doc it is a no-op.
 
-    Use --propose to author a shadow-only passport: the handoff agent writes
+    Use --propose to author a shadow-only passport: the memory writer writes
     suggestions to a shadow file instead of editing the doc directly.
 
     For one-off updates without a passport, instruct the agent directly.

@@ -324,7 +324,7 @@ def _persist_fork_transfer_derivation(
     return SessionStore(str(forge_root), manifest.name).update(timeout_s=5.0, mutate=_mutate)
 
 
-def _is_legacy_flat_handoff_path(path: Path) -> bool:
+def _is_legacy_flat_transfer_path(path: Path) -> bool:
     """Return True for pre-0.2.0 ``.forge/prev_sessions/<parent>.md`` artifacts."""
     return path.suffix == ".md" and path.parent.name == "prev_sessions"
 
@@ -346,17 +346,17 @@ def _validate_resume_mode(_ctx: click.Context, _param: click.Parameter, value: s
 
 
 def _resolve_derivation_context_file(manifest: SessionState) -> Path | None:
-    """Resolve a persisted handoff context file for a never-launched child."""
+    """Resolve a persisted transfer context file for a never-launched child."""
     derivation = manifest.confirmed.derivation
     if derivation is None or not derivation.context_file:
         return None
 
     context_path = Path(derivation.context_file).expanduser()
-    if _is_legacy_flat_handoff_path(context_path):
+    if _is_legacy_flat_transfer_path(context_path):
         parent = derivation.parent_session or manifest.parent_session or "<parent>"
         print_error_with_tip(
-            f"Legacy handoff artifact format is no longer supported: {display_path(context_path)}",
-            f"Run 'forge session resume {parent} --fresh' to regenerate a per-child handoff artifact.",
+            f"Legacy transfer artifact format is no longer supported: {display_path(context_path)}",
+            f"Run 'forge session resume {parent} --fresh' to regenerate a per-child transfer artifact.",
             console=console,
         )
         sys.exit(1)
@@ -1260,7 +1260,7 @@ def launch_new_session(
     "subprocess_proxy",
     type=str,
     default=None,
-    help="Route subprocesses (supervisor, panel, handoff) through this proxy while main session is direct",
+    help="Route subprocesses (supervisor, panel, memory-writer) through this proxy while main session is direct",
 )
 @click.option(
     "--memory",
@@ -1300,7 +1300,7 @@ def start(
     with lifecycle coupling. The project directory is mounted at /workspace.
 
     With --subprocess-proxy, the main session talks to Anthropic directly
-    (free subscription) while panels, supervisors, and handoff agents route
+    (free subscription) while panels, supervisors, and memory writers route
     through the named proxy for cost tracking and multi-model access.
 
     For resuming existing sessions, use ``forge session resume``.
@@ -1587,7 +1587,7 @@ def resume(
     if fresh:
         effective_resume_mode = resume_mode or "transfer"
 
-        # Warn about handoff-only flags with native mode
+        # Warn about transfer-only flags with native mode
         if effective_resume_mode == "native":
             ctx = click.get_current_context()
             if ctx.get_parameter_source("strategy") == click.core.ParameterSource.COMMANDLINE:
@@ -2047,7 +2047,7 @@ def _open_in_editor(file_path: Path, *, resume_session_name: str | None = None) 
         )
         console.print(f"[red]Aborted:[/red] editor exited with code {result.returncode}. Session not launched.")
         print_tip(
-            f"The handoff file at {display_path(file_path)} is preserved. "
+            f"The transfer file at {display_path(file_path)} is preserved. "
             f"Run '{resume_tip}' to launch with the current content.",
             blank_before=False,
             console=console,
@@ -2073,7 +2073,7 @@ def _resume_fresh(
 
     This is the --fresh path of ``forge session resume``. Creates a new
     derived session with a context summary, then launches Claude fresh.
-    When ``review`` is True, opens the per-child handoff file in $EDITOR
+    When ``review`` is True, opens the per-child transfer file in $EDITOR
     before launching (user can curate the context).
     """
     # Routing for context limit: --proxy/--no-proxy override > parent's effective routing.
@@ -2093,7 +2093,7 @@ def _resume_fresh(
     )
 
     try:
-        child_manifest, handoff_result = manager.resume_session(
+        child_manifest, transfer_result = manager.resume_session(
             parent,
             child_name=child_name,
             strategy=strategy,
@@ -2116,15 +2116,15 @@ def _resume_fresh(
     )
     _apply_routing_override_to_state(state=child_manifest, routing=routing, direct=direct)
 
-    console.print(f"[dim]Context assembled: {handoff_result.context_file_rel}[/dim]")
-    if handoff_result.warnings:
-        for warning in handoff_result.warnings:
+    console.print(f"[dim]Context assembled: {transfer_result.context_file_rel}[/dim]")
+    if transfer_result.warnings:
+        for warning in transfer_result.warnings:
             console.print(f"[yellow]Warning:[/yellow] {warning}")
     console.print()
 
-    if review and handoff_result.context_file is not None:
-        console.print(f"[dim]Opening {handoff_result.context_file_rel} in $EDITOR for review...[/dim]")
-        _open_in_editor(handoff_result.context_file, resume_session_name=child_manifest.name)
+    if review and transfer_result.context_file is not None:
+        console.print(f"[dim]Opening {transfer_result.context_file_rel} in $EDITOR for review...[/dim]")
+        _open_in_editor(transfer_result.context_file, resume_session_name=child_manifest.name)
 
     console.print(f"Created derived session [green]{child_manifest.name}[/green] from [cyan]{parent}[/cyan]")
     console.print(f"[dim]Strategy: {strategy}, Depth: {depth}[/dim]")
@@ -2136,8 +2136,8 @@ def _resume_fresh(
     configured_prompt = _resolve_manifest_prompt_file(child_manifest)
     if configured_prompt is not None:
         prompt_files.append(configured_prompt)
-    if handoff_result.context_file is not None:
-        prompt_files.append(handoff_result.context_file.resolve())
+    if transfer_result.context_file is not None:
+        prompt_files.append(transfer_result.context_file.resolve())
     prompt_file = _combine_prompt_files(
         worktree_path=child_worktree,
         session_name=child_manifest.name,
@@ -2224,7 +2224,7 @@ def _resume_fresh_native(
     context_limit = _sess()._resolve_context_limit(effective_proxy_ref)
 
     try:
-        child_manifest, handoff_result = manager.resume_session(
+        child_manifest, transfer_result = manager.resume_session(
             parent,
             child_name=child_name,
             resume_mode="native",
@@ -2244,8 +2244,8 @@ def _resume_fresh_native(
     )
     _apply_routing_override_to_state(state=child_manifest, routing=routing, direct=direct)
 
-    if handoff_result.warnings:
-        for warning in handoff_result.warnings:
+    if transfer_result.warnings:
+        for warning in transfer_result.warnings:
             console.print(f"[yellow]Warning:[/yellow] {warning}")
 
     parent_uuid = parent_state.confirmed.claude_session_id

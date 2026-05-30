@@ -2,7 +2,7 @@
 
 Commands for managing Claude Code sessions:
 - start: Create and start a new session
-- resume: Resume a session (reattach or --fresh for context handoff)
+- resume: Resume a session (reattach or --fresh for context transfer)
 - fork: Fork an existing session
 - delete: Delete a session
 - list: List all sessions

@@ -92,7 +92,7 @@ def is_memory_enabled(manifest: SessionState, effective: SessionIntent) -> bool:
     """Return True if the memory writer should run for this session.
 
     Checks incognito exclusion and effective ``auto_update.enabled``.
-    Used by the Stop-hook enqueue gate and the detached handoff runner.
+    Used by the Stop-hook enqueue gate and the detached memory-writer runner.
     """
     return (
         not manifest.is_incognito

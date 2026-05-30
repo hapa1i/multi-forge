@@ -1,7 +1,7 @@
 """Proxy registry lookup utility.
 
 Provides a shared function for looking up proxy base URLs from the
-registry. Used by the semantic supervisor, handoff agent, and review engine.
+registry. Used by the semantic supervisor, memory writer, and review engine.
 
 Note: This module is intentionally NOT re-exported from __init__.py
 because it lazy-imports forge.proxy.proxies (a top-level component).
