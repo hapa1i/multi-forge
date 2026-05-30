@@ -24,19 +24,23 @@ wc -l docs/board/doing/runtime_abstraction/checklist.md
 
 ## Current Focus
 
-Phase 1: stabilize curated handoff as a schema-backed, user-reviewable cross-runtime substrate. Keep CLI default
+Phase 1: stabilize curated transfer as a schema-backed, user-reviewable cross-runtime substrate. Keep CLI default
 behavior unchanged unless a separate default-change decision is recorded.
 
-**Deferred prerequisite (memory_substrate reconciliation, 2026-05-29):**
+**Deferred prerequisite (memory_substrate reconciliation) -- RESOLVED 2026-05-30:**
 
-- [ ] Reconcile this card's "curated handoff" vocabulary with the shipped **transfer** taxonomy, and retarget the
-  proposed `forge session handoff regenerate|edit|diff` surface before implementing the schema. Those verbs were never
-  built, but the `forge session handoff` parent is now a removed-command tombstone group (its `show` redirects to
-  `forge memory report show`), so they must be re-homed under a new transfer-owned surface (see the Phase 1 namespace
-  task). The doc-updater is the **memory writer**; resume/fork context is
-  **transfer**. Align with `docs/design.md` §3.9 (transfer) and §5.6 (memory writer). The 2026-05-29 repoint fixed
-  symbol references (`memory_writer.py`/`transfer.py`); the conceptual vocabulary was intentionally left for this card
-  to own when it executes.
+- [x] Reconcile this card's "curated handoff" vocabulary with the shipped **transfer** taxonomy, and retarget the
+  proposed `forge session handoff regenerate|edit|diff` surface before implementing the schema.
+  - Resolution: `card.md` now uses **curated transfer** throughout (the `ai-curated` transfer strategy, repositioned as
+    the primary cross-runtime substrate), with a vocabulary note in the "Curated Transfer as Cross-Runtime Substrate"
+    section tying it to `docs/design.md` §3.9 (transfer) and §5.6 (memory writer). The doc-updater stays the **memory
+    writer**; resume/fork context stays **transfer**.
+  - Namespace: the retargeted verbs live under a new **top-level `forge transfer` group**
+    (`forge transfer show|regenerate|edit|diff`), chosen over `forge session transfer` on user-mental-model grounds so
+    it pairs with `forge memory`. `forge session resume --fresh --review` stays the ergonomic entry point, not a second
+    namespace. See the resolved namespace task in Phase 1 and the Open Decisions.
+  - Verification: `rg "handoff" card.md` returns only intentional refs (the quoted historical term in the vocabulary
+    note + `forge session handoff` tombstone mentions); `rg "forge session transfer" card.md` returns nothing.
 
 ## Phase 0 - Baseline Confirmation
 
@@ -57,14 +61,14 @@ Phase 0 gaps carried forward:
 - Session and Claude launchers have subprocess-proxy environment wiring, but the durable runtime usage ledger remains
   future; track under Phase 4 usage ledger callsites.
 
-## Phase 1 - Curated Handoff Reframe
+## Phase 1 - Curated Transfer Reframe
 
-- [ ] Reposition `ai-curated` / curated handoff in `docs/design.md` as the primary cross-runtime and cross-topology
+- [ ] Reposition `ai-curated` / curated transfer in `docs/design.md` as the primary cross-runtime and cross-topology
   transfer substrate, not merely a lossy fallback.
-  - Assertion: design text distinguishes native resume, native-relocate, and curated handoff by user agency and runtime
+  - Assertion: design text distinguishes native resume, native-relocate, and curated transfer by user agency and runtime
     portability. This is a prose/schema reframe only; `structured` remains the CLI default unless an explicit default
     change is approved.
-- [x] Verify `forge session resume --review` behavior.
+- [x] Verify `forge session resume --fresh --review` behavior.
   - Note: this shipped before the runtime-abstraction checklist was activated; it is retained here as verified Phase 1
     foundation.
   - Assertion: transfer-mode resume opens the generated child transfer context file in `$EDITOR`; native mode rejects
@@ -72,17 +76,24 @@ Phase 0 gaps carried forward:
   - Verification: `src/forge/cli/session_lifecycle.py` implements the `resume --review` option, native-mode rejection,
     and `$EDITOR` launch for the generated child context; `docs/design.md` command reference documents the CLI contract;
     `tests/src/cli/test_session_resume_review.py` covers the behavior.
-- [ ] Decide the resume-context command namespace before adding `regenerate|edit|diff`.
-  - Assertion: command contract avoids names that are already taken. Verified 2026-05-30: `forge session handoff` is a
-    removed-command tombstone (it redirects to `forge memory report show`) and `forge session context` is a deprecated
-    alias for `forge session show` — neither can be reused. These verbs are **transfer-owned** (they act on resume/fork
-    context, not project-doc memory), so the surface must live under transfer, not `forge memory`. Candidate free
-    surface: `forge session transfer regenerate|edit|diff`.
-- [ ] Define the Forge-owned curated handoff schema contract in docs.
+- [x] Decide the resume-context command namespace before adding `regenerate|edit|diff`.
+  - Decision (2026-05-30): **top-level `forge transfer` group** -- `forge transfer show|regenerate|edit|diff`. Chosen
+    over the `forge session transfer` subgroup on user-mental-model grounds: users think "inspect/reshape the context
+    that moves forward," not "a subresource of session," and it pairs with the top-level `forge memory` as the two
+    halves of the former "handoff." This is a user-facing-namespace choice, not a scoping claim -- transfer is still
+    session-derived and every verb takes a parent session argument.
+  - Verified free/occupied (2026-05-30): `forge transfer` is unclaimed (no CLI command; `transfer` appears only as the
+    `--resume-mode` value, a `forge clean` category key, and internal `transfer.py` symbols). `forge session handoff` is
+    a removed-command tombstone (redirects to `forge memory report show`) and `forge session context` is a hidden
+    deprecated alias for `forge session show` -- neither reusable. `forge transfer show` (assembled transfer artifact)
+    is deliberately distinct from the deprecated `forge session context` (a running session's runtime context).
+  - Single canonical namespace only: `forge session resume --fresh --review` remains a delegating entry point, not a
+    competing surface.
+- [ ] Define the Forge-owned curated transfer schema contract in docs.
   - Assertion: schema records lineage, decisions with citations, current state, open questions, runtime hints, and user
     notes overlay.
-- [ ] Implement the curated handoff schema in `src/forge/session/transfer.py`.
-  - Assertion: generated handoff markdown has stable sections for the schema fields; existing
+- [ ] Implement the curated transfer schema in `src/forge/session/transfer.py`.
+  - Assertion: generated transfer markdown has stable sections for the schema fields; existing
     `minimal|structured|full|ai-curated` strategies either emit that schema or document their compatibility fallback.
 - [ ] Add tests for schema output and artifact durability.
   - Assertion: tests cover parent cache regeneration, per-child artifact preservation, and required schema sections for
@@ -90,10 +101,10 @@ Phase 0 gaps carried forward:
 - [ ] Define the user notes overlay convention.
   - Assertion: docs/code state where user notes live, how they compose with generated content, and that regeneration
     never overwrites authoritative user notes.
-- [ ] Decide how `ctx` relates to Forge handoff.
+- [ ] Decide how `ctx` relates to Forge transfer.
   - Assertion: docs state whether `ctx` is only prior art, an import/export peer, or a future dependency.
 - [ ] Confirm Phase 1 schema is stable enough for Phase 5 target-runtime tuning.
-  - Assertion: Phase 5 can tune handoff presentation for Codex without changing transcript source artifacts or schema
+  - Assertion: Phase 5 can tune transfer presentation for Codex without changing transcript source artifacts or schema
     semantics.
 
 ## Phase 2 - Optional Audit Proxy
@@ -123,10 +134,10 @@ Phase 0 gaps carried forward:
 - [ ] Gate path rewriting separately.
   - Assertion: absolute path rewriting is opt-in and disabled by default until tests prove it harmless.
 - [ ] Preserve derivation and GC invariants for relocated artifacts.
-  - Assertion: relocated JSONL, generated parent cache, and per-child handoff artifacts are traceable without orphaning
+  - Assertion: relocated JSONL, generated parent cache, and per-child transfer artifacts are traceable without orphaning
     or overwriting user-edited child files.
 - [ ] Decide outcome of native-relocate.
-  - Assertion: either introduce opt-in `--resume-mode native-relocate` or record why curated handoff remains the only
+  - Assertion: either introduce opt-in `--resume-mode native-relocate` or record why curated transfer remains the only
     cross-CWD path.
 
 ## Phase 4 - Runtime Abstraction Core
@@ -158,26 +169,26 @@ Phase 0 gaps carried forward:
 - [ ] Add runtime/auth preflight for native Codex execution.
   - Assertion: unsupported auth paths fail before launch with setup guidance.
 - [ ] Add target-runtime-aware curator.
-  - Assertion: consumes the stable Phase 1 handoff schema so output can be tuned for Codex without changing source
+  - Assertion: consumes the stable Phase 1 transfer schema so output can be tuned for Codex without changing source
     transcript artifacts or schema semantics.
 - [ ] Demonstrate Claude-to-Codex resume.
-  - Assertion: a documented workflow can plan in Claude and implement in Codex using curated handoff.
+  - Assertion: a documented workflow can plan in Claude and implement in Codex using curated transfer.
 
 ## Phase 6 - Codex Frontend Beta
 
 - [ ] Evaluate Codex as an interactive frontend runtime.
-  - Assertion: decision is based on headless invocation, usage accounting, policy semantics, and curated handoff results
-    from earlier phases.
+  - Assertion: decision is based on headless invocation, usage accounting, policy semantics, and curated transfer
+    results from earlier phases.
 
 ## Open Decisions
 
 Tracks Forge-local execution decisions for this checklist. For broader card questions, see
 [`card.md` Open Questions](./card.md#open-questions).
 
-- [ ] Should `forge session resume --review` become default for curated handoff workflows?
-- [ ] Which transfer-owned namespace should the resume-context commands use — a new `forge session transfer ...` verb
-  or a top-level `forge transfer ...`? (`forge session context` is a deprecated alias and `forge session handoff` is a
-  removed-command tombstone, so neither can be reused; the surface stays under transfer, not `forge memory`.)
+- [ ] Should `forge session resume --fresh --review` become default for curated transfer workflows?
+- [x] Which transfer-owned namespace should the resume-context commands use? **Resolved 2026-05-30: top-level
+  `forge transfer ...`** (not `forge session transfer ...`), pairing with `forge memory`. Rationale and free/occupied
+  verification are recorded in the Phase 1 namespace task above.
 - [ ] Should Phase 1 remain prose/schema-only, or should it change the default strategy after schema tests land?
 - [ ] Where do proxy cost logs, audit logs, and the future usage ledger converge?
 - [ ] How should `FORGE_DEPTH` compose with future run-tree attribution ids?

@@ -36,14 +36,14 @@ propagates -- where the default would otherwise be opacity or external control.
 | --------------------------------------------------- | --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
 | Wire (request/response with model provider)         | Unobserved harness/provider drift in defaults, prompts, routing | Proxy capture + parameter pinning + prompt augmentation                                         |
 | Cost / spend                                        | Runaway API or subscription credit consumption                  | Spend caps + per-verb attribution + usage ledger                                                |
-| Session topology (same runtime, cross-CWD/worktree) | Reasoning continuity vs portability                             | Native resume / native-relocate / curated handoff strategies                                    |
+| Session topology (same runtime, cross-CWD/worktree) | Reasoning continuity vs portability                             | Native resume / native-relocate / curated transfer strategies                                   |
 | Runtime (Claude Code / Codex / Gemini)              | Different internal state formats, different operator quirks     | Runtime registry + `HeadlessInvoker` + transfer context as interchange (see `memory_substrate`) |
 | Knowledge across sessions                           | Loss of context, decisions, intent                              | Passported memory docs + memory writer (see `memory_substrate` card)                            |
 
 The runtime abstraction is one application of this frame: it gives the user agency over **which runtime executes their
 work** without forcing them to commit to one. Other applications in this proposal -- the optional always-on audit proxy,
-curated handoff as cross-runtime substrate, and native-relocate for cross-CWD continuity -- share the same architectural
-commitment. They are not separate features; they are the same pattern applied at different layers.
+curated transfer as cross-runtime substrate, and native-relocate for cross-CWD continuity -- share the same
+architectural commitment. They are not separate features; they are the same pattern applied at different layers.
 
 ## PR #8 Alignment
 
@@ -152,7 +152,7 @@ A thinking block returned by the API has three fields:
 - **Cross-model within Anthropic:** signatures may be model-specific. Assume same model id is required for safe replay
   until a contract test proves otherwise.
 - **Cross-runtime (Claude / Codex / Gemini):** signatures and reasoning state are structurally non-portable. Each
-  runtime's internal model state belongs to that runtime. **Curated handoff** is the only viable substrate for crossing
+  runtime's internal model state belongs to that runtime. **Curated transfer** is the only viable substrate for crossing
   runtime boundaries.
 - **Wire-level intervention can be signature-safe** when restricted to current-request control surfaces: generation
   parameters, context-management headers, cache-aware system prompt augmentation, and validation/guards that do not
@@ -160,7 +160,7 @@ A thinking block returned by the API has three fields:
   cryptographic sense, but it is semantically dangerous and should not be part of the default design.
 
 These properties are the technical foundation for two later sections in this proposal: the optional always-on proxy
-(which exploits "current-request mutation is signature-safe") and curated handoff as cross-runtime substrate (which
+(which exploits "current-request mutation is signature-safe") and curated transfer as cross-runtime substrate (which
 accepts that cross-runtime reasoning replay is impossible).
 
 ## Source-Grounded Posture
@@ -595,16 +595,25 @@ For every historical message:
 This invariant protects signed reasoning blocks and prevents Forge from rewriting historical user/tool evidence just
 because such rewrites might be cryptographically allowed.
 
-### Curated Handoff as Cross-Runtime Substrate
+### Curated Transfer as Cross-Runtime Substrate
+
+> **Vocabulary (reconciled with the shipped transfer taxonomy, 2026-05-30).** This card was drafted using "curated
+> handoff." The shipped taxonomy ([design.md §3.9](../design.md#39-session-resume-context-management)) calls resume/fork
+> context assembly **transfer** (`transfer.py`, `--resume-mode transfer`, `assemble_transfer_context`), and the separate
+> Stop-time project-doc updater the **memory writer** ([design.md §5.6](../design.md#56-designated-memory-docs)). The
+> concept this card calls "curated handoff" is therefore **curated transfer** -- the `ai-curated` transfer strategy,
+> repositioned as the primary cross-runtime/cross-topology substrate. The removed `forge session handoff` CLI surface is
+> a tombstone (it redirects to `forge memory report show`) and hosts no transfer verbs; the canonical surface is the
+> top-level `forge transfer` group (see Phase 1).
 
 Within a runtime, native resume (`claude --resume`, `codex exec resume`) is the right primitive when topology allows --
 it preserves signed reasoning state byte-for-byte. Across runtimes, native resume is structurally impossible: Anthropic
 thinking signatures don't validate against Codex; OpenAI reasoning IDs are meaningless to Claude; each runtime has its
 own session JSONL format.
 
-This proposal commits to **curated handoff as the canonical cross-runtime substrate**, not as a lossy fallback.
+This proposal commits to **curated transfer as the canonical cross-runtime substrate**, not as a lossy fallback.
 
-A curated handoff is a human-readable, AI-distilled, optionally user-edited document representing session state at the
+A curated transfer is a human-readable, AI-distilled, optionally user-edited document representing session state at the
 level of decisions, current work, and intent. It:
 
 - Carries decisions and rationale, not raw conversation.
@@ -614,39 +623,39 @@ level of decisions, current work, and intent. It:
 - Mitigates the underspecification problem ([design.md §4.1.2](../design.md#412-semantic-policy-the-supervisor)) by
   making implicit intent explicit.
 
-**Fidelity-vs-agency reframe.** The existing handoff modes in
+**Fidelity-vs-agency reframe.** The existing transfer strategies in
 [design.md §3.9](../design.md#39-session-resume-context-management) (`minimal`, `structured`, `full`, `ai-curated`) are
 positioned as a fidelity spectrum where native is the lossless ideal and curated is the lossy fallback. This proposal
 reframes the trade-off:
 
-| Mode                                                           | Strength                                           | Cost                                 |
-| -------------------------------------------------------------- | -------------------------------------------------- | ------------------------------------ |
-| Native (within runtime, within CWD)                            | Byte-faithful reasoning continuity                 | Opaque to the user; cannot be edited |
-| Native-relocate (cross-CWD, within runtime; future)            | Same byte-faithful continuity, broader topology    | Requires JSONL copy and path-rewrite |
-| Curated handoff (cross runtime, cross project, cross worktree) | **User can read, edit, and shape what propagates** | Loses signed reasoning trail         |
+| Mode                                                            | Strength                                           | Cost                                 |
+| --------------------------------------------------------------- | -------------------------------------------------- | ------------------------------------ |
+| Native (within runtime, within CWD)                             | Byte-faithful reasoning continuity                 | Opaque to the user; cannot be edited |
+| Native-relocate (cross-CWD, within runtime; future)             | Same byte-faithful continuity, broader topology    | Requires JSONL copy and path-rewrite |
+| Curated transfer (cross runtime, cross project, cross worktree) | **User can read, edit, and shape what propagates** | Loses signed reasoning trail         |
 
-Curated handoff is not a degradation; it offers something native structurally cannot -- user agency over what crosses
+Curated transfer is not a degradation; it offers something native structurally cannot -- user agency over what crosses
 the session boundary. The lossless modes carry everything but cannot be inspected or pruned; the curated mode requires
 distillation but is *more* useful when work is genuinely transferring (different runtime, different operator, different
 phase of the project).
 
 Existing tools such as [ctx](https://github.com/dchu917/ctx) are useful prior art: workstreams, exact transcript
 binding, branching, indexed retrieval, local SQLite storage, and curation are all aligned with this substrate. Forge
-should not depend on `ctx` as the first implementation step, because curated handoff is central to Forge's session,
-policy, and usage story. The better near-term path is a Forge-owned handoff schema with optional import/export or
+should not depend on `ctx` as the first implementation step, because curated transfer is central to Forge's session,
+policy, and usage story. The better near-term path is a Forge-owned transfer schema with optional import/export or
 peer-tool integration once the contract is stable.
 
 **Required for cross-runtime resume:**
 
 - A transfer curator (resume/fork context assembly in `transfer.py`, distinct from the project-doc memory writer) that
-  reads the parent transcript and produces a runtime-neutral handoff document.
-- A `--target-runtime` option on the curator so handoffs can be tuned for the destination's conventions (terseness, tool
-  naming, model style). Parallel to today's per-model-family system prompt addendums
+  reads the parent transcript and produces a runtime-neutral transfer document.
+- A `--target-runtime` option on the curator so the transfer can be tuned for the destination's conventions (terseness,
+  tool naming, model style). Parallel to today's per-model-family system prompt addendums
   (`src/forge/cli/session_addendum.py`).
-- A `--review` step on resume that opens the draft handoff in `$EDITOR` for user curation before child launch.
+- A `--review` step on resume that opens the draft transfer context in `$EDITOR` for user curation before child launch.
 - A three-layer file convention under `<forge_root>/.forge/prev_sessions/<parent>/`: raw transcript (immutable),
   AI-curated (regeneratable), user notes (authoritative).
-- Capability-registry entries: every runtime should declare curated handoff *input* (can accept a context document at
+- Capability-registry entries: every runtime should declare curated transfer *input* (can accept a context document at
   session start) and *output* (can generate curation of its own transcript) capabilities.
 
 This composes with the existing `intent.subprocess_proxy` and `--resume-mode` machinery; the new pieces are the
@@ -676,20 +685,20 @@ inspectable traffic.
 
 Initial target matrix:
 
-| Capability                                                     | Claude Code                      | Codex CLI                                       | Gemini CLI                     |
-| -------------------------------------------------------------- | -------------------------------- | ----------------------------------------------- | ------------------------------ |
-| Interactive frontend                                           | Current default                  | Target beta                                     | Not planned initially          |
-| Headless worker                                                | `claude -p`                      | `codex exec`                                    | `gemini -p`                    |
-| Native hooks                                                   | Existing Forge integration       | Stable in 0.124.0+; enable `codex_hooks`        | No comparable hook target yet  |
-| Pre-tool policy                                                | Current Claude hooks             | `PreToolUse` adapter                            | Not initially                  |
-| Usage source                                                   | Transcript/status/proxy fallback | JSONL usage events                              | JSON stats                     |
-| Native resume (within runtime, within CWD)                     | `claude --resume`                | `codex exec resume`                             | Capability-check first         |
-| Curated handoff *input* (accept context doc at start)          | `--append-system-prompt-file`    | Initial user message                            | Initial message                |
-| Curated handoff *output* (generate curation of own transcript) | Yes (transfer curator)           | Yes (via headless invoker)                      | Yes (via headless invoker)     |
-| Always-on proxy compatible                                     | Yes (host or sidecar)            | Yes (host or sidecar)                           | TBD per CLI                    |
-| Request inspectable by Forge                                   | Only through Forge proxy/sidecar | Only through Forge proxy/sidecar; direct opaque | Route-dependent; direct opaque |
-| Gateway route                                                  | Anthropic-compatible base URLs   | Native CLI or first-class ChatGPT LiteLLM route | API/Vertex route only          |
-| Consumer auth as gateway                                       | Not supported by Forge           | Supported only through documented Codex routes  | Not supported                  |
+| Capability                                                      | Claude Code                      | Codex CLI                                       | Gemini CLI                     |
+| --------------------------------------------------------------- | -------------------------------- | ----------------------------------------------- | ------------------------------ |
+| Interactive frontend                                            | Current default                  | Target beta                                     | Not planned initially          |
+| Headless worker                                                 | `claude -p`                      | `codex exec`                                    | `gemini -p`                    |
+| Native hooks                                                    | Existing Forge integration       | Stable in 0.124.0+; enable `codex_hooks`        | No comparable hook target yet  |
+| Pre-tool policy                                                 | Current Claude hooks             | `PreToolUse` adapter                            | Not initially                  |
+| Usage source                                                    | Transcript/status/proxy fallback | JSONL usage events                              | JSON stats                     |
+| Native resume (within runtime, within CWD)                      | `claude --resume`                | `codex exec resume`                             | Capability-check first         |
+| Curated transfer *input* (accept context doc at start)          | `--append-system-prompt-file`    | Initial user message                            | Initial message                |
+| Curated transfer *output* (generate curation of own transcript) | Yes (transfer curator)           | Yes (via headless invoker)                      | Yes (via headless invoker)     |
+| Always-on proxy compatible                                      | Yes (host or sidecar)            | Yes (host or sidecar)                           | TBD per CLI                    |
+| Request inspectable by Forge                                    | Only through Forge proxy/sidecar | Only through Forge proxy/sidecar; direct opaque | Route-dependent; direct opaque |
+| Gateway route                                                   | Anthropic-compatible base URLs   | Native CLI or first-class ChatGPT LiteLLM route | API/Vertex route only          |
+| Consumer auth as gateway                                        | Not supported by Forge           | Supported only through documented Codex routes  | Not supported                  |
 
 ## Shipping Strategy (Phases)
 
@@ -705,18 +714,29 @@ the payoff that justifies Phase 4. Phase 6 is reserved for once everything else 
 - Proxy-level cost visibility and per-proxy spend caps.
 - `--subprocess-proxy` for dual-auth on direct sessions (transitional bridge for headless work).
 
-### Phase 1 -- Conceptual reframe and curated-handoff repositioning
+### Phase 1 -- Conceptual reframe and curated-transfer repositioning
 
 No new architecture; mostly documentation and small CLI additions.
 
 - Reposition `ai-curated` in [design.md §3.9](../design.md#39-session-resume-context-management) as the cross-everything
   primary substrate rather than one strategy among four.
-- Add `forge session resume --review` (opens draft handoff in `$EDITOR` before child launch).
-- Add transfer-context `regenerate|edit|diff` commands under a new transfer-owned surface (e.g.
-  `forge session transfer regenerate|edit|diff`); `forge session handoff` is now a removed-command tombstone and cannot
-  host them.
-- Document the agency-at-boundaries frame and the curated-handoff-as-interchange principle in `design.md`.
-- Define the Forge-owned handoff schema and decide whether `ctx` should become an import/export peer later.
+- Add `forge session resume <parent> --fresh --review` (opens the draft transfer context in `$EDITOR` before child
+  launch; `--review` requires `--fresh` transfer mode). This stays the ergonomic workflow entry point -- a convenience
+  on the session lifecycle, not a second canonical namespace -- and should print the follow-up `forge transfer` commands
+  via the standard `Next steps:` output convention.
+- Add the transfer-context verbs under a new **top-level `forge transfer` group** (canonical surface):
+  `forge transfer show|regenerate|edit|diff`. Top-level (not `forge session transfer`) so it pairs with `forge memory`
+  as the two halves of the former "handoff": `forge memory` curates project docs, `forge transfer` assembles resume/fork
+  context. This is a user-mental-model choice, not a scoping claim -- every transfer verb still takes a parent session
+  argument. `forge session handoff` is a removed-command tombstone and cannot host these verbs.
+- Verb/argument shape follows the two-layer artifact model (`prev_sessions/<parent>/generated.md` regeneratable cache vs
+  `children/<child>.md` authoritative per-child file): `regenerate <parent>` rewrites only the parent cache (per-child
+  files are never overwritten, per design.md §3.9); `edit <parent> --child <child>` targets the authoritative per-child
+  file; `show`/`diff` take an optional `--child` to select child-vs-cache. `forge transfer show` reports the assembled
+  transfer artifact and is distinct from the deprecated `forge session context` (a running session's runtime context,
+  now folded into `forge session show`).
+- Document the agency-at-boundaries frame and the curated-transfer-as-interchange principle in `design.md`.
+- Define the Forge-owned transfer schema and decide whether `ctx` should become an import/export peer later.
 - Initial schema sketch: lineage pointer, decisions with transcript/file citations, current state snapshot, file:line
   evidence, open questions, runtime hints, and user notes overlay.
 
@@ -751,7 +771,7 @@ Native-relocate is an experimental spike, not a committed UX until contract test
   JSONL across a CWD boundary and complete a tool-use continuation without signature-validation failure.
 - Only after the spike passes, update the cross-`forge_root` native-resume no-op guard in
   `src/forge/session/manager.py:573-578` and introduce `--resume-mode native-relocate` as an opt-in value.
-- If the spike fails, keep native resume within the original runtime/CWD boundary and rely on curated handoff for
+- If the spike fails, keep native resume within the original runtime/CWD boundary and rely on curated transfer for
   cross-CWD and cross-runtime movement.
 
 ### Phase 4 -- Runtime abstraction core
@@ -770,13 +790,13 @@ Native-relocate is an experimental spike, not a committed UX until contract test
 - `CodexHeadlessInvoker` using `codex exec` and JSONL usage events.
 - Runtime capability checks and auth preflight for native Codex execution.
 - `forge session start --runtime codex --resume-from <claude-session>` workflow.
-- Target-runtime-aware curator (`--target-runtime codex` adjusts the handoff for Codex's conventions).
-- First end-to-end "plan in Claude, implement in Codex via curated handoff" demonstration.
+- Target-runtime-aware curator (`--target-runtime codex` adjusts the transfer for Codex's conventions).
+- First end-to-end "plan in Claude, implement in Codex via curated transfer" demonstration.
 
 ### Phase 6 -- Codex frontend beta
 
 - Evaluate Codex as an interactive frontend runtime once headless invocation, usage accounting, policy semantics, and
-  curated handoff are clear.
+  curated transfer are clear.
 
 ## Non-Goals
 
@@ -786,7 +806,7 @@ Native-relocate is an experimental spike, not a committed UX until contract test
 - Do not represent subscription usage as exact API dollar spend.
 - Do not let expensive skills bypass hard caps once configured.
 - Do not make Forge proxy the only path; native runtime execution should be preferred where it is cleaner.
-- Do not treat cross-runtime resume as a lossy degradation; it is the canonical use case for curated handoff and the
+- Do not treat cross-runtime resume as a lossy degradation; it is the canonical use case for curated transfer and the
   substrate is intentional, not residual.
 - Do not make always-on proxy mandatory; users who want direct-mode minimalism keep it. Always-on is opt-in (recommended
   via sidecar mode for users who want audit/control without separate proxy lifecycle).
@@ -803,10 +823,10 @@ Native-relocate is an experimental spike, not a committed UX until contract test
 - How should run-tree attribution (`FORGE_RUN_ID`, `FORGE_PARENT_RUN_ID`) compose with the existing `FORGE_DEPTH`
   recursion guard and `FORGE_SESSION` identifier? Should `FORGE_DEPTH` become a derived property of the run tree?
 - How should Forge interoperate with [ctx](https://github.com/dchu917/ctx)? The current posture is "Forge-owned schema,
-  ctx as prior art/peer," but useful bridges may include importing ctx packs, exporting Forge handoffs to ctx, or
+  ctx as prior art/peer," but useful bridges may include importing ctx packs, exporting Forge transfers to ctx, or
   linking a Forge session to a ctx workstream.
-- Should `forge session resume --review` be the default behavior or an explicit flag? Default is friendlier for the
-  curated workflow; flag preserves today's "just resume" UX.
+- Should `forge session resume --fresh --review` be the default behavior or an explicit flag? Default is friendlier for
+  the curated workflow; flag preserves today's "just resume" UX.
 - Where do PR #8's `~/.forge/costs/requests/*.jsonl` and Phase 4's `~/.forge/usage/events.jsonl` converge? Same data
   plane eventually merged, or parallel forever? The audit logs from Phase 2 (`~/.forge/audit/requests/*.jsonl`) raise
   the same question.
