@@ -2,8 +2,8 @@
 
 Manual multi-session plan for executing [`card.md`](./card.md).
 
-This card is currently parked in `todo/`. Move the whole `runtime_abstraction/` directory to `docs/board/doing/` when
-its execution branch is created, and to `docs/board/done/` after closeout.
+This card is in active execution under `doing/`. Move the whole `runtime_abstraction/` directory to
+`docs/board/done/` after closeout.
 
 ## Maintenance
 
@@ -18,8 +18,8 @@ its execution branch is created, and to `docs/board/done/` after closeout.
 - Check size periodically while a card is active:
 
 ```bash
-wc -l docs/board/todo/runtime_abstraction/checklist.md
-./scripts/count-tokens.py --model <agent-model> docs/board/todo/runtime_abstraction/checklist.md
+wc -l docs/board/doing/runtime_abstraction/checklist.md
+./scripts/count-tokens.py --model <agent-model> docs/board/doing/runtime_abstraction/checklist.md
 ```
 
 ## Current Focus
