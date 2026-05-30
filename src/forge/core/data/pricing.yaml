@@ -5,11 +5,15 @@
 # cached_input = price for prompt-cache HIT tokens (a subset of input_tokens).
 # Cost formula: (input - cached) * input + cached * cached_input + output * output
 schema_version: 1
-updated_at: "2026-05-28"
+updated_at: "2026-05-29"
 
 models:
   # --- Anthropic ---
   claude-opus-4-8:
+    input: 5.00
+    output: 25.00
+    cached_input: 0.50
+  claude-opus-4-7:
     input: 5.00
     output: 25.00
     cached_input: 0.50
@@ -73,6 +77,14 @@ models:
     input: 0.30
     output: 2.50
     cached_input: 0.03
+  gemini-3-flash-preview:
+    input: 0.50
+    output: 3.00
+    cached_input: 0.05
+  gemini-3.5-flash:
+    input: 1.50
+    output: 9.00
+    cached_input: 0.15
   gemini-3.1-pro-preview:
     input: 2.00
     output: 12.00

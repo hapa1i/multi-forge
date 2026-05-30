@@ -21,7 +21,7 @@ pytestmark = [pytest.mark.integration, pytest.mark.slow, pytest.mark.remote_lite
         (
             "litellm-gemini",
             "proxy_server_remote_gemini",
-            "vertex_ai/gemini-2.5-flash",
+            "vertex_ai/gemini-3.5-flash",
         ),
     ],
 )

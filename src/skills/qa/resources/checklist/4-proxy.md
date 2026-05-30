@@ -425,9 +425,9 @@ forge proxy template show openrouter-qwen
 - [ ] `openrouter-openai` maps tiers to GPT models (haiku=gpt-5.4-mini, sonnet=gpt-5.5, opus=gpt-5.5)
 - [ ] `openrouter-openai-codex` maps tiers to Codex models (haiku=gpt-5.1-codex-mini, sonnet=gpt-5.3-codex,
   opus=gpt-5.5)
-- [ ] `openrouter-gemini` maps tiers to Gemini models (haiku=gemini-2.5-flash, sonnet=gemini-3.1-pro-preview,
+- [ ] `openrouter-gemini` maps tiers to Gemini models (haiku=gemini-3.5-flash, sonnet=gemini-3.1-pro-preview,
   opus=gemini-3.1-pro-preview)
-- [ ] `openrouter-gemini-flash` maps all tiers to gemini-2.5-flash with tier_overrides for reasoning_effort
+- [ ] `openrouter-gemini-flash` maps all tiers to gemini-3.5-flash with tier_overrides for reasoning_effort
   (low/medium/high)
 - [ ] Each OpenRouter template has a distinct default_port (8095-8104)
 

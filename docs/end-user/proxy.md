@@ -149,7 +149,7 @@ Default tiers use Anthropic Claude models on OpenRouter. Edit the proxy to use a
 ```bash
 forge proxy edit <proxy_id>
 # Change tiers to e.g.:
-#   haiku: google/gemini-2.5-flash
+#   haiku: google/gemini-3.5-flash
 #   sonnet: anthropic/claude-sonnet-4.6
 #   opus: openai/gpt-5.5
 ```

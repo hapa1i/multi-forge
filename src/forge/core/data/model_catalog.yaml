@@ -867,8 +867,32 @@ models:
     system_prompt_addendum: system_prompt_addendums/gemini.md
     tags: []
 
+  gemini-3.5-flash:
+    friendly_name: Gemini 3.5 Flash
+    context_window_tokens: 1048576
+    max_output_tokens: 65536
+    max_thinking_tokens: null
+    supports_thinking: true
+    supports_images: true
+    temperature_constraint: fixed
+    temperature: 1.0
+    supports_top_p: true
+    default_timeout_seconds: 120
+    prompt_caching:
+      supports: false  # Gemini has Context Caching API but LiteLLM doesn't support it
+    # Native: thinking_level (minimal, low, medium, high for Flash)
+    native_thinking_param: thinking_level
+    thinking_levels: [minimal, low, medium, high]
+    default_thinking_level: high
+    # LiteLLM mapping: reasoning_effort -> thinking_level
+    litellm_reasoning_efforts: [none, disable, minimal, low, medium, high]
+    default_reasoning_effort: high
+    intelligence_score: 84
+    system_prompt_addendum: system_prompt_addendums/gemini.md
+    tags: []
+
   # ---------------------------------------------------------------------------
-  # Claude Models (4.8 + 4.6 + 4.5 series)
+  # Claude Models (4.8 + 4.7 + 4.6 + 4.5 series)
   # ---------------------------------------------------------------------------
 
   # --- Claude 4.6 Series ---
@@ -896,6 +920,35 @@ models:
     default_reasoning_effort: high
     intelligence_score: 98
     tags: []
+
+  # --- Claude 4.7 Series ---
+  # Opus 4.7 is intentionally opt-in. Keep opus/claude-opus defaults on 4.6
+  # until this profile is proven safe for resume-heavy and referent-heavy flows.
+  claude-opus-4-7:
+    friendly_name: Claude Opus 4.7
+    context_window_tokens: 1000000
+    max_output_tokens: 128000
+    max_thinking_tokens: 128000
+    supports_thinking: true
+    supports_images: true
+    supports_1m_context: true
+    temperature_constraint: fixed
+    temperature: 1.0
+    supports_top_p: false
+    supports_sampling_overrides: false
+    default_timeout_seconds: 240
+    prompt_caching:
+      supports: true
+      mechanism: cache_control
+      min_tokens: 1024
+      max_cache_blocks: 4
+    native_thinking_param: output_config.effort
+    thinking_modes: [adaptive]
+    litellm_reasoning_efforts: [low, medium, high, xhigh]
+    default_reasoning_effort: high
+    token_estimate_multiplier: 1.35
+    intelligence_score: 99
+    tags: [bounded-review, opt-in]
 
   # --- Claude 4.8 Series ---
   # Opus 4.8 is intentionally opt-in. Keep opus/claude-opus defaults on 4.6
@@ -1424,6 +1477,7 @@ aliases:
   vertex_ai/gemini-3-flash-preview: gemini-3-flash-preview
   vertex_ai/gemini-2.5-pro: gemini-2.5-pro
   vertex_ai/gemini-2.5-flash: gemini-2.5-flash
+  vertex_ai/gemini-3.5-flash: gemini-3.5-flash
 
   # Google AI Studio provider prefix (LiteLLM style)
   gemini/gemini-3.1-pro-preview: gemini-3.1-pro-preview
@@ -1431,12 +1485,14 @@ aliases:
   gemini/gemini-3-flash-preview: gemini-3-flash-preview
   gemini/gemini-2.5-pro: gemini-2.5-pro
   gemini/gemini-2.5-flash: gemini-2.5-flash
+  gemini/gemini-3.5-flash: gemini-3.5-flash
 
   # Google provider prefix (OpenRouter style)
   google/gemini-3.1-pro-preview: gemini-3.1-pro-preview
   google/gemini-3-flash-preview: gemini-3-flash-preview
   google/gemini-2.5-pro: gemini-2.5-pro
   google/gemini-2.5-flash: gemini-2.5-flash
+  google/gemini-3.5-flash: gemini-3.5-flash
 
   # Anthropic provider prefix + friendly aliases
   # Opus 4.6
@@ -1448,6 +1504,13 @@ aliases:
   opus-4.6: claude-opus-4-6
   opus-4-6-1m: claude-opus-4-6-1m
   opus: claude-opus-4-6
+
+  # Opus 4.7 (explicit opt-in only)
+  anthropic/claude-opus-4-7: claude-opus-4-7
+  anthropic/claude-opus-4.7: claude-opus-4-7
+  claude-opus-4.7: claude-opus-4-7
+  opus-4-7: claude-opus-4-7
+  opus-4.7: claude-opus-4-7
 
   # Opus 4.8 (explicit opt-in only)
   anthropic/claude-opus-4-8: claude-opus-4-8
