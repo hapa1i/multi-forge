@@ -672,6 +672,8 @@ class TestFindForgeInstallation:
             find_forge_installation(start=start_dir)
 
         assert "projects" in str(exc_info.value)
+        assert "forge extension enable" in str(exc_info.value)
+        assert "forge init" not in str(exc_info.value)
 
     def test_skips_project_at_home_level(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """Should not detect PROJECT scope at home directory (only USER)."""

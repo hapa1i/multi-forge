@@ -91,7 +91,8 @@ class NestedClaudeDirectoryError(ForgeInstallError):
     """Raised when project_root is inside a .claude directory.
 
     This prevents creating nested .claude/.claude directories which can
-    happen if `forge init --project` is run from within a .claude directory.
+    happen if `forge extension enable --scope project` is run from within a
+    .claude directory.
 
     Attributes:
         project_root: The problematic project root path.
@@ -138,7 +139,7 @@ class NoForgeInstallationError(ForgeInstallError):
         self.start_path = start_path
         super().__init__(
             f"no Forge installation found walking up from '{start_path}'. "
-            "Run 'forge init' first, or specify a scope explicitly."
+            "Run 'forge extension enable' first, or specify a scope explicitly."
         )
 
 

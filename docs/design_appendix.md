@@ -535,8 +535,8 @@ All settings modifications must be backed up first (`settings.json.forge-backup`
 
 The installer must track what it changed so:
 
-- `forge update` updates only tracked items
-- `forge uninstall` removes only tracked files and reverts only Forge-added settings entries
+- `forge extension sync` updates only tracked items
+- `forge extension disable` removes only tracked files and reverts only Forge-added settings entries
 
 ### E.5 Multi-scope installation (§5.5 -- skill resolution)
 

@@ -54,8 +54,8 @@ class TrackingStore:
     """Manage the tracking manifest at ~/.forge/installed.json.
 
     The tracking manifest records what Forge has installed so that:
-    - `forge update` updates only tracked items
-    - `forge uninstall` removes only tracked files and settings entries
+    - `forge extension sync` updates only tracked items
+    - `forge extension disable` removes only tracked files and settings entries
 
     Error handling:
     - Missing file: Return empty manifest (not an error)
