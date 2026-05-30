@@ -1,7 +1,8 @@
 """Forge installer for Claude Code extensions.
 
-Provides `forge init` / `forge update` / `forge uninstall` / `forge status` commands
-to manage installation of commands, agents, hooks, skills, and settings.
+Provides `forge extension enable` / `forge extension sync` /
+`forge extension disable` / `forge extension status` commands to manage
+installation of commands, agents, hooks, skills, and settings.
 """
 
 from __future__ import annotations

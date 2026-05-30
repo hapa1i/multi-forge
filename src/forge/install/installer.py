@@ -217,9 +217,9 @@ def find_claude_root(
 ) -> tuple[InstallScope, Path | None]:
     """Find the nearest .claude directory walking up from start.
 
-    Used by `forge init` to auto-detect scope. Walks up from start directory
-    looking for a .claude/ directory. If found, returns LOCAL scope at that
-    project. If reaching home directory (~), returns USER scope.
+    Used by `forge extension enable` to auto-detect scope. Walks up from start
+    directory looking for a .claude/ directory. If found, returns LOCAL scope
+    at that project. If reaching home directory (~), returns USER scope.
 
     Args:
         start: Starting directory. Defaults to cwd.
@@ -265,9 +265,9 @@ def find_forge_installation(
 ) -> tuple[InstallScope, Path | None]:
     """Find the nearest Forge installation walking up from start.
 
-    Used by `forge uninstall`, `forge update`, etc. to auto-detect scope.
-    Walks up from start directory, checking LOCAL then PROJECT at each level,
-    then USER at home.
+    Used by `forge extension disable`, `forge extension sync`, etc. to
+    auto-detect scope. Walks up from start directory, checking LOCAL then
+    PROJECT at each level, then USER at home.
 
     Detection is based on file evidence (.settings.*.json.forge.* files)
     which works across multiple projects, not just tracking store state.

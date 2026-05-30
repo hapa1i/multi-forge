@@ -26,8 +26,8 @@ print(get_tracking_path())
     return result.stdout.strip()
 
 
-class TestForgeInit:
-    """Tests for forge init command."""
+class TestForgeExtensionEnable:
+    """Tests for forge extension enable command."""
 
     def test_init_user_scope_creates_claude_dir(self, synced_container: ContainerLike) -> None:
         """Verify forge extensions enable --scope user creates ~/.claude/."""
@@ -145,8 +145,8 @@ print('hooks present')
         ), f".claude/ should not be created during dry-run: {anchor_check.stderr}"
 
 
-class TestForgeUpdate:
-    """Tests for forge update command."""
+class TestForgeExtensionSync:
+    """Tests for forge extension sync command."""
 
     def test_update_requires_existing_installation(self, synced_container: ContainerLike) -> None:
         """Verify forge extensions sync fails without prior install."""
@@ -193,8 +193,8 @@ print('preserved')
         assert "preserved" in check.stdout
 
 
-class TestForgeUninstall:
-    """Tests for forge uninstall command."""
+class TestForgeExtensionDisable:
+    """Tests for forge extension disable command."""
 
     def test_uninstall_removes_tracked_files(self, synced_container: ContainerLike) -> None:
         """Verify forge extensions disable removes installed files."""

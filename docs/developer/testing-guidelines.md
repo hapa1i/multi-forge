@@ -375,7 +375,7 @@ Session-scoped (once/run)
 
 Function-scoped (per test; reuses session resources)
 ├── clean_workspace         # Reset `/workspace` (git clean)
-├── workspace_with_forge    # + `forge init`
+├── workspace_with_forge    # + `forge extension enable`
 └── workspace_with_session  # + session started
 ```
 

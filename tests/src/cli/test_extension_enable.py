@@ -605,3 +605,28 @@ class TestScopeAllConflict:
         result = runner.invoke(status_cmd, ["--scope", "user", "--root", str(tmp_path)])
         assert result.exit_code != 0
         assert "not applicable" in result.output.lower()
+
+
+class TestDisableNoInstallMessage:
+    """Regression tests for disable guidance when auto-detection misses."""
+
+    def test_disable_without_install_names_extension_enable(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from click.testing import CliRunner
+
+        from forge.cli.extensions import disable_cmd
+
+        home = tmp_path / "home"
+        workspace = tmp_path / "workspace"
+        home.mkdir()
+        workspace.mkdir()
+        monkeypatch.setattr(Path, "home", lambda: home)
+        monkeypatch.chdir(workspace)
+
+        runner = CliRunner()
+        result = runner.invoke(disable_cmd, [])
+
+        assert result.exit_code != 0
+        assert "forge extension enable" in result.output
+        assert "forge init" not in result.output
