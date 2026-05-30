@@ -8,8 +8,6 @@ Enforces coding conventions from docs/developer/coding-standards.md:
 
 from __future__ import annotations
 
-import re
-
 from forge.policy.deterministic.base import DeterministicPolicy
 from forge.policy.types import ActionContext, PolicyDecision, Violation
 
@@ -162,16 +160,30 @@ class NoBackwardCompatPolicy(DeterministicPolicy):
 # Colorful emoji ranges — double-width characters that break monospace rendering.
 # Excludes text-safe dingbats (checkmark, cross, diamond, warning, arrows) that render
 # properly in fixed-width terminals.
-_EMOJI_PATTERN = re.compile(
-    "["
-    "\U0001f300-\U0001f5ff"  # Misc symbols & pictographs
-    "\U0001f600-\U0001f64f"  # Emoticons (faces)
-    "\U0001f680-\U0001f6ff"  # Transport & map symbols
-    "\U0001f700-\U0001f77f"  # Alchemical symbols
-    "\U0001f900-\U0001f9ff"  # Supplemental symbols & pictographs
-    "\U0001fa00-\U0001faff"  # Chess, extended-A symbols
-    "]"
+_EMOJI_RANGES = (
+    (0x1F300, 0x1F5FF),  # Misc symbols & pictographs
+    (0x1F600, 0x1F64F),  # Emoticons (faces)
+    (0x1F680, 0x1F6FF),  # Transport & map symbols
+    (0x1F700, 0x1F77F),  # Alchemical symbols
+    (0x1F900, 0x1F9FF),  # Supplemental symbols & pictographs
+    (0x1FA00, 0x1FAFF),  # Chess, extended-A symbols
 )
+
+
+def _is_colorful_emoji(ch: str) -> bool:
+    """Return True if ch is a colorful emoji this policy blocks.
+
+    Compares the code point against _EMOJI_RANGES directly rather than using a regex
+    character class. A literal class with supplementary-plane range escapes reads as an
+    ambiguous range to static analyzers: CodeQL's py/overly-large-range collapses astral
+    code points to U+FFFD and reports phantom overlapping ranges. Explicit integer bounds
+    carry the same intent without the ambiguity.
+    """
+    cp = ord(ch)
+    if cp < 0x10000:  # Every blocked range is supplementary-plane; BMP text is always fine.
+        return False
+    return any(lo <= cp <= hi for lo, hi in _EMOJI_RANGES)
+
 
 _CODE_EXTENSIONS = frozenset(
     {
@@ -239,7 +251,7 @@ class NoEmojiPolicy(DeterministicPolicy):
     def _evaluate(self, context: ActionContext) -> PolicyDecision:
         """Check for colorful emoji in content."""
         assert context.new_content is not None
-        found = _EMOJI_PATTERN.findall(context.new_content)
+        found = [ch for ch in context.new_content if _is_colorful_emoji(ch)]
         if found:
             unique = list(dict.fromkeys(found))  # dedupe, preserve order
             sample = " ".join(unique[:5])
