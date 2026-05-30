@@ -6,7 +6,7 @@ into Claude Code's settings.json on ``forge extensions enable``.
 Built-in content contains only essential infrastructure:
 - hooks: all 13 Forge-managed hook events wiring ``forge hook <name>`` commands
 - statusLine: ``forge status-line`` command
-- permissions: Write/Edit (required by handoff agent's ``claude -p`` subprocess)
+- permissions: Write/Edit (required by the memory writer's ``claude -p`` subprocess)
 
 Users customize additional permissions, env vars, etc. via ``forge claude preset edit``.
 """
@@ -35,7 +35,7 @@ def get_builtin_preset() -> dict[str, Any]:
     Contains only essential Forge infrastructure:
     - hooks: all 13 Forge-managed hook events
     - statusLine: forge status-line command
-    - permissions: Write/Edit (handoff agent needs these for claude -p)
+    - permissions: Write/Edit (the memory writer needs these for claude -p)
     """
     return {
         "permissions": {

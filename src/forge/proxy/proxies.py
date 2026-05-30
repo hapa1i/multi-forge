@@ -189,7 +189,7 @@ def resolve_proxy_optional(registry: ProxyRegistry, name: str) -> ProxyEntry | N
 
     Returns None on not-found. Logs a warning on ambiguous match
     (silent fallback to direct could bypass enterprise proxy policies).
-    Intended for headless consumers (supervisor, handoff, workflows)
+    Intended for headless consumers (supervisor, memory writer, workflows)
     where a missing proxy should degrade gracefully.
     """
     try:

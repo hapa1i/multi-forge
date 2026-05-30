@@ -1,7 +1,7 @@
 """Regression: resume context artifacts are child-scoped, not parent-scoped.
 
 Bug ID: prev-sessions-parent-scope
-Root cause: process_handoff wrote a single flat ``.forge/prev_sessions/<parent>.md``
+Root cause: assemble_transfer_context wrote a single flat ``.forge/prev_sessions/<parent>.md``
 file shared across every child derived from the parent. The child manifest
 stored that overwriteable path in ``Derivation.context_file``. A subsequent
 resume/fork from the same parent silently rewrote the file -- any user
@@ -11,7 +11,7 @@ Fix: Split into ``<parent>/generated.md`` (regeneratable cache) and
 ``<parent>/children/<child>.md`` (per-child authoritative file). Each child
 gets its own durable file; regenerating the parent cache never disturbs an
 existing child file.
-Affected files: src/forge/session/handoff.py, src/forge/session/manager.py,
+Affected files: src/forge/session/transfer.py, src/forge/session/manager.py,
 src/forge/session/prev_sessions.py, src/forge/core/ops/gc.py
 """
 
@@ -22,9 +22,9 @@ from pathlib import Path
 import pytest
 
 from forge.session import create_session_state
-from forge.session.handoff import ResumeStrategy, process_handoff
 from forge.session.models import SessionState
 from forge.session.prev_sessions import child_path, generated_path
+from forge.session.transfer import ResumeStrategy, assemble_transfer_context
 
 pytestmark = pytest.mark.regression
 
@@ -48,7 +48,7 @@ def test_two_children_get_independent_files(tmp_path: Path) -> None:
     parent_state = _parent_state(str(parent_dir))
 
     # First resume: creates generated.md + children/child-a.md
-    result_a = process_handoff(
+    result_a = assemble_transfer_context(
         parent_name="parent",
         parent_state=parent_state,
         forge_root=parent_dir,
@@ -62,7 +62,7 @@ def test_two_children_get_independent_files(tmp_path: Path) -> None:
     assert child_path(parent_dir, "parent", "child-a").is_file()
 
     # Second resume: creates children/child-b.md, regenerates generated.md
-    result_b = process_handoff(
+    result_b = assemble_transfer_context(
         parent_name="parent",
         parent_state=parent_state,
         forge_root=parent_dir,
@@ -91,7 +91,7 @@ def test_user_edits_to_child_survive_sibling_resume(tmp_path: Path) -> None:
     parent_state = _parent_state(str(parent_dir))
 
     # Resume into child-a
-    process_handoff(
+    assemble_transfer_context(
         parent_name="parent",
         parent_state=parent_state,
         forge_root=parent_dir,
@@ -106,7 +106,7 @@ def test_user_edits_to_child_survive_sibling_resume(tmp_path: Path) -> None:
     assert "USER CURATION" in child_a_file.read_text()
 
     # Resume into child-b -- regenerates parent cache, must not touch child-a
-    process_handoff(
+    assemble_transfer_context(
         parent_name="parent",
         parent_state=parent_state,
         forge_root=parent_dir,
@@ -130,7 +130,7 @@ def test_existing_child_is_not_clobbered_by_re_resume(tmp_path: Path) -> None:
 
     parent_state = _parent_state(str(parent_dir))
 
-    process_handoff(
+    assemble_transfer_context(
         parent_name="parent",
         parent_state=parent_state,
         forge_root=parent_dir,
@@ -143,7 +143,7 @@ def test_existing_child_is_not_clobbered_by_re_resume(tmp_path: Path) -> None:
     child_file.write_text("CURATED\n", encoding="utf-8")
 
     # Re-resume with same child name (not realistic from CLI but tests idempotency)
-    process_handoff(
+    assemble_transfer_context(
         parent_name="parent",
         parent_state=parent_state,
         forge_root=parent_dir,

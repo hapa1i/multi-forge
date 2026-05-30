@@ -12,7 +12,7 @@
 
 **Test Repo**: `$FORGE_TEST_REPO`
 
-**Last updated**: 2026-05-18 (add memory CLI and handoff report checks)
+**Last updated**: 2026-05-18 (add memory CLI and memory report checks)
 
 ---
 
@@ -82,9 +82,9 @@
 
 <!-- section: 15 checklist/15-skills.md -->
 
-- [16. Handoff Agent](checklist/16-handoff.md)
+- [16. Memory Writer](checklist/16-memory.md)
 
-<!-- section: 16 checklist/16-handoff.md -->
+<!-- section: 16 checklist/16-memory.md -->
 
 - [17. System Info](checklist/17-info.md)
 

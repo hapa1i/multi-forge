@@ -69,7 +69,7 @@ forge session start my-feature --proxy openrouter-anthropic    # Named + proxy r
 ```
 
 This gives you: named session with manifest, hook-driven plan snapshots, transcript capture, status line, session
-resume, search, and handoff agent. Requires `forge extension enable` first (creates `.forge/`).
+resume, search, and the memory writer. Requires `forge extension enable` first (creates `.forge/`).
 
 **Bare launch** (`forge claude start`) — proxy routing only, no session state:
 
@@ -115,7 +115,7 @@ forge session resume [parent] --fresh \
   [--child-name/-n <child_name>] \
   [--strategy/-s minimal|structured|full|ai-curated] \
   [--depth/-d <n>] \
-  [--resume-mode native|handoff] \
+  [--resume-mode native|transfer] \
   [--proxy <template>]
 
 # Show / list
@@ -194,7 +194,7 @@ require `.forge/`.
 
 ## Session scoping (`forge_root`)
 
-All session state (manifests, artifacts, search index, handoff files) is scoped to the **Forge project root**
+All session state (manifests, artifacts, search index, transfer files) is scoped to the **Forge project root**
 (`forge_root`) — the directory containing `.forge/`. In most setups this is your repo root. In monorepos with nested
 Forge projects, each project has its own session namespace.
 
@@ -320,18 +320,18 @@ forge session resume auth-refactor --fresh
 forge session resume --fresh
 ```
 
-`forge session resume --fresh` creates a new child session derived from the parent. By default it uses assembled handoff
-context; `--resume-mode native` carries the full Claude conversation instead.
+`forge session resume --fresh` creates a new child session derived from the parent. By default it uses assembled
+transfer context; `--resume-mode native` carries the full Claude conversation instead.
 
 **Resume modes** (`--resume-mode`):
 
-| Mode                | Mechanism                                           | Trade-off                       |
-| ------------------- | --------------------------------------------------- | ------------------------------- |
-| `handoff` (default) | Assembled context via `--append-system-prompt-file` | Lossy but survives `/compact`   |
-| `native`            | `--resume --fork-session` (full conversation)       | Lossless but lost on `/compact` |
+| Mode                 | Mechanism                                           | Trade-off                       |
+| -------------------- | --------------------------------------------------- | ------------------------------- |
+| `transfer` (default) | Assembled context via `--append-system-prompt-file` | Lossy but survives `/compact`   |
+| `native`             | `--resume --fork-session` (full conversation)       | Lossless but lost on `/compact` |
 
 ```bash
-# Default: assembled context (handoff)
+# Default: assembled context (transfer)
 forge session resume auth-refactor --fresh
 
 # Lossless: carry full conversation history
@@ -342,13 +342,13 @@ forge session resume auth-refactor --fresh --review
 ```
 
 Native mode requires the parent to have a confirmed Claude session ID (i.e., the session must have been launched at
-least once). `--strategy` and `--depth` are ignored in native mode. `--review` is only valid for handoff mode (native
+least once). `--strategy` and `--depth` are ignored in native mode. `--review` is only valid for transfer mode (native
 resumes carry the conversation verbatim and have no editable artifact).
 
-**Curating the handoff with `--review`.** When you pass `--review`, Forge opens the generated per-child handoff file in
-`$EDITOR` and waits. Save and exit normally to launch; abort (`:cq` in vim) to skip the launch. The edited file is
+**Curating the transfer with `--review`.** When you pass `--review`, Forge opens the generated per-child transfer file
+in `$EDITOR` and waits. Save and exit normally to launch; abort (`:cq` in vim) to skip the launch. The edited file is
 preserved on disk regardless of whether the launch proceeded. If you abort, the child session remains unlaunched; run
-`forge session resume <child>` later to launch it with the preserved edited handoff file.
+`forge session resume <child>` later to launch it with the preserved edited transfer file.
 
 **Per-parent layout for resume artifacts.** Each parent gets a directory under `.forge/prev_sessions/`:
 
@@ -365,7 +365,7 @@ hand-edits a user makes to a child file survive subsequent resumes from the same
 
 Resume and fork-recovery launches inject the per-child file directly with `--append-system-prompt-file`. If you
 customize `CLAUDE.md`, do not also add manual references to `.forge/prev_sessions/...` there, or you may duplicate the
-same handoff context.
+same transfer context.
 
 ### Fork a session (branch the conversation)
 
@@ -389,11 +389,11 @@ forge session fork auth-refactor --name auth-refactor-alt --worktree
 ```
 
 Creates a git worktree for the fork. `--branch` implies `--worktree`. Because Claude conversations are project-scoped,
-the fork starts a fresh Claude session in the new worktree and automatically injects a parent handoff context file
+the fork starts a fresh Claude session in the new worktree and automatically injects a parent transfer context file
 (`.forge/prev_sessions/<parent>/children/<fork-name>.md`). Claude knows where the parent left off, but the old visible
 chat history is not replayed.
 
-The fork manifest and handoff file live under the new worktree's Forge root. For a root-level project, inspect
+The fork manifest and transfer file live under the new worktree's Forge root. For a root-level project, inspect
 `<new-worktree>/.forge/sessions/<fork>/forge.session.json` and
 `<new-worktree>/.forge/prev_sessions/<parent>/children/<fork-name>.md`.
 
@@ -403,11 +403,11 @@ The fork manifest and handoff file live under the new worktree's Forge root. For
 forge session fork planner-session --into /path/to/executor-worktree
 ```
 
-Forks into an **existing** non-main worktree. The fork gets the parent's conversation context (via handoff file) but
+Forks into an **existing** non-main worktree. The fork gets the parent's conversation context (via transfer file) but
 lands in the target worktree's code. The target must be part of the same git repository (validated via
 `git-common-dir`). The main checkout is rejected — use a same-directory fork instead.
 
-The child manifest and handoff file live under the target worktree's Forge root, for example
+The child manifest and transfer file live under the target worktree's Forge root, for example
 `/path/to/executor-worktree/.forge/sessions/<child>/forge.session.json` for a root-level project.
 
 Key differences from `--worktree`:
@@ -418,14 +418,14 @@ Key differences from `--worktree`:
 - The session does NOT own the worktree (`owns_worktree=False`): deleting it never removes the worktree, and if the
   owning session was deleted earlier, final worktree cleanup is left to you
 
-**Handoff options:**
+**Transfer options:**
 
-| Flag             | Purpose                                                                    | Default      |
-| ---------------- | -------------------------------------------------------------------------- | ------------ |
-| `--strategy <s>` | Context assembly strategy (`minimal`/`structured`/`full`/`ai-curated`)     | `structured` |
-| `--inline-plan`  | Embed the approved plan content in the handoff (not just a path reference) | off          |
+| Flag             | Purpose                                                                     | Default      |
+| ---------------- | --------------------------------------------------------------------------- | ------------ |
+| `--strategy <s>` | Context assembly strategy (`minimal`/`structured`/`full`/`ai-curated`)      | `structured` |
+| `--inline-plan`  | Embed the approved plan content in the transfer (not just a path reference) | off          |
 
-These flags apply to `--worktree` and `--into` forks (file-based handoff). Same-directory forks use native
+These flags apply to `--worktree` and `--into` forks (file-based transfer). Same-directory forks use native
 `--resume --fork-session` and ignore these flags.
 
 `ai-curated` uses OpenRouter directly and requires `OPENROUTER_API_KEY`. If OpenRouter auth is unavailable, Forge warns
@@ -569,7 +569,7 @@ routes the child session through the resolved proxy. It accepts both proxy IDs a
 ### Route only subprocesses through a proxy
 
 Use `--subprocess-proxy` when the main session should use Claude Code's direct Anthropic auth, but Forge-spawned
-subprocesses such as supervisor, panel, or handoff jobs should use a proxy:
+subprocesses such as supervisor, panel, or memory-writer jobs should use a proxy:
 
 ```bash
 forge session start my-session --subprocess-proxy openrouter
@@ -612,7 +612,7 @@ forge policy status                                 # Show current policy state
 **Session-owned** (you CAN toggle):
 
 - policy enforcement (`forge policy enable/disable`)
-- memory behavior (`memory.*`) — see [`handoff.md`](handoff.md) for automatic doc updates
+- memory behavior (`memory.*`) — see [`memory.md`](memory.md) for automatic doc updates
 - artifact capture settings
 - worktree association
 - session metadata

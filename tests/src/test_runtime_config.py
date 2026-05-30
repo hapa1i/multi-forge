@@ -53,9 +53,9 @@ class TestRuntimeConfigDefaults:
         rc = RuntimeConfig()
         assert rc.status_timeout == 2.0
 
-    def test_default_handoff_timeout(self):
+    def test_default_memory_writer_timeout(self):
         rc = RuntimeConfig()
-        assert rc.handoff_timeout == 300
+        assert rc.memory_writer_timeout == 300
 
     def test_default_user_agent_version_empty(self):
         rc = RuntimeConfig()
@@ -99,9 +99,9 @@ class TestRuntimeConfigValidation:
         with pytest.raises(ValueError, match="status_timeout must be > 0"):
             RuntimeConfig(status_timeout=-1.0)
 
-    def test_zero_handoff_timeout_rejected(self):
-        with pytest.raises(ValueError, match="handoff_timeout must be >= 1"):
-            RuntimeConfig(handoff_timeout=0)
+    def test_zero_memory_writer_timeout_rejected(self):
+        with pytest.raises(ValueError, match="memory_writer_timeout must be >= 1"):
+            RuntimeConfig(memory_writer_timeout=0)
 
     def test_negative_log_retention_days_rejected(self):
         with pytest.raises(ValueError, match="log_retention_days must be >= 0"):
@@ -133,13 +133,13 @@ class TestRuntimeConfigValidation:
             sidecar_image="custom:v2",
             context_limit=1000000,
             status_timeout=0.5,
-            handoff_timeout=60,
+            memory_writer_timeout=60,
         )
         assert rc.proxy_mode == "sidecar"
         assert rc.sidecar_image == "custom:v2"
         assert rc.context_limit == 1000000
         assert rc.status_timeout == 0.5
-        assert rc.handoff_timeout == 60
+        assert rc.memory_writer_timeout == 60
 
 
 # ---------------------------------------------------------------------------
@@ -233,11 +233,31 @@ class TestLoadRuntimeConfig:
 
     def test_integer_and_float_types_preserved(self, tmp_path: Path):
         config_file = tmp_path / "config.yaml"
-        config_file.write_text("context_limit: 1000000\nstatus_timeout: 0.25\nhandoff_timeout: 60\n")
+        config_file.write_text("context_limit: 1000000\nstatus_timeout: 0.25\nmemory_writer_timeout: 60\n")
         rc = load_runtime_config(config_file)
         assert rc.context_limit == 1000000
         assert rc.status_timeout == 0.25
-        assert rc.handoff_timeout == 60
+        assert rc.memory_writer_timeout == 60
+
+    def test_memory_writer_timeout_yaml_parsed(self, tmp_path: Path):
+        """New config key is respected."""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text("memory_writer_timeout: 120\n")
+        rc = load_runtime_config(config_file)
+        assert rc.memory_writer_timeout == 120
+
+    def test_renamed_handoff_timeout_warned_and_ignored(self, tmp_path: Path, caplog):
+        """Old key 'handoff_timeout' warns with rename guidance; value is ignored (degrades to default)."""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text("handoff_timeout: 600\n")
+        with caplog.at_level(logging.WARNING):
+            rc = load_runtime_config(config_file)
+        assert rc.memory_writer_timeout == 300  # old value NOT applied
+        assert "handoff_timeout" in caplog.text
+        assert "memory_writer_timeout" in caplog.text
+        assert "renamed" in caplog.text
+        # Renamed keys get a targeted warning, not the generic "Unknown keys" line.
+        assert "Unknown keys" not in caplog.text
 
 
 # ---------------------------------------------------------------------------
@@ -378,7 +398,7 @@ class TestGetDefaultConfigContent:
             "default_direct_model",
             "context_limit",
             "status_timeout",
-            "handoff_timeout",
+            "memory_writer_timeout",
             "log_tool_failures",
             "auth_ignore_env",
         ]:

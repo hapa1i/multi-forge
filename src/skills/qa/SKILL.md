@@ -83,21 +83,21 @@ stop.
 
 **Category name allowlist** (exact match only -- reject unknown names):
 
-| Name       | Section | Name        | Section |
-| ---------- | ------- | ----------- | ------- |
-| enable     | 0       | status-line | 8       |
-| preflight  | 1       | commands    | 9       |
-| extensions | 2       | resume      | 10      |
-| auth       | 3       | config      | 11      |
-| proxy      | 4       | search      | 12      |
-| session    | 5       | policy      | 13      |
-| hooks      | 6       | workflow    | 14      |
-| costs      | 7       | skills      | 15      |
-|            |         | handoff     | 16      |
-|            |         | info        | 17      |
-|            |         | disable     | 18      |
-|            |         | uninstall   | 19      |
-|            |         | cleanup     | 20      |
+| Name       | Section | Name          | Section |
+| ---------- | ------- | ------------- | ------- |
+| enable     | 0       | status-line   | 8       |
+| preflight  | 1       | commands      | 9       |
+| extensions | 2       | resume        | 10      |
+| auth       | 3       | config        | 11      |
+| proxy      | 4       | search        | 12      |
+| session    | 5       | policy        | 13      |
+| hooks      | 6       | workflow      | 14      |
+| costs      | 7       | skills        | 15      |
+|            |         | memory-writer | 16      |
+|            |         | info          | 17      |
+|            |         | disable       | 18      |
+|            |         | uninstall     | 19      |
+|            |         | cleanup       | 20      |
 
 If category names were given, validate each against this allowlist. Reject unknown names: "Unknown category 'foo'. Valid
 categories: enable, preflight, extensions, ..."
@@ -483,12 +483,12 @@ For each section/step in the filtered range:
 
 11. **Gate rules** -- check after each section completes:
 
-    | If section fails... | Then...                                                              |
-    | ------------------- | -------------------------------------------------------------------- |
-    | 0 (Enable)          | Stop. Enable is broken.                                              |
-    | 2 (Extensions)      | Skip Section 3 (can't verify auth without ext).                      |
-    | 4 (Proxy)           | Skip Sections 7, 14-16 (no proxy for costs/workflow/skills/handoff). |
-    | Any section         | Section 20 (Cleanup) always runs.                                    |
+    | If section fails... | Then...                                                                    |
+    | ------------------- | -------------------------------------------------------------------------- |
+    | 0 (Enable)          | Stop. Enable is broken.                                                    |
+    | 2 (Extensions)      | Skip Section 3 (can't verify auth without ext).                            |
+    | 4 (Proxy)           | Skip Sections 7, 14-16 (no proxy for costs/workflow/skills/memory-writer). |
+    | Any section         | Section 20 (Cleanup) always runs.                                          |
 
 12. **Context conservation**: After completing each `## N.` section, print a one-line summary using the progress numbers
     from the last `record` output. Do NOT carry raw command output forward -- the state file and logs inside the
@@ -650,29 +650,29 @@ The full checklist is split:
 
 It covers 21 categories:
 
-| Category    | Section | Destructive? |
-| ----------- | ------- | ------------ |
-| enable      | 0       | Yes          |
-| preflight   | 1       | No           |
-| extensions  | 2       | No           |
-| auth        | 3       | No           |
-| proxy       | 4       | No           |
-| session     | 5       | No           |
-| hooks       | 6       | No           |
-| costs       | 7       | No           |
-| status-line | 8       | No           |
-| commands    | 9       | No           |
-| resume      | 10      | No           |
-| config      | 11      | No           |
-| search      | 12      | No           |
-| policy      | 13      | No           |
-| workflow    | 14      | No           |
-| skills      | 15      | No           |
-| handoff     | 16      | No           |
-| info        | 17      | No           |
-| disable     | 18      | Yes          |
-| uninstall   | 19      | Yes          |
-| cleanup     | 20      | Yes          |
+| Category      | Section | Destructive? |
+| ------------- | ------- | ------------ |
+| enable        | 0       | Yes          |
+| preflight     | 1       | No           |
+| extensions    | 2       | No           |
+| auth          | 3       | No           |
+| proxy         | 4       | No           |
+| session       | 5       | No           |
+| hooks         | 6       | No           |
+| costs         | 7       | No           |
+| status-line   | 8       | No           |
+| commands      | 9       | No           |
+| resume        | 10      | No           |
+| config        | 11      | No           |
+| search        | 12      | No           |
+| policy        | 13      | No           |
+| workflow      | 14      | No           |
+| skills        | 15      | No           |
+| memory-writer | 16      | No           |
+| info          | 17      | No           |
+| disable       | 18      | Yes          |
+| uninstall     | 19      | Yes          |
+| cleanup       | 20      | Yes          |
 
 Commands are deterministic (from checklist); interpretation is adaptive (agent judges output).
 

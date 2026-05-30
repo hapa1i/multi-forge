@@ -1,4 +1,4 @@
-"""Tests for forge.session.handoff module."""
+"""Tests for forge.session.transfer module."""
 
 from __future__ import annotations
 
@@ -9,7 +9,8 @@ from typing import Any, cast
 import pytest
 
 from forge.core.transcript import parse_jsonl_transcript, truncate
-from forge.session.handoff import (
+from forge.session.models import SessionState
+from forge.session.transfer import (
     AI_CURATION_MODEL,
     AI_CURATION_PROVIDER,
     MAX_TRANSCRIPT_CHARS,
@@ -19,11 +20,10 @@ from forge.session.handoff import (
     _generate_minimal_context,
     _generate_structured_context,
     _resolve_plan_content,
+    assemble_transfer_context,
     estimate_transcript_tokens,
-    process_handoff,
     resolve_lineage,
 )
-from forge.session.models import SessionState
 
 # -----------------------------------------------------------------------------
 # Test fixtures
@@ -870,7 +870,7 @@ class TestResolvePlanContent:
 
 
 class TestInlinePlan:
-    """Tests for inline_plan parameter in process_handoff and strategy generators."""
+    """Tests for inline_plan parameter in assemble_transfer_context and strategy generators."""
 
     def _make_parent_state(self, tmp_path: Path, *, with_plan: bool = False) -> SessionState:
         """Create a minimal parent SessionState for testing."""
@@ -895,7 +895,7 @@ class TestInlinePlan:
         state = self._make_parent_state(tmp_path, with_plan=True)
         state.confirmed.latest_plan_path = ".claude/plans/draft.md"
 
-        result = process_handoff(
+        result = assemble_transfer_context(
             parent_name="parent",
             parent_state=state,
             forge_root=tmp_path,
@@ -912,7 +912,7 @@ class TestInlinePlan:
         """inline_plan=True inlines the approved plan content."""
         state = self._make_parent_state(tmp_path, with_plan=True)
 
-        result = process_handoff(
+        result = assemble_transfer_context(
             parent_name="parent",
             parent_state=state,
             forge_root=tmp_path,
@@ -931,7 +931,7 @@ class TestInlinePlan:
         state = self._make_parent_state(tmp_path, with_plan=False)
         state.confirmed.latest_plan_path = "nonexistent/plan.md"
 
-        result = process_handoff(
+        result = assemble_transfer_context(
             parent_name="parent",
             parent_state=state,
             forge_root=tmp_path,
@@ -946,7 +946,7 @@ class TestInlinePlan:
         """inline_plan=True with no plan path at all still warns."""
         state = self._make_parent_state(tmp_path, with_plan=False)
 
-        result = process_handoff(
+        result = assemble_transfer_context(
             parent_name="parent",
             parent_state=state,
             forge_root=tmp_path,
@@ -976,7 +976,7 @@ class TestInlinePlan:
             {"kind": "approved", "snapshot_path": ".forge/artifacts/parent/plans/plan.md"}
         ]
 
-        result = process_handoff(
+        result = assemble_transfer_context(
             parent_name="parent",
             parent_state=state,
             forge_root=main_repo,
@@ -1003,7 +1003,7 @@ class TestInlinePlan:
         state = self._make_parent_state(worktree, with_plan=False)
         state.confirmed.latest_plan_path = ".claude/plans/draft.md"
 
-        result = process_handoff(
+        result = assemble_transfer_context(
             parent_name="parent",
             parent_state=state,
             forge_root=main_repo,
@@ -1020,7 +1020,7 @@ class TestInlinePlan:
         """inline_plan works with full strategy too."""
         state = self._make_parent_state(tmp_path, with_plan=True)
 
-        result = process_handoff(
+        result = assemble_transfer_context(
             parent_name="parent",
             parent_state=state,
             forge_root=tmp_path,
@@ -1037,7 +1037,7 @@ class TestInlinePlan:
         """inline_plan works with minimal strategy."""
         state = self._make_parent_state(tmp_path, with_plan=True)
 
-        result = process_handoff(
+        result = assemble_transfer_context(
             parent_name="parent",
             parent_state=state,
             forge_root=tmp_path,
@@ -1055,7 +1055,7 @@ class TestInlinePlan:
         state = self._make_parent_state(tmp_path, with_plan=True)
 
         # AI curation will fail (no LLM configured), falling back to structured
-        result = process_handoff(
+        result = assemble_transfer_context(
             parent_name="parent",
             parent_state=state,
             forge_root=tmp_path,

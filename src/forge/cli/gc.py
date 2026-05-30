@@ -24,7 +24,7 @@ from forge.core.ops.gc import CleanError, CleanReport, collect_clean_report, run
 @click.option("--verbose", "-v", is_flag=True, help="Show individual items")
 @click.option("--json", "as_json", is_flag=True, help="JSON output")
 def clean_cmd(scope: str, yes: bool, verbose: bool, as_json: bool) -> None:
-    """Remove orphaned Forge state (sessions, handoff files, stale entries).
+    """Remove orphaned Forge state (sessions, transfer files, stale entries).
 
     By default, shows what would be cleaned (dry-run). Pass --yes to actually delete.
 
@@ -156,7 +156,7 @@ def _category_label(category: str) -> str:
     """Human-readable label for a category."""
     labels = {
         "session_dirs": "Orphan session dirs:",
-        "handoff_files": "Orphan handoff files:",
+        "transfer_files": "Orphan transfer files:",
         "active_entries": "Stale active entries:",
         "work_queue": "Stale work queue:",
         "proxies": "Stale proxy entries:",

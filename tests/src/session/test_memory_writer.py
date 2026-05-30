@@ -1,6 +1,6 @@
-"""Tests for the handoff agent core module.
+"""Tests for the memory writer core module.
 
-Covers: turn counting, prompt building, proxy resolution, agent invocation,
+Covers: turn counting, prompt building, proxy resolution, writer invocation,
 multi-doc strategies, shadow/propose mode, containment guard.
 """
 
@@ -13,16 +13,16 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from forge.core.reactive.session_runner import SessionResult
-from forge.session.handoff_agent import (
+from forge.session.memory_writer import (
     _dedupe_specs,
     _stdout_indicates_permission_denied,
     _validate_designated_docs,
     build_multi_doc_prompt,
     count_conversation_turns,
-    resolve_handoff_base_url,
-    run_handoff_agent,
+    resolve_writer_base_url,
+    run_memory_writer,
 )
-from forge.session.models import DesignatedDoc, HandoffConfig
+from forge.session.models import DesignatedDoc, MemoryWriterConfig
 from forge.session.passport import (
     STRATEGY_INSTRUCTIONS,
     Passport,
@@ -390,7 +390,7 @@ class TestBuildMultiDocPrompt:
 
 
 # ---------------------------------------------------------------------------
-# resolve_handoff_base_url
+# resolve_writer_base_url
 # ---------------------------------------------------------------------------
 
 
@@ -428,10 +428,10 @@ class TestResolveHandoffBaseUrl:
     def test_proxy_id_takes_priority(self) -> None:
         """When proxy_id resolves via shared resolver, it takes priority."""
         with patch(
-            "forge.session.handoff_agent.resolve_subprocess_routing",
+            "forge.session.memory_writer.resolve_subprocess_routing",
             return_value=_resolved_result("http://proxy-from-registry:8080"),
         ):
-            result = resolve_handoff_base_url(
+            result = resolve_writer_base_url(
                 proxy_id="my-proxy",
                 confirmed_proxy_base_url="http://session-proxy:8084",
                 env_base_url="http://env-proxy:8085",
@@ -440,7 +440,7 @@ class TestResolveHandoffBaseUrl:
 
     def test_confirmed_proxy_over_env(self) -> None:
         """When no proxy_id, confirmed proxy URL is used over env."""
-        result = resolve_handoff_base_url(
+        result = resolve_writer_base_url(
             proxy_id=None,
             confirmed_proxy_base_url="http://session-proxy:8084",
             env_base_url="http://env-proxy:8085",
@@ -449,7 +449,7 @@ class TestResolveHandoffBaseUrl:
 
     def test_env_fallback(self) -> None:
         """When no proxy_id or confirmed proxy, uses env ANTHROPIC_BASE_URL."""
-        result = resolve_handoff_base_url(
+        result = resolve_writer_base_url(
             proxy_id=None,
             confirmed_proxy_base_url=None,
             env_base_url="http://env-proxy:8085",
@@ -458,7 +458,7 @@ class TestResolveHandoffBaseUrl:
 
     def test_none_when_no_sources(self) -> None:
         """Returns None when all sources are empty (Anthropic direct)."""
-        result = resolve_handoff_base_url(
+        result = resolve_writer_base_url(
             proxy_id=None,
             confirmed_proxy_base_url=None,
             env_base_url=None,
@@ -468,10 +468,10 @@ class TestResolveHandoffBaseUrl:
     def test_proxy_id_lookup_failure_falls_through(self) -> None:
         """When proxy_id lookup fails, falls through to confirmed proxy."""
         with patch(
-            "forge.session.handoff_agent.resolve_subprocess_routing",
+            "forge.session.memory_writer.resolve_subprocess_routing",
             return_value=_unresolved_result(),
         ):
-            result = resolve_handoff_base_url(
+            result = resolve_writer_base_url(
                 proxy_id="nonexistent-proxy",
                 confirmed_proxy_base_url="http://session-proxy:8084",
                 env_base_url=None,
@@ -482,7 +482,7 @@ class TestResolveHandoffBaseUrl:
         """Ambient ANTHROPIC_BASE_URL must not beat the session's confirmed proxy."""
         monkeypatch.setenv("ANTHROPIC_BASE_URL", "http://ambient-env-proxy:8080")
 
-        result = resolve_handoff_base_url(
+        result = resolve_writer_base_url(
             proxy_id="definitely-missing-proxy-for-handoff-test",
             confirmed_proxy_base_url="http://session-proxy:8084",
             env_base_url="http://ambient-env-proxy:8080",
@@ -493,10 +493,10 @@ class TestResolveHandoffBaseUrl:
     def test_subprocess_proxy_used_before_confirmed_proxy(self) -> None:
         """Persisted subprocess proxy is tried before falling back to the session proxy."""
         with patch(
-            "forge.session.handoff_agent.resolve_subprocess_routing",
+            "forge.session.memory_writer.resolve_subprocess_routing",
             return_value=_resolved_result("http://subprocess-proxy:8080"),
         ) as mock_resolver:
-            result = resolve_handoff_base_url(
+            result = resolve_writer_base_url(
                 proxy_id=None,
                 subprocess_proxy="openrouter-subprocess",
                 confirmed_proxy_base_url="http://session-proxy:8084",
@@ -513,10 +513,10 @@ class TestResolveHandoffBaseUrl:
     def test_config_proxy_takes_priority_over_subprocess_proxy(self) -> None:
         """Handoff-specific proxy remains the highest-priority handoff route."""
         with patch(
-            "forge.session.handoff_agent.resolve_subprocess_routing",
+            "forge.session.memory_writer.resolve_subprocess_routing",
             return_value=_resolved_result("http://handoff-config-proxy:8080"),
         ) as mock_resolver:
-            result = resolve_handoff_base_url(
+            result = resolve_writer_base_url(
                 proxy_id="handoff-config-proxy",
                 subprocess_proxy="openrouter-subprocess",
                 confirmed_proxy_base_url="http://session-proxy:8084",
@@ -532,10 +532,10 @@ class TestResolveHandoffBaseUrl:
     def test_subprocess_proxy_miss_falls_back_to_confirmed_proxy(self) -> None:
         """Async handoff remains best-effort if the subprocess proxy is unavailable."""
         with patch(
-            "forge.session.handoff_agent.resolve_subprocess_routing",
+            "forge.session.memory_writer.resolve_subprocess_routing",
             return_value=_unresolved_result(),
         ):
-            result = resolve_handoff_base_url(
+            result = resolve_writer_base_url(
                 proxy_id=None,
                 subprocess_proxy="missing-subprocess-proxy",
                 confirmed_proxy_base_url="http://session-proxy:8084",
@@ -545,7 +545,7 @@ class TestResolveHandoffBaseUrl:
 
     def test_direct_short_circuits_all_resolution(self) -> None:
         """direct=True should return None regardless of other sources."""
-        result = resolve_handoff_base_url(
+        result = resolve_writer_base_url(
             proxy_id="my-proxy",
             confirmed_proxy_base_url="http://session-proxy:8084",
             env_base_url="http://env-proxy:8085",
@@ -556,10 +556,10 @@ class TestResolveHandoffBaseUrl:
     def test_delegates_to_shared_resolver(self) -> None:
         """Verifies resolve_subprocess_routing is called with correct params."""
         with patch(
-            "forge.session.handoff_agent.resolve_subprocess_routing",
+            "forge.session.memory_writer.resolve_subprocess_routing",
             return_value=_resolved_result(),
         ) as mock_resolver:
-            resolve_handoff_base_url(proxy_id="my-proxy")
+            resolve_writer_base_url(proxy_id="my-proxy")
         mock_resolver.assert_called_once_with(
             preferred_proxy="my-proxy",
             require_route=False,
@@ -568,7 +568,7 @@ class TestResolveHandoffBaseUrl:
 
 
 # ---------------------------------------------------------------------------
-# run_handoff_agent
+# run_memory_writer
 # ---------------------------------------------------------------------------
 
 
@@ -620,8 +620,8 @@ class TestRunHandoffAgent:
         ]
         _write_transcript(transcript_abs, entries)
 
-        config = HandoffConfig(enabled=True, min_turns=5)
-        result = run_handoff_agent(
+        config = MemoryWriterConfig(enabled=True, min_turns=5)
+        result = run_memory_writer(
             session_name="test",
             forge_root=workspace,
             transcript_snapshot_rel=transcript_rel,
@@ -630,11 +630,11 @@ class TestRunHandoffAgent:
         )
         assert result is True  # Skip is not a failure
 
-    @patch("forge.session.handoff_agent.is_claude_available", return_value=False)
+    @patch("forge.session.memory_writer.is_claude_available", return_value=False)
     def test_returns_false_when_claude_not_available(self, mock_claude: MagicMock, workspace: Path) -> None:
         """Returns False when claude CLI is not in PATH."""
-        config = HandoffConfig(enabled=True, min_turns=1)
-        result = run_handoff_agent(
+        config = MemoryWriterConfig(enabled=True, min_turns=1)
+        result = run_memory_writer(
             session_name="test",
             forge_root=workspace,
             transcript_snapshot_rel=".forge/artifacts/test/transcripts/uuid-123.jsonl",
@@ -651,17 +651,17 @@ class TestRunHandoffAgent:
         project_root: Path | None = None,
         **kwargs: object,
     ) -> bool:
-        """Helper: run_handoff_agent with mocked claude."""
+        """Helper: run_memory_writer with mocked claude."""
         root = project_root if project_root is not None else workspace
-        with patch("forge.session.handoff_agent.is_claude_available", return_value=True):
-            return run_handoff_agent(
+        with patch("forge.session.memory_writer.is_claude_available", return_value=True):
+            return run_memory_writer(
                 session_name=kwargs.get("session_name", "test"),  # type: ignore[arg-type]
                 forge_root=root,
                 transcript_snapshot_rel=kwargs.get(
                     "transcript_snapshot_rel",
                     ".forge/artifacts/test/transcripts/uuid-123.jsonl",
                 ),  # type: ignore[arg-type]
-                config=kwargs.get("config", HandoffConfig(enabled=True, min_turns=1)),  # type: ignore[arg-type]
+                config=kwargs.get("config", MemoryWriterConfig(enabled=True, min_turns=1)),  # type: ignore[arg-type]
                 base_url=kwargs.get("base_url"),  # type: ignore[arg-type]
                 timeout_seconds=kwargs.get("timeout_seconds", 300),  # type: ignore[arg-type]
                 designated_docs=kwargs.get("designated_docs", self._default_docs()),  # type: ignore[arg-type]
@@ -669,7 +669,7 @@ class TestRunHandoffAgent:
 
     def test_invokes_claude_p_with_correct_args(self, workspace: Path) -> None:
         """Verifies run_claude_session is called with correct prompt, cwd, and timeout."""
-        with patch("forge.session.handoff_agent.run_claude_session") as mock_run:
+        with patch("forge.session.memory_writer.run_claude_session") as mock_run:
             mock_run.return_value = SessionResult(stdout="", stderr="", returncode=0)
 
             result = self._run_with_mock_claude(
@@ -687,7 +687,7 @@ class TestRunHandoffAgent:
 
     def test_sets_base_url_when_provided(self, workspace: Path) -> None:
         """Passes base_url to run_claude_session when provided."""
-        with patch("forge.session.handoff_agent.run_claude_session") as mock_run:
+        with patch("forge.session.memory_writer.run_claude_session") as mock_run:
             mock_run.return_value = SessionResult(stdout="", stderr="", returncode=0)
 
             self._run_with_mock_claude(
@@ -701,7 +701,7 @@ class TestRunHandoffAgent:
 
     def test_no_base_url_when_none(self, workspace: Path) -> None:
         """Does not set base_url when not provided."""
-        with patch("forge.session.handoff_agent.run_claude_session") as mock_run:
+        with patch("forge.session.memory_writer.run_claude_session") as mock_run:
             mock_run.return_value = SessionResult(stdout="", stderr="", returncode=0)
 
             self._run_with_mock_claude(workspace, mock_run, base_url=None)
@@ -711,7 +711,7 @@ class TestRunHandoffAgent:
 
     def test_handles_timeout(self, workspace: Path) -> None:
         """Returns False when claude -p times out."""
-        with patch("forge.session.handoff_agent.run_claude_session") as mock_run:
+        with patch("forge.session.memory_writer.run_claude_session") as mock_run:
             mock_run.return_value = SessionResult(
                 stdout="",
                 stderr="",
@@ -724,7 +724,7 @@ class TestRunHandoffAgent:
 
     def test_handles_nonzero_exit(self, workspace: Path) -> None:
         """Returns False when claude -p exits with non-zero code."""
-        with patch("forge.session.handoff_agent.run_claude_session") as mock_run:
+        with patch("forge.session.memory_writer.run_claude_session") as mock_run:
             mock_run.return_value = SessionResult(stdout="", stderr="error", returncode=1)
 
             result = self._run_with_mock_claude(workspace, mock_run)
@@ -732,7 +732,7 @@ class TestRunHandoffAgent:
 
     def test_no_fallback_when_no_designated_docs(self, workspace: Path) -> None:
         """Empty/None designated_docs returns True without calling subprocess."""
-        with patch("forge.session.handoff_agent.run_claude_session") as mock_run:
+        with patch("forge.session.memory_writer.run_claude_session") as mock_run:
             mock_run.return_value = SessionResult(stdout="", stderr="", returncode=0)
 
             result = self._run_with_mock_claude(workspace, mock_run, designated_docs=None)
@@ -742,7 +742,7 @@ class TestRunHandoffAgent:
 
     def test_no_fallback_when_empty_designated_docs(self, workspace: Path) -> None:
         """Empty list returns True without calling subprocess."""
-        with patch("forge.session.handoff_agent.run_claude_session") as mock_run:
+        with patch("forge.session.memory_writer.run_claude_session") as mock_run:
             mock_run.return_value = SessionResult(stdout="", stderr="", returncode=0)
 
             result = self._run_with_mock_claude(workspace, mock_run, designated_docs=[])
@@ -752,7 +752,7 @@ class TestRunHandoffAgent:
 
     def test_transcript_path_absolute_in_prompt(self, workspace: Path) -> None:
         """Transcript path in prompt is absolute (not repo-relative)."""
-        with patch("forge.session.handoff_agent.run_claude_session") as mock_run:
+        with patch("forge.session.memory_writer.run_claude_session") as mock_run:
             mock_run.return_value = SessionResult(stdout="", stderr="", returncode=0)
 
             self._run_with_mock_claude(workspace, mock_run)
@@ -764,7 +764,7 @@ class TestRunHandoffAgent:
 
     def test_rejects_unsafe_transcript_path(self, workspace: Path) -> None:
         """Transcript path with unsafe characters is rejected."""
-        with patch("forge.session.handoff_agent.run_claude_session") as mock_run:
+        with patch("forge.session.memory_writer.run_claude_session") as mock_run:
             mock_run.return_value = SessionResult(stdout="", stderr="", returncode=0)
 
             result = self._run_with_mock_claude(
@@ -778,7 +778,7 @@ class TestRunHandoffAgent:
 
     def test_rejects_traversal_transcript_path(self, workspace: Path) -> None:
         """Transcript path with ../ traversal is rejected."""
-        with patch("forge.session.handoff_agent.run_claude_session") as mock_run:
+        with patch("forge.session.memory_writer.run_claude_session") as mock_run:
             mock_run.return_value = SessionResult(stdout="", stderr="", returncode=0)
 
             result = self._run_with_mock_claude(
@@ -792,7 +792,7 @@ class TestRunHandoffAgent:
 
     def test_returns_false_when_transcript_missing(self, workspace: Path) -> None:
         """Returns False when transcript file doesn't exist on disk."""
-        with patch("forge.session.handoff_agent.run_claude_session") as mock_run:
+        with patch("forge.session.memory_writer.run_claude_session") as mock_run:
             mock_run.return_value = SessionResult(stdout="", stderr="", returncode=0)
 
             result = self._run_with_mock_claude(
@@ -806,13 +806,13 @@ class TestRunHandoffAgent:
 
     def test_rejects_unknown_mode(self, workspace: Path) -> None:
         """Unknown config.mode is rejected (not silently treated as review-only)."""
-        with patch("forge.session.handoff_agent.run_claude_session") as mock_run:
+        with patch("forge.session.memory_writer.run_claude_session") as mock_run:
             mock_run.return_value = SessionResult(stdout="", stderr="", returncode=0)
 
             result = self._run_with_mock_claude(
                 workspace,
                 mock_run,
-                config=HandoffConfig(enabled=True, min_turns=1, mode="review_only"),
+                config=MemoryWriterConfig(enabled=True, min_turns=1, mode="review_only"),
             )
 
             assert result is False
@@ -820,9 +820,9 @@ class TestRunHandoffAgent:
 
     def test_persists_review_file_in_augment_mode(self, workspace: Path) -> None:
         """Augment mode writes a review file under artifacts/<session>/handoff/."""
-        from forge.session.handoff_agent import review_dir
+        from forge.session.memory_writer import memory_report_dir
 
-        with patch("forge.session.handoff_agent.run_claude_session") as mock_run:
+        with patch("forge.session.memory_writer.run_claude_session") as mock_run:
             mock_run.return_value = SessionResult(
                 stdout="Applied: docs/state.md\n- Added handoff notes\n",
                 stderr="",
@@ -831,10 +831,10 @@ class TestRunHandoffAgent:
             result = self._run_with_mock_claude(workspace, mock_run, session_name="my-sess")
 
         assert result is True
-        files = list(review_dir(workspace, "my-sess").iterdir())
+        files = list(memory_report_dir(workspace, "my-sess").iterdir())
         assert len(files) == 1
         content = files[0].read_text(encoding="utf-8")
-        assert "Handoff Agent Report -- my-sess" in content
+        assert "Memory Writer Report -- my-sess" in content
         assert "**Mode**: augment" in content
         assert "Applied: docs/state.md" in content
         assert files[0].name.startswith("review-")
@@ -842,9 +842,9 @@ class TestRunHandoffAgent:
 
     def test_persists_review_file_in_review_only_mode(self, workspace: Path) -> None:
         """Review-only mode persists the would-have-been-applied output."""
-        from forge.session.handoff_agent import review_dir
+        from forge.session.memory_writer import memory_report_dir
 
-        with patch("forge.session.handoff_agent.run_claude_session") as mock_run:
+        with patch("forge.session.memory_writer.run_claude_session") as mock_run:
             mock_run.return_value = SessionResult(
                 stdout="Would add: 'New decision recorded' to docs/state.md\n",
                 stderr="",
@@ -854,11 +854,11 @@ class TestRunHandoffAgent:
                 workspace,
                 mock_run,
                 session_name="my-sess",
-                config=HandoffConfig(enabled=True, min_turns=1, mode="review-only"),
+                config=MemoryWriterConfig(enabled=True, min_turns=1, mode="review-only"),
             )
 
         assert result is True
-        files = list(review_dir(workspace, "my-sess").iterdir())
+        files = list(memory_report_dir(workspace, "my-sess").iterdir())
         assert len(files) == 1
         content = files[0].read_text(encoding="utf-8")
         assert "**Mode**: review-only" in content
@@ -866,14 +866,14 @@ class TestRunHandoffAgent:
 
     def test_review_file_not_written_on_run_failure(self, workspace: Path) -> None:
         """Failed agent run (non-zero exit) skips the review file."""
-        from forge.session.handoff_agent import review_dir
+        from forge.session.memory_writer import memory_report_dir
 
-        with patch("forge.session.handoff_agent.run_claude_session") as mock_run:
+        with patch("forge.session.memory_writer.run_claude_session") as mock_run:
             mock_run.return_value = SessionResult(stdout="", stderr="boom", returncode=1)
             result = self._run_with_mock_claude(workspace, mock_run, session_name="my-sess")
 
         assert result is False
-        assert not review_dir(workspace, "my-sess").exists()
+        assert not memory_report_dir(workspace, "my-sess").exists()
 
 
 # ---------------------------------------------------------------------------
@@ -1078,19 +1078,19 @@ class TestPermissionDeniedDetection:
         return transcript_rel
 
     def test_run_handoff_returns_false_on_permission_denied(self, tmp_path):
-        """run_handoff_agent returns False when Claude can't write in augment mode."""
+        """run_memory_writer returns False when Claude can't write in augment mode."""
         transcript_rel = self._make_workspace(tmp_path)
         mock_result = SessionResult(
             stdout="I need write permission to modify docs/state.md.",
             stderr="",
             returncode=0,
         )
-        config = HandoffConfig(enabled=True, min_turns=1, mode="augment")
+        config = MemoryWriterConfig(enabled=True, min_turns=1, mode="augment")
         with (
-            patch("forge.session.handoff_agent.is_claude_available", return_value=True),
-            patch("forge.session.handoff_agent.run_claude_session", return_value=mock_result),
+            patch("forge.session.memory_writer.is_claude_available", return_value=True),
+            patch("forge.session.memory_writer.run_claude_session", return_value=mock_result),
         ):
-            result = run_handoff_agent(
+            result = run_memory_writer(
                 session_name="test",
                 forge_root=tmp_path,
                 transcript_snapshot_rel=transcript_rel,
@@ -1107,12 +1107,12 @@ class TestPermissionDeniedDetection:
             stderr="",
             returncode=0,
         )
-        config = HandoffConfig(enabled=True, min_turns=1, mode="review-only")
+        config = MemoryWriterConfig(enabled=True, min_turns=1, mode="review-only")
         with (
-            patch("forge.session.handoff_agent.is_claude_available", return_value=True),
-            patch("forge.session.handoff_agent.run_claude_session", return_value=mock_result),
+            patch("forge.session.memory_writer.is_claude_available", return_value=True),
+            patch("forge.session.memory_writer.run_claude_session", return_value=mock_result),
         ):
-            result = run_handoff_agent(
+            result = run_memory_writer(
                 session_name="test",
                 forge_root=tmp_path,
                 transcript_snapshot_rel=transcript_rel,
@@ -1123,12 +1123,12 @@ class TestPermissionDeniedDetection:
 
 
 # ---------------------------------------------------------------------------
-# run_handoff_agent with designated_docs
+# run_memory_writer with designated_docs
 # ---------------------------------------------------------------------------
 
 
 class TestRunHandoffAgentMultiDoc:
-    """Tests for run_handoff_agent with designated_docs."""
+    """Tests for run_memory_writer with designated_docs."""
 
     @pytest.fixture
     def workspace(self, tmp_path: Path) -> Path:
@@ -1164,17 +1164,17 @@ class TestRunHandoffAgentMultiDoc:
         project_root: Path | None = None,
         **kwargs: object,
     ) -> bool:
-        """Helper: run_handoff_agent with mocked claude."""
+        """Helper: run_memory_writer with mocked claude."""
         root = project_root if project_root is not None else workspace
-        with patch("forge.session.handoff_agent.is_claude_available", return_value=True):
-            return run_handoff_agent(
+        with patch("forge.session.memory_writer.is_claude_available", return_value=True):
+            return run_memory_writer(
                 session_name=kwargs.get("session_name", "test"),  # type: ignore[arg-type]
                 forge_root=root,
                 transcript_snapshot_rel=kwargs.get(
                     "transcript_snapshot_rel",
                     ".forge/artifacts/test/transcripts/uuid-123.jsonl",
                 ),  # type: ignore[arg-type]
-                config=kwargs.get("config", HandoffConfig(enabled=True, min_turns=1)),  # type: ignore[arg-type]
+                config=kwargs.get("config", MemoryWriterConfig(enabled=True, min_turns=1)),  # type: ignore[arg-type]
                 base_url=kwargs.get("base_url"),  # type: ignore[arg-type]
                 timeout_seconds=kwargs.get("timeout_seconds", 300),  # type: ignore[arg-type]
                 designated_docs=kwargs.get("designated_docs"),  # type: ignore[arg-type]
@@ -1189,7 +1189,7 @@ class TestRunHandoffAgentMultiDoc:
             DesignatedDoc(path="docs/checklist.md", strategy="checklist"),
             DesignatedDoc(path="docs/changelog.md", strategy="changelog"),
         ]
-        with patch("forge.session.handoff_agent.run_claude_session") as mock_run:
+        with patch("forge.session.memory_writer.run_claude_session") as mock_run:
             mock_run.return_value = SessionResult(stdout="", stderr="", returncode=0)
             self._run_with_mock_claude(workspace, mock_run, designated_docs=docs)
 
@@ -1208,7 +1208,7 @@ class TestRunHandoffAgentMultiDoc:
             DesignatedDoc(path="docs/checklist.md", strategy="checklist"),
             DesignatedDoc(path="docs/missing_checklist.md", strategy="checklist"),
         ]
-        with patch("forge.session.handoff_agent.run_claude_session") as mock_run:
+        with patch("forge.session.memory_writer.run_claude_session") as mock_run:
             mock_run.return_value = SessionResult(stdout="", stderr="", returncode=0)
             self._run_with_mock_claude(workspace, mock_run, designated_docs=docs)
 
@@ -1223,7 +1223,7 @@ class TestRunHandoffAgentMultiDoc:
         memory_dir = workspace / ".forge" / "memory"
         assert not memory_dir.exists()
 
-        with patch("forge.session.handoff_agent.run_claude_session") as mock_run:
+        with patch("forge.session.memory_writer.run_claude_session") as mock_run:
             mock_run.return_value = SessionResult(stdout="", stderr="", returncode=0)
             result = self._run_with_mock_claude(workspace, mock_run, designated_docs=docs)
 
@@ -1236,7 +1236,7 @@ class TestRunHandoffAgentMultiDoc:
     def test_containment_guard_rejects_traversal(self, workspace: Path) -> None:
         """Traversal paths in designated_docs are rejected; returns True (skip)."""
         docs = [DesignatedDoc(path="../../etc/passwd")]
-        with patch("forge.session.handoff_agent.run_claude_session") as mock_run:
+        with patch("forge.session.memory_writer.run_claude_session") as mock_run:
             mock_run.return_value = SessionResult(stdout="", stderr="", returncode=0)
             result = self._run_with_mock_claude(workspace, mock_run, designated_docs=docs)
 
@@ -1249,7 +1249,7 @@ class TestRunHandoffAgentMultiDoc:
         (workspace / "docs" / "checklist.md").write_text("# Checklist\n")
 
         docs = [DesignatedDoc(path="docs/checklist.md", strategy="checklist")]
-        with patch("forge.session.handoff_agent.run_claude_session") as mock_run:
+        with patch("forge.session.memory_writer.run_claude_session") as mock_run:
             mock_run.return_value = SessionResult(stdout="", stderr="", returncode=0)
             self._run_with_mock_claude(workspace, mock_run, designated_docs=docs)
 
@@ -1264,7 +1264,7 @@ class TestRunHandoffAgentMultiDoc:
             checklist.unlink()
 
         docs = [DesignatedDoc(path="docs/checklist.md", strategy="checklist")]
-        with patch("forge.session.handoff_agent.run_claude_session") as mock_run:
+        with patch("forge.session.memory_writer.run_claude_session") as mock_run:
             mock_run.return_value = SessionResult(stdout="", stderr="", returncode=0)
             result = self._run_with_mock_claude(workspace, mock_run, designated_docs=docs)
 
@@ -1286,7 +1286,7 @@ class TestRunHandoffAgentMultiDoc:
                 shadows="STANDARDS.md",
             )
         ]
-        with patch("forge.session.handoff_agent.run_claude_session") as mock_run:
+        with patch("forge.session.memory_writer.run_claude_session") as mock_run:
             mock_run.return_value = SessionResult(stdout="", stderr="", returncode=0)
             result = self._run_with_mock_claude(workspace, mock_run, designated_docs=docs)
 
@@ -1308,7 +1308,7 @@ class TestRunHandoffAgentMultiDoc:
                 shadows="STANDARDS.md",
             )
         ]
-        with patch("forge.session.handoff_agent.run_claude_session") as mock_run:
+        with patch("forge.session.memory_writer.run_claude_session") as mock_run:
             mock_run.return_value = SessionResult(stdout="", stderr="", returncode=0)
             self._run_with_mock_claude(workspace, mock_run, designated_docs=docs)
 
@@ -1482,7 +1482,7 @@ class TestShadowFilePassportConflict:
 
 
 class TestWriterFiltering:
-    """Writer authorization in run_handoff_agent()."""
+    """Writer authorization in run_memory_writer()."""
 
     def _make_workspace(self, tmp_path: Path) -> Path:
         workspace = tmp_path / "workspace"
@@ -1509,12 +1509,12 @@ class TestWriterFiltering:
         doc_path.write_text("# Log\n")
         _write_passport_to_doc(doc_path, strategy="changelog", writers="planner")
 
-        config = HandoffConfig(enabled=True, mode="augment", min_turns=1)
+        config = MemoryWriterConfig(enabled=True, mode="augment", min_turns=1)
         docs = [DesignatedDoc(path="docs/changelog.md", strategy="changelog")]
 
-        with patch("forge.session.handoff_agent.run_claude_session") as mock_run:
+        with patch("forge.session.memory_writer.run_claude_session") as mock_run:
             mock_run.return_value = SessionResult(stdout="done", stderr="", returncode=0)
-            run_handoff_agent(
+            run_memory_writer(
                 session_name="executor",
                 forge_root=workspace,
                 transcript_snapshot_rel=".forge/artifacts/test-session/transcript.jsonl",
@@ -1530,13 +1530,13 @@ class TestWriterFiltering:
         doc_path.write_text("# Log\n")
         _write_passport_to_doc(doc_path, strategy="changelog", writers="planner")
 
-        config = HandoffConfig(enabled=True, mode="augment", min_turns=1)
+        config = MemoryWriterConfig(enabled=True, mode="augment", min_turns=1)
         docs = [DesignatedDoc(path="docs/changelog.md", strategy="changelog")]
 
-        with patch("forge.session.handoff_agent.run_claude_session") as mock_run:
+        with patch("forge.session.memory_writer.run_claude_session") as mock_run:
             mock_run.return_value = SessionResult(stdout="done", stderr="", returncode=0)
-            with patch("forge.session.handoff_agent.is_claude_available", return_value=True):
-                run_handoff_agent(
+            with patch("forge.session.memory_writer.is_claude_available", return_value=True):
+                run_memory_writer(
                     session_name="planner",
                     forge_root=workspace,
                     transcript_snapshot_rel=".forge/artifacts/test-session/transcript.jsonl",
@@ -1575,16 +1575,16 @@ class TestMalformedPassportSkipped:
         good_doc = workspace / "docs" / "good.md"
         good_doc.write_text("# Good doc\n")
 
-        config = HandoffConfig(enabled=True, mode="augment", min_turns=1)
+        config = MemoryWriterConfig(enabled=True, mode="augment", min_turns=1)
         docs = [
             DesignatedDoc(path="docs/bad.md", strategy="generic"),
             DesignatedDoc(path="docs/good.md", strategy="generic"),
         ]
 
-        with patch("forge.session.handoff_agent.run_claude_session") as mock_run:
+        with patch("forge.session.memory_writer.run_claude_session") as mock_run:
             mock_run.return_value = SessionResult(stdout="done", stderr="", returncode=0)
-            with patch("forge.session.handoff_agent.is_claude_available", return_value=True):
-                run_handoff_agent(
+            with patch("forge.session.memory_writer.is_claude_available", return_value=True):
+                run_memory_writer(
                     session_name="test-session",
                     forge_root=workspace,
                     transcript_snapshot_rel=".forge/artifacts/sess/transcript.jsonl",
@@ -1621,13 +1621,13 @@ class TestPassportLessDocsWork:
         doc.parent.mkdir(parents=True)
         doc.write_text("# Changelog\nNo passport here.\n")
 
-        config = HandoffConfig(enabled=True, mode="augment", min_turns=1)
+        config = MemoryWriterConfig(enabled=True, mode="augment", min_turns=1)
         docs = [DesignatedDoc(path="docs/changelog.md", strategy="changelog")]
 
-        with patch("forge.session.handoff_agent.run_claude_session") as mock_run:
+        with patch("forge.session.memory_writer.run_claude_session") as mock_run:
             mock_run.return_value = SessionResult(stdout="done", stderr="", returncode=0)
-            with patch("forge.session.handoff_agent.is_claude_available", return_value=True):
-                run_handoff_agent(
+            with patch("forge.session.memory_writer.is_claude_available", return_value=True):
+                run_memory_writer(
                     session_name="test-session",
                     forge_root=workspace,
                     transcript_snapshot_rel=".forge/artifacts/sess/transcript.jsonl",

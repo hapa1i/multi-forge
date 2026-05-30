@@ -508,7 +508,7 @@ print(json.dumps({
         assert result.data["worktree_exists"] is True
         assert result.data["branch_exists"] is True
         assert result.data["derivation"]["parent_session"] == "parent-session"
-        assert result.data["derivation"]["resume_mode"] == "handoff"
+        assert result.data["derivation"]["resume_mode"] == "transfer"
         assert result.data["derivation"]["strategy"] is None
         assert result.data["derivation"]["depth"] == 1
         assert result.data["derivation"]["lineage"] == ["parent-session"]

@@ -184,7 +184,7 @@ sidecar_image: forge-sidecar:latest
 user_agent_claude_code_version: ""
 context_limit: 200000
 status_timeout: 2.0
-handoff_timeout: 300
+memory_writer_timeout: 300
 log_level: off               # off | debug | info | warning
 ```
 
@@ -218,7 +218,7 @@ User-editable JSON merged into Claude Code `settings.json` by `forge extension e
 ```
 
 - **Auto-created on first access**: `forge claude preset` / `forge claude preset show`
-- **Built-in defaults are intentionally minimal**: hooks, status line, and handoff agent permissions
+- **Built-in defaults are intentionally minimal**: hooks, status line, and memory writer permissions
 - **Merged keys only**: `hooks`, `statusLine`, `env`, and `permissions`
 - **User customization surface**: usually permissions and extra env vars; hooks/status line only if intentionally
   overriding Forge defaults
@@ -414,11 +414,11 @@ leakage): `process_pending_work(handlers={"stop": handler, "index": handler})`.
 
 ### C.3 Known marker kinds
 
-| Kind      | Producer            | Handler                             |
-| --------- | ------------------- | ----------------------------------- |
-| `stop`    | Stop hook           | No-op (delete only)                 |
-| `index`   | Stop hook           | Index transcript for search         |
-| `handoff` | Stop hook (planned) | Spawn handoff agent for memory docs |
+| Kind      | Producer            | Handler                                 |
+| --------- | ------------------- | --------------------------------------- |
+| `stop`    | Stop hook           | No-op (delete only)                     |
+| `index`   | Stop hook           | Index transcript for search             |
+| `handoff` | Stop hook (planned) | Spawn the memory writer for memory docs |
 
 ---
 
@@ -431,7 +431,7 @@ verification loop, and action context remain in design.md.
 
 | Utility            | Extracted from                      | API                                                                                   |
 | ------------------ | ----------------------------------- | ------------------------------------------------------------------------------------- |
-| Session runner     | `supervisor.py`, `handoff_agent.py` | `run_claude_session(prompt, resume_id?, model?, base_url?, timeout, unset_env_vars?)` |
+| Session runner     | `supervisor.py`, `memory_writer.py` | `run_claude_session(prompt, resume_id?, model?, base_url?, timeout, unset_env_vars?)` |
 | Proxy resolution   | both                                | `resolve_base_url(proxy_id?, explicit_url?, fallbacks)`                               |
 | Throttle cache     | `policy/store.py`                   | `ThrottleCache(ttl).check(key) / .update(key, value)`                                 |
 | Structured output  | `verdict.py`                        | `extract_json_verdict(stdout, schema)`                                                |
@@ -650,7 +650,7 @@ disagreement areas, evidence-weighted recommendation). Temp file cleaned up via 
 
 **Recursion guard:** Skills invoke `forge` commands. `forge` commands spawn `claude -p` subprocesses. Those subprocesses
 trigger hooks. If a hook spawns another subprocess, you get recursion. `build_claude_env()` sets `FORGE_DEPTH` (starting
-at 0, incremented per subprocess layer). Hooks that spawn subprocesses (supervisor, handoff agent) skip at depth >= 2.
+at 0, incremented per subprocess layer). Hooks that spawn subprocesses (supervisor, memory writer) skip at depth >= 2.
 
 **JSON output contract:** `forge` commands invoked by skills must support `--json` for structured output. Skills should
 never parse human-readable CLI text -- it drifts. JSON schemas are the API contract between skills and CLI.
@@ -676,8 +676,8 @@ installed script. The same principle applies to skill scripts.
 
 ## G. Memory Doc Reference
 
-Extracted from [design.md §5.6](design.md#56-designated-memory-docs). Passport model, operating modes, and handoff agent
-concept remain in design.md.
+Extracted from [design.md §5.6](design.md#56-designated-memory-docs). Passport model, operating modes, and the memory
+writer concept remain in design.md.
 
 ### G.1 Strategy registry (from §5.6.5)
 
@@ -685,12 +685,12 @@ Strategies are defined in `MemoryStrategy` enum (`src/forge/session/passport.py`
 
 **Direct update strategies:**
 
-| Strategy        | Behavior                                      |
-| --------------- | --------------------------------------------- |
-| `project-state` | Update focus, active work, decisions, handoff |
-| `checklist`     | Mark `[x]` completed, add discovered tasks    |
-| `changelog`     | Add accomplishments, follow existing format   |
-| `generic`       | Add any new information (default fallback)    |
+| Strategy        | Behavior                                         |
+| --------------- | ------------------------------------------------ |
+| `project-state` | Update focus, active work, decisions, next steps |
+| `checklist`     | Mark `[x]` completed, add discovered tasks       |
+| `changelog`     | Add accomplishments, follow existing format      |
+| `generic`       | Add any new information (default fallback)       |
 
 Shadow mode (`--propose`) is orthogonal to strategy: any strategy works with `--propose`.
 
@@ -738,7 +738,7 @@ are ordinary agent instructions. All docs are processed in one `claude -p` call 
 
 ### G.3 Worktree resolution (extends §5.6.5)
 
-Managed sessions always launch from `forge_root`. The handoff agent resolves designated doc paths relative to
+Managed sessions always launch from `forge_root`. The memory writer resolves designated doc paths relative to
 `forge_root`, so git-tracked docs (for example, a card checklist under `docs/board/doing/<slug>/checklist.md`) target
 the correct branch when working in a worktree.
 
@@ -761,9 +761,9 @@ transcript paths in the prompt must be **absolute**; designated doc paths remain
 Claude Code (Feb 2026) ships **auto-memory**: Claude writes free-form notes to `~/.claude/projects/<project>/memory/`
 during sessions. `MEMORY.md` (first 200 lines) loads at startup; topic files load on demand.
 
-Forge's handoff agent is complementary, not competitive:
+Forge's memory writer is complementary, not competitive:
 
-| Aspect          | Auto-Memory                  | Handoff Agent                              |
+| Aspect          | Auto-Memory                  | Memory Writer                              |
 | --------------- | ---------------------------- | ------------------------------------------ |
 | Timing          | During session (incremental) | After session (retrospective)              |
 | Signal quality  | In-the-moment judgment       | Full-session hindsight                     |
@@ -772,14 +772,14 @@ Forge's handoff agent is complementary, not competitive:
 | Curation        | None -- entries accumulate   | Shadow pattern provides human review gate  |
 | Graduation path | None                         | Shadow doc -> human review -> official doc |
 
-**Key design rationale:** Free-form capture relies on model judgment and tends to accumulate noise over time. The
-handoff agent reduces this via (a) retrospective synthesis, (b) per-doc topic constraints, and (c) the shadow pattern
-(human curation gate).
+**Key design rationale:** Free-form capture relies on model judgment and tends to accumulate noise over time. The memory
+writer reduces this via (a) retrospective synthesis, (b) per-doc topic constraints, and (c) the shadow pattern (human
+curation gate).
 
-Auto-memory is better for long-lived preferences; the handoff agent is better for structured project docs and proposed
+Auto-memory is better for long-lived preferences; the memory writer is better for structured project docs and proposed
 standards evolution.
 
-**Deliberate non-integration:** The handoff agent does not read auto-memory (`~/.claude/projects/<project>/memory/`) as
+**Deliberate non-integration:** The memory writer does not read auto-memory (`~/.claude/projects/<project>/memory/`) as
 input. It's outside the project root (containment guard), is free-form (hard to dedupe against structured strategies),
 and targets different information (preferences/patterns vs project state/standards). Occasional duplication is cheaper
 than cross-format deduplication. If overlap becomes painful, a small prompt tweak can address it.
@@ -794,7 +794,7 @@ Memory activation is session-scoped. The effective `memory.auto_update.enabled` 
 | `auto_update.enabled`   | bool        | `false`   | Whether the memory writer runs at Stop     |
 | `auto_update.mode`      | str         | `augment` | `augment` (edit) or `review-only` (report) |
 | `auto_update.min_turns` | int         | `5`       | Skip sessions shorter than this            |
-| `auto_update.proxy`     | str \| null | `null`    | Optional `proxy_id` for the handoff agent  |
+| `auto_update.proxy`     | str \| null | `null`    | Optional `proxy_id` for the memory writer  |
 
 Scan roots are hardcoded: `DEFAULT_SCAN_ROOTS = ("docs/",)` plus always `.forge/memory/`. Configurable roots deferred.
 

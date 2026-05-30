@@ -1,6 +1,6 @@
 <!-- prereq: 0.3, 5.1, 10.1 -->
 
-## 16. Handoff Agent
+## 16. Memory Writer
 
 ### 16.1 Configure Memory and Passports
 
@@ -38,9 +38,9 @@ cat .forge/sessions/test-session-1/forge.session.json | jq '.overrides.memory'
 - [ ] `forge memory track` writes a passport into the doc (sessionless)
 - [ ] `forge memory enable --session` sets activation override
 - [ ] `forge memory list` discovers passported docs via scan
-- [ ] Handoff config written to session overrides (`enabled`, `min_turns`)
+- [ ] Memory writer config written to session overrides (`enabled`, `min_turns`)
 
-### 16.2 Run Handoff Manually (Direct Update)
+### 16.2 Run Memory Writer Manually (Direct Update)
 
 <!-- prereq: 16.1 -->
 
@@ -62,7 +62,7 @@ EOF
 
 BEFORE_LINES=$(wc -l < .forge/memory/debugging.md)
 
-forge handoff run \
+forge memory-writer run \
   --session-name test-session-1 \
   --worktree-path $FORGE_TEST_REPO \
   --transcript-rel .forge/artifacts/test-session-1/transcripts/manual-handoff-direct.jsonl
@@ -73,16 +73,16 @@ echo "before=$BEFORE_LINES after=$AFTER_LINES"
 cat .forge/memory/debugging.md
 
 ls .forge/artifacts/test-session-1/handoff/review-*.md
-forge session handoff show test-session-1 --latest
+forge memory report show test-session-1 --latest
 
 test "$AFTER_LINES" -gt "$BEFORE_LINES"
 ```
 
-- [ ] `forge handoff run` succeeds with the transcript artifact path provided
+- [ ] `forge memory-writer run` succeeds with the transcript artifact path provided
 - [ ] Passported docs are discovered via scan and updated with session takeaways
-- [ ] Handoff agent stdout is persisted and visible via `forge session handoff show --latest`
+- [ ] Memory writer stdout is persisted and visible via `forge memory report show --latest`
 
-### 16.3 Shadow Handoff (`--propose` + shadow mode)
+### 16.3 Shadow Memory Writer (`--propose` + shadow mode)
 
 <!-- prereq: 16.1 -->
 
@@ -125,7 +125,7 @@ EOF
 cp docs/team-standards.md /tmp/team-standards.before
 SHADOW_BEFORE=$(wc -l < .forge/memory/shadow_standards.md)
 
-forge handoff run \
+forge memory-writer run \
   --session-name test-session-1 \
   --worktree-path $FORGE_TEST_REPO \
   --transcript-rel .forge/artifacts/test-session-1/transcripts/manual-handoff-shadow.jsonl
@@ -139,11 +139,11 @@ test "$SHADOW_AFTER" -gt "$SHADOW_BEFORE"
 ```
 
 - [ ] Shadow-only passport discovered via scan
-- [ ] Handoff runs successfully against the shadow doc pair
+- [ ] Memory writer runs successfully against the shadow doc pair
 - [ ] Shadow file gains proposed additions for later human review
 - [ ] Official document is not edited in-place
 
-### 16.4 Queued Handoff on Next CLI Startup
+### 16.4 Queued Memory Writer on Next CLI Startup
 
 <!-- prereq: 16.1 -->
 
@@ -184,7 +184,7 @@ echo "$STOP_OUTPUT" | jq -e '.queued_handoff == true'
 
 test -f "$MARKER"
 
-# Any later Forge CLI startup should process the queued marker and spawn handoff in the background.
+# Any later Forge CLI startup should process the queued marker and spawn the memory writer in the background.
 forge session list >/tmp/handoff-queue-trigger.log
 
 for _ in $(seq 1 30); do
@@ -205,8 +205,8 @@ test "$AFTER_LINES" -gt "$BEFORE_LINES"
 
 - [ ] Stop hook reports `queued_handoff: true`
 - [ ] Handoff marker is created under `~/.forge/pending-work/`
-- [ ] A later Forge CLI startup processes the queued handoff automatically
-- [ ] Background handoff updates passported docs without a direct `forge handoff run`
+- [ ] A later Forge CLI startup processes the queued memory-writer work automatically
+- [ ] The background memory writer updates passported docs without a direct `forge memory-writer run`
 - [ ] Pending handoff marker is gone after processing completes
 
 ---

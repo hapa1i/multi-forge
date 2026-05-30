@@ -33,6 +33,14 @@ _ENV_OVERRIDES: dict[str, str] = {
     "FORGE_DEBUG": "log_level",
 }
 
+# Renamed config keys: old name -> new name. Surfaced with migration guidance
+# instead of the generic "unknown key" path. The old value is NOT migrated --
+# runtime config is a system boundary that degrades to the built-in default
+# (coding-standards.md §5).
+_RENAMED_KEYS: dict[str, str] = {
+    "handoff_timeout": "memory_writer_timeout",
+}
+
 
 @dataclass
 class RuntimeConfig:
@@ -66,8 +74,8 @@ class RuntimeConfig:
     # Status line timeout for proxy/git subprocess calls (seconds)
     status_timeout: float = 2.0
 
-    # Handoff agent default timeout (seconds)
-    handoff_timeout: int = 300
+    # Memory writer default timeout (seconds)
+    memory_writer_timeout: int = 300
 
     # File logging level: "off" (no file logging), "debug", "info", "warning"
     # Override: FORGE_DEBUG env var (1/true/yes → "debug", 0/false/no/off → "off")
@@ -113,8 +121,8 @@ class RuntimeConfig:
             raise ValueError(f"context_limit must be >= 1, got {self.context_limit}")
         if self.status_timeout <= 0:
             raise ValueError(f"status_timeout must be > 0, got {self.status_timeout}")
-        if self.handoff_timeout < 1:
-            raise ValueError(f"handoff_timeout must be >= 1, got {self.handoff_timeout}")
+        if self.memory_writer_timeout < 1:
+            raise ValueError(f"memory_writer_timeout must be >= 1, got {self.memory_writer_timeout}")
         valid_log_levels = {"off", "debug", "info", "warning"}
         if self.log_level not in valid_log_levels:
             raise ValueError(
@@ -267,11 +275,24 @@ def _dict_to_runtime_config(data: dict[str, Any], source: Path) -> RuntimeConfig
     """
     known_fields = {f.name for f in fields(RuntimeConfig)}
     unknown = set(data.keys()) - known_fields
-    if unknown:
+
+    # Renamed keys get migration guidance, not the generic "unknown" warning.
+    # The old value is ignored (degrade to default) -- see _RENAMED_KEYS.
+    renamed = unknown & set(_RENAMED_KEYS)
+    for old in sorted(renamed):
+        logger.warning(
+            "%s: '%s' was renamed to '%s' and is ignored. " "Update your config (the old value is not applied).",
+            source,
+            old,
+            _RENAMED_KEYS[old],
+        )
+
+    truly_unknown = unknown - renamed
+    if truly_unknown:
         logger.warning(
             "Unknown keys in %s (ignored): %s",
             source,
-            ", ".join(sorted(unknown)),
+            ", ".join(sorted(truly_unknown)),
         )
 
     kwargs: dict[str, Any] = {}
@@ -395,8 +416,8 @@ proxy_mode: host
 # Status line timeout for proxy/git calls (seconds)
 # status_timeout: 2.0
 
-# Handoff agent timeout (seconds)
-# handoff_timeout: 300
+# Memory writer timeout (seconds)
+# memory_writer_timeout: 300
 
 # File logging level: off (no file logging), debug, info, warning
 # Logs written to $FORGE_HOME/logs/

@@ -63,7 +63,7 @@ def should_spawn_subprocesses(env: Mapping[str, str] | None = None) -> bool:
     """True if current depth allows spawning ``claude -p`` subprocesses.
 
     Returns False when depth >= FORGE_MAX_DEPTH, meaning hooks should skip
-    subprocess-spawning work (supervisor, handoff agent, etc.) to prevent
+    subprocess-spawning work (supervisor, memory writer, etc.) to prevent
     runaway recursion.
     """
     return get_forge_depth(env) < FORGE_MAX_DEPTH

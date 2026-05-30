@@ -64,7 +64,7 @@ from forge.cli.session_lifecycle import (  # noqa: E402
     _apply_and_persist_direct_model_override,
     _apply_direct_model_env_if_supported,
     _launch_claude_for_session,
-    _persist_fork_handoff_derivation,
+    _persist_fork_transfer_derivation,
     _print_branch_exists_tip,
     _print_post_exit_tip,
     _resolve_manifest_prompt_file,
@@ -123,7 +123,7 @@ __all__ = ["fork"]
     "--inline-plan",
     is_flag=True,
     default=False,
-    help="For worktree/--into forks, embed approved plan text in the handoff; default is a parent plan-path reference",
+    help="For worktree/--into forks, embed approved plan text in the transfer; default is a parent plan-path reference",
 )
 @click.option(
     "--into",
@@ -394,7 +394,7 @@ def fork(
                 preflight_ref = child_template
             context_limit_preflight = _sess()._resolve_context_limit(preflight_ref)
             if context_limit_preflight is not None:
-                from forge.session.handoff import estimate_transcript_tokens
+                from forge.session.transfer import estimate_transcript_tokens
 
                 artifact_root = _resolve_session_artifact_root(manager=manager, state=parent_state)
                 transcripts = parent_state.confirmed.artifacts.get("transcripts", [])
@@ -614,10 +614,10 @@ def fork(
     # so --resume --fork-session cannot find the parent's conversation from a different
     # directory. Tested 2026-04-02 with Claude Code 2.1.90: all cross-CWD scenarios fail
     # with "No conversation found." See scripts/experiments/native-resume/.
-    # Use handoff (assembled context via --append-system-prompt-file) instead.
+    # Use transfer (assembled context via --append-system-prompt-file) instead.
     if is_worktree_fork:
         worktree_path = Path(fork_manifest.worktree.path)  # type: ignore[union-attr]
-        fork_context, prompt_warnings = _sess()._generate_parent_handoff_context(
+        fork_context, prompt_warnings = _sess()._generate_parent_transfer_context(
             manager=manager,
             manifest=fork_manifest,
             parent_state=parent_manifest,
@@ -645,13 +645,13 @@ def fork(
             console.print(f"[yellow]Warning:[/yellow] {warning}")
 
         try:
-            fork_manifest = _persist_fork_handoff_derivation(
+            fork_manifest = _persist_fork_transfer_derivation(
                 manifest=fork_manifest,
                 strategy=strategy,
                 context_path=fork_context,
             )
         except Exception:
-            logger.warning("Failed to persist fork derivation handoff details", exc_info=True)
+            logger.warning("Failed to persist fork derivation transfer details", exc_info=True)
 
         _fork_uuid = str(_uuid.uuid4())
         try:

@@ -1,6 +1,6 @@
 """Tests for ``forge session resume --review`` (D4 from runtime abstraction Phase 1).
 
-Verifies the --review flag opens the per-child handoff file in $EDITOR before
+Verifies the --review flag opens the per-child transfer file in $EDITOR before
 launching Claude, and that the flag rejects incompatible combinations.
 """
 
@@ -32,17 +32,17 @@ class TestReviewFlagValidation:
             ["session", "resume", "some-session", "--fresh", "--review", "--resume-mode", "native"],
         )
         assert result.exit_code == 1
-        assert "--review is only meaningful in handoff mode" in result.output
+        assert "--review is only meaningful in transfer mode" in result.output
 
 
 class TestReviewFlagEditorInvocation:
-    """--review should open the per-child handoff file in $EDITOR before launch."""
+    """--review should open the per-child transfer file in $EDITOR before launch."""
 
     def test_editor_is_invoked_with_child_file_path(
         self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         from forge.session import create_session_state
-        from forge.session.handoff import HandoffResult
+        from forge.session.transfer import TransferResult
 
         # Pretend we have a fake editor that always succeeds
         fake_editor = tmp_path / "fake-editor"
@@ -70,7 +70,7 @@ class TestReviewFlagEditorInvocation:
             worktree_path=str(tmp_path),
         )
 
-        handoff_result = HandoffResult(
+        handoff_result = TransferResult(
             context_file=child_file,
             context_file_rel=".forge/prev_sessions/p1/children/child-1.md",
             transcript_artifact_path=None,
@@ -113,7 +113,7 @@ class TestReviewFlagEditorInvocation:
         self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         from forge.session import create_session_state
-        from forge.session.handoff import HandoffResult
+        from forge.session.transfer import TransferResult
 
         fake_editor = tmp_path / "fake-editor"
         fake_editor.write_text("#!/bin/sh\nexit 0\n")
@@ -140,7 +140,7 @@ class TestReviewFlagEditorInvocation:
             worktree_path=str(tmp_path),
         )
 
-        handoff_result = HandoffResult(
+        handoff_result = TransferResult(
             context_file=child_file,
             context_file_rel=".forge/prev_sessions/p1/children/child-1.md",
             transcript_artifact_path=None,
@@ -180,7 +180,7 @@ class TestReviewFlagEditorInvocation:
     ) -> None:
         """If editor exits non-zero (user aborted), launch is skipped."""
         from forge.session import create_session_state
-        from forge.session.handoff import HandoffResult
+        from forge.session.transfer import TransferResult
 
         fake_editor = tmp_path / "fake-editor"
         fake_editor.write_text("#!/bin/sh\nexit 1\n")
@@ -207,7 +207,7 @@ class TestReviewFlagEditorInvocation:
             worktree_path=str(tmp_path),
         )
 
-        handoff_result = HandoffResult(
+        handoff_result = TransferResult(
             context_file=child_file,
             context_file_rel=".forge/prev_sessions/p1/children/child-1.md",
             transcript_artifact_path=None,
@@ -240,7 +240,7 @@ class TestReviewFlagEditorInvocation:
         self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         from forge.session import create_session_state
-        from forge.session.handoff import HandoffResult
+        from forge.session.transfer import TransferResult
 
         # Set $EDITOR to a clearly-missing binary
         monkeypatch.setenv("EDITOR", "/nonexistent/never-installed-editor-99")
@@ -265,7 +265,7 @@ class TestReviewFlagEditorInvocation:
             worktree_path=str(tmp_path),
         )
 
-        handoff_result = HandoffResult(
+        handoff_result = TransferResult(
             context_file=child_file,
             context_file_rel=".forge/prev_sessions/p1/children/child-1.md",
             transcript_artifact_path=None,
@@ -312,7 +312,7 @@ class TestReviewRelaunch:
         child_manifest.forge_root = str(tmp_path)
         child_manifest.confirmed.derivation = Derivation(
             parent_session="p1",
-            resume_mode="handoff",
+            resume_mode="transfer",
             context_file=".forge/prev_sessions/p1/children/child-1.md",
         )
         SessionStore(str(tmp_path), "child-1").write(child_manifest)
@@ -366,5 +366,5 @@ class TestReviewRelaunch:
 
         output = capsys.readouterr().out
         assert exc.value.code == 1
-        assert "Legacy handoff artifact format is no longer supported" in output
+        assert "Legacy transfer artifact format is no longer supported" in output
         assert "forge session resume p1 --fresh" in output

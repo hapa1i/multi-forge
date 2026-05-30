@@ -2,7 +2,7 @@
 
 Commands for managing Claude Code sessions:
 - start: Create and start a new session
-- resume: Resume a session (reattach or --fresh for context handoff)
+- resume: Resume a session (reattach or --fresh for context transfer)
 - fork: Fork an existing session
 - delete: Delete a session
 - list: List all sessions
@@ -701,7 +701,7 @@ def _resolve_session_artifact_root(*, manager: SessionManager, state: SessionSta
     return Path(manager.resolve_project_root(worktree_path))
 
 
-def _generate_parent_handoff_context(
+def _generate_parent_transfer_context(
     *,
     manager: SessionManager,
     manifest: SessionState,
@@ -709,7 +709,7 @@ def _generate_parent_handoff_context(
     strategy: str = "structured",
     inline_plan: bool = False,
 ) -> tuple[Path | None, list[str]]:
-    """Generate a fresh parent-context handoff file for a forked session.
+    """Generate a fresh parent transfer-context file for a forked session.
 
     Writes ``<fork_forge_root>/.forge/prev_sessions/<parent>/generated.md`` (the
     regeneratable cache) and copies it into ``children/<fork_name>.md`` (the
@@ -769,7 +769,7 @@ def _generate_parent_handoff_context(
 
     project_root = _resolve_session_artifact_root(manager=manager, state=parent_state)
 
-    from forge.session.handoff import ResumeStrategy, process_handoff
+    from forge.session.transfer import ResumeStrategy, assemble_transfer_context
 
     try:
         resume_strategy = ResumeStrategy(strategy)
@@ -784,7 +784,7 @@ def _generate_parent_handoff_context(
         except ForgeSessionError:
             return None
 
-    handoff_result = process_handoff(
+    transfer_result = assemble_transfer_context(
         parent_name=manifest.parent_session,
         parent_state=parent_state,
         forge_root=project_root,
@@ -796,9 +796,9 @@ def _generate_parent_handoff_context(
         inline_plan=inline_plan,
         child_name=manifest.name,
     )
-    if handoff_result.context_file is None:
-        return None, handoff_result.warnings
-    return handoff_result.context_file.resolve(), handoff_result.warnings
+    if transfer_result.context_file is None:
+        return None, transfer_result.warnings
+    return transfer_result.context_file.resolve(), transfer_result.warnings
 
 
 def _hint_cross_project_session(name: str, forge_root: str | None) -> bool:
@@ -857,10 +857,10 @@ def session() -> None:
     pass
 
 
-# Register subgroups attached to `session`. Done at module import so that
-# `forge session handoff show` resolves on first call. Imported here (not at
-# top of module) to avoid circular imports: session_handoff imports from this
-# module's namespace (`_cwd_forge_root`, `handle_session_error`, `console`).
+# Register subgroups attached to `session` at import time so the
+# `forge session handoff` and `forge session memory` tombstone groups resolve.
+# Deferred (not a top-of-module import) to keep subgroup registration out of the
+# import path and avoid import-order fragility across the session CLI surface.
 def _register_subgroups() -> None:
     from forge.cli.session_handoff import handoff_group  # noqa: E402
     from forge.cli.session_memory import memory_group  # noqa: E402

@@ -223,7 +223,7 @@ def track_cmd(
     require a session. Re-running with --strategy/--writers updates the passport;
     with no flags on an already-passported doc it is a no-op.
 
-    Use --propose to author a shadow-only passport: the handoff agent writes
+    Use --propose to author a shadow-only passport: the memory writer writes
     suggestions to a shadow file instead of editing the doc directly.
 
     For one-off updates without a passport, instruct the agent directly.
@@ -946,7 +946,7 @@ def _review_curate(
     """Handle ``--curate``: run LLM curation."""
     import os
 
-    from forge.session.handoff_agent import resolve_handoff_base_url
+    from forge.session.memory_writer import resolve_writer_base_url
     from forge.session.shadow_curation import (
         collect_shadow_entries,
         run_shadow_curation,
@@ -1048,7 +1048,7 @@ def _review_curate(
         confirmed_proxy_url = state.confirmed.started_with_proxy.base_url
 
     direct = config.direct if config else False
-    base_url = resolve_handoff_base_url(
+    base_url = resolve_writer_base_url(
         proxy_id=config.proxy if config else None,
         confirmed_proxy_base_url=confirmed_proxy_url,
         env_base_url=os.environ.get("ANTHROPIC_BASE_URL"),
@@ -1225,3 +1225,11 @@ def passport_remove_cmd(path: str, as_json: bool) -> None:
         console.print("[dim]This doc is no longer project-discovered unless added as a session extra.[/dim]")
     else:
         console.print(f"[dim]No passport found in {path}.[/dim]")
+
+
+# Registered at module bottom via a late import to avoid deepening the
+# memory -> session -> session_handoff import cycle (memory.py already imports
+# forge.cli.session at module top). Mirrors session.py's _register_subgroups.
+from forge.cli.memory_report import report_group  # noqa: E402
+
+memory.add_command(report_group)

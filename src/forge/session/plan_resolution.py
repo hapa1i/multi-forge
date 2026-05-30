@@ -17,7 +17,7 @@ up via ``IndexStore``. Same-dir forks can still fall back to the caller's
 
 Authority rule: approved plan snapshots (``confirmed.artifacts["plans"]``) are
 preferred over ``latest_plan_path`` drafts — same ordering as
-``forge.session.handoff._resolve_plan_content``. Callers should render the
+``forge.session.transfer._resolve_plan_content``. Callers should render the
 snapshot path when present and fall through to the draft only if absent.
 """
 

@@ -4,10 +4,9 @@ Completed-work record for Forge implementation sessions.
 
 ## Maintenance
 
-- Updated by the handoff agent with `strategy=changelog`, and by humans when closing a phase.
+- Updated by the memory writer with `strategy=changelog`, and by humans when closing a phase.
 - Add compact entries for completed work only. Pending tasks belong in card checklists.
-- Follow `docs/developer/work-board-contract.md` "Change Log Policy": each entry needs Goal, Key changes, and
-  Verification.
+- Follow `docs/developer/board-contract.md` "Change Log Policy": each entry needs Goal, Key changes, and Verification.
 - Keep entries short. Do not list every file unless the file list is the point of the work.
 - Use newest-first order so active work stays near the top.
 - When this file approaches the documentation size limits, compact the oldest entries at the bottom into a dated summary
@@ -23,8 +22,58 @@ wc -l docs/board/change_log.md
 ## Entries
 
 > Format: `## YYYY-MM-DD`, then `### Phase X.Y: Short Title`, with `**Goal**:`, `**Key changes**:` as bullets, and
-> `**Verification**:`. Use newest-first order. See `docs/developer/work-board-contract.md` "Change Log Policy" for the
-> full spec.
+> `**Verification**:`. Use newest-first order. See `docs/developer/board-contract.md` "Change Log Policy" for the full
+> spec.
+
+## 2026-05-29
+
+### fix: tombstone `forge handoff run` (memory_substrate follow-up)
+
+**Goal**: Make the removed runner path fail with an actionable message, matching the report path.
+
+**Key changes**: The memory_substrate closeout tombstoned `forge session handoff show` but left `forge handoff run` as a
+generic Click "No such command 'handoff'" dead-end. Added a hidden top-level `handoff` tombstone group
+(`cli/memory_writer.py`, registered in `main.py`) whose `run` command errors with "Use: forge memory-writer run",
+mirroring `session_handoff.py`.
+
+**Verification**: `forge handoff run` (bare and with old flags) exits non-zero naming `forge memory-writer run`, not
+Click's "No such option"; regression `TestOldHandoffRunTombstone` in `test_memory_writer_cli.py` (2 tests).
+
+### memory_substrate: resolve "handoff" naming → memory writer + transfer
+
+**Goal**: Split the overloaded "handoff" term into two clear concepts — the **memory writer** (Stop-time project-doc
+curation) and **transfer** (resume/fork context assembly) — across code, CLI, config, durable state, docs, and skills.
+
+**Key changes**:
+
+- **Session layer**: `git mv handoff_agent.py → memory_writer.py`, `handoff.py → transfer.py`; renamed
+  `HandoffConfig→MemoryWriterConfig`, `HandoffResult→TransferResult`, `process_handoff→assemble_transfer_context`,
+  `run_handoff_agent→run_memory_writer`, `review_dir→memory_report_dir`.
+- **CLI**: `forge session handoff show → forge memory report show` (new `cli/memory_report.py`);
+  `forge handoff run → forge memory-writer run`; old paths are actionable tombstones.
+- **Durable state**: `--resume-mode handoff → transfer` with `confirmed.derivation.resume_mode` accept-and-tolerate
+  (legacy `"handoff"`/`None` read as transfer); config key `handoff_timeout → memory_writer_timeout` (stale-key
+  warn-and-ignore).
+- **Docs/skills**: `docs/end-user/handoff.md → memory.md`; QA `16-handoff.md → 16-memory.md`; 3-layer memory taxonomy
+  table added to design.md §5.6; design/appendix/diagrams/skills synced.
+- **Internal naming sweep (closeout)**: drove residual `handoff` in `src/forge/` from 207 (Phase 0) to 39, all
+  intentional KEEPs. Renamed `handoff_result→transfer_result` (manager.py, session_lifecycle.py); the GC
+  transfer-context subsystem (`_detect_orphan_handoff_files`, `_build_handoff_context_reference_set`,
+  `_clean_handoff_files` → `…transfer…`, incl. the **user-visible** `forge clean` category key
+  `handoff_files→transfer_files`); the cost-tracking verb `handoff→memory-writer`; user-facing resume messages/help; and
+  ~12 `core/reactive`/proxy docstrings ("handoff agent"→"memory writer"). Coupled tests updated (`test_gc.py` ×2,
+  `test_session_resume_review.py`).
+
+**Intentional KEEPs** (durable state / routing / fixtures): work-queue marker `kind="handoff"`,
+`enqueue_handoff_marker()`, `marker_id="handoff-<id>"`, the `.forge/artifacts/<session>/handoff/` artifact path, the
+`queued_handoff` Stop-hook field, the `forge session handoff` tombstone, the legacy-value migration messages, and the
+generic-English passport "project-state" wording.
+
+**Verification**: full unit+regression green (4902 passed); the 2 failures
+(`test_session_resume_review::test_editor_nonzero_aborts_launch`,
+`test_removal_patching_system::test_forge_info_no_traceback`) reproduce identically on `origin/main` (f8c07d9) —
+pre-existing, unrelated. `test_handoff_integration.py` (10) green — renamed runtime + `forge memory report show`
+end-to-end. `make pre-commit` clean. Shipped as PR #8; unrelated gemini-3.5-flash catalog work split to PR #9.
 
 ## 2026-05-28
 
