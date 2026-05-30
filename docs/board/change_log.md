@@ -27,6 +27,18 @@ wc -l docs/board/change_log.md
 
 ## 2026-05-29
 
+### fix: tombstone `forge handoff run` (memory_substrate follow-up)
+
+**Goal**: Make the removed runner path fail with an actionable message, matching the report path.
+
+**Key changes**: The memory_substrate closeout tombstoned `forge session handoff show` but left `forge handoff run` as a
+generic Click "No such command 'handoff'" dead-end. Added a hidden top-level `handoff` tombstone group
+(`cli/memory_writer.py`, registered in `main.py`) whose `run` command errors with "Use: forge memory-writer run",
+mirroring `session_handoff.py`.
+
+**Verification**: `forge handoff run` (bare and with old flags) exits non-zero naming `forge memory-writer run`, not
+Click's "No such option"; regression `TestOldHandoffRunTombstone` in `test_memory_writer_cli.py` (2 tests).
+
 ### memory_substrate: resolve "handoff" naming → memory writer + transfer
 
 **Goal**: Split the overloaded "handoff" term into two clear concepts — the **memory writer** (Stop-time project-doc

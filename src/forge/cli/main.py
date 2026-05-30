@@ -24,7 +24,7 @@ from .config_cmd import config as config_cmd  # noqa: E402
 from .extensions import extensions  # noqa: E402
 from .hooks import hooks  # noqa: E402
 from .memory import memory as memory_cmd  # noqa: E402
-from .memory_writer import memory_writer  # noqa: E402
+from .memory_writer import handoff_tombstone, memory_writer  # noqa: E402
 from .policy import policy  # noqa: E402
 from .proxy import proxy  # noqa: E402
 from .search import search_cmd  # noqa: E402
@@ -279,6 +279,7 @@ main.add_command(session)
 main.add_command(proxy)
 main.add_command(policy)
 main.add_command(memory_writer)
+main.add_command(handoff_tombstone)  # tombstone: `forge handoff run` -> `forge memory-writer run`
 main.add_command(claude)
 main.add_command(config_cmd, name="config")
 main.add_command(hooks)
