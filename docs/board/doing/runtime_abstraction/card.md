@@ -638,7 +638,8 @@ peer-tool integration once the contract is stable.
 
 **Required for cross-runtime resume:**
 
-- A curator (memory writer) that reads the parent transcript and produces a runtime-neutral handoff document.
+- A transfer curator (resume/fork context assembly in `transfer.py`, distinct from the project-doc memory writer) that
+  reads the parent transcript and produces a runtime-neutral handoff document.
 - A `--target-runtime` option on the curator so handoffs can be tuned for the destination's conventions (terseness, tool
   naming, model style). Parallel to today's per-model-family system prompt addendums
   (`src/forge/cli/session_addendum.py`).
@@ -684,7 +685,7 @@ Initial target matrix:
 | Usage source                                                   | Transcript/status/proxy fallback | JSONL usage events                              | JSON stats                     |
 | Native resume (within runtime, within CWD)                     | `claude --resume`                | `codex exec resume`                             | Capability-check first         |
 | Curated handoff *input* (accept context doc at start)          | `--append-system-prompt-file`    | Initial user message                            | Initial message                |
-| Curated handoff *output* (generate curation of own transcript) | Yes (memory writer)              | Yes (via headless invoker)                      | Yes (via headless invoker)     |
+| Curated handoff *output* (generate curation of own transcript) | Yes (transfer curator)           | Yes (via headless invoker)                      | Yes (via headless invoker)     |
 | Always-on proxy compatible                                     | Yes (host or sidecar)            | Yes (host or sidecar)                           | TBD per CLI                    |
 | Request inspectable by Forge                                   | Only through Forge proxy/sidecar | Only through Forge proxy/sidecar; direct opaque | Route-dependent; direct opaque |
 | Gateway route                                                  | Anthropic-compatible base URLs   | Native CLI or first-class ChatGPT LiteLLM route | API/Vertex route only          |
@@ -711,7 +712,9 @@ No new architecture; mostly documentation and small CLI additions.
 - Reposition `ai-curated` in [design.md §3.9](../design.md#39-session-resume-context-management) as the cross-everything
   primary substrate rather than one strategy among four.
 - Add `forge session resume --review` (opens draft handoff in `$EDITOR` before child launch).
-- Add `forge session handoff regenerate|edit|diff` commands.
+- Add transfer-context `regenerate|edit|diff` commands under a new transfer-owned surface (e.g.
+  `forge session transfer regenerate|edit|diff`); `forge session handoff` is now a removed-command tombstone and cannot
+  host them.
 - Document the agency-at-boundaries frame and the curated-handoff-as-interchange principle in `design.md`.
 - Define the Forge-owned handoff schema and decide whether `ctx` should become an import/export peer later.
 - Initial schema sketch: lineage pointer, decisions with transcript/file citations, current state snapshot, file:line
@@ -746,8 +749,8 @@ Native-relocate is an experimental spike, not a committed UX until contract test
 - Validate any third-party Anthropic-compatible passthrough route separately before advertising compatibility.
 - Pass criterion: an integration contract test in `tests/integration/` verifies Claude Code 2.1.90+ can resume relocated
   JSONL across a CWD boundary and complete a tool-use continuation without signature-validation failure.
-- Only after the spike passes, update the "for now, this is a no-op" guard in `src/forge/session/manager.py:570` and
-  introduce `--resume-mode native-relocate` as an opt-in value.
+- Only after the spike passes, update the cross-`forge_root` native-resume no-op guard in
+  `src/forge/session/manager.py:573-578` and introduce `--resume-mode native-relocate` as an opt-in value.
 - If the spike fails, keep native resume within the original runtime/CWD boundary and rely on curated handoff for
   cross-CWD and cross-runtime movement.
 

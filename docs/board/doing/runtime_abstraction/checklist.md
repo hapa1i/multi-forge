@@ -2,8 +2,8 @@
 
 Manual multi-session plan for executing [`card.md`](./card.md).
 
-This card is in active execution under `doing/`. Move the whole `runtime_abstraction/` directory to
-`docs/board/done/` after closeout.
+This card is in active execution under `doing/`. Move the whole `runtime_abstraction/` directory to `docs/board/done/`
+after closeout.
 
 ## Maintenance
 
@@ -30,11 +30,13 @@ behavior unchanged unless a separate default-change decision is recorded.
 **Deferred prerequisite (memory_substrate reconciliation, 2026-05-29):**
 
 - [ ] Reconcile this card's "curated handoff" vocabulary with the shipped **transfer** taxonomy, and retarget the
-  proposed `forge session handoff regenerate|edit|diff` surface (now removed/tombstoned in favor of `forge memory ...`)
-  before implementing the schema. The doc-updater is the **memory writer**; resume/fork context is **transfer**. Align
-  with `docs/design.md` §3.9 (transfer) and §5.6 (memory writer). The concrete code surfaces in this card were repointed
-  to `memory_writer.py`/`transfer.py` on 2026-05-29; the conceptual vocabulary was intentionally left for this card to
-  own when it executes.
+  proposed `forge session handoff regenerate|edit|diff` surface before implementing the schema. Those verbs were never
+  built, but the `forge session handoff` parent is now a removed-command tombstone group (its `show` redirects to
+  `forge memory report show`), so they must be re-homed under a new transfer-owned surface (see the Phase 1 namespace
+  task). The doc-updater is the **memory writer**; resume/fork context is
+  **transfer**. Align with `docs/design.md` §3.9 (transfer) and §5.6 (memory writer). The 2026-05-29 repoint fixed
+  symbol references (`memory_writer.py`/`transfer.py`); the conceptual vocabulary was intentionally left for this card
+  to own when it executes.
 
 ## Phase 0 - Baseline Confirmation
 
@@ -65,14 +67,17 @@ Phase 0 gaps carried forward:
 - [x] Verify `forge session resume --review` behavior.
   - Note: this shipped before the runtime-abstraction checklist was activated; it is retained here as verified Phase 1
     foundation.
-  - Assertion: handoff-mode resume opens the generated child handoff file in `$EDITOR`; native mode rejects `--review`
-    with an actionable error.
+  - Assertion: transfer-mode resume opens the generated child transfer context file in `$EDITOR`; native mode rejects
+    `--review` with an actionable error.
   - Verification: `src/forge/cli/session_lifecycle.py` implements the `resume --review` option, native-mode rejection,
     and `$EDITOR` launch for the generated child context; `docs/design.md` command reference documents the CLI contract;
     `tests/src/cli/test_session_resume_review.py` covers the behavior.
 - [ ] Decide the resume-context command namespace before adding `regenerate|edit|diff`.
-  - Assertion: command contract avoids collision with memory-doc handoff reports under `forge session handoff show`.
-    Candidate surface: `forge session context regenerate|edit|diff`.
+  - Assertion: command contract avoids names that are already taken. Verified 2026-05-30: `forge session handoff` is a
+    removed-command tombstone (it redirects to `forge memory report show`) and `forge session context` is a deprecated
+    alias for `forge session show` — neither can be reused. These verbs are **transfer-owned** (they act on resume/fork
+    context, not project-doc memory), so the surface must live under transfer, not `forge memory`. Candidate free
+    surface: `forge session transfer regenerate|edit|diff`.
 - [ ] Define the Forge-owned curated handoff schema contract in docs.
   - Assertion: schema records lineage, decisions with citations, current state, open questions, runtime hints, and user
     notes overlay.
@@ -109,9 +114,9 @@ Phase 0 gaps carried forward:
   - Assertion: integration contract test proves Claude Code can resume relocated JSONL across CWD boundary without
     signature-validation failure, while explicitly acknowledging the prior Claude Code 2.1.90 negative result documented
     in `docs/design.md` §3.9.
-- [ ] Tie the spike to the current no-op and handoff-only guards.
+- [ ] Tie the spike to the current no-op and transfer-only guards.
   - Assertion: checklist/test references cover the native-resume guard in `src/forge/session/manager.py` and the
-    worktree-fork handoff branch in `src/forge/cli/session_fork.py`.
+    worktree-fork transfer branch in `src/forge/cli/session_fork.py`.
 - [ ] Split native-relocate handling by code path.
   - Assertion: `fork --worktree`, `fork --into`, and `resume --fresh --resume-mode native-relocate` each have an
     explicit expected behavior before implementation.
@@ -170,8 +175,9 @@ Tracks Forge-local execution decisions for this checklist. For broader card ques
 [`card.md` Open Questions](./card.md#open-questions).
 
 - [ ] Should `forge session resume --review` become default for curated handoff workflows?
-- [ ] Should the resume-context command surface be `forge session context ...` instead of overloading
-  `forge session handoff ...`?
+- [ ] Which transfer-owned namespace should the resume-context commands use — a new `forge session transfer ...` verb
+  or a top-level `forge transfer ...`? (`forge session context` is a deprecated alias and `forge session handoff` is a
+  removed-command tombstone, so neither can be reused; the surface stays under transfer, not `forge memory`.)
 - [ ] Should Phase 1 remain prose/schema-only, or should it change the default strategy after schema tests land?
 - [ ] Where do proxy cost logs, audit logs, and the future usage ledger converge?
 - [ ] How should `FORGE_DEPTH` compose with future run-tree attribution ids?
