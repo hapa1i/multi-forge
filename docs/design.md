@@ -132,9 +132,10 @@ this.
 When sessions cross **Forge project boundaries** (worktree forks, `fork --into`, resume), Forge uses **file-based
 transfer**: `assemble_transfer_context()` reads the parent's transcript artifacts and generates a portable context file
 at `<forge_root>/.forge/prev_sessions/<parent>/generated.md`, then copies it to the launch-time child artifact at
-`<forge_root>/.forge/prev_sessions/<parent>/children/<child>.md`, appended via `--append-system-prompt-file`. This is an
-accepted tradeoff: transfer files are lossy compared to native `--resume` (structured summary vs full conversation), but
-they enable branch isolation and cross-worktree workflows.
+`<forge_root>/.forge/prev_sessions/<parent>/children/<child>.md`, appended via `--append-system-prompt-file`. Transfer
+trades the full conversation for a runtime-neutral, **user-editable** view: it is the only substrate that crosses
+worktree, project, and (later) runtime boundaries, and the user can inspect and prune what propagates — something native
+`--resume` structurally cannot offer (see §3.9).
 
 The `--strategy` knob controls fidelity: `minimal` (lineage pointer) → `structured` (conversation skeleton, default) →
 `full` (complete transcript) → `ai-curated` (LLM-selected highlights). `--inline-plan` embeds the approved plan content
@@ -589,6 +590,13 @@ forge session resume <parent> --fresh --strategy <strategy> [--depth N]
 | `full`       | Complete parent context (fails if exceeds proxy context limit) |
 | `ai-curated` | AI-selected highlights from ancestry chain                     |
 
+**Curated transfer is the primary cross-boundary substrate, not a lossy fallback.** Native resume is byte-faithful but
+works only within the same runtime and CWD, and its carried conversation is opaque — the user cannot inspect or prune
+it. Curated transfer is runtime-neutral and *user-editable*, so it is the only way to carry context across worktrees,
+projects, and (later) runtimes while letting the user shape what propagates. `structured` stays the CLI default;
+`ai-curated` emits the full schema (see [design_appendix.md §M](design_appendix.md#m-transfer-context-schema)) and is
+the substrate for genuine cross-boundary moves.
+
 **Native mode** (`--resume-mode native`):
 
 ```bash
@@ -626,12 +634,16 @@ This pulls relevant context from earlier sessions (e.g., a decision from 5 sessi
 **Processed context location:**
 
 ```
-<forge_root>/.forge/prev_sessions/<parent-name>/generated.md            # Regeneratable parent cache
-<forge_root>/.forge/prev_sessions/<parent-name>/children/<child>.md     # Per-child launch artifact
+<forge_root>/.forge/prev_sessions/<parent-name>/generated.md              # Regeneratable parent AI cache
+<forge_root>/.forge/prev_sessions/<parent-name>/children/<child>.md        # Per-child AI snapshot (frozen; never edited)
+<forge_root>/.forge/prev_sessions/<parent-name>/children/<child>.notes.md  # Per-child user-notes overlay (edit this)
 ```
 
-You can resume the same parent with different strategies. Raw artifacts stay immutable; the parent cache is regenerated,
-while existing per-child launch artifacts are not overwritten.
+The child snapshot is a **pure AI artifact**: `forge session resume --fresh --review` and `forge transfer edit` write
+user edits to the separate `.notes.md` overlay, which is merged after the snapshot at launch (via
+`--append-system-prompt-file`). You can resume the same parent with different strategies — the parent cache is
+regenerated, while existing per-child snapshots **and** their notes are never overwritten. Inspect and reshape transfer
+context with `forge transfer show|regenerate|edit|diff` (§4.0).
 
 **Session derivation tracking:**
 
@@ -913,9 +925,22 @@ support `--json` for scripting.
 | `forge session incognito [name]`       | Start an ephemeral session (auto-delete on exit)                                  |
 | `forge session shell [name]`           | Open shell in sidecar container                                                   |
 
-Note: `session context` is a deprecated alias for `session show`. `session resume --fresh --review` opens the generated
-per-child transfer context file in `$EDITOR` before launching Claude. `forge session memory` is removed; use
-`forge memory`.
+Note: `session context` is a deprecated alias for `session show`. `session resume --fresh --review` opens the per-child
+user-notes overlay (`children/<child>.notes.md`) in `$EDITOR` before launching Claude; the AI snapshot stays read-only.
+`forge session memory` is removed; use `forge memory`.
+
+#### Transfer context
+
+| Command                              | Purpose                                                                    |
+| ------------------------------------ | -------------------------------------------------------------------------- |
+| `forge transfer show <parent>`       | Show the parent AI cache, or a child's composed view (`--child`, `--json`) |
+| `forge transfer regenerate <parent>` | Rebuild the parent cache only (defaults to its current strategy/depth)     |
+| `forge transfer edit <parent>`       | Edit a child's user-notes overlay in `$EDITOR` (`--child`)                 |
+| `forge transfer diff <parent>`       | Show cache-vs-child-snapshot drift (`--child`)                             |
+
+`forge transfer` pairs with `forge memory` as the two halves of the former "handoff": `forge memory` curates project
+docs; `forge transfer` assembles resume/fork context. Every verb takes a parent session argument. `show`/`regenerate`
+default to the parent cache; `edit`/`diff` resolve a child (inferred when the parent has exactly one, else `--child`).
 
 #### Memory management
 

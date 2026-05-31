@@ -1083,3 +1083,67 @@ In sidecar mode (`~/.forge` not mounted), registry-dependent steps are unavailab
 Proxy IDs are resolved on the host before entering the sidecar. If a user supplies a plain proxy ID inside a sidecar
 with no injected metadata, Forge fails with an actionable error suggesting `--subprocess-proxy` at session start or
 running the workflow on the host.
+
+---
+
+## M. Transfer Context Schema
+
+Extracted from [design.md §3.9](design.md#39-session-resume-context-management). The transfer document is a stable,
+frontmatter-backed Markdown contract produced by `assemble_transfer_context` (`src/forge/session/transfer.py`).
+
+### M.1 Frontmatter (child-agnostic)
+
+Every strategy prepends one YAML block. It carries **no `child` field** — child identity is path-derived, so
+`generated.md` and the `children/<child>.md` copy stay byte-identical (the `ensure_child` copy and the auto-name retry
+byte-compare in `manager.py` both depend on this).
+
+```yaml
+---
+forge_transfer:
+  schema_version: 1
+  parent: <parent-session-name>
+  strategy: ai-curated | structured | full | minimal
+  schema: full | compatibility-fallback   # "full" only for a successful ai-curated body
+  depth: <int>                              # lineage depth (regenerate restores this)
+  generated_at: <ISO8601>
+  lineage: [<parent>, <grandparent>, ...]
+  transcript_artifact: <forge-root-rel path | null>
+  token_estimate: <int | null>
+  target_runtime: claude                    # reserved for Phase 5 cross-runtime tuning
+---
+```
+
+Reads are **best-effort** (`parse_transfer_frontmatter`): the doc is an LLM-consumed artifact with a user-editable
+overlay (a system boundary), so missing/malformed frontmatter warns and still returns the body — it never hard-fails.
+
+### M.2 Sections
+
+`ai-curated` emits the full 8-section contract; code owns the skeleton and the model fills section bodies (it returns
+structured JSON, parsed with `extract_json_from_response`). Decisions cite a transcript turn (`[turn N]`) or file;
+citations are validated against the turn range the model saw and fabricated ones are dropped with a warning
+(`_validate_decision_citations`), so `schema: full` does not overstate evidence quality. Sections 1–7 live in the AI
+snapshot; section 8 is the separate notes overlay (so the snapshot has 7 headers and the composed launch view has 8):
+
+1. `## Lineage`
+2. `## Goal / Current Task`
+3. `## Decisions` (cited)
+4. `## Current State`
+5. `## Relevant Files` (`file:line`)
+6. `## Open Questions`
+7. `## Runtime Hints`
+8. `## User Notes` (overlay)
+
+`minimal | structured | full` keep their existing bodies and set `schema: compatibility-fallback`.
+
+### M.3 File layout and overlay
+
+```
+<forge_root>/.forge/prev_sessions/<parent>/generated.md               # parent AI cache (regenerate rewrites)
+<forge_root>/.forge/prev_sessions/<parent>/children/<child>.md        # per-child AI snapshot (frozen; never edited)
+<forge_root>/.forge/prev_sessions/<parent>/children/<child>.notes.md  # per-child user overlay (the editable surface)
+```
+
+The launcher appends the snapshot plus the notes overlay (when it has user content) to one `--append-system-prompt-file`
+via `_combine_prompt_files`. `forge transfer regenerate` rewrites only `generated.md`; snapshots and notes are never
+overwritten. GC pairs a notes file's liveness to its snapshot — it is never orphaned independently
+(`_detect_orphan_transfer_files`).

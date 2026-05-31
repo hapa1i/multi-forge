@@ -7,10 +7,7 @@ continues to work.
 
 from __future__ import annotations
 
-import os
 import shlex
-import shutil
-import subprocess
 import sys
 import uuid as _uuid
 from pathlib import Path
@@ -48,6 +45,11 @@ from forge.session.exceptions import (
     SessionNotFoundError,
     WorktreePathExistsError,
 )
+from forge.session.prev_sessions import (
+    ensure_notes_overlay,
+    notes_for_snapshot,
+    notes_has_user_content,
+)
 
 
 # Names that tests patch on forge.cli.session (invoke_claude,
@@ -58,6 +60,7 @@ def _sess():  # type: ignore[return]
     return sys.modules["forge.cli.session"]
 
 
+from forge.cli.editor import open_in_editor  # noqa: E402
 from forge.cli.output import print_error_with_tip, print_tip  # noqa: E402
 from forge.cli.session import (  # noqa: E402
     ResolvedRouting,
@@ -1742,6 +1745,9 @@ def _launch_in_place(
         persisted_context = _resolve_derivation_context_file(manifest)
         if persisted_context is not None:
             prompt_files.append(persisted_context)
+            notes_overlay = notes_for_snapshot(persisted_context)
+            if notes_has_user_content(notes_overlay):
+                prompt_files.append(notes_overlay)
             launch_action = "Start fresh Claude session with parent context"
         else:
             fork_context, prompt_warnings = _sess()._generate_parent_transfer_context(
@@ -2023,38 +2029,6 @@ def _pick_session(
         return None
 
 
-def _open_in_editor(file_path: Path, *, resume_session_name: str | None = None) -> None:
-    """Open ``file_path`` in $EDITOR. Aborts launch on non-zero exit (git-commit-style).
-
-    The file is edited in place; no temp file dance because the per-child
-    context file is the authoritative artifact.
-    """
-    editor = os.environ.get("EDITOR", "vim")
-    editor_argv = shlex.split(editor)
-    if not editor_argv:
-        console.print("[red]Error:[/red] $EDITOR is empty. Set $EDITOR to an available editor.")
-        sys.exit(1)
-    if not shutil.which(editor_argv[0]):
-        console.print(f"[red]Error:[/red] Editor '{editor}' not found. Set $EDITOR to an available editor.")
-        sys.exit(1)
-
-    result = subprocess.run([*editor_argv, str(file_path)])
-    if result.returncode != 0:
-        resume_tip = (
-            f"forge session resume {resume_session_name}"
-            if resume_session_name
-            else "forge session resume <child-name>"
-        )
-        console.print(f"[red]Aborted:[/red] editor exited with code {result.returncode}. Session not launched.")
-        print_tip(
-            f"The transfer file at {display_path(file_path)} is preserved. "
-            f"Run '{resume_tip}' to launch with the current content.",
-            blank_before=False,
-            console=console,
-        )
-        sys.exit(result.returncode)
-
-
 def _resume_fresh(
     *,
     manager: SessionManager,
@@ -2123,8 +2097,21 @@ def _resume_fresh(
     console.print()
 
     if review and transfer_result.context_file is not None:
-        console.print(f"[dim]Opening {transfer_result.context_file_rel} in $EDITOR for review...[/dim]")
-        _open_in_editor(transfer_result.context_file, resume_session_name=child_manifest.name)
+        # Unify on the overlay: --review edits the user-notes overlay, never the
+        # pure AI snapshot. Notes are merged into the launch context below.
+        notes_overlay = ensure_notes_overlay(transfer_result.context_file)
+        console.print(
+            f"[dim]Opening notes overlay {display_path(notes_overlay)} in $EDITOR "
+            f"(AI snapshot at {transfer_result.context_file_rel} stays read-only)...[/dim]"
+        )
+        open_in_editor(
+            notes_overlay,
+            console=console,
+            abort_tip=(
+                f"Your notes at {display_path(notes_overlay)} are preserved. "
+                f"Run 'forge session resume {child_manifest.name}' to launch with the current content."
+            ),
+        )
 
     console.print(f"Created derived session [green]{child_manifest.name}[/green] from [cyan]{parent}[/cyan]")
     console.print(f"[dim]Strategy: {strategy}, Depth: {depth}[/dim]")
@@ -2137,7 +2124,14 @@ def _resume_fresh(
     if configured_prompt is not None:
         prompt_files.append(configured_prompt)
     if transfer_result.context_file is not None:
-        prompt_files.append(transfer_result.context_file.resolve())
+        snapshot = transfer_result.context_file.resolve()
+        prompt_files.append(snapshot)
+        # Merge the user-notes overlay (e.g. just authored via --review) after
+        # the pure AI snapshot. _combine_prompt_files concatenates both into one
+        # appended system-prompt file; the snapshot itself is never edited.
+        notes_overlay = notes_for_snapshot(snapshot)
+        if notes_has_user_content(notes_overlay):
+            prompt_files.append(notes_overlay)
     prompt_file = _combine_prompt_files(
         worktree_path=child_worktree,
         session_name=child_manifest.name,

@@ -325,10 +325,10 @@ transfer context; `--resume-mode native` carries the full Claude conversation in
 
 **Resume modes** (`--resume-mode`):
 
-| Mode                 | Mechanism                                           | Trade-off                       |
-| -------------------- | --------------------------------------------------- | ------------------------------- |
-| `transfer` (default) | Assembled context via `--append-system-prompt-file` | Lossy but survives `/compact`   |
-| `native`             | `--resume --fork-session` (full conversation)       | Lossless but lost on `/compact` |
+| Mode                 | Mechanism                                           | Trade-off                                              |
+| -------------------- | --------------------------------------------------- | ------------------------------------------------------ |
+| `transfer` (default) | Assembled context via `--append-system-prompt-file` | Editable + portable; survives `/compact`               |
+| `native`             | `--resume --fork-session` (full conversation)       | Byte-faithful but opaque; same CWD; lost on `/compact` |
 
 ```bash
 # Default: assembled context (transfer)
@@ -337,7 +337,7 @@ forge session resume auth-refactor --fresh
 # Lossless: carry full conversation history
 forge session resume auth-refactor --fresh --resume-mode native
 
-# Curate the assembled context in $EDITOR before launching
+# Curate the user-notes overlay in $EDITOR before launching
 forge session resume auth-refactor --fresh --review
 ```
 
@@ -345,23 +345,26 @@ Native mode requires the parent to have a confirmed Claude session ID (i.e., the
 least once). `--strategy` and `--depth` are ignored in native mode. `--review` is only valid for transfer mode (native
 resumes carry the conversation verbatim and have no editable artifact).
 
-**Curating the transfer with `--review`.** When you pass `--review`, Forge opens the generated per-child transfer file
-in `$EDITOR` and waits. Save and exit normally to launch; abort (`:cq` in vim) to skip the launch. The edited file is
-preserved on disk regardless of whether the launch proceeded. If you abort, the child session remains unlaunched; run
-`forge session resume <child>` later to launch it with the preserved edited transfer file.
+**Curating with `--review`.** When you pass `--review`, Forge opens the per-child **user-notes overlay**
+(`children/<child>.notes.md`) in `$EDITOR` and waits — the AI snapshot (`children/<child>.md`) stays read-only, so your
+notes survive a later `forge transfer regenerate`. Save and exit normally to launch; abort (`:cq` in vim) to skip the
+launch. Your notes are preserved on disk regardless. If you abort, the child remains unlaunched; run
+`forge session resume <child>` later. Notes are merged after the snapshot at launch.
 
 **Per-parent layout for resume artifacts.** Each parent gets a directory under `.forge/prev_sessions/`:
 
 ```text
 <forge_root>/.forge/prev_sessions/
 └── <parent>/
-    ├── generated.md             # Regeneratable cache (overwritten on every resume)
+    ├── generated.md              # Regeneratable AI cache (overwritten on every resume)
     └── children/
-        └── <child>.md           # Per-child authoritative context (durable)
+        ├── <child>.md            # Per-child AI snapshot (frozen; never edited)
+        └── <child>.notes.md      # Per-child user-notes overlay (edit this; merged at launch)
 ```
 
-Re-resuming the same parent regenerates `generated.md` but never disturbs an existing `children/<child>.md`. Any
-hand-edits a user makes to a child file survive subsequent resumes from the same parent.
+Re-resuming the same parent regenerates `generated.md` but never disturbs an existing `children/<child>.md` **or** its
+`.notes.md` overlay. Write your edits to the notes overlay (via `--review` or `forge transfer edit`) so they survive
+regeneration. Inspect or reshape any of this with `forge transfer show|regenerate|edit|diff`.
 
 Resume and fork-recovery launches inject the per-child file directly with `--append-system-prompt-file`. If you
 customize `CLAUDE.md`, do not also add manual references to `.forge/prev_sessions/...` there, or you may duplicate the

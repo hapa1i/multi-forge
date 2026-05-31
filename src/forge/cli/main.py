@@ -30,6 +30,7 @@ from .proxy import proxy  # noqa: E402
 from .search import search_cmd  # noqa: E402
 from .session import session  # noqa: E402
 from .status_line import status_line  # noqa: E402
+from .transfer import transfer as transfer_cmd  # noqa: E402
 from .workflow import workflow_cmd  # noqa: E402
 
 # Subcommands that should NOT trigger pending-work processing or auto file logging.
@@ -284,6 +285,7 @@ main.add_command(claude)
 main.add_command(config_cmd, name="config")
 main.add_command(hooks)
 main.add_command(memory_cmd, name="memory")
+main.add_command(transfer_cmd, name="transfer")
 main.add_command(extensions, name="extension")
 main.add_command(status_line)
 main.add_command(info_cmd, name="info")
