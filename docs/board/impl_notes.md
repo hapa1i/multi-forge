@@ -106,3 +106,6 @@ Shipped 2026-05-31 (commit `2b70c29`). Durable invariants for `src/forge/session
   `forge session context` (folded into `forge session show`).
 - **`target_runtime`** is reserved in the frontmatter (`TRANSFER_TARGET_RUNTIME = "claude"`) for Phase 5 cross-runtime
   tuning: Phase 5 retargets presentation without changing transcript source artifacts or schema semantics.
+- **`ctx` is prior art and inspiration only, never a dependency**: the transfer schema is Forge-owned and canonical
+  (design_appendix.md §M.4). [`ctx`](https://github.com/dchu917/ctx) concepts informed it; Forge will not depend on it
+  and no interop is planned. The self-contained schema means an optional future bridge would need no schema change.

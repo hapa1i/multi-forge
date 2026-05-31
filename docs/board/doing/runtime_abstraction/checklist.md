@@ -24,11 +24,14 @@ wc -l docs/board/doing/runtime_abstraction/checklist.md
 
 ## Current Focus
 
-Phase 1 largely shipped (commit `2b70c29`, 2026-05-31): schema-backed curated transfer, the `children/<child>.notes.md`
-overlay, and the top-level `forge transfer show|regenerate|edit|diff` CLI; `docs/design.md` §3.9 and
-`docs/design_appendix.md` §M reflect it. Remaining Phase 1 work: record a `ctx` interop decision in a design doc, then
-the closeout sign-off (schema-stable-for-Phase-5). CLI default stays `structured` unless a separate default-change
-decision is recorded (see Open Decisions).
+**Phase 1 complete (2026-05-31).** Schema-backed curated transfer, the `children/<child>.notes.md` overlay, and the
+top-level `forge transfer show|regenerate|edit|diff` CLI shipped in commit `2b70c29`; `docs/design.md` §3.9 and
+`docs/design_appendix.md` §M reflect it. The `ctx` posture is recorded (prior art and inspiration only, never a
+dependency -- §M.4), and both default-behavior decisions are resolved docs-only: keep `--review` opt-in, keep
+`structured` the CLI default (`ai-curated` opt-in via `--strategy`). All Phase 1 boxes are ticked.
+
+Next: Phase 2 (optional audit proxy) and Phase 3 (native-relocate spike) are independent and can ship in either order
+before the Phase 4 runtime-abstraction core. The card stays in `doing/` until Phases 2-6 land.
 
 **Deferred prerequisite (memory_substrate reconciliation) -- RESOLVED 2026-05-30:**
 
@@ -130,18 +133,20 @@ Phase 0 gaps carried forward:
     child, and `forge transfer regenerate` rewrites only `generated.md`. Covered by `test_prev_sessions.py`
     (`test_snapshot_notes_round_trip`, `test_compose_merges_user_notes`, `test_compose_skips_empty_notes`). Shipped in
     `2b70c29`.
-- [ ] Decide how `ctx` relates to Forge transfer.
+- [x] Decide how `ctx` relates to Forge transfer.
   - Assertion: docs state whether `ctx` is only prior art, an import/export peer, or a future dependency.
-  - Status (2026-05-31): NOT done. `card.md` leans "Forge-owned schema; `ctx` as prior art/peer, not a first
-    dependency," but `docs/design.md` records no `ctx` decision and the card still lists interop as an Open Question.
-    Tick only once the posture is written into a design doc.
-- [ ] Confirm Phase 1 schema is stable enough for Phase 5 target-runtime tuning.
+  - Decision (2026-05-31): `ctx` is **prior art and inspiration only -- never a dependency**. The Forge-owned transfer
+    schema is canonical and no `ctx` interop is planned (an optional import/export bridge could be added later on the
+    existing schema, but is not committed work). Recorded in `docs/design_appendix.md` §M.4; the matching `card.md`
+    prose and Open Question are aligned and marked resolved.
+- [x] Confirm Phase 1 schema is stable enough for Phase 5 target-runtime tuning.
   - Assertion: Phase 5 can tune transfer presentation for Codex without changing transcript source artifacts or schema
     semantics.
-  - Status (2026-05-31): supporting evidence exists -- the schema reserves `target_runtime` (frontmatter +
-    `TRANSFER_TARGET_RUNTIME`, appendix §M.1) and code owns the section skeleton, so Phase 5 can retarget presentation
-    without touching transcript artifacts. Left unchecked as the deliberate Phase 1 closeout sign-off (pending the `ctx`
-    decision and the default-strategy decision in Open Decisions).
+  - Verification (2026-05-31): the schema reserves `target_runtime` (frontmatter + `TRANSFER_TARGET_RUNTIME`, appendix
+    §M.1) and code owns the section skeleton, so Phase 5 retargets presentation without touching transcript artifacts or
+    schema semantics. Closeout gates cleared -- the `ctx` posture is recorded (§M.4) and both default-behavior Open
+    Decisions are resolved (keep `--review` opt-in, keep `structured` default). All Phase 1 boxes are now ticked; the
+    card stays in `doing/` for Phases 2-6.
 
 ## Phase 2 - Optional Audit Proxy
 
@@ -221,10 +226,16 @@ Phase 0 gaps carried forward:
 Tracks Forge-local execution decisions for this checklist. For broader card questions, see
 [`card.md` Open Questions](./card.md#open-questions).
 
-- [ ] Should `forge session resume --fresh --review` become default for curated transfer workflows?
+- [x] Should `forge session resume --fresh --review` become default for curated transfer workflows? **Resolved
+  2026-05-31: no -- keep `--review` opt-in.** A plain `--fresh` resume launches immediately; `--review` stays an
+  explicit flag so non-interactive/scripted resume never blocks on `$EDITOR`. Curation is deliberate. Docs-only, no code
+  change.
 - [x] Which transfer-owned namespace should the resume-context commands use? **Resolved 2026-05-30: top-level
   `forge transfer ...`** (not `forge session transfer ...`), pairing with `forge memory`. Rationale and free/occupied
   verification are recorded in the Phase 1 namespace task above.
-- [ ] Should Phase 1 remain prose/schema-only, or should it change the default strategy after schema tests land?
+- [x] Should Phase 1 remain prose/schema-only, or should it change the default strategy after schema tests land?
+  **Resolved 2026-05-31: prose/schema-only -- keep `structured` as the CLI default.** `ai-curated` stays opt-in via
+  `--strategy ai-curated`, keeping the resume hot path deterministic, free, and LLM-free (matches design.md §3.9).
+  Docs-only, no code change.
 - [ ] Where do proxy cost logs, audit logs, and the future usage ledger converge?
 - [ ] How should `FORGE_DEPTH` compose with future run-tree attribution ids?

@@ -1147,3 +1147,12 @@ The launcher appends the snapshot plus the notes overlay (when it has user conte
 via `_combine_prompt_files`. `forge transfer regenerate` rewrites only `generated.md`; snapshots and notes are never
 overwritten. GC pairs a notes file's liveness to its snapshot — it is never orphaned independently
 (`_detect_orphan_transfer_files`).
+
+### M.4 Relationship to `ctx` (prior art)
+
+The transfer schema (§M.1–M.3) is **Forge-owned and canonical**. [`ctx`](https://github.com/dchu917/ctx) is **prior art
+and inspiration only** — its concepts (workstreams, exact transcript binding, branching, indexed retrieval, local
+storage, curation) informed this substrate. Forge will **not** take `ctx` as a dependency: curated transfer is
+load-bearing for Forge's session, policy, and usage story, so its contract lives in-tree. The schema is self-contained
+and **no `ctx` interop is planned**. An optional import/export bridge could be built on the existing schema later
+without changing it, but that is explicitly not committed work.

@@ -50,8 +50,14 @@ cross-boundary transfer path, with a top-level `forge transfer` CLI to inspect a
   appendix §M documents the frontmatter + 8-section contract + overlay; end-user/session.md updated.
 
 **Verification**: 113 transfer tests pass (`test_transfer.py`, `test_transfer_cli.py`, `test_prev_sessions.py`,
-regression `test_bug_transfer_notes_not_gc_orphaned.py`); shipped as commit `2b70c29`. Phase 1 `ctx`-interop decision
-and closeout sign-off remain open (tracked in the card checklist).
+regression `test_bug_transfer_notes_not_gc_orphaned.py`); shipped as commit `2b70c29`.
+
+**Phase 1 closeout (2026-05-31, docs-only)**: `ctx` posture recorded in `design_appendix.md` §M.4 -- the transfer schema
+is Forge-owned and canonical; `ctx` is prior art and inspiration only, never a dependency, and no interop is planned.
+Both default-behavior decisions resolved as keep-current: `--review` stays opt-in (a plain `--fresh` resume never blocks
+on `$EDITOR`) and `structured` stays the CLI default (`ai-curated` opt-in via `--strategy`, keeping the resume hot path
+deterministic and LLM-free). Schema confirmed stable for Phase 5 (`target_runtime` reserved). All Phase 1 boxes ticked;
+card stays in `doing/` for Phases 2-6. No code or tests changed.
 
 ## 2026-05-29
 

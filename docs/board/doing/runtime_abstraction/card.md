@@ -641,9 +641,10 @@ phase of the project).
 
 Existing tools such as [ctx](https://github.com/dchu917/ctx) are useful prior art: workstreams, exact transcript
 binding, branching, indexed retrieval, local SQLite storage, and curation are all aligned with this substrate. Forge
-should not depend on `ctx` as the first implementation step, because curated transfer is central to Forge's session,
-policy, and usage story. The better near-term path is a Forge-owned transfer schema with optional import/export or
-peer-tool integration once the contract is stable.
+should not take `ctx` as a dependency: `ctx` is prior art and inspiration only, and curated transfer is central to
+Forge's session, policy, and usage story. The transfer schema is Forge-owned and canonical (now shipped); no `ctx`
+interop is planned, though an optional import/export bridge could be added later on the existing schema (see
+`docs/design_appendix.md` §M.4).
 
 **Required for cross-runtime resume:**
 
@@ -736,7 +737,8 @@ No new architecture; mostly documentation and small CLI additions.
   child-vs-cache. `forge transfer show` reports the assembled transfer artifact and is distinct from the deprecated
   `forge session context` (a running session's runtime context, now folded into `forge session show`).
 - Document the agency-at-boundaries frame and the curated-transfer-as-interchange principle in `design.md`.
-- Define the Forge-owned transfer schema and decide whether `ctx` should become an import/export peer later.
+- Define the Forge-owned transfer schema; `ctx` stays prior art and inspiration only, not a dependency or planned peer
+  (see `docs/design_appendix.md` §M.4).
 - Initial schema sketch: lineage pointer, decisions with transcript/file citations, current state snapshot, file:line
   evidence, open questions, runtime hints, and user notes overlay.
 
@@ -822,11 +824,13 @@ Native-relocate is an experimental spike, not a committed UX until contract test
 - How should Forge represent runtimes that can run headless but cannot enforce pre-tool policy?
 - How should run-tree attribution (`FORGE_RUN_ID`, `FORGE_PARENT_RUN_ID`) compose with the existing `FORGE_DEPTH`
   recursion guard and `FORGE_SESSION` identifier? Should `FORGE_DEPTH` become a derived property of the run tree?
-- How should Forge interoperate with [ctx](https://github.com/dchu917/ctx)? The current posture is "Forge-owned schema,
-  ctx as prior art/peer," but useful bridges may include importing ctx packs, exporting Forge transfers to ctx, or
-  linking a Forge session to a ctx workstream.
-- Should `forge session resume --fresh --review` be the default behavior or an explicit flag? Default is friendlier for
-  the curated workflow; flag preserves today's "just resume" UX.
+- How should Forge interoperate with [ctx](https://github.com/dchu917/ctx)? **Resolved (Phase 1, 2026-05-31):** `ctx` is
+  prior art and inspiration only — Forge will not take it as a dependency. The Forge-owned schema is canonical
+  (`docs/design_appendix.md` §M.4) and no `ctx` interop is planned; an optional import/export bridge could be added
+  later on the existing schema, but is not committed work.
+- Should `forge session resume --fresh --review` be the default behavior or an explicit flag? **Resolved (Phase 1,
+  2026-05-31):** explicit flag (opt-in) -- a plain `--fresh` resume launches immediately, and `--review` stays opt-in so
+  non-interactive/scripted resume never blocks on `$EDITOR`.
 - Where do PR #8's `~/.forge/costs/requests/*.jsonl` and Phase 4's `~/.forge/usage/events.jsonl` converge? Same data
   plane eventually merged, or parallel forever? The audit logs from Phase 2 (`~/.forge/audit/requests/*.jsonl`) raise
   the same question.
