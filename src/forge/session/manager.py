@@ -167,23 +167,47 @@ def _add_unique_project_root(roots: list[str], value: Any) -> None:
         roots.append(normalized)
 
 
-def _transcript_cleanup_project_root(state: SessionState | None, fallback_root: str) -> str:
+def _raw_confirmed_value(raw_data: dict[str, Any] | None, key: str) -> Any:
+    if not isinstance(raw_data, dict):
+        return None
+    confirmed = raw_data.get("confirmed")
+    if not isinstance(confirmed, dict):
+        return None
+    return confirmed.get(key)
+
+
+def _transcript_cleanup_project_root(
+    state: SessionState | None,
+    fallback_root: str,
+    raw_data: dict[str, Any] | None = None,
+) -> str:
     """Return the Claude project root whose raw transcript files should be cleaned."""
     if state is not None:
         if state.confirmed.claude_project_root:
             return str(Path(state.confirmed.claude_project_root).expanduser().resolve())
         if state.worktree or state.forge_root:
             return str(Path(resolve_claude_project_root(state)).expanduser().resolve())
+
+    raw_claude_project_root = _raw_confirmed_value(raw_data, "claude_project_root")
+    if isinstance(raw_claude_project_root, str) and raw_claude_project_root:
+        return str(Path(raw_claude_project_root).expanduser().resolve())
+
     return str(Path(fallback_root).expanduser().resolve())
 
 
-def _candidate_transcript_project_roots(state: SessionState | None, entry: SessionIndexEntry) -> list[str]:
+def _candidate_transcript_project_roots(
+    state: SessionState | None,
+    entry: SessionIndexEntry,
+    raw_data: dict[str, Any] | None = None,
+) -> list[str]:
     """Return possible Claude project roots for a session, newest source first."""
     roots: list[str] = []
     if state is not None:
         _add_unique_project_root(roots, state.confirmed.claude_project_root)
         if state.worktree or state.forge_root:
             _add_unique_project_root(roots, resolve_claude_project_root(state))
+    else:
+        _add_unique_project_root(roots, _raw_confirmed_value(raw_data, "claude_project_root"))
     _add_unique_project_root(roots, entry.forge_root or entry.worktree_path)
     _add_unique_project_root(roots, entry.worktree_path)
     return roots
@@ -1551,7 +1575,7 @@ class SessionManager:
             if not other_ids:
                 continue
 
-            candidate_roots = _candidate_transcript_project_roots(other_state, other_entry)
+            candidate_roots = _candidate_transcript_project_roots(other_state, other_entry, other_raw)
             for session_id in target_paths:
                 if session_id not in other_ids:
                     continue
@@ -1694,7 +1718,11 @@ class SessionManager:
             for _session_id in [_claude_session_id, *_artifact_ids]:
                 _append_unique_string(_cleanup_ids, _session_id)
 
-            _transcript_project_root = _transcript_cleanup_project_root(state, entry.forge_root or entry.worktree_path)
+            _transcript_project_root = _transcript_cleanup_project_root(
+                state,
+                entry.forge_root or entry.worktree_path,
+                _raw_data,
+            )
             shared_ids = self._find_shared_transcript_sessions(
                 _transcript_project_root,
                 _cleanup_ids,
