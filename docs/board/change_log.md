@@ -25,6 +25,34 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board-contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-05-31
+
+### Phase 1: Schema-backed curated transfer + `forge transfer` CLI (Runtime Abstraction)
+
+**Goal**: Make curated transfer a schema-backed, user-reviewable substrate and reposition `ai-curated` as the primary
+cross-boundary transfer path, with a top-level `forge transfer` CLI to inspect and reshape it.
+
+**Key changes**:
+
+- **Transfer schema** (`src/forge/session/transfer.py`): `_build_ai_curated_output()` emits canonical sections 1-7
+  (Lineage, Goal/Current Task, Decisions, Current State, Relevant Files, Open Questions, Runtime Hints); section 8 (User
+  Notes) is the overlay merged at launch. `_build_frontmatter()` stamps `schema_version: 1`, reserves `target_runtime`
+  for Phase 5, and marks `schema: "full"` only for a successful ai-curated body (`minimal|structured|full` →
+  `compatibility-fallback`). `_validate_decision_citations()` drops citations outside the turn range the model saw, so
+  `schema: full` never overstates evidence.
+- **Three-file artifact model**: `generated.md` (regeneratable parent cache), `children/<child>.md` (frozen AI
+  snapshot), `children/<child>.notes.md` (user overlay). `ensure_child` never overwrites an existing child; GC ties a
+  notes file's liveness to its snapshot.
+- **CLI** (`cli/transfer.py`, `core/ops/transfer.py`): new top-level `forge transfer show|regenerate|edit|diff`, pairing
+  with `forge memory`. `regenerate` rewrites only the parent cache; `edit` targets the notes overlay; `show`/`diff` take
+  `--child`.
+- **Docs**: design.md §3.9 reframes curated transfer as the primary cross-boundary substrate (not a lossy fallback);
+  appendix §M documents the frontmatter + 8-section contract + overlay; end-user/session.md updated.
+
+**Verification**: 113 transfer tests pass (`test_transfer.py`, `test_transfer_cli.py`, `test_prev_sessions.py`,
+regression `test_bug_transfer_notes_not_gc_orphaned.py`); shipped as commit `2b70c29`. Phase 1 `ctx`-interop decision
+and closeout sign-off remain open (tracked in the card checklist).
+
 ## 2026-05-29
 
 ### fix: tombstone `forge handoff run` (memory_substrate follow-up)

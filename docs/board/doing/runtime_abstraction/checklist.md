@@ -24,8 +24,11 @@ wc -l docs/board/doing/runtime_abstraction/checklist.md
 
 ## Current Focus
 
-Phase 1: stabilize curated transfer as a schema-backed, user-reviewable cross-runtime substrate. Keep CLI default
-behavior unchanged unless a separate default-change decision is recorded.
+Phase 1 largely shipped (commit `2b70c29`, 2026-05-31): schema-backed curated transfer, the `children/<child>.notes.md`
+overlay, and the top-level `forge transfer show|regenerate|edit|diff` CLI; `docs/design.md` §3.9 and
+`docs/design_appendix.md` §M reflect it. Remaining Phase 1 work: record a `ctx` interop decision in a design doc, then
+the closeout sign-off (schema-stable-for-Phase-5). CLI default stays `structured` unless a separate default-change
+decision is recorded (see Open Decisions).
 
 **Deferred prerequisite (memory_substrate reconciliation) -- RESOLVED 2026-05-30:**
 
@@ -63,18 +66,25 @@ Phase 0 gaps carried forward:
 
 ## Phase 1 - Curated Transfer Reframe
 
-- [ ] Reposition `ai-curated` / curated transfer in `docs/design.md` as the primary cross-runtime and cross-topology
+- [x] Reposition `ai-curated` / curated transfer in `docs/design.md` as the primary cross-runtime and cross-topology
   transfer substrate, not merely a lossy fallback.
-  - Assertion: design text distinguishes native resume, native-relocate, and curated transfer by user agency and runtime
-    portability. This is a prose/schema reframe only; `structured` remains the CLI default unless an explicit default
-    change is approved.
+  - Assertion: design text distinguishes native resume (byte-faithful but opaque and CWD-locked) from curated transfer
+    (runtime-neutral, user-editable) by user agency and runtime portability; `structured` remains the CLI default unless
+    an explicit default change is approved.
+  - Scope note (assertion refined 2026-05-31): the native-*relocate* leg of the agency reframe stays in `card.md` and
+    lands in `design.md` only when Phase 3 ships native-relocate. Design docs describe shipped behavior
+    (documentation-guidelines Rule 2), so an unshipped Phase 3 spike must not be written as current design; the original
+    assertion's "native-relocate" clause was dropped for this reason.
+  - Verification (2026-05-31): `docs/design.md` §3.9 ("Curated transfer is the primary cross-boundary substrate, not a
+    lossy fallback") shipped in commit `2b70c29`; `structured` confirmed still the CLI default in both the prose and
+    `transfer.py`.
 - [x] Verify `forge session resume --fresh --review` behavior.
   - Note: this shipped before the runtime-abstraction checklist was activated; it is retained here as verified Phase 1
     foundation.
-  - Assertion: transfer-mode resume opens the generated child transfer context file in `$EDITOR`; native mode rejects
-    `--review` with an actionable error.
+  - Assertion: transfer-mode resume opens the per-child user-notes overlay (`children/<child>.notes.md`) in `$EDITOR`;
+    native mode rejects `--review` with an actionable error.
   - Verification: `src/forge/cli/session_lifecycle.py` implements the `resume --review` option, native-mode rejection,
-    and `$EDITOR` launch for the generated child context; `docs/design.md` command reference documents the CLI contract;
+    and `$EDITOR` launch for the user-notes overlay; `docs/design.md` command reference documents the CLI contract;
     `tests/src/cli/test_session_resume_review.py` covers the behavior.
 - [x] Decide the resume-context command namespace before adding `regenerate|edit|diff`.
   - Decision (2026-05-30): **top-level `forge transfer` group** -- `forge transfer show|regenerate|edit|diff`. Chosen
@@ -89,23 +99,49 @@ Phase 0 gaps carried forward:
     is deliberately distinct from the deprecated `forge session context` (a running session's runtime context).
   - Single canonical namespace only: `forge session resume --fresh --review` remains a delegating entry point, not a
     competing surface.
-- [ ] Define the Forge-owned curated transfer schema contract in docs.
+- [x] Define the Forge-owned curated transfer schema contract in docs.
   - Assertion: schema records lineage, decisions with citations, current state, open questions, runtime hints, and user
     notes overlay.
-- [ ] Implement the curated transfer schema in `src/forge/session/transfer.py`.
+  - Verification (2026-05-31): `docs/design_appendix.md` §M documents the contract -- §M.1 child-agnostic frontmatter
+    (`schema_version: 1`, `schema`, `strategy`, `lineage`, `target_runtime`), §M.2 the 8 canonical sections (Lineage,
+    Goal/Current Task, Decisions cited, Current State, Relevant Files, Open Questions, Runtime Hints, User Notes), §M.3
+    the three-file layout + overlay. Shipped in `2b70c29`.
+- [x] Implement the curated transfer schema in `src/forge/session/transfer.py`.
   - Assertion: generated transfer markdown has stable sections for the schema fields; existing
     `minimal|structured|full|ai-curated` strategies either emit that schema or document their compatibility fallback.
-- [ ] Add tests for schema output and artifact durability.
+  - Verification (2026-05-31): `transfer.py` `_build_ai_curated_output()` emits canonical sections 1-7 (section 8 is the
+    `.notes.md` overlay merged at show/launch); `_build_frontmatter()` stamps `schema: "full"` only for a successful
+    ai-curated body and `schema: "compatibility-fallback"` for `minimal|structured|full`;
+    `_validate_decision_citations()` drops fabricated citations so `schema: full` stays honest. Shipped in `2b70c29`.
+- [x] Add tests for schema output and artifact durability.
   - Assertion: tests cover parent cache regeneration, per-child artifact preservation, and required schema sections for
     curated output.
-- [ ] Define the user notes overlay convention.
+  - Verification (2026-05-31): 113 passed -- `tests/src/session/test_transfer.py`
+    (`test_ai_curated_renders_schema_sections`, `test_compatibility_fallback_frontmatter`,
+    `test_generated_and_child_are_byte_identical`, citation grounding), `tests/src/cli/test_transfer_cli.py`
+    (`test_regenerate_preserves_strategy`, `test_regenerate_does_not_touch_notes`,
+    `test_show_json_includes_section_map`), `tests/src/session/test_prev_sessions.py` (notes round-trip, compose,
+    `iter_children` excludes notes), and regression `tests/regression/test_bug_transfer_notes_not_gc_orphaned.py`.
+- [x] Define the user notes overlay convention.
   - Assertion: docs/code state where user notes live, how they compose with generated content, and that regeneration
     never overwrites authoritative user notes.
+  - Verification (2026-05-31): `children/<child>.notes.md` is the editable overlay (design.md §3.9, appendix §M.3);
+    `prev_sessions.py` composes notes after the frozen snapshot at launch, `ensure_child` never overwrites an existing
+    child, and `forge transfer regenerate` rewrites only `generated.md`. Covered by `test_prev_sessions.py`
+    (`test_snapshot_notes_round_trip`, `test_compose_merges_user_notes`, `test_compose_skips_empty_notes`). Shipped in
+    `2b70c29`.
 - [ ] Decide how `ctx` relates to Forge transfer.
   - Assertion: docs state whether `ctx` is only prior art, an import/export peer, or a future dependency.
+  - Status (2026-05-31): NOT done. `card.md` leans "Forge-owned schema; `ctx` as prior art/peer, not a first
+    dependency," but `docs/design.md` records no `ctx` decision and the card still lists interop as an Open Question.
+    Tick only once the posture is written into a design doc.
 - [ ] Confirm Phase 1 schema is stable enough for Phase 5 target-runtime tuning.
   - Assertion: Phase 5 can tune transfer presentation for Codex without changing transcript source artifacts or schema
     semantics.
+  - Status (2026-05-31): supporting evidence exists -- the schema reserves `target_runtime` (frontmatter +
+    `TRANSFER_TARGET_RUNTIME`, appendix §M.1) and code owns the section skeleton, so Phase 5 can retarget presentation
+    without touching transcript artifacts. Left unchecked as the deliberate Phase 1 closeout sign-off (pending the `ctx`
+    decision and the default-strategy decision in Open Decisions).
 
 ## Phase 2 - Optional Audit Proxy
 

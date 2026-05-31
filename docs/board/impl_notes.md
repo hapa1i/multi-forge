@@ -83,3 +83,26 @@ CLI surface, check whether the target path is already a tombstone.
 **Durable-value rename pattern (resume_mode):** `confirmed.derivation.resume_mode` migrated `"handoff"` → `"transfer"`
 via accept-and-tolerate, not reject — readers map legacy `"handoff"`/`None` to transfer with no branching; writers emit
 `"transfer"`. Regression: `tests/regression/test_bug_resume_mode_rename.py`.
+
+### Curated transfer: schema + three-file artifact model (runtime_abstraction Phase 1)
+
+Shipped 2026-05-31 (commit `2b70c29`). Durable invariants for `src/forge/session/transfer.py` and
+`src/forge/session/prev_sessions.py`:
+
+- **Three-file artifact model** under `<forge_root>/.forge/prev_sessions/<parent>/`: `generated.md` (regeneratable
+  parent cache), `children/<child>.md` (frozen AI snapshot, schema sections 1-7), `children/<child>.notes.md` (user
+  overlay, section 8). `forge transfer regenerate` rewrites only `generated.md`; `ensure_child` never overwrites an
+  existing child; GC ties a notes file's liveness to its snapshot (never orphaned independently).
+- **Child-agnostic frontmatter (load-bearing)**: the transfer frontmatter carries no `child` field, so `generated.md`
+  and the copied `children/<child>.md` stay byte-identical. `ensure_child` and the auto-name retry byte-compare in
+  `manager.py` both depend on this — do not add per-child fields to the frontmatter.
+- **Citation honesty**: `schema: "full"` is stamped only for a successful ai-curated body; every other strategy or
+  fallback is `"compatibility-fallback"`. `_validate_decision_citations()` drops any citation outside the `[turn N]`
+  range the model actually saw (keeps the decision text, blanks false provenance), so `schema: full` never overstates
+  evidence quality.
+- **Namespace**: `forge transfer` is a **top-level** group (pairs with `forge memory`), not `forge session transfer`.
+  `forge session resume --fresh --review` is a delegating entry point that edits the `.notes.md` overlay, not a
+  competing namespace. `forge transfer show` (assembled artifact) is distinct from the deprecated
+  `forge session context` (folded into `forge session show`).
+- **`target_runtime`** is reserved in the frontmatter (`TRANSFER_TARGET_RUNTIME = "claude"`) for Phase 5 cross-runtime
+  tuning: Phase 5 retargets presentation without changing transcript source artifacts or schema semantics.

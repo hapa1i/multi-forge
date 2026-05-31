@@ -720,7 +720,7 @@ No new architecture; mostly documentation and small CLI additions.
 
 - Reposition `ai-curated` in [design.md §3.9](../design.md#39-session-resume-context-management) as the cross-everything
   primary substrate rather than one strategy among four.
-- Add `forge session resume <parent> --fresh --review` (opens the draft transfer context in `$EDITOR` before child
+- Add `forge session resume <parent> --fresh --review` (opens the per-child user-notes overlay in `$EDITOR` before child
   launch; `--review` requires `--fresh` transfer mode). This stays the ergonomic workflow entry point -- a convenience
   on the session lifecycle, not a second canonical namespace -- and should print the follow-up `forge transfer` commands
   via the standard `Next steps:` output convention.
@@ -729,12 +729,12 @@ No new architecture; mostly documentation and small CLI additions.
   as the two halves of the former "handoff": `forge memory` curates project docs, `forge transfer` assembles resume/fork
   context. This is a user-mental-model choice, not a scoping claim -- every transfer verb still takes a parent session
   argument. `forge session handoff` is a removed-command tombstone and cannot host these verbs.
-- Verb/argument shape follows the two-layer artifact model (`prev_sessions/<parent>/generated.md` regeneratable cache vs
-  `children/<child>.md` authoritative per-child file): `regenerate <parent>` rewrites only the parent cache (per-child
-  files are never overwritten, per design.md §3.9); `edit <parent> --child <child>` targets the authoritative per-child
-  file; `show`/`diff` take an optional `--child` to select child-vs-cache. `forge transfer show` reports the assembled
-  transfer artifact and is distinct from the deprecated `forge session context` (a running session's runtime context,
-  now folded into `forge session show`).
+- Verb/argument shape follows the three-file artifact model (`prev_sessions/<parent>/generated.md` regeneratable cache,
+  `children/<child>.md` frozen AI snapshot, and `children/<child>.notes.md` user overlay): `regenerate <parent>`
+  rewrites only the parent cache (per-child files are never overwritten, per design.md §3.9);
+  `edit <parent> --child <child>` targets the user-notes overlay; `show`/`diff` take an optional `--child` to select
+  child-vs-cache. `forge transfer show` reports the assembled transfer artifact and is distinct from the deprecated
+  `forge session context` (a running session's runtime context, now folded into `forge session show`).
 - Document the agency-at-boundaries frame and the curated-transfer-as-interchange principle in `design.md`.
 - Define the Forge-owned transfer schema and decide whether `ctx` should become an import/export peer later.
 - Initial schema sketch: lineage pointer, decisions with transcript/file citations, current state snapshot, file:line
