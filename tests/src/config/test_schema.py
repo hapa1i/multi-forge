@@ -721,6 +721,7 @@ class TestInterceptAuditConfig:
         from forge.config.schema import InterceptOverrideConfig
 
         config = self._make(
+            wire_shape="anthropic_passthrough",  # override requires the signature-safe wire shape
             intercept={
                 "mode": "override",
                 "override": {
@@ -733,6 +734,36 @@ class TestInterceptAuditConfig:
         assert isinstance(config.intercept.override, InterceptOverrideConfig)
         assert config.intercept.override.system_prompt_augment == "Stay on task."
         assert config.intercept.override.system_prompt_guards == [{"pattern": "secret", "action": "strip"}]
+
+    def test_override_requires_passthrough_wire_shape(self):
+        """override on the openai_translated path is rejected (it cannot mutate)."""
+        with pytest.raises(ValueError, match="requires wire_shape='anthropic_passthrough'"):
+            self._make(intercept={"mode": "override"})  # default wire_shape is openai_translated
+
+    def test_override_allowed_on_passthrough(self):
+        config = self._make(wire_shape="anthropic_passthrough", intercept={"mode": "override"})
+        assert config.intercept.mode == "override"
+
+    def test_guard_unknown_key_rejected(self):
+        with pytest.raises(ValueError, match="Unknown system_prompt_guards key"):
+            self._make(
+                wire_shape="anthropic_passthrough",
+                intercept={"mode": "override", "override": {"system_prompt_guards": [{"pattern": "x", "typo": 1}]}},
+            )
+
+    def test_guard_non_string_pattern_rejected(self):
+        with pytest.raises(ValueError, match="must be a non-empty string"):
+            self._make(
+                wire_shape="anthropic_passthrough",
+                intercept={"mode": "override", "override": {"system_prompt_guards": [{"pattern": ["x"]}]}},
+            )
+
+    def test_guard_invalid_regex_rejected(self):
+        with pytest.raises(ValueError, match="Invalid system_prompt_guards regex"):
+            self._make(
+                wire_shape="anthropic_passthrough",
+                intercept={"mode": "override", "override": {"system_prompt_guards": [{"pattern": "[unclosed"}]}},
+            )
 
     def test_effective_redact_headers_unions_defaults(self):
         """User-configured redact headers add to defaults; cannot un-redact authorization."""

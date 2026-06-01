@@ -213,10 +213,26 @@ async def test_passthrough_missing_credential_returns_401(monkeypatch):
     assert resp.status_code == 401
 
 
-def _passthrough_config(*, default_tier="sonnet", intercept_mode="passthrough", audit_full_body=False):
+def _passthrough_config(
+    *,
+    default_tier="sonnet",
+    intercept_mode="passthrough",
+    audit_full_body=False,
+    augment="",
+    guards=None,
+    reasoning_effort=None,
+):
     """A minimal real (non-MagicMock) config stub so header values stay strings."""
     provider = SimpleNamespace(base_url="https://api.anthropic.com")
-    intercept = SimpleNamespace(mode=intercept_mode)
+    if reasoning_effort:
+        # Apply to every tier so the model-derived tier (not just default_tier) is covered.
+        provider.tier_overrides = {
+            t: SimpleNamespace(reasoning_effort=reasoning_effort) for t in ("haiku", "sonnet", "opus")
+        }
+    intercept = SimpleNamespace(
+        mode=intercept_mode,
+        override=SimpleNamespace(system_prompt_augment=augment, system_prompt_guards=guards or []),
+    )
     audit = SimpleNamespace(
         audit_full_body=audit_full_body,
         effective_redact_headers=lambda: set(),
@@ -536,3 +552,261 @@ async def test_passthrough_full_body_captures_redacted_response(monkeypatch, tmp
     blob = json.dumps(rec)
     for secret in ("SECRET-SYSTEM", "SECRET-USER-TEXT", "SECRET-RESPONSE-TEXT", "SECRET-TOKEN"):
         assert secret not in blob
+
+
+# --- Override mode (2d) ------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_passthrough_override_mutates_body_and_records(monkeypatch, tmp_path):
+    """Override augments the system prompt + pins reasoning, forwards the mutated body,
+    and writes a redacted mutation record."""
+    import forge.proxy.server as server
+    from forge.proxy import audit_logger
+
+    monkeypatch.setenv("FORGE_HOME", str(tmp_path))
+    audit_logger._drift_state.clear()
+    monkeypatch.setattr(server, "_ensure_runtime_state", lambda: None)
+    monkeypatch.setattr(server, "PROXY_ID", "pt")
+    monkeypatch.setattr(server, "cost_tracker", None)
+    monkeypatch.setattr(
+        server.config,
+        "proxy",
+        _passthrough_config(intercept_mode="override", augment="STAY-FOCUSED", reasoning_effort="high").proxy,
+    )
+    monkeypatch.setattr("forge.core.auth.template_secrets.resolve_env_or_credential", lambda var: "K")
+    monkeypatch.setattr(passthrough.httpx, "AsyncClient", _UsageResponseClient)
+    _UsageResponseClient.captured = {}
+
+    raw_body = {
+        "model": "claude-opus-4-6",
+        "max_tokens": 64000,
+        "system": [{"type": "text", "text": "base"}],
+        "messages": [{"role": "user", "content": "hi"}],
+    }
+    await server._handle_anthropic_passthrough(_RawReq(raw_body, "req_ov"), "req_ov")
+
+    sent = _UsageResponseClient.captured["json"]
+    assert sent["system"][-1]["text"] == "STAY-FOCUSED"  # augment forwarded
+    assert sent["thinking"]["budget_tokens"] == 10000  # reasoning pinned to the 'high' floor
+
+    recs = audit_logger.read_audit_logs(record_type="mutation")
+    assert len(recs) == 1
+    actions = {m["action"] for m in recs[0]["mutations"]}
+    assert {"augment", "reasoning_pin"} <= actions
+    assert "STAY-FOCUSED" not in json.dumps(recs[0])  # redacted: only hashes/lengths
+
+
+@pytest.mark.asyncio
+async def test_passthrough_override_guard_block_returns_403(monkeypatch, tmp_path):
+    """A block guard short-circuits with 403, records the block, and does not forward."""
+    import forge.proxy.server as server
+    from forge.proxy import audit_logger
+
+    monkeypatch.setenv("FORGE_HOME", str(tmp_path))
+    audit_logger._drift_state.clear()
+    monkeypatch.setattr(server, "_ensure_runtime_state", lambda: None)
+    monkeypatch.setattr(server, "PROXY_ID", "pt")
+    monkeypatch.setattr(server, "cost_tracker", None)
+    monkeypatch.setattr(
+        server.config,
+        "proxy",
+        _passthrough_config(intercept_mode="override", guards=[{"pattern": "FORBIDDEN", "action": "block"}]).proxy,
+    )
+    monkeypatch.setattr("forge.core.auth.template_secrets.resolve_env_or_credential", lambda var: "K")
+
+    async def _boom(**kwargs):  # forward must not run when a guard blocks
+        raise AssertionError("forward should not run on a blocked request")
+
+    monkeypatch.setattr("forge.proxy.passthrough.forward", _boom)
+
+    raw_body = {
+        "model": "claude-opus-4-6",
+        "max_tokens": 1000,
+        "system": [{"type": "text", "text": "this has a FORBIDDEN directive"}],
+        "messages": [{"role": "user", "content": "hi"}],
+    }
+    resp = await server._handle_anthropic_passthrough(_RawReq(raw_body, "req_blk"), "req_blk")
+
+    assert resp.status_code == 403
+    assert b"intercept_guard_blocked" in bytes(resp.body)
+    recs = audit_logger.read_audit_logs(record_type="mutation")
+    assert recs and recs[0]["blocked"] is True
+
+
+@pytest.mark.asyncio
+async def test_passthrough_override_preserves_history_through_server(monkeypatch, tmp_path):
+    """Through the server path, override leaves historical thinking blocks byte-identical."""
+    import copy
+
+    import forge.proxy.server as server
+    from forge.proxy import audit_logger
+
+    monkeypatch.setenv("FORGE_HOME", str(tmp_path))
+    audit_logger._drift_state.clear()
+    monkeypatch.setattr(server, "_ensure_runtime_state", lambda: None)
+    monkeypatch.setattr(server, "PROXY_ID", "pt")
+    monkeypatch.setattr(server, "cost_tracker", None)
+    monkeypatch.setattr(server.config, "proxy", _passthrough_config(intercept_mode="override", augment="EXTRA").proxy)
+    monkeypatch.setattr("forge.core.auth.template_secrets.resolve_env_or_credential", lambda var: "K")
+    monkeypatch.setattr(passthrough.httpx, "AsyncClient", _UsageResponseClient)
+    _UsageResponseClient.captured = {}
+
+    history = [
+        {"role": "assistant", "content": [{"type": "thinking", "thinking": "x", "signature": "SIG-9"}]},
+        {"role": "user", "content": "go"},
+    ]
+    raw_body = {
+        "model": "claude-opus-4-6",
+        "max_tokens": 8000,
+        "system": [{"type": "text", "text": "base"}],
+        "messages": copy.deepcopy(history),
+    }
+    await server._handle_anthropic_passthrough(_RawReq(raw_body, "req_hist"), "req_hist")
+
+    sent = _UsageResponseClient.captured["json"]
+    assert sent["messages"] == history  # signed thinking untouched
+    assert sent["system"][-1]["text"] == "EXTRA"  # but the control surface was augmented
+
+
+@pytest.mark.asyncio
+async def test_non_override_mode_does_not_apply_override(monkeypatch, tmp_path):
+    """Override directives are inert unless intercept.mode == 'override' (no mutation)."""
+    import forge.proxy.server as server
+    from forge.proxy import audit_logger
+
+    monkeypatch.setenv("FORGE_HOME", str(tmp_path))
+    audit_logger._drift_state.clear()
+    monkeypatch.setattr(server, "_ensure_runtime_state", lambda: None)
+    monkeypatch.setattr(server, "PROXY_ID", "pt")
+    monkeypatch.setattr(server, "cost_tracker", None)
+    # augment IS configured, but mode is inspect -> it must NOT be applied.
+    monkeypatch.setattr(
+        server.config,
+        "proxy",
+        _passthrough_config(intercept_mode="inspect", augment="SHOULD-NOT-APPEAR").proxy,
+    )
+    monkeypatch.setattr("forge.core.auth.template_secrets.resolve_env_or_credential", lambda var: "K")
+    monkeypatch.setattr(passthrough.httpx, "AsyncClient", _UsageResponseClient)
+    _UsageResponseClient.captured = {}
+
+    raw_body = {
+        "model": "claude-opus-4-6",
+        "max_tokens": 8000,
+        "system": [{"type": "text", "text": "base"}],
+        "messages": [{"role": "user", "content": "hi"}],
+    }
+    await server._handle_anthropic_passthrough(_RawReq(raw_body, "req_insp2"), "req_insp2")
+
+    sent = _UsageResponseClient.captured["json"]
+    assert sent["system"] == [{"type": "text", "text": "base"}]  # body unmutated
+    assert "thinking" not in sent
+    assert audit_logger.read_audit_logs(record_type="mutation") == []  # no mutation record
+
+
+@pytest.mark.asyncio
+async def test_passthrough_override_uses_model_tier_not_default(monkeypatch, tmp_path):
+    """Reasoning pin keys off the request's model tier (opus), not proxy default_tier (sonnet)."""
+    import forge.proxy.server as server
+    from forge.proxy import audit_logger
+
+    monkeypatch.setenv("FORGE_HOME", str(tmp_path))
+    audit_logger._drift_state.clear()
+    monkeypatch.setattr(server, "_ensure_runtime_state", lambda: None)
+    monkeypatch.setattr(server, "PROXY_ID", "pt")
+    monkeypatch.setattr(server, "cost_tracker", None)
+
+    cfg = _passthrough_config(default_tier="sonnet", intercept_mode="override")
+    # opus pinned 'high', sonnet pinned 'minimal' -> an opus request must pick HIGH.
+    cfg.proxy.get_provider().tier_overrides = {
+        "opus": SimpleNamespace(reasoning_effort="high"),
+        "sonnet": SimpleNamespace(reasoning_effort="minimal"),
+    }
+    monkeypatch.setattr(server.config, "proxy", cfg.proxy)
+    monkeypatch.setattr("forge.core.auth.template_secrets.resolve_env_or_credential", lambda var: "K")
+    monkeypatch.setattr(passthrough.httpx, "AsyncClient", _UsageResponseClient)
+    _UsageResponseClient.captured = {}
+
+    raw_body = {
+        "model": "claude-opus-4-6",
+        "max_tokens": 64000,
+        "system": [{"type": "text", "text": "s"}],
+        "messages": [{"role": "user", "content": "hi"}],
+    }
+    await server._handle_anthropic_passthrough(_RawReq(raw_body, "req_t4"), "req_t4")
+
+    sent = _UsageResponseClient.captured["json"]
+    assert sent["thinking"]["budget_tokens"] == 10000  # opus 'high' floor, not sonnet 'minimal'
+
+
+@pytest.mark.asyncio
+async def test_passthrough_override_invariant_violation_fails_closed(monkeypatch):
+    """A mutation-safety fingerprint mismatch raises and never forwards (fail closed)."""
+    import forge.proxy.server as server
+    from forge.proxy import intercept
+
+    monkeypatch.setattr(server, "_ensure_runtime_state", lambda: None)
+    monkeypatch.setattr(server, "PROXY_ID", "pt")
+    monkeypatch.setattr(server, "cost_tracker", None)
+    monkeypatch.setattr(server.config, "proxy", _passthrough_config(intercept_mode="override", augment="X").proxy)
+    monkeypatch.setattr("forge.core.auth.template_secrets.resolve_env_or_credential", lambda var: "K")
+
+    async def _boom(**kwargs):
+        raise AssertionError("forward must not run after an invariant violation")
+
+    monkeypatch.setattr("forge.proxy.passthrough.forward", _boom)
+
+    # Force the post-mutation fingerprint to differ -> apply_override raises.
+    calls = {"n": 0}
+    real_fp = intercept.messages_fingerprint
+
+    def _fp(messages):
+        calls["n"] += 1
+        return "sha256:tampered" if calls["n"] == 2 else real_fp(messages)
+
+    monkeypatch.setattr(intercept, "messages_fingerprint", _fp)
+
+    raw_body = {
+        "model": "claude-opus-4-6",
+        "max_tokens": 8000,
+        "system": [{"type": "text", "text": "s"}],
+        "messages": [{"role": "user", "content": "hi"}],
+    }
+    with pytest.raises(RuntimeError, match="mutation-safety invariant"):
+        await server._handle_anthropic_passthrough(_RawReq(raw_body, "req_inv"), "req_inv")
+
+
+@pytest.mark.asyncio
+async def test_override_full_body_record_is_self_consistent(monkeypatch, tmp_path):
+    """#6: the full-body record pairs the MUTATED body with a hash recomputed from it."""
+    import forge.proxy.server as server
+    from forge.proxy import audit_logger
+
+    monkeypatch.setenv("FORGE_HOME", str(tmp_path))
+    audit_logger._drift_state.clear()
+    monkeypatch.setattr(server, "_ensure_runtime_state", lambda: None)
+    monkeypatch.setattr(server, "PROXY_ID", "pt")
+    monkeypatch.setattr(server, "cost_tracker", None)
+    monkeypatch.setattr(
+        server.config,
+        "proxy",
+        _passthrough_config(intercept_mode="override", augment="AUGTEXT", audit_full_body=True).proxy,
+    )
+    monkeypatch.setattr("forge.core.auth.template_secrets.resolve_env_or_credential", lambda var: "K")
+    monkeypatch.setattr(passthrough.httpx, "AsyncClient", _UsageResponseClient)
+    _UsageResponseClient.captured = {}
+
+    raw_body = {
+        "model": "claude-opus-4-6",
+        "max_tokens": 8000,
+        "system": [{"type": "text", "text": "base"}],
+        "messages": [{"role": "user", "content": "hi"}],
+    }
+    await server._handle_anthropic_passthrough(_RawReq(raw_body, "req_fbc"), "req_fbc")
+
+    sent = _UsageResponseClient.captured["json"]
+    fb = [r for r in audit_logger.read_audit_logs(record_type="request") if r.get("full_body")]
+    assert len(fb) == 1
+    # The record's hash matches the MUTATED (augmented) system, not the pre-mutation one.
+    assert fb[0]["system_prompt_hash"] == audit_logger.hash_system_prompt(sent["system"])
+    assert fb[0]["system_prompt_hash"] != audit_logger.hash_system_prompt([{"type": "text", "text": "base"}])

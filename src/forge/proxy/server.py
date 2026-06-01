@@ -497,6 +497,66 @@ async def _observe_request_side(
     return ctx
 
 
+def _tier_from_model_name(model: str) -> str | None:
+    """Infer haiku/sonnet/opus tier from a raw Anthropic model name (passthrough path).
+
+    Mirrors data_models._detect_tier without constructing a MessagesRequest, so an
+    explicit `claude-opus-*` request resolves tier_overrides.opus on passthrough.
+    """
+    name = (model or "").lower()
+    for tier in ("haiku", "sonnet", "opus"):
+        if tier in name:
+            return tier
+    return None
+
+
+async def _apply_passthrough_override(
+    raw_body: dict[str, Any], request_id: str, resolved_tier: str, ctx: dict[str, Any] | None
+) -> JSONResponse | None:
+    """Apply override mutations to the raw body and write a mutation record.
+
+    Returns a 403 JSONResponse when a guard blocks the request (caller returns it),
+    else None (continue forwarding the possibly-mutated body). The mutation-safety
+    RuntimeError is intentionally NOT caught — it must fail closed (no forward).
+    """
+    from forge.proxy import audit_logger, intercept
+
+    intercept_cfg = config.proxy.intercept
+    override_cfg = getattr(intercept_cfg, "override", None)
+    tier_override = _get_tier_override(resolved_tier)
+    reasoning_floor = getattr(tier_override, "reasoning_effort", None) if tier_override else None
+    route = (ctx or {}).get("route") or _inspect_route()
+    proxy_id = PROXY_ID or "unknown"
+
+    result = intercept.apply_override(
+        raw_body,
+        system_prompt_augment=getattr(override_cfg, "system_prompt_augment", "") if override_cfg else "",
+        system_prompt_guards=getattr(override_cfg, "system_prompt_guards", []) if override_cfg else [],
+        reasoning_floor_effort=reasoning_floor,
+    )
+    for warning in result.warnings:
+        logger.warning("[%s] override: %s", request_id, warning)
+    if result.mutation_record is not None:
+        try:
+            # Offload the JSONL write off the event loop (parity with inspect persistence).
+            await asyncio.to_thread(
+                audit_logger.write_mutation_record,
+                request_id=request_id,
+                proxy_id=proxy_id,
+                route=route,
+                mutation=result.mutation_record,
+            )
+        except Exception as e:
+            logger.debug("[%s] mutation record skipped: %s", request_id, e)
+    if result.blocked:
+        return JSONResponse(
+            status_code=403,
+            content={"type": "error", "error": {"type": "intercept_guard_blocked", "message": result.blocked_reason}},
+            headers={"X-Request-ID": request_id},
+        )
+    return None
+
+
 async def _handle_anthropic_passthrough(raw_request: Request, request_id: str, *, path: str = "/v1/messages"):
     """Forward a raw Anthropic request upstream without the OpenAI translation.
 
@@ -538,7 +598,9 @@ async def _handle_anthropic_passthrough(raw_request: Request, request_id: str, *
 
     raw_body = await raw_request.json()
 
-    # count_tokens carries no generation/usage: forward only (no caps/cost/audit).
+    # count_tokens carries no generation/usage: forward only (no caps/cost/audit, and
+    # intentionally no override — the preflight estimate omits augment/reasoning-pin
+    # deltas; the real /v1/messages call applies them).
     if path != "/v1/messages":
         return await forward(
             raw_body=raw_body,
@@ -550,7 +612,9 @@ async def _handle_anthropic_passthrough(raw_request: Request, request_id: str, *
         )
 
     model = str(raw_body.get("model") or "unknown")
-    resolved_tier = getattr(config.proxy, "default_tier", None) or "sonnet"
+    # Prefer the request's explicit tier (from the model name) over the proxy default,
+    # so tier_overrides.<tier> (e.g. reasoning_effort) match an explicit opus request.
+    resolved_tier = _tier_from_model_name(model) or getattr(config.proxy, "default_tier", None) or "sonnet"
     req_headers = dict(raw_request.headers)
 
     # Spend-cap preflight — same cross-request accumulation as the translated path,
@@ -585,6 +649,16 @@ async def _handle_anthropic_passthrough(raw_request: Request, request_id: str, *
     # Request-side observation; full-body capture is deferred to on_complete so the
     # record can include the redacted response rather than overclaiming request-only.
     ctx = await _observe_request_side(raw_body, request_id, headers=req_headers, defer_full_body=True)
+
+    # Override mode: mutate current-request control surfaces (system prompt + thinking)
+    # AFTER the inspect record, BEFORE forwarding. Signature-safe — historical messages
+    # are never touched. A guard block short-circuits with a 403.
+    _intercept = getattr(config.proxy, "intercept", None)
+    if _intercept is not None and getattr(_intercept, "mode", "passthrough") == "override":
+        blocked_response = await _apply_passthrough_override(raw_body, request_id, resolved_tier, ctx)
+        if blocked_response is not None:
+            return blocked_response
+
     streaming = bool(raw_body.get("stream"))
 
     def _on_complete(usage: dict[str, int], response_body: dict[str, Any] | None, failed: bool) -> None:
@@ -620,6 +694,9 @@ async def _handle_anthropic_passthrough(raw_request: Request, request_id: str, *
             try:
                 from forge.proxy import audit_logger
 
+                # Recompute hashes from the body being logged: under override the
+                # forwarded body is mutated, so ctx's pre-mutation hashes would make
+                # the row internally inconsistent (mutated body, stale hash).
                 audit_logger.write_full_body_record(
                     request_id=request_id,
                     proxy_id=ctx["proxy_id"],
@@ -630,10 +707,10 @@ async def _handle_anthropic_passthrough(raw_request: Request, request_id: str, *
                     response_headers=None,
                     response_body=response_body,
                     redact_header_names=ctx["redact_headers"],
-                    system_prompt_hash=ctx["sys_hash"],
-                    tool_surface_hash=ctx["tool_hash"],
+                    system_prompt_hash=audit_logger.hash_system_prompt(raw_body.get("system")),
+                    tool_surface_hash=audit_logger.hash_tool_surface(raw_body.get("tools")),
                     counts=ctx["counts"],
-                    thinking=ctx["thinking"],
+                    thinking=_thinking_summary(raw_body.get("thinking")),
                 )
             except Exception as e:
                 logger.debug("[%s] passthrough full-body audit skipped: %s", request_id, e)

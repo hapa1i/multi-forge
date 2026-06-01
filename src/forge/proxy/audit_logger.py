@@ -227,6 +227,25 @@ def write_drift_record(
     )
 
 
+def write_mutation_record(*, request_id: str, proxy_id: str, route: dict[str, Any], mutation: dict[str, Any]) -> None:
+    """Write an override before/after mutation record.
+
+    ``mutation`` is the already-redacted payload from ``intercept.apply_override``
+    (hashes, lengths, numeric budgets only — never plaintext augment text or matched
+    guard content), so this writer adds no redaction of its own.
+    """
+    log_audit_record(
+        {
+            "record_type": "mutation",
+            "request_id": request_id,
+            "proxy_id": proxy_id,
+            "mode": "override",
+            "route": route,
+            **mutation,
+        }
+    )
+
+
 # --- Drift detection (hybrid: in-memory baseline + per-proxy state file) ------
 
 

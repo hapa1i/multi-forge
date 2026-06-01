@@ -240,15 +240,54 @@ Review of the OBSERVE half surfaced 10 issues (4 Blocker / 3 Medium / 3 Low); al
     streaming full-body carries response usage metadata, not the full streamed body. Docker proxy-runtime integration
     not yet run for 2a-2c (middleware change warrants it before merge).
 
-### Slice 2d - Override mode + augment/guards + reasoning pin + mutation safety + `audit diff` (MUTATE)
+### Slice 2d - Override mode + augment/guards + reasoning pin + mutation safety + `audit diff` (MUTATE) (DONE 2026-05-31)
 
-- [ ] `override` branch (build/validate/apply mutation plan to current-request control surfaces only): cache-aware
-  `system_prompt_augment` (after last `cache_control` marker; warn on cache invalidation), `system_prompt_guards`
-  (warn/block/strip), reasoning-effort pin via existing `tier_overrides` in Anthropic units on the passthrough path;
-  mutation-safety invariant (historical-message fingerprint, raise on change); `record_type="mutation"` redacted diff;
-  `forge proxy audit diff`.
-  - Assertion: historical `thinking`/`redacted_thinking` byte-identical under override; augment lands post-cache (or
-    logs expected invalidation); `passthrough` mode is a no-op on the raw body.
+| Test                                  | Fixture                                                                              | Assertion                                                                                         | Test File                                                                                           |
+| ------------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| History byte-identical under override | history with signed `thinking`+`redacted_thinking`; augment+guard+pin all on         | `messages` unchanged byte-for-byte; control surfaces (system/thinking) mutated                    | `tests/regression/test_bug_override_preserves_thinking_blocks.py`                                   |
+| Augment is cache-aware                | system with a `cache_control` marker                                                 | augment inserted AFTER the last marker (prefix byte-identical); markerless flags invalidation     | `tests/regression/test_bug_augment_cache_aware_insertion.py`                                        |
+| Override mutates + records (server)   | passthrough proxy, `mode=override`, augment + `tier_overrides.reasoning_effort=high` | forwarded body augmented + `thinking.budget_tokens=10000`; redacted mutation record, no plaintext | `tests/src/proxy/test_passthrough.py::test_passthrough_override_mutates_body_and_records`           |
+| Guard block -> 403                    | `mode=override`, block guard matches system                                          | 403 `intercept_guard_blocked`; forward not reached; `blocked` mutation record                     | `..::test_passthrough_override_guard_block_returns_403`                                             |
+| Non-override is inert                 | `mode=inspect` with augment configured                                               | body unmutated; no mutation record                                                                | `..::test_non_override_mode_does_not_apply_override`                                                |
+| Pin floor consistent                  | each effort floor                                                                    | round-trips back to the same effort via `server._derive_reasoning_effort` (no table drift)        | `tests/src/proxy/test_intercept.py::TestReasoningPin::test_floor_consistent_with_server_thresholds` |
+| `audit diff` view                     | drift + mutation records                                                             | renders both, tagged drift/mutation, hashes only                                                  | `tests/src/cli/test_proxy_audit.py`, `tests/src/cli/test_user_prompt_dispatcher.py`                 |
+
+- [x] New `src/forge/proxy/intercept.py` (pure): `messages_fingerprint`, cache-aware `insert_augment_cache_aware`,
+  `apply_guards` (warn/block/strip), `pin_reasoning` (effort floor -> Anthropic `thinking.budget_tokens`, clamped
+  `>=1024`/`<max_tokens`), `apply_override` (build -> validate -> apply, mutation-safety `RuntimeError` tripwire).
+  Reuses `audit_logger.hash_system_prompt`; reasoning pin reuses `tier_overrides.<tier>.reasoning_effort` (no new config
+  key).
+- [x] `override` branch wired into `_handle_anthropic_passthrough` AFTER the inspect record, BEFORE forward
+  (mutate-after-observe); guard `block` short-circuits 403; mutation-safety violation fails closed (no forward).
+  `audit_logger.write_mutation_record` (already-redacted payload). Non-override modes skip the branch entirely.
+- [x] `forge proxy audit diff` leaf (`proxy_audit.py`) + `%proxy audit diff` (`direct_commands.py`): drift + mutation
+  folded into one timeline, hashes/lengths/budgets only.
+  - Verification: 126 focused (intercept+passthrough+audit CLI+dispatcher+regression) + broad 2184-test sweep green;
+    mypy/pyright/ruff clean on changed src. One pre-existing unrelated failure (`test_forge_info_no_traceback`).
+  - Deferred: override on the `openai_translated` wire shape (the lossy path) is out of scope — override targets the
+    signature-safe passthrough path per the plan; translated proxies already apply tier_overrides via their own path.
+
+#### Slice 2d hardening - review fixes (DONE 2026-05-31)
+
+Review of 2d surfaced 14 issues (2 High / 4 Med / 5 Low / 3 nit); all verified against code and fixed.
+
+- [x] **High**: (1) `intercept.mode=override` now REQUIRED to pair with `wire_shape=anthropic_passthrough` — rejected at
+  `ProxyInstanceConfig.__post_init__` (was silently inert on translated, and GET / mislabelled it active). (2) guard
+  config validated at config time — unknown keys rejected, `pattern` must be a non-empty str, regex compiled (a bad
+  regex was silently disabling a security control).
+- [x] **Medium**: (3) guards evaluate all `block` checks BEFORE any strip/augment, so a strip-before-block can't
+  half-mutate a blocked body (+ regression). (4) passthrough reasoning pin resolves tier from the request model
+  (`_tier_from_model_name`), not just `default_tier`, so an explicit opus request hits `tier_overrides.opus`. (5)
+  mutation audit write offloaded via `asyncio.to_thread` (parity with inspect). (6) full-body records recompute hashes
+  from the forwarded (post-override) body so the row is self-consistent.
+- [x] **Low/nits**: (7) reasoning pin preserves unknown `thinking` sibling keys (forward-safe). (8) server-path
+  fail-closed test (fingerprint mismatch -> raise, no forward). (9) force-enable floor semantics documented (consistent
+  with translated `_max_effort`). (10) count_tokens override-skip commented. (11) guard matching per-block for all
+  actions. (12) dropped unused `flatten_system_text`. (13) explicit `action == "warn"` branch. (14) renamed
+  `intercept._short_hash` -> `_pattern_hash` (distinct from `proxy_audit._short_hash`).
+  - Verification: 192 focused + broad 2194-test sweep green; mypy/pyright/ruff clean on 6 changed src; `make pre-commit`
+    clean. New tests: config (override-requires-passthrough, 3 guard-validation), intercept (strip-then-block,
+    siblings), server-path (model-tier pin, fail-closed, full-body consistency).
 
 ### Slice 2e - Sidecar audit plumbing
 

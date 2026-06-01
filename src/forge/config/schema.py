@@ -19,6 +19,7 @@ Usage:
     overrides = config.proxy.litellm.tier_overrides.get("opus")
 """
 
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -289,6 +290,18 @@ class InterceptOverrideConfig:
         for guard in self.system_prompt_guards:
             if not isinstance(guard, dict) or "pattern" not in guard:
                 raise ValueError("each intercept.override.system_prompt_guards entry needs a 'pattern' key")
+            unknown = set(guard) - {"pattern", "action"}
+            if unknown:
+                raise ValueError(f"Unknown system_prompt_guards key(s): {', '.join(sorted(unknown))}")
+            pattern = guard.get("pattern")
+            if not isinstance(pattern, str) or not pattern:
+                raise ValueError("system_prompt_guards 'pattern' must be a non-empty string")
+            # Compile now so a bad regex fails loudly at config time, not silently at
+            # runtime (a skipped guard is a disabled security control).
+            try:
+                re.compile(pattern)
+            except re.error as e:
+                raise ValueError(f"Invalid system_prompt_guards regex {pattern!r}: {e}") from e
             action = guard.get("action", "warn")
             if action not in _VALID_GUARD_ACTIONS:
                 raise ValueError(
@@ -534,6 +547,14 @@ class ProxyInstanceConfig:
             )
         self.intercept = _coerce_intercept_config(self.intercept)
         self.audit = _coerce_audit_config(self.audit)
+        # override mutates the RAW Anthropic body; the openai_translated path cannot
+        # apply it, so the combo is rejected rather than silently doing only inspect.
+        if self.intercept.mode == "override" and self.wire_shape != "anthropic_passthrough":
+            raise ValueError(
+                "intercept.mode='override' requires wire_shape='anthropic_passthrough' "
+                "(override applies to the raw passthrough body only). "
+                "Set wire_shape: anthropic_passthrough, or use intercept.mode: inspect."
+            )
 
         _validate_static_tier_override_constraints(self.tiers, self.tier_overrides)
 

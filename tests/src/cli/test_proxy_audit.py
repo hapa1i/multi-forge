@@ -65,3 +65,67 @@ def test_audit_show_json():
     assert isinstance(data, list)
     assert data[0]["proxy_id"] == "audit-test"
     assert SECRET_SYS not in result.output
+
+
+def _write_drift(proxy_id="audit-test"):
+    audit_logger.write_drift_record(
+        request_id="r",
+        proxy_id=proxy_id,
+        dimension="system_prompt",
+        previous_hash="sha256:aaaaaaaaaa",
+        current_hash="sha256:bbbbbbbbbb",
+        route=ROUTE,
+    )
+
+
+def _write_mutation(proxy_id="audit-test"):
+    audit_logger.write_mutation_record(
+        request_id="r",
+        proxy_id=proxy_id,
+        route=ROUTE,
+        mutation={
+            "blocked": False,
+            "system_prompt_hash_before": "sha256:1111111111",
+            "system_prompt_hash_after": "sha256:2222222222",
+            "mutations": [
+                {
+                    "target": "system_prompt",
+                    "action": "augment",
+                    "augment_len": 12,
+                    "cache_invalidation_expected": True,
+                },
+                {
+                    "target": "thinking",
+                    "action": "reasoning_pin",
+                    "effort_floor": "high",
+                    "budget_before": 100,
+                    "budget_after": 10000,
+                },
+            ],
+        },
+    )
+
+
+def test_audit_diff_empty():
+    result = CliRunner().invoke(proxy, ["audit", "diff", "--period", "all"])
+    assert result.exit_code == 0
+    assert "No wire changes" in result.output
+
+
+def test_audit_diff_shows_drift_and_mutation():
+    _write_drift()
+    _write_mutation()
+    result = CliRunner().invoke(proxy, ["audit", "diff", "--period", "all"])
+    assert result.exit_code == 0
+    assert "drift" in result.output
+    assert "mutation" in result.output
+    assert "augment" in result.output
+    assert "thinking pin" in result.output  # reasoning pin rendered
+
+
+def test_audit_diff_json():
+    _write_mutation()
+    result = CliRunner().invoke(proxy, ["audit", "diff", "--period", "all", "--json"])
+    assert result.exit_code == 0
+    data = json.loads(result.output)
+    assert any(r["record_type"] == "mutation" for r in data)

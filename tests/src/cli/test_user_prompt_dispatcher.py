@@ -603,6 +603,67 @@ class TestProxyDirectCommands:
         assert out["decision"] == "block"
         assert "usage" in out["reason"].lower()
 
+    def test_proxy_audit_show_blocks_with_metadata(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """%proxy audit show renders metadata; plaintext is never shown."""
+        monkeypatch.chdir(tmp_path)
+        from forge.proxy import audit_logger
+
+        audit_logger.write_metadata_record(
+            request_id="r",
+            proxy_id="p",
+            mode="inspect",
+            route={"template": "anthropic-passthrough"},
+            system_prompt_hash=audit_logger.hash_system_prompt("SECRET-PROMPT"),
+            tool_surface_hash=None,
+            counts={"num_messages": 1, "num_tools": 0},
+        )
+
+        payload = {"prompt": "%proxy audit show", "transcript_path": ""}
+        result = CliRunner().invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
+        out = json.loads(result.output)
+        assert out["decision"] == "block"
+        assert "inspect" in out["reason"]
+        assert "SECRET-PROMPT" not in out["reason"]
+
+    def test_proxy_audit_diff_blocks_with_changes(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """%proxy audit diff renders drift + override mutations."""
+        monkeypatch.chdir(tmp_path)
+        from forge.proxy import audit_logger
+
+        audit_logger.write_drift_record(
+            request_id="r",
+            proxy_id="p",
+            dimension="system_prompt",
+            previous_hash="sha256:aaaaaaaa",
+            current_hash="sha256:bbbbbbbb",
+            route={"template": "t"},
+        )
+        audit_logger.write_mutation_record(
+            request_id="r",
+            proxy_id="p",
+            route={"template": "t"},
+            mutation={
+                "blocked": False,
+                "mutations": [{"target": "system_prompt", "action": "augment", "augment_len": 5}],
+            },
+        )
+
+        payload = {"prompt": "%proxy audit diff", "transcript_path": ""}
+        result = CliRunner().invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
+        out = json.loads(result.output)
+        assert out["decision"] == "block"
+        assert "drift" in out["reason"]
+        assert "augment" in out["reason"]
+
+    def test_proxy_audit_unknown_action_shows_usage(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """%proxy audit <unknown> shows the show|diff usage."""
+        monkeypatch.chdir(tmp_path)
+        payload = {"prompt": "%proxy audit bogus", "transcript_path": ""}
+        result = CliRunner().invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
+        out = json.loads(result.output)
+        assert out["decision"] == "block"
+        assert "show|diff" in out["reason"]
+
 
 class TestGuardCommands:
     """Test %policy enable/disable use overrides (not intent mutation)."""
