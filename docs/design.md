@@ -581,9 +581,11 @@ The resume command supports two **resume modes** (`--resume-mode`):
 - **`native`**: Uses `--resume --fork-session` to carry full conversation history. Lossless but lost on `/compact`. No
   context file generated. Requires the parent to have a confirmed `claude_session_id`.
 
-> **Why not native for worktree forks?** Claude Code stores sessions at `~/.claude/projects/<encoded-cwd>/`. `--resume`
-> from a different CWD cannot find the session JSONL. Tested with Claude Code 2.1.90 (Apr 2026): all cross-CWD scenarios
-> fail with "No conversation found." Worktree forks use transfer only.
+> **Why not native for worktree forks?** Claude Code stores sessions at `~/.claude/projects/<encoded-cwd>/`, so a bare
+> `--resume` from a different CWD cannot find the session JSONL — Claude Code 2.1.90 and 2.1.158 both fail "No
+> conversation found." **Worktree forks ship transfer-only.** A Phase 3 spike
+> (`scripts/experiments/native-resume/`) confirmed that *relocating* the parent JSONL into the child CWD's encoded dir
+> makes cross-CWD native resume work on 2.1.158, but the opt-in `--resume-mode native-relocate` wiring is deferred.
 
 **Transfer mode strategies** (`--resume-mode transfer`, default):
 

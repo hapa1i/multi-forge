@@ -27,6 +27,42 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-01
 
+### Phase 3 (spike): Native-relocate cross-CWD resume — PASS, wiring deferred
+
+**Goal**: Settle the design.md §3.9 open question — can a Claude Code conversation resume across a CWD boundary if its
+session JSONL is first copied into the destination CWD's encoded project dir? Deliver a contract test + go/no-go, not
+the product surface.
+
+**Key changes**:
+
+- **Bug fix (surfaced by the spike)**: `encode_project_path` (`session/claude/paths.py`) now maps `_`→`-` alongside `/`
+  and `.`. Claude Code 2.1.158 hyphenates underscores; Forge didn't, so `get_transcript_path` pointed at the wrong dir
+  for any underscore-bearing path (silently breaking cleanup, status transcript reads, and relocation). Regression:
+  `tests/regression/test_bug_encode_project_path_underscore.py`.
+- **Relocate primitive**: new `session/claude/relocate.py` — `relocate_transcript()` does a content-untouched, atomic
+  (temp + `os.replace`) copy into the dest CWD's encoded dir; owner-only perms; idempotent; refuses to clobber differing
+  content; `rewrite_paths` seam reserved (`NotImplementedError`, off by default). 8 unit tests.
+- **Reproduction script**: `scripts/experiments/native-resume/` (recreates the path dangling-referenced in code) —
+  host-runnable, isolated `HOME`, control-vs-experiment, PASS/DISCOVERY-FAIL/SIGNATURE-FAIL/UNCATEGORIZED verdicts.
+- **Contract test**: `tests/integration/docker/test_native_relocate_contract.py` + conftest `relocate_and_resume` — real
+  Claude, signed-thinking + tool-use parent turn, in-container relocate via the real primitive, hook-free child resume
+  (`FORGE_SESSION` unset) from a real git worktree; three-way verdict judged from Claude's project dir; host+container
+  version gate; parent-immutability sha256. Found (and the harness documents) that `--dangerously-skip-permissions` is
+  rejected under root, so the container runs without it (read-only tools still execute in `--print`).
+- **Docs**: design.md §3.9 and the `session_fork.py` worktree-branch comment version-stamped; transfer stays the shipped
+  default (native-relocate opt-in wiring is the deferred Stage C follow-up).
+
+**Outcome**: **PASS on Claude Code 2.1.158.** Control (resume without relocating) still reproduces the 2026-04-02 "No
+conversation found" discovery failure; the experiment (relocate, then resume) completes a signed-thinking tool-use
+continuation with the relocated parent JSONL unmodified. Native-relocate is viable; opt-in
+`--resume-mode native-relocate` wiring deferred (touch points recorded in the plan). Candidate for `impl_notes.md` after
+review: the Claude project-dir encoding maps `/` `.` `_` → `-` (case/`-`/digits preserved).
+
+**Verification**: host repro `[PASS]` (Claude 2.1.158);
+`./scripts/test-integration.sh tests/integration/docker/test_native_relocate_contract.py` PASSED (23.6s); 8 relocate
+unit + 3 encode-underscore regression + 880 session unit green; ruff/mypy/pyright + shellcheck clean; `make pre-commit`
+clean.
+
 ### Phase 2: Optional Audit Proxy (Runtime Abstraction)
 
 **Goal**: Make a Forge proxy an opt-in, user-controlled chokepoint that can observe and (optionally) control the wire

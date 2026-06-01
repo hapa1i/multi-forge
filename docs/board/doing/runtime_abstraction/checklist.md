@@ -24,6 +24,16 @@ wc -l docs/board/doing/runtime_abstraction/checklist.md
 
 ## Current Focus
 
+**Phase 3 spike complete (2026-06-01) — native-relocate is VIABLE (PASS); opt-in wiring deferred.** Both gates agree on
+Claude Code 2.1.158: the control (resume without relocating) still reproduces the 2026-04-02 "No conversation found"
+discovery failure, and the experiment (relocate the parent JSONL into the child CWD's encoded dir, then
+`--resume --fork-session`) completes a signed-thinking tool-use continuation with the relocated parent unmodified. Host
+repro (`scripts/experiments/native-resume/`) `[PASS]`; Docker contract test
+(`tests/integration/docker/test_native_relocate_contract.py`) PASSED (23.6s). The spike also fixed a bug it surfaced:
+`encode_project_path` now maps `_`→`-` (Claude 2.1.158 does, Forge didn't — broke transcript discovery for any
+underscore path). `docs/design.md` §3.9 + the `session_fork.py` worktree-branch comment are version-stamped. The opt-in
+`--resume-mode native-relocate` CLI wiring is the deferred **Stage C** follow-up.
+
 **Phase 2 complete (2026-06-01).** The optional always-on audit proxy shipped across commits `97abe5c` (OBSERVE),
 `2663c06` (MUTATE), `d0eb708` (sidecar plumbing), and `5991896` (sidecar `--user` fix), plus the 2f docs slice:
 `wire_shape`/`intercept`/`audit` config, the thinking-preserving `anthropic_passthrough` wire, redacted audit logs with
@@ -35,8 +45,9 @@ All Phase 2 slice boxes are ticked.
 top-level `forge transfer show|regenerate|edit|diff` CLI shipped in commit `2b70c29`; `docs/design.md` §3.9 and
 `docs/design_appendix.md` §M reflect it. All Phase 1 boxes are ticked.
 
-Next: **Phase 3 (native-relocate spike)** and Phase 4 (runtime-abstraction core) remain. The card stays in `doing/`
-until Phases 3-6 land (board-contract: move to `done/` only when fully executed).
+Next: **Phase 4 (runtime-abstraction core)**, plus the deferred Phase 3 **Stage C** (opt-in
+`--resume-mode native-relocate` wiring) when prioritized. The card stays in `doing/` until Phases 3-6 land
+(board-contract: move to `done/` only when fully executed).
 
 **Deferred prerequisite (memory_substrate reconciliation) -- RESOLVED 2026-05-30:**
 
@@ -388,24 +399,78 @@ Do **not** move the card to `done/` until those land (board-contract: move only 
 
 ## Phase 3 - Native-Relocate Spike
 
-- [ ] Spike cross-CWD Claude JSONL relocation.
+**Spike outcome (2026-06-01): PASS on Claude Code 2.1.158 — native-relocate is viable.** The relocate primitive, host
+reproduction, and Docker contract test shipped; the opt-in `--resume-mode native-relocate` CLI wiring (the per-code-path
+split + derivation/GC provenance) is the deferred **Stage C** follow-up (touch points recorded in the execution plan).
+
+- [x] Spike cross-CWD Claude JSONL relocation.
   - Assertion: integration contract test proves Claude Code can resume relocated JSONL across CWD boundary without
     signature-validation failure, while explicitly acknowledging the prior Claude Code 2.1.90 negative result documented
     in `docs/design.md` §3.9.
-- [ ] Tie the spike to the current no-op and transfer-only guards.
+  - Verification (2026-06-01): `tests/integration/docker/test_native_relocate_contract.py` PASSED (23.6s) — signed
+    parent thinking block exercised, child resume exit 0, ≥2 tool_use in the fork, relocated parent sha256 unchanged.
+    Host repro `[PASS]`. The control still reproduces the "No conversation found" discovery failure (now confirmed on
+    2.1.158 too); design.md §3.9 acknowledges it.
+- [x] Tie the spike to the current no-op and transfer-only guards.
   - Assertion: checklist/test references cover the native-resume guard in `src/forge/session/manager.py` and the
     worktree-fork transfer branch in `src/forge/cli/session_fork.py`.
-- [ ] Split native-relocate handling by code path.
-  - Assertion: `fork --worktree`, `fork --into`, and `resume --fresh --resume-mode native-relocate` each have an
-    explicit expected behavior before implementation.
-- [ ] Gate path rewriting separately.
+  - Verification: the `session_fork.py` worktree-branch comment (the transfer-only guard) is version-stamped with the
+    spike result; the cross-`forge_root` native-resume no-op guard at `manager.py:700-703` is recorded as the Stage C
+    wiring point (deferred, untouched here).
+- [x] Gate path rewriting separately.
   - Assertion: absolute path rewriting is opt-in and disabled by default until tests prove it harmless.
-- [ ] Preserve derivation and GC invariants for relocated artifacts.
-  - Assertion: relocated JSONL, generated parent cache, and per-child transfer artifacts are traceable without orphaning
-    or overwriting user-edited child files.
-- [ ] Decide outcome of native-relocate.
+  - Verification: `relocate_transcript(rewrite_paths=...)` is a reserved seam — `True` raises `NotImplementedError`
+    (default off); content-untouched copy is the signature-safe minimum. Locked by
+    `test_claude_relocate.py::TestRelocateTranscript::test_rewrite_paths_not_implemented`.
+- [x] Decide outcome of native-relocate.
   - Assertion: either introduce opt-in `--resume-mode native-relocate` or record why curated transfer remains the only
     cross-CWD path.
+  - Decision (2026-06-01): native-relocate is **viable** (PASS); the opt-in `--resume-mode native-relocate` wiring is
+    deferred to Stage C, and curated transfer remains the shipped default for worktree forks. Recorded in design.md
+    §3.9.
+- [ ] Split native-relocate handling by code path. *(Stage C — deferred)*
+  - Assertion: `fork --worktree`, `fork --into`, and `resume --fresh --resume-mode native-relocate` each have an
+    explicit expected behavior before implementation.
+  - Note: per-path behavior is specified in the execution plan; not implemented (wiring deferred).
+- [ ] Preserve derivation and GC invariants for relocated artifacts. *(Stage C — deferred)*
+  - Assertion: relocated JSONL, generated parent cache, and per-child transfer artifacts are traceable without orphaning
+    or overwriting user-edited child files.
+  - Note: confirmed analytically — relocated JSONL lives under `~/.claude/projects/` (outside Forge's `.forge/` GC
+    scope; `gc.py` never touches it); the parent-UUID orphan nuance in `cleanup.py` is documented. Derivation provenance
+    lands with the Stage C wiring.
+
+#### Phase 3 hardening - review fixes (DONE 2026-06-01)
+
+Review of the spike surfaced 10 issues (5 Medium / 5 Low); all verified against code and fixed. Both gates were re-run
+green after the changes: host repro `[PASS]`, Docker contract test PASSED (23.0s).
+
+- [x] **Medium**: (M1) the contract test's child root is now an **underscore-bearing path** (`/tmp/relocate_child_wt`),
+  so real Claude exercises the `encode_project_path` `_`->`-` branch end-to-end — an encoder regression now surfaces as
+  DISCOVERY-FAIL instead of passing silently on a clean `/workspace`-style path. (M2) host repro drops
+  `--dangerously-skip-permissions` to match the contract test's root posture (Claude rejects the flag under root; the
+  read-only `Read` tool runs without it). (M4) both gates digest the relocated parent JSONL before/after resume and
+  assert it is unchanged (`--fork-session` must not mutate the relocated copy). (M5) both gates track whether a **signed
+  thinking block** was actually present and emit `[INCONCLUSIVE]` (host) / `pytest.fail("INCONCLUSIVE: ...")` (Docker)
+  rather than `[PASS]` when it was not — a clean resume with nothing to revalidate is not evidence for the
+  signature-survival hypothesis.
+- [x] **M3 real-Claude helper smoke (decision recorded)**: the conftest helper refactor (`run_claude_print` signature,
+  `setup_real_claude`, `relocate_and_resume`) is exercised by **two passing real-Claude tests** — the new contract test
+  and `tests/integration/docker/test_real_claude_hooks.py` (2 passed, 15.95s). The other three consumers
+  (`test_real_claude_workers.py`, `test_real_claude_memory.py`, `test_real_claude_supervisor.py`) are **deferred to
+  release-validation**: all call sites pass the changed args by keyword and the new params are keyword-only with
+  unchanged defaults, so the change is backward-compatible by construction (statically verified).
+- [x] **Low**: (L6) conftest detects the signed block by parsing JSONL **content blocks** (`type=="thinking"` with
+  `signature`, or `type=="redacted_thinking"` with `data`), not a naive substring grep. (L7) the experiment README
+  documents that `/`, `.`, and `_` all map to `-`. (L8) `relocate_transcript` writes via `tempfile.mkstemp` +
+  `os.replace` (atomic, owner-only `0600`, unique temp name so concurrent same-UUID relocations can't collide; temp
+  removed on any failure). (L9) discovery classification matches the **exact** `"no conversation found"` marker in both
+  gates; a bare `"not found"` could mislabel an unrelated failure that should fall through to UNCATEGORIZED. (L10)
+  `encode_project_path` carries a note that only `/`, `.`, `_` are characterized against real Claude — do not broaden
+  the rule without a characterization test.
+  - Verification: 30 host unit/regression tests pass (`test_claude_relocate` + `test_claude_paths` +
+    `test_bug_encode_project_path_underscore`); `bash -n` + shellcheck clean on `reproduce.sh`; host repro `[PASS]` and
+    `tests/integration/docker/test_native_relocate_contract.py` PASSED (23.0s) after the changes; `make pre-commit`
+    clean.
 
 ## Phase 4 - Runtime Abstraction Core
 

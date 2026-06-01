@@ -610,11 +610,15 @@ def fork(
     _fork_uuid: str | None = None
     prompt_file: str | None = None
 
-    # Worktree forks: Claude Code stores sessions at ~/.claude/projects/<encoded-cwd>/,
-    # so --resume --fork-session cannot find the parent's conversation from a different
-    # directory. Tested 2026-04-02 with Claude Code 2.1.90: all cross-CWD scenarios fail
-    # with "No conversation found." See scripts/experiments/native-resume/.
-    # Use transfer (assembled context via --append-system-prompt-file) instead.
+    # Worktree forks ship transfer-only: Claude Code stores sessions at
+    # ~/.claude/projects/<encoded-cwd>/, so a bare --resume --fork-session cannot find
+    # the parent conversation from a different directory (2.1.90 and 2.1.158 both fail
+    # "No conversation found"). A Phase 3 spike (scripts/experiments/native-resume/ +
+    # tests/integration/docker/test_native_relocate_contract.py) confirmed that
+    # *relocating* the parent JSONL into the child CWD's encoded dir makes cross-CWD
+    # native resume work on 2.1.158, but the opt-in --resume-mode native-relocate wiring
+    # is deferred; transfer (assembled context via --append-system-prompt-file) is the
+    # shipped default here.
     if is_worktree_fork:
         worktree_path = Path(fork_manifest.worktree.path)  # type: ignore[union-attr]
         fork_context, prompt_warnings = _sess()._generate_parent_transfer_context(
