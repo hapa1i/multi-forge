@@ -49,9 +49,12 @@ All Phase 2 slice boxes are ticked.
 top-level `forge transfer show|regenerate|edit|diff` CLI shipped in commit `2b70c29`; `docs/design.md` §3.9 and
 `docs/design_appendix.md` §M reflect it. All Phase 1 boxes are ticked.
 
-Next: **Phase 4 (runtime-abstraction core)**. Deferred Phase 3 follow-ups (`--rewrite-paths`, sidecar/resume
-native-relocate, the gated default flip) land when prioritized. The card stays in `doing/` until Phases 3-6 land
-(board-contract: move to `done/` only when fully executed).
+Next: **Phase 4 (runtime-abstraction core)**. The two cross-cutting Phase 4 decisions are now resolved (data-plane:
+separate planes linked by `request_id`; `FORGE_DEPTH`: additive run-tree env, integer guard unchanged) -- see Open
+Decisions for the de-risked build sequence, recorded at the top of the Phase 4 section. Deferred Phase 3 follow-ups
+(`--rewrite-paths`, sidecar/resume native-relocate, the gated default flip) are now recorded as trackable boxes under
+Phase 3 and land when prioritized. The card stays in `doing/` until Phases 3-6 land (board-contract: move to `done/`
+only when fully executed).
 
 **Deferred prerequisite (memory_substrate reconciliation) -- RESOLVED 2026-05-30:**
 
@@ -485,7 +488,34 @@ green after the changes: host repro `[PASS]`, Docker contract test PASSED (23.0s
     `tests/integration/docker/test_native_relocate_contract.py` PASSED (23.0s) after the changes; `make pre-commit`
     clean.
 
+### Phase 3 - Deferred follow-ups (parked; land when prioritized)
+
+Recorded so they are not lost while Phase 4 proceeds. None block Phase 4. Verified still deferred against code at commit
+`21688d6` (2026-06-01).
+
+- [ ] `--rewrite-paths`: rewrite absolute paths inside relocated `tool_result` blocks (historical paths point at the
+  parent checkout). Seam reserved; `relocate_transcript(rewrite_paths=True)` raises `NotImplementedError`
+  (`session/claude/relocate.py:93`). **Gated**: needs a contract test proving the rewrite cannot invalidate a thinking
+  signature (it touches signed historical content). **Blocks the default-flip below.**
+- [ ] `resume --resume-mode native-relocate`: extend native-relocate from `fork` to `resume --fresh`. Validator
+  currently accepts only `{native, transfer}` (`cli/session_lifecycle.py:346`); only `fork` has the choice. Lowest-risk
+  item (relocate primitive + derivation/GC plumbing already exist); same stale-path caveat as `--rewrite-paths`.
+- [ ] Sidecar native-relocate: currently rejected at preflight (`cli/session_fork.py:386`) because relocation writes to
+  the host `~/.claude` store, which the sidecar does not mount. Needs a decision on mounting part of host `~/.claude`
+  into the sidecar (UID/port-isolation tradeoffs per design.md §7). `--direct`/`--no-proxy` already escape to host mode.
+- [ ] Gated default-flip: make native-relocate the default for cross-CWD forks. Two gates: (a) stale-path mitigation
+  proven (`--rewrite-paths`), AND (b) a compaction/fallback story defined (relocated history is lost on `/compact`, same
+  as native resume). Order: `--worktree` flips before `--into` (more collision surface on an existing `--into`
+  worktree). Wiring point: the cross-`forge_root` native-resume no-op guard at `session/manager.py:700-703`.
+
 ## Phase 4 - Runtime Abstraction Core
+
+**Cross-cutting decisions resolved (2026-06-01, see Open Decisions):** data-plane (three separate planes linked by
+`request_id`) and `FORGE_DEPTH` vs run-tree (additive, orthogonal). **De-risked build sequence:** (1) run-tree env
+contract in `build_claude_env` (additive, touches no durable schema); (2) define `usage/events.jsonl` schema with
+nullable `source_refs`; (3) instrument native + direct `core.llm` paths first (linkage exact or moot); (4) proxied
+per-request correlation fork last. The `HeadlessInvoker` refactor is the largest *implementation* risk but is
+internal/refactorable -- it does not mint a durable contract, so it does not gate the schema work.
 
 - [ ] Introduce `HeadlessInvoker` interface and `ClaudeHeadlessInvoker`.
   - Assertion: existing single headless callers of `run_claude_session()` keep user-visible behavior, timeout semantics,
@@ -541,5 +571,28 @@ Tracks Forge-local execution decisions for this checklist. For broader card ques
   **Resolved 2026-05-31: prose/schema-only -- keep `structured` as the CLI default.** `ai-curated` stays opt-in via
   `--strategy ai-curated`, keeping the resume hot path deterministic, free, and LLM-free (matches design.md §3.9).
   Docs-only, no code change.
-- [ ] Where do proxy cost logs, audit logs, and the future usage ledger converge?
-- [ ] How should `FORGE_DEPTH` compose with future run-tree attribution ids?
+- [x] Where do proxy cost logs, audit logs, and the future usage ledger converge? **Resolved 2026-06-01: they do not
+  physically converge -- three separate planes linked by a shared `request_id`.** `costs/requests/*.jsonl` stays the
+  cap-enforcement spend log + bootstrap source; `audit/requests/*.jsonl` stays the privacy-sensitive wire record with
+  its own retention; the new `usage/events.jsonl` is the canonical attribution ledger ("which run/workflow/session
+  invoked which runtime/provider/model via which route and consumed what"), referencing the other planes via
+  **nullable** `source_refs` (`{cost_request_id, audit_request_id}`), not absorbing them. Join key verified to exist:
+  the proxy generates one `request_id` per request (`server.py:1627`) and threads it into both the cost writer
+  (`cost_logger.py:50`) and every audit writer (`audit_logger.py`). Denormalize `cost_micro_usd` into the event for
+  greppability while keeping `source_refs` for provenance; native-runtime events (Codex/Gemini) carry units directly and
+  leave `source_refs` null.
+- [x] How should `FORGE_DEPTH` compose with future run-tree attribution ids? **Resolved 2026-06-01: run identity is
+  authoritative; `FORGE_DEPTH` stays an additive integer guard, not reinterpreted.** New env
+  `FORGE_RUN_ID`/`FORGE_PARENT_RUN_ID`/`FORGE_ROOT_RUN_ID` (root sets root to its own run_id; children inherit
+  unchanged). `FORGE_DEPTH` keeps its `parent+1` computation at the single choke point (`env.py:130`); run tree and
+  depth are **orthogonal** (no derivation to build), stamped together so they cannot drift. Do NOT reinterpret the
+  integer -- three recursion guards depend on `>= 2` (`supervisor.py:393`, `team/handlers.py:180`,
+  `review/engine.py:145`). Real Phase 4 task: audit that every spawn path (incl. review-engine fan-out, sidecar) stamps
+  both at one site.
+- [ ] Proxied per-request correlation: how does the attribution id reach the proxy cost/audit plane for `claude -p`
+  subprocess traffic, where **Forge is not the HTTP client** (Claude is)? `source_refs.cost_request_id` is exact only on
+  the direct `core.llm` path (set/read `X-Request-ID`). Options: **(a)** header propagation -- inject `FORGE_RUN_ID`
+  into the subprocess env, have Claude forward it as a custom request header, proxy stamps it onto each record (needs a
+  Claude-Code custom-header feasibility check); **(b)** out-of-band `(run_id, proxy_id, time_window)` correlation
+  (inherits today's `estimated=True` snapshot concurrency fragility, `cost_tracking.py:7`). **Sequenced last (Phase 4
+  step 4)** -- validate the ledger on native + direct paths first, then resolve this fork as its own slice.
