@@ -83,6 +83,17 @@ PROXY_ID: str | None = os.environ.get("FORGE_PROXY_ID")
 cost_tracker: CostTracker | None = None
 
 
+def _sidecar_mode_active() -> bool:
+    """True when running inside a Forge sidecar container (FORGE_SIDECAR set by container.py).
+
+    Sidecar proxies skip host-registry startup validation: the host proxy registry
+    is not mounted into the container and the port is fixed (8085), so the
+    registry/port cross-check cannot hold there. The proxy.yaml overlay is mounted
+    explicitly and is the in-container source of truth.
+    """
+    return bool(os.environ.get("FORGE_SIDECAR"))
+
+
 def _initialize_cost_tracker_from_config() -> CostTracker:
     """Initialize request cost tracking in the module serving FastAPI traffic.
 
@@ -1881,7 +1892,10 @@ def main(
 
     from forge.config.loader import template_exists
 
-    if not template_exists(template):
+    # When a proxy id is supplied, proxy.yaml is authoritative (init_config ignores the
+    # template), so don't hard-gate on template existence — a proxy created from a user
+    # template that isn't shipped in this environment (e.g. a sidecar) must still start.
+    if proxy_id is None and not template_exists(template):
         click.echo(f"Unknown template '{template}'")
         click.echo("Run 'forge proxy template list' to see available templates.")
         sys.exit(1)
@@ -1931,8 +1945,10 @@ def main(
                 click.echo(" Use --auto-port to automatically find an available port")
                 sys.exit(1)
 
-    # Strict proxy startup validation (B2.1.3)
-    if effective_proxy_id is not None:
+    # Strict proxy startup validation (B2.1.3). Skipped in sidecar mode — see
+    # _sidecar_mode_active(): the host registry isn't in the container and the port
+    # is fixed, so the registry/port cross-check can't hold; proxy.yaml is mounted.
+    if effective_proxy_id is not None and not _sidecar_mode_active():
         from forge.proxy.proxy_startup import (
             ProxyStartupContext,
             ProxyStartupValidationError,

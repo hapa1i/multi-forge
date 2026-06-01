@@ -536,6 +536,21 @@ def _launch_claude_for_session(
         sidecar_image = image or get_runtime_config().sidecar_image
         console.print("[cyan]Starting sidecar session in container[/cyan]")
         console.print(f"  Image: {sidecar_image}")
+        # Preflight: surface the active intercept mode + that audit is host-visible,
+        # so the user knows the sidecar is a real observation point (best-effort).
+        if proxy_id:
+            try:
+                from forge.config.loader import load_proxy_instance_config
+
+                _icfg = load_proxy_instance_config(proxy_id)
+                if _icfg is not None:
+                    console.print(f"  Intercept: {_icfg.intercept.mode} (proxy '{proxy_id}')")
+                    if _icfg.intercept.mode != "passthrough":
+                        from forge.core.paths import display_path, get_forge_home
+
+                        console.print(f"  Audit: host-visible at {display_path(get_forge_home() / 'audit')}")
+            except Exception:
+                logger.debug("sidecar intercept preflight failed", exc_info=True)
         console.print()
 
         try:
@@ -550,6 +565,7 @@ def _launch_claude_for_session(
                     template=effective_template,
                     session_name=manifest.name,
                     project_dir=launch_root,
+                    proxy_id=proxy_id,
                     extra_mounts=all_mounts,
                     context_limit=context_limit,
                     env_vars=container_env,

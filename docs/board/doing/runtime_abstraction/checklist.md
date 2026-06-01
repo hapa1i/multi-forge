@@ -289,13 +289,71 @@ Review of 2d surfaced 14 issues (2 High / 4 Med / 5 Low / 3 nit); all verified a
     clean. New tests: config (override-requires-passthrough, 3 guard-validation), intercept (strip-then-block,
     siblings), server-path (model-tier pin, fail-closed, full-body consistency).
 
-### Slice 2e - Sidecar audit plumbing
+### Slice 2e - Sidecar audit plumbing (DONE 2026-06-01)
 
-- [ ] `FORGE_PROXY_ID` into `container.py` env + narrow read-only per-proxy config mount + writable host `audit/` mount;
-  `docker/entrypoint.sh` passes BOTH `--template` and `--proxy-id`; drift state writable in sidecar; preflight reports
-  mode + host-visible audit.
-  - Assertion (Docker integration): in-container `GET /` reports `intercept_mode`; host `forge proxy audit show <id>`
-    shows records written inside the container after it exits.
+| Test                               | Fixture                                                        | Assertion                                                                       | Test File                                                      |
+| ---------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| proxy_id adds env + both mounts    | `run_sidecar_session(proxy_id=...)`, host config dir present   | cmd has `FORGE_PROXY_ID`, `FORGE_HOME=/root/.forge`, config `:ro` + audit `:rw` | `tests/src/sidecar/test_container.py`                          |
+| audit mount without config dir     | `proxy_id` set, no host config dir                             | ro config mount skipped; writable audit mount still present                     | `..::test_audit_mount_present_even_without_config_dir`         |
+| template-only unchanged            | `proxy_id=None`                                                | no `FORGE_PROXY_ID`/`FORGE_HOME`/`/root/.forge` in cmd                          | `..::test_no_proxy_id_is_template_only`                        |
+| drift state redirect in sidecar    | `FORGE_SIDECAR=1`                                              | `_audit_state_path` -> `audit/state/<id>.json` (not the read-only config dir)   | `tests/src/proxy/test_audit_logger.py::TestAuditStatePath`     |
+| validation skipped in sidecar      | `FORGE_SIDECAR` set                                            | `server._sidecar_mode_active()` True -> host-registry check bypassed            | `tests/src/proxy/test_proxy_startup.py::TestSidecarModeActive` |
+| sidecar overlay + host audit (E2E) | real image+entrypoint, `--proxy-id`, inspect passthrough proxy | in-container `GET /` `intercept_mode==inspect`; host audit shard has the record | `tests/integration/sidecar/test_audit_plumbing.py`             |
+
+- [x] `FORGE_PROXY_ID` into `container.py` env + narrow read-only per-proxy config mount + writable host `audit/` mount;
+  `docker/entrypoint.sh` passes `--proxy-id` when set; drift state writable in sidecar; preflight reports mode +
+  host-visible audit. Docker E2E gate passes via the canonical runner.
+  - **Plan correction (verified against code):** the plan's "no server CLI change needed" was wrong.
+    `validate_proxy_startup` (`proxy_startup.py`) requires the proxy_id in the host registry AND registry port ==
+    runtime port; in-container the registry isn't mounted and the port is fixed (8085), so `--proxy-id` would abort
+    startup. Fix: `server._sidecar_mode_active()` skips that registry/port cross-check under `FORGE_SIDECAR` (the
+    overlay is the in-container source of truth). Semantically correct — the check guards host-side registry coherence,
+    absent in a one-proxy container.
+  - **Drift-state redirect:** the per-proxy config dir is mounted read-only, so `audit_state.json` (written beside
+    `proxy.yaml` on host) moves to the writable audit mount (`~/.forge/audit/state/<id>.json`) under `FORGE_SIDECAR`.
+  - **Mounts:** `container.py` pins `FORGE_HOME=/root/.forge` and mounts host `~/.forge/proxies/<id>` (ro) +
+    `~/.forge/audit` (rw) at that home; `get_forge_home()` is `/root/.forge` in-container (no USER in
+    `Dockerfile.sidecar`).
+- [x] **Two latent `entrypoint.sh` bugs found by the E2E and fixed** (the sidecar proxy could never start; never caught
+  because `forge-sidecar:latest` was never in any test path): (1) bare `python -m forge.proxy.server` hit the system
+  interpreter with no forge — now `/forge/.venv/bin/python` (the editable venv), PATH fallback for non-standard bases;
+  (2) `--log-level warning` is not a server option (log level is env-driven, defaults to `off`) — removed. The E2E is
+  the regression for both.
+- [x] **Sidecar image wired into the canonical runner** (tooling gap: nothing built `forge-sidecar:latest`, and
+  `Dockerfile.sidecar` pinned `FROM forge-claude-test:latest` while the runner tags by Claude version):
+  `Dockerfile.sidecar` now takes `ARG BASE_IMAGE`; `scripts/test-integration.sh` builds `forge-sidecar:latest` from the
+  freshly-built base after the base build; conftest failure message points at the runner.
+  - Verification: **`./scripts/test-integration.sh tests/integration/sidecar/test_audit_plumbing.py` PASSES**
+    (in-container `GET /` `intercept_mode==inspect`/`wire_shape==anthropic_passthrough`; host `forge proxy audit show`
+    surfaces the record after the `--rm` container exits). Host gates green: 70 focused unit (`test_container` +
+    `test_audit_logger` + `test_proxy_startup`), 516 proxy+sidecar+audit-CLI sweep, 177 session-command; ruff/mypy
+    clean; fresh `uv run pyright` 0/0/0 on changed src; `bash -n` on entrypoint + runner OK.
+
+#### Slice 2e hardening - review fixes (DONE 2026-06-01)
+
+Review of 2e surfaced 9 issues (2 High / 1 Med / 4 Low / 2 nits/docs); all verified against code and fixed.
+
+- [x] **High**: (1) **costs not host-persistent** — mounted `audit/` but not `costs/`, so cost history AND cumulative
+  spend-cap accounting reset every `--rm` launch (caps bootstrap from cost logs). Added a writable `costs/` mount beside
+  `audit/`. (2) **Linux `--user` vs `/root`** — real but pre-existing (the existing `/root/.claude` mounts + the
+  entrypoint's direct `/root/.claude.json` write share it): under `--user uid:gid`, `/root` (0700) isn't
+  traversable/writable. Fixed the inaccurate "runs as root" comment to record the limitation honestly; the UID-writable
+  home rework is tracked as **follow-up** (touches the pre-existing `/root/.claude` flow, out of 2e scope).
+- [x] **Medium**: (3) `--proxy-id` startup no longer hard-gates on `template_exists` — proxy.yaml is authoritative when
+  a proxy id is supplied, so a proxy from a non-shipped user template starts in-container (`server.main`:
+  `if proxy_id is None and not template_exists`).
+- [x] **Low/nits**: (4) `run_sidecar_session` fails fast on the host when `proxy_id` has no `proxy.yaml` (was a late
+  in-container health failure). (5) integration test carries a cross-reference comment to
+  `run_sidecar_session`/`_ensure_audit_plumbing_mounts` (hand-rolled `docker run` can't drive `-it`+`exec claude`). (6)
+  renamed `_audit_plumbing_mounts` -> `_ensure_audit_plumbing_mounts` and documented the host-dir `mkdir` side effect.
+  (7) drift-state redirect gated on `FORGE_SIDECAR` **and** `FORGE_PROXY_ID` (template-only sidecars mount no audit/).
+  (8) `_SIDECAR_FORGE_HOME` comment corrected re: Linux `--user`. (9) confirmed checklist 2f keeps the narrow-mount §7
+  exception as a docs item.
+  - Verification: **E2E re-run PASSES against a freshly-rebuilt base** (current source incl. #3/#7 baked); 71 focused
+    unit + 799 proxy+sidecar+config+session sweep; ruff/mypy clean; fresh `uv run pyright` 0/0/0 on changed src;
+    `pre-commit` clean.
+  - **Follow-up (tracked):** Linux `--user` UID-writable home for the sidecar (fixes #2 fully; shared with the
+    pre-existing `/root/.claude` mount + `/root/.claude.json` write). Out of 2e scope; macOS path verified.
 
 ### Slice 2f - Docs + always-on posture + closeout
 

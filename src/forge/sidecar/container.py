@@ -13,7 +13,19 @@ import sys
 import tempfile
 from pathlib import Path
 
+from forge.core.paths import get_forge_home
 from forge.sidecar.docker import _docker_name_filter
+
+# In-container Forge home, pinned via FORGE_HOME so audit/cost/config resolution is
+# deterministic. On macOS the sidecar runs as root (Dockerfile.sidecar sets no USER)
+# and ~/.forge resolves to /root/.forge.
+#
+# KNOWN LIMITATION (Linux): run_sidecar_session adds `--user uid:gid`, but /root is
+# 0700 and the entrypoint also writes /root/.claude* directly, so these /root paths
+# are not traversable/writable by a non-root uid. This predates 2e (the /root/.claude
+# mounts have the same constraint); the audit/cost path is verified on macOS, and the
+# Linux UID-writable-home rework is tracked as follow-up.
+_SIDECAR_FORGE_HOME = "/root/.forge"
 
 
 class ContainerExistsError(RuntimeError):
@@ -53,6 +65,7 @@ def run_sidecar_session(
     template: str,
     session_name: str,
     project_dir: Path,
+    proxy_id: str | None = None,
     extra_mounts: list[tuple[str, str, str]] | None = None,
     context_limit: int = 200000,
     env_vars: dict[str, str] | None = None,
@@ -64,12 +77,27 @@ def run_sidecar_session(
     - Container starts when this function is called
     - Container exits when Claude exits
     - Container auto-cleaned via --rm flag
+
+    When ``proxy_id`` is set the sidecar becomes a real always-on audit path: the
+    in-container proxy starts under that proxy id (loading the per-proxy
+    intercept/audit overlay), and audit logs persist on the host. Template-only
+    sidecars (``proxy_id=None``) keep the plain ``--template`` behavior.
     """
     container_name = f"forge-{session_name}"
 
     # Collision guard: detect both running AND stopped containers
     if container_exists(container_name):
         raise ContainerExistsError(container_name)
+
+    # Fail fast on the host: a proxy id with no proxy.yaml would start the container
+    # only to abort at proxy health-check (the in-container init_config can't load it).
+    if proxy_id is not None:
+        proxy_config = get_forge_home() / "proxies" / proxy_id / "proxy.yaml"
+        if not proxy_config.is_file():
+            raise FileNotFoundError(
+                f"Proxy '{proxy_id}' has no config at {proxy_config}. "
+                f"Create it with 'forge proxy create' or launch template-only (without --proxy)."
+            )
 
     cmd = [
         "docker",
@@ -94,9 +122,19 @@ def run_sidecar_session(
         "/workspace",
     ]
 
+    # Audit plumbing: proxy id + FORGE_HOME so the in-container server starts under
+    # the proxy id (entrypoint.sh passes --proxy-id when FORGE_PROXY_ID is set) and
+    # resolves ~/.forge to the mounted location.
+    if proxy_id is not None:
+        cmd.extend(["-e", f"FORGE_PROXY_ID={proxy_id}", "-e", f"FORGE_HOME={_SIDECAR_FORGE_HOME}"])
+
     if sys.platform == "linux":
         uid, gid = os.getuid(), os.getgid()
         cmd.extend(["--user", f"{uid}:{gid}"])
+
+    if proxy_id is not None:
+        for host_path, container_path, mode in _ensure_audit_plumbing_mounts(proxy_id):
+            cmd.extend(["-v", f"{host_path}:{container_path}:{mode}"])
 
     if extra_mounts:
         for host_path, container_path, mode in extra_mounts:
@@ -126,6 +164,32 @@ def run_sidecar_session(
                 os.unlink(env_file_path)
             except OSError:
                 pass
+
+
+def _ensure_audit_plumbing_mounts(proxy_id: str) -> list[tuple[str, str, str]]:
+    """Build the sidecar audit-plumbing mounts, creating host state dirs as needed.
+
+    Side effect: creates the host audit/ and costs/ dirs (Docker bind sources must
+    exist before `docker run`). Narrow mounts (NOT all of ~/.forge, preserving the
+    design.md §7 isolation rationale):
+    - per-proxy config dir read-only, so the in-container server reads the proxy.yaml
+      intercept/audit overlay.
+    - host audit/ + costs/ read-write, so audit records, cost history, and spend-cap
+      accounting persist where the host `forge proxy audit|costs` reads them instead
+      of dying with the --rm container. (Caps bootstrap from cost history, so an
+      unmounted costs/ would silently reset daily/monthly caps every launch.)
+    """
+    forge_home = get_forge_home()
+    mounts: list[tuple[str, str, str]] = [
+        (str(forge_home / "proxies" / proxy_id), f"{_SIDECAR_FORGE_HOME}/proxies/{proxy_id}", "ro"),
+    ]
+
+    for subdir in ("audit", "costs"):
+        host_dir = forge_home / subdir
+        host_dir.mkdir(parents=True, exist_ok=True)
+        mounts.append((str(host_dir), f"{_SIDECAR_FORGE_HOME}/{subdir}", "rw"))
+
+    return mounts
 
 
 def exec_in_container(container_name: str, command: list[str]) -> int:

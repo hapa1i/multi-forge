@@ -250,6 +250,17 @@ def write_mutation_record(*, request_id: str, proxy_id: str, route: dict[str, An
 
 
 def _audit_state_path(proxy_id: str) -> Path:
+    """Path to the per-proxy drift baseline.
+
+    Host mode keeps it beside proxy.yaml. In a proxy-id sidecar that per-proxy config
+    dir is mounted read-only, so redirect the baseline to the writable audit mount
+    (``~/.forge/audit/state/<id>.json``) — otherwise every restart loses the baseline
+    and re-flags the first prompt as drift. Gated on FORGE_PROXY_ID too: template-only
+    sidecars set FORGE_SIDECAR but mount no audit/ dir, so the redirect target would
+    not exist for them.
+    """
+    if os.environ.get("FORGE_SIDECAR") and os.environ.get("FORGE_PROXY_ID"):
+        return get_forge_home() / "audit" / "state" / f"{proxy_id}.json"
     return get_forge_home() / "proxies" / proxy_id / "audit_state.json"
 
 

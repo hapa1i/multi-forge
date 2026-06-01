@@ -36,6 +36,35 @@ def _meta(request_id="r", proxy_id="p", **kw):
     )
 
 
+class TestAuditStatePath:
+    """Drift-state file location (Slice 2e: read-only config mount forces a redirect)."""
+
+    def test_host_mode_writes_beside_proxy_yaml(self, monkeypatch):
+        from forge.core.paths import get_forge_home
+
+        monkeypatch.delenv("FORGE_SIDECAR", raising=False)
+        monkeypatch.delenv("FORGE_PROXY_ID", raising=False)
+        assert audit_logger._audit_state_path("px") == get_forge_home() / "proxies" / "px" / "audit_state.json"
+
+    def test_proxy_id_sidecar_redirects_to_writable_audit_mount(self, monkeypatch):
+        from forge.core.paths import get_forge_home
+
+        # A proxy-id sidecar mounts ~/.forge/proxies/<id>/ read-only, so the drift
+        # baseline must land in the writable audit mount instead.
+        monkeypatch.setenv("FORGE_SIDECAR", "1")
+        monkeypatch.setenv("FORGE_PROXY_ID", "px")
+        assert audit_logger._audit_state_path("px") == get_forge_home() / "audit" / "state" / "px.json"
+
+    def test_template_only_sidecar_does_not_redirect(self, monkeypatch):
+        from forge.core.paths import get_forge_home
+
+        # Template-only sidecars set FORGE_SIDECAR but mount no audit/ dir, so the
+        # redirect target would not exist — keep the host-mode path.
+        monkeypatch.setenv("FORGE_SIDECAR", "1")
+        monkeypatch.delenv("FORGE_PROXY_ID", raising=False)
+        assert audit_logger._audit_state_path("px") == get_forge_home() / "proxies" / "px" / "audit_state.json"
+
+
 class TestHashing:
     def test_system_prompt_str_and_list_equivalent(self):
         as_str = audit_logger.hash_system_prompt("You are helpful.")
