@@ -150,15 +150,120 @@ Phase 0 gaps carried forward:
 
 ## Phase 2 - Optional Audit Proxy
 
-- [ ] Add Anthropic passthrough proxy template design.
-  - Assertion: template is pure passthrough with explicit logging/intercept modes and no tier mapping confusion.
-- [ ] Define intercept modes: `passthrough`, `inspect`, `override`.
-  - Assertion: preflight reports which mode is active and what Forge can or cannot inspect.
-- [ ] Design full-body audit logging with redaction.
-  - Assertion: redaction policy covers headers, request bodies, response bodies, and tool payloads before
-    `audit_full_body` can be enabled.
-- [ ] Add audit CLI surface design.
-  - Assertion: `forge proxy audit show|diff` behavior is specified with safe defaults.
+Execution plan: `~/.claude/plans/yeah-let-s-move-on-proud-kernighan.md` (approved). Sliced OBSERVE-before-MUTATE; each
+slice leaves the proxy working because new config defaults are inert. Two axes kept distinct everywhere: **wire shape**
+(`openai_translated` | `anthropic_passthrough`) and **intercept mode** (`passthrough` | `inspect` | `override`).
+
+### Slice 2a - Config schema + loader propagation + wire_shape (DONE 2026-05-31)
+
+- [x] Add `InterceptConfig`/`InterceptOverrideConfig`/`AuditConfig` + `wire_shape` to `ProxyInstanceConfig` and runtime
+  `ProxyConfig` (strict unknown-key rejection); propagate through `loader.load_proxy_instance_config_from_dict` +
+  `_proxy_instance_to_forge_config` + `proxy_orchestrator`; report `wire_shape`/`intercept_mode` in `GET /`; add
+  `forge proxy set` int-coercion for `audit.retention_days`/`max_total_mb`.
+  - Assertion: defaults inert (`wire_shape="openai_translated"`, `intercept.mode="passthrough"`,
+    `audit_full_body=False`); unknown sub-keys raise (`audit.full_body` typo); config reaches runtime `ProxyConfig`
+    (propagation trap guarded).
+  - Verification: `tests/src/config/test_schema.py::TestInterceptAuditConfig`,
+    `tests/src/config/test_loader.py::test_proxy_instance_{config_round_trips,to_forge_config_propagates}_intercept_audit`;
+    107 config tests pass; mypy/pyright/ruff clean.
+
+### Slice 2b - Anthropic passthrough forward path + template (DONE 2026-05-31)
+
+| Test               | Fixture                                               | Assertion                                                          | Test File                                                     |
+| ------------------ | ----------------------------------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------- |
+| Raw body preserved | passthrough proxy; unknown field + thinking blocks    | forwarded body byte-identical; unknown field + `signature` survive | `tests/regression/test_bug_passthrough_preserves_raw_body.py` |
+| ASGI body re-read  | real app via `TestClient`                             | branch re-reads full raw body after `MessagesRequest` parse        | `tests/src/proxy/test_passthrough.py`                         |
+| Template create    | `forge proxy create anthropic-passthrough --no-start` | `proxy.yaml` carries `wire_shape: anthropic_passthrough`           | manual CLI smoke (verified)                                   |
+
+- [x] New `src/forge/proxy/passthrough.py` forwarder (httpx, raw SSE, no converters); early branch in
+  `create_message`/`count_tokens` on `wire_shape`; `anthropic-passthrough.yaml` template (`provider: litellm` slot,
+  `wire_shape` truth, `base_url: api.anthropic.com`); `ANTHROPIC_API_KEY` registered in `template_secrets.py`.
+  - Verification: 10 passthrough/regression tests pass; full 1467-test proxy+config+core sweep green; mypy/pyright/ruff
+    clean; CLI create smoke confirms `proxy.yaml` round-trip.
+  - Deferred (checklist debt): real-upstream `@pytest.mark.slow` signature-replay e2e
+    (`tests/integration/proxy/test_passthrough_e2e.py`) needs `ANTHROPIC_API_KEY` + Docker (release-validation tier).
+    The in-process `TestClient` test covers the body-reparse risk now.
+
+### Slice 2c - Audit logging + redaction + drift + `forge proxy audit show` + preflight (OBSERVE) (DONE 2026-05-31)
+
+| Test                    | Fixture                                                            | Assertion                                                               | Test File                                                                                  |
+| ----------------------- | ------------------------------------------------------------------ | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| No plaintext secret     | full-body record w/ planted secrets in headers+body+tools+response | none of the secrets appear in the JSONL; structure retained             | `tests/regression/test_bug_audit_header_redaction_no_leak.py`                              |
+| Metadata-only default   | passthrough proxy in `inspect` mode, one request                   | audit record has hashes + counts, no body text, no secret header values | `tests/src/proxy/test_passthrough.py::test_passthrough_inspect_mode_writes_audit_metadata` |
+| Drift fires on change   | two inspect requests, changed system prompt                        | second produces a `drift` record; baseline survives a simulated restart | `tests/src/proxy/test_audit_logger.py::TestDrift`                                          |
+| `audit show` no secrets | audit records written for two proxies                              | `forge proxy audit show <id>` scopes by id, prints hashes not plaintext | `tests/src/cli/test_proxy_audit.py`                                                        |
+
+- [x] `audit_logger.py` (`log_audit_record`/`read_audit_logs`/`prune_audit_logs`, `record_type` request/drift, hashing,
+  `schema_version`, owner-only 0600/0700); `redact_headers` in `utils.py` (denylist + substring fallback) reusing
+  `_redact_body_for_log`/`_redact_tools`; inspect-mode hook in both wire-shape paths (best-effort, guarded inert in
+  `passthrough` mode); drift detection + per-proxy `audit_state.json`; `audit_full_body` opt-in (request body + headers
+  redacted; streaming response = metadata only — full streamed-body capture deferred); retention pruning at startup;
+  `GET /` `intercept` preflight (`can_inspect`/`thinking_blocks_preserved`); `forge proxy audit show` (`proxy_audit.py`)
+  - `%proxy audit show`; `forge proxy set audit.audit_full_body=true` privacy warning; template flipped to
+    `intercept.mode: inspect`.
+  * Verification: 27 `test_audit_logger` + 4 `test_proxy_audit` + inspect server test + no-leak regression pass; broad
+    697-test proxy+cli+config sweep green; mypy/pyright/ruff clean.
+
+#### Slice 2c hardening - OBSERVE-half review fixes (DONE 2026-05-31)
+
+Review of the OBSERVE half surfaced 10 issues (4 Blocker / 3 Medium / 3 Low); all verified against code and fixed.
+
+| Test                              | Fixture                                                         | Assertion                                                           | Test File                                                                                                            |
+| --------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Unknown block bypasses validation | passthrough proxy, nested `future_block_99` block via real ASGI | 200 (not 422); raw block forwarded; `X-Resolved-Model` set          | `tests/src/proxy/test_passthrough.py::test_passthrough_middleware_bypasses_validation_for_unknown_block`             |
+| Translated proxy not intercepted  | `openai_translated` config via real ASGI                        | passthrough handler never reached                                   | `..::test_translated_proxy_not_intercepted_by_passthrough_middleware`                                                |
+| Usage -> cost                     | non-streaming response w/ usage                                 | `_calc_and_log_cost` gets input/output/cached=100/50/10             | `..::test_passthrough_logs_cost_from_response_usage`                                                                 |
+| Caps enforced                     | passthrough + cap exceeded, `on_cap_hit=reject`                 | 429 `spend_cap_exceeded`; forward not reached                       | `..::test_passthrough_enforces_spend_cap_reject`                                                                     |
+| Streaming usage tap               | SSE `message_start`+`message_delta`, split chunk                | `on_complete` usage = in 200 / out 77 / cached 20                   | `..::test_forward_streaming_taps_usage`, `..::test_usage_accumulator_handles_split_chunks`                           |
+| Full-body response + no leak      | inspect+`audit_full_body`, secret sys/user/resp/header          | record has redacted `response_body` + hashes/counts; zero plaintext | `..::test_passthrough_full_body_captures_redacted_response`                                                          |
+| No-leak via server path           | TestClient passthrough, secret Authorization+body+response      | no plaintext in shard; wiring (not just writer) covered             | `tests/regression/test_bug_audit_header_redaction_no_leak.py::test_full_body_audit_through_server_path_no_plaintext` |
+| Size retention                    | 3x 0.5 MiB shards, cap 1 MiB                                    | oldest pruned, newer kept                                           | `tests/src/proxy/test_audit_logger.py::TestPrune::test_prune_by_total_size_oldest_first`                             |
+| Non-text system block             | system list w/ text + image block                               | image block excluded from hash                                      | `..::TestHashing::test_system_prompt_excludes_non_text_blocks`                                                       |
+
+- [x] **B1** raw-validation bypass: passthrough intercepted in `log_requests_middleware` BEFORE FastAPI binds
+  `MessagesRequest`, so unknown/future content blocks forward byte-for-byte. The middleware is the SOLE passthrough
+  entry point — the old in-handler `wire_shape` branches in `create_message`/`count_tokens` were removed (they were dead
+  for real requests once the middleware short-circuits `call_next`); handler-logic tests call
+  `_handle_anthropic_passthrough` directly, middleware delegation is covered by two `TestClient` tests.
+- [x] **B2** caps/cost: passthrough now runs the same spend-cap preflight + `_calc_and_log_cost` + `record_request`;
+  usage captured from the non-streaming body and tapped from the streaming SSE (`_UsageAccumulator`).
+- [x] **B3/M5** response-side audit: full-body record written response-side with redacted response + request
+  hashes/counts; CLI label honest (`[req+resp]` vs `[req-body]`). **B4** no-leak now also covered through the server
+  path.
+- [x] **M6** event loop: request-side observation offloaded via `await asyncio.to_thread` (deterministic, off-loop).
+  **M7** headers: `X-Resolved-Model/Tier`, `X-Cumulative-Cost`, `X-Spend-Warning`. **L8** parent `audit/` chmod 0700.
+  **L10** system-prompt hash filters to text blocks.
+  - Verification: 43 passthrough+audit_logger + broad 2147-test sweep green; mypy/pyright/ruff clean. (One pre-existing,
+    unrelated failure on this branch: `test_removal_patching_system::...test_forge_info_no_traceback` — confirmed via
+    stash; not touched by this work.)
+  - Deferred (debt): translated-path full-body capture stays request-only (honest `[req-body]` label); passthrough
+    streaming full-body carries response usage metadata, not the full streamed body. Docker proxy-runtime integration
+    not yet run for 2a-2c (middleware change warrants it before merge).
+
+### Slice 2d - Override mode + augment/guards + reasoning pin + mutation safety + `audit diff` (MUTATE)
+
+- [ ] `override` branch (build/validate/apply mutation plan to current-request control surfaces only): cache-aware
+  `system_prompt_augment` (after last `cache_control` marker; warn on cache invalidation), `system_prompt_guards`
+  (warn/block/strip), reasoning-effort pin via existing `tier_overrides` in Anthropic units on the passthrough path;
+  mutation-safety invariant (historical-message fingerprint, raise on change); `record_type="mutation"` redacted diff;
+  `forge proxy audit diff`.
+  - Assertion: historical `thinking`/`redacted_thinking` byte-identical under override; augment lands post-cache (or
+    logs expected invalidation); `passthrough` mode is a no-op on the raw body.
+
+### Slice 2e - Sidecar audit plumbing
+
+- [ ] `FORGE_PROXY_ID` into `container.py` env + narrow read-only per-proxy config mount + writable host `audit/` mount;
+  `docker/entrypoint.sh` passes BOTH `--template` and `--proxy-id`; drift state writable in sidecar; preflight reports
+  mode + host-visible audit.
+  - Assertion (Docker integration): in-container `GET /` reports `intercept_mode`; host `forge proxy audit show <id>`
+    shows records written inside the container after it exits.
+
+### Slice 2f - Docs + always-on posture + closeout
+
+- [ ] `docs/design.md` §7.x (intercept modes, sidecar-recommended/host-supported, narrow-mount §7 exception),
+  `intercept_mode`/`wire_shape` in §3.7 `GET /`, `forge proxy audit` row in §4.0, §3.4 line; `docs/design_appendix.md`
+  §A.11 (config schema) + §A.12 (audit log schema); `docs/end-user/proxy.md` audit/intercept section + `audit_full_body`
+  privacy warning; `docs/board/change_log.md` Phase 2 entry; close out the deferred 2b e2e debt.
 
 ## Phase 3 - Native-Relocate Spike
 

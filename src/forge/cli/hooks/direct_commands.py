@@ -67,7 +67,7 @@ def _handle_cmd_help() -> None:
                 "decision": "block",
                 "reason": "Direct commands:\n"
                 "- %session show [name] | list\n"
-                "- %proxy list | show <id>\n"
+                "- %proxy list | show <id> | audit show [id]\n"
                 "- %clean [--scope repo|project|all]\n"
                 "- %plan\n"
                 "- %config (show runtime config)\n"
@@ -224,7 +224,36 @@ def _handle_cmd_proxy(data: dict[str, Any], argv: list[str]) -> None:
         _handle_proxy_show(proxy_id)
         return
 
-    click.echo(json.dumps({"decision": "block", "reason": "Usage: %proxy list | show <id>"}))
+    if sub == "audit":
+        if len(argv) < 2 or argv[1].lower() != "show":
+            click.echo(json.dumps({"decision": "block", "reason": "Usage: %proxy audit show [id]"}))
+            return
+        _handle_proxy_audit_show(argv[2] if len(argv) > 2 else None)
+        return
+
+    click.echo(json.dumps({"decision": "block", "reason": "Usage: %proxy list | show <id> | audit show [id]"}))
+
+
+def _handle_proxy_audit_show(proxy_id: str | None) -> None:
+    """Show recent audit metadata (read-only; metadata only, never secrets)."""
+    from forge.proxy.audit_logger import read_audit_logs
+
+    records = read_audit_logs(proxy_id=proxy_id)[-10:]
+    if not records:
+        scope = f" for '{proxy_id}'" if proxy_id else ""
+        click.echo(json.dumps({"decision": "block", "reason": f"No audit data{scope}."}))
+        return
+
+    lines = ["Proxy audit (metadata, last 10):"]
+    for record in records:
+        ts = record.get("ts", "")
+        proxy = record.get("proxy_id", "-")
+        if record.get("record_type") == "drift":
+            lines.append(f"  {ts} {proxy} drift {record.get('dimension')}")
+            continue
+        sys_hash = (record.get("system_prompt_hash") or "-").removeprefix("sha256:")[:10]
+        lines.append(f"  {ts} {proxy} {record.get('mode', '-')} sys:{sys_hash}")
+    click.echo(json.dumps({"decision": "block", "reason": "\n".join(lines)}))
 
 
 def _handle_proxy_list() -> None:

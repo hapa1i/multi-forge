@@ -38,6 +38,7 @@ from rich.syntax import Syntax
 from rich.table import Table
 
 from forge.cli.output import print_error_with_tip, print_tip
+from forge.cli.proxy_audit import audit_cmd
 from forge.cli.proxy_costs import costs_cmd
 from forge.config.loader import (
     get_proxy_file_path,
@@ -53,7 +54,7 @@ from forge.config.loader import (
     template_exists,
     validate_template_name,
 )
-from forge.core.paths import display_path
+from forge.core.paths import display_path, get_forge_home
 from forge.core.process import find_pid_by_port
 from forge.proxy.proxies import (
     CLI_LOCK_TIMEOUT_S,
@@ -95,6 +96,7 @@ def proxy() -> None:
 
 
 proxy.add_command(costs_cmd)
+proxy.add_command(audit_cmd)
 
 
 def _clear_workflow_template_cache() -> None:
@@ -910,7 +912,7 @@ def set_cmd(proxy_id: str, key_value: str) -> None:
     try:
         if value.lower() in ("none", "null"):
             coerced_value = None
-        elif final_key in ("port", "proxy_format", "thinking_budget_tokens"):
+        elif final_key in ("port", "proxy_format", "thinking_budget_tokens", "retention_days", "max_total_mb"):
             coerced_value = int(value)
         elif final_key in ("temperature",) or key in ("costs.caps.per_day", "costs.caps.per_month"):
             coerced_value = float(value)
@@ -948,6 +950,13 @@ def set_cmd(proxy_id: str, key_value: str) -> None:
         print_tip(
             "Cost config is read at proxy startup. Restart the proxy for this change to take effect.",
             blank_before=False,
+            console=console,
+        )
+    if key == "audit.audit_full_body" and coerced_value is True:
+        print_tip(
+            "Full-body audit logs request/response structure (redacted, but retains code/file structure).",
+            f"Written owner-only under {display_path(get_forge_home() / 'audit' / 'requests')}.",
+            commands=[f"forge proxy set {proxy_id} audit.audit_full_body=false"],
             console=console,
         )
 

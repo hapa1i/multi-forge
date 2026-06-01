@@ -420,6 +420,33 @@ def _redact_body_for_log(body: dict[str, object] | None) -> dict[str, object] | 
     return redacted
 
 
+# Header-name substrings that always trigger redaction even if not explicitly
+# listed — catches vendor-prefixed credential headers (e.g. x-acme-secret).
+_SUBSTRING_REDACT_MARKERS = ("authorization", "api-key", "apikey", "token", "secret", "cookie", "password")
+
+
+def redact_headers(headers: dict[str, str] | None, redact: set[str] | None = None) -> dict[str, object]:
+    """Redact sensitive headers case-insensitively, preserving the rest verbatim.
+
+    Sensitive values become ``{"redacted": True, "length": N}`` — the same marker
+    shape as ``_redact_content``. Non-sensitive header names/values are kept because
+    they are the drift signal (``anthropic-version``, ``anthropic-beta`` flags).
+    ``redact`` is the explicit denylist (union of defaults + ``AuditConfig.redact_headers``);
+    a substring fallback also catches credential-bearing names not in the list.
+    """
+    if not headers:
+        return {}
+    redact_lc = {h.lower() for h in (redact or set())}
+    out: dict[str, object] = {}
+    for key, value in headers.items():
+        key_lc = key.lower()
+        if key_lc in redact_lc or any(marker in key_lc for marker in _SUBSTRING_REDACT_MARKERS):
+            out[key] = {"redacted": True, "length": len(value) if isinstance(value, str) else 0}
+        else:
+            out[key] = value
+    return out
+
+
 async def log_request_response(
     request_id: str,
     original_model: str,

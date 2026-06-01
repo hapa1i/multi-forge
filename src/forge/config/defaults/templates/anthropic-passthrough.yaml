@@ -1,0 +1,29 @@
+# Template: anthropic-passthrough
+# Direct Anthropic Messages API passthrough (Phase 2 audit proxy).
+#
+# Forwards the raw Anthropic request to api.anthropic.com WITHOUT OpenAI
+# translation, so thinking blocks and unknown/future fields survive byte-for-byte
+# (signature-safe). This is the only wire shape that preserves signed reasoning.
+#
+# `provider: litellm` is only a config slot used for credential and upstream
+# resolution — `wire_shape: anthropic_passthrough` is the authoritative wire truth
+# (GET / reports it). Tiers are informational here; the client's model is forwarded
+# unchanged. Requires ANTHROPIC_API_KEY in .env (or environment).
+
+proxy:
+  family: anthropic
+  preferred_provider: litellm
+  default_port: 8096
+  wire_shape: anthropic_passthrough
+
+  # Observe by default: hash + drift-detect outbound system prompts / tool surfaces.
+  # No body inspection until raised to 'inspect'; set 'override' to apply controls.
+  intercept:
+    mode: inspect
+
+  litellm:
+    tiers:
+      haiku: claude-haiku-4-5
+      sonnet: claude-sonnet-4-6
+      opus: claude-opus-4-6
+    base_url: "https://api.anthropic.com"

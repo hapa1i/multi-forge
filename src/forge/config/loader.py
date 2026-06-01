@@ -449,6 +449,9 @@ def load_proxy_instance_config_from_dict(data: dict) -> "ProxyInstanceConfig":
         prompt_caching=data.get("prompt_caching", "passthrough"),
         auto_cache_min_tokens=data.get("auto_cache_min_tokens", 1024),
         costs=data.get("costs", {}),
+        wire_shape=data.get("wire_shape", "openai_translated"),
+        intercept=data.get("intercept", {}),
+        audit=data.get("audit", {}),
         created_at=data.get("created_at"),
         updated_at=data.get("updated_at"),
     )
@@ -558,6 +561,9 @@ def _proxy_instance_to_forge_config(
         default_tier=proxy_config.default_tier,
         default_port=proxy_config.port,
         costs=proxy_config.costs,
+        wire_shape=proxy_config.wire_shape,
+        intercept=proxy_config.intercept,
+        audit=proxy_config.audit,
     )
 
     if proxy_config.provider == "gemini":
