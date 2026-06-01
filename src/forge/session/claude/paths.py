@@ -48,7 +48,17 @@ def encode_project_path(project_root: str) -> str:
     """Encode project path for Claude's directory structure.
 
     Claude stores session data in directories named after the project path,
-    with path separators and dots replaced by hyphens.
+    with path separators, dots, and underscores replaced by hyphens.
+
+    The underscore mapping is empirically verified against Claude Code 2.1.158
+    (e.g. a CWD of ``.../my_project`` is stored under ``...-my-project``); a
+    transcript path computed without it points at the wrong directory, breaking
+    cleanup, status, and cross-CWD relocation for any underscore-bearing path.
+
+    Only ``/``, ``.``, and ``_`` are characterized against real Claude (case,
+    digits, and ``-`` are preserved). Other punctuation/whitespace is a known
+    unknown -- do not broaden this rule without a real-Claude characterization
+    test (see tests/regression/test_bug_encode_project_path_underscore.py).
 
     Args:
         project_root: Absolute path to project root.
@@ -57,11 +67,11 @@ def encode_project_path(project_root: str) -> str:
         Encoded path string (e.g., '/home/user/project' -> '-home-user-project').
 
     Example:
-        >>> encode_project_path("/home/user/my.project")
-        '-home-user-my-project'
+        >>> encode_project_path("/home/user/my.project_v2")
+        '-home-user-my-project-v2'
     """
     normalized = str(Path(project_root).resolve())
-    encoded = normalized.replace("/", "-").replace(".", "-")
+    encoded = normalized.replace("/", "-").replace(".", "-").replace("_", "-")
 
     return encoded
 
