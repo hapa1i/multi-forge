@@ -17,15 +17,17 @@ from forge.core.paths import get_forge_home
 from forge.sidecar.docker import _docker_name_filter
 
 # In-container Forge home, pinned via FORGE_HOME so audit/cost/config resolution is
-# deterministic. On macOS the sidecar runs as root (Dockerfile.sidecar sets no USER)
-# and ~/.forge resolves to /root/.forge.
+# deterministic. The sidecar keeps everything under /root (root's home: the
+# entrypoint writes /root/.claude*, the standard mounts target /root/.claude, and the
+# audit/cost/config mounts target /root/.forge).
 #
-# KNOWN LIMITATION (Linux): run_sidecar_session adds `--user uid:gid`, but /root is
-# 0700 and the entrypoint also writes /root/.claude* directly, so these /root paths
-# are not traversable/writable by a non-root uid. This predates 2e (the /root/.claude
-# mounts have the same constraint); the audit/cost path is verified on macOS, and the
-# Linux UID-writable-home rework is tracked as follow-up.
+# Under the Linux `--user uid:gid` mapping the process is a non-root uid with no
+# passwd entry, so two things are needed (both also no-ops for the macOS root run):
+# HOME=/root is set explicitly (Docker otherwise leaves HOME=/ for such a uid), and
+# Dockerfile.sidecar runs `chmod 0777 /root` so the mapped uid can traverse/write
+# /root and its mounted children. Safe for an ephemeral single-session --rm sandbox.
 _SIDECAR_FORGE_HOME = "/root/.forge"
+_SIDECAR_HOME = "/root"
 
 
 class ContainerExistsError(RuntimeError):
@@ -118,6 +120,10 @@ def run_sidecar_session(
         "FORGE_SIDECAR=1",
         "-e",
         "FORGE_LAUNCH_MODE=sidecar",
+        # Deterministic home: a `--user` uid with no passwd entry would get HOME=/,
+        # breaking claude (~/.claude.json) and forge (~/.forge) resolution.
+        "-e",
+        f"HOME={_SIDECAR_HOME}",
         "-w",
         "/workspace",
     ]

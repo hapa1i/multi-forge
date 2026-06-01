@@ -335,10 +335,11 @@ Review of 2e surfaced 9 issues (2 High / 1 Med / 4 Low / 2 nits/docs); all verif
 
 - [x] **High**: (1) **costs not host-persistent** — mounted `audit/` but not `costs/`, so cost history AND cumulative
   spend-cap accounting reset every `--rm` launch (caps bootstrap from cost logs). Added a writable `costs/` mount beside
-  `audit/`. (2) **Linux `--user` vs `/root`** — real but pre-existing (the existing `/root/.claude` mounts + the
-  entrypoint's direct `/root/.claude.json` write share it): under `--user uid:gid`, `/root` (0700) isn't
-  traversable/writable. Fixed the inaccurate "runs as root" comment to record the limitation honestly; the UID-writable
-  home rework is tracked as **follow-up** (touches the pre-existing `/root/.claude` flow, out of 2e scope).
+  `audit/`. (2) **Linux `--user` vs `/root`** — under `--user uid:gid` the process is a non-root uid with no passwd
+  entry, so HOME collapsed to `/` and `/root` (0700) was un-traversable, breaking both forge (`~/.forge`) and claude
+  (`~/.claude.json`). **Fixed:** `container.py` pins `HOME=/root` and `Dockerfile.sidecar` runs `chmod 0777 /root` so
+  the mapped uid can reach the /root mounts (sandbox-justified; ephemeral single-session `--rm`). Reproduced + verified
+  on macOS by forcing `--user` (container `/root` perms are real regardless of host OS).
 - [x] **Medium**: (3) `--proxy-id` startup no longer hard-gates on `template_exists` — proxy.yaml is authoritative when
   a proxy id is supplied, so a proxy from a non-shipped user template starts in-container (`server.main`:
   `if proxy_id is None and not template_exists`).
@@ -349,11 +350,10 @@ Review of 2e surfaced 9 issues (2 High / 1 Med / 4 Low / 2 nits/docs); all verif
   (7) drift-state redirect gated on `FORGE_SIDECAR` **and** `FORGE_PROXY_ID` (template-only sidecars mount no audit/).
   (8) `_SIDECAR_FORGE_HOME` comment corrected re: Linux `--user`. (9) confirmed checklist 2f keeps the narrow-mount §7
   exception as a docs item.
-  - Verification: **E2E re-run PASSES against a freshly-rebuilt base** (current source incl. #3/#7 baked); 71 focused
-    unit + 799 proxy+sidecar+config+session sweep; ruff/mypy clean; fresh `uv run pyright` 0/0/0 on changed src;
-    `pre-commit` clean.
-  - **Follow-up (tracked):** Linux `--user` UID-writable home for the sidecar (fixes #2 fully; shared with the
-    pre-existing `/root/.claude` mount + `/root/.claude.json` write). Out of 2e scope; macOS path verified.
+  - Verification: **E2E PASSES under forced `--user` against a freshly-rebuilt base** (current source incl. #2/#3/#7
+    baked; the test now always runs with `--user uid:gid` + `HOME=/root`, exercising the arbitrary-uid path on macOS);
+    71 focused unit + 799 proxy+sidecar+config+session sweep; ruff/mypy clean; fresh `uv run pyright` 0/0/0 on changed
+    src; `pre-commit` clean.
 
 ### Slice 2f - Docs + always-on posture + closeout
 

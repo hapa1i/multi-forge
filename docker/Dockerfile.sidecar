@@ -26,6 +26,14 @@ FROM ${BASE_IMAGE}
 # (Already in base image from Dockerfile.forge, but explicit for documentation)
 RUN command -v curl > /dev/null || (apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*)
 
+# Arbitrary-uid support: forge session start --sidecar runs the container as the
+# host `--user uid:gid` on Linux. That uid has no passwd entry, so HOME falls back
+# to / and /root (0700) is unreadable. run_sidecar_session pins HOME=/root; make
+# /root traversable/writable here so the mapped uid can reach the mounts under it
+# (/root/.claude, /root/.forge/*) and write /root/.claude.json. Safe for an
+# ephemeral single-session --rm sandbox.
+RUN chmod 0777 /root
+
 # Copy and set up entrypoint script
 COPY docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh

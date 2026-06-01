@@ -11,8 +11,10 @@ can assert the two end-to-end properties the slice promises:
 2. Audit records written inside the container are host-visible on the *writable*
    audit mount after the container stops (``forge proxy audit show`` reads them).
 
-Primary target is macOS (Docker Desktop maps container-root writes to the host
-user). On Linux the run mirrors container.py's ``--user`` mapping for fidelity.
+The container always runs under the host ``--user uid:gid`` mapping (the Linux
+launch path), so this also exercises arbitrary-uid support on macOS: HOME=/root +
+``chmod 0777 /root`` (Dockerfile.sidecar) must let a non-root uid reach the /root
+mounts. Docker Desktop maps the bind-mount writes back to the host user.
 """
 
 from __future__ import annotations
@@ -20,7 +22,6 @@ from __future__ import annotations
 import json
 import os
 import subprocess
-import sys
 import time
 from pathlib import Path
 
@@ -102,6 +103,8 @@ def test_sidecar_proxy_id_overlay_and_host_visible_audit(tmp_path: Path, sidecar
         "-e",
         "FORGE_HOME=/root/.forge",
         "-e",
+        "HOME=/root",
+        "-e",
         "ANTHROPIC_API_KEY=test-not-real",
         "-v",
         f"{proxy_dir}:/root/.forge/proxies/{PROXY_ID}:ro",
@@ -112,8 +115,10 @@ def test_sidecar_proxy_id_overlay_and_host_visible_audit(tmp_path: Path, sidecar
         "-v",
         f"{sleeper}:{claude_path}:ro",
     ]
-    if sys.platform == "linux":
-        run_cmd += ["--user", f"{os.getuid()}:{os.getgid()}"]
+    # Always run under the host --user mapping (not just Linux) so this exercises the
+    # arbitrary-uid path on macOS too: HOME=/root + `chmod 0777 /root` (Dockerfile.sidecar)
+    # must let a non-root uid reach the /root mounts and start the proxy.
+    run_cmd += ["--user", f"{os.getuid()}:{os.getgid()}"]
     run_cmd.append(sidecar_image)
 
     try:
