@@ -2091,6 +2091,309 @@ class TestSessionFork:
         call_kwargs = mock_manager.fork_session.call_args.kwargs
         assert call_kwargs["create_worktree"] is True
 
+    # ---- native-relocate (--resume-mode) -------------------------------------
+
+    def _nr_parent_and_fork(self, temp_env: Path, *, parent_sidecar: bool = False, with_transcript: bool = True):
+        """Build (parent, worktree-fork) states; optionally seed the parent's Claude transcript."""
+        from forge.session import LAUNCH_MODE_HOST as _HOST
+        from forge.session import LAUNCH_MODE_SIDECAR as _SC
+        from forge.session.claude.paths import get_transcript_path
+
+        parent = create_session_state(
+            "fork-parent",
+            worktree_path=str(temp_env),
+            worktree_branch="main",
+            launch_mode=_SC if parent_sidecar else _HOST,
+        )
+        parent.confirmed.claude_session_id = "parent-uuid"
+        parent.confirmed.claude_project_root = str(temp_env)
+        if with_transcript:
+            tp = get_transcript_path(str(temp_env), "parent-uuid")
+            tp.parent.mkdir(parents=True, exist_ok=True)
+            tp.write_text('{"type":"thinking","signature":"x"}\n')
+
+        fork_worktree = temp_env / "fork-child"
+        fork_worktree.mkdir(exist_ok=True)
+        fork_state = create_session_state(
+            "fork-child",
+            parent_session="fork-parent",
+            is_fork=True,
+            worktree_path=str(fork_worktree),
+            worktree_branch="fork-child",
+        )
+        assert fork_state.worktree is not None
+        fork_state.worktree.is_worktree = True
+        return parent, fork_state
+
+    def test_native_relocate_worktree_resumes_parent(self, runner: CliRunner, temp_env: Path) -> None:
+        """--resume-mode native-relocate relocates the parent JSONL and resumes natively."""
+        from forge.session.claude.paths import get_transcript_path
+
+        parent, fork_state = self._nr_parent_and_fork(temp_env)
+        with (
+            patch("forge.cli.session.SessionManager") as mock_manager_cls,
+            patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
+        ):
+            mock_manager = mock_manager_cls.return_value
+            mock_manager.get_session.return_value = parent
+            mock_manager.fork_session.return_value = (parent, fork_state)
+            result = runner.invoke(
+                main,
+                [
+                    "session",
+                    "fork",
+                    "fork-parent",
+                    "-n",
+                    "fork-child",
+                    "--worktree",
+                    "--resume-mode",
+                    "native-relocate",
+                ],
+            )
+
+        assert result.exit_code == 0, result.output
+        kwargs = mock_invoke.call_args.kwargs
+        assert kwargs.get("resume_id") == "parent-uuid"
+        assert kwargs.get("fork_session") is True
+        assert kwargs.get("session_id") is None
+        # The parent transcript was relocated into the child's encoded dir.
+        child_cwd = str(temp_env / "fork-child")
+        assert get_transcript_path(child_cwd, "parent-uuid").is_file()
+
+    def test_worktree_default_prints_native_relocate_tip(self, runner: CliRunner, temp_env: Path) -> None:
+        """A plain worktree fork (no --resume-mode) surfaces the native-relocate option."""
+        parent, fork_state = self._nr_parent_and_fork(temp_env)
+        context_file = temp_env / "fork-child" / ".forge" / "ctx.md"
+        context_file.parent.mkdir(parents=True, exist_ok=True)
+        context_file.write_text("# ctx\n")
+        with (
+            patch("forge.cli.session.SessionManager") as mock_manager_cls,
+            patch("forge.cli.session.invoke_claude", return_value=0),
+            patch("forge.cli.session._generate_parent_transfer_context", return_value=(context_file, [])),
+        ):
+            mock_manager = mock_manager_cls.return_value
+            mock_manager.get_session.return_value = parent
+            mock_manager.fork_session.return_value = (parent, fork_state)
+            result = runner.invoke(main, ["session", "fork", "fork-parent", "-n", "fork-child", "--worktree"])
+
+        assert result.exit_code == 0, result.output
+        assert "--resume-mode native-relocate" in result.output
+
+    def test_native_relocate_rejects_sidecar(self, runner: CliRunner, temp_env: Path) -> None:
+        """A non-direct sidecar parent rejects native-relocate before any fork is created."""
+        parent, fork_state = self._nr_parent_and_fork(temp_env, parent_sidecar=True)
+        with patch("forge.cli.session.SessionManager") as mock_manager_cls:
+            mock_manager = mock_manager_cls.return_value
+            mock_manager.get_session.return_value = parent
+            mock_manager.fork_session.return_value = (parent, fork_state)
+            result = runner.invoke(
+                main,
+                [
+                    "session",
+                    "fork",
+                    "fork-parent",
+                    "-n",
+                    "fork-child",
+                    "--worktree",
+                    "--resume-mode",
+                    "native-relocate",
+                ],
+            )
+
+        assert result.exit_code != 0
+        assert "not supported with sidecar" in result.output
+        mock_manager.fork_session.assert_not_called()
+
+    def test_native_relocate_allows_direct_sidecar_parent(self, runner: CliRunner, temp_env: Path) -> None:
+        """--no-proxy forces host launch, so a sidecar parent is NOT rejected with --no-proxy."""
+        parent, fork_state = self._nr_parent_and_fork(temp_env, parent_sidecar=True)
+        with (
+            patch("forge.cli.session.SessionManager") as mock_manager_cls,
+            patch("forge.cli.session.invoke_claude", return_value=0),
+        ):
+            mock_manager = mock_manager_cls.return_value
+            mock_manager.get_session.return_value = parent
+            mock_manager.fork_session.return_value = (parent, fork_state)
+            result = runner.invoke(
+                main,
+                [
+                    "session",
+                    "fork",
+                    "fork-parent",
+                    "-n",
+                    "fork-child",
+                    "--worktree",
+                    "--no-proxy",
+                    "--resume-mode",
+                    "native-relocate",
+                ],
+            )
+
+        assert "not supported with sidecar" not in result.output
+        mock_manager.fork_session.assert_called_once()
+
+    def test_native_relocate_rejects_no_launch(self, runner: CliRunner, temp_env: Path) -> None:
+        parent, fork_state = self._nr_parent_and_fork(temp_env)
+        with patch("forge.cli.session.SessionManager") as mock_manager_cls:
+            mock_manager = mock_manager_cls.return_value
+            mock_manager.get_session.return_value = parent
+            mock_manager.fork_session.return_value = (parent, fork_state)
+            result = runner.invoke(
+                main,
+                [
+                    "session",
+                    "fork",
+                    "fork-parent",
+                    "-n",
+                    "fork-child",
+                    "--worktree",
+                    "--no-launch",
+                    "--resume-mode",
+                    "native-relocate",
+                ],
+            )
+
+        assert result.exit_code != 0
+        assert "--no-launch" in result.output
+        mock_manager.fork_session.assert_not_called()
+
+    def test_native_relocate_rejects_missing_parent_transcript(self, runner: CliRunner, temp_env: Path) -> None:
+        parent, fork_state = self._nr_parent_and_fork(temp_env, with_transcript=False)
+        with patch("forge.cli.session.SessionManager") as mock_manager_cls:
+            mock_manager = mock_manager_cls.return_value
+            mock_manager.get_session.return_value = parent
+            mock_manager.fork_session.return_value = (parent, fork_state)
+            result = runner.invoke(
+                main,
+                [
+                    "session",
+                    "fork",
+                    "fork-parent",
+                    "-n",
+                    "fork-child",
+                    "--worktree",
+                    "--resume-mode",
+                    "native-relocate",
+                ],
+            )
+
+        assert result.exit_code != 0
+        assert "no Claude transcript" in result.output
+        mock_manager.fork_session.assert_not_called()
+
+    def test_resume_mode_on_same_directory_fork_warns(self, runner: CliRunner, temp_env: Path) -> None:
+        """--resume-mode on a same-directory fork is inapplicable: tip + ignored."""
+        parent, _ = self._nr_parent_and_fork(temp_env)
+        samedir_fork = create_session_state(
+            "fork-child", parent_session="fork-parent", is_fork=True, worktree_path=str(temp_env)
+        )
+        if samedir_fork.worktree is not None:
+            samedir_fork.worktree.is_worktree = False
+        with (
+            patch("forge.cli.session.SessionManager") as mock_manager_cls,
+            patch("forge.cli.session.invoke_claude", return_value=0),
+        ):
+            mock_manager = mock_manager_cls.return_value
+            mock_manager.get_session.return_value = parent
+            mock_manager.fork_session.return_value = (parent, samedir_fork)
+            result = runner.invoke(
+                main, ["session", "fork", "fork-parent", "-n", "fork-child", "--resume-mode", "native-relocate"]
+            )
+
+        assert "--resume-mode only applies to --worktree/--into forks" in result.output
+        mock_manager.fork_session.assert_called_once()
+
+    def test_native_relocate_warns_strategy_ignored(self, runner: CliRunner, temp_env: Path) -> None:
+        parent, fork_state = self._nr_parent_and_fork(temp_env)
+        with (
+            patch("forge.cli.session.SessionManager") as mock_manager_cls,
+            patch("forge.cli.session.invoke_claude", return_value=0),
+        ):
+            mock_manager = mock_manager_cls.return_value
+            mock_manager.get_session.return_value = parent
+            mock_manager.fork_session.return_value = (parent, fork_state)
+            result = runner.invoke(
+                main,
+                [
+                    "session",
+                    "fork",
+                    "fork-parent",
+                    "-n",
+                    "fork-child",
+                    "--worktree",
+                    "--strategy",
+                    "full",
+                    "--resume-mode",
+                    "native-relocate",
+                ],
+            )
+
+        assert "ignored with --resume-mode native-relocate" in result.output
+
+    def test_native_relocate_rolls_back_on_conflict(self, runner: CliRunner, temp_env: Path) -> None:
+        """A relocation conflict rolls back the fork WITHOUT deleting the pre-existing transcript."""
+        from forge.session.claude import RelocateConflictError
+
+        parent, fork_state = self._nr_parent_and_fork(temp_env)
+        with (
+            patch("forge.cli.session.SessionManager") as mock_manager_cls,
+            patch("forge.session.claude.relocate_transcript", side_effect=RelocateConflictError("dup")),
+        ):
+            mock_manager = mock_manager_cls.return_value
+            mock_manager.get_session.return_value = parent
+            mock_manager.fork_session.return_value = (parent, fork_state)
+            result = runner.invoke(
+                main,
+                [
+                    "session",
+                    "fork",
+                    "fork-parent",
+                    "-n",
+                    "fork-child",
+                    "--worktree",
+                    "--resume-mode",
+                    "native-relocate",
+                ],
+            )
+
+        assert result.exit_code != 0
+        assert "already holds a different transcript" in result.output
+        # Rollback must NOT delete transcripts: the conflicting dest file is the user's, and the
+        # cleanup branch would otherwise unlink the exact file the conflict protected.
+        mock_manager.delete_session.assert_called_once()
+        assert mock_manager.delete_session.call_args.kwargs["delete_transcripts"] is False
+
+    def test_native_relocate_rolls_back_on_io_error(self, runner: CliRunner, temp_env: Path) -> None:
+        """A non-custom IO failure (e.g. PermissionError) rolls back the fork without a traceback."""
+        parent, fork_state = self._nr_parent_and_fork(temp_env)
+        with (
+            patch("forge.cli.session.SessionManager") as mock_manager_cls,
+            patch("forge.session.claude.relocate_transcript", side_effect=PermissionError("denied")),
+        ):
+            mock_manager = mock_manager_cls.return_value
+            mock_manager.get_session.return_value = parent
+            mock_manager.fork_session.return_value = (parent, fork_state)
+            result = runner.invoke(
+                main,
+                [
+                    "session",
+                    "fork",
+                    "fork-parent",
+                    "-n",
+                    "fork-child",
+                    "--worktree",
+                    "--resume-mode",
+                    "native-relocate",
+                ],
+            )
+
+        assert result.exit_code != 0
+        # Clean exit (SystemExit), not an uncaught PermissionError traceback.
+        assert isinstance(result.exception, SystemExit)
+        assert "Could not relocate" in result.output
+        mock_manager.delete_session.assert_called_once()
+        assert mock_manager.delete_session.call_args.kwargs["delete_transcripts"] is False
+
     def test_sidecar_worktree_fork_injects_addendum_once(self, runner: CliRunner, temp_env: Path) -> None:
         """Sidecar worktree forks should combine context with one copy of the addendum."""
         parent = create_session_state(

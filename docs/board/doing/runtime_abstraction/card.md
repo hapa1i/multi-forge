@@ -839,9 +839,13 @@ Native-relocate is an experimental spike, not a committed UX until contract test
 - How should the intercept layer degrade when the selected runtime route uses a non-Forge gateway? Forge proxy routes
   are inspectable; direct API, native CLI auth, and user-managed LiteLLM routes may be launchable but opaque to prompt
   guards, full-body audit, and proxy-level cost caps.
-- For Phase 3 native-relocate: can copied Claude JSONL be replayed safely across CWD boundaries at all? If yes, should
-  path-rewriting in tool_result blocks remain opt-in (`--rewrite-paths`)? The signature-safe minimum is "copy JSONL,
-  leave content untouched" -- path rewriting is a nice-to-have that risks subtle mismatches.
+- For Phase 3 native-relocate: **resolved 2026-06-01** -- copied Claude JSONL replays safely across CWD boundaries on
+  Claude 2.1.158, shipped as the opt-in `fork --resume-mode native-relocate` (host mode only; default stays transfer).
+  Still open: (a) path rewriting in `tool_result` blocks (`--rewrite-paths`) is off -- historical absolute paths point
+  at the parent checkout; (b) **default-flip gates** -- native-relocate can become the cross-CWD-fork default only after
+  stale-path mitigation is proven AND a compaction/fallback story is defined, and `--worktree` should flip before
+  `--into` (an existing `--into` worktree has more collision surface); (c) sidecar native-relocate and
+  `resume --resume-mode native-relocate` are deferred.
 - Are Anthropic thinking signatures cross-*model* portable within the same family (e.g., sonnet-4.6 thinking validated
   against sonnet-4.7), or strictly per-model-id? Default assumption: not portable. Empirical contract tests are
   mandatory before Phase 3 enables any cross-model replay behavior.

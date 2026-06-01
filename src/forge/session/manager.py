@@ -1036,6 +1036,7 @@ class SessionManager:
         forge_root: str | None = None,
         force: bool = False,
         memory_flag: bool | None = None,
+        resume_mode: str | None = None,
         warnings_sink: list[str] | None = None,
     ) -> tuple[SessionState, SessionState]:
         """Fork an existing session.
@@ -1308,12 +1309,20 @@ class SessionManager:
             memory_flag=memory_flag,
         )
 
-        fork_resume_mode = "transfer" if (create_worktree or is_into) else "native"
+        # Opt-in native-relocate (worktree/--into only) overrides the transfer default;
+        # everything else keeps the auto-decision (same-dir native, cross-CWD transfer).
+        if resume_mode == "native-relocate" and (create_worktree or is_into):
+            fork_resume_mode = "native-relocate"
+        else:
+            fork_resume_mode = "transfer" if (create_worktree or is_into) else "native"
         # For transfer-mode forks the per-child file is created lazily at launch
         # (see _generate_parent_transfer_context). We pre-record the reference
         # here so GC knows the fork's child file belongs to this session, even
         # if launch happens later.
         fork_context_file_rel = child_path_rel(parent_name, fork_name) if fork_resume_mode == "transfer" else None
+        # native-relocate copies the parent transcript into the child's encoded dir; record the
+        # parent UUID so cleanup can remove that copy (dir-scoped to the child, never the parent's).
+        fork_relocated_parent = parent.confirmed.claude_session_id if fork_resume_mode == "native-relocate" else None
         fork_state.confirmed.derivation = Derivation(
             parent_session=parent_name,
             parent_transcript=_latest_transcript_artifact_path(parent),
@@ -1324,6 +1333,7 @@ class SessionManager:
             resumed_at=now_iso(),
             lineage=[parent_name],
             context_file=fork_context_file_rel,
+            relocated_parent_session_id=fork_relocated_parent,
             parent_forge_root=parent_entry.forge_root or parent_entry.worktree_path,
             parent_project_root=parent_entry.project_root,
         )
@@ -1747,6 +1757,24 @@ class SessionManager:
                     claude_session_id=_filtered_claude_session_id,
                     artifact_session_ids=_filtered_artifact_ids,
                 )
+
+        # native-relocate forks copy the parent transcript into the child's encoded dir.
+        # Remove that copy independently of the child's own UUID (which may be unset on a
+        # failed/partial launch). The path is dir-scoped to the child, so the parent's
+        # original under its own encoded dir is never touched.
+        if delete_transcripts and state is not None:
+            _deriv = state.confirmed.derivation
+            if _deriv is not None and _deriv.resume_mode == "native-relocate" and _deriv.relocated_parent_session_id:
+                _reloc_root = _transcript_cleanup_project_root(
+                    state,
+                    entry.forge_root or entry.worktree_path,
+                    _raw_data,
+                )
+                _reloc_path = get_transcript_path(_reloc_root, _deriv.relocated_parent_session_id)
+                try:
+                    _reloc_path.unlink(missing_ok=True)
+                except OSError as exc:
+                    logger.warning("Failed to remove relocated parent transcript %s: %s", _reloc_path, exc)
 
         self.index_store.remove_session(name, forge_root=entry_forge_root)
 

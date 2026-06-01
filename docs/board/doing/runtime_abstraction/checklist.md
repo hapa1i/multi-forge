@@ -24,15 +24,19 @@ wc -l docs/board/doing/runtime_abstraction/checklist.md
 
 ## Current Focus
 
-**Phase 3 spike complete (2026-06-01) — native-relocate is VIABLE (PASS); opt-in wiring deferred.** Both gates agree on
-Claude Code 2.1.158: the control (resume without relocating) still reproduces the 2026-04-02 "No conversation found"
-discovery failure, and the experiment (relocate the parent JSONL into the child CWD's encoded dir, then
-`--resume --fork-session`) completes a signed-thinking tool-use continuation with the relocated parent unmodified. Host
-repro (`scripts/experiments/native-resume/`) `[PASS]`; Docker contract test
+**Phase 3 spike complete (2026-06-01) — native-relocate is VIABLE (PASS); opt-in wiring shipped (Stage C v1).** Both
+gates agree on Claude Code 2.1.158: the control (resume without relocating) still reproduces the 2026-04-02 "No
+conversation found" discovery failure, and the experiment (relocate the parent JSONL into the child CWD's encoded dir,
+then `--resume --fork-session`) completes a signed-thinking tool-use continuation with the relocated parent unmodified.
+Host repro (`scripts/experiments/native-resume/`) `[PASS]`; Docker contract test
 (`tests/integration/docker/test_native_relocate_contract.py`) PASSED (23.6s). The spike also fixed a bug it surfaced:
 `encode_project_path` now maps `_`→`-` (Claude 2.1.158 does, Forge didn't — broke transcript discovery for any
-underscore path). `docs/design.md` §3.9 + the `session_fork.py` worktree-branch comment are version-stamped. The opt-in
-`--resume-mode native-relocate` CLI wiring is the deferred **Stage C** follow-up.
+underscore path). `docs/design.md` §3.9 + the `session_fork.py` worktree-branch comment are version-stamped.
+
+**Stage C v1 shipped (2026-06-01):** the opt-in `forge session fork --resume-mode native-relocate` (host mode only;
+default stays transfer) relocates the parent JSONL and resumes byte-for-byte, with preflights (sidecar/`--direct`,
+`--no-launch`, source-transcript), post-create rollback, and dir-scoped cleanup of the relocated copy. Deferred:
+`--rewrite-paths`, sidecar native-relocate, `resume --resume-mode native-relocate`, and the (gated) default flip.
 
 **Phase 2 complete (2026-06-01).** The optional always-on audit proxy shipped across commits `97abe5c` (OBSERVE),
 `2663c06` (MUTATE), `d0eb708` (sidecar plumbing), and `5991896` (sidecar `--user` fix), plus the 2f docs slice:
@@ -45,8 +49,8 @@ All Phase 2 slice boxes are ticked.
 top-level `forge transfer show|regenerate|edit|diff` CLI shipped in commit `2b70c29`; `docs/design.md` §3.9 and
 `docs/design_appendix.md` §M reflect it. All Phase 1 boxes are ticked.
 
-Next: **Phase 4 (runtime-abstraction core)**, plus the deferred Phase 3 **Stage C** (opt-in
-`--resume-mode native-relocate` wiring) when prioritized. The card stays in `doing/` until Phases 3-6 land
+Next: **Phase 4 (runtime-abstraction core)**. Deferred Phase 3 follow-ups (`--rewrite-paths`, sidecar/resume
+native-relocate, the gated default flip) land when prioritized. The card stays in `doing/` until Phases 3-6 land
 (board-contract: move to `done/` only when fully executed).
 
 **Deferred prerequisite (memory_substrate reconciliation) -- RESOLVED 2026-05-30:**
@@ -393,9 +397,10 @@ Review of 2e surfaced 9 issues (2 High / 1 Med / 4 Low / 2 nits/docs); all verif
     shared helper so `tests/integration/sidecar/test_audit_plumbing.py` and `run_sidecar_session` can't drift (cross
     -reference comment in place for now). (a)/(b) noted in the change_log Phase 2 entry.
 
-**Phase 2 complete (2026-06-01).** The card **stays in `doing/`** — the `runtime_abstraction` card spans Phases 2-6, and
-Phases 3-6 (native-relocate spike, runtime-abstraction core, cross-runtime resume, Codex frontend) are not yet executed.
-Do **not** move the card to `done/` until those land (board-contract: move only when the card is fully executed).
+**Phase 2 complete (2026-06-01).** The card **stays in `doing/`** — the `runtime_abstraction` card spans Phases 2-6.
+Phase 3 shipped (native-relocate spike + fork Stage C v1); Phases 4-6 (runtime-abstraction core, cross-runtime resume,
+Codex frontend) and the deferred Phase 3 follow-ups are not yet executed. Do **not** move the card to `done/` until
+those land (board-contract: move only when the card is fully executed).
 
 ## Phase 3 - Native-Relocate Spike
 
@@ -425,19 +430,27 @@ split + derivation/GC provenance) is the deferred **Stage C** follow-up (touch p
 - [x] Decide outcome of native-relocate.
   - Assertion: either introduce opt-in `--resume-mode native-relocate` or record why curated transfer remains the only
     cross-CWD path.
-  - Decision (2026-06-01): native-relocate is **viable** (PASS); the opt-in `--resume-mode native-relocate` wiring is
-    deferred to Stage C, and curated transfer remains the shipped default for worktree forks. Recorded in design.md
-    §3.9.
-- [ ] Split native-relocate handling by code path. *(Stage C — deferred)*
-  - Assertion: `fork --worktree`, `fork --into`, and `resume --fresh --resume-mode native-relocate` each have an
-    explicit expected behavior before implementation.
-  - Note: per-path behavior is specified in the execution plan; not implemented (wiring deferred).
-- [ ] Preserve derivation and GC invariants for relocated artifacts. *(Stage C — deferred)*
-  - Assertion: relocated JSONL, generated parent cache, and per-child transfer artifacts are traceable without orphaning
-    or overwriting user-edited child files.
-  - Note: confirmed analytically — relocated JSONL lives under `~/.claude/projects/` (outside Forge's `.forge/` GC
-    scope; `gc.py` never touches it); the parent-UUID orphan nuance in `cleanup.py` is documented. Derivation provenance
-    lands with the Stage C wiring.
+  - Decision (2026-06-01): native-relocate is **viable** (PASS); the opt-in `--resume-mode native-relocate` wiring
+    shipped as **Stage C v1** (fork, host mode only), and transfer remains the default for worktree forks. Deferred:
+    `resume --resume-mode native-relocate`, sidecar, path rewriting, the default flip. Recorded in design.md §3.9.
+- [x] Split native-relocate handling by code path. *(Stage C v1 — shipped for fork)*
+  - Assertion: `fork --worktree` and `fork --into` resume natively via relocation;
+    `resume --resume-mode native-relocate` has an explicit deferred status.
+  - Verification (2026-06-01): `fork --resume-mode native-relocate` (a `click.Choice(["transfer", "native-relocate"])`
+    on `forge session fork`, `default=None`) relocates the parent JSONL into the child's encoded dir and launches
+    `--resume --fork-session` from the worktree CWD (`src/forge/cli/session_fork.py`). Host mode only (sidecar rejected,
+    `--direct`-aware), `--no-launch` rejected, source-transcript preflighted before create, post-create relocate failure
+    rolls back the fork (`delete_session`, owns_worktree-aware). `resume --resume-mode native-relocate` is **deferred**
+    (the shared resume validator stays `{native, transfer}`). Covered by
+    `tests/src/cli/test_session_commands.py::TestSessionFork` (10 cases: routing, notice, same-dir/strategy tips,
+    sidecar/no-launch/source rejects, `--direct` allowed, conflict rollback).
+- [x] Preserve derivation and GC invariants for relocated artifacts. *(Stage C v1 — shipped)*
+  - Assertion: the relocated JSONL is traceable and cleaned up without orphaning or touching the parent's original.
+  - Verification (2026-06-01): `Derivation.resume_mode="native-relocate"` + `relocated_parent_session_id` (the parent
+    UUID) record the relocation (`models.py`, `manager.fork_session`); `delete_session` unlinks
+    `get_transcript_path(child_root, parent_uuid)` in a branch gated only on the derivation (independent of the child
+    UUID, so failed/partial launches still clean up) — dir-scoped to the child, never the parent's original. Covered by
+    `test_fork_into.py::TestForkNativeRelocate` (derivation, same-dir fallback, cleanup-without-child-UUID).
 
 #### Phase 3 hardening - review fixes (DONE 2026-06-01)
 

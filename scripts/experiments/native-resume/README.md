@@ -47,13 +47,13 @@ writes your real `~/.claude` store.
 
 ## Verdicts
 
-| Verdict            | Meaning                                                                 |
-| ------------------ | ----------------------------------------------------------------------- |
+| Verdict            | Meaning                                                                                 |
+| ------------------ | --------------------------------------------------------------------------------------- |
 | `[PASS]`           | Child resumed the relocated JSONL and completed a tool-use turn (signed block present). |
 | `[INCONCLUSIVE]`   | Resumed cleanly, but the parent carried no signed thinking block to revalidate.         |
-| `[DISCOVERY-FAIL]` | Claude could not find the relocated JSONL ("No conversation found").    |
-| `[SIGNATURE-FAIL]` | Found, but the continuation was rejected (signature/thinking).          |
-| `[UNCATEGORIZED]`  | Some other non-zero failure — read the child output and tighten triage. |
+| `[DISCOVERY-FAIL]` | Claude could not find the relocated JSONL ("No conversation found").                    |
+| `[SIGNATURE-FAIL]` | Found, but the continuation was rejected (signature/thinking).                          |
+| `[UNCATEGORIZED]`  | Some other non-zero failure — read the child output and tighten triage.                 |
 
 If the parent transcript carries **no** signature, the run is **inconclusive** for signature validation (it could not
 exercise the thing under test), not a negative — adjust the model / `MAX_THINKING_TOKENS` and retry.
@@ -61,5 +61,6 @@ exercise the thing under test), not a negative — adjust the model / `MAX_THINK
 ## If it passes
 
 A `[PASS]` (with a signed parent block) is evidence the open question in `docs/design.md` §3.9 can be revisited for the
-current Claude Code version. The product wiring (`--resume-mode native-relocate`) remains a separate, deferred follow-up
-— this experiment and the contract test only settle the *mechanism*.
+current Claude Code version. The fork wiring (`forge session fork --resume-mode native-relocate`) shipped as Stage C v1;
+`resume --resume-mode native-relocate`, sidecar support, path rewriting, and the default flip remain deferred — this
+experiment and the contract test settle the *mechanism*.

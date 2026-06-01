@@ -27,6 +27,30 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-01
 
+### Phase 3 (Stage C v1): Opt-in native-relocate for worktree forks
+
+**Goal**: Ship `forge session fork --resume-mode native-relocate` as an opt-in, byte-faithful cross-CWD resume and make
+the transfer fallback visible, while keeping transfer the default.
+
+**Key changes**:
+
+- `fork --resume-mode [transfer|native-relocate]` (`default=None`). For worktree/`--into` forks, native-relocate copies
+  the parent JSONL into the child's encoded dir (reusing `relocate_transcript`) and launches `--resume --fork-session`
+  from the worktree CWD; transfer stays the default and now prints a one-line tip pointing at native-relocate.
+- Preflights before `fork_session()` (no orphans): reject sidecar (accounting for `--direct`/`--no-proxy` forcing host
+  via `manager.py:1263-1266`), `--no-launch`, and a missing parent transcript; tips for `--resume-mode` on a same-dir
+  fork and for `--strategy`/`--inline-plan` under native-relocate. A post-create relocate failure (e.g. `--into`
+  conflict) rolls back the fork via `delete_session` (owns_worktree-aware, so an `--into` target is preserved).
+- Provenance + cleanup: `Derivation.resume_mode="native-relocate"` + `relocated_parent_session_id`; `delete_session`
+  unlinks the relocated copy in a branch gated only on the derivation (independent of the child UUID, so failed/partial
+  launches still clean up), dir-scoped so the parent's original is never touched.
+- Host mode only; `--rewrite-paths`, sidecar native-relocate, `resume --resume-mode native-relocate`, and the default
+  flip are deferred (default-flip gates recorded in `card.md`). `docs/design.md` §3.9 documents the shipped opt-in.
+
+**Verification**: 13 new unit tests (`test_session_commands.py::TestSessionFork` 10,
+`test_fork_into.py::TestForkNativeRelocate` 3) pass; 39 existing fork tests green (no regression); pyright/mypy clean on
+changed src; design.md under the 25k tiktoken size hook; `make pre-commit` clean.
+
 ### Phase 3 (spike): Native-relocate cross-CWD resume — PASS, wiring deferred
 
 **Goal**: Settle the design.md §3.9 open question — can a Claude Code conversation resume across a CWD boundary if its

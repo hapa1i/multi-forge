@@ -133,6 +133,14 @@ __all__ = ["fork"]
     help="Fork into an existing non-main worktree directory",
 )
 @click.option(
+    "--resume-mode",
+    "resume_mode",
+    type=click.Choice(["transfer", "native-relocate"]),
+    default=None,
+    help="Cross-CWD (worktree/--into) resume: transfer (assembled context, default) or "
+    "native-relocate (byte-faithful Claude resume; relocates the parent JSONL).",
+)
+@click.option(
     "--supervise",
     "supervise_target",
     is_flag=True,
@@ -181,6 +189,7 @@ def fork(
     strategy: str,
     inline_plan: bool,
     into_path: str | None,
+    resume_mode: str | None,
     supervise_target: bool,
     supervisor_proxy: str | None,
     supervisor_direct: bool,
@@ -194,13 +203,18 @@ def fork(
     code isolation in a separate git worktree, or --into for an existing
     non-main worktree.
 
+    Worktree/--into forks default to transfer context (a distilled summary).
+    Pass --resume-mode native-relocate to instead relocate the parent JSONL
+    and resume the full conversation byte-for-byte (host mode only).
+
     Use --no-proxy to bypass the proxy, or --proxy to route through
     a specific proxy instead of the parent's.
 
     \b
     Examples:
         forge session fork parent-session                      # Fork, same directory
-        forge session fork parent-session --worktree           # Fork with worktree
+        forge session fork parent-session --worktree           # Fork with worktree (transfer)
+        forge session fork parent-session -w --resume-mode native-relocate  # Byte-faithful resume
         forge session fork parent-session -n child-session     # Custom fork name
         forge session fork parent-session --no-proxy           # Fork, bypass proxy
     """
@@ -345,6 +359,62 @@ def fork(
     # Budget preflight for --strategy full (before fork_session to avoid orphaned sessions/worktrees)
     # Use the child's effective routing: --no-proxy means no proxy, --proxy overrides parent
     is_cross_dir = worktree or into_resolved is not None
+
+    # Native-relocate (opt-in) preflights -- reject before fork_session() to avoid orphaned state.
+    if resume_mode == "native-relocate" and is_cross_dir:
+        if no_launch:
+            print_error_with_tip(
+                "--resume-mode native-relocate cannot be combined with --no-launch.",
+                "Native-relocate relocates and resumes at launch; omit --no-launch.",
+                console=console,
+            )
+            sys.exit(1)
+        try:
+            _parent_nr = manager.get_session(parent, forge_root=_fr)
+        except ForgeSessionError as e:
+            handle_session_error(e)
+            return
+        # --no-proxy/--direct force host (manager.fork_session), so a direct fork is host-compatible
+        # even when the parent is sidecar; only a real (non-direct) sidecar fork is rejected.
+        _nr_launch = _parent_nr.intent.launch
+        _parent_is_sidecar = _parent_nr.confirmed.is_sandboxed or (
+            _nr_launch is not None and _nr_launch.mode == LAUNCH_MODE_SIDECAR
+        )
+        if not direct and _parent_is_sidecar:
+            print_error_with_tip(
+                "--resume-mode native-relocate is not supported with sidecar mode.",
+                "Relocation writes to the host ~/.claude store; run in host mode (e.g. --no-proxy) "
+                "or use the default transfer mode.",
+                console=console,
+            )
+            sys.exit(1)
+        from forge.session.claude.paths import (
+            get_transcript_path,
+            resolve_claude_project_root,
+        )
+
+        _nr_uuid = _parent_nr.confirmed.claude_session_id
+        _nr_parent_cwd = _parent_nr.confirmed.claude_project_root or resolve_claude_project_root(_parent_nr)
+        if not _nr_uuid or not get_transcript_path(_nr_parent_cwd, _nr_uuid).is_file():
+            print_error_with_tip(
+                f"Parent session '{parent}' has no Claude transcript to relocate.",
+                "Start the parent session so it has a conversation to fork, or use the default transfer mode.",
+                console=console,
+            )
+            sys.exit(1)
+        if _strategy_explicit or _inline_plan_explicit:
+            print_tip(
+                "--strategy/--inline-plan apply only to transfer forks; ignored with --resume-mode native-relocate.",
+                blank_before=False,
+                console=console,
+            )
+    elif resume_mode is not None and not is_cross_dir:
+        print_tip(
+            "--resume-mode only applies to --worktree/--into forks; same-directory forks already use native resume.",
+            blank_before=False,
+            console=console,
+        )
+
     # Resolve --proxy early for preflight (reuses routing resolved later for launch)
     _preflight_routing: ResolvedRouting | None = None
     if proxy_name:
@@ -450,6 +520,7 @@ def fork(
             forge_root=_fr,
             force=force,
             memory_flag={"on": True, "off": False}.get(memory_flag) if memory_flag else None,
+            resume_mode=resume_mode,
             warnings_sink=fork_warnings,
         )
     except CannotForkIncognitoError as e:
@@ -580,6 +651,7 @@ def fork(
     )
     fork_name = fork_manifest.name  # Capture for cleanup
     is_worktree_fork = bool(fork_manifest.worktree and fork_manifest.worktree.is_worktree)
+    native_relocate = is_worktree_fork and resume_mode == "native-relocate"
     if effective_url is None:
         from forge.runtime_config import get_default_direct_model
 
@@ -610,17 +682,104 @@ def fork(
     _fork_uuid: str | None = None
     prompt_file: str | None = None
 
-    # Worktree forks ship transfer-only: Claude Code stores sessions at
-    # ~/.claude/projects/<encoded-cwd>/, so a bare --resume --fork-session cannot find
-    # the parent conversation from a different directory (2.1.90 and 2.1.158 both fail
-    # "No conversation found"). A Phase 3 spike (scripts/experiments/native-resume/ +
-    # tests/integration/docker/test_native_relocate_contract.py) confirmed that
-    # *relocating* the parent JSONL into the child CWD's encoded dir makes cross-CWD
-    # native resume work on 2.1.158, but the opt-in --resume-mode native-relocate wiring
-    # is deferred; transfer (assembled context via --append-system-prompt-file) is the
-    # shipped default here.
-    if is_worktree_fork:
+    # Worktree forks default to transfer: Claude stores sessions per CWD-encoded project dir
+    # (~/.claude/projects/<encoded-cwd>/), so a bare --resume can't cross the boundary (2.1.90
+    # and 2.1.158 both fail "No conversation found"). The opt-in --resume-mode native-relocate
+    # instead copies the parent JSONL into the child's encoded dir and resumes natively (Phase 3
+    # spike: scripts/experiments/native-resume/ + the contract test). Transfer stays the default
+    # (inspectable, editable, survives /compact); native-relocate is byte-faithful but opaque,
+    # lost on /compact, and its historical tool paths still point at the parent checkout.
+    if native_relocate:
+        from forge.session.claude import RelocateConflictError, relocate_transcript
+        from forge.session.claude.paths import resolve_claude_project_root
+
+        _fork_cwd = resolve_claude_project_root(fork_manifest)
+        _parent_cwd = parent_manifest.confirmed.claude_project_root or resolve_claude_project_root(parent_manifest)
+        try:
+            relocate_transcript(
+                session_id=parent_session_id,
+                source_project_root=_parent_cwd,
+                dest_project_root=_fork_cwd,
+            )
+        except OSError as exc:
+            # Any relocate failure (RelocateConflictError/RelocateSourceMissingError are OSError
+            # subclasses, plus real permission/disk/os.replace errors) rolls back the just-created
+            # fork so nothing is left orphaned and no traceback escapes. delete_transcripts=False is
+            # critical: on a conflict the destination holds a *different* pre-existing transcript that
+            # relocate refused to clobber, and the native-relocate cleanup branch would otherwise
+            # delete that exact file. The fork never launched, so it owns no transcript to clean.
+            # owns_worktree-aware deletion keeps an --into target.
+            try:
+                manager.delete_session(
+                    fork_name,
+                    delete_worktree=True,
+                    delete_transcripts=False,
+                    force=True,
+                    forge_root=fork_manifest.forge_root,
+                )
+            except Exception:
+                logger.debug("native-relocate rollback delete failed", exc_info=True)
+            if isinstance(exc, RelocateConflictError):
+                print_error_with_tip(
+                    f"The destination worktree already holds a different transcript for parent '{parent}'.",
+                    "Fork into a fresh worktree, or use the default transfer mode.",
+                    console=console,
+                )
+            else:
+                print_error_with_tip(
+                    f"Could not relocate the parent transcript for native resume: {exc}",
+                    "Use the default transfer mode, or fork into a fresh worktree.",
+                    console=console,
+                )
+            sys.exit(1)
+
+        console.print(
+            "[yellow]Warning:[/yellow] Native-relocate preserves Claude history across CWDs, but historical "
+            "tool paths may still point at the parent checkout -- path rewriting is not enabled."
+        )
+
+        # Pre-seed claude_project_root so cleanup targets the child's encoded dir even before the
+        # hook reconciles. No --session-id: --fork-session assigns the child UUID (hook records it).
+        try:
+            from forge.session import SessionStore as _ForkStore
+
+            _nr_store_root = Path(fork_manifest.forge_root) if fork_manifest.forge_root else Path(_fork_cwd)
+            _nr_store = _ForkStore(str(_nr_store_root), fork_manifest.name)
+
+            def _preseed_cpr(m: SessionState) -> None:
+                m.confirmed.claude_project_root = _fork_cwd
+
+            _nr_store.update(timeout_s=5.0, mutate=_preseed_cpr)
+        except Exception:
+            logger.debug("native-relocate claude_project_root pre-seed failed (hook will reconcile)", exc_info=True)
+
+        _nr_addendum = resolve_addendum_content_for_proxy(effective_proxy_id)
+        _nr_prompt: str | None = None
+        if _nr_addendum:
+            _nr_forge_root = Path(fork_manifest.forge_root) if fork_manifest.forge_root else Path(_fork_cwd)
+            _nr_prompt = str(write_managed_addendum(_nr_forge_root, fork_manifest.name, _nr_addendum))
+
+        def _invoke_fork() -> int:
+            return _sess().invoke_claude(
+                resume_id=parent_session_id,
+                fork_session=True,
+                name=fork_manifest.name,
+                model=None,
+                system_prompt_file=_nr_prompt,
+                env_vars=env_vars,
+                unset_env_vars=unset_env_vars,
+                cwd=_fork_cwd,
+            )
+
+    elif is_worktree_fork:
         worktree_path = Path(fork_manifest.worktree.path)  # type: ignore[union-attr]
+        if resume_mode is None:
+            print_tip(
+                "Worktree fork uses transfer context by default.",
+                "Use --resume-mode native-relocate for byte-faithful Claude resume.",
+                blank_before=False,
+                console=console,
+            )
         fork_context, prompt_warnings = _sess()._generate_parent_transfer_context(
             manager=manager,
             manifest=fork_manifest,
