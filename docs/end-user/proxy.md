@@ -480,6 +480,61 @@ burn rate.
 
 ---
 
+## Audit and intercept (optional always-on)
+
+A proxy can also **observe** and optionally **control** the wire between Claude Code and the provider. These fields are
+inert by default, so existing proxies are unchanged — set them to opt in. (The `anthropic-passthrough` template is the
+exception: it ships with `intercept.mode: inspect`.) Useful when you want local evidence of what was actually sent
+(system prompts, tool surfaces, drift over time) or a signature-safe place to enforce prompt guards.
+
+Two settings, kept separate:
+
+- **`wire_shape`** — how requests reach the upstream. `openai_translated` (default) is translated and **drops thinking
+  blocks** (inspectable but lossy). `anthropic_passthrough` forwards the raw Anthropic request and **preserves thinking
+  blocks byte-for-byte** (signature-safe; required for control/override). The shipped `anthropic-passthrough` template
+  uses it.
+- **`intercept.mode`** — `passthrough` (default, no inspection), `inspect` (observe: hashes + drift + redacted audit
+  metadata), or `override` (inspect plus apply prompt augment/guards and a reasoning-effort floor). `override` requires
+  `wire_shape: anthropic_passthrough`.
+
+Quick start (observe):
+
+```bash
+forge proxy create anthropic-passthrough --name audit-test   # signature-safe wire, inspect by default
+forge proxy set audit-test intercept.mode=inspect
+# run a session through it, then:
+forge proxy audit show audit-test        # redacted records: hashes, counts — no secrets
+forge proxy audit diff audit-test        # system/tool drift + any override mutations, over time
+curl -s localhost:<port>/ | jq '.intercept_mode, .wire_shape'   # preflight: is inspect active and signature-safe?
+```
+
+`%proxy audit show` / `%proxy audit diff` are the read-only in-session equivalents (type them in Claude Code).
+
+Audit records are **redacted before they are written** — metadata records hold hashes/lengths/counts only, never prompt
+or response text. Records live at `~/.forge/audit/requests/*.jsonl` (owner-only). Retention is enforced at proxy startup
+via `audit.retention_days` and `audit.max_total_mb`.
+
+⚠︎ **`audit_full_body` is a higher-risk opt-in.** It additionally captures **redacted** bodies (roles, block types,
+per-block lengths — still never plaintext) at `~/.forge/audit/`: the request body on every path, and the response body
+only for non-streaming passthrough today (streaming and the translated path don't capture response bodies yet). Forge
+prints a privacy warning when you enable it:
+
+```bash
+forge proxy set audit-test audit.audit_full_body=true
+```
+
+**Sidecar-recommended, host-supported.** Both host and `--sidecar` sessions support the audit path. Sidecar is
+recommended for an always-on posture (the proxy's lifecycle is coupled to the session). A sidecar launched with a proxy
+makes its audit + cost logs host-visible automatically:
+
+```bash
+forge session start demo --sidecar --proxy audit-test
+# after the session, on the host:
+forge proxy audit show audit-test        # records written inside the container are here
+```
+
+---
+
 ## Prerequisites
 
 - **Claude Code >= 2.1.81** -- required for `--bare` (used by workflow subprocesses for faster startup). Older versions

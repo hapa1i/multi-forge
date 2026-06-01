@@ -25,6 +25,42 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board-contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-06-01
+
+### Phase 2: Optional Audit Proxy (Runtime Abstraction)
+
+**Goal**: Make a Forge proxy an opt-in, user-controlled chokepoint that can observe and (optionally) control the wire
+between Claude Code and the model provider, with redacted audit logs — without changing any existing proxy (all new
+config defaults to inert).
+
+**Key changes** (sliced OBSERVE-before-MUTATE; two orthogonal axes kept distinct: `wire_shape` and `intercept.mode`):
+
+- **Config** (`config/schema.py`, `loader.py`): `wire_shape` (`openai_translated` | `anthropic_passthrough`) +
+  `intercept` + `audit` on `ProxyInstanceConfig`/runtime `ProxyConfig`, strict unknown-key rejection, propagated to the
+  running server; `override` requires `anthropic_passthrough` (validated at load).
+- **Passthrough wire** (`proxy/passthrough.py`, server middleware): non-converting Anthropic forward path that preserves
+  `thinking`/`redacted_thinking` byte-for-byte; intercepted in middleware before `MessagesRequest` validation; shipped
+  `anthropic-passthrough` template.
+- **Audit** (`proxy/audit_logger.py`, `utils` redaction): redact-before-persist JSONL records (`request`/`drift`/
+  `mutation`), system/tool hashing, drift detection, retention pruning at startup; `forge proxy audit show|diff` +
+  `%proxy audit`.
+- **Override** (`proxy/intercept.py`): cache-aware `system_prompt_augment`, `system_prompt_guards` (warn/block/strip),
+  reasoning-effort pin reusing `tier_overrides`; mutation-safety fingerprint tripwire (never rewrites historical
+  messages; fails closed).
+- **Sidecar** (`sidecar/container.py`, `docker/entrypoint.sh`, `Dockerfile.sidecar`, `scripts/test-integration.sh`):
+  `FORGE_PROXY_ID` + narrow read-only-config / writable audit+costs mounts so records, costs, and caps persist on the
+  host; sidecar-aware startup-validation skip; drift-state redirect; `--user` arbitrary-uid support (`HOME=/root` +
+  `chmod 0777 /root`). Fixed two latent entrypoint bugs the E2E surfaced (bare `python` had no forge; `--log-level` is
+  not a server flag) — the sidecar proxy could never start before.
+- **Docs**: `design.md` §7.x + §3.4/§3.7/§4.0; `design_appendix.md` §A.11 (config) + §A.12 (audit log schema);
+  `end-user/proxy.md` audit/intercept section + `audit_full_body` privacy warning.
+
+**Verification**: focused unit suites (intercept, audit_logger, passthrough server-path, config schema/loader,
+container, proxy_startup) + `tests/integration/sidecar/test_audit_plumbing.py` passing via the canonical runner under
+forced `--user`; no-plaintext-secret regression; broad proxy/sidecar/config/session sweeps; ruff/mypy/pyright + full
+`make pre-commit` clean. Deferred (debt): real-upstream `@pytest.mark.slow` passthrough signature-replay e2e (needs
+`ANTHROPIC_API_KEY`); streamed full-body capture (request body + response metadata only today).
+
 ## 2026-05-31
 
 ### Phase 1: Schema-backed curated transfer + `forge transfer` CLI (Runtime Abstraction)

@@ -281,6 +281,8 @@ started_with_proxy:
 - **Proxy mode**: Claude is configured to send requests to a proxy base URL (`ANTHROPIC_BASE_URL`).
   - The proxy (template ↔ base_url) is the **routing identity**.
   - Status/other tools may query the proxy (`GET /`) for tier→model mapping and context windows.
+  - The optional always-on audit/intercept chokepoint (observe or control outbound traffic, §7.x) is **proxy-mode only**
+    — direct mode has no wire to observe.
 - **No-proxy mode**: Claude talks to Anthropic directly.
   - Sessions, worktrees, hooks, and overrides still work (for session-owned fields).
   - `forge session start` and `forge session incognito` default to direct mode. Use `--proxy` for proxy routing.
@@ -483,6 +485,9 @@ The proxy exposes runtime truth via `GET /`:
 {
   "is_proxy": true,
   "proxy": { "template": "litellm-openai", "base_url": "http://localhost:8085" },
+  "wire_shape": "openai_translated",
+  "intercept_mode": "passthrough",
+  "intercept": { "mode": "passthrough", "thinking_blocks_preserved": false, "can_inspect": { "...": "..." } },
   "tiers": {
     "haiku": { "model": "gpt-4o-mini", "context_window": 128000 },
     "sonnet": { "model": "gpt-4o", "context_window": 128000 },
@@ -498,6 +503,9 @@ The proxy exposes runtime truth via `GET /`:
 - Status line tools read both sources independently
 - Spend cap rejections return HTTP 429 with `error.type=spend_cap_exceeded`
 - Warn-mode spend caps allow the request and attach `X-Spend-Warning`
+- `wire_shape` is the authoritative wire truth (a passthrough proxy may carry `provider: litellm` as a credential slot
+  only); `intercept_mode` + `intercept.can_inspect` let a launcher report "inspect active (signature-safe)" vs "inspect
+  active (lossy)" before launch (§7.x)
 
 **Tier selection precedence:**
 
@@ -960,23 +968,25 @@ default to the parent cache; `edit`/`diff` resolve a child (inferred when the pa
 
 #### Proxy management
 
-| Command                              | Purpose                                                |
-| ------------------------------------ | ------------------------------------------------------ |
-| `forge proxy create <template>`      | Create a proxy from template and start it              |
-| `forge proxy list`                   | List all proxies (`--json`)                            |
-| `forge proxy show <id>`              | Show proxy configuration (`--json`, `--raw`)           |
-| `forge proxy edit <id>`              | Edit proxy overlay in $EDITOR                          |
-| `forge proxy set <id> <key>=<value>` | Set a proxy configuration value                        |
-| `forge proxy start <id>`             | Start server for existing proxy                        |
-| `forge proxy stop <id>`              | Stop server (keeps config)                             |
-| `forge proxy delete <id>...`         | Delete one or more proxies (`--all` for bulk deletion) |
-| `forge proxy clean`                  | Remove stale proxies (dead pids)                       |
-| `forge proxy validate <id>`          | Validate proxy configuration                           |
-| `forge proxy metrics [id]`           | Show runtime metrics (`--json`, `--all`)               |
-| `forge proxy template list`          | List available templates                               |
-| `forge proxy template show <name>`   | Show template configuration (`--raw`)                  |
-| `forge proxy template edit <name>`   | Customize a template (copy-on-first-edit)              |
-| `forge proxy template reset <name>`  | Reset template to built-in defaults                    |
+| Command                              | Purpose                                                 |
+| ------------------------------------ | ------------------------------------------------------- |
+| `forge proxy create <template>`      | Create a proxy from template and start it               |
+| `forge proxy list`                   | List all proxies (`--json`)                             |
+| `forge proxy show <id>`              | Show proxy configuration (`--json`, `--raw`)            |
+| `forge proxy edit <id>`              | Edit proxy overlay in $EDITOR                           |
+| `forge proxy set <id> <key>=<value>` | Set a proxy configuration value                         |
+| `forge proxy start <id>`             | Start server for existing proxy                         |
+| `forge proxy stop <id>`              | Stop server (keeps config)                              |
+| `forge proxy delete <id>...`         | Delete one or more proxies (`--all` for bulk deletion)  |
+| `forge proxy clean`                  | Remove stale proxies (dead pids)                        |
+| `forge proxy validate <id>`          | Validate proxy configuration                            |
+| `forge proxy metrics [id]`           | Show runtime metrics (`--json`, `--all`)                |
+| `forge proxy audit show [id]`        | Show redacted audit records (hashes/counts, no secrets) |
+| `forge proxy audit diff [id]`        | Show system/tool drift + override mutations over time   |
+| `forge proxy template list`          | List available templates                                |
+| `forge proxy template show <name>`   | Show template configuration (`--raw`)                   |
+| `forge proxy template edit <name>`   | Customize a template (copy-on-first-edit)               |
+| `forge proxy template reset <name>`  | Reset template to built-in defaults                     |
 
 #### Claude Code management
 
@@ -1850,9 +1860,75 @@ multi-forge/
 
 **Sidecar mode** solves operational problems (not security): lifecycle coupling, port isolation, version consistency,
 log isolation. Configurable via `~/.forge/config.yaml` (`proxy_mode: host|sidecar`), overrideable with `--sidecar` /
-`--host-proxy`. Mounts `.claude/` and `.forge/` from host; does NOT mount `~/.forge` (UID issues, undermines port
-isolation). Sidecar sessions also persist their launch mode, extra mounts, and image in `intent.launch` so
-`forge session resume <name>` can replay the same runtime wiring later.
+`--host-proxy`. Mounts `.claude/` and `.forge/` from host; does NOT mount all of `~/.forge` (UID issues, undermines port
+isolation). **Narrow exception (§7.x audit path):** when a session launches with a proxy id, the sidecar additionally
+mounts that proxy's `~/.forge/proxies/<id>/` read-only (so the in-container proxy loads its intercept/audit overlay) and
+`~/.forge/audit/` + `~/.forge/costs/` read-write (so audit records, cost history, and spend-cap accounting persist on
+the host instead of dying with the `--rm` container). These are the only `~/.forge` subdirs mounted, preserving the
+port-isolation rationale. On Linux the sidecar runs as the host `--user uid:gid`; that uid has no passwd entry, so the
+launcher pins `HOME=/root` and the image makes `/root` traversable/writable (`chmod 0777 /root`) so the mapped uid can
+reach the `/root/.forge` and `/root/.claude` mounts — an accommodation for the ephemeral single-session `--rm` sandbox,
+**not** a security-sandbox guarantee. Sidecar sessions also persist their launch mode, extra mounts, and image in
+`intent.launch` so `forge session resume <name>` can replay the same runtime wiring later.
 
 **Forge still owns:** Docker test infrastructure, runtime config. `src/forge/sidecar/` provides sidecar mode —
 operational, not a security sandbox.
+
+### 7.x Optional Always-On Proxy (audit and control)
+
+A Forge proxy can be a user-controlled chokepoint that **observes** and optionally **controls** the wire between Claude
+Code and the model provider. The audit/intercept fields default to inert, so existing proxies are unchanged; the shipped
+`anthropic-passthrough` template is the deliberate exception (it opts into `inspect`). It is motivated by a simple
+property: agent quality can change at the harness boundary without leaving the user local evidence. Owning the wire
+gives Forge a durable observation point and a signature-safe control point.
+
+**Two orthogonal axes** (kept distinct everywhere):
+
+1. **Wire shape** (`wire_shape` on the proxy config) — how the request reaches the upstream:
+   - `openai_translated` (default): `convert_anthropic_to_openai` → upstream → `convert_openai_to_anthropic`. **Strips
+     `thinking`/`redacted_thinking` blocks** — inspectable but **not** signature-safe (lossy).
+   - `anthropic_passthrough`: forwards the raw Anthropic body unchanged and streams the response back unchanged.
+     **Preserves thinking blocks byte-for-byte** (signature-safe). Shipped as the `anthropic-passthrough` template
+     (`provider: litellm` is a credential slot only; `wire_shape` is the wire truth, and `GET /` labels it so).
+2. **Intercept mode** (`intercept.mode`, per proxy):
+   - `passthrough` (default): no body inspection.
+   - `inspect`: observe only — hash the system prompt + tool surface, detect drift, write redacted audit metadata.
+   - `override`: inspect **plus** apply mutations to the current request. **Requires
+     `wire_shape: anthropic_passthrough`** (rejected at config load otherwise) so mutations are signature-safe.
+
+**Observe (`inspect`).** Before forwarding, the proxy records a redacted metadata audit record (hashes of the system
+prompt and tool surface, cache markers, token counts — never plaintext) and runs drift detection: the first observation
+of a hash dimension seeds a baseline; a later change emits a `drift` record. `audit.audit_full_body` (opt-in, OFF by
+default) additionally captures **redacted** bodies (structure only — never plaintext, no raw-body mode): the request
+body on every path, the response body only for non-streaming passthrough today (streaming/translated deferred; §A.12 has
+the per-path contract). Retention (`audit.retention_days`, `audit.max_total_mb`) is enforced by `prune_audit_logs()` at
+startup, so it is not a dangling promise.
+
+**Control (`override`).** Builds → validates → applies a mutation plan to the **current request's control surfaces
+only** — the system prompt and generation parameters, **never** historical messages:
+
+- cache-aware `system_prompt_augment` (inserted after the last `cache_control` marker so the cached prefix stays
+  byte-identical; markerless appends and flags cache invalidation);
+- `system_prompt_guards` (`warn`/`block`/`strip`; all `block` checks run first, so a strip can't half-mutate a blocked
+  request — a block returns HTTP 403 `intercept_guard_blocked`);
+- reasoning-effort pin — **reuses** `tier_overrides.<tier>.reasoning_effort` as a floor (not a new key), in Anthropic
+  `thinking.budget_tokens` units.
+
+**Mutation-safety invariant (normative):** override fingerprints the `messages` list (SHA256) before and after apply and
+raises (`RuntimeError`, fail-closed, no forward) if it changed. Override never writes `messages[0..n-1]`, so signed
+reasoning in historical turns is untouched. Mutation records carry hashes/lengths/budgets only.
+
+**Route-bound caveat.** Intercept is a property of the resolved proxy/route, not the session. A direct-mode session has
+no chokepoint; launch-time preflight reports visibility explicitly (it never silently "degrades to passthrough").
+`GET /` surfaces both axes (`wire_shape`, `intercept_mode`, `intercept.can_inspect`, `thinking_blocks_preserved`) so a
+launcher can say "inspect active (signature-safe)" vs "inspect active (lossy)".
+
+**Sidecar-recommended, host-supported.** Both modes support the audit path; sidecar is recommended for an always-on
+posture (lifecycle-coupled, port-isolated), with the narrow mounts of §7 making in-container records host-visible.
+
+**Read surface.** `forge proxy audit show [id]` and `forge proxy audit diff [id]` (drift + override mutations in one
+timeline) render redacted records; `%proxy audit show|diff` is the in-session equivalent. Redaction happens **before**
+persistence — the typed builders redact, then call the writer — so no raw body reaches disk.
+
+See [design_appendix.md §A.11](design_appendix.md#a11-intercept-and-audit-configuration-7x) (config schema) and
+[§A.12](design_appendix.md#a12-audit-log-schema-7x) (audit record schema + log paths).

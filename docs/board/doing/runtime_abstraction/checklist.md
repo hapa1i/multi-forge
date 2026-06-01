@@ -24,14 +24,19 @@ wc -l docs/board/doing/runtime_abstraction/checklist.md
 
 ## Current Focus
 
+**Phase 2 complete (2026-06-01).** The optional always-on audit proxy shipped across commits `97abe5c` (OBSERVE),
+`2663c06` (MUTATE), `d0eb708` (sidecar plumbing), and `5991896` (sidecar `--user` fix), plus the 2f docs slice:
+`wire_shape`/`intercept`/`audit` config, the thinking-preserving `anthropic_passthrough` wire, redacted audit logs with
+`forge proxy audit show|diff`, override-mode controls on the signature-safe path, and host-persistent sidecar audit.
+`docs/design.md` §7.x + §3.4/§3.7/§4.0, `docs/design_appendix.md` §A.11/§A.12, and `docs/end-user/proxy.md` reflect it.
+All Phase 2 slice boxes are ticked.
+
 **Phase 1 complete (2026-05-31).** Schema-backed curated transfer, the `children/<child>.notes.md` overlay, and the
 top-level `forge transfer show|regenerate|edit|diff` CLI shipped in commit `2b70c29`; `docs/design.md` §3.9 and
-`docs/design_appendix.md` §M reflect it. The `ctx` posture is recorded (prior art and inspiration only, never a
-dependency -- §M.4), and both default-behavior decisions are resolved docs-only: keep `--review` opt-in, keep
-`structured` the CLI default (`ai-curated` opt-in via `--strategy`). All Phase 1 boxes are ticked.
+`docs/design_appendix.md` §M reflect it. All Phase 1 boxes are ticked.
 
-Next: Phase 2 (optional audit proxy) and Phase 3 (native-relocate spike) are independent and can ship in either order
-before the Phase 4 runtime-abstraction core. The card stays in `doing/` until Phases 2-6 land.
+Next: **Phase 3 (native-relocate spike)** and Phase 4 (runtime-abstraction core) remain. The card stays in `doing/`
+until Phases 3-6 land (board-contract: move to `done/` only when fully executed).
 
 **Deferred prerequisite (memory_substrate reconciliation) -- RESOLVED 2026-05-30:**
 
@@ -291,14 +296,14 @@ Review of 2d surfaced 14 issues (2 High / 4 Med / 5 Low / 3 nit); all verified a
 
 ### Slice 2e - Sidecar audit plumbing (DONE 2026-06-01)
 
-| Test                               | Fixture                                                        | Assertion                                                                       | Test File                                                      |
-| ---------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| proxy_id adds env + both mounts    | `run_sidecar_session(proxy_id=...)`, host config dir present   | cmd has `FORGE_PROXY_ID`, `FORGE_HOME=/root/.forge`, config `:ro` + audit `:rw` | `tests/src/sidecar/test_container.py`                          |
-| audit mount without config dir     | `proxy_id` set, no host config dir                             | ro config mount skipped; writable audit mount still present                     | `..::test_audit_mount_present_even_without_config_dir`         |
-| template-only unchanged            | `proxy_id=None`                                                | no `FORGE_PROXY_ID`/`FORGE_HOME`/`/root/.forge` in cmd                          | `..::test_no_proxy_id_is_template_only`                        |
-| drift state redirect in sidecar    | `FORGE_SIDECAR=1`                                              | `_audit_state_path` -> `audit/state/<id>.json` (not the read-only config dir)   | `tests/src/proxy/test_audit_logger.py::TestAuditStatePath`     |
-| validation skipped in sidecar      | `FORGE_SIDECAR` set                                            | `server._sidecar_mode_active()` True -> host-registry check bypassed            | `tests/src/proxy/test_proxy_startup.py::TestSidecarModeActive` |
-| sidecar overlay + host audit (E2E) | real image+entrypoint, `--proxy-id`, inspect passthrough proxy | in-container `GET /` `intercept_mode==inspect`; host audit shard has the record | `tests/integration/sidecar/test_audit_plumbing.py`             |
+| Test                               | Fixture                                                        | Assertion                                                                             | Test File                                                                   |
+| ---------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| proxy_id adds env + mounts         | `run_sidecar_session(proxy_id=...)`, `proxy.yaml` present      | cmd has `FORGE_PROXY_ID`, `FORGE_HOME=/root/.forge`, config `:ro` + audit/costs `:rw` | `tests/src/sidecar/test_container.py::...test_proxy_id_adds_env_and_mounts` |
+| missing proxy.yaml fails fast      | `proxy_id` set, no `proxy.yaml` on host                        | raises `FileNotFoundError` before `docker run` (no late in-container failure)         | `..::test_missing_proxy_yaml_fails_fast`                                    |
+| template-only unchanged            | `proxy_id=None`                                                | no `FORGE_PROXY_ID`/`FORGE_HOME`/`/root/.forge` in cmd                                | `..::test_no_proxy_id_is_template_only`                                     |
+| drift state redirect in sidecar    | `FORGE_SIDECAR=1`                                              | `_audit_state_path` -> `audit/state/<id>.json` (not the read-only config dir)         | `tests/src/proxy/test_audit_logger.py::TestAuditStatePath`                  |
+| validation skipped in sidecar      | `FORGE_SIDECAR` set                                            | `server._sidecar_mode_active()` True -> host-registry check bypassed                  | `tests/src/proxy/test_proxy_startup.py::TestSidecarModeActive`              |
+| sidecar overlay + host audit (E2E) | real image+entrypoint, `--proxy-id`, inspect passthrough proxy | in-container `GET /` `intercept_mode==inspect`; host audit shard has the record       | `tests/integration/sidecar/test_audit_plumbing.py`                          |
 
 - [x] `FORGE_PROXY_ID` into `container.py` env + narrow read-only per-proxy config mount + writable host `audit/` mount;
   `docker/entrypoint.sh` passes `--proxy-id` when set; drift state writable in sidecar; preflight reports mode +
@@ -355,12 +360,31 @@ Review of 2e surfaced 9 issues (2 High / 1 Med / 4 Low / 2 nits/docs); all verif
     71 focused unit + 799 proxy+sidecar+config+session sweep; ruff/mypy clean; fresh `uv run pyright` 0/0/0 on changed
     src; `pre-commit` clean.
 
-### Slice 2f - Docs + always-on posture + closeout
+### Slice 2f - Docs + always-on posture + closeout (DONE 2026-06-01)
 
-- [ ] `docs/design.md` §7.x (intercept modes, sidecar-recommended/host-supported, narrow-mount §7 exception),
-  `intercept_mode`/`wire_shape` in §3.7 `GET /`, `forge proxy audit` row in §4.0, §3.4 line; `docs/design_appendix.md`
+- [x] `docs/design.md` §7.x (intercept modes, sidecar-recommended/host-supported, narrow-mount §7 exception),
+  `intercept_mode`/`wire_shape` in §3.7 `GET /`, `forge proxy audit` rows in §4.0, §3.4 line; `docs/design_appendix.md`
   §A.11 (config schema) + §A.12 (audit log schema); `docs/end-user/proxy.md` audit/intercept section + `audit_full_body`
-  privacy warning; `docs/board/change_log.md` Phase 2 entry; close out the deferred 2b e2e debt.
+  privacy warning; `docs/board/change_log.md` Phase 2 entry.
+  - Design docs describe **shipped** behavior (documentation-guidelines Rule 2): §A.11/§A.12 anchors are linked from
+    §7.x; the `chmod 0777 /root` + `HOME=/root` sandbox decision is recorded in §7.
+  - **Doc-accuracy review fixes (6 issues, all verified against code):** full-body capture contract corrected (redacted
+    request body every path; redacted **response** body only for non-streaming passthrough — streaming/translated
+    deferred) in §7.x + §A.12 + `proxy.md`; §7 now records the `--user`/`HOME=/root`/`chmod 0777 /root` decision (the
+    earlier "recorded in §7" claim was premature); "inert by default" reworded to note the `anthropic-passthrough`
+    template opts into `inspect`; stale 2e mount table fixed (config `:ro` + audit/costs `:rw`; the silent-skip row
+    replaced by the fail-fast test); `tool-surface` hyphen-wrap typo fixed.
+  - Verification: `make pre-commit` clean (mdformat + link/anchor consistency); design.md/appendix/proxy.md/change_log
+    render and cross-link.
+  - **Carried forward as debt (not closed):** (a) deferred 2b real-upstream `@pytest.mark.slow` passthrough
+    signature-replay e2e needs `ANTHROPIC_API_KEY` (release-validation tier); (b) streamed full-body capture stays
+    request-body + response-metadata only; (c) optional cleanup — extract the `docker run` argv construction into a
+    shared helper so `tests/integration/sidecar/test_audit_plumbing.py` and `run_sidecar_session` can't drift (cross
+    -reference comment in place for now). (a)/(b) noted in the change_log Phase 2 entry.
+
+**Phase 2 complete (2026-06-01).** The card **stays in `doing/`** — the `runtime_abstraction` card spans Phases 2-6, and
+Phases 3-6 (native-relocate spike, runtime-abstraction core, cross-runtime resume, Codex frontend) are not yet executed.
+Do **not** move the card to `done/` until those land (board-contract: move only when the card is fully executed).
 
 ## Phase 3 - Native-Relocate Spike
 

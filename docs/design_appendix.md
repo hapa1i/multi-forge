@@ -330,6 +330,70 @@ open -- common with OpenRouter's open model space).
 
 ---
 
+### A.11 Intercept and audit configuration (§7.x)
+
+Optional always-on audit/control fields on the user-owned proxy file. All default to inert, so existing proxies are
+unchanged. Coercion is **strict** — unknown sub-keys raise (a typo like `audit.full_body` must not silently disable
+full-body capture).
+
+```yaml
+# ~/.forge/proxies/<proxy_id>/proxy.yaml
+wire_shape: anthropic_passthrough # openai_translated (default) | anthropic_passthrough
+intercept:
+  mode: inspect # passthrough (default) | inspect | override
+  override: # applied only in override mode (requires anthropic_passthrough)
+    system_prompt_augment: "" # cache-aware system-prompt insert
+    system_prompt_guards:
+      - { pattern: "SECRET", action: block } # action: warn | block | strip
+audit:
+  audit_full_body: false # opt-in: capture REDACTED bodies (never plaintext)
+  redact_headers: [] # extra header names to redact (denylist + substring)
+  retention_days: 14
+  max_total_mb: 512
+```
+
+| Field                                      | Values                                       | Meaning                                                                 |
+| ------------------------------------------ | -------------------------------------------- | ----------------------------------------------------------------------- |
+| `wire_shape`                               | `openai_translated`, `anthropic_passthrough` | Wire truth; passthrough preserves thinking blocks (signature-safe)      |
+| `intercept.mode`                           | `passthrough`, `inspect`, `override`         | `override` requires `wire_shape: anthropic_passthrough`                 |
+| `intercept.override.system_prompt_augment` | string                                       | Cache-aware system-prompt insert (after the last `cache_control`)       |
+| `intercept.override.system_prompt_guards`  | list of `{pattern, action}`                  | `pattern` is a regex (compiled at config load); action warn/block/strip |
+| `audit.audit_full_body`                    | bool (default `false`)                       | Capture redacted bodies; there is **no** raw-body mode                  |
+| `audit.redact_headers`                     | list of strings                              | Extra header names to redact beyond the built-in denylist               |
+| `audit.retention_days`                     | int                                          | Prune shards older than N days at proxy startup                         |
+| `audit.max_total_mb`                       | int                                          | Prune oldest shards once total exceeds N MB at startup                  |
+
+Reasoning-effort pinning in override mode **reuses** `tier_overrides.<tier>.reasoning_effort` (§A.1) — it is not a new
+`intercept` key. `forge proxy set <id> intercept.mode=inspect` (and `audit.audit_full_body=true`, which prints a privacy
+warning naming `~/.forge/audit/`) edits these via the normal proxy surface.
+
+---
+
+### A.12 Audit log schema (§7.x)
+
+Records are persisted **already redacted** (the typed builders redact headers/bodies before calling the writer, which
+only appends). The no-plaintext-secret guarantee is regression-tested
+(`tests/regression/test_bug_audit_header_redaction_no_leak.py`).
+
+| Path                                            | Owner                      | Notes                                           |
+| ----------------------------------------------- | -------------------------- | ----------------------------------------------- |
+| `~/.forge/audit/requests/<YYYY-MM>_<pid>.jsonl` | `forge.proxy.audit_logger` | Owner-only 0600, append-only, PID-sharded       |
+| `~/.forge/proxies/<id>/audit_state.json`        | drift baseline (host)      | `schema_version`, `last_seen` hash map          |
+| `~/.forge/audit/state/<id>.json`                | drift baseline (sidecar)   | Same shape; the config dir is mounted read-only |
+
+Every record carries `schema_version`, `ts`, `request_id`, `proxy_id`, and a `record_type`:
+
+| `record_type` | Key fields                                                                                                                                                                                                                                                                                                                                                                      |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `request`     | `mode`, `route`, `full_body`, `system_prompt_hash`, `tool_surface_hash`, `thinking`, `cache_markers`, `counts`; full-body adds the redacted `request_headers/body` (every path) and `response_headers/body` (structure only) **only for non-streaming passthrough** — streaming captures response usage metadata only; the translated path is request-body only (both deferred) |
+| `drift`       | `dimension` (`system_prompt`\|`tool_surface`), `previous_hash`, `current_hash`, `route`                                                                                                                                                                                                                                                                                         |
+| `mutation`    | `mode: override`, `blocked`, `system_prompt_hash_before/after`, `mutations[]` (each `{target, action, ...}` with `augment_len` / `cache_invalidation_expected` / `pattern_hash` / `stripped_count` / `effort_floor` / `budget_before/after`) — hashes, lengths, and budgets only                                                                                                |
+
+Reading skips records written by a newer Forge (`schema_version` > current) with a one-time warning.
+`forge proxy audit show|diff` (§4.0) is the read surface.
+
+---
+
 ## B. Direct Command Reference
 
 Extracted from [design.md §3.11](design.md#311-direct-commands-userpromptsubmit-dispatcher). Design goal, mechanism, and
