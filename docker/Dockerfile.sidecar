@@ -3,8 +3,10 @@
 # Bundles proxy + Claude Code in a single container for lifecycle coupling.
 # Used by `forge session start --sidecar`.
 #
-# Build:
+# Build (prefer the canonical runner, which builds the base + this layer):
+#   ./scripts/test-integration.sh           # builds forge-sidecar:latest from the fresh base
 #   docker build -f docker/Dockerfile.sidecar -t forge-sidecar:latest .
+#   docker build -f docker/Dockerfile.sidecar --build-arg BASE_IMAGE=forge-claude-test:2.1.158 -t forge-sidecar:latest .
 #
 # The image is based on forge-claude-test which includes:
 #   - Python 3.12 + uv
@@ -15,11 +17,22 @@
 # Usage (via forge CLI, not directly):
 #   forge session start my-feature --sidecar --template litellm-openai
 
-FROM forge-claude-test:latest
+# Base image tag. The integration runner tags the base by Claude version
+# (forge-claude-test:<ver>) and passes it here so the sidecar tracks current source.
+ARG BASE_IMAGE=forge-claude-test:latest
+FROM ${BASE_IMAGE}
 
 # Ensure curl is available for health checks
 # (Already in base image from Dockerfile.forge, but explicit for documentation)
 RUN command -v curl > /dev/null || (apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*)
+
+# Arbitrary-uid support: forge session start --sidecar runs the container as the
+# host `--user uid:gid` on Linux. That uid has no passwd entry, so HOME falls back
+# to / and /root (0700) is unreadable. run_sidecar_session pins HOME=/root; make
+# /root traversable/writable here so the mapped uid can reach the mounts under it
+# (/root/.claude, /root/.forge/*) and write /root/.claude.json. Safe for an
+# ephemeral single-session --rm sandbox.
+RUN chmod 0777 /root
 
 # Copy and set up entrypoint script
 COPY docker/entrypoint.sh /entrypoint.sh

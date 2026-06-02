@@ -451,10 +451,11 @@ def invoke_supervisor(
         unset_env_vars = _CLAUDE_MODEL_PIN_ENV_VARS if base_url else None
 
     from forge.core.reactive.cost_tracking import track_verb_cost
+    from forge.core.usage import emit_usage_for_session_result
 
     tracking_url = base_url
 
-    with track_verb_cost("supervisor", [tracking_url] if tracking_url else []):
+    with track_verb_cost("supervisor", [tracking_url] if tracking_url else []) as cost:
         result = run_claude_session(
             prompt,
             resume_id=resolved.resume_id,
@@ -466,6 +467,17 @@ def invoke_supervisor(
             cwd=resolved.source_cwd,
             unset_env_vars=unset_env_vars,
         )
+
+    # Attribute before the failure branch so failed runs are recorded too.
+    emit_usage_for_session_result(
+        result,
+        command="supervisor",
+        cost=cost,
+        session=context.session_name,
+        model=model,
+        base_url=base_url,
+        direct=config.direct,
+    )
 
     if not result.success:
         _log.warning(

@@ -13,6 +13,8 @@
 # Optional environment variables:
 #   CLAUDE_CODE_AUTO_COMPACT_WINDOW - Compaction window limit (default: 200000)
 #   FORGE_SESSION - Session name for hooks
+#   FORGE_PROXY_ID - Start the proxy under this proxy id (loads the per-proxy
+#                    intercept/audit overlay; requires the proxy.yaml mount)
 
 set -e
 
@@ -31,11 +33,28 @@ if [ -z "$FORGE_TEMPLATE" ]; then
     exit 1
 fi
 
-# Start proxy in background (bind to localhost only — minimal blast radius)
-python -m forge.proxy.server \
+# Forge is installed editable in /forge/.venv (Dockerfile.forge: WORKDIR /forge +
+# uv sync). The system `python` on PATH has no forge, so invoke the proxy through
+# the venv interpreter. Fall back to PATH `python` for non-standard base images.
+FORGE_PYTHON="/forge/.venv/bin/python"
+if [ ! -x "$FORGE_PYTHON" ]; then
+    FORGE_PYTHON="python"
+fi
+
+# Start proxy in background (bind to localhost only — minimal blast radius).
+# Pass --proxy-id only when set so the proxy loads the per-proxy intercept/audit
+# overlay (proxy.yaml mounted read-only). Template-only sidecars omit it.
+PROXY_ID_ARGS=()
+if [ -n "$FORGE_PROXY_ID" ]; then
+    PROXY_ID_ARGS=(--proxy-id "$FORGE_PROXY_ID")
+fi
+
+# Log level is env-driven (get_effective_log_level, defaults to "off"); the server
+# has no --log-level flag. Set FORGE_DEBUG/log_level via env to raise verbosity.
+"$FORGE_PYTHON" -m forge.proxy.server \
   --template "$FORGE_TEMPLATE" \
-  --host 127.0.0.1 --port 8085 \
-  --log-level warning &
+  "${PROXY_ID_ARGS[@]}" \
+  --host 127.0.0.1 --port 8085 &
 
 PROXY_PID=$!
 

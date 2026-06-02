@@ -29,9 +29,9 @@ class TestReviewCodeSkill:
 
     def test_auto_detects_model_family(self):
         content = (SKILLS_DIR / "review" / "SKILL.md").read_text()
-        assert "forge session context" in content
+        assert "forge session show" in content
         assert "model_family" in content
-        assert 'forge session context "${CLAUDE_SESSION_ID}"' not in content
+        assert 'forge session show "${CLAUDE_SESSION_ID}"' not in content
 
     def test_preflight_reports_main_model(self):
         content = (SKILLS_DIR / "review" / "SKILL.md").read_text()
@@ -120,9 +120,9 @@ class TestReviewDocsSkill:
 
     def test_auto_detects_model_family(self):
         content = (SKILLS_DIR / "review-docs" / "SKILL.md").read_text()
-        assert "forge session context" in content
+        assert "forge session show" in content
         assert "model_family" in content
-        assert 'forge session context "${CLAUDE_SESSION_ID}"' not in content
+        assert 'forge session show "${CLAUDE_SESSION_ID}"' not in content
 
     def test_preflight_reports_main_model(self):
         content = (SKILLS_DIR / "review-docs" / "SKILL.md").read_text()
@@ -279,9 +279,9 @@ class TestUnderstandSkill:
 
     def test_auto_detects_model_family(self):
         content = (SKILLS_DIR / "understand" / "SKILL.md").read_text()
-        assert "forge session context" in content
+        assert "forge session show" in content
         assert "model_family" in content
-        assert 'forge session context "${CLAUDE_SESSION_ID}"' not in content
+        assert 'forge session show "${CLAUDE_SESSION_ID}"' not in content
 
     def test_preflight_reports_main_model(self):
         content = (SKILLS_DIR / "understand" / "SKILL.md").read_text()
@@ -351,7 +351,7 @@ class TestQaWorkflowChecklist:
         skills_md = SKILLS_DIR / "qa" / "resources" / "checklist" / "15-skills.md"
         content = skills_md.read_text()
         step = content.split("### 15.1", 1)[1].split("### 15.2", 1)[0]
-        assert "forge session context test-session-1 --json" in step
+        assert "forge session show test-session-1 --json" in step
         assert "--session test-session-1" not in step
 
     def test_live_debate_step_uses_real_slash_command(self):

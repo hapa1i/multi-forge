@@ -102,7 +102,7 @@ def sidecar_image() -> str:
         capture_output=True,
     )
     if result.returncode != 0:
-        pytest.fail(f"Sandbox image '{image}' not built. Run: docker build -t {image} .")
+        pytest.fail(f"Sidecar image '{image}' not built. Run ./scripts/test-integration.sh (it builds base + sidecar).")
     return image
 
 

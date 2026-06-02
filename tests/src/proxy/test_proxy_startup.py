@@ -76,3 +76,21 @@ def test_validate_proxy_startup_allows_matching_registered_proxy(
     )
 
     validate_proxy_startup(ctx=ProxyStartupContext(proxy_id="proxy_1", template="litellm-openai", port=8085))
+
+
+class TestSidecarModeActive:
+    """Sidecar mode gates whether host-registry startup validation runs (Slice 2e)."""
+
+    def test_false_without_env(self, monkeypatch) -> None:
+        from forge.proxy import server
+
+        monkeypatch.delenv("FORGE_SIDECAR", raising=False)
+        assert server._sidecar_mode_active() is False
+
+    def test_true_when_forge_sidecar_set(self, monkeypatch) -> None:
+        from forge.proxy import server
+
+        # container.py sets FORGE_SIDECAR=1; the proxy then skips the registry/port
+        # cross-check (registry not mounted, port fixed at 8085 in-container).
+        monkeypatch.setenv("FORGE_SIDECAR", "1")
+        assert server._sidecar_mode_active() is True

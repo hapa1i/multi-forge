@@ -30,6 +30,7 @@ from forge.session.models import SupervisorConfig, create_session_state
 def _make_context(tool_name: str = "Write", target_path: str = "src/main.py") -> ActionContext:
     """Create a minimal ActionContext for testing."""
     return ActionContext(
+        runtime="claude_code",
         event=f"PreToolUse.{tool_name}",
         tool_name=tool_name,
         tool_args={"file_path": target_path, "content": "print('hello')"},

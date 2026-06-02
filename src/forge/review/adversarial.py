@@ -12,6 +12,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from forge.core.invoker import Attribution
+
 from .engine import run_multi_review
 from .models import AdversarialOutput, ModelSpec, StanceSpec
 from .routing import WorkerRoutingPlan
@@ -45,6 +47,7 @@ def run_adversarial(
     cwd: str | None = None,
     via: str | None = None,
     routing_plan: WorkerRoutingPlan | None = None,
+    attribution: Attribution | None = None,
 ) -> AdversarialOutput:
     """Run adversarial evaluation with stance-injected workers.
 
@@ -99,6 +102,7 @@ def run_adversarial(
         timeout_seconds=timeout_seconds,
         cwd=cwd,
         resume_id=None,
+        attribution=attribution,
     )
 
     stance_map = {spec.effective_worker_id: s.effective_label for spec, s in zip(specs, stances)}

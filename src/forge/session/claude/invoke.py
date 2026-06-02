@@ -163,9 +163,15 @@ def _build_environment(
     extra_vars: dict[str, str] | None = None,
     unset_vars: list[str] | None = None,
 ) -> dict[str, str]:
-    """Build the environment for Claude process.
+    """Build the environment for an interactive Claude process.
 
-    Delegates to the shared ``build_claude_env`` utility.
+    Delegates to the shared ``build_claude_env`` utility. Interactive launches
+    (session start/resume/fork, bare ``forge claude start``) are always run-tree
+    roots — a human starting a session, never a child of an inherited run — so
+    this mints a fresh root identity and scrubs any inherited parent rather than
+    deriving a child of the spawner. Headless subprocesses (supervisor, memory
+    writer, review workers) call ``build_claude_env`` directly and DO derive a
+    child, which is why the root mint lives here, not there.
 
     Args:
         extra_vars: Additional environment variables to set.
@@ -174,9 +180,16 @@ def _build_environment(
     Returns:
         Complete environment dictionary.
     """
-    from forge.core.reactive.env import build_claude_env
+    from forge.core.reactive.env import (
+        FORGE_PARENT_RUN_ID_VAR,
+        build_claude_env,
+        new_root_run_identity,
+    )
 
-    env = build_claude_env(extra_vars=extra_vars)
+    root = new_root_run_identity()
+    merged = {**(extra_vars or {}), **root.as_env()}
+    env = build_claude_env(extra_vars=merged, derive_run_identity=False)
+    env.pop(FORGE_PARENT_RUN_ID_VAR, None)  # a root has no parent; scrub any inherited
     for key in unset_vars or ():
         env.pop(key, None)
     return env

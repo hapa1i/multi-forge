@@ -177,7 +177,7 @@ class TestBuildReconciliationBrief:
 
 class TestRunConsensus:
     @patch("forge.review.routing.resolve_invocation_routing", side_effect=_auto_plan)
-    @patch("forge.review.engine.subprocess.Popen")
+    @patch("forge.core.invoker.claude.subprocess.Popen")
     def test_replaces_role_marker(self, mock_popen_cls, mock_routing, tmp_path):
         resource = tmp_path / "eval.md"
         resource.write_text(f"Evaluate: {ROLE_MARKER}\nEnd.")
@@ -195,7 +195,7 @@ class TestRunConsensus:
         assert ROLE_MARKER not in r1_prompt
 
     @patch("forge.review.routing.resolve_invocation_routing", side_effect=_auto_plan)
-    @patch("forge.review.engine.subprocess.Popen")
+    @patch("forge.core.invoker.claude.subprocess.Popen")
     def test_consensus_guardrail_present(self, mock_popen_cls, mock_routing, tmp_path):
         resource = tmp_path / "eval.md"
         resource.write_text(f"Evaluate: {ROLE_MARKER}")
@@ -210,7 +210,7 @@ class TestRunConsensus:
         assert CONSENSUS_GUARDRAIL in r1_prompt
 
     @patch("forge.review.routing.resolve_invocation_routing", side_effect=_auto_plan)
-    @patch("forge.review.engine.subprocess.Popen")
+    @patch("forge.core.invoker.claude.subprocess.Popen")
     def test_mandatory_blinding_both_rounds(self, mock_popen_cls, mock_routing, tmp_path):
         """resume_id=None for both rounds (mandatory blinding)."""
         resource = tmp_path / "eval.md"
@@ -228,7 +228,7 @@ class TestRunConsensus:
             assert "--resume" not in cmd
 
     @patch("forge.review.routing.resolve_invocation_routing", side_effect=_auto_plan)
-    @patch("forge.review.engine.subprocess.Popen")
+    @patch("forge.core.invoker.claude.subprocess.Popen")
     def test_worker_names_include_role(self, mock_popen_cls, mock_routing, tmp_path):
         resource = tmp_path / "eval.md"
         resource.write_text(f"Evaluate: {ROLE_MARKER}")
@@ -245,7 +245,7 @@ class TestRunConsensus:
         assert "gem-security" in r1_names
 
     @patch("forge.review.routing.resolve_invocation_routing", side_effect=_auto_plan)
-    @patch("forge.review.engine.subprocess.Popen")
+    @patch("forge.core.invoker.claude.subprocess.Popen")
     def test_round2_receives_reconciliation_brief(self, mock_popen_cls, mock_routing, tmp_path):
         resource = tmp_path / "eval.md"
         resource.write_text(f"Evaluate: {ROLE_MARKER}")
@@ -263,7 +263,7 @@ class TestRunConsensus:
         assert output.reconciliation_brief != ""
 
     @patch("forge.review.routing.resolve_invocation_routing", side_effect=_auto_plan)
-    @patch("forge.review.engine.subprocess.Popen")
+    @patch("forge.core.invoker.claude.subprocess.Popen")
     def test_output_structure(self, mock_popen_cls, mock_routing, tmp_path):
         resource = tmp_path / "eval.md"
         resource.write_text(f"Evaluate: {ROLE_MARKER}")
@@ -284,7 +284,7 @@ class TestRunConsensus:
         assert output.role_map["m1-architecture"] == "architecture"
 
     @patch("forge.review.routing.resolve_invocation_routing", side_effect=_auto_plan)
-    @patch("forge.review.engine.subprocess.Popen")
+    @patch("forge.core.invoker.claude.subprocess.Popen")
     def test_one_worker_fails_round1(self, mock_popen_cls, mock_routing, tmp_path):
         """One worker fails in Round 1; others succeed. Round 2 still runs."""
         resource = tmp_path / "eval.md"
@@ -313,7 +313,7 @@ class TestRunConsensus:
         assert "failed" in output.reconciliation_brief
 
     @patch("forge.review.routing.resolve_invocation_routing", side_effect=_auto_plan)
-    @patch("forge.review.engine.subprocess.Popen")
+    @patch("forge.core.invoker.claude.subprocess.Popen")
     def test_duplicate_model_role_gets_suffixed_id(self, mock_popen_cls, mock_routing, tmp_path):
         """Same model+role combo gets suffixed worker_id."""
         resource = tmp_path / "eval.md"
@@ -331,7 +331,7 @@ class TestRunConsensus:
         assert "gpt-security-1" in r1_names
 
     @patch("forge.review.routing.resolve_invocation_routing", side_effect=_auto_plan)
-    @patch("forge.review.engine.subprocess.Popen")
+    @patch("forge.core.invoker.claude.subprocess.Popen")
     def test_custom_role_uses_effective_label_in_roles(self, mock_popen_cls, mock_routing, tmp_path):
         """Custom roles should use display_label, not 'custom', in output.roles."""
         resource = tmp_path / "eval.md"
@@ -346,7 +346,7 @@ class TestRunConsensus:
         assert output.role_map["m1-compliance"] == "compliance"
 
     @patch("forge.review.routing.resolve_invocation_routing", side_effect=_auto_plan)
-    @patch("forge.review.engine.subprocess.Popen")
+    @patch("forge.core.invoker.claude.subprocess.Popen")
     def test_subject_falls_back_to_resource_path(self, mock_popen_cls, mock_routing, tmp_path):
         """When no original_subject, subject should be resource path."""
         resource = tmp_path / "eval.md"

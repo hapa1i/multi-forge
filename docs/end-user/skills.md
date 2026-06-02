@@ -213,7 +213,7 @@ Session -> proxy template -> tier model name -> vendor prefix -> family
 | `gemini`    | `openrouter-gemini`         | `-gemini.md`    |
 | `anthropic` | `litellm-anthropic`, direct | (default)       |
 
-The detection chain uses `forge session context --field model_family`, which resolves managed sessions from
+The detection chain uses `forge session show --field model_family`, which resolves managed sessions from
 `$FORGE_SESSION` (set by Forge at launch) and otherwise falls back to local environment metadata such as
 `ACTIVE_TEMPLATE`, `ANTHROPIC_BASE_URL`, and direct-model env vars. If detection fails, skills fall back to the
 Opus-optimized default resource.

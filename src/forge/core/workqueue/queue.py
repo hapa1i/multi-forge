@@ -266,6 +266,18 @@ def enqueue_handoff_marker(
     if forge_root:
         payload["forge_root"] = forge_root
 
+    # Snapshot the originating session's run identity (the Stop hook runs inside the
+    # session's env). The memory-writer is drained and spawned LATER by an unrelated
+    # CLI process, so env inheritance would otherwise root it under the drainer; the
+    # handler reads these back to re-root it under this session. Additive payload
+    # fields — no marker-envelope version bump.
+    from forge.core.reactive.env import get_run_identity
+
+    origin = get_run_identity()
+    if origin:
+        payload["origin_run_id"] = origin.run_id
+        payload["origin_root_run_id"] = origin.root_run_id
+
     return enqueue(
         kind="handoff",
         marker_id=f"handoff-{session_id}",

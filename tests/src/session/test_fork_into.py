@@ -248,3 +248,95 @@ class TestForkIntoRelativePath:
 
         entry = manager.index_store.get_session("child")
         assert entry.relative_path == "packages/app"
+
+
+class TestForkNativeRelocate:
+    """fork_session derivation + cleanup for the opt-in native-relocate resume mode."""
+
+    def _parent_with_uuid(self, manager: SessionManager, repo: Path, uuid: str) -> None:
+        """Start a parent session and assign it a Claude UUID (normally hook-set)."""
+        manager.start_session(name="parent", worktree_path=str(repo))
+        pstore = manager.get_session_store("parent")
+        pstate = pstore.read()
+        pstate.confirmed.claude_session_id = uuid
+        pstore.write(pstate)
+
+    def test_native_relocate_records_derivation(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A worktree fork with resume_mode=native-relocate records it honestly."""
+        monkeypatch.setenv("HOME", str(tmp_path / "home"))
+        (tmp_path / "home").mkdir()
+        parent_repo = tmp_path / "repo"
+        _init_git_repo(parent_repo)
+        _enable_forge(parent_repo)
+
+        manager = SessionManager()
+        self._parent_with_uuid(manager, parent_repo, "parent-uuid-abc")
+
+        _, fork = manager.fork_session("parent", "child", create_worktree=True, resume_mode="native-relocate")
+
+        assert fork.confirmed.derivation is not None
+        assert fork.confirmed.derivation.resume_mode == "native-relocate"
+        assert fork.confirmed.derivation.relocated_parent_session_id == "parent-uuid-abc"
+        # native-relocate carries the full transcript, not an assembled context file
+        assert fork.confirmed.derivation.context_file is None
+        assert fork.confirmed.derivation.strategy is None
+
+    def test_native_relocate_ignored_for_same_directory_fork(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Without a worktree the mode is inapplicable; the fork stays plain native."""
+        monkeypatch.setenv("HOME", str(tmp_path / "home"))
+        (tmp_path / "home").mkdir()
+        parent_repo = tmp_path / "repo"
+        _init_git_repo(parent_repo)
+        _enable_forge(parent_repo)
+
+        manager = SessionManager()
+        self._parent_with_uuid(manager, parent_repo, "parent-uuid-abc")
+
+        _, fork = manager.fork_session("parent", "child", resume_mode="native-relocate")
+
+        assert fork.confirmed.derivation is not None
+        assert fork.confirmed.derivation.resume_mode == "native"
+        assert fork.confirmed.derivation.relocated_parent_session_id is None
+
+    def test_delete_removes_relocated_copy_without_child_uuid(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Deleting a native-relocate fork removes the relocated parent copy (dir-scoped),
+        preserves the parent's original, and runs even when the child never got a UUID."""
+        from forge.session.claude.paths import get_transcript_path
+
+        monkeypatch.setenv("HOME", str(tmp_path / "home"))
+        (tmp_path / "home").mkdir()
+        parent_repo = tmp_path / "repo"
+        _init_git_repo(parent_repo)
+        _enable_forge(parent_repo)
+
+        manager = SessionManager()
+        self._parent_with_uuid(manager, parent_repo, "parent-uuid-xyz")
+        _, fork = manager.fork_session("parent", "child", create_worktree=True, resume_mode="native-relocate")
+
+        assert fork.worktree is not None
+        child_cwd = fork.worktree.path
+
+        # Simulate the CLI launch step: pre-seed claude_project_root; the child has NO
+        # claude_session_id (failed/partial launch) so cleanup must not depend on it.
+        fstore = manager.get_session_store("child")
+        fchild = fstore.read()
+        fchild.confirmed.claude_project_root = child_cwd
+        fchild.confirmed.claude_session_id = None
+        fstore.write(fchild)
+
+        # The relocated copy lives in the child's encoded dir; the parent original in the parent's.
+        parent_original = get_transcript_path(str(parent_repo), "parent-uuid-xyz")
+        parent_original.parent.mkdir(parents=True, exist_ok=True)
+        parent_original.write_text("PARENT\n")
+        relocated = get_transcript_path(child_cwd, "parent-uuid-xyz")
+        relocated.parent.mkdir(parents=True, exist_ok=True)
+        relocated.write_text("PARENT\n")
+
+        manager.delete_session("child", delete_transcripts=True, delete_worktree=False, force=True)
+
+        assert not relocated.exists(), "relocated parent copy should be removed from the child's dir"
+        assert parent_original.exists(), "parent's original transcript must be preserved"

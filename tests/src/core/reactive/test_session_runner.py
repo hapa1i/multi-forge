@@ -34,6 +34,37 @@ class TestSessionResult:
         assert r.success is False
 
 
+class TestRunIdentitySurfacing:
+    """SessionResult carries the subprocess's run-tree identity (Phase 4a)."""
+
+    @patch("forge.core.reactive.session_runner.subprocess.run")
+    def test_success_surfaces_run_id(self, mock_run):
+        mock_run.return_value = MagicMock(stdout="ok", stderr="", returncode=0)
+        with patch.dict(
+            "os.environ",
+            {"FORGE_RUN_ID": "run_parent", "FORGE_ROOT_RUN_ID": "run_root"},
+            clear=True,
+        ):
+            result = run_claude_session("hi")
+        assert result.parent_run_id == "run_parent"
+        assert result.root_run_id == "run_root"
+        assert result.run_id and result.run_id not in ("run_parent", "run_root")
+
+    @patch("forge.core.reactive.session_runner.subprocess.run")
+    def test_timeout_path_surfaces_run_id(self, mock_run):
+        """Even an error/timeout result carries the run id (failures are attributed too)."""
+        mock_run.side_effect = subprocess.TimeoutExpired(cmd="claude", timeout=1)
+        with patch.dict(
+            "os.environ",
+            {"FORGE_RUN_ID": "run_parent", "FORGE_ROOT_RUN_ID": "run_root"},
+            clear=True,
+        ):
+            result = run_claude_session("hi", timeout_seconds=1)
+        assert result.timed_out is True
+        assert result.parent_run_id == "run_parent"
+        assert result.run_id  # minted by build_claude_env even on the error path
+
+
 class TestRunClaudeSession:
     @patch("forge.core.reactive.session_runner.subprocess.run")
     def test_success_path(self, mock_run):

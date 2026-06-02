@@ -67,6 +67,14 @@ class TestEncodeProjectPath:
         # Original dots in path should become hyphens
         assert "my-project" in result
 
+    def test_replaces_underscores_with_hyphens(self, tmp_path: Path) -> None:
+        """Should replace _ with - (matches Claude Code 2.1.158 encoding)."""
+        test_dir = tmp_path / "my_project"
+        test_dir.mkdir()
+        result = encode_project_path(str(test_dir))
+        assert "_" not in result
+        assert "my-project" in result
+
     def test_handles_trailing_slash(self, tmp_path: Path) -> None:
         """Should handle trailing slashes."""
         test_dir = tmp_path / "project"

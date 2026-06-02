@@ -23,7 +23,7 @@ class _FakeWorkspace:
         del timeout
         self.commands.append(command)
 
-        if len(self.commands) in (1, 2, 4):
+        if len(self.commands) in (1, 2, 3, 5):
             return subprocess.CompletedProcess(args=["bash", "-c", command], returncode=0, stdout="", stderr="")
 
         if "|| true" in command:
@@ -57,5 +57,5 @@ def test_run_claude_print_preserves_nonzero_exit_code(monkeypatch: pytest.Monkey
     assert exit_code == 42
     assert stdout == ""
     assert stderr == "claude failed"
-    assert "|| true" not in workspace.commands[2]
-    assert workspace.commands[-1] == "rm -f /tmp/.anthropic_key"
+    assert "|| true" not in workspace.commands[3]
+    assert workspace.commands[-1] == "rm -f /tmp/.anthropic_key /tmp/.forge_prompt"

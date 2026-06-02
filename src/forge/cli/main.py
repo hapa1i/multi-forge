@@ -27,9 +27,11 @@ from .memory import memory as memory_cmd  # noqa: E402
 from .memory_writer import handoff_tombstone, memory_writer  # noqa: E402
 from .policy import policy  # noqa: E402
 from .proxy import proxy  # noqa: E402
+from .runtime import runtime  # noqa: E402
 from .search import search_cmd  # noqa: E402
 from .session import session  # noqa: E402
 from .status_line import status_line  # noqa: E402
+from .transfer import transfer as transfer_cmd  # noqa: E402
 from .workflow import workflow_cmd  # noqa: E402
 
 # Subcommands that should NOT trigger pending-work processing or auto file logging.
@@ -88,6 +90,60 @@ class AliasGroup(click.Group):
         if commands:
             with formatter.section("Commands"):
                 formatter.write_dl(commands)
+
+
+def _memory_writer_env(payload: dict[str, object]) -> dict[str, str]:
+    """Build the detached memory-writer's env, re-rooted under the originating session.
+
+    The writer is drained and spawned by an unrelated later CLI process, so it must inherit
+    NONE of that drainer's identity. Run-tree and session are handled differently on purpose:
+
+    - Run-tree (FORGE_RUN_ID/PARENT/ROOT): re-rooted at the marker's captured origin (with a
+      fresh child run_id) so attribution chains to the originating session. Markers predating
+      run-tree capture fall through scrubbed, so the writer mints its own root.
+    - Session (FORGE_SESSION/FORK/PARENT): scrubbed, NOT re-rooted — Forge hooks *act* on
+      FORGE_SESSION, so re-injecting the origin would make the writer's own ``claude -p`` Stop
+      hook resolve the (ended) origin session and re-enqueue a handoff for it: a self-spawning
+      loop. The writer gets its target session from ``--session-name`` (and Slice 4c reads the
+      usage label from there too), so it needs no inherited session var.
+    """
+    import os
+
+    from forge.core.reactive.env import (
+        FORGE_PARENT_RUN_ID_VAR,
+        FORGE_ROOT_RUN_ID_VAR,
+        FORGE_RUN_ID_VAR,
+        mint_run_id,
+    )
+    from forge.session.hooks.session_start import (
+        ENV_FORK_NAME,
+        ENV_PARENT_SESSION,
+        ENV_SESSION,
+    )
+
+    env = os.environ.copy()
+    # Scrub the drainer's run-tree AND session identity (see docstring): inheriting either
+    # mis-attributes the detached writer. Session vars are dropped unconditionally; the
+    # run-tree is re-rooted below when the marker captured the origin.
+    for var in (
+        FORGE_RUN_ID_VAR,
+        FORGE_PARENT_RUN_ID_VAR,
+        FORGE_ROOT_RUN_ID_VAR,
+        ENV_SESSION,
+        ENV_FORK_NAME,
+        ENV_PARENT_SESSION,
+    ):
+        env.pop(var, None)
+
+    # Current handoff markers write origin_run_id and origin_root_run_id together;
+    # the fallback only tolerates older/corrupt partial payloads without inheriting
+    # the unrelated drainer's run-tree identity.
+    origin_root = payload.get("origin_root_run_id") or payload.get("origin_run_id")
+    if origin_root:
+        env[FORGE_ROOT_RUN_ID_VAR] = str(origin_root)
+        env[FORGE_PARENT_RUN_ID_VAR] = str(payload.get("origin_run_id") or origin_root)
+        env[FORGE_RUN_ID_VAR] = mint_run_id()
+    return env
 
 
 def _process_pending_work_best_effort() -> None:
@@ -192,6 +248,7 @@ def _process_pending_work_best_effort() -> None:
 
             subprocess.Popen(
                 cmd,
+                env=_memory_writer_env(payload),
                 start_new_session=True,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
@@ -284,11 +341,13 @@ main.add_command(claude)
 main.add_command(config_cmd, name="config")
 main.add_command(hooks)
 main.add_command(memory_cmd, name="memory")
+main.add_command(transfer_cmd, name="transfer")
 main.add_command(extensions, name="extension")
 main.add_command(status_line)
 main.add_command(info_cmd, name="info")
 main.add_command(workflow_cmd, name="workflow")
 main.add_command(search_cmd, name="search")
+main.add_command(runtime, name="runtime")
 
 from forge.cli.gc import clean_cmd  # noqa: E402
 from forge.cli.logs import logs_cmd  # noqa: E402

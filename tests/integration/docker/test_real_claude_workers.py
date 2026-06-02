@@ -9,7 +9,10 @@ import pytest
 
 from forge.core.models.catalog import get_default_model
 from tests.fixtures.docker import ContainerLike
-from tests.integration.docker.conftest import setup_real_claude
+from tests.integration.docker.conftest import (
+    read_container_usage_events,
+    setup_real_claude,
+)
 
 pytestmark = [
     pytest.mark.integration,
@@ -65,12 +68,14 @@ class TestRealClaudeWorkers:
     def test_multi_review_uses_real_bare_worker(self, forge_workspace: ContainerLike) -> None:
         setup_real_claude(forge_workspace, session_name="real-worker")
         _install_passthrough_logging_wrapper(forge_workspace)
+        forge_workspace.exec("rm -rf ~/.forge/usage")
 
         api_key = os.getenv("ANTHROPIC_API_KEY", "")
         forge_workspace.exec(f"cat > /tmp/.anthropic_key << 'KEY_EOF'\n{api_key}\nKEY_EOF")
         try:
             result = forge_workspace.exec(
                 "export ANTHROPIC_API_KEY=$(cat /tmp/.anthropic_key) && "
+                "export FORGE_RUN_ID=run_real_worker_panel FORGE_ROOT_RUN_ID=run_real_worker_panel && "
                 "cd /workspace && forge workflow panel "
                 "--models claude-opus "
                 "-p 'Reply with a single short greeting.' "
@@ -98,6 +103,29 @@ class TestRealClaudeWorkers:
         env_text = forge_workspace.read_file(env_path)
         assert "ANTHROPIC_MODEL=opus" in env_text
         assert f"ANTHROPIC_DEFAULT_OPUS_MODEL={anthropic_opus}" in env_text
+
+        usage_events = read_container_usage_events(forge_workspace, command="panel")
+        worker_events = [event for event in usage_events if event["attribution_granularity"] == "worker"]
+        assert len(worker_events) == 1
+        worker_event = worker_events[0]
+        assert worker_event["runtime"] == "claude_code"
+        assert worker_event["status"] == "success"
+        assert worker_event["parent_run_id"] == "run_real_worker_panel"
+        assert worker_event["root_run_id"] == "run_real_worker_panel"
+        assert worker_event["run_id"].startswith("run_")
+        assert worker_event["run_id"] != "run_real_worker_panel"
+        assert worker_event["provider"] == "direct"
+        assert worker_event["model"] == anthropic_opus
+        assert worker_event["proxy_id"] is None
+        assert worker_event["measurement_source"] == "unattributed"
+        assert worker_event["source_refs"] is None
+
+        verb_events = [event for event in usage_events if event["attribution_granularity"] == "verb"]
+        assert len(verb_events) == 1
+        verb_event = verb_events[0]
+        assert verb_event["run_id"] == "run_real_worker_panel"
+        assert verb_event["root_run_id"] == "run_real_worker_panel"
+        assert verb_event["status"] == "success"
 
     def test_debate_uses_real_bare_worker(self, forge_workspace: ContainerLike) -> None:
         setup_real_claude(forge_workspace, session_name="real-debate-worker")

@@ -20,7 +20,12 @@ from forge.core.paths import get_forge_home
 
 logger = logging.getLogger(__name__)
 
+COST_SCHEMA_VERSION = 1
+
 _lock = threading.Lock()
+
+# One-time warning latch for records written by a newer Forge.
+_warned_newer_schema = False
 
 
 def _pid_suffix() -> str:
@@ -55,6 +60,7 @@ def log_request_cost(
     Best-effort: write failures are logged but never block the request.
     """
     record: dict[str, Any] = {
+        "schema_version": COST_SCHEMA_VERSION,
         "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "proxy_id": proxy_id,
         "model": model,
@@ -95,11 +101,16 @@ def read_cost_logs(
 
     Returns:
         List of cost record dicts, sorted by timestamp.
+
+    Skips malformed lines and records written by a newer Forge (schema_version >
+    COST_SCHEMA_VERSION), surfacing the latter once at warning level. Legacy
+    unversioned records (no schema_version) are read normally.
     """
     costs_dir = _costs_dir()
     if not costs_dir.is_dir():
         return []
 
+    global _warned_newer_schema
     records: list[dict[str, Any]] = []
     for path in sorted(costs_dir.glob("*.jsonl")):
         try:
@@ -111,6 +122,16 @@ def read_cost_logs(
                     try:
                         record = json.loads(line)
                     except json.JSONDecodeError:
+                        continue
+
+                    ver = record.get("schema_version")
+                    if isinstance(ver, int) and ver > COST_SCHEMA_VERSION:
+                        if not _warned_newer_schema:
+                            logger.warning(
+                                "Skipping cost records written by a newer Forge (schema_version=%s); upgrade Forge",
+                                ver,
+                            )
+                            _warned_newer_schema = True
                         continue
 
                     if period_start or period_end:

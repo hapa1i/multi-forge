@@ -206,6 +206,9 @@ def create_proxy_file(
         model_alternatives=provider.model_alternatives,
         default_tier=cfg.proxy.default_tier or "sonnet",
         provider_settings=provider_settings,
+        wire_shape=cfg.proxy.wire_shape,
+        intercept=cfg.proxy.intercept,
+        audit=cfg.proxy.audit,
         created_at=now_iso(),
     )
 

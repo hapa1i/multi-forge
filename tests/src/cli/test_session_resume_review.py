@@ -89,7 +89,7 @@ class TestReviewFlagEditorInvocation:
         with (
             patch("forge.cli.session_lifecycle.SessionManager") as mock_mgr_cls,
             patch("forge.cli.session_lifecycle._launch_claude_for_session", return_value=0),
-            patch("forge.cli.session_lifecycle.subprocess.run", side_effect=fake_subprocess_run),
+            patch("forge.cli.editor.subprocess.run", side_effect=fake_subprocess_run),
             patch("forge.cli.session.SessionManager") as mock_mgr_cls_sess,
         ):
             mgr = mock_mgr_cls.return_value
@@ -104,10 +104,88 @@ class TestReviewFlagEditorInvocation:
             )
 
         assert result.exit_code == 0, result.output
-        # Editor was invoked with the per-child file path
+        # --review opens the per-child NOTES overlay, not the pure AI snapshot.
+        notes_file = child_file.with_name("child-1.notes.md")
         assert len(editor_calls) == 1
         assert editor_calls[0][0] == str(fake_editor)
-        assert editor_calls[0][1] == str(child_file)
+        assert editor_calls[0][1] == str(notes_file)
+        assert notes_file.is_file()  # overlay template was created
+
+    def test_fresh_review_merges_authored_notes_into_launch_context(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Fresh path: notes authored during --review reach the launch prompt file.
+
+        The editor appends to the notes overlay; the launcher must then combine the
+        snapshot + notes into one ``launch-context/<child>.md`` so the edit is not
+        silently dropped before Claude starts.
+        """
+        from forge.session import create_session_state
+        from forge.session.transfer import TransferResult
+
+        # Fake editor that appends user content to the file it is handed ($1 = notes).
+        fake_editor = tmp_path / "fake-editor"
+        fake_editor.write_text("#!/bin/sh\nprintf '%s' 'REVIEW NOTE HERE' >> \"$1\"\nexit 0\n")
+        fake_editor.chmod(0o755)
+        monkeypatch.setenv("EDITOR", str(fake_editor))
+
+        parent = create_session_state(
+            "p1",
+            proxy_template="litellm-openai",
+            proxy_base_url="http://localhost:8085",
+            worktree_path=str(tmp_path),
+        )
+        parent.confirmed.claude_session_id = "parent-uuid"
+
+        child_file = tmp_path / ".forge" / "prev_sessions" / "p1" / "children" / "child-1.md"
+        child_file.parent.mkdir(parents=True)
+        child_file.write_text("# Context")
+
+        child_manifest = create_session_state(
+            "child-1",
+            proxy_template="litellm-openai",
+            proxy_base_url="http://localhost:8085",
+            parent_session="p1",
+            worktree_path=str(tmp_path),
+        )
+
+        handoff_result = TransferResult(
+            context_file=child_file,
+            context_file_rel=".forge/prev_sessions/p1/children/child-1.md",
+            transcript_artifact_path=None,
+            token_estimate=None,
+            lineage=["p1"],
+        )
+
+        launch_calls: list[str | None] = []
+
+        def fake_launch(**kwargs):
+            launch_calls.append(kwargs["system_prompt_file"])
+            return 0
+
+        # subprocess.run is NOT patched here: the fake editor must really execute
+        # so it appends to the notes file, exercising the launch-merge wiring.
+        with (
+            patch("forge.cli.session_lifecycle.SessionManager") as mock_mgr_cls,
+            patch("forge.cli.session_lifecycle._launch_claude_for_session", side_effect=fake_launch),
+            patch("forge.cli.session.SessionManager") as mock_mgr_cls_sess,
+        ):
+            mgr = mock_mgr_cls.return_value
+            mgr.get_session.return_value = parent
+            mgr.resume_session.return_value = (child_manifest, handoff_result)
+            mock_mgr_cls_sess.return_value = mgr
+
+            result = runner.invoke(
+                main,
+                ["session", "resume", "p1", "--fresh", "--review", "--child-name", "child-1"],
+            )
+
+        assert result.exit_code == 0, result.output
+        combined = tmp_path / ".forge" / "launch-context" / "child-1.md"
+        assert launch_calls == [str(combined.resolve())]
+        body = combined.read_text(encoding="utf-8")
+        assert "# Context" in body  # the AI snapshot
+        assert "REVIEW NOTE HERE" in body  # the just-authored notes overlay
 
     def test_editor_command_with_args_is_split(
         self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -159,7 +237,7 @@ class TestReviewFlagEditorInvocation:
         with (
             patch("forge.cli.session_lifecycle.SessionManager") as mock_mgr_cls,
             patch("forge.cli.session_lifecycle._launch_claude_for_session", return_value=0),
-            patch("forge.cli.session_lifecycle.subprocess.run", side_effect=fake_subprocess_run),
+            patch("forge.cli.editor.subprocess.run", side_effect=fake_subprocess_run),
             patch("forge.cli.session.SessionManager") as mock_mgr_cls_sess,
         ):
             mgr = mock_mgr_cls.return_value
@@ -173,7 +251,8 @@ class TestReviewFlagEditorInvocation:
             )
 
         assert result.exit_code == 0, result.output
-        assert editor_calls == [[str(fake_editor), "--wait", str(child_file)]]
+        notes_file = child_file.with_name("child-1.notes.md")
+        assert editor_calls == [[str(fake_editor), "--wait", str(notes_file)]]
 
     def test_editor_nonzero_aborts_launch(
         self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -234,7 +313,8 @@ class TestReviewFlagEditorInvocation:
         assert result.exit_code != 0
         launch_mock.assert_not_called()
         assert "Aborted" in result.output
-        assert "forge session resume child-1" in result.output
+        # The recovery tip names the child session (Rich may wrap the line).
+        assert "child-1" in result.output
 
     def test_missing_editor_exits_with_error(
         self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -337,6 +417,65 @@ class TestReviewRelaunch:
 
         assert exc.value.code == 0
         assert launch_calls == [str(child_file.resolve())]
+
+    def test_reattach_appends_notes_overlay_to_launch_context(self, tmp_path: Path) -> None:
+        """Reattach path: a notes overlay with content is merged into the launch file.
+
+        Guards the cheap unit invariant behind the Docker E2E: when the per-child
+        ``.notes.md`` has user content, ``_combine_prompt_files`` produces a single
+        ``launch-context/<child>.md`` carrying both the snapshot and the notes.
+        """
+        from forge.cli.session_lifecycle import _launch_in_place
+        from forge.session import SessionStore, create_session_state
+        from forge.session.models import Derivation
+
+        child_file = tmp_path / ".forge" / "prev_sessions" / "p1" / "children" / "child-1.md"
+        child_file.parent.mkdir(parents=True)
+        child_file.write_text("# Curated context")
+        # Notes overlay with real user content (header + blanks are stripped by
+        # notes_has_user_content, so this counts as non-empty).
+        child_file.with_name("child-1.notes.md").write_text("## User Notes\n\nrun the regression suite")
+
+        child_manifest = create_session_state(
+            "child-1",
+            proxy_template="litellm-openai",
+            proxy_base_url="http://localhost:8085",
+            parent_session="p1",
+            worktree_path=str(tmp_path),
+        )
+        child_manifest.forge_root = str(tmp_path)
+        child_manifest.confirmed.derivation = Derivation(
+            parent_session="p1",
+            resume_mode="transfer",
+            context_file=".forge/prev_sessions/p1/children/child-1.md",
+        )
+        SessionStore(str(tmp_path), "child-1").write(child_manifest)
+
+        manager = MagicMock()
+        manager.index_store.sync_uuid_from_state = MagicMock()
+
+        launch_calls: list[str | None] = []
+
+        def fake_launch(**kwargs):
+            launch_calls.append(kwargs["system_prompt_file"])
+            return 0
+
+        with (
+            patch("forge.cli.session_lifecycle._launch_claude_for_session", side_effect=fake_launch),
+            patch("forge.cli.session_lifecycle._persist_routing_override"),
+            patch("forge.cli.session_lifecycle._get_effective_proxy_for_session", return_value=(None, None, None)),
+            patch("forge.cli.session._resolve_context_limit", return_value=200000),
+        ):
+            with pytest.raises(SystemExit) as exc:
+                _launch_in_place(manager=manager, name="child-1", manifest=child_manifest)
+
+        assert exc.value.code == 0
+        # Snapshot + notes -> a single combined launch-context file (not the raw snapshot).
+        combined = tmp_path / ".forge" / "launch-context" / "child-1.md"
+        assert launch_calls == [str(combined.resolve())]
+        body = combined.read_text(encoding="utf-8")
+        assert "# Curated context" in body
+        assert "run the regression suite" in body
 
     def test_legacy_flat_context_path_is_rejected(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
         from forge.cli.session_lifecycle import _resolve_derivation_context_file

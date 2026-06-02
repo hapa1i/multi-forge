@@ -83,6 +83,17 @@ PROXY_ID: str | None = os.environ.get("FORGE_PROXY_ID")
 cost_tracker: CostTracker | None = None
 
 
+def _sidecar_mode_active() -> bool:
+    """True when running inside a Forge sidecar container (FORGE_SIDECAR set by container.py).
+
+    Sidecar proxies skip host-registry startup validation: the host proxy registry
+    is not mounted into the container and the port is fixed (8085), so the
+    registry/port cross-check cannot hold there. The proxy.yaml overlay is mounted
+    explicitly and is the in-container source of truth.
+    """
+    return bool(os.environ.get("FORGE_SIDECAR"))
+
+
 def _initialize_cost_tracker_from_config() -> CostTracker:
     """Initialize request cost tracking in the module serving FastAPI traffic.
 
@@ -112,6 +123,26 @@ def _initialize_cost_tracker_from_config() -> CostTracker:
     return cost_tracker
 
 
+_audit_pruned = False
+
+
+def _maybe_prune_audit_logs() -> None:
+    """Enforce audit retention once per process (best-effort) once config is loaded."""
+    global _audit_pruned
+    if _audit_pruned:
+        return
+    _audit_pruned = True
+    audit = getattr(config.proxy, "audit", None)
+    if audit is None:
+        return
+    try:
+        from forge.proxy.audit_logger import prune_audit_logs
+
+        prune_audit_logs(retention_days=audit.retention_days, max_total_mb=audit.max_total_mb)
+    except Exception as e:
+        logger.debug("audit prune skipped: %s", e)
+
+
 def _ensure_runtime_state() -> None:
     """Ensure the imported app module has proxy config and runtime trackers."""
     if PROXY_ID is None:
@@ -120,6 +151,7 @@ def _ensure_runtime_state() -> None:
         reload(proxy_id=PROXY_ID)
 
     _initialize_cost_tracker_from_config()
+    _maybe_prune_audit_logs()
 
 
 def _calc_and_log_cost(
@@ -343,6 +375,378 @@ def _max_effort(a: str | None, b: str | None) -> str | None:
     return a if _EFFORT_RANK.get(a, 3) >= _EFFORT_RANK.get(b, 3) else b
 
 
+def _thinking_summary(thinking: object) -> dict[str, object] | None:
+    if not isinstance(thinking, dict):
+        return None
+    return {"type": thinking.get("type"), "budget_tokens": thinking.get("budget_tokens")}
+
+
+def _inspect_route() -> dict[str, Any]:
+    return {
+        "template": getattr(config.proxy, "active_template", ""),
+        "provider": getattr(config.proxy, "preferred_provider", ""),
+        "wire_shape": getattr(config.proxy, "wire_shape", "openai_translated"),
+    }
+
+
+def _persist_request_side(
+    *,
+    body: dict[str, Any],
+    request_id: str,
+    proxy_id: str,
+    route: dict[str, Any],
+    mode: str,
+    headers: dict[str, str] | None,
+    sys_hash: str | None,
+    tool_hash: str | None,
+    counts: dict[str, int],
+    thinking: dict[str, Any] | None,
+    full_body: bool,
+    redact_headers: set[str],
+    defer_full_body: bool,
+) -> None:
+    """Request-side audit persistence (drift + record). Runs in a worker thread.
+
+    Writes a metadata record (metadata mode) or a request-only full-body record
+    (full-body mode). When full-body capture is deferred (passthrough), the record
+    is written response-side instead so the redacted response is included here.
+    Best-effort — never raises into the request path.
+    """
+    from forge.proxy import audit_logger
+
+    try:
+        audit_logger.check_and_record_drift(
+            proxy_id=proxy_id, dimension="system_prompt", current_hash=sys_hash, request_id=request_id, route=route
+        )
+        audit_logger.check_and_record_drift(
+            proxy_id=proxy_id, dimension="tool_surface", current_hash=tool_hash, request_id=request_id, route=route
+        )
+        if not full_body:
+            audit_logger.write_metadata_record(
+                request_id=request_id,
+                proxy_id=proxy_id,
+                mode=mode,
+                route=route,
+                system_prompt_hash=sys_hash,
+                tool_surface_hash=tool_hash,
+                thinking=thinking,
+                counts=counts,
+            )
+        elif not defer_full_body:
+            # Request-only full body (the translated path has no response capture yet);
+            # hashes/counts are included so the record is complete on the request side.
+            audit_logger.write_full_body_record(
+                request_id=request_id,
+                proxy_id=proxy_id,
+                mode=mode,
+                route=route,
+                request_headers=headers,
+                request_body=body,
+                redact_header_names=redact_headers,
+                system_prompt_hash=sys_hash,
+                tool_surface_hash=tool_hash,
+                counts=counts,
+                thinking=thinking,
+            )
+    except Exception as e:
+        logger.debug("[%s] inspect persist skipped: %s", request_id, e)
+
+
+async def _observe_request_side(
+    body: dict[str, Any], request_id: str, *, headers: dict[str, str] | None = None, defer_full_body: bool = False
+) -> dict[str, Any] | None:
+    """Inspect-mode observation: hash system/tools, detect drift, write a record.
+
+    Hashing is cheap and runs inline; the drift/JSONL I/O is offloaded to a thread
+    so the event loop is never blocked. Returns the computed context (hashes,
+    counts, mode, route) so a response-side caller can complete a deferred
+    full-body record, or None in passthrough mode / when there is no intercept config.
+    """
+    intercept = getattr(config.proxy, "intercept", None)
+    if intercept is None or intercept.mode == "passthrough":
+        return None
+    try:
+        from forge.proxy import audit_logger
+
+        audit = getattr(config.proxy, "audit", None)
+        full_body = bool(audit is not None and getattr(audit, "audit_full_body", False))
+        redact_headers = audit.effective_redact_headers() if audit is not None else set()
+        ctx: dict[str, Any] = {
+            "proxy_id": PROXY_ID or "unknown",
+            "route": _inspect_route(),
+            "mode": intercept.mode,
+            "sys_hash": audit_logger.hash_system_prompt(body.get("system")),
+            "tool_hash": audit_logger.hash_tool_surface(body.get("tools")),
+            "counts": {"num_messages": len(body.get("messages") or []), "num_tools": len(body.get("tools") or [])},
+            "thinking": _thinking_summary(body.get("thinking")),
+            "full_body": full_body,
+            "redact_headers": redact_headers,
+        }
+    except Exception as e:
+        logger.debug("[%s] inspect observation skipped: %s", request_id, e)
+        return None
+
+    try:
+        await asyncio.to_thread(
+            _persist_request_side,
+            body=body,
+            request_id=request_id,
+            proxy_id=ctx["proxy_id"],
+            route=ctx["route"],
+            mode=ctx["mode"],
+            headers=headers,
+            sys_hash=ctx["sys_hash"],
+            tool_hash=ctx["tool_hash"],
+            counts=ctx["counts"],
+            thinking=ctx["thinking"],
+            full_body=full_body,
+            redact_headers=redact_headers,
+            defer_full_body=defer_full_body,
+        )
+    except Exception as e:
+        logger.debug("[%s] inspect persist dispatch failed: %s", request_id, e)
+    return ctx
+
+
+def _tier_from_model_name(model: str) -> str | None:
+    """Infer haiku/sonnet/opus tier from a raw Anthropic model name (passthrough path).
+
+    Mirrors data_models._detect_tier without constructing a MessagesRequest, so an
+    explicit `claude-opus-*` request resolves tier_overrides.opus on passthrough.
+    """
+    name = (model or "").lower()
+    for tier in ("haiku", "sonnet", "opus"):
+        if tier in name:
+            return tier
+    return None
+
+
+async def _apply_passthrough_override(
+    raw_body: dict[str, Any], request_id: str, resolved_tier: str, ctx: dict[str, Any] | None
+) -> JSONResponse | None:
+    """Apply override mutations to the raw body and write a mutation record.
+
+    Returns a 403 JSONResponse when a guard blocks the request (caller returns it),
+    else None (continue forwarding the possibly-mutated body). The mutation-safety
+    RuntimeError is intentionally NOT caught — it must fail closed (no forward).
+    """
+    from forge.proxy import audit_logger, intercept
+
+    intercept_cfg = config.proxy.intercept
+    override_cfg = getattr(intercept_cfg, "override", None)
+    tier_override = _get_tier_override(resolved_tier)
+    reasoning_floor = getattr(tier_override, "reasoning_effort", None) if tier_override else None
+    route = (ctx or {}).get("route") or _inspect_route()
+    proxy_id = PROXY_ID or "unknown"
+
+    result = intercept.apply_override(
+        raw_body,
+        system_prompt_augment=getattr(override_cfg, "system_prompt_augment", "") if override_cfg else "",
+        system_prompt_guards=getattr(override_cfg, "system_prompt_guards", []) if override_cfg else [],
+        reasoning_floor_effort=reasoning_floor,
+    )
+    for warning in result.warnings:
+        logger.warning("[%s] override: %s", request_id, warning)
+    if result.mutation_record is not None:
+        try:
+            # Offload the JSONL write off the event loop (parity with inspect persistence).
+            await asyncio.to_thread(
+                audit_logger.write_mutation_record,
+                request_id=request_id,
+                proxy_id=proxy_id,
+                route=route,
+                mutation=result.mutation_record,
+            )
+        except Exception as e:
+            logger.debug("[%s] mutation record skipped: %s", request_id, e)
+    if result.blocked:
+        return JSONResponse(
+            status_code=403,
+            content={"type": "error", "error": {"type": "intercept_guard_blocked", "message": result.blocked_reason}},
+            headers={"X-Request-ID": request_id},
+        )
+    return None
+
+
+async def _handle_anthropic_passthrough(raw_request: Request, request_id: str, *, path: str = "/v1/messages"):
+    """Forward a raw Anthropic request upstream without the OpenAI translation.
+
+    Used when the proxy's wire_shape is 'anthropic_passthrough'. Reads the raw
+    body (not the parsed MessagesRequest, which drops unknown fields) so thinking
+    blocks and unknown/future fields survive byte-for-byte. Spend caps, cost
+    logging, metrics, and audit all run here so a passthrough proxy is a
+    first-class accounted path rather than an unmetered side door.
+    """
+    from forge.core.auth.template_secrets import resolve_env_or_credential
+    from forge.proxy.passthrough import forward
+
+    start_time = time.time()
+
+    base_url = config.proxy.get_provider().base_url
+    if not base_url:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "type": "error",
+                "error": {"type": "configuration_error", "message": "passthrough upstream base_url is not configured"},
+            },
+            headers={"X-Request-ID": request_id},
+        )
+
+    api_key = resolve_env_or_credential("ANTHROPIC_API_KEY")
+    if not api_key:
+        return JSONResponse(
+            status_code=401,
+            content={
+                "type": "error",
+                "error": {
+                    "type": "authentication_error",
+                    "message": "ANTHROPIC_API_KEY is not configured for passthrough",
+                },
+            },
+            headers={"X-Request-ID": request_id},
+        )
+
+    raw_body = await raw_request.json()
+
+    # count_tokens carries no generation/usage: forward only (no caps/cost/audit, and
+    # intentionally no override — the preflight estimate omits augment/reasoning-pin
+    # deltas; the real /v1/messages call applies them).
+    if path != "/v1/messages":
+        return await forward(
+            raw_body=raw_body,
+            inbound_headers=raw_request.headers,
+            base_url=base_url,
+            api_key=api_key,
+            request_id=request_id,
+            path=path,
+        )
+
+    model = str(raw_body.get("model") or "unknown")
+    # Prefer the request's explicit tier (from the model name) over the proxy default,
+    # so tier_overrides.<tier> (e.g. reasoning_effort) match an explicit opus request.
+    resolved_tier = _tier_from_model_name(model) or getattr(config.proxy, "default_tier", None) or "sonnet"
+    req_headers = dict(raw_request.headers)
+
+    # Spend-cap preflight — same cross-request accumulation as the translated path,
+    # so caps configured on a passthrough proxy are enforced, not silently ignored.
+    spend_warning: str | None = None
+    if cost_tracker is not None and cost_tracker.has_caps:
+        projected = 0
+        if cost_tracker.cap_mode == "strict":
+            from forge.core.models.pricing import calculate_cost as _est_cost
+
+            est_input = (
+                _textish_chars(raw_body.get("system"))
+                + _textish_chars(raw_body.get("messages"))
+                + _textish_chars(raw_body.get("tools"))
+            ) // 4
+            est_output = int(raw_body.get("max_tokens") or 4096)
+            try:
+                projected = _est_cost(model, est_input, est_output, 0)
+            except Exception:
+                projected = 0
+        cap_result = cost_tracker.check_cap(projected_cost_micros=projected)
+        if cap_result.exceeded:
+            spend_warning = _cap_result_message(cap_result)
+            if cost_tracker.on_cap_hit == "reject":
+                return JSONResponse(
+                    status_code=429,
+                    content={"type": "error", "error": {"type": "spend_cap_exceeded", "message": spend_warning}},
+                    headers=_with_spend_warning({"X-Request-ID": request_id}, spend_warning),
+                )
+            logger.warning("[%s] %s", request_id, spend_warning)
+
+    # Request-side observation; full-body capture is deferred to on_complete so the
+    # record can include the redacted response rather than overclaiming request-only.
+    ctx = await _observe_request_side(raw_body, request_id, headers=req_headers, defer_full_body=True)
+
+    # Override mode: mutate current-request control surfaces (system prompt + thinking)
+    # AFTER the inspect record, BEFORE forwarding. Signature-safe — historical messages
+    # are never touched. A guard block short-circuits with a 403.
+    _intercept = getattr(config.proxy, "intercept", None)
+    if _intercept is not None and getattr(_intercept, "mode", "passthrough") == "override":
+        blocked_response = await _apply_passthrough_override(raw_body, request_id, resolved_tier, ctx)
+        if blocked_response is not None:
+            return blocked_response
+
+    streaming = bool(raw_body.get("stream"))
+
+    def _on_complete(usage: dict[str, int], response_body: dict[str, Any] | None, failed: bool) -> None:
+        elapsed = (time.time() - start_time) * 1000
+        in_tok, out_tok, cache_tok = (
+            usage.get("input_tokens", 0),
+            usage.get("output_tokens", 0),
+            usage.get("cached_tokens", 0),
+        )
+        cost = _calc_and_log_cost(
+            model=model,
+            tier=resolved_tier,
+            input_tokens=in_tok,
+            output_tokens=out_tok,
+            cached_tokens=cache_tok,
+            latency_ms=elapsed,
+            failed=failed,
+            request_id=request_id,
+        )
+        proxy_metrics.record_request(
+            tier=resolved_tier,
+            model=model,
+            input_tokens=in_tok,
+            output_tokens=out_tok,
+            cached_tokens=cache_tok,
+            latency_ms=elapsed,
+            streaming=streaming,
+            failed=failed,
+            error_type=None,
+            cost_micros=cost,
+        )
+        if ctx is not None and ctx.get("full_body"):
+            try:
+                from forge.proxy import audit_logger
+
+                # Recompute hashes from the body being logged: under override the
+                # forwarded body is mutated, so ctx's pre-mutation hashes would make
+                # the row internally inconsistent (mutated body, stale hash).
+                audit_logger.write_full_body_record(
+                    request_id=request_id,
+                    proxy_id=ctx["proxy_id"],
+                    mode=ctx["mode"],
+                    route=ctx["route"],
+                    request_headers=req_headers,
+                    request_body=raw_body,
+                    response_headers=None,
+                    response_body=response_body,
+                    redact_header_names=ctx["redact_headers"],
+                    system_prompt_hash=audit_logger.hash_system_prompt(raw_body.get("system")),
+                    tool_surface_hash=audit_logger.hash_tool_surface(raw_body.get("tools")),
+                    counts=ctx["counts"],
+                    thinking=_thinking_summary(raw_body.get("thinking")),
+                )
+            except Exception as e:
+                logger.debug("[%s] passthrough full-body audit skipped: %s", request_id, e)
+
+    extra_headers = _with_spend_warning(
+        {
+            "X-Resolved-Model": model,
+            "X-Resolved-Tier": resolved_tier,
+            "X-Cumulative-Cost": f"{proxy_metrics.total_cost_micros / 1_000_000:.6f}",
+        },
+        spend_warning,
+    )
+
+    return await forward(
+        raw_body=raw_body,
+        inbound_headers=raw_request.headers,
+        base_url=base_url,
+        api_key=api_key,
+        request_id=request_id,
+        path=path,
+        on_complete=_on_complete,
+        extra_headers=extra_headers,
+    )
+
+
 @app.post("/v1/messages", response_model=None)
 async def create_message(request_data: MessagesRequest, raw_request: Request):
     """
@@ -355,6 +759,17 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
     start_time = time.time()
 
     _ensure_runtime_state()
+
+    # Passthrough (wire_shape='anthropic_passthrough') is handled entirely in
+    # log_requests_middleware, before this route binds MessagesRequest — so
+    # create_message only ever runs the openai_translated path below.
+
+    # Inspect/override observation on the openai_translated path (lossy: thinking
+    # blocks are stripped downstream). Guarded so the default passthrough mode does
+    # no model_dump() on the hot path.
+    _intercept = getattr(config.proxy, "intercept", None)
+    if _intercept is not None and _intercept.mode != "passthrough":
+        await _observe_request_side(request_data.model_dump(), request_id, headers=dict(raw_request.headers))
 
     spend_warning: str | None = None
 
@@ -935,6 +1350,9 @@ async def count_tokens(request_data: TokenCountRequest, raw_request: Request):
 
     _ensure_runtime_state()
 
+    # Passthrough count_tokens is handled in log_requests_middleware (pre-routing);
+    # this handler only runs the openai_translated path.
+
     try:
         original_model_name = request_data.original_model_name
 
@@ -1153,10 +1571,33 @@ async def root(request: Request):
         "status": proxy_identity.status,
     }
 
+    # Intercept preflight: report mode + what Forge can inspect for this route so a
+    # launcher can say "inspect active (signature-safe)" vs "inspect active (lossy)".
+    _wire_shape = getattr(config.proxy, "wire_shape", "openai_translated")
+    _intercept_cfg = getattr(config.proxy, "intercept", None)
+    _intercept_mode = _intercept_cfg.mode if _intercept_cfg is not None else "passthrough"
+    _audit_cfg = getattr(config.proxy, "audit", None)
+    intercept_section = {
+        "mode": _intercept_mode,
+        "wire_shape": _wire_shape,
+        "thinking_blocks_preserved": _wire_shape == "anthropic_passthrough",
+        "can_inspect": {
+            "system_prompt": _intercept_mode in ("inspect", "override"),
+            "drift_detection": _intercept_mode in ("inspect", "override"),
+            "override": _intercept_mode == "override",
+            "full_body_audit": bool(getattr(_audit_cfg, "audit_full_body", False)),
+        },
+    }
+
     response = {
         "is_proxy": True,
         "template": active_template,
         "provider": preferred_provider,
+        # Wire shape is the authoritative wire truth; provider may be a config slot
+        # (e.g. anthropic-passthrough uses provider=litellm). See Phase 2 audit proxy.
+        "wire_shape": _wire_shape,
+        "intercept_mode": _intercept_mode,
+        "intercept": intercept_section,
         "tiers": tiers,
         "status": "running",
         "routing": routing_section,
@@ -1185,6 +1626,35 @@ async def log_requests_middleware(request: Request, call_next):
 
     request_id = request.headers.get("X-Request-ID") or f"{prefix}{uuid.uuid4().hex[:12]}"
     request.state.request_id = request_id
+
+    # Transparent Anthropic passthrough is intercepted HERE, before the route's
+    # MessagesRequest binding runs — FastAPI validates the body against a closed
+    # content-block union, so an unknown/future block type would 422 before any
+    # in-handler wire_shape check. Middleware forwards the raw bytes instead.
+    if request.method == "POST" and path in ("/v1/messages", "/v1/messages/count_tokens"):
+        try:
+            _ensure_runtime_state()
+            is_passthrough = getattr(config.proxy, "wire_shape", "openai_translated") == "anthropic_passthrough"
+        except Exception as e:
+            logger.error("[%s] passthrough preflight failed: %s", request_id, e)
+            is_passthrough = False
+        if is_passthrough:
+            try:
+                response = await _handle_anthropic_passthrough(request, request_id, path=path)
+            except Exception as e:
+                logger.error("[%s] passthrough error: %s", request_id, e, exc_info=True)
+                return JSONResponse(
+                    status_code=500,
+                    content={
+                        "type": "error",
+                        "error": {"type": "api_error", "message": f"Passthrough error [{request_id}]"},
+                    },
+                    headers={"X-Request-ID": request_id},
+                )
+            if "X-Request-ID" not in response.headers:
+                response.headers["X-Request-ID"] = request_id
+            logger.info(f"{path} [{request_id}] passthrough completed in {time.time() - start_time:.3f}s")
+            return response
 
     # Endpoints that have their own detailed logging
     verbose_endpoints = ("/messages", "/event_logging")
@@ -1422,7 +1892,10 @@ def main(
 
     from forge.config.loader import template_exists
 
-    if not template_exists(template):
+    # When a proxy id is supplied, proxy.yaml is authoritative (init_config ignores the
+    # template), so don't hard-gate on template existence — a proxy created from a user
+    # template that isn't shipped in this environment (e.g. a sidecar) must still start.
+    if proxy_id is None and not template_exists(template):
         click.echo(f"Unknown template '{template}'")
         click.echo("Run 'forge proxy template list' to see available templates.")
         sys.exit(1)
@@ -1472,8 +1945,10 @@ def main(
                 click.echo(" Use --auto-port to automatically find an available port")
                 sys.exit(1)
 
-    # Strict proxy startup validation (B2.1.3)
-    if effective_proxy_id is not None:
+    # Strict proxy startup validation (B2.1.3). Skipped in sidecar mode — see
+    # _sidecar_mode_active(): the host registry isn't in the container and the port
+    # is fixed, so the registry/port cross-check can't hold; proxy.yaml is mounted.
+    if effective_proxy_id is not None and not _sidecar_mode_active():
         from forge.proxy.proxy_startup import (
             ProxyStartupContext,
             ProxyStartupValidationError,

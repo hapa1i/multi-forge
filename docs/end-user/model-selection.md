@@ -156,7 +156,7 @@ supervisor to follow a Forge proxy mapping.
 ### Skill Model-Family Detection Follows The Proxy
 
 `/forge:review` and `/forge:understand` auto-detect the model family from the proxy template's `opus` tier via
-`forge session context --field model_family`. Today, specialized resources exist for OpenAI and Gemini; Anthropic and
+`forge session show --field model_family`. Today, specialized resources exist for OpenAI and Gemini; Anthropic and
 currently-unmapped families use the Anthropic-tuned default unless additional `code-{family}.md` resources and family
 mappings are added.
 

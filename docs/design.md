@@ -132,9 +132,10 @@ this.
 When sessions cross **Forge project boundaries** (worktree forks, `fork --into`, resume), Forge uses **file-based
 transfer**: `assemble_transfer_context()` reads the parent's transcript artifacts and generates a portable context file
 at `<forge_root>/.forge/prev_sessions/<parent>/generated.md`, then copies it to the launch-time child artifact at
-`<forge_root>/.forge/prev_sessions/<parent>/children/<child>.md`, appended via `--append-system-prompt-file`. This is an
-accepted tradeoff: transfer files are lossy compared to native `--resume` (structured summary vs full conversation), but
-they enable branch isolation and cross-worktree workflows.
+`<forge_root>/.forge/prev_sessions/<parent>/children/<child>.md`, appended via `--append-system-prompt-file`. Transfer
+trades the full conversation for a runtime-neutral, **user-editable** view: it is the only substrate that crosses
+worktree, project, and (later) runtime boundaries, and the user can inspect and prune what propagates — something native
+`--resume` structurally cannot offer (see §3.9).
 
 The `--strategy` knob controls fidelity: `minimal` (lineage pointer) → `structured` (conversation skeleton, default) →
 `full` (complete transcript) → `ai-curated` (LLM-selected highlights). `--inline-plan` embeds the approved plan content
@@ -164,16 +165,17 @@ for cross-session transfer. Worktrees are used when sessions write concurrently.
 
 ### 3.2 Contract files (authoritative paths)
 
-| Artifact             | Path                                                             | Owned by                 | Purpose                                                                                 |
-| -------------------- | ---------------------------------------------------------------- | ------------------------ | --------------------------------------------------------------------------------------- |
-| Session file         | `<forge_root>/.forge/sessions/<session_name>/forge.session.json` | Forge Session + Hooks    | Session `intent`, `overrides`, hook-written `confirmed`                                 |
-| Global session index | `~/.forge/sessions/index.json`                                   | Forge Session            | Session metadata (name, `forge_root`, `project_root`); fast listing + project filtering |
-| Active session index | `~/.forge/sessions/active.json`                                  | Forge Session            | Ephemeral live-launch registry for delete warnings + stale pruning                      |
-| Proxy registry       | `~/.forge/proxies/index.json`                                    | Forge Proxy Orchestrator | Running proxies (template ↔ base_url/port ↔ pid)                                        |
-| Runtime config       | `~/.forge/config.yaml`                                           | Forge CLI                | Global runtime preferences (proxy mode, timeouts, context limit)                        |
-| Installed manifest   | `~/.forge/installed.json`                                        | Forge Installer          | Tracks what `forge extension enable` installed for update/uninstall                     |
-| Work queue           | `~/.forge/pending-work/*.json`                                   | Forge Work Queue (§3.13) | Deferred work markers (stop, index, handoff)                                            |
-| Optional events      | `~/.forge/events/*.jsonl`                                        | TBD                      | Debugging/analytics; optional                                                           |
+| Artifact             | Path                                                             | Owned by                 | Purpose                                                                                                   |
+| -------------------- | ---------------------------------------------------------------- | ------------------------ | --------------------------------------------------------------------------------------------------------- |
+| Session file         | `<forge_root>/.forge/sessions/<session_name>/forge.session.json` | Forge Session + Hooks    | Session `intent`, `overrides`, hook-written `confirmed`                                                   |
+| Global session index | `~/.forge/sessions/index.json`                                   | Forge Session            | Session metadata (name, `forge_root`, `project_root`); fast listing + project filtering                   |
+| Active session index | `~/.forge/sessions/active.json`                                  | Forge Session            | Ephemeral live-launch registry for delete warnings + stale pruning                                        |
+| Proxy registry       | `~/.forge/proxies/index.json`                                    | Forge Proxy Orchestrator | Running proxies (template ↔ base_url/port ↔ pid)                                                          |
+| Runtime config       | `~/.forge/config.yaml`                                           | Forge CLI                | Global runtime preferences (proxy mode, timeouts, context limit)                                          |
+| Installed manifest   | `~/.forge/installed.json`                                        | Forge Installer          | Tracks what `forge extension enable` installed for update/uninstall                                       |
+| Work queue           | `~/.forge/pending-work/*.json`                                   | Forge Work Queue (§3.13) | Deferred work markers (stop, index, handoff)                                                              |
+| Usage ledger         | `~/.forge/usage/events/<month>_<pid>.jsonl`                      | Forge Usage Ledger       | Attribution events (run/runtime/model/billing/tokens), joined to cost+audit by `request_id`; schema §A.13 |
+| Optional events      | `~/.forge/events/*.jsonl`                                        | TBD                      | Debugging/analytics; optional                                                                             |
 
 The active session index is intentionally runtime-only. It is self-healed via launcher PID / sidecar container liveness
 checks and must not be treated as durable session truth like the manifest or global session index.
@@ -280,6 +282,8 @@ started_with_proxy:
 - **Proxy mode**: Claude is configured to send requests to a proxy base URL (`ANTHROPIC_BASE_URL`).
   - The proxy (template ↔ base_url) is the **routing identity**.
   - Status/other tools may query the proxy (`GET /`) for tier→model mapping and context windows.
+  - The optional always-on audit/intercept chokepoint (observe or control outbound traffic, §7.x) is **proxy-mode only**
+    — direct mode has no wire to observe.
 - **No-proxy mode**: Claude talks to Anthropic directly.
   - Sessions, worktrees, hooks, and overrides still work (for session-owned fields).
   - `forge session start` and `forge session incognito` default to direct mode. Use `--proxy` for proxy routing.
@@ -482,6 +486,9 @@ The proxy exposes runtime truth via `GET /`:
 {
   "is_proxy": true,
   "proxy": { "template": "litellm-openai", "base_url": "http://localhost:8085" },
+  "wire_shape": "openai_translated",
+  "intercept_mode": "passthrough",
+  "intercept": { "mode": "passthrough", "thinking_blocks_preserved": false, "can_inspect": { "...": "..." } },
   "tiers": {
     "haiku": { "model": "gpt-4o-mini", "context_window": 128000 },
     "sonnet": { "model": "gpt-4o", "context_window": 128000 },
@@ -497,6 +504,9 @@ The proxy exposes runtime truth via `GET /`:
 - Status line tools read both sources independently
 - Spend cap rejections return HTTP 429 with `error.type=spend_cap_exceeded`
 - Warn-mode spend caps allow the request and attach `X-Spend-Warning`
+- `wire_shape` is the authoritative wire truth (a passthrough proxy may carry `provider: litellm` as a credential slot
+  only); `intercept_mode` + `intercept.can_inspect` let a launcher report "inspect active (signature-safe)" vs "inspect
+  active (lossy)" before launch (§7.x)
 
 **Tier selection precedence:**
 
@@ -572,9 +582,10 @@ The resume command supports two **resume modes** (`--resume-mode`):
 - **`native`**: Uses `--resume --fork-session` to carry full conversation history. Lossless but lost on `/compact`. No
   context file generated. Requires the parent to have a confirmed `claude_session_id`.
 
-> **Why not native for worktree forks?** Claude Code stores sessions at `~/.claude/projects/<encoded-cwd>/`. `--resume`
-> from a different CWD cannot find the session JSONL. Tested with Claude Code 2.1.90 (Apr 2026): all cross-CWD scenarios
-> fail with "No conversation found." Worktree forks use transfer only.
+> **Why not native for worktree forks?** Claude stores sessions at `~/.claude/projects/<encoded-cwd>/`, so a bare
+> `--resume` can't cross the CWD boundary (2.1.90/2.1.158 fail "No conversation found"). **Worktree forks default to
+> transfer.** The opt-in `fork --resume-mode native-relocate` (host only) relocates the parent JSONL and resumes
+> byte-for-byte; tool paths are not rewritten. See `scripts/experiments/native-resume/`.
 
 **Transfer mode strategies** (`--resume-mode transfer`, default):
 
@@ -588,6 +599,13 @@ forge session resume <parent> --fresh --strategy <strategy> [--depth N]
 | `structured` | Conversation skeleton with truncated tool results              |
 | `full`       | Complete parent context (fails if exceeds proxy context limit) |
 | `ai-curated` | AI-selected highlights from ancestry chain                     |
+
+**Curated transfer is the primary cross-boundary substrate, not a lossy fallback.** Native resume is byte-faithful but
+works only within the same runtime and CWD, and its carried conversation is opaque — the user cannot inspect or prune
+it. Curated transfer is runtime-neutral and *user-editable*, so it is the only way to carry context across worktrees,
+projects, and (later) runtimes while letting the user shape what propagates. `structured` stays the CLI default;
+`ai-curated` emits the full schema (see [design_appendix.md §M](design_appendix.md#m-transfer-context-schema)) and is
+the substrate for genuine cross-boundary moves.
 
 **Native mode** (`--resume-mode native`):
 
@@ -626,12 +644,16 @@ This pulls relevant context from earlier sessions (e.g., a decision from 5 sessi
 **Processed context location:**
 
 ```
-<forge_root>/.forge/prev_sessions/<parent-name>/generated.md            # Regeneratable parent cache
-<forge_root>/.forge/prev_sessions/<parent-name>/children/<child>.md     # Per-child launch artifact
+<forge_root>/.forge/prev_sessions/<parent-name>/generated.md              # Regeneratable parent AI cache
+<forge_root>/.forge/prev_sessions/<parent-name>/children/<child>.md        # Per-child AI snapshot (frozen; never edited)
+<forge_root>/.forge/prev_sessions/<parent-name>/children/<child>.notes.md  # Per-child user-notes overlay (edit this)
 ```
 
-You can resume the same parent with different strategies. Raw artifacts stay immutable; the parent cache is regenerated,
-while existing per-child launch artifacts are not overwritten.
+The child snapshot is a **pure AI artifact**: `forge session resume --fresh --review` and `forge transfer edit` write
+user edits to the separate `.notes.md` overlay, which is merged after the snapshot at launch (via
+`--append-system-prompt-file`). You can resume the same parent with different strategies — the parent cache is
+regenerated, while existing per-child snapshots **and** their notes are never overwritten. Inspect and reshape transfer
+context with `forge transfer show|regenerate|edit|diff` (§4.0).
 
 **Session derivation tracking:**
 
@@ -846,6 +868,20 @@ Request logs are the source of truth for proxy spend. The proxy bootstraps its i
 previous month request logs on startup so cap enforcement survives restarts. Verb logs are attribution aids for CLI
 visibility; they are estimates because several Forge subprocesses can share a proxy concurrently.
 
+A third plane, the **usage-attribution ledger** (`~/.forge/usage/events/`, schema in
+[§A.13](design_appendix.md#a13-usage-attribution-ledger-schema-314)), records *which run/workflow/session* invoked which
+runtime/provider/model and what it consumed, referencing the cost and audit planes via a shared proxy `request_id`
+(nullable `source_refs`). The three planes stay physically separate by design — cost is the spend source of truth, audit
+is the redacted wire record, usage is attribution. Emission is wired (Phase 4c): the workflow verbs
+(`panel`/`analyze`/`debate`/`consensus`) record one estimated verb-level event each; the memory writer, semantic
+supervisor, and shadow curation record one event per `claude -p` run; the action tagger records exact provider tokens
+from its direct `core.llm` call (and, when that call resolves to a registered Forge proxy, an exact
+`source_refs.cost_request_id` join via a forwarded `X-Request-ID`; direct `billing_mode` stays `unknown` unless provably
+direct + credentialed). All emit best-effort, never gate the work they measure, and record `latency_ms`. `claude -p`
+events carry null `source_refs` because Forge is not the HTTP client and can't know the proxy `request_id`; exact
+per-request correlation for `claude -p` is deferred to Phase 4g (see
+[§A.13](design_appendix.md#a13-usage-attribution-ledger-schema-314)).
+
 Each proxy may define:
 
 ```yaml
@@ -913,9 +949,22 @@ support `--json` for scripting.
 | `forge session incognito [name]`       | Start an ephemeral session (auto-delete on exit)                                  |
 | `forge session shell [name]`           | Open shell in sidecar container                                                   |
 
-Note: `session context` is a deprecated alias for `session show`. `session resume --fresh --review` opens the generated
-per-child transfer context file in `$EDITOR` before launching Claude. `forge session memory` is removed; use
-`forge memory`.
+Note: `session context` is a deprecated alias for `session show`. `session resume --fresh --review` opens the per-child
+user-notes overlay (`children/<child>.notes.md`) in `$EDITOR` before launching Claude; the AI snapshot stays read-only.
+`forge session memory` is removed; use `forge memory`.
+
+#### Transfer context
+
+| Command                              | Purpose                                                                    |
+| ------------------------------------ | -------------------------------------------------------------------------- |
+| `forge transfer show <parent>`       | Show the parent AI cache, or a child's composed view (`--child`, `--json`) |
+| `forge transfer regenerate <parent>` | Rebuild the parent cache only (defaults to its current strategy/depth)     |
+| `forge transfer edit <parent>`       | Edit a child's user-notes overlay in `$EDITOR` (`--child`)                 |
+| `forge transfer diff <parent>`       | Show cache-vs-child-snapshot drift (`--child`)                             |
+
+`forge transfer` pairs with `forge memory` as the two halves of the former "handoff": `forge memory` curates project
+docs; `forge transfer` assembles resume/fork context. Every verb takes a parent session argument. `show`/`regenerate`
+default to the parent cache; `edit`/`diff` resolve a child (inferred when the parent has exactly one, else `--child`).
 
 #### Memory management
 
@@ -935,23 +984,25 @@ per-child transfer context file in `$EDITOR` before launching Claude. `forge ses
 
 #### Proxy management
 
-| Command                              | Purpose                                                |
-| ------------------------------------ | ------------------------------------------------------ |
-| `forge proxy create <template>`      | Create a proxy from template and start it              |
-| `forge proxy list`                   | List all proxies (`--json`)                            |
-| `forge proxy show <id>`              | Show proxy configuration (`--json`, `--raw`)           |
-| `forge proxy edit <id>`              | Edit proxy overlay in $EDITOR                          |
-| `forge proxy set <id> <key>=<value>` | Set a proxy configuration value                        |
-| `forge proxy start <id>`             | Start server for existing proxy                        |
-| `forge proxy stop <id>`              | Stop server (keeps config)                             |
-| `forge proxy delete <id>...`         | Delete one or more proxies (`--all` for bulk deletion) |
-| `forge proxy clean`                  | Remove stale proxies (dead pids)                       |
-| `forge proxy validate <id>`          | Validate proxy configuration                           |
-| `forge proxy metrics [id]`           | Show runtime metrics (`--json`, `--all`)               |
-| `forge proxy template list`          | List available templates                               |
-| `forge proxy template show <name>`   | Show template configuration (`--raw`)                  |
-| `forge proxy template edit <name>`   | Customize a template (copy-on-first-edit)              |
-| `forge proxy template reset <name>`  | Reset template to built-in defaults                    |
+| Command                              | Purpose                                                 |
+| ------------------------------------ | ------------------------------------------------------- |
+| `forge proxy create <template>`      | Create a proxy from template and start it               |
+| `forge proxy list`                   | List all proxies (`--json`)                             |
+| `forge proxy show <id>`              | Show proxy configuration (`--json`, `--raw`)            |
+| `forge proxy edit <id>`              | Edit proxy overlay in $EDITOR                           |
+| `forge proxy set <id> <key>=<value>` | Set a proxy configuration value                         |
+| `forge proxy start <id>`             | Start server for existing proxy                         |
+| `forge proxy stop <id>`              | Stop server (keeps config)                              |
+| `forge proxy delete <id>...`         | Delete one or more proxies (`--all` for bulk deletion)  |
+| `forge proxy clean`                  | Remove stale proxies (dead pids)                        |
+| `forge proxy validate <id>`          | Validate proxy configuration                            |
+| `forge proxy metrics [id]`           | Show runtime metrics (`--json`, `--all`)                |
+| `forge proxy audit show [id]`        | Show redacted audit records (hashes/counts, no secrets) |
+| `forge proxy audit diff [id]`        | Show system/tool drift + override mutations over time   |
+| `forge proxy template list`          | List available templates                                |
+| `forge proxy template show <name>`   | Show template configuration (`--raw`)                   |
+| `forge proxy template edit <name>`   | Customize a template (copy-on-first-edit)               |
+| `forge proxy template reset <name>`  | Reset template to built-in defaults                     |
 
 #### Claude Code management
 
@@ -1306,12 +1357,20 @@ auditable). Both time limits matter: `max_iterations` catches fast-failing loops
 
 #### 4.1.4 Action context
 
-Policies operate on a normalized view of what Claude Code is doing, for example:
+Policies operate on a normalized, runtime-tagged view of what a runtime is doing (an `ActionContext`), for example:
 
+- `runtime` — which agent runtime produced the action (`claude_code` today; `codex`/`gemini` later)
 - hook event (`PreToolUse.Write`, `PreToolUse.Edit`, …)
 - tool arguments (target path, content/diff metadata)
 - repository/worktree path
 - effective session config (intent + overrides)
+
+Normalization happens at the **adapter boundary**: a runtime's hook adapter (`ClaudeHookAdapter`,
+`src/forge/cli/hooks/policy.py`) maps that runtime's payload into this shape and tags `runtime`. `PolicyEngine.evaluate`
+is runtime-agnostic — it never branches on `runtime`. The reverse seam, a hook **responder** (`ClaudeHookResponder`),
+serializes the composed decision back into the runtime's wire contract (exit codes, block message, allow output). Both
+match runtime-neutral `HookAdapter`/`HookResponder` protocols (`src/forge/cli/hooks/protocols.py`), so a Codex
+adapter/responder pair (Phase 6) reuses the engine without touching it.
 
 #### 4.1.5 Policy composition
 
@@ -1336,7 +1395,9 @@ Policy violation(s):
 ```
 
 The `Intent:` line appears once per denying policy (not per violation). The `Note:` uses project-owner framing so models
-treat it as a constraint to respect, not an obstacle to circumvent.
+treat it as a constraint to respect, not an obstacle to circumvent. The runtime's hook responder owns this serialization
+(`ClaudeHookResponder.format_deny`/`format_needs_review`/`allow_feedback`); the `[forge] Policy: …` summary line is a
+separate telemetry overlay in the hook command, not part of the runtime wire contract.
 
 #### 4.1.6 Policy state and ownership
 
@@ -1481,9 +1542,26 @@ differently by different entry points.
 - Callable from skills (on-demand) and policies (automatic)
 - Conservative set: fundamental patterns only
 
-The **fan-out runner** (`run_multi_review()`) spawns N workers in parallel via `ThreadPoolExecutor`, each with its own
-model/proxy and optional per-worker prompt. The **adversarial runner** constrains workers to review/eval skills with
-stance injection (`{stance_prompt}`), mandatory blinding (no peer outputs), and evidence-weighted synthesis.
+The **fan-out runner** (`run_multi_review()`) shapes one already-routed `HeadlessRequest` per worker (model/proxy +
+optional per-worker prompt) and delegates the parallel `claude -p` lifecycle -- per-worker process groups, `os.killpg`
+SIGTERM->SIGKILL cleanup, `ThreadPoolExecutor`, and deterministic `result_map[idx]` ordering -- to
+`ClaudeHeadlessInvoker.run_parallel` (`core/invoker/`). The invoker is the runtime seam Phase 5 swaps for a
+`CodexHeadlessInvoker` without changing the review callers; it also emits one per-worker usage event when a request
+carries attribution (run/model/status/latency; cost null -- the verb aggregate holds the estimated total). The
+**adversarial runner** constrains workers to review/eval skills with stance injection (`{stance_prompt}`), mandatory
+blinding (no peer outputs), and evidence-weighted synthesis.
+
+**Runtime registry (`core/runtime/`).** The capability half of the runtime seam (the invoker above is the lifecycle
+half). A frozen `RuntimeSpec` per runtime in a module-level `RUNTIMES` table (mirrors `core/auth/capabilities.py`'s
+`Credential`/`CREDENTIALS` pattern) answers the card's seven questions without hard-coding Claude Code assumptions:
+installed (`is_installed()` = PATH presence; `detect()` = best-effort `--version`), interactive, headless, hooks, usage
+source, native resume, and install scopes (plus curated-transfer in/out). Partial or planned support is a tri-state
+`Literal`, not a `bool` — Codex `pretool_policy="partial"` (its `PreToolUse` is not a full enforcement boundary),
+`interactive="beta"` (a target, not shipped), and `native_hooks="gated"` carrying machine-readable
+`hook_min_version`/`hook_feature_flag` (a preflight verifies the gate rather than parsing prose) — so a consumer never
+mistakes a Codex limit for Claude parity. `forge runtime list [--json]` renders the matrix. Claude Code is fully
+populated; Codex/Gemini declare their limits as values. Phase 5's Codex invoker and the auth/runtime preflight will read
+this registry; nothing branches on it yet.
 
 #### 5.5.6 Relationship to policies (workflow unification)
 
@@ -1825,9 +1903,75 @@ multi-forge/
 
 **Sidecar mode** solves operational problems (not security): lifecycle coupling, port isolation, version consistency,
 log isolation. Configurable via `~/.forge/config.yaml` (`proxy_mode: host|sidecar`), overrideable with `--sidecar` /
-`--host-proxy`. Mounts `.claude/` and `.forge/` from host; does NOT mount `~/.forge` (UID issues, undermines port
-isolation). Sidecar sessions also persist their launch mode, extra mounts, and image in `intent.launch` so
-`forge session resume <name>` can replay the same runtime wiring later.
+`--host-proxy`. Mounts `.claude/` and `.forge/` from host; does NOT mount all of `~/.forge` (UID issues, undermines port
+isolation). **Narrow exception (§7.x audit path):** when a session launches with a proxy id, the sidecar additionally
+mounts that proxy's `~/.forge/proxies/<id>/` read-only (so the in-container proxy loads its intercept/audit overlay) and
+`~/.forge/audit/` + `~/.forge/costs/` read-write (so audit records, cost history, and spend-cap accounting persist on
+the host instead of dying with the `--rm` container). These are the only `~/.forge` subdirs mounted, preserving the
+port-isolation rationale. On Linux the sidecar runs as the host `--user uid:gid`; that uid has no passwd entry, so the
+launcher pins `HOME=/root` and the image makes `/root` traversable/writable (`chmod 0777 /root`) so the mapped uid can
+reach the `/root/.forge` and `/root/.claude` mounts — an accommodation for the ephemeral single-session `--rm` sandbox,
+**not** a security-sandbox guarantee. Sidecar sessions also persist their launch mode, extra mounts, and image in
+`intent.launch` so `forge session resume <name>` can replay the same runtime wiring later.
 
 **Forge still owns:** Docker test infrastructure, runtime config. `src/forge/sidecar/` provides sidecar mode —
 operational, not a security sandbox.
+
+### 7.x Optional Always-On Proxy (audit and control)
+
+A Forge proxy can be a user-controlled chokepoint that **observes** and optionally **controls** the wire between Claude
+Code and the model provider. The audit/intercept fields default to inert, so existing proxies are unchanged; the shipped
+`anthropic-passthrough` template is the deliberate exception (it opts into `inspect`). It is motivated by a simple
+property: agent quality can change at the harness boundary without leaving the user local evidence. Owning the wire
+gives Forge a durable observation point and a signature-safe control point.
+
+**Two orthogonal axes** (kept distinct everywhere):
+
+1. **Wire shape** (`wire_shape` on the proxy config) — how the request reaches the upstream:
+   - `openai_translated` (default): `convert_anthropic_to_openai` → upstream → `convert_openai_to_anthropic`. **Strips
+     `thinking`/`redacted_thinking` blocks** — inspectable but **not** signature-safe (lossy).
+   - `anthropic_passthrough`: forwards the raw Anthropic body unchanged and streams the response back unchanged.
+     **Preserves thinking blocks byte-for-byte** (signature-safe). Shipped as the `anthropic-passthrough` template
+     (`provider: litellm` is a credential slot only; `wire_shape` is the wire truth, and `GET /` labels it so).
+2. **Intercept mode** (`intercept.mode`, per proxy):
+   - `passthrough` (default): no body inspection.
+   - `inspect`: observe only — hash the system prompt + tool surface, detect drift, write redacted audit metadata.
+   - `override`: inspect **plus** apply mutations to the current request. **Requires
+     `wire_shape: anthropic_passthrough`** (rejected at config load otherwise) so mutations are signature-safe.
+
+**Observe (`inspect`).** Before forwarding, the proxy records a redacted metadata audit record (hashes of the system
+prompt and tool surface, cache markers, token counts — never plaintext) and runs drift detection: the first observation
+of a hash dimension seeds a baseline; a later change emits a `drift` record. `audit.audit_full_body` (opt-in, OFF by
+default) additionally captures **redacted** bodies (structure only — never plaintext, no raw-body mode): the request
+body on every path, the response body only for non-streaming passthrough today (streaming/translated deferred; §A.12 has
+the per-path contract). Retention (`audit.retention_days`, `audit.max_total_mb`) is enforced by `prune_audit_logs()` at
+startup, so it is not a dangling promise.
+
+**Control (`override`).** Builds → validates → applies a mutation plan to the **current request's control surfaces
+only** — the system prompt and generation parameters, **never** historical messages:
+
+- cache-aware `system_prompt_augment` (inserted after the last `cache_control` marker so the cached prefix stays
+  byte-identical; markerless appends and flags cache invalidation);
+- `system_prompt_guards` (`warn`/`block`/`strip`; all `block` checks run first, so a strip can't half-mutate a blocked
+  request — a block returns HTTP 403 `intercept_guard_blocked`);
+- reasoning-effort pin — **reuses** `tier_overrides.<tier>.reasoning_effort` as a floor (not a new key), in Anthropic
+  `thinking.budget_tokens` units.
+
+**Mutation-safety invariant (normative):** override fingerprints the `messages` list (SHA256) before and after apply and
+raises (`RuntimeError`, fail-closed, no forward) if it changed. Override never writes `messages[0..n-1]`, so signed
+reasoning in historical turns is untouched. Mutation records carry hashes/lengths/budgets only.
+
+**Route-bound caveat.** Intercept is a property of the resolved proxy/route, not the session. A direct-mode session has
+no chokepoint; launch-time preflight reports visibility explicitly (it never silently "degrades to passthrough").
+`GET /` surfaces both axes (`wire_shape`, `intercept_mode`, `intercept.can_inspect`, `thinking_blocks_preserved`) so a
+launcher can say "inspect active (signature-safe)" vs "inspect active (lossy)".
+
+**Sidecar-recommended, host-supported.** Both modes support the audit path; sidecar is recommended for an always-on
+posture (lifecycle-coupled, port-isolated), with the narrow mounts of §7 making in-container records host-visible.
+
+**Read surface.** `forge proxy audit show [id]` and `forge proxy audit diff [id]` (drift + override mutations in one
+timeline) render redacted records; `%proxy audit show|diff` is the in-session equivalent. Redaction happens **before**
+persistence — the typed builders redact, then call the writer — so no raw body reaches disk.
+
+See [design_appendix.md §A.11](design_appendix.md#a11-intercept-and-audit-configuration-7x) (config schema) and
+[§A.12](design_appendix.md#a12-audit-log-schema-7x) (audit record schema + log paths).

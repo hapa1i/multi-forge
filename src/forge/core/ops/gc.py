@@ -280,7 +280,8 @@ def _detect_orphan_transfer_files(ref_set: set[tuple[str, str]], forge_roots: se
        the whole directory is orphaned (rmtree).
     2. ``children/<child>.md`` files not referenced by any child session's
        ``Derivation.context_file`` (within a still-referenced parent dir) --
-       just the file.
+       just the file. A ``<child>.notes.md`` user-notes overlay is orphaned
+       only together with its snapshot, never independently.
     3. Top-level ``<parent>.md`` files (legacy pre-0.2.0 flat layout) --
        always orphaned since new code never writes here.
 
@@ -317,6 +318,16 @@ def _detect_orphan_transfer_files(ref_set: set[tuple[str, str]], forge_roots: se
             for child_file in child_files:
                 if str(child_file.resolve()) not in referenced_context_files:
                     orphans.append(str(child_file))
+
+            # A <child>.notes.md user-notes overlay is never referenced by
+            # Derivation.context_file, so its liveness is tied to its snapshot:
+            # orphan it only when the paired snapshot is unreferenced. Never
+            # orphan notes alone, or `forge clean` would silently delete
+            # user-authored notes paired with a live child.
+            for notes_file in _ps.iter_child_notes(forge_root, parent_name):
+                snapshot = _ps.snapshot_for_notes(notes_file)
+                if str(snapshot.resolve()) not in referenced_context_files:
+                    orphans.append(str(notes_file))
 
         # 3: legacy flat files at the top of prev_sessions/
         for legacy_file in _ps.iter_legacy_flat_files(forge_root):

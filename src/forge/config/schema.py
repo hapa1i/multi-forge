@@ -19,6 +19,7 @@ Usage:
     overrides = config.proxy.litellm.tier_overrides.get("opus")
 """
 
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -239,6 +240,174 @@ def _coerce_cost_config(value: Any) -> CostConfig:
     )
 
 
+# --- Intercept / audit config (Phase 2 audit proxy) ---
+
+_VALID_INTERCEPT_MODES = ("passthrough", "inspect", "override")
+_VALID_WIRE_SHAPES = ("openai_translated", "anthropic_passthrough")
+_VALID_GUARD_ACTIONS = ("warn", "block", "strip")
+_DEFAULT_REDACT_HEADERS = (
+    "authorization",
+    "proxy-authorization",
+    "x-api-key",
+    "anthropic-api-key",
+    "openai-api-key",
+    "openrouter-api-key",
+    "x-goog-api-key",
+    "cookie",
+    "set-cookie",
+)
+
+
+def _reject_unknown_keys(value: dict, allowed: set[str], where: str) -> None:
+    """Reject unknown keys in intercept/audit config (coding-standards §5).
+
+    Unlike CostConfig's lenient .get() coercion, intercept/audit are security
+    controls: a silently-ignored typo (e.g. audit.full_body) would leave the
+    control OFF without telling the user, so unknown keys are corruption here.
+    """
+    unknown = set(value) - allowed
+    if unknown:
+        raise ValueError(f"Unknown {where} key(s): {', '.join(sorted(unknown))}")
+
+
+@dataclass
+class InterceptOverrideConfig:
+    """Override-mode mutation directives (applied only when intercept.mode='override').
+
+    Targets are current-request control surfaces (mutation-safety invariant):
+    cache-aware system-prompt augmentation and guard checks. Reasoning-effort
+    pinning reuses tier_overrides.<tier>.reasoning_effort, not a field here.
+    """
+
+    system_prompt_augment: str = ""
+    system_prompt_guards: list[dict[str, str]] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.system_prompt_augment, str):
+            raise ValueError("intercept.override.system_prompt_augment must be a string")
+        if not isinstance(self.system_prompt_guards, list):
+            raise ValueError("intercept.override.system_prompt_guards must be a list")
+        for guard in self.system_prompt_guards:
+            if not isinstance(guard, dict) or "pattern" not in guard:
+                raise ValueError("each intercept.override.system_prompt_guards entry needs a 'pattern' key")
+            unknown = set(guard) - {"pattern", "action"}
+            if unknown:
+                raise ValueError(f"Unknown system_prompt_guards key(s): {', '.join(sorted(unknown))}")
+            pattern = guard.get("pattern")
+            if not isinstance(pattern, str) or not pattern:
+                raise ValueError("system_prompt_guards 'pattern' must be a non-empty string")
+            # Compile now so a bad regex fails loudly at config time, not silently at
+            # runtime (a skipped guard is a disabled security control).
+            try:
+                re.compile(pattern)
+            except re.error as e:
+                raise ValueError(f"Invalid system_prompt_guards regex {pattern!r}: {e}") from e
+            action = guard.get("action", "warn")
+            if action not in _VALID_GUARD_ACTIONS:
+                raise ValueError(
+                    f"Invalid system_prompt_guards action: {action!r} (must be one of: {', '.join(_VALID_GUARD_ACTIONS)})"
+                )
+
+
+def _coerce_intercept_override(value: Any) -> InterceptOverrideConfig:
+    if value is None:
+        return InterceptOverrideConfig()
+    if isinstance(value, InterceptOverrideConfig):
+        return value
+    if not isinstance(value, dict):
+        raise ValueError("Invalid intercept.override: must be a mapping")
+    _reject_unknown_keys(value, {"system_prompt_augment", "system_prompt_guards"}, "intercept.override")
+    return InterceptOverrideConfig(
+        system_prompt_augment=value.get("system_prompt_augment", ""),
+        system_prompt_guards=value.get("system_prompt_guards", []) or [],
+    )
+
+
+@dataclass
+class InterceptConfig:
+    """Per-proxy wire-intercept mode (Phase 2 audit proxy).
+
+    mode='passthrough' (default) leaves existing proxies unchanged: no body
+    inspection, no mutation. 'inspect' observes (hash/drift/audit metadata).
+    'override' additionally applies the override directives.
+    """
+
+    mode: str = "passthrough"
+    override: InterceptOverrideConfig = field(default_factory=InterceptOverrideConfig)
+
+    def __post_init__(self) -> None:
+        if self.mode not in _VALID_INTERCEPT_MODES:
+            raise ValueError(
+                f"Invalid intercept.mode: {self.mode!r} (must be one of: {', '.join(_VALID_INTERCEPT_MODES)})"
+            )
+        self.override = _coerce_intercept_override(self.override)
+
+
+def _coerce_intercept_config(value: Any) -> InterceptConfig:
+    if value is None:
+        return InterceptConfig()
+    if isinstance(value, InterceptConfig):
+        return value
+    if not isinstance(value, dict):
+        raise ValueError("Invalid intercept: must be a mapping")
+    _reject_unknown_keys(value, {"mode", "override"}, "intercept")
+    return InterceptConfig(
+        mode=value.get("mode", "passthrough"),
+        override=_coerce_intercept_override(value.get("override", {}) or {}),
+    )
+
+
+@dataclass
+class AuditConfig:
+    """Per-proxy audit logging configuration (Phase 2 audit proxy).
+
+    Metadata-only audit is implied by intercept.mode in (inspect, override).
+    audit_full_body is the high-risk opt-in for redacted full request/response
+    capture; retention_days/max_total_mb bound on-disk exposure.
+    """
+
+    audit_full_body: bool = False
+    redact_headers: list[str] = field(default_factory=list)
+    retention_days: int = 14
+    max_total_mb: int = 512
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.audit_full_body, bool):
+            raise ValueError("audit.audit_full_body must be a bool")
+        if not isinstance(self.redact_headers, list):
+            raise ValueError("audit.redact_headers must be a list")
+        # bool is an int subclass; reject it explicitly so audit.retention_days=true fails.
+        if isinstance(self.retention_days, bool) or not isinstance(self.retention_days, int) or self.retention_days < 0:
+            raise ValueError("audit.retention_days must be a non-negative int")
+        if isinstance(self.max_total_mb, bool) or not isinstance(self.max_total_mb, int) or self.max_total_mb <= 0:
+            raise ValueError("audit.max_total_mb must be a positive int")
+        self.redact_headers = [h.lower() for h in self.redact_headers]
+
+    def effective_redact_headers(self) -> set[str]:
+        """Return the union of default + user-configured redacted header names.
+
+        User-supplied names are added to the defaults, never replace them — you
+        cannot accidentally un-redact authorization.
+        """
+        return {h.lower() for h in _DEFAULT_REDACT_HEADERS} | set(self.redact_headers)
+
+
+def _coerce_audit_config(value: Any) -> AuditConfig:
+    if value is None:
+        return AuditConfig()
+    if isinstance(value, AuditConfig):
+        return value
+    if not isinstance(value, dict):
+        raise ValueError("Invalid audit: must be a mapping")
+    _reject_unknown_keys(value, {"audit_full_body", "redact_headers", "retention_days", "max_total_mb"}, "audit")
+    return AuditConfig(
+        audit_full_body=value.get("audit_full_body", False),
+        redact_headers=value.get("redact_headers", []) or [],
+        retention_days=value.get("retention_days", 14),
+        max_total_mb=value.get("max_total_mb", 512),
+    )
+
+
 @dataclass
 class BackendDependency:
     """Backend dependency declaration (proxy runtime requirement).
@@ -250,6 +419,37 @@ class BackendDependency:
     adapter: str  # e.g., "litellm"
     port: int
     required_env_vars: list[str] = field(default_factory=list)
+
+
+def _validate_wire_shape_intercept(wire_shape: str, intercept: InterceptConfig) -> None:
+    """Reject intercept.mode='override' unless wire_shape='anthropic_passthrough'.
+
+    override mutates the RAW Anthropic body, so the openai_translated path cannot apply it.
+    Enforced on BOTH the running-proxy (ProxyInstanceConfig) and template (ProxyConfig) paths
+    so 'forge proxy template edit' fails at edit time, not late at 'forge proxy create'.
+    """
+    if intercept.mode == "override" and wire_shape != "anthropic_passthrough":
+        raise ValueError(
+            "intercept.mode='override' requires wire_shape='anthropic_passthrough' "
+            "(override applies to the raw passthrough body only). "
+            "Set wire_shape: anthropic_passthrough, or use intercept.mode: inspect."
+        )
+
+
+_VALID_DEFAULT_TIERS = frozenset({"haiku", "sonnet", "opus"})
+
+
+def _validate_default_tier(default_tier: str) -> None:
+    """Reject a default_tier outside the user-facing tier allowlist.
+
+    Enforced on BOTH ProxyConfig (template path) and ProxyInstanceConfig (running
+    proxy) so a bad default_tier fails at 'forge proxy template edit', not late at
+    'forge proxy create'.
+    """
+    if default_tier not in _VALID_DEFAULT_TIERS:
+        raise ValueError(
+            f"Invalid default_tier: '{default_tier}' (must be one of: {', '.join(sorted(_VALID_DEFAULT_TIERS))})"
+        )
 
 
 @dataclass
@@ -270,6 +470,28 @@ class ProxyConfig:
     host: str = "127.0.0.1"
     tool_prefixes_to_ignore: list[str] = field(default_factory=list)
     costs: CostConfig = field(default_factory=CostConfig)
+    wire_shape: str = "openai_translated"
+    intercept: InterceptConfig = field(default_factory=InterceptConfig)
+    audit: AuditConfig = field(default_factory=AuditConfig)
+
+    def __post_init__(self) -> None:
+        # Templates carry wire_shape/intercept/audit/costs/default_tier/tier_overrides too; coerce +
+        # validate here so an invalid combo is rejected at 'forge proxy template edit', not late at
+        # 'forge proxy create' (parity with ProxyInstanceConfig).
+        self.intercept = _coerce_intercept_config(self.intercept)
+        self.audit = _coerce_audit_config(self.audit)
+        self.costs = _coerce_cost_config(self.costs)
+        if self.wire_shape not in _VALID_WIRE_SHAPES:
+            raise ValueError(
+                f"Invalid wire_shape: {self.wire_shape!r} (must be one of: {', '.join(_VALID_WIRE_SHAPES)})"
+            )
+        _validate_wire_shape_intercept(self.wire_shape, self.intercept)
+        _validate_default_tier(self.default_tier)
+        # Per-provider overrides: the constraint check skips tiers with no model, so empty/partial
+        # providers no-op and only a concrete unsupported override (its tier's model set) is
+        # rejected -- no false positives on templates whose model mapping resolves later.
+        for _prov in (self.gemini, self.openai, self.litellm, self.openrouter):
+            _validate_static_tier_override_constraints(_prov.tiers, _prov.tier_overrides)
 
     def get_provider(self, name: str | None = None) -> ProviderConfig:
         """Get provider config by name, defaulting to preferred_provider."""
@@ -332,6 +554,9 @@ class ProxyInstanceConfig:
     auto_cache_min_tokens: int = 1024
 
     costs: CostConfig = field(default_factory=CostConfig)
+    wire_shape: str = "openai_translated"
+    intercept: InterceptConfig = field(default_factory=InterceptConfig)
+    audit: AuditConfig = field(default_factory=AuditConfig)
 
     created_at: str | None = None
     updated_at: str | None = None
@@ -358,13 +583,18 @@ class ProxyInstanceConfig:
         if not self.tiers.sonnet:
             raise ValueError("Tiers must define at least 'sonnet' model")
 
-        valid_tiers = {"haiku", "sonnet", "opus"}
-        if self.default_tier not in valid_tiers:
-            raise ValueError(
-                f"Invalid default_tier: '{self.default_tier}' (must be one of: {', '.join(sorted(valid_tiers))})"
-            )
+        _validate_default_tier(self.default_tier)
 
         self.costs = _coerce_cost_config(self.costs)
+
+        if self.wire_shape not in _VALID_WIRE_SHAPES:
+            raise ValueError(
+                f"Invalid wire_shape: {self.wire_shape!r} (must be one of: {', '.join(_VALID_WIRE_SHAPES)})"
+            )
+        self.intercept = _coerce_intercept_config(self.intercept)
+        self.audit = _coerce_audit_config(self.audit)
+        _validate_wire_shape_intercept(self.wire_shape, self.intercept)
+
         _validate_static_tier_override_constraints(self.tiers, self.tier_overrides)
 
 

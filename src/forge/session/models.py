@@ -331,15 +331,20 @@ class Derivation:
         parent_session: Parent session name (same as SessionState.parent_session).
         parent_transcript: Repo-relative path to parent's transcript artifact.
         inherited_proxy: Template from parent's started_with_proxy (if any).
-        resume_mode: "native" (--resume --fork-session) or "transfer" (assembled context).
-            None and legacy "handoff" are tolerated as transfer (no reader branches on a
-            loaded parent's mode token). Authoritative field for how context was transferred.
+        resume_mode: "native" (--resume --fork-session), "native-relocate" (worktree fork that
+            relocates the parent JSONL into the child CWD's encoded dir, then resumes), or
+            "transfer" (assembled context). None and legacy "handoff" are tolerated as transfer
+            (no reader branches on a loaded parent's mode token). Authoritative field for how
+            context was transferred.
         strategy: Context assembly strategy (minimal|structured|full|ai-curated).
             Only set when resume_mode is "transfer" (or legacy "handoff"/None). Null for native resumes.
         depth: How many ancestors were traversed (1 = parent only).
         resumed_at: ISO8601 timestamp when resume was executed.
         lineage: Ancestry chain from parent to oldest ancestor traversed.
         context_file: Repo-relative path to generated context file.
+        relocated_parent_session_id: For resume_mode "native-relocate" only -- the parent UUID
+            whose transcript was copied into the child's encoded project dir. Lets cleanup remove
+            that relocated copy (dir-scoped to the child) without touching the parent's original.
     """
 
     parent_session: str
@@ -351,6 +356,7 @@ class Derivation:
     resumed_at: str | None = None
     lineage: list[str] = field(default_factory=list)
     context_file: str | None = None
+    relocated_parent_session_id: str | None = None  # Set only for resume_mode "native-relocate"
     # Project identity fields for cross-project resume (see design.md §3)
     parent_forge_root: str | None = None  # Where to find parent artifacts
     parent_project_root: str | None = None  # Must match child's project_root

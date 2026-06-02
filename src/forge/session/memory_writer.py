@@ -461,11 +461,12 @@ def run_memory_writer(
     # Use forge_root as cwd so designated doc paths (relative) resolve
     # against the correct branch content. Transcript path is absolute.
     from forge.core.reactive.cost_tracking import track_verb_cost
+    from forge.core.usage import emit_usage_for_session_result
 
     effective_timeout = timeout_seconds if timeout_seconds is not None else _default_timeout()
     tracking_url = base_url
 
-    with track_verb_cost("memory-writer", [tracking_url] if tracking_url else []):
+    with track_verb_cost("memory-writer", [tracking_url] if tracking_url else []) as cost:
         result = run_claude_session(
             prompt,
             base_url=base_url,
@@ -473,6 +474,16 @@ def run_memory_writer(
             timeout_seconds=effective_timeout,
             cwd=str(forge_root),
         )
+
+    # Attribute before the failure branch so failed runs are recorded too.
+    emit_usage_for_session_result(
+        result,
+        command="memory-writer",
+        cost=cost,
+        session=session_name,
+        base_url=base_url,
+        direct=config.direct,
+    )
 
     if not result.success:
         detail = result.error or (result.stderr[:500] if result.stderr else f"exit {result.returncode}")

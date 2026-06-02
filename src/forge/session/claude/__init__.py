@@ -4,6 +4,7 @@ This module provides utilities for:
 - Path encoding and transcript path resolution
 - Claude binary invocation
 - Session data cleanup (transcripts, agent logs)
+- Cross-CWD transcript relocation (native-relocate spike)
 """
 
 from __future__ import annotations
@@ -28,6 +29,13 @@ from .paths import (
     get_project_encoded_dir,
     get_transcript_path,
 )
+from .relocate import (
+    RelocateConflictError,
+    RelocateResult,
+    RelocateSameDirError,
+    RelocateSourceMissingError,
+    relocate_transcript,
+)
 
 __all__ = [
     # Cleanup
@@ -47,4 +55,10 @@ __all__ = [
     "get_claude_projects_dir",
     "get_project_encoded_dir",
     "get_transcript_path",
+    # Relocate
+    "RelocateConflictError",
+    "RelocateResult",
+    "RelocateSameDirError",
+    "RelocateSourceMissingError",
+    "relocate_transcript",
 ]

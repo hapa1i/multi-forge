@@ -460,7 +460,9 @@ def panel(
 
     _run_preflight(specs, json_output=json_output, routing_plan=routing_plan)
 
-    with track_verb_cost("panel", resolve_proxy_urls_from_plan(routing_plan)):
+    from forge.core.invoker import Attribution
+
+    with track_verb_cost("panel", resolve_proxy_urls_from_plan(routing_plan)) as cost:
         output = run_multi_review(
             resolved_prompt,
             models=specs,
@@ -468,7 +470,13 @@ def panel(
             timeout_seconds=timeout,
             cwd=cwd or str(Path.cwd()),
             resume_id=resume_id,
+            attribution=Attribution(command="panel"),
         )
+
+    # Verb-level aggregate (estimated, across workers) attributed to the ambient run.
+    from forge.core.usage import emit_verb_usage
+
+    emit_verb_usage(command="panel", cost=cost, status="success" if output.successful else "error")
 
     _handle_review_output(
         ctx,
@@ -822,14 +830,22 @@ def analyze(
 
     _run_preflight(specs, json_output=json_output, routing_plan=routing_plan)
 
-    with track_verb_cost("analyze", resolve_proxy_urls_from_plan(routing_plan)):
+    from forge.core.invoker import Attribution
+
+    with track_verb_cost("analyze", resolve_proxy_urls_from_plan(routing_plan)) as cost:
         output = run_multi_review(
             combined_prompt,
             models=specs,
             routing_plan=routing_plan,
             timeout_seconds=timeout,
             cwd=cwd or str(Path.cwd()),
+            attribution=Attribution(command="analyze"),
         )
+
+    # Verb-level aggregate (estimated, across workers) attributed to the ambient run.
+    from forge.core.usage import emit_verb_usage
+
+    emit_verb_usage(command="analyze", cost=cost, status="success" if output.successful else "error")
 
     _handle_review_output(
         ctx,
@@ -1240,17 +1256,25 @@ def debate(
 
         _run_preflight(stance_models, json_output=json_output, routing_plan=routing_plan)
 
-        with track_verb_cost("debate", resolve_proxy_urls_from_plan(routing_plan)):
+        from forge.core.invoker import Attribution
+
+        with track_verb_cost("debate", resolve_proxy_urls_from_plan(routing_plan)) as cost:
             output = run_adversarial(
                 resource_path,
                 stances,
                 timeout_seconds=timeout,
                 cwd=cwd or str(Path.cwd()),
                 routing_plan=routing_plan,
+                attribution=Attribution(command="debate"),
             )
     finally:
         if tmp_file is not None:
             Path(tmp_file.name).unlink(missing_ok=True)
+
+    # Verb-level aggregate (estimated, across workers) attributed to the ambient run.
+    from forge.core.usage import emit_verb_usage
+
+    emit_verb_usage(command="debate", cost=cost, status="success" if output.successful else "error")
 
     debate_warnings = _routing_plan_warnings(stance_models, routing_plan)
     debate_resolved_models = _resolved_models_summary(
@@ -1922,7 +1946,9 @@ def consensus(
 
         _run_preflight(role_models, json_output=json_output, routing_plan=routing_plan)
 
-        with track_verb_cost("consensus", resolve_proxy_urls_from_plan(routing_plan)):
+        from forge.core.invoker import Attribution
+
+        with track_verb_cost("consensus", resolve_proxy_urls_from_plan(routing_plan)) as cost:
             output = run_consensus(
                 resource_path,
                 role_specs,
@@ -1930,10 +1956,16 @@ def consensus(
                 cwd=cwd or str(Path.cwd()),
                 original_subject=raw_subject or "",
                 routing_plan=routing_plan,
+                attribution=Attribution(command="consensus"),
             )
     finally:
         if tmp_file is not None:
             Path(tmp_file.name).unlink(missing_ok=True)
+
+    # Verb-level aggregate (estimated, across workers) attributed to the ambient run.
+    from forge.core.usage import emit_verb_usage
+
+    emit_verb_usage(command="consensus", cost=cost, status="success" if output.successful else "error")
 
     consensus_warnings = _routing_plan_warnings(role_models, routing_plan)
     consensus_resolved_models = _resolved_models_summary(

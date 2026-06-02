@@ -1,6 +1,6 @@
 """Tests for policy check helpers (PreToolUse hook).
 
-Covers: _build_action_context, _persist_policy_state.
+Covers: ClaudeHookAdapter.build_context, _persist_policy_state.
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from forge.cli.hooks.policy import (
-    _build_action_context,
+    ClaudeHookAdapter,
     _persist_policy_state,
 )
 
@@ -27,7 +27,7 @@ def _make_manifest(name: str = "test-session") -> MagicMock:
 
 
 class TestBuildActionContext:
-    """Test _build_action_context() payload parsing."""
+    """Test ClaudeHookAdapter.build_context() payload parsing."""
 
     def test_write_payload(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(Path, "cwd", lambda: tmp_path)
@@ -37,8 +37,9 @@ class TestBuildActionContext:
                 "content": "print('hello')",
             }
         }
-        result = _build_action_context(data, "Write", _make_manifest())
+        result = ClaudeHookAdapter().build_context(data, "Write", _make_manifest())
         assert result is not None
+        assert result.runtime == "claude_code"  # adapter tags the origin runtime
         assert result.tool_name == "Write"
         assert result.event == "PreToolUse.Write"
         assert result.new_content == "print('hello')"
@@ -53,13 +54,13 @@ class TestBuildActionContext:
                 "new_string": "new code here",
             }
         }
-        result = _build_action_context(data, "Edit", _make_manifest())
+        result = ClaudeHookAdapter().build_context(data, "Edit", _make_manifest())
         assert result is not None
         assert result.new_content == "new code here"
 
     def test_tool_input_not_dict_returns_none(self) -> None:
         data = {"tool_input": "not a dict"}
-        result = _build_action_context(data, "Write", _make_manifest())
+        result = ClaudeHookAdapter().build_context(data, "Write", _make_manifest())
         assert result is None
 
     def test_missing_tool_input_returns_context_with_none_path(
@@ -67,7 +68,7 @@ class TestBuildActionContext:
     ) -> None:
         monkeypatch.setattr(Path, "cwd", lambda: tmp_path)
         data: dict = {"tool_input": {}}
-        result = _build_action_context(data, "Write", _make_manifest())
+        result = ClaudeHookAdapter().build_context(data, "Write", _make_manifest())
         assert result is not None
         assert result.target_path is None
 
@@ -75,14 +76,14 @@ class TestBuildActionContext:
         """Falls back to 'path' when 'file_path' is missing."""
         monkeypatch.setattr(Path, "cwd", lambda: tmp_path)
         data = {"tool_input": {"path": str(tmp_path / "readme.md")}}
-        result = _build_action_context(data, "Write", _make_manifest())
+        result = ClaudeHookAdapter().build_context(data, "Write", _make_manifest())
         assert result is not None
         assert result.target_path == "readme.md"
 
     def test_absolute_path_normalized_relative(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(Path, "cwd", lambda: tmp_path)
         data = {"tool_input": {"file_path": str(tmp_path / "deep" / "nested" / "file.py")}}
-        result = _build_action_context(data, "Write", _make_manifest())
+        result = ClaudeHookAdapter().build_context(data, "Write", _make_manifest())
         assert result is not None
         assert result.target_path == "deep/nested/file.py"
 
@@ -90,7 +91,7 @@ class TestBuildActionContext:
         """Path that can't be made relative to cwd is kept as absolute."""
         monkeypatch.setattr(Path, "cwd", lambda: tmp_path / "subdir")
         data = {"tool_input": {"file_path": "/completely/different/path.py"}}
-        result = _build_action_context(data, "Write", _make_manifest())
+        result = ClaudeHookAdapter().build_context(data, "Write", _make_manifest())
         assert result is not None
         assert result.target_path == "/completely/different/path.py"
 
@@ -98,8 +99,9 @@ class TestBuildActionContext:
         monkeypatch.setattr(Path, "cwd", lambda: tmp_path)
         content = "x" * 5000
         data = {"tool_input": {"file_path": "f.py", "content": content}}
-        result = _build_action_context(data, "Write", _make_manifest())
+        result = ClaudeHookAdapter().build_context(data, "Write", _make_manifest())
         assert result is not None
+        assert result.new_content is not None
         assert len(result.new_content) == 5000
         assert "truncated" not in result.new_content
 
@@ -107,8 +109,9 @@ class TestBuildActionContext:
         monkeypatch.setattr(Path, "cwd", lambda: tmp_path)
         content = "x" * 5001
         data = {"tool_input": {"file_path": "f.py", "content": content}}
-        result = _build_action_context(data, "Write", _make_manifest())
+        result = ClaudeHookAdapter().build_context(data, "Write", _make_manifest())
         assert result is not None
+        assert result.new_content is not None
         assert "truncated" in result.new_content
         assert len(result.new_content) < 5001 + 50  # truncation marker overhead
 
@@ -116,7 +119,7 @@ class TestBuildActionContext:
         """Empty string content is falsy, so truncation is skipped."""
         monkeypatch.setattr(Path, "cwd", lambda: tmp_path)
         data = {"tool_input": {"file_path": "f.py", "content": ""}}
-        result = _build_action_context(data, "Write", _make_manifest())
+        result = ClaudeHookAdapter().build_context(data, "Write", _make_manifest())
         assert result is not None
         # Empty string is passed through to ActionContext (no truncation applied)
         assert result.new_content == ""
@@ -124,7 +127,7 @@ class TestBuildActionContext:
     def test_non_string_target_path_treated_as_none(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(Path, "cwd", lambda: tmp_path)
         data = {"tool_input": {"file_path": 12345}}
-        result = _build_action_context(data, "Write", _make_manifest())
+        result = ClaudeHookAdapter().build_context(data, "Write", _make_manifest())
         assert result is not None
         assert result.target_path is None
 
@@ -132,7 +135,7 @@ class TestBuildActionContext:
         monkeypatch.setattr(Path, "cwd", lambda: tmp_path)
         manifest = _make_manifest("my-session")
         data = {"tool_input": {"file_path": "f.py"}}
-        result = _build_action_context(data, "Write", manifest)
+        result = ClaudeHookAdapter().build_context(data, "Write", manifest)
         assert result is not None
         assert result.session_name == "my-session"
 

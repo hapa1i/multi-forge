@@ -11,6 +11,7 @@ from forge.policy.types import ActionContext
 def write_context() -> ActionContext:
     """Create a Write action context for testing."""
     return ActionContext(
+        runtime="claude_code",
         event="PreToolUse.Write",
         tool_name="Write",
         tool_args={"file_path": "/repo/src/foo.py", "content": "print(1)"},
@@ -25,6 +26,7 @@ def write_context() -> ActionContext:
 def edit_context() -> ActionContext:
     """Create an Edit action context for testing."""
     return ActionContext(
+        runtime="claude_code",
         event="PreToolUse.Edit",
         tool_name="Edit",
         tool_args={
@@ -43,6 +45,7 @@ def edit_context() -> ActionContext:
 def test_file_context() -> ActionContext:
     """Create a test file Write context for testing."""
     return ActionContext(
+        runtime="claude_code",
         event="PreToolUse.Write",
         tool_name="Write",
         tool_args={

@@ -15,6 +15,7 @@ def _ctx(
     new_content: str = "x = 1",
 ) -> ActionContext:
     return ActionContext(
+        runtime="claude_code",
         event=f"PreToolUse.{tool_name}",
         tool_name=tool_name,
         tool_args={},
