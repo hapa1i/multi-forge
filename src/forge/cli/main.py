@@ -27,6 +27,7 @@ from .memory import memory as memory_cmd  # noqa: E402
 from .memory_writer import handoff_tombstone, memory_writer  # noqa: E402
 from .policy import policy  # noqa: E402
 from .proxy import proxy  # noqa: E402
+from .runtime import runtime  # noqa: E402
 from .search import search_cmd  # noqa: E402
 from .session import session  # noqa: E402
 from .status_line import status_line  # noqa: E402
@@ -343,6 +344,7 @@ main.add_command(status_line)
 main.add_command(info_cmd, name="info")
 main.add_command(workflow_cmd, name="workflow")
 main.add_command(search_cmd, name="search")
+main.add_command(runtime, name="runtime")
 
 from forge.cli.gc import clean_cmd  # noqa: E402
 from forge.cli.logs import logs_cmd  # noqa: E402

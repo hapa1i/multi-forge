@@ -27,6 +27,35 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-01
 
+### Phase 4 (Slice 4e): Runtime registry capability matrix
+
+**Goal**: Make "can this runtime do X?" a declarative lookup instead of hard-coded Claude Code assumptions, so Phase 5's
+Codex invoker and auth/runtime preflight have a capability source to read.
+
+**Key changes**:
+
+- New `src/forge/core/runtime/` package: a frozen `RuntimeSpec` per runtime in a module-level `RUNTIMES` table (mirrors
+  `core/auth/capabilities.py`'s `Credential`/`CREDENTIALS` pattern) + lookup helpers (`get_runtime` raises on unknown
+  id; `list_runtimes`/`installed_runtimes`). Answers the card's seven questions:
+  installed/interactive/headless/hooks/usage source/native resume/install scopes (+ curated-transfer in/out).
+- **Installed vs version split**: `is_installed()` = PATH presence (reliable, fast); `detect()` = best-effort
+  `--version` probe. Claude reuses `install/version.py:get_claude_runtime_version` via a **lazy** import (matching the
+  `core->install` lazy-import precedent in `core/ops/gc.py`), so importing the registry never drags the installer.
+- **Honest capability encoding**: partial/planned support is a tri-state `Literal`, not a `bool` -- Codex
+  `pretool_policy="partial"` (the card: PreToolUse is not a full enforcement boundary), `interactive="beta"`, and
+  `native_hooks="gated"` with machine-readable `hook_min_version`/`hook_feature_flag` (a preflight verifies the gate,
+  not a note string); Gemini `native_hooks="none"`/`native_resume=False`. Codex/Gemini declare limits as values, never
+  as parity-implying omissions.
+- `forge runtime list [--json]` read surface (registered in `cli/main.py`). The table escapes free-text notes so a
+  bracketed token like `[features] codex_hooks = true` survives Rich markup instead of being eaten as a style tag.
+- `design.md` §5.5.5 documents the registry as the capability half of the runtime seam (the invoker is the lifecycle
+  half). Nothing branches on the registry yet -- Phase 5 is its first consumer.
+
+**Verification**: 16 new unit tests (`tests/src/core/runtime/test_registry.py` shape/fields/limits/`is_installed`/
+`_probe_version`; `tests/src/cli/test_runtime.py` hermetic render + `--json` + the markup-escape regression) pass; mypy
+clean on the 3 new source files; `forge runtime list` smoke-rendered the matrix against the real CLIs on this host
+(claude 2.1.159 / codex 0.135.0 / gemini 0.43.0).
+
 ### Phase 4 (Slice 4d): HeadlessInvoker + review fan-out migration + per-worker usage events
 
 **Goal**: Extract the review engine's parallel `claude -p` lifecycle behind a runtime-neutral `HeadlessInvoker` seam (so

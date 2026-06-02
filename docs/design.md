@@ -1541,6 +1541,18 @@ carries attribution (run/model/status/latency; cost null -- the verb aggregate h
 **adversarial runner** constrains workers to review/eval skills with stance injection (`{stance_prompt}`), mandatory
 blinding (no peer outputs), and evidence-weighted synthesis.
 
+**Runtime registry (`core/runtime/`).** The capability half of the runtime seam (the invoker above is the lifecycle
+half). A frozen `RuntimeSpec` per runtime in a module-level `RUNTIMES` table (mirrors `core/auth/capabilities.py`'s
+`Credential`/`CREDENTIALS` pattern) answers the card's seven questions without hard-coding Claude Code assumptions:
+installed (`is_installed()` = PATH presence; `detect()` = best-effort `--version`), interactive, headless, hooks, usage
+source, native resume, and install scopes (plus curated-transfer in/out). Partial or planned support is a tri-state
+`Literal`, not a `bool` — Codex `pretool_policy="partial"` (its `PreToolUse` is not a full enforcement boundary),
+`interactive="beta"` (a target, not shipped), and `native_hooks="gated"` carrying machine-readable
+`hook_min_version`/`hook_feature_flag` (a preflight verifies the gate rather than parsing prose) — so a consumer never
+mistakes a Codex limit for Claude parity. `forge runtime list [--json]` renders the matrix. Claude Code is fully
+populated; Codex/Gemini declare their limits as values. Phase 5's Codex invoker and the auth/runtime preflight will read
+this registry; nothing branches on it yet.
+
 #### 5.5.6 Relationship to policies (workflow unification)
 
 Skills and policies are the **same building blocks with different triggers**:

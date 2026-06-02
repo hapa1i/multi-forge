@@ -50,13 +50,14 @@ top-level `forge transfer show|regenerate|edit|diff` CLI shipped in commit `2b70
 `docs/design_appendix.md` §M reflect it. All Phase 1 boxes are ticked.
 
 Next: **Phase 4 (runtime-abstraction core)** -- **Slices 4a (run-tree env contract) + 4b (usage-ledger schema) + 4c
-(instrument native + direct paths) + 4d (`HeadlessInvoker` + review fan-out migration + per-worker usage events) shipped
-2026-06-01**; next is Slice 4e (runtime registry capability matrix). The two cross-cutting Phase 4 decisions are
-resolved (data-plane: separate planes linked by `request_id`; `FORGE_DEPTH`: additive run-tree env, integer guard
-unchanged) -- see Open Decisions for the de-risked build sequence, recorded at the top of the Phase 4 section. Deferred
-Phase 3 follow-ups (`--rewrite-paths`, sidecar/resume native-relocate, the gated default flip) are recorded as trackable
-boxes under Phase 3 and land when prioritized. The card stays in `doing/` until Phases 3-6 land (board-contract: move to
-`done/` only when fully executed).
+(instrument native + direct paths) + 4d (`HeadlessInvoker` + review fan-out migration + per-worker usage events) + 4e
+(runtime registry capability matrix) shipped 2026-06-01**; next is Slice 4f (generalize `ActionContext`/`PolicyDecision`
+for runtime adapters). The two cross-cutting Phase 4 decisions are resolved (data-plane: separate planes linked by
+`request_id`; `FORGE_DEPTH`: additive run-tree env, integer guard unchanged) -- see Open Decisions for the de-risked
+build sequence, recorded at the top of the Phase 4 section. Deferred Phase 3 follow-ups (`--rewrite-paths`,
+sidecar/resume native-relocate, the gated default flip) are recorded as trackable boxes under Phase 3 and land when
+prioritized. The card stays in `doing/` until Phases 3-6 land (board-contract: move to `done/` only when fully
+executed).
 
 **Deferred prerequisite (memory_substrate reconciliation) -- RESOLVED 2026-05-30:**
 
@@ -576,9 +577,29 @@ internal/refactorable -- it does not mint a durable contract, so it does not gat
     (`tests/src/core/invoker/test_claude_invoker.py`: ordering, concurrency cap, timeout + cancellation killpg, run-id
     surfaced, single-shot parity, per-worker emission). Full unit suite 4925 passed; mypy clean.
 
-- [ ] Add runtime registry capability matrix.
+- [x] Add runtime registry capability matrix. *(Slice 4e -- shipped 2026-06-01)*
 
   - Assertion: registry answers installed, interactive, headless, hooks, usage, native resume, and scope capabilities.
+  - Verification (2026-06-01): new `src/forge/core/runtime/` package -- a frozen `RuntimeSpec` per runtime in a
+    module-level `RUNTIMES` table (mirrors `core/auth/capabilities.py`'s `Credential`/`CREDENTIALS` pattern) + lookup
+    helpers (`get_runtime` raises on unknown id; `list_runtimes`/`installed_runtimes`). Answers the card's seven
+    questions: **installed** (`is_installed()` = PATH presence, independent of version parsing; `detect()` = best-effort
+    `--version` probe -- Claude reuses `install/version.py:get_claude_runtime_version` via a lazy import, matching the
+    `core->install` lazy-import precedent in `core/ops/gc.py`), **interactive**/**headless**/**hooks**/**usage
+    source**/**native resume**/**install scopes** (+ curated-transfer in/out). **Honesty:** partial/planned support is a
+    tri-state `Literal`, not a `bool` -- Codex `pretool_policy="partial"` (card: PreToolUse is not a full enforcement
+    boundary), `interactive="beta"`, and `native_hooks="gated"` with machine-readable
+    `hook_min_version`/`hook_feature_flag` (a Phase 5 preflight verifies the gate instead of parsing a note); Gemini
+    `native_hooks="none"`/`native_resume=False` (capability-check-first). Data is the card's Runtime Capability Matrix;
+    Claude fully populated, Codex/Gemini declare limits as values not omissions. `forge runtime list [--json]` renders
+    it (registered in `cli/main.py`; the table escapes free-text notes so a bracketed token like
+    `[features] codex_hooks = true` survives Rich markup instead of being eaten as a tag). 16 unit tests
+    (`tests/src/core/runtime/test_registry.py`: shape/order, per-runtime capability fields, Codex/Gemini limits,
+    `is_installed` PATH reflection, `_probe_version` parse/both-streams/nonzero/unparseable;
+    `tests/src/cli/test_runtime.py`: hermetic render + `--json` shape + the markup-escape regression) pass; mypy clean
+    on the 3 new source files; `design.md` §5.5.5 documents the registry as the capability half of the runtime seam (the
+    invoker is the lifecycle half). **Nothing branches on the registry yet** -- Phase 5's Codex invoker + auth/runtime
+    preflight are its first consumers.
 
 - [ ] Generalize existing `ActionContext` / `PolicyDecision` for runtime adapters.
 
