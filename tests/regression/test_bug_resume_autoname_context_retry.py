@@ -146,3 +146,78 @@ def test_resume_autoname_collision_preserves_winner_curated_context(tmp_path: Pa
     assert (
         winner_snapshot.read_text() == curated
     ), "winner's curated snapshot must be unmodified (winner_owns short-circuits the orphan-unlink)"
+
+
+def test_resume_autoname_collision_preserves_winner_manifest(tmp_path: Path) -> None:
+    """Audit second-pass (HIGH): a losing concurrent resume must not overwrite the winner's MANIFEST.
+
+    _persist_resume_child reserves the index name (add_from_state) BEFORE writing
+    .forge/sessions/<child>/forge.session.json, so on a `parent-resumed` collision the loser never
+    touches the winner's manifest path. Pre-fix the manifest was written at the TOP of the loop --
+    before the collision was detected -- so the loser clobbered the winner's manifest. The
+    snapshot/index-only tests above miss this because they never write a real winner manifest.
+    """
+    project = tmp_path / "project"
+    project.mkdir()
+
+    parent = create_session_state(
+        "parent",
+        proxy_template="litellm-openai",
+        proxy_base_url="http://localhost:8085",
+        worktree_path=str(project),
+    )
+    parent.forge_root = str(project)
+
+    manager = SessionManager()
+    SessionStore(str(project), "parent").write(parent)
+    manager.index_store.add_from_state(
+        parent, str(project), checkout_root=str(project), forge_root=str(project), relative_path="."
+    )
+
+    # The winner's manifest is already on disk at the colliding name with a distinct marker,
+    # simulating the winner's child_store.write having landed. NOT in the index yet, so
+    # _generate_resume_name (index-only check) still picks "parent-resumed" and the collision fires.
+    winner_store = SessionStore(str(project), "parent-resumed")
+    winner_state = create_session_state(
+        "parent-resumed",
+        proxy_template="litellm-openai",
+        proxy_base_url="http://localhost:8085",
+        worktree_path=str(project),
+    )
+    winner_state.forge_root = str(project)
+    winner_state.confirmed.claude_session_id = "winner-uuid-xyz"
+    winner_store.write(winner_state)
+    winner_manifest_bytes = winner_store.manifest_path.read_bytes()
+
+    original_add = manager.index_store.add_from_state
+    failed_once = False
+
+    def fail_base_name_once(state, *args, **kwargs):
+        nonlocal failed_once
+        if state.name == "parent-resumed" and not failed_once:
+            failed_once = True
+            # Winner reserves the name in the index (its manifest is already on disk above).
+            manager.index_store.add_session(
+                name="parent-resumed",
+                worktree_path=str(project),
+                project_root=str(project),
+                forge_root=str(project),
+                checkout_root=str(project),
+                relative_path=".",
+                is_incognito=False,
+                is_fork=False,
+                parent_session="parent",
+            )
+            raise SessionExistsError("parent-resumed")
+        return original_add(state, *args, **kwargs)
+
+    manager.index_store.add_from_state = fail_base_name_once  # type: ignore[method-assign]
+
+    child, _ = manager.resume_session("parent")
+
+    assert failed_once is True, "the loser must hit the SessionExistsError collision branch"
+    assert child.name.startswith("parent-resumed-"), "loser must retry under a fresh unique name"
+    assert (
+        winner_store.manifest_path.read_bytes() == winner_manifest_bytes
+    ), "winner's manifest must be byte-identical (loser must never write to the colliding path)"
+    assert b"winner-uuid-xyz" in winner_store.manifest_path.read_bytes(), "winner's content survives, not the loser's"

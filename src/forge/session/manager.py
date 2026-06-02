@@ -104,7 +104,7 @@ def _tracked_transcript_session_ids_from_artifacts(artifacts: Any) -> list[str]:
 
 
 def _tracked_derivation_transcript_session_ids(
-    derivation: Derivation | dict[str, Any] | None,
+    derivation: object,
 ) -> list[str]:
     """Extract transcript UUIDs a derivation points at, when present.
 
@@ -115,16 +115,21 @@ def _tracked_derivation_transcript_session_ids(
     that copy as shared -- otherwise deleting one alias destroys the other's
     baseline. (The parent's own claude_session_id == the relocated UUID, so this
     also protects the parent's original when the child/parent dirs collide.)
-    """
-    if derivation is None:
-        return []
 
+    Accepts ``object``: force-delete and shared-transcript scans pass the raw JSON
+    value of ``confirmed.derivation`` from manifests that failed strict validation,
+    so a corrupted ``"derivation": "oops"`` must degrade to no tracked UUIDs rather
+    than raise (AttributeError) and abort cleanup.
+    """
     if isinstance(derivation, Derivation):
         parent_transcript = derivation.parent_transcript
         relocated = derivation.relocated_parent_session_id
-    else:
+    elif isinstance(derivation, dict):
         parent_transcript = derivation.get("parent_transcript")
         relocated = derivation.get("relocated_parent_session_id")
+    else:
+        # None, or a malformed raw derivation from a corrupted manifest -> nothing tracked.
+        return []
 
     session_ids: list[str] = []
     if isinstance(parent_transcript, str):
@@ -916,9 +921,6 @@ class SessionManager:
         """
         parent_forge_root = parent_entry.forge_root or parent_entry.worktree_path
         for attempt in range(2):
-            child_store = SessionStore(parent_forge_root, child_name)
-            child_store.write(child_state)
-
             try:
                 self.index_store.add_from_state(
                     child_state,
@@ -927,20 +929,18 @@ class SessionManager:
                     forge_root=parent_entry.forge_root,
                     relative_path=parent_entry.relative_path,
                 )
-                break  # Success
             except SessionExistsError:
-                # The session that won add_from_state owns `child_name`. With a deterministic
-                # auto-name (<parent>-resumed), the winner's manifest dir AND its curated
-                # children/<child>.md snapshot are the SAME paths this loser just touched, so
-                # deleting them would destroy the winner's resume context. Only clean up a name
-                # that no live session owns; otherwise leave the winner's state and just rename.
-                winner_owns = self.index_store.session_exists(child_name, forge_root=parent_entry.forge_root)
-                if not winner_owns:
-                    child_store.delete()
-
+                # Reserve the index name BEFORE writing the manifest. With a deterministic auto-name
+                # (<parent>-resumed), a concurrent resume that already won `child_name` owns
+                # .forge/sessions/<child_name>/forge.session.json; writing it here would clobber the
+                # winner's manifest. Because the reservation comes first, this loser never wrote that
+                # manifest -- the winner's state is untouched. Only the curated transfer snapshot
+                # (children/<child>.md, written by assemble_transfer_context before this call) may be
+                # an orphan to reclaim, and only when no live session owns the name.
                 if not name_was_auto or attempt > 0:
                     raise
 
+                winner_owns = self.index_store.session_exists(child_name, forge_root=parent_entry.forge_root)
                 derivation = child_state.confirmed.derivation
                 if derivation is not None and derivation.resume_mode == "transfer" and not winner_owns:
                     orphan_context = child_path(Path(parent_forge_root), parent_name, child_name)
@@ -960,6 +960,12 @@ class SessionManager:
                 if derivation is not None and derivation.resume_mode == "transfer":
                     ensure_child(Path(parent_forge_root), parent_name, child_name)
                     derivation.context_file = child_path_rel(parent_name, child_name)
+                continue
+
+            # Name reserved: now publish the manifest. Writing the manifest only after the index
+            # reservation is what prevents a losing concurrent resume from overwriting the winner's.
+            SessionStore(parent_forge_root, child_name).write(child_state)
+            break
 
         return child_name
 
