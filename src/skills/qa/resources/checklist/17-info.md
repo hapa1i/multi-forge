@@ -47,4 +47,20 @@ forge logs
 - [ ] `forge logs --clean` removes stale log files
 - [ ] After cleanup, `forge logs` reports 0 files, or only logs for currently running Forge proxy processes
 
+### 17.3 `forge runtime list`
+
+<!-- auto -->
+
+```bash
+# Capability matrix: which agent runtimes Forge knows, install state, and capabilities
+forge runtime list
+
+# Machine-readable
+forge runtime list --json
+```
+
+- [ ] A `claude_code` row is present in the capability matrix
+- [ ] `--json` emits a valid JSON array (one object per runtime, each with `id` and `installed`)
+- [ ] Codex/Gemini rows are roadmap (detected capabilities), not launchable frontends today
+
 ---
