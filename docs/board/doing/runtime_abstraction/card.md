@@ -67,16 +67,19 @@ Anthropic's May 2026 Agent SDK credit announcement makes this boundary concrete:
 API-routed work, but runtime-native headless usage also needs a usage ledger because it may be billed or quota-limited
 outside the proxy.
 
-What it does not yet do:
+What Phase 0 (PR #8) did not yet do -- and where Phases 1-4 (this runtime-refactor PR) now stand:
 
-- Introduce a runtime registry.
-- Abstract `claude -p` behind a runtime-neutral `HeadlessInvoker`.
-- Add native `codex exec` or `gemini -p` workers.
-- Normalize Claude/Codex hooks into a shared policy event model.
-- Unify proxy logs and runtime-native usage events into a single durable ledger.
+- Introduce a runtime registry. **Shipped (Phase 4):** capability registry behind `forge runtime list`.
+- Abstract `claude -p` behind a runtime-neutral `HeadlessInvoker`. **Shipped (Phase 4):** `ClaudeHeadlessInvoker`.
+- Normalize Claude/Codex hooks into a shared policy event model. **Shipped (Phase 4):** runtime-tagged `ActionContext`
+  plus a Claude hook adapter/responder (the Codex adapter is Phase 5).
+- Unify proxy logs and runtime-native usage events into a single durable ledger. **Shipped (Phase 4):**
+  `~/.forge/usage/events/<YYYY-MM>_<pid>.jsonl`.
+- Add native `codex exec` or `gemini -p` workers. **Still future (Phase 5+):** Claude Code is the only launchable
+  frontend today; the items above are the scaffolding those native invokers consume.
 
-So the proposal should remain in the PR as future architecture, but framed as the next layer above this PR's
-multi-provider routing and cost-control work.
+The runtime-abstraction *core* therefore lands in this PR; the proposal stays open only for its cross-runtime payoff
+(native Codex/Gemini invokers and interactive Codex), framed as the next layer above this PR's runtime core.
 
 ## Problem
 
@@ -379,7 +382,7 @@ That layer is useful now, but it is not the final runtime usage system. It sees 
 estimate command attribution by snapshotting proxy metrics around a verb; and it does not represent native runtime usage
 from future `codex exec` or `gemini -p` runs.
 
-The next layer should create a durable usage ledger:
+Phase 4 (this runtime-refactor PR) adds the durable usage ledger:
 
 ```text
 ~/.forge/usage/events/<YYYY-MM>_<pid>.jsonl
@@ -396,8 +399,9 @@ Each event should include:
 - dollar cost only when the route is API-priced and pricing is known
 - quota/token units for subscription-backed routes, without estimating dollar cost
 
-For example, a future `ClaudeHeadlessInvoker` should record `claude -p` usage even when no Forge proxy is involved,
-because that usage can draw from a runtime-managed headless credit pool rather than proxy-visible API billing.
+For example, the shipped `ClaudeHeadlessInvoker` is the seam for recording `claude -p` usage even when no Forge proxy is
+involved -- that usage can draw from a runtime-managed headless credit pool rather than proxy-visible API billing.
+Wiring that emission at every launch callsite (see the table below) is partly shipped, partly future.
 
 Attribution environment variables should be injected into Forge-spawned processes:
 
