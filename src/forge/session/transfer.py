@@ -31,6 +31,7 @@ import yaml
 
 from forge.core.llm.detection import ProviderType
 from forge.core.state import now_iso
+from forge.core.state.io import atomic_write_text
 from forge.core.transcript import parse_jsonl_transcript, truncate
 from forge.session.artifacts import resolve_artifact_path
 from forge.session.claude.paths import get_transcript_path
@@ -591,7 +592,7 @@ def _generate_full_context(
     return "\n".join(lines), warnings
 
 
-def _format_transcript_for_llm(entries: list[dict[str, Any]]) -> tuple[str, bool, int]:
+def _format_transcript_for_llm(entries: list[dict[str, Any]]) -> tuple[str, bool, set[int]]:
     """Format transcript entries for LLM consumption with turn anchors and a char cap.
 
     Each line is prefixed with ``[turn N]`` (numbered over the same turn grouping
@@ -602,14 +603,16 @@ def _format_transcript_for_llm(entries: list[dict[str, Any]]) -> tuple[str, bool
         entries: Parsed transcript entries from parse_jsonl_transcript().
 
     Returns:
-        Tuple of (formatted_text, was_truncated, max_turn) where ``max_turn`` is
-        the highest ``[turn N]`` actually emitted (the citable range the model
-        saw; 0 when nothing was emitted). Used to validate model citations.
+        Tuple of (formatted_text, was_truncated, emitted_turns) where
+        ``emitted_turns`` is the SET of ``[turn N]`` anchors actually emitted.
+        Turn grouping is sparse -- a group whose entries all summarize to empty
+        advances the index without emitting -- so a dense ``1..max`` range would
+        wrongly validate a citation to a skipped turn. Used to validate citations.
     """
     lines: list[str] = []
     total_chars = 0
     was_truncated = False
-    max_turn = 0
+    emitted_turns: set[int] = set()
 
     for turn_num, group in enumerate(_group_entries_into_turns(entries), start=1):
         for entry in group:
@@ -630,7 +633,7 @@ def _format_transcript_for_llm(entries: list[dict[str, Any]]) -> tuple[str, bool
                     break
                 lines.append(line)
                 total_chars += len(line) + 1  # +1 for newline
-                max_turn = turn_num
+                emitted_turns.add(turn_num)
 
             if was_truncated:
                 break
@@ -641,7 +644,7 @@ def _format_transcript_for_llm(entries: list[dict[str, Any]]) -> tuple[str, bool
     if was_truncated:
         result += "\n\n...(transcript truncated for length)"
 
-    return result, was_truncated, max_turn
+    return result, was_truncated, emitted_turns
 
 
 def _call_llm_for_curation(transcript_text: str) -> tuple[dict[str, Any], str]:
@@ -690,21 +693,22 @@ _TURN_CITE_RE = re.compile(r"turn\s*(\d+)", re.IGNORECASE)
 _FILE_CITE_RE = re.compile(r"^[\w./~-]+\.[A-Za-z0-9]{1,8}(?::\d+(?:-\d+)?)?$")
 
 
-def _citation_is_grounded(citation: str, max_turn: int) -> bool:
-    """Return True if the citation references an in-range turn or a file ref.
+def _citation_is_grounded(citation: str, emitted_turns: set[int]) -> bool:
+    """Return True if the citation references an emitted turn or a file ref.
 
-    ``max_turn`` is the highest turn anchor present in the transcript the model
-    saw. A turn citation outside ``1..max_turn`` is fabricated. When ``max_turn``
-    is 0 (turn range unknown) turn citations cannot be validated, so they are
-    treated as ungrounded rather than trusted.
+    ``emitted_turns`` is the set of turn anchors actually present in the
+    transcript the model saw. A turn citation NOT in that set is fabricated --
+    including a skipped turn that falls inside the dense ``1..max`` range but was
+    never emitted. When the set is empty, turn citations cannot be validated, so
+    they are treated as ungrounded rather than trusted.
     """
     turns = [int(n) for n in _TURN_CITE_RE.findall(citation)]
     if turns:
-        return max_turn > 0 and all(1 <= n <= max_turn for n in turns)
+        return bool(emitted_turns) and all(n in emitted_turns for n in turns)
     return bool(_FILE_CITE_RE.match(citation.strip()))
 
 
-def _validate_decision_citations(decisions: Any, max_turn: int) -> tuple[Any, list[str]]:
+def _validate_decision_citations(decisions: Any, emitted_turns: set[int]) -> tuple[Any, list[str]]:
     """Drop fabricated citations from decisions, returning (sanitized, warnings).
 
     The schema advertises decisions as grounded (design_appendix §M.2), but the
@@ -724,7 +728,7 @@ def _validate_decision_citations(decisions: Any, max_turn: int) -> tuple[Any, li
             sanitized.append(item)
             continue
         citation = _coerce_text(item.get("citation"))
-        if citation and not _citation_is_grounded(citation, max_turn):
+        if citation and not _citation_is_grounded(citation, emitted_turns):
             text = _coerce_text(item.get("text"))
             warnings.append(f"Dropped ungrounded citation '{citation}' on decision: {text[:60]}")
             item = {**item, "citation": ""}
@@ -848,7 +852,7 @@ def _generate_ai_curated_context(
         )
         return content, ["Empty transcript; using minimal strategy"], "compatibility-fallback"
 
-    transcript_text, was_truncated, max_turn = _format_transcript_for_llm(entries)
+    transcript_text, was_truncated, emitted_turns = _format_transcript_for_llm(entries)
     if was_truncated:
         warnings.append("Transcript truncated to fit context limit")
 
@@ -875,7 +879,7 @@ def _generate_ai_curated_context(
     warnings.append(f"AI-curated: transcript content sent to {model_used} for processing")
 
     # Drop fabricated citations before rendering so schema:full stays honest.
-    curated["decisions"], cite_warnings = _validate_decision_citations(curated.get("decisions"), max_turn)
+    curated["decisions"], cite_warnings = _validate_decision_citations(curated.get("decisions"), emitted_turns)
     warnings.extend(cite_warnings)
 
     content = _build_ai_curated_output(
@@ -1078,7 +1082,9 @@ def assemble_transfer_context(
     write_root = output_root if output_root is not None else forge_root
     cache_file = generated_path(write_root, parent_name)
     cache_file.parent.mkdir(parents=True, exist_ok=True)
-    cache_file.write_text(content, encoding="utf-8")
+    # Atomic (tempfile + os.replace): a concurrent regenerate/resume copies generated.md into
+    # children/<child>.md via shutil.copyfile, which must never read a torn/truncated cache.
+    atomic_write_text(cache_file, content)
 
     if child_name is not None:
         context_file = ensure_child(write_root, parent_name, child_name)

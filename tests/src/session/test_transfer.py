@@ -587,12 +587,12 @@ class TestFormatTranscriptForLLM:
     def test_formats_entries_correctly(self, sample_transcript: Path) -> None:
         """Should format transcript entries as [ROLE] text lines."""
         entries = parse_jsonl_transcript(sample_transcript)
-        formatted, was_truncated, max_turn = _format_transcript_for_llm(entries)
+        formatted, was_truncated, emitted_turns = _format_transcript_for_llm(entries)
 
         assert "[USER]" in formatted or "[ASSISTANT]" in formatted
         assert was_truncated is False
-        # max_turn is the citable ceiling used to validate decision citations.
-        assert max_turn >= 1
+        # emitted_turns is the set of citable anchors used to validate decision citations.
+        assert len(emitted_turns) >= 1
 
     def test_respects_max_chars_limit(self, tmp_path: Path) -> None:
         """Should truncate transcript at MAX_TRANSCRIPT_CHARS."""
@@ -623,10 +623,10 @@ class TestFormatTranscriptForLLM:
 
     def test_empty_entries_returns_empty(self) -> None:
         """Empty entries should return empty string and no truncation."""
-        formatted, was_truncated, max_turn = _format_transcript_for_llm([])
+        formatted, was_truncated, emitted_turns = _format_transcript_for_llm([])
         assert formatted == ""
         assert was_truncated is False
-        assert max_turn == 0
+        assert emitted_turns == set()
 
 
 # -----------------------------------------------------------------------------
@@ -638,49 +638,50 @@ class TestDecisionCitationValidation:
     """Unit tests for citation grounding (no LLM)."""
 
     @pytest.mark.parametrize(
-        "citation,max_turn,grounded",
+        "citation,emitted_turns,grounded",
         [
-            ("turn 2", 3, True),
-            ("turn 3", 3, True),
-            ("turn 4", 3, False),  # out of range
-            ("turn 0", 3, False),  # turns are 1-indexed
-            ("turn 1", 0, False),  # unknown range -> not trusted
-            ("[turn 2]", 3, True),  # bracketed form
-            ("src/forge/session/transfer.py:80", 3, True),
-            ("src/forge/session/transfer.py:80-95", 3, True),  # line range
-            ("README.md", 3, True),
-            ("because the user asked", 3, False),  # prose
-            ("earlier in the session", 3, False),
+            ("turn 2", {1, 2, 3}, True),
+            ("turn 3", {1, 2, 3}, True),
+            ("turn 4", {1, 2, 3}, False),  # out of range
+            ("turn 0", {1, 2, 3}, False),  # turns are 1-indexed
+            ("turn 1", set(), False),  # unknown range -> not trusted
+            ("turn 2", {1, 3}, False),  # SPARSE: turn 2 was skipped (never emitted) -> fabricated
+            ("[turn 2]", {1, 2, 3}, True),  # bracketed form
+            ("src/forge/session/transfer.py:80", {1, 2, 3}, True),
+            ("src/forge/session/transfer.py:80-95", {1, 2, 3}, True),  # line range
+            ("README.md", {1, 2, 3}, True),
+            ("because the user asked", {1, 2, 3}, False),  # prose
+            ("earlier in the session", {1, 2, 3}, False),
         ],
     )
-    def test_citation_is_grounded(self, citation: str, max_turn: int, grounded: bool) -> None:
-        assert _citation_is_grounded(citation, max_turn) is grounded
+    def test_citation_is_grounded(self, citation: str, emitted_turns: set[int], grounded: bool) -> None:
+        assert _citation_is_grounded(citation, emitted_turns) is grounded
 
     def test_blanks_ungrounded_keeps_text(self) -> None:
         """An ungrounded citation is blanked; the decision text is preserved."""
         decisions = [{"text": "Keep this", "citation": "turn 99"}]
-        sanitized, warnings = _validate_decision_citations(decisions, max_turn=2)
+        sanitized, warnings = _validate_decision_citations(decisions, emitted_turns={1, 2})
         assert sanitized[0]["text"] == "Keep this"
         assert sanitized[0]["citation"] == ""
         assert len(warnings) == 1
 
     def test_grounded_citation_untouched(self) -> None:
         decisions = [{"text": "Keep", "citation": "turn 1"}]
-        sanitized, warnings = _validate_decision_citations(decisions, max_turn=2)
+        sanitized, warnings = _validate_decision_citations(decisions, emitted_turns={1, 2})
         assert sanitized[0]["citation"] == "turn 1"
         assert warnings == []
 
     def test_non_list_and_string_items_pass_through(self) -> None:
         """Non-list input and bare-string items are returned unchanged, no error."""
-        assert _validate_decision_citations(None, max_turn=2) == (None, [])
-        sanitized, warnings = _validate_decision_citations(["plain decision"], max_turn=2)
+        assert _validate_decision_citations(None, emitted_turns={1, 2}) == (None, [])
+        sanitized, warnings = _validate_decision_citations(["plain decision"], emitted_turns={1, 2})
         assert sanitized == ["plain decision"]
         assert warnings == []
 
     def test_missing_citation_not_flagged(self) -> None:
         """A decision with no citation is fine -- it claims no provenance to fake."""
         decisions = [{"text": "No cite here"}]
-        sanitized, warnings = _validate_decision_citations(decisions, max_turn=2)
+        sanitized, warnings = _validate_decision_citations(decisions, emitted_turns={1, 2})
         assert sanitized[0]["text"] == "No cite here"
         assert warnings == []
 
