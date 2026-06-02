@@ -1170,6 +1170,7 @@ def _handle_policy_check(argv: list[str]) -> None:
     for file_path, diff_chunk in file_diffs:
         added = extract_added_lines(diff_chunk) if diff_chunk else None
         context = ActionContext(
+            runtime="claude_code",
             event="OnDemand.Check",
             tool_name="Edit",
             tool_args={"file_path": file_path, "content": (added or "")[:200]},

@@ -51,13 +51,15 @@ top-level `forge transfer show|regenerate|edit|diff` CLI shipped in commit `2b70
 
 Next: **Phase 4 (runtime-abstraction core)** -- **Slices 4a (run-tree env contract) + 4b (usage-ledger schema) + 4c
 (instrument native + direct paths) + 4d (`HeadlessInvoker` + review fan-out migration + per-worker usage events) + 4e
-(runtime registry capability matrix) shipped 2026-06-01**; next is Slice 4f (generalize `ActionContext`/`PolicyDecision`
-for runtime adapters). The two cross-cutting Phase 4 decisions are resolved (data-plane: separate planes linked by
-`request_id`; `FORGE_DEPTH`: additive run-tree env, integer guard unchanged) -- see Open Decisions for the de-risked
-build sequence, recorded at the top of the Phase 4 section. Deferred Phase 3 follow-ups (`--rewrite-paths`,
-sidecar/resume native-relocate, the gated default flip) are recorded as trackable boxes under Phase 3 and land when
-prioritized. The card stays in `doing/` until Phases 3-6 land (board-contract: move to `done/` only when fully
-executed).
+(runtime registry capability matrix) + 4f (runtime-tagged `ActionContext` + named Claude hook adapter/responder behind
+runtime-neutral protocols) shipped 2026-06-01**. The only remaining Phase 4 item is **Slice 4g (proxied per-request
+correlation), which stays DEFERRED** (needs a Claude-Code custom-header feasibility check) -- so Phase 4's core is
+complete; the next phase is **Phase 5 (cross-runtime resume / `CodexHeadlessInvoker`)**. The two cross-cutting Phase 4
+decisions are resolved (data-plane: separate planes linked by `request_id`; `FORGE_DEPTH`: additive run-tree env,
+integer guard unchanged) -- see Open Decisions for the de-risked build sequence, recorded at the top of the Phase 4
+section. Deferred Phase 3 follow-ups (`--rewrite-paths`, sidecar/resume native-relocate, the gated default flip) are
+recorded as trackable boxes under Phase 3 and land when prioritized. The card stays in `doing/` until Phases 3-6 land
+(board-contract: move to `done/` only when fully executed).
 
 **Deferred prerequisite (memory_substrate reconciliation) -- RESOLVED 2026-05-30:**
 
@@ -601,10 +603,27 @@ internal/refactorable -- it does not mint a durable contract, so it does not gat
     invoker is the lifecycle half). **Nothing branches on the registry yet** -- Phase 5's Codex invoker + auth/runtime
     preflight are its first consumers.
 
-- [ ] Generalize existing `ActionContext` / `PolicyDecision` for runtime adapters.
+- [x] Generalize existing `ActionContext` / `PolicyDecision` for runtime adapters. *(Slice 4f -- shipped 2026-06-01)*
 
   - Assertion: current Claude hook adapter behavior is unchanged, runtime identity is represented explicitly, and Codex
     adapter limitations are represented as capabilities instead of implied parity.
+  - Verification (2026-06-01): `ActionContext` gains a **required** `runtime: str` (no default -- forces every adapter
+    to declare its origin runtime; `PolicyEngine.evaluate` still never branches on it, so it is attribution metadata,
+    not control flow). The Claude-specific halves are now named behind runtime-neutral protocols
+    (`src/forge/cli/hooks/protocols.py`): `ClaudeHookAdapter.build_context` (payload -> `ActionContext`, tags
+    `runtime="claude_code"`) and `ClaudeHookResponder` (decision -> wire: `format_deny`/`format_needs_review`/
+    `allow_feedback` + `BLOCK_EXIT`/`ALLOW_EXIT`); `policy_check` routes through both, with the `[forge]`
+    summary/warning overlay kept as a separate telemetry concern. Codex parity is NOT implied -- its limits live in the
+    4e runtime registry (`pretool_policy="partial"`, `native_hooks="gated"`); a `CodexHookAdapter`/`CodexHookResponder`
+    is the Phase 6 stub the protocols make room for. All 4 production constructors + ~45 test constructions pass
+    `runtime`; `_build_action_context` is replaced by the adapter (no compat shim). 340 policy + 77 hook-command
+    (output/exit-code snapshot -- behavior unchanged) + 23 new responder/adapter tests pass; mypy clean (the precise
+    `ActionContext | None` return surfaced + fixed two latent `new_content` narrowing gaps). `design.md` §4.1.4/§4.1.5
+    document the seam. Integration (CLAUDE.md-mandated for hook changes):
+    `tests/integration/docker/test_policy_hooks.py` -- the real wheel-installed `forge hook policy-check` subprocess in
+    an isolated container -- **10 passed (16.7s)** (deny exit 2, allow exit 0 + manifest state updates, all three
+    fail-open paths), confirming the adapter->engine->responder dispatch is byte-identical through the real CLI
+    boundary.
 
 - [x] Define durable usage ledger schema. *(Slice 4b -- shipped 2026-06-01)*
 

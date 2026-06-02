@@ -22,6 +22,7 @@ def _make_context(**kwargs: object) -> ActionContext:
     defaults.update(kwargs)
 
     return ActionContext(
+        runtime="claude_code",
         event=str(defaults["event"]),
         tool_name=str(defaults["tool_name"]),
         tool_args=defaults["tool_args"],  # type: ignore[arg-type]

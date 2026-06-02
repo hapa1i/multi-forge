@@ -20,6 +20,7 @@ pytestmark = pytest.mark.regression
 
 def _make_context() -> ActionContext:
     return ActionContext(
+        runtime="claude_code",
         event="PreToolUse.Write",
         tool_name="Write",
         tool_args={"file_path": "src/main.py", "content": "x = 1"},

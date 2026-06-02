@@ -1357,12 +1357,20 @@ auditable). Both time limits matter: `max_iterations` catches fast-failing loops
 
 #### 4.1.4 Action context
 
-Policies operate on a normalized view of what Claude Code is doing, for example:
+Policies operate on a normalized, runtime-tagged view of what a runtime is doing (an `ActionContext`), for example:
 
+- `runtime` — which agent runtime produced the action (`claude_code` today; `codex`/`gemini` later)
 - hook event (`PreToolUse.Write`, `PreToolUse.Edit`, …)
 - tool arguments (target path, content/diff metadata)
 - repository/worktree path
 - effective session config (intent + overrides)
+
+Normalization happens at the **adapter boundary**: a runtime's hook adapter (`ClaudeHookAdapter`,
+`src/forge/cli/hooks/policy.py`) maps that runtime's payload into this shape and tags `runtime`. `PolicyEngine.evaluate`
+is runtime-agnostic — it never branches on `runtime`. The reverse seam, a hook **responder** (`ClaudeHookResponder`),
+serializes the composed decision back into the runtime's wire contract (exit codes, block message, allow output). Both
+match runtime-neutral `HookAdapter`/`HookResponder` protocols (`src/forge/cli/hooks/protocols.py`), so a Codex
+adapter/responder pair (Phase 6) reuses the engine without touching it.
 
 #### 4.1.5 Policy composition
 
@@ -1387,7 +1395,9 @@ Policy violation(s):
 ```
 
 The `Intent:` line appears once per denying policy (not per violation). The `Note:` uses project-owner framing so models
-treat it as a constraint to respect, not an obstacle to circumvent.
+treat it as a constraint to respect, not an obstacle to circumvent. The runtime's hook responder owns this serialization
+(`ClaudeHookResponder.format_deny`/`format_needs_review`/`allow_feedback`); the `[forge] Policy: …` summary line is a
+separate telemetry overlay in the hook command, not part of the runtime wire contract.
 
 #### 4.1.6 Policy state and ownership
 

@@ -27,6 +27,37 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-01
 
+### Phase 4 (Slice 4f): Runtime-tagged ActionContext + named Claude hook adapter/responder
+
+**Goal**: Make the policy hook's runtime boundary explicit -- so a Codex hook can normalize into the same
+`ActionContext` and reuse the runtime-agnostic policy engine -- without changing any Claude behavior.
+
+**Key changes**:
+
+- `ActionContext` gains a **required** `runtime: str` (no default): every normalized action declares its origin runtime.
+  `PolicyEngine.evaluate` still never branches on it -- it is attribution metadata, not control flow -- so the engine
+  stays runtime-agnostic.
+- Named the two Claude-specific halves behind runtime-neutral protocols (`src/forge/cli/hooks/protocols.py`,
+  `HookAdapter`/`HookResponder`): `ClaudeHookAdapter.build_context` (Claude payload -> `ActionContext`, tags
+  `runtime="claude_code"`; replaces the private `_build_action_context`, no compat shim) and `ClaudeHookResponder`
+  (composed decision -> Claude wire: `format_deny`/`format_needs_review`/`allow_feedback` + `BLOCK_EXIT`/`ALLOW_EXIT`).
+- `policy_check` (`cli/hooks/commands.py`) routes deny/needs_review/allow through the responder; the `[forge] Policy: …`
+  summary + warning lines stay inline as a telemetry overlay, not part of the runtime wire contract. Output bytes and
+  exit codes are unchanged -- the 77 existing hook-command snapshot tests pass untouched.
+- Codex parity is NOT implied: its limits live in the 4e runtime registry (`pretool_policy="partial"`,
+  `native_hooks="gated"`); a `CodexHookAdapter`/`CodexHookResponder` is the Phase 6 stub the protocols make room for.
+- All 4 production constructors (hook + 3 on-demand checks) + ~45 test constructions pass `runtime`. `design.md` §4.1.4
+  (runtime field + adapter/responder boundary) and §4.1.5 (responder owns the deny serialization) document the seam.
+
+**Verification**: 340 policy + 77 hook-command + 23 new responder/adapter tests pass; `mypy` clean across policy +
+cli/hooks (the precise `ActionContext | None` adapter return surfaced and fixed two latent `new_content` narrowing gaps
+the old `Any` return had masked). Two pre-existing, unrelated regression failures (`forge info` patching-build text,
+`run_claude_print` exit code) confirmed failing on a stashed clean tree -- not introduced here. Integration
+(CLAUDE.md-mandated for hook changes): `tests/integration/docker/test_policy_hooks.py` -- the real wheel-installed
+`forge hook policy-check` subprocess in an isolated container -- 10 passed (16.7s), confirming the
+adapter->engine->responder dispatch (deny exit 2, allow exit 0 + manifest updates, fail-open) is byte-identical through
+the real CLI boundary.
+
 ### Phase 4 (Slice 4e): Runtime registry capability matrix
 
 **Goal**: Make "can this runtime do X?" a declarative lookup instead of hard-coded Claude Code assumptions, so Phase 5's
