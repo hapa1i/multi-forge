@@ -151,7 +151,10 @@ class TestStaleManifestGuard:
         runner = CliRunner()
         result = runner.invoke(main, ["info"])
         assert "Traceback" not in result.output
-        assert "pre-OSS patching build" in result.output
+        # Rich wraps the guard message at console width; a long tmp_path can split
+        # "pre-OSS patching build" across a newline. Normalize whitespace so the
+        # assertion checks the message, not the render width.
+        assert "pre-OSS patching build" in " ".join(result.output.split())
 
     def test_extension_status_no_traceback(self, stale_manifest):
         """forge extension status handles stale manifest without traceback."""
