@@ -19,37 +19,37 @@ from tests.fixtures.docker import ContainerLike
 pytestmark = [pytest.mark.integration, pytest.mark.docker_in]
 
 
+def _create_stop_marker(
+    workspace: ContainerLike,
+    session_id: str = "test-marker-123",
+) -> str:
+    """Create a valid pending-work stop marker."""
+    marker_path = f"$HOME/.forge/pending-work/{session_id}.json"
+    workspace.mkdir("$HOME/.forge/pending-work", parents=True)
+
+    marker_data = {
+        "schema_version": 1,
+        "kind": "stop",
+        "session_id": session_id,
+        "session_name": "test-session",
+        "worktree_path": "/workspace",
+        "artifacts": {
+            "transcript_snapshot_rel": f".forge/artifacts/test-session/transcripts/{session_id}.jsonl",
+        },
+        "created_at": "2025-01-01T00:00:00Z",
+    }
+    workspace.write_json(marker_path, marker_data)
+
+    return marker_path
+
+
 class TestStartupQueueProcessing:
     """Tests for CLI startup queue processing behavior."""
-
-    def _create_stop_marker(
-        self,
-        workspace: ContainerLike,
-        session_id: str = "test-marker-123",
-    ) -> str:
-        """Create a valid pending-work stop marker."""
-        marker_path = f"$HOME/.forge/pending-work/{session_id}.json"
-        workspace.mkdir("$HOME/.forge/pending-work", parents=True)
-
-        marker_data = {
-            "schema_version": 1,
-            "kind": "stop",
-            "session_id": session_id,
-            "session_name": "test-session",
-            "worktree_path": "/workspace",
-            "artifacts": {
-                "transcript_snapshot_rel": f".forge/artifacts/test-session/transcripts/{session_id}.jsonl",
-            },
-            "created_at": "2025-01-01T00:00:00Z",
-        }
-        workspace.write_json(marker_path, marker_data)
-
-        return marker_path
 
     def test_forge_status_processes_queue(self, mock_claude_workspace: ContainerLike) -> None:
         """forge extensions status (non-exempt) triggers pending-work processing and deletes markers."""
         # Create a marker
-        marker_path = self._create_stop_marker(mock_claude_workspace)
+        marker_path = _create_stop_marker(mock_claude_workspace)
 
         # Verify marker exists
         check = mock_claude_workspace.exec(f"test -f {marker_path} && echo exists || echo missing")
@@ -79,33 +79,9 @@ class TestStartupQueueProcessing:
 class TestExemptSubcommands:
     """Tests that exempt subcommands skip queue processing."""
 
-    def _create_stop_marker(
-        self,
-        workspace: ContainerLike,
-        session_id: str = "test-marker-123",
-    ) -> str:
-        """Create a valid pending-work stop marker."""
-        marker_path = f"$HOME/.forge/pending-work/{session_id}.json"
-        workspace.mkdir("$HOME/.forge/pending-work", parents=True)
-
-        marker_data = {
-            "schema_version": 1,
-            "kind": "stop",
-            "session_id": session_id,
-            "session_name": "test-session",
-            "worktree_path": "/workspace",
-            "artifacts": {
-                "transcript_snapshot_rel": f".forge/artifacts/test-session/transcripts/{session_id}.jsonl",
-            },
-            "created_at": "2025-01-01T00:00:00Z",
-        }
-        workspace.write_json(marker_path, marker_data)
-
-        return marker_path
-
     def test_forge_hook_skips_queue(self, mock_claude_workspace: ContainerLike) -> None:
         """forge hook (exempt) does NOT process pending-work queue."""
-        marker_path = self._create_stop_marker(mock_claude_workspace)
+        marker_path = _create_stop_marker(mock_claude_workspace)
 
         # Verify marker exists
         check = mock_claude_workspace.exec(f"test -f {marker_path} && echo exists || echo missing")
@@ -120,7 +96,7 @@ class TestExemptSubcommands:
 
     def test_forge_status_line_skips_queue(self, mock_claude_workspace: ContainerLike) -> None:
         """forge status-line (exempt) does NOT process pending-work queue."""
-        marker_path = self._create_stop_marker(mock_claude_workspace)
+        marker_path = _create_stop_marker(mock_claude_workspace)
 
         # Verify marker exists
         check = mock_claude_workspace.exec(f"test -f {marker_path} && echo exists || echo missing")
@@ -136,30 +112,6 @@ class TestExemptSubcommands:
 
 class TestStartupQueueRobustness:
     """Tests for startup queue robustness (error handling)."""
-
-    def _create_stop_marker(
-        self,
-        workspace: ContainerLike,
-        session_id: str = "test-marker-123",
-    ) -> str:
-        """Create a valid pending-work stop marker."""
-        marker_path = f"$HOME/.forge/pending-work/{session_id}.json"
-        workspace.mkdir("$HOME/.forge/pending-work", parents=True)
-
-        marker_data = {
-            "schema_version": 1,
-            "kind": "stop",
-            "session_id": session_id,
-            "session_name": "test-session",
-            "worktree_path": "/workspace",
-            "artifacts": {
-                "transcript_snapshot_rel": f".forge/artifacts/test-session/transcripts/{session_id}.jsonl",
-            },
-            "created_at": "2025-01-01T00:00:00Z",
-        }
-        workspace.write_json(marker_path, marker_data)
-
-        return marker_path
 
     def test_corrupted_marker_does_not_crash_cli(self, mock_claude_workspace: ContainerLike) -> None:
         """Corrupted markers don't crash CLI startup."""
@@ -184,7 +136,7 @@ class TestStartupQueueRobustness:
         """Multiple markers are processed by startup."""
         markers = []
         for i in range(3):
-            marker_path = self._create_stop_marker(mock_claude_workspace, session_id=f"multi-{i}")
+            marker_path = _create_stop_marker(mock_claude_workspace, session_id=f"multi-{i}")
             markers.append(marker_path)
 
         # Verify all markers exist

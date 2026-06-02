@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import os
 import shlex
-from typing import Generator
+from typing import Any, Generator
 
 import pytest
 
@@ -32,6 +32,7 @@ __all__ = [
     "local_claude_available",
     "policy_workspace",
     "precompact_workspace",
+    "read_container_usage_events",
     "relocate_and_resume",
     "run_claude_print",
     "setup_real_claude",
@@ -82,6 +83,31 @@ def setup_real_claude(
     result = workspace.exec(f"cd {root_q} && forge session start --no-launch {shlex.quote(session_name)}")
     if result.returncode != 0:
         pytest.fail(f"Failed to create session: {result.stderr}")
+
+
+def read_container_usage_events(
+    workspace: ContainerLike,
+    *,
+    command: str | None = None,
+) -> list[dict[str, Any]]:
+    """Read the container's usage ledger through Forge's strict reader."""
+    command_arg = json.dumps(command)
+    result = workspace.exec(
+        f"""
+        /forge/.venv/bin/python - <<'PY'
+import json
+from dataclasses import asdict
+from forge.core.usage.ledger import read_usage_events
+
+events = [asdict(event) for event in read_usage_events(command={command_arg})]
+print(json.dumps(events, sort_keys=True))
+PY
+        """,
+    )
+    if result.returncode != 0:
+        pytest.fail(f"Failed to read usage events: stdout={result.stdout!r} stderr={result.stderr!r}")
+    payload = result.stdout.strip().splitlines()[-1] if result.stdout.strip() else "[]"
+    return json.loads(payload)
 
 
 def run_claude_print(
