@@ -704,7 +704,11 @@ def fork(
     # (inspectable, editable, survives /compact); native-relocate is byte-faithful but opaque,
     # lost on /compact, and its historical tool paths still point at the parent checkout.
     if native_relocate:
-        from forge.session.claude import RelocateConflictError, RelocateSameDirError, relocate_transcript
+        from forge.session.claude import (
+            RelocateConflictError,
+            RelocateSameDirError,
+            relocate_transcript,
+        )
         from forge.session.claude.paths import resolve_claude_project_root
 
         _fork_cwd = resolve_claude_project_root(fork_manifest)

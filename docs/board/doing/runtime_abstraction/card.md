@@ -831,9 +831,9 @@ Native-relocate is an experimental spike, not a committed UX until contract test
 - Should `forge session resume --fresh --review` be the default behavior or an explicit flag? **Resolved (Phase 1,
   2026-05-31):** explicit flag (opt-in) -- a plain `--fresh` resume launches immediately, and `--review` stays opt-in so
   non-interactive/scripted resume never blocks on `$EDITOR`.
-- Where do PR #8's `~/.forge/costs/requests/*.jsonl` and Phase 4's `~/.forge/usage/events/<YYYY-MM>_<pid>.jsonl` converge? Same data
-  plane eventually merged, or parallel forever? The audit logs from Phase 2 (`~/.forge/audit/requests/*.jsonl`) raise
-  the same question.
+- Where do PR #8's `~/.forge/costs/requests/*.jsonl` and Phase 4's `~/.forge/usage/events/<YYYY-MM>_<pid>.jsonl`
+  converge? Same data plane eventually merged, or parallel forever? The audit logs from Phase 2
+  (`~/.forge/audit/requests/*.jsonl`) raise the same question.
 - Phase 2 audit proxy: enforce sidecar-only or also support host-mode always-on? Host mode is more flexible but harder
   to guarantee "actually running" against accidental direct-mode escapes.
 - How should the intercept layer degrade when the selected runtime route uses a non-Forge gateway? Forge proxy routes

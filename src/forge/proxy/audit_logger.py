@@ -284,8 +284,7 @@ def _load_drift_baseline(proxy_id: str) -> dict[str, str]:
                 global _warned_newer_schema
                 if not _warned_newer_schema:
                     logger.warning(
-                        "Skipping audit drift baseline written by a newer Forge "
-                        "(schema_version=%s); upgrade Forge",
+                        "Skipping audit drift baseline written by a newer Forge " "(schema_version=%s); upgrade Forge",
                         ver,
                     )
                     _warned_newer_schema = True

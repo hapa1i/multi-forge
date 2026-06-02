@@ -1784,9 +1784,7 @@ class SessionManager:
                 # collapsing '/', '.', '_' to '-'), _reloc_path IS the parent's live transcript.
                 # relocate_transcript rejects source==dest up front, so this is a backstop.
                 _parent_dirs = {
-                    get_project_encoded_dir(r)
-                    for r in (_deriv.parent_forge_root, _deriv.parent_project_root)
-                    if r
+                    get_project_encoded_dir(r) for r in (_deriv.parent_forge_root, _deriv.parent_project_root) if r
                 }
                 if get_project_encoded_dir(_reloc_root) in _parent_dirs:
                     logger.warning(
