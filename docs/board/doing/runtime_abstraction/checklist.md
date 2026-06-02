@@ -50,12 +50,12 @@ top-level `forge transfer show|regenerate|edit|diff` CLI shipped in commit `2b70
 `docs/design_appendix.md` §M reflect it. All Phase 1 boxes are ticked.
 
 Next: **Phase 4 (runtime-abstraction core)** -- **Slices 4a (run-tree env contract) + 4b (usage-ledger schema) + 4c
-(instrument native + direct paths) shipped 2026-06-01**; next is Slice 4d (`HeadlessInvoker` + review fan-out migration,
-which also picks up the deferred per-worker usage events). The two cross-cutting Phase 4 decisions are resolved
-(data-plane: separate planes linked by `request_id`; `FORGE_DEPTH`: additive run-tree env, integer guard unchanged) --
-see Open Decisions for the de-risked build sequence, recorded at the top of the Phase 4 section. Deferred Phase 3
-follow-ups (`--rewrite-paths`, sidecar/resume native-relocate, the gated default flip) are recorded as trackable boxes
-under Phase 3 and land when prioritized. The card stays in `doing/` until Phases 3-6 land (board-contract: move to
+(instrument native + direct paths) + 4d (`HeadlessInvoker` + review fan-out migration + per-worker usage events) shipped
+2026-06-01**; next is Slice 4e (runtime registry capability matrix). The two cross-cutting Phase 4 decisions are
+resolved (data-plane: separate planes linked by `request_id`; `FORGE_DEPTH`: additive run-tree env, integer guard
+unchanged) -- see Open Decisions for the de-risked build sequence, recorded at the top of the Phase 4 section. Deferred
+Phase 3 follow-ups (`--rewrite-paths`, sidecar/resume native-relocate, the gated default flip) are recorded as trackable
+boxes under Phase 3 and land when prioritized. The card stays in `doing/` until Phases 3-6 land (board-contract: move to
 `done/` only when fully executed).
 
 **Deferred prerequisite (memory_substrate reconciliation) -- RESOLVED 2026-05-30:**
@@ -542,15 +542,39 @@ internal/refactorable -- it does not mint a durable contract, so it does not gat
     interactive root minted once in `_build_environment` (the shared interactive choke point) rather than per-builder,
     so no caller (resume/fork) can drift.
 
-- [ ] Introduce `HeadlessInvoker` interface and `ClaudeHeadlessInvoker`.
+- [x] Introduce `HeadlessInvoker` interface and `ClaudeHeadlessInvoker`. *(Slice 4d -- shipped 2026-06-01)*
 
   - Assertion: existing single headless callers of `run_claude_session()` keep user-visible behavior, timeout semantics,
     environment routing, and fail-open/fail-closed choices.
+  - Verification (2026-06-01): new `src/forge/core/invoker/` package -- `HeadlessRequest`/`HeadlessResult`/`Attribution`
+    - the `HeadlessInvoker` Protocol (`run` single-shot, `run_parallel` fan-out) in `types.py`, `ClaudeHeadlessInvoker`
+      in `claude.py`. The seam is the **lifecycle, not the routing**: a request arrives already-routed (`argv`+`env`),
+      so routing stays review-domain and Phase 5's Codex invoker reuses the same `run_parallel`. The 4 single-shot
+      callers (supervisor/memory-writer/shadow-curation/team-handlers) **keep `run_claude_session`** (already the right
+      single-shot abstraction with its bare/proxy guards; routing them through the invoker buys nothing until the
+      runtime registry in 4e, and avoids churning hook/session callsites in the riskiest slice). `run()` exists for
+      protocol completeness + Phase 5, covered by a single-shot parity test.
 
-- [ ] Move review-engine fan-out behind invoker lifecycle management.
+- [x] Move review-engine fan-out behind invoker lifecycle management. *(Slice 4d -- shipped 2026-06-01)*
 
   - Assertion: `src/forge/review/engine.py` parallel `subprocess.Popen()` fan-out, process-group cleanup, timeout
     handling, cancellation, and deterministic result ordering are preserved and covered by tests.
+  - Verification (2026-06-01): `run_multi_review` now shapes per-worker `HeadlessRequest`s (`_prepare_worker`: routing
+    -> env+argv+prompt) and delegates to `ClaudeHeadlessInvoker().run_parallel`, mapping back via `_to_review_result`
+    (original status conventions preserved: strip-on-success, `Exit code N`, `Timeout after Ns`). The lifecycle moved
+    **verbatim** (`Popen(start_new_session=True)`, `os.killpg` SIGTERM->SIGKILL under `children_lock`,
+    `ThreadPoolExecutor(min(N,5))`, `result_map[idx]` ordering), so the 62 existing review tests
+    (`test_engine`/`test_adversarial`/`test_consensus`) pass with only a patch-target retarget
+    (`forge.review.engine.subprocess.Popen` -> `forge.core.invoker.claude.subprocess.Popen`). **Per-worker usage
+    events** (deferred from 4c) emit here: when a request carries `Attribution` (threaded from the 4 verbs via
+    `run_multi_review`/`run_adversarial`/`run_consensus`), `run_parallel` emits one `emit_worker_usage` per worker
+    (`attribution_granularity=worker`, `measurement_source=unattributed`, cost null -- the verb aggregate holds the
+    estimated total; the event records the **actual routed** model/provider/proxy_id, not the friendly catalog id).
+    **Review fixes:** cancellation cleanup now SIGTERMs children *before* the blocking executor join (manual executor
+    management -- the `with ThreadPoolExecutor` `__exit__` would otherwise join-then-cleanup, delaying SIGTERM up to
+    `timeout_seconds` on Ctrl+C). 15 invoker tests + an engine routed-metadata test
+    (`tests/src/core/invoker/test_claude_invoker.py`: ordering, concurrency cap, timeout + cancellation killpg, run-id
+    surfaced, single-shot parity, per-worker emission). Full unit suite 4925 passed; mypy clean.
 
 - [ ] Add runtime registry capability matrix.
 
@@ -585,17 +609,17 @@ internal/refactorable -- it does not mint a durable contract, so it does not gat
     review engine (`src/forge/review/engine.py`), semantic supervisor (`src/forge/policy/semantic/supervisor.py`), team
     supervisor (`src/forge/policy/team/handlers.py`), Claude launcher (`src/forge/cli/claude.py`), and session launcher
     (`src/forge/cli/session.py`) each have an explicit done/deferred status.
-  - Verification (2026-06-01): two commits -- 4c-i foundation (holder + helpers) `1477d3b`, then 4c-ii wiring.
-    **Done:** the four workflow verbs (`cli/workflow.py`, one estimated verb-level event each via `emit_verb_usage`,
-    ambient run, `attribution_granularity=verb`); memory writer, semantic supervisor, shadow curation -- one event per
-    `claude -p` run via `emit_usage_for_session_result` + the `track_verb_cost` holder, attributed to the subprocess's
-    run identity, null `source_refs`; action tagger (`core/reactive/tagger.py`) -- direct worked example, `ask()` ->
-    `complete()` to capture `provider_usage_exact` tokens, forwards `X-Request-ID` via `with_forge_request_id`
-    (behavior-preserving: a None-default client returns the hp verbatim, so only the header is added).
-    **Deferred:** review-engine per-worker events (`review/engine.py` -- land behind `HeadlessInvoker` in 4d, where each
-    spawn is owned; the verb aggregate already covers the fan-out); team supervisor (`policy/team/handlers.py`) + team
-    tagger + `policy/workflow/stages.py` (no cost wrapper / proxy-only direct); interactive launchers (`cli/claude.py`,
-    `cli/session.py` -- interactive-session usage is its own concern, not a headless verb); native Codex/Gemini (Phase 5).
+  - Verification (2026-06-01): two commits -- 4c-i foundation (holder + helpers) `1477d3b`, then 4c-ii wiring. **Done:**
+    the four workflow verbs (`cli/workflow.py`, one estimated verb-level event each via `emit_verb_usage`, ambient run,
+    `attribution_granularity=verb`); memory writer, semantic supervisor, shadow curation -- one event per `claude -p`
+    run via `emit_usage_for_session_result` + the `track_verb_cost` holder, attributed to the subprocess's run identity,
+    null `source_refs`; action tagger (`core/reactive/tagger.py`) -- direct worked example, `ask()` -> `complete()` to
+    capture `provider_usage_exact` tokens, forwards `X-Request-ID` via `with_forge_request_id` (behavior-preserving: a
+    None-default client returns the hp verbatim, so only the header is added). **Deferred:** review-engine per-worker
+    events (`review/engine.py` -- land behind `HeadlessInvoker` in 4d, where each spawn is owned; the verb aggregate
+    already covers the fan-out); team supervisor (`policy/team/handlers.py`) + team tagger + `policy/workflow/stages.py`
+    (no cost wrapper / proxy-only direct); interactive launchers (`cli/claude.py`, `cli/session.py` --
+    interactive-session usage is its own concern, not a headless verb); native Codex/Gemini (Phase 5).
   - `track_verb_cost` now yields a `VerbCostResult` holder (`measured` flag separates a real snapshot delta from a
     no-proxy verb -> null cost, not a fabricated $0); backward-compatible (callers without `as cost` unaffected;
     verb-cost log unchanged). **Refinement vs plan:** added `measurement_source=provider_usage_exact` (a direct call's
@@ -607,8 +631,8 @@ internal/refactorable -- it does not mint a durable contract, so it does not gat
     memory_writer + supervisor + shadow); mypy clean on all 11 wired files. design.md §3.14 + appendix §A.13 updated
     (emitters shipped).
   - **Review fixes (2026-06-01):** (1) direct-path join now works -- the tagger resolves its base_url sync
-    (`resolve_client_base_url` -> `resolve_provider_base_url`) and sets `source_refs.cost_request_id` when the target is a
-    registered Forge proxy (was minted+forwarded then discarded -> always null); (2) `emit_direct_llm_usage` billing
+    (`resolve_client_base_url` -> `resolve_provider_base_url`) and sets `source_refs.cost_request_id` when the target is
+    a registered Forge proxy (was minted+forwarded then discarded -> always null); (2) `emit_direct_llm_usage` billing
     defaults to `unknown` (no more hardcoded `api`/`has_api_key=True` -- the tagger uses a dummy local-LiteLLM key); (3)
     `latency_ms` populated -- `track_verb_cost` records duration on every path and the emitters copy it. +4 unit tests;
     unit suite 4910 green.

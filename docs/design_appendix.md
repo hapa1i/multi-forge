@@ -428,15 +428,22 @@ records written by a newer Forge (`schema_version` > current), and (strict on sh
 
 **Instrumented emitters (Phase 4c).** The workflow verbs (`panel`/`analyze`/`debate`/`consensus`) emit one estimated
 verb-level event each (`measurement_source=verb_snapshot_estimated`, attributed to the ambient run — per-worker cost is
-not available); the memory writer, semantic supervisor, and shadow curation emit one event per `claude -p` run (attributed
-to that subprocess's run identity, via the `track_verb_cost` holder); the action tagger emits a `provider_usage_exact`
-event from a direct `core.llm` call (exact in-band provider tokens). On the **direct path**, Forge resolves the call's
-base_url synchronously: if it is a registered Forge proxy, the tagger forwards an `X-Request-ID` and records an exact
-`source_refs.cost_request_id` join (the proxy logs its cost record under the same id); otherwise it sends no header and
-leaves the ref null (a dangling join is worse than none). Direct-path `billing_mode` stays `unknown` unless the caller
-proves direct + real-credential billing (the tagger routes via local LiteLLM with a dummy key, so it can't). All emit
-best-effort, never gate the work they measure, and record `latency_ms`; `claude -p` events carry null `source_refs` (4g).
-Helpers: `emit_verb_usage`, `emit_usage_for_session_result`, `emit_direct_llm_usage` (`forge.core.usage.emit`).
+not available); the memory writer, semantic supervisor, and shadow curation emit one event per `claude -p` run
+(attributed to that subprocess's run identity, via the `track_verb_cost` holder); the action tagger emits a
+`provider_usage_exact` event from a direct `core.llm` call (exact in-band provider tokens). On the **direct path**,
+Forge resolves the call's base_url synchronously: if it is a registered Forge proxy, the tagger forwards an
+`X-Request-ID` and records an exact `source_refs.cost_request_id` join (the proxy logs its cost record under the same
+id); otherwise it sends no header and leaves the ref null (a dangling join is worse than none). Direct-path
+`billing_mode` stays `unknown` unless the caller proves direct + real-credential billing (the tagger routes via local
+LiteLLM with a dummy key, so it can't). All emit best-effort, never gate the work they measure, and record `latency_ms`;
+`claude -p` events carry null `source_refs` (4g). Helpers: `emit_verb_usage`, `emit_usage_for_session_result`,
+`emit_direct_llm_usage` (`forge.core.usage.emit`).
+
+**Per-worker fan-out events (Phase 4d).** The review fan-out (`run_multi_review` → `ClaudeHeadlessInvoker.run_parallel`)
+emits one event per worker (`attribution_granularity=worker`, `measurement_source=unattributed`): the run-tree leaf
+(run/parent/root) plus the **actual routed** `model` (`route.model_ref`), `provider`, and `proxy_id`, with `status` and
+`latency_ms`. Per-worker cost/tokens are null — `ReviewResult` carries none, so the verb-level aggregate above holds the
+estimated total. Helper: `emit_worker_usage`.
 
 ---
 

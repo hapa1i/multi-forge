@@ -15,18 +15,16 @@ from __future__ import annotations
 import logging
 import os
 import shutil
-import signal
-import subprocess
-import threading
-import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from forge.core.auth.capabilities import CREDENTIALS, format_missing_credential_error
 from forge.core.auth.template_secrets import resolve_env_or_credential
+from forge.core.invoker import (
+    Attribution,
+    ClaudeHeadlessInvoker,
+    HeadlessRequest,
+    HeadlessResult,
+)
 from forge.core.reactive.env import (
-    FORGE_PARENT_RUN_ID_VAR,
-    FORGE_ROOT_RUN_ID_VAR,
-    FORGE_RUN_ID_VAR,
     build_claude_env,
     can_use_bare,
     should_spawn_subprocesses,
@@ -128,17 +126,26 @@ def run_multi_review(
     timeout_seconds: int = 600,
     cwd: str | None = None,
     resume_id: str | None = None,
+    attribution: Attribution | None = None,
 ) -> MultiReviewOutput:
     """Fan out a review prompt to multiple models in parallel.
+
+    Routing and per-worker request shaping happen here (review domain); the spawn
+    lifecycle (process groups, signal cleanup, ordered fan-out, timeouts) is
+    delegated to ``ClaudeHeadlessInvoker.run_parallel`` so it is shared with future
+    runtimes (Phase 5). When ``attribution`` is set, the invoker emits a per-worker
+    UsageEvent for each spawned worker.
 
     Args:
         prompt: The review prompt to send to each model.
         models: Model specs to use. Defaults to DEFAULT_MODELS values.
         routing_plan: Pre-resolved routing for all workers. When None,
-            resolves routing once at the top before the thread pool.
+            resolves routing once at the top before fan-out.
         timeout_seconds: Per-model timeout in seconds.
         cwd: Working directory for each subprocess.
         resume_id: If set, adds ``--resume <id>`` to each subprocess.
+        attribution: Verb context (command/workflow/session) for per-worker usage
+            events. None (default) skips per-worker emission.
 
     Returns:
         MultiReviewOutput with per-model results in input order.
@@ -174,209 +181,172 @@ def run_multi_review(
                 ],
             )
 
-    # Thread-safe list for tracking child processes
-    children: list[subprocess.Popen[str]] = []
-    children_lock = threading.Lock()
+    # Shape each worker into a request (routing -> env + argv + prompt). A worker
+    # whose route fails to resolve becomes a failed ReviewResult here, without
+    # spawning. Only the spawnable requests go to the invoker.
+    prepared = [
+        _prepare_worker(
+            spec,
+            routing_plan.routes[idx],
+            prompt=prompt,
+            cwd=cwd,
+            resume_id=resume_id,
+            timeout_seconds=timeout_seconds,
+            attribution=attribution,
+        )
+        for idx, spec in enumerate(specs)
+    ]
 
-    def _cleanup() -> None:
-        """Terminate and reap all running children. SIGTERM -> wait -> SIGKILL."""
-        with children_lock:
-            for proc in children:
-                if proc.poll() is None:
-                    try:
-                        os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
-                    except (OSError, ProcessLookupError):
-                        pass
-            for proc in children:
-                try:
-                    proc.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    try:
-                        os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
-                        proc.wait(timeout=2)
-                    except (OSError, ProcessLookupError, subprocess.TimeoutExpired):
-                        pass
-                except OSError:
-                    pass
-
-    def _run_single(spec: ModelSpec, routing_result: RoutingResult) -> ReviewResult:
-        """Run a single model review with pre-resolved routing."""
-        start = time.monotonic()
-        if spec.prompt is None:
-            worker_prompt = prompt
-        elif spec.prompt_mode == "prefix":
-            worker_prompt = f"{spec.prompt}\n\n{prompt}" if prompt else spec.prompt
+    results: dict[int, ReviewResult] = {}
+    spawnable: list[tuple[int, HeadlessRequest]] = []
+    for idx, item in enumerate(prepared):
+        if isinstance(item, HeadlessRequest):
+            spawnable.append((idx, item))
         else:
-            worker_prompt = spec.prompt
+            results[idx] = item
 
-        extra_env: dict[str, str] = {}
-        if not os.environ.get("ANTHROPIC_API_KEY"):
-            ak = resolve_env_or_credential("ANTHROPIC_API_KEY")
-            if ak:
-                extra_env["ANTHROPIC_API_KEY"] = ak
-
-        route = routing_result.route
-        if route is None:
-            duration = time.monotonic() - start
-            return ReviewResult(
-                model_name=spec.effective_worker_id,
-                stdout="",
-                stderr="",
-                success=False,
-                duration_seconds=duration,
-                error=f"No route resolved for '{spec.name}'",
-            )
-
-        if route.provider == "direct":
-            try:
-                extra_env.update(direct_model_env(route.model_ref))
-            except ValueError as e:
-                duration = time.monotonic() - start
-                return ReviewResult(
-                    model_name=spec.effective_worker_id,
-                    stdout="",
-                    stderr="",
-                    success=False,
-                    duration_seconds=duration,
-                    error=str(e),
-                )
-            env = build_claude_env(direct=True, extra_vars=extra_env or None)
-        else:
-            env = build_claude_env(base_url=routing_result.base_url, extra_vars=extra_env or None)
-
-        # Run-tree identity for this worker (build_claude_env stamped it). Threaded
-        # onto every post-env ReviewResult so the usage ledger can attribute the worker.
-        run_id = env.get(FORGE_RUN_ID_VAR)
-        parent_run_id = env.get(FORGE_PARENT_RUN_ID_VAR)
-        root_run_id = env.get(FORGE_ROOT_RUN_ID_VAR)
-
-        cmd = ["claude", "-p"]
-        if can_use_bare(env):
-            cmd.append("--bare")
-        if resume_id:
-            cmd.extend(["--resume", resume_id])
-
-        model_flag = resolve_model_flag(route)
-        if model_flag:
-            cmd.extend(["--model", model_flag])
-
-        proc: subprocess.Popen[str] | None = None
-        try:
-            proc = subprocess.Popen(
-                cmd,
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                cwd=cwd,
-                env=env,
-                start_new_session=True,
-            )
-            with children_lock:
-                children.append(proc)
-
-            stdout, stderr = proc.communicate(input=worker_prompt, timeout=timeout_seconds)
-            duration = time.monotonic() - start
-
-            if proc.returncode != 0:
-                error_msg = stderr.strip() or f"Exit code {proc.returncode}"
-                return ReviewResult(
-                    model_name=spec.effective_worker_id,
-                    stdout=stdout,
-                    stderr=stderr,
-                    success=False,
-                    duration_seconds=duration,
-                    error=error_msg,
-                    run_id=run_id,
-                    parent_run_id=parent_run_id,
-                    root_run_id=root_run_id,
-                )
-
-            return ReviewResult(
-                model_name=spec.effective_worker_id,
-                stdout=stdout.strip(),
-                stderr=stderr,
-                success=True,
-                duration_seconds=duration,
-                run_id=run_id,
-                parent_run_id=parent_run_id,
-                root_run_id=root_run_id,
-            )
-
-        except subprocess.TimeoutExpired:
-            try:
-                if proc is not None:
-                    os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
-                    proc.wait(timeout=5)
-            except (OSError, ProcessLookupError, subprocess.TimeoutExpired):
-                pass
-            return ReviewResult(
-                model_name=spec.effective_worker_id,
-                stdout="",
-                stderr="",
-                success=False,
-                duration_seconds=float(timeout_seconds),
-                error=f"Timeout after {timeout_seconds}s",
-                run_id=run_id,
-                parent_run_id=parent_run_id,
-                root_run_id=root_run_id,
-            )
-
-        except FileNotFoundError:
-            duration = time.monotonic() - start
-            return ReviewResult(
-                model_name=spec.effective_worker_id,
-                stdout="",
-                stderr="",
-                success=False,
-                duration_seconds=duration,
-                error="claude CLI not found in PATH",
-                run_id=run_id,
-                parent_run_id=parent_run_id,
-                root_run_id=root_run_id,
-            )
-
-        except (OSError, subprocess.SubprocessError) as e:
-            duration = time.monotonic() - start
-            return ReviewResult(
-                model_name=spec.effective_worker_id,
-                stdout="",
-                stderr="",
-                success=False,
-                duration_seconds=duration,
-                error=str(e),
-                run_id=run_id,
-                parent_run_id=parent_run_id,
-                root_run_id=root_run_id,
-            )
-
-    # Fan out with ThreadPoolExecutor, preserving input order and duplicate workers.
-    result_map: dict[int, ReviewResult] = {}
-    max_workers = min(len(specs), 5)
-
-    try:
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            future_to_item = {
-                executor.submit(_run_single, spec, routing_plan.routes[idx]): (idx, spec)
-                for idx, spec in enumerate(specs)
-            }
-            for future in as_completed(future_to_item):
-                idx, spec = future_to_item[future]
-                wid = spec.effective_worker_id
-                try:
-                    result_map[idx] = future.result()
-                except Exception as e:
-                    result_map[idx] = ReviewResult(
-                        model_name=wid,
-                        stdout="",
-                        stderr="",
-                        success=False,
-                        duration_seconds=0.0,
-                        error=f"Thread error: {e}",
-                    )
-    finally:
-        _cleanup()
+    if spawnable:
+        outcomes = ClaudeHeadlessInvoker().run_parallel([req for _, req in spawnable])
+        for (idx, req), outcome in zip(spawnable, outcomes):
+            results[idx] = _to_review_result(req, outcome)
 
     # Return in deterministic input order
-    ordered = [result_map[idx] for idx in range(len(specs)) if idx in result_map]
+    ordered = [results[idx] for idx in range(len(specs)) if idx in results]
     return MultiReviewOutput(prompt=prompt, results=ordered)
+
+
+def _prepare_worker(
+    spec: ModelSpec,
+    routing_result: RoutingResult,
+    *,
+    prompt: str,
+    cwd: str | None,
+    resume_id: str | None,
+    timeout_seconds: int,
+    attribution: Attribution | None,
+) -> ReviewResult | HeadlessRequest:
+    """Shape one worker into a HeadlessRequest, or a failed ReviewResult.
+
+    Returns a ReviewResult (no spawn) when the route doesn't resolve or the
+    direct-model env can't be built; otherwise a HeadlessRequest carrying the
+    built ``claude -p`` argv + env (with run-tree identity stamped) + the
+    per-worker prompt.
+    """
+    if spec.prompt is None:
+        worker_prompt = prompt
+    elif spec.prompt_mode == "prefix":
+        worker_prompt = f"{spec.prompt}\n\n{prompt}" if prompt else spec.prompt
+    else:
+        worker_prompt = spec.prompt
+
+    extra_env: dict[str, str] = {}
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        ak = resolve_env_or_credential("ANTHROPIC_API_KEY")
+        if ak:
+            extra_env["ANTHROPIC_API_KEY"] = ak
+
+    route = routing_result.route
+    if route is None:
+        return ReviewResult(
+            model_name=spec.effective_worker_id,
+            stdout="",
+            stderr="",
+            success=False,
+            duration_seconds=0.0,
+            error=f"No route resolved for '{spec.name}'",
+        )
+
+    if route.provider == "direct":
+        try:
+            extra_env.update(direct_model_env(route.model_ref))
+        except ValueError as e:
+            return ReviewResult(
+                model_name=spec.effective_worker_id,
+                stdout="",
+                stderr="",
+                success=False,
+                duration_seconds=0.0,
+                error=str(e),
+            )
+        env = build_claude_env(direct=True, extra_vars=extra_env or None)
+    else:
+        env = build_claude_env(base_url=routing_result.base_url, extra_vars=extra_env or None)
+
+    cmd = ["claude", "-p"]
+    if can_use_bare(env):
+        cmd.append("--bare")
+    if resume_id:
+        cmd.extend(["--resume", resume_id])
+    model_flag = resolve_model_flag(route)
+    if model_flag:
+        cmd.extend(["--model", model_flag])
+
+    return HeadlessRequest(
+        argv=cmd,
+        prompt=worker_prompt,
+        env=env,
+        cwd=cwd,
+        timeout_seconds=timeout_seconds,
+        label=spec.effective_worker_id,
+        # Record what actually ran (the resolved route), not the friendly catalog id:
+        # a proxied worker's `route.model_ref` is the provider-prefixed model that
+        # executed, with its provider + proxy. (`spec.model_id` stays recoverable via `label`.)
+        model=route.model_ref,
+        provider=route.provider,
+        proxy_id=routing_result.proxy_id,
+        attribution=attribution,
+    )
+
+
+def _to_review_result(request: HeadlessRequest, outcome: HeadlessResult) -> ReviewResult:
+    """Map a HeadlessResult back to a ReviewResult.
+
+    Preserves the engine's original status conventions: strip stdout on success,
+    ``stderr.strip() or "Exit code N"`` on non-zero exit, the ``Timeout after Ns``
+    string with the configured timeout as the recorded duration.
+    """
+    identity = {
+        "run_id": outcome.run_id,
+        "parent_run_id": outcome.parent_run_id,
+        "root_run_id": outcome.root_run_id,
+    }
+    model_name = request.label or ""
+
+    if outcome.timed_out:
+        return ReviewResult(
+            model_name=model_name,
+            stdout="",
+            stderr="",
+            success=False,
+            duration_seconds=float(request.timeout_seconds),
+            error=f"Timeout after {request.timeout_seconds}s",
+            **identity,
+        )
+    if outcome.error is not None:
+        return ReviewResult(
+            model_name=model_name,
+            stdout="",
+            stderr="",
+            success=False,
+            duration_seconds=outcome.duration_seconds,
+            error=outcome.error,
+            **identity,
+        )
+    if outcome.returncode != 0:
+        return ReviewResult(
+            model_name=model_name,
+            stdout=outcome.stdout,
+            stderr=outcome.stderr,
+            success=False,
+            duration_seconds=outcome.duration_seconds,
+            error=outcome.stderr.strip() or f"Exit code {outcome.returncode}",
+            **identity,
+        )
+    return ReviewResult(
+        model_name=model_name,
+        stdout=outcome.stdout.strip(),
+        stderr=outcome.stderr,
+        success=True,
+        duration_seconds=outcome.duration_seconds,
+        **identity,
+    )

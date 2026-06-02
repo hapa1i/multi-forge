@@ -102,7 +102,7 @@ def _mock_popen(stdout: str = "review output", returncode: int = 0, stderr: str 
 
 
 class TestRunMultiReview:
-    @patch("forge.review.engine.subprocess.Popen")
+    @patch("forge.core.invoker.claude.subprocess.Popen")
     def test_single_model_success(self, mock_popen_cls):
         mock_popen_cls.return_value = _mock_popen("great review")
         plan = _plan(_routing_result())
@@ -111,7 +111,7 @@ class TestRunMultiReview:
         assert output.results[0].success
         assert output.results[0].stdout == "great review"
 
-    @patch("forge.review.engine.subprocess.Popen")
+    @patch("forge.core.invoker.claude.subprocess.Popen")
     def test_multiple_models_parallel(self, mock_popen_cls):
         mock_popen_cls.return_value = _mock_popen("output")
         specs = [_spec(f"model-{i}") for i in range(3)]
@@ -120,7 +120,7 @@ class TestRunMultiReview:
         assert output.successful == 3
         assert len(output.results) == 3
 
-    @patch("forge.review.engine.subprocess.Popen")
+    @patch("forge.core.invoker.claude.subprocess.Popen")
     def test_results_in_deterministic_order(self, mock_popen_cls):
         mock_popen_cls.return_value = _mock_popen("output")
         specs = [_spec("alpha"), _spec("beta"), _spec("gamma")]
@@ -129,7 +129,7 @@ class TestRunMultiReview:
         names = [r.model_name for r in output.results]
         assert names == ["alpha", "beta", "gamma"]
 
-    @patch("forge.review.engine.subprocess.Popen")
+    @patch("forge.core.invoker.claude.subprocess.Popen")
     def test_duplicate_model_specs_return_one_result_per_input_in_order(self, mock_popen_cls):
         mock_popen_cls.side_effect = [_mock_popen("first"), _mock_popen("second")]
         specs = [_spec("same-model"), _spec("same-model")]
@@ -139,7 +139,7 @@ class TestRunMultiReview:
         assert [r.model_name for r in output.results] == ["same-model", "same-model"]
         assert {r.stdout for r in output.results} == {"first", "second"}
 
-    @patch("forge.review.engine.subprocess.Popen")
+    @patch("forge.core.invoker.claude.subprocess.Popen")
     def test_model_failure_captured(self, mock_popen_cls):
         mock_popen_cls.return_value = _mock_popen(stdout="", returncode=1, stderr="error msg")
         plan = _plan(_routing_result())
@@ -147,7 +147,7 @@ class TestRunMultiReview:
         assert output.failed == 1
         assert output.results[0].error == "error msg"
 
-    @patch("forge.review.engine.subprocess.Popen")
+    @patch("forge.core.invoker.claude.subprocess.Popen")
     def test_direct_model_no_base_url(self, mock_popen_cls):
         """Direct route means no ANTHROPIC_BASE_URL in env."""
         mock_popen_cls.return_value = _mock_popen("direct output")
@@ -163,7 +163,7 @@ class TestRunMultiReview:
         call_kwargs = mock_popen_cls.call_args.kwargs
         assert "ANTHROPIC_BASE_URL" not in call_kwargs["env"]
 
-    @patch("forge.review.engine.subprocess.Popen")
+    @patch("forge.core.invoker.claude.subprocess.Popen")
     def test_forge_depth_set_in_env(self, mock_popen_cls):
         mock_popen_cls.return_value = _mock_popen("output")
         plan = _plan(_routing_result())
@@ -172,7 +172,7 @@ class TestRunMultiReview:
         call_kwargs = mock_popen_cls.call_args.kwargs
         assert call_kwargs["env"]["FORGE_DEPTH"] == "1"
 
-    @patch("forge.review.engine.subprocess.Popen")
+    @patch("forge.core.invoker.claude.subprocess.Popen")
     def test_worker_surfaces_run_id(self, mock_popen_cls):
         """Each ReviewResult carries the worker's run identity (parent = the verb)."""
         mock_popen_cls.return_value = _mock_popen("output")
@@ -188,7 +188,28 @@ class TestRunMultiReview:
         assert result.root_run_id == "run_root"
         assert result.run_id and result.run_id not in ("run_verb", "run_root")
 
-    @patch("forge.review.engine.subprocess.Popen")
+    @patch("forge.core.invoker.claude.subprocess.Popen")
+    def test_per_worker_event_records_routed_model_provider_proxy(self, mock_popen_cls):
+        """The per-worker usage event records the actual routed model/provider/proxy
+        (route.model_ref / route.provider / routing_result.proxy_id), not the friendly
+        spec id with null provider/proxy."""
+        from forge.core.invoker import Attribution
+        from forge.core.usage.ledger import read_usage_events
+
+        mock_popen_cls.return_value = _mock_popen("output")
+        route = _route(provider="openrouter", model_ref="openai/gpt-5.5")
+        plan = _plan(_routing_result(route=route))  # proxy_id="test-proxy"
+        # NOTE: no clear=True -- that would wipe FORGE_HOME (the isolate_forge_home tmp dir),
+        # sending the ledger write to the real ~/.forge while the read sees the tmp dir.
+        with patch.dict("os.environ", {"FORGE_RUN_ID": "run_v", "FORGE_ROOT_RUN_ID": "run_v"}):
+            run_multi_review("review", models=[_spec()], routing_plan=plan, attribution=Attribution(command="panel"))
+        events = read_usage_events()
+        assert len(events) == 1
+        e = events[0]
+        assert (e.command, e.attribution_granularity, e.parent_run_id) == ("panel", "worker", "run_v")
+        assert (e.model, e.provider, e.proxy_id) == ("openai/gpt-5.5", "openrouter", "test-proxy")
+
+    @patch("forge.core.invoker.claude.subprocess.Popen")
     def test_bare_flag_when_api_key_present(self, mock_popen_cls):
         mock_popen_cls.return_value = _mock_popen("output")
         plan = _plan(_routing_result())
@@ -197,7 +218,7 @@ class TestRunMultiReview:
         cmd = mock_popen_cls.call_args[0][0]
         assert "--bare" in cmd
 
-    @patch("forge.review.engine.subprocess.Popen")
+    @patch("forge.core.invoker.claude.subprocess.Popen")
     def test_bare_flag_skipped_without_api_key(self, mock_popen_cls):
         mock_popen_cls.return_value = _mock_popen("output")
         plan = _plan(_routing_result())
@@ -205,7 +226,7 @@ class TestRunMultiReview:
         cmd = mock_popen_cls.call_args[0][0]
         assert "--bare" not in cmd
 
-    @patch("forge.review.engine.subprocess.Popen")
+    @patch("forge.core.invoker.claude.subprocess.Popen")
     def test_resume_id_in_command(self, mock_popen_cls):
         mock_popen_cls.return_value = _mock_popen("output")
         plan = _plan(_routing_result())
@@ -214,7 +235,7 @@ class TestRunMultiReview:
         assert "--resume" in cmd
         assert "uuid-123" in cmd
 
-    @patch("forge.review.engine.subprocess.Popen")
+    @patch("forge.core.invoker.claude.subprocess.Popen")
     def test_model_flag_for_proxied_worker(self, mock_popen_cls):
         """Proxied workers get --model from route.model_ref."""
         mock_popen_cls.return_value = _mock_popen("output")
@@ -225,7 +246,7 @@ class TestRunMultiReview:
         assert "--model" in cmd
         assert "openai/gpt-5.5" in cmd
 
-    @patch("forge.review.engine.subprocess.Popen")
+    @patch("forge.core.invoker.claude.subprocess.Popen")
     def test_direct_worker_uses_env_pin_not_model_flag(self, mock_popen_cls, monkeypatch):
         mock_popen_cls.return_value = _mock_popen("output")
         monkeypatch.setenv("FORGE_SUBPROCESS_PROXY", "openrouter")
@@ -256,7 +277,7 @@ class TestRunMultiReview:
         assert "ANTHROPIC_BASE_URL" not in env
         assert "FORGE_SUBPROCESS_PROXY" not in env
 
-    @patch("forge.review.engine.subprocess.Popen")
+    @patch("forge.core.invoker.claude.subprocess.Popen")
     def test_cwd_passed_through(self, mock_popen_cls):
         mock_popen_cls.return_value = _mock_popen("output")
         plan = _plan(_routing_result())
@@ -264,7 +285,7 @@ class TestRunMultiReview:
         call_kwargs = mock_popen_cls.call_args.kwargs
         assert call_kwargs["cwd"] == "/my/project"
 
-    @patch("forge.review.engine.subprocess.Popen")
+    @patch("forge.core.invoker.claude.subprocess.Popen")
     def test_start_new_session_for_cleanup(self, mock_popen_cls):
         mock_popen_cls.return_value = _mock_popen("output")
         plan = _plan(_routing_result())
@@ -283,7 +304,7 @@ class TestRunMultiReview:
         assert output.results == []
         assert output.successful == 0
 
-    @patch("forge.review.engine.subprocess.Popen")
+    @patch("forge.core.invoker.claude.subprocess.Popen")
     def test_runs_below_max_forge_depth(self, mock_popen_cls):
         mock_popen_cls.return_value = _mock_popen("output")
         plan = _plan(_routing_result())
@@ -292,7 +313,7 @@ class TestRunMultiReview:
         assert output.successful == 1
         mock_popen_cls.assert_called_once()
 
-    @patch("forge.review.engine.subprocess.Popen")
+    @patch("forge.core.invoker.claude.subprocess.Popen")
     def test_per_worker_prompt_override(self, mock_popen_cls):
         mock_popen_cls.return_value = _mock_popen("output")
         plan = _plan(_routing_result())
@@ -300,7 +321,7 @@ class TestRunMultiReview:
         communicate_kwargs = mock_popen_cls.return_value.communicate.call_args[1]
         assert communicate_kwargs["input"] == "worker-specific"
 
-    @patch("forge.review.engine.subprocess.Popen")
+    @patch("forge.core.invoker.claude.subprocess.Popen")
     def test_none_prompt_falls_back_to_global(self, mock_popen_cls):
         mock_popen_cls.return_value = _mock_popen("output")
         plan = _plan(_routing_result())
@@ -308,7 +329,7 @@ class TestRunMultiReview:
         communicate_kwargs = mock_popen_cls.return_value.communicate.call_args[1]
         assert communicate_kwargs["input"] == "global prompt"
 
-    @patch("forge.review.engine.subprocess.Popen")
+    @patch("forge.core.invoker.claude.subprocess.Popen")
     def test_prompt_prefix_mode_prepends_hint_to_global_prompt(self, mock_popen_cls):
         mock_popen_cls.return_value = _mock_popen("output")
         plan = _plan(_routing_result())
@@ -320,7 +341,7 @@ class TestRunMultiReview:
         communicate_kwargs = mock_popen_cls.return_value.communicate.call_args[1]
         assert communicate_kwargs["input"] == "worker hint\n\nglobal prompt"
 
-    @patch("forge.review.engine.subprocess.Popen")
+    @patch("forge.core.invoker.claude.subprocess.Popen")
     def test_mixed_prompts(self, mock_popen_cls):
         mock_popen_cls.return_value = _mock_popen("output")
         specs = [_spec("custom", prompt="my custom"), _spec("default", prompt=None)]
@@ -423,7 +444,7 @@ class TestPreflightCheck:
 class TestCredentialInjection:
     """Tests for ANTHROPIC_API_KEY injection from credential file into workflow env."""
 
-    @patch("forge.review.engine.subprocess.Popen")
+    @patch("forge.core.invoker.claude.subprocess.Popen")
     def test_credential_file_key_injected_into_env(self, mock_popen_cls, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
         mock_popen_cls.return_value = _mock_popen("output")
@@ -438,7 +459,7 @@ class TestCredentialInjection:
         call_kwargs = mock_popen_cls.call_args[1]
         assert call_kwargs["env"]["ANTHROPIC_API_KEY"] == "sk-from-file"
 
-    @patch("forge.review.engine.subprocess.Popen")
+    @patch("forge.core.invoker.claude.subprocess.Popen")
     def test_bare_flag_uses_built_env(self, mock_popen_cls, monkeypatch: pytest.MonkeyPatch) -> None:
         """--bare should be added when ANTHROPIC_API_KEY is in the built env."""
         monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)

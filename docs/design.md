@@ -1532,9 +1532,14 @@ differently by different entry points.
 - Callable from skills (on-demand) and policies (automatic)
 - Conservative set: fundamental patterns only
 
-The **fan-out runner** (`run_multi_review()`) spawns N workers in parallel via `ThreadPoolExecutor`, each with its own
-model/proxy and optional per-worker prompt. The **adversarial runner** constrains workers to review/eval skills with
-stance injection (`{stance_prompt}`), mandatory blinding (no peer outputs), and evidence-weighted synthesis.
+The **fan-out runner** (`run_multi_review()`) shapes one already-routed `HeadlessRequest` per worker (model/proxy +
+optional per-worker prompt) and delegates the parallel `claude -p` lifecycle -- per-worker process groups, `os.killpg`
+SIGTERM->SIGKILL cleanup, `ThreadPoolExecutor`, and deterministic `result_map[idx]` ordering -- to
+`ClaudeHeadlessInvoker.run_parallel` (`core/invoker/`). The invoker is the runtime seam Phase 5 swaps for a
+`CodexHeadlessInvoker` without changing the review callers; it also emits one per-worker usage event when a request
+carries attribution (run/model/status/latency; cost null -- the verb aggregate holds the estimated total). The
+**adversarial runner** constrains workers to review/eval skills with stance injection (`{stance_prompt}`), mandatory
+blinding (no peer outputs), and evidence-weighted synthesis.
 
 #### 5.5.6 Relationship to policies (workflow unification)
 

@@ -460,6 +460,8 @@ def panel(
 
     _run_preflight(specs, json_output=json_output, routing_plan=routing_plan)
 
+    from forge.core.invoker import Attribution
+
     with track_verb_cost("panel", resolve_proxy_urls_from_plan(routing_plan)) as cost:
         output = run_multi_review(
             resolved_prompt,
@@ -468,6 +470,7 @@ def panel(
             timeout_seconds=timeout,
             cwd=cwd or str(Path.cwd()),
             resume_id=resume_id,
+            attribution=Attribution(command="panel"),
         )
 
     # Verb-level aggregate (estimated, across workers) attributed to the ambient run.
@@ -827,6 +830,8 @@ def analyze(
 
     _run_preflight(specs, json_output=json_output, routing_plan=routing_plan)
 
+    from forge.core.invoker import Attribution
+
     with track_verb_cost("analyze", resolve_proxy_urls_from_plan(routing_plan)) as cost:
         output = run_multi_review(
             combined_prompt,
@@ -834,6 +839,7 @@ def analyze(
             routing_plan=routing_plan,
             timeout_seconds=timeout,
             cwd=cwd or str(Path.cwd()),
+            attribution=Attribution(command="analyze"),
         )
 
     # Verb-level aggregate (estimated, across workers) attributed to the ambient run.
@@ -1250,6 +1256,8 @@ def debate(
 
         _run_preflight(stance_models, json_output=json_output, routing_plan=routing_plan)
 
+        from forge.core.invoker import Attribution
+
         with track_verb_cost("debate", resolve_proxy_urls_from_plan(routing_plan)) as cost:
             output = run_adversarial(
                 resource_path,
@@ -1257,6 +1265,7 @@ def debate(
                 timeout_seconds=timeout,
                 cwd=cwd or str(Path.cwd()),
                 routing_plan=routing_plan,
+                attribution=Attribution(command="debate"),
             )
     finally:
         if tmp_file is not None:
@@ -1937,6 +1946,8 @@ def consensus(
 
         _run_preflight(role_models, json_output=json_output, routing_plan=routing_plan)
 
+        from forge.core.invoker import Attribution
+
         with track_verb_cost("consensus", resolve_proxy_urls_from_plan(routing_plan)) as cost:
             output = run_consensus(
                 resource_path,
@@ -1945,6 +1956,7 @@ def consensus(
                 cwd=cwd or str(Path.cwd()),
                 original_subject=raw_subject or "",
                 routing_plan=routing_plan,
+                attribution=Attribution(command="consensus"),
             )
     finally:
         if tmp_file is not None:

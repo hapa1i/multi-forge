@@ -33,7 +33,12 @@ def _ok_result(**overrides: Any) -> SessionResult:
 class TestEmitForSessionResult:
     def test_measured_proxy_cost(self) -> None:
         cost = VerbCostResult(
-            verb="memory-writer", total_cost_micros=1500, input_tokens=10, output_tokens=20, duration_ms=1234.5, measured=True
+            verb="memory-writer",
+            total_cost_micros=1500,
+            input_tokens=10,
+            output_tokens=20,
+            duration_ms=1234.5,
+            measured=True,
         )
         emit_usage_for_session_result(
             _ok_result(), command="memory-writer", session="s1", cost=cost, base_url="http://localhost:8084"

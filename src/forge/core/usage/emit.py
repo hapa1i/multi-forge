@@ -144,6 +144,55 @@ def emit_verb_usage(
         logger.debug("emit_verb_usage(%s) failed: %s", command, e)
 
 
+def emit_worker_usage(
+    *,
+    run_id: str,
+    command: str,
+    status: str,
+    parent_run_id: str | None = None,
+    root_run_id: str | None = None,
+    workflow: str | None = None,
+    session: str | None = None,
+    model: str | None = None,
+    provider: str | None = None,
+    proxy_id: str | None = None,
+    latency_ms: float | None = None,
+    runtime: str = "claude_code",
+) -> None:
+    """Emit a per-worker UsageEvent: one run-tree leaf of a fan-out.
+
+    Each worker is a ``claude -p`` subprocess whose *per-worker* cost is unknown
+    (``ReviewResult`` carries none; the verb aggregate from :func:`emit_verb_usage`
+    holds the estimated total). So cost/tokens stay null and
+    ``measurement_source="unattributed"`` -- the event captures the tree shape
+    (run/parent/root + model + status + latency), never a fabricated cost.
+    Best-effort; no-ops without a ``run_id`` (nothing to attribute).
+    """
+    try:
+        if not run_id:
+            return
+        event = UsageEvent(
+            run_id=run_id,
+            parent_run_id=parent_run_id,
+            root_run_id=root_run_id or run_id,
+            runtime=runtime,
+            command=command,
+            status=status,
+            session=session,
+            workflow=workflow,
+            provider=provider,
+            model=model,
+            proxy_id=proxy_id,
+            measurement_source="unattributed",
+            attribution_granularity="worker",
+            latency_ms=round(latency_ms, 1) if latency_ms is not None else None,
+            source_refs=None,
+        )
+        log_usage_event(event)
+    except Exception as e:  # best-effort: telemetry must not break the fan-out
+        logger.debug("emit_worker_usage(%s) failed: %s", command, e)
+
+
 def emit_direct_llm_usage(
     *,
     command: str,

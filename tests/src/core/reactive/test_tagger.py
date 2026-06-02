@@ -183,7 +183,9 @@ class TestTagAction:
 
         tag_action(_make_context(), model="gemini/gemini-2.0-flash", prompt_template="{tool_name}")
 
-        forwarded = mock_adapter.complete.call_args.kwargs["hyperparams"].extra["openai"]["extra_headers"]["X-Request-ID"]
+        forwarded = mock_adapter.complete.call_args.kwargs["hyperparams"].extra["openai"]["extra_headers"][
+            "X-Request-ID"
+        ]
         assert forwarded.startswith("req_")
 
         from forge.core.usage.ledger import read_usage_events

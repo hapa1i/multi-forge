@@ -27,24 +27,57 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-01
 
+### Phase 4 (Slice 4d): HeadlessInvoker + review fan-out migration + per-worker usage events
+
+**Goal**: Extract the review engine's parallel `claude -p` lifecycle behind a runtime-neutral `HeadlessInvoker` seam (so
+Phase 5 can add a Codex runtime without touching callers), and emit the per-worker usage events deferred from 4c.
+
+**Key changes**:
+
+- New `src/forge/core/invoker/` package: `HeadlessRequest`/`HeadlessResult`/`Attribution` + the `HeadlessInvoker`
+  Protocol (`run` single-shot, `run_parallel` fan-out), and `ClaudeHeadlessInvoker`. The seam is the **lifecycle, not
+  the routing**: a request arrives already-routed (`argv`+`env`), so routing stays review-domain and the same
+  `run_parallel` serves a future `CodexHeadlessInvoker`.
+- `review/engine.py` `run_multi_review` shapes per-worker requests (`_prepare_worker`) and delegates to
+  `ClaudeHeadlessInvoker().run_parallel`, mapping back via `_to_review_result`. The lifecycle moved **verbatim**
+  (`Popen(start_new_session=True)`, `os.killpg` SIGTERM->SIGKILL under `children_lock`, `ThreadPoolExecutor(min(N,5))`,
+  `result_map[idx]` ordering); original status conventions preserved.
+- Per-worker usage events: `Attribution(command=...)` threaded from the 4 verbs (panel/analyze via `run_multi_review`,
+  debate/consensus via `run_adversarial`/`run_consensus`); `run_parallel` emits one `emit_worker_usage` per worker
+  (`attribution_granularity=worker`, `measurement_source=unattributed`, cost null -- the verb aggregate holds the
+  estimated total; run/model/status/latency capture the tree leaf).
+- The 4 single-shot callers keep `run_claude_session` (already the right abstraction with its guards; the invoker's
+  `run()` is for protocol completeness + Phase 5). `design.md` §5.5.5 updated; checklist 4d boxes ticked.
+- **Review fixes (folded in):** (1) cancellation cleanup — `run_parallel` manages the executor manually so `_cleanup()`
+  SIGTERMs children **before** the blocking join; the `with ThreadPoolExecutor` `__exit__` would otherwise
+  `shutdown(wait=True)` before cleanup, delaying SIGTERM up to `timeout_seconds` on Ctrl+C. (2) Per-worker events record
+  the **actual routed** `model`/`provider`/`proxy_id` (`route.model_ref`/`route.provider`/`routing_result.proxy_id`),
+  not the friendly catalog id with null provider/proxy. `design_appendix.md` §A.13 documents the per-worker emitter.
+
+**Verification**: 62 existing review tests (`test_engine`/`test_adversarial`/`test_consensus`) pass with only a
+patch-target retarget (`forge.review.engine.subprocess.Popen` -> `forge.core.invoker.claude.subprocess.Popen`), proving
+the extraction is behavior-preserving; 15 invoker tests (`tests/src/core/invoker/test_claude_invoker.py`: ordering,
+concurrency cap, timeout + cancellation killpg, run-id surfacing, single-shot parity, per-worker emission) + an engine
+per-worker routed-metadata test. Full unit suite 4925 passed; mypy clean.
+
 ### Phase 4 (Slice 4c): Review fixes -- direct-path join, honest billing, latency
 
 **Goal**: Close three correctness gaps in the 4c emitters found in review.
 
 **Key changes**:
 
-- Direct-path join now actually works. The tagger resolves its call's base_url synchronously
-  (`resolve_client_base_url` -> new `resolve_provider_base_url`) and, when it is a registered Forge proxy, forwards
-  `X-Request-ID` **and** records `source_refs.cost_request_id` (forwarded id == recorded id). Off-proxy: no header, null
-  ref. Before, the id was minted, forwarded, then discarded -- so even a proxy target produced `source_refs=None`.
-- Honest direct billing. `emit_direct_llm_usage` no longer hardcodes `has_api_key=True`/`api`; `billing_mode` defaults to
-  `unknown` (the default tagger path routes via local LiteLLM with a dummy `not-needed` key, and proxy-lookup failures
-  must not read as `api`).
+- Direct-path join now actually works. The tagger resolves its call's base_url synchronously (`resolve_client_base_url`
+  -> new `resolve_provider_base_url`) and, when it is a registered Forge proxy, forwards `X-Request-ID` **and** records
+  `source_refs.cost_request_id` (forwarded id == recorded id). Off-proxy: no header, null ref. Before, the id was
+  minted, forwarded, then discarded -- so even a proxy target produced `source_refs=None`.
+- Honest direct billing. `emit_direct_llm_usage` no longer hardcodes `has_api_key=True`/`api`; `billing_mode` defaults
+  to `unknown` (the default tagger path routes via local LiteLLM with a dummy `not-needed` key, and proxy-lookup
+  failures must not read as `api`).
 - `latency_ms` now populated. `track_verb_cost` records wall-clock duration on every path (incl. no-proxy); the
   verb/session emitters copy `duration_ms`; the tagger times its own `complete()` call.
 
-**Verification**: +4 unit tests (base_url resolver, end-to-end proxy join, billing/latency); full unit suite green
-(4910 passed); mypy clean. design.md §3.14 + appendix §A.13 updated.
+**Verification**: +4 unit tests (base_url resolver, end-to-end proxy join, billing/latency); full unit suite green (4910
+passed); mypy clean. design.md §3.14 + appendix §A.13 updated.
 
 ### Phase 4 (Slice 4c): Instrument native + direct usage paths
 
@@ -70,10 +103,11 @@ so `forge` verbs and the action tagger record who consumed what -- honestly, wit
   (no cost wrapper / proxy-only); interactive launchers; native runtimes (Phase 5). `claude -p` per-request correlation
   stays null until 4g.
 
-**Verification**: 20 new unit tests (billing/correlation/emit), tagger updated to `.complete()` + emits, `test_workflow.py`
-verb-event emission, regression `test_bug_usage_claude_p_null_source_refs.py`; targeted suites green (usage, tagger,
-cost_tracking, workflow, memory_writer, supervisor, shadow); mypy clean on all 11 wired files; `make pre-commit` clean.
-Two commits: 4c-i foundation `1477d3b`, then 4c-ii wiring. design.md §3.14 + appendix §A.13 updated (emitters shipped).
+**Verification**: 20 new unit tests (billing/correlation/emit), tagger updated to `.complete()` + emits,
+`test_workflow.py` verb-event emission, regression `test_bug_usage_claude_p_null_source_refs.py`; targeted suites green
+(usage, tagger, cost_tracking, workflow, memory_writer, supervisor, shadow); mypy clean on all 11 wired files;
+`make pre-commit` clean. Two commits: 4c-i foundation `1477d3b`, then 4c-ii wiring. design.md §3.14 + appendix §A.13
+updated (emitters shipped).
 
 ### Phase 4 (Slice 4b): Usage-attribution ledger schema
 
