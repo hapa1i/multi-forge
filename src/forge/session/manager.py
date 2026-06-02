@@ -919,13 +919,20 @@ class SessionManager:
                 )
                 break  # Success
             except SessionExistsError:
-                child_store.delete()
+                # The session that won add_from_state owns `child_name`. With a deterministic
+                # auto-name (<parent>-resumed), the winner's manifest dir AND its curated
+                # children/<child>.md snapshot are the SAME paths this loser just touched, so
+                # deleting them would destroy the winner's resume context. Only clean up a name
+                # that no live session owns; otherwise leave the winner's state and just rename.
+                winner_owns = self.index_store.session_exists(child_name, forge_root=parent_entry.forge_root)
+                if not winner_owns:
+                    child_store.delete()
 
                 if not name_was_auto or attempt > 0:
                     raise
 
                 derivation = child_state.confirmed.derivation
-                if derivation is not None and derivation.resume_mode == "transfer":
+                if derivation is not None and derivation.resume_mode == "transfer" and not winner_owns:
                     orphan_context = child_path(Path(parent_forge_root), parent_name, child_name)
                     generated_context = generated_path(Path(parent_forge_root), parent_name)
                     try:
