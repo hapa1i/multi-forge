@@ -19,6 +19,9 @@ from forge.core.runtime import RuntimeSpec, list_runtimes
 def runtime() -> None:
     """Inspect agent-runtime capabilities (Claude Code, Codex, Gemini).
 
+    Claude Code is the only launchable frontend today; the Codex and Gemini
+    entries describe detected capabilities for follow-up runtime work.
+
     \b
     Examples:
         forge runtime list           # Capability matrix for all runtimes

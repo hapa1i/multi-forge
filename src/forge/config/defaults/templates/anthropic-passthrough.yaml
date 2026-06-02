@@ -16,8 +16,9 @@ proxy:
   default_port: 8096
   wire_shape: anthropic_passthrough
 
-  # Observe by default: hash + drift-detect outbound system prompts / tool surfaces.
-  # No body inspection until raised to 'inspect'; set 'override' to apply controls.
+  # Observe by default: 'inspect' hashes + drift-detects outbound system prompts /
+  # tool surfaces (metadata only, no body mutation). Raise to 'override' to apply
+  # body controls (allowed only on this anthropic_passthrough wire shape).
   intercept:
     mode: inspect
 
