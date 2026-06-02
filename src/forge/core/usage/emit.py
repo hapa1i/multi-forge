@@ -98,6 +98,50 @@ def emit_usage_for_session_result(
         logger.debug("emit_usage_for_session_result(%s) failed: %s", command, e)
 
 
+def emit_verb_usage(
+    *,
+    command: str,
+    cost: VerbCostResult | None = None,
+    status: str = "success",
+    workflow: str | None = None,
+    session: str | None = None,
+    runtime: str = "claude_code",
+) -> None:
+    """Emit a verb-level aggregate UsageEvent attributed to the ambient run.
+
+    For workflow fan-outs (panel/analyze/debate/consensus): ``track_verb_cost``
+    gives an *estimated aggregate* across N proxied workers, attributed to the
+    ambient run (the session that launched the workflow), granularity ``"verb"``.
+    Per-worker events are out of scope -- ``ReviewResult`` carries no per-worker
+    cost (those land in 4d behind the invoker). No-ops without a run identity.
+    """
+    try:
+        identity = get_run_identity()
+        if identity is None:
+            return
+        measured_cost = cost if (cost is not None and cost.measured) else None
+        event = UsageEvent(
+            run_id=identity.run_id,
+            parent_run_id=identity.parent_run_id,
+            root_run_id=identity.root_run_id,
+            runtime=runtime,
+            command=command,
+            status=status,
+            session=session,
+            workflow=workflow,
+            measurement_source="verb_snapshot_estimated" if measured_cost else "unattributed",
+            attribution_granularity="verb",
+            input_tokens=measured_cost.input_tokens if measured_cost else None,
+            output_tokens=measured_cost.output_tokens if measured_cost else None,
+            cached_tokens=measured_cost.cached_tokens if measured_cost else None,
+            cost_micro_usd=measured_cost.total_cost_micros if measured_cost else None,
+            source_refs=None,  # claude -p workers: proxy request_id unknown (4g)
+        )
+        log_usage_event(event)
+    except Exception as e:
+        logger.debug("emit_verb_usage(%s) failed: %s", command, e)
+
+
 def emit_direct_llm_usage(
     *,
     command: str,

@@ -49,8 +49,9 @@ All Phase 2 slice boxes are ticked.
 top-level `forge transfer show|regenerate|edit|diff` CLI shipped in commit `2b70c29`; `docs/design.md` §3.9 and
 `docs/design_appendix.md` §M reflect it. All Phase 1 boxes are ticked.
 
-Next: **Phase 4 (runtime-abstraction core)** -- **Slices 4a (run-tree env contract) + 4b (usage-ledger schema) shipped
-2026-06-01**; next is Slice 4c (instrument native + direct paths). The two cross-cutting Phase 4 decisions are resolved
+Next: **Phase 4 (runtime-abstraction core)** -- **Slices 4a (run-tree env contract) + 4b (usage-ledger schema) + 4c
+(instrument native + direct paths) shipped 2026-06-01**; next is Slice 4d (`HeadlessInvoker` + review fan-out migration,
+which also picks up the deferred per-worker usage events). The two cross-cutting Phase 4 decisions are resolved
 (data-plane: separate planes linked by `request_id`; `FORGE_DEPTH`: additive run-tree env, integer guard unchanged) --
 see Open Decisions for the de-risked build sequence, recorded at the top of the Phase 4 section. Deferred Phase 3
 follow-ups (`--rewrite-paths`, sidecar/resume native-relocate, the gated default flip) are recorded as trackable boxes
@@ -578,12 +579,33 @@ internal/refactorable -- it does not mint a durable contract, so it does not gat
     (`tests/regression/test_bug_usage_ledger_non_dict_line.py`); `design.md` §3.2/§3.14 + `design_appendix.md` §A.13
     document the schema + three-plane model. `pre-commit` clean. Callsite instrumentation is the next box (Slice 4c).
 
-- [ ] Instrument usage ledger callsites in staged order.
+- [x] Instrument usage ledger callsites in staged order. *(Slice 4c -- shipped 2026-06-01)*
 
   - Assertion: workflow verbs (`src/forge/cli/workflow.py`), memory writer (`src/forge/session/memory_writer.py`),
     review engine (`src/forge/review/engine.py`), semantic supervisor (`src/forge/policy/semantic/supervisor.py`), team
     supervisor (`src/forge/policy/team/handlers.py`), Claude launcher (`src/forge/cli/claude.py`), and session launcher
     (`src/forge/cli/session.py`) each have an explicit done/deferred status.
+  - Verification (2026-06-01): two commits -- 4c-i foundation (holder + helpers) `1477d3b`, then 4c-ii wiring.
+    **Done:** the four workflow verbs (`cli/workflow.py`, one estimated verb-level event each via `emit_verb_usage`,
+    ambient run, `attribution_granularity=verb`); memory writer, semantic supervisor, shadow curation -- one event per
+    `claude -p` run via `emit_usage_for_session_result` + the `track_verb_cost` holder, attributed to the subprocess's
+    run identity, null `source_refs`; action tagger (`core/reactive/tagger.py`) -- direct worked example, `ask()` ->
+    `complete()` to capture `provider_usage_exact` tokens, forwards `X-Request-ID` via `with_forge_request_id`
+    (behavior-preserving: a None-default client returns the hp verbatim, so only the header is added).
+    **Deferred:** review-engine per-worker events (`review/engine.py` -- land behind `HeadlessInvoker` in 4d, where each
+    spawn is owned; the verb aggregate already covers the fan-out); team supervisor (`policy/team/handlers.py`) + team
+    tagger + `policy/workflow/stages.py` (no cost wrapper / proxy-only direct); interactive launchers (`cli/claude.py`,
+    `cli/session.py` -- interactive-session usage is its own concern, not a headless verb); native Codex/Gemini (Phase 5).
+  - `track_verb_cost` now yields a `VerbCostResult` holder (`measured` flag separates a real snapshot delta from a
+    no-proxy verb -> null cost, not a fabricated $0); backward-compatible (callers without `as cost` unaffected;
+    verb-cost log unchanged). **Refinement vs plan:** added `measurement_source=provider_usage_exact` (a direct call's
+    exact in-band tokens fit none of the original four values); enum finalized with its first emitters (nothing emitted
+    before, so no migration).
+  - Tests: billing/correlation/emit unit (20), tagger updated to `.complete()` + emits a `provider_usage_exact` event,
+    `test_workflow.py` verb-event emission (one aggregate, ambient run; none without identity), regression
+    `test_bug_usage_claude_p_null_source_refs.py`. Targeted suites green (usage + tagger + cost_tracking + workflow +
+    memory_writer + supervisor + shadow); mypy clean on all 11 wired files. design.md §3.14 + appendix §A.13 updated
+    (emitters shipped).
 
 ## Phase 5 - Cross-Runtime Resume
 

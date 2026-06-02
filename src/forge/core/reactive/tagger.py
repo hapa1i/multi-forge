@@ -38,7 +38,8 @@ def tag_action(
         List of tag strings. Empty list on any error (fail-open).
     """
     try:
-        from forge.core.llm import SyncAdapter, get_client
+        from forge.core.llm import Message, SyncAdapter, get_client
+        from forge.core.usage import emit_direct_llm_usage, mint_request_id, with_forge_request_id
 
         prompt = prompt_template.format(
             tool_name=context.tool_name,
@@ -48,9 +49,24 @@ def tag_action(
 
         client = get_client(model)
         adapter = SyncAdapter(client)
-        response = adapter.ask(prompt)
+        # Forward X-Request-ID so a Forge proxy in the path (if this model is routed
+        # through one) can correlate this call's cost record. With a None-default
+        # client, merge_hyperparams returns this hp verbatim, so every other param
+        # stays at its default -- behavior is preserved, only the header is added.
+        hp = with_forge_request_id(None, mint_request_id())
+        response = adapter.complete([Message(role="user", content=prompt)], hyperparams=hp)
 
-        return _parse_tags(response)
+        # Best-effort usage attribution: provider-reported tokens, ambient run.
+        # cost_request_id stays null -- the tagger can't prove a Forge-proxy target,
+        # and a dangling back-reference would be worse than none.
+        emit_direct_llm_usage(
+            command="tagger",
+            model=model,
+            provider=model.split("/", 1)[0] if "/" in model else None,
+            usage=response.usage,
+        )
+
+        return _parse_tags(response.text)
 
     except Exception as e:
         _log.warning("tag_action failed (model=%s): %s", model, e)

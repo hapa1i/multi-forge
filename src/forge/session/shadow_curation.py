@@ -279,6 +279,7 @@ def run_shadow_curation(
     """
     from forge.core.reactive.cost_tracking import track_verb_cost
     from forge.core.reactive.session_runner import run_claude_session
+    from forge.core.usage import emit_usage_for_session_result
 
     prompt = build_curation_prompt(
         official_path=official_path,
@@ -288,7 +289,7 @@ def run_shadow_curation(
 
     tracking_urls = [base_url] if base_url else []
 
-    with track_verb_cost("curation", tracking_urls):
+    with track_verb_cost("curation", tracking_urls) as cost:
         result = run_claude_session(
             prompt,
             base_url=base_url,
@@ -296,6 +297,16 @@ def run_shadow_curation(
             timeout_seconds=timeout_seconds,
             cwd=str(forge_root),
         )
+
+    # Attribute before the failure branch so failed runs are recorded too.
+    emit_usage_for_session_result(
+        result,
+        command="curation",
+        cost=cost,
+        session=session_name,
+        base_url=base_url,
+        direct=direct,
+    )
 
     if not result.success:
         logger.warning(

@@ -7,7 +7,7 @@ audit planes by a shared proxy ``request_id`` via nullable ``source_refs``. See
 
 from .billing import infer_billing_mode
 from .correlation import mint_request_id, target_is_forge_proxy, with_forge_request_id
-from .emit import emit_direct_llm_usage, emit_usage_for_session_result
+from .emit import emit_direct_llm_usage, emit_usage_for_session_result, emit_verb_usage
 from .ledger import (
     USAGE_SCHEMA_VERSION,
     AttributionGranularity,
@@ -29,6 +29,7 @@ __all__ = [
     "UsageEvent",
     "emit_direct_llm_usage",
     "emit_usage_for_session_result",
+    "emit_verb_usage",
     "infer_billing_mode",
     "log_usage_event",
     "mint_request_id",

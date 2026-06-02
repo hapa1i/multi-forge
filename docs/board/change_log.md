@@ -27,6 +27,35 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-01
 
+### Phase 4 (Slice 4c): Instrument native + direct usage paths
+
+**Goal**: Wire the usage-attribution ledger to the callsites where a run identity and a cost/usage signal already exist,
+so `forge` verbs and the action tagger record who consumed what -- honestly, without faking figures Forge can't measure.
+
+**Key changes**:
+
+- `track_verb_cost` now yields a `VerbCostResult` holder (populated in place on exit) so callers read the estimated cost
+  delta for attribution. A new `measured` flag separates a real snapshot delta from a no-proxy verb (null cost, not a
+  fabricated $0). Backward-compatible: callers without `as cost` are unaffected; the verb-cost log is unchanged.
+- New `core/usage` helpers: `infer_billing_mode` (conservative -- `api` only when direct + key, else `unknown`),
+  `with_forge_request_id` + `target_is_forge_proxy` + `mint_request_id` (direct-path `X-Request-ID` correlation
+  primitives), and `emit_verb_usage` / `emit_usage_for_session_result` / `emit_direct_llm_usage` (best-effort,
+  depth-agnostic; no-op without a run identity). 4d reuses the emit helpers.
+- Wired emitters: the four workflow verbs (`panel`/`analyze`/`debate`/`consensus`, one estimated verb-level event each,
+  ambient run); memory writer, semantic supervisor, shadow curation (one event per `claude -p` run, attributed to the
+  subprocess run, null `source_refs`); the action tagger, switched `ask()` -> `complete()` to capture
+  `provider_usage_exact` provider tokens and forward `X-Request-ID` (behavior-preserving on a None-default client).
+- Added `measurement_source=provider_usage_exact` (a direct call's exact in-band tokens fit none of the original four
+  values); enum finalized with its first emitters -- nothing emitted before, so no migration.
+- Deferred: review-engine per-worker events (-> 4d behind `HeadlessInvoker`); team supervisor/tagger + workflow stages
+  (no cost wrapper / proxy-only); interactive launchers; native runtimes (Phase 5). `claude -p` per-request correlation
+  stays null until 4g.
+
+**Verification**: 20 new unit tests (billing/correlation/emit), tagger updated to `.complete()` + emits, `test_workflow.py`
+verb-event emission, regression `test_bug_usage_claude_p_null_source_refs.py`; targeted suites green (usage, tagger,
+cost_tracking, workflow, memory_writer, supervisor, shadow); mypy clean on all 11 wired files; `make pre-commit` clean.
+Two commits: 4c-i foundation `1477d3b`, then 4c-ii wiring. design.md §3.14 + appendix §A.13 updated (emitters shipped).
+
 ### Phase 4 (Slice 4b): Usage-attribution ledger schema
 
 **Goal**: Add the durable, versioned `~/.forge/usage/events/` attribution ledger -- the third data plane alongside cost

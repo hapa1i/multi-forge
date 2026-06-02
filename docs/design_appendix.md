@@ -424,8 +424,15 @@ Enumerations are `Literal`s (provenance is recorded, never inferred):
 `source_refs` is null on native-runtime events (no proxy) and on `claude -p` traffic until per-request correlation ships
 (Phase 4g); the event stays useful without it (run/model/billing_mode/tokens). Reading skips — with a one-time warning —
 records written by a newer Forge (`schema_version` > current), and (strict on shape) records with unknown fields.
-`read_usage_events()` is the typed read surface. The schema and `log_usage_event`/`read_usage_events` API are the
-shipped surface; Forge callsites do not yet emit events.
+`read_usage_events()` is the typed read surface.
+
+**Instrumented emitters (Phase 4c).** The workflow verbs (`panel`/`analyze`/`debate`/`consensus`) emit one estimated
+verb-level event each (`measurement_source=verb_snapshot_estimated`, attributed to the ambient run — per-worker cost is
+not available); the memory writer, semantic supervisor, and shadow curation emit one event per `claude -p` run (attributed
+to that subprocess's run identity, via the `track_verb_cost` holder); the action tagger emits a `provider_usage_exact`
+event from a direct `core.llm` call (exact in-band provider tokens). All emit best-effort and never gate the work they
+measure; `claude -p` events carry null `source_refs` (4g). Helpers: `emit_verb_usage`, `emit_usage_for_session_result`,
+`emit_direct_llm_usage` (`forge.core.usage.emit`).
 
 ---
 

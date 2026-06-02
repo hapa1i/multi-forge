@@ -460,7 +460,7 @@ def panel(
 
     _run_preflight(specs, json_output=json_output, routing_plan=routing_plan)
 
-    with track_verb_cost("panel", resolve_proxy_urls_from_plan(routing_plan)):
+    with track_verb_cost("panel", resolve_proxy_urls_from_plan(routing_plan)) as cost:
         output = run_multi_review(
             resolved_prompt,
             models=specs,
@@ -469,6 +469,11 @@ def panel(
             cwd=cwd or str(Path.cwd()),
             resume_id=resume_id,
         )
+
+    # Verb-level aggregate (estimated, across workers) attributed to the ambient run.
+    from forge.core.usage import emit_verb_usage
+
+    emit_verb_usage(command="panel", cost=cost, status="success" if output.successful else "error")
 
     _handle_review_output(
         ctx,
@@ -822,7 +827,7 @@ def analyze(
 
     _run_preflight(specs, json_output=json_output, routing_plan=routing_plan)
 
-    with track_verb_cost("analyze", resolve_proxy_urls_from_plan(routing_plan)):
+    with track_verb_cost("analyze", resolve_proxy_urls_from_plan(routing_plan)) as cost:
         output = run_multi_review(
             combined_prompt,
             models=specs,
@@ -830,6 +835,11 @@ def analyze(
             timeout_seconds=timeout,
             cwd=cwd or str(Path.cwd()),
         )
+
+    # Verb-level aggregate (estimated, across workers) attributed to the ambient run.
+    from forge.core.usage import emit_verb_usage
+
+    emit_verb_usage(command="analyze", cost=cost, status="success" if output.successful else "error")
 
     _handle_review_output(
         ctx,
@@ -1240,7 +1250,7 @@ def debate(
 
         _run_preflight(stance_models, json_output=json_output, routing_plan=routing_plan)
 
-        with track_verb_cost("debate", resolve_proxy_urls_from_plan(routing_plan)):
+        with track_verb_cost("debate", resolve_proxy_urls_from_plan(routing_plan)) as cost:
             output = run_adversarial(
                 resource_path,
                 stances,
@@ -1251,6 +1261,11 @@ def debate(
     finally:
         if tmp_file is not None:
             Path(tmp_file.name).unlink(missing_ok=True)
+
+    # Verb-level aggregate (estimated, across workers) attributed to the ambient run.
+    from forge.core.usage import emit_verb_usage
+
+    emit_verb_usage(command="debate", cost=cost, status="success" if output.successful else "error")
 
     debate_warnings = _routing_plan_warnings(stance_models, routing_plan)
     debate_resolved_models = _resolved_models_summary(
@@ -1922,7 +1937,7 @@ def consensus(
 
         _run_preflight(role_models, json_output=json_output, routing_plan=routing_plan)
 
-        with track_verb_cost("consensus", resolve_proxy_urls_from_plan(routing_plan)):
+        with track_verb_cost("consensus", resolve_proxy_urls_from_plan(routing_plan)) as cost:
             output = run_consensus(
                 resource_path,
                 role_specs,
@@ -1934,6 +1949,11 @@ def consensus(
     finally:
         if tmp_file is not None:
             Path(tmp_file.name).unlink(missing_ok=True)
+
+    # Verb-level aggregate (estimated, across workers) attributed to the ambient run.
+    from forge.core.usage import emit_verb_usage
+
+    emit_verb_usage(command="consensus", cost=cost, status="success" if output.successful else "error")
 
     consensus_warnings = _routing_plan_warnings(role_models, routing_plan)
     consensus_resolved_models = _resolved_models_summary(
