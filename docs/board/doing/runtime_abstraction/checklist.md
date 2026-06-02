@@ -736,3 +736,14 @@ Tracks Forge-local execution decisions for this checklist. For broader card ques
   Claude-Code custom-header feasibility check); **(b)** out-of-band `(run_id, proxy_id, time_window)` correlation
   (inherits today's `estimated=True` snapshot concurrency fragility, `cost_tracking.py:7`). **Sequenced last (Phase 4
   step 4)** -- validate the ledger on native + direct paths first, then resolve this fork as its own slice.
+- [ ] On-demand policy CLI runtime origin (4f follow-up, surfaced by review 2026-06-02): the manual `forge policy check`
+  (`cli/policy.py` `check`, :519) and `forge policy supervisor` (`supervisor_cmd`, :693) leaf commands tag
+  `ActionContext.runtime="claude_code"`, but their actual actor is a human at a terminal, not Claude (synthetic
+  `session_name="on-demand"`, no session). 4f's contract is "which runtime *produced* the action" -- the file under
+  review may be Claude's output, but that is the check's *subject*, not its *invoker*. **Inert today**: nothing reads
+  `ActionContext.runtime` (the engine ignores it; it does not flow to the usage ledger, whose emit helpers take a
+  separate `runtime` param), so no behavior is wrong yet. The `%policy check` path
+  (`direct_commands.py:_handle_policy_check`, :1173) is **genuinely Claude-context** (a UserPromptSubmit `%`-command)
+  and correctly stays `claude_code` -- only the two CLI leaves are the over-claim. **Phase 5/6 decision** (when a
+  consumer first reads `runtime`): give the manual CLI checks a distinct origin -- prefer `forge_cli` (the actor is
+  known) over `unknown` (reserve that for genuinely-undeterminable payloads).
