@@ -392,6 +392,40 @@ Every record carries `schema_version`, `ts`, `request_id`, `proxy_id`, and a `re
 Reading skips records written by a newer Forge (`schema_version` > current) with a one-time warning.
 `forge proxy audit show|diff` (§4.0) is the read surface.
 
+### A.13 Usage-attribution ledger schema (§3.14)
+
+The canonical **attribution** plane: which run/workflow/session invoked which runtime/provider/model via which route,
+and what it consumed. Modeled on the audit log (versioned, strictly read). The three data planes stay physically
+separate and are joined by a shared proxy `request_id`:
+
+| Path                                          | Owner                     | Notes                                                    |
+| --------------------------------------------- | ------------------------- | -------------------------------------------------------- |
+| `~/.forge/usage/events/<YYYY-MM>_<pid>.jsonl` | `forge.core.usage.ledger` | Owner-only 0600, append-only, PID-sharded; `UsageEvent`s |
+
+`UsageEvent` carries `schema_version` (= 1) plus an auto-stamped `event_id` (`evt_…`, for dedupe/debugging) and `ts`:
+
+| Group            | Fields                                                                                           |
+| ---------------- | ------------------------------------------------------------------------------------------------ |
+| Attribution core | `run_id`, `root_run_id`, `runtime`, `command`, `status` (required); `parent_run_id` (optional)   |
+| Context          | `session`, `workflow`, `provider`, `model`, `proxy_id`                                           |
+| Provenance       | `billing_mode`, `measurement_source`, `attribution_granularity`                                  |
+| Consumption      | `input_tokens`, `output_tokens`, `cached_tokens`, `latency_ms`, `failure_type`, `cost_micro_usd` |
+| Cross-plane refs | `source_refs` = `{cost_request_id, audit_request_id}` (nullable)                                 |
+
+Enumerations are `Literal`s (provenance is recorded, never inferred):
+
+- `measurement_source`: `proxy_request_exact` | `verb_snapshot_estimated` | `runtime_native` | `unattributed` — how the
+  cost/token figures were obtained, so an event lacking an exact figure says so rather than guessing.
+- `billing_mode`: `api` | `subscription_interactive` | `subscription_headless_credit` | `subscription_quota` | `unknown`
+  (`unknown` is the honest default where the signal is ambiguous).
+- `attribution_granularity`: `worker` | `verb` | `session`.
+
+`source_refs` is null on native-runtime events (no proxy) and on `claude -p` traffic until per-request correlation ships
+(Phase 4g); the event stays useful without it (run/model/billing_mode/tokens). Reading skips — with a one-time warning —
+records written by a newer Forge (`schema_version` > current), and (strict on shape) records with unknown fields.
+`read_usage_events()` is the typed read surface. The schema and `log_usage_event`/`read_usage_events` API are the
+shipped surface; Forge callsites do not yet emit events.
+
 ---
 
 ## B. Direct Command Reference

@@ -27,6 +27,33 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-01
 
+### Phase 4 (Slice 4b): Usage-attribution ledger schema
+
+**Goal**: Add the durable, versioned `~/.forge/usage/events/` attribution ledger -- the third data plane alongside cost
+and audit, joined to them by a shared proxy `request_id` -- so Phase 4c can record which run/workflow/session invoked
+which runtime/model and consumed what.
+
+**Key changes**:
+
+- New `src/forge/core/usage/` package (`ledger.py`): `UsageEvent` (`schema_version=1`; auto-stamped `event_id`/`ts`;
+  required attribution core run/root/runtime/command/status; every other field defaulted), `SourceRefs`
+  (`{cost_request_id, audit_request_id}`, nullable), and `BillingMode`/`MeasurementSource`/`AttributionGranularity`
+  literals (provenance recorded, never inferred).
+- `log_usage_event` (best-effort, never raises; `open_secure_append` 0600, dirs 0700; PID-sharded
+  `usage/events/<month>_<pid>.jsonl`; module `_lock`); strict typed `read_usage_events` -- `dacite.Config(strict=True)`,
+  so unknown fields, invalid literals, and wrong nested types are all corruption; a non-object line, a newer-schema
+  record, or a malformed record is skipped with a one-time warning; raw-dict filters run before the typed build. Plus
+  `prune_usage_events`. Modeled on `audit_logger.py` (versioned), NOT the unversioned `cost_logger.py`.
+- **Refinement vs the decision's path**: PID-sharded `usage/events/<month>_<pid>.jsonl`, not a single `events.jsonl`, so
+  cross-process review workers never contend on one file.
+- Docs: `design.md` §3.2 (contract-files row) + §3.14 (three-plane model); `design_appendix.md` §A.13 (schema).
+
+**Verification**: 16 unit tests (`tests/src/core/usage/test_ledger.py`: roundtrip, version stamp, 0600/0700 perms, null
+and nested `source_refs`, newer-skip-warn-once, unknown-field / bad-literal / bad-nested corruption, non-object and
+malformed line skip, run/command filters, ts-window, best-effort writer) plus a parametrized regression
+(`tests/regression/test_bug_usage_ledger_non_dict_line.py`: a non-object JSONL line must not abort the read).
+`pre-commit` clean (mypy + pyright). No callsites emit yet -- instrumentation is Slice 4c.
+
 ### Phase 4 (Slice 4a): Run-tree env contract
 
 **Goal**: Give every Forge-spawned process a run-tree identity

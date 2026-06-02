@@ -49,13 +49,13 @@ All Phase 2 slice boxes are ticked.
 top-level `forge transfer show|regenerate|edit|diff` CLI shipped in commit `2b70c29`; `docs/design.md` §3.9 and
 `docs/design_appendix.md` §M reflect it. All Phase 1 boxes are ticked.
 
-Next: **Phase 4 (runtime-abstraction core)** -- **Slice 4a (run-tree env contract) shipped 2026-06-01**; next is Slice
-4b (usage-ledger schema). The two cross-cutting Phase 4 decisions are resolved (data-plane: separate planes linked by
-`request_id`; `FORGE_DEPTH`: additive run-tree env, integer guard unchanged) -- see Open Decisions for the de-risked
-build sequence, recorded at the top of the Phase 4 section. Deferred Phase 3 follow-ups (`--rewrite-paths`,
-sidecar/resume native-relocate, the gated default flip) are recorded as trackable boxes under Phase 3 and land when
-prioritized. The card stays in `doing/` until Phases 3-6 land (board-contract: move to `done/` only when fully
-executed).
+Next: **Phase 4 (runtime-abstraction core)** -- **Slices 4a (run-tree env contract) + 4b (usage-ledger schema) shipped
+2026-06-01**; next is Slice 4c (instrument native + direct paths). The two cross-cutting Phase 4 decisions are resolved
+(data-plane: separate planes linked by `request_id`; `FORGE_DEPTH`: additive run-tree env, integer guard unchanged) --
+see Open Decisions for the de-risked build sequence, recorded at the top of the Phase 4 section. Deferred Phase 3
+follow-ups (`--rewrite-paths`, sidecar/resume native-relocate, the gated default flip) are recorded as trackable boxes
+under Phase 3 and land when prioritized. The card stays in `doing/` until Phases 3-6 land (board-contract: move to
+`done/` only when fully executed).
 
 **Deferred prerequisite (memory_substrate reconciliation) -- RESOLVED 2026-05-30:**
 
@@ -513,9 +513,9 @@ Recorded so they are not lost while Phase 4 proceeds. None block Phase 4. Verifi
 
 **Cross-cutting decisions resolved (2026-06-01, see Open Decisions):** data-plane (three separate planes linked by
 `request_id`) and `FORGE_DEPTH` vs run-tree (additive, orthogonal). **De-risked build sequence:** (1) run-tree env
-contract in `build_claude_env` (additive, touches no durable schema); (2) define `usage/events.jsonl` schema with
-nullable `source_refs`; (3) instrument native + direct `core.llm` paths first (linkage exact or moot); (4) proxied
-per-request correlation fork last. The `HeadlessInvoker` refactor is the largest *implementation* risk but is
+contract in `build_claude_env` (additive, touches no durable schema); (2) define `usage/events/<month>_<pid>.jsonl`
+schema with nullable `source_refs`; (3) instrument native + direct `core.llm` paths first (linkage exact or moot); (4)
+proxied per-request correlation fork last. The `HeadlessInvoker` refactor is the largest *implementation* risk but is
 internal/refactorable -- it does not mint a durable contract, so it does not gate the schema work.
 
 ### Slice 4a - Run-tree env contract (DONE 2026-06-01)
@@ -560,10 +560,23 @@ internal/refactorable -- it does not mint a durable contract, so it does not gat
   - Assertion: current Claude hook adapter behavior is unchanged, runtime identity is represented explicitly, and Codex
     adapter limitations are represented as capabilities instead of implied parity.
 
-- [ ] Define durable usage ledger schema.
+- [x] Define durable usage ledger schema. *(Slice 4b -- shipped 2026-06-01)*
 
-  - Assertion: `~/.forge/usage/events.jsonl` event schema covers runtime, provider, model, proxy, billing mode, tokens,
-    latency, status, and attribution ids.
+  - Assertion: the `~/.forge/usage/events/<month>_<pid>.jsonl` `UsageEvent` schema covers runtime, provider, model,
+    proxy, billing mode, tokens, latency, status, and attribution ids (run/parent/root + cross-plane `source_refs`).
+  - Verification (2026-06-01): new `src/forge/core/usage/` package -- `UsageEvent` (`schema_version=1`, auto-stamped
+    `event_id`/`ts`, every non-core field defaulted), `SourceRefs`, and `BillingMode`/`MeasurementSource`/
+    `AttributionGranularity` literals; `log_usage_event` (best-effort, `open_secure_append` 0600, dirs 0700,
+    PID-sharded, module `_lock`) + strict typed `read_usage_events` (`dacite.Config(strict=True)`: unknown fields,
+    invalid literals, and wrong nested types are all corruption; skips non-object / newer-schema / malformed lines with
+    a one-time warning) + `prune_usage_events`. Modeled on `audit_logger.py` (versioned), not the unversioned cost
+    logger. **Path refinement:** shipped PID-sharded `usage/events/<month>_<pid>.jsonl` (not a single `events.jsonl`),
+    like every sibling log, so concurrent (cross-process) review workers never contend on one file. 16 unit tests
+    (`tests/src/core/usage/test_ledger.py`: roundtrip, version stamp, 0600/0700 perms, null and nested `source_refs`,
+    newer-skip-warn-once, unknown-field / bad-literal / bad-nested corruption, non-object + malformed line skip,
+    filters, ts-window, best-effort writer) + a parametrized regression
+    (`tests/regression/test_bug_usage_ledger_non_dict_line.py`); `design.md` §3.2/§3.14 + `design_appendix.md` §A.13
+    document the schema + three-plane model. `pre-commit` clean. Callsite instrumentation is the next box (Slice 4c).
 
 - [ ] Instrument usage ledger callsites in staged order.
 
@@ -609,13 +622,13 @@ Tracks Forge-local execution decisions for this checklist. For broader card ques
 - [x] Where do proxy cost logs, audit logs, and the future usage ledger converge? **Resolved 2026-06-01: they do not
   physically converge -- three separate planes linked by a shared `request_id`.** `costs/requests/*.jsonl` stays the
   cap-enforcement spend log + bootstrap source; `audit/requests/*.jsonl` stays the privacy-sensitive wire record with
-  its own retention; the new `usage/events.jsonl` is the canonical attribution ledger ("which run/workflow/session
-  invoked which runtime/provider/model via which route and consumed what"), referencing the other planes via
-  **nullable** `source_refs` (`{cost_request_id, audit_request_id}`), not absorbing them. Join key verified to exist:
-  the proxy generates one `request_id` per request (`server.py:1627`) and threads it into both the cost writer
-  (`cost_logger.py:50`) and every audit writer (`audit_logger.py`). Denormalize `cost_micro_usd` into the event for
-  greppability while keeping `source_refs` for provenance; native-runtime events (Codex/Gemini) carry units directly and
-  leave `source_refs` null.
+  its own retention; the new `usage/events/<month>_<pid>.jsonl` (PID-sharded) is the canonical attribution ledger
+  ("which run/workflow/session invoked which runtime/provider/model via which route and consumed what"), referencing the
+  other planes via **nullable** `source_refs` (`{cost_request_id, audit_request_id}`), not absorbing them. Join key
+  verified to exist: the proxy generates one `request_id` per request (`server.py:1627`) and threads it into both the
+  cost writer (`cost_logger.py:50`) and every audit writer (`audit_logger.py`). Denormalize `cost_micro_usd` into the
+  event for greppability while keeping `source_refs` for provenance; native-runtime events (Codex/Gemini) carry units
+  directly and leave `source_refs` null.
 - [x] How should `FORGE_DEPTH` compose with future run-tree attribution ids? **Resolved 2026-06-01: run identity is
   authoritative; `FORGE_DEPTH` stays an additive integer guard, not reinterpreted.** New env
   `FORGE_RUN_ID`/`FORGE_PARENT_RUN_ID`/`FORGE_ROOT_RUN_ID` (root sets root to its own run_id; children inherit
