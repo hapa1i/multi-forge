@@ -242,6 +242,7 @@ def emit_direct_llm_usage(
             attribution_granularity="verb",
             input_tokens=usage.get("prompt_tokens") if usage else None,
             output_tokens=usage.get("completion_tokens") if usage else None,
+            cached_tokens=usage.get("cached_tokens") if usage else None,
             cost_micro_usd=None,
             latency_ms=round(latency_ms, 1) if latency_ms is not None else None,
             source_refs=SourceRefs(cost_request_id=cost_request_id) if cost_request_id else None,

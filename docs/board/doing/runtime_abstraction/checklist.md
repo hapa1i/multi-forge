@@ -59,7 +59,8 @@ decisions are resolved (data-plane: separate planes linked by `request_id`; `FOR
 integer guard unchanged) -- see Open Decisions for the de-risked build sequence, recorded at the top of the Phase 4
 section. Deferred Phase 3 follow-ups (`--rewrite-paths`, sidecar/resume native-relocate, the gated default flip) are
 recorded as trackable boxes under Phase 3 and land when prioritized. The card stays in `doing/` until Phases 3-6 land
-(board-contract: move to `done/` only when fully executed).
+(board-contract: move to `done/` only when fully executed). A 2026-06-02 review pass hardened 4a-4d (cancellation race,
+cancelled-worker emission, direct-LLM `cached_tokens`, partial-origin marker) -- see *Phase 4 hardening - review fixes*.
 
 **Deferred prerequisite (memory_substrate reconciliation) -- RESOLVED 2026-05-30:**
 
@@ -575,7 +576,8 @@ internal/refactorable -- it does not mint a durable contract, so it does not gat
     estimated total; the event records the **actual routed** model/provider/proxy_id, not the friendly catalog id).
     **Review fixes:** cancellation cleanup now SIGTERMs children *before* the blocking executor join (manual executor
     management -- the `with ThreadPoolExecutor` `__exit__` would otherwise join-then-cleanup, delaying SIGTERM up to
-    `timeout_seconds` on Ctrl+C). 15 invoker tests + an engine routed-metadata test
+    `timeout_seconds` on Ctrl+C; the spawn/register race + cancelled-worker emission were further hardened 2026-06-02,
+    see *Phase 4 hardening - review fixes*). 15 invoker tests + an engine routed-metadata test
     (`tests/src/core/invoker/test_claude_invoker.py`: ordering, concurrency cap, timeout + cancellation killpg, run-id
     surfaced, single-shot parity, per-worker emission). Full unit suite 4925 passed; mypy clean.
 
@@ -676,6 +678,30 @@ internal/refactorable -- it does not mint a durable contract, so it does not gat
     defaults to `unknown` (no more hardcoded `api`/`has_api_key=True` -- the tagger uses a dummy local-LiteLLM key); (3)
     `latency_ms` populated -- `track_verb_cost` records duration on every path and the emitters copy it. +4 unit tests;
     unit suite 4910 green.
+
+#### Phase 4 hardening - review fixes (DONE 2026-06-02)
+
+Post-merge review of the shipped 4a-4d slices surfaced 4 fixes (1 concurrency race / 3 correctness/clarity); all
+verified against code, each with a test. Targeted suites green (24 invoker+emit passed); mypy/pyright/`pre-commit`
+clean.
+
+- [x] **4d cancellation race (spawn/register TOCTOU)**: `run_parallel` could spawn a child in the window between `Popen`
+  returning and its registration in `children`; if `_cleanup` snapshotted `children` then, the child escaped SIGTERM and
+  `executor.shutdown(wait=True)` blocked on its `communicate(timeout=...)` (a Ctrl+C hang + a transiently-orphaned
+  `claude -p`). Fix: a lock-guarded `cleanup_started` flag -- a worker re-checks it after registering and self-reaps its
+  just-spawned child (`_terminate_and_reap`), skips spawning once cancellation began, and
+  `shutdown(cancel_futures=True)` drops never-started workers. Append and flag-read are atomic under `children_lock`, so
+  every child is reaped by exactly one of {cleanup snapshot, worker} -- none escapes, none double-waited. Deterministic
+  test `test_cancellation_reaps_child_registered_after_cleanup` forces the window via an observed lock.
+- [x] **4d cancelled workers no longer emit usage**: a cancelled job did no attributable work but fell through to
+  `_emit_worker` (logged `status="error"`). Added a typed `HeadlessResult.cancelled` (keeps `error="cancelled"` for the
+  review layer's `_to_review_result` display); `_emit_worker` skips cancelled -- the single policy point. Test
+  `test_cancelled_worker_emits_no_event`.
+- [x] **4c direct-LLM `cached_tokens`**: `emit_direct_llm_usage` recorded input/output but dropped `cached_tokens`; now
+  copied from the provider usage. Test updated.
+- [x] **4a partial-origin marker**: documented the both-or-neither `origin_run_id`/`origin_root_run_id` contract on
+  `_memory_writer_env` and pinned the defensive fallback (only-`origin_run_id` -> parent=root=origin, fresh child) with
+  `test_env_tolerates_partial_origin_marker`, so it is not re-flagged as a parent/root bug.
 
 ## Phase 5 - Cross-Runtime Resume
 

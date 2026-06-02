@@ -133,36 +133,58 @@ class ClaudeHeadlessInvoker:
         if not requests:
             return []
 
-        # Thread-safe list for tracking child processes (verbatim from the engine).
+        # Thread-safe child tracking. cleanup_started closes cancellation races where
+        # a worker is about to spawn, or has spawned but not yet registered, a child.
         children: list[subprocess.Popen[str]] = []
         children_lock = threading.Lock()
+        cleanup_started = False
+
+        def _terminate_and_reap(procs: list[subprocess.Popen[str]]) -> None:
+            """Terminate and reap the given children. SIGTERM -> wait -> SIGKILL."""
+            for proc in procs:
+                if proc.poll() is None:
+                    try:
+                        os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+                    except (OSError, ProcessLookupError):
+                        pass
+            for proc in procs:
+                try:
+                    proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    try:
+                        os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+                        proc.wait(timeout=2)
+                    except (OSError, ProcessLookupError, subprocess.TimeoutExpired):
+                        pass
+                except OSError:
+                    pass
 
         def _cleanup() -> None:
-            """Terminate and reap all running children. SIGTERM -> wait -> SIGKILL."""
+            """Mark cancellation, then terminate every child registered so far."""
+            nonlocal cleanup_started
             with children_lock:
-                for proc in children:
-                    if proc.poll() is None:
-                        try:
-                            os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
-                        except (OSError, ProcessLookupError):
-                            pass
-                for proc in children:
-                    try:
-                        proc.wait(timeout=5)
-                    except subprocess.TimeoutExpired:
-                        try:
-                            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
-                            proc.wait(timeout=2)
-                        except (OSError, ProcessLookupError, subprocess.TimeoutExpired):
-                            pass
-                    except OSError:
-                        pass
+                cleanup_started = True
+                snapshot = list(children)
+            _terminate_and_reap(snapshot)
 
         def _run_one(request: HeadlessRequest) -> HeadlessResult:
             start = time.monotonic()
             ident = _identity(request.env)
             proc: subprocess.Popen[str] | None = None
             try:
+                with children_lock:
+                    if cleanup_started:
+                        return HeadlessResult(
+                            label=request.label,
+                            stdout="",
+                            stderr="",
+                            returncode=-1,
+                            duration_seconds=time.monotonic() - start,
+                            error="cancelled",
+                            cancelled=True,
+                            **ident,
+                        )
+
                 proc = subprocess.Popen(
                     request.argv,
                     stdin=subprocess.PIPE,
@@ -175,16 +197,33 @@ class ClaudeHeadlessInvoker:
                 )
                 with children_lock:
                     children.append(proc)
+                    should_cancel = cleanup_started
 
-                stdout, stderr = proc.communicate(input=request.prompt, timeout=request.timeout_seconds)
-                result = HeadlessResult(
-                    label=request.label,
-                    stdout=stdout,
-                    stderr=stderr,
-                    returncode=proc.returncode,
-                    duration_seconds=time.monotonic() - start,
-                    **ident,
-                )
+                if should_cancel:
+                    # Cleanup may have started after Popen returned but before the child
+                    # was registered in `children`. In that race, the worker owns reaping
+                    # its just-spawned process so shutdown(wait=True) cannot hang on it.
+                    _terminate_and_reap([proc])
+                    result = HeadlessResult(
+                        label=request.label,
+                        stdout="",
+                        stderr="",
+                        returncode=proc.returncode if proc.returncode is not None else -1,
+                        duration_seconds=time.monotonic() - start,
+                        error="cancelled",
+                        cancelled=True,
+                        **ident,
+                    )
+                else:
+                    stdout, stderr = proc.communicate(input=request.prompt, timeout=request.timeout_seconds)
+                    result = HeadlessResult(
+                        label=request.label,
+                        stdout=stdout,
+                        stderr=stderr,
+                        returncode=proc.returncode,
+                        duration_seconds=time.monotonic() - start,
+                        **ident,
+                    )
             except subprocess.TimeoutExpired:
                 try:
                     if proc is not None:
@@ -253,7 +292,7 @@ class ClaudeHeadlessInvoker:
             try:
                 _cleanup()  # kill running children first (prompt cancellation)
             finally:
-                executor.shutdown(wait=True)  # always join workers (never leak threads)
+                executor.shutdown(wait=True, cancel_futures=True)  # always join workers (never leak threads)
 
         return [result_map[idx] for idx in range(len(requests)) if idx in result_map]
 
@@ -262,10 +301,11 @@ def _emit_worker(request: HeadlessRequest, result: HeadlessResult) -> None:
     """Emit a per-worker UsageEvent when the request carries attribution.
 
     Opt-in (no attribution -> no event), so non-workflow callers of ``run_parallel``
-    don't suddenly write to the ledger. No identity -> nothing to attribute.
+    don't suddenly write to the ledger. No identity -> nothing to attribute. A
+    cancelled job did no attributable work, so it is not recorded either.
     """
     attribution = request.attribution
-    if attribution is None or not result.run_id:
+    if attribution is None or not result.run_id or result.cancelled:
         return
     from forge.core.usage import emit_worker_usage
 

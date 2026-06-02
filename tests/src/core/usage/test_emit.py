@@ -89,13 +89,13 @@ class TestEmitDirectLlmUsage:
             command="tagger",
             model="gemini/gemini-2.0-flash",
             provider="gemini",
-            usage={"prompt_tokens": 7, "completion_tokens": 3, "total_tokens": 10},
+            usage={"prompt_tokens": 7, "completion_tokens": 3, "total_tokens": 10, "cached_tokens": 4},
             latency_ms=12.0,
         )
         e = read_usage_events()[0]
         assert (e.command, e.run_id, e.provider) == ("tagger", "run_amb", "gemini")
         assert e.measurement_source == "provider_usage_exact"
-        assert (e.input_tokens, e.output_tokens, e.cost_micro_usd) == (7, 3, None)
+        assert (e.input_tokens, e.output_tokens, e.cached_tokens, e.cost_micro_usd) == (7, 3, 4, None)
         assert e.latency_ms == 12.0
         assert e.source_refs is None  # no proven proxy target
         assert e.billing_mode == "unknown"  # never guessed -- caller didn't prove direct+credential

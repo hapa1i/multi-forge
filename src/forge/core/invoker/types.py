@@ -69,6 +69,9 @@ class HeadlessResult:
     returncode: int
     duration_seconds: float
     timed_out: bool = False
+    # Interrupted at/just-before spawn (cancellation), not a genuine failure: keeps
+    # ``error="cancelled"`` for display but suppresses per-worker usage emission.
+    cancelled: bool = False
     error: str | None = None
     run_id: str | None = None
     parent_run_id: str | None = None

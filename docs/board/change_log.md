@@ -27,6 +27,29 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-02
 
+### Phase 4: Review-pass hardening (4a / 4c / 4d)
+
+**Goal**: Fix issues found reviewing the shipped Phase 4 slices before merge -- one concurrency race plus three
+correctness/clarity gaps, each with a test.
+
+**Key changes**:
+
+- **4d cancellation race (spawn/register TOCTOU)**: `ClaudeHeadlessInvoker.run_parallel` could spawn a child between
+  `Popen` returning and registering it in `children`; a `_cleanup` snapshot in that window left the child un-SIGTERMed,
+  so `executor.shutdown(wait=True)` blocked on its `communicate(timeout)` (Ctrl+C hang + transient orphan). Fixed with a
+  lock-guarded `cleanup_started` flag: a worker self-reaps a child registered after cleanup began, skips spawning once
+  cancellation starts, and `shutdown(cancel_futures=True)` drops unstarted workers -- append and flag-read are atomic
+  under `children_lock`, so each child is reaped exactly once.
+- **4d cancelled workers no longer emit usage**: a cancelled job fell through to `_emit_worker` and was logged
+  `status="error"`. Added a typed `HeadlessResult.cancelled` (keeps `error="cancelled"` for the review layer);
+  `_emit_worker` skips cancelled -- one policy point.
+- **4c direct-LLM `cached_tokens`**: `emit_direct_llm_usage` dropped `cached_tokens`; now copied from provider usage.
+- **4a partial-origin marker**: pinned the both-or-neither `origin_run_id`/`origin_root_run_id` contract on
+  `_memory_writer_env` with a comment + test, so the defensive fallback isn't mistaken for a parent/root bug.
+
+**Verification**: `test_claude_invoker.py` + `test_emit.py` 24 passed (incl. new race + cancelled-emit + cached_tokens
+tests) + `test_startup_queue.py` partial-marker test; mypy + pyright + `pre-commit` clean on changed files.
+
 ### Phase 4: Deferred integration validation (4a / 4c / 4d / 4f)
 
 **Goal**: Run the CLAUDE.md-mandated Docker / real-`claude -p` integration deferred across the Phase 4 slices, now that

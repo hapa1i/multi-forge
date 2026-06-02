@@ -12,6 +12,7 @@ import signal
 import subprocess
 import threading
 from concurrent.futures import ThreadPoolExecutor
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -171,6 +172,62 @@ class TestRunParallel:
         assert any(call.args == (777, signal.SIGTERM) for call in mock_killpg.call_args_list)
         assert not watchdog_fired.is_set()  # killpg, not the failsafe, unblocked the workers
 
+    @patch("forge.core.invoker.claude.os.getpgid", return_value=888)
+    @patch("forge.core.invoker.claude.os.killpg")
+    @patch("forge.core.invoker.claude.subprocess.Popen")
+    def test_cancellation_reaps_child_registered_after_cleanup(self, mock_popen, mock_killpg, _getpgid):
+        """If cleanup starts while Popen is still returning, the worker reaps its child.
+
+        This guards the narrow race where a process exists but has not yet been
+        appended to the shared children list. Cleanup marks cancellation, sees no
+        registered children, and the worker must kill the just-spawned child before
+        entering communicate().
+        """
+        cleanup_lock_entered = threading.Event()
+        popen_started = threading.Event()
+        real_lock = threading.Lock()
+
+        class ObservedLock:
+            def __init__(self) -> None:
+                self.entries = 0
+
+            def __enter__(self):
+                real_lock.acquire()
+                self.entries += 1
+                if self.entries == 2:
+                    cleanup_lock_entered.set()
+                return self
+
+            def __exit__(self, *_exc) -> None:
+                real_lock.release()
+
+        proc = _mock_proc()
+        proc.poll.return_value = None
+        proc.communicate.side_effect = AssertionError("cancelled child should not communicate")
+
+        def make_proc(*_a, **_k):
+            popen_started.set()
+            assert cleanup_lock_entered.wait(timeout=5)
+            return proc
+
+        mock_popen.side_effect = make_proc
+
+        def fake_as_completed(_futs):
+            assert popen_started.wait(timeout=5)
+            raise KeyboardInterrupt
+
+        observed_threading = SimpleNamespace(Lock=ObservedLock)
+        try:
+            with patch("forge.core.invoker.claude.threading", observed_threading):
+                with patch("forge.core.invoker.claude.as_completed", fake_as_completed):
+                    with pytest.raises(KeyboardInterrupt):
+                        ClaudeHeadlessInvoker().run_parallel([_req(label="w0")])
+        finally:
+            cleanup_lock_entered.set()
+
+        assert any(call.args == (888, signal.SIGTERM) for call in mock_killpg.call_args_list)
+        proc.communicate.assert_not_called()
+
 
 class TestRun:
     @patch("forge.core.invoker.claude.subprocess.run")
@@ -239,3 +296,24 @@ class TestPerWorkerEmission:
         reqs = [_req(label=f"w{i}", env=dict(_IDENT, FORGE_RUN_ID=f"run_{i}"), attribution=attr) for i in range(3)]
         ClaudeHeadlessInvoker().run_parallel(reqs)
         assert {e.run_id for e in read_usage_events()} == {"run_0", "run_1", "run_2"}
+
+    def test_cancelled_worker_emits_no_event(self):
+        """A cancelled job did no attributable work, so it is not recorded even
+        with attribution -- the verb-level aggregate still holds the estimated total."""
+        from forge.core.invoker.claude import _emit_worker
+        from forge.core.invoker.types import HeadlessResult
+
+        cancelled = HeadlessResult(
+            label="w0",
+            stdout="",
+            stderr="",
+            returncode=-1,
+            duration_seconds=0.01,
+            error="cancelled",
+            cancelled=True,
+            run_id="run_w",
+            parent_run_id="run_verb",
+            root_run_id="run_root",
+        )
+        _emit_worker(_req(env=dict(_IDENT), attribution=Attribution(command="panel")), cancelled)
+        assert read_usage_events() == []

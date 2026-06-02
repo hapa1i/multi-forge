@@ -226,6 +226,16 @@ class TestMemoryWriterRunIdentity:
         assert env["FORGE_RUN_ID"].startswith("run_")
         assert env["FORGE_RUN_ID"] not in ("run_C", "run_R")
 
+    def test_env_tolerates_partial_origin_marker(self) -> None:
+        """Current markers write both origin ids; fallback is defensive only."""
+        from forge.cli.main import _memory_writer_env
+
+        env = _memory_writer_env({"origin_run_id": "run_C"})
+        assert env["FORGE_PARENT_RUN_ID"] == "run_C"
+        assert env["FORGE_ROOT_RUN_ID"] == "run_C"
+        assert env["FORGE_RUN_ID"].startswith("run_")
+        assert env["FORGE_RUN_ID"] != "run_C"
+
     def test_env_scrubs_drainer_identity_when_no_origin(self) -> None:
         """With no origin captured, the memory-writer must not inherit the drainer's run id."""
         from unittest.mock import patch

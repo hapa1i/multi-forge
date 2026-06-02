@@ -135,6 +135,9 @@ def _memory_writer_env(payload: dict[str, object]) -> dict[str, str]:
     ):
         env.pop(var, None)
 
+    # Current handoff markers write origin_run_id and origin_root_run_id together;
+    # the fallback only tolerates older/corrupt partial payloads without inheriting
+    # the unrelated drainer's run-tree identity.
     origin_root = payload.get("origin_root_run_id") or payload.get("origin_run_id")
     if origin_root:
         env[FORGE_ROOT_RUN_ID_VAR] = str(origin_root)
