@@ -421,6 +421,21 @@ class BackendDependency:
     required_env_vars: list[str] = field(default_factory=list)
 
 
+def _validate_wire_shape_intercept(wire_shape: str, intercept: InterceptConfig) -> None:
+    """Reject intercept.mode='override' unless wire_shape='anthropic_passthrough'.
+
+    override mutates the RAW Anthropic body, so the openai_translated path cannot apply it.
+    Enforced on BOTH the running-proxy (ProxyInstanceConfig) and template (ProxyConfig) paths
+    so 'forge proxy template edit' fails at edit time, not late at 'forge proxy create'.
+    """
+    if intercept.mode == "override" and wire_shape != "anthropic_passthrough":
+        raise ValueError(
+            "intercept.mode='override' requires wire_shape='anthropic_passthrough' "
+            "(override applies to the raw passthrough body only). "
+            "Set wire_shape: anthropic_passthrough, or use intercept.mode: inspect."
+        )
+
+
 @dataclass
 class ProxyConfig:
     """Proxy server configuration."""
@@ -442,6 +457,17 @@ class ProxyConfig:
     wire_shape: str = "openai_translated"
     intercept: InterceptConfig = field(default_factory=InterceptConfig)
     audit: AuditConfig = field(default_factory=AuditConfig)
+
+    def __post_init__(self) -> None:
+        # Templates carry wire_shape/intercept/audit too; coerce + validate here so an invalid
+        # combo is rejected at 'forge proxy template edit', not late at 'forge proxy create'.
+        self.intercept = _coerce_intercept_config(self.intercept)
+        self.audit = _coerce_audit_config(self.audit)
+        if self.wire_shape not in _VALID_WIRE_SHAPES:
+            raise ValueError(
+                f"Invalid wire_shape: {self.wire_shape!r} (must be one of: {', '.join(_VALID_WIRE_SHAPES)})"
+            )
+        _validate_wire_shape_intercept(self.wire_shape, self.intercept)
 
     def get_provider(self, name: str | None = None) -> ProviderConfig:
         """Get provider config by name, defaulting to preferred_provider."""
@@ -547,14 +573,7 @@ class ProxyInstanceConfig:
             )
         self.intercept = _coerce_intercept_config(self.intercept)
         self.audit = _coerce_audit_config(self.audit)
-        # override mutates the RAW Anthropic body; the openai_translated path cannot
-        # apply it, so the combo is rejected rather than silently doing only inspect.
-        if self.intercept.mode == "override" and self.wire_shape != "anthropic_passthrough":
-            raise ValueError(
-                "intercept.mode='override' requires wire_shape='anthropic_passthrough' "
-                "(override applies to the raw passthrough body only). "
-                "Set wire_shape: anthropic_passthrough, or use intercept.mode: inspect."
-            )
+        _validate_wire_shape_intercept(self.wire_shape, self.intercept)
 
         _validate_static_tier_override_constraints(self.tiers, self.tier_overrides)
 
