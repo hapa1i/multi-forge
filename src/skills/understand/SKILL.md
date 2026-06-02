@@ -64,8 +64,8 @@ Do not ask the user -- just apply the rules.
 
 **Do NOT start the analysis until this step is complete.**
 
-Model family: !`forge session context --field model_family 2>/dev/null || true` Main model:
-!`forge session context --field main_model 2>/dev/null || true`
+Model family: !`forge session show --field model_family 2>/dev/null || true` Main model:
+!`forge session show --field main_model 2>/dev/null || true`
 
 Resolve session context from `$FORGE_SESSION` or the local environment. Do not force `$CLAUDE_SESSION_ID`: unmanaged
 direct Claude sessions are not in Forge's session index, but may still expose direct-model environment metadata.

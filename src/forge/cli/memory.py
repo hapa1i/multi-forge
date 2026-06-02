@@ -78,6 +78,9 @@ def _auto_create_shadow(shadow_path: str, forge_root: Path) -> bool:
 def memory() -> None:
     """Manage project memory docs.
 
+    Pairs with 'forge transfer': memory curates project docs; transfer assembles
+    the per-session resume/fork context.
+
     \b
     Examples:
         forge memory track docs/changelog.md --strategy changelog    # author a passport (sessionless)

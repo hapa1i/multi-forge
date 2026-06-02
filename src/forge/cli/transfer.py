@@ -40,6 +40,9 @@ _STRATEGY_CHOICES = [s.value for s in ResumeStrategy]
 def transfer() -> None:
     """Inspect and reshape session transfer context.
 
+    Pairs with 'forge memory' (the two halves of session continuity): memory
+    curates project docs; transfer assembles the per-parent resume/fork context.
+
     \b
     Examples:
         forge transfer show planner                 # show the parent AI cache

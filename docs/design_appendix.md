@@ -457,7 +457,7 @@ scope rationale remain in design.md.
 | Category              | Allowed via `%`                                                                                                     | Not allowed via `%`                                           |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
 | Session / plan        | `%session list`, `%plan`                                                                                            | --                                                            |
-| Proxy                 | `%proxy list`, `%proxy show` (read-only)                                                                            | `%proxy create`, `%proxy edit`, `%proxy set`, `%proxy delete` |
+| Proxy                 | `%proxy list`, `%proxy show`, `%proxy audit show/diff` (read-only)                                                  | `%proxy create`, `%proxy edit`, `%proxy set`, `%proxy delete` |
 | Policy / verification | `%policy status`, `%policy enable`, `%policy disable`, `%policy check`, `%policy supervise`, `%cancel-verification` | --                                                            |
 | Cleanup               | `%clean [--scope repo\|project\|all]` (read-only report)                                                            | destructive cleanup (use `forge clean --yes` from terminal)   |
 | Utilities / config    | `%h`, `%help`, `%config`                                                                                            | --                                                            |
@@ -475,6 +475,7 @@ Shared commands (mirrors CLI syntax):
 - `%plan` (shows the current session's recorded plan file path)
 - `%proxy list` (read-only: shows available proxies)
 - `%proxy show <id>` (read-only: shows proxy details and tier mappings)
+- `%proxy audit show|diff [id]` (read-only: recent audit metadata / wire changes; metadata only, never secrets)
 - `%policy status` (shows current policy config and state)
 - `%policy enable --bundle tdd [--permissive]` (enables policy enforcement)
 - `%policy disable` (disables all policies for the session)

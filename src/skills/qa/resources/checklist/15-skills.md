@@ -8,23 +8,23 @@ section tests the skills that wrap it with auto-detection and model-aware resour
 The workflow-backed skills in this section depend on the workflow proxy aliases created in 4.2. In partial runs such as
 `--from 15`, prereq auto-resolution should create those aliases before `/forge:panel` or `/forge:consensus` is checked.
 
-### 15.1 `forge session context` CLI
+### 15.1 `forge session show` CLI
 
 <!-- auto -->
 
 ```bash
-# Verify the session context command works (requires an active session)
-forge session context test-session-1 --json
+# Verify the session show command works (requires an active session)
+forge session show test-session-1 --json
 
 # Extract model family field
-forge session context test-session-1 --field model_family
+forge session show test-session-1 --field model_family
 ```
 
 - [ ] Returns valid JSON with session_name, proxy, model_family, models, policy
 - [ ] `--field model_family` returns a raw string (openai, gemini, or anthropic)
 - [ ] Direct (no-proxy) session returns `model_family: "anthropic"`
 
-### 15.2 `forge session context` with UUID
+### 15.2 `forge session show` with UUID
 
 <!-- auto -->
 
@@ -36,7 +36,7 @@ UUID=$(cat .forge/sessions/test-session-1/forge.session.json | jq -r '.confirmed
 
 # If UUID exists, verify UUID-based resolution
 if [ -n "$UUID" ]; then
-  forge session context "$UUID" --field session_name
+  forge session show "$UUID" --field session_name
   echo "UUID_RESOLVED=true"
 else
   echo "UUID_RESOLVED=skip (no confirmed UUID yet)"

@@ -10,8 +10,8 @@ sessions.
 
 PR #8 is an enabling slice for this proposal, not the runtime abstraction itself. It strengthens the model gateway,
 credential, routing, and cost-accounting foundations that an agent runtime layer will need. The runtime registry,
-headless invoker interface, Codex/Gemini native invokers, normalized hooks, and durable cross-runtime usage ledger
-remain future work.
+headless invoker interface, normalized hooks, and durable usage ledger ship as part of this work (Phases 1-4).
+Codex/Gemini native invokers and interactive Codex sessions remain future work (Phase 5+).
 
 The design separates concepts that are currently too easy to blur:
 
@@ -382,7 +382,7 @@ from future `codex exec` or `gemini -p` runs.
 The next layer should create a durable usage ledger:
 
 ```text
-~/.forge/usage/events.jsonl
+~/.forge/usage/events/<YYYY-MM>_<pid>.jsonl
 ```
 
 Each event should include:
@@ -783,7 +783,7 @@ Native-relocate is an experimental spike, not a committed UX until contract test
 - Move review-engine parallel fan-out behind the invoker contract, including process-group cleanup, timeout handling,
   and cancellation.
 - Runtime registry exposing the capability matrix above.
-- Promote proxy request logs + verb snapshots + audit logs into a durable `~/.forge/usage/events.jsonl`.
+- Promote proxy request logs + verb snapshots + audit logs into a durable `~/.forge/usage/events/<YYYY-MM>_<pid>.jsonl`.
 - `FORGE_RUN_ID` / `FORGE_PARENT_RUN_ID` attribution env injection across Forge-spawned processes.
 - Normalize Claude and Codex hook payloads into `ActionContext` / `PolicyDecision`.
 
@@ -831,7 +831,7 @@ Native-relocate is an experimental spike, not a committed UX until contract test
 - Should `forge session resume --fresh --review` be the default behavior or an explicit flag? **Resolved (Phase 1,
   2026-05-31):** explicit flag (opt-in) -- a plain `--fresh` resume launches immediately, and `--review` stays opt-in so
   non-interactive/scripted resume never blocks on `$EDITOR`.
-- Where do PR #8's `~/.forge/costs/requests/*.jsonl` and Phase 4's `~/.forge/usage/events.jsonl` converge? Same data
+- Where do PR #8's `~/.forge/costs/requests/*.jsonl` and Phase 4's `~/.forge/usage/events/<YYYY-MM>_<pid>.jsonl` converge? Same data
   plane eventually merged, or parallel forever? The audit logs from Phase 2 (`~/.forge/audit/requests/*.jsonl`) raise
   the same question.
 - Phase 2 audit proxy: enforce sidecar-only or also support host-mode always-on? Host mode is more flexible but harder

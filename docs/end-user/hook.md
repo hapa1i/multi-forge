@@ -220,6 +220,7 @@ Type these directly in the Claude prompt to interact with Forge without switchin
 | `%plan`                                      | Show the current session's recorded plan file path        |
 | `%proxy list`                                | List proxies (read-only)                                  |
 | `%proxy show <id>`                           | Show proxy details (read-only)                            |
+| `%proxy audit show\|diff [id]`               | Recent audit metadata / wire changes (read-only)          |
 | `%policy status`                             | Show policy config and state                              |
 | `%policy enable --bundle tdd [--permissive]` | Enable policy enforcement                                 |
 | `%policy disable`                            | Disable all policies                                      |

@@ -200,6 +200,7 @@ def _handle_cmd_proxy(data: dict[str, Any], argv: list[str]) -> None:
 
     - `%proxy list`: list all registered proxies
     - `%proxy show <id>`: show details for a specific proxy
+    - `%proxy audit show|diff [id]`: recent audit metadata / wire changes (metadata only)
 
     Always emits `{decision:block}` when handled.
 
@@ -207,7 +208,7 @@ def _handle_cmd_proxy(data: dict[str, Any], argv: list[str]) -> None:
     """
 
     if not argv:
-        click.echo(json.dumps({"decision": "block", "reason": "Usage: %proxy list | show <id>"}))
+        click.echo(json.dumps({"decision": "block", "reason": "Usage: %proxy list | show <id> | audit show|diff [id]"}))
         return
 
     sub = argv[0].lower()

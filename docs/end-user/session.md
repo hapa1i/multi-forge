@@ -396,6 +396,12 @@ the fork starts a fresh Claude session in the new worktree and automatically inj
 (`.forge/prev_sessions/<parent>/children/<fork-name>.md`). Claude knows where the parent left off, but the old visible
 chat history is not replayed.
 
+**Resume mode (`--resume-mode`):** cross-directory forks (`--worktree`/`--into`) default to `transfer` — the assembled,
+editable context file above. For a byte-faithful alternative, pass `--resume-mode native-relocate`: Forge relocates the
+parent's Claude transcript into the fork so the full conversation resumes verbatim. It is **host mode only** (rejected in
+sidecar), the relocated history is opaque to Forge (lost on `/compact`, and historical tool paths still point at the
+parent checkout — no path rewriting yet), and the default stays `transfer`.
+
 The fork manifest and transfer file live under the new worktree's Forge root. For a root-level project, inspect
 `<new-worktree>/.forge/sessions/<fork>/forge.session.json` and
 `<new-worktree>/.forge/prev_sessions/<parent>/children/<fork-name>.md`.
