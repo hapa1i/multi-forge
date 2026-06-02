@@ -10,9 +10,13 @@ transcript (data loss). The shipped contract test only used ``create_worktree=Tr
 distinct child dir), so the collision was unguarded and untested.
 
 Fix: ``relocate_transcript`` raises ``RelocateSameDirError`` on source == dest
-(``relocate.py``); the fork preflight + relocate handler reject it (``session_fork.py``);
-and ``delete_session``'s relocate-GC skips the unlink when the child dir collides with a
-recorded parent root (``manager.py``).
+(``relocate.py``); the fork preflight + relocate handler reject it (``session_fork.py``).
+``delete_session``'s relocate-GC now routes the relocated copy through the path-resolved
+shared-transcript scan (``manager.py``): the relocated UUID is the parent's
+``claude_session_id``, so the scan skips the unlink whenever the parent's original OR a
+co-resident native-relocate sibling still resolves to that path -- replacing an earlier
+encoded-dir guard that used index identity and so missed root-level-worktree parents and
+sibling sharing (audit HIGH sibling-bug + backstop source-of-truth).
 
 Affected: src/forge/session/claude/relocate.py, src/forge/cli/session_fork.py,
 src/forge/session/manager.py, src/forge/session/claude/paths.py.
@@ -108,4 +112,96 @@ def test_delete_preserves_parent_original_on_dir_collision(tmp_path: Path, monke
     manager.delete_session("child", delete_transcripts=True, delete_worktree=False, force=True)
 
     assert parent_original.exists(), "parent's original transcript must be preserved on dir collision"
+    assert parent_original.read_text() == "PARENT\n"
+
+
+def test_delete_sibling_preserves_shared_relocated_transcript(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Audit HIGH sibling-bug: two `fork --into <same-checkout> --resume-mode native-relocate`
+    children relocate the SAME parent UUID into the SAME dir (idempotent relocate), so both record
+    relocated_parent_session_id pointing at one shared copy. Deleting one sibling must NOT unlink the
+    copy the other still needs. Pre-fix the relocate-GC had no sibling awareness and unlinked it.
+    """
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    (tmp_path / "home").mkdir()
+    parent_repo = tmp_path / "repo"
+    _init_git_repo(parent_repo)
+    (parent_repo / ".claude").mkdir(exist_ok=True)
+    (parent_repo / ".forge").mkdir(exist_ok=True)
+    # A separate checkout both siblings fork --into (distinct from the parent's own dir).
+    target = tmp_path / "repo-feat"
+    _init_git_repo(target)
+    (target / ".claude").mkdir(exist_ok=True)
+    (target / ".forge").mkdir(exist_ok=True)
+
+    manager = SessionManager()
+    manager.start_session(name="parent", worktree_path=str(parent_repo))
+    pstore = manager.get_session_store("parent")
+    pstate = pstore.read()
+    pstate.confirmed.claude_session_id = "puuid"
+    pstore.write(pstate)
+
+    _, child_a = manager.fork_session("parent", "child-a", into_path=str(target), resume_mode="native-relocate")
+    _, child_b = manager.fork_session("parent", "child-b", into_path=str(target), resume_mode="native-relocate")
+    assert child_a.confirmed.derivation is not None
+    assert child_b.confirmed.derivation is not None
+    assert child_a.confirmed.derivation.relocated_parent_session_id == "puuid"
+    assert child_b.confirmed.derivation.relocated_parent_session_id == "puuid"
+
+    # The shared relocated copy in the target checkout (what a real launch would have written),
+    # plus the parent's untouched original under its own checkout.
+    shared_reloc = _write_transcript(str(target), "puuid", "RELOCATED\n")
+    parent_original = _write_transcript(str(parent_repo), "puuid", "PARENT\n")
+
+    manager.delete_session("child-a", delete_transcripts=True, delete_worktree=False, force=True)
+    assert shared_reloc.exists(), "shared relocated copy must survive while sibling child-b references it"
+    assert shared_reloc.read_text() == "RELOCATED\n"
+
+    # Once the last referencing sibling is gone, the copy is reclaimed; the parent's own original
+    # (under a different checkout) is never touched by either child deletion.
+    manager.delete_session("child-b", delete_transcripts=True, delete_worktree=False, force=True)
+    assert not shared_reloc.exists(), "relocated copy reclaimed once no session references it"
+    assert parent_original.exists(), "parent's own original (different checkout) untouched throughout"
+    assert parent_original.read_text() == "PARENT\n"
+
+
+def test_delete_preserves_divergent_topology_parent_original(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Audit backstop source-of-truth: a parent whose Claude CWD (claude_project_root) diverges from
+    its forge_root (root-level worktree) -- the child collides with the parent's CLAUDE CWD, not its
+    forge_root. The old _parent_dirs guard built its set from index identity (parent_forge_root/
+    project_root) and so missed this dir, unlinking the parent's original. The path-resolved
+    shared-transcript scan finds the parent (it references the same UUID at the same resolved path).
+    """
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    (tmp_path / "home").mkdir()
+    main_repo = tmp_path / "repo"
+    _init_git_repo(main_repo)
+    (main_repo / ".claude").mkdir(exist_ok=True)
+    (main_repo / ".forge").mkdir(exist_ok=True)
+    parent_cwd = tmp_path / "repo-parentwt"  # parent's actual Claude CWD, != forge_root (main_repo)
+    parent_cwd.mkdir()
+
+    manager = SessionManager()
+    manager.start_session(name="parent", worktree_path=str(main_repo))
+    pstore = manager.get_session_store("parent")
+    pstate = pstore.read()
+    pstate.confirmed.claude_session_id = "puuid"
+    pstate.confirmed.claude_project_root = str(parent_cwd)  # diverges from forge_root
+    pstore.write(pstate)
+
+    _, child = manager.fork_session("parent", "child", create_worktree=True, resume_mode="native-relocate")
+    assert child.confirmed.derivation is not None
+    assert child.confirmed.derivation.relocated_parent_session_id == "puuid"
+
+    # Force the child's relocate dir to collide with the parent's CLAUDE CWD (not its forge_root).
+    fstore = manager.get_session_store("child")
+    fchild = fstore.read()
+    fchild.confirmed.claude_project_root = str(parent_cwd)
+    fchild.confirmed.claude_session_id = None
+    fstore.write(fchild)
+
+    parent_original = _write_transcript(str(parent_cwd), "puuid", "PARENT\n")
+
+    manager.delete_session("child", delete_transcripts=True, delete_worktree=False, force=True)
+
+    assert parent_original.exists(), "parent's original (under its Claude CWD, != forge_root) must survive"
     assert parent_original.read_text() == "PARENT\n"

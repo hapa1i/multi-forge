@@ -20,7 +20,6 @@ from forge.core.state import now_iso
 from .artifacts import resolve_artifact_path
 from .claude.paths import (
     find_project_root,
-    get_project_encoded_dir,
     get_transcript_path,
     resolve_claude_project_root,
 )
@@ -107,16 +106,25 @@ def _tracked_transcript_session_ids_from_artifacts(artifacts: Any) -> list[str]:
 def _tracked_derivation_transcript_session_ids(
     derivation: Derivation | dict[str, Any] | None,
 ) -> list[str]:
-    """Extract UUIDs from derivation transcript pointers, when present."""
+    """Extract transcript UUIDs a derivation points at, when present.
+
+    Yields UUIDs from ``parent_transcript`` (archived-artifact pointer) AND
+    ``relocated_parent_session_id``. The latter is load-bearing for cleanup: a
+    native-relocate fork copies the parent UUID's transcript into the child's
+    dir, so a co-resident sibling that relocated the same parent UUID must mark
+    that copy as shared -- otherwise deleting one alias destroys the other's
+    baseline. (The parent's own claude_session_id == the relocated UUID, so this
+    also protects the parent's original when the child/parent dirs collide.)
+    """
     if derivation is None:
         return []
 
     if isinstance(derivation, Derivation):
         parent_transcript = derivation.parent_transcript
-    elif isinstance(derivation, dict):
-        parent_transcript = derivation.get("parent_transcript")
+        relocated = derivation.relocated_parent_session_id
     else:
-        return []
+        parent_transcript = derivation.get("parent_transcript")
+        relocated = derivation.get("relocated_parent_session_id")
 
     session_ids: list[str] = []
     if isinstance(parent_transcript, str):
@@ -124,6 +132,8 @@ def _tracked_derivation_transcript_session_ids(
         # live raw transcript with the same UUID is still treated as shared.
         for match in _UUID_RE.findall(parent_transcript):
             _append_unique_string(session_ids, match)
+    if isinstance(relocated, str):
+        _append_unique_string(session_ids, relocated)
     return session_ids
 
 
@@ -1768,8 +1778,7 @@ class SessionManager:
 
         # native-relocate forks copy the parent transcript into the child's encoded dir.
         # Remove that copy independently of the child's own UUID (which may be unset on a
-        # failed/partial launch). A same-encoded-dir guard below keeps the parent's ORIGINAL
-        # transcript safe even when the child and parent dirs collide.
+        # failed/partial launch) -- but never when another session still needs it.
         if delete_transcripts and state is not None:
             _deriv = state.confirmed.derivation
             if _deriv is not None and _deriv.resume_mode == "native-relocate" and _deriv.relocated_parent_session_id:
@@ -1779,18 +1788,27 @@ class SessionManager:
                     _raw_data,
                 )
                 _reloc_path = get_transcript_path(_reloc_root, _deriv.relocated_parent_session_id)
-                # Defense-in-depth: never delete the parent's ORIGINAL transcript. If the child's
-                # encoded dir collides with a parent root (same-CWD --into, or encode_project_path
-                # collapsing '/', '.', '_' to '-'), _reloc_path IS the parent's live transcript.
-                # relocate_transcript rejects source==dest up front, so this is a backstop.
-                _parent_dirs = {
-                    get_project_encoded_dir(r) for r in (_deriv.parent_forge_root, _deriv.parent_project_root) if r
-                }
-                if get_project_encoded_dir(_reloc_root) in _parent_dirs:
-                    logger.warning(
-                        "Skipping relocated-transcript cleanup: child dir collides with the parent's "
-                        "own Claude dir (%s); not deleting the parent's original transcript.",
+                # The relocated UUID IS the parent's claude_session_id, so the shared-transcript
+                # scan (path-resolved, not encoded-dir-guessed) protects two cases at once:
+                #   (1) the parent's ORIGINAL -- the parent references the same UUID, and in a dir
+                #       collision its transcript resolves to this same path;
+                #   (2) a co-resident native-relocate SIBLING that relocated the same parent UUID
+                #       into the same checkout (idempotent relocate -> one shared copy; the
+                #       sibling's derivation now yields relocated_parent_session_id).
+                # Replaces an earlier guard that compared index identity (parent_forge_root/
+                # project_root) instead of the parent's resolved Claude CWD, and so missed
+                # root-level-worktree parents and had no sibling awareness.
+                _reloc_shared = self._find_shared_transcript_sessions(
+                    _reloc_root,
+                    [_deriv.relocated_parent_session_id],
+                    exclude_name=name,
+                    exclude_forge_root=entry_forge_root,
+                )
+                if _reloc_shared:
+                    logger.info(
+                        "Skipping relocated-transcript cleanup: %s still referenced by %s",
                         _reloc_path,
+                        ", ".join(f"{sid} ({', '.join(refs[:3])})" for sid, refs in _reloc_shared.items()),
                     )
                 else:
                     try:
