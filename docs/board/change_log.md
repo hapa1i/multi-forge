@@ -25,6 +25,34 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board-contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-06-02
+
+### Phase 4: Deferred integration validation (4a / 4c / 4d / 4f)
+
+**Goal**: Run the CLAUDE.md-mandated Docker / real-`claude -p` integration deferred across the Phase 4 slices, now that
+4a-4f have shipped, so every shipped slice has real-subprocess coverage (not just mocked unit tests).
+
+**Key changes**: None -- validation-only run.
+
+**Verification** (`./scripts/test-integration.sh <file> -v`):
+
+- `test_policy_hooks.py` (4f, deterministic): 10/10 -- real `forge hook policy-check` (adapter->engine->responder, exit
+  codes, manifest).
+- `test_supervisor_e2e.py` (4a/4c/4f, deterministic harness): 4/4 (8.2s) -- `forge policy supervisor`
+  aligned/divergent/infra-error + session-set wiring (covers 4a env stamping, 4c supervisor emission, the 4f
+  `cli/policy.py:692` site).
+- `test_real_claude_memory.py::test_real_handoff_review_only_smoke` (4a/4c, real Claude): PASSED -- real
+  `forge memory-writer run` end-to-end (4a origin-identity marker plumbing + 4c emission).
+- `test_real_claude_workers.py` (4d, real Claude): 2/2 (34.4s) -- real `claude -p --bare` fan-out via
+  `ClaudeHeadlessInvoker.run_parallel` (the process-group spawn/cleanup/ordering the mocked unit tests can't reach).
+
+**Pre-existing finding (NOT runtime-abstraction; surfaced by this run)**:
+`test_real_claude_memory.py::test_real_shadow_curation_smoke` FAILS because it passes `--session` to
+`forge memory track`, which PR #6 (`13f57db`, 2026-05-28, project-scoped memory passports) made invalid ("track ... does
+not take a session"). Stale test from the #6 memory change -- `13f57db` is a pre-branch ancestor and this branch touches
+neither `cli/memory.py` nor the test. Latent because `slow` real-Claude tests are rarely run. Needs a separate test-only
+fix to the post-#6 shadow-curation invocation; tracked for whoever owns #6's surface.
+
 ## 2026-06-01
 
 ### Phase 4 (Slice 4f): Runtime-tagged ActionContext + named Claude hook adapter/responder
