@@ -81,11 +81,16 @@ def test_resume_autoname_retry_updates_context_file(tmp_path: Path) -> None:
 
 
 def test_resume_autoname_collision_preserves_winner_curated_context(tmp_path: Path) -> None:
-    """Audit P3/#2: a colliding concurrent resume must NOT delete the winner's curated snapshot.
+    """Audit dead-coverage fix: drive the REAL race and assert the winner's genuinely-curated
+    (NON-byte-identical) snapshot survives the loser's collision retry.
 
-    Reproduces the data-loss race: two resumes of the same parent auto-name `parent-resumed`;
-    the loser's retry-cleanup byte-compare cannot distinguish its throwaway copy from the
-    winner's byte-identical (or curated) snapshot, so it used to unlink the winner's file.
+    The prior version pre-seeded `parent-resumed` in the index BEFORE resume_session, so
+    _generate_resume_name picked a fresh suffix and the collision -- and the entire
+    `except SessionExistsError` fix branch -- never ran (it passed with the fix reverted). This
+    version injects the winner mid-`add_from_state` (like the first test) so the loser actually hits
+    the branch, and covers the case the first test does not: a winner that ran `forge transfer edit`
+    has content != generated.md, and winner_owns must preserve it (the fix short-circuits the
+    orphan-unlink before any byte-compare).
     """
     project = tmp_path / "project"
     project.mkdir()
@@ -104,25 +109,40 @@ def test_resume_autoname_collision_preserves_winner_curated_context(tmp_path: Pa
         parent, str(project), checkout_root=str(project), forge_root=str(project), relative_path="."
     )
 
-    # Pre-seed the WINNER: an indexed `parent-resumed` whose curated snapshot already exists.
-    manager.index_store.add_session(
-        name="parent-resumed",
-        worktree_path=str(project),
-        project_root=str(project),
-        forge_root=str(project),
-        checkout_root=str(project),
-        relative_path=".",
-        is_incognito=False,
-        is_fork=False,
-        parent_session="parent",
-    )
     winner_snapshot = child_path(project, "parent", "parent-resumed")
-    winner_snapshot.parent.mkdir(parents=True, exist_ok=True)
-    winner_snapshot.write_text("WINNER CURATED CONTEXT\n")
+    curated = "WINNER-CURATED (user-edited via forge transfer edit)\n"
 
-    # The loser resumes; its auto-name collides on `parent-resumed` at add_from_state.
+    original_add = manager.index_store.add_from_state
+    failed_once = False
+
+    def fail_base_name_once(state, *args, **kwargs):
+        nonlocal failed_once
+        if state.name == "parent-resumed" and not failed_once:
+            failed_once = True
+            # The winner wins the name AND has curated its snapshot (content != generated.md).
+            manager.index_store.add_session(
+                name="parent-resumed",
+                worktree_path=str(project),
+                project_root=str(project),
+                forge_root=str(project),
+                checkout_root=str(project),
+                relative_path=".",
+                is_incognito=False,
+                is_fork=False,
+                parent_session="parent",
+            )
+            winner_snapshot.parent.mkdir(parents=True, exist_ok=True)
+            winner_snapshot.write_text(curated)
+            raise SessionExistsError("parent-resumed")
+        return original_add(state, *args, **kwargs)
+
+    manager.index_store.add_from_state = fail_base_name_once  # type: ignore[method-assign]
+
     child, _ = manager.resume_session("parent")
 
+    assert failed_once is True, "the loser must actually hit the SessionExistsError collision branch"
     assert child.name.startswith("parent-resumed-"), "loser must retry under a fresh unique name"
     assert winner_snapshot.exists(), "winner's curated snapshot must be preserved"
-    assert winner_snapshot.read_text() == "WINNER CURATED CONTEXT\n", "winner's snapshot must be unmodified"
+    assert (
+        winner_snapshot.read_text() == curated
+    ), "winner's curated snapshot must be unmodified (winner_owns short-circuits the orphan-unlink)"

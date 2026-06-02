@@ -26,9 +26,10 @@ treats any remaining flat ``*.md`` files at the top level of
 from __future__ import annotations
 
 import re
-import shutil
 from collections.abc import Iterator
 from pathlib import Path
+
+from forge.core.state.io import atomic_write_text
 
 PREV_SESSIONS_DIR = "prev_sessions"
 GENERATED_FILENAME = "generated.md"
@@ -172,8 +173,13 @@ def ensure_child(forge_root: Path, parent_name: str, child_name: str) -> Path:
             f"Cannot copy parent cache to child: {source} does not exist. " "Run assemble_transfer_context() first."
         )
 
-    target.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(source, target)
+    # Atomic copy: children/<child>.md is the durable, authoritative context. A bare
+    # shutil.copyfile truncate-and-streams the final path, so a concurrent reader (transfer
+    # show/diff) or the resume-time GC byte-compare could observe it torn during first creation.
+    # atomic_write_text (tempfile + os.replace, create_parents) makes the create all-or-nothing;
+    # the utf-8 round trip is byte-identical to generated.md (also written via atomic_write_text),
+    # preserving the generated==child invariant the GC byte-compare and auto-name retry depend on.
+    atomic_write_text(target, source.read_text(encoding="utf-8"))
     return target
 
 
