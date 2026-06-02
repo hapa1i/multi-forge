@@ -414,8 +414,9 @@ separate and are joined by a shared proxy `request_id`:
 
 Enumerations are `Literal`s (provenance is recorded, never inferred):
 
-- `measurement_source`: `proxy_request_exact` | `verb_snapshot_estimated` | `runtime_native` | `unattributed` — how the
-  cost/token figures were obtained, so an event lacking an exact figure says so rather than guessing.
+- `measurement_source`: `proxy_request_exact` | `verb_snapshot_estimated` | `provider_usage_exact` | `runtime_native` |
+  `unattributed` — how the cost/token figures were obtained, so an event lacking an exact figure says so rather than
+  guessing (`provider_usage_exact` = a direct `core.llm` call where the provider returned exact token usage in-band).
 - `billing_mode`: `api` | `subscription_interactive` | `subscription_headless_credit` | `subscription_quota` | `unknown`
   (`unknown` is the honest default where the signal is ambiguous).
 - `attribution_granularity`: `worker` | `verb` | `session`.
