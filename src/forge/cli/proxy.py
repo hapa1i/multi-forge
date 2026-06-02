@@ -1813,6 +1813,19 @@ def template_edit_cmd(name: str) -> None:
             console.print(f"Your changes are saved at: {display_path(tmp_path)}")
             sys.exit(1)
 
+        # proxy.family is required for a template (mirrors _load_template_config, the create path).
+        # dict_to_dataclass strict= only rejects unknown keys, and family defaults to "" on the
+        # dataclass, so a blank/missing family would otherwise pass edit and fail late at create.
+        _proxy_block = edited_data.get("proxy")
+        _family = _proxy_block.get("family", "") if isinstance(_proxy_block, dict) else ""
+        if not isinstance(_family, str) or not _family.strip():
+            console.print(
+                "[red]Error:[/red] Invalid template configuration: "
+                "proxy.family is required (must be a non-blank string)"
+            )
+            console.print(f"Your changes are saved at: {display_path(tmp_path)}")
+            sys.exit(1)
+
         # Validate template shape (ForgeConfig, not ProxyInstanceConfig)
         try:
             from forge.config.dataclass_utils import dict_to_dataclass

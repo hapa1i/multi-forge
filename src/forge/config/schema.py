@@ -436,6 +436,22 @@ def _validate_wire_shape_intercept(wire_shape: str, intercept: InterceptConfig) 
         )
 
 
+_VALID_DEFAULT_TIERS = frozenset({"haiku", "sonnet", "opus"})
+
+
+def _validate_default_tier(default_tier: str) -> None:
+    """Reject a default_tier outside the user-facing tier allowlist.
+
+    Enforced on BOTH ProxyConfig (template path) and ProxyInstanceConfig (running
+    proxy) so a bad default_tier fails at 'forge proxy template edit', not late at
+    'forge proxy create'.
+    """
+    if default_tier not in _VALID_DEFAULT_TIERS:
+        raise ValueError(
+            f"Invalid default_tier: '{default_tier}' (must be one of: {', '.join(sorted(_VALID_DEFAULT_TIERS))})"
+        )
+
+
 @dataclass
 class ProxyConfig:
     """Proxy server configuration."""
@@ -459,15 +475,23 @@ class ProxyConfig:
     audit: AuditConfig = field(default_factory=AuditConfig)
 
     def __post_init__(self) -> None:
-        # Templates carry wire_shape/intercept/audit too; coerce + validate here so an invalid
-        # combo is rejected at 'forge proxy template edit', not late at 'forge proxy create'.
+        # Templates carry wire_shape/intercept/audit/costs/default_tier/tier_overrides too; coerce +
+        # validate here so an invalid combo is rejected at 'forge proxy template edit', not late at
+        # 'forge proxy create' (parity with ProxyInstanceConfig).
         self.intercept = _coerce_intercept_config(self.intercept)
         self.audit = _coerce_audit_config(self.audit)
+        self.costs = _coerce_cost_config(self.costs)
         if self.wire_shape not in _VALID_WIRE_SHAPES:
             raise ValueError(
                 f"Invalid wire_shape: {self.wire_shape!r} (must be one of: {', '.join(_VALID_WIRE_SHAPES)})"
             )
         _validate_wire_shape_intercept(self.wire_shape, self.intercept)
+        _validate_default_tier(self.default_tier)
+        # Per-provider overrides: the constraint check skips tiers with no model, so empty/partial
+        # providers no-op and only a concrete unsupported override (its tier's model set) is
+        # rejected -- no false positives on templates whose model mapping resolves later.
+        for _prov in (self.gemini, self.openai, self.litellm, self.openrouter):
+            _validate_static_tier_override_constraints(_prov.tiers, _prov.tier_overrides)
 
     def get_provider(self, name: str | None = None) -> ProviderConfig:
         """Get provider config by name, defaulting to preferred_provider."""
@@ -559,11 +583,7 @@ class ProxyInstanceConfig:
         if not self.tiers.sonnet:
             raise ValueError("Tiers must define at least 'sonnet' model")
 
-        valid_tiers = {"haiku", "sonnet", "opus"}
-        if self.default_tier not in valid_tiers:
-            raise ValueError(
-                f"Invalid default_tier: '{self.default_tier}' (must be one of: {', '.join(sorted(valid_tiers))})"
-            )
+        _validate_default_tier(self.default_tier)
 
         self.costs = _coerce_cost_config(self.costs)
 
