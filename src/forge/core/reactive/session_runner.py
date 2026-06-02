@@ -15,6 +15,9 @@ import subprocess
 from dataclasses import dataclass
 
 from forge.core.reactive.env import (
+    FORGE_PARENT_RUN_ID_VAR,
+    FORGE_ROOT_RUN_ID_VAR,
+    FORGE_RUN_ID_VAR,
     FORGE_SUBPROCESS_PROXY_VAR,
     build_claude_env,
     can_use_bare,
@@ -37,6 +40,11 @@ class SessionResult:
     returncode: int
     timed_out: bool = False
     error: str | None = None
+    # Run-tree identity of this subprocess (minted by build_claude_env). Read by
+    # the usage ledger (Phase 4c) to attribute the work to its run/session.
+    run_id: str | None = None
+    parent_run_id: str | None = None
+    root_run_id: str | None = None
 
     @property
     def success(self) -> bool:
@@ -88,6 +96,32 @@ def run_claude_session(
     for key in unset_env_vars or ():
         env.pop(key, None)
 
+    # Read the run-tree identity build_claude_env stamped, and funnel every
+    # return through _session_result so all outcomes (success AND error) carry
+    # it — the usage ledger attributes failures by run_id too.
+    run_id = env.get(FORGE_RUN_ID_VAR)
+    parent_run_id = env.get(FORGE_PARENT_RUN_ID_VAR)
+    root_run_id = env.get(FORGE_ROOT_RUN_ID_VAR)
+
+    def _session_result(
+        *,
+        stdout: str = "",
+        stderr: str = "",
+        returncode: int = -1,
+        timed_out: bool = False,
+        error: str | None = None,
+    ) -> SessionResult:
+        return SessionResult(
+            stdout=stdout,
+            stderr=stderr,
+            returncode=returncode,
+            timed_out=timed_out,
+            error=error,
+            run_id=run_id,
+            parent_run_id=parent_run_id,
+            root_run_id=root_run_id,
+        )
+
     use_bare = bare if bare is not None else can_use_bare(env)
     cmd = ["claude", "-p"]
     if use_bare:
@@ -108,7 +142,7 @@ def run_claude_session(
             f"Start it with: forge proxy start {subprocess_proxy}"
         )
         _log.warning(msg)
-        return SessionResult(stdout="", stderr="", returncode=-1, error=msg)
+        return _session_result(error=msg)
 
     # Guard: fail with actionable error if --bare was requested but no API key.
     # Without this, the subprocess would fail with a cryptic Claude CLI error.
@@ -134,7 +168,7 @@ def run_claude_session(
                     env_ignored=env_ignored,
                 )
                 _log.warning(msg)
-                return SessionResult(stdout="", stderr="", returncode=-1, error=msg)
+                return _session_result(error=msg)
         except Exception as e:
             _log.debug("Could not format missing Anthropic subprocess credential error: %s", e)
 
@@ -159,7 +193,7 @@ def run_claude_session(
         if result.returncode != 0:
             _log.warning("claude -p returned non-zero exit code: %d", result.returncode)
 
-        return SessionResult(
+        return _session_result(
             stdout=result.stdout,
             stderr=result.stderr,
             returncode=result.returncode,
@@ -167,28 +201,15 @@ def run_claude_session(
 
     except subprocess.TimeoutExpired:
         _log.warning("claude -p timed out after %ds", timeout_seconds)
-        return SessionResult(
-            stdout="",
-            stderr="",
-            returncode=-1,
+        return _session_result(
             timed_out=True,
             error=f"Timed out after {timeout_seconds}s",
         )
 
     except FileNotFoundError:
         _log.error("claude CLI not found in PATH")
-        return SessionResult(
-            stdout="",
-            stderr="",
-            returncode=-1,
-            error="claude CLI not found in PATH",
-        )
+        return _session_result(error="claude CLI not found in PATH")
 
     except Exception as e:
         _log.warning("claude -p failed: %s", e)
-        return SessionResult(
-            stdout="",
-            stderr="",
-            returncode=-1,
-            error=str(e),
-        )
+        return _session_result(error=str(e))

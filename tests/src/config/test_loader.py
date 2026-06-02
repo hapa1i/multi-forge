@@ -414,6 +414,65 @@ class TestProxyFileIO:
         assert loaded.costs.cap_mode == "strict"
         assert loaded.costs.on_cap_hit == "warn"
 
+    def test_proxy_instance_config_round_trips_intercept_audit(self, tmp_path, monkeypatch):
+        """wire_shape/intercept/audit survive write/load of proxy.yaml."""
+        from forge.config.loader import (
+            load_proxy_instance_config,
+            write_proxy_instance_config,
+        )
+        from forge.config.schema import ProxyInstanceConfig, TierModels
+
+        monkeypatch.setenv("FORGE_HOME", str(tmp_path))
+
+        original = ProxyInstanceConfig(
+            proxy_format=1,
+            template="anthropic-passthrough",
+            template_digest="sha256:abc",
+            provider="litellm",
+            proxy_endpoint="http://localhost:8096",
+            port=8096,
+            upstream_base_url="https://api.anthropic.com",
+            tiers=TierModels(haiku="h", sonnet="s", opus="o"),
+            wire_shape="anthropic_passthrough",
+            intercept={"mode": "inspect"},
+            audit={"audit_full_body": True, "retention_days": 30},
+        )
+
+        write_proxy_instance_config("audit-proxy", original)
+        loaded = load_proxy_instance_config("audit-proxy")
+
+        assert loaded is not None
+        assert loaded.wire_shape == "anthropic_passthrough"
+        assert loaded.intercept.mode == "inspect"
+        assert loaded.audit.audit_full_body is True
+        assert loaded.audit.retention_days == 30
+
+    def test_proxy_instance_to_forge_config_propagates_intercept_audit(self):
+        """wire_shape/intercept/audit reach the runtime ProxyConfig (propagation trap)."""
+        from forge.config.loader import _proxy_instance_to_forge_config
+        from forge.config.schema import ProxyInstanceConfig, TierModels
+
+        config = ProxyInstanceConfig(
+            proxy_format=1,
+            template="anthropic-passthrough",
+            template_digest="sha256:test",
+            provider="litellm",
+            proxy_endpoint="http://localhost:8096",
+            port=8096,
+            upstream_base_url="https://api.anthropic.com",
+            tiers=TierModels(haiku="h", sonnet="s", opus="o"),
+            wire_shape="anthropic_passthrough",
+            intercept={"mode": "override", "override": {"system_prompt_augment": "Stay on task."}},
+            audit={"audit_full_body": True},
+        )
+
+        forge_config = _proxy_instance_to_forge_config(config)
+
+        assert forge_config.proxy.wire_shape == "anthropic_passthrough"
+        assert forge_config.proxy.intercept.mode == "override"
+        assert forge_config.proxy.intercept.override.system_prompt_augment == "Stay on task."
+        assert forge_config.proxy.audit.audit_full_body is True
+
     def test_load_proxy_instance_config_not_found(self, tmp_path, monkeypatch):
         """load_proxy_instance_config returns None for missing file."""
         from forge.config.loader import load_proxy_instance_config

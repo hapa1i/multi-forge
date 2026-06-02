@@ -2,17 +2,17 @@
 
 <!-- checklist: index -->
 
-<!-- version: 1.0.19 -->
+<!-- version: 1.0.20 -->
 
-<!-- test-count: 482 -->
+<!-- test-count: 508 -->
 
-<!-- last-updated: 2026-05-18 -->
+<!-- last-updated: 2026-06-02 -->
 
 <!-- aligned-with: v0.1.0 -->
 
 **Test Repo**: `$FORGE_TEST_REPO`
 
-**Last updated**: 2026-05-18 (add memory CLI and memory report checks)
+**Last updated**: 2026-06-02 (add proxy audit/intercept, native-relocate preflight, forge transfer, runtime list checks)
 
 ---
 

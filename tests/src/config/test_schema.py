@@ -1,5 +1,7 @@
 """Tests for config schema types (is_openai_model, dict_to_dataclass, ForgeConfig, ProxyInstanceConfig)."""
 
+from typing import Any
+
 import pytest
 
 from forge.config import load_config
@@ -625,3 +627,148 @@ class TestProxyInstanceConfigValidation:
 
         assert config.tier_overrides.opus is not None
         assert config.tier_overrides.opus.reasoning_effort == "xhigh"
+
+
+class TestInterceptAuditConfig:
+    """Tests for Phase 2 intercept/audit/wire_shape config on ProxyInstanceConfig."""
+
+    @staticmethod
+    def _make(**overrides):
+        from forge.config.schema import ProxyInstanceConfig, TierModels
+
+        base: dict[str, Any] = dict(
+            proxy_format=1,
+            template="test",
+            template_digest="sha256:test",
+            provider="litellm",
+            proxy_endpoint="http://localhost:8084",
+            port=8084,
+            upstream_base_url="https://litellm.test.example.com",
+            tiers=TierModels(haiku="h", sonnet="s", opus="o"),
+        )
+        base.update(overrides)
+        return ProxyInstanceConfig(**base)
+
+    def test_defaults_are_inert(self):
+        """A proxy config without the new keys keeps existing behavior."""
+        from forge.config.schema import AuditConfig, InterceptConfig
+
+        config = self._make()
+
+        assert config.wire_shape == "openai_translated"
+        assert isinstance(config.intercept, InterceptConfig)
+        assert config.intercept.mode == "passthrough"
+        assert isinstance(config.audit, AuditConfig)
+        assert config.audit.audit_full_body is False
+
+    def test_intercept_audit_coerced_from_dicts(self):
+        """Raw proxy.yaml dicts are normalized to dataclasses after validation."""
+        from forge.config.schema import AuditConfig, InterceptConfig
+
+        config = self._make(
+            wire_shape="anthropic_passthrough",
+            intercept={"mode": "inspect"},
+            audit={"audit_full_body": True, "retention_days": 30},
+        )
+
+        assert config.wire_shape == "anthropic_passthrough"
+        assert isinstance(config.intercept, InterceptConfig)
+        assert config.intercept.mode == "inspect"
+        assert isinstance(config.audit, AuditConfig)
+        assert config.audit.audit_full_body is True
+        assert config.audit.retention_days == 30
+
+    def test_invalid_wire_shape_rejected(self):
+        with pytest.raises(ValueError, match="Invalid wire_shape"):
+            self._make(wire_shape="bogus")
+
+    def test_invalid_intercept_mode_rejected(self):
+        with pytest.raises(ValueError, match="Invalid intercept.mode"):
+            self._make(intercept={"mode": "bogus"})
+
+    def test_unknown_audit_key_rejected(self):
+        """A typo like audit.full_body must fail, not silently disable the control."""
+        with pytest.raises(ValueError, match="Unknown audit key.*full_body"):
+            self._make(audit={"full_body": True})
+
+    def test_unknown_intercept_key_rejected(self):
+        with pytest.raises(ValueError, match="Unknown intercept key.*mod"):
+            self._make(intercept={"mod": "inspect"})
+
+    def test_audit_retention_days_rejects_bool(self):
+        """bool is an int subclass; audit.retention_days=true must be rejected."""
+        with pytest.raises(ValueError, match="audit.retention_days"):
+            self._make(audit={"retention_days": True})
+
+    def test_audit_retention_days_rejects_negative(self):
+        with pytest.raises(ValueError, match="audit.retention_days"):
+            self._make(audit={"retention_days": -1})
+
+    def test_system_prompt_guard_requires_pattern(self):
+        with pytest.raises(ValueError, match="needs a 'pattern' key"):
+            self._make(intercept={"mode": "override", "override": {"system_prompt_guards": [{"action": "warn"}]}})
+
+    def test_system_prompt_guard_invalid_action_rejected(self):
+        with pytest.raises(ValueError, match="Invalid system_prompt_guards action"):
+            self._make(
+                intercept={
+                    "mode": "override",
+                    "override": {"system_prompt_guards": [{"pattern": "x", "action": "nuke"}]},
+                }
+            )
+
+    def test_system_prompt_augment_and_guard_accepted(self):
+        from forge.config.schema import InterceptOverrideConfig
+
+        config = self._make(
+            wire_shape="anthropic_passthrough",  # override requires the signature-safe wire shape
+            intercept={
+                "mode": "override",
+                "override": {
+                    "system_prompt_augment": "Stay on task.",
+                    "system_prompt_guards": [{"pattern": "secret", "action": "strip"}],
+                },
+            },
+        )
+
+        assert isinstance(config.intercept.override, InterceptOverrideConfig)
+        assert config.intercept.override.system_prompt_augment == "Stay on task."
+        assert config.intercept.override.system_prompt_guards == [{"pattern": "secret", "action": "strip"}]
+
+    def test_override_requires_passthrough_wire_shape(self):
+        """override on the openai_translated path is rejected (it cannot mutate)."""
+        with pytest.raises(ValueError, match="requires wire_shape='anthropic_passthrough'"):
+            self._make(intercept={"mode": "override"})  # default wire_shape is openai_translated
+
+    def test_override_allowed_on_passthrough(self):
+        config = self._make(wire_shape="anthropic_passthrough", intercept={"mode": "override"})
+        assert config.intercept.mode == "override"
+
+    def test_guard_unknown_key_rejected(self):
+        with pytest.raises(ValueError, match="Unknown system_prompt_guards key"):
+            self._make(
+                wire_shape="anthropic_passthrough",
+                intercept={"mode": "override", "override": {"system_prompt_guards": [{"pattern": "x", "typo": 1}]}},
+            )
+
+    def test_guard_non_string_pattern_rejected(self):
+        with pytest.raises(ValueError, match="must be a non-empty string"):
+            self._make(
+                wire_shape="anthropic_passthrough",
+                intercept={"mode": "override", "override": {"system_prompt_guards": [{"pattern": ["x"]}]}},
+            )
+
+    def test_guard_invalid_regex_rejected(self):
+        with pytest.raises(ValueError, match="Invalid system_prompt_guards regex"):
+            self._make(
+                wire_shape="anthropic_passthrough",
+                intercept={"mode": "override", "override": {"system_prompt_guards": [{"pattern": "[unclosed"}]}},
+            )
+
+    def test_effective_redact_headers_unions_defaults(self):
+        """User-configured redact headers add to defaults; cannot un-redact authorization."""
+        config = self._make(audit={"redact_headers": ["X-Custom-Token"]})
+
+        effective = config.audit.effective_redact_headers()
+        assert "authorization" in effective  # default preserved
+        assert "x-custom-token" in effective  # user addition, lowercased

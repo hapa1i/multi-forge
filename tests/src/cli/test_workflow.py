@@ -1480,3 +1480,41 @@ class TestRunAnalyze:
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert data["passed"] is True
+
+
+class TestUsageEmission:
+    """Phase 4c: a workflow fan-out emits ONE verb-level usage event, attributed
+    to the ambient run (not per-worker -- ReviewResult carries no per-worker cost)."""
+
+    @patch("forge.review.engine.run_multi_review")
+    def test_panel_emits_one_verb_event(self, mock_run, monkeypatch):
+        from forge.core.usage.ledger import read_usage_events
+
+        monkeypatch.setenv("FORGE_RUN_ID", "run_panel")
+        monkeypatch.setenv("FORGE_ROOT_RUN_ID", "run_panel")
+        # No live proxy in tests: skip snapshot fetches so the holder is unmeasured.
+        monkeypatch.setattr("forge.core.reactive.cost_tracking.resolve_proxy_urls_from_plan", lambda _plan: [])
+        mock_run.return_value = _mock_output()
+
+        result = CliRunner().invoke(main, ["workflow", "panel", "-p", "Review this"])
+        assert result.exit_code == 0, result.output
+
+        events = read_usage_events()
+        assert len(events) == 1  # one verb aggregate, not two per-worker
+        e = events[0]
+        assert (e.command, e.run_id, e.status) == ("panel", "run_panel", "success")
+        assert e.attribution_granularity == "verb"
+        assert e.measurement_source == "unattributed"  # no live proxy in test
+        assert e.source_refs is None
+
+    @patch("forge.review.engine.run_multi_review")
+    def test_no_ambient_identity_emits_nothing(self, mock_run, monkeypatch):
+        from forge.core.usage.ledger import read_usage_events
+
+        monkeypatch.delenv("FORGE_RUN_ID", raising=False)
+        monkeypatch.setattr("forge.core.reactive.cost_tracking.resolve_proxy_urls_from_plan", lambda _plan: [])
+        mock_run.return_value = _mock_output()
+
+        result = CliRunner().invoke(main, ["workflow", "panel", "-p", "Review this"])
+        assert result.exit_code == 0
+        assert read_usage_events() == []

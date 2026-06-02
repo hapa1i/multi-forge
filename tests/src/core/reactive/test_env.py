@@ -7,9 +7,17 @@ from unittest.mock import patch
 from forge.core.reactive.env import (
     FORGE_DEPTH_VAR,
     FORGE_MAX_DEPTH,
+    FORGE_PARENT_RUN_ID_VAR,
+    FORGE_ROOT_RUN_ID_VAR,
+    FORGE_RUN_ID_VAR,
+    RunIdentity,
     build_claude_env,
     can_use_bare,
+    derive_child_run_identity,
     get_forge_depth,
+    get_run_identity,
+    mint_run_id,
+    new_root_run_identity,
     should_spawn_subprocesses,
 )
 
@@ -275,3 +283,124 @@ class TestHydrateCredentialsIntegration:
         env = build_claude_env()
 
         assert "ANTHROPIC_API_KEY" not in env
+
+
+class TestRunIdentityHelpers:
+    def test_mint_run_id_format(self):
+        rid = mint_run_id()
+        assert rid.startswith("run_")
+        assert len(rid) == len("run_") + 12
+
+    def test_mint_run_id_unique(self):
+        assert mint_run_id() != mint_run_id()
+
+    def test_new_root_has_no_parent_and_is_own_root(self):
+        root = new_root_run_identity()
+        assert root.parent_run_id is None
+        assert root.run_id == root.root_run_id
+
+    def test_get_run_identity_none_when_unset(self):
+        assert get_run_identity({}) is None
+
+    def test_get_run_identity_reads_env(self):
+        rid = get_run_identity(
+            {
+                FORGE_RUN_ID_VAR: "run_self",
+                FORGE_PARENT_RUN_ID_VAR: "run_parent",
+                FORGE_ROOT_RUN_ID_VAR: "run_root",
+            }
+        )
+        assert rid == RunIdentity(run_id="run_self", parent_run_id="run_parent", root_run_id="run_root")
+
+    def test_get_run_identity_root_falls_back_to_run_id(self):
+        rid = get_run_identity({FORGE_RUN_ID_VAR: "run_self"})
+        assert rid is not None
+        assert rid.root_run_id == "run_self"
+        assert rid.parent_run_id is None
+
+    def test_derive_child_inherits_root_parent_is_spawner(self):
+        child = derive_child_run_identity({FORGE_RUN_ID_VAR: "run_spawn", FORGE_ROOT_RUN_ID_VAR: "run_root"})
+        assert child.parent_run_id == "run_spawn"
+        assert child.root_run_id == "run_root"
+        assert child.run_id not in ("run_spawn", "run_root")
+
+    def test_derive_child_of_nothing_is_fresh_root(self):
+        child = derive_child_run_identity({})
+        assert child.parent_run_id is None
+        assert child.run_id == child.root_run_id
+
+    def test_derive_child_ignores_stale_parent(self):
+        # A stale inherited FORGE_PARENT_RUN_ID must not become the child's parent;
+        # parent is always recomputed from the spawner's FORGE_RUN_ID.
+        child = derive_child_run_identity(
+            {
+                FORGE_RUN_ID_VAR: "run_spawn",
+                FORGE_PARENT_RUN_ID_VAR: "run_stale",
+                FORGE_ROOT_RUN_ID_VAR: "run_root",
+            }
+        )
+        assert child.parent_run_id == "run_spawn"
+
+    def test_as_env_root_omits_parent(self):
+        env = new_root_run_identity().as_env()
+        assert FORGE_PARENT_RUN_ID_VAR not in env
+        assert env[FORGE_RUN_ID_VAR] == env[FORGE_ROOT_RUN_ID_VAR]
+
+    def test_as_env_child_includes_parent(self):
+        env = RunIdentity(run_id="run_c", parent_run_id="run_p", root_run_id="run_r").as_env()
+        assert env[FORGE_PARENT_RUN_ID_VAR] == "run_p"
+
+
+class TestBuildClaudeEnvRunIdentity:
+    def test_mints_root_when_unset(self):
+        with patch.dict("os.environ", {}, clear=True):
+            env = build_claude_env()
+        assert env[FORGE_RUN_ID_VAR].startswith("run_")
+        assert env[FORGE_RUN_ID_VAR] == env[FORGE_ROOT_RUN_ID_VAR]
+        assert FORGE_PARENT_RUN_ID_VAR not in env
+
+    def test_child_inherits_root_parent_is_spawner(self):
+        with patch.dict(
+            "os.environ",
+            {FORGE_RUN_ID_VAR: "run_spawn", FORGE_ROOT_RUN_ID_VAR: "run_root"},
+            clear=True,
+        ):
+            env = build_claude_env()
+        assert env[FORGE_PARENT_RUN_ID_VAR] == "run_spawn"
+        assert env[FORGE_ROOT_RUN_ID_VAR] == "run_root"
+        assert env[FORGE_RUN_ID_VAR] not in ("run_spawn", "run_root")
+
+    def test_derive_run_identity_false_passes_through(self):
+        with patch.dict("os.environ", {}, clear=True):
+            env = build_claude_env(
+                extra_vars={FORGE_RUN_ID_VAR: "run_fixed", FORGE_ROOT_RUN_ID_VAR: "run_fixed"},
+                derive_run_identity=False,
+            )
+        assert env[FORGE_RUN_ID_VAR] == "run_fixed"
+        assert env[FORGE_ROOT_RUN_ID_VAR] == "run_fixed"
+
+    def test_stale_parent_scrubbed_on_derive(self):
+        # Inherited FORGE_PARENT_RUN_ID (the spawner's own parent) must not leak.
+        with patch.dict(
+            "os.environ",
+            {
+                FORGE_RUN_ID_VAR: "run_spawn",
+                FORGE_PARENT_RUN_ID_VAR: "run_stale",
+                FORGE_ROOT_RUN_ID_VAR: "run_root",
+            },
+            clear=True,
+        ):
+            env = build_claude_env()
+        assert env[FORGE_PARENT_RUN_ID_VAR] == "run_spawn"
+
+    def test_source_env_not_mutated(self):
+        import os
+
+        with patch.dict("os.environ", {FORGE_DEPTH_VAR: "1", FORGE_RUN_ID_VAR: "run_src"}, clear=True):
+            env = build_claude_env()
+            # Child env advances depth and gets a fresh run id...
+            assert env[FORGE_DEPTH_VAR] == "2"
+            assert env[FORGE_RUN_ID_VAR] != "run_src"
+            # ...while the source os.environ is untouched.
+            assert os.environ[FORGE_DEPTH_VAR] == "1"
+            assert os.environ[FORGE_RUN_ID_VAR] == "run_src"

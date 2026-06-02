@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from forge.core.invoker import Attribution
 from forge.core.reactive.structured_output import extract_json_from_response
 
 from .engine import run_multi_review
@@ -130,6 +131,7 @@ def run_consensus(
     original_subject: str = "",
     via: str | None = None,
     routing_plan: WorkerRoutingPlan | None = None,
+    attribution: Attribution | None = None,
 ) -> ConsensusOutput:
     """Run two-round consensus workflow with role-assigned workers.
 
@@ -192,6 +194,7 @@ def run_consensus(
         timeout_seconds=timeout_seconds,
         cwd=cwd,
         resume_id=None,
+        attribution=attribution,
     )
 
     # --- Build reconciliation brief ---
@@ -224,6 +227,7 @@ def run_consensus(
         timeout_seconds=timeout_seconds,
         cwd=cwd,
         resume_id=None,
+        attribution=attribution,
     )
 
     return ConsensusOutput(

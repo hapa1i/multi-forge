@@ -15,13 +15,16 @@ from forge.session.transfer import (
     AI_CURATION_PROVIDER,
     MAX_TRANSCRIPT_CHARS,
     ResumeStrategy,
+    _citation_is_grounded,
     _format_transcript_for_llm,
     _generate_ai_curated_context,
     _generate_minimal_context,
     _generate_structured_context,
     _resolve_plan_content,
+    _validate_decision_citations,
     assemble_transfer_context,
     estimate_transcript_tokens,
+    parse_transfer_frontmatter,
     resolve_lineage,
 )
 
@@ -584,10 +587,12 @@ class TestFormatTranscriptForLLM:
     def test_formats_entries_correctly(self, sample_transcript: Path) -> None:
         """Should format transcript entries as [ROLE] text lines."""
         entries = parse_jsonl_transcript(sample_transcript)
-        formatted, was_truncated = _format_transcript_for_llm(entries)
+        formatted, was_truncated, emitted_turns = _format_transcript_for_llm(entries)
 
         assert "[USER]" in formatted or "[ASSISTANT]" in formatted
         assert was_truncated is False
+        # emitted_turns is the set of citable anchors used to validate decision citations.
+        assert len(emitted_turns) >= 1
 
     def test_respects_max_chars_limit(self, tmp_path: Path) -> None:
         """Should truncate transcript at MAX_TRANSCRIPT_CHARS."""
@@ -609,7 +614,7 @@ class TestFormatTranscriptForLLM:
         large_transcript.write_text("\n".join(entries), encoding="utf-8")
 
         parsed = parse_jsonl_transcript(large_transcript)
-        formatted, was_truncated = _format_transcript_for_llm(parsed)
+        formatted, was_truncated, _ = _format_transcript_for_llm(parsed)
 
         # Should be truncated and include marker
         assert was_truncated is True
@@ -618,9 +623,10 @@ class TestFormatTranscriptForLLM:
 
     def test_empty_entries_returns_empty(self) -> None:
         """Empty entries should return empty string and no truncation."""
-        formatted, was_truncated = _format_transcript_for_llm([])
+        formatted, was_truncated, emitted_turns = _format_transcript_for_llm([])
         assert formatted == ""
         assert was_truncated is False
+        assert emitted_turns == set()
 
 
 # -----------------------------------------------------------------------------
@@ -628,22 +634,81 @@ class TestFormatTranscriptForLLM:
 # -----------------------------------------------------------------------------
 
 
+class TestDecisionCitationValidation:
+    """Unit tests for citation grounding (no LLM)."""
+
+    @pytest.mark.parametrize(
+        "citation,emitted_turns,grounded",
+        [
+            ("turn 2", {1, 2, 3}, True),
+            ("turn 3", {1, 2, 3}, True),
+            ("turn 4", {1, 2, 3}, False),  # out of range
+            ("turn 0", {1, 2, 3}, False),  # turns are 1-indexed
+            ("turn 1", set(), False),  # unknown range -> not trusted
+            ("turn 2", {1, 3}, False),  # SPARSE: turn 2 was skipped (never emitted) -> fabricated
+            ("[turn 2]", {1, 2, 3}, True),  # bracketed form
+            ("src/forge/session/transfer.py:80", {1, 2, 3}, True),
+            ("src/forge/session/transfer.py:80-95", {1, 2, 3}, True),  # line range
+            ("README.md", {1, 2, 3}, True),
+            ("because the user asked", {1, 2, 3}, False),  # prose
+            ("earlier in the session", {1, 2, 3}, False),
+        ],
+    )
+    def test_citation_is_grounded(self, citation: str, emitted_turns: set[int], grounded: bool) -> None:
+        assert _citation_is_grounded(citation, emitted_turns) is grounded
+
+    def test_blanks_ungrounded_keeps_text(self) -> None:
+        """An ungrounded citation is blanked; the decision text is preserved."""
+        decisions = [{"text": "Keep this", "citation": "turn 99"}]
+        sanitized, warnings = _validate_decision_citations(decisions, emitted_turns={1, 2})
+        assert sanitized[0]["text"] == "Keep this"
+        assert sanitized[0]["citation"] == ""
+        assert len(warnings) == 1
+
+    def test_grounded_citation_untouched(self) -> None:
+        decisions = [{"text": "Keep", "citation": "turn 1"}]
+        sanitized, warnings = _validate_decision_citations(decisions, emitted_turns={1, 2})
+        assert sanitized[0]["citation"] == "turn 1"
+        assert warnings == []
+
+    def test_non_list_and_string_items_pass_through(self) -> None:
+        """Non-list input and bare-string items are returned unchanged, no error."""
+        assert _validate_decision_citations(None, emitted_turns={1, 2}) == (None, [])
+        sanitized, warnings = _validate_decision_citations(["plain decision"], emitted_turns={1, 2})
+        assert sanitized == ["plain decision"]
+        assert warnings == []
+
+    def test_missing_citation_not_flagged(self) -> None:
+        """A decision with no citation is fine -- it claims no provenance to fake."""
+        decisions = [{"text": "No cite here"}]
+        sanitized, warnings = _validate_decision_citations(decisions, emitted_turns={1, 2})
+        assert sanitized[0]["text"] == "No cite here"
+        assert warnings == []
+
+
 class TestAICuratedStrategy:
     """Tests for AI-curated strategy with mocked LLM."""
 
-    def test_ai_curated_calls_llm_and_returns_highlights(self, sample_transcript: Path) -> None:
-        """AI-curated should call LLM and include highlights in output."""
+    def test_ai_curated_renders_schema_sections(self, sample_transcript: Path) -> None:
+        """AI-curated should call the LLM and render the structured schema sections."""
         from unittest.mock import MagicMock, patch
 
+        curated = {
+            "goal": "Refactor the transfer subsystem",
+            "decisions": [{"text": "Use child-agnostic frontmatter", "citation": "turn 1"}],
+            "current_state": "Schema landed",
+            "files": ["src/forge/session/transfer.py:80 - schema enum"],
+            "open_questions": ["Do we change the default strategy?"],
+        }
         mock_adapter = MagicMock()
-        mock_adapter.ask.return_value = "- Key decision made\n- Files modified"
+        mock_adapter.ask.return_value = json.dumps(curated)
 
         # Patch at source module since lazy import is used
         with (
             patch("forge.core.llm.SyncAdapter", return_value=mock_adapter),
             patch("forge.core.llm.get_client") as mock_get_client,
         ):
-            content, warnings = _generate_ai_curated_context(
+            content, warnings, schema = _generate_ai_curated_context(
                 parent_name="test-parent",
                 lineage=["test-parent"],
                 transcript_path=sample_transcript,
@@ -652,16 +717,75 @@ class TestAICuratedStrategy:
                 latest_plan_path=None,
             )
 
-        # Assert LLM was called
         mock_get_client.assert_called_once_with(AI_CURATION_MODEL, provider=AI_CURATION_PROVIDER)
         mock_adapter.ask.assert_called_once()
-        # Assert output contains strategy marker
-        assert "ai-curated" in content
+        # Full 8-section schema: sections 1-7 live in the snapshot body.
+        assert schema == "full"
+        for header in (
+            "## Goal / Current Task",
+            "## Decisions",
+            "## Current State",
+            "## Relevant Files",
+            "## Open Questions",
+            "## Runtime Hints",
+        ):
+            assert header in content, header
+        # Decision text and its grounded (in-range) citation are rendered.
+        assert "Use child-agnostic frontmatter" in content
+        assert "turn 1" in content
+        # Model attribution + security warning.
         assert f"{AI_CURATION_MODEL} via {AI_CURATION_PROVIDER}" in content
-        # Assert LLM output is included
-        assert "Key decision made" in content
-        # Assert security warning is present
         assert any("for processing" in w for w in warnings)
+
+    def test_ai_curated_strips_ungrounded_citations(self, sample_transcript: Path) -> None:
+        """Fabricated citations are dropped (decision text kept) and warned about.
+
+        The fixture yields a single turn, so ``turn 99`` is out of range and a
+        prose citation is not a turn/file ref -- both must be stripped. A valid
+        ``turn 1`` and a ``file:line`` citation must survive.
+        """
+        from unittest.mock import MagicMock, patch
+
+        curated = {
+            "goal": "Goal",
+            "decisions": [
+                {"text": "Fabricated turn decision", "citation": "turn 99"},
+                {"text": "Vague decision", "citation": "because the user said so"},
+                {"text": "Grounded turn decision", "citation": "turn 1"},
+                {"text": "Grounded file decision", "citation": "src/forge/session/transfer.py:80"},
+            ],
+            "current_state": "State",
+            "files": [],
+            "open_questions": [],
+        }
+        mock_adapter = MagicMock()
+        mock_adapter.ask.return_value = json.dumps(curated)
+
+        with (
+            patch("forge.core.llm.SyncAdapter", return_value=mock_adapter),
+            patch("forge.core.llm.get_client"),
+        ):
+            content, warnings, schema = _generate_ai_curated_context(
+                parent_name="p",
+                lineage=["p"],
+                transcript_path=sample_transcript,
+                artifacts_path=None,
+                proxy_template=None,
+                latest_plan_path=None,
+            )
+
+        assert schema == "full"
+        # All decision text survives; only the false provenance is removed.
+        for text in ("Fabricated turn decision", "Vague decision", "Grounded turn decision"):
+            assert text in content
+        assert "turn 99" not in content
+        assert "because the user said so" not in content
+        # Grounded citations are preserved verbatim.
+        assert "turn 1" in content
+        assert "src/forge/session/transfer.py:80" in content
+        # Each dropped citation is surfaced as a warning (not silent).
+        dropped = [w for w in warnings if "ungrounded citation" in w]
+        assert len(dropped) == 2
 
     def test_ai_curated_fallback_on_llm_error(self, sample_transcript: Path) -> None:
         """Should fall back to structured on LLM error."""
@@ -675,7 +799,7 @@ class TestAICuratedStrategy:
             patch("forge.core.llm.SyncAdapter", return_value=mock_adapter),
             patch("forge.core.llm.get_client"),
         ):
-            content, warnings = _generate_ai_curated_context(
+            content, warnings, schema = _generate_ai_curated_context(
                 parent_name="test",
                 lineage=["test"],
                 transcript_path=sample_transcript,
@@ -684,16 +808,15 @@ class TestAICuratedStrategy:
                 latest_plan_path=None,
             )
 
-        # Assert fallback warning
+        # Fallback to structured marks the body as a compatibility fallback.
+        assert schema == "compatibility-fallback"
         assert any("using structured" in w.lower() for w in warnings)
-        # Assert output is NOT ai-curated (should be structured)
-        assert "ai-curated" not in content
         # Structured output has Conversation Summary section
         assert "Conversation Summary" in content
 
     def test_ai_curated_no_transcript_uses_minimal(self) -> None:
         """Should use minimal strategy if no transcript."""
-        content, warnings = _generate_ai_curated_context(
+        content, warnings, schema = _generate_ai_curated_context(
             parent_name="test",
             lineage=["test"],
             transcript_path=None,
@@ -702,10 +825,9 @@ class TestAICuratedStrategy:
             latest_plan_path=None,
         )
 
-        # Assert fallback warning
+        # Fallback to minimal marks the body as a compatibility fallback.
+        assert schema == "compatibility-fallback"
         assert any("using minimal" in w.lower() for w in warnings)
-        # Assert output is NOT ai-curated
-        assert "ai-curated" not in content
         # Minimal output has Lineage section
         assert "## Lineage" in content
 
@@ -714,7 +836,7 @@ class TestAICuratedStrategy:
         empty_transcript = tmp_path / "empty.jsonl"
         empty_transcript.write_text("", encoding="utf-8")
 
-        content, warnings = _generate_ai_curated_context(
+        content, warnings, schema = _generate_ai_curated_context(
             parent_name="test",
             lineage=["test"],
             transcript_path=empty_transcript,
@@ -723,9 +845,9 @@ class TestAICuratedStrategy:
             latest_plan_path=None,
         )
 
-        # Assert fallback warning
+        # Fallback to minimal marks the body as a compatibility fallback.
+        assert schema == "compatibility-fallback"
         assert any("using minimal" in w.lower() for w in warnings)
-        assert "ai-curated" not in content
 
     def test_transcript_truncation_adds_warning(self, tmp_path: Path) -> None:
         """Should warn when transcript is truncated."""
@@ -750,13 +872,13 @@ class TestAICuratedStrategy:
 
         # Mock LLM (patch at source module since lazy import is used)
         mock_adapter = MagicMock()
-        mock_adapter.ask.return_value = "- Highlights"
+        mock_adapter.ask.return_value = json.dumps({"goal": "g", "current_state": "s"})
 
         with (
             patch("forge.core.llm.SyncAdapter", return_value=mock_adapter),
             patch("forge.core.llm.get_client"),
         ):
-            content, warnings = _generate_ai_curated_context(
+            content, warnings, schema = _generate_ai_curated_context(
                 parent_name="test",
                 lineage=["test"],
                 transcript_path=large_transcript,
@@ -767,8 +889,9 @@ class TestAICuratedStrategy:
 
         # Should have truncation warning
         assert any("truncated" in w.lower() for w in warnings)
-        # But should still succeed with ai-curated
-        assert "ai-curated" in content
+        # But should still succeed with the full curated schema
+        assert schema == "full"
+        assert "## Goal / Current Task" in content
 
 
 class TestResolvePlanContent:
@@ -1068,3 +1191,86 @@ class TestInlinePlan:
         # Plan should be inlined regardless of which strategy runs
         assert "## Approved Plan" in content
         assert "Do X" in content
+
+
+class TestTransferFrontmatter:
+    """The child-agnostic YAML frontmatter contract on every strategy."""
+
+    def _parent(self, tmp_path: Path) -> SessionState:
+        from forge.session.models import create_session_state
+
+        return create_session_state(name="parent", worktree_path=str(tmp_path))
+
+    @pytest.mark.parametrize(
+        "strategy",
+        [ResumeStrategy.MINIMAL, ResumeStrategy.STRUCTURED, ResumeStrategy.FULL],
+    )
+    def test_compatibility_fallback_frontmatter(self, tmp_path: Path, strategy: ResumeStrategy) -> None:
+        """Non-curated strategies carry frontmatter + a compatibility-fallback marker."""
+        result = assemble_transfer_context(
+            parent_name="parent",
+            parent_state=self._parent(tmp_path),
+            forge_root=tmp_path,
+            strategy=strategy,
+            depth=2,
+            get_session=lambda _: None,
+        )
+        assert result.context_file is not None
+        frontmatter, body, warning = parse_transfer_frontmatter(result.context_file.read_text())
+
+        assert warning is None
+        assert frontmatter is not None
+        assert frontmatter["schema_version"] == 1
+        assert frontmatter["parent"] == "parent"
+        assert frontmatter["strategy"] == strategy.value
+        assert frontmatter["schema"] == "compatibility-fallback"
+        assert frontmatter["depth"] == 2
+        assert frontmatter["target_runtime"] == "claude"
+        # The human-readable body is preserved beneath the frontmatter.
+        assert body.lstrip().startswith("# Session Context")
+
+    def test_frontmatter_has_no_child_field(self, tmp_path: Path) -> None:
+        """A child: field would break the byte-for-byte generated->child copy."""
+        result = assemble_transfer_context(
+            parent_name="parent",
+            parent_state=self._parent(tmp_path),
+            forge_root=tmp_path,
+            strategy=ResumeStrategy.MINIMAL,
+            depth=1,
+            get_session=lambda _: None,
+        )
+        assert result.context_file is not None
+        frontmatter, _, _ = parse_transfer_frontmatter(result.context_file.read_text())
+        assert frontmatter is not None
+        assert "child" not in frontmatter
+
+    def test_generated_and_child_are_byte_identical(self, tmp_path: Path) -> None:
+        """ensure_child copies generated.md verbatim -- the durability invariant."""
+        from forge.session.prev_sessions import child_path, generated_path
+
+        result = assemble_transfer_context(
+            parent_name="parent",
+            parent_state=self._parent(tmp_path),
+            forge_root=tmp_path,
+            strategy=ResumeStrategy.STRUCTURED,
+            depth=1,
+            get_session=lambda _: None,
+            child_name="kid",
+        )
+        generated = generated_path(tmp_path, "parent")
+        child = child_path(tmp_path, "parent", "kid")
+        assert generated.read_bytes() == child.read_bytes()
+        assert result.context_file == child
+
+    def test_parse_frontmatter_degrades_on_malformed_yaml(self) -> None:
+        """Malformed frontmatter never raises: warn + return the body (system boundary)."""
+        frontmatter, body, warning = parse_transfer_frontmatter("---\n::: not yaml :::\n---\nbody text")
+        assert frontmatter is None
+        assert warning is not None
+        assert "body text" in body
+
+    def test_parse_frontmatter_without_frontmatter(self) -> None:
+        frontmatter, body, warning = parse_transfer_frontmatter("# Just a body\nno frontmatter here")
+        assert frontmatter is None
+        assert warning is None
+        assert "Just a body" in body

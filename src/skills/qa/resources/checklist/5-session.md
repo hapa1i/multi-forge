@@ -538,4 +538,90 @@ forge session delete test-fork-subproxy --force 2>/dev/null || true
 - [ ] Child `intent.subprocess_proxy` matches `$FORGE_QA_GEMINI_PROXY`
 - [ ] Both test sessions cleaned up
 
+### 5.19 Native-Relocate Fork Preflight Rejections
+
+<!-- auto -->
+
+Verify the `--resume-mode native-relocate` preflight guards reject before any fork/worktree is created. These exit
+non-zero during preflight and never launch Claude (no live transcript needed). A live byte-faithful resume is covered by
+the Docker contract test, not here.
+
+```bash
+cd $FORGE_TEST_REPO
+
+# Clean up from previous runs
+forge session delete nr-parent --force 2>/dev/null || true
+forge session delete nr-sidecar-parent --force 2>/dev/null || true
+
+# Host parent with no transcript (no Claude launch)
+forge session start nr-parent --no-launch
+
+# native-relocate resumes at launch -> --no-launch is rejected
+forge session fork nr-parent --worktree --resume-mode native-relocate --no-launch 2>&1; echo "NOLAUNCH_EXIT=$?"
+
+# Parent has no Claude transcript to relocate (exits in preflight, does not launch)
+forge session fork nr-parent --worktree --resume-mode native-relocate 2>&1; echo "NOTRANSCRIPT_EXIT=$?"
+
+# Sidecar parent: relocation writes to the host ~/.claude store -> host mode only
+forge session start nr-sidecar-parent --sidecar --no-launch
+forge session fork nr-sidecar-parent --worktree --resume-mode native-relocate 2>&1; echo "SIDECAR_EXIT=$?"
+
+# Clean up
+git worktree prune 2>/dev/null || true
+forge session delete nr-parent --force 2>/dev/null || true
+forge session delete nr-sidecar-parent --force 2>/dev/null || true
+```
+
+- [ ] `--resume-mode native-relocate --no-launch` rejected (exit non-zero) with the `omit --no-launch` tip
+- [ ] native-relocate with no parent transcript rejected with `has no Claude transcript to relocate` (no launch)
+- [ ] native-relocate with a sidecar parent rejected with `not supported with sidecar mode` (host mode only)
+
+### 5.20 Native-Relocate `--into` Same-Dir Data-Loss Guard
+
+<!-- auto -->
+
+Just-fixed data-loss guard: a `--into` target that encodes to the parent's OWN Claude project dir is rejected, so a
+no-op relocate can never make later child-deletion unlink the parent's original transcript.
+
+```bash
+cd $FORGE_TEST_REPO
+
+# Clean up from previous runs
+forge session delete nr-into-parent --force 2>/dev/null || true
+NR_WT="${FORGE_TEST_REPO}-nr-into-target"
+git worktree remove "$NR_WT" --force 2>/dev/null || true
+git branch -D nr-into-target 2>/dev/null || true
+
+# Target worktree (with Forge enabled -- required for --into)
+git worktree add "$NR_WT" -b nr-into-target
+cd "$NR_WT" && forge extension enable --scope local && cd "$FORGE_TEST_REPO"
+
+# Parent whose claude_project_root IS that worktree, with a real transcript there.
+forge session start nr-into-parent --no-launch
+PJSON=".forge/sessions/nr-into-parent/forge.session.json"
+jq --arg cwd "$NR_WT" \
+  '.confirmed.claude_project_root = $cwd | .confirmed.claude_session_id = "fixture-nr-into"' \
+  "$PJSON" > /tmp/nri.json && mv /tmp/nri.json "$PJSON"
+
+# Create the exact transcript file the CLI preflight checks (encoding-agnostic via the real helper).
+TP=$(python3 -c "from forge.session.claude.paths import get_transcript_path; print(get_transcript_path('$NR_WT','fixture-nr-into'))")
+mkdir -p "$(dirname "$TP")"
+printf '%s\n' '{"type":"thinking","signature":"x"}' > "$TP"
+
+# Fork --into the parent's own dir -> rejected (requires a different CWD than the parent)
+forge session fork nr-into-parent --into "$NR_WT" --resume-mode native-relocate 2>&1; echo "INTO_GUARD_EXIT=$?"
+
+# The parent's original transcript must be untouched.
+test -f "$TP" && echo "PARENT_TRANSCRIPT_PRESERVED=true" || echo "PARENT_TRANSCRIPT_PRESERVED=false"
+
+# Clean up
+git worktree remove "$NR_WT" --force 2>/dev/null || true
+git branch -D nr-into-target 2>/dev/null || true
+forge session delete nr-into-parent --force 2>/dev/null || true
+```
+
+- [ ] `fork --into <parent's own dir> --resume-mode native-relocate` rejected (exit non-zero) with
+  `requires a different CWD than the parent`
+- [ ] Parent's original transcript is preserved (not relocated or unlinked)
+
 ---

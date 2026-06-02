@@ -104,17 +104,31 @@ def _tracked_transcript_session_ids_from_artifacts(artifacts: Any) -> list[str]:
 
 
 def _tracked_derivation_transcript_session_ids(
-    derivation: Derivation | dict[str, Any] | None,
+    derivation: object,
 ) -> list[str]:
-    """Extract UUIDs from derivation transcript pointers, when present."""
-    if derivation is None:
-        return []
+    """Extract transcript UUIDs a derivation points at, when present.
 
+    Yields UUIDs from ``parent_transcript`` (archived-artifact pointer) AND
+    ``relocated_parent_session_id``. The latter is load-bearing for cleanup: a
+    native-relocate fork copies the parent UUID's transcript into the child's
+    dir, so a co-resident sibling that relocated the same parent UUID must mark
+    that copy as shared -- otherwise deleting one alias destroys the other's
+    baseline. (The parent's own claude_session_id == the relocated UUID, so this
+    also protects the parent's original when the child/parent dirs collide.)
+
+    Accepts ``object``: force-delete and shared-transcript scans pass the raw JSON
+    value of ``confirmed.derivation`` from manifests that failed strict validation,
+    so a corrupted ``"derivation": "oops"`` must degrade to no tracked UUIDs rather
+    than raise (AttributeError) and abort cleanup.
+    """
     if isinstance(derivation, Derivation):
         parent_transcript = derivation.parent_transcript
+        relocated = derivation.relocated_parent_session_id
     elif isinstance(derivation, dict):
         parent_transcript = derivation.get("parent_transcript")
+        relocated = derivation.get("relocated_parent_session_id")
     else:
+        # None, or a malformed raw derivation from a corrupted manifest -> nothing tracked.
         return []
 
     session_ids: list[str] = []
@@ -123,6 +137,8 @@ def _tracked_derivation_transcript_session_ids(
         # live raw transcript with the same UUID is still treated as shared.
         for match in _UUID_RE.findall(parent_transcript):
             _append_unique_string(session_ids, match)
+    if isinstance(relocated, str):
+        _append_unique_string(session_ids, relocated)
     return session_ids
 
 
@@ -167,23 +183,47 @@ def _add_unique_project_root(roots: list[str], value: Any) -> None:
         roots.append(normalized)
 
 
-def _transcript_cleanup_project_root(state: SessionState | None, fallback_root: str) -> str:
+def _raw_confirmed_value(raw_data: dict[str, Any] | None, key: str) -> Any:
+    if not isinstance(raw_data, dict):
+        return None
+    confirmed = raw_data.get("confirmed")
+    if not isinstance(confirmed, dict):
+        return None
+    return confirmed.get(key)
+
+
+def _transcript_cleanup_project_root(
+    state: SessionState | None,
+    fallback_root: str,
+    raw_data: dict[str, Any] | None = None,
+) -> str:
     """Return the Claude project root whose raw transcript files should be cleaned."""
     if state is not None:
         if state.confirmed.claude_project_root:
             return str(Path(state.confirmed.claude_project_root).expanduser().resolve())
         if state.worktree or state.forge_root:
             return str(Path(resolve_claude_project_root(state)).expanduser().resolve())
+
+    raw_claude_project_root = _raw_confirmed_value(raw_data, "claude_project_root")
+    if isinstance(raw_claude_project_root, str) and raw_claude_project_root:
+        return str(Path(raw_claude_project_root).expanduser().resolve())
+
     return str(Path(fallback_root).expanduser().resolve())
 
 
-def _candidate_transcript_project_roots(state: SessionState | None, entry: SessionIndexEntry) -> list[str]:
+def _candidate_transcript_project_roots(
+    state: SessionState | None,
+    entry: SessionIndexEntry,
+    raw_data: dict[str, Any] | None = None,
+) -> list[str]:
     """Return possible Claude project roots for a session, newest source first."""
     roots: list[str] = []
     if state is not None:
         _add_unique_project_root(roots, state.confirmed.claude_project_root)
         if state.worktree or state.forge_root:
             _add_unique_project_root(roots, resolve_claude_project_root(state))
+    else:
+        _add_unique_project_root(roots, _raw_confirmed_value(raw_data, "claude_project_root"))
     _add_unique_project_root(roots, entry.forge_root or entry.worktree_path)
     _add_unique_project_root(roots, entry.worktree_path)
     return roots
@@ -881,9 +921,6 @@ class SessionManager:
         """
         parent_forge_root = parent_entry.forge_root or parent_entry.worktree_path
         for attempt in range(2):
-            child_store = SessionStore(parent_forge_root, child_name)
-            child_store.write(child_state)
-
             try:
                 self.index_store.add_from_state(
                     child_state,
@@ -892,15 +929,20 @@ class SessionManager:
                     forge_root=parent_entry.forge_root,
                     relative_path=parent_entry.relative_path,
                 )
-                break  # Success
             except SessionExistsError:
-                child_store.delete()
-
+                # Reserve the index name BEFORE writing the manifest. With a deterministic auto-name
+                # (<parent>-resumed), a concurrent resume that already won `child_name` owns
+                # .forge/sessions/<child_name>/forge.session.json; writing it here would clobber the
+                # winner's manifest. Because the reservation comes first, this loser never wrote that
+                # manifest -- the winner's state is untouched. Only the curated transfer snapshot
+                # (children/<child>.md, written by assemble_transfer_context before this call) may be
+                # an orphan to reclaim, and only when no live session owns the name.
                 if not name_was_auto or attempt > 0:
                     raise
 
+                winner_owns = self.index_store.session_exists(child_name, forge_root=parent_entry.forge_root)
                 derivation = child_state.confirmed.derivation
-                if derivation is not None and derivation.resume_mode == "transfer":
+                if derivation is not None and derivation.resume_mode == "transfer" and not winner_owns:
                     orphan_context = child_path(Path(parent_forge_root), parent_name, child_name)
                     generated_context = generated_path(Path(parent_forge_root), parent_name)
                     try:
@@ -918,6 +960,12 @@ class SessionManager:
                 if derivation is not None and derivation.resume_mode == "transfer":
                     ensure_child(Path(parent_forge_root), parent_name, child_name)
                     derivation.context_file = child_path_rel(parent_name, child_name)
+                continue
+
+            # Name reserved: now publish the manifest. Writing the manifest only after the index
+            # reservation is what prevents a losing concurrent resume from overwriting the winner's.
+            SessionStore(parent_forge_root, child_name).write(child_state)
+            break
 
         return child_name
 
@@ -1012,6 +1060,7 @@ class SessionManager:
         forge_root: str | None = None,
         force: bool = False,
         memory_flag: bool | None = None,
+        resume_mode: str | None = None,
         warnings_sink: list[str] | None = None,
     ) -> tuple[SessionState, SessionState]:
         """Fork an existing session.
@@ -1284,12 +1333,20 @@ class SessionManager:
             memory_flag=memory_flag,
         )
 
-        fork_resume_mode = "transfer" if (create_worktree or is_into) else "native"
+        # Opt-in native-relocate (worktree/--into only) overrides the transfer default;
+        # everything else keeps the auto-decision (same-dir native, cross-CWD transfer).
+        if resume_mode == "native-relocate" and (create_worktree or is_into):
+            fork_resume_mode = "native-relocate"
+        else:
+            fork_resume_mode = "transfer" if (create_worktree or is_into) else "native"
         # For transfer-mode forks the per-child file is created lazily at launch
         # (see _generate_parent_transfer_context). We pre-record the reference
         # here so GC knows the fork's child file belongs to this session, even
         # if launch happens later.
         fork_context_file_rel = child_path_rel(parent_name, fork_name) if fork_resume_mode == "transfer" else None
+        # native-relocate copies the parent transcript into the child's encoded dir; record the
+        # parent UUID so cleanup can remove that copy (dir-scoped to the child, never the parent's).
+        fork_relocated_parent = parent.confirmed.claude_session_id if fork_resume_mode == "native-relocate" else None
         fork_state.confirmed.derivation = Derivation(
             parent_session=parent_name,
             parent_transcript=_latest_transcript_artifact_path(parent),
@@ -1300,6 +1357,7 @@ class SessionManager:
             resumed_at=now_iso(),
             lineage=[parent_name],
             context_file=fork_context_file_rel,
+            relocated_parent_session_id=fork_relocated_parent,
             parent_forge_root=parent_entry.forge_root or parent_entry.worktree_path,
             parent_project_root=parent_entry.project_root,
         )
@@ -1551,7 +1609,7 @@ class SessionManager:
             if not other_ids:
                 continue
 
-            candidate_roots = _candidate_transcript_project_roots(other_state, other_entry)
+            candidate_roots = _candidate_transcript_project_roots(other_state, other_entry, other_raw)
             for session_id in target_paths:
                 if session_id not in other_ids:
                     continue
@@ -1694,7 +1752,11 @@ class SessionManager:
             for _session_id in [_claude_session_id, *_artifact_ids]:
                 _append_unique_string(_cleanup_ids, _session_id)
 
-            _transcript_project_root = _transcript_cleanup_project_root(state, entry.forge_root or entry.worktree_path)
+            _transcript_project_root = _transcript_cleanup_project_root(
+                state,
+                entry.forge_root or entry.worktree_path,
+                _raw_data,
+            )
             shared_ids = self._find_shared_transcript_sessions(
                 _transcript_project_root,
                 _cleanup_ids,
@@ -1719,6 +1781,46 @@ class SessionManager:
                     claude_session_id=_filtered_claude_session_id,
                     artifact_session_ids=_filtered_artifact_ids,
                 )
+
+        # native-relocate forks copy the parent transcript into the child's encoded dir.
+        # Remove that copy independently of the child's own UUID (which may be unset on a
+        # failed/partial launch) -- but never when another session still needs it.
+        if delete_transcripts and state is not None:
+            _deriv = state.confirmed.derivation
+            if _deriv is not None and _deriv.resume_mode == "native-relocate" and _deriv.relocated_parent_session_id:
+                _reloc_root = _transcript_cleanup_project_root(
+                    state,
+                    entry.forge_root or entry.worktree_path,
+                    _raw_data,
+                )
+                _reloc_path = get_transcript_path(_reloc_root, _deriv.relocated_parent_session_id)
+                # The relocated UUID IS the parent's claude_session_id, so the shared-transcript
+                # scan (path-resolved, not encoded-dir-guessed) protects two cases at once:
+                #   (1) the parent's ORIGINAL -- the parent references the same UUID, and in a dir
+                #       collision its transcript resolves to this same path;
+                #   (2) a co-resident native-relocate SIBLING that relocated the same parent UUID
+                #       into the same checkout (idempotent relocate -> one shared copy; the
+                #       sibling's derivation now yields relocated_parent_session_id).
+                # Replaces an earlier guard that compared index identity (parent_forge_root/
+                # project_root) instead of the parent's resolved Claude CWD, and so missed
+                # root-level-worktree parents and had no sibling awareness.
+                _reloc_shared = self._find_shared_transcript_sessions(
+                    _reloc_root,
+                    [_deriv.relocated_parent_session_id],
+                    exclude_name=name,
+                    exclude_forge_root=entry_forge_root,
+                )
+                if _reloc_shared:
+                    logger.info(
+                        "Skipping relocated-transcript cleanup: %s still referenced by %s",
+                        _reloc_path,
+                        ", ".join(f"{sid} ({', '.join(refs[:3])})" for sid, refs in _reloc_shared.items()),
+                    )
+                else:
+                    try:
+                        _reloc_path.unlink(missing_ok=True)
+                    except OSError as exc:
+                        logger.warning("Failed to remove relocated parent transcript %s: %s", _reloc_path, exc)
 
         self.index_store.remove_session(name, forge_root=entry_forge_root)
 

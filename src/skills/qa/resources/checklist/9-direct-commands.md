@@ -143,4 +143,23 @@ cat .forge/sessions/test-session-1/forge.session.json | jq '.overrides.verificat
 - [ ] `%cancel-verification` returns "bypass enabled" message
 - [ ] Session overrides include `verification.bypass: true`
 
+### 9.10 Test %proxy audit
+
+<!-- auto -->
+
+```bash
+# Bare %proxy prints usage -- which now includes the audit subcommands
+echo '{"prompt": "%proxy"}' | FORGE_SESSION=test-session-1 forge hook user-prompt-submit
+
+# Audit metadata mirrors the CLI (metadata only; never secrets)
+echo '{"prompt": "%proxy audit show"}' | FORGE_SESSION=test-session-1 forge hook user-prompt-submit
+
+# Wire-change timeline (drift + override mutations; metadata only)
+echo '{"prompt": "%proxy audit diff"}' | FORGE_SESSION=test-session-1 forge hook user-prompt-submit
+```
+
+- [ ] Bare `%proxy` usage lists `audit show|diff` alongside `list` and `show`
+- [ ] `%proxy audit show` returns audit metadata or a clean `No audit data` message (no secrets/plaintext)
+- [ ] `%proxy audit diff` returns wire changes or a clean `No wire changes` message
+
 ---

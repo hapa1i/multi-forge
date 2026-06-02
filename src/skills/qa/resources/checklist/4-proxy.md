@@ -23,10 +23,11 @@ forge proxy template list
 
 - [ ] `forge proxy list` shows "No proxies found." when none exist
 - [ ] `forge proxy list` shows tip to run `forge proxy template list`
-- [ ] `forge proxy template list` shows available templates (18 user-facing: litellm-anthropic, litellm-anthropic-local,
-  litellm-gemini, litellm-gemini-flash-local, litellm-gemini-local, litellm-openai, litellm-openai-codex-local,
-  litellm-openai-local, openrouter-anthropic, openrouter-deepseek, openrouter-gemini, openrouter-gemini-flash,
-  openrouter-glm, openrouter-kimi, openrouter-minimax, openrouter-openai, openrouter-openai-codex, openrouter-qwen)
+- [ ] `forge proxy template list` shows available templates (19 user-facing: anthropic-passthrough, litellm-anthropic,
+  litellm-anthropic-local, litellm-gemini, litellm-gemini-flash-local, litellm-gemini-local, litellm-openai,
+  litellm-openai-codex-local, litellm-openai-local, openrouter-anthropic, openrouter-deepseek, openrouter-gemini,
+  openrouter-gemini-flash, openrouter-glm, openrouter-kimi, openrouter-minimax, openrouter-openai,
+  openrouter-openai-codex, openrouter-qwen)
 - [ ] Internal test-only templates (e.g., litellm-gemini-test) are hidden from the default list
 
 ### 4.2 Create a Proxy
@@ -414,7 +415,8 @@ forge proxy template show openrouter-minimax
 forge proxy template show openrouter-qwen
 ```
 
-- [ ] `forge proxy template list` shows 18 user-facing templates total (8 litellm + 10 openrouter)
+- [ ] `forge proxy template list` shows 19 user-facing templates total (8 litellm + 10 openrouter + 1
+  anthropic-passthrough)
 - [ ] `openrouter-anthropic` maps tiers to Claude models (haiku=claude-haiku-4.5, sonnet=claude-sonnet-4.6,
   opus=claude-opus-4.6)
 - [ ] `openrouter-deepseek` maps tiers to DeepSeek models (haiku=deepseek-v4-flash, sonnet/opus=deepseek-v4-pro)
@@ -477,5 +479,71 @@ forge proxy delete openrouter-test --force 2>/dev/null || true
 - [ ] Opus alternative maps `claude-opus-4-8` to `anthropic/claude-opus-4.8`
 - [ ] Proxy instance inherits `model_alternatives` from template
 - [ ] `openrouter-test` proxy cleaned up
+
+### 4.20 Proxy Audit (Read-Only Metadata)
+
+<!-- prereq: 4.2 -->
+
+<!-- auto -->
+
+<!-- requires: proxy -->
+
+```bash
+# Recent audit metadata (timestamps, mode, system-prompt/tool hashes).
+# Metadata only -- redacted logs, so no secrets or message text are printed.
+forge proxy audit show
+
+# Period + limit filters and machine-readable output
+forge proxy audit show --period all --limit 5 --json
+
+# Wire-change timeline (drift + override mutations; hashes/lengths only)
+forge proxy audit diff
+```
+
+- [ ] `forge proxy audit show` lists metadata records (time, proxy, mode, system/tool hashes) or a clean
+  `No audit data for <period>.` message
+- [ ] `--json` emits valid JSON (`[]` when empty, parseable array otherwise)
+- [ ] `forge proxy audit diff` shows wire changes or `No wire changes for <period>.`
+- [ ] No secrets, API keys, or plaintext request/response bodies appear in any output
+
+### 4.21 Intercept / Audit Config and Passthrough Template
+
+<!-- auto -->
+
+```bash
+# Clean up from previous runs
+forge proxy delete intercept-test --force 2>/dev/null || true
+forge proxy delete passthrough-test --force 2>/dev/null || true
+
+# A translated proxy (openai_translated wire shape), config-only.
+forge proxy create openrouter-openai --name intercept-test --no-start
+
+# inspect mode is allowed on any wire shape (observe: hash + drift, no mutation)
+forge proxy set intercept-test intercept.mode=inspect
+
+# override mode mutates the RAW Anthropic body -> rejected unless wire_shape=anthropic_passthrough
+forge proxy set intercept-test intercept.mode=override 2>&1; echo "OVERRIDE_REJECT_EXIT=$?"
+
+# Full-body audit is the high-risk opt-in: must print a privacy warning naming ~/.forge/audit/
+forge proxy set intercept-test audit.audit_full_body=true 2>&1
+
+# Create a proxy from the anthropic-passthrough template (the only signature-safe wire shape).
+# Config-only: no ANTHROPIC_API_KEY needed until start.
+forge proxy create anthropic-passthrough --name passthrough-test --no-start
+forge proxy show passthrough-test --raw | grep -E "wire_shape|default_port|port:"
+
+# override IS allowed here because the passthrough wire shape preserves the raw body.
+forge proxy set passthrough-test intercept.mode=override 2>&1; echo "OVERRIDE_OK_EXIT=$?"
+
+# Clean up
+forge proxy delete intercept-test --force 2>/dev/null || true
+forge proxy delete passthrough-test --force 2>/dev/null || true
+```
+
+- [ ] `forge proxy set intercept-test intercept.mode=inspect` succeeds on the translated proxy
+- [ ] `intercept.mode=override` is rejected (exit non-zero) naming `requires wire_shape='anthropic_passthrough'`
+- [ ] `audit.audit_full_body=true` prints a privacy warning naming `~/.forge/audit/`
+- [ ] `anthropic-passthrough` proxy created config-only with `wire_shape: anthropic_passthrough` (default port 8096)
+- [ ] `intercept.mode=override` succeeds on the `anthropic-passthrough` proxy
 
 ---

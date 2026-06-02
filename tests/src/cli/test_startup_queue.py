@@ -212,3 +212,88 @@ class TestIndexMarkerProcessing:
         store = SearchDocumentStore(forge_root=tmp_path)
         docs = store.read()
         assert any(d.session_id == "doc-test" for d in docs)
+
+
+class TestMemoryWriterRunIdentity:
+    """The detached memory-writer is re-rooted under the originating session (Phase 4a)."""
+
+    def test_env_roots_under_origin(self) -> None:
+        from forge.cli.main import _memory_writer_env
+
+        env = _memory_writer_env({"origin_run_id": "run_C", "origin_root_run_id": "run_R"})
+        assert env["FORGE_PARENT_RUN_ID"] == "run_C"
+        assert env["FORGE_ROOT_RUN_ID"] == "run_R"
+        assert env["FORGE_RUN_ID"].startswith("run_")
+        assert env["FORGE_RUN_ID"] not in ("run_C", "run_R")
+
+    def test_env_tolerates_partial_origin_marker(self) -> None:
+        """Current markers write both origin ids; fallback is defensive only."""
+        from forge.cli.main import _memory_writer_env
+
+        env = _memory_writer_env({"origin_run_id": "run_C"})
+        assert env["FORGE_PARENT_RUN_ID"] == "run_C"
+        assert env["FORGE_ROOT_RUN_ID"] == "run_C"
+        assert env["FORGE_RUN_ID"].startswith("run_")
+        assert env["FORGE_RUN_ID"] != "run_C"
+
+    def test_env_scrubs_drainer_identity_when_no_origin(self) -> None:
+        """With no origin captured, the memory-writer must not inherit the drainer's run id."""
+        from unittest.mock import patch
+
+        from forge.cli.main import _memory_writer_env
+
+        with patch.dict(
+            "os.environ",
+            {"FORGE_RUN_ID": "run_drainer", "FORGE_ROOT_RUN_ID": "run_drainer"},
+        ):
+            env = _memory_writer_env({})
+        assert "FORGE_RUN_ID" not in env
+        assert "FORGE_PARENT_RUN_ID" not in env
+        assert "FORGE_ROOT_RUN_ID" not in env
+
+    def test_env_scrubs_drainer_session_identity(self) -> None:
+        """The writer must not inherit the drainer's SESSION identity either.
+
+        A `forge` command draining the queue inside another active session would otherwise
+        run the writer's claude -p child (hooks/status) under that drainer's session. The
+        session vars are scrubbed unconditionally — even when the run-tree origin is present
+        and re-rooted.
+        """
+        from unittest.mock import patch
+
+        from forge.cli.main import _memory_writer_env
+
+        with patch.dict(
+            "os.environ",
+            {
+                "FORGE_SESSION": "drainer-session",
+                "FORGE_FORK_NAME": "drainer-fork",
+                "FORGE_PARENT_SESSION": "drainer-parent",
+            },
+        ):
+            env = _memory_writer_env({"origin_run_id": "run_C", "origin_root_run_id": "run_R"})
+        assert "FORGE_SESSION" not in env
+        assert "FORGE_FORK_NAME" not in env
+        assert "FORGE_PARENT_SESSION" not in env
+        # Run-tree re-rooting is independent of (and unaffected by) the session scrub.
+        assert env["FORGE_ROOT_RUN_ID"] == "run_R"
+        assert env["FORGE_PARENT_RUN_ID"] == "run_C"
+
+    def test_handoff_marker_captures_origin_identity(self, tmp_path: Path) -> None:
+        """enqueue_handoff_marker snapshots the session's run identity into the payload."""
+        import json
+        from unittest.mock import patch
+
+        from forge.core.workqueue.queue import enqueue_handoff_marker
+
+        with patch.dict("os.environ", {"FORGE_RUN_ID": "run_C", "FORGE_ROOT_RUN_ID": "run_R"}):
+            marker_path = enqueue_handoff_marker(
+                session_id="sess-origin",
+                worktree_path=tmp_path,
+                session_name="s",
+                transcript_snapshot_rel=".forge/artifacts/s/transcripts/sess-origin.jsonl",
+            )
+        assert marker_path is not None
+        payload = json.loads(marker_path.read_text())["payload"]
+        assert payload["origin_run_id"] == "run_C"
+        assert payload["origin_root_run_id"] == "run_R"

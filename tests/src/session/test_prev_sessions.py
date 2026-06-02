@@ -9,18 +9,27 @@ import pytest
 from forge.session.prev_sessions import (
     CHILDREN_DIR,
     GENERATED_FILENAME,
+    NOTES_SUFFIX,
     PREV_SESSIONS_DIR,
+    child_notes_path,
     child_path,
     child_path_rel,
     children_dir,
+    compose_child_context,
     ensure_child,
+    ensure_notes_overlay,
+    ensure_notes_template,
     generated_path,
     generated_path_rel,
+    iter_child_notes,
     iter_children,
     iter_legacy_flat_files,
     iter_parents,
+    notes_for_snapshot,
+    notes_has_user_content,
     parent_dir,
     prev_sessions_root,
+    snapshot_for_notes,
 )
 
 
@@ -126,3 +135,67 @@ class TestIterators:
 
         names = sorted(p.stem for p in iter_legacy_flat_files(tmp_path))
         assert names == ["p1", "p2"]
+
+
+class TestNotesOverlay:
+    """Per-child user-notes overlay (children/<child>.notes.md)."""
+
+    def _seed_child(self, tmp_path: Path) -> Path:
+        generated_path(tmp_path, "p1").parent.mkdir(parents=True, exist_ok=True)
+        generated_path(tmp_path, "p1").write_text("# Snapshot body", encoding="utf-8")
+        return ensure_child(tmp_path, "p1", "c1")
+
+    def test_notes_path_layout(self, tmp_path: Path) -> None:
+        assert child_notes_path(tmp_path, "p1", "c1").name == f"c1{NOTES_SUFFIX}"
+
+    def test_snapshot_notes_round_trip(self, tmp_path: Path) -> None:
+        snap = child_path(tmp_path, "p1", "c1")
+        notes = notes_for_snapshot(snap)
+        assert notes.name == "c1.notes.md"
+        assert snapshot_for_notes(notes) == snap
+
+    def test_iter_children_excludes_notes(self, tmp_path: Path) -> None:
+        self._seed_child(tmp_path)
+        ensure_notes_template(tmp_path, "p1", "c1")
+        snapshots = sorted(p.name for p in iter_children(tmp_path, "p1"))
+        notes = sorted(p.name for p in iter_child_notes(tmp_path, "p1"))
+        assert snapshots == ["c1.md"]
+        assert notes == ["c1.notes.md"]
+
+    def test_untouched_template_has_no_user_content(self, tmp_path: Path) -> None:
+        self._seed_child(tmp_path)
+        notes = ensure_notes_template(tmp_path, "p1", "c1")
+        assert not notes_has_user_content(notes)
+
+    def test_user_written_notes_detected(self, tmp_path: Path) -> None:
+        self._seed_child(tmp_path)
+        notes = ensure_notes_template(tmp_path, "p1", "c1")
+        notes.write_text("## User Notes\n\nremember the migration", encoding="utf-8")
+        assert notes_has_user_content(notes)
+
+    def test_ensure_notes_overlay_is_idempotent(self, tmp_path: Path) -> None:
+        self._seed_child(tmp_path)
+        notes = ensure_notes_overlay(child_path(tmp_path, "p1", "c1"))
+        notes.write_text("## User Notes\n\nkeep me", encoding="utf-8")
+        # Second call must not clobber existing user content.
+        again = ensure_notes_overlay(child_path(tmp_path, "p1", "c1"))
+        assert again == notes
+        assert "keep me" in again.read_text(encoding="utf-8")
+
+    def test_compose_skips_empty_notes(self, tmp_path: Path) -> None:
+        self._seed_child(tmp_path)
+        ensure_notes_template(tmp_path, "p1", "c1")
+        composed = compose_child_context(tmp_path, "p1", "c1")
+        assert composed.strip() == "# Snapshot body"
+
+    def test_compose_merges_user_notes(self, tmp_path: Path) -> None:
+        self._seed_child(tmp_path)
+        notes = ensure_notes_template(tmp_path, "p1", "c1")
+        notes.write_text("## User Notes\n\nrun the integration suite", encoding="utf-8")
+        composed = compose_child_context(tmp_path, "p1", "c1")
+        assert "# Snapshot body" in composed
+        assert "run the integration suite" in composed
+
+    def test_compose_raises_without_snapshot(self, tmp_path: Path) -> None:
+        with pytest.raises(FileNotFoundError):
+            compose_child_context(tmp_path, "p1", "missing")

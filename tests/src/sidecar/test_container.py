@@ -206,6 +206,32 @@ class TestRunSidecarSession:
             assert "FORGE_LAUNCH_MODE=sidecar" in " ".join(cmd)
             assert "forge-sidecar:latest" in cmd
 
+    def test_run_sidecar_session_mints_root_identity(self) -> None:
+        """Sidecar is a run-tree root: FORGE_RUN_ID == FORGE_ROOT_RUN_ID, no parent."""
+        with (
+            patch("forge.sidecar.container.container_exists", return_value=False),
+            patch("forge.sidecar.container.subprocess.run") as mock_run,
+        ):
+            mock_run.return_value = MagicMock(returncode=0)
+            run_sidecar_session(
+                image="forge-sidecar:latest",
+                template="litellm-openai",
+                session_name="test-session",
+                project_dir=Path("/home/user/code"),
+            )
+            cmd = mock_run.call_args[0][0]
+            run_id = next(
+                (p.split("=", 1)[1] for p in cmd if isinstance(p, str) and p.startswith("FORGE_RUN_ID=")),
+                None,
+            )
+            root_id = next(
+                (p.split("=", 1)[1] for p in cmd if isinstance(p, str) and p.startswith("FORGE_ROOT_RUN_ID=")),
+                None,
+            )
+            assert run_id is not None and run_id.startswith("run_")
+            assert run_id == root_id
+            assert not any(isinstance(p, str) and p.startswith("FORGE_PARENT_RUN_ID=") for p in cmd)
+
     def test_run_sidecar_session_with_extra_mounts(self) -> None:
         """Verify extra mounts are added."""
         with (
@@ -396,6 +422,76 @@ class TestRunSidecarSession:
 
             assert "forge-test" in str(exc_info.value)
             assert "docker rm -f" in str(exc_info.value)
+
+
+class TestRunSidecarSessionProxyAudit:
+    """Tests for the proxy-id audit plumbing (Slice 2e)."""
+
+    def _capture_cmd(self, *, proxy_id: str | None, make_proxy_yaml: bool) -> str:
+        """Run the session with subprocess mocked; return the docker cmd as a string."""
+        from forge.core.paths import get_forge_home
+
+        if make_proxy_yaml and proxy_id:
+            proxy_dir = get_forge_home() / "proxies" / proxy_id
+            proxy_dir.mkdir(parents=True, exist_ok=True)
+            (proxy_dir / "proxy.yaml").write_text("proxy:\n  family: anthropic\n")
+
+        captured: dict[str, list[str]] = {}
+
+        def capture(cmd: list[str], **kwargs: object) -> MagicMock:
+            captured["cmd"] = cmd
+            return MagicMock(returncode=0)
+
+        with (
+            patch("forge.sidecar.container.container_exists", return_value=False),
+            patch("forge.sidecar.container.subprocess.run", side_effect=capture),
+        ):
+            run_sidecar_session(
+                image="forge-sidecar:latest",
+                template="anthropic-passthrough",
+                session_name="audit-sess",
+                project_dir=Path("/code"),
+                proxy_id=proxy_id,
+            )
+        return " ".join(captured["cmd"])
+
+    def test_proxy_id_adds_env_and_mounts(self) -> None:
+        """proxy_id sets FORGE_PROXY_ID + FORGE_HOME and mounts config (ro) + audit/costs (rw)."""
+        from forge.core.paths import get_forge_home
+
+        cmd = self._capture_cmd(proxy_id="audit-test", make_proxy_yaml=True)
+        forge_home = get_forge_home()
+
+        assert "FORGE_PROXY_ID=audit-test" in cmd
+        assert "FORGE_HOME=/root/.forge" in cmd
+        # Per-proxy config mounted read-only at the in-container forge home
+        assert f"{forge_home}/proxies/audit-test:/root/.forge/proxies/audit-test:ro" in cmd
+        # Audit + cost dirs mounted read-write (host-visible logs; caps persist across launches)
+        assert f"{forge_home}/audit:/root/.forge/audit:rw" in cmd
+        assert f"{forge_home}/costs:/root/.forge/costs:rw" in cmd
+
+    def test_missing_proxy_yaml_fails_fast(self) -> None:
+        """proxy_id with no proxy.yaml raises on the host, never reaching docker run."""
+        with (
+            patch("forge.sidecar.container.container_exists", return_value=False),
+            patch("forge.sidecar.container.subprocess.run") as mock_run,
+        ):
+            with pytest.raises(FileNotFoundError, match="has no config"):
+                run_sidecar_session(
+                    image="forge-sidecar:latest",
+                    template="anthropic-passthrough",
+                    session_name="audit-sess",
+                    project_dir=Path("/code"),
+                    proxy_id="ghost",
+                )
+            mock_run.assert_not_called()
+
+    def test_no_proxy_id_is_template_only(self) -> None:
+        """Template-only sidecar adds no proxy-id env, no FORGE_HOME, no audit/costs mounts."""
+        cmd = self._capture_cmd(proxy_id=None, make_proxy_yaml=False)
+        assert "FORGE_PROXY_ID" not in cmd
+        assert "FORGE_HOME=" not in cmd
+        assert "/root/.forge" not in cmd
 
 
 class TestExecInContainer:

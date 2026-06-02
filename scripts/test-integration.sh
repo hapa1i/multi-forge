@@ -129,6 +129,21 @@ else
     info "Using existing image: $IMAGE_NAME"
 fi
 
+# Build the sidecar image (base + entrypoint) so sidecar integration tests have
+# their prerequisite. Thin layer on the just-built base; the COPY of entrypoint.sh
+# cache-busts when it changes, so forge-sidecar:latest always tracks current source.
+SIDECAR_IMAGE="forge-sidecar:latest"
+SIDECAR_DOCKERFILE="$REPO_ROOT/docker/Dockerfile.sidecar"
+info "Building sidecar image: $SIDECAR_IMAGE (base: $IMAGE_NAME)"
+if ! docker build \
+    -f "$SIDECAR_DOCKERFILE" \
+    --build-arg "BASE_IMAGE=$IMAGE_NAME" \
+    -t "$SIDECAR_IMAGE" \
+    "$REPO_ROOT"; then
+    error "Sidecar image build failed"
+    exit 1
+fi
+
 # Ensure local LiteLLM is running (prerequisite for some integration tests)
 # Uses port 4001 to avoid conflicts with local development LiteLLM (port 4000)
 ensure_local_litellm() {

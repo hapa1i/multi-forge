@@ -67,7 +67,7 @@ def _handle_cmd_help() -> None:
                 "decision": "block",
                 "reason": "Direct commands:\n"
                 "- %session show [name] | list\n"
-                "- %proxy list | show <id>\n"
+                "- %proxy list | show <id> | audit show|diff [id]\n"
                 "- %clean [--scope repo|project|all]\n"
                 "- %plan\n"
                 "- %config (show runtime config)\n"
@@ -200,6 +200,7 @@ def _handle_cmd_proxy(data: dict[str, Any], argv: list[str]) -> None:
 
     - `%proxy list`: list all registered proxies
     - `%proxy show <id>`: show details for a specific proxy
+    - `%proxy audit show|diff [id]`: recent audit metadata / wire changes (metadata only)
 
     Always emits `{decision:block}` when handled.
 
@@ -207,7 +208,7 @@ def _handle_cmd_proxy(data: dict[str, Any], argv: list[str]) -> None:
     """
 
     if not argv:
-        click.echo(json.dumps({"decision": "block", "reason": "Usage: %proxy list | show <id>"}))
+        click.echo(json.dumps({"decision": "block", "reason": "Usage: %proxy list | show <id> | audit show|diff [id]"}))
         return
 
     sub = argv[0].lower()
@@ -224,7 +225,66 @@ def _handle_cmd_proxy(data: dict[str, Any], argv: list[str]) -> None:
         _handle_proxy_show(proxy_id)
         return
 
-    click.echo(json.dumps({"decision": "block", "reason": "Usage: %proxy list | show <id>"}))
+    if sub == "audit":
+        action = argv[1].lower() if len(argv) > 1 else ""
+        if action not in ("show", "diff"):
+            click.echo(json.dumps({"decision": "block", "reason": "Usage: %proxy audit show|diff [id]"}))
+            return
+        target = argv[2] if len(argv) > 2 else None
+        if action == "show":
+            _handle_proxy_audit_show(target)
+        else:
+            _handle_proxy_audit_diff(target)
+        return
+
+    click.echo(json.dumps({"decision": "block", "reason": "Usage: %proxy list | show <id> | audit show|diff [id]"}))
+
+
+def _handle_proxy_audit_show(proxy_id: str | None) -> None:
+    """Show recent audit metadata (read-only; metadata only, never secrets)."""
+    from forge.proxy.audit_logger import read_audit_logs
+
+    records = read_audit_logs(proxy_id=proxy_id)[-10:]
+    if not records:
+        scope = f" for '{proxy_id}'" if proxy_id else ""
+        click.echo(json.dumps({"decision": "block", "reason": f"No audit data{scope}."}))
+        return
+
+    lines = ["Proxy audit (metadata, last 10):"]
+    for record in records:
+        ts = record.get("ts", "")
+        proxy = record.get("proxy_id", "-")
+        if record.get("record_type") == "drift":
+            lines.append(f"  {ts} {proxy} drift {record.get('dimension')}")
+            continue
+        sys_hash = (record.get("system_prompt_hash") or "-").removeprefix("sha256:")[:10]
+        lines.append(f"  {ts} {proxy} {record.get('mode', '-')} sys:{sys_hash}")
+    click.echo(json.dumps({"decision": "block", "reason": "\n".join(lines)}))
+
+
+def _handle_proxy_audit_diff(proxy_id: str | None) -> None:
+    """Show recent wire changes (drift + override mutations; metadata only, never secrets)."""
+    from forge.proxy.audit_logger import read_audit_logs
+
+    changes = [r for r in read_audit_logs(proxy_id=proxy_id) if r.get("record_type") in ("drift", "mutation")][-10:]
+    if not changes:
+        scope = f" for '{proxy_id}'" if proxy_id else ""
+        click.echo(json.dumps({"decision": "block", "reason": f"No wire changes{scope}."}))
+        return
+
+    lines = ["Proxy wire changes (last 10):"]
+    for record in changes:
+        ts = record.get("ts", "")
+        proxy = record.get("proxy_id", "-")
+        if record.get("record_type") == "drift":
+            prev = (record.get("previous_hash") or "-").removeprefix("sha256:")[:8]
+            curr = (record.get("current_hash") or "-").removeprefix("sha256:")[:8]
+            lines.append(f"  {ts} {proxy} drift {record.get('dimension')}: {prev} -> {curr}")
+        else:
+            actions = ",".join(m.get("action", "?") for m in record.get("mutations", []))
+            tag = "blocked" if record.get("blocked") else "mutation"
+            lines.append(f"  {ts} {proxy} {tag}: {actions}")
+    click.echo(json.dumps({"decision": "block", "reason": "\n".join(lines)}))
 
 
 def _handle_proxy_list() -> None:
@@ -1111,6 +1171,7 @@ def _handle_policy_check(argv: list[str]) -> None:
     for file_path, diff_chunk in file_diffs:
         added = extract_added_lines(diff_chunk) if diff_chunk else None
         context = ActionContext(
+            runtime="claude_code",
             event="OnDemand.Check",
             tool_name="Edit",
             tool_args={"file_path": file_path, "content": (added or "")[:200]},

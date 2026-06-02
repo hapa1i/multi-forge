@@ -31,14 +31,19 @@ def extract_added_lines(diff_chunk: str) -> str:
 
 @dataclass(frozen=True)
 class ActionContext:
-    """Normalized view of what Claude Code is about to do.
+    """Normalized view of what a runtime is about to do.
 
-    This is the input to all policy evaluations. Built from hook payload.
+    This is the input to all policy evaluations. A runtime's hook adapter (e.g.
+    ``ClaudeHookAdapter``) normalizes that runtime's hook payload into this shape;
+    ``PolicyEngine.evaluate`` is runtime-agnostic and does not branch on ``runtime``.
 
     Attributes:
+        runtime: Which agent runtime produced this action ("claude_code" today;
+            "codex"/"gemini" later). Required so the origin runtime is explicit at
+            the adapter boundary, never silently assumed; flows into attribution.
         event: Hook event type (e.g., "PreToolUse.Write")
         tool_name: Tool being invoked (e.g., "Write", "Edit")
-        tool_args: Raw tool input arguments from Claude Code
+        tool_args: Raw tool input arguments from the runtime's hook payload
         repo_root: Absolute path to repository root
         session_name: Current Forge session name
         target_path: Normalized file path being modified (if applicable)
@@ -49,6 +54,7 @@ class ActionContext:
             context for LLM-based policies. None for hook-triggered evaluations.
     """
 
+    runtime: str
     event: str
     tool_name: str
     tool_args: dict[str, Any]

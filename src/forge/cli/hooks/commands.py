@@ -60,7 +60,8 @@ from .direct_commands import (
     _parse_direct_command,
 )
 from .policy import (
-    _build_action_context,
+    ClaudeHookAdapter,
+    ClaudeHookResponder,
     _derive_policy_source_label,
     _persist_policy_state,
 )
@@ -1115,7 +1116,7 @@ def policy_check() -> None:
     if not effective.policy or not effective.policy.enabled:
         sys.exit(0)
 
-    context = _build_action_context(data, tool_name, manifest)
+    context = ClaudeHookAdapter().build_context(data, tool_name, manifest)
     if context is None:
         print("[forge] Policy check: cannot build action context", file=sys.stderr)
         sys.exit(0)
@@ -1186,26 +1187,12 @@ def policy_check() -> None:
     cache_label = ", cached" if is_cached else ""
     source_label = _derive_policy_source_label(result, effective)
 
-    if result.final_decision == "deny":
-        lines = ["Policy violation(s):"]
-        for d in result.decisions:
-            if d.decision != "deny":
-                continue
-            for i, v in enumerate(d.violations):
-                lines.append(f"  [{v.rule_id}] {v.message}")
-                if d.intent and i == 0:
-                    lines.append(f"    Intent: {d.intent}")
-                if v.suggested_fix:
-                    lines.append(f"    Fix: {v.suggested_fix}")
-            lines.append(
-                "    Note: This policy was configured by the project owner. First"
-                " try a compliant approach that satisfies the intent above. If the"
-                " user's request cannot be fulfilled without violating the intent,"
-                " explain the conflict and ask how to proceed. Do not attempt"
-                " bypasses that pass the check but defeat the goal."
-            )
+    # Serialize the decision into Claude's PreToolUse wire contract (block message,
+    # exit codes, allow JSON); the [forge] summary/warning overlay below is telemetry.
+    responder = ClaudeHookResponder()
 
-        print("\n".join(lines), file=sys.stderr)
+    if result.final_decision == "deny":
+        print(responder.format_deny(result), file=sys.stderr)
         if show_summary:
             violation_count = sum(len(d.violations) for d in result.decisions if d.decision == "deny")
             if violation_count > 0:
@@ -1220,26 +1207,17 @@ def policy_check() -> None:
                     f" (blocked, evaluation error, {elapsed:.1f}s)",
                     file=sys.stderr,
                 )
-        sys.exit(2)
+        sys.exit(responder.BLOCK_EXIT)
 
     if result.final_decision == "needs_review":
-        lines = ["Policy review required but no semantic supervisor resolved it:"]
-        for d in result.decisions:
-            if d.decision == "needs_review":
-                lines.append(f"  [{d.policy_id}] requested review")
-                if d.intent:
-                    lines.append(f"    Intent: {d.intent}")
-        lines.append(
-            "    Configure a supervisor for this session or ask the user how to proceed before making this change."
-        )
-        print("\n".join(lines), file=sys.stderr)
+        print(responder.format_needs_review(result), file=sys.stderr)
         if show_summary:
             print(
                 f"[forge] Policy: checked {target_label} against {source_label}"
                 f" (review required, unresolved, {elapsed:.1f}s)",
                 file=sys.stderr,
             )
-        sys.exit(2)
+        sys.exit(responder.BLOCK_EXIT)
 
     # Surface warnings before allowing (deduped to avoid spam) -- always visible
     if result.all_warnings:
@@ -1263,18 +1241,12 @@ def policy_check() -> None:
             file=sys.stderr,
         )
         _output_json(
-            {
-                "hookSpecificOutput": {
-                    "hookEventName": "PreToolUse",
-                    "permissionDecision": "allow",
-                    "additionalContext": (
-                        f"Forge policy: {target_label} checked against {source_label}"
-                        f" ({verdict}{cache_label}, {elapsed:.1f}s)"
-                    ),
-                }
-            }
+            responder.allow_feedback(
+                f"Forge policy: {target_label} checked against {source_label}"
+                f" ({verdict}{cache_label}, {elapsed:.1f}s)"
+            )
         )
-    sys.exit(0)
+    sys.exit(responder.ALLOW_EXIT)
 
 
 @hooks.command(name="user-prompt-submit")

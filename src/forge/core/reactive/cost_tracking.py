@@ -44,7 +44,14 @@ class ProxyCostDelta:
 
 @dataclass
 class VerbCostResult:
-    """Aggregated cost attribution for one verb invocation."""
+    """Aggregated cost attribution for one verb invocation.
+
+    Also serves as the holder ``track_verb_cost`` yields: it is populated in
+    place on context exit, so a caller can read the (estimated) delta for usage
+    attribution. ``measured`` is True only when at least one proxy snapshot delta
+    was captured; a direct/no-proxy verb leaves it False (zero cost means "no
+    figure," not "measured $0").
+    """
 
     verb: str
     total_cost_micros: int = 0
@@ -54,6 +61,7 @@ class VerbCostResult:
     request_count: int = 0
     duration_ms: float = 0.0
     estimated: bool = True
+    measured: bool = False
     per_proxy: list[ProxyCostDelta] = field(default_factory=list)
 
 
@@ -205,15 +213,14 @@ def track_verb_cost(verb: str, proxy_base_urls: list[str]):
             Direct workers (no proxy) are excluded — only proxied
             requests have cost data at the proxy level.
 
-    Yields control to the caller. On exit, computes snapshot deltas,
-    logs the verb cost record, and discards. The caller does not
-    receive the result (it's fire-and-forget for the log).
+    Yields a :class:`VerbCostResult` holder, populated in place on exit so a
+    caller can read the (estimated) delta after the block for usage attribution
+    (``with track_verb_cost(...) as cost: ...``). Callers that don't bind it are
+    unaffected. On exit the verb-cost record is still logged as before; a
+    no-proxy verb yields an unmeasured holder (``measured=False``).
     """
+    holder = VerbCostResult(verb=verb)
     unique_urls = list(dict.fromkeys(u for u in proxy_base_urls if u))
-
-    if not unique_urls:
-        yield
-        return
 
     snapshots_before: dict[str, dict[str, Any]] = {}
     for url in unique_urls:
@@ -223,40 +230,37 @@ def track_verb_cost(verb: str, proxy_base_urls: list[str]):
 
     start = time.monotonic()
     try:
-        yield
+        yield holder
     finally:
-        elapsed = (time.monotonic() - start) * 1000
+        # Always record wall-clock latency, even for a no-proxy verb -- the work
+        # still took real time and the usage ledger records latency_ms.
+        holder.duration_ms = (time.monotonic() - start) * 1000
 
-        try:
-            deltas: list[ProxyCostDelta] = []
-            for url in unique_urls:
-                if url not in snapshots_before:
-                    continue
-                after = _fetch_snapshot(url)
-                if after is None:
-                    continue
-                deltas.append(_compute_delta(snapshots_before[url], after, url))
+        if unique_urls:
+            try:
+                deltas: list[ProxyCostDelta] = []
+                for url in unique_urls:
+                    if url not in snapshots_before:
+                        continue
+                    after = _fetch_snapshot(url)
+                    if after is None:
+                        continue
+                    deltas.append(_compute_delta(snapshots_before[url], after, url))
 
-            total_cost = sum(d.cost_micros for d in deltas)
-            total_input = sum(d.input_tokens for d in deltas)
-            total_output = sum(d.output_tokens for d in deltas)
-            total_cached = sum(d.cached_tokens for d in deltas)
-            total_requests = sum(d.request_count for d in deltas)
-
-            result = VerbCostResult(
-                verb=verb,
-                total_cost_micros=total_cost,
-                input_tokens=total_input,
-                output_tokens=total_output,
-                cached_tokens=total_cached,
-                request_count=total_requests,
-                duration_ms=elapsed,
-                estimated=True,
-                per_proxy=deltas,
-            )
-            _log_verb_cost(result)
-        except Exception as e:
-            logger.warning("Failed to track verb cost for %s: %s", verb, e)
+                # Populate the holder in place so the (already-yielded) caller sees it.
+                holder.total_cost_micros = sum(d.cost_micros for d in deltas)
+                holder.input_tokens = sum(d.input_tokens for d in deltas)
+                holder.output_tokens = sum(d.output_tokens for d in deltas)
+                holder.cached_tokens = sum(d.cached_tokens for d in deltas)
+                holder.request_count = sum(d.request_count for d in deltas)
+                holder.estimated = True
+                # measured=True only when a real snapshot delta was captured, so callers
+                # can tell "no proxy / no data" (cost is None) from a genuine $0 delta.
+                holder.measured = bool(deltas)
+                holder.per_proxy = deltas
+                _log_verb_cost(holder)
+            except Exception as e:
+                logger.warning("Failed to track verb cost for %s: %s", verb, e)
 
 
 def read_verb_logs(

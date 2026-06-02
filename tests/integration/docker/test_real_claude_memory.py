@@ -14,7 +14,10 @@ import os
 import pytest
 
 from tests.fixtures.docker import ContainerLike
-from tests.integration.docker.conftest import setup_real_claude
+from tests.integration.docker.conftest import (
+    read_container_usage_events,
+    setup_real_claude,
+)
 
 pytestmark = [
     pytest.mark.integration,
@@ -115,6 +118,7 @@ class TestRealClaudeMemory:
             assert result.returncode == 0, result.stderr
 
         official_before = forge_workspace.read_file("/workspace/docs/state.md")
+        forge_workspace.exec("rm -rf ~/.forge/usage")
 
         exit_code, stdout, stderr = _run_with_anthropic_key(
             forge_workspace,
@@ -144,6 +148,19 @@ class TestRealClaudeMemory:
         assert show_result.returncode == 0, show_result.stderr
         assert "Memory Writer Report" in show_result.stdout
 
+        usage_events = read_container_usage_events(forge_workspace, command="memory-writer")
+        assert len(usage_events) == 1
+        event = usage_events[0]
+        assert event["runtime"] == "claude_code"
+        assert event["session"] == session_name
+        assert event["status"] == "success"
+        assert event["attribution_granularity"] == "verb"
+        assert event["measurement_source"] == "unattributed"
+        assert event["run_id"].startswith("run_")
+        assert event["root_run_id"] == event["run_id"]
+        assert event["parent_run_id"] is None
+        assert event["source_refs"] is None
+
     def test_real_shadow_curation_smoke(self, forge_workspace: ContainerLike) -> None:
         session_name = "real-memory-curation"
         official_path = "docs/official.md"
@@ -157,8 +174,7 @@ class TestRealClaudeMemory:
         )
 
         track_result = forge_workspace.exec(
-            "cd /workspace && forge memory track "
-            f"{official_path} --propose --shadow-path {shadow_path} --session {session_name}"
+            "cd /workspace && forge memory track " f"{official_path} --propose --shadow-path {shadow_path}"
         )
         assert track_result.returncode == 0, track_result.stderr
 

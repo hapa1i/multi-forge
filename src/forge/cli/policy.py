@@ -516,6 +516,7 @@ def check(
             target_path = str(target)
 
     context = ActionContext(
+        runtime="claude_code",
         event="OnDemand.Check",
         tool_name=tool_name,
         tool_args={"file_path": file_path or "", "content": new_content[:200]},
@@ -690,6 +691,7 @@ def supervisor_cmd(
     )
 
     context = ActionContext(
+        runtime="claude_code",
         event="OnDemand.Supervisor",
         tool_name="Write",
         tool_args={"file_path": file_path, "content": file_content[:200]},

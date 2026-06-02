@@ -25,6 +25,7 @@ class TestTDDEnforcementPolicy:
     def test_applies_to_src_writes(self, policy: TDDEnforcementPolicy) -> None:
         """Policy applies to writes under src/."""
         ctx = ActionContext(
+            runtime="claude_code",
             event="PreToolUse.Write",
             tool_name="Write",
             tool_args={},
@@ -37,6 +38,7 @@ class TestTDDEnforcementPolicy:
     def test_applies_to_tests_writes(self, policy: TDDEnforcementPolicy) -> None:
         """Policy applies to writes under tests/."""
         ctx = ActionContext(
+            runtime="claude_code",
             event="PreToolUse.Write",
             tool_name="Write",
             tool_args={},
@@ -49,6 +51,7 @@ class TestTDDEnforcementPolicy:
     def test_not_applies_to_other_paths(self, policy: TDDEnforcementPolicy) -> None:
         """Policy does not apply to other paths."""
         ctx = ActionContext(
+            runtime="claude_code",
             event="PreToolUse.Write",
             tool_name="Write",
             tool_args={},
@@ -124,6 +127,7 @@ class TestNoSkipTestsPolicy:
     def test_applies_to_content_with_code(self, policy: NoSkipTestsPolicy) -> None:
         """Policy applies when there is diff content."""
         ctx = ActionContext(
+            runtime="claude_code",
             event="PreToolUse.Write",
             tool_name="Write",
             tool_args={},
@@ -137,6 +141,7 @@ class TestNoSkipTestsPolicy:
     def test_not_applies_without_content(self, policy: NoSkipTestsPolicy) -> None:
         """Policy does not apply without diff content."""
         ctx = ActionContext(
+            runtime="claude_code",
             event="PreToolUse.Write",
             tool_name="Write",
             tool_args={},
@@ -150,6 +155,7 @@ class TestNoSkipTestsPolicy:
     def test_allows_normal_tests(self, policy: NoSkipTestsPolicy) -> None:
         """Allows normal test code."""
         ctx = ActionContext(
+            runtime="claude_code",
             event="PreToolUse.Write",
             tool_name="Write",
             tool_args={},
@@ -164,6 +170,7 @@ class TestNoSkipTestsPolicy:
     def test_denies_pytest_skip(self, policy: NoSkipTestsPolicy) -> None:
         """Denies pytest.skip() calls."""
         ctx = ActionContext(
+            runtime="claude_code",
             event="PreToolUse.Write",
             tool_name="Write",
             tool_args={},
@@ -179,6 +186,7 @@ class TestNoSkipTestsPolicy:
     def test_denies_pytest_mark_skip(self, policy: NoSkipTestsPolicy) -> None:
         """Denies @pytest.mark.skip decorator."""
         ctx = ActionContext(
+            runtime="claude_code",
             event="PreToolUse.Write",
             tool_name="Write",
             tool_args={},
@@ -193,6 +201,7 @@ class TestNoSkipTestsPolicy:
     def test_denies_pytest_mark_skipif(self, policy: NoSkipTestsPolicy) -> None:
         """Denies @pytest.mark.skipif decorator."""
         ctx = ActionContext(
+            runtime="claude_code",
             event="PreToolUse.Write",
             tool_name="Write",
             tool_args={},
@@ -207,6 +216,7 @@ class TestNoSkipTestsPolicy:
     def test_denies_unittest_skip(self, policy: NoSkipTestsPolicy) -> None:
         """Denies unittest.skip decorator."""
         ctx = ActionContext(
+            runtime="claude_code",
             event="PreToolUse.Write",
             tool_name="Write",
             tool_args={},

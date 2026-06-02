@@ -25,6 +25,390 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board-contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-06-02
+
+### Phase 4: Review-pass hardening (4a / 4c / 4d)
+
+**Goal**: Fix issues found reviewing the shipped Phase 4 slices before merge -- one concurrency race plus three
+correctness/clarity gaps, each with a test.
+
+**Key changes**:
+
+- **4d cancellation race (spawn/register TOCTOU)**: `ClaudeHeadlessInvoker.run_parallel` could spawn a child between
+  `Popen` returning and registering it in `children`; a `_cleanup` snapshot in that window left the child un-SIGTERMed,
+  so `executor.shutdown(wait=True)` blocked on its `communicate(timeout)` (Ctrl+C hang + transient orphan). Fixed with a
+  lock-guarded `cleanup_started` flag: a worker self-reaps a child registered after cleanup began, skips spawning once
+  cancellation starts, and `shutdown(cancel_futures=True)` drops unstarted workers -- append and flag-read are atomic
+  under `children_lock`, so each child is reaped exactly once.
+- **4d cancelled workers no longer emit usage**: a cancelled job fell through to `_emit_worker` and was logged
+  `status="error"`. Added a typed `HeadlessResult.cancelled` (keeps `error="cancelled"` for the review layer);
+  `_emit_worker` skips cancelled -- one policy point.
+- **4c direct-LLM `cached_tokens`**: `emit_direct_llm_usage` dropped `cached_tokens`; now copied from provider usage.
+- **4a partial-origin marker**: pinned the both-or-neither `origin_run_id`/`origin_root_run_id` contract on
+  `_memory_writer_env` with a comment + test, so the defensive fallback isn't mistaken for a parent/root bug.
+
+**Verification**: `test_claude_invoker.py` + `test_emit.py` 24 passed (incl. new race + cancelled-emit + cached_tokens
+tests) + `test_startup_queue.py` partial-marker test; mypy + pyright + `pre-commit` clean on changed files.
+
+### Phase 4: Deferred integration validation (4a / 4c / 4d / 4f)
+
+**Goal**: Run the CLAUDE.md-mandated Docker / real-`claude -p` integration deferred across the Phase 4 slices, now that
+4a-4f have shipped, so every shipped slice has real-subprocess coverage (not just mocked unit tests).
+
+**Key changes**: None -- validation-only run.
+
+**Verification** (`./scripts/test-integration.sh <file> -v`):
+
+- `test_policy_hooks.py` (4f, deterministic): 10/10 -- real `forge hook policy-check` (adapter->engine->responder, exit
+  codes, manifest).
+- `test_supervisor_e2e.py` (4a/4c/4f, deterministic harness): 4/4 (8.2s) -- `forge policy supervisor`
+  aligned/divergent/infra-error + session-set wiring (covers 4a env stamping, 4c supervisor emission, the 4f
+  `cli/policy.py:692` site).
+- `test_real_claude_memory.py::test_real_handoff_review_only_smoke` (4a/4c, real Claude): PASSED -- real
+  `forge memory-writer run` end-to-end (4a origin-identity marker plumbing + 4c emission).
+- `test_real_claude_workers.py` (4d, real Claude): 2/2 (34.4s) -- real `claude -p --bare` fan-out via
+  `ClaudeHeadlessInvoker.run_parallel` (the process-group spawn/cleanup/ordering the mocked unit tests can't reach).
+
+**Pre-existing finding (NOT runtime-abstraction; surfaced by this run)**:
+`test_real_claude_memory.py::test_real_shadow_curation_smoke` FAILS because it passes `--session` to
+`forge memory track`, which PR #6 (`13f57db`, 2026-05-28, project-scoped memory passports) made invalid ("track ... does
+not take a session"). Stale test from the #6 memory change -- `13f57db` is a pre-branch ancestor and this branch touches
+neither `cli/memory.py` nor the test. Latent because `slow` real-Claude tests are rarely run. Needs a separate test-only
+fix to the post-#6 shadow-curation invocation; tracked for whoever owns #6's surface.
+
+## 2026-06-01
+
+### Phase 4 (Slice 4f): Runtime-tagged ActionContext + named Claude hook adapter/responder
+
+**Goal**: Make the policy hook's runtime boundary explicit -- so a Codex hook can normalize into the same
+`ActionContext` and reuse the runtime-agnostic policy engine -- without changing any Claude behavior.
+
+**Key changes**:
+
+- `ActionContext` gains a **required** `runtime: str` (no default): every normalized action declares its origin runtime.
+  `PolicyEngine.evaluate` still never branches on it -- it is attribution metadata, not control flow -- so the engine
+  stays runtime-agnostic.
+- Named the two Claude-specific halves behind runtime-neutral protocols (`src/forge/cli/hooks/protocols.py`,
+  `HookAdapter`/`HookResponder`): `ClaudeHookAdapter.build_context` (Claude payload -> `ActionContext`, tags
+  `runtime="claude_code"`; replaces the private `_build_action_context`, no compat shim) and `ClaudeHookResponder`
+  (composed decision -> Claude wire: `format_deny`/`format_needs_review`/`allow_feedback` + `BLOCK_EXIT`/`ALLOW_EXIT`).
+- `policy_check` (`cli/hooks/commands.py`) routes deny/needs_review/allow through the responder; the `[forge] Policy: …`
+  summary + warning lines stay inline as a telemetry overlay, not part of the runtime wire contract. Output bytes and
+  exit codes are unchanged -- the 77 existing hook-command snapshot tests pass untouched.
+- Codex parity is NOT implied: its limits live in the 4e runtime registry (`pretool_policy="partial"`,
+  `native_hooks="gated"`); a `CodexHookAdapter`/`CodexHookResponder` is the Phase 6 stub the protocols make room for.
+- All 4 production constructors (hook + 3 on-demand checks) + ~45 test constructions pass `runtime`. `design.md` §4.1.4
+  (runtime field + adapter/responder boundary) and §4.1.5 (responder owns the deny serialization) document the seam.
+
+**Verification**: 340 policy + 77 hook-command + 23 new responder/adapter tests pass; `mypy` clean across policy +
+cli/hooks (the precise `ActionContext | None` adapter return surfaced and fixed two latent `new_content` narrowing gaps
+the old `Any` return had masked). Two pre-existing, unrelated regression failures (`forge info` patching-build text,
+`run_claude_print` exit code) confirmed failing on a stashed clean tree -- not introduced here. Integration
+(CLAUDE.md-mandated for hook changes): `tests/integration/docker/test_policy_hooks.py` -- the real wheel-installed
+`forge hook policy-check` subprocess in an isolated container -- 10 passed (16.7s), confirming the
+adapter->engine->responder dispatch (deny exit 2, allow exit 0 + manifest updates, fail-open) is byte-identical through
+the real CLI boundary.
+
+### Phase 4 (Slice 4e): Runtime registry capability matrix
+
+**Goal**: Make "can this runtime do X?" a declarative lookup instead of hard-coded Claude Code assumptions, so Phase 5's
+Codex invoker and auth/runtime preflight have a capability source to read.
+
+**Key changes**:
+
+- New `src/forge/core/runtime/` package: a frozen `RuntimeSpec` per runtime in a module-level `RUNTIMES` table (mirrors
+  `core/auth/capabilities.py`'s `Credential`/`CREDENTIALS` pattern) + lookup helpers (`get_runtime` raises on unknown
+  id; `list_runtimes`/`installed_runtimes`). Answers the card's seven questions:
+  installed/interactive/headless/hooks/usage source/native resume/install scopes (+ curated-transfer in/out).
+- **Installed vs version split**: `is_installed()` = PATH presence (reliable, fast); `detect()` = best-effort
+  `--version` probe. Claude reuses `install/version.py:get_claude_runtime_version` via a **lazy** import (matching the
+  `core->install` lazy-import precedent in `core/ops/gc.py`), so importing the registry never drags the installer.
+- **Honest capability encoding**: partial/planned support is a tri-state `Literal`, not a `bool` -- Codex
+  `pretool_policy="partial"` (the card: PreToolUse is not a full enforcement boundary), `interactive="beta"`, and
+  `native_hooks="gated"` with machine-readable `hook_min_version`/`hook_feature_flag` (a preflight verifies the gate,
+  not a note string); Gemini `native_hooks="none"`/`native_resume=False`. Codex/Gemini declare limits as values, never
+  as parity-implying omissions.
+- `forge runtime list [--json]` read surface (registered in `cli/main.py`). The table escapes free-text notes so a
+  bracketed token like `[features] codex_hooks = true` survives Rich markup instead of being eaten as a style tag.
+- `design.md` §5.5.5 documents the registry as the capability half of the runtime seam (the invoker is the lifecycle
+  half). Nothing branches on the registry yet -- Phase 5 is its first consumer.
+
+**Verification**: 16 new unit tests (`tests/src/core/runtime/test_registry.py` shape/fields/limits/`is_installed`/
+`_probe_version`; `tests/src/cli/test_runtime.py` hermetic render + `--json` + the markup-escape regression) pass; mypy
+clean on the 3 new source files; `forge runtime list` smoke-rendered the matrix against the real CLIs on this host
+(claude 2.1.159 / codex 0.135.0 / gemini 0.43.0).
+
+### Phase 4 (Slice 4d): HeadlessInvoker + review fan-out migration + per-worker usage events
+
+**Goal**: Extract the review engine's parallel `claude -p` lifecycle behind a runtime-neutral `HeadlessInvoker` seam (so
+Phase 5 can add a Codex runtime without touching callers), and emit the per-worker usage events deferred from 4c.
+
+**Key changes**:
+
+- New `src/forge/core/invoker/` package: `HeadlessRequest`/`HeadlessResult`/`Attribution` + the `HeadlessInvoker`
+  Protocol (`run` single-shot, `run_parallel` fan-out), and `ClaudeHeadlessInvoker`. The seam is the **lifecycle, not
+  the routing**: a request arrives already-routed (`argv`+`env`), so routing stays review-domain and the same
+  `run_parallel` serves a future `CodexHeadlessInvoker`.
+- `review/engine.py` `run_multi_review` shapes per-worker requests (`_prepare_worker`) and delegates to
+  `ClaudeHeadlessInvoker().run_parallel`, mapping back via `_to_review_result`. The lifecycle moved **verbatim**
+  (`Popen(start_new_session=True)`, `os.killpg` SIGTERM->SIGKILL under `children_lock`, `ThreadPoolExecutor(min(N,5))`,
+  `result_map[idx]` ordering); original status conventions preserved.
+- Per-worker usage events: `Attribution(command=...)` threaded from the 4 verbs (panel/analyze via `run_multi_review`,
+  debate/consensus via `run_adversarial`/`run_consensus`); `run_parallel` emits one `emit_worker_usage` per worker
+  (`attribution_granularity=worker`, `measurement_source=unattributed`, cost null -- the verb aggregate holds the
+  estimated total; run/model/status/latency capture the tree leaf).
+- The 4 single-shot callers keep `run_claude_session` (already the right abstraction with its guards; the invoker's
+  `run()` is for protocol completeness + Phase 5). `design.md` §5.5.5 updated; checklist 4d boxes ticked.
+- **Review fixes (folded in):** (1) cancellation cleanup — `run_parallel` manages the executor manually so `_cleanup()`
+  SIGTERMs children **before** the blocking join; the `with ThreadPoolExecutor` `__exit__` would otherwise
+  `shutdown(wait=True)` before cleanup, delaying SIGTERM up to `timeout_seconds` on Ctrl+C. (2) Per-worker events record
+  the **actual routed** `model`/`provider`/`proxy_id` (`route.model_ref`/`route.provider`/`routing_result.proxy_id`),
+  not the friendly catalog id with null provider/proxy. `design_appendix.md` §A.13 documents the per-worker emitter.
+
+**Verification**: 62 existing review tests (`test_engine`/`test_adversarial`/`test_consensus`) pass with only a
+patch-target retarget (`forge.review.engine.subprocess.Popen` -> `forge.core.invoker.claude.subprocess.Popen`), proving
+the extraction is behavior-preserving; 15 invoker tests (`tests/src/core/invoker/test_claude_invoker.py`: ordering,
+concurrency cap, timeout + cancellation killpg, run-id surfacing, single-shot parity, per-worker emission) + an engine
+per-worker routed-metadata test. Full unit suite 4925 passed; mypy clean.
+
+### Phase 4 (Slice 4c): Review fixes -- direct-path join, honest billing, latency
+
+**Goal**: Close three correctness gaps in the 4c emitters found in review.
+
+**Key changes**:
+
+- Direct-path join now actually works. The tagger resolves its call's base_url synchronously (`resolve_client_base_url`
+  -> new `resolve_provider_base_url`) and, when it is a registered Forge proxy, forwards `X-Request-ID` **and** records
+  `source_refs.cost_request_id` (forwarded id == recorded id). Off-proxy: no header, null ref. Before, the id was
+  minted, forwarded, then discarded -- so even a proxy target produced `source_refs=None`.
+- Honest direct billing. `emit_direct_llm_usage` no longer hardcodes `has_api_key=True`/`api`; `billing_mode` defaults
+  to `unknown` (the default tagger path routes via local LiteLLM with a dummy `not-needed` key, and proxy-lookup
+  failures must not read as `api`).
+- `latency_ms` now populated. `track_verb_cost` records wall-clock duration on every path (incl. no-proxy); the
+  verb/session emitters copy `duration_ms`; the tagger times its own `complete()` call.
+
+**Verification**: +4 unit tests (base_url resolver, end-to-end proxy join, billing/latency); full unit suite green (4910
+passed); mypy clean. design.md §3.14 + appendix §A.13 updated.
+
+### Phase 4 (Slice 4c): Instrument native + direct usage paths
+
+**Goal**: Wire the usage-attribution ledger to the callsites where a run identity and a cost/usage signal already exist,
+so `forge` verbs and the action tagger record who consumed what -- honestly, without faking figures Forge can't measure.
+
+**Key changes**:
+
+- `track_verb_cost` now yields a `VerbCostResult` holder (populated in place on exit) so callers read the estimated cost
+  delta for attribution. A new `measured` flag separates a real snapshot delta from a no-proxy verb (null cost, not a
+  fabricated $0). Backward-compatible: callers without `as cost` are unaffected; the verb-cost log is unchanged.
+- New `core/usage` helpers: `infer_billing_mode` (conservative -- `api` only when direct + key, else `unknown`),
+  `with_forge_request_id` + `target_is_forge_proxy` + `mint_request_id` (direct-path `X-Request-ID` correlation
+  primitives), and `emit_verb_usage` / `emit_usage_for_session_result` / `emit_direct_llm_usage` (best-effort,
+  depth-agnostic; no-op without a run identity). 4d reuses the emit helpers.
+- Wired emitters: the four workflow verbs (`panel`/`analyze`/`debate`/`consensus`, one estimated verb-level event each,
+  ambient run); memory writer, semantic supervisor, shadow curation (one event per `claude -p` run, attributed to the
+  subprocess run, null `source_refs`); the action tagger, switched `ask()` -> `complete()` to capture
+  `provider_usage_exact` provider tokens and forward `X-Request-ID` (behavior-preserving on a None-default client).
+- Added `measurement_source=provider_usage_exact` (a direct call's exact in-band tokens fit none of the original four
+  values); enum finalized with its first emitters -- nothing emitted before, so no migration.
+- Deferred: review-engine per-worker events (-> 4d behind `HeadlessInvoker`); team supervisor/tagger + workflow stages
+  (no cost wrapper / proxy-only); interactive launchers; native runtimes (Phase 5). `claude -p` per-request correlation
+  stays null until 4g.
+
+**Verification**: 20 new unit tests (billing/correlation/emit), tagger updated to `.complete()` + emits,
+`test_workflow.py` verb-event emission, regression `test_bug_usage_claude_p_null_source_refs.py`; targeted suites green
+(usage, tagger, cost_tracking, workflow, memory_writer, supervisor, shadow); mypy clean on all 11 wired files;
+`make pre-commit` clean. Two commits: 4c-i foundation `1477d3b`, then 4c-ii wiring. design.md §3.14 + appendix §A.13
+updated (emitters shipped).
+
+### Phase 4 (Slice 4b): Usage-attribution ledger schema
+
+**Goal**: Add the durable, versioned `~/.forge/usage/events/` attribution ledger -- the third data plane alongside cost
+and audit, joined to them by a shared proxy `request_id` -- so Phase 4c can record which run/workflow/session invoked
+which runtime/model and consumed what.
+
+**Key changes**:
+
+- New `src/forge/core/usage/` package (`ledger.py`): `UsageEvent` (`schema_version=1`; auto-stamped `event_id`/`ts`;
+  required attribution core run/root/runtime/command/status; every other field defaulted), `SourceRefs`
+  (`{cost_request_id, audit_request_id}`, nullable), and `BillingMode`/`MeasurementSource`/`AttributionGranularity`
+  literals (provenance recorded, never inferred).
+- `log_usage_event` (best-effort, never raises; `open_secure_append` 0600, dirs 0700; PID-sharded
+  `usage/events/<month>_<pid>.jsonl`; module `_lock`); strict typed `read_usage_events` -- `dacite.Config(strict=True)`,
+  so unknown fields, invalid literals, and wrong nested types are all corruption; a non-object line, a newer-schema
+  record, or a malformed record is skipped with a one-time warning; raw-dict filters run before the typed build. Plus
+  `prune_usage_events`. Modeled on `audit_logger.py` (versioned), NOT the unversioned `cost_logger.py`.
+- **Refinement vs the decision's path**: PID-sharded `usage/events/<month>_<pid>.jsonl`, not a single `events.jsonl`, so
+  cross-process review workers never contend on one file.
+- Docs: `design.md` §3.2 (contract-files row) + §3.14 (three-plane model); `design_appendix.md` §A.13 (schema).
+
+**Verification**: 16 unit tests (`tests/src/core/usage/test_ledger.py`: roundtrip, version stamp, 0600/0700 perms, null
+and nested `source_refs`, newer-skip-warn-once, unknown-field / bad-literal / bad-nested corruption, non-object and
+malformed line skip, run/command filters, ts-window, best-effort writer) plus a parametrized regression
+(`tests/regression/test_bug_usage_ledger_non_dict_line.py`: a non-object JSONL line must not abort the read).
+`pre-commit` clean (mypy + pyright). No callsites emit yet -- instrumentation is Slice 4c.
+
+### Phase 4 (Slice 4a): Run-tree env contract
+
+**Goal**: Give every Forge-spawned process a run-tree identity
+(`FORGE_RUN_ID`/`FORGE_PARENT_RUN_ID`/`FORGE_ROOT_RUN_ID`) for usage attribution, orthogonal to the `FORGE_DEPTH`
+recursion guard.
+
+**Key changes**:
+
+- `core/reactive/env.py`: `RunIdentity` + `mint_run_id`/`get_run_identity`/`new_root_run_identity`/
+  `derive_child_run_identity`; `build_claude_env` gains `derive_run_identity=True` and stamps the triple right after the
+  depth block (reads the spawner id before overwriting; recomputes parent so a stale inherited `FORGE_PARENT_RUN_ID`
+  can't leak). `FORGE_DEPTH` and its three recursion guards are untouched.
+- `SessionResult` and `ReviewResult` surface `run_id/parent_run_id/root_run_id` (read back from the built env) for Slice
+  4c attribution; error/timeout returns carry it too.
+- Interactive launches are roots: minting centralized in `invoke._build_environment` (`derive_run_identity=False` +
+  fresh root + parent scrub) covers session start/resume/fork and bare `forge claude start`; the sidecar mints its own
+  root in `container.py`. (Refinement vs plan: one choke point instead of per-builder, so resume/fork can't drift.)
+- Memory-writer (queue-decoupled): `enqueue_handoff_marker` snapshots the session's
+  `origin_run_id`/`origin_root_run_id`; `main._memory_writer_env` re-roots the detached spawn under that origin (fresh
+  child run_id) and scrubs the drainer's run-tree **and** session identity
+  (`FORGE_SESSION`/`FORK_NAME`/`PARENT_SESSION`, via the canonical `session_start` constants), so neither the run-tree
+  nor the writer's `claude -p` hooks/status attribute to whichever CLI drained the queue (the writer takes its target
+  session from `--session-name`).
+- Docs: `design_appendix.md` §F.5 (run-tree identity vs recursion guard) + §C.1 (handoff marker origin fields).
+
+**Verification**: targeted unit/regression tests pass, incl. new `tests/regression/test_run_tree_env_contract.py`
+(depth/guard orthogonality, source-env-unmutated), run-id surfacing across env/session_runner/engine/container/
+startup_queue, and `test_claude_invoke.py` interactive fresh-root carve-out (inherited run vars must not leak into a
+root). `tests/src -m "not integration"` fully green (4866 passed). The only 2 failures under
+`tests/src + tests/regression` are pre-existing and unrelated to run-tree: `test_bug_claude_print_helper_exit_code` (a
+Docker-only conftest helper failing host-side at `tests/integration/docker/conftest.py:133`, mis-filed in `regression/`
+without the `integration` marker) and `test_removal_patching_system::test_forge_info_no_traceback` (pre-OSS
+manifest-guard assertion). `pre-commit` clean (mypy + pyright).
+
+### Phase 3 (Stage C v1): Opt-in native-relocate for worktree forks
+
+**Goal**: Ship `forge session fork --resume-mode native-relocate` as an opt-in, byte-faithful cross-CWD resume and make
+the transfer fallback visible, while keeping transfer the default.
+
+**Key changes**:
+
+- `fork --resume-mode [transfer|native-relocate]` (`default=None`). For worktree/`--into` forks, native-relocate copies
+  the parent JSONL into the child's encoded dir (reusing `relocate_transcript`) and launches `--resume --fork-session`
+  from the worktree CWD; transfer stays the default and now prints a one-line tip pointing at native-relocate.
+- Preflights before `fork_session()` (no orphans): reject sidecar (accounting for `--direct`/`--no-proxy` forcing host
+  via `manager.py:1263-1266`), `--no-launch`, and a missing parent transcript; tips for `--resume-mode` on a same-dir
+  fork and for `--strategy`/`--inline-plan` under native-relocate. A post-create relocate failure (e.g. `--into`
+  conflict) rolls back the fork via `delete_session` (owns_worktree-aware, so an `--into` target is preserved).
+- Provenance + cleanup: `Derivation.resume_mode="native-relocate"` + `relocated_parent_session_id`; `delete_session`
+  unlinks the relocated copy in a branch gated only on the derivation (independent of the child UUID, so failed/partial
+  launches still clean up), dir-scoped so the parent's original is never touched.
+- Host mode only; `--rewrite-paths`, sidecar native-relocate, `resume --resume-mode native-relocate`, and the default
+  flip are deferred (default-flip gates recorded in `card.md`). `docs/design.md` §3.9 documents the shipped opt-in.
+
+**Verification**: 13 new unit tests (`test_session_commands.py::TestSessionFork` 10,
+`test_fork_into.py::TestForkNativeRelocate` 3) pass; 39 existing fork tests green (no regression); pyright/mypy clean on
+changed src; design.md under the 25k tiktoken size hook; `make pre-commit` clean.
+
+### Phase 3 (spike): Native-relocate cross-CWD resume — PASS, wiring deferred
+
+**Goal**: Settle the design.md §3.9 open question — can a Claude Code conversation resume across a CWD boundary if its
+session JSONL is first copied into the destination CWD's encoded project dir? Deliver a contract test + go/no-go, not
+the product surface.
+
+**Key changes**:
+
+- **Bug fix (surfaced by the spike)**: `encode_project_path` (`session/claude/paths.py`) now maps `_`→`-` alongside `/`
+  and `.`. Claude Code 2.1.158 hyphenates underscores; Forge didn't, so `get_transcript_path` pointed at the wrong dir
+  for any underscore-bearing path (silently breaking cleanup, status transcript reads, and relocation). Regression:
+  `tests/regression/test_bug_encode_project_path_underscore.py`.
+- **Relocate primitive**: new `session/claude/relocate.py` — `relocate_transcript()` does a content-untouched, atomic
+  (temp + `os.replace`) copy into the dest CWD's encoded dir; owner-only perms; idempotent; refuses to clobber differing
+  content; `rewrite_paths` seam reserved (`NotImplementedError`, off by default). 8 unit tests.
+- **Reproduction script**: `scripts/experiments/native-resume/` (recreates the path dangling-referenced in code) —
+  host-runnable, isolated `HOME`, control-vs-experiment, PASS/DISCOVERY-FAIL/SIGNATURE-FAIL/UNCATEGORIZED verdicts.
+- **Contract test**: `tests/integration/docker/test_native_relocate_contract.py` + conftest `relocate_and_resume` — real
+  Claude, signed-thinking + tool-use parent turn, in-container relocate via the real primitive, hook-free child resume
+  (`FORGE_SESSION` unset) from a real git worktree; three-way verdict judged from Claude's project dir; host+container
+  version gate; parent-immutability sha256. Found (and the harness documents) that `--dangerously-skip-permissions` is
+  rejected under root, so the container runs without it (read-only tools still execute in `--print`).
+- **Docs**: design.md §3.9 and the `session_fork.py` worktree-branch comment version-stamped; transfer stays the shipped
+  default (native-relocate opt-in wiring is the deferred Stage C follow-up).
+
+**Outcome**: **PASS on Claude Code 2.1.158.** Control (resume without relocating) still reproduces the 2026-04-02 "No
+conversation found" discovery failure; the experiment (relocate, then resume) completes a signed-thinking tool-use
+continuation with the relocated parent JSONL unmodified. Native-relocate is viable; opt-in
+`--resume-mode native-relocate` wiring deferred (touch points recorded in the plan). Candidate for `impl_notes.md` after
+review: the Claude project-dir encoding maps `/` `.` `_` → `-` (case/`-`/digits preserved).
+
+**Verification**: host repro `[PASS]` (Claude 2.1.158);
+`./scripts/test-integration.sh tests/integration/docker/test_native_relocate_contract.py` PASSED (23.6s); 8 relocate
+unit + 3 encode-underscore regression + 880 session unit green; ruff/mypy/pyright + shellcheck clean; `make pre-commit`
+clean.
+
+### Phase 2: Optional Audit Proxy (Runtime Abstraction)
+
+**Goal**: Make a Forge proxy an opt-in, user-controlled chokepoint that can observe and (optionally) control the wire
+between Claude Code and the model provider, with redacted audit logs — without changing any existing proxy (all new
+config defaults to inert).
+
+**Key changes** (sliced OBSERVE-before-MUTATE; two orthogonal axes kept distinct: `wire_shape` and `intercept.mode`):
+
+- **Config** (`config/schema.py`, `loader.py`): `wire_shape` (`openai_translated` | `anthropic_passthrough`) +
+  `intercept` + `audit` on `ProxyInstanceConfig`/runtime `ProxyConfig`, strict unknown-key rejection, propagated to the
+  running server; `override` requires `anthropic_passthrough` (validated at load).
+- **Passthrough wire** (`proxy/passthrough.py`, server middleware): non-converting Anthropic forward path that preserves
+  `thinking`/`redacted_thinking` byte-for-byte; intercepted in middleware before `MessagesRequest` validation; shipped
+  `anthropic-passthrough` template.
+- **Audit** (`proxy/audit_logger.py`, `utils` redaction): redact-before-persist JSONL records (`request`/`drift`/
+  `mutation`), system/tool hashing, drift detection, retention pruning at startup; `forge proxy audit show|diff` +
+  `%proxy audit`.
+- **Override** (`proxy/intercept.py`): cache-aware `system_prompt_augment`, `system_prompt_guards` (warn/block/strip),
+  reasoning-effort pin reusing `tier_overrides`; mutation-safety fingerprint tripwire (never rewrites historical
+  messages; fails closed).
+- **Sidecar** (`sidecar/container.py`, `docker/entrypoint.sh`, `Dockerfile.sidecar`, `scripts/test-integration.sh`):
+  `FORGE_PROXY_ID` + narrow read-only-config / writable audit+costs mounts so records, costs, and caps persist on the
+  host; sidecar-aware startup-validation skip; drift-state redirect; `--user` arbitrary-uid support (`HOME=/root` +
+  `chmod 0777 /root`). Fixed two latent entrypoint bugs the E2E surfaced (bare `python` had no forge; `--log-level` is
+  not a server flag) — the sidecar proxy could never start before.
+- **Docs**: `design.md` §7.x + §3.4/§3.7/§4.0; `design_appendix.md` §A.11 (config) + §A.12 (audit log schema);
+  `end-user/proxy.md` audit/intercept section + `audit_full_body` privacy warning.
+
+**Verification**: focused unit suites (intercept, audit_logger, passthrough server-path, config schema/loader,
+container, proxy_startup) + `tests/integration/sidecar/test_audit_plumbing.py` passing via the canonical runner under
+forced `--user`; no-plaintext-secret regression; broad proxy/sidecar/config/session sweeps; ruff/mypy/pyright + full
+`make pre-commit` clean. Deferred (debt): real-upstream `@pytest.mark.slow` passthrough signature-replay e2e (needs
+`ANTHROPIC_API_KEY`); streamed full-body capture (request body + response metadata only today).
+
+## 2026-05-31
+
+### Phase 1: Schema-backed curated transfer + `forge transfer` CLI (Runtime Abstraction)
+
+**Goal**: Make curated transfer a schema-backed, user-reviewable substrate and reposition `ai-curated` as the primary
+cross-boundary transfer path, with a top-level `forge transfer` CLI to inspect and reshape it.
+
+**Key changes**:
+
+- **Transfer schema** (`src/forge/session/transfer.py`): `_build_ai_curated_output()` emits canonical sections 1-7
+  (Lineage, Goal/Current Task, Decisions, Current State, Relevant Files, Open Questions, Runtime Hints); section 8 (User
+  Notes) is the overlay merged at launch. `_build_frontmatter()` stamps `schema_version: 1`, reserves `target_runtime`
+  for Phase 5, and marks `schema: "full"` only for a successful ai-curated body (`minimal|structured|full` →
+  `compatibility-fallback`). `_validate_decision_citations()` drops citations outside the turn range the model saw, so
+  `schema: full` never overstates evidence.
+- **Three-file artifact model**: `generated.md` (regeneratable parent cache), `children/<child>.md` (frozen AI
+  snapshot), `children/<child>.notes.md` (user overlay). `ensure_child` never overwrites an existing child; GC ties a
+  notes file's liveness to its snapshot.
+- **CLI** (`cli/transfer.py`, `core/ops/transfer.py`): new top-level `forge transfer show|regenerate|edit|diff`, pairing
+  with `forge memory`. `regenerate` rewrites only the parent cache; `edit` targets the notes overlay; `show`/`diff` take
+  `--child`.
+- **Docs**: design.md §3.9 reframes curated transfer as the primary cross-boundary substrate (not a lossy fallback);
+  appendix §M documents the frontmatter + 8-section contract + overlay; end-user/session.md updated.
+
+**Verification**: 113 transfer tests pass (`test_transfer.py`, `test_transfer_cli.py`, `test_prev_sessions.py`,
+regression `test_bug_transfer_notes_not_gc_orphaned.py`); shipped as commit `2b70c29`.
+
+**Phase 1 closeout (2026-05-31, docs-only)**: `ctx` posture recorded in `design_appendix.md` §M.4 -- the transfer schema
+is Forge-owned and canonical; `ctx` is prior art and inspiration only, never a dependency, and no interop is planned.
+Both default-behavior decisions resolved as keep-current: `--review` stays opt-in (a plain `--fresh` resume never blocks
+on `$EDITOR`) and `structured` stays the CLI default (`ai-curated` opt-in via `--strategy`, keeping the resume hot path
+deterministic and LLM-free). Schema confirmed stable for Phase 5 (`target_runtime` reserved). All Phase 1 boxes ticked;
+card stays in `doing/` for Phases 2-6. No code or tests changed.
+
 ## 2026-05-29
 
 ### fix: tombstone `forge handoff run` (memory_substrate follow-up)

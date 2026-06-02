@@ -172,6 +172,33 @@ def test_delete_uses_confirmed_claude_project_root_for_raw_cleanup(
     assert forge_root_decoy.exists()
 
 
+def test_force_delete_corrupt_manifest_uses_raw_confirmed_claude_project_root(project: Path) -> None:
+    """Raw-manifest force delete must still clean the persisted launch-root transcript."""
+    manager = SessionManager(index_store=IndexStore())
+    launch_root = project.parent / "executor-checkout"
+    launch_root.mkdir()
+    _write_session(
+        manager,
+        project,
+        "executor",
+        session_id=CHILD_ID,
+        claude_project_root=launch_root,
+        worktree_path=launch_root,
+    )
+    store = SessionStore(str(project), "executor")
+    raw = json.loads(store.manifest_path.read_text(encoding="utf-8"))
+    raw["unknown_top_level"] = True
+    store.manifest_path.write_text(json.dumps(raw), encoding="utf-8")
+
+    launch_transcript = _write_raw_transcript(launch_root, CHILD_ID)
+    forge_root_decoy = _write_raw_transcript(project, CHILD_ID)
+
+    manager.delete_session("executor", force=True, forge_root=str(project))
+
+    assert not launch_transcript.exists()
+    assert forge_root_decoy.exists()
+
+
 def test_same_uuid_in_different_claude_project_root_does_not_block_cleanup(
     project: Path,
 ) -> None:

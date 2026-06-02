@@ -60,6 +60,11 @@ class ReviewResult:
     success: bool
     duration_seconds: float
     error: str | None = None
+    # Run-tree identity of the worker subprocess (minted by build_claude_env).
+    # Null when the worker failed before its env was built (no route resolved).
+    run_id: str | None = None
+    parent_run_id: str | None = None
+    root_run_id: str | None = None
 
 
 @dataclass

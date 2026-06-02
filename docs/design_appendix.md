@@ -330,6 +330,123 @@ open -- common with OpenRouter's open model space).
 
 ---
 
+### A.11 Intercept and audit configuration (§7.x)
+
+Optional always-on audit/control fields on the user-owned proxy file. All default to inert, so existing proxies are
+unchanged. Coercion is **strict** — unknown sub-keys raise (a typo like `audit.full_body` must not silently disable
+full-body capture).
+
+```yaml
+# ~/.forge/proxies/<proxy_id>/proxy.yaml
+wire_shape: anthropic_passthrough # openai_translated (default) | anthropic_passthrough
+intercept:
+  mode: inspect # passthrough (default) | inspect | override
+  override: # applied only in override mode (requires anthropic_passthrough)
+    system_prompt_augment: "" # cache-aware system-prompt insert
+    system_prompt_guards:
+      - { pattern: "SECRET", action: block } # action: warn | block | strip
+audit:
+  audit_full_body: false # opt-in: capture REDACTED bodies (never plaintext)
+  redact_headers: [] # extra header names to redact (denylist + substring)
+  retention_days: 14
+  max_total_mb: 512
+```
+
+| Field                                      | Values                                       | Meaning                                                                 |
+| ------------------------------------------ | -------------------------------------------- | ----------------------------------------------------------------------- |
+| `wire_shape`                               | `openai_translated`, `anthropic_passthrough` | Wire truth; passthrough preserves thinking blocks (signature-safe)      |
+| `intercept.mode`                           | `passthrough`, `inspect`, `override`         | `override` requires `wire_shape: anthropic_passthrough`                 |
+| `intercept.override.system_prompt_augment` | string                                       | Cache-aware system-prompt insert (after the last `cache_control`)       |
+| `intercept.override.system_prompt_guards`  | list of `{pattern, action}`                  | `pattern` is a regex (compiled at config load); action warn/block/strip |
+| `audit.audit_full_body`                    | bool (default `false`)                       | Capture redacted bodies; there is **no** raw-body mode                  |
+| `audit.redact_headers`                     | list of strings                              | Extra header names to redact beyond the built-in denylist               |
+| `audit.retention_days`                     | int                                          | Prune shards older than N days at proxy startup                         |
+| `audit.max_total_mb`                       | int                                          | Prune oldest shards once total exceeds N MB at startup                  |
+
+Reasoning-effort pinning in override mode **reuses** `tier_overrides.<tier>.reasoning_effort` (§A.1) — it is not a new
+`intercept` key. `forge proxy set <id> intercept.mode=inspect` (and `audit.audit_full_body=true`, which prints a privacy
+warning naming `~/.forge/audit/`) edits these via the normal proxy surface.
+
+---
+
+### A.12 Audit log schema (§7.x)
+
+Records are persisted **already redacted** (the typed builders redact headers/bodies before calling the writer, which
+only appends). The no-plaintext-secret guarantee is regression-tested
+(`tests/regression/test_bug_audit_header_redaction_no_leak.py`).
+
+| Path                                            | Owner                      | Notes                                           |
+| ----------------------------------------------- | -------------------------- | ----------------------------------------------- |
+| `~/.forge/audit/requests/<YYYY-MM>_<pid>.jsonl` | `forge.proxy.audit_logger` | Owner-only 0600, append-only, PID-sharded       |
+| `~/.forge/proxies/<id>/audit_state.json`        | drift baseline (host)      | `schema_version`, `last_seen` hash map          |
+| `~/.forge/audit/state/<id>.json`                | drift baseline (sidecar)   | Same shape; the config dir is mounted read-only |
+
+Every record carries `schema_version`, `ts`, `request_id`, `proxy_id`, and a `record_type`:
+
+| `record_type` | Key fields                                                                                                                                                                                                                                                                                                                                                                      |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `request`     | `mode`, `route`, `full_body`, `system_prompt_hash`, `tool_surface_hash`, `thinking`, `cache_markers`, `counts`; full-body adds the redacted `request_headers/body` (every path) and `response_headers/body` (structure only) **only for non-streaming passthrough** — streaming captures response usage metadata only; the translated path is request-body only (both deferred) |
+| `drift`       | `dimension` (`system_prompt`\|`tool_surface`), `previous_hash`, `current_hash`, `route`                                                                                                                                                                                                                                                                                         |
+| `mutation`    | `mode: override`, `blocked`, `system_prompt_hash_before/after`, `mutations[]` (each `{target, action, ...}` with `augment_len` / `cache_invalidation_expected` / `pattern_hash` / `stripped_count` / `effort_floor` / `budget_before/after`) — hashes, lengths, and budgets only                                                                                                |
+
+Reading skips records written by a newer Forge (`schema_version` > current) with a one-time warning.
+`forge proxy audit show|diff` (§4.0) is the read surface.
+
+### A.13 Usage-attribution ledger schema (§3.14)
+
+The canonical **attribution** plane: which run/workflow/session invoked which runtime/provider/model via which route,
+and what it consumed. Modeled on the audit log (versioned, strictly read). The three data planes stay physically
+separate and are joined by a shared proxy `request_id`:
+
+| Path                                          | Owner                     | Notes                                                    |
+| --------------------------------------------- | ------------------------- | -------------------------------------------------------- |
+| `~/.forge/usage/events/<YYYY-MM>_<pid>.jsonl` | `forge.core.usage.ledger` | Owner-only 0600, append-only, PID-sharded; `UsageEvent`s |
+
+`UsageEvent` carries `schema_version` (= 1) plus an auto-stamped `event_id` (`evt_…`, for dedupe/debugging) and `ts`:
+
+| Group            | Fields                                                                                           |
+| ---------------- | ------------------------------------------------------------------------------------------------ |
+| Attribution core | `run_id`, `root_run_id`, `runtime`, `command`, `status` (required); `parent_run_id` (optional)   |
+| Context          | `session`, `workflow`, `provider`, `model`, `proxy_id`                                           |
+| Provenance       | `billing_mode`, `measurement_source`, `attribution_granularity`                                  |
+| Consumption      | `input_tokens`, `output_tokens`, `cached_tokens`, `latency_ms`, `failure_type`, `cost_micro_usd` |
+| Cross-plane refs | `source_refs` = `{cost_request_id, audit_request_id}` (nullable)                                 |
+
+Enumerations are `Literal`s (provenance is recorded, never inferred):
+
+- `measurement_source`: `proxy_request_exact` | `verb_snapshot_estimated` | `provider_usage_exact` | `runtime_native` |
+  `unattributed` — how the cost/token figures were obtained, so an event lacking an exact figure says so rather than
+  guessing (`provider_usage_exact` = a direct `core.llm` call where the provider returned exact token usage in-band).
+- `billing_mode`: `api` | `subscription_interactive` | `subscription_headless_credit` | `subscription_quota` | `unknown`
+  (`unknown` is the honest default where the signal is ambiguous).
+- `attribution_granularity`: `worker` | `verb` | `session`.
+
+`source_refs` is null on native-runtime events (no proxy) and on `claude -p` traffic until per-request correlation ships
+(Phase 4g); the event stays useful without it (run/model/billing_mode/tokens). Reading skips — with a one-time warning —
+records written by a newer Forge (`schema_version` > current), and (strict on shape) records with unknown fields.
+`read_usage_events()` is the typed read surface.
+
+**Instrumented emitters (Phase 4c).** The workflow verbs (`panel`/`analyze`/`debate`/`consensus`) emit one estimated
+verb-level event each (`measurement_source=verb_snapshot_estimated`, attributed to the ambient run — per-worker cost is
+not available); the memory writer, semantic supervisor, and shadow curation emit one event per `claude -p` run
+(attributed to that subprocess's run identity, via the `track_verb_cost` holder); the action tagger emits a
+`provider_usage_exact` event from a direct `core.llm` call (exact in-band provider tokens). On the **direct path**,
+Forge resolves the call's base_url synchronously: if it is a registered Forge proxy, the tagger forwards an
+`X-Request-ID` and records an exact `source_refs.cost_request_id` join (the proxy logs its cost record under the same
+id); otherwise it sends no header and leaves the ref null (a dangling join is worse than none). Direct-path
+`billing_mode` stays `unknown` unless the caller proves direct + real-credential billing (the tagger routes via local
+LiteLLM with a dummy key, so it can't). All emit best-effort, never gate the work they measure, and record `latency_ms`;
+`claude -p` events carry null `source_refs` (4g). Helpers: `emit_verb_usage`, `emit_usage_for_session_result`,
+`emit_direct_llm_usage` (`forge.core.usage.emit`).
+
+**Per-worker fan-out events (Phase 4d).** The review fan-out (`run_multi_review` → `ClaudeHeadlessInvoker.run_parallel`)
+emits one event per worker (`attribution_granularity=worker`, `measurement_source=unattributed`): the run-tree leaf
+(run/parent/root) plus the **actual routed** `model` (`route.model_ref`), `provider`, and `proxy_id`, with `status` and
+`latency_ms`. Per-worker cost/tokens are null — `ReviewResult` carries none, so the verb-level aggregate above holds the
+estimated total. Helper: `emit_worker_usage`.
+
+---
+
 ## B. Direct Command Reference
 
 Extracted from [design.md §3.11](design.md#311-direct-commands-userpromptsubmit-dispatcher). Design goal, mechanism, and
@@ -340,7 +457,7 @@ scope rationale remain in design.md.
 | Category              | Allowed via `%`                                                                                                     | Not allowed via `%`                                           |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
 | Session / plan        | `%session list`, `%plan`                                                                                            | --                                                            |
-| Proxy                 | `%proxy list`, `%proxy show` (read-only)                                                                            | `%proxy create`, `%proxy edit`, `%proxy set`, `%proxy delete` |
+| Proxy                 | `%proxy list`, `%proxy show`, `%proxy audit show/diff` (read-only)                                                  | `%proxy create`, `%proxy edit`, `%proxy set`, `%proxy delete` |
 | Policy / verification | `%policy status`, `%policy enable`, `%policy disable`, `%policy check`, `%policy supervise`, `%cancel-verification` | --                                                            |
 | Cleanup               | `%clean [--scope repo\|project\|all]` (read-only report)                                                            | destructive cleanup (use `forge clean --yes` from terminal)   |
 | Utilities / config    | `%h`, `%help`, `%config`                                                                                            | --                                                            |
@@ -358,6 +475,7 @@ Shared commands (mirrors CLI syntax):
 - `%plan` (shows the current session's recorded plan file path)
 - `%proxy list` (read-only: shows available proxies)
 - `%proxy show <id>` (read-only: shows proxy details and tier mappings)
+- `%proxy audit show|diff [id]` (read-only: recent audit metadata / wire changes; metadata only, never secrets)
 - `%policy status` (shows current policy config and state)
 - `%policy enable --bundle tdd [--permissive]` (enables policy enforcement)
 - `%policy disable` (disables all policies for the session)
@@ -397,7 +515,9 @@ Extracted from [design.md §3.13](design.md#313-async-work-queue). Design goals 
 
 **Key fields:** `kind` = routing key (which handler); `marker_id` = filename key (caller chooses idempotency, e.g.
 session ID); `payload` = kind-specific data; `attempt_count`/`last_error` = retry tracking. Marker ID validated with
-`^[A-Za-z0-9._-]+$`.
+`^[A-Za-z0-9._-]+$`. The `handoff` marker payload additionally carries `origin_run_id`/`origin_root_run_id` (the
+originating session's run-tree identity, snapshotted at Stop time) so the detached memory writer roots under that
+session rather than the draining CLI (§F.5).
 
 ### C.2 Processing contract
 
@@ -651,6 +771,15 @@ disagreement areas, evidence-weighted recommendation). Temp file cleaned up via 
 **Recursion guard:** Skills invoke `forge` commands. `forge` commands spawn `claude -p` subprocesses. Those subprocesses
 trigger hooks. If a hook spawns another subprocess, you get recursion. `build_claude_env()` sets `FORGE_DEPTH` (starting
 at 0, incremented per subprocess layer). Hooks that spawn subprocesses (supervisor, memory writer) skip at depth >= 2.
+
+**Run-tree identity (attribution, orthogonal to the recursion guard):** alongside `FORGE_DEPTH`, `build_claude_env()`
+stamps `FORGE_RUN_ID` (this process), `FORGE_PARENT_RUN_ID` (the spawner), and `FORGE_ROOT_RUN_ID` (the tree root). A
+child inherits the root and sets its parent to the spawner's run_id; an interactive launch (session start/resume/fork,
+bare `forge claude start`) and the sidecar instead mint a fresh root (`invoke._build_environment` / `container.py`, via
+`derive_run_identity=False`). Depth guards recursion; identity records who-spawned-whom for the usage ledger — the two
+are independent and `FORGE_DEPTH` is never reinterpreted. The queue-decoupled memory writer is the one spawn where env
+inheritance breaks: the Stop hook snapshots the originating session's run id into the handoff marker (§C.1) and the
+drain handler re-roots the detached process under it, not under the unrelated draining CLI.
 
 **JSON output contract:** `forge` commands invoked by skills must support `--json` for structured output. Skills should
 never parse human-readable CLI text -- it drifts. JSON schemas are the API contract between skills and CLI.
@@ -1083,3 +1212,76 @@ In sidecar mode (`~/.forge` not mounted), registry-dependent steps are unavailab
 Proxy IDs are resolved on the host before entering the sidecar. If a user supplies a plain proxy ID inside a sidecar
 with no injected metadata, Forge fails with an actionable error suggesting `--subprocess-proxy` at session start or
 running the workflow on the host.
+
+---
+
+## M. Transfer Context Schema
+
+Extracted from [design.md §3.9](design.md#39-session-resume-context-management). The transfer document is a stable,
+frontmatter-backed Markdown contract produced by `assemble_transfer_context` (`src/forge/session/transfer.py`).
+
+### M.1 Frontmatter (child-agnostic)
+
+Every strategy prepends one YAML block. It carries **no `child` field** — child identity is path-derived, so
+`generated.md` and the `children/<child>.md` copy stay byte-identical (the `ensure_child` copy and the auto-name retry
+byte-compare in `manager.py` both depend on this).
+
+```yaml
+---
+forge_transfer:
+  schema_version: 1
+  parent: <parent-session-name>
+  strategy: ai-curated | structured | full | minimal
+  schema: full | compatibility-fallback   # "full" only for a successful ai-curated body
+  depth: <int>                              # lineage depth (regenerate restores this)
+  generated_at: <ISO8601>
+  lineage: [<parent>, <grandparent>, ...]
+  transcript_artifact: <forge-root-rel path | null>
+  token_estimate: <int | null>
+  target_runtime: claude                    # reserved for Phase 5 cross-runtime tuning
+---
+```
+
+Reads are **best-effort** (`parse_transfer_frontmatter`): the doc is an LLM-consumed artifact with a user-editable
+overlay (a system boundary), so missing/malformed frontmatter warns and still returns the body — it never hard-fails.
+
+### M.2 Sections
+
+`ai-curated` emits the full 8-section contract; code owns the skeleton and the model fills section bodies (it returns
+structured JSON, parsed with `extract_json_from_response`). Decisions cite a transcript turn (`[turn N]`) or file;
+citations are validated against the turn range the model saw and fabricated ones are dropped with a warning
+(`_validate_decision_citations`), so `schema: full` does not overstate evidence quality. Sections 1–7 live in the AI
+snapshot; section 8 is the separate notes overlay (so the snapshot has 7 headers and the composed launch view has 8):
+
+1. `## Lineage`
+2. `## Goal / Current Task`
+3. `## Decisions` (cited)
+4. `## Current State`
+5. `## Relevant Files` (`file:line`)
+6. `## Open Questions`
+7. `## Runtime Hints`
+8. `## User Notes` (overlay)
+
+`minimal | structured | full` keep their existing bodies and set `schema: compatibility-fallback`.
+
+### M.3 File layout and overlay
+
+```
+<forge_root>/.forge/prev_sessions/<parent>/generated.md               # parent AI cache (regenerate rewrites)
+<forge_root>/.forge/prev_sessions/<parent>/children/<child>.md        # per-child AI snapshot (frozen; never edited)
+<forge_root>/.forge/prev_sessions/<parent>/children/<child>.notes.md  # per-child user overlay (the editable surface)
+```
+
+The launcher appends the snapshot plus the notes overlay (when it has user content) to one `--append-system-prompt-file`
+via `_combine_prompt_files`. `forge transfer regenerate` rewrites only `generated.md`; snapshots and notes are never
+overwritten. GC pairs a notes file's liveness to its snapshot — it is never orphaned independently
+(`_detect_orphan_transfer_files`).
+
+### M.4 Relationship to `ctx` (prior art)
+
+The transfer schema (§M.1–M.3) is **Forge-owned and canonical**. [`ctx`](https://github.com/dchu917/ctx) is **prior art
+and inspiration only** — its concepts (workstreams, exact transcript binding, branching, indexed retrieval, local
+storage, curation) informed this substrate. Forge will **not** take `ctx` as a dependency: curated transfer is
+load-bearing for Forge's session, policy, and usage story, so its contract lives in-tree. The schema is self-contained
+and **no `ctx` interop is planned**. An optional import/export bridge could be built on the existing schema later
+without changing it, but that is explicitly not committed work.

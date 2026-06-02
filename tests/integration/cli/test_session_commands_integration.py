@@ -281,13 +281,24 @@ echo 'EDITOR_WAS_HERE' >> "$1"
         )
 
         assert result.returncode == 0, result.stderr
-        context_path = "/workspace/.forge/prev_sessions/review-parent/children/review-child.md"
         invocations = mock_claude_workspace.read_file("/tmp/claude_invocations.log")
-        assert f"--append-system-prompt-file {context_path}" in invocations
 
-        context = mock_claude_workspace.read_file(context_path)
-        assert "original parent context" in context
-        assert "EDITOR_WAS_HERE" in context
+        # --review edits the user-notes overlay, not the pure AI snapshot.
+        notes_path = "/workspace/.forge/prev_sessions/review-parent/children/review-child.notes.md"
+        assert "EDITOR_WAS_HERE" in mock_claude_workspace.read_file(notes_path)
+
+        # The AI snapshot stays pure (carries parent context, not user edits).
+        snapshot_path = "/workspace/.forge/prev_sessions/review-parent/children/review-child.md"
+        snapshot = mock_claude_workspace.read_file(snapshot_path)
+        assert "original parent context" in snapshot
+        assert "EDITOR_WAS_HERE" not in snapshot
+
+        # Launch appends the combined snapshot+notes file, so the edit reaches Claude.
+        combined_path = "/workspace/.forge/launch-context/review-child.md"
+        assert f"--append-system-prompt-file {combined_path}" in invocations
+        combined = mock_claude_workspace.read_file(combined_path)
+        assert "original parent context" in combined
+        assert "EDITOR_WAS_HERE" in combined
 
     def test_resume_nonexistent_fails(self, mock_claude_workspace: ContainerLike) -> None:
         """Should fail for nonexistent session."""
