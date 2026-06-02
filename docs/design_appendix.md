@@ -461,7 +461,9 @@ Extracted from [design.md §3.13](design.md#313-async-work-queue). Design goals 
 
 **Key fields:** `kind` = routing key (which handler); `marker_id` = filename key (caller chooses idempotency, e.g.
 session ID); `payload` = kind-specific data; `attempt_count`/`last_error` = retry tracking. Marker ID validated with
-`^[A-Za-z0-9._-]+$`.
+`^[A-Za-z0-9._-]+$`. The `handoff` marker payload additionally carries `origin_run_id`/`origin_root_run_id` (the
+originating session's run-tree identity, snapshotted at Stop time) so the detached memory writer roots under that
+session rather than the draining CLI (§F.5).
 
 ### C.2 Processing contract
 
@@ -715,6 +717,15 @@ disagreement areas, evidence-weighted recommendation). Temp file cleaned up via 
 **Recursion guard:** Skills invoke `forge` commands. `forge` commands spawn `claude -p` subprocesses. Those subprocesses
 trigger hooks. If a hook spawns another subprocess, you get recursion. `build_claude_env()` sets `FORGE_DEPTH` (starting
 at 0, incremented per subprocess layer). Hooks that spawn subprocesses (supervisor, memory writer) skip at depth >= 2.
+
+**Run-tree identity (attribution, orthogonal to the recursion guard):** alongside `FORGE_DEPTH`, `build_claude_env()`
+stamps `FORGE_RUN_ID` (this process), `FORGE_PARENT_RUN_ID` (the spawner), and `FORGE_ROOT_RUN_ID` (the tree root). A
+child inherits the root and sets its parent to the spawner's run_id; an interactive launch (session start/resume/fork,
+bare `forge claude start`) and the sidecar instead mint a fresh root (`invoke._build_environment` / `container.py`, via
+`derive_run_identity=False`). Depth guards recursion; identity records who-spawned-whom for the usage ledger — the two
+are independent and `FORGE_DEPTH` is never reinterpreted. The queue-decoupled memory writer is the one spawn where env
+inheritance breaks: the Stop hook snapshots the originating session's run id into the handoff marker (§C.1) and the
+drain handler re-roots the detached process under it, not under the unrelated draining CLI.
 
 **JSON output contract:** `forge` commands invoked by skills must support `--json` for structured output. Skills should
 never parse human-readable CLI text -- it drifts. JSON schemas are the API contract between skills and CLI.

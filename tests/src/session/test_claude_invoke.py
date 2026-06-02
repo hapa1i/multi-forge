@@ -10,6 +10,11 @@ from unittest.mock import Mock
 
 import pytest
 
+from forge.core.reactive.env import (
+    FORGE_PARENT_RUN_ID_VAR,
+    FORGE_ROOT_RUN_ID_VAR,
+    FORGE_RUN_ID_VAR,
+)
 from forge.session.claude.invoke import (
     _build_command,
     _build_environment,
@@ -116,6 +121,38 @@ class TestBuildEnvironment:
 
         assert "ANTHROPIC_BASE_URL" not in env
         assert "ACTIVE_TEMPLATE" not in env
+
+    def test_mints_fresh_root_identity(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """An interactive launch is a run-tree root: FORGE_RUN_ID == FORGE_ROOT_RUN_ID, no parent."""
+        for var in (FORGE_RUN_ID_VAR, FORGE_PARENT_RUN_ID_VAR, FORGE_ROOT_RUN_ID_VAR):
+            monkeypatch.delenv(var, raising=False)
+
+        env = _build_environment()
+
+        assert env[FORGE_RUN_ID_VAR].startswith("run_")
+        assert env[FORGE_RUN_ID_VAR] == env[FORGE_ROOT_RUN_ID_VAR]
+        assert FORGE_PARENT_RUN_ID_VAR not in env
+
+    def test_fresh_root_does_not_inherit_run_identity(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Inherited run vars must NOT leak into an interactive root.
+
+        Guards the two fragile lines in ``_build_environment``: the merge order (the fresh
+        root must win over an inherited ``FORGE_RUN_ID``) and the ``FORGE_PARENT_RUN_ID``
+        scrub (a root has no parent). A misparented root silently breaks usage attribution
+        while still looking like a valid tree.
+        """
+        monkeypatch.setenv(FORGE_RUN_ID_VAR, "run_inherited")
+        monkeypatch.setenv(FORGE_PARENT_RUN_ID_VAR, "run_inheritedparent")
+        monkeypatch.setenv(FORGE_ROOT_RUN_ID_VAR, "run_inheritedroot")
+
+        env = _build_environment()
+
+        # A fresh root, not a child or a continuation of the inherited tree.
+        assert env[FORGE_RUN_ID_VAR].startswith("run_")
+        assert env[FORGE_RUN_ID_VAR] not in ("run_inherited", "run_inheritedroot")
+        assert env[FORGE_ROOT_RUN_ID_VAR] == env[FORGE_RUN_ID_VAR]
+        # A root has no parent — the inherited parent must be scrubbed.
+        assert FORGE_PARENT_RUN_ID_VAR not in env
 
 
 class TestRunClaude:

@@ -24,6 +24,9 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from forge.core.auth.capabilities import CREDENTIALS, format_missing_credential_error
 from forge.core.auth.template_secrets import resolve_env_or_credential
 from forge.core.reactive.env import (
+    FORGE_PARENT_RUN_ID_VAR,
+    FORGE_ROOT_RUN_ID_VAR,
+    FORGE_RUN_ID_VAR,
     build_claude_env,
     can_use_bare,
     should_spawn_subprocesses,
@@ -241,6 +244,12 @@ def run_multi_review(
         else:
             env = build_claude_env(base_url=routing_result.base_url, extra_vars=extra_env or None)
 
+        # Run-tree identity for this worker (build_claude_env stamped it). Threaded
+        # onto every post-env ReviewResult so the usage ledger can attribute the worker.
+        run_id = env.get(FORGE_RUN_ID_VAR)
+        parent_run_id = env.get(FORGE_PARENT_RUN_ID_VAR)
+        root_run_id = env.get(FORGE_ROOT_RUN_ID_VAR)
+
         cmd = ["claude", "-p"]
         if can_use_bare(env):
             cmd.append("--bare")
@@ -278,6 +287,9 @@ def run_multi_review(
                     success=False,
                     duration_seconds=duration,
                     error=error_msg,
+                    run_id=run_id,
+                    parent_run_id=parent_run_id,
+                    root_run_id=root_run_id,
                 )
 
             return ReviewResult(
@@ -286,6 +298,9 @@ def run_multi_review(
                 stderr=stderr,
                 success=True,
                 duration_seconds=duration,
+                run_id=run_id,
+                parent_run_id=parent_run_id,
+                root_run_id=root_run_id,
             )
 
         except subprocess.TimeoutExpired:
@@ -302,6 +317,9 @@ def run_multi_review(
                 success=False,
                 duration_seconds=float(timeout_seconds),
                 error=f"Timeout after {timeout_seconds}s",
+                run_id=run_id,
+                parent_run_id=parent_run_id,
+                root_run_id=root_run_id,
             )
 
         except FileNotFoundError:
@@ -313,6 +331,9 @@ def run_multi_review(
                 success=False,
                 duration_seconds=duration,
                 error="claude CLI not found in PATH",
+                run_id=run_id,
+                parent_run_id=parent_run_id,
+                root_run_id=root_run_id,
             )
 
         except (OSError, subprocess.SubprocessError) as e:
@@ -324,6 +345,9 @@ def run_multi_review(
                 success=False,
                 duration_seconds=duration,
                 error=str(e),
+                run_id=run_id,
+                parent_run_id=parent_run_id,
+                root_run_id=root_run_id,
             )
 
     # Fan out with ThreadPoolExecutor, preserving input order and duplicate workers.

@@ -91,6 +91,57 @@ class AliasGroup(click.Group):
                 formatter.write_dl(commands)
 
 
+def _memory_writer_env(payload: dict[str, object]) -> dict[str, str]:
+    """Build the detached memory-writer's env, re-rooted under the originating session.
+
+    The writer is drained and spawned by an unrelated later CLI process, so it must inherit
+    NONE of that drainer's identity. Run-tree and session are handled differently on purpose:
+
+    - Run-tree (FORGE_RUN_ID/PARENT/ROOT): re-rooted at the marker's captured origin (with a
+      fresh child run_id) so attribution chains to the originating session. Markers predating
+      run-tree capture fall through scrubbed, so the writer mints its own root.
+    - Session (FORGE_SESSION/FORK/PARENT): scrubbed, NOT re-rooted — Forge hooks *act* on
+      FORGE_SESSION, so re-injecting the origin would make the writer's own ``claude -p`` Stop
+      hook resolve the (ended) origin session and re-enqueue a handoff for it: a self-spawning
+      loop. The writer gets its target session from ``--session-name`` (and Slice 4c reads the
+      usage label from there too), so it needs no inherited session var.
+    """
+    import os
+
+    from forge.core.reactive.env import (
+        FORGE_PARENT_RUN_ID_VAR,
+        FORGE_ROOT_RUN_ID_VAR,
+        FORGE_RUN_ID_VAR,
+        mint_run_id,
+    )
+    from forge.session.hooks.session_start import (
+        ENV_FORK_NAME,
+        ENV_PARENT_SESSION,
+        ENV_SESSION,
+    )
+
+    env = os.environ.copy()
+    # Scrub the drainer's run-tree AND session identity (see docstring): inheriting either
+    # mis-attributes the detached writer. Session vars are dropped unconditionally; the
+    # run-tree is re-rooted below when the marker captured the origin.
+    for var in (
+        FORGE_RUN_ID_VAR,
+        FORGE_PARENT_RUN_ID_VAR,
+        FORGE_ROOT_RUN_ID_VAR,
+        ENV_SESSION,
+        ENV_FORK_NAME,
+        ENV_PARENT_SESSION,
+    ):
+        env.pop(var, None)
+
+    origin_root = payload.get("origin_root_run_id") or payload.get("origin_run_id")
+    if origin_root:
+        env[FORGE_ROOT_RUN_ID_VAR] = str(origin_root)
+        env[FORGE_PARENT_RUN_ID_VAR] = str(payload.get("origin_run_id") or origin_root)
+        env[FORGE_RUN_ID_VAR] = mint_run_id()
+    return env
+
+
 def _process_pending_work_best_effort() -> None:
     """Process pending-work queue opportunistically.
 
@@ -193,6 +244,7 @@ def _process_pending_work_best_effort() -> None:
 
             subprocess.Popen(
                 cmd,
+                env=_memory_writer_env(payload),
                 start_new_session=True,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,

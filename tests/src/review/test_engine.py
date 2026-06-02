@@ -173,6 +173,22 @@ class TestRunMultiReview:
         assert call_kwargs["env"]["FORGE_DEPTH"] == "1"
 
     @patch("forge.review.engine.subprocess.Popen")
+    def test_worker_surfaces_run_id(self, mock_popen_cls):
+        """Each ReviewResult carries the worker's run identity (parent = the verb)."""
+        mock_popen_cls.return_value = _mock_popen("output")
+        plan = _plan(_routing_result())
+        with patch.dict(
+            "os.environ",
+            {"FORGE_RUN_ID": "run_verb", "FORGE_ROOT_RUN_ID": "run_root"},
+            clear=True,
+        ):
+            output = run_multi_review("review", models=[_spec()], routing_plan=plan)
+        result = output.results[0]
+        assert result.parent_run_id == "run_verb"
+        assert result.root_run_id == "run_root"
+        assert result.run_id and result.run_id not in ("run_verb", "run_root")
+
+    @patch("forge.review.engine.subprocess.Popen")
     def test_bare_flag_when_api_key_present(self, mock_popen_cls):
         mock_popen_cls.return_value = _mock_popen("output")
         plan = _plan(_routing_result())

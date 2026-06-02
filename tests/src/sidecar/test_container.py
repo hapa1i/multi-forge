@@ -206,6 +206,32 @@ class TestRunSidecarSession:
             assert "FORGE_LAUNCH_MODE=sidecar" in " ".join(cmd)
             assert "forge-sidecar:latest" in cmd
 
+    def test_run_sidecar_session_mints_root_identity(self) -> None:
+        """Sidecar is a run-tree root: FORGE_RUN_ID == FORGE_ROOT_RUN_ID, no parent."""
+        with (
+            patch("forge.sidecar.container.container_exists", return_value=False),
+            patch("forge.sidecar.container.subprocess.run") as mock_run,
+        ):
+            mock_run.return_value = MagicMock(returncode=0)
+            run_sidecar_session(
+                image="forge-sidecar:latest",
+                template="litellm-openai",
+                session_name="test-session",
+                project_dir=Path("/home/user/code"),
+            )
+            cmd = mock_run.call_args[0][0]
+            run_id = next(
+                (p.split("=", 1)[1] for p in cmd if isinstance(p, str) and p.startswith("FORGE_RUN_ID=")),
+                None,
+            )
+            root_id = next(
+                (p.split("=", 1)[1] for p in cmd if isinstance(p, str) and p.startswith("FORGE_ROOT_RUN_ID=")),
+                None,
+            )
+            assert run_id is not None and run_id.startswith("run_")
+            assert run_id == root_id
+            assert not any(isinstance(p, str) and p.startswith("FORGE_PARENT_RUN_ID=") for p in cmd)
+
     def test_run_sidecar_session_with_extra_mounts(self) -> None:
         """Verify extra mounts are added."""
         with (

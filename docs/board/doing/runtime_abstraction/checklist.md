@@ -49,12 +49,13 @@ All Phase 2 slice boxes are ticked.
 top-level `forge transfer show|regenerate|edit|diff` CLI shipped in commit `2b70c29`; `docs/design.md` §3.9 and
 `docs/design_appendix.md` §M reflect it. All Phase 1 boxes are ticked.
 
-Next: **Phase 4 (runtime-abstraction core)**. The two cross-cutting Phase 4 decisions are now resolved (data-plane:
-separate planes linked by `request_id`; `FORGE_DEPTH`: additive run-tree env, integer guard unchanged) -- see Open
-Decisions for the de-risked build sequence, recorded at the top of the Phase 4 section. Deferred Phase 3 follow-ups
-(`--rewrite-paths`, sidecar/resume native-relocate, the gated default flip) are now recorded as trackable boxes under
-Phase 3 and land when prioritized. The card stays in `doing/` until Phases 3-6 land (board-contract: move to `done/`
-only when fully executed).
+Next: **Phase 4 (runtime-abstraction core)** -- **Slice 4a (run-tree env contract) shipped 2026-06-01**; next is Slice
+4b (usage-ledger schema). The two cross-cutting Phase 4 decisions are resolved (data-plane: separate planes linked by
+`request_id`; `FORGE_DEPTH`: additive run-tree env, integer guard unchanged) -- see Open Decisions for the de-risked
+build sequence, recorded at the top of the Phase 4 section. Deferred Phase 3 follow-ups (`--rewrite-paths`,
+sidecar/resume native-relocate, the gated default flip) are recorded as trackable boxes under Phase 3 and land when
+prioritized. The card stays in `doing/` until Phases 3-6 land (board-contract: move to `done/` only when fully
+executed).
 
 **Deferred prerequisite (memory_substrate reconciliation) -- RESOLVED 2026-05-30:**
 
@@ -517,21 +518,55 @@ nullable `source_refs`; (3) instrument native + direct `core.llm` paths first (l
 per-request correlation fork last. The `HeadlessInvoker` refactor is the largest *implementation* risk but is
 internal/refactorable -- it does not mint a durable contract, so it does not gate the schema work.
 
+### Slice 4a - Run-tree env contract (DONE 2026-06-01)
+
+- [x] Run-tree identity minted at the single env choke point, orthogonal to `FORGE_DEPTH`.
+
+  - Assertion: every Forge-spawned process carries `(FORGE_RUN_ID, FORGE_PARENT_RUN_ID, FORGE_ROOT_RUN_ID)`; the
+    interactive top is a fresh root; the queue-decoupled memory-writer roots under its originating session;
+    `FORGE_DEPTH` and its three recursion guards (`supervisor.py`, `team/handlers.py`, `review/engine.py`) are
+    unchanged.
+  - Verification (2026-06-01): `RunIdentity` + `mint_run_id`/`get_run_identity`/`new_root_run_identity`/
+    `derive_child_run_identity` in `core/reactive/env.py`; `build_claude_env(derive_run_identity=True)` stamps the
+    triple right after the depth block (reads spawner id before overwrite; a stale `FORGE_PARENT_RUN_ID` is recomputed,
+    not leaked). `SessionResult` (all 6 returns) and `ReviewResult` (5 post-env returns; 2 pre-env failures stay null)
+    surface `run_id/parent_run_id/root_run_id`. Interactive root centralized in `invoke._build_environment`
+    (`derive_run_identity=False` + fresh root + parent scrub) -- covers session start/resume/fork + bare
+    `forge claude start`; sidecar mints its own root in `container.py`. Memory-writer: `enqueue_handoff_marker`
+    snapshots `origin_run_id/origin_root_run_id`; `main._memory_writer_env` re-roots the detached spawn under the origin
+    (parent=origin_run_id, root=origin_root_run_id, fresh run_id) and scrubs the drainer's id. Targeted unit/regression
+    tests pass (incl. `tests/regression/test_run_tree_env_contract.py` orthogonality + source-env-unmutated, and
+    `test_claude_invoke.py` interactive fresh-root carve-out -- inherited run vars must not leak into a root);
+    `tests/src -m "not integration"` green (4866 passed); `pre-commit` clean (mypy + pyright). **Refinement vs plan:**
+    interactive root minted once in `_build_environment` (the shared interactive choke point) rather than per-builder,
+    so no caller (resume/fork) can drift.
+
 - [ ] Introduce `HeadlessInvoker` interface and `ClaudeHeadlessInvoker`.
+
   - Assertion: existing single headless callers of `run_claude_session()` keep user-visible behavior, timeout semantics,
     environment routing, and fail-open/fail-closed choices.
+
 - [ ] Move review-engine fan-out behind invoker lifecycle management.
+
   - Assertion: `src/forge/review/engine.py` parallel `subprocess.Popen()` fan-out, process-group cleanup, timeout
     handling, cancellation, and deterministic result ordering are preserved and covered by tests.
+
 - [ ] Add runtime registry capability matrix.
+
   - Assertion: registry answers installed, interactive, headless, hooks, usage, native resume, and scope capabilities.
+
 - [ ] Generalize existing `ActionContext` / `PolicyDecision` for runtime adapters.
+
   - Assertion: current Claude hook adapter behavior is unchanged, runtime identity is represented explicitly, and Codex
     adapter limitations are represented as capabilities instead of implied parity.
+
 - [ ] Define durable usage ledger schema.
+
   - Assertion: `~/.forge/usage/events.jsonl` event schema covers runtime, provider, model, proxy, billing mode, tokens,
     latency, status, and attribution ids.
+
 - [ ] Instrument usage ledger callsites in staged order.
+
   - Assertion: workflow verbs (`src/forge/cli/workflow.py`), memory writer (`src/forge/session/memory_writer.py`),
     review engine (`src/forge/review/engine.py`), semantic supervisor (`src/forge/policy/semantic/supervisor.py`), team
     supervisor (`src/forge/policy/team/handlers.py`), Claude launcher (`src/forge/cli/claude.py`), and session launcher

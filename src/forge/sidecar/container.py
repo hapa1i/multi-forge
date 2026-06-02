@@ -14,6 +14,7 @@ import tempfile
 from pathlib import Path
 
 from forge.core.paths import get_forge_home
+from forge.core.reactive.env import new_root_run_identity
 from forge.sidecar.docker import _docker_name_filter
 
 # In-container Forge home, pinned via FORGE_HOME so audit/cost/config resolution is
@@ -101,6 +102,11 @@ def run_sidecar_session(
                 f"Create it with 'forge proxy create' or launch template-only (without --proxy)."
             )
 
+    # The sidecar is a run-tree root (an interactive session in a container), so it
+    # mints a fresh identity with no parent — host env inheritance does not cross the
+    # container boundary, and a sidecar session begins its own run tree.
+    run_identity = new_root_run_identity()
+
     cmd = [
         "docker",
         "run",
@@ -120,6 +126,10 @@ def run_sidecar_session(
         "FORGE_SIDECAR=1",
         "-e",
         "FORGE_LAUNCH_MODE=sidecar",
+        "-e",
+        f"FORGE_RUN_ID={run_identity.run_id}",
+        "-e",
+        f"FORGE_ROOT_RUN_ID={run_identity.root_run_id}",
         # Deterministic home: a `--user` uid with no passwd entry would get HOME=/,
         # breaking claude (~/.claude.json) and forge (~/.forge) resolution.
         "-e",

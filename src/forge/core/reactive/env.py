@@ -1,14 +1,19 @@
 """Environment builder for Claude subprocess invocation.
 
 Provides ``build_claude_env()`` for constructing subprocess environments,
-and ``FORGE_DEPTH`` helpers for recursion-guarding hook → subprocess chains.
+``FORGE_DEPTH`` helpers for recursion-guarding hook → subprocess chains, and
+the run-tree identity (``FORGE_RUN_ID``/``FORGE_PARENT_RUN_ID``/
+``FORGE_ROOT_RUN_ID``) used for usage attribution. Run identity is orthogonal
+to depth: depth guards recursion, identity records who-spawned-whom.
 """
 
 from __future__ import annotations
 
 import logging
 import os
+import uuid
 from collections.abc import Mapping
+from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +21,14 @@ logger = logging.getLogger(__name__)
 # but FORGE_DEPTH still guards against subprocess spawning at depth >= 2.
 FORGE_DEPTH_VAR = "FORGE_DEPTH"
 FORGE_MAX_DEPTH = 2
+
+# Run-tree identity (orthogonal to FORGE_DEPTH). Composes like depth: a root
+# mints its own run_id and is its own root; a child inherits root_run_id and
+# sets parent_run_id to the spawner's run_id. Used for usage attribution, not
+# recursion guarding.
+FORGE_RUN_ID_VAR = "FORGE_RUN_ID"
+FORGE_PARENT_RUN_ID_VAR = "FORGE_PARENT_RUN_ID"
+FORGE_ROOT_RUN_ID_VAR = "FORGE_ROOT_RUN_ID"
 
 FORGE_SUBPROCESS_PROXY_VAR = "FORGE_SUBPROCESS_PROXY"
 FORGE_SUBPROCESS_BASE_URL_VAR = "FORGE_SUBPROCESS_BASE_URL"
@@ -69,10 +82,82 @@ def should_spawn_subprocesses(env: Mapping[str, str] | None = None) -> bool:
     return get_forge_depth(env) < FORGE_MAX_DEPTH
 
 
+@dataclass(frozen=True)
+class RunIdentity:
+    """Attribution identity for one Forge-spawned process in the run tree.
+
+    ``run_id`` identifies this process; ``parent_run_id`` is the spawner's
+    run_id (None at the root); ``root_run_id`` is the tree root. Composes like
+    FORGE_DEPTH and is orthogonal to it — depth guards recursion, identity
+    records who-spawned-whom for usage attribution.
+    """
+
+    run_id: str
+    parent_run_id: str | None
+    root_run_id: str
+
+    def as_env(self) -> dict[str, str]:
+        """Render the run-tree env vars (parent omitted when None)."""
+        env = {FORGE_RUN_ID_VAR: self.run_id, FORGE_ROOT_RUN_ID_VAR: self.root_run_id}
+        if self.parent_run_id:
+            env[FORGE_PARENT_RUN_ID_VAR] = self.parent_run_id
+        return env
+
+
+def mint_run_id() -> str:
+    """Mint a fresh run id (mirrors the proxy's ``request_id`` prefix style)."""
+    return f"run_{uuid.uuid4().hex[:12]}"
+
+
+def get_run_identity(env: Mapping[str, str] | None = None) -> RunIdentity | None:
+    """Read the current process's run identity from ``env`` (or os.environ).
+
+    Returns None when FORGE_RUN_ID is unset (the process is not part of a run
+    tree). A missing root falls back to ``run_id`` (the process is its own root).
+    """
+    source = env if env is not None else os.environ
+    run_id = source.get(FORGE_RUN_ID_VAR)
+    if not run_id:
+        return None
+    return RunIdentity(
+        run_id=run_id,
+        parent_run_id=source.get(FORGE_PARENT_RUN_ID_VAR) or None,
+        root_run_id=source.get(FORGE_ROOT_RUN_ID_VAR) or run_id,
+    )
+
+
+def new_root_run_identity() -> RunIdentity:
+    """Mint a fresh root identity (no parent; it is its own root).
+
+    Used by interactive frontends (session/bare launch) and the sidecar, which
+    begin a new run tree rather than continuing the spawner's.
+    """
+    run_id = mint_run_id()
+    return RunIdentity(run_id=run_id, parent_run_id=None, root_run_id=run_id)
+
+
+def derive_child_run_identity(env: Mapping[str, str] | None = None) -> RunIdentity:
+    """Compose a child identity from the spawner's env (root-inheriting).
+
+    Mints a fresh run_id; ``parent_run_id`` is the spawner's run_id;
+    ``root_run_id`` is inherited from the spawner (or the new run_id when the
+    spawner has no identity, i.e. the child is itself a new root). Mirrors
+    ``get_forge_depth``'s read-from-env model. A stale ``FORGE_PARENT_RUN_ID``
+    in the source env is ignored — parent is always recomputed from the
+    spawner's ``FORGE_RUN_ID``.
+    """
+    parent = get_run_identity(env)
+    run_id = mint_run_id()
+    if parent is None:
+        return RunIdentity(run_id=run_id, parent_run_id=None, root_run_id=run_id)
+    return RunIdentity(run_id=run_id, parent_run_id=parent.run_id, root_run_id=parent.root_run_id)
+
+
 def build_claude_env(
     base_url: str | None = None,
     extra_vars: dict[str, str] | None = None,
     direct: bool = False,
+    derive_run_identity: bool = True,
 ) -> dict[str, str]:
     """Build environment dict for a Claude subprocess.
 
@@ -91,6 +176,12 @@ def build_claude_env(
         base_url: Proxy URL to route Claude requests through.
         extra_vars: Additional environment variables to set/override.
         direct: Force direct Anthropic routing (unset inherited proxy URL).
+        derive_run_identity: When True (default, the headless-spawn case),
+            derive a child run identity from the spawner's env and stamp the
+            run-tree vars. When False, leave the run-tree vars from
+            ``extra_vars`` untouched — used by interactive frontends that
+            supply an explicit root identity (so the process IS the root, not
+            a child of itself).
 
     Returns:
         Complete environment dict ready for ``subprocess.run(env=...)``.
@@ -128,6 +219,19 @@ def build_claude_env(
     # Increment FORGE_DEPTH so child subprocesses know their nesting level
     current_depth = get_forge_depth(env)
     env[FORGE_DEPTH_VAR] = str(current_depth + 1)
+
+    # Stamp the run-tree identity (orthogonal to FORGE_DEPTH). derive_child_run_identity
+    # reads the spawner's FORGE_RUN_ID from `env` BEFORE we overwrite it, so the child's
+    # parent is the spawner and the root is inherited. derive_run_identity=False means the
+    # caller supplied an explicit identity (e.g. an interactive root) via extra_vars.
+    if derive_run_identity:
+        child = derive_child_run_identity(env)
+        env[FORGE_RUN_ID_VAR] = child.run_id
+        env[FORGE_ROOT_RUN_ID_VAR] = child.root_run_id
+        if child.parent_run_id:
+            env[FORGE_PARENT_RUN_ID_VAR] = child.parent_run_id
+        else:
+            env.pop(FORGE_PARENT_RUN_ID_VAR, None)
 
     return env
 

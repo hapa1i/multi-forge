@@ -27,6 +27,40 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-01
 
+### Phase 4 (Slice 4a): Run-tree env contract
+
+**Goal**: Give every Forge-spawned process a run-tree identity
+(`FORGE_RUN_ID`/`FORGE_PARENT_RUN_ID`/`FORGE_ROOT_RUN_ID`) for usage attribution, orthogonal to the `FORGE_DEPTH`
+recursion guard.
+
+**Key changes**:
+
+- `core/reactive/env.py`: `RunIdentity` + `mint_run_id`/`get_run_identity`/`new_root_run_identity`/
+  `derive_child_run_identity`; `build_claude_env` gains `derive_run_identity=True` and stamps the triple right after the
+  depth block (reads the spawner id before overwriting; recomputes parent so a stale inherited `FORGE_PARENT_RUN_ID`
+  can't leak). `FORGE_DEPTH` and its three recursion guards are untouched.
+- `SessionResult` and `ReviewResult` surface `run_id/parent_run_id/root_run_id` (read back from the built env) for Slice
+  4c attribution; error/timeout returns carry it too.
+- Interactive launches are roots: minting centralized in `invoke._build_environment` (`derive_run_identity=False` +
+  fresh root + parent scrub) covers session start/resume/fork and bare `forge claude start`; the sidecar mints its own
+  root in `container.py`. (Refinement vs plan: one choke point instead of per-builder, so resume/fork can't drift.)
+- Memory-writer (queue-decoupled): `enqueue_handoff_marker` snapshots the session's
+  `origin_run_id`/`origin_root_run_id`; `main._memory_writer_env` re-roots the detached spawn under that origin (fresh
+  child run_id) and scrubs the drainer's run-tree **and** session identity
+  (`FORGE_SESSION`/`FORK_NAME`/`PARENT_SESSION`, via the canonical `session_start` constants), so neither the run-tree
+  nor the writer's `claude -p` hooks/status attribute to whichever CLI drained the queue (the writer takes its target
+  session from `--session-name`).
+- Docs: `design_appendix.md` §F.5 (run-tree identity vs recursion guard) + §C.1 (handoff marker origin fields).
+
+**Verification**: targeted unit/regression tests pass, incl. new `tests/regression/test_run_tree_env_contract.py`
+(depth/guard orthogonality, source-env-unmutated), run-id surfacing across env/session_runner/engine/container/
+startup_queue, and `test_claude_invoke.py` interactive fresh-root carve-out (inherited run vars must not leak into a
+root). `tests/src -m "not integration"` fully green (4866 passed). The only 2 failures under
+`tests/src + tests/regression` are pre-existing and unrelated to run-tree: `test_bug_claude_print_helper_exit_code` (a
+Docker-only conftest helper failing host-side at `tests/integration/docker/conftest.py:133`, mis-filed in `regression/`
+without the `integration` marker) and `test_removal_patching_system::test_forge_info_no_traceback` (pre-OSS
+manifest-guard assertion). `pre-commit` clean (mypy + pyright).
+
 ### Phase 3 (Stage C v1): Opt-in native-relocate for worktree forks
 
 **Goal**: Ship `forge session fork --resume-mode native-relocate` as an opt-in, byte-faithful cross-CWD resume and make
