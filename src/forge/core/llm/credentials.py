@@ -169,6 +169,26 @@ def _get_openrouter_base_url() -> str:
     return OPENROUTER_DEFAULT_BASE_URL
 
 
+def resolve_provider_base_url(provider: ProviderType) -> str | None:
+    """Resolve a provider's base_url synchronously (the sync core of credential
+    resolution, without fetching secrets).
+
+    Returns None for providers with no Forge-controlled base_url (direct Anthropic)
+    or when resolution fails. Lets a sync caller learn where a ``core.llm`` call
+    will go -- e.g. to decide whether it hits a Forge proxy (usage correlation).
+    """
+    try:
+        if provider == "litellm_local":
+            return _get_litellm_local_base_url()
+        if provider == "litellm_remote":
+            return _get_litellm_remote_base_url()
+        if provider == "openrouter":
+            return _get_openrouter_base_url()
+    except Exception as e:
+        logger.debug("resolve_provider_base_url(%s) failed: %s", provider, e)
+    return None
+
+
 class CredentialManager:
     """Injectable credential manager with TTL caching and proactive refresh.
 

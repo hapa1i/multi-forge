@@ -222,10 +222,6 @@ def track_verb_cost(verb: str, proxy_base_urls: list[str]):
     holder = VerbCostResult(verb=verb)
     unique_urls = list(dict.fromkeys(u for u in proxy_base_urls if u))
 
-    if not unique_urls:
-        yield holder
-        return
-
     snapshots_before: dict[str, dict[str, Any]] = {}
     for url in unique_urls:
         snap = _fetch_snapshot(url)
@@ -236,33 +232,35 @@ def track_verb_cost(verb: str, proxy_base_urls: list[str]):
     try:
         yield holder
     finally:
-        elapsed = (time.monotonic() - start) * 1000
+        # Always record wall-clock latency, even for a no-proxy verb -- the work
+        # still took real time and the usage ledger records latency_ms.
+        holder.duration_ms = (time.monotonic() - start) * 1000
 
-        try:
-            deltas: list[ProxyCostDelta] = []
-            for url in unique_urls:
-                if url not in snapshots_before:
-                    continue
-                after = _fetch_snapshot(url)
-                if after is None:
-                    continue
-                deltas.append(_compute_delta(snapshots_before[url], after, url))
+        if unique_urls:
+            try:
+                deltas: list[ProxyCostDelta] = []
+                for url in unique_urls:
+                    if url not in snapshots_before:
+                        continue
+                    after = _fetch_snapshot(url)
+                    if after is None:
+                        continue
+                    deltas.append(_compute_delta(snapshots_before[url], after, url))
 
-            # Populate the holder in place so the (already-yielded) caller sees it.
-            holder.total_cost_micros = sum(d.cost_micros for d in deltas)
-            holder.input_tokens = sum(d.input_tokens for d in deltas)
-            holder.output_tokens = sum(d.output_tokens for d in deltas)
-            holder.cached_tokens = sum(d.cached_tokens for d in deltas)
-            holder.request_count = sum(d.request_count for d in deltas)
-            holder.duration_ms = elapsed
-            holder.estimated = True
-            # measured=True only when a real snapshot delta was captured, so callers
-            # can tell "no proxy / no data" (cost is None) from a genuine $0 delta.
-            holder.measured = bool(deltas)
-            holder.per_proxy = deltas
-            _log_verb_cost(holder)
-        except Exception as e:
-            logger.warning("Failed to track verb cost for %s: %s", verb, e)
+                # Populate the holder in place so the (already-yielded) caller sees it.
+                holder.total_cost_micros = sum(d.cost_micros for d in deltas)
+                holder.input_tokens = sum(d.input_tokens for d in deltas)
+                holder.output_tokens = sum(d.output_tokens for d in deltas)
+                holder.cached_tokens = sum(d.cached_tokens for d in deltas)
+                holder.request_count = sum(d.request_count for d in deltas)
+                holder.estimated = True
+                # measured=True only when a real snapshot delta was captured, so callers
+                # can tell "no proxy / no data" (cost is None) from a genuine $0 delta.
+                holder.measured = bool(deltas)
+                holder.per_proxy = deltas
+                _log_verb_cost(holder)
+            except Exception as e:
+                logger.warning("Failed to track verb cost for %s: %s", verb, e)
 
 
 def read_verb_logs(

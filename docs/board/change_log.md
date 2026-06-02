@@ -27,6 +27,25 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-01
 
+### Phase 4 (Slice 4c): Review fixes -- direct-path join, honest billing, latency
+
+**Goal**: Close three correctness gaps in the 4c emitters found in review.
+
+**Key changes**:
+
+- Direct-path join now actually works. The tagger resolves its call's base_url synchronously
+  (`resolve_client_base_url` -> new `resolve_provider_base_url`) and, when it is a registered Forge proxy, forwards
+  `X-Request-ID` **and** records `source_refs.cost_request_id` (forwarded id == recorded id). Off-proxy: no header, null
+  ref. Before, the id was minted, forwarded, then discarded -- so even a proxy target produced `source_refs=None`.
+- Honest direct billing. `emit_direct_llm_usage` no longer hardcodes `has_api_key=True`/`api`; `billing_mode` defaults to
+  `unknown` (the default tagger path routes via local LiteLLM with a dummy `not-needed` key, and proxy-lookup failures
+  must not read as `api`).
+- `latency_ms` now populated. `track_verb_cost` records wall-clock duration on every path (incl. no-proxy); the
+  verb/session emitters copy `duration_ms`; the tagger times its own `complete()` call.
+
+**Verification**: +4 unit tests (base_url resolver, end-to-end proxy join, billing/latency); full unit suite green
+(4910 passed); mypy clean. design.md §3.14 + appendix §A.13 updated.
+
 ### Phase 4 (Slice 4c): Instrument native + direct usage paths
 
 **Goal**: Wire the usage-attribution ledger to the callsites where a run identity and a cost/usage signal already exist,

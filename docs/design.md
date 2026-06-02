@@ -875,9 +875,12 @@ runtime/provider/model and what it consumed, referencing the cost and audit plan
 is the redacted wire record, usage is attribution. Emission is wired (Phase 4c): the workflow verbs
 (`panel`/`analyze`/`debate`/`consensus`) record one estimated verb-level event each; the memory writer, semantic
 supervisor, and shadow curation record one event per `claude -p` run; the action tagger records exact provider tokens
-from its direct `core.llm` call. All emit best-effort and never gate the work they measure. `claude -p` events carry null
-`source_refs` because Forge is not the HTTP client and can't know the proxy `request_id`; exact per-request correlation is
-deferred to Phase 4g (see [§A.13](design_appendix.md#a13-usage-attribution-ledger-schema-314)).
+from its direct `core.llm` call (and, when that call resolves to a registered Forge proxy, an exact
+`source_refs.cost_request_id` join via a forwarded `X-Request-ID`; direct `billing_mode` stays `unknown` unless provably
+direct + credentialed). All emit best-effort, never gate the work they measure, and record `latency_ms`. `claude -p`
+events carry null `source_refs` because Forge is not the HTTP client and can't know the proxy `request_id`; exact
+per-request correlation for `claude -p` is deferred to Phase 4g (see
+[§A.13](design_appendix.md#a13-usage-attribution-ledger-schema-314)).
 
 Each proxy may define:
 

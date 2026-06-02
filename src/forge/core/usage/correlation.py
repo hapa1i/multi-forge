@@ -53,6 +53,23 @@ def with_forge_request_id(
     return base
 
 
+def resolve_client_base_url(model: str) -> str | None:
+    """The base_url a ``core.llm`` client will use for ``model`` (synchronously).
+
+    Mirrors the client's own resolution (provider detection -> sync base_url
+    derivation) so a sync caller can tell whether a direct call will hit a Forge
+    proxy. Returns None for a direct-API provider (Anthropic) or on any failure.
+    """
+    try:
+        from forge.core.llm.credentials import resolve_provider_base_url
+        from forge.core.llm.detection import detect_provider
+
+        return resolve_provider_base_url(detect_provider(model))
+    except Exception as e:
+        logger.debug("resolve_client_base_url(%s) failed: %s", model, e)
+        return None
+
+
 def target_is_forge_proxy(base_url: str | None) -> bool:
     """True if ``base_url`` is a known Forge proxy endpoint.
 

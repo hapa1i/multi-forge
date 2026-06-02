@@ -430,9 +430,13 @@ records written by a newer Forge (`schema_version` > current), and (strict on sh
 verb-level event each (`measurement_source=verb_snapshot_estimated`, attributed to the ambient run — per-worker cost is
 not available); the memory writer, semantic supervisor, and shadow curation emit one event per `claude -p` run (attributed
 to that subprocess's run identity, via the `track_verb_cost` holder); the action tagger emits a `provider_usage_exact`
-event from a direct `core.llm` call (exact in-band provider tokens). All emit best-effort and never gate the work they
-measure; `claude -p` events carry null `source_refs` (4g). Helpers: `emit_verb_usage`, `emit_usage_for_session_result`,
-`emit_direct_llm_usage` (`forge.core.usage.emit`).
+event from a direct `core.llm` call (exact in-band provider tokens). On the **direct path**, Forge resolves the call's
+base_url synchronously: if it is a registered Forge proxy, the tagger forwards an `X-Request-ID` and records an exact
+`source_refs.cost_request_id` join (the proxy logs its cost record under the same id); otherwise it sends no header and
+leaves the ref null (a dangling join is worse than none). Direct-path `billing_mode` stays `unknown` unless the caller
+proves direct + real-credential billing (the tagger routes via local LiteLLM with a dummy key, so it can't). All emit
+best-effort, never gate the work they measure, and record `latency_ms`; `claude -p` events carry null `source_refs` (4g).
+Helpers: `emit_verb_usage`, `emit_usage_for_session_result`, `emit_direct_llm_usage` (`forge.core.usage.emit`).
 
 ---
 

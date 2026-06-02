@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 
 from forge.policy.types import ActionContext
 
@@ -39,7 +40,13 @@ def tag_action(
     """
     try:
         from forge.core.llm import Message, SyncAdapter, get_client
-        from forge.core.usage import emit_direct_llm_usage, mint_request_id, with_forge_request_id
+        from forge.core.usage import (
+            emit_direct_llm_usage,
+            mint_request_id,
+            resolve_client_base_url,
+            target_is_forge_proxy,
+            with_forge_request_id,
+        )
 
         prompt = prompt_template.format(
             tool_name=context.tool_name,
@@ -49,21 +56,29 @@ def tag_action(
 
         client = get_client(model)
         adapter = SyncAdapter(client)
-        # Forward X-Request-ID so a Forge proxy in the path (if this model is routed
-        # through one) can correlate this call's cost record. With a None-default
-        # client, merge_hyperparams returns this hp verbatim, so every other param
-        # stays at its default -- behavior is preserved, only the header is added.
-        hp = with_forge_request_id(None, mint_request_id())
-        response = adapter.complete([Message(role="user", content=prompt)], hyperparams=hp)
 
-        # Best-effort usage attribution: provider-reported tokens, ambient run.
-        # cost_request_id stays null -- the tagger can't prove a Forge-proxy target,
-        # and a dangling back-reference would be worse than none.
+        # If this model's client will hit a Forge proxy, forward an X-Request-ID and
+        # record it -- the proxy logs a cost record under that id, giving an exact
+        # source_refs join. Otherwise send no header (preserving prior behavior on a
+        # None-default client) and leave cost_request_id null: a back-reference to a
+        # cost record that never materialized is worse than none.
+        request_id = mint_request_id() if target_is_forge_proxy(resolve_client_base_url(model)) else None
+        hp = with_forge_request_id(None, request_id) if request_id else None
+
+        start = time.monotonic()
+        response = adapter.complete([Message(role="user", content=prompt)], hyperparams=hp)
+        latency_ms = (time.monotonic() - start) * 1000
+
+        # Best-effort usage attribution: exact provider tokens, ambient run. billing
+        # stays unknown -- the tagger routes via local LiteLLM with a dummy key, so it
+        # can't prove direct API billing.
         emit_direct_llm_usage(
             command="tagger",
             model=model,
             provider=model.split("/", 1)[0] if "/" in model else None,
             usage=response.usage,
+            cost_request_id=request_id,
+            latency_ms=latency_ms,
         )
 
         return _parse_tags(response.text)

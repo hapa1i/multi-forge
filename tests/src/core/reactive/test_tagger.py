@@ -102,9 +102,9 @@ class TestTagAction:
         prompt = _prompt_of(mock_adapter.complete)
         assert "Write" in prompt
         assert "src/foo.py" in prompt
-        # X-Request-ID is forwarded so a Forge proxy in the path could correlate.
-        hp = mock_adapter.complete.call_args.kwargs["hyperparams"]
-        assert hp.extra["openai"]["extra_headers"]["X-Request-ID"].startswith("req_")
+        # Default path: target is not a Forge proxy -> no header forwarded (prior
+        # behavior preserved; cost_request_id stays null in the emitted event).
+        assert mock_adapter.complete.call_args.kwargs["hyperparams"] is None
 
     @patch("forge.core.llm.get_client")
     @patch("forge.core.llm.SyncAdapter")
@@ -165,3 +165,29 @@ class TestTagAction:
         assert e.measurement_source == "provider_usage_exact"
         assert (e.input_tokens, e.output_tokens) == (9, 4)
         assert e.source_refs is None  # no proven Forge-proxy target
+
+    @patch("forge.core.llm.get_client")
+    @patch("forge.core.llm.SyncAdapter")
+    def test_proxy_target_forwards_header_and_joins(self, mock_adapter_cls, mock_get_client, monkeypatch):
+        """When the resolved target IS a Forge proxy: forward X-Request-ID AND record
+        the exact source_refs.cost_request_id join (the forwarded id == the recorded id)."""
+        monkeypatch.setenv("FORGE_RUN_ID", "run_t")
+        monkeypatch.setenv("FORGE_ROOT_RUN_ID", "run_t")
+        monkeypatch.setattr("forge.core.usage.resolve_client_base_url", lambda _m: "http://localhost:8084")
+        monkeypatch.setattr("forge.core.usage.target_is_forge_proxy", lambda _u: True)
+        mock_adapter = MagicMock()
+        mock_adapter.complete.return_value = CompletionResponse(
+            text="routine", usage={"prompt_tokens": 1, "completion_tokens": 1}
+        )
+        mock_adapter_cls.return_value = mock_adapter
+
+        tag_action(_make_context(), model="gemini/gemini-2.0-flash", prompt_template="{tool_name}")
+
+        forwarded = mock_adapter.complete.call_args.kwargs["hyperparams"].extra["openai"]["extra_headers"]["X-Request-ID"]
+        assert forwarded.startswith("req_")
+
+        from forge.core.usage.ledger import read_usage_events
+
+        e = read_usage_events()[0]
+        assert e.source_refs is not None
+        assert e.source_refs.cost_request_id == forwarded

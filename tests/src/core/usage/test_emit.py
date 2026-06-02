@@ -33,7 +33,7 @@ def _ok_result(**overrides: Any) -> SessionResult:
 class TestEmitForSessionResult:
     def test_measured_proxy_cost(self) -> None:
         cost = VerbCostResult(
-            verb="memory-writer", total_cost_micros=1500, input_tokens=10, output_tokens=20, measured=True
+            verb="memory-writer", total_cost_micros=1500, input_tokens=10, output_tokens=20, duration_ms=1234.5, measured=True
         )
         emit_usage_for_session_result(
             _ok_result(), command="memory-writer", session="s1", cost=cost, base_url="http://localhost:8084"
@@ -45,6 +45,7 @@ class TestEmitForSessionResult:
         assert (e.run_id, e.parent_run_id, e.root_run_id) == ("run_w", "run_p", "run_r")
         assert e.measurement_source == "verb_snapshot_estimated"
         assert (e.cost_micro_usd, e.input_tokens, e.output_tokens) == (1500, 10, 20)
+        assert e.latency_ms == 1234.5
         assert e.attribution_granularity == "verb"
         assert e.source_refs is None  # claude -p: proxy request_id unknown (4g)
         assert e.billing_mode == "unknown"  # proxied -> opaque upstream
@@ -84,13 +85,15 @@ class TestEmitDirectLlmUsage:
             model="gemini/gemini-2.0-flash",
             provider="gemini",
             usage={"prompt_tokens": 7, "completion_tokens": 3, "total_tokens": 10},
+            latency_ms=12.0,
         )
         e = read_usage_events()[0]
         assert (e.command, e.run_id, e.provider) == ("tagger", "run_amb", "gemini")
         assert e.measurement_source == "provider_usage_exact"
         assert (e.input_tokens, e.output_tokens, e.cost_micro_usd) == (7, 3, None)
+        assert e.latency_ms == 12.0
         assert e.source_refs is None  # no proven proxy target
-        assert e.billing_mode == "api"  # direct (no cost_request_id), key assumed
+        assert e.billing_mode == "unknown"  # never guessed -- caller didn't prove direct+credential
 
     def test_proxy_target_sets_cost_request_id(self, monkeypatch) -> None:
         monkeypatch.setenv("FORGE_RUN_ID", "run_amb")

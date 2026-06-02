@@ -11,7 +11,12 @@ from __future__ import annotations
 import json
 
 from forge.core.llm import ModelHyperparameters
-from forge.core.usage.correlation import mint_request_id, target_is_forge_proxy, with_forge_request_id
+from forge.core.usage.correlation import (
+    mint_request_id,
+    resolve_client_base_url,
+    target_is_forge_proxy,
+    with_forge_request_id,
+)
 from forge.proxy.proxies import get_proxy_registry_path
 
 
@@ -72,3 +77,33 @@ class TestTargetIsForgeProxy:
     def test_unregistered_url_is_false(self) -> None:
         self._write_registry("http://localhost:8084")
         assert target_is_forge_proxy("http://localhost:9999") is False
+
+
+class TestResolveClientBaseUrl:
+    def test_litellm_local_from_env(self, monkeypatch) -> None:
+        # gemini/* -> litellm_local; base_url resolves from LITELLM_LOCAL_BASE_URL.
+        monkeypatch.setenv("LITELLM_LOCAL_BASE_URL", "http://localhost:8084")
+        assert resolve_client_base_url("gemini/gemini-2.0-flash") == "http://localhost:8084"
+
+    def test_best_effort_never_raises(self, monkeypatch) -> None:
+        monkeypatch.delenv("LITELLM_LOCAL_BASE_URL", raising=False)
+        # Whatever the config state, resolution is best-effort: a str or None, never raises.
+        result = resolve_client_base_url("gemini/gemini-2.0-flash")
+        assert result is None or isinstance(result, str)
+
+    def test_gate_true_when_resolved_url_is_registered_proxy(self, monkeypatch) -> None:
+        # The end-to-end direct-path gate: resolved client base_url IS a Forge proxy.
+        monkeypatch.setenv("LITELLM_LOCAL_BASE_URL", "http://localhost:8084")
+        path = get_proxy_registry_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            json.dumps(
+                {
+                    "version": 1,
+                    "proxies": {
+                        "p1": {"proxy_id": "p1", "template": "t", "base_url": "http://localhost:8084", "port": 8084}
+                    },
+                }
+            )
+        )
+        assert target_is_forge_proxy(resolve_client_base_url("gemini/gemini-2.0-flash")) is True

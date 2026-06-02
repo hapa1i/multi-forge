@@ -606,6 +606,12 @@ internal/refactorable -- it does not mint a durable contract, so it does not gat
     `test_bug_usage_claude_p_null_source_refs.py`. Targeted suites green (usage + tagger + cost_tracking + workflow +
     memory_writer + supervisor + shadow); mypy clean on all 11 wired files. design.md §3.14 + appendix §A.13 updated
     (emitters shipped).
+  - **Review fixes (2026-06-01):** (1) direct-path join now works -- the tagger resolves its base_url sync
+    (`resolve_client_base_url` -> `resolve_provider_base_url`) and sets `source_refs.cost_request_id` when the target is a
+    registered Forge proxy (was minted+forwarded then discarded -> always null); (2) `emit_direct_llm_usage` billing
+    defaults to `unknown` (no more hardcoded `api`/`has_api_key=True` -- the tagger uses a dummy local-LiteLLM key); (3)
+    `latency_ms` populated -- `track_verb_cost` records duration on every path and the emitters copy it. +4 unit tests;
+    unit suite 4910 green.
 
 ## Phase 5 - Cross-Runtime Resume
 

@@ -28,7 +28,7 @@ from forge.core.reactive.cost_tracking import VerbCostResult
 from forge.core.reactive.env import get_run_identity
 from forge.core.reactive.session_runner import SessionResult
 from forge.core.usage.billing import infer_billing_mode
-from forge.core.usage.ledger import SourceRefs, UsageEvent, log_usage_event
+from forge.core.usage.ledger import BillingMode, SourceRefs, UsageEvent, log_usage_event
 
 logger = logging.getLogger(__name__)
 
@@ -91,6 +91,7 @@ def emit_usage_for_session_result(
             output_tokens=measured_cost.output_tokens if measured_cost else None,
             cached_tokens=measured_cost.cached_tokens if measured_cost else None,
             cost_micro_usd=measured_cost.total_cost_micros if measured_cost else None,
+            latency_ms=round(cost.duration_ms, 1) if (cost and cost.duration_ms) else None,
             source_refs=None,  # claude -p: proxy request_id unknown to Forge (4g)
         )
         log_usage_event(event)
@@ -135,6 +136,7 @@ def emit_verb_usage(
             output_tokens=measured_cost.output_tokens if measured_cost else None,
             cached_tokens=measured_cost.cached_tokens if measured_cost else None,
             cost_micro_usd=measured_cost.total_cost_micros if measured_cost else None,
+            latency_ms=round(cost.duration_ms, 1) if (cost and cost.duration_ms) else None,
             source_refs=None,  # claude -p workers: proxy request_id unknown (4g)
         )
         log_usage_event(event)
@@ -151,6 +153,8 @@ def emit_direct_llm_usage(
     status: str = "success",
     failure_type: str | None = None,
     cost_request_id: str | None = None,
+    billing_mode: BillingMode = "unknown",
+    latency_ms: float | None = None,
     workflow: str | None = None,
     session: str | None = None,
     runtime: str = "claude_code",
@@ -159,9 +163,13 @@ def emit_direct_llm_usage(
 
     Attribution comes from the ambient run identity (``os.environ``). Tokens come
     from the provider's in-band ``usage`` (exact), so ``measurement_source`` is
-    ``provider_usage_exact``; ``cost_micro_usd`` stays null (no $ figure is
-    computed here). ``cost_request_id`` is set only by callers that proved a Forge
-    proxy target (else null -- a dangling ref is worse than null).
+    ``provider_usage_exact``; ``cost_micro_usd`` stays null (no $ figure is computed
+    here -- when ``cost_request_id`` is set, the exact $ lives in the joined proxy
+    cost record). ``cost_request_id`` is set only by callers that proved a Forge
+    proxy target (else null -- a dangling ref is worse than null). ``billing_mode``
+    defaults to ``unknown``: a direct caller rarely proves direct + real-credential
+    billing (e.g. the tagger routes via local LiteLLM with a dummy key), and a
+    guessed mode is worse than honest uncertainty.
     """
     try:
         identity = get_run_identity()
@@ -180,13 +188,13 @@ def emit_direct_llm_usage(
             workflow=workflow,
             provider=provider,
             model=model,
-            # cost_request_id set => proxied (upstream opaque); else direct (api).
-            billing_mode=infer_billing_mode(direct=cost_request_id is None, has_api_key=True),
+            billing_mode=billing_mode,
             measurement_source="provider_usage_exact" if measured else "unattributed",
             attribution_granularity="verb",
             input_tokens=usage.get("prompt_tokens") if usage else None,
             output_tokens=usage.get("completion_tokens") if usage else None,
             cost_micro_usd=None,
+            latency_ms=round(latency_ms, 1) if latency_ms is not None else None,
             source_refs=SourceRefs(cost_request_id=cost_request_id) if cost_request_id else None,
         )
         log_usage_event(event)
