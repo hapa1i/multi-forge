@@ -31,6 +31,9 @@ _lock = threading.Lock()
 
 # In-memory per-process drift baseline: proxy_id -> {dimension: last_seen_hash}.
 _drift_state: dict[str, dict[str, str]] = {}
+# Proxy ids whose on-disk drift baseline was written by a NEWER Forge: never load
+# (unknown shape) or downgrade-overwrite it.
+_drift_state_frozen: set[str] = set()
 
 # One-time warning latch for records written by a newer Forge.
 _warned_newer_schema = False
@@ -273,10 +276,24 @@ def _load_drift_baseline(proxy_id: str) -> dict[str, str]:
         from forge.core.state import read_json
 
         data = read_json(_audit_state_path(proxy_id))
-        if isinstance(data, dict) and data.get("schema_version") == AUDIT_SCHEMA_VERSION:
-            seen = data.get("last_seen")
-            if isinstance(seen, dict):
-                baseline = {str(k): str(v) for k, v in seen.items() if v}
+        if isinstance(data, dict):
+            ver = data.get("schema_version")
+            if isinstance(ver, int) and ver > AUDIT_SCHEMA_VERSION:
+                # Written by a newer Forge: do not load (unknown shape) and freeze so a later
+                # drift write cannot downgrade-overwrite it. Mirror read_audit_logs' one-time notice.
+                global _warned_newer_schema
+                if not _warned_newer_schema:
+                    logger.warning(
+                        "Skipping audit drift baseline written by a newer Forge "
+                        "(schema_version=%s); upgrade Forge",
+                        ver,
+                    )
+                    _warned_newer_schema = True
+                _drift_state_frozen.add(proxy_id)
+            elif ver == AUDIT_SCHEMA_VERSION:
+                seen = data.get("last_seen")
+                if isinstance(seen, dict):
+                    baseline = {str(k): str(v) for k, v in seen.items() if v}
     except Exception:
         # Missing/corrupt baseline is non-fatal — the first request reseeds it.
         baseline = {}
@@ -285,6 +302,9 @@ def _load_drift_baseline(proxy_id: str) -> dict[str, str]:
 
 
 def _persist_drift_baseline(proxy_id: str, baseline: dict[str, str]) -> None:
+    if proxy_id in _drift_state_frozen:
+        # A newer-schema baseline exists on disk; never downgrade-overwrite it.
+        return
     try:
         from forge.core.state import atomic_write_json
 
