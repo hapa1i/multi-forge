@@ -20,6 +20,7 @@ from forge.core.state import now_iso
 from .artifacts import resolve_artifact_path
 from .claude.paths import (
     find_project_root,
+    get_project_encoded_dir,
     get_transcript_path,
     resolve_claude_project_root,
 )
@@ -1760,8 +1761,8 @@ class SessionManager:
 
         # native-relocate forks copy the parent transcript into the child's encoded dir.
         # Remove that copy independently of the child's own UUID (which may be unset on a
-        # failed/partial launch). The path is dir-scoped to the child, so the parent's
-        # original under its own encoded dir is never touched.
+        # failed/partial launch). A same-encoded-dir guard below keeps the parent's ORIGINAL
+        # transcript safe even when the child and parent dirs collide.
         if delete_transcripts and state is not None:
             _deriv = state.confirmed.derivation
             if _deriv is not None and _deriv.resume_mode == "native-relocate" and _deriv.relocated_parent_session_id:
@@ -1771,10 +1772,26 @@ class SessionManager:
                     _raw_data,
                 )
                 _reloc_path = get_transcript_path(_reloc_root, _deriv.relocated_parent_session_id)
-                try:
-                    _reloc_path.unlink(missing_ok=True)
-                except OSError as exc:
-                    logger.warning("Failed to remove relocated parent transcript %s: %s", _reloc_path, exc)
+                # Defense-in-depth: never delete the parent's ORIGINAL transcript. If the child's
+                # encoded dir collides with a parent root (same-CWD --into, or encode_project_path
+                # collapsing '/', '.', '_' to '-'), _reloc_path IS the parent's live transcript.
+                # relocate_transcript rejects source==dest up front, so this is a backstop.
+                _parent_dirs = {
+                    get_project_encoded_dir(r)
+                    for r in (_deriv.parent_forge_root, _deriv.parent_project_root)
+                    if r
+                }
+                if get_project_encoded_dir(_reloc_root) in _parent_dirs:
+                    logger.warning(
+                        "Skipping relocated-transcript cleanup: child dir collides with the parent's "
+                        "own Claude dir (%s); not deleting the parent's original transcript.",
+                        _reloc_path,
+                    )
+                else:
+                    try:
+                        _reloc_path.unlink(missing_ok=True)
+                    except OSError as exc:
+                        logger.warning("Failed to remove relocated parent transcript %s: %s", _reloc_path, exc)
 
         self.index_store.remove_session(name, forge_root=entry_forge_root)
 

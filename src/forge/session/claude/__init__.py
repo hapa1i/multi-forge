@@ -32,6 +32,7 @@ from .paths import (
 from .relocate import (
     RelocateConflictError,
     RelocateResult,
+    RelocateSameDirError,
     RelocateSourceMissingError,
     relocate_transcript,
 )
@@ -57,6 +58,7 @@ __all__ = [
     # Relocate
     "RelocateConflictError",
     "RelocateResult",
+    "RelocateSameDirError",
     "RelocateSourceMissingError",
     "relocate_transcript",
 ]

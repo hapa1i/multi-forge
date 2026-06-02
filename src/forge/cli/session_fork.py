@@ -389,6 +389,7 @@ def fork(
             )
             sys.exit(1)
         from forge.session.claude.paths import (
+            get_project_encoded_dir,
             get_transcript_path,
             resolve_claude_project_root,
         )
@@ -399,6 +400,19 @@ def fork(
             print_error_with_tip(
                 f"Parent session '{parent}' has no Claude transcript to relocate.",
                 "Start the parent session so it has a conversation to fork, or use the default transfer mode.",
+                console=console,
+            )
+            sys.exit(1)
+        # Reject a fork whose CWD encodes to the parent's OWN Claude dir: relocation would be a
+        # no-op that later makes child-deletion delete the parent's original transcript. Only the
+        # --into target is known pre-fork; --worktree's new dir is guarded at the relocate seam.
+        if into_resolved is not None and get_project_encoded_dir(_nr_parent_cwd) == get_project_encoded_dir(
+            str(into_resolved)
+        ):
+            print_error_with_tip(
+                "--resume-mode native-relocate requires a different CWD than the parent; "
+                "the --into target resolves to the parent's own Claude project dir.",
+                "Fork into a fresh --worktree, or use the default transfer mode.",
                 console=console,
             )
             sys.exit(1)
@@ -690,7 +704,7 @@ def fork(
     # (inspectable, editable, survives /compact); native-relocate is byte-faithful but opaque,
     # lost on /compact, and its historical tool paths still point at the parent checkout.
     if native_relocate:
-        from forge.session.claude import RelocateConflictError, relocate_transcript
+        from forge.session.claude import RelocateConflictError, RelocateSameDirError, relocate_transcript
         from forge.session.claude.paths import resolve_claude_project_root
 
         _fork_cwd = resolve_claude_project_root(fork_manifest)
@@ -701,7 +715,7 @@ def fork(
                 source_project_root=_parent_cwd,
                 dest_project_root=_fork_cwd,
             )
-        except OSError as exc:
+        except (OSError, RelocateSameDirError) as exc:
             # Any relocate failure (RelocateConflictError/RelocateSourceMissingError are OSError
             # subclasses, plus real permission/disk/os.replace errors) rolls back the just-created
             # fork so nothing is left orphaned and no traceback escapes. delete_transcripts=False is
@@ -719,7 +733,14 @@ def fork(
                 )
             except Exception:
                 logger.debug("native-relocate rollback delete failed", exc_info=True)
-            if isinstance(exc, RelocateConflictError):
+            if isinstance(exc, RelocateSameDirError):
+                print_error_with_tip(
+                    "--resume-mode native-relocate requires a different CWD than the parent; "
+                    "the fork resolves to the parent's own Claude project dir.",
+                    "Fork into a fresh --worktree, or use the default transfer mode.",
+                    console=console,
+                )
+            elif isinstance(exc, RelocateConflictError):
                 print_error_with_tip(
                     f"The destination worktree already holds a different transcript for parent '{parent}'.",
                     "Fork into a fresh worktree, or use the default transfer mode.",

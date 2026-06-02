@@ -35,6 +35,17 @@ class RelocateConflictError(FileExistsError):
     """Destination transcript exists with different content and overwrite=False."""
 
 
+class RelocateSameDirError(ValueError):
+    """Source and destination CWDs encode to the same Claude project dir.
+
+    A same-dir relocation is a silent no-op, but recording it would make the
+    child's relocated-copy cleanup indistinguishable from the parent's ORIGINAL
+    transcript -- deleting the child could then delete the parent's live
+    transcript. Reject it up front. Note encode_project_path maps '/', '.', and
+    '_' all to '-', so even physically-distinct CWDs can collide here.
+    """
+
+
 @dataclass(frozen=True)
 class RelocateResult:
     """Outcome of a transcript relocation.
@@ -101,6 +112,15 @@ def relocate_transcript(
         raise RelocateSourceMissingError(f"No transcript for session {session_id!r} at {source_path}")
 
     dest_path = get_transcript_path(dest_project_root, session_id)
+    # Source and dest encoding to the same file is not a relocation: it is a no-op that
+    # would make the child's relocated-copy cleanup delete the parent's ORIGINAL transcript.
+    # Reject before the idempotent branch below can silently "succeed".
+    if source_path == dest_path:
+        raise RelocateSameDirError(
+            f"Source and destination encode to the same Claude project dir "
+            f"({dest_path.parent}); relocation would be a no-op that makes the relocated "
+            f"copy indistinguishable from the parent's original transcript."
+        )
     source_bytes = source_path.read_bytes()
 
     if dest_path.exists():
