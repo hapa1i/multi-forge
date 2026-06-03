@@ -197,7 +197,7 @@ class TestResolveModelSpecs:
         assert "claude-opus-4.6-1m" in names
         assert "claude-opus-4.8" in names
         assert "deepseek-v4-pro" in names
-        assert "minimax-m2.7" in names
+        assert "minimax-m3" in names
 
 
 DEEPSEEK_DEFAULT = get_default_model("deepseek", "opus")

@@ -144,9 +144,9 @@ def _build_available_models() -> dict[str, ModelSpec]:
             name=minimax_opus,
             model_id=minimax_opus,
             family="minimax",
-            provider_refs=(("openrouter", "minimax/minimax-m2.7"),),
+            provider_refs=(("openrouter", "minimax/minimax-m3"),),
             preferred_proxy="openrouter-minimax",
-            description="Cost-efficient agentic analysis, broad coverage",
+            description="Frontier agentic coding analysis, 1M context",
         ),
         qwen_opus: ModelSpec(
             name=qwen_opus,

@@ -53,7 +53,7 @@ runtime from proxy templates and credentials. The preferred proxy is a catalog h
 compatible proxy found in the registry will work.
 
 Selectable direct Claude workers include `claude-opus-4.6`, `claude-opus-4.6-1m`, and `claude-opus-4.8`. Additional OSS
-models include `deepseek-v4-pro`, `minimax-m2.7`, `qwen3.6-max-preview`, `kimi-k2.6`, and `glm-5.1`. Use `--proxy` to
+models include `deepseek-v4-pro`, `minimax-m3`, `qwen3.6-max-preview`, `kimi-k2.6`, and `glm-5.1`. Use `--proxy` to
 route all workers through a specific proxy:
 
 ```bash
