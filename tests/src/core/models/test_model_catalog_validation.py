@@ -378,6 +378,7 @@ class TestOpenRouterOpenModelsCatalog:
             "qwen/qwen3-coder": ("qwen3-coder", 262144, 65536),
             "minimax/minimax-m2.5": ("minimax-m2.5", 196608, 196608),
             "minimax/minimax-m2.7": ("minimax-m2.7", 196608, 131072),
+            "minimax/minimax-m3": ("minimax-m3", 1048576, 512000),
             "z-ai/glm-4.7-flash": ("glm-4.7-flash", 202752, 16384),
             "z-ai/glm-5.1": ("glm-5.1", 202752, 202752),
             "google/gemma-4-31b-it": ("gemma-4-31b-it", 262144, 16384),
