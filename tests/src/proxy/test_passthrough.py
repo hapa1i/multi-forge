@@ -18,9 +18,15 @@ class _FakeResponse:
 
 
 class _FakeStream:
-    def __init__(self, status_code: int = 200, chunks: tuple[bytes, ...] = (b"event: message_start\n\n",)) -> None:
+    def __init__(
+        self,
+        status_code: int = 200,
+        chunks: tuple[bytes, ...] = (b"event: message_start\n\n",),
+        headers: dict | None = None,
+    ) -> None:
         self.status_code = status_code
         self._chunks = chunks
+        self.headers = headers or {"content-type": "application/json"}
 
     async def __aenter__(self):
         return self
@@ -139,6 +145,35 @@ async def test_forward_streaming_returns_event_stream(monkeypatch):
     assert resp.media_type == "text/event-stream"
     chunks = [chunk async for chunk in resp.body_iterator]
     assert b"".join(c if isinstance(c, bytes) else c.encode() for c in chunks)
+
+
+@pytest.mark.asyncio
+async def test_forward_streaming_upstream_error_preserves_status(monkeypatch):
+    class _StreamingErrorClient(_FakeAsyncClient):
+        def stream(self, method, url, headers=None, json=None):
+            return _FakeStream(
+                status_code=401,
+                chunks=(b'{"type":"error","error":{"type":"authentication_error"}}',),
+            )
+
+    monkeypatch.setattr(passthrough.httpx, "AsyncClient", _StreamingErrorClient)
+    captured: dict = {}
+
+    def _on_complete(usage, body, failed):
+        captured.update(usage=usage, body=body, failed=failed)
+
+    resp = await passthrough.forward(
+        raw_body={"model": "m", "max_tokens": 10, "stream": True, "messages": []},
+        inbound_headers={},
+        base_url="https://api.anthropic.com",
+        api_key="K",
+        request_id="req_401",
+        on_complete=_on_complete,
+    )
+
+    assert resp.status_code == 401
+    assert b"authentication_error" in bytes(resp.body)
+    assert captured == {"usage": {}, "body": None, "failed": True}
 
 
 @pytest.mark.asyncio
@@ -283,6 +318,32 @@ def test_passthrough_middleware_bypasses_validation_for_unknown_block(monkeypatc
     assert resp.status_code == 200  # NOT 422 — validation was bypassed
     assert _FakeAsyncClient.captured["json"]["messages"][0]["content"][0]["type"] == "future_block_99"
     assert resp.headers["X-Resolved-Model"] == "claude-opus-4-6"  # M7: resolved-model header
+
+
+@pytest.mark.parametrize(
+    ("body", "status_code"),
+    [
+        ("{not-json", 400),
+        ("[]", 422),
+        ("null", 422),
+    ],
+)
+def test_passthrough_middleware_rejects_bad_json_body(monkeypatch, body, status_code):
+    from fastapi.testclient import TestClient
+
+    import forge.proxy.server as server
+    from forge.proxy.server import app
+
+    monkeypatch.setattr(server, "_ensure_runtime_state", lambda: None)
+    monkeypatch.setattr(server.config, "proxy", _passthrough_config().proxy)
+    monkeypatch.setattr(server, "cost_tracker", None)
+    monkeypatch.setattr("forge.core.auth.template_secrets.resolve_env_or_credential", lambda var: "UPSTREAM-KEY")
+
+    client = TestClient(app, raise_server_exceptions=False)
+    resp = client.post("/v1/messages", content=body, headers={"content-type": "application/json"})
+
+    assert resp.status_code == status_code
+    assert resp.json()["error"]["type"] == "invalid_request_error"
 
 
 def test_translated_proxy_not_intercepted_by_passthrough_middleware(monkeypatch):

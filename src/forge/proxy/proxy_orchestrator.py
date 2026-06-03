@@ -853,13 +853,6 @@ def smoke_test_proxy(*, base_url: str, timeout_s: float = 30.0) -> tuple[bool, s
     Returns (success, detail) where detail is the model response text on
     success or the error message on failure. Retries once on failure.
     """
-    # max_tokens must be large enough for thinking models (e.g., Gemini 2.5 Pro)
-    # which consume tokens for internal reasoning before producing visible output
-    payload = {
-        "model": "sonnet",
-        "max_tokens": 256,
-        "messages": [{"role": "user", "content": "Say hi"}],
-    }
     url = f"{base_url.rstrip('/')}/v1/messages"
     last_error = ""
 
@@ -868,6 +861,13 @@ def smoke_test_proxy(*, base_url: str, timeout_s: float = 30.0) -> tuple[bool, s
             time.sleep(2)
         try:
             with httpx.Client(timeout=httpx.Timeout(timeout_s)) as client:
+                # max_tokens must be large enough for thinking models (e.g., Gemini 2.5 Pro)
+                # which consume tokens for internal reasoning before producing visible output.
+                payload = {
+                    "model": _resolve_smoke_test_model(client=client, base_url=base_url),
+                    "max_tokens": 256,
+                    "messages": [{"role": "user", "content": "Say hi"}],
+                }
                 resp = client.post(url, json=payload)
 
             if resp.status_code != 200:
@@ -898,6 +898,54 @@ def smoke_test_proxy(*, base_url: str, timeout_s: float = 30.0) -> tuple[bool, s
             last_error = str(e)
 
     return False, last_error
+
+
+def _resolve_smoke_test_model(*, client: httpx.Client, base_url: str) -> str:
+    """Pick the smoke-test model for the proxy's wire shape.
+
+    Translated proxies accept the local ``sonnet`` tier alias. Anthropic
+    passthrough proxies forward the client model unchanged, so the smoke test
+    must use the resolved Claude model reported by ``GET /``.
+    """
+    fallback = "sonnet"
+    try:
+        resp = client.get(f"{base_url.rstrip('/')}/")
+        if resp.status_code != 200:
+            return fallback
+        data = resp.json()
+    except Exception as e:
+        logger.debug("Could not resolve proxy smoke-test model from GET /: %s", e)
+        return fallback
+
+    if not isinstance(data, dict) or data.get("wire_shape") != "anthropic_passthrough":
+        return fallback
+
+    routing = data.get("routing")
+    runtime = data.get("runtime")
+    default_tier = "sonnet"
+    if isinstance(routing, dict) and isinstance(routing.get("default_tier"), str):
+        default_tier = routing["default_tier"]
+    elif isinstance(runtime, dict) and isinstance(runtime.get("active_tier"), str):
+        default_tier = runtime["active_tier"]
+
+    if isinstance(runtime, dict):
+        tier_mappings = runtime.get("tier_mappings")
+        if isinstance(tier_mappings, dict):
+            model = tier_mappings.get(default_tier)
+            if isinstance(model, str) and model:
+                return model
+
+    tiers = data.get("tiers")
+    if isinstance(tiers, dict):
+        tier_info = tiers.get(default_tier)
+        if isinstance(tier_info, dict):
+            model = tier_info.get("model")
+            if isinstance(model, str) and model:
+                return model
+        if isinstance(tier_info, str) and tier_info:
+            return tier_info
+
+    return fallback
 
 
 def _find_available_port(*, start_port: int, max_attempts: int) -> int:

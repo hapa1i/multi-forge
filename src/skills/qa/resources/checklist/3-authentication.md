@@ -151,25 +151,7 @@ forge authentication profiles
 - [ ] Profile removed from credentials file
 - [ ] Other profiles unaffected
 
-### 3.9 Logout — Skip Confirmation
-
-<!-- human:guided -->
-
-In the **container shell**, create a temp profile (enter any test key when prompted), then remove it with `-y`.
-
-```
-# Re-create and remove without confirmation
-forge authentication login -c anthropic-api --profile temp
-# Enter any test key
-
-forge authentication logout --profile temp -y
-forge authentication profiles
-```
-
-- [ ] `-y` flag skips confirmation
-- [ ] Profile removed immediately
-
-### 3.10 Credential File Security
+### 3.9 Credential File Security
 
 <!-- auto -->
 
@@ -195,7 +177,7 @@ for name, profile in data.get('profiles', {}).items():
 - [ ] File has `version: 1` field
 - [ ] Profile names map to flat key-value pairs (values masked)
 
-### 3.11 Credential Resolution in CredentialManager
+### 3.10 Credential Resolution in CredentialManager
 
 <!-- auto -->
 
@@ -214,7 +196,7 @@ forge authentication status --profile default
 - [ ] Credential available via file when env var is unset
 - [ ] `forge authentication status` confirms file source
 
-### 3.12 Retired Credential Names
+### 3.11 Retired Credential Names
 
 <!-- auto -->
 

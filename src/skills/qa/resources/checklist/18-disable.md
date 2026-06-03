@@ -13,30 +13,30 @@ Test uninstalling individual scopes before the complete uninstall.
 ```bash
 cd $FORGE_TEST_REPO
 
-# Uninstall only the local scope
-forge extension disable --scope local
+# Uninstall only the local scope (-y: disable prompts for confirmation; non-interactive under docker exec)
+forge extension disable --scope local -y
 
 # (Optional) Uninstall hooks-only path, if you used it
 forge hook disable --local
 
-# Verify local removal
-ls .claude/commands/   # Should be empty or removed
+# Verify local removal (extensions install skills/, not a commands/ dir)
+ls .claude/skills/   # Should be empty or removed
 cat .claude/settings.local.json | jq '.hooks'  # Should have no Forge hooks
 
 # Verify user scope STILL installed
-ls ~/.claude/commands/  # Should still have Forge commands
+ls ~/.claude/skills/  # Should still have Forge skills
 cat ~/.claude/settings.json | jq '.hooks'  # Should still have Forge hooks
 
-# Check tracking
+# Check tracking: the local:$FORGE_TEST_REPO key is removed; the user key remains.
+# Other local:... keys from earlier worktree sections (5/6/10) may still be present.
 cat ~/.forge/installed.json | jq '.installations | keys'
-# Should show only ["user"], not the local:... key
 ```
 
-- [ ] Local commands removed
+- [ ] Local skills removed
 - [ ] Local hooks removed from settings.local.json
-- [ ] User scope commands still present
+- [ ] User scope skills still present
 - [ ] User scope hooks still present
-- [ ] Tracking shows only "user" key
+- [ ] `local:$FORGE_TEST_REPO` removed from tracking; `user` key still present (other worktree-local keys may remain)
 
 ### 18.2 Verify Pre-Existing Settings Restored (Local)
 

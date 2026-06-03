@@ -161,8 +161,44 @@ async def forward(
     if raw_body.get("stream"):
         stream_headers = dict(resp_headers)
         stream_headers["Cache-Control"] = "no-cache"
+        client_cm = httpx.AsyncClient(timeout=_PASSTHROUGH_TIMEOUT)
+        stream_cm = None
+        try:
+            client = await client_cm.__aenter__()
+            stream_cm = client.stream("POST", url, headers=headers, json=raw_body)
+            resp = await stream_cm.__aenter__()
+        except httpx.HTTPError as e:
+            logger.warning("[%s] passthrough upstream stream failed: %s", request_id, e)
+            await client_cm.__aexit__(None, None, None)
+            _safe_on_complete(on_complete, {}, None, True, request_id)
+            return Response(
+                status_code=502,
+                content=b'{"type":"error","error":{"type":"upstream_error","message":"passthrough upstream stream failed"}}',
+                media_type="application/json",
+                headers=resp_headers,
+            )
+
+        if resp.status_code != 200:
+            body = await resp.aread()
+            logger.warning("[%s] passthrough upstream %s", request_id, resp.status_code)
+            await stream_cm.__aexit__(None, None, None)
+            await client_cm.__aexit__(None, None, None)
+            _safe_on_complete(on_complete, {}, None, True, request_id)
+            return Response(
+                status_code=resp.status_code,
+                content=body,
+                media_type=resp.headers.get("content-type", "application/json"),
+                headers=resp_headers,
+            )
+
         return StreamingResponse(
-            _stream_upstream(url, headers, raw_body, request_id, on_complete=on_complete),
+            _stream_opened_upstream(
+                client_cm,
+                stream_cm,
+                resp,
+                request_id,
+                on_complete=on_complete,
+            ),
             media_type="text/event-stream",
             headers=stream_headers,
         )
@@ -201,10 +237,10 @@ async def forward(
     )
 
 
-async def _stream_upstream(
-    url: str,
-    headers: dict[str, str],
-    raw_body: dict[str, Any],
+async def _stream_opened_upstream(
+    client_cm: Any,
+    stream_cm: Any,
+    resp: httpx.Response,
     request_id: str,
     on_complete: OnComplete | None = None,
 ) -> AsyncIterator[bytes]:
@@ -216,22 +252,16 @@ async def _stream_upstream(
     accumulator = _UsageAccumulator()
     failed = False
     try:
-        async with httpx.AsyncClient(timeout=_PASSTHROUGH_TIMEOUT) as client:
-            async with client.stream("POST", url, headers=headers, json=raw_body) as resp:
-                if resp.status_code != 200:
-                    failed = True
-                    body = await resp.aread()
-                    logger.warning("[%s] passthrough upstream %s", request_id, resp.status_code)
-                    yield body
-                    return
-                async for chunk in resp.aiter_bytes():
-                    yield chunk  # byte-faithful, unchanged
-                    accumulator.feed(chunk)  # tolerant side-tap (copy); never alters bytes
+        async for chunk in resp.aiter_bytes():
+            yield chunk  # byte-faithful, unchanged
+            accumulator.feed(chunk)  # tolerant side-tap (copy); never alters bytes
     except httpx.HTTPError as e:
         failed = True
         logger.warning("[%s] passthrough upstream stream failed: %s", request_id, e)
         yield b'{"type":"error","error":{"type":"upstream_error","message":"passthrough upstream stream failed"}}'
     finally:
+        await stream_cm.__aexit__(None, None, None)
+        await client_cm.__aexit__(None, None, None)
         _safe_on_complete(on_complete, accumulator.usage, None, failed, request_id)
 
 

@@ -7,7 +7,13 @@
 <!-- auto -->
 
 ```bash
-forge policy status
+# Clear policy overrides left by earlier sections (e.g. %policy disable in 9.x);
+# overrides outrank intent, so a stale policy.enabled=false would mask 13.2's enable.
+forge session reset 'policy.*' --session test-session-1 2>/dev/null || true
+
+# Target the canonical QA session explicitly: $FORGE_TEST_REPO accumulates many
+# sessions by section 13, so bare 'forge policy' would fail on session ambiguity.
+forge policy status --session test-session-1
 ```
 
 - [ ] Shows enabled/disabled state
@@ -20,10 +26,10 @@ forge policy status
 
 ```bash
 # Enable TDD bundle
-forge policy enable --bundle tdd
+forge policy enable --bundle tdd --session test-session-1
 
 # Verify
-forge policy status
+forge policy status --session test-session-1
 ```
 
 - [ ] TDD bundle activated
@@ -35,10 +41,10 @@ forge policy status
 
 ```bash
 # Enable TDD in warn-only mode
-forge policy enable --bundle tdd --permissive
+forge policy enable --bundle tdd --permissive --session test-session-1
 
 # Verify
-forge policy status
+forge policy status --session test-session-1
 ```
 
 - [ ] TDD in permissive mode (warns instead of blocks)
@@ -48,9 +54,9 @@ forge policy status
 <!-- auto -->
 
 ```bash
-forge policy enable --bundle coding_standards
+forge policy enable --bundle coding_standards --session test-session-1
 
-forge policy status
+forge policy status --session test-session-1
 ```
 
 - [ ] Coding standards bundle activated
@@ -108,9 +114,9 @@ Claude launch is unavailable in this environment, mark this step `Skip` rather t
 ```bash
 cd $FORGE_TEST_REPO
 
-forge session delete policy-planner --force 2>/dev/null || true
-forge session delete policy-supervisor --force 2>/dev/null || true
-forge session delete policy-executor --force 2>/dev/null || true
+forge session delete policy-planner --yes --force 2>/dev/null || true
+forge session delete policy-supervisor --yes --force 2>/dev/null || true
+forge session delete policy-executor --yes --force 2>/dev/null || true
 rm -f src/supervisor_demo.py
 
 forge session start policy-planner --proxy "$FORGE_QA_OPENAI_PROXY"
@@ -226,9 +232,9 @@ echo "exit: $?"
 <!-- auto -->
 
 ```bash
-forge policy disable
+forge policy disable --session test-session-1
 
-forge policy status
+forge policy status --session test-session-1
 ```
 
 - [ ] All policies disabled

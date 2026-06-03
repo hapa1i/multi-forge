@@ -161,6 +161,11 @@ cat > .forge/memory/debugging.md <<'EOF'
 # Debugging Notes
 EOF
 
+# Re-track after the reset: 'cat >' truncates the passport written in 16.1, and the
+# scan-based writer only updates passported docs. Without this the queued writer would
+# correctly skip debugging.md, so the AFTER>BEFORE assertion below could never pass.
+forge memory track .forge/memory/debugging.md --strategy generic
+
 mkdir -p .forge/walkthrough
 cat > .forge/walkthrough/handoff-queued-source.jsonl <<'EOF'
 {"requestId":"queued-1","message":{"role":"user","content":[{"type":"text","text":"Ruff failed because generated fixtures were not formatted."}]}}

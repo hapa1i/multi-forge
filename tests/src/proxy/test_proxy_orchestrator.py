@@ -925,6 +925,56 @@ class TestSmokeTestProxy:
         assert ok is True
         assert "Hi there!" in detail
 
+    def test_anthropic_passthrough_uses_resolved_model(self, monkeypatch):
+        from forge.proxy import proxy_orchestrator
+
+        captured: dict = {}
+
+        class _HealthResp:
+            status_code = 200
+
+            def json(self):
+                return {
+                    "wire_shape": "anthropic_passthrough",
+                    "routing": {"default_tier": "sonnet"},
+                    "runtime": {
+                        "tier_mappings": {
+                            "haiku": "claude-haiku-4-5",
+                            "sonnet": "claude-sonnet-4-6",
+                            "opus": "claude-opus-4-6",
+                        }
+                    },
+                }
+
+        class _MessagesResp:
+            status_code = 200
+            text = '{"content":[{"text":"Hi"}]}'
+
+            def json(self):
+                return {"content": [{"text": "Hi"}]}
+
+        class _FakeClient:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                pass
+
+            def get(self, url, **kw):
+                return _HealthResp()
+
+            def post(self, url, **kw):
+                captured.update(kw.get("json") or {})
+                return _MessagesResp()
+
+        monkeypatch.setattr(proxy_orchestrator.httpx, "Client", lambda **kw: _FakeClient())
+
+        ok, detail = proxy_orchestrator.smoke_test_proxy(base_url="http://localhost:9999")
+
+        assert ok is True
+        assert detail == "Hi"
+        assert captured["model"] == "claude-sonnet-4-6"
+
     def test_http_error_retries_then_fails(self, monkeypatch):
         from forge.proxy import proxy_orchestrator
 

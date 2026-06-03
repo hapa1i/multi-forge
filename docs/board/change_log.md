@@ -25,6 +25,45 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board-contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-06-03
+
+### QA hardening: proxy passthrough + system-role + stale-container guard (runtime_abstraction)
+
+**Goal**: A manual `/forge:qa` dry-run of the runtime-refactor branch surfaced real proxy-runtime bugs plus a QA-harness
+bug that was *masking* them; fix all, each with a regression test.
+
+**Key changes**:
+
+- **Proxy accepts Claude system-role messages**: Claude Code 2.1.161 emits mid-conversation `{"role": "system"}` entries
+  inside `messages`. The translated path binds `MessagesRequest` before conversion, so the `user|assistant`-only role
+  Literal made Forge itself return a local 422 before the upstream saw the request. Added `"system"` to `Message.role`
+  (`proxy/data_models.py`); `convert_anthropic_to_openai` preserves the block.
+- **Passthrough hardening** (`proxy/passthrough.py`, `proxy/server.py`): (1) streaming upstream errors now surface with
+  their real status — the upstream connection is opened *before* the `StreamingResponse` is constructed (refactor
+  `_stream_upstream` -> `_stream_opened_upstream`), so a non-200 returns that status/body instead of a committed
+  `200 text/event-stream` with error bytes inside it; (2) malformed JSON -> 400 and non-object JSON (`[]`/`null`) -> 422
+  before forwarding.
+- **Smoke-test model resolution** (`proxy/proxy_orchestrator.py`): `smoke_test_proxy` hardcoded `model: "sonnet"`, but
+  passthrough proxies forward the client model unchanged (no tier aliasing). New `_resolve_smoke_test_model` reads the
+  resolved Claude model from `GET /` tier mappings for `wire_shape: anthropic_passthrough`, defensively falling back to
+  `sonnet`.
+- **QA stale-container guard** (`skills/qa/scripts/start-container.sh`): the running-container reuse path `exit 0`'d
+  before any image-revision check, so QA silently validated code older than the checkout (e.g. a proxy build predating
+  the system-role fix). `FORGE_REV` is now computed before the reuse fast-path; a running container whose baked
+  `org.opencontainers.image.revision` != `FORGE_REV` is refused (exit 3, points at `--reset`).
+- **QA checklist + ignores**: `--yes --force` for non-interactive `session delete` (35 lines; `--force` overrides
+  guards, `--yes` skips the prompt that `docker exec` EOFs on); removed the logout-skip-confirmation item; refreshed
+  config-reset/policy-scoping/memory-retrack/disable sections + 1.0.21 count; new `.worktreeinclude` and `.envrc` ignore
+  entries.
+
+**Verification**: 70 unit+regression pass (new `test_bug_system_role_message_422.py`,
+`test_bug_qa_stale_container_reuse.py`, plus `test_passthrough.py`/`test_proxy_orchestrator.py` additions); mypy clean
+on the 4 changed proxy sources. Real-wire integration validation: `test_proxy_openrouter_e2e.py` (2 passed, translated
+routing) + a host harness against real running proxies — passthrough malformed/non-object JSON -> 400/422, bad-model
+stream -> real `404` (not 200-SSE), `smoke_test_proxy` resolves `claude-sonnet-4-6` and completes, and a system-role
+message routes 200 through a translated proxy. Carried debt: the new passthrough error branches have unit +
+manual-harness coverage but no committed integration test yet.
+
 ## 2026-06-02
 
 ### Phase 4: Review-pass hardening (4a / 4c / 4d)

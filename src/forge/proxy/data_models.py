@@ -118,7 +118,12 @@ class SystemContent(BaseModel):
 
 
 class Message(BaseModel):
-    role: Literal["user", "assistant"]
+    # Anthropic's canonical Messages API historically kept system content in
+    # the top-level ``system`` field, but Claude Code 2.1.161 can send
+    # mid-conversation system messages. The translated proxy path accepts and
+    # preserves them for OpenAI-compatible backends instead of 422ing at the
+    # validation boundary.
+    role: Literal["system", "user", "assistant"]
     content: Union[str, List[ContentBlock]]
 
 

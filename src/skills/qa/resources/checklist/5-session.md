@@ -10,7 +10,7 @@
 cd $FORGE_TEST_REPO
 
 # Clean up from previous runs
-forge session delete test-session-1 --force 2>/dev/null || true
+forge session delete test-session-1 --yes --force 2>/dev/null || true
 
 # Start a new session
 forge session start test-session-1 --no-launch
@@ -92,8 +92,8 @@ we?" to confirm the conversation context carried over, then exit (`/exit`).
 
 ```
 # Clean up from previous runs
-forge session delete test-session-parent --force 2>/dev/null || true
-forge session delete test-session-forked --force 2>/dev/null || true
+forge session delete test-session-parent --yes --force 2>/dev/null || true
+forge session delete test-session-forked --yes --force 2>/dev/null || true
 
 # Start the parent session through the proxy provisioned in 4.2.
 # Interact briefly ("hello"), then exit (/exit).
@@ -137,7 +137,7 @@ transfer context should both live under the forked worktree's `.forge/` director
 
 ```
 # Clean up from previous runs
-forge session delete test-session-forked-wt --force 2>/dev/null || true
+forge session delete test-session-forked-wt --yes --force 2>/dev/null || true
 WORKTREE_PATH="${FORGE_TEST_REPO}-test-session-forked-wt"
 git worktree remove "$WORKTREE_PATH" --force 2>/dev/null || true
 git branch -D test-session-forked-wt 2>/dev/null || true
@@ -179,7 +179,7 @@ exclusive). In the **container shell**, launch an incognito session, interact br
 
 ```
 # Clean up from previous runs
-forge session delete test-incognito --force 2>/dev/null || true
+forge session delete test-incognito --yes --force 2>/dev/null || true
 
 # Launch an incognito session (auto-deletes on exit).
 # Say "hello", then exit with /exit.
@@ -200,13 +200,13 @@ forge session list
 
 ```bash
 # Clean up from previous runs
-forge session delete test-session-delete-me --force 2>/dev/null || true
+forge session delete test-session-delete-me --yes --force 2>/dev/null || true
 
 # Create a disposable session to delete
 forge session start test-session-delete-me --no-launch
 
 # Delete a test session (non-interactive)
-forge session delete test-session-delete-me --force
+forge session delete test-session-delete-me --yes --force
 
 # Verify deletion
 forge session list
@@ -219,8 +219,8 @@ Ref-count delete guard: verify that deleting a co-resident session preserves the
 
 ```bash
 # Create a worktree session (owns the worktree)
-forge session delete test-refcount-owner --force 2>/dev/null || true
-forge session delete test-refcount-guest --force 2>/dev/null || true
+forge session delete test-refcount-owner --yes --force 2>/dev/null || true
+forge session delete test-refcount-guest --yes --force 2>/dev/null || true
 git worktree remove "${FORGE_TEST_REPO}-test-refcount-owner" --force 2>/dev/null || true
 git branch -D test-refcount-owner 2>/dev/null || true
 
@@ -238,7 +238,7 @@ cd "$WORKTREE_PATH" && forge extension enable --scope local && cd "$FORGE_TEST_R
 forge session fork test-refcount-owner --name test-refcount-guest --into "$WORKTREE_PATH" --no-launch
 
 # Delete the guest — worktree must be preserved
-forge session delete test-refcount-guest --force
+forge session delete test-refcount-guest --yes --force
 
 # Verify worktree still exists
 test -d "$WORKTREE_PATH" && echo "WORKTREE_PRESERVED=true" || echo "WORKTREE_PRESERVED=false"
@@ -255,7 +255,7 @@ forge session list | grep test-refcount-owner
 
 ```bash
 # Clean up from previous runs
-forge session delete test-session-worktree --force 2>/dev/null || true
+forge session delete test-session-worktree --yes --force 2>/dev/null || true
 
 # Create a session with a git worktree (no Claude launch)
 forge session start test-session-worktree --worktree --no-launch
@@ -293,7 +293,7 @@ System prompts are injected at launch time (`--system-prompt` is mutually exclus
 
 ```
 # Clean up from previous runs
-forge session delete test-session-system-prompt --force 2>/dev/null || true
+forge session delete test-session-system-prompt --yes --force 2>/dev/null || true
 
 # Launch a session with an inline system prompt.
 # Say "hello", then exit with /exit.
@@ -335,9 +335,9 @@ Verify that `--strategy` controls transfer content density on worktree forks.
 
 ```bash
 # Setup: create parent with a mock transcript for transfer generation
-forge session delete test-strat-parent --force 2>/dev/null || true
-forge session delete test-fork-strat-min --force 2>/dev/null || true
-forge session delete test-fork-strat-struct --force 2>/dev/null || true
+forge session delete test-strat-parent --yes --force 2>/dev/null || true
+forge session delete test-fork-strat-min --yes --force 2>/dev/null || true
+forge session delete test-fork-strat-struct --yes --force 2>/dev/null || true
 git worktree remove "${FORGE_TEST_REPO}-test-fork-strat-min" --force 2>/dev/null || true
 git worktree remove "${FORGE_TEST_REPO}-test-fork-strat-struct" --force 2>/dev/null || true
 git branch -D test-fork-strat-min 2>/dev/null || true
@@ -385,8 +385,8 @@ Verify that `--inline-plan` inlines approved plan content in the transfer contex
 
 ```bash
 # Setup: create parent with a mock plan via confirmed.latest_plan_path
-forge session delete test-plan-parent --force 2>/dev/null || true
-forge session delete test-fork-plan --force 2>/dev/null || true
+forge session delete test-plan-parent --yes --force 2>/dev/null || true
+forge session delete test-fork-plan --yes --force 2>/dev/null || true
 git worktree remove "${FORGE_TEST_REPO}-test-fork-plan" --force 2>/dev/null || true
 git branch -D test-fork-plan 2>/dev/null || true
 
@@ -438,7 +438,7 @@ differs from root-level `session start --worktree`, which keeps the session mani
 
 ```
 # Clean up from previous runs
-forge session delete test-fork-into --force 2>/dev/null || true
+forge session delete test-fork-into --yes --force 2>/dev/null || true
 TARGET_WORKTREE="${FORGE_TEST_REPO}-test-into-target"
 git worktree remove "$TARGET_WORKTREE" --force 2>/dev/null || true
 git branch -D test-into-target 2>/dev/null || true
@@ -478,7 +478,7 @@ cat "$TARGET_WORKTREE/.forge/sessions/test-fork-into/forge.session.json" | \
 
 ```bash
 # Clean up from previous runs
-forge session delete test-subprocess-proxy --force 2>/dev/null || true
+forge session delete test-subprocess-proxy --yes --force 2>/dev/null || true
 
 # Create a session with --subprocess-proxy (direct main, proxied subprocesses)
 forge session start test-subprocess-proxy --subprocess-proxy "$FORGE_QA_GEMINI_PROXY" --no-launch
@@ -523,15 +523,15 @@ jq '.confirmed.claude_session_id = "fixture-subproxy"' "$PARENT_JSON" > /tmp/sp.
   && mv /tmp/sp.json "$PARENT_JSON"
 
 # Fork the session
-forge session delete test-fork-subproxy --force 2>/dev/null || true
+forge session delete test-fork-subproxy --yes --force 2>/dev/null || true
 forge session fork test-subprocess-proxy --name test-fork-subproxy --no-launch
 
 # Verify forked session inherits subprocess_proxy
 jq '.intent.subprocess_proxy' .forge/sessions/test-fork-subproxy/forge.session.json
 
 # Clean up
-forge session delete test-subprocess-proxy --force 2>/dev/null || true
-forge session delete test-fork-subproxy --force 2>/dev/null || true
+forge session delete test-subprocess-proxy --yes --force 2>/dev/null || true
+forge session delete test-fork-subproxy --yes --force 2>/dev/null || true
 ```
 
 - [ ] Forked session inherits `subprocess_proxy` from parent
@@ -550,8 +550,8 @@ the Docker contract test, not here.
 cd $FORGE_TEST_REPO
 
 # Clean up from previous runs
-forge session delete nr-parent --force 2>/dev/null || true
-forge session delete nr-sidecar-parent --force 2>/dev/null || true
+forge session delete nr-parent --yes --force 2>/dev/null || true
+forge session delete nr-sidecar-parent --yes --force 2>/dev/null || true
 
 # Host parent with no transcript (no Claude launch)
 forge session start nr-parent --no-launch
@@ -568,8 +568,8 @@ forge session fork nr-sidecar-parent --worktree --resume-mode native-relocate 2>
 
 # Clean up
 git worktree prune 2>/dev/null || true
-forge session delete nr-parent --force 2>/dev/null || true
-forge session delete nr-sidecar-parent --force 2>/dev/null || true
+forge session delete nr-parent --yes --force 2>/dev/null || true
+forge session delete nr-sidecar-parent --yes --force 2>/dev/null || true
 ```
 
 - [ ] `--resume-mode native-relocate --no-launch` rejected (exit non-zero) with the `omit --no-launch` tip
@@ -587,7 +587,7 @@ no-op relocate can never make later child-deletion unlink the parent's original 
 cd $FORGE_TEST_REPO
 
 # Clean up from previous runs
-forge session delete nr-into-parent --force 2>/dev/null || true
+forge session delete nr-into-parent --yes --force 2>/dev/null || true
 NR_WT="${FORGE_TEST_REPO}-nr-into-target"
 git worktree remove "$NR_WT" --force 2>/dev/null || true
 git branch -D nr-into-target 2>/dev/null || true
@@ -617,7 +617,7 @@ test -f "$TP" && echo "PARENT_TRANSCRIPT_PRESERVED=true" || echo "PARENT_TRANSCR
 # Clean up
 git worktree remove "$NR_WT" --force 2>/dev/null || true
 git branch -D nr-into-target 2>/dev/null || true
-forge session delete nr-into-parent --force 2>/dev/null || true
+forge session delete nr-into-parent --yes --force 2>/dev/null || true
 ```
 
 - [ ] `fork --into <parent's own dir> --resume-mode native-relocate` rejected (exit non-zero) with
