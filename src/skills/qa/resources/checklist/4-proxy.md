@@ -144,7 +144,7 @@ In the **container shell**, create a session bound to a proxy, then launch Claud
 
 ```
 # Clean up from previous runs
-forge session delete proxy-session --force 2>/dev/null || true
+forge session delete proxy-session --yes --force 2>/dev/null || true
 
 # Create a session bound to the proxy created in 4.2 (accepts proxy_id or template name)
 forge session start proxy-session --proxy "$FORGE_QA_OPENAI_PROXY" --no-launch

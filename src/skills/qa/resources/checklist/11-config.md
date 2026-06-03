@@ -46,8 +46,8 @@ forge config show | grep proxy_mode
 # Reset one key
 forge config reset status_timeout
 
-# Reset all
-forge config reset
+# Reset all (-y: reset-all prompts for confirmation; non-interactive under docker exec)
+forge config reset -y
 ```
 
 - [ ] `set` persists the value

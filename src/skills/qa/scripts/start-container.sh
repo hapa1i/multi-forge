@@ -33,6 +33,24 @@ IMAGE_NAME="forge-claude-test:${CLAUDE_VERSION}"
 error() { echo "ERROR: $*" >&2; }
 info()  { echo "INFO: $*" >&2; }
 
+# Repo revision baked into built images (org.opencontainers.image.revision).
+# A trailing -dirty marks an uncommitted working tree so any local change forces
+# a rebuild instead of a stale reuse. Defined here (not just before the build) so
+# the running-container reuse path can revision-check before reusing.
+get_forge_rev() {
+    if command -v git &>/dev/null && git -C "$REPO_ROOT" rev-parse --is-inside-work-tree &>/dev/null; then
+        local rev
+        rev="$(git -C "$REPO_ROOT" rev-parse HEAD)"
+        if [[ -n "$(git -C "$REPO_ROOT" status --porcelain)" ]]; then
+            echo "${rev}-dirty"
+        else
+            echo "${rev}"
+        fi
+        return 0
+    fi
+    echo "unknown"
+}
+
 usage() {
     cat >&2 <<'EOF'
 Usage: start-container.sh [--provider-profile openrouter|remote-litellm] [--reset|--stop|--status]
@@ -265,8 +283,23 @@ if [[ "$ACTION" == "status" ]]; then
     fi
 fi
 
+# --- Resolve repo revision (used by the reuse staleness guard and the build) ---
+FORGE_REV="$(get_forge_rev)"
+
 # --- Reuse if already running ---
 if [[ "$RESET" != "true" ]] && docker ps -q -f "name=^${CONTAINER_NAME}$" | grep -q .; then
+    # Staleness guard (must run before the reuse fast-path's `exit 0` below): a
+    # container whose baked image revision predates the current checkout would
+    # make QA silently validate stale code. Refuse to reuse it and point at
+    # --reset. The earlier bug exited 0 here without any revision check, so a
+    # running container built before a fix was reused indefinitely.
+    running_rev="$(docker inspect -f '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$CONTAINER_NAME" 2>/dev/null || true)"
+    if [[ -z "$running_rev" || "$running_rev" != "$FORGE_REV" ]]; then
+        error "Running container '$CONTAINER_NAME' is stale (image=${running_rev:-<missing>}, repo=${FORGE_REV})."
+        error "Reusing it would run QA against code older than your checkout."
+        error "Rerun QA with --reset to rebuild, or 'bash start-container.sh --stop' to remove it."
+        exit 3
+    fi
     existing_profile="$(docker exec "$CONTAINER_NAME" sh -c 'printf "%s" "${FORGE_QA_PROVIDER_PROFILE:-}"' 2>/dev/null || true)"
     if [[ "$existing_profile" != "$FORGE_QA_PROVIDER_PROFILE" ]]; then
         error "Running container '$CONTAINER_NAME' was created with provider profile '${existing_profile:-unknown}', not '$FORGE_QA_PROVIDER_PROFILE'."
@@ -308,22 +341,8 @@ fi
 DOCKERFILE="$REPO_ROOT/docker/Dockerfile.forge"
 
 # --- Image staleness detection (reuse pattern from scripts/test-integration.sh) ---
-get_forge_rev() {
-    if command -v git &>/dev/null && git -C "$REPO_ROOT" rev-parse --is-inside-work-tree &>/dev/null; then
-        local rev
-        rev="$(git -C "$REPO_ROOT" rev-parse HEAD)"
-        if [[ -n "$(git -C "$REPO_ROOT" status --porcelain)" ]]; then
-            echo "${rev}-dirty"
-        else
-            echo "${rev}"
-        fi
-        return 0
-    fi
-    echo "unknown"
-}
-
-FORGE_REV="$(get_forge_rev)"
-
+# FORGE_REV is computed before the reuse fast-path (so stale *running* containers
+# are rejected there too); here it gates rebuilds for stopped/missing images.
 needs_build=false
 if ! docker image inspect "$IMAGE_NAME" &> /dev/null; then
     needs_build=true
