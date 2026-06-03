@@ -192,7 +192,7 @@ invocations (steps 6.3–6.9) cannot detect.
 In the **container shell**, clean up and start a session:
 
 ```
-forge session delete hook-e2e-test --force 2>/dev/null || true
+forge session delete hook-e2e-test --yes --force 2>/dev/null || true
 forge session start hook-e2e-test --proxy "$FORGE_QA_OPENAI_PROXY"
 ```
 

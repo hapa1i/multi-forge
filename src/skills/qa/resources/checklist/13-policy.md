@@ -108,9 +108,9 @@ Claude launch is unavailable in this environment, mark this step `Skip` rather t
 ```bash
 cd $FORGE_TEST_REPO
 
-forge session delete policy-planner --force 2>/dev/null || true
-forge session delete policy-supervisor --force 2>/dev/null || true
-forge session delete policy-executor --force 2>/dev/null || true
+forge session delete policy-planner --yes --force 2>/dev/null || true
+forge session delete policy-supervisor --yes --force 2>/dev/null || true
+forge session delete policy-executor --yes --force 2>/dev/null || true
 rm -f src/supervisor_demo.py
 
 forge session start policy-planner --proxy "$FORGE_QA_OPENAI_PROXY"

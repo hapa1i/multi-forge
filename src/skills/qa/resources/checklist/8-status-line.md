@@ -140,7 +140,7 @@ echo "$STATUS_INPUT" \
 cd $FORGE_TEST_REPO
 
 # Create a disposable derived-looking session so this step does not depend on section 10.
-forge session delete test-session-breadcrumb --force 2>/dev/null || true
+forge session delete test-session-breadcrumb --yes --force 2>/dev/null || true
 forge session start test-session-breadcrumb --no-launch >/dev/null
 
 cat .forge/sessions/test-session-breadcrumb/forge.session.json \
@@ -166,7 +166,7 @@ STATUS_INPUT=$(jq -nc \
 echo "$STATUS_INPUT" \
   | FORGE_SESSION=test-session-breadcrumb ANTHROPIC_BASE_URL="$BASE_URL" forge status-line 2>/dev/null
 
-forge session delete test-session-breadcrumb --force >/dev/null
+forge session delete test-session-breadcrumb --yes --force >/dev/null
 ```
 
 - [ ] Shows session lineage breadcrumb (for example `test-session-1 > test-session-breadcrumb`)
