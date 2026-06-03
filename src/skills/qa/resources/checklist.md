@@ -2,17 +2,19 @@
 
 <!-- checklist: index -->
 
-<!-- version: 1.0.20 -->
+<!-- version: 1.0.21 -->
 
-<!-- test-count: 508 -->
+<!-- test-count: 506 -->
 
-<!-- last-updated: 2026-06-02 -->
+<!-- last-updated: 2026-06-03 -->
 
 <!-- aligned-with: v0.1.0 -->
 
 **Test Repo**: `$FORGE_TEST_REPO`
 
-**Last updated**: 2026-06-02 (add proxy audit/intercept, native-relocate preflight, forge transfer, runtime list checks)
+**Last updated**: 2026-06-03 (non-interactive fixes for docker exec: config reset -y, extension disable -y; policy steps
+target --session and clear stale overrides; memory 16.4 re-tracks after reset; disable assertions match skills-based
+install)
 
 ---
 

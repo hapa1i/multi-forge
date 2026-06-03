@@ -26,6 +26,7 @@ import sys
 import time
 import uuid
 from contextlib import asynccontextmanager
+from json import JSONDecodeError
 from typing import Any
 
 import click
@@ -607,7 +608,27 @@ async def _handle_anthropic_passthrough(raw_request: Request, request_id: str, *
             headers={"X-Request-ID": request_id},
         )
 
-    raw_body = await raw_request.json()
+    try:
+        raw_body = await raw_request.json()
+    except (JSONDecodeError, ValueError):
+        return JSONResponse(
+            status_code=400,
+            content={
+                "type": "error",
+                "error": {"type": "invalid_request_error", "message": "Request body must be valid JSON"},
+            },
+            headers={"X-Request-ID": request_id},
+        )
+
+    if not isinstance(raw_body, dict):
+        return JSONResponse(
+            status_code=422,
+            content={
+                "type": "error",
+                "error": {"type": "invalid_request_error", "message": "Request body must be a JSON object"},
+            },
+            headers={"X-Request-ID": request_id},
+        )
 
     # count_tokens carries no generation/usage: forward only (no caps/cost/audit, and
     # intentionally no override — the preflight estimate omits augment/reasoning-pin
