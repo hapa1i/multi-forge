@@ -83,9 +83,9 @@ case "$PROVIDER_PROFILE" in
         FORGE_QA_OPENAI_TEMPLATE="openrouter-openai"
         FORGE_QA_GEMINI_TEMPLATE="openrouter-gemini"
         FORGE_QA_ANTHROPIC_TEMPLATE="openrouter-anthropic"
-        : "${FORGE_QA_WORKFLOW_MODELS:=deepseek-v4-pro,minimax-m2.7}"
+        : "${FORGE_QA_WORKFLOW_MODELS:=deepseek-v4-pro,minimax-m3}"
         : "${FORGE_QA_WORKFLOW_MODEL_A:=deepseek-v4-pro}"
-        : "${FORGE_QA_WORKFLOW_MODEL_B:=minimax-m2.7}"
+        : "${FORGE_QA_WORKFLOW_MODEL_B:=minimax-m3}"
         FORGE_QA_DEEPSEEK_TEMPLATE="openrouter-deepseek"
         FORGE_QA_MINIMAX_TEMPLATE="openrouter-minimax"
         ;;

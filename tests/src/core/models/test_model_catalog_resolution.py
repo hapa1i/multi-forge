@@ -113,6 +113,7 @@ class TestOpenRouterSlugAliases:
         assert resolve_model_id("qwen/qwen3.6-plus") == "qwen3.6-plus"
         assert resolve_model_id("minimax/minimax-m2.5") == "minimax-m2.5"
         assert resolve_model_id("minimax/minimax-m2.7") == "minimax-m2.7"
+        assert resolve_model_id("minimax/minimax-m3") == "minimax-m3"
         assert resolve_model_id("z-ai/glm-4.7-flash") == "glm-4.7-flash"
         assert resolve_model_id("z-ai/glm-5.1") == "glm-5.1"
 
@@ -124,6 +125,7 @@ class TestOpenRouterSlugAliases:
         assert get_context_window_tokens("z-ai/glm-5.1") == 202752
         assert get_max_output_tokens("minimax/minimax-m2.5") == 196608
         assert get_max_output_tokens("minimax/minimax-m2.7") == 131072
+        assert get_max_output_tokens("minimax/minimax-m3") == 512000
 
 
 class TestConvenienceFunctions:

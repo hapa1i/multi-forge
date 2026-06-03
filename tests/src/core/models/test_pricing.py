@@ -76,6 +76,11 @@ class TestGetPricing:
         assert p.input_per_mtok == 0.15
         assert p.output_per_mtok == 1.15
 
+        p = get_pricing("minimax/minimax-m3")
+        assert p.source == "catalog"
+        assert p.input_per_mtok == 0.60
+        assert p.output_per_mtok == 2.40
+
         p = get_pricing("z-ai/glm-4.7-flash")
         assert p.source == "catalog"
         assert p.input_per_mtok == 0.06
