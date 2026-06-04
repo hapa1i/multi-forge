@@ -15,12 +15,12 @@ This card is in active execution under `doing/`. Move the whole `statusline-enha
 
 ## Current Focus
 
-**Phase 3 (throttled cache-hit-rate) complete.** New `cache_hit` opt-in segment: proxy mode reads the live
-`metrics.cache_hit_rate` (free); direct mode computes it from the transcript with `requestId` dedup (matching the
-proxy's `cache_read/input*100` formula) and throttles the result on disk (`statusline/throttle.py`) so a busy session
-recomputes at most once per `cache_hit_ttl`. All cache I/O is fail-open. Verified: `make test-unit` (1558 pass),
-`make pre-commit` clean, manual render (`cache:75%` with dedup + throttle file written). Next: Phase 4 Forge-unique
-pure-read segments.
+**Phase 4 (Forge-unique pure-read segments) complete.** Four opt-in segments off by default: `supervisor`/`policy` read
+EFFECTIVE session state via `apply_overrides(intent, overrides)` (a `%supervisor suspend` override flips the segment with
+no intent mutation — the headline acceptance); `audit`/`drift` read proxy `GET /` truth (`runtime.raw`). All hidden when
+their data is absent; none in `DEFAULT_ORDER`. Names added to `SEGMENT_NAMES` + producers (equality invariant holds).
+Verified: `make pre-commit` clean (mypy + pyright), full statusline/config/runtime suite green, end-to-end CLI render
+shows `SUP(susp)` + `pol:TDD` through the override path. Next: Phase 5 spend-cap proximity (proxy change).
 
 ## Phase 0 — Nested `statusline:` config foundation
 
@@ -108,9 +108,26 @@ pure-read segments.
 
 ## Phase 4 — Forge-unique pure-read segments (opt-in)
 
-- [ ] `produce_supervisor`/`policy` read EFFECTIVE state via `apply_overrides(intent, overrides)` on the raw manifest
-  dict (not raw intent). `produce_audit` (intercept fields from GET /). `produce_drift` (compact-name of
-  `tier_mappings[active_tier]` vs stdin `model.id`).
+- [x] `_produce_supervisor`/`_produce_policy` read EFFECTIVE state via `ctx.effective_intent` (lazy `cached_property`
+  wrapping `apply_overrides(intent, overrides)` on the raw manifest dict). Supervisor → `SUP`/`SUP(susp)`, hidden when no
+  supervisor block. Policy → `pol:TDD+STD` from effective `policy.bundles`, falling back to `confirmed.policy.bundles`
+  when intent has no policy.
+- [x] `_produce_audit` reads `runtime.raw["intercept_mode"]` + `["intercept"]["thinking_blocks_preserved"]` → `aud:<mode>`
+  with a dim `(lossy)` suffix when inspecting/overriding a translated wire (mirrors `GET /`'s framing). Proxy-only.
+- [x] `_produce_drift` compares `compact_model_name(tier_mappings[active_tier])` vs `compact_model_name(stdin model.id)`
+  → `drift:X!=Y` on mismatch, `None` when aligned or `model.id` absent (no false positives from `display_name`).
+- [x] Added `supervisor`/`policy`/`audit`/`drift` to `SEGMENT_NAMES` + producers (equality invariant holds; the two
+  pre-existing "reserved name" tests repointed to `spend_cap`, the lone remaining reserved name).
+
+| Test                     | Fixture                                            | Assertion                                  | Test File                                          |
+| ------------------------ | -------------------------------------------------- | ------------------------------------------ | -------------------------------------------------- |
+| override flips supervisor | intent suspended=False + override suspended=True   | renders `SUP(susp)`, intent dict untouched | `tests/src/cli/test_statusline_forge_segments.py`  |
+| policy effective bundles | intent `policy.bundles=[tdd]`                       | `pol:TDD`                                   | `...test_statusline_forge_segments.py`             |
+| audit lossy note         | `intercept_mode=inspect`, thinking not preserved    | `aud:inspect` + `(lossy)`                   | `...test_statusline_forge_segments.py`             |
+| drift quiet when aligned | active-tier backend == stdin `model.id`             | producer emits nothing                      | `...test_statusline_forge_segments.py`             |
+| opt-in, off by default   | `render_segments(ctx, [])` with full manifest       | none of the four appear                     | `...test_statusline_forge_segments.py`             |
+| set accepts the four     | `set statusline.segments=path,supervisor,policy,…`  | exit 0                                       | `tests/src/cli/test_config_cli.py`                 |
+| spend_cap still rejected | `set statusline.segments=spend_cap`                 | exit 1, names `spend_cap`                    | `...test_config_cli.py`                            |
 
 ## Phase 5 — Spend-cap proximity (proxy change; ship last)
 

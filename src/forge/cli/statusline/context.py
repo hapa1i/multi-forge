@@ -119,3 +119,26 @@ class RenderContext:
     @cached_property
     def effective_context_window(self) -> int | None:
         return sl.get_effective_context_window(self.data, self.runtime, self.context_info)
+
+    @cached_property
+    def effective_intent(self) -> dict[str, Any]:
+        """Session intent with overrides applied (the in-force posture).
+
+        ``%policy disable`` / ``%supervisor suspend`` write sparse overrides and
+        leave ``intent`` untouched, so the supervisor/policy producers must read
+        this merged view, not raw intent. ``apply_overrides`` is a pure dict merge
+        — no ``SessionState``/dacite construction on the hot path. Manifest is
+        Forge-owned, but the status line is fail-open, so non-dict shapes degrade
+        to ``{}`` rather than raise.
+        """
+        if not self.manifest:
+            return {}
+        intent = self.manifest.get("intent")
+        if not isinstance(intent, dict):
+            return {}
+        overrides = self.manifest.get("overrides")
+        if not isinstance(overrides, dict):
+            return intent
+        from forge.session.effective import apply_overrides
+
+        return apply_overrides(intent, overrides)

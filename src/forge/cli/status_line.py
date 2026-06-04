@@ -1102,6 +1102,60 @@ def format_cache_hit(rate: float) -> str:
     return f"{DIM}cache:{RESET}{color}{pct}%{RESET}"
 
 
+# Compact labels for the Forge-unique opt-in segments. Known names map to short
+# codes; unknown names fall back to the uppercased raw name (honest, if longer).
+_BUNDLE_LABELS = {"tdd": "TDD", "coding_standards": "STD"}
+_AUDIT_MODE_LABELS = {"passthrough": "pass", "inspect": "inspect", "override": "override"}
+
+
+def format_supervisor(suspended: bool) -> str:
+    """Supervisor posture: ``SUP`` when active, ``SUP(susp)`` when suspended.
+
+    Suspended is the noteworthy state (oversight is paused), so it gets the
+    warning color; active is neutral.
+    """
+    if suspended:
+        return f"{YELLOW}SUP(susp){RESET}"
+    return f"{METRICS_COLOR}SUP{RESET}"
+
+
+def format_policy(bundles: list[str]) -> str | None:
+    """Active policy bundles as ``pol:TDD+STD``. None if no usable bundle names."""
+    labels = [_BUNDLE_LABELS.get(b, b.upper()) for b in bundles if isinstance(b, str) and b]
+    if not labels:
+        return None
+    return f"{DIM}pol:{RESET}{METRICS_COLOR}{'+'.join(labels)}{RESET}"
+
+
+def format_audit(mode: str, thinking_preserved: bool) -> str:
+    """Proxy audit posture as ``aud:<mode>`` (+ ``(lossy)`` when applicable).
+
+    ``override`` actively rewrites traffic, so it gets the warning color. When
+    inspecting/overriding on a translated wire, thinking-block signatures can't
+    round-trip — mirror ``GET /``'s lossy framing with a dim suffix.
+    """
+    label = _AUDIT_MODE_LABELS.get(mode, mode)
+    color = YELLOW if mode == "override" else METRICS_COLOR
+    out = f"{DIM}aud:{RESET}{color}{label}{RESET}"
+    if mode in ("inspect", "override") and not thinking_preserved:
+        out += f"{DIM}(lossy){RESET}"
+    return out
+
+
+def format_drift(stdin_model_id: str, backend_model: str) -> str | None:
+    """Flag when the served backend differs from the model Claude Code reports.
+
+    Compares compact names so equivalent IDs (``claude-opus-4-8`` vs its catalog
+    short name) don't false-positive. Returns None when aligned — the segment is
+    an alert, so no news is good news.
+    """
+    shown = compact_model_name(stdin_model_id)
+    served = compact_model_name(backend_model)
+    if shown == served:
+        return None
+    return f"{YELLOW}drift:{shown}!={served}{RESET}"
+
+
 def format_token_breakdown(input_tokens: int, output_tokens: int, cached_tokens: int) -> str | None:
     """Format cumulative token breakdown: in:12K out:3.2K cache:8K."""
     if input_tokens == 0 and output_tokens == 0 and cached_tokens == 0:

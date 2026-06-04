@@ -157,10 +157,62 @@ def _produce_cache_hit(ctx: RenderContext) -> Optional[str]:
     return sl.format_cache_hit(rate)
 
 
-# Producers implemented so far. Later phases add cache_hit/supervisor/policy/
-# audit/spend_cap/drift — their names already live in names.SEGMENT_NAMES so the
-# config allowlist is stable across the rollout; until a producer exists the
-# renderer drops the name (debug-logged).
+def _produce_supervisor(ctx: RenderContext) -> Optional[str]:
+    # Effective (intent+overrides) posture: a %supervisor suspend override flips
+    # this without touching intent. Hidden entirely when no supervisor is set.
+    policy = ctx.effective_intent.get("policy")
+    supervisor = policy.get("supervisor") if isinstance(policy, dict) else None
+    if not isinstance(supervisor, dict):
+        return None
+    return sl.format_supervisor(suspended=bool(supervisor.get("suspended", False)))
+
+
+def _produce_policy(ctx: RenderContext) -> Optional[str]:
+    # Prefer effective intent bundles (the configured-now posture); fall back to
+    # the last-evaluated confirmed bundles only when intent carries no policy.
+    policy = ctx.effective_intent.get("policy")
+    bundles = policy.get("bundles") if isinstance(policy, dict) else None
+    if not isinstance(bundles, list) or not bundles:
+        confirmed = (ctx.manifest or {}).get("confirmed")
+        cpolicy = confirmed.get("policy") if isinstance(confirmed, dict) else None
+        bundles = cpolicy.get("bundles") if isinstance(cpolicy, dict) else None
+    if not isinstance(bundles, list) or not bundles:
+        return None
+    return sl.format_policy(bundles)
+
+
+def _produce_audit(ctx: RenderContext) -> Optional[str]:
+    # Proxy-only: intercept posture lives in GET / runtime truth.
+    if not ctx.is_proxy or ctx.runtime is None:
+        return None
+    raw = ctx.runtime.raw
+    mode = raw.get("intercept_mode")
+    if not isinstance(mode, str) or not mode:
+        return None
+    intercept = raw.get("intercept")
+    thinking_preserved = bool(intercept.get("thinking_blocks_preserved")) if isinstance(intercept, dict) else False
+    return sl.format_audit(mode, thinking_preserved)
+
+
+def _produce_drift(ctx: RenderContext) -> Optional[str]:
+    # Proxy-only: compare the active tier's backend against the model Claude Code
+    # reports. Needs stdin model.id (not display_name) to normalize correctly.
+    if not ctx.is_proxy or ctx.runtime is None:
+        return None
+    active_tier = ctx.runtime.active_tier
+    mappings = ctx.runtime.tier_mappings
+    if not active_tier or not isinstance(mappings, dict):
+        return None
+    backend = mappings.get(active_tier)
+    model_id = (ctx.data.get("model") or {}).get("id")
+    if not backend or not model_id:
+        return None
+    return sl.format_drift(str(model_id), str(backend))
+
+
+# Producers implemented so far. Later phases add spend_cap — its name will join
+# names.SEGMENT_NAMES in the same change that lands its producer (the allowlist
+# == producer-names equality test enforces this two-way sync).
 SEGMENTS: tuple[Segment, ...] = (
     Segment("path", _produce_path, "where"),
     Segment("branch", _produce_branch, "where"),
@@ -174,6 +226,10 @@ SEGMENTS: tuple[Segment, ...] = (
     Segment("loop", _produce_loop),
     Segment("sidecar", _produce_sidecar),
     Segment("cache_hit", _produce_cache_hit),
+    Segment("supervisor", _produce_supervisor),
+    Segment("policy", _produce_policy),
+    Segment("audit", _produce_audit),
+    Segment("drift", _produce_drift),
 )
 
 _BY_NAME: dict[str, Segment] = {seg.name: seg for seg in SEGMENTS}

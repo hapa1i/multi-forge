@@ -186,8 +186,9 @@ class TestRegistryInvariants:
 
     def test_resolve_all_dropped_falls_back_to_default(self):
         # Only reachable via a hand-edited / newer-Forge config: a non-empty list
-        # of not-yet-implemented (reserved) names must not blank the bar.
-        assert resolve_order(["supervisor", "drift"]) == list(DEFAULT_ORDER)
+        # of not-yet-implemented (reserved) names must not blank the bar. spend_cap
+        # is the lone reserved name (Phase 5); update this if it gains a producer.
+        assert resolve_order(["spend_cap"]) == list(DEFAULT_ORDER)
 
     def test_resolve_preserves_user_order(self):
         assert resolve_order(["model", "path"]) == ["model", "path"]
