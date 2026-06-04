@@ -1492,6 +1492,7 @@ class TestUsageEmission:
 
         monkeypatch.setenv("FORGE_RUN_ID", "run_panel")
         monkeypatch.setenv("FORGE_ROOT_RUN_ID", "run_panel")
+        monkeypatch.setenv("FORGE_SESSION", "planner")
         # No live proxy in tests: skip snapshot fetches so the holder is unmeasured.
         monkeypatch.setattr("forge.core.reactive.cost_tracking.resolve_proxy_urls_from_plan", lambda _plan: [])
         mock_run.return_value = _mock_output()
@@ -1506,6 +1507,7 @@ class TestUsageEmission:
         assert e.attribution_granularity == "verb"
         assert e.measurement_source == "unattributed"  # no live proxy in test
         assert e.source_refs is None
+        assert e.session == "planner"  # threaded from $FORGE_SESSION so 'forge usage' can scope it
 
     @patch("forge.review.engine.run_multi_review")
     def test_no_ambient_identity_emits_nothing(self, mock_run, monkeypatch):

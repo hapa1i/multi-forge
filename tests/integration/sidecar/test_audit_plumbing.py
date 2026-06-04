@@ -10,6 +10,10 @@ can assert the two end-to-end properties the slice promises:
    registry isn't in the container and the port is fixed at 8085).
 2. Audit records written inside the container are host-visible on the *writable*
    audit mount after the container stops (``forge proxy audit show`` reads them).
+3. Usage-ledger events written inside the container are host-visible on the *writable*
+   usage mount after the container stops. In sidecar mode the in-container supervisor +
+   workflow verbs are the only writers of these events, so without the mount a sidecar
+   session is invisible to ``forge usage`` and the session-end summary.
 
 The container always runs under the host ``--user uid:gid`` mapping (the Linux
 launch path), so this also exercises arbitrary-uid support on macOS: HOME=/root +
@@ -64,7 +68,7 @@ def _claude_path(image: str) -> str:
     return path
 
 
-def test_sidecar_proxy_id_overlay_and_host_visible_audit(tmp_path: Path, sidecar_image: str) -> None:
+def test_sidecar_proxy_id_overlay_and_host_visible_audit_and_usage(tmp_path: Path, sidecar_image: str) -> None:
     forge_home = tmp_path / "forge-home"
 
     # 1) Create the passthrough proxy (inspect by default) on the host.
@@ -74,8 +78,10 @@ def test_sidecar_proxy_id_overlay_and_host_visible_audit(tmp_path: Path, sidecar
     assert (proxy_dir / "proxy.yaml").exists(), "proxy.yaml not written"
     audit_dir = forge_home / "audit"
     costs_dir = forge_home / "costs"
+    usage_dir = forge_home / "usage"
     audit_dir.mkdir(parents=True, exist_ok=True)
     costs_dir.mkdir(parents=True, exist_ok=True)
+    usage_dir.mkdir(parents=True, exist_ok=True)
 
     # 2) `claude` sleeper keeps the container up after the entrypoint starts the proxy.
     sleeper = tmp_path / "claude"
@@ -86,7 +92,7 @@ def test_sidecar_proxy_id_overlay_and_host_visible_audit(tmp_path: Path, sidecar
     _docker("rm", "-f", CONTAINER)
     # NOTE: this intentionally mirrors the env + mounts that
     # forge.sidecar.container.run_sidecar_session / _ensure_audit_plumbing_mounts build
-    # (FORGE_PROXY_ID, FORGE_HOME, proxies ro + audit/costs rw). We hand-roll `docker run`
+    # (FORGE_PROXY_ID, FORGE_HOME, proxies ro + audit/costs/usage rw). We hand-roll `docker run`
     # because the real helper uses `-it` + `exec claude`, which a headless test can't drive.
     # If you change the helper's env/mounts, update this list (and its unit tests) too.
     run_cmd = [
@@ -112,6 +118,8 @@ def test_sidecar_proxy_id_overlay_and_host_visible_audit(tmp_path: Path, sidecar
         f"{audit_dir}:/root/.forge/audit:rw",
         "-v",
         f"{costs_dir}:/root/.forge/costs:rw",
+        "-v",
+        f"{usage_dir}:/root/.forge/usage:rw",
         "-v",
         f"{sleeper}:{claude_path}:ro",
     ]
@@ -158,6 +166,24 @@ def test_sidecar_proxy_id_overlay_and_host_visible_audit(tmp_path: Path, sidecar
             json.dumps(body),
         )
         time.sleep(1)  # let the offloaded audit write flush to the mount
+
+        # 4b) Write one usage-ledger event from *inside* the container — a supervisor
+        # error, the exact case the read surface was built for. `docker exec` inherits
+        # FORGE_HOME=/root/.forge, so log_usage_event targets the mounted usage/ dir. The
+        # write is synchronous, so it has landed by the time exec returns (unlike the
+        # offloaded audit write above, no flush wait is needed).
+        usage_write = _docker(
+            "exec",
+            CONTAINER,
+            "/forge/.venv/bin/python",
+            "-c",
+            (
+                "from forge.core.usage.ledger import log_usage_event, UsageEvent; "
+                "log_usage_event(UsageEvent(run_id='r1', root_run_id='r1', runtime='claude_code', "
+                "command='supervisor', status='error', session='audit-sess'))"
+            ),
+        )
+        assert usage_write.returncode == 0, f"in-container usage write failed: {usage_write.stderr}"
     finally:
         _docker("rm", "-f", CONTAINER)
 
@@ -174,3 +200,17 @@ def test_sidecar_proxy_id_overlay_and_host_visible_audit(tmp_path: Path, sidecar
     assert show.returncode == 0, f"audit show failed: {show.stderr}"
     show_output = show.stdout + show.stderr
     assert PROXY_ID in show_output, f"audit show did not surface the record: {show_output!r}"
+
+    # 6) Usage events are likewise host-visible on the writable usage/ mount after the
+    #    --rm container is gone — this is what feeds `forge usage` + the session-end
+    #    summary for sidecar sessions (the supervisor error mirrors the OpenRouter
+    #    content-filter failures that motivated the read surface).
+    usage_shards = list((usage_dir / "events").glob("*.jsonl"))
+    assert usage_shards, f"no usage shards under {usage_dir / 'events'} (usage/ mount missing?)"
+    usage_records = [
+        json.loads(line) for shard in usage_shards for line in shard.read_text().splitlines() if line.strip()
+    ]
+    assert any(
+        r.get("command") == "supervisor" and r.get("status") == "error" and r.get("session") == "audit-sess"
+        for r in usage_records
+    ), f"supervisor usage event not host-visible: {usage_records}"

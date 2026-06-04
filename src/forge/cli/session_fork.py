@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import sys
 import uuid as _uuid
+from datetime import datetime, timezone
 from pathlib import Path
 
 import click
@@ -67,6 +68,7 @@ from forge.cli.session_lifecycle import (  # noqa: E402
     _persist_fork_transfer_derivation,
     _print_branch_exists_tip,
     _print_post_exit_tip,
+    _print_session_activity_summary,
     _resolve_manifest_prompt_file,
     _resume_tip_command,
     _validate_direct_model_pin_for_routing,
@@ -999,6 +1001,9 @@ def fork(
     _sess()._warn_if_version_outdated()
     active_claude_session_id = _fork_uuid if is_worktree_fork else None
 
+    # Scope the post-exit summary to this run (hooks write during the session).
+    launch_started_at = datetime.now(timezone.utc)
+
     if incognito:
         exit_code = 0
         try:
@@ -1032,5 +1037,6 @@ def fork(
             claude_session_id=active_claude_session_id,
             runner=_invoke_fork,
         )
+        _print_session_activity_summary(fork_manifest, since=launch_started_at)
         _print_post_exit_tip(fork_manifest)
         sys.exit(exit_code)

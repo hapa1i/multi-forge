@@ -445,6 +445,30 @@ emits one event per worker (`attribution_granularity=worker`, `measurement_sourc
 `latency_ms`. Per-worker cost/tokens are null — `ReviewResult` carries none, so the verb-level aggregate above holds the
 estimated total. Helper: `emit_worker_usage`.
 
+**Read surface — `forge usage` and the session-end summary.** `read_usage_events(..., session=<name>)` filters the
+ledger by the `session` field; `forge.core.ops.usage_summary.build_session_activity_summary(name, forge_root, since=)`
+aggregates it with the manifest's `confirmed.policy.decisions` into a `SessionActivitySummary` (ledger -> per-command
+`CommandUsage` run/error/token/cost rows; decisions -> `PolicyActivity` supervisor allow/warn/deny + warnings, with
+`log_capped` when the decision log hit `MAX_DECISION_LOG`). The builder re-reads the manifest fresh from disk because
+hooks mutate `confirmed.*` during the run. `forge usage [session]` renders a table (`--json`/`--days`/`--all`); the
+launcher prints a one-line `render_summary_line(...)` on exit (host, sidecar, fork). Cost is estimated and may be
+partial (`cost_partial`); `forge proxy costs` is authoritative.
+
+Per-emitter session coverage (a per-session summary is honest about what it can attribute):
+
+| Emitter                                               | Tags `session`? | Notes                                                                     |
+| ----------------------------------------------------- | --------------- | ------------------------------------------------------------------------- |
+| Semantic supervisor (`emit_usage_for_session_result`) | Yes             | `session=context.session_name` (= manifest name)                          |
+| Memory writer (`emit_usage_for_session_result`)       | Yes             | `session=session_name`                                                    |
+| Workflow verbs panel/analyze/debate/consensus         | Yes             | threaded `session=$FORGE_SESSION` (verb aggregate + per-worker)           |
+| Action tagger (`emit_direct_llm_usage`)               | No              | policy-internal classification; left untagged (`session_tagging_partial`) |
+
+**Sidecar.** When a sidecar session launches with a proxy id, the launcher mounts `~/.forge/usage/` rw alongside
+`audit/` + `costs/` (§7), so the in-container supervisor/verb events survive the `--rm` container and a sidecar
+session-end summary + `forge usage` show the full ledger half, not just the policy-decision half. Template-only sidecars
+(no proxy id) mount none of these, so their ledger events stay ephemeral — consistent with how they already drop
+audit/costs.
+
 ---
 
 ## B. Direct Command Reference

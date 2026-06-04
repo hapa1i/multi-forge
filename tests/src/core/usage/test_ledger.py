@@ -204,6 +204,22 @@ class TestFilters:
         assert read_usage_events(period_start=future) == []
         assert len(read_usage_events(period_start=past)) == 1
 
+    def test_filter_by_session(self) -> None:
+        log_usage_event(_event(command="supervisor", session="planner"))
+        log_usage_event(_event(command="panel", session="executor"))
+        log_usage_event(_event(command="tagger", session=None))  # untagged event
+        assert {e.command for e in read_usage_events(session="planner")} == {"supervisor"}
+        assert {e.command for e in read_usage_events(session="executor")} == {"panel"}
+        # An untagged (session=None) event matches no session filter.
+        assert read_usage_events(session="nope") == []
+
+    def test_filter_by_session_with_period(self) -> None:
+        log_usage_event(_event(command="supervisor", session="planner"))
+        past = datetime.now(timezone.utc) - timedelta(days=1)
+        future = datetime.now(timezone.utc) + timedelta(days=1)
+        assert len(read_usage_events(period_start=past, session="planner")) == 1
+        assert read_usage_events(period_start=future, session="planner") == []
+
 
 class TestBestEffort:
     def test_writer_never_raises(self, monkeypatch) -> None:

@@ -745,3 +745,44 @@ class TestTransactionalBehavior:
         content_after = after.stdout
 
         assert content_before == content_after
+
+
+class TestUsageCommand:
+    """'forge usage' reads the real on-disk ledger + manifest through the wheel CLI.
+
+    Exercises the real session resolver and ledger read (which unit tests mock) so a
+    supervisor's error count -- e.g. OpenRouter content-filter failures -- is visible.
+    """
+
+    def test_usage_reports_supervisor_errors(self, mock_claude_workspace: ContainerLike) -> None:
+        mock_claude_workspace.exec("cd /workspace && forge session start usage-test")
+
+        # Emit real ledger events via the real code path (not hand-rolled JSON), so
+        # the same FORGE_HOME/usage shard the CLI globs is written.
+        _run_container_python(
+            mock_claude_workspace,
+            """
+            from forge.core.usage.ledger import UsageEvent, log_usage_event
+
+            for status in ("success", "success", "error"):
+                log_usage_event(
+                    UsageEvent(
+                        run_id="r",
+                        root_run_id="r",
+                        runtime="claude_code",
+                        command="supervisor",
+                        status=status,
+                        session="usage-test",
+                    )
+                )
+            """,
+        )
+
+        result = mock_claude_workspace.exec("cd /workspace && forge usage usage-test --all --json")
+        assert result.returncode == 0, result.stderr
+
+        data = json.loads(result.stdout)
+        assert data["session"] == "usage-test"
+        supervisor = next(c for c in data["commands"] if c["command"] == "supervisor")
+        assert supervisor["calls"] == 3
+        assert supervisor["errors"] == 1
