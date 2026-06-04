@@ -465,6 +465,36 @@ async def test_warn_cap_adds_header_and_allows_request(monkeypatch):
     assert "daily spend cap reached" in resp.headers["X-Spend-Warning"]
 
 
+def test_attach_cap_summary_nests_caps_under_costs():
+    """GET / surfaces spend-cap proximity under metrics.costs.caps when configured."""
+    import forge.proxy.server as server
+    from forge.proxy.cost_tracker import CostTracker
+
+    tracker = CostTracker(daily_cap_usd=5.0)
+    tracker.record(3_200_000)  # $3.20 in microdollars
+    metrics: dict = {"costs": {"total_usd": 3.2}}
+
+    server._attach_cap_summary(metrics, tracker)
+
+    daily = metrics["costs"]["caps"]["daily"]
+    assert daily["limit_usd"] == 5.0
+    assert daily["current_usd"] == 3.2
+    assert daily["percent"] == 64.0
+
+
+def test_attach_cap_summary_omits_caps_when_none():
+    """No caps configured (or no tracker) -> no caps key; presence means caps active."""
+    import forge.proxy.server as server
+    from forge.proxy.cost_tracker import CostTracker
+
+    metrics: dict = {"costs": {"total_usd": 1.0}}
+    server._attach_cap_summary(metrics, CostTracker())  # tracker without caps
+    assert "caps" not in metrics["costs"]
+
+    server._attach_cap_summary(metrics, None)  # no tracker at all
+    assert "caps" not in metrics["costs"]
+
+
 @pytest.mark.asyncio
 async def test_cached_tokens_in_metrics(monkeypatch):
     import forge.proxy.server as server

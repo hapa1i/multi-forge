@@ -25,6 +25,30 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board-contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-06-04
+
+### Fix: status-line enhancement post-PR review — 5 findings (PR #16)
+
+**Goal**: A second self-review pass after opening PR #16 surfaced five issues across the proxy GET / path, status-line
+fail-open contract, a duplicated tier scanner, and two documentation claims; each fixed (two with regression tests).
+
+**Key changes**:
+
+- **F1 (proxy)**: `root()` now calls the idempotent `_ensure_runtime_state()` so a freshly-imported proxy GET / reports
+  real config and exposes `metrics.costs.caps` before any POST warms the module (caps were load-order dependent; the
+  `spend_cap` segment showed nothing on a fresh proxy).
+- **F3 (fail-open)**: `render_segments` wraps each producer in `try/except` (one bad segment degrades to absent, never
+  crashes the line); `_produce_cache_hit` guards the proxy metrics shape with `isinstance` like `_produce_spend_cap`.
+- **F4 (parity)**: test asserting `explicit_tier_from_model` agrees with the proxy's `_tier_from_model_name` (its 1:1
+  mirror) over a model corpus; shared-helper extraction deferred to keep `proxy.server` off the status-line hot path.
+- **F2 / F5 (docs)**: qualified the "byte-identical default output" claim to the API billing path (the golden guard pins
+  `ANTHROPIC_API_KEY`) + added a golden-scope test pinning the sole no-key divergence (`$`→`≈$`); generated
+  `statusline.segments` config comment now lists all shipped names (`supervisor`/`policy`/`audit`/`drift`/`spend_cap`).
+
+**Verification**: 5136 unit tests pass (`make test-unit`); 15 proxy metrics-integration (incl. the import-split cap
+test); 2 new regression tests (`test_bug_proxy_root_caps_uninitialized.py`, `test_bug_statusline_producer_failopen.py`);
+`make pre-commit` clean; PR #16 CI green (Tests, Pre-commit, CodeQL).
+
 ## 2026-06-03
 
 ### Fix: `forge usage` workflow double-count + supervisor warning misattribution (review fixes)
@@ -134,6 +158,133 @@ routing) + a host harness against real running proxies — passthrough malformed
 stream -> real `404` (not 200-SSE), `smoke_test_proxy` resolves `claude-sonnet-4-6` and completes, and a system-role
 message routes 200 through a translated proxy. Carried debt: the new passthrough error branches have unit +
 manual-harness coverage but no committed integration test yet.
+
+### Statusline Enhancement — Phase 5: Spend-cap proximity
+
+**Goal**: Surface how close the session is to its configured spend cap, sourced from the proxy.
+
+**Key changes**:
+
+- `CostTracker.cap_summary()` (already present) wired into the proxy `GET /` snapshot under `metrics.costs.caps` via a
+  new `_attach_cap_summary(metrics, tracker)` helper (`proxy/server.py`) — extracted so the wiring is unit-testable with
+  a real `CostTracker` without standing up the full `root()` env, and keeps `ProxyMetrics` decoupled from `CostTracker`.
+  The `caps` key is omitted entirely when no caps are configured (presence == caps active).
+- New opt-in `spend_cap` segment: `format_spend_cap` renders the **binding** window (highest percent — the cap that
+  blocks first) as `cap:<d|m> $X/$Y (Z%)`, threshold-colored (normal \<75%, yellow 75-89%, red >=90%).
+  `_produce_spend_cap` reads `runtime.raw["metrics"]["costs"]["caps"]`; `None` in direct mode, on a registry-fallback
+  proxy, or when caps are absent. `spend_cap` was the last reserved name — `SEGMENT_NAMES` now equals the producer set
+  with zero reserved entries.
+- Review fix: cap amounts use a new `_fmt_cap_money` (four decimals below a cent) instead of `_fmt_dollars`, which
+  collapsed sub-cent smoke caps ($0.0005/$0.001) to the misleading `0c/0c`.
+
+**Verification**: `_attach_cap_summary` CIT tests (real CostTracker; caps present/omitted); spend_cap format + producer
+unit tests (binding window, thresholds, sub-cent precision, direct/no-caps hidden). `make test-unit` (5096 pass),
+`make pre-commit` clean, full `test_metrics_integration.py` (15) green.
+
+### Statusline Enhancement — Phase 4: Forge-unique opt-in segments
+
+**Goal**: Surface Forge-specific posture (policy/supervisor/audit/routing) that nothing else in the bar shows.
+
+**Key changes**:
+
+- Four opt-in segments (off by default, absent from `DEFAULT_ORDER`): `supervisor`/`policy` read **effective** session
+  state via a lazy `ctx.effective_intent` (`apply_overrides(intent, overrides)` on the raw manifest — no
+  SessionState/dacite on the hot path); `audit`/`drift` read proxy `GET /` truth (`runtime.raw`). Names added to
+  `SEGMENT_NAMES` + producers (equality invariant holds).
+- `supervisor`/`policy` honor effective `policy.enabled` (a disabled policy makes the hook exit early): `SUP`/`pol:TDD`
+  active, `SUP(susp)` suspended, `SUP(off)`/`pol:TDD(off)` disabled. A `%supervisor suspend` override flips the segment
+  with no intent mutation.
+- `audit` → `aud:<mode>` (+ `(lossy)` when inspecting/overriding a translated wire); `drift` mirrors the proxy's routing
+  precedence — derives the route tier from stdin `model.id` (`explicit_tier_from_model`, 1:1 with the proxy's
+  `_tier_from_model_name`) before falling back to `active_tier`, so an opus-pinned session on a sonnet-default proxy no
+  longer false-positives.
+
+**Review fixes (3 findings)**: (1) `policy.enabled` gating; (2) confirmed bundles revived only when intent has no policy
+block at all — an override emptying `bundles` no longer resurrects stale `confirmed.policy.bundles`; (3) real-route
+drift.
+
+**Verification**: format-helper + producer unit tests, override-flips-supervisor through the full CLI, opt-in/off-by-
+default wiring, three review-fix regression cases. `make pre-commit` clean (mypy + pyright); 5096 unit tests pass.
+
+### Statusline Enhancement — Phase 3: Throttled cache-hit-rate (file-backed)
+
+**Goal**: Add a `cache_hit` segment that surfaces cache effectiveness without re-scanning the transcript on every poll.
+
+**Key changes**:
+
+- New opt-in `cache_hit` segment (added to `SEGMENT_NAMES` + producer; equality invariant holds). Proxy mode reads the
+  live `runtime.raw["metrics"]["cache_hit_rate"]` (free, no file). Direct mode uses `compute_cache_hit_rate`, a new
+  deduped transcript primitive: groups by `requestId` (fallback `message.id`), keeps the max-`input_tokens` snapshot per
+  request (streaming appends growing records — Claude Code #5904), and computes
+  `sum(cache_read_input_tokens) / sum(input_tokens) * 100` — matching the proxy's `passthrough._normalize_usage` +
+  `metrics.snapshot` definition exactly (reads over fresh input; cache creation is not a hit).
+- `src/forge/cli/statusline/throttle.py`: caches the rate at
+  `get_forge_home()/cache/statusline/<sha1(session_id|transcript_path)>.json`. Reuses while the transcript is unchanged
+  (mtime+size) OR the entry is within `cache_hit_ttl`; recomputes otherwise. Atomic write (mkstemp + os.replace).
+  Runtime-only: version mismatch / corrupt / any I/O error → recompute or skip, never raise. A `None` result is not
+  cached. The path hashes the session id (never a raw stdin value).
+- `cache_hit: off` hides the segment even when listed.
+
+**Verification**: dedup + proxy-formula unit tests; throttle tests (within-TTL reuse via compute spy, unchanged-past-TTL
+reuse, changed+past-TTL recompute, corrupt/version recompute, hashed key, None-not-cached); cache_hit e2e (proxy reads
+metric + writes no file, direct writes throttle file, `off` hides). `make test-unit` (1558 pass), `make pre-commit`
+clean, manual render `cache:75%`.
+
+### Statusline Enhancement — Phase 2: Billing-aware cost + rate_limits shape fix
+
+**Goal**: Make the cost segment honest for a mixed userbase (API key → real dollars; OAuth/subscription → quota), and
+fix rate-limit rendering against the current payload shape.
+
+**Key changes**:
+
+- `format_rate_limits` now accepts BOTH the current object payload (`{five_hour, seven_day}`) and the legacy list, via
+  `_extract_short_window` (prefers the 5h window). A bare dict without those keys is still rejected (back-compat). Added
+  an opt-in reset countdown (`show_reset`, testable `now`) sanity-capped at ~8 days so a malformed `resets_at` can't
+  render `616518h`.
+- `RenderContext.billing_mode` resolves to `api` | `subscription` | `ambiguous` from `statusline.cost_mode` + raw
+  `os.environ.get("ANTHROPIC_API_KEY")` (NOT `resolve_env_or_credential`, which would misclassify an OAuth session).
+- `_produce_cost`: API → dollars (`get_session_metrics`); subscription/ambiguous → `format_billing_cost` (5h quota, or
+  an `≈$` hedge when auto+no-key has a phantom dollar figure but no quota data); proxy unchanged (`~$`). Extracted
+  shared `_fmt_dollars` / `_format_duration` helpers (no behavior change to the API path).
+- `_produce_rate_limits` suppresses the standalone segment when billing is non-API AND `cost` is in the active layout
+  (`ctx.active_segments`, set by `render_segments`), so the quota never shows twice.
+- Documented `refreshInterval`/`padding` as a `forge claude preset edit` opt-in (`docs/end-user/config.md`); no
+  auto-installed preset change.
+
+**Verification**: Object-shape + reset-countdown + `format_billing_cost` unit tests; billing e2e through `status_line()`
+(api/subscription/auto±key/suppression). Commands: `make test-unit` (1537 pass), `make pre-commit` clean,
+`./scripts/test-integration.sh tests/integration/cli/test_status_line_integration.py` (10 pass), manual render across
+all four billing modes.
+
+### Statusline Enhancement — Phase 1: Segment registry + palette/glyphs
+
+**Goal**: Make the status line config-driven and customizable without changing default output, and adopt a selectable
+earthy palette.
+
+**Key changes**:
+
+- New `src/forge/cli/statusline/` siblings: `registry.py` (ordered `Segment` table, `resolve_order`, `render_segments`),
+  `context.py` (lazy `RenderContext` — transcript scan / git / context parsing are `cached_property`, so disabled
+  segments do zero work), `palette.py` (`Palette` + `Glyphs`, earthy "Sage & clay" instance).
+- `status_line()` replaced its 106-line inline 5-category assembly with `render_segments` + the unchanged
+  `render_categories()` / wrap-harden tail. Producers are thin adapters over existing `format_*`.
+- Palette applied as an **output-level ANSI remap** (single-pass regex; `default` == empty remap == no-op), so earthy
+  recolors the whole line without threading a `palette` arg through ~8 helpers. `glyphs: ascii|unicode` threads block
+  chars (U+2588/U+2591) into the `get_context_display` progress bar only.
+- **Breaking (research-preview clean break)**: removed the flat `show_rate_limits` config key. `rate_limits` is now an
+  opt-in segment (not in `DEFAULT_ORDER`). New `_REMOVED_KEYS` map surfaces an actionable message on load (one-time
+  warning), `set`, and `reset`, naming the replacement. **Reset path**: delete `show_rate_limits:` from
+  `~/.forge/config.yaml` (auto-pruned on next `config set`) and, to keep rate limits, run
+  `forge config set statusline.segments=path,model,rate_limits`.
+
+**Verification**: Golden no-op guard freezes byte-identical default output across 4 fixtures on the API billing path
+(the guard pins `ANTHROPIC_API_KEY`, so the snapshots are the `$` view); the sole no-key divergence — the `$`→`≈$` cost
+hedge added in Phase 2 — is pinned by a companion golden-scope test. Lazy-compute tests (with firing controls);
+earthy/unicode unit + e2e tests; `show_rate_limits` removal tests (load warn, set/reset reject); allowlist == producers
+equality test + all-dropped→`DEFAULT_ORDER` fallback. Commands run: `make test-unit` (1512 pass), `make pre-commit`
+clean (ruff/black/isort/mypy/pyright/mdformat),
+`./scripts/test-integration.sh tests/integration/cli/test_status_line_integration.py` (10 pass, incl. the rate-limit
+tests repointed to segment config), and a manual `forge status-line` render confirming earthy+unicode.
 
 ## 2026-06-02
 

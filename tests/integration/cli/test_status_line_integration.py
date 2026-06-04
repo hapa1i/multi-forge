@@ -157,9 +157,12 @@ class TestStatusLineInputContract:
         assert result.returncode == 0
 
     def test_shows_rate_limits_for_direct_sessions(self, mock_claude_workspace: ContainerLike) -> None:
-        """Config-enabled direct sessions should surface Claude Code rate limit usage."""
+        """Direct sessions surface rate limits when the rate_limits segment is enabled."""
         mock_claude_workspace.mkdir("$HOME/.forge", parents=True)
-        mock_claude_workspace.write_file("$HOME/.forge/config.yaml", "show_rate_limits: true\n")
+        mock_claude_workspace.write_file(
+            "$HOME/.forge/config.yaml",
+            "statusline:\n  segments: [path, model, rate_limits]\n",
+        )
         input_data = {
             "model": {"display_name": "Claude 3.5 Sonnet", "id": "claude-3-5-sonnet"},
             "cwd": "/workspace",
@@ -175,7 +178,7 @@ class TestStatusLineInputContract:
         assert "30%" in result.stdout
 
     def test_hides_rate_limits_for_proxy_sessions(self, mock_claude_workspace: ContainerLike) -> None:
-        """Proxy sessions should suppress Claude Code rate limits even when config-enabled."""
+        """Proxy sessions suppress Claude Code rate limits even when the segment is enabled."""
         _create_registry(
             mock_claude_workspace,
             {
@@ -190,7 +193,10 @@ class TestStatusLineInputContract:
             },
         )
         mock_claude_workspace.mkdir("$HOME/.forge", parents=True)
-        mock_claude_workspace.write_file("$HOME/.forge/config.yaml", "show_rate_limits: true\n")
+        mock_claude_workspace.write_file(
+            "$HOME/.forge/config.yaml",
+            "statusline:\n  segments: [path, model, rate_limits]\n",
+        )
         input_data = {
             "model": {"display_name": "Claude 3.5 Sonnet", "id": "claude-3-5-sonnet"},
             "cwd": "/workspace",

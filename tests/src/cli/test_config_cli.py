@@ -144,28 +144,45 @@ class TestConfigSet:
     def test_set_bool_true_values(self):
         runner = CliRunner()
         for val in ("true", "True", "1", "yes", "on"):
-            result = runner.invoke(config, ["set", f"show_rate_limits={val}"])
+            result = runner.invoke(config, ["set", f"log_tool_failures={val}"])
             assert result.exit_code == 0, f"Failed for value: {val}"
             import yaml
 
             data = yaml.safe_load((get_forge_home() / "config.yaml").read_text())
-            assert data["show_rate_limits"] is True, f"Expected True for: {val}"
+            assert data["log_tool_failures"] is True, f"Expected True for: {val}"
 
     def test_set_bool_false_values(self):
         runner = CliRunner()
         for val in ("false", "False", "0", "no", "off"):
-            result = runner.invoke(config, ["set", f"show_rate_limits={val}"])
+            result = runner.invoke(config, ["set", f"log_tool_failures={val}"])
             assert result.exit_code == 0, f"Failed for value: {val}"
             import yaml
 
             data = yaml.safe_load((get_forge_home() / "config.yaml").read_text())
-            assert data["show_rate_limits"] is False, f"Expected False for: {val}"
+            assert data["log_tool_failures"] is False, f"Expected False for: {val}"
 
     def test_set_bool_invalid_rejected(self):
         runner = CliRunner()
-        result = runner.invoke(config, ["set", "show_rate_limits=maybe"])
+        result = runner.invoke(config, ["set", "log_tool_failures=maybe"])
         assert result.exit_code == 1
         assert "Invalid value" in result.output
+
+    def test_set_removed_key_rejected(self):
+        """Setting the removed show_rate_limits key errors and names the replacement."""
+        runner = CliRunner()
+        result = runner.invoke(config, ["set", "show_rate_limits=true"])
+        assert result.exit_code == 1
+        assert "was removed" in result.output
+        assert "statusline.segments" in result.output
+
+    def test_reset_removed_key_rejected(self):
+        # reset short-circuits when no config file exists, so write one first.
+        (get_forge_home() / "config.yaml").write_text("log_level: debug\n")
+        runner = CliRunner()
+        result = runner.invoke(config, ["reset", "show_rate_limits"])
+        assert result.exit_code == 1
+        assert "was removed" in result.output
+        assert "statusline.segments" in result.output
 
     def test_set_renamed_key_rejected(self):
         """Setting the old name errors and names the new key."""
@@ -299,3 +316,149 @@ class TestConfigReset:
         assert "memory_writer_timeout" not in data
         assert "handoff_timeout" not in data
         assert data["proxy_mode"] == "sidecar"
+
+
+class TestConfigSetStatusline:
+    """Tests for nested `forge config set statusline.<key>=<value>`."""
+
+    def setup_method(self):
+        reset_runtime_config()
+
+    def teardown_method(self):
+        reset_runtime_config()
+
+    def test_set_cost_mode_persists_nested(self):
+        runner = CliRunner()
+        result = runner.invoke(config, ["set", "statusline.cost_mode=subscription"])
+        assert result.exit_code == 0
+        import yaml
+
+        data = yaml.safe_load((get_forge_home() / "config.yaml").read_text())
+        assert data["statusline"]["cost_mode"] == "subscription"
+
+    def test_set_segments_comma_list(self):
+        runner = CliRunner()
+        result = runner.invoke(config, ["set", "statusline.segments=path,model,rate_limits"])
+        assert result.exit_code == 0
+        import yaml
+
+        data = yaml.safe_load((get_forge_home() / "config.yaml").read_text())
+        assert data["statusline"]["segments"] == ["path", "model", "rate_limits"]
+
+    def test_set_int_subfield(self):
+        runner = CliRunner()
+        result = runner.invoke(config, ["set", "statusline.cache_hit_ttl=30"])
+        assert result.exit_code == 0
+        import yaml
+
+        data = yaml.safe_load((get_forge_home() / "config.yaml").read_text())
+        assert data["statusline"]["cache_hit_ttl"] == 30
+
+    def test_set_invalid_enum_rejected(self):
+        runner = CliRunner()
+        result = runner.invoke(config, ["set", "statusline.cost_mode=wat"])
+        assert result.exit_code == 1
+        assert "Invalid statusline.cost_mode" in result.output
+
+    def test_set_unknown_segment_rejected(self):
+        runner = CliRunner()
+        result = runner.invoke(config, ["set", "statusline.segments=path,bogus"])
+        assert result.exit_code == 1
+        assert "Unknown segment" in result.output
+        assert "bogus" in result.output
+
+    def test_set_forge_unique_segments_accepted(self):
+        # All Forge-unique opt-in segments (Phases 4-5) are in the allowlist.
+        runner = CliRunner()
+        result = runner.invoke(config, ["set", "statusline.segments=path,supervisor,policy,audit,drift,spend_cap"])
+        assert result.exit_code == 0, result.output
+
+    def test_set_unknown_subkey_rejected(self):
+        runner = CliRunner()
+        result = runner.invoke(config, ["set", "statusline.nope=1"])
+        assert result.exit_code == 1
+        assert "Unknown statusline key" in result.output
+
+    def test_set_unknown_section_rejected(self):
+        runner = CliRunner()
+        result = runner.invoke(config, ["set", "bogus.key=1"])
+        assert result.exit_code == 1
+        assert "Unknown config section" in result.output
+
+    def test_set_preserves_other_statusline_keys(self):
+        runner = CliRunner()
+        assert runner.invoke(config, ["set", "statusline.cost_mode=api"]).exit_code == 0
+        assert runner.invoke(config, ["set", "statusline.palette=earthy"]).exit_code == 0
+        import yaml
+
+        data = yaml.safe_load((get_forge_home() / "config.yaml").read_text())
+        assert data["statusline"]["cost_mode"] == "api"
+        assert data["statusline"]["palette"] == "earthy"
+
+    def test_show_renders_statusline_block(self):
+        runner = CliRunner()
+        runner.invoke(config, ["set", "statusline.cost_mode=subscription"])
+        result = runner.invoke(config, ["show", "--raw"])
+        assert result.exit_code == 0
+        assert "statusline:" in result.output
+        assert "cost_mode: subscription" in result.output
+
+    def test_reset_statusline_section(self):
+        runner = CliRunner()
+        runner.invoke(config, ["set", "statusline.cost_mode=subscription"])
+        result = runner.invoke(config, ["reset", "statusline", "-y"])
+        assert result.exit_code == 0
+        # File may be removed (only key) or statusline dropped; either way default applies.
+        reset_runtime_config()
+        from forge.runtime_config import load_runtime_config
+
+        rc = load_runtime_config()
+        assert rc.statusline.cost_mode == "auto"
+
+
+class TestConfigEditStatusline:
+    """`forge config edit` must also enforce the segment allowlist (strict gate)."""
+
+    def setup_method(self):
+        reset_runtime_config()
+
+    def teardown_method(self):
+        reset_runtime_config()
+
+    def _run_edit_with(self, content: str, monkeypatch):
+        from pathlib import Path
+
+        from forge.cli import config_cmd
+
+        def fake_run(cmd, *a, **k):
+            # cmd = [editor, tmp_path]; simulate the user's edits to the temp file.
+            Path(cmd[1]).write_text(content)
+
+            class _Result:
+                returncode = 0
+
+            return _Result()
+
+        monkeypatch.setattr(config_cmd.subprocess, "run", fake_run)
+        monkeypatch.setenv("EDITOR", "true")
+        return CliRunner().invoke(config, ["edit"])
+
+    def test_edit_rejects_unknown_segment(self, monkeypatch):
+        result = self._run_edit_with("statusline:\n  segments: [path, bogus]\n", monkeypatch)
+        assert result.exit_code == 1
+        assert "segment" in result.output.lower()
+        assert "bogus" in result.output
+
+    def test_edit_rejects_invalid_enum(self, monkeypatch):
+        result = self._run_edit_with("statusline:\n  cost_mode: wat\n", monkeypatch)
+        assert result.exit_code == 1
+        assert "cost_mode" in result.output
+
+    def test_edit_accepts_valid_statusline(self, monkeypatch):
+        result = self._run_edit_with("statusline:\n  segments: [path, model]\n  cost_mode: api\n", monkeypatch)
+        assert result.exit_code == 0
+        import yaml
+
+        data = yaml.safe_load((get_forge_home() / "config.yaml").read_text())
+        assert data["statusline"]["segments"] == ["path", "model"]
+        assert data["statusline"]["cost_mode"] == "api"

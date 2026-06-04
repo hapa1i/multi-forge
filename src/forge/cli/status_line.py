@@ -342,6 +342,22 @@ def get_tier_from_display_name(display_name: str) -> str:
     return "sonnet"
 
 
+def explicit_tier_from_model(model_id: str) -> str | None:
+    """Infer an explicit haiku/sonnet/opus tier from a model id, else None.
+
+    1:1 mirror of the proxy's ``_tier_from_model_name`` (proxy/server.py): request
+    routing prefers an explicit tier in the model name over ``config.proxy
+    .default_tier``. Returns None when no tier substring is present (the proxy then
+    falls back to its default), so the drift producer can replicate the real route
+    instead of comparing against the proxy default tier.
+    """
+    name = (model_id or "").lower()
+    for tier in ("haiku", "sonnet", "opus"):
+        if tier in name:
+            return tier
+    return None
+
+
 class TranscriptStats(NamedTuple):
     """Results from single-pass transcript scan."""
 
@@ -475,6 +491,73 @@ def scan_transcript(transcript_path: str) -> TranscriptStats:
     )
 
 
+def _safe_int(value: Any) -> int:
+    """Coerce a transcript usage field to int; 0 on missing/non-numeric."""
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
+
+
+def compute_cache_hit_rate(transcript_path: str) -> float | None:
+    """Cache hit rate from the transcript, matching the proxy's definition.
+
+    Proxy formula (``metrics.py`` / ``passthrough.py``):
+    ``sum(cache_read_input_tokens) / sum(input_tokens) * 100`` — cache *reads*
+    over *fresh* input only (cache creation is billed as normal input, not a
+    hit). Entries are deduped by ``requestId`` (fallback ``message.id``), keeping
+    the snapshot with the largest ``input_tokens`` per request, because streaming
+    appends multiple growing usage records per request (Claude Code #5904 —
+    summing them blind inflates 2-4x).
+
+    Returns the rounded percentage, ``0.0`` when there is input but no cache
+    read, or ``None`` when the transcript is missing/empty (fail-open: no data).
+    """
+    if not transcript_path:
+        return None
+    path = Path(transcript_path)
+    if not path.is_file():
+        return None
+
+    by_request: dict[str, tuple[int, int]] = {}  # key -> (input_tokens, cache_read)
+    try:
+        with path.open(encoding="utf-8") as f:
+            for idx, line in enumerate(f):
+                line = line.strip()
+                if not line:
+                    continue
+                # The transcript is an external Claude Code artifact (system
+                # boundary): skip any row whose shape/types are unexpected rather
+                # than crash an opt-in status-line segment.
+                try:
+                    entry = json.loads(line)
+                    message = entry.get("message")
+                    if not isinstance(message, dict):
+                        continue
+                    usage = message.get("usage")
+                    if not isinstance(usage, dict):
+                        continue
+                    request_id = entry.get("requestId") or message.get("id")
+                    key = str(request_id) if request_id is not None else f"_line_{idx}"
+                    inp = _safe_int(usage.get("input_tokens"))
+                    cache_read = _safe_int(usage.get("cache_read_input_tokens"))
+                except (json.JSONDecodeError, AttributeError, TypeError, ValueError):
+                    continue
+                prev = by_request.get(key)
+                if prev is None or inp >= prev[0]:
+                    by_request[key] = (inp, cache_read)
+    except OSError:
+        return None
+
+    if not by_request:
+        return None
+    total_input = sum(v[0] for v in by_request.values())
+    total_cache_read = sum(v[1] for v in by_request.values())
+    if total_input <= 0:
+        return 0.0
+    return round(total_cache_read / total_input * 100, 1)
+
+
 def parse_context_from_json(data: dict[str, Any]) -> dict[str, Any] | None:
     """Parse context usage from Claude Code's JSON input.
 
@@ -572,8 +655,16 @@ def format_context_size(size: int) -> str:
     return str(size)
 
 
-def get_context_display(context_info: dict[str, Any] | None) -> str:
-    """Generate context display with progress bar."""
+def get_context_display(
+    context_info: dict[str, Any] | None,
+    glyphs: tuple[str, str] | None = None,
+) -> str:
+    """Generate context display with progress bar.
+
+    ``glyphs`` is an optional ``(filled, empty)`` pair for the bar; defaults to
+    the ASCII module constants so existing callers stay byte-identical.
+    """
+    filled_char, empty_char = glyphs if glyphs is not None else (PROGRESS_FILLED, PROGRESS_EMPTY)
     if not context_info:
         return f"{DARK_GRAY}---{RESET}"
 
@@ -602,7 +693,7 @@ def get_context_display(context_info: dict[str, Any] | None) -> str:
     segments = 8
     filled = percent * segments // 100
     empty = segments - filled
-    bar = PROGRESS_FILLED * filled + PROGRESS_EMPTY * empty
+    bar = filled_char * filled + empty_char * empty
 
     # Warning overrides
     if warning == "auto-compact":
@@ -619,52 +710,68 @@ def get_context_display(context_info: dict[str, Any] | None) -> str:
         return f"{color}{bar} {percent}%{BOLD}{alert_str}{RESET}"
 
 
+def _fmt_dollars(cost_usd: float) -> str:
+    """Format a USD amount: sub-cent as ``Nc``, else ``$X.XX`` (no color)."""
+    if cost_usd < 0.01:
+        return f"{int(cost_usd * 100)}c"
+    return f"${cost_usd:.2f}"
+
+
+def _fmt_cap_money(usd: float) -> str:
+    """Format a spend-cap amount, preserving precision below one cent.
+
+    Caps can legitimately be tiny (smoke-test caps of ``$0.0005``), so unlike
+    ``_fmt_dollars`` — which collapses any sub-cent value to ``0c`` and would
+    render ``$0.0005/$0.001`` as the misleading ``0c/0c`` — this keeps four
+    decimals below a cent so the two amounts stay distinguishable.
+    """
+    if usd >= 0.01:
+        return f"${usd:.2f}"
+    if usd <= 0:
+        return "$0.00"
+    return f"${usd:.4f}"
+
+
+def _format_duration(cost_data: dict[str, Any]) -> str | None:
+    """Format session duration (colored), or None if absent. Unrelated to billing."""
+    duration_ms = (cost_data or {}).get("total_duration_ms", 0)
+    if duration_ms <= 0:
+        return None
+    minutes = duration_ms // 60000
+    color = YELLOW if minutes >= 30 else METRICS_COLOR
+    duration_str = f"{duration_ms // 1000}s" if duration_ms < 60000 else f"{minutes}m"
+    return f"{color}{duration_str}{RESET}"
+
+
 def get_session_metrics(
     cost_data: dict[str, Any],
     is_proxy: bool,
     proxy_cost_usd: float = 0.0,
 ) -> str | None:
-    """Get session metrics (cost, duration). Returns bare string or None."""
+    """Get session metrics (cost in dollars, duration). Returns bare string or None.
+
+    This is the API-billing / proxy view (dollars are real). Subscription/quota
+    rendering lives in ``format_billing_cost``.
+    """
     if not cost_data and proxy_cost_usd <= 0:
         return None
 
     metrics: list[str] = []
 
     if is_proxy and proxy_cost_usd > 0:
-        cost_color = METRICS_COLOR
         if proxy_cost_usd < 0.01:
             cost_str = f"~{int(proxy_cost_usd * 10000) / 100}c"
         else:
             cost_str = f"~${proxy_cost_usd:.2f}"
-        metrics.append(f"{cost_color}{cost_str}{RESET}")
+        metrics.append(f"{METRICS_COLOR}{cost_str}{RESET}")
     elif not is_proxy:
         cost_usd = (cost_data or {}).get("total_cost_usd", 0)
         if cost_usd > 0:
-            cost_color = METRICS_COLOR
+            metrics.append(f"{METRICS_COLOR}{_fmt_dollars(cost_usd)}{RESET}")
 
-            if cost_usd < 0.01:
-                cost_str = f"{int(cost_usd * 100)}c"
-            else:
-                cost_str = f"${cost_usd:.2f}"
-
-            metrics.append(f"{cost_color}{cost_str}{RESET}")
-
-    # Duration
-    duration_ms = cost_data.get("total_duration_ms", 0)
-    if duration_ms > 0:
-        minutes = duration_ms // 60000
-
-        if minutes >= 30:
-            duration_color = YELLOW
-        else:
-            duration_color = METRICS_COLOR
-
-        if duration_ms < 60000:
-            duration_str = f"{duration_ms // 1000}s"
-        else:
-            duration_str = f"{minutes}m"
-
-        metrics.append(f"{duration_color}{duration_str}{RESET}")
+    duration = _format_duration(cost_data)
+    if duration:
+        metrics.append(duration)
 
     return " ".join(metrics) if metrics else None
 
@@ -876,44 +983,96 @@ def format_native_sandbox() -> str | None:
     return None
 
 
-def format_rate_limits(rate_limits: Any, is_proxy: bool) -> str | None:
-    """Format rate limit usage from Claude Code's rate_limits field.
+def _extract_short_window(rate_limits: Any) -> dict[str, Any] | None:
+    """Return the shortest-window dict from either Claude Code rate_limits shape.
 
-    Only shows the shortest window (5h) since that's the one users hit.
-    Skips display in proxy mode (proxy has its own rate limits).
+    Current payload is an object ``{five_hour: {...}, seven_day: {...}}``; older
+    payloads were a list of ``{type, used_percentage, resets_at}`` entries. The
+    5h window is preferred (it's the one users hit). Returns None for anything
+    that isn't a recognizable rate-limit container (a bare dict without the
+    object keys is rejected, not guessed).
+    """
+    if isinstance(rate_limits, dict):
+        for key in ("five_hour", "seven_day"):
+            window = rate_limits.get(key)
+            if isinstance(window, dict):
+                return window
+        return None
 
-    Color thresholds: green < 50%, yellow 50-80%, red > 80%.
+    if isinstance(rate_limits, list):
+        for entry in rate_limits:
+            if not isinstance(entry, dict):
+                continue
+            window_type = str(entry.get("type", ""))
+            if "5" in window_type or "hour" in window_type.lower():
+                return entry
+        first = rate_limits[0] if rate_limits else None
+        return first if isinstance(first, dict) else None
+
+    logger.debug("rate_limits unexpected type: %s", type(rate_limits).__name__)
+    return None
+
+
+def _format_reset_countdown(resets_at: Any, now: float | None = None) -> str | None:
+    """Compact 'time until reset' (e.g. ``2h``/``5m``) from an ISO or epoch value.
+
+    Returns None when absent, already elapsed, or unparseable (fail-open).
+    """
+    if resets_at is None:
+        return None
+    if now is None:
+        now = time.time()
+    epoch: float | None = None
+    if isinstance(resets_at, (int, float)):
+        epoch = float(resets_at)
+    elif isinstance(resets_at, str):
+        try:
+            from datetime import datetime
+
+            epoch = datetime.fromisoformat(resets_at.replace("Z", "+00:00")).timestamp()
+        except ValueError:
+            return None
+    if epoch is None:
+        return None
+    remaining = epoch - now
+    if remaining <= 0:
+        return None
+    # Sanity cap: a 5h/7d rate-limit window never resets more than ~8 days out.
+    # Beyond that the timestamp is malformed (wrong units/epoch) — omit rather
+    # than render an absurd "616518h" (system boundary, best-effort).
+    if remaining > 8 * 86400:
+        return None
+    hours = int(remaining // 3600)
+    if hours >= 1:
+        return f"{hours}h"
+    return f"{max(1, int(remaining // 60))}m"
+
+
+def format_rate_limits(
+    rate_limits: Any,
+    is_proxy: bool,
+    *,
+    show_reset: bool = False,
+    now: float | None = None,
+) -> str | None:
+    """Format rate-limit usage from Claude Code's rate_limits field.
+
+    Shows the shortest window (5h) — the one users hit — as ``RL:N%``. Handles
+    both the object and legacy list payload shapes. Skipped in proxy mode (the
+    proxy has its own rate limits). With ``show_reset`` a compact reset countdown
+    is appended when available. Color thresholds: green <50%, yellow 50-80%,
+    red >80%.
     """
     if is_proxy or not rate_limits:
         return None
 
-    # rate_limits is a list of window objects
-    if not isinstance(rate_limits, list):
-        logger.debug("rate_limits unexpected type: %s", type(rate_limits).__name__)
-        return None
-
-    # Find the shortest window (5h preferred)
-    window = None
-    for entry in rate_limits:
-        if not isinstance(entry, dict):
-            continue
-        window_type = entry.get("type", "")
-        if "5" in str(window_type) or "hour" in str(window_type).lower():
-            window = entry
-            break
-    # Fall back to first entry if no 5h window found
-    if window is None and rate_limits:
-        first = rate_limits[0]
-        if isinstance(first, dict):
-            window = first
-
+    window = _extract_short_window(rate_limits)
     if window is None:
         return None
 
     used_pct = window.get("used_percentage")
     if used_pct is None:
         return None
-
     try:
         used_pct_float = float(used_pct)
     except (TypeError, ValueError):
@@ -928,7 +1087,142 @@ def format_rate_limits(rate_limits: Any, is_proxy: bool) -> str | None:
     else:
         color = GREEN
 
-    return f"{DIM}RL:{RESET}{color}{pct}%{RESET}"
+    label = f"{DIM}RL:{RESET}{color}{pct}%{RESET}"
+    if show_reset:
+        countdown = _format_reset_countdown(window.get("resets_at"), now)
+        if countdown:
+            label += f"{DIM} {countdown}{RESET}"
+    return label
+
+
+def format_billing_cost(
+    billing_mode: str,
+    cost_data: dict[str, Any],
+    rate_limits: Any,
+    *,
+    now: float | None = None,
+) -> str | None:
+    """Cost segment for non-API billing (direct sessions).
+
+    ``subscription``/``ambiguous`` show the 5h quota instead of dollars (which are
+    a phantom figure on a subscription). When no quota data is available,
+    ``ambiguous`` hedges with ``≈$X.XX`` (we inferred subscription from a missing
+    ANTHROPIC_API_KEY but aren't certain); an explicit ``subscription`` shows no
+    dollar figure at all. Duration is always appended when present.
+    """
+    parts: list[str] = []
+    quota = format_rate_limits(rate_limits, is_proxy=False, show_reset=True, now=now)
+    if quota:
+        parts.append(quota)
+    elif billing_mode == "ambiguous":
+        cost_usd = (cost_data or {}).get("total_cost_usd", 0) or 0
+        if cost_usd > 0:
+            parts.append(f"{METRICS_COLOR}\u2248{_fmt_dollars(cost_usd)}{RESET}")
+
+    duration = _format_duration(cost_data)
+    if duration:
+        parts.append(duration)
+
+    return " ".join(parts) if parts else None
+
+
+def format_cache_hit(rate: float) -> str:
+    """Format a cache-hit-rate percentage as ``cache:N%`` (green when high)."""
+    pct = int(rate)
+    color = GREEN if rate >= 50 else METRICS_COLOR
+    return f"{DIM}cache:{RESET}{color}{pct}%{RESET}"
+
+
+# Compact labels for the Forge-unique opt-in segments. Known names map to short
+# codes; unknown names fall back to the uppercased raw name (honest, if longer).
+_BUNDLE_LABELS = {"tdd": "TDD", "coding_standards": "STD"}
+_AUDIT_MODE_LABELS = {"passthrough": "pass", "inspect": "inspect", "override": "override"}
+
+
+def format_supervisor(suspended: bool, enabled: bool = True) -> str:
+    """Supervisor posture: ``SUP`` active, ``SUP(susp)`` suspended, ``SUP(off)`` when
+    policy is disabled.
+
+    ``policy.enabled=False`` makes the whole policy subsystem inert (the hook
+    exits before running), so a disabled supervisor is not actually watching —
+    distinct from suspended. Both non-active states use the warning color.
+    """
+    if not enabled:
+        return f"{YELLOW}SUP(off){RESET}"
+    if suspended:
+        return f"{YELLOW}SUP(susp){RESET}"
+    return f"{METRICS_COLOR}SUP{RESET}"
+
+
+def format_policy(bundles: list[str], enabled: bool = True) -> str | None:
+    """Active policy bundles as ``pol:TDD+STD``. None if no usable bundle names.
+
+    When policy is disabled the bundles are configured but not enforced, so the
+    label gets an ``(off)`` suffix in the warning color rather than claiming they
+    are active.
+    """
+    labels = [_BUNDLE_LABELS.get(b, b.upper()) for b in bundles if isinstance(b, str) and b]
+    if not labels:
+        return None
+    joined = "+".join(labels)
+    if not enabled:
+        return f"{DIM}pol:{RESET}{YELLOW}{joined}(off){RESET}"
+    return f"{DIM}pol:{RESET}{METRICS_COLOR}{joined}{RESET}"
+
+
+def format_audit(mode: str, thinking_preserved: bool) -> str:
+    """Proxy audit posture as ``aud:<mode>`` (+ ``(lossy)`` when applicable).
+
+    ``override`` actively rewrites traffic, so it gets the warning color. When
+    inspecting/overriding on a translated wire, thinking-block signatures can't
+    round-trip — mirror ``GET /``'s lossy framing with a dim suffix.
+    """
+    label = _AUDIT_MODE_LABELS.get(mode, mode)
+    color = YELLOW if mode == "override" else METRICS_COLOR
+    out = f"{DIM}aud:{RESET}{color}{label}{RESET}"
+    if mode in ("inspect", "override") and not thinking_preserved:
+        out += f"{DIM}(lossy){RESET}"
+    return out
+
+
+def format_drift(stdin_model_id: str, backend_model: str) -> str | None:
+    """Flag when the served backend differs from the model Claude Code reports.
+
+    Compares compact names so equivalent IDs (``claude-opus-4-8`` vs its catalog
+    short name) don't false-positive. Returns None when aligned — the segment is
+    an alert, so no news is good news.
+    """
+    shown = compact_model_name(stdin_model_id)
+    served = compact_model_name(backend_model)
+    if shown == served:
+        return None
+    return f"{YELLOW}drift:{shown}!={served}{RESET}"
+
+
+def format_spend_cap(caps: dict[str, Any]) -> str | None:
+    """Spend-cap proximity for the binding window, e.g. ``cap:m $42.00/$100.00 (42%)``.
+
+    ``caps`` is the proxy's ``metrics.costs.caps`` (``{"daily"|"monthly":
+    {current_usd, limit_usd, percent}}``). Shows whichever configured window is
+    closest to its limit — the one that blocks first — marked ``d``/``m``.
+    Threshold-colored: normal < 75%, yellow 75-89%, red >= 90%. None if no usable
+    entry.
+    """
+    binding: tuple[float, str, float, float] | None = None
+    for window in ("daily", "monthly"):
+        entry = caps.get(window)
+        if not isinstance(entry, dict):
+            continue
+        pct, cur, lim = entry.get("percent"), entry.get("current_usd"), entry.get("limit_usd")
+        if not all(isinstance(v, (int, float)) for v in (pct, cur, lim)):
+            continue
+        if binding is None or float(pct) > binding[0]:  # type: ignore[arg-type]  # guarded above
+            binding = (float(pct), window[0], float(cur), float(lim))  # type: ignore[arg-type]
+    if binding is None:
+        return None
+    pct, marker, cur, lim = binding
+    color = RED if pct >= 90 else YELLOW if pct >= 75 else METRICS_COLOR
+    return f"{DIM}cap:{RESET}{color}{marker} {_fmt_cap_money(cur)}/{_fmt_cap_money(lim)} ({int(pct)}%){RESET}"
 
 
 def format_token_breakdown(input_tokens: int, output_tokens: int, cached_tokens: int) -> str | None:
@@ -1256,112 +1550,40 @@ def status_line() -> None:
     else:
         logger.debug("proxy: runtime=None")
 
-    workspace = data.get("workspace", {})
-    current_dir = workspace.get("current_dir", "")
-    model_data = data.get("model", {})
-    raw_model_name = model_data.get("display_name", "Claude")
-    transcript_path = data.get("transcript_path", "")
-    cost_data = data.get("cost", {})
-
-    # Discover session early (needed for Who + State categories)
+    # Discover session early (used by breadcrumb / loop / sidecar segments)
     session_manifest, is_session_authoritative = discover_session()
-
     session_name = session_manifest.get("name") if session_manifest else None
     logger.debug("session: name=%s, authoritative=%s", session_name, is_session_authoritative)
-
-    # === CATEGORY: Where ===
-    where: list[str] = []
-    where.append(f"{GREEN_BOLD}{get_compact_path(current_dir)}{RESET}")
-    git_branch = get_git_branch(current_dir)
-    if git_branch:
-        where.append(f" ({YELLOW_BOLD}{git_branch}{RESET})")
-
-    # === CATEGORY: Who ===
-    who: list[str] = []
-    if session_manifest:
-        breadcrumb = format_breadcrumb(session_manifest, is_session_authoritative)
-        if breadcrumb:
-            who.append(f"{BREADCRUMB_COLOR}{breadcrumb}{RESET}")
-
-    # === CATEGORY: What ===
-    what: list[str] = []
-
-    # Context info (may be overridden by proxy runtime truth)
     logger.debug(
         "context_window raw: %s (type=%s)", data.get("context_window"), type(data.get("context_window")).__name__
     )
-    context_info = parse_context_from_json(data)
-    if is_proxy and runtime and runtime.active_context_window:
-        if context_info:
-            tokens = context_info.get("tokens", 0)
-            accurate_window = runtime.active_context_window
-            context_info["context_window"] = accurate_window
-            context_info["percent"] = min(100, int((tokens / accurate_window) * 100))
 
-    effective_context_window = get_effective_context_window(data, runtime, context_info)
-    model_name = format_model_label(raw_model_name, effective_context_window)
-
-    tier_display = get_tier_display(runtime) if is_proxy else None
-    if tier_display:
-        model_segment = f"[{tier_display}] {get_context_display(context_info)}"
-    else:
-        detected_tier = get_tier_from_display_name(raw_model_name)
-        model_color = _tier_color(detected_tier, runtime)
-        model_segment = f"{model_color}[{model_name}]{RESET} {get_context_display(context_info)}"
-
-    if is_proxy and runtime and runtime.template and runtime.template != "unknown":
-        suffix = "" if is_proxy_authoritative else "(~)"
-        what.append(f"{TEMPLATE_COLOR}{runtime.template}{suffix}{RESET} {model_segment}")
-    else:
-        what.append(model_segment)
-
-    # === CATEGORY: Metrics ===
-    metrics_cat: list[str] = []
-
-    _proxy_cost = runtime.proxy_cost_usd if runtime else 0.0
-    session_metrics = get_session_metrics(cost_data, is_proxy, proxy_cost_usd=_proxy_cost)
-    if session_metrics:
-        metrics_cat.append(session_metrics)
-
-    # Rate limit usage (direct Anthropic sessions only, config-gated)
+    # Build the render context once, then let the segment registry produce the
+    # line. RenderContext is lazy (cached_property): a transcript scan or git
+    # subprocess runs only if an enabled segment accesses it. The registry routes
+    # producer output into a `where` list (concatenated) + a `stream` list
+    # (separator-joined), preserving today's exact order via DEFAULT_ORDER.
+    from forge.cli.statusline.context import RenderContext
+    from forge.cli.statusline.palette import apply_palette
+    from forge.cli.statusline.registry import render_segments
     from forge.runtime_config import get_runtime_config
 
-    if get_runtime_config().show_rate_limits:
-        rate_limits_data = data.get("rate_limits")
-        logger.debug("rate_limits: %s", rate_limits_data)
-        rate_limit_display = format_rate_limits(rate_limits_data, is_proxy)
-        if rate_limit_display:
-            metrics_cat.append(rate_limit_display)
-
-    # Transcript stats (mtime-cached to avoid re-scanning unchanged files)
-    stats = _cached_scan_transcript(transcript_path)
-
-    line_display = format_line_changes(cost_data, current_dir)
-    if line_display:
-        metrics_cat.append(line_display)
-
-    input_tokens, output_tokens, cached_tokens = get_token_breakdown_values(data, stats)
-    token_display = format_token_breakdown(input_tokens, output_tokens, cached_tokens)
-    if token_display:
-        metrics_cat.append(token_display)
-
-    # === CATEGORY: State ===
-    state: list[str] = []
-
-    if stats.has_thinking:
-        state.append(f"{BLUE}{THINKING_INDICATOR}{RESET}")
-
-    if session_manifest:
-        verif = format_verification(session_manifest)
-        if verif:
-            state.append(verif)
-
-        sidecar = format_sidecar(session_manifest)
-        if sidecar:
-            state.append(sidecar)
+    config = get_runtime_config()
+    ctx = RenderContext(
+        data=data,
+        is_proxy=is_proxy,
+        runtime=runtime,
+        is_proxy_authoritative=is_proxy_authoritative,
+        manifest=session_manifest,
+        is_session_authoritative=is_session_authoritative,
+        config=config,
+    )
+    where, stream = render_segments(ctx, config.statusline.segments)
 
     # === RENDER ===
-    output = render_categories(where, who, what, metrics_cat, state)
+    output = render_categories(where, [], [], stream, [])
+    # Recolor by the configured palette (default == no-op: empty remap).
+    output = apply_palette(output, ctx.palette)
 
     # Output hardening (from ccstatusline)
     # ANSI reset prefix: override Claude Code's dim default styling

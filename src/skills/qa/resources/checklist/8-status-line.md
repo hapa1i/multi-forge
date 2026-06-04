@@ -171,4 +171,50 @@ forge session delete test-session-breadcrumb --yes --force >/dev/null
 
 - [ ] Shows session lineage breadcrumb (for example `test-session-1 > test-session-breadcrumb`)
 
+### 8.4 Customize fields, palette, and cost mode (`statusline:` config)
+
+<!-- human:confirm -->
+
+The status line's fields, colors, and cost view are configured under `statusline:` in `forge config` (NOT the Claude
+preset). This step exercises the strict allowlist gate, a custom segment subset, the earthy palette, and billing-aware
+cost, then restores defaults with `forge config reset statusline` (the whole-section reset; dotted
+`reset statusline.<key>` is intentionally not supported).
+
+```bash
+cd $FORGE_TEST_REPO
+BASE_URL=$(jq -r '.intent.proxy.base_url // empty' .forge/sessions/test-session-1/forge.session.json)
+SUBSET=$(jq -nc --arg cwd "$FORGE_TEST_REPO" \
+  '{workspace:{current_dir:$cwd}, model:{display_name:"Opus 4.6"},
+    context_window:{context_window_size:200000, used_percentage:6, current_usage:{input_tokens:8500}}}')
+
+# Strict allowlist gate: an unknown segment name is rejected and the valid names are listed
+# (the list must include the Forge-unique supervisor/policy/audit/drift/spend_cap segments).
+forge config set statusline.segments=path,model,bogus ; echo "set-bogus exit=$?"
+
+# Custom subset (path + model only) + earthy palette.
+forge config set statusline.segments=path,model
+forge config set statusline.palette=earthy
+echo "$SUBSET" | FORGE_SESSION=test-session-1 ANTHROPIC_BASE_URL="$BASE_URL" forge status-line
+
+# Billing-aware cost (DIRECT mode — no proxy, so cost_mode applies; under a proxy the cost is always ~$).
+forge config reset statusline
+COSTY=$(jq -nc --arg cwd "$FORGE_TEST_REPO" \
+  '{workspace:{current_dir:$cwd}, model:{display_name:"Opus 4.6"},
+    context_window:{context_window_size:200000, used_percentage:6, current_usage:{input_tokens:8500}},
+    cost:{total_cost_usd:0.42}, rate_limits:{five_hour:{used_percentage:37}}}')
+forge config set statusline.cost_mode=api
+echo "$COSTY" | FORGE_SESSION=test-session-1 forge status-line
+forge config set statusline.cost_mode=subscription
+echo "$COSTY" | FORGE_SESSION=test-session-1 forge status-line
+
+# Restore the default bar, palette, and cost mode in one shot.
+forge config reset statusline
+```
+
+- [ ] `set statusline.segments=...,bogus` exits non-zero and lists the valid segment names
+- [ ] `segments=path,model` + `palette=earthy`: only path + `[Opus 4.6]`, no cost/tokens/breadcrumb, earthy tones
+- [ ] `cost_mode=api` renders the dollar figure `$0.42`
+- [ ] `cost_mode=subscription` shows the 5h quota (e.g. `RL:37%`), NOT a `$` figure
+- [ ] `forge config reset statusline` restores the default multi-segment bar
+
 ---

@@ -112,12 +112,56 @@ example:
 - personal `permissions`
 - advanced hook or status-line customization if you intentionally want to override Forge defaults
 
+Forge's built-in preset sets `statusLine` to `forge status-line` and nothing else. Claude Code status-line options such
+as `refreshInterval` (poll cadence) and `padding` are **not** auto-installed — add them yourself via
+`forge claude preset edit` (under the `statusLine` object). Forge intentionally leaves them to you so re-enabling never
+overwrites your cadence/padding choices. Segment selection, palette, glyphs, and cost mode live in
+`~/.forge/config.yaml` under `statusline:` instead (see `forge config set statusline.<key>`).
+
 Notes:
 
 - The preset file is auto-created on first access.
 - `forge claude preset edit` validates JSON before saving.
 - `forge claude preset reset` restores the built-in preset; without `--force`, it asks for confirmation.
 - If the preset file is corrupted, Forge tells you to fix it with `forge claude preset edit` or reset it.
+
+---
+
+## Status line (`statusline:`)
+
+The status line's fields, colors, and cost behavior live in `~/.forge/config.yaml` under `statusline:` (not the Claude
+Code preset). Set keys with `forge config set statusline.<key>=<value>`:
+
+| Key             | Values                        | Default       | Meaning                                              |
+| --------------- | ----------------------------- | ------------- | ---------------------------------------------------- |
+| `segments`      | comma-separated segment names | (default bar) | Which fields show, in order. Empty = the default bar |
+| `cost_mode`     | `auto` `api` `subscription`   | `auto`        | How the cost field is interpreted (see below)        |
+| `palette`       | `default` `earthy`            | `default`     | Color theme                                          |
+| `glyphs`        | `ascii` `unicode`             | `ascii`       | Progress-bar fill (`#`/`-` vs block characters)      |
+| `cache_hit`     | `auto` `off`                  | `auto`        | `off` hides the `cache_hit` segment even if listed   |
+| `cache_hit_ttl` | seconds                       | `12`          | Direct-mode cache-hit recompute throttle window      |
+
+**Segments.** The default bar is `path, branch, breadcrumb, model, cost, lines, tokens, think, loop, sidecar`. Opt-in
+segments (add to `segments` to enable): `rate_limits`, `cache_hit`, and the Forge-unique `supervisor`, `policy`,
+`audit`, `drift`, `spend_cap`. `forge config set` rejects unknown names; an empty list restores the default bar.
+
+```bash
+forge config set statusline.segments=path,model,cost,cache_hit,spend_cap
+forge config set statusline.palette=earthy
+forge config set statusline.cost_mode=subscription
+```
+
+**Billing-aware cost.** Claude Code runs on either a per-token API key (dollars are real) or a subscription/OAuth login
+(dollars are a phantom; quota burn is the real signal). `cost_mode` picks the honest view:
+
+- `api` — show real `$` spend.
+- `subscription` — show the 5-hour quota instead of dollars.
+- `auto` (default) — `$` when `ANTHROPIC_API_KEY` is set, otherwise the quota (or a hedged `≈$` when no quota data).
+
+Under a proxy the cost field always shows the proxy's estimated `~$`.
+
+**Removed:** the old flat `show_rate_limits` key. Add `rate_limits` to `statusline.segments` instead (e.g.
+`forge config set statusline.segments=path,model,rate_limits`).
 
 ---
 

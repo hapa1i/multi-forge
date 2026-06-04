@@ -109,3 +109,39 @@ Shipped 2026-05-31 (commit `2b70c29`). Durable invariants for `src/forge/session
 - **`ctx` is prior art and inspiration only, never a dependency**: the transfer schema is Forge-owned and canonical
   (design_appendix.md §M.4). [`ctx`](https://github.com/dchu917/ctx) concepts informed it; Forge will not depend on it
   and no interop is planned. The self-contained schema means an optional future bridge would need no schema change.
+
+### Status line: segment registry + Forge-unique segments (shipped)
+
+Shipped 2026-06-03 (statusline-enhancement card). Durable rules for `src/forge/cli/status_line.py` +
+`src/forge/cli/statusline/`:
+
+- **Allowlist == producers invariant**: `names.SEGMENT_NAMES` must equal the set of `registry.SEGMENTS` producer names
+  (enforced by `test_statusline_registry.py`). Add a segment's name and producer in the SAME change — a name without a
+  producer would let `forge config set` accept a field that renders nothing. There are no reserved-but-unimplemented
+  names. `forge config set`/`edit` is the strict gate (rejects unknown names/enums); the renderer drops unknown names
+  and falls back to `DEFAULT_ORDER` when empty OR when a non-empty config resolves to nothing (never blanks the bar).
+- **`DEFAULT_ORDER` is the golden contract**: empty `statusline.segments` reproduces the pre-config bar byte-for-byte
+  (`test_statusline_registry.py` golden snapshots). It EXCLUDES `rate_limits` + every opt-in segment.
+- **Lazy `RenderContext`**: derivations are `cached_property`, so a segment not in the active set does zero I/O (no
+  transcript scan, git subprocess, or proxy-field access). Producers reach `format_*` via `sl.<name>` module-attribute
+  lookup — keeps the import direction acyclic (registry/context import `status_line`; `status_line()` imports them
+  lazily) and lets tests patch helpers.
+- **Palette = output-level ANSI remap**: each role emits a unique code; `apply_palette` is a single-pass regex mapping
+  default→themed. `default` palette == empty remap == byte-identical no-op (golden-safe). Glyphs thread ONLY into the
+  `get_context_display` progress bar (block chars can't be safely output-remapped). Do not thread a `palette` arg
+  through the `format_*` helpers.
+- **Billing mode uses RAW `os.environ["ANTHROPIC_API_KEY"]`**, never `resolve_env_or_credential` (which falls back to
+  the credential file / honors `auth_ignore_env` and would misclassify an OAuth session as API).
+- **Forge-unique segments read EFFECTIVE state** (`apply_overrides(intent, overrides)` on the raw manifest, not raw
+  intent) AND honor `policy.enabled` — a disabled policy makes the hook exit early (commands.py:1116), so
+  `supervisor`/`policy` show `SUP(off)`/`pol:…(off)`, not active. `drift` must mirror proxy routing precedence: an
+  explicit tier in stdin `model.id` (`explicit_tier_from_model`, 1:1 with the proxy's `_tier_from_model_name`) wins over
+  `runtime.active_tier`, which is only the proxy `default_tier`. Using `active_tier` alone false-positives a pinned
+  session on a different-default proxy.
+- **Runtime-only state fails open**: the cache-hit throttle (`statusline/throttle.py`, keyed by
+  `sha1(session_id|transcript_path)`) and all transcript/manifest reads degrade to recompute/None on any error — the
+  status line must always exit 0. Guard value TYPES at point of use, not just shape at the boundary (a
+  structurally-valid cache entry can carry a wrong-typed field).
+- **Proxy spend caps**: `_attach_cap_summary` nests `CostTracker.cap_summary()` under `GET / metrics.costs.caps`,
+  keeping `ProxyMetrics` decoupled from `CostTracker`. Cap amounts use `_fmt_cap_money` (four decimals below a cent),
+  NOT `_fmt_dollars` (whose `int(usd*100)` collapses sub-cent caps to `0c`).

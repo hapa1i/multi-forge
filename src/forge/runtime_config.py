@@ -17,7 +17,7 @@ from __future__ import annotations
 import logging
 import os
 import tempfile
-from dataclasses import asdict, dataclass, fields
+from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 from typing import Any
 
@@ -40,6 +40,87 @@ _ENV_OVERRIDES: dict[str, str] = {
 _RENAMED_KEYS: dict[str, str] = {
     "handoff_timeout": "memory_writer_timeout",
 }
+
+# Removed config keys: old name -> actionable guidance naming the replacement
+# path. Unlike a rename, there is no 1:1 successor key, so the guidance is a
+# human sentence. Surfaced on load (one-time warning) and rejected by
+# set/edit/reset with the same guidance (clean break, coding-standards.md §5:
+# "known legacy state that is intentionally ignored must still be surfaced with
+# an actionable warning").
+_REMOVED_KEYS: dict[str, str] = {
+    "show_rate_limits": (
+        "add 'rate_limits' to statusline.segments "
+        "(e.g. 'forge config set statusline.segments=path,model,rate_limits')"
+    ),
+}
+
+
+# Valid enum values for StatusLineConfig fields.
+_VALID_COST_MODES = ("auto", "api", "subscription")
+_VALID_PALETTES = ("default", "earthy")
+_VALID_GLYPHS = ("ascii", "unicode")
+_VALID_CACHE_HIT = ("auto", "off")
+
+
+@dataclass
+class StatusLineConfig:
+    """Nested status-line display preferences (``statusline:`` in config.yaml).
+
+    Segment NAMES are deliberately NOT validated here (see
+    ``forge.cli.statusline.names``): the renderer drops unknown names and
+    ``forge config set``/``edit`` reject them, so this dataclass needs no
+    registry import. Enum fields ARE validated strictly — a bad value raises,
+    making ``set``/``edit`` fail closed; the disk loader catches that and falls
+    back to defaults (fail-open, subtree-scoped).
+    """
+
+    segments: list[str] = field(default_factory=list)  # empty -> names.DEFAULT_ORDER
+    cost_mode: str = "auto"  # auto | api | subscription
+    palette: str = "default"  # default | earthy
+    glyphs: str = "ascii"  # ascii | unicode
+    cache_hit: str = "auto"  # auto | off
+    cache_hit_ttl: int = 12  # direct-mode throttle window (seconds)
+
+    def __post_init__(self) -> None:
+        if self.cost_mode not in _VALID_COST_MODES:
+            raise ValueError(
+                f"Invalid statusline.cost_mode: '{self.cost_mode}' (must be one of: {', '.join(_VALID_COST_MODES)})"
+            )
+        if self.palette not in _VALID_PALETTES:
+            raise ValueError(
+                f"Invalid statusline.palette: '{self.palette}' (must be one of: {', '.join(_VALID_PALETTES)})"
+            )
+        if self.glyphs not in _VALID_GLYPHS:
+            raise ValueError(f"Invalid statusline.glyphs: '{self.glyphs}' (must be one of: {', '.join(_VALID_GLYPHS)})")
+        if self.cache_hit not in _VALID_CACHE_HIT:
+            raise ValueError(
+                f"Invalid statusline.cache_hit: '{self.cache_hit}' (must be one of: {', '.join(_VALID_CACHE_HIT)})"
+            )
+        if not isinstance(self.segments, list) or not all(isinstance(s, str) for s in self.segments):
+            raise ValueError("statusline.segments must be a list of strings")
+        if self.cache_hit_ttl < 1:
+            raise ValueError(f"statusline.cache_hit_ttl must be >= 1, got {self.cache_hit_ttl}")
+
+
+def _coerce_statusline_config(value: Any) -> StatusLineConfig:
+    """Normalize a raw ``statusline`` value into ``StatusLineConfig``.
+
+    Mirrors ``_coerce_cost_config`` in the proxy schema. Required because
+    ``from __future__ import annotations`` makes field types strings (so the
+    generic ``dict_to_dataclass`` won't auto-recurse) and because ``forge config
+    set``/``edit`` build ``RuntimeConfig(**dict)`` directly — ``__post_init__``
+    is the single convergence point. Unknown sub-keys are dropped (forward
+    compat); known fields are validated by ``StatusLineConfig.__post_init__``.
+    """
+    if value is None:
+        return StatusLineConfig()
+    if isinstance(value, StatusLineConfig):
+        return value
+    if not isinstance(value, dict):
+        raise ValueError("statusline must be a mapping")
+    known = {f.name for f in fields(StatusLineConfig)}
+    kwargs = {k: v for k, v in value.items() if k in known}
+    return StatusLineConfig(**kwargs)
 
 
 @dataclass
@@ -81,10 +162,6 @@ class RuntimeConfig:
     # Override: FORGE_DEBUG env var (1/true/yes → "debug", 0/false/no/off → "off")
     log_level: str = "off"
 
-    # Show Claude.ai rate limit usage in status line (direct sessions only).
-    # Off by default — not relevant for enterprise plans.
-    show_rate_limits: bool = False
-
     # Auto-delete log files older than N days on CLI startup.
     # 0 = disabled (no auto-cleanup). Positive integer = retention window in days.
     log_retention_days: int = 0
@@ -111,7 +188,15 @@ class RuntimeConfig:
     # Useful when shell API keys are for Claude Code (not Forge subprocesses).
     auth_ignore_env: bool = False
 
+    # Nested status-line display preferences (statusline: section in config.yaml).
+    statusline: StatusLineConfig = field(default_factory=StatusLineConfig)
+
     def __post_init__(self) -> None:
+        # Coerce a raw dict (from YAML or `forge config set`/`edit`) into the
+        # nested dataclass. This is the single convergence point for the load,
+        # set, and edit paths (see _coerce_statusline_config).
+        self.statusline = _coerce_statusline_config(self.statusline)
+
         valid_modes = {"host", "sidecar"}
         if self.proxy_mode not in valid_modes:
             raise ValueError(
@@ -287,7 +372,18 @@ def _dict_to_runtime_config(data: dict[str, Any], source: Path) -> RuntimeConfig
             _RENAMED_KEYS[old],
         )
 
-    truly_unknown = unknown - renamed
+    # Removed keys get a specific replacement hint (not the generic warning), so
+    # stale recognized config doesn't silently degrade to default.
+    removed = unknown & set(_REMOVED_KEYS)
+    for old in sorted(removed):
+        logger.warning(
+            "%s: '%s' was removed and is ignored; %s.",
+            source,
+            old,
+            _REMOVED_KEYS[old],
+        )
+
+    truly_unknown = unknown - renamed - removed
     if truly_unknown:
         logger.warning(
             "Unknown keys in %s (ignored): %s",
@@ -315,6 +411,20 @@ def _dict_to_runtime_config(data: dict[str, Any], source: Path) -> RuntimeConfig
                     logger.warning("Invalid boolean for %s: %r — using default", f.name, val)
                     continue
             kwargs[f.name] = val
+
+    # Subtree fail-open: a bad statusline block must reset only statusline, not
+    # discard other valid keys or trip the whole-config fallback below. (set/edit
+    # construct RuntimeConfig directly and keep the strict raise — fail-closed.)
+    if "statusline" in kwargs:
+        try:
+            _coerce_statusline_config(kwargs["statusline"])
+        except (ValueError, TypeError) as e:
+            logger.warning(
+                "Invalid statusline config in %s: %s — using statusline defaults",
+                source,
+                e,
+            )
+            kwargs["statusline"] = StatusLineConfig()
 
     try:
         return RuntimeConfig(**kwargs)
@@ -424,10 +534,6 @@ proxy_mode: host
 # Override: FORGE_DEBUG env var (1/true/yes for debug, 0/false/no/off to disable)
 # log_level: "off"
 
-# Show Claude.ai rate limit usage in status line (direct sessions only).
-# Not relevant for enterprise plans. Enable with: forge config set show_rate_limits=true
-# show_rate_limits: false
-
 # Auto-delete log files older than N days on CLI startup.
 # 0 = disabled (no auto-cleanup). Example: 30 = keep last 30 days.
 # Manual cleanup: forge logs --clean [--older-than DAYS]
@@ -456,4 +562,19 @@ proxy_mode: host
 # Useful when your shell ANTHROPIC_API_KEY is for Claude Code (OAuth/Max),
 # but you want Forge subprocesses to use a separate key from the credential file.
 # auth_ignore_env: false
+
+# Status line display (nested section). Choose which segments show, the cost
+# model, palette, and glyphs. Set values with: forge config set statusline.<key>=<value>
+#   cost_mode: auto | api | subscription   (auto detects from ANTHROPIC_API_KEY;
+#              subscription shows quota instead of dollars)
+#   palette:   default | earthy
+#   glyphs:    ascii | unicode
+#   segments:  ordered list; empty = default layout. Valid names: path, branch,
+#              breadcrumb, model, cost, rate_limits, lines, tokens, think, loop,
+#              sidecar, cache_hit, supervisor, policy, audit, drift, spend_cap
+#   cache_hit: auto | off    cache_hit_ttl: <seconds, direct-mode throttle window>
+# statusline:
+#   cost_mode: auto
+#   palette: default
+#   segments: []
 """
