@@ -27,10 +27,12 @@ CACHE_VERSION = 1
 
 
 def _cache_path(session_id: str | None, transcript_path: str) -> Path:
-    # Hash the identity — never put a raw stdin session_id in the path
-    # (system-boundary hardening: odd characters / traversal).
+    # Derive a stable, filesystem-safe filename from the identity — never put a raw
+    # stdin session_id in the path (system-boundary hardening: odd characters /
+    # traversal). SHA-256 with usedforsecurity=False: this is a non-cryptographic
+    # filename derivation, not a security primitive (SHA-1 is avoided as broken).
     identity = session_id or transcript_path or ""
-    digest = hashlib.sha1(identity.encode("utf-8")).hexdigest()
+    digest = hashlib.sha256(identity.encode("utf-8"), usedforsecurity=False).hexdigest()
     return get_forge_home() / "cache" / "statusline" / f"{digest}.json"
 
 
