@@ -124,6 +124,22 @@ def _initialize_cost_tracker_from_config() -> CostTracker:
     return cost_tracker
 
 
+def _attach_cap_summary(metrics: dict[str, Any], tracker: CostTracker | None) -> None:
+    """Nest spend-cap proximity under ``metrics.costs.caps`` when caps are configured.
+
+    ``cap_summary()`` returns per-window ``current_usd``/``limit_usd``/``percent``;
+    the ``caps`` key is omitted entirely when no caps exist, so a consumer (the
+    ``spend_cap`` status-line segment) can treat its presence as "caps are active".
+    Mutates ``metrics`` in place.
+    """
+    if tracker is None or not tracker.has_caps:
+        return
+    caps = tracker.cap_summary()
+    costs = metrics.get("costs")
+    if caps and isinstance(costs, dict):
+        costs["caps"] = caps
+
+
 _audit_pruned = False
 
 
@@ -1610,6 +1626,11 @@ async def root(request: Request):
         },
     }
 
+    # Per-proxy metrics (request counts, token usage, latency); spend-cap
+    # proximity is attached under metrics.costs.caps when caps are configured.
+    metrics_snapshot = proxy_metrics.snapshot()
+    _attach_cap_summary(metrics_snapshot, cost_tracker)
+
     response = {
         "is_proxy": True,
         "template": active_template,
@@ -1626,8 +1647,7 @@ async def root(request: Request):
         "proxy": proxy_section,
         # Runtime truth: tier mappings, context windows, hyperparameter defaults
         "runtime": runtime_section,
-        # Per-proxy metrics (request counts, token usage, latency)
-        "metrics": proxy_metrics.snapshot(),
+        "metrics": metrics_snapshot,
     }
 
     return response

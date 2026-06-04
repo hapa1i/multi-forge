@@ -185,10 +185,11 @@ class TestRegistryInvariants:
         assert resolve_order(["path", "bogus", "model"]) == ["path", "model"]
 
     def test_resolve_all_dropped_falls_back_to_default(self):
-        # Only reachable via a hand-edited / newer-Forge config: a non-empty list
-        # of not-yet-implemented (reserved) names must not blank the bar. spend_cap
-        # is the lone reserved name (Phase 5); update this if it gains a producer.
-        assert resolve_order(["spend_cap"]) == list(DEFAULT_ORDER)
+        # Only reachable via a hand-edited config or one written by a newer Forge
+        # (a segment this version doesn't know): a non-empty list that resolves to
+        # nothing renderable must not blank the bar. No reserved names remain, so
+        # use clearly-unknown names here.
+        assert resolve_order(["from_newer_forge", "another_unknown"]) == list(DEFAULT_ORDER)
 
     def test_resolve_preserves_user_order(self):
         assert resolve_order(["model", "path"]) == ["model", "path"]

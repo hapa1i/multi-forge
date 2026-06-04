@@ -367,20 +367,10 @@ class TestConfigSetStatusline:
         assert "Unknown segment" in result.output
         assert "bogus" in result.output
 
-    def test_set_reserved_future_segment_rejected(self):
-        # spend_cap has no producer yet (Phase 5), so it is not in the allowlist
-        # and must be rejected — otherwise it would silently render nothing. It
-        # becomes settable when its phase lands.
-        runner = CliRunner()
-        result = runner.invoke(config, ["set", "statusline.segments=spend_cap"])
-        assert result.exit_code == 1
-        assert "Unknown segment" in result.output
-        assert "spend_cap" in result.output
-
     def test_set_forge_unique_segments_accepted(self):
-        # Phase 4 implemented these, so the allowlist now accepts them.
+        # All Forge-unique opt-in segments (Phases 4-5) are in the allowlist.
         runner = CliRunner()
-        result = runner.invoke(config, ["set", "statusline.segments=path,supervisor,policy,audit,drift"])
+        result = runner.invoke(config, ["set", "statusline.segments=path,supervisor,policy,audit,drift,spend_cap"])
         assert result.exit_code == 0, result.output
 
     def test_set_unknown_subkey_rejected(self):

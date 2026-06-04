@@ -15,12 +15,12 @@ This card is in active execution under `doing/`. Move the whole `statusline-enha
 
 ## Current Focus
 
-**Phase 4 (Forge-unique pure-read segments) complete.** Four opt-in segments off by default: `supervisor`/`policy` read
-EFFECTIVE session state via `apply_overrides(intent, overrides)` (a `%supervisor suspend` override flips the segment
-with no intent mutation — the headline acceptance); `audit`/`drift` read proxy `GET /` truth (`runtime.raw`). All hidden
-when their data is absent; none in `DEFAULT_ORDER`. Names added to `SEGMENT_NAMES` + producers (equality invariant
-holds). Verified: `make pre-commit` clean (mypy + pyright), full statusline/config/runtime suite green, end-to-end CLI
-render shows `SUP(susp)` + `pol:TDD` through the override path. Next: Phase 5 spend-cap proximity (proxy change).
+**Phase 5 (spend-cap proximity) complete — all implementation phases done.** `CostTracker.cap_summary()` (already
+existed) is wired into `GET / metrics.costs.caps` via `_attach_cap_summary`; the `spend_cap` segment renders the binding
+window (`cap:m $42.00/$100.00 (42%)`) with threshold colors. `spend_cap` was the last reserved name — `SEGMENT_NAMES`
+now == producers with zero reserved entries. Verified: `make pre-commit` clean (mypy + pyright); 5096 unit tests pass;
+the two caps-wiring CIT tests + full `test_metrics_integration.py` (15) green. Next: Closeout (design-doc sync,
+change_log, move card to `done/`).
 
 ## Phase 0 — Nested `statusline:` config foundation
 
@@ -134,14 +134,30 @@ render shows `SUP(susp)` + `pol:TDD` through the override path. Next: Phase 5 sp
 | audit lossy note          | `intercept_mode=inspect`, thinking not preserved   | `aud:inspect` + `(lossy)`                  | `...test_statusline_forge_segments.py`            |
 | drift quiet when aligned  | active-tier backend == stdin `model.id`            | producer emits nothing                     | `...test_statusline_forge_segments.py`            |
 | opt-in, off by default    | `render_segments(ctx, [])` with full manifest      | none of the four appear                    | `...test_statusline_forge_segments.py`            |
-| set accepts the four      | `set statusline.segments=path,supervisor,policy,…` | exit 0                                     | `tests/src/cli/test_config_cli.py`                |
-| spend_cap still rejected  | `set statusline.segments=spend_cap`                | exit 1, names `spend_cap`                  | `...test_config_cli.py`                           |
+| set accepts forge segs    | `set statusline.segments=…,supervisor,…,spend_cap` | exit 0                                     | `tests/src/cli/test_config_cli.py`                |
+| unknown segment rejected  | `set statusline.segments=path,bogus`               | exit 1, names `bogus`                      | `...test_config_cli.py`                           |
 
 ## Phase 5 — Spend-cap proximity (proxy change; ship last)
 
-- [ ] 5a: add `CostTracker.cap_summary()` to the `GET /` snapshot (`proxy/server.py` ~`:1609`) under
-  `metrics.costs.caps`. Proxy endpoint test.
-- [ ] 5b: `produce_spend_cap` → `$X/$Y (Z%)` with threshold colors; `None` when absent or registry-fallback proxy.
+- [x] 5a: `CostTracker.cap_summary()` already existed; wired it into the `GET /` snapshot under `metrics.costs.caps` via
+  a small testable helper `_attach_cap_summary(metrics, tracker)` (`proxy/server.py`) — keeps `ProxyMetrics` unaware of
+  `CostTracker`. Key omitted entirely when no caps configured (presence == caps active).
+- [x] 5b: `format_spend_cap` → `cap:<d|m> $X.XX/$Y.YY (Z%)` for the binding window (highest percent), threshold-colored
+  (normal \<75, yellow 75-89, red >=90). `_produce_spend_cap` reads `runtime.raw["metrics"]["costs"]["caps"]`; `None`
+  when direct mode, registry-fallback (no runtime), or caps absent. Added `spend_cap` to `SEGMENT_NAMES` + producer (no
+  reserved names remain).
+
+| Test                   | Fixture                                      | Assertion                              | Test File                                         |
+| ---------------------- | -------------------------------------------- | -------------------------------------- | ------------------------------------------------- |
+| caps wired into GET /  | `CostTracker(daily_cap_usd=5)` + $3.20 spend | `metrics.costs.caps.daily.percent==64` | `tests/src/proxy/test_metrics_integration.py`     |
+| caps omitted when none | `CostTracker()` / `None`                     | no `caps` key                          | `...test_metrics_integration.py`                  |
+| binding window         | daily 10% + monthly 42%                      | shows monthly `cap:m … (42%)`          | `tests/src/cli/test_statusline_forge_segments.py` |
+| threshold colors       | percent 50 / 80 / 95                         | metrics / yellow / red                 | `...test_statusline_forge_segments.py`            |
+| direct/no-caps hidden  | non-proxy, or proxy without `caps`           | producer emits nothing                 | `...test_statusline_forge_segments.py`            |
+
+Note: the full Docker GET / endpoint path was not re-run for this 3-line injection — the new logic is isolated in
+`_attach_cap_summary` (CIT-tested with a real `CostTracker`) and the consumer side is unit-tested; the `root()` change
+is a typed, mechanical extract verified by the metrics-integration suite.
 
 ## Closeout
 

@@ -9,10 +9,9 @@ is owned by the renderer (drops unknown names) and ``forge config set``/``edit``
 
 ``SEGMENT_NAMES`` is exactly the set of segments that render *today*: every name
 here has a producer in ``registry.py`` and an equality test enforces the
-two-way sync. The reserved future segment ``spend_cap`` is intentionally NOT
-listed yet — adding the name without a producer would let ``forge config set``
-accept a segment that silently renders nothing. Each future phase adds its name
-here in the same change that lands its producer.
+two-way sync. There are no reserved-but-unimplemented names — a name must land
+with its producer in the same change, so ``forge config set`` never accepts a
+segment that silently renders nothing.
 """
 
 from __future__ import annotations
@@ -39,6 +38,7 @@ SEGMENT_NAMES: tuple[str, ...] = (
     "policy",
     "audit",
     "drift",
+    "spend_cap",
 )
 
 # Default render order — reproduces the pre-enhancement status line exactly.

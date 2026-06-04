@@ -234,9 +234,22 @@ def _produce_drift(ctx: RenderContext) -> Optional[str]:
     return sl.format_drift(str(model_id), str(backend))
 
 
-# Producers implemented so far. Later phases add spend_cap — its name will join
-# names.SEGMENT_NAMES in the same change that lands its producer (the allowlist
-# == producer-names equality test enforces this two-way sync).
+def _produce_spend_cap(ctx: RenderContext) -> Optional[str]:
+    # Proxy-only: spend caps live in GET / metrics.costs.caps. Absent when no caps
+    # are configured or on a registry-fallback proxy (no live metrics snapshot).
+    if not ctx.is_proxy or ctx.runtime is None:
+        return None
+    metrics = ctx.runtime.raw.get("metrics")
+    costs = metrics.get("costs") if isinstance(metrics, dict) else None
+    caps = costs.get("caps") if isinstance(costs, dict) else None
+    if not isinstance(caps, dict) or not caps:
+        return None
+    return sl.format_spend_cap(caps)
+
+
+# Every segment name now has a producer (no reserved names remain). The
+# allowlist == producer-names equality test (test_statusline_registry.py)
+# enforces this two-way sync whenever a segment is added.
 SEGMENTS: tuple[Segment, ...] = (
     Segment("path", _produce_path, "where"),
     Segment("branch", _produce_branch, "where"),
@@ -254,6 +267,7 @@ SEGMENTS: tuple[Segment, ...] = (
     Segment("policy", _produce_policy),
     Segment("audit", _produce_audit),
     Segment("drift", _produce_drift),
+    Segment("spend_cap", _produce_spend_cap),
 )
 
 _BY_NAME: dict[str, Segment] = {seg.name: seg for seg in SEGMENTS}

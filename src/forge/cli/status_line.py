@@ -1184,6 +1184,32 @@ def format_drift(stdin_model_id: str, backend_model: str) -> str | None:
     return f"{YELLOW}drift:{shown}!={served}{RESET}"
 
 
+def format_spend_cap(caps: dict[str, Any]) -> str | None:
+    """Spend-cap proximity for the binding window, e.g. ``cap:m $42.00/$100.00 (42%)``.
+
+    ``caps`` is the proxy's ``metrics.costs.caps`` (``{"daily"|"monthly":
+    {current_usd, limit_usd, percent}}``). Shows whichever configured window is
+    closest to its limit — the one that blocks first — marked ``d``/``m``.
+    Threshold-colored: normal < 75%, yellow 75-89%, red >= 90%. None if no usable
+    entry.
+    """
+    binding: tuple[float, str, float, float] | None = None
+    for window in ("daily", "monthly"):
+        entry = caps.get(window)
+        if not isinstance(entry, dict):
+            continue
+        pct, cur, lim = entry.get("percent"), entry.get("current_usd"), entry.get("limit_usd")
+        if not all(isinstance(v, (int, float)) for v in (pct, cur, lim)):
+            continue
+        if binding is None or float(pct) > binding[0]:  # type: ignore[arg-type]  # guarded above
+            binding = (float(pct), window[0], float(cur), float(lim))  # type: ignore[arg-type]
+    if binding is None:
+        return None
+    pct, marker, cur, lim = binding
+    color = RED if pct >= 90 else YELLOW if pct >= 75 else METRICS_COLOR
+    return f"{DIM}cap:{RESET}{color}{marker} {_fmt_dollars(cur)}/{_fmt_dollars(lim)} ({int(pct)}%){RESET}"
+
+
 def format_token_breakdown(input_tokens: int, output_tokens: int, cached_tokens: int) -> str | None:
     """Format cumulative token breakdown: in:12K out:3.2K cache:8K."""
     if input_tokens == 0 and output_tokens == 0 and cached_tokens == 0:

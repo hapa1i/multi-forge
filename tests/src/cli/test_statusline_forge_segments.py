@@ -21,11 +21,15 @@ from click.testing import CliRunner
 from forge.cli import status_line as sl
 from forge.cli.status_line import (
     _ANSI_RE,
+    METRICS_COLOR,
+    RED,
+    YELLOW,
     ProxyRuntimeTruth,
     TranscriptStats,
     format_audit,
     format_drift,
     format_policy,
+    format_spend_cap,
     format_supervisor,
     status_line,
 )
@@ -256,12 +260,63 @@ class TestDriftProducer:
         assert any("drift:" in s for s in _stream(ctx, ["drift"]))  # custom-model != gpt-4o
 
 
+class TestSpendCapFormat:
+    def test_binding_window_is_highest_percent(self):
+        caps = {
+            "daily": {"current_usd": 1.0, "limit_usd": 10.0, "percent": 10.0},
+            "monthly": {"current_usd": 42.0, "limit_usd": 100.0, "percent": 42.0},
+        }
+        out = _plain(format_spend_cap(caps) or "")
+        assert "cap:m" in out and "$42.00/$100.00" in out and "(42%)" in out  # monthly binds
+
+    def test_single_daily_window(self):
+        out = _plain(format_spend_cap({"daily": {"current_usd": 3.2, "limit_usd": 5.0, "percent": 64.0}}) or "")
+        assert "cap:d" in out and "$3.20/$5.00" in out and "(64%)" in out
+
+    def test_threshold_colors(self):
+        def _c(pct):
+            return format_spend_cap({"daily": {"current_usd": 1.0, "limit_usd": 2.0, "percent": pct}}) or ""
+
+        assert METRICS_COLOR in _c(50.0)  # normal
+        assert YELLOW in _c(80.0)  # warning
+        assert RED in _c(95.0)  # critical
+
+    def test_empty_or_garbage_is_none(self):
+        assert format_spend_cap({}) is None
+        assert format_spend_cap({"daily": {"percent": "bad", "current_usd": 1, "limit_usd": 2}}) is None
+        assert format_spend_cap({"daily": "notadict"}) is None  # type: ignore[dict-item]
+
+
+class TestSpendCapProducer:
+    _RAW = {
+        "is_proxy": True,
+        "proxy": {"template": "litellm-openai"},
+        "metrics": {
+            "costs": {
+                "total_usd": 1.0,
+                "caps": {"daily": {"current_usd": 3.2, "limit_usd": 5.0, "percent": 64.0}},
+            }
+        },
+    }
+
+    def test_renders_when_caps_present(self):
+        ctx = _ctx(is_proxy=True, runtime=_proxy(self._RAW))
+        assert any("cap:d" in s for s in _stream(ctx, ["spend_cap"]))
+
+    def test_no_caps_key_hidden(self):
+        raw = {"is_proxy": True, "metrics": {"costs": {"total_usd": 1.0}}, "proxy": {}}
+        assert _stream(_ctx(is_proxy=True, runtime=_proxy(raw)), ["spend_cap"]) == []
+
+    def test_direct_mode_hidden(self):
+        assert _stream(_ctx(is_proxy=False, runtime=None), ["spend_cap"]) == []
+
+
 # --- Registry wiring ------------------------------------------------------
 
 
 class TestOptInWiring:
-    def test_all_four_named_and_opt_in(self):
-        for name in ("supervisor", "policy", "audit", "drift"):
+    def test_all_forge_segments_named_and_opt_in(self):
+        for name in ("supervisor", "policy", "audit", "drift", "spend_cap"):
             assert name in SEGMENT_NAMES
             assert name not in DEFAULT_ORDER
 
