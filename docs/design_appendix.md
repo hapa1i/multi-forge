@@ -230,31 +230,47 @@ See [docs/end-user/config.md](end-user/config.md) for the full user guide.
 
 ### A.8 Status line guidance (§3.6.11)
 
-Status line reads three sources via env vars set at launch:
+Status line reads Claude Code's stdin JSON plus two env-var-addressed sources:
 
-| Source         | Env Var                                | What it provides                   | Availability          |
-| -------------- | -------------------------------------- | ---------------------------------- | --------------------- |
-| Session file   | `FORGE_SESSION`                        | Intent, overrides, confirmed facts | Always (file)         |
-| Proxy registry | `ANTHROPIC_BASE_URL` -> reverse lookup | proxy_id, template, port           | Always (file)         |
-| Proxy `GET /`  | `ANTHROPIC_BASE_URL` -> query          | tier mappings, context windows     | Only if proxy running |
+| Source            | Address                                | What it provides                                                       | Availability          |
+| ----------------- | -------------------------------------- | ---------------------------------------------------------------------- | --------------------- |
+| Claude Code stdin | piped JSON                             | model, workspace, context_window, cost, rate_limits, session_id        | Always                |
+| Session file      | `FORGE_SESSION`                        | Intent, overrides, confirmed facts                                     | Always (file)         |
+| Proxy registry    | `ANTHROPIC_BASE_URL` -> reverse lookup | proxy_id, template, port                                               | Always (file)         |
+| Proxy `GET /`     | `ANTHROPIC_BASE_URL` -> query          | tier mappings, context windows, metrics, intercept posture, spend caps | Only if proxy running |
 
 **Information strategy:**
 
 1. **Session identity**: Read `FORGE_SESSION` -> locate `.forge/sessions/<name>/forge.session.json`
 2. **Proxy identity**: Reverse lookup `ANTHROPIC_BASE_URL` in `~/.forge/proxies/index.json`
-3. **Runtime truth**: Query proxy `GET /` for tier mappings and context windows (may fail gracefully)
+3. **Runtime truth**: Query proxy `GET /` for tier mappings, context windows, metrics, intercept posture, and spend caps
+   (may fail gracefully)
 
-**Note:** Status line does NOT get `session_id` from Claude Code (only hooks do); it relies on `FORGE_SESSION`.
+**On `session_id`:** Claude Code DOES pass `session_id` in the stdin JSON, but it is NOT used for session discovery —
+only as the cache key for the throttled direct-mode cache-hit-rate. Session discovery still keys off `FORGE_SESSION`.
 
 **No CWD fallback:** If `FORGE_SESSION` is not set, the status line shows no session information. It does not scan CWD
 for `.forge/` directories.
 
-**Display sections:**
+**Configuration (`statusline:` in `~/.forge/config.yaml`).** A segment registry renders an ordered, user-selectable set
+of fields. `statusline.segments` is the ordered allowlist (empty -> `DEFAULT_ORDER`, which reproduces the pre-config bar
+byte-for-byte). Other keys: `cost_mode` (`auto|api|subscription`), `palette` (`default|earthy`), `glyphs`
+(`ascii|unicode`), `cache_hit` (`auto|off`), `cache_hit_ttl`. `forge config set`/`edit` is the strict allowlist gate
+(rejects unknown segment names and bad enums; the on-disk loader fails open per-subtree); the renderer drops unknown
+names and falls back to `DEFAULT_ORDER` if a non-empty config resolves to nothing. The flat `show_rate_limits` key was
+removed (clean break) — `rate_limits` is now an opt-in segment. Default-off segments: `rate_limits`, `cache_hit`,
+`supervisor`, `policy`, `audit`, `drift`, `spend_cap`. Full key/segment reference: `docs/end-user/config.md`.
 
-| Section | Shows                                             | Source           |
-| ------- | ------------------------------------------------- | ---------------- |
-| Proxy   | template, base_url, tier mappings, context window | Registry + Proxy |
-| Session | policy/TDD mode, worktree, overrides summary      | Session file     |
+**Billing-aware cost.** `cost_mode` + raw `os.environ["ANTHROPIC_API_KEY"]` (not credential resolution, which would
+misclassify OAuth as API) resolve a billing mode: `api` shows real `$`, `subscription` shows the 5h quota (dollars are a
+phantom on a subscription), `auto` infers from the key (hedged `≈$` when ambiguous). Proxy mode always shows the proxy's
+estimated `~$`.
+
+**Rendering.** The `where` bucket (`path`, `branch`) leads concatenated; all other segments are separator-joined in the
+configured order. `RenderContext` derivations are lazy `cached_property` — a segment not in the active set does zero I/O
+(no transcript scan, git subprocess, or proxy-field access it would otherwise trigger). Forge-unique segments read
+**effective** session state (`apply_overrides(intent, overrides)`), so a `%policy`/`%supervisor` override changes
+posture without an intent edit.
 
 **Labeling:** Proxy info is authoritative for routing. Session info is authoritative for workflow.
 

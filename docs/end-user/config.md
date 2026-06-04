@@ -127,6 +127,44 @@ Notes:
 
 ---
 
+## Status line (`statusline:`)
+
+The status line's fields, colors, and cost behavior live in `~/.forge/config.yaml` under `statusline:` (not the Claude
+Code preset). Set keys with `forge config set statusline.<key>=<value>`:
+
+| Key             | Values                        | Default       | Meaning                                              |
+| --------------- | ----------------------------- | ------------- | ---------------------------------------------------- |
+| `segments`      | comma-separated segment names | (default bar) | Which fields show, in order. Empty = the default bar |
+| `cost_mode`     | `auto` `api` `subscription`   | `auto`        | How the cost field is interpreted (see below)        |
+| `palette`       | `default` `earthy`            | `default`     | Color theme                                          |
+| `glyphs`        | `ascii` `unicode`             | `ascii`       | Progress-bar fill (`#`/`-` vs block characters)      |
+| `cache_hit`     | `auto` `off`                  | `auto`        | `off` hides the `cache_hit` segment even if listed   |
+| `cache_hit_ttl` | seconds                       | `12`          | Direct-mode cache-hit recompute throttle window      |
+
+**Segments.** The default bar is `path, branch, breadcrumb, model, cost, lines, tokens, think, loop, sidecar`. Opt-in
+segments (add to `segments` to enable): `rate_limits`, `cache_hit`, and the Forge-unique `supervisor`, `policy`,
+`audit`, `drift`, `spend_cap`. `forge config set` rejects unknown names; an empty list restores the default bar.
+
+```bash
+forge config set statusline.segments=path,model,cost,cache_hit,spend_cap
+forge config set statusline.palette=earthy
+forge config set statusline.cost_mode=subscription
+```
+
+**Billing-aware cost.** Claude Code runs on either a per-token API key (dollars are real) or a subscription/OAuth login
+(dollars are a phantom; quota burn is the real signal). `cost_mode` picks the honest view:
+
+- `api` — show real `$` spend.
+- `subscription` — show the 5-hour quota instead of dollars.
+- `auto` (default) — `$` when `ANTHROPIC_API_KEY` is set, otherwise the quota (or a hedged `≈$` when no quota data).
+
+Under a proxy the cost field always shows the proxy's estimated `~$`.
+
+**Removed:** the old flat `show_rate_limits` key. Add `rate_limits` to `statusline.segments` instead (e.g.
+`forge config set statusline.segments=path,model,rate_limits`).
+
+---
+
 ## Secrets (`forge authentication`)
 
 API keys and credentials are managed via `forge auth login` and stored in `~/.forge/credentials.yaml`. These are for

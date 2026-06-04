@@ -135,6 +135,53 @@ stream -> real `404` (not 200-SSE), `smoke_test_proxy` resolves `claude-sonnet-4
 message routes 200 through a translated proxy. Carried debt: the new passthrough error branches have unit +
 manual-harness coverage but no committed integration test yet.
 
+### Statusline Enhancement — Phase 5: Spend-cap proximity
+
+**Goal**: Surface how close the session is to its configured spend cap, sourced from the proxy.
+
+**Key changes**:
+
+- `CostTracker.cap_summary()` (already present) wired into the proxy `GET /` snapshot under `metrics.costs.caps` via a
+  new `_attach_cap_summary(metrics, tracker)` helper (`proxy/server.py`) — extracted so the wiring is unit-testable with
+  a real `CostTracker` without standing up the full `root()` env, and keeps `ProxyMetrics` decoupled from `CostTracker`.
+  The `caps` key is omitted entirely when no caps are configured (presence == caps active).
+- New opt-in `spend_cap` segment: `format_spend_cap` renders the **binding** window (highest percent — the cap that
+  blocks first) as `cap:<d|m> $X/$Y (Z%)`, threshold-colored (normal \<75%, yellow 75-89%, red >=90%).
+  `_produce_spend_cap` reads `runtime.raw["metrics"]["costs"]["caps"]`; `None` in direct mode, on a registry-fallback
+  proxy, or when caps are absent. `spend_cap` was the last reserved name — `SEGMENT_NAMES` now equals the producer set
+  with zero reserved entries.
+- Review fix: cap amounts use a new `_fmt_cap_money` (four decimals below a cent) instead of `_fmt_dollars`, which
+  collapsed sub-cent smoke caps ($0.0005/$0.001) to the misleading `0c/0c`.
+
+**Verification**: `_attach_cap_summary` CIT tests (real CostTracker; caps present/omitted); spend_cap format + producer
+unit tests (binding window, thresholds, sub-cent precision, direct/no-caps hidden). `make test-unit` (5096 pass),
+`make pre-commit` clean, full `test_metrics_integration.py` (15) green.
+
+### Statusline Enhancement — Phase 4: Forge-unique opt-in segments
+
+**Goal**: Surface Forge-specific posture (policy/supervisor/audit/routing) that nothing else in the bar shows.
+
+**Key changes**:
+
+- Four opt-in segments (off by default, absent from `DEFAULT_ORDER`): `supervisor`/`policy` read **effective** session
+  state via a lazy `ctx.effective_intent` (`apply_overrides(intent, overrides)` on the raw manifest — no
+  SessionState/dacite on the hot path); `audit`/`drift` read proxy `GET /` truth (`runtime.raw`). Names added to
+  `SEGMENT_NAMES` + producers (equality invariant holds).
+- `supervisor`/`policy` honor effective `policy.enabled` (a disabled policy makes the hook exit early): `SUP`/`pol:TDD`
+  active, `SUP(susp)` suspended, `SUP(off)`/`pol:TDD(off)` disabled. A `%supervisor suspend` override flips the segment
+  with no intent mutation.
+- `audit` → `aud:<mode>` (+ `(lossy)` when inspecting/overriding a translated wire); `drift` mirrors the proxy's routing
+  precedence — derives the route tier from stdin `model.id` (`explicit_tier_from_model`, 1:1 with the proxy's
+  `_tier_from_model_name`) before falling back to `active_tier`, so an opus-pinned session on a sonnet-default proxy no
+  longer false-positives.
+
+**Review fixes (3 findings)**: (1) `policy.enabled` gating; (2) confirmed bundles revived only when intent has no policy
+block at all — an override emptying `bundles` no longer resurrects stale `confirmed.policy.bundles`; (3) real-route
+drift.
+
+**Verification**: format-helper + producer unit tests, override-flips-supervisor through the full CLI, opt-in/off-by-
+default wiring, three review-fix regression cases. `make pre-commit` clean (mypy + pyright); 5096 unit tests pass.
+
 ### Statusline Enhancement — Phase 3: Throttled cache-hit-rate (file-backed)
 
 **Goal**: Add a `cache_hit` segment that surfaces cache effectiveness without re-scanning the transcript on every poll.

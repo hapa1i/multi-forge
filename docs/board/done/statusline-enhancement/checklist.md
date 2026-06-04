@@ -2,8 +2,9 @@
 
 Execution plan for [`card.md`](./card.md). Full design: `~/.claude/plans/giggly-swimming-wren.md`.
 
-This card is in active execution under `doing/`. Move the whole `statusline-enhancement/` directory to
-`docs/board/done/` after closeout.
+This card is complete and lives under `done/`. All five implementation phases plus both review rounds shipped; design
+docs (`design_appendix.md §A.8`, `docs/end-user/config.md`), the change log, impl_notes, and the QA checklist (§8.4) are
+synced. Kept as a historical snapshot — design docs and code are now normative.
 
 ## Maintenance
 
