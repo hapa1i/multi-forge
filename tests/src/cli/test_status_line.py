@@ -23,10 +23,12 @@ from forge.cli.status_line import (
     _format_reset_countdown,
     _visible_width,
     _wrap_output,
+    compute_cache_hit_rate,
     detect_proxy,
     discover_session,
     format_billing_cost,
     format_breadcrumb,
+    format_cache_hit,
     format_line_changes,
     format_model_label,
     format_native_sandbox,
@@ -1110,6 +1112,74 @@ class TestFormatBillingCost:
         visible = _ANSI_RE.sub("", out)
         assert "RL:60%" in visible
         assert "$" not in visible
+
+
+class TestComputeCacheHitRate:
+    """Deduped cache-hit-rate matching the proxy formula (cache_read / input)."""
+
+    def _write(self, tmp_path, entries):
+        p = tmp_path / "transcript.jsonl"
+        p.write_text("\n".join(json.dumps(e) for e in entries))
+        return str(p)
+
+    def test_basic_ratio(self, tmp_path):
+        path = self._write(
+            tmp_path, [{"requestId": "r1", "message": {"usage": {"input_tokens": 100, "cache_read_input_tokens": 50}}}]
+        )
+        assert compute_cache_hit_rate(path) == 50.0
+
+    def test_dedup_by_request_id_keeps_final(self, tmp_path):
+        # Streaming appends growing usage for the same requestId — count once
+        # (the final/max snapshot), not summed (would be 150/300 = 50, wrong).
+        path = self._write(
+            tmp_path,
+            [
+                {"requestId": "r1", "message": {"usage": {"input_tokens": 40, "cache_read_input_tokens": 20}}},
+                {"requestId": "r1", "message": {"usage": {"input_tokens": 100, "cache_read_input_tokens": 50}}},
+            ],
+        )
+        assert compute_cache_hit_rate(path) == 50.0  # only the 100/50 snapshot
+
+    def test_sums_across_distinct_requests(self, tmp_path):
+        path = self._write(
+            tmp_path,
+            [
+                {"requestId": "r1", "message": {"usage": {"input_tokens": 100, "cache_read_input_tokens": 50}}},
+                {"requestId": "r2", "message": {"usage": {"input_tokens": 100, "cache_read_input_tokens": 100}}},
+            ],
+        )
+        assert compute_cache_hit_rate(path) == 75.0  # 150 / 200 * 100
+
+    def test_message_id_fallback(self, tmp_path):
+        path = self._write(
+            tmp_path,
+            [
+                {"message": {"id": "m1", "usage": {"input_tokens": 50, "cache_read_input_tokens": 10}}},
+                {"message": {"id": "m1", "usage": {"input_tokens": 50, "cache_read_input_tokens": 10}}},
+            ],
+        )
+        assert compute_cache_hit_rate(path) == 20.0  # deduped to one 50/10
+
+    def test_no_cache_reads_is_zero(self, tmp_path):
+        path = self._write(
+            tmp_path, [{"requestId": "r1", "message": {"usage": {"input_tokens": 100, "cache_read_input_tokens": 0}}}]
+        )
+        assert compute_cache_hit_rate(path) == 0.0
+
+    def test_missing_transcript_is_none(self, tmp_path):
+        assert compute_cache_hit_rate(str(tmp_path / "nope.jsonl")) is None
+
+    def test_empty_path_is_none(self):
+        assert compute_cache_hit_rate("") is None
+
+    def test_no_usage_entries_is_none(self, tmp_path):
+        path = self._write(tmp_path, [{"requestId": "r1", "message": {"role": "user", "content": "hi"}}])
+        assert compute_cache_hit_rate(path) is None
+
+    def test_format_cache_hit_colors(self):
+        assert "cache:" in format_cache_hit(60.0)
+        assert "60%" in _ANSI_RE.sub("", format_cache_hit(60.0))
+        assert "\033[32m" in format_cache_hit(60.0)  # green when high
 
 
 class TestGetSessionMetrics:

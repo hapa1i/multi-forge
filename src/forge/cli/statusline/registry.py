@@ -136,6 +136,27 @@ def _produce_sidecar(ctx: RenderContext) -> Optional[str]:
     return sl.format_sidecar(ctx.manifest)
 
 
+def _produce_cache_hit(ctx: RenderContext) -> Optional[str]:
+    if ctx.config.statusline.cache_hit == "off":
+        return None
+    if ctx.is_proxy:
+        # Proxy already computes this — free read, no transcript scan, no file.
+        rate = ctx.runtime.raw.get("metrics", {}).get("cache_hit_rate") if ctx.runtime else None
+    else:
+        # Direct mode: deduped transcript computation, throttled on disk.
+        from forge.cli.statusline.throttle import read_or_compute
+
+        rate = read_or_compute(
+            ctx.transcript_path,
+            ctx.session_id,
+            ctx.config.statusline.cache_hit_ttl,
+            sl.compute_cache_hit_rate,
+        )
+    if rate is None:
+        return None
+    return sl.format_cache_hit(rate)
+
+
 # Producers implemented so far. Later phases add cache_hit/supervisor/policy/
 # audit/spend_cap/drift — their names already live in names.SEGMENT_NAMES so the
 # config allowlist is stable across the rollout; until a producer exists the
@@ -152,6 +173,7 @@ SEGMENTS: tuple[Segment, ...] = (
     Segment("think", _produce_think),
     Segment("loop", _produce_loop),
     Segment("sidecar", _produce_sidecar),
+    Segment("cache_hit", _produce_cache_hit),
 )
 
 _BY_NAME: dict[str, Segment] = {seg.name: seg for seg in SEGMENTS}

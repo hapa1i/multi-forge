@@ -15,14 +15,12 @@ This card is in active execution under `doing/`. Move the whole `statusline-enha
 
 ## Current Focus
 
-**Phase 2 (billing-aware cost + rate_limits shape fix) complete.** `format_rate_limits` now handles the current object
-payload (`five_hour`/`seven_day`) as well as the legacy list, with an opt-in reset countdown.
-`RenderContext.billing_mode` (`api`/`subscription`/`ambiguous`) resolves from `cost_mode` + raw `ANTHROPIC_API_KEY`; the
-cost segment shows real `$` under API billing, the 5h quota under subscription, and an `≈$` hedge when auto+no-key has
-no quota data. The standalone `rate_limits` segment suppresses itself when cost already shows the quota. Verified:
-`make test-unit` (1537 pass), `make pre-commit` clean,
-`./scripts/test-integration.sh tests/integration/cli/test_status_line_integration.py` (10 pass), manual render across
-all four billing modes. Next: Phase 3 throttled cache-hit-rate (file-backed).
+**Phase 3 (throttled cache-hit-rate) complete.** New `cache_hit` opt-in segment: proxy mode reads the live
+`metrics.cache_hit_rate` (free); direct mode computes it from the transcript with `requestId` dedup (matching the
+proxy's `cache_read/input*100` formula) and throttles the result on disk (`statusline/throttle.py`) so a busy session
+recomputes at most once per `cache_hit_ttl`. All cache I/O is fail-open. Verified: `make test-unit` (1558 pass),
+`make pre-commit` clean, manual render (`cache:75%` with dedup + throttle file written). Next: Phase 4 Forge-unique
+pure-read segments.
 
 ## Phase 0 — Nested `statusline:` config foundation
 
@@ -91,10 +89,22 @@ all four billing modes. Next: Phase 3 throttled cache-hit-rate (file-backed).
 
 ## Phase 3 — Throttled cache-hit-rate (file-backed)
 
-- [ ] `produce_cache_hit`: proxy mode reads `runtime.raw["metrics"]["cache_hit_rate"]`; direct mode computes from
-  transcript with requestId dedup (group by requestId, final/max usage per request) matching proxy `cached/input*100`.
-- [ ] `statusline/throttle.py`: cache at `get_forge_home()/cache/statusline/<sha1(session_id|transcript_path)>.json`;
-  TTL `cache_hit_ttl`; atomic write; runtime-only (version mismatch→recompute); fail-open.
+- [x] `_produce_cache_hit`: proxy mode reads `runtime.raw["metrics"]["cache_hit_rate"]` (free, no file); direct mode
+  `compute_cache_hit_rate` dedups by `requestId` (fallback `message.id`, max-input snapshot per request) and matches the
+  proxy formula `sum(cache_read_input_tokens)/sum(input_tokens)*100`. `cache_hit=off` hides the segment. Added
+  `cache_hit` to `SEGMENT_NAMES` + producer (equality invariant holds).
+- [x] `statusline/throttle.py`: cache at `get_forge_home()/cache/statusline/<sha1(session_id|transcript_path)>.json`;
+  reuse when transcript unchanged OR within `cache_hit_ttl`; atomic write (mkstemp+os.replace); runtime-only (version
+  mismatch/corrupt → recompute); all I/O fail-open; `None` result not cached.
+
+| Test            | Fixture                                  | Assertion                                   | Test File                                   |
+| --------------- | ---------------------------------------- | ------------------------------------------- | ------------------------------------------- |
+| requestId dedup | two growing entries, same `requestId`    | counted once (max snapshot), 50% not 50/300 | `tests/src/cli/test_status_line.py`         |
+| proxy formula   | input 200, cache_read 150 across 2 reqs  | 75.0                                        | `...test_status_line.py`                    |
+| within TTL      | re-render 5s later, transcript changed   | reuse stale, compute spy not called         | `tests/src/cli/test_statusline_throttle.py` |
+| unchanged       | re-render past TTL, transcript identical | reuse, no recompute                         | `...test_statusline_throttle.py`            |
+| corrupt/version | bad JSON or version 999 cache file       | recompute                                   | `...test_statusline_throttle.py`            |
+| proxy no-file   | proxy `metrics.cache_hit_rate`           | `cache:64%`, no throttle file written       | `...test_statusline_throttle.py`            |
 
 ## Phase 4 — Forge-unique pure-read segments (opt-in)
 

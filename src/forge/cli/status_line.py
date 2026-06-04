@@ -475,6 +475,58 @@ def scan_transcript(transcript_path: str) -> TranscriptStats:
     )
 
 
+def compute_cache_hit_rate(transcript_path: str) -> float | None:
+    """Cache hit rate from the transcript, matching the proxy's definition.
+
+    Proxy formula (``metrics.py`` / ``passthrough.py``):
+    ``sum(cache_read_input_tokens) / sum(input_tokens) * 100`` — cache *reads*
+    over *fresh* input only (cache creation is billed as normal input, not a
+    hit). Entries are deduped by ``requestId`` (fallback ``message.id``), keeping
+    the snapshot with the largest ``input_tokens`` per request, because streaming
+    appends multiple growing usage records per request (Claude Code #5904 —
+    summing them blind inflates 2-4x).
+
+    Returns the rounded percentage, ``0.0`` when there is input but no cache
+    read, or ``None`` when the transcript is missing/empty (fail-open: no data).
+    """
+    if not transcript_path:
+        return None
+    path = Path(transcript_path)
+    if not path.is_file():
+        return None
+
+    by_request: dict[str, tuple[int, int]] = {}  # key -> (input_tokens, cache_read)
+    try:
+        with path.open(encoding="utf-8") as f:
+            for idx, line in enumerate(f):
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                usage = entry.get("message", {}).get("usage")
+                if not usage:
+                    continue
+                key = entry.get("requestId") or entry.get("message", {}).get("id") or f"_line_{idx}"
+                inp = usage.get("input_tokens", 0)
+                cache_read = usage.get("cache_read_input_tokens", 0)
+                prev = by_request.get(key)
+                if prev is None or inp >= prev[0]:
+                    by_request[key] = (inp, cache_read)
+    except OSError:
+        return None
+
+    if not by_request:
+        return None
+    total_input = sum(v[0] for v in by_request.values())
+    total_cache_read = sum(v[1] for v in by_request.values())
+    if total_input <= 0:
+        return 0.0
+    return round(total_cache_read / total_input * 100, 1)
+
+
 def parse_context_from_json(data: dict[str, Any]) -> dict[str, Any] | None:
     """Parse context usage from Claude Code's JSON input.
 
@@ -1026,6 +1078,13 @@ def format_billing_cost(
         parts.append(duration)
 
     return " ".join(parts) if parts else None
+
+
+def format_cache_hit(rate: float) -> str:
+    """Format a cache-hit-rate percentage as ``cache:N%`` (green when high)."""
+    pct = int(rate)
+    color = GREEN if rate >= 50 else METRICS_COLOR
+    return f"{DIM}cache:{RESET}{color}{pct}%{RESET}"
 
 
 def format_token_breakdown(input_tokens: int, output_tokens: int, cached_tokens: int) -> str | None:

@@ -135,6 +135,30 @@ stream -> real `404` (not 200-SSE), `smoke_test_proxy` resolves `claude-sonnet-4
 message routes 200 through a translated proxy. Carried debt: the new passthrough error branches have unit +
 manual-harness coverage but no committed integration test yet.
 
+### Statusline Enhancement — Phase 3: Throttled cache-hit-rate (file-backed)
+
+**Goal**: Add a `cache_hit` segment that surfaces cache effectiveness without re-scanning the transcript on every poll.
+
+**Key changes**:
+
+- New opt-in `cache_hit` segment (added to `SEGMENT_NAMES` + producer; equality invariant holds). Proxy mode reads the
+  live `runtime.raw["metrics"]["cache_hit_rate"]` (free, no file). Direct mode uses `compute_cache_hit_rate`, a new
+  deduped transcript primitive: groups by `requestId` (fallback `message.id`), keeps the max-`input_tokens` snapshot per
+  request (streaming appends growing records — Claude Code #5904), and computes
+  `sum(cache_read_input_tokens) / sum(input_tokens) * 100` — matching the proxy's `passthrough._normalize_usage` +
+  `metrics.snapshot` definition exactly (reads over fresh input; cache creation is not a hit).
+- `src/forge/cli/statusline/throttle.py`: caches the rate at
+  `get_forge_home()/cache/statusline/<sha1(session_id|transcript_path)>.json`. Reuses while the transcript is unchanged
+  (mtime+size) OR the entry is within `cache_hit_ttl`; recomputes otherwise. Atomic write (mkstemp + os.replace).
+  Runtime-only: version mismatch / corrupt / any I/O error → recompute or skip, never raise. A `None` result is not
+  cached. The path hashes the session id (never a raw stdin value).
+- `cache_hit: off` hides the segment even when listed.
+
+**Verification**: dedup + proxy-formula unit tests; throttle tests (within-TTL reuse via compute spy, unchanged-past-TTL
+reuse, changed+past-TTL recompute, corrupt/version recompute, hashed key, None-not-cached); cache_hit e2e (proxy reads
+metric + writes no file, direct writes throttle file, `off` hides). `make test-unit` (1558 pass), `make pre-commit`
+clean, manual render `cache:75%`.
+
 ### Statusline Enhancement — Phase 2: Billing-aware cost + rate_limits shape fix
 
 **Goal**: Make the cost segment honest for a mixed userbase (API key → real dollars; OAuth/subscription → quota), and

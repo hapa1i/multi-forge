@@ -61,6 +61,10 @@ class RenderContext:
         return self.data.get("transcript_path", "")
 
     @property
+    def session_id(self) -> str | None:
+        return self.data.get("session_id")
+
+    @property
     def cost_data(self) -> dict[str, Any]:
         return self.data.get("cost") or {}
 

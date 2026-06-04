@@ -368,14 +368,14 @@ class TestConfigSetStatusline:
         assert "bogus" in result.output
 
     def test_set_reserved_future_segment_rejected(self):
-        # Reserved names (cache_hit/supervisor/...) have no producer yet, so they
-        # are not in the allowlist and must be rejected — otherwise they would
+        # Reserved names (supervisor/audit/...) have no producer yet, so they are
+        # not in the allowlist and must be rejected — otherwise they would
         # silently render nothing. They become settable when their phase lands.
         runner = CliRunner()
-        result = runner.invoke(config, ["set", "statusline.segments=cache_hit"])
+        result = runner.invoke(config, ["set", "statusline.segments=supervisor"])
         assert result.exit_code == 1
         assert "Unknown segment" in result.output
-        assert "cache_hit" in result.output
+        assert "supervisor" in result.output
 
     def test_set_unknown_subkey_rejected(self):
         runner = CliRunner()
