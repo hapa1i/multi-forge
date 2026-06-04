@@ -25,6 +25,30 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board-contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-06-04
+
+### Fix: status-line enhancement post-PR review — 5 findings (PR #16)
+
+**Goal**: A second self-review pass after opening PR #16 surfaced five issues across the proxy GET / path, status-line
+fail-open contract, a duplicated tier scanner, and two documentation claims; each fixed (two with regression tests).
+
+**Key changes**:
+
+- **F1 (proxy)**: `root()` now calls the idempotent `_ensure_runtime_state()` so a freshly-imported proxy GET / reports
+  real config and exposes `metrics.costs.caps` before any POST warms the module (caps were load-order dependent; the
+  `spend_cap` segment showed nothing on a fresh proxy).
+- **F3 (fail-open)**: `render_segments` wraps each producer in `try/except` (one bad segment degrades to absent, never
+  crashes the line); `_produce_cache_hit` guards the proxy metrics shape with `isinstance` like `_produce_spend_cap`.
+- **F4 (parity)**: test asserting `explicit_tier_from_model` agrees with the proxy's `_tier_from_model_name` (its 1:1
+  mirror) over a model corpus; shared-helper extraction deferred to keep `proxy.server` off the status-line hot path.
+- **F2 / F5 (docs)**: qualified the "byte-identical default output" claim to the API billing path (the golden guard pins
+  `ANTHROPIC_API_KEY`) + added a golden-scope test pinning the sole no-key divergence (`$`→`≈$`); generated
+  `statusline.segments` config comment now lists all shipped names (`supervisor`/`policy`/`audit`/`drift`/`spend_cap`).
+
+**Verification**: 5136 unit tests pass (`make test-unit`); 15 proxy metrics-integration (incl. the import-split cap
+test); 2 new regression tests (`test_bug_proxy_root_caps_uninitialized.py`, `test_bug_statusline_producer_failopen.py`);
+`make pre-commit` clean; PR #16 CI green (Tests, Pre-commit, CodeQL).
+
 ## 2026-06-03
 
 ### Fix: `forge usage` workflow double-count + supervisor warning misattribution (review fixes)
