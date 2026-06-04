@@ -19,7 +19,11 @@ from forge.core.ops.usage_summary import (
     render_summary_line,
 )
 from forge.core.usage.ledger import UsageEvent, log_usage_event
-from forge.session.models import PolicyConfirmed, SubagentConfirmed, create_session_state
+from forge.session.models import (
+    PolicyConfirmed,
+    SubagentConfirmed,
+    create_session_state,
+)
 from forge.session.store import SessionStore
 
 

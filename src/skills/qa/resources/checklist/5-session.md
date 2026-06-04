@@ -624,4 +624,34 @@ forge session delete nr-into-parent --yes --force 2>/dev/null || true
   `requires a different CWD than the parent`
 - [ ] Parent's original transcript is preserved (not relocated or unlinked)
 
+### 5.21 Session-End Activity Summary
+
+<!-- requires: api_key -->
+
+<!-- human:confirm -->
+
+On exit the launcher prints a one-line rollup of what Forge did this session (supervisor checks, estimated cost, tokens,
+workflows) just before the reconnect tip -- the one session-end channel Claude Code does not suppress. It is the
+interactive complement to the non-interactive `forge usage` (section 7.12).
+
+In the **container shell**, launch a session through the QA proxy, do a little work (a file edit or two so the
+supervisor runs when a policy bundle is enabled), then exit (`/exit`) and read the final lines.
+
+```
+# Launch through the QA proxy. Interact briefly, edit a file, then exit (/exit).
+forge session delete test-session-end --yes --force 2>/dev/null || true
+forge session start test-session-end --proxy "$FORGE_QA_OPENAI_PROXY"
+
+# After exiting, the same activity is available non-interactively:
+forge usage test-session-end
+
+# Clean up
+forge session delete test-session-end --yes --force 2>/dev/null || true
+```
+
+- [ ] When the session had activity, a `Forge this session — …` summary line prints on exit, before the reconnect tip
+- [ ] The line reports supervisor `errors` when an LLM call failed (e.g. an OpenRouter content-filter rejection)
+- [ ] `forge usage test-session-end` reports the same session's activity (or `No Forge activity` if the session was
+  idle)
+
 ---

@@ -66,7 +66,13 @@ def test_tdd_only_warning_is_not_supervisor_activity(tmp_path: Path) -> None:
     _write(
         tmp_path,
         "planner",
-        [_entry(final="warn", composite_warnings=[tdd_warning], subs=[_sub("tdd.tests-before-impl", "warn", [tdd_warning])])],
+        [
+            _entry(
+                final="warn",
+                composite_warnings=[tdd_warning],
+                subs=[_sub("tdd.tests-before-impl", "warn", [tdd_warning])],
+            )
+        ],
     )
     summary = build_session_activity_summary("planner", forge_root=str(tmp_path))
     # No supervisor sub-decision -> no supervisor section at all (was: phantom 0/0/0).

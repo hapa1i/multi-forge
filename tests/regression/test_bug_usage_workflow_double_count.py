@@ -20,7 +20,10 @@ from __future__ import annotations
 
 import pytest
 
-from forge.core.ops.usage_summary import build_session_activity_summary, render_summary_line
+from forge.core.ops.usage_summary import (
+    build_session_activity_summary,
+    render_summary_line,
+)
 from forge.core.usage.ledger import UsageEvent, log_usage_event
 
 pytestmark = pytest.mark.regression

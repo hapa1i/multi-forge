@@ -125,6 +125,10 @@ forge session list            # Sessions in current repo (default: --scope repo)
 forge session list --scope project  # Sessions in current Forge project only
 forge session list --scope all      # All sessions globally
 
+# What a session did (usage ledger + policy decisions)
+forge usage [name]            # Per-session activity: supervisor checks, cost, tokens
+forge usage [name] --json --days N --all
+
 # Fork (conversation branching)
 forge session fork <parent> [--name <name>] [--model <claude-model>] [--incognito] [--branch <branch>] [--worktree] [--into <path>] [--supervise] [--supervisor-proxy <id>] [--no-supervisor-proxy] [--no-launch]
 
@@ -636,6 +640,45 @@ forge policy status                                 # Show current policy state
 
 Attempting to set proxy-owned keys is rejected. To change routing defaults, use a different proxy or edit your proxy
 overlay. See [proxy.md](proxy.md) for proxy configuration.
+
+---
+
+## What a session did (`forge usage` + session-end summary)
+
+Two read surfaces report what Forge actually did during a session, over data the usage ledger and the policy-decision
+log already capture. Spend figures are **estimates** — `forge proxy costs` stays the authoritative dollar view (see
+[proxy.md](proxy.md#cost-tracking-and-spend-caps)).
+
+**Session-end summary (automatic).** When a session exits, the launcher prints a one-line rollup before the reconnect
+tip. This is the one session-end channel Claude Code does not suppress — non-blocking hook output (including supervisor
+**warnings**) is hidden from you mid-session, so without this line a `warn` verdict is invisible:
+
+```text
+Forge this session — supervisor: 12 checks (2 warn, 0 block, 3 errors) · ~$0.04 est · 21k tok · 2 workflows
+```
+
+The `errors` count surfaces failed supervisor LLM calls directly — for example an OpenRouter content-filter rejection.
+The line is best-effort and prints only when the session had activity; incognito sessions are skipped.
+
+**`forge usage [session]` (on demand).** Inspect any session's activity anytime:
+
+```bash
+forge usage                      # current session ($FORGE_SESSION)
+forge usage my-feature           # a named session (or Claude UUID)
+forge usage my-feature --days 7  # last 7 days (default: 30)
+forge usage my-feature --all     # full history
+forge usage my-feature --json    # machine-readable
+```
+
+It reports per-command calls/errors/tokens/estimated-cost plus the supervisor allow/warn/deny breakdown with recent
+warning text. A workflow fan-out (panel/debate/...) counts as **one** call with its worker count tracked in a separate
+column, so a 4-worker panel reads as one workflow, not five.
+
+> **Sidecar:** both surfaces work in sidecar mode when the session launched with a proxy id (the in-container usage
+> ledger is mounted back to the host). A template-only sidecar shows only the policy-decision half.
+>
+> **Coverage:** some Forge LLM calls (e.g. the action tagger) don't tag a session, so they aren't attributed to one. The
+> summary flags coverage as partial rather than guessing.
 
 ---
 

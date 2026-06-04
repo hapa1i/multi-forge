@@ -66,9 +66,7 @@ class PolicyActivity:
 
     @property
     def has_content(self) -> bool:
-        return bool(
-            self.supervisor_allow or self.supervisor_warn or self.supervisor_deny or self.total_warnings
-        )
+        return bool(self.supervisor_allow or self.supervisor_warn or self.supervisor_deny or self.total_warnings)
 
 
 @dataclass

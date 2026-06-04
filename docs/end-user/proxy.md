@@ -447,6 +447,11 @@ forge proxy costs --period week      # This week
 forge proxy costs openrouter-anthropic         # Filter by proxy
 ```
 
+> **Per-session view:** `forge proxy costs` is the authoritative, **proxy-scoped** dollar view. For a **session-scoped**
+> rollup of what Forge did — supervisor checks (including failed ones), tokens, and *estimated* cost — use
+> [`forge usage [session]`](session.md#what-a-session-did-forge-usage--session-end-summary). The two are complementary:
+> spend is billed per proxy; activity is attributed per session.
+
 Set caps on the proxy:
 
 ```bash

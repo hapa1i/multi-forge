@@ -17,8 +17,14 @@ from rich.console import Console
 from rich.table import Table
 
 from forge.cli.output import print_error_with_tip
-from forge.core.ops.session_context import SessionContextError, resolve_session_identifier
-from forge.core.ops.usage_summary import SessionActivitySummary, build_session_activity_summary
+from forge.core.ops.session_context import (
+    SessionContextError,
+    resolve_session_identifier,
+)
+from forge.core.ops.usage_summary import (
+    SessionActivitySummary,
+    build_session_activity_summary,
+)
 
 console = Console()
 
