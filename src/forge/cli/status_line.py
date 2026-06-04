@@ -475,6 +475,14 @@ def scan_transcript(transcript_path: str) -> TranscriptStats:
     )
 
 
+def _safe_int(value: Any) -> int:
+    """Coerce a transcript usage field to int; 0 on missing/non-numeric."""
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
+
+
 def compute_cache_hit_rate(transcript_path: str) -> float | None:
     """Cache hit rate from the transcript, matching the proxy's definition.
 
@@ -502,16 +510,23 @@ def compute_cache_hit_rate(transcript_path: str) -> float | None:
                 line = line.strip()
                 if not line:
                     continue
+                # The transcript is an external Claude Code artifact (system
+                # boundary): skip any row whose shape/types are unexpected rather
+                # than crash an opt-in status-line segment.
                 try:
                     entry = json.loads(line)
-                except json.JSONDecodeError:
+                    message = entry.get("message")
+                    if not isinstance(message, dict):
+                        continue
+                    usage = message.get("usage")
+                    if not isinstance(usage, dict):
+                        continue
+                    request_id = entry.get("requestId") or message.get("id")
+                    key = str(request_id) if request_id is not None else f"_line_{idx}"
+                    inp = _safe_int(usage.get("input_tokens"))
+                    cache_read = _safe_int(usage.get("cache_read_input_tokens"))
+                except (json.JSONDecodeError, AttributeError, TypeError, ValueError):
                     continue
-                usage = entry.get("message", {}).get("usage")
-                if not usage:
-                    continue
-                key = entry.get("requestId") or entry.get("message", {}).get("id") or f"_line_{idx}"
-                inp = usage.get("input_tokens", 0)
-                cache_read = usage.get("cache_read_input_tokens", 0)
                 prev = by_request.get(key)
                 if prev is None or inp >= prev[0]:
                     by_request[key] = (inp, cache_read)

@@ -88,16 +88,20 @@ def read_or_compute(
     path = _cache_path(session_id, transcript_path)
     cached = _read(path)
     if cached is not None and cached.get("version") == CACHE_VERSION:
+        # A structurally-valid JSON entry can still carry wrong-typed fields
+        # (e.g. computed_at: "bad"). Guard every value used in arithmetic so a
+        # malformed entry degrades to recompute instead of raising (runtime-only
+        # state must never crash the status line).
+        rate = cached.get("cache_hit_rate")
+        computed_at = cached.get("computed_at")
         unchanged = (
             mtime_ns is not None
             and cached.get("transcript_mtime_ns") == mtime_ns
             and cached.get("transcript_size") == size
         )
-        fresh = (now - cached.get("computed_at", 0)) < ttl
-        if unchanged or fresh:
-            rate = cached.get("cache_hit_rate")
-            if isinstance(rate, (int, float)):
-                return float(rate)
+        fresh = isinstance(computed_at, (int, float)) and (now - computed_at) < ttl
+        if (unchanged or fresh) and isinstance(rate, (int, float)):
+            return float(rate)
 
     rate = compute_fn(transcript_path)
     if rate is None:
