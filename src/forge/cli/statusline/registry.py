@@ -157,26 +157,42 @@ def _produce_cache_hit(ctx: RenderContext) -> Optional[str]:
     return sl.format_cache_hit(rate)
 
 
+def _confirmed_bundles(ctx: RenderContext) -> Optional[list[str]]:
+    confirmed = (ctx.manifest or {}).get("confirmed")
+    cpolicy = confirmed.get("policy") if isinstance(confirmed, dict) else None
+    bundles = cpolicy.get("bundles") if isinstance(cpolicy, dict) else None
+    return bundles if isinstance(bundles, list) and bundles else None
+
+
 def _produce_supervisor(ctx: RenderContext) -> Optional[str]:
     # Effective (intent+overrides) posture: a %supervisor suspend override flips
     # this without touching intent. Hidden entirely when no supervisor is set.
+    # policy.enabled gates the whole subsystem — a disabled policy means the
+    # supervisor is configured but not watching (the hook exits early).
     policy = ctx.effective_intent.get("policy")
-    supervisor = policy.get("supervisor") if isinstance(policy, dict) else None
+    if not isinstance(policy, dict):
+        return None
+    supervisor = policy.get("supervisor")
     if not isinstance(supervisor, dict):
         return None
-    return sl.format_supervisor(suspended=bool(supervisor.get("suspended", False)))
+    return sl.format_supervisor(
+        suspended=bool(supervisor.get("suspended", False)),
+        enabled=bool(policy.get("enabled", False)),
+    )
 
 
 def _produce_policy(ctx: RenderContext) -> Optional[str]:
-    # Prefer effective intent bundles (the configured-now posture); fall back to
-    # the last-evaluated confirmed bundles only when intent carries no policy.
+    # Effective intent is authoritative: an override that empties or disables the
+    # bundle list must NOT revive stale confirmed bundles. Fall back to the
+    # last-evaluated confirmed posture only when intent carries no policy at all.
     policy = ctx.effective_intent.get("policy")
-    bundles = policy.get("bundles") if isinstance(policy, dict) else None
-    if not isinstance(bundles, list) or not bundles:
-        confirmed = (ctx.manifest or {}).get("confirmed")
-        cpolicy = confirmed.get("policy") if isinstance(confirmed, dict) else None
-        bundles = cpolicy.get("bundles") if isinstance(cpolicy, dict) else None
-    if not isinstance(bundles, list) or not bundles:
+    if isinstance(policy, dict):
+        bundles = policy.get("bundles")
+        if not isinstance(bundles, list) or not bundles:
+            return None
+        return sl.format_policy(bundles, enabled=bool(policy.get("enabled", False)))
+    bundles = _confirmed_bundles(ctx)
+    if bundles is None:
         return None
     return sl.format_policy(bundles)
 
@@ -195,17 +211,25 @@ def _produce_audit(ctx: RenderContext) -> Optional[str]:
 
 
 def _produce_drift(ctx: RenderContext) -> Optional[str]:
-    # Proxy-only: compare the active tier's backend against the model Claude Code
-    # reports. Needs stdin model.id (not display_name) to normalize correctly.
+    # Proxy-only: compare the backend this request actually routes to against the
+    # model Claude Code reports. Routing prefers an explicit tier in the model
+    # name over the proxy default (server.py:779), and runtime.active_tier is only
+    # the *default* tier — so derive the route tier from stdin model.id first and
+    # fall back to active_tier, mirroring the proxy. Needs model.id (not
+    # display_name) to normalize.
     if not ctx.is_proxy or ctx.runtime is None:
         return None
-    active_tier = ctx.runtime.active_tier
     mappings = ctx.runtime.tier_mappings
-    if not active_tier or not isinstance(mappings, dict):
+    if not isinstance(mappings, dict) or not mappings:
         return None
-    backend = mappings.get(active_tier)
     model_id = (ctx.data.get("model") or {}).get("id")
-    if not backend or not model_id:
+    if not model_id:
+        return None
+    route_tier = sl.explicit_tier_from_model(str(model_id)) or ctx.runtime.active_tier
+    if not route_tier:
+        return None
+    backend = mappings.get(route_tier)
+    if not backend:
         return None
     return sl.format_drift(str(model_id), str(backend))
 

@@ -109,21 +109,29 @@ class TestFormatHelpers:
 
 class TestSupervisorProducer:
     def test_active_supervisor_renders(self):
-        manifest = {"intent": {"policy": {"supervisor": {"suspended": False}}}}
-        assert any("SUP" in s for s in _stream(_ctx(manifest=manifest), ["supervisor"]))
+        manifest = {"intent": {"policy": {"enabled": True, "supervisor": {"suspended": False}}}}
+        out = _stream(_ctx(manifest=manifest), ["supervisor"])
+        assert any("SUP" in s and "(" not in s for s in out)
 
     def test_no_supervisor_is_hidden(self):
         # Policy present but no supervisor block -> nothing to show.
-        manifest = {"intent": {"policy": {"bundles": ["tdd"]}}}
+        manifest = {"intent": {"policy": {"enabled": True, "bundles": ["tdd"]}}}
         assert _stream(_ctx(manifest=manifest), ["supervisor"]) == []
 
     def test_no_manifest_is_hidden(self):
         assert _stream(_ctx(manifest=None), ["supervisor"]) == []
 
+    def test_disabled_policy_shows_off_not_active(self):
+        # Finding 1: %policy disable sets policy.enabled=False; the hook then exits
+        # before running, so the supervisor is configured but NOT watching.
+        manifest = {"intent": {"policy": {"enabled": False, "supervisor": {"suspended": False}}}}
+        out = _stream(_ctx(manifest=manifest), ["supervisor"])
+        assert any("SUP(off)" in s for s in out)
+
     def test_override_suspends_without_mutating_intent(self):
         # Headline acceptance: a sparse override flips the rendered posture to
         # suspended while raw intent stays active (we read effective state).
-        intent = {"policy": {"supervisor": {"suspended": False}}}
+        intent = {"policy": {"enabled": True, "supervisor": {"suspended": False}}}
         manifest = {"intent": intent, "overrides": {"policy": {"supervisor": {"suspended": True}}}}
         stream = _stream(_ctx(manifest=manifest), ["supervisor"])
         assert any("SUP(susp)" in s for s in stream)
@@ -133,18 +141,29 @@ class TestSupervisorProducer:
 
 class TestPolicyProducer:
     def test_effective_bundles_render(self):
-        manifest = {"intent": {"policy": {"bundles": ["tdd"]}}}
-        assert any("pol:TDD" in s for s in _stream(_ctx(manifest=manifest), ["policy"]))
+        manifest = {"intent": {"policy": {"enabled": True, "bundles": ["tdd"]}}}
+        out = _stream(_ctx(manifest=manifest), ["policy"])
+        assert any("pol:TDD" in s and "(off)" not in s for s in out)
 
-    def test_override_clears_bundles(self):
+    def test_disabled_policy_marks_bundles_off(self):
+        # Finding 1: a disabled policy must not report its bundles as active.
+        manifest = {"intent": {"policy": {"enabled": False, "bundles": ["tdd"]}}}
+        out = _stream(_ctx(manifest=manifest), ["policy"])
+        assert any("pol:TDD(off)" in s for s in out)
+
+    def test_override_clears_bundles_does_not_revive_confirmed(self):
+        # Finding 2: an override that empties bundles is authoritative — the stale
+        # confirmed bundles must NOT be revived as the active posture.
         manifest = {
-            "intent": {"policy": {"bundles": ["tdd"]}},
+            "intent": {"policy": {"enabled": True, "bundles": ["tdd"]}},
             "overrides": {"policy": {"bundles": []}},
+            "confirmed": {"policy": {"bundles": ["tdd"]}},
         }
-        # Effective bundles empty -> falls back to confirmed (none here) -> hidden.
         assert _stream(_ctx(manifest=manifest), ["policy"]) == []
 
-    def test_confirmed_fallback_when_intent_has_no_policy(self):
+    def test_confirmed_fallback_only_when_no_effective_policy(self):
+        # Confirmed is the last-evaluated posture; surface it ONLY when intent
+        # carries no policy block at all (not when it explicitly clears bundles).
         manifest = {"intent": {}, "confirmed": {"policy": {"bundles": ["coding_standards"]}}}
         assert any("pol:STD" in s for s in _stream(_ctx(manifest=manifest), ["policy"]))
 
@@ -202,6 +221,40 @@ class TestDriftProducer:
         ctx = _ctx(data={"workspace": {}, "model": {"display_name": "Opus"}}, is_proxy=True, runtime=_proxy(raw))
         assert _stream(ctx, ["drift"]) == []
 
+    def test_explicit_tier_beats_default_no_false_positive(self):
+        # Finding 3: active_tier is the proxy *default* (sonnet here), but routing
+        # prefers the explicit tier in the model name (opus). The opus request
+        # routes to the opus backend == model.id, so there is NO drift — comparing
+        # against the sonnet default would have false-positived.
+        raw = {
+            "is_proxy": True,
+            "runtime": {
+                "active_tier": "sonnet",
+                "tier_mappings": {"sonnet": "claude-sonnet-4-5", "opus": "claude-opus-4-8"},
+            },
+            "proxy": {"template": "anthropic-passthrough"},
+        }
+        ctx = _ctx(
+            data={"workspace": {}, "model": {"id": "claude-opus-4-8", "display_name": "Opus"}},
+            is_proxy=True,
+            runtime=_proxy(raw),
+        )
+        assert _stream(ctx, ["drift"]) == []
+
+    def test_no_explicit_tier_falls_back_to_default(self):
+        # A bare backend model id (no haiku/sonnet/opus) -> route by proxy default.
+        raw = {
+            "is_proxy": True,
+            "runtime": {"active_tier": "sonnet", "tier_mappings": {"sonnet": "gpt-4o"}},
+            "proxy": {"template": "litellm-openai"},
+        }
+        ctx = _ctx(
+            data={"workspace": {}, "model": {"id": "custom-model", "display_name": "Custom"}},
+            is_proxy=True,
+            runtime=_proxy(raw),
+        )
+        assert any("drift:" in s for s in _stream(ctx, ["drift"]))  # custom-model != gpt-4o
+
 
 # --- Registry wiring ------------------------------------------------------
 
@@ -239,8 +292,10 @@ class TestEndToEndRender:
 
     def test_suspended_supervisor_and_policy_render_through_cli(self):
         manifest = (
-            {"intent": {"policy": {"supervisor": {"suspended": False}, "bundles": ["tdd"]}},
-             "overrides": {"policy": {"supervisor": {"suspended": True}}}},
+            {
+                "intent": {"policy": {"enabled": True, "supervisor": {"suspended": False}, "bundles": ["tdd"]}},
+                "overrides": {"policy": {"supervisor": {"suspended": True}}},
+            },
             True,
         )
         visible = self._render(dict(_DATA), segments=["path", "model", "supervisor", "policy"], session=manifest)

@@ -342,6 +342,22 @@ def get_tier_from_display_name(display_name: str) -> str:
     return "sonnet"
 
 
+def explicit_tier_from_model(model_id: str) -> str | None:
+    """Infer an explicit haiku/sonnet/opus tier from a model id, else None.
+
+    1:1 mirror of the proxy's ``_tier_from_model_name`` (proxy/server.py): request
+    routing prefers an explicit tier in the model name over ``config.proxy
+    .default_tier``. Returns None when no tier substring is present (the proxy then
+    falls back to its default), so the drift producer can replicate the real route
+    instead of comparing against the proxy default tier.
+    """
+    name = (model_id or "").lower()
+    for tier in ("haiku", "sonnet", "opus"):
+        if tier in name:
+            return tier
+    return None
+
+
 class TranscriptStats(NamedTuple):
     """Results from single-pass transcript scan."""
 
@@ -1108,23 +1124,35 @@ _BUNDLE_LABELS = {"tdd": "TDD", "coding_standards": "STD"}
 _AUDIT_MODE_LABELS = {"passthrough": "pass", "inspect": "inspect", "override": "override"}
 
 
-def format_supervisor(suspended: bool) -> str:
-    """Supervisor posture: ``SUP`` when active, ``SUP(susp)`` when suspended.
+def format_supervisor(suspended: bool, enabled: bool = True) -> str:
+    """Supervisor posture: ``SUP`` active, ``SUP(susp)`` suspended, ``SUP(off)`` when
+    policy is disabled.
 
-    Suspended is the noteworthy state (oversight is paused), so it gets the
-    warning color; active is neutral.
+    ``policy.enabled=False`` makes the whole policy subsystem inert (the hook
+    exits before running), so a disabled supervisor is not actually watching —
+    distinct from suspended. Both non-active states use the warning color.
     """
+    if not enabled:
+        return f"{YELLOW}SUP(off){RESET}"
     if suspended:
         return f"{YELLOW}SUP(susp){RESET}"
     return f"{METRICS_COLOR}SUP{RESET}"
 
 
-def format_policy(bundles: list[str]) -> str | None:
-    """Active policy bundles as ``pol:TDD+STD``. None if no usable bundle names."""
+def format_policy(bundles: list[str], enabled: bool = True) -> str | None:
+    """Active policy bundles as ``pol:TDD+STD``. None if no usable bundle names.
+
+    When policy is disabled the bundles are configured but not enforced, so the
+    label gets an ``(off)`` suffix in the warning color rather than claiming they
+    are active.
+    """
     labels = [_BUNDLE_LABELS.get(b, b.upper()) for b in bundles if isinstance(b, str) and b]
     if not labels:
         return None
-    return f"{DIM}pol:{RESET}{METRICS_COLOR}{'+'.join(labels)}{RESET}"
+    joined = "+".join(labels)
+    if not enabled:
+        return f"{DIM}pol:{RESET}{YELLOW}{joined}(off){RESET}"
+    return f"{DIM}pol:{RESET}{METRICS_COLOR}{joined}{RESET}"
 
 
 def format_audit(mode: str, thinking_preserved: bool) -> str:
