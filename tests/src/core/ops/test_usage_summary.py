@@ -185,6 +185,21 @@ class TestBestEffort:
         summary = build_session_activity_summary("planner", forge_root=None)
         assert summary.is_empty is True
         assert render_summary_line(summary) is None
+        # Nothing happened -> nothing to be partial about (was unconditionally True).
+        assert summary.session_tagging_partial is False
+
+    def test_session_tagging_partial_true_when_active(self) -> None:
+        log_usage_event(_event(command="supervisor"))
+        summary = build_session_activity_summary("planner", forge_root=None)
+        assert summary.session_tagging_partial is True
+
+    def test_measured_zero_total_cost_is_zero_not_none(self) -> None:
+        # A measured 0 is distinct from "unmeasured" (None): keep it 0 so the view
+        # reports "$0.00", not "n/a".
+        log_usage_event(_event(cost_micro_usd=0))
+        summary = build_session_activity_summary("planner", forge_root=None)
+        assert summary.total_cost_micro_usd == 0
+        assert summary.cost_partial is False
 
 
 class TestRenderLine:
@@ -217,3 +232,37 @@ class TestRenderLine:
         line = render_summary_line(summary)
         assert line is not None
         assert "supervisor: 4 runs (4 errors)" in line
+
+    def test_capped_log_marks_checks_as_floor(self) -> None:
+        # Capped decision log (checks) vs uncapped ledger (errors): the "+" keeps
+        # "100+ checks (... 120 errors)" from reading as a contradiction.
+        summary = SessionActivitySummary(
+            session="planner",
+            commands=[CommandUsage(command="supervisor", calls=100, errors=120)],
+            policy=PolicyActivity(supervisor_allow=100, log_capped=True),
+        )
+        line = render_summary_line(summary)
+        assert line is not None
+        assert "supervisor: 100+ checks" in line
+        assert "120 errors" in line
+
+    def test_uncapped_log_has_no_plus(self) -> None:
+        summary = SessionActivitySummary(
+            session="planner",
+            policy=PolicyActivity(supervisor_allow=3, log_capped=False),
+        )
+        line = render_summary_line(summary)
+        assert line is not None
+        assert "supervisor: 3 checks" in line
+        assert "3+ checks" not in line
+
+    def test_measured_zero_cost_renders(self) -> None:
+        # total_cost_micro_usd == 0 is measured-zero, not unmeasured: it should print.
+        summary = SessionActivitySummary(
+            session="planner",
+            commands=[CommandUsage(command="supervisor", calls=1)],
+            total_cost_micro_usd=0,
+        )
+        line = render_summary_line(summary)
+        assert line is not None
+        assert "~$0.00 est" in line

@@ -108,7 +108,10 @@ def _render(summary: SessionActivitySummary, *, days: int | None) -> None:
         for warning in pol.recent_warnings:
             console.print(f"  [yellow]•[/yellow] {warning}")
 
-    total_cost = f"~{_fmt_usd(summary.total_cost_micro_usd)} est" if summary.total_cost_micro_usd else "n/a"
+    if summary.subagents:
+        console.print(f"\n[bold]Subagents[/bold]: {summary.subagents}")
+
+    total_cost = f"~{_fmt_usd(summary.total_cost_micro_usd)} est" if summary.total_cost_micro_usd is not None else "n/a"
     console.print(
         f"\n[dim]Total:[/dim] {summary.total_events} events · "
         f"{summary.total_input_tokens}/{summary.total_output_tokens} tok · {total_cost}"
@@ -123,7 +126,7 @@ def _footnotes(summary: SessionActivitySummary) -> list[str]:
     if summary.cost_partial:
         notes.append("cost is estimated and partial (some calls report no cost)")
     if summary.policy is not None and summary.policy.log_capped:
-        notes.append("policy decision log is capped — older decisions not shown")
+        notes.append("policy decision log is at capacity — older decisions may not be shown")
     if summary.session_tagging_partial:
         notes.append("some calls (e.g. the action tagger) are not session-attributed")
     notes.append("estimated; see 'forge proxy costs' for authoritative spend")

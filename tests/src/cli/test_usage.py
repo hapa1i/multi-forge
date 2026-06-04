@@ -89,6 +89,23 @@ def test_empty_session_message(monkeypatch) -> None:
     assert "No Forge activity" in result.output
 
 
+def test_human_render_shows_subagents(monkeypatch, tmp_path) -> None:
+    # Subagent count is collected and JSON-exposed; it must also appear in the human view.
+    from forge.session.models import SubagentConfirmed, create_session_state
+    from forge.session.store import SessionStore
+
+    state = create_session_state("planner", worktree_path=str(tmp_path))
+    state.confirmed.subagents = SubagentConfirmed(total_count=3)
+    SessionStore(str(tmp_path), "planner").write(state)
+    _patch_resolver(monkeypatch, name="planner", forge_root=str(tmp_path))
+    log_usage_event(_event(command="supervisor"))
+
+    result = CliRunner().invoke(usage_cmd, ["planner", "--all"])
+    assert result.exit_code == 0
+    assert "Subagents" in result.output
+    assert "3" in result.output
+
+
 def test_days_window_excludes_nothing_recent(monkeypatch) -> None:
     _patch_resolver(monkeypatch)
     log_usage_event(_event(command="supervisor"))

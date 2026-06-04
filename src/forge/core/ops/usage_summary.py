@@ -84,8 +84,10 @@ class SessionActivitySummary:
     subagents: int = 0
     # Explicit coverage flags (JSON-friendly) so a sparse summary reads honestly.
     cost_partial: bool = False  # some in-scope events lacked a measured cost
-    # Some Forge LLM calls (e.g. the action tagger) never tag a session, so a
-    # per-session view can undercount. A static truth, recorded for consumers.
+    # Some Forge LLM calls (e.g. the action tagger) never tag a session, so a per-session
+    # view can undercount. The builder sets this True only when the session has activity
+    # (an empty summary has nothing to be partial about); the default True is the safe
+    # caveat for hand-built summaries.
     session_tagging_partial: bool = True
 
     @property
@@ -115,6 +117,11 @@ def build_session_activity_summary(
         subagents = manifest.confirmed.subagents
         if subagents is not None:
             summary.subagents = int(subagents.total_count)
+
+    # Untagged emitters (e.g. the action tagger) never tag a session, so a per-session
+    # view can undercount -- but only flag that once the session has activity to
+    # contextualize it; claiming partial coverage of an empty summary is noise.
+    summary.session_tagging_partial = not summary.is_empty
     return summary
 
 
@@ -128,8 +135,14 @@ def render_summary_line(summary: SessionActivitySummary) -> str | None:
     sup_errors = next((c.errors for c in summary.commands if c.command == "supervisor"), 0)
     pol = summary.policy
     if pol and pol.has_content:
+        # `checks` (allow+warn+deny) is the capped decision-log count; `sup_errors` is the
+        # uncapped ledger count -- different planes. A supervisor error fails open to an
+        # `allow`, so normally errors <= checks; only decision-log eviction breaks that. So
+        # when the log is at capacity render `checks` as a floor ("12+"), otherwise a capped
+        # 100 checks beside 120 ledger errors reads as a contradiction instead of eviction.
         checks = pol.supervisor_allow + pol.supervisor_warn + pol.supervisor_deny
-        seg = f"supervisor: {checks} checks ({pol.supervisor_warn} warn, {pol.supervisor_deny} block"
+        checks_label = f"{checks}+" if pol.log_capped else str(checks)
+        seg = f"supervisor: {checks_label} checks ({pol.supervisor_warn} warn, {pol.supervisor_deny} block"
         seg += f", {sup_errors} errors)" if sup_errors else ")"
         parts.append(seg)
     else:
@@ -140,7 +153,7 @@ def render_summary_line(summary: SessionActivitySummary) -> str | None:
                 seg += f" ({sup.errors} errors)"
             parts.append(seg)
 
-    if summary.total_cost_micro_usd:
+    if summary.total_cost_micro_usd is not None:
         parts.append(f"~${summary.total_cost_micro_usd / 1_000_000:.2f} est")
 
     tokens = summary.total_input_tokens + summary.total_output_tokens
@@ -228,6 +241,9 @@ def _policy_activity(manifest, since: datetime | None) -> PolicyActivity | None:
 
     from forge.policy.store import MAX_DECISION_LOG
 
+    # "At capacity", not "definitely truncated": the store caps the log to the last
+    # MAX_DECISION_LOG on write, so at read time a naturally-exactly-full log is
+    # indistinguishable from a truncated one -- treat at-capacity as "older may be evicted".
     activity = PolicyActivity(log_capped=len(decisions) >= MAX_DECISION_LOG)
     warnings: list[str] = []
 
