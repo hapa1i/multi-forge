@@ -10,6 +10,7 @@ from __future__ import annotations
 import shlex
 import sys
 import uuid as _uuid
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import cast
 
@@ -450,6 +451,10 @@ def _launch_claude_for_session(
             mutate=lambda m: setattr(m.confirmed, "claude_project_root", _lr),
         )
 
+    # Wall-clock start so the post-exit summary scopes ledger/policy activity to
+    # this run (hooks keep writing to the manifest during the session).
+    launch_started_at = datetime.now(timezone.utc)
+
     if use_sidecar:
         if effective_template is None or runtime_base_url is None:
             console.print("[red]Error:[/red] Direct sessions are not supported with --sidecar")
@@ -554,7 +559,7 @@ def _launch_claude_for_session(
         console.print()
 
         try:
-            return _sess().run_with_active_session(
+            sidecar_exit = _sess().run_with_active_session(
                 session_name=manifest.name,
                 worktree_path=worktree_path,
                 launch_mode=LAUNCH_MODE_SIDECAR,
@@ -571,6 +576,9 @@ def _launch_claude_for_session(
                     env_vars=container_env,
                     claude_args=claude_args,
                 ),
+            )
+            return _post_exit_render(
+                manifest, store_exists=store.exists(), exit_code=sidecar_exit, since=launch_started_at
             )
         except ContainerExistsError as e:
             store.update(
@@ -642,12 +650,50 @@ def _launch_claude_for_session(
     if exit_code == 0 and not fork_session:
         _sess()._infer_launch_confirmation(store=store, manifest=manifest, session_id=resume_id or session_id)
 
-    if store.exists():
+    return _post_exit_render(manifest, store_exists=store.exists(), exit_code=exit_code, since=launch_started_at)
+
+
+def _post_exit_render(
+    manifest: SessionState,
+    *,
+    store_exists: bool,
+    exit_code: int,
+    since: datetime | None,
+) -> int:
+    """Shared post-exit output for host, sidecar, and fork launches.
+
+    Prints the Forge activity summary (best-effort) then the reconnect tip when the
+    session still exists; returns ``exit_code`` unchanged so callers can ``return`` it.
+    """
+    if store_exists:
+        _print_session_activity_summary(manifest, since=since)
         _print_post_exit_tip(manifest)
     elif not manifest.is_incognito and manifest.name:
         console.print(f"\n[dim]Session '{manifest.name}' was deleted during this run.[/dim]")
-
     return exit_code
+
+
+def _print_session_activity_summary(manifest: SessionState, *, since: datetime | None) -> None:
+    """Print a one-line summary of what Forge did this run. Best-effort; never raises.
+
+    Reads the manifest fresh from disk (via the ops builder) because hooks wrote
+    ``confirmed.policy`` / ``subagents`` during the session, after the launcher's
+    in-memory copy was taken.
+    """
+    if manifest.is_incognito or not manifest.name or not manifest.forge_root:
+        return
+    try:
+        from forge.core.ops.usage_summary import (
+            build_session_activity_summary,
+            render_summary_line,
+        )
+
+        summary = build_session_activity_summary(manifest.name, manifest.forge_root, since=since)
+        line = render_summary_line(summary)
+        if line:
+            console.print(f"\n[dim]{line}[/dim]")
+    except Exception:
+        logger.debug("session activity summary failed", exc_info=True)
 
 
 def _print_post_exit_tip(manifest: SessionState) -> None:

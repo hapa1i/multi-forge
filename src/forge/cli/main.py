@@ -351,9 +351,11 @@ main.add_command(runtime, name="runtime")
 
 from forge.cli.gc import clean_cmd  # noqa: E402
 from forge.cli.logs import logs_cmd  # noqa: E402
+from forge.cli.usage import usage_cmd  # noqa: E402
 
 main.add_command(clean_cmd, name="clean")
 main.add_command(logs_cmd, name="logs")
+main.add_command(usage_cmd, name="usage")
 
 
 if __name__ == "__main__":

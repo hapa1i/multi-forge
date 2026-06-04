@@ -181,6 +181,7 @@ def read_usage_events(
     root_run_id: str | None = None,
     runtime: str | None = None,
     command: str | None = None,
+    session: str | None = None,
 ) -> list[UsageEvent]:
     """Read and merge usage events across PID shards, sorted by timestamp.
 
@@ -233,6 +234,8 @@ def read_usage_events(
                     if runtime and record.get("runtime") != runtime:
                         continue
                     if command and record.get("command") != command:
+                        continue
+                    if session and record.get("session") != session:
                         continue
 
                     if period_start or period_end:

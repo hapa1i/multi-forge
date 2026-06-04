@@ -306,4 +306,65 @@ forge proxy start "$FORGE_QA_OPENAI_PROXY"
 - [ ] QA cap seed logs removed (no `*_qa-cap-seed.jsonl` in `requests/`)
 - [ ] Spend caps reset on QA OpenAI and Gemini test proxies
 
+### 7.12 Per-Session Usage (`forge usage`)
+
+<!-- prereq: 0.3 -->
+
+<!-- auto -->
+
+`forge usage [session]` reads the usage-attribution ledger (`~/.forge/usage/events/`) filtered by session. Seed fixture
+events for a throwaway session and assert the rollup -- including the workflow worker/verb split (one panel = 1 call + N
+workers, not N+1 calls).
+
+```bash
+cd $FORGE_TEST_REPO
+
+# A resolvable session for `forge usage` to target (no Claude launch).
+forge session delete qa-usage --yes --force 2>/dev/null || true
+forge session start qa-usage --no-launch
+
+# Seed fixture usage events: 3 supervisor (1 error) + one panel verb aggregate + 3 panel
+# worker leaves. The workers share command="panel"; the double-count fix must keep them
+# out of `calls`. PID 99999 avoids collision with any real ledger shard.
+mkdir -p ~/.forge/usage/events
+cat > ~/.forge/usage/events/qa-usage-fixture_99999.jsonl <<'EOF'
+{"schema_version":1,"run_id":"qa-r1","root_run_id":"qa-r1","runtime":"claude_code","command":"supervisor","status":"success","session":"qa-usage","attribution_granularity":"verb","input_tokens":200,"output_tokens":80,"cost_micro_usd":300,"ts":"2026-05-01T00:00:00Z"}
+{"schema_version":1,"run_id":"qa-r2","root_run_id":"qa-r2","runtime":"claude_code","command":"supervisor","status":"success","session":"qa-usage","attribution_granularity":"verb","input_tokens":150,"output_tokens":60,"cost_micro_usd":250,"ts":"2026-05-01T00:01:00Z"}
+{"schema_version":1,"run_id":"qa-r3","root_run_id":"qa-r3","runtime":"claude_code","command":"supervisor","status":"error","session":"qa-usage","attribution_granularity":"verb","ts":"2026-05-01T00:02:00Z"}
+{"schema_version":1,"run_id":"qa-r4","root_run_id":"qa-r4","runtime":"claude_code","command":"panel","status":"success","session":"qa-usage","attribution_granularity":"verb","input_tokens":700,"output_tokens":230,"cost_micro_usd":1500,"ts":"2026-05-01T00:03:00Z"}
+{"schema_version":1,"run_id":"qa-w1","root_run_id":"qa-r4","runtime":"claude_code","command":"panel","status":"success","session":"qa-usage","attribution_granularity":"worker","ts":"2026-05-01T00:03:01Z"}
+{"schema_version":1,"run_id":"qa-w2","root_run_id":"qa-r4","runtime":"claude_code","command":"panel","status":"success","session":"qa-usage","attribution_granularity":"worker","ts":"2026-05-01T00:03:02Z"}
+{"schema_version":1,"run_id":"qa-w3","root_run_id":"qa-r4","runtime":"claude_code","command":"panel","status":"success","session":"qa-usage","attribution_granularity":"worker","ts":"2026-05-01T00:03:03Z"}
+EOF
+
+# JSON contract + the double-count assertion
+forge usage qa-usage --all --json | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+cmds = {c['command']: c for c in d['commands']}
+sup, panel = cmds.get('supervisor', {}), cmds.get('panel', {})
+print(f'total_events={d[\"total_events\"]}')
+print(f'supervisor calls={sup.get(\"calls\")} errors={sup.get(\"errors\")}')
+print(f'panel calls={panel.get(\"calls\")} workers={panel.get(\"workers\")}')
+print('DOUBLE_COUNT_OK' if panel.get('calls') == 1 and panel.get('workers') == 3 else 'DOUBLE_COUNT_FAIL')
+print(f'session={d[\"session\"]} tagging_partial={d[\"session_tagging_partial\"]}')
+"
+
+echo "---"
+# Human-readable render (Rich table -> stderr): the Workers column appears only with a fan-out.
+forge usage qa-usage --all 2>&1
+
+# Clean up
+rm -f ~/.forge/usage/events/qa-usage-fixture_99999.jsonl
+forge session delete qa-usage --yes --force 2>/dev/null || true
+```
+
+- [ ] `total_events` is 7 (3 supervisor + 1 panel verb + 3 panel workers)
+- [ ] `supervisor calls=3 errors=1` (the error mirrors an OpenRouter content-filter failure)
+- [ ] `panel calls=1 workers=3` and the script prints `DOUBLE_COUNT_OK` (verb + workers not double-counted)
+- [ ] `session=qa-usage tagging_partial=True`
+- [ ] Human render shows a `supervisor` row and a `panel` row, a `Workers` column with `3` on the panel row, and a
+  `Total: 7 events` line
+- [ ] Fixture shard + `qa-usage` session removed at the end
+
 ---

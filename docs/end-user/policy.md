@@ -42,13 +42,19 @@ Claude calls Write or Edit
   → PreToolUse hook fires
   → PolicyEngine evaluates all applicable policies
   → deny  → tool call blocked (stderr feedback to Claude)
-  → warn  → tool call proceeds (warning printed)
+  → warn  → tool call proceeds (warning recorded; see "Seeing warn verdicts" below)
   → needs_review → semantic supervisor resolves it; unresolved requests block
   → allow → tool call proceeds silently
 ```
 
 Policies are **session-scoped** — enabling policies in one session doesn't affect others. State (like which test files
 have been touched) persists in the session manifest between hook invocations.
+
+> **Seeing `warn` verdicts.** A `warn` does not block, and Claude Code does **not** surface non-blocking hook output to
+> you at the terminal (it goes to the model as context, not your console). So a warning is effectively invisible
+> mid-session. Forge records every verdict; review them after the fact with
+> [`forge usage [session]`](session.md#what-a-session-did-forge-usage--session-end-summary) (supervisor allow/warn/deny
+> plus recent warning text) or the one-line session-end summary the launcher prints on exit.
 
 ---
 

@@ -27,6 +27,77 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-03
 
+### Fix: `forge usage` workflow double-count + supervisor warning misattribution (review fixes)
+
+**Goal**: Two correctness bugs found reviewing today's per-session usage work; each fixed with a regression test.
+
+**Key changes**:
+
+- **Workflow double-count** (`core/ops/usage_summary.py`): a panel emits one verb-aggregate event plus N per-worker
+  events that all share `command="panel"`, so `calls` — and the session-end "N workflows" tally derived from it —
+  counted N+1 (a 4-worker panel read as 5 workflows). Worker-granularity events now land in a separate
+  `CommandUsage.workers`; `calls`/`errors` count verb/session events only. `forge usage` gains a conditional Workers
+  column; the Total line is relabeled "events".
+- **Supervisor warning misattribution** (`_policy_activity`): collected the entry-level *composite* warnings (which the
+  policy engine accumulates across every policy), so a TDD-permissive warning surfaced a phantom "supervisor: 0/0/0"
+  section. Warnings now come from the `semantic.supervisor` sub-decision only, and the function returns None when the
+  supervisor had no in-window activity.
+
+**Verification**: 2 new regression files (`test_bug_usage_workflow_double_count.py`,
+`test_bug_usage_supervisor_warning_misattribution.py`); 28 usage unit + regression tests pass; `make pre-commit` clean.
+
+### Sidecar usage-ledger mount: `forge usage` + session-end summary now cover sidecar sessions
+
+**Goal**: Close the deferred gap from the per-session usage entry below. In sidecar mode the supervisor + workflow verbs
+(the only writers of usage events) run inside the `--rm` container and wrote to an unmounted `~/.forge/usage/`, so their
+events died with the container — a sidecar session was invisible to `forge usage` and the session-end summary.
+
+**Key changes**:
+
+- **Mount `usage/` rw** in `sidecar/container.py` `_ensure_audit_plumbing_mounts`, symmetric with `audit/` + `costs/`
+  (gated on a proxy id). The in-container `FORGE_HOME=/root/.forge` plus the bind mount let `log_usage_event` writes
+  land on the host where `forge usage` reads them; PID-sharded shards keep host/container writers contention-free.
+- **Docs**: design.md §7 mount enumeration + design_appendix.md §A.13 sidecar note flipped to the closed state
+  (template-only sidecars, no proxy id, still mount nothing — consistent with how they already drop audit/costs).
+
+**Verification**: `test_container.py::test_proxy_id_adds_env_and_mounts` asserts the `usage:/root/.forge/usage:rw`
+mount; the `test_audit_plumbing.py` integration test (real sidecar image, host-spawned `--rm` container) writes a
+supervisor-`error` `UsageEvent` inside the container and asserts the host sees it on the mounted `usage/events/` shard
+after teardown. `make pre-commit` clean.
+
+### Per-session usage visibility: `forge usage` + session-end summary (runtime_abstraction Phase 4 follow-up)
+
+**Goal**: The Phase-4 usage ledger and `confirmed.policy.decisions` already record per-session supervisor/cost/token
+activity, but nothing surfaced it — supervisor `warn`s exit 0 (Claude Code hides non-blocking hook stderr) and there was
+no read surface. Light up two human-visible planes over the already-captured data.
+
+**Key changes**:
+
+- **Ledger read filter**: `read_usage_events(..., session=)` (`core/usage/ledger.py`), applied to the raw record before
+  the typed build like the existing filters.
+- **Pure aggregator** (`core/ops/usage_summary.py`, design §3.12):
+  `build_session_activity_summary(name, forge_root, since=)` -> `SessionActivitySummary`. Two sources kept separate by
+  guarantee — the **ledger** for per-command run/error/token/cost (uncapped) and `confirmed.policy.decisions` for
+  supervisor allow/warn/deny + warning text (capped, surfaced via `log_capped`). Re-reads the manifest fresh from disk
+  (hooks mutate `confirmed.*` during the run). Coverage flags `cost_partial`/`session_tagging_partial`.
+  `render_summary_line()` is a shared pure formatter.
+- **`forge usage [session]`** (`cli/usage.py`, registered in `main.py`): table + `--json`/`--days`/`--all`; resolves an
+  explicit name/UUID via `resolve_session_identifier`, else `$FORGE_SESSION`; not-found tips `forge session list`.
+- **Session-end summary**: refactored the launcher so host (`session_lifecycle.py:623`) and the early-returning sidecar
+  path (`:557`) converge on one `_post_exit_render`; new best-effort `_print_session_activity_summary` prints a one-line
+  rollup before the reconnect tip. Same helper wired into `session_fork.py` (the fork post-exit site). Surfaces
+  supervisor `status="error"` runs — i.e. OpenRouter content-filter failures — directly.
+- **Coverage**: threaded `session=$FORGE_SESSION` into the 4 workflow verbs' `emit_verb_usage`/`Attribution` so
+  panels/debates appear per-session. Action tagger left untagged (documented). Sidecar usage-ledger mount closed in the
+  follow-up above; action-tagger session tagging still deferred.
+- **Docs**: design.md §3.14 (read surface) + §4.0 (command); design_appendix.md §A.13 (read surface + per-emitter
+  coverage table + sidecar caveat).
+
+**Verification**: 172 unit tests across the new + affected suites pass (`test_ledger` session filter,
+`test_usage_summary` 11, `test_usage` 6, `test_session_activity_summary` 7, `test_workflow` session assertion); 207
+existing session-command/fork/resume tests green (launcher refactor non-regressing); mypy + full pyright clean on
+changed src.
+
 ### QA hardening: proxy passthrough + system-role + stale-container guard (runtime_abstraction)
 
 **Goal**: A manual `/forge:qa` dry-run of the runtime-refactor branch surfaced real proxy-runtime bugs plus a QA-harness

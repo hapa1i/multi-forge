@@ -185,22 +185,26 @@ def run_sidecar_session(
 def _ensure_audit_plumbing_mounts(proxy_id: str) -> list[tuple[str, str, str]]:
     """Build the sidecar audit-plumbing mounts, creating host state dirs as needed.
 
-    Side effect: creates the host audit/ and costs/ dirs (Docker bind sources must
-    exist before `docker run`). Narrow mounts (NOT all of ~/.forge, preserving the
+    Side effect: creates the host audit/, costs/, and usage/ dirs (Docker bind sources
+    must exist before `docker run`). Narrow mounts (NOT all of ~/.forge, preserving the
     design.md §7 isolation rationale):
     - per-proxy config dir read-only, so the in-container server reads the proxy.yaml
       intercept/audit overlay.
-    - host audit/ + costs/ read-write, so audit records, cost history, and spend-cap
-      accounting persist where the host `forge proxy audit|costs` reads them instead
-      of dying with the --rm container. (Caps bootstrap from cost history, so an
-      unmounted costs/ would silently reset daily/monthly caps every launch.)
+    - host audit/, costs/, and usage/ read-write, so the proxy's audit records and cost
+      history, spend-cap accounting, and the attribution ledger persist where the host
+      reads them (`forge proxy audit|costs`, `forge usage`, the session-end summary)
+      instead of dying with the --rm container. Each would otherwise be lost silently:
+      caps bootstrap from cost history, so an unmounted costs/ resets daily/monthly caps
+      every launch; and in sidecar mode the in-container supervisor + workflow verbs are
+      the *only* writers of their usage events, so an unmounted usage/ makes the whole
+      session invisible to `forge usage`.
     """
     forge_home = get_forge_home()
     mounts: list[tuple[str, str, str]] = [
         (str(forge_home / "proxies" / proxy_id), f"{_SIDECAR_FORGE_HOME}/proxies/{proxy_id}", "ro"),
     ]
 
-    for subdir in ("audit", "costs"):
+    for subdir in ("audit", "costs", "usage"):
         host_dir = forge_home / subdir
         host_dir.mkdir(parents=True, exist_ok=True)
         mounts.append((str(host_dir), f"{_SIDECAR_FORGE_HOME}/{subdir}", "rw"))

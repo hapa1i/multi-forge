@@ -11,6 +11,7 @@ Provides:
 from __future__ import annotations
 
 import json
+import os
 import sys
 import tempfile
 from pathlib import Path
@@ -470,13 +471,18 @@ def panel(
             timeout_seconds=timeout,
             cwd=cwd or str(Path.cwd()),
             resume_id=resume_id,
-            attribution=Attribution(command="panel"),
+            attribution=Attribution(command="panel", session=os.environ.get("FORGE_SESSION")),
         )
 
     # Verb-level aggregate (estimated, across workers) attributed to the ambient run.
     from forge.core.usage import emit_verb_usage
 
-    emit_verb_usage(command="panel", cost=cost, status="success" if output.successful else "error")
+    emit_verb_usage(
+        command="panel",
+        cost=cost,
+        status="success" if output.successful else "error",
+        session=os.environ.get("FORGE_SESSION"),
+    )
 
     _handle_review_output(
         ctx,
@@ -839,13 +845,18 @@ def analyze(
             routing_plan=routing_plan,
             timeout_seconds=timeout,
             cwd=cwd or str(Path.cwd()),
-            attribution=Attribution(command="analyze"),
+            attribution=Attribution(command="analyze", session=os.environ.get("FORGE_SESSION")),
         )
 
     # Verb-level aggregate (estimated, across workers) attributed to the ambient run.
     from forge.core.usage import emit_verb_usage
 
-    emit_verb_usage(command="analyze", cost=cost, status="success" if output.successful else "error")
+    emit_verb_usage(
+        command="analyze",
+        cost=cost,
+        status="success" if output.successful else "error",
+        session=os.environ.get("FORGE_SESSION"),
+    )
 
     _handle_review_output(
         ctx,
@@ -1265,7 +1276,7 @@ def debate(
                 timeout_seconds=timeout,
                 cwd=cwd or str(Path.cwd()),
                 routing_plan=routing_plan,
-                attribution=Attribution(command="debate"),
+                attribution=Attribution(command="debate", session=os.environ.get("FORGE_SESSION")),
             )
     finally:
         if tmp_file is not None:
@@ -1274,7 +1285,12 @@ def debate(
     # Verb-level aggregate (estimated, across workers) attributed to the ambient run.
     from forge.core.usage import emit_verb_usage
 
-    emit_verb_usage(command="debate", cost=cost, status="success" if output.successful else "error")
+    emit_verb_usage(
+        command="debate",
+        cost=cost,
+        status="success" if output.successful else "error",
+        session=os.environ.get("FORGE_SESSION"),
+    )
 
     debate_warnings = _routing_plan_warnings(stance_models, routing_plan)
     debate_resolved_models = _resolved_models_summary(
@@ -1956,7 +1972,7 @@ def consensus(
                 cwd=cwd or str(Path.cwd()),
                 original_subject=raw_subject or "",
                 routing_plan=routing_plan,
-                attribution=Attribution(command="consensus"),
+                attribution=Attribution(command="consensus", session=os.environ.get("FORGE_SESSION")),
             )
     finally:
         if tmp_file is not None:
@@ -1965,7 +1981,12 @@ def consensus(
     # Verb-level aggregate (estimated, across workers) attributed to the ambient run.
     from forge.core.usage import emit_verb_usage
 
-    emit_verb_usage(command="consensus", cost=cost, status="success" if output.successful else "error")
+    emit_verb_usage(
+        command="consensus",
+        cost=cost,
+        status="success" if output.successful else "error",
+        session=os.environ.get("FORGE_SESSION"),
+    )
 
     consensus_warnings = _routing_plan_warnings(role_models, routing_plan)
     consensus_resolved_models = _resolved_models_summary(

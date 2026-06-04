@@ -456,7 +456,7 @@ class TestRunSidecarSessionProxyAudit:
         return " ".join(captured["cmd"])
 
     def test_proxy_id_adds_env_and_mounts(self) -> None:
-        """proxy_id sets FORGE_PROXY_ID + FORGE_HOME and mounts config (ro) + audit/costs (rw)."""
+        """proxy_id sets FORGE_PROXY_ID + FORGE_HOME and mounts config (ro) + audit/costs/usage (rw)."""
         from forge.core.paths import get_forge_home
 
         cmd = self._capture_cmd(proxy_id="audit-test", make_proxy_yaml=True)
@@ -469,6 +469,9 @@ class TestRunSidecarSessionProxyAudit:
         # Audit + cost dirs mounted read-write (host-visible logs; caps persist across launches)
         assert f"{forge_home}/audit:/root/.forge/audit:rw" in cmd
         assert f"{forge_home}/costs:/root/.forge/costs:rw" in cmd
+        # Usage ledger mounted read-write so the in-container supervisor/verb attribution
+        # events survive --rm and feed the host `forge usage` + session-end summary.
+        assert f"{forge_home}/usage:/root/.forge/usage:rw" in cmd
 
     def test_missing_proxy_yaml_fails_fast(self) -> None:
         """proxy_id with no proxy.yaml raises on the host, never reaching docker run."""
