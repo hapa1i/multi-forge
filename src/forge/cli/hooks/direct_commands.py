@@ -418,6 +418,7 @@ def _handle_cmd_config(data: dict[str, Any], argv: list[str]) -> None:
     No mutations from inside a session (matching %proxy policy).
     """
     from dataclasses import fields as dc_fields
+    from dataclasses import is_dataclass
 
     from forge.runtime_config import RuntimeConfig, get_config_path, load_runtime_config
 
@@ -433,6 +434,12 @@ def _handle_cmd_config(data: dict[str, Any], argv: list[str]) -> None:
 
     for f in dc_fields(RuntimeConfig):
         val = getattr(rc, f.name)
+        # Expand nested config (e.g. statusline) instead of printing its repr.
+        if is_dataclass(val) and not isinstance(val, type):
+            lines.append(f"  {f.name}:")
+            for sub in dc_fields(type(val)):
+                lines.append(f"    {sub.name}: {getattr(val, sub.name)}")
+            continue
         env_var = env_sources.get(f.name)
         if env_var:
             lines.append(f"  {f.name}: {val}  (from {env_var})")

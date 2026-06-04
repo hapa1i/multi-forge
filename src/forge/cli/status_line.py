@@ -572,8 +572,16 @@ def format_context_size(size: int) -> str:
     return str(size)
 
 
-def get_context_display(context_info: dict[str, Any] | None) -> str:
-    """Generate context display with progress bar."""
+def get_context_display(
+    context_info: dict[str, Any] | None,
+    glyphs: tuple[str, str] | None = None,
+) -> str:
+    """Generate context display with progress bar.
+
+    ``glyphs`` is an optional ``(filled, empty)`` pair for the bar; defaults to
+    the ASCII module constants so existing callers stay byte-identical.
+    """
+    filled_char, empty_char = glyphs if glyphs is not None else (PROGRESS_FILLED, PROGRESS_EMPTY)
     if not context_info:
         return f"{DARK_GRAY}---{RESET}"
 
@@ -602,7 +610,7 @@ def get_context_display(context_info: dict[str, Any] | None) -> str:
     segments = 8
     filled = percent * segments // 100
     empty = segments - filled
-    bar = PROGRESS_FILLED * filled + PROGRESS_EMPTY * empty
+    bar = filled_char * filled + empty_char * empty
 
     # Warning overrides
     if warning == "auto-compact":
@@ -1256,112 +1264,40 @@ def status_line() -> None:
     else:
         logger.debug("proxy: runtime=None")
 
-    workspace = data.get("workspace", {})
-    current_dir = workspace.get("current_dir", "")
-    model_data = data.get("model", {})
-    raw_model_name = model_data.get("display_name", "Claude")
-    transcript_path = data.get("transcript_path", "")
-    cost_data = data.get("cost", {})
-
-    # Discover session early (needed for Who + State categories)
+    # Discover session early (used by breadcrumb / loop / sidecar segments)
     session_manifest, is_session_authoritative = discover_session()
-
     session_name = session_manifest.get("name") if session_manifest else None
     logger.debug("session: name=%s, authoritative=%s", session_name, is_session_authoritative)
-
-    # === CATEGORY: Where ===
-    where: list[str] = []
-    where.append(f"{GREEN_BOLD}{get_compact_path(current_dir)}{RESET}")
-    git_branch = get_git_branch(current_dir)
-    if git_branch:
-        where.append(f" ({YELLOW_BOLD}{git_branch}{RESET})")
-
-    # === CATEGORY: Who ===
-    who: list[str] = []
-    if session_manifest:
-        breadcrumb = format_breadcrumb(session_manifest, is_session_authoritative)
-        if breadcrumb:
-            who.append(f"{BREADCRUMB_COLOR}{breadcrumb}{RESET}")
-
-    # === CATEGORY: What ===
-    what: list[str] = []
-
-    # Context info (may be overridden by proxy runtime truth)
     logger.debug(
         "context_window raw: %s (type=%s)", data.get("context_window"), type(data.get("context_window")).__name__
     )
-    context_info = parse_context_from_json(data)
-    if is_proxy and runtime and runtime.active_context_window:
-        if context_info:
-            tokens = context_info.get("tokens", 0)
-            accurate_window = runtime.active_context_window
-            context_info["context_window"] = accurate_window
-            context_info["percent"] = min(100, int((tokens / accurate_window) * 100))
 
-    effective_context_window = get_effective_context_window(data, runtime, context_info)
-    model_name = format_model_label(raw_model_name, effective_context_window)
-
-    tier_display = get_tier_display(runtime) if is_proxy else None
-    if tier_display:
-        model_segment = f"[{tier_display}] {get_context_display(context_info)}"
-    else:
-        detected_tier = get_tier_from_display_name(raw_model_name)
-        model_color = _tier_color(detected_tier, runtime)
-        model_segment = f"{model_color}[{model_name}]{RESET} {get_context_display(context_info)}"
-
-    if is_proxy and runtime and runtime.template and runtime.template != "unknown":
-        suffix = "" if is_proxy_authoritative else "(~)"
-        what.append(f"{TEMPLATE_COLOR}{runtime.template}{suffix}{RESET} {model_segment}")
-    else:
-        what.append(model_segment)
-
-    # === CATEGORY: Metrics ===
-    metrics_cat: list[str] = []
-
-    _proxy_cost = runtime.proxy_cost_usd if runtime else 0.0
-    session_metrics = get_session_metrics(cost_data, is_proxy, proxy_cost_usd=_proxy_cost)
-    if session_metrics:
-        metrics_cat.append(session_metrics)
-
-    # Rate limit usage (direct Anthropic sessions only, config-gated)
+    # Build the render context once, then let the segment registry produce the
+    # line. RenderContext is lazy (cached_property): a transcript scan or git
+    # subprocess runs only if an enabled segment accesses it. The registry routes
+    # producer output into a `where` list (concatenated) + a `stream` list
+    # (separator-joined), preserving today's exact order via DEFAULT_ORDER.
+    from forge.cli.statusline.context import RenderContext
+    from forge.cli.statusline.palette import apply_palette
+    from forge.cli.statusline.registry import render_segments
     from forge.runtime_config import get_runtime_config
 
-    if get_runtime_config().show_rate_limits:
-        rate_limits_data = data.get("rate_limits")
-        logger.debug("rate_limits: %s", rate_limits_data)
-        rate_limit_display = format_rate_limits(rate_limits_data, is_proxy)
-        if rate_limit_display:
-            metrics_cat.append(rate_limit_display)
-
-    # Transcript stats (mtime-cached to avoid re-scanning unchanged files)
-    stats = _cached_scan_transcript(transcript_path)
-
-    line_display = format_line_changes(cost_data, current_dir)
-    if line_display:
-        metrics_cat.append(line_display)
-
-    input_tokens, output_tokens, cached_tokens = get_token_breakdown_values(data, stats)
-    token_display = format_token_breakdown(input_tokens, output_tokens, cached_tokens)
-    if token_display:
-        metrics_cat.append(token_display)
-
-    # === CATEGORY: State ===
-    state: list[str] = []
-
-    if stats.has_thinking:
-        state.append(f"{BLUE}{THINKING_INDICATOR}{RESET}")
-
-    if session_manifest:
-        verif = format_verification(session_manifest)
-        if verif:
-            state.append(verif)
-
-        sidecar = format_sidecar(session_manifest)
-        if sidecar:
-            state.append(sidecar)
+    config = get_runtime_config()
+    ctx = RenderContext(
+        data=data,
+        is_proxy=is_proxy,
+        runtime=runtime,
+        is_proxy_authoritative=is_proxy_authoritative,
+        manifest=session_manifest,
+        is_session_authoritative=is_session_authoritative,
+        config=config,
+    )
+    where, stream = render_segments(ctx, config.statusline.segments)
 
     # === RENDER ===
-    output = render_categories(where, who, what, metrics_cat, state)
+    output = render_categories(where, [], [], stream, [])
+    # Recolor by the configured palette (default == no-op: empty remap).
+    output = apply_palette(output, ctx.palette)
 
     # Output hardening (from ccstatusline)
     # ANSI reset prefix: override Claude Code's dim default styling

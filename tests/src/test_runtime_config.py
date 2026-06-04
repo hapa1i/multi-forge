@@ -20,6 +20,7 @@ import pytest
 from forge.core.paths import get_forge_home
 from forge.runtime_config import (
     RuntimeConfig,
+    StatusLineConfig,
     get_default_config_content,
     get_runtime_config,
     load_runtime_config,
@@ -259,6 +260,18 @@ class TestLoadRuntimeConfig:
         # Renamed keys get a targeted warning, not the generic "Unknown keys" line.
         assert "Unknown keys" not in caplog.text
 
+    def test_removed_show_rate_limits_warned_with_replacement(self, tmp_path: Path, caplog):
+        """Removed key 'show_rate_limits' warns naming the statusline.segments replacement."""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text("show_rate_limits: true\n")
+        with caplog.at_level(logging.WARNING):
+            load_runtime_config(config_file)
+        assert "show_rate_limits" in caplog.text
+        assert "removed" in caplog.text
+        assert "statusline.segments" in caplog.text
+        # Removed keys get a targeted warning, not the generic "Unknown keys" line.
+        assert "Unknown keys" not in caplog.text
+
 
 # ---------------------------------------------------------------------------
 # get_runtime_config() singleton
@@ -475,3 +488,108 @@ class TestEnvVarOverrides:
             assert field_name in valid_fields, (
                 f"_ENV_OVERRIDES[{env_var!r}] targets {field_name!r} " f"which is not a RuntimeConfig field"
             )
+
+
+# ---------------------------------------------------------------------------
+# StatusLineConfig (nested statusline: section)
+# ---------------------------------------------------------------------------
+
+
+class TestStatusLineConfigDefaults:
+    def test_runtime_config_has_statusline_default(self):
+        rc = RuntimeConfig()
+        assert isinstance(rc.statusline, StatusLineConfig)
+
+    def test_statusline_field_defaults(self):
+        sl = StatusLineConfig()
+        assert sl.segments == []
+        assert sl.cost_mode == "auto"
+        assert sl.palette == "default"
+        assert sl.glyphs == "ascii"
+        assert sl.cache_hit == "auto"
+        assert sl.cache_hit_ttl == 12
+
+
+class TestStatusLineConfigValidation:
+    def test_invalid_cost_mode_rejected(self):
+        with pytest.raises(ValueError, match="Invalid statusline.cost_mode"):
+            StatusLineConfig(cost_mode="wat")
+
+    def test_invalid_palette_rejected(self):
+        with pytest.raises(ValueError, match="Invalid statusline.palette"):
+            StatusLineConfig(palette="neon")
+
+    def test_invalid_glyphs_rejected(self):
+        with pytest.raises(ValueError, match="Invalid statusline.glyphs"):
+            StatusLineConfig(glyphs="emoji")
+
+    def test_invalid_cache_hit_rejected(self):
+        with pytest.raises(ValueError, match="Invalid statusline.cache_hit"):
+            StatusLineConfig(cache_hit="sometimes")
+
+    def test_cache_hit_ttl_must_be_positive(self):
+        with pytest.raises(ValueError, match="cache_hit_ttl must be >= 1"):
+            StatusLineConfig(cache_hit_ttl=0)
+
+    def test_segments_must_be_list_of_strings(self):
+        with pytest.raises(ValueError, match="segments must be a list of strings"):
+            StatusLineConfig(segments=[1, 2])  # type: ignore[list-item]
+
+    def test_segment_names_not_validated_here(self):
+        """The dataclass does NOT know valid segment names (renderer/CLI own that)."""
+        sl = StatusLineConfig(segments=["not-a-real-segment"])
+        assert sl.segments == ["not-a-real-segment"]
+
+
+class TestStatusLineConfigCoercion:
+    def test_dict_coerced_via_runtime_config(self):
+        """The set/edit path builds RuntimeConfig(**{statusline: {...}}) directly."""
+        # __post_init__ coerces dict -> StatusLineConfig; this test exercises that path.
+        rc = RuntimeConfig(statusline={"cost_mode": "subscription", "palette": "earthy"})  # type: ignore[arg-type]
+        assert isinstance(rc.statusline, StatusLineConfig)
+        assert rc.statusline.cost_mode == "subscription"
+        assert rc.statusline.palette == "earthy"
+
+    def test_unknown_subkey_dropped(self):
+        """Unknown sub-keys are forward-compatible (dropped, not fatal)."""
+        rc = RuntimeConfig(statusline={"cost_mode": "api", "future_key": 123})  # type: ignore[arg-type]  # dict coercion path
+        assert rc.statusline.cost_mode == "api"
+        assert not hasattr(rc.statusline, "future_key")
+
+    def test_bad_enum_in_dict_raises(self):
+        """Construction is strict so set/edit fail closed."""
+        with pytest.raises(ValueError, match="Invalid statusline.cost_mode"):
+            RuntimeConfig(statusline={"cost_mode": "bogus"})  # type: ignore[arg-type]  # dict coercion path
+
+
+class TestStatusLineConfigLoad:
+    def test_load_round_trips_statusline(self, tmp_path: Path):
+        cfg = tmp_path / "config.yaml"
+        cfg.write_text("statusline:\n  cost_mode: subscription\n  segments: [path, model]\n")
+        rc = load_runtime_config(cfg)
+        assert rc.statusline.cost_mode == "subscription"
+        assert rc.statusline.segments == ["path", "model"]
+
+    def test_bad_statusline_subtree_fails_open(self, tmp_path: Path, caplog):
+        """A bad statusline resets ONLY statusline; other valid keys survive."""
+        cfg = tmp_path / "config.yaml"
+        cfg.write_text("status_timeout: 0.5\nstatusline:\n  cost_mode: bogus\n  palette: earthy\n")
+        with caplog.at_level(logging.WARNING):
+            rc = load_runtime_config(cfg)
+        assert rc.status_timeout == 0.5  # unrelated key preserved
+        assert rc.statusline.cost_mode == "auto"  # whole subtree reset to defaults
+        assert rc.statusline.palette == "default"
+        assert any("statusline" in r.message for r in caplog.records)
+
+    def test_missing_statusline_uses_defaults(self, tmp_path: Path):
+        cfg = tmp_path / "config.yaml"
+        cfg.write_text("proxy_mode: host\n")
+        rc = load_runtime_config(cfg)
+        assert rc.statusline == StatusLineConfig()
+
+    def test_write_round_trip(self, tmp_path: Path):
+        cfg = tmp_path / "config.yaml"
+        write_runtime_config({"statusline": {"glyphs": "unicode", "cache_hit_ttl": 30}}, cfg)
+        rc = load_runtime_config(cfg)
+        assert rc.statusline.glyphs == "unicode"
+        assert rc.statusline.cache_hit_ttl == 30

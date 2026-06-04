@@ -17,7 +17,7 @@ import subprocess
 import sys
 import tempfile
 from collections.abc import MutableMapping
-from dataclasses import fields
+from dataclasses import asdict, fields, is_dataclass
 from pathlib import Path
 from typing import Any
 
@@ -28,6 +28,7 @@ from rich.syntax import Syntax
 from forge.cli.output import print_error_with_tip
 from forge.core.paths import display_path
 from forge.runtime_config import (
+    _REMOVED_KEYS,
     _RENAMED_KEYS,
     RuntimeConfig,
     ensure_config,
@@ -74,7 +75,12 @@ def show_cmd(raw: bool = False) -> None:
 
     effective: dict[str, Any] = {}
     for f in fields(RuntimeConfig):
-        effective[f.name] = getattr(rc, f.name)
+        val = getattr(rc, f.name)
+        # Nested config (e.g. statusline) must render as a plain mapping — yaml
+        # can't dump a dataclass instance.
+        if is_dataclass(val) and not isinstance(val, type):
+            val = asdict(val)
+        effective[f.name] = val
 
     content = yaml.dump(effective, default_flow_style=False, sort_keys=False)
 
@@ -118,6 +124,19 @@ def set_cmd(key_value: str) -> None:
             console=console,
         )
         sys.exit(1)
+
+    if key in _REMOVED_KEYS:
+        print_error_with_tip(
+            f"'{key}' was removed.",
+            f"Instead, {_REMOVED_KEYS[key]}.",
+            console=console,
+        )
+        sys.exit(1)
+
+    # Nested section keys (e.g. statusline.cost_mode) take the dotted path.
+    if "." in key:
+        _set_nested_key(key, value, console)
+        return
 
     known_fields = {f.name: f for f in fields(RuntimeConfig)}
     if key not in known_fields:
@@ -211,6 +230,20 @@ def edit_cmd() -> None:
             console.print(f"Your changes are saved at: {display_path(tmp_path)}")
             sys.exit(1)
 
+        # Segment names aren't validated by StatusLineConfig (the renderer and
+        # the set/edit CLI own that), so the edit path must enforce the allowlist
+        # too — otherwise statusline.segments: [path, bogus] would be accepted.
+        sl_section = edited_data.get("statusline")
+        if isinstance(sl_section, dict) and isinstance(sl_section.get("segments"), list):
+            unknown_segs = _unknown_segments(sl_section["segments"])
+            if unknown_segs:
+                from forge.cli.statusline.names import SEGMENT_NAMES
+
+                console.print(f"[red]Error:[/red] Unknown statusline segment(s): {', '.join(map(str, unknown_segs))}")
+                console.print(f"[dim]Valid segments: {', '.join(SEGMENT_NAMES)}[/dim]")
+                console.print(f"Your changes are saved at: {display_path(tmp_path)}")
+                sys.exit(1)
+
         write_runtime_config(dict(edited_data))
         success = True
         console.print("[green]Updated[/green] runtime configuration")
@@ -261,6 +294,13 @@ def reset_cmd(key: str | None = None, yes: bool = False, force: bool = False) ->
             console=console,
         )
         sys.exit(1)
+    if key in _REMOVED_KEYS:
+        print_error_with_tip(
+            f"'{key}' was removed.",
+            f"Instead, {_REMOVED_KEYS[key]}.",
+            console=console,
+        )
+        sys.exit(1)
     if key not in known_fields:
         console.print(f"[red]Error:[/red] Unknown config key: '{key}'")
         console.print(f"\n[dim]Available keys: {', '.join(sorted(known_fields))}[/dim]")
@@ -294,18 +334,25 @@ def reset_cmd(key: str | None = None, yes: bool = False, force: bool = False) ->
 
 
 def _prune_renamed_keys(data: MutableMapping[str, Any], console: Console) -> bool:
-    """Drop dead renamed-config keys from ``data`` so they stop re-warning on load.
+    """Drop dead renamed/removed config keys from ``data`` so they stop re-warning.
 
-    Returns True if any were removed. Called on the set/reset write paths (not
-    ``edit``, the raw surface) so following the rename tip converges the file.
+    Returns True if any were dropped. Called on the set/reset write paths (not
+    ``edit``, the raw surface) so following the migration tip converges the file.
     """
-    removed = [old for old in _RENAMED_KEYS if old in data]
-    for old in removed:
+    renamed = [old for old in _RENAMED_KEYS if old in data]
+    for old in renamed:
         del data[old]
-    if removed:
-        new_names = ", ".join(_RENAMED_KEYS[old] for old in removed)
-        console.print(f"[dim]Removed stale key(s): {', '.join(removed)} (renamed to {new_names})[/dim]")
-    return bool(removed)
+    if renamed:
+        new_names = ", ".join(_RENAMED_KEYS[old] for old in renamed)
+        console.print(f"[dim]Removed stale key(s): {', '.join(renamed)} (renamed to {new_names})[/dim]")
+
+    gone = [old for old in _REMOVED_KEYS if old in data]
+    for old in gone:
+        del data[old]
+    if gone:
+        console.print(f"[dim]Removed stale key(s): {', '.join(gone)} (no longer supported)[/dim]")
+
+    return bool(renamed or gone)
 
 
 def _persist_or_clear(data: MutableMapping[str, Any], config_path: Path) -> None:
@@ -348,3 +395,81 @@ def _coerce_value(key: str, value: str, field_info: Any) -> Any:
 
     # String fields: pass through
     return value
+
+
+def _unknown_segments(segments: list[Any]) -> list[Any]:
+    """Return segment names not in the allowlist (the set/edit strict gate).
+
+    Segment names are intentionally NOT validated by ``StatusLineConfig`` (the
+    renderer drops unknown names on load); the write paths reject them instead.
+    """
+    from forge.cli.statusline.names import SEGMENT_NAMES
+
+    return [s for s in segments if s not in SEGMENT_NAMES]
+
+
+def _set_nested_key(key: str, value: str, console: Console) -> None:
+    """Set a dotted nested config key. Only ``statusline.<subkey>`` is supported.
+
+    Strict (fail-closed): unknown section/subkey, invalid enum values, and
+    unknown segment names all error and exit non-zero, naming valid options.
+    """
+    from forge.cli.statusline.names import SEGMENT_NAMES
+    from forge.runtime_config import StatusLineConfig
+
+    section, _, subkey = key.partition(".")
+    if section != "statusline":
+        console.print(f"[red]Error:[/red] Unknown config section: '{section}'")
+        console.print("\n[dim]Only 'statusline.*' nested keys are supported.[/dim]")
+        sys.exit(1)
+
+    sl_fields = {f.name: f for f in fields(StatusLineConfig)}
+    if subkey not in sl_fields:
+        console.print(f"[red]Error:[/red] Unknown statusline key: '{subkey}'")
+        console.print(f"\n[dim]Available: {', '.join(sorted(sl_fields))}[/dim]")
+        sys.exit(1)
+
+    coerced_sub: Any
+    if subkey == "segments":
+        coerced_sub = [s.strip() for s in value.split(",") if s.strip()]
+        unknown = _unknown_segments(coerced_sub)
+        if unknown:
+            console.print(f"[red]Error:[/red] Unknown segment(s): {', '.join(unknown)}")
+            console.print(f"\n[dim]Valid segments: {', '.join(SEGMENT_NAMES)}[/dim]")
+            sys.exit(1)
+    else:
+        coerced_sub = _coerce_value(subkey, value, sl_fields[subkey])
+        if coerced_sub is _COERCE_ERROR:
+            console.print(f"[red]Error:[/red] Invalid value for 'statusline.{subkey}': {value}")
+            sys.exit(1)
+
+    config_path = get_config_path()
+    if config_path.is_file():
+        from ruamel.yaml import YAML
+
+        ruamel = YAML()
+        ruamel.preserve_quotes = True
+        with open(config_path) as f:
+            data = ruamel.load(f) or {}
+    else:
+        data = {}
+
+    _prune_renamed_keys(data, console)
+
+    section_data = data.get("statusline")
+    if not isinstance(section_data, dict):
+        section_data = {}
+    section_data[subkey] = coerced_sub
+    data["statusline"] = section_data
+
+    # Validate via construction — StatusLineConfig.__post_init__ rejects bad enums
+    # (fail-closed); segment names were already checked above.
+    known_fields = {f.name for f in fields(RuntimeConfig)}
+    try:
+        RuntimeConfig(**{k: v for k, v in dict(data).items() if k in known_fields})
+    except (ValueError, TypeError) as e:
+        console.print(f"[red]Error:[/red] Invalid configuration: {e}")
+        sys.exit(1)
+
+    write_runtime_config(data)
+    console.print(f"[green]Set[/green] {key}={coerced_sub}")

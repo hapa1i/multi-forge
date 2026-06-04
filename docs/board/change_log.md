@@ -135,6 +135,35 @@ stream -> real `404` (not 200-SSE), `smoke_test_proxy` resolves `claude-sonnet-4
 message routes 200 through a translated proxy. Carried debt: the new passthrough error branches have unit +
 manual-harness coverage but no committed integration test yet.
 
+### Statusline Enhancement — Phase 1: Segment registry + palette/glyphs
+
+**Goal**: Make the status line config-driven and customizable without changing default output, and adopt a selectable
+earthy palette.
+
+**Key changes**:
+
+- New `src/forge/cli/statusline/` siblings: `registry.py` (ordered `Segment` table, `resolve_order`, `render_segments`),
+  `context.py` (lazy `RenderContext` — transcript scan / git / context parsing are `cached_property`, so disabled
+  segments do zero work), `palette.py` (`Palette` + `Glyphs`, earthy "Sage & clay" instance).
+- `status_line()` replaced its 106-line inline 5-category assembly with `render_segments` + the unchanged
+  `render_categories()` / wrap-harden tail. Producers are thin adapters over existing `format_*`.
+- Palette applied as an **output-level ANSI remap** (single-pass regex; `default` == empty remap == no-op), so earthy
+  recolors the whole line without threading a `palette` arg through ~8 helpers. `glyphs: ascii|unicode` threads block
+  chars (U+2588/U+2591) into the `get_context_display` progress bar only.
+- **Breaking (research-preview clean break)**: removed the flat `show_rate_limits` config key. `rate_limits` is now an
+  opt-in segment (not in `DEFAULT_ORDER`). New `_REMOVED_KEYS` map surfaces an actionable message on load (one-time
+  warning), `set`, and `reset`, naming the replacement. **Reset path**: delete `show_rate_limits:` from
+  `~/.forge/config.yaml` (auto-pruned on next `config set`) and, to keep rate limits, run
+  `forge config set statusline.segments=path,model,rate_limits`.
+
+**Verification**: Golden no-op guard freezes byte-identical default output across 4 fixtures; lazy-compute tests (with
+firing controls); earthy/unicode unit + e2e tests; `show_rate_limits` removal tests (load warn, set/reset reject);
+allowlist == producers equality test + all-dropped→`DEFAULT_ORDER` fallback. Commands run: `make test-unit` (1512 pass),
+`make pre-commit` clean (ruff/black/isort/mypy/pyright/mdformat),
+`./scripts/test-integration.sh tests/integration/cli/test_status_line_integration.py` (10 pass, incl. the rate-limit
+tests repointed to segment config), and a manual `forge status-line` render confirming earthy+unicode.
+
+
 ## 2026-06-02
 
 ### Phase 4: Review-pass hardening (4a / 4c / 4d)
