@@ -85,8 +85,8 @@ attribution first: Claude's native harness signal stays Claude's; Forge's extra 
 The status line shows two clearly-separated things:
 
 - **Claude Code's native signal, as Claude's.** Branch on `rate_limits`: present -> show the quota as Claude's
-  subscription signal; absent -> show Claude's own `cost.total_cost_usd` as Claude-reported cost with payer unknown unless
-  the user explicitly declared API mode. Forge never re-attributes or recomputes it.
+  subscription signal; absent -> show Claude's own `cost.total_cost_usd` as Claude-reported cost with payer unknown
+  unless the user explicitly declared API mode. Forge never re-attributes or recomputes it.
 - **Forge's additional cost, clearly marked as Forge's** (e.g. `forge +$Y`) — the extra `claude -p` work Forge caused,
   rendered as a distinct segment so it never blends into Claude's native cost.
 
@@ -132,8 +132,8 @@ Document the tradeoff directly:
 > Caps are enforced after completed requests using reported route cost. They prevent further spend after a cap is
 > reached; they do not pre-estimate pending requests.
 
-The same event/aggregate/policy loop is the longer-term generalization target for non-cost policies. This card should not
-implement every row below; it should keep the data model compatible with them:
+The same event/aggregate/policy loop is the longer-term generalization target for non-cost policies. This card should
+not implement every row below; it should keep the data model compatible with them:
 
 | Signal           | Post-event fact                   | Aggregate                         | Possible policy                         |
 | ---------------- | --------------------------------- | --------------------------------- | --------------------------------------- |
@@ -263,8 +263,8 @@ These came out of the auth/cost/usage audit and should be handled with or before
 
 ## Open Questions
 
-- Is there any hidden dependency on the local pricing catalog outside normal user-facing cost accounting that must survive
-  the removal?
+- Is there any hidden dependency on the local pricing catalog outside normal user-facing cost accounting that must
+  survive the removal?
 - Should reported-cost caps support token-only fallback policies, or should dollar caps simply ignore cost-unavailable
   events?
 - Should `forge usage` be renamed, or is a clear subtitle enough?
