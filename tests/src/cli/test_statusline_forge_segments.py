@@ -273,6 +273,14 @@ class TestSpendCapFormat:
         out = _plain(format_spend_cap({"daily": {"current_usd": 3.2, "limit_usd": 5.0, "percent": 64.0}}) or "")
         assert "cap:d" in out and "$3.20/$5.00" in out and "(64%)" in out
 
+    def test_sub_cent_caps_keep_precision(self):
+        # Regression: _fmt_dollars collapsed sub-cent amounts to "0c", so a tiny
+        # smoke cap rendered as the misleading "cap:d 0c/0c (50%)". Caps can be
+        # legitimately sub-cent, so the binding amounts must stay distinguishable.
+        out = _plain(format_spend_cap({"daily": {"current_usd": 0.0005, "limit_usd": 0.001, "percent": 50.0}}) or "")
+        assert "$0.0005/$0.0010" in out and "(50%)" in out
+        assert "0c" not in out
+
     def test_threshold_colors(self):
         def _c(pct):
             return format_spend_cap({"daily": {"current_usd": 1.0, "limit_usd": 2.0, "percent": pct}}) or ""

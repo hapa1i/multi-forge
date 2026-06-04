@@ -717,6 +717,21 @@ def _fmt_dollars(cost_usd: float) -> str:
     return f"${cost_usd:.2f}"
 
 
+def _fmt_cap_money(usd: float) -> str:
+    """Format a spend-cap amount, preserving precision below one cent.
+
+    Caps can legitimately be tiny (smoke-test caps of ``$0.0005``), so unlike
+    ``_fmt_dollars`` — which collapses any sub-cent value to ``0c`` and would
+    render ``$0.0005/$0.001`` as the misleading ``0c/0c`` — this keeps four
+    decimals below a cent so the two amounts stay distinguishable.
+    """
+    if usd >= 0.01:
+        return f"${usd:.2f}"
+    if usd <= 0:
+        return "$0.00"
+    return f"${usd:.4f}"
+
+
 def _format_duration(cost_data: dict[str, Any]) -> str | None:
     """Format session duration (colored), or None if absent. Unrelated to billing."""
     duration_ms = (cost_data or {}).get("total_duration_ms", 0)
@@ -1207,7 +1222,7 @@ def format_spend_cap(caps: dict[str, Any]) -> str | None:
         return None
     pct, marker, cur, lim = binding
     color = RED if pct >= 90 else YELLOW if pct >= 75 else METRICS_COLOR
-    return f"{DIM}cap:{RESET}{color}{marker} {_fmt_dollars(cur)}/{_fmt_dollars(lim)} ({int(pct)}%){RESET}"
+    return f"{DIM}cap:{RESET}{color}{marker} {_fmt_cap_money(cur)}/{_fmt_cap_money(lim)} ({int(pct)}%){RESET}"
 
 
 def format_token_breakdown(input_tokens: int, output_tokens: int, cached_tokens: int) -> str | None:
