@@ -1512,6 +1512,14 @@ async def root(request: Request):
     This endpoint reflects what the proxy is **actually doing**, not just
     echoed configuration. It serves as the source of runtime truth.
     """
+    # A freshly-imported uvicorn app has only import-time default config and a
+    # None cost_tracker until the first POST runs _ensure_runtime_state(). As the
+    # documented source of runtime truth (polled by the status line before any
+    # request flows), root() must self-initialize too — otherwise it reports
+    # default template/tiers and omits metrics.costs.caps. Idempotent + cheap on
+    # a warm process (reload() no-ops once config is loaded; tracker init returns).
+    _ensure_runtime_state()
+
     import os
 
     from forge.proxy.proxy_identity import get_proxy_identity

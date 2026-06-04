@@ -571,7 +571,7 @@ proxy_mode: host
 #   glyphs:    ascii | unicode
 #   segments:  ordered list; empty = default layout. Valid names: path, branch,
 #              breadcrumb, model, cost, rate_limits, lines, tokens, think, loop,
-#              sidecar, cache_hit (more segments are added in later versions)
+#              sidecar, cache_hit, supervisor, policy, audit, drift, spend_cap
 #   cache_hit: auto | off    cache_hit_ttl: <seconds, direct-mode throttle window>
 # statusline:
 #   cost_mode: auto

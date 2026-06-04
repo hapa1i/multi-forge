@@ -24,8 +24,14 @@ from forge.cli.statusline.registry import SEGMENTS, render_segments, resolve_ord
 from forge.runtime_config import RuntimeConfig
 
 
-def _render(fixture, *, proxy=None, session=None, stats=None):
-    """Render status_line() with all environment-dependent inputs pinned."""
+def _render(fixture, *, proxy=None, session=None, stats=None, api_key=True):
+    """Render status_line() with all environment-dependent inputs pinned.
+
+    ``api_key`` pins ``cost_mode=auto`` deterministically regardless of the dev's
+    ANTHROPIC_API_KEY: ``True`` -> API ($) view (the golden snapshots); ``False``
+    removes the var (Click drops env entries whose value is ``None``) -> the
+    no-key ambiguous view.
+    """
     runner = CliRunner()
     with contextlib.ExitStack() as es:
         es.enter_context(patch.object(sl, "_get_terminal_width", return_value=200))
@@ -33,12 +39,10 @@ def _render(fixture, *, proxy=None, session=None, stats=None):
         es.enter_context(patch.object(sl, "discover_session", return_value=(session or (None, False))))
         es.enter_context(patch.object(sl, "get_git_branch", return_value=None))
         es.enter_context(patch.object(sl, "_cached_scan_transcript", return_value=(stats or TranscriptStats())))
-        # Pin API billing so cost_mode=auto is deterministic regardless of the
-        # dev's ANTHROPIC_API_KEY — the snapshots are the API ($) view.
         res = runner.invoke(
             status_line,
             input=json.dumps(fixture),
-            env={"FORGE_STATUS_TRUNCATE": "0", "ANTHROPIC_API_KEY": "sk-ant-test"},
+            env={"FORGE_STATUS_TRUNCATE": "0", "ANTHROPIC_API_KEY": "sk-ant-test" if api_key else None},
         )
     assert res.exit_code == 0, res.output
     return res.output
@@ -143,6 +147,15 @@ class TestGoldenNoOpGuard:
 
     def test_full_direct_metrics_with_thinking(self):
         assert _render(FIXTURE_FULL, stats=TranscriptStats(has_thinking=True)) == GOLDEN_FULL
+
+    def test_no_key_diverges_only_in_cost_hedge(self):
+        # Scope of the "byte-identical default" claim: the golden snapshots are the
+        # API ($) view (the helper pins ANTHROPIC_API_KEY). With the key removed,
+        # cost_mode=auto can't confirm API billing, so the cost segment hedges
+        # $0.42 -> ≈$0.42 (phantom-dollar honesty, Phase 2). That hedge is the ONLY
+        # divergence — registry/layout/colors are otherwise byte-identical.
+        no_key = _render(FIXTURE_FULL, stats=TranscriptStats(has_thinking=True), api_key=False)
+        assert no_key == GOLDEN_FULL.replace("$0.42", "\u2248$0.42")
 
     def test_session_breadcrumb_loop_sidecar(self):
         assert _render(FIXTURE_SESSION, session=SESSION_MANIFEST) == GOLDEN_SESSION

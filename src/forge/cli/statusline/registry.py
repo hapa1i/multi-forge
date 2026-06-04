@@ -141,7 +141,10 @@ def _produce_cache_hit(ctx: RenderContext) -> Optional[str]:
         return None
     if ctx.is_proxy:
         # Proxy already computes this — free read, no transcript scan, no file.
-        rate = ctx.runtime.raw.get("metrics", {}).get("cache_hit_rate") if ctx.runtime else None
+        # Guard the metrics shape (system boundary: proxy HTTP response) like
+        # _produce_spend_cap does — a non-dict payload must not raise.
+        metrics = ctx.runtime.raw.get("metrics") if ctx.runtime else None
+        rate = metrics.get("cache_hit_rate") if isinstance(metrics, dict) else None
     else:
         # Direct mode: deduped transcript computation, throttled on disk.
         from forge.cli.statusline.throttle import read_or_compute
@@ -307,7 +310,14 @@ def render_segments(ctx: RenderContext, configured: list[str]) -> tuple[list[str
     stream: list[str] = []
     for name in order:
         segment = _BY_NAME[name]
-        rendered = segment.producer(ctx)
+        try:
+            rendered = segment.producer(ctx)
+        except Exception:
+            # Fail-open: the status line must always render (exit 0). A producer
+            # bug or malformed upstream payload degrades that ONE segment to
+            # absent, never crashing the whole line.
+            logger.debug("status-line: producer %r failed; dropping segment", name, exc_info=True)
+            continue
         if rendered is None:
             continue
         (where if segment.bucket == "where" else stream).append(rendered)

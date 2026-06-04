@@ -26,6 +26,7 @@ from forge.cli.status_line import (
     YELLOW,
     ProxyRuntimeTruth,
     TranscriptStats,
+    explicit_tier_from_model,
     format_audit,
     format_drift,
     format_policy,
@@ -258,6 +259,29 @@ class TestDriftProducer:
             runtime=_proxy(raw),
         )
         assert any("drift:" in s for s in _stream(ctx, ["drift"]))  # custom-model != gpt-4o
+
+    def test_tier_detection_parity_with_proxy(self):
+        # explicit_tier_from_model is a deliberate 1:1 mirror of the proxy's
+        # _tier_from_model_name (status_line can't import proxy.server on the hot
+        # path). If the proxy's tier logic changes and the mirror doesn't, the drift
+        # segment silently replicates the wrong route. This guard fails on drift;
+        # the proxy is the source of truth. (Follow-up: extract a shared helper.)
+        from forge.proxy.server import _tier_from_model_name
+
+        corpus = [
+            "claude-opus-4-8",
+            "claude-sonnet-4-5",
+            "claude-3-5-haiku-20241022",
+            "Claude-OPUS-4",  # case-insensitive
+            "gpt-4o",  # no tier substring -> None
+            "o3",
+            "gemini-1.5-pro",
+            "custom-model",
+            "",  # empty
+            "opusculum-7",  # shared naive-substring quirk: both must agree (-> opus)
+        ]
+        for model in corpus:
+            assert explicit_tier_from_model(model) == _tier_from_model_name(model), model
 
 
 class TestSpendCapFormat:

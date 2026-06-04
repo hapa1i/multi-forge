@@ -253,10 +253,12 @@ earthy palette.
   `~/.forge/config.yaml` (auto-pruned on next `config set`) and, to keep rate limits, run
   `forge config set statusline.segments=path,model,rate_limits`.
 
-**Verification**: Golden no-op guard freezes byte-identical default output across 4 fixtures; lazy-compute tests (with
-firing controls); earthy/unicode unit + e2e tests; `show_rate_limits` removal tests (load warn, set/reset reject);
-allowlist == producers equality test + all-dropped→`DEFAULT_ORDER` fallback. Commands run: `make test-unit` (1512 pass),
-`make pre-commit` clean (ruff/black/isort/mypy/pyright/mdformat),
+**Verification**: Golden no-op guard freezes byte-identical default output across 4 fixtures on the API billing path
+(the guard pins `ANTHROPIC_API_KEY`, so the snapshots are the `$` view); the sole no-key divergence — the `$`→`≈$` cost
+hedge added in Phase 2 — is pinned by a companion golden-scope test. Lazy-compute tests (with firing controls);
+earthy/unicode unit + e2e tests; `show_rate_limits` removal tests (load warn, set/reset reject); allowlist == producers
+equality test + all-dropped→`DEFAULT_ORDER` fallback. Commands run: `make test-unit` (1512 pass), `make pre-commit`
+clean (ruff/black/isort/mypy/pyright/mdformat),
 `./scripts/test-integration.sh tests/integration/cli/test_status_line_integration.py` (10 pass, incl. the rate-limit
 tests repointed to segment config), and a manual `forge status-line` render confirming earthy+unicode.
 
