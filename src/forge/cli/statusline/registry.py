@@ -91,12 +91,22 @@ def _produce_model(ctx: RenderContext) -> Optional[str]:
 
 
 def _produce_cost(ctx: RenderContext) -> Optional[str]:
-    proxy_cost = ctx.runtime.proxy_cost_usd if ctx.runtime else 0.0
-    return sl.get_session_metrics(ctx.cost_data, ctx.is_proxy, proxy_cost_usd=proxy_cost)
+    if ctx.is_proxy:
+        proxy_cost = ctx.runtime.proxy_cost_usd if ctx.runtime else 0.0
+        return sl.get_session_metrics(ctx.cost_data, True, proxy_cost_usd=proxy_cost)
+    # Direct session: dollars are real only under API billing.
+    if ctx.billing_mode == "api":
+        return sl.get_session_metrics(ctx.cost_data, False)
+    return sl.format_billing_cost(ctx.billing_mode, ctx.cost_data, ctx.data.get("rate_limits"))
 
 
 def _produce_rate_limits(ctx: RenderContext) -> Optional[str]:
-    return sl.format_rate_limits(ctx.data.get("rate_limits"), ctx.is_proxy)
+    # Under subscription/ambiguous billing the cost segment already shows the 5h
+    # quota; suppress the standalone segment when cost is in the active layout to
+    # avoid showing the same number twice.
+    if ctx.billing_mode in ("subscription", "ambiguous") and "cost" in ctx.active_segments:
+        return None
+    return sl.format_rate_limits(ctx.data.get("rate_limits"), ctx.is_proxy, show_reset=True)
 
 
 def _produce_lines(ctx: RenderContext) -> Optional[str]:
@@ -175,9 +185,11 @@ def resolve_order(configured: list[str]) -> list[str]:
 
 def render_segments(ctx: RenderContext, configured: list[str]) -> tuple[list[str], list[str]]:
     """Run producers in resolved order, splitting output into (where, stream)."""
+    order = resolve_order(configured)
+    ctx.active_segments = set(order)  # let producers see what else is active
     where: list[str] = []
     stream: list[str] = []
-    for name in resolve_order(configured):
+    for name in order:
         segment = _BY_NAME[name]
         rendered = segment.producer(ctx)
         if rendered is None:

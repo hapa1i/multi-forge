@@ -15,14 +15,14 @@ This card is in active execution under `doing/`. Move the whole `statusline-enha
 
 ## Current Focus
 
-**Phase 1 (registry refactor + palette/glyphs) complete.** `status_line()` now builds a lazy `RenderContext` and runs an
-ordered segment registry (`statusline/registry.py` + `context.py`); a golden no-op guard freezes byte-identical default
-output. `show_rate_limits` removed (clean break via `_REMOVED_KEYS` + actionable load/set/reset guidance); `rate_limits`
-is now an opt-in segment. Earthy "Sage & clay" palette via an output-level ANSI remap (`statusline/palette.py`,
-`default` == no-op); `glyphs: ascii|unicode` threads block chars into the progress bar. Verified: `make test-unit` (1512
-pass), `make pre-commit` clean (mypy/pyright/ruff/black/isort/mdformat),
-`./scripts/test-integration.sh tests/integration/cli/test_status_line_integration.py` (10 pass), manual earthy+unicode
-render. Next: Phase 2 billing-aware cost + rate_limits object-shape fix.
+**Phase 2 (billing-aware cost + rate_limits shape fix) complete.** `format_rate_limits` now handles the current object
+payload (`five_hour`/`seven_day`) as well as the legacy list, with an opt-in reset countdown.
+`RenderContext.billing_mode` (`api`/`subscription`/`ambiguous`) resolves from `cost_mode` + raw `ANTHROPIC_API_KEY`; the
+cost segment shows real `$` under API billing, the 5h quota under subscription, and an `≈$` hedge when auto+no-key has
+no quota data. The standalone `rate_limits` segment suppresses itself when cost already shows the quota. Verified:
+`make test-unit` (1537 pass), `make pre-commit` clean,
+`./scripts/test-integration.sh tests/integration/cli/test_status_line_integration.py` (10 pass), manual render across
+all four billing modes. Next: Phase 3 throttled cache-hit-rate (file-backed).
 
 ## Phase 0 — Nested `statusline:` config foundation
 
@@ -71,11 +71,23 @@ render. Next: Phase 2 billing-aware cost + rate_limits object-shape fix.
 
 ## Phase 2 — Billing-aware cost + rate_limits shape fix
 
-- [ ] `format_rate_limits` supports BOTH object (`five_hour`/`seven_day`) and list shapes; optional reset countdown.
-- [ ] Resolve `billing_mode` once in `RenderContext` from `cost_mode` + raw `os.environ.get("ANTHROPIC_API_KEY")`.
-- [ ] `produce_cost`: `subscription`→quota, `api`→`$`, `auto`→heuristic, ambiguous→`≈$`; proxy mode unchanged (`~$`).
-  Suppress standalone `rate_limits` segment when cost shows quota.
-- [ ] Document `refreshInterval`/`padding` as `forge claude preset edit` opt-in (no auto-installed preset change).
+- [x] `format_rate_limits` supports BOTH object (`five_hour`/`seven_day`) and list shapes via `_extract_short_window`;
+  optional reset countdown (`show_reset`, testable `now`, sanity-capped at ~8 days for malformed timestamps).
+- [x] Resolved `billing_mode` in `RenderContext` (`api`/`subscription`/`ambiguous`) from `cost_mode` + raw
+  `os.environ.get("ANTHROPIC_API_KEY")` (NOT resolve_env_or_credential — would misclassify OAuth as API).
+- [x] `_produce_cost`: `subscription`/`ambiguous`→`format_billing_cost` (quota, or `≈$` hedge when no quota data),
+  `api`→`$`, proxy unchanged (`~$`). `_produce_rate_limits` suppresses itself when billing is non-API AND `cost` is in
+  the active layout (via `ctx.active_segments`, set by `render_segments`).
+- [x] Documented `refreshInterval`/`padding` as a `forge claude preset edit` opt-in (`docs/end-user/config.md`); no
+  auto-installed preset change.
+
+| Test           | Fixture                         | Assertion                             | Test File                                  |
+| -------------- | ------------------------------- | ------------------------------------- | ------------------------------------------ |
+| object shape   | `{five_hour:{used_percentage}}` | renders `RL:N%` (prefers 5h)          | `tests/src/cli/test_status_line.py`        |
+| bad dict       | `{unexpected: dict}`            | None (back-compat, not guessed)       | `...test_status_line.py`                   |
+| subscription   | `cost_mode=subscription` + RL   | quota shown, no `$`                   | `tests/src/cli/test_statusline_billing.py` |
+| auto heuristic | `auto` ± `ANTHROPIC_API_KEY`    | key→`$`, no-key+RL→quota, no-key→`≈$` | `...test_statusline_billing.py`            |
+| suppression    | subscription + cost+rate_limits | quota appears once (`RL:` count == 1) | `...test_statusline_billing.py`            |
 
 ## Phase 3 — Throttled cache-hit-rate (file-backed)
 

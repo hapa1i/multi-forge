@@ -19,10 +19,13 @@ from forge.cli.status_line import (
     TRAILING_MARGIN,
     ProxyRuntimeTruth,
     TranscriptStats,
+    _extract_short_window,
+    _format_reset_countdown,
     _visible_width,
     _wrap_output,
     detect_proxy,
     discover_session,
+    format_billing_cost,
     format_breadcrumb,
     format_line_changes,
     format_model_label,
@@ -1002,6 +1005,111 @@ class TestFormatRateLimits:
     def test_non_numeric_used_percentage(self):
         limits = [{"type": "5_hour", "used_percentage": "not-a-number"}]
         assert format_rate_limits(limits, is_proxy=False) is None
+
+
+class TestRateLimitsObjectShape:
+    """Current Claude Code payload is an object, not a list (bug fix)."""
+
+    def test_object_shape_five_hour(self):
+        rl = {"five_hour": {"used_percentage": 23.5, "resets_at": 0}, "seven_day": {"used_percentage": 80}}
+        result = format_rate_limits(rl, is_proxy=False)
+        assert result is not None
+        assert "RL:23%" == _ANSI_RE.sub("", result)  # prefers 5h over 7d
+
+    def test_object_shape_falls_back_to_seven_day(self):
+        rl = {"seven_day": {"used_percentage": 42}}
+        assert "RL:42%" == _ANSI_RE.sub("", format_rate_limits(rl, is_proxy=False) or "")
+
+    def test_unrecognized_dict_rejected(self):
+        # A dict without five_hour/seven_day is not guessed (back-compat: the old
+        # list-only code returned None for any dict).
+        assert format_rate_limits({"unexpected": "dict"}, is_proxy=False) is None
+
+    def test_extract_short_window_both_shapes(self):
+        obj = {"five_hour": {"used_percentage": 10}}
+        assert _extract_short_window(obj) == {"used_percentage": 10}
+        lst = [{"type": "7_day", "used_percentage": 5}, {"type": "5_hour", "used_percentage": 9}]
+        win = _extract_short_window(lst)
+        assert win is not None and win["used_percentage"] == 9
+        assert _extract_short_window("nonsense") is None
+
+
+class TestResetCountdown:
+    """Optional reset countdown (opt-in via show_reset; testable via now)."""
+
+    def test_future_iso_renders_hours(self):
+        # resets_at 2h after `now`.
+        now = 1_000_000.0
+        assert _format_reset_countdown(now + 7200, now=now) == "2h"
+
+    def test_future_under_one_hour_renders_minutes(self):
+        now = 1_000_000.0
+        assert _format_reset_countdown(now + 300, now=now) == "5m"
+
+    def test_past_returns_none(self):
+        now = 1_000_000.0
+        assert _format_reset_countdown(now - 60, now=now) is None
+
+    def test_iso_string_parsed(self):
+        # 2026-01-01T00:00:00Z == 1767225600 epoch; now 1h earlier -> "1h".
+        epoch = 1767225600
+        assert _format_reset_countdown("2026-01-01T00:00:00Z", now=epoch - 3600) == "1h"
+
+    def test_unparseable_returns_none(self):
+        assert _format_reset_countdown("not-a-date", now=0.0) is None
+
+    def test_absurd_future_capped_to_none(self):
+        # Malformed timestamp far in the future -> omit, don't render "616518h".
+        assert _format_reset_countdown(4_000_000_000, now=1_780_000_000.0) is None
+
+    def test_show_reset_appends_countdown(self):
+        rl = {"five_hour": {"used_percentage": 30, "resets_at": 7200}}
+        out = format_rate_limits(rl, is_proxy=False, show_reset=True, now=0.0)
+        assert out is not None
+        visible = _ANSI_RE.sub("", out)
+        assert "RL:30%" in visible
+        assert "2h" in visible
+
+    def test_default_omits_countdown(self):
+        rl = {"five_hour": {"used_percentage": 30, "resets_at": 7200}}
+        out = format_rate_limits(rl, is_proxy=False)  # show_reset defaults False
+        assert out is not None
+        assert "RL:30%" == _ANSI_RE.sub("", out)
+
+
+class TestFormatBillingCost:
+    """Subscription/ambiguous cost rendering (quota instead of phantom dollars)."""
+
+    def test_subscription_shows_quota_not_dollars(self):
+        rl = {"five_hour": {"used_percentage": 23}}
+        cost = {"total_cost_usd": 0.42, "total_duration_ms": 185000}
+        out = format_billing_cost("subscription", cost, rl, now=0.0)
+        assert out is not None
+        visible = _ANSI_RE.sub("", out)
+        assert "RL:23%" in visible
+        assert "$" not in visible  # dollars are phantom on a subscription
+        assert "3m" in visible  # duration still shown
+
+    def test_subscription_no_quota_data_shows_only_duration(self):
+        cost = {"total_cost_usd": 0.42, "total_duration_ms": 185000}
+        out = format_billing_cost("subscription", cost, None, now=0.0)
+        assert out is not None
+        assert _ANSI_RE.sub("", out) == "3m"  # no $ figure, no quota, just duration
+
+    def test_ambiguous_hedges_with_approx_dollars(self):
+        cost = {"total_cost_usd": 0.42}
+        out = format_billing_cost("ambiguous", cost, None, now=0.0)
+        assert out is not None
+        assert "\u2248$0.42" in _ANSI_RE.sub("", out)
+
+    def test_ambiguous_prefers_quota_when_available(self):
+        rl = {"five_hour": {"used_percentage": 60}}
+        cost = {"total_cost_usd": 0.42}
+        out = format_billing_cost("ambiguous", cost, rl, now=0.0)
+        assert out is not None
+        visible = _ANSI_RE.sub("", out)
+        assert "RL:60%" in visible
+        assert "$" not in visible
 
 
 class TestGetSessionMetrics:

@@ -135,6 +135,32 @@ stream -> real `404` (not 200-SSE), `smoke_test_proxy` resolves `claude-sonnet-4
 message routes 200 through a translated proxy. Carried debt: the new passthrough error branches have unit +
 manual-harness coverage but no committed integration test yet.
 
+### Statusline Enhancement — Phase 2: Billing-aware cost + rate_limits shape fix
+
+**Goal**: Make the cost segment honest for a mixed userbase (API key → real dollars; OAuth/subscription → quota), and
+fix rate-limit rendering against the current payload shape.
+
+**Key changes**:
+
+- `format_rate_limits` now accepts BOTH the current object payload (`{five_hour, seven_day}`) and the legacy list, via
+  `_extract_short_window` (prefers the 5h window). A bare dict without those keys is still rejected (back-compat). Added
+  an opt-in reset countdown (`show_reset`, testable `now`) sanity-capped at ~8 days so a malformed `resets_at` can't
+  render `616518h`.
+- `RenderContext.billing_mode` resolves to `api` | `subscription` | `ambiguous` from `statusline.cost_mode` + raw
+  `os.environ.get("ANTHROPIC_API_KEY")` (NOT `resolve_env_or_credential`, which would misclassify an OAuth session).
+- `_produce_cost`: API → dollars (`get_session_metrics`); subscription/ambiguous → `format_billing_cost` (5h quota, or
+  an `≈$` hedge when auto+no-key has a phantom dollar figure but no quota data); proxy unchanged (`~$`). Extracted
+  shared `_fmt_dollars` / `_format_duration` helpers (no behavior change to the API path).
+- `_produce_rate_limits` suppresses the standalone segment when billing is non-API AND `cost` is in the active layout
+  (`ctx.active_segments`, set by `render_segments`), so the quota never shows twice.
+- Documented `refreshInterval`/`padding` as a `forge claude preset edit` opt-in (`docs/end-user/config.md`); no
+  auto-installed preset change.
+
+**Verification**: Object-shape + reset-countdown + `format_billing_cost` unit tests; billing e2e through `status_line()`
+(api/subscription/auto±key/suppression). Commands: `make test-unit` (1537 pass), `make pre-commit` clean,
+`./scripts/test-integration.sh tests/integration/cli/test_status_line_integration.py` (10 pass), manual render across
+all four billing modes.
+
 ### Statusline Enhancement — Phase 1: Segment registry + palette/glyphs
 
 **Goal**: Make the status line config-driven and customizable without changing default output, and adopt a selectable
@@ -162,7 +188,6 @@ allowlist == producers equality test + all-dropped→`DEFAULT_ORDER` fallback. C
 `make pre-commit` clean (ruff/black/isort/mypy/pyright/mdformat),
 `./scripts/test-integration.sh tests/integration/cli/test_status_line_integration.py` (10 pass, incl. the rate-limit
 tests repointed to segment config), and a manual `forge status-line` render confirming earthy+unicode.
-
 
 ## 2026-06-02
 

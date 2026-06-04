@@ -627,52 +627,53 @@ def get_context_display(
         return f"{color}{bar} {percent}%{BOLD}{alert_str}{RESET}"
 
 
+def _fmt_dollars(cost_usd: float) -> str:
+    """Format a USD amount: sub-cent as ``Nc``, else ``$X.XX`` (no color)."""
+    if cost_usd < 0.01:
+        return f"{int(cost_usd * 100)}c"
+    return f"${cost_usd:.2f}"
+
+
+def _format_duration(cost_data: dict[str, Any]) -> str | None:
+    """Format session duration (colored), or None if absent. Unrelated to billing."""
+    duration_ms = (cost_data or {}).get("total_duration_ms", 0)
+    if duration_ms <= 0:
+        return None
+    minutes = duration_ms // 60000
+    color = YELLOW if minutes >= 30 else METRICS_COLOR
+    duration_str = f"{duration_ms // 1000}s" if duration_ms < 60000 else f"{minutes}m"
+    return f"{color}{duration_str}{RESET}"
+
+
 def get_session_metrics(
     cost_data: dict[str, Any],
     is_proxy: bool,
     proxy_cost_usd: float = 0.0,
 ) -> str | None:
-    """Get session metrics (cost, duration). Returns bare string or None."""
+    """Get session metrics (cost in dollars, duration). Returns bare string or None.
+
+    This is the API-billing / proxy view (dollars are real). Subscription/quota
+    rendering lives in ``format_billing_cost``.
+    """
     if not cost_data and proxy_cost_usd <= 0:
         return None
 
     metrics: list[str] = []
 
     if is_proxy and proxy_cost_usd > 0:
-        cost_color = METRICS_COLOR
         if proxy_cost_usd < 0.01:
             cost_str = f"~{int(proxy_cost_usd * 10000) / 100}c"
         else:
             cost_str = f"~${proxy_cost_usd:.2f}"
-        metrics.append(f"{cost_color}{cost_str}{RESET}")
+        metrics.append(f"{METRICS_COLOR}{cost_str}{RESET}")
     elif not is_proxy:
         cost_usd = (cost_data or {}).get("total_cost_usd", 0)
         if cost_usd > 0:
-            cost_color = METRICS_COLOR
+            metrics.append(f"{METRICS_COLOR}{_fmt_dollars(cost_usd)}{RESET}")
 
-            if cost_usd < 0.01:
-                cost_str = f"{int(cost_usd * 100)}c"
-            else:
-                cost_str = f"${cost_usd:.2f}"
-
-            metrics.append(f"{cost_color}{cost_str}{RESET}")
-
-    # Duration
-    duration_ms = cost_data.get("total_duration_ms", 0)
-    if duration_ms > 0:
-        minutes = duration_ms // 60000
-
-        if minutes >= 30:
-            duration_color = YELLOW
-        else:
-            duration_color = METRICS_COLOR
-
-        if duration_ms < 60000:
-            duration_str = f"{duration_ms // 1000}s"
-        else:
-            duration_str = f"{minutes}m"
-
-        metrics.append(f"{duration_color}{duration_str}{RESET}")
+    duration = _format_duration(cost_data)
+    if duration:
+        metrics.append(duration)
 
     return " ".join(metrics) if metrics else None
 
@@ -884,44 +885,96 @@ def format_native_sandbox() -> str | None:
     return None
 
 
-def format_rate_limits(rate_limits: Any, is_proxy: bool) -> str | None:
-    """Format rate limit usage from Claude Code's rate_limits field.
+def _extract_short_window(rate_limits: Any) -> dict[str, Any] | None:
+    """Return the shortest-window dict from either Claude Code rate_limits shape.
 
-    Only shows the shortest window (5h) since that's the one users hit.
-    Skips display in proxy mode (proxy has its own rate limits).
+    Current payload is an object ``{five_hour: {...}, seven_day: {...}}``; older
+    payloads were a list of ``{type, used_percentage, resets_at}`` entries. The
+    5h window is preferred (it's the one users hit). Returns None for anything
+    that isn't a recognizable rate-limit container (a bare dict without the
+    object keys is rejected, not guessed).
+    """
+    if isinstance(rate_limits, dict):
+        for key in ("five_hour", "seven_day"):
+            window = rate_limits.get(key)
+            if isinstance(window, dict):
+                return window
+        return None
 
-    Color thresholds: green < 50%, yellow 50-80%, red > 80%.
+    if isinstance(rate_limits, list):
+        for entry in rate_limits:
+            if not isinstance(entry, dict):
+                continue
+            window_type = str(entry.get("type", ""))
+            if "5" in window_type or "hour" in window_type.lower():
+                return entry
+        first = rate_limits[0] if rate_limits else None
+        return first if isinstance(first, dict) else None
+
+    logger.debug("rate_limits unexpected type: %s", type(rate_limits).__name__)
+    return None
+
+
+def _format_reset_countdown(resets_at: Any, now: float | None = None) -> str | None:
+    """Compact 'time until reset' (e.g. ``2h``/``5m``) from an ISO or epoch value.
+
+    Returns None when absent, already elapsed, or unparseable (fail-open).
+    """
+    if resets_at is None:
+        return None
+    if now is None:
+        now = time.time()
+    epoch: float | None = None
+    if isinstance(resets_at, (int, float)):
+        epoch = float(resets_at)
+    elif isinstance(resets_at, str):
+        try:
+            from datetime import datetime
+
+            epoch = datetime.fromisoformat(resets_at.replace("Z", "+00:00")).timestamp()
+        except ValueError:
+            return None
+    if epoch is None:
+        return None
+    remaining = epoch - now
+    if remaining <= 0:
+        return None
+    # Sanity cap: a 5h/7d rate-limit window never resets more than ~8 days out.
+    # Beyond that the timestamp is malformed (wrong units/epoch) — omit rather
+    # than render an absurd "616518h" (system boundary, best-effort).
+    if remaining > 8 * 86400:
+        return None
+    hours = int(remaining // 3600)
+    if hours >= 1:
+        return f"{hours}h"
+    return f"{max(1, int(remaining // 60))}m"
+
+
+def format_rate_limits(
+    rate_limits: Any,
+    is_proxy: bool,
+    *,
+    show_reset: bool = False,
+    now: float | None = None,
+) -> str | None:
+    """Format rate-limit usage from Claude Code's rate_limits field.
+
+    Shows the shortest window (5h) — the one users hit — as ``RL:N%``. Handles
+    both the object and legacy list payload shapes. Skipped in proxy mode (the
+    proxy has its own rate limits). With ``show_reset`` a compact reset countdown
+    is appended when available. Color thresholds: green <50%, yellow 50-80%,
+    red >80%.
     """
     if is_proxy or not rate_limits:
         return None
 
-    # rate_limits is a list of window objects
-    if not isinstance(rate_limits, list):
-        logger.debug("rate_limits unexpected type: %s", type(rate_limits).__name__)
-        return None
-
-    # Find the shortest window (5h preferred)
-    window = None
-    for entry in rate_limits:
-        if not isinstance(entry, dict):
-            continue
-        window_type = entry.get("type", "")
-        if "5" in str(window_type) or "hour" in str(window_type).lower():
-            window = entry
-            break
-    # Fall back to first entry if no 5h window found
-    if window is None and rate_limits:
-        first = rate_limits[0]
-        if isinstance(first, dict):
-            window = first
-
+    window = _extract_short_window(rate_limits)
     if window is None:
         return None
 
     used_pct = window.get("used_percentage")
     if used_pct is None:
         return None
-
     try:
         used_pct_float = float(used_pct)
     except (TypeError, ValueError):
@@ -936,7 +989,43 @@ def format_rate_limits(rate_limits: Any, is_proxy: bool) -> str | None:
     else:
         color = GREEN
 
-    return f"{DIM}RL:{RESET}{color}{pct}%{RESET}"
+    label = f"{DIM}RL:{RESET}{color}{pct}%{RESET}"
+    if show_reset:
+        countdown = _format_reset_countdown(window.get("resets_at"), now)
+        if countdown:
+            label += f"{DIM} {countdown}{RESET}"
+    return label
+
+
+def format_billing_cost(
+    billing_mode: str,
+    cost_data: dict[str, Any],
+    rate_limits: Any,
+    *,
+    now: float | None = None,
+) -> str | None:
+    """Cost segment for non-API billing (direct sessions).
+
+    ``subscription``/``ambiguous`` show the 5h quota instead of dollars (which are
+    a phantom figure on a subscription). When no quota data is available,
+    ``ambiguous`` hedges with ``≈$X.XX`` (we inferred subscription from a missing
+    ANTHROPIC_API_KEY but aren't certain); an explicit ``subscription`` shows no
+    dollar figure at all. Duration is always appended when present.
+    """
+    parts: list[str] = []
+    quota = format_rate_limits(rate_limits, is_proxy=False, show_reset=True, now=now)
+    if quota:
+        parts.append(quota)
+    elif billing_mode == "ambiguous":
+        cost_usd = (cost_data or {}).get("total_cost_usd", 0) or 0
+        if cost_usd > 0:
+            parts.append(f"{METRICS_COLOR}\u2248{_fmt_dollars(cost_usd)}{RESET}")
+
+    duration = _format_duration(cost_data)
+    if duration:
+        parts.append(duration)
+
+    return " ".join(parts) if parts else None
 
 
 def format_token_breakdown(input_tokens: int, output_tokens: int, cached_tokens: int) -> str | None:

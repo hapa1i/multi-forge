@@ -13,7 +13,8 @@ the module docstring in ``registry.py``).
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import os
+from dataclasses import dataclass, field
 from functools import cached_property
 from typing import Any
 
@@ -40,6 +41,11 @@ class RenderContext:
     is_session_authoritative: bool
     config: RuntimeConfig
 
+    # Set by render_segments() to the resolved render order, so a producer can
+    # see what else is active (e.g. rate_limits suppresses itself when cost
+    # already shows the quota). Empty until render_segments runs.
+    active_segments: set[str] = field(default_factory=set)
+
     # --- Cheap raw accessors (no I/O) ---
 
     @property
@@ -65,6 +71,25 @@ class RenderContext:
     @property
     def glyphs(self) -> Glyphs:
         return resolve_glyphs(self.config.statusline.glyphs)
+
+    @property
+    def has_api_key(self) -> bool:
+        # RAW env only. resolve_env_or_credential would fall back to the Forge
+        # credential file (and honor auth_ignore_env), misclassifying an OAuth
+        # session as API. The status line wants the main session's actual auth.
+        return bool(os.environ.get("ANTHROPIC_API_KEY"))
+
+    @property
+    def billing_mode(self) -> str:
+        """``api`` | ``subscription`` | ``ambiguous`` (declare + heuristic).
+
+        ``auto`` resolves to ``api`` when ANTHROPIC_API_KEY is set, else
+        ``ambiguous`` (we lean subscription but aren't certain).
+        """
+        mode = self.config.statusline.cost_mode
+        if mode in ("api", "subscription"):
+            return mode
+        return "api" if self.has_api_key else "ambiguous"
 
     # --- Lazy derivations (run once, only if accessed) ---
 

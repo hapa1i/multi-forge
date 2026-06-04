@@ -112,6 +112,12 @@ example:
 - personal `permissions`
 - advanced hook or status-line customization if you intentionally want to override Forge defaults
 
+Forge's built-in preset sets `statusLine` to `forge status-line` and nothing else. Claude Code status-line options such
+as `refreshInterval` (poll cadence) and `padding` are **not** auto-installed — add them yourself via
+`forge claude preset edit` (under the `statusLine` object). Forge intentionally leaves them to you so re-enabling never
+overwrites your cadence/padding choices. Segment selection, palette, glyphs, and cost mode live in
+`~/.forge/config.yaml` under `statusline:` instead (see `forge config set statusline.<key>`).
+
 Notes:
 
 - The preset file is auto-created on first access.

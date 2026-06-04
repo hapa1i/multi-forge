@@ -33,7 +33,13 @@ def _render(fixture, *, proxy=None, session=None, stats=None):
         es.enter_context(patch.object(sl, "discover_session", return_value=(session or (None, False))))
         es.enter_context(patch.object(sl, "get_git_branch", return_value=None))
         es.enter_context(patch.object(sl, "_cached_scan_transcript", return_value=(stats or TranscriptStats())))
-        res = runner.invoke(status_line, input=json.dumps(fixture), env={"FORGE_STATUS_TRUNCATE": "0"})
+        # Pin API billing so cost_mode=auto is deterministic regardless of the
+        # dev's ANTHROPIC_API_KEY — the snapshots are the API ($) view.
+        res = runner.invoke(
+            status_line,
+            input=json.dumps(fixture),
+            env={"FORGE_STATUS_TRUNCATE": "0", "ANTHROPIC_API_KEY": "sk-ant-test"},
+        )
     assert res.exit_code == 0, res.output
     return res.output
 
