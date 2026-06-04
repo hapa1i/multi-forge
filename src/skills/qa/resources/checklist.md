@@ -12,8 +12,8 @@
 
 **Test Repo**: `$FORGE_TEST_REPO`
 
-**Last updated**: 2026-06-03 (added status-line customization checks (§8.4), `forge usage` per-session rollup
-with the workflow worker/verb double-count assertion (7.12), and the session-end activity summary (5.21); earlier:
+**Last updated**: 2026-06-03 (added status-line customization checks (§8.4), `forge usage` per-session rollup with the
+workflow worker/verb double-count assertion (7.12), and the session-end activity summary (5.21); earlier:
 non-interactive docker-exec fixes, policy `--session` targeting, memory 16.4 re-track, skills-based disable assertions)
 
 ---
