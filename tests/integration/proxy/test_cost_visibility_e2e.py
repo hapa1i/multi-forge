@@ -171,14 +171,13 @@ def test_local_litellm_streaming_cost_unavailable(
     registered_proxy_server_local_gemini: RegisteredProxyServer,
     module_forge_home: Path,
 ) -> None:
-    """A LiteLLM gateway does NOT report cost on the streaming (SSE) path.
+    """A LiteLLM gateway does NOT report cost on the streaming (SSE) path → unavailable.
 
     Verified gap (card risk): LiteLLM's x-litellm-response-cost header is emitted at
     stream start, before token counts/cost exist, and this gateway does not put cost
-    in the final usage chunk body. So streaming LiteLLM cost is never route-reported —
-    catalog-inferred while the catalog exists (Step 2), 'unavailable' once Step 3
-    removes it. Tokens are always captured regardless. This asserts the durable
-    invariant (never a false gateway/reported claim) so it survives the Step 3 flip.
+    in the final usage chunk body. With the catalog removed (Step 3), streaming LiteLLM
+    cost is recorded as 'unavailable' (cost_micros=None) — never a fabricated figure.
+    Tokens are still captured.
     """
     proxy = registered_proxy_server_local_gemini
     all_before = _request_records(module_forge_home)
@@ -204,9 +203,10 @@ def test_local_litellm_streaming_cost_unavailable(
     record = new_records[-1]
     # Tokens are captured even when cost is unavailable.
     assert record["output_tokens"] > 0
-    # Never a false route-reported cost on the LiteLLM stream (the documented gap).
-    assert record["reporter"] != "litellm"
-    assert record["confidence"] not in ("reported", "gateway_calculated")
+    # No catalog fallback: streaming LiteLLM cost is explicitly unavailable, not invented.
+    assert record["cost_micros"] is None
+    assert record["reporter"] is None
+    assert record["confidence"] == "unavailable"
 
 
 def _install_proxying_claude_shim(tmp_path: Path) -> Path:

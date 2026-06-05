@@ -201,21 +201,19 @@ def _calc_and_log_cost(
 ) -> int | None:
     """Log a request's cost (microdollars) and return it, or ``None`` if unavailable.
 
-    When the route reported a cost (``reported_cost_micros``), it is logged with the
-    real reporter and ``reported``/``gateway_calculated`` confidence. Otherwise the
-    figure is still catalog-derived (``confidence="inferred"``) — Step 3 removes that
-    fallback so an unreported cost becomes ``None``/``unavailable``. Best-effort:
-    never raises; cost tracking must not break the request path.
+    Forge records what the route reported, nothing more. When the route reported a
+    cost (``reported_cost_micros``), it is logged with the real reporter and
+    ``reported``/``gateway_calculated`` confidence. Otherwise cost is ``None`` /
+    ``confidence="unavailable"`` — tokens are still logged, but no dollar figure is
+    invented from a local price table. Best-effort: never raises; cost tracking must
+    not break the request path.
     """
     try:
         if reported_cost_micros is not None:
             cost_micros: int | None = reported_cost_micros
             reporter, confidence = _reported_cost_provenance()
         else:
-            from forge.core.models.pricing import calculate_cost
-
-            cost_micros = calculate_cost(model, input_tokens, output_tokens, cached_tokens)
-            reporter, confidence = None, "inferred"
+            cost_micros, reporter, confidence = None, None, "unavailable"
 
         log_request_cost(
             proxy_id=PROXY_ID or "unknown",
@@ -232,7 +230,8 @@ def _calc_and_log_cost(
             confidence=confidence,
         )
 
-        if cost_tracker is not None:
+        # Spend caps account for reported costs only; an unavailable cost advances nothing.
+        if cost_tracker is not None and cost_micros is not None:
             cost_tracker.record(cost_micros)
 
         return cost_micros

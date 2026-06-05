@@ -44,6 +44,7 @@ class TestEmitForSessionResult:
             output_tokens=20,
             duration_ms=1234.5,
             measured=True,
+            cost_measured=True,  # the window had a reported-cost request
         )
         emit_usage_for_session_result(
             _ok_result(), command="memory-writer", session="s1", cost=cost, base_url="http://localhost:8084"
@@ -59,7 +60,31 @@ class TestEmitForSessionResult:
         assert e.attribution_granularity == "verb"
         assert e.source_refs is None  # claude -p: proxy request_id unknown (4g)
         assert e.billing_mode == "unknown"  # proxied -> opaque upstream
-        assert (e.route, e.reporter, e.confidence) == ("claude_p", "forge_proxy", "inferred")
+        assert (e.route, e.reporter, e.confidence) == ("claude_p", "forge_proxy", "reported")
+
+    def test_measured_tokens_but_unreported_cost_logs_null_cost(self) -> None:
+        """Passthrough verb: snapshot measured tokens, but no reported cost → null $.
+
+        Regression for the verb cost-evidence conflation: measured=True (a snapshot
+        delta existed) must not fabricate a measured $0 when cost_measured=False.
+        Tokens are still attributed; cost is unavailable.
+        """
+        cost = VerbCostResult(
+            verb="memory-writer",
+            total_cost_micros=0,
+            input_tokens=10,
+            output_tokens=20,
+            measured=True,
+            cost_measured=False,  # no reported-cost request in the window
+        )
+        emit_usage_for_session_result(
+            _ok_result(), command="memory-writer", session="s1", cost=cost, base_url="http://localhost:8084"
+        )
+        e = read_usage_events()[0]
+        # Tokens attributed; cost is null (not a fabricated $0).
+        assert (e.input_tokens, e.output_tokens) == (10, 20)
+        assert e.cost_micro_usd is None
+        assert (e.reporter, e.confidence) == (None, "unavailable")
 
     def test_unmeasured_no_proxy_is_unattributed(self, monkeypatch) -> None:
         # A direct/no-proxy verb: holder never measured -> null cost, not $0.
@@ -133,10 +158,25 @@ class TestEmitVerbAndWorkerVocabulary:
     def test_verb_aggregate_measured(self, monkeypatch) -> None:
         monkeypatch.setenv("FORGE_RUN_ID", "run_v")
         monkeypatch.setenv("FORGE_ROOT_RUN_ID", "run_v")
-        emit_verb_usage(command="panel", cost=VerbCostResult(verb="panel", total_cost_micros=900, measured=True))
+        emit_verb_usage(
+            command="panel",
+            cost=VerbCostResult(verb="panel", total_cost_micros=900, measured=True, cost_measured=True),
+        )
         e = read_usage_events()[0]
-        # Aggregate spans heterogeneous worker routes -> no single route.
-        assert (e.route, e.reporter, e.confidence) == (None, "forge_proxy", "inferred")
+        # Aggregate spans heterogeneous worker routes -> no single route; reported cost.
+        assert (e.route, e.reporter, e.confidence) == (None, "forge_proxy", "reported")
+
+    def test_verb_aggregate_measured_tokens_unreported_cost(self, monkeypatch) -> None:
+        """A fan-out that moved tokens but reported no cost logs null $, not a fake $0."""
+        monkeypatch.setenv("FORGE_RUN_ID", "run_v")
+        monkeypatch.setenv("FORGE_ROOT_RUN_ID", "run_v")
+        emit_verb_usage(
+            command="panel",
+            cost=VerbCostResult(verb="panel", total_cost_micros=0, input_tokens=5, measured=True, cost_measured=False),
+        )
+        e = read_usage_events()[0]
+        assert e.cost_micro_usd is None
+        assert (e.reporter, e.confidence) == (None, "unavailable")
 
     def test_verb_aggregate_unmeasured(self, monkeypatch) -> None:
         monkeypatch.setenv("FORGE_RUN_ID", "run_v")

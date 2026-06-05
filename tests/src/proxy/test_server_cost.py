@@ -112,20 +112,24 @@ class TestCalcAndLogCostReported:
         assert captured_log[0]["cost_micros"] == 0
         assert captured_log[0]["confidence"] == "reported"
 
-    def test_no_reported_cost_falls_back_to_catalog(
+    def test_no_reported_cost_is_unavailable(
         self,
         monkeypatch: pytest.MonkeyPatch,
         captured_log: list[dict[str, Any]],
         recorded_costs: list[int | None],
     ) -> None:
-        """Step 2: an unreported cost is still catalog-inferred (Step 3 removes this)."""
+        """No reported cost → None / 'unavailable'; tokens still logged, no catalog guess."""
         _set_provider(monkeypatch, "litellm")
-        monkeypatch.setattr("forge.core.models.pricing.calculate_cost", lambda *a, **k: 999)
 
-        result = _calc()  # no reported_cost_micros
+        result = _calc(input_tokens=100, output_tokens=50)  # no reported_cost_micros
 
-        assert result == 999
+        assert result is None
         rec = captured_log[0]
-        assert rec["cost_micros"] == 999
+        assert rec["cost_micros"] is None
         assert rec["reporter"] is None
-        assert rec["confidence"] == "inferred"
+        assert rec["confidence"] == "unavailable"
+        # Tokens are preserved even when cost is unavailable.
+        assert rec["input_tokens"] == 100
+        assert rec["output_tokens"] == 50
+        # An unavailable cost advances no spend-cap aggregate.
+        assert recorded_costs == []

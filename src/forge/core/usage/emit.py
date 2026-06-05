@@ -69,16 +69,20 @@ def emit_usage_for_session_result(
             return
         status, failure_type = _session_status(result)
         # Narrow to a measured holder (None when no proxy delta was captured) so a
-        # direct/no-proxy verb reports null cost, not a fabricated $0.
+        # direct/no-proxy verb reports null tokens, not fabricated zeros.
         measured_cost = cost if (cost is not None and cost.measured) else None
+        # Cost is real evidence only when the proxy window had a reported-cost request.
+        # A passthrough verb is measured (tokens) yet cost-unavailable (no $ evidence) —
+        # so its cost is null, never a fabricated measured $0.
+        cost_evident = cost is not None and cost.cost_measured
         # "Direct" for billing only when no proxy is in the path; a proxied call's
         # upstream billing is opaque from here, so it stays "unknown".
         effective_direct = direct and not base_url
-        # A claude -p verb is always route="claude_p"; its cost (when a proxy snapshot
-        # measured it) is catalog-derived today -> "inferred" (Phase 2 flips to "reported"
-        # once gateway cost is wired). No proxy snapshot -> no cost reporter -> "unavailable".
-        reporter: Reporter | None = "forge_proxy" if measured_cost else None
-        confidence: Confidence = "inferred" if measured_cost else "unavailable"
+        # A claude -p verb is always route="claude_p"; reported cost makes it "reported"
+        # (the proxy total now sums route-reported costs only). No reported-cost evidence
+        # -> no reporter -> "unavailable".
+        reporter: Reporter | None = "forge_proxy" if cost_evident else None
+        confidence: Confidence = "reported" if cost_evident else "unavailable"
         event = UsageEvent(
             run_id=result.run_id,
             parent_run_id=result.parent_run_id,
@@ -99,7 +103,7 @@ def emit_usage_for_session_result(
             input_tokens=measured_cost.input_tokens if measured_cost else None,
             output_tokens=measured_cost.output_tokens if measured_cost else None,
             cached_tokens=measured_cost.cached_tokens if measured_cost else None,
-            cost_micro_usd=measured_cost.total_cost_micros if measured_cost else None,
+            cost_micro_usd=cost.total_cost_micros if (cost is not None and cost.cost_measured) else None,
             latency_ms=round(cost.duration_ms, 1) if (cost and cost.duration_ms) else None,
             source_refs=None,  # claude -p: proxy request_id unknown to Forge (4g)
         )
@@ -130,11 +134,14 @@ def emit_verb_usage(
         if identity is None:
             return
         measured_cost = cost if (cost is not None and cost.measured) else None
-        # Aggregate over heterogeneous workers -> no single route (None). Cost, when a
-        # proxy snapshot measured it, is catalog-derived today -> "inferred"; else no cost
-        # reporter -> "unavailable". Phase 2 flips "inferred" -> "reported".
-        reporter: Reporter | None = "forge_proxy" if measured_cost else None
-        confidence: Confidence = "inferred" if measured_cost else "unavailable"
+        # Cost is real evidence only when the window had a reported-cost request; a
+        # tokens-only passthrough aggregate reports cost-unavailable, never a fake $0.
+        cost_evident = cost is not None and cost.cost_measured
+        # Aggregate over heterogeneous workers -> no single route (None). Reported cost
+        # makes it "reported" (proxy total sums route-reported costs only); else no cost
+        # reporter -> "unavailable".
+        reporter: Reporter | None = "forge_proxy" if cost_evident else None
+        confidence: Confidence = "reported" if cost_evident else "unavailable"
         event = UsageEvent(
             run_id=identity.run_id,
             parent_run_id=identity.parent_run_id,
@@ -152,7 +159,7 @@ def emit_verb_usage(
             input_tokens=measured_cost.input_tokens if measured_cost else None,
             output_tokens=measured_cost.output_tokens if measured_cost else None,
             cached_tokens=measured_cost.cached_tokens if measured_cost else None,
-            cost_micro_usd=measured_cost.total_cost_micros if measured_cost else None,
+            cost_micro_usd=cost.total_cost_micros if (cost is not None and cost.cost_measured) else None,
             latency_ms=round(cost.duration_ms, 1) if (cost and cost.duration_ms) else None,
             source_refs=None,  # claude -p workers: proxy request_id unknown (4g)
         )
