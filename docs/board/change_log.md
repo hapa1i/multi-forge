@@ -27,6 +27,24 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-05
 
+### Phase 2 follow-up: Fix panel cost-visibility canary (wrong monkeypatch target)
+
+**Goal**: Make the panel integration test previously filed as a "pre-existing" failure
+(`test_panel_with_subprocess_proxy_records_verb_cost`) pass, so the panel verb-cost path is actually real-wire verified
+rather than left red.
+
+**Key changes**:
+
+- Root cause was a **test bug**, not a product bug. The test registered its canary model via
+  `monkeypatch.setitem(DEFAULT_MODELS, …)`, but `forge workflow panel --models <name>` resolves through
+  `resolve_model_specs`, which validates an explicit `--models` against `AVAILABLE_MODELS` (the full registry).
+  `DEFAULT_MODELS` is only the no-args fallback quorum, so the canary read as `Unknown models`. Patched it into
+  `AVAILABLE_MODELS` — the registry the resolver actually reads.
+
+**Verification**: `test_cost_visibility_e2e.py::test_panel_with_subprocess_proxy_records_verb_cost` passes on real
+OpenRouter (4.2s); cost-visibility matrix now 5/5. Diagnosis confirmed with an isolated `resolve_model_specs` repro
+(DEFAULT_MODELS patch → `Unknown models`; AVAILABLE_MODELS patch → resolves).
+
 ### Phase 2 follow-up: Verb cost-evidence in `forge proxy costs` + docs sync (review fixes)
 
 **Goal**: Close two review findings on the shipped Phase 2 work — the verb display ignored the cost-evidence flag

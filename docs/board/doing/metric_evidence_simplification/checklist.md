@@ -225,10 +225,12 @@ unchanged.)
 `_estimate_input_tokens` helpers). Stale `cap_mode` rejected as a tombstone at config-parse **and** the CLI set path.
 One post-event cap behavior; `on_cap_hit` (reject/warn) retained. 924 proxy/config/regression unit tests pass + the new
 removed-key regression (4 cases); `make pre-commit` clean. Proxy integration: 3/4 cost-visibility e2e pass (request path
-intact after the strict removal); the 4th (`test_panel_with_subprocess_proxy_records_verb_cost`) is a **pre-existing**
-failure — confirmed identical on clean HEAD `c7402c3`, caused by `monkeypatch.setitem(DEFAULT_MODELS, …)` not reaching
-the workflow model resolver, unrelated to this slice. **Breaking change**: existing `proxy.yaml` with a `cap_mode:` line
-must drop it. Deferred to Phase 2: nullable `cost_micros`, reported-cost wiring, the "reported route cost" wording.
+intact after the strict removal); the 4th (`test_panel_with_subprocess_proxy_records_verb_cost`) was a **pre-existing**
+test bug — confirmed identical on clean HEAD `c7402c3`, caused by `monkeypatch.setitem(DEFAULT_MODELS, …)` not reaching
+the workflow model resolver, unrelated to this slice. **Resolved 2026-06-05** by patching the canary into
+`AVAILABLE_MODELS` (the registry `resolve_model_specs` validates `--models` against); the panel test now passes on real
+wire — cost-visibility matrix is 5/5. **Breaking change**: existing `proxy.yaml` with a `cap_mode:` line must drop it.
+Deferred to Phase 2: nullable `cost_micros`, reported-cost wiring, the "reported route cost" wording.
 
 ---
 
@@ -290,17 +292,17 @@ both gateways) and **remove the catalog entirely** (not flag it). Provenance shi
 
 **Acceptance** — all rows verified (5531 unit+regression pass; mypy/pyright/`make pre-commit` clean):
 
-| Test                                    | Assertion                                                                                                      | Status                                                                      |
-| --------------------------------------- | -------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| Reported cost persisted with source     | record `reporter="openrouter"`, `confidence="reported"`; no `estimated`/`pricing_source`                       | ✔ `test_cost_logger.py`                                                     |
-| Unavailable cost is `None`, not `0`     | record `cost_micros=None`; tokens present; `confidence="unavailable"`                                          | ✔ `test_cost_logger.py`, `test_server_cost.py`                              |
-| None cost skips cap aggregate           | `record()` not advanced on `None`; no `TypeError`                                                              | ✔ `test_cost_tracker.py`, `test_server_cost.py`                             |
-| Reported-cost capture (carrier)         | `cost_usd` on both types; OpenRouter body + LiteLLM header read end-to-end                                     | ✔ `test_openai_compat.py`, `test_litellm_cost.py`, `test_client_adapter.py` |
-| Streaming cost threads to `on_complete` | `reported_cost_micros` in `final_usage`, never emitted to client                                               | ✔ `test_converters.py`, `test_openrouter.py`                                |
-| Display/metrics treat `None` ≠ `$0`     | "unavailable" rendered; mixed legacy+reported+null aggregates without crash                                    | ✔ `test_proxy_costs.py`, `test_metrics.py`                                  |
-| Verb passthrough logs null cost         | `measured` tokens but `cost_measured=False` → `cost_micro_usd=None`                                            | ✔ `test_emit.py`, `test_cost_tracking.py`                                   |
-| Verb **display** gates on evidence      | `cost_measured=False`+total 0 → `reported:false`/"unavailable"; scope recomputes from `reported_request_count` | ✔ `test_proxy_costs.py` (`TestVerbCostReported`, scope tests)               |
-| **Real-wire matrix** (integration)      | OR reported (stream+non), LiteLLM gateway_calculated (non), LiteLLM stream `unavailable`/`None`                | ✔ `test_cost_visibility_e2e.py` (4 pass, catalog removed)                   |
+| Test                                    | Assertion                                                                                                      | Status                                                                       |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| Reported cost persisted with source     | record `reporter="openrouter"`, `confidence="reported"`; no `estimated`/`pricing_source`                       | ✔ `test_cost_logger.py`                                                      |
+| Unavailable cost is `None`, not `0`     | record `cost_micros=None`; tokens present; `confidence="unavailable"`                                          | ✔ `test_cost_logger.py`, `test_server_cost.py`                               |
+| None cost skips cap aggregate           | `record()` not advanced on `None`; no `TypeError`                                                              | ✔ `test_cost_tracker.py`, `test_server_cost.py`                              |
+| Reported-cost capture (carrier)         | `cost_usd` on both types; OpenRouter body + LiteLLM header read end-to-end                                     | ✔ `test_openai_compat.py`, `test_litellm_cost.py`, `test_client_adapter.py`  |
+| Streaming cost threads to `on_complete` | `reported_cost_micros` in `final_usage`, never emitted to client                                               | ✔ `test_converters.py`, `test_openrouter.py`                                 |
+| Display/metrics treat `None` ≠ `$0`     | "unavailable" rendered; mixed legacy+reported+null aggregates without crash                                    | ✔ `test_proxy_costs.py`, `test_metrics.py`                                   |
+| Verb passthrough logs null cost         | `measured` tokens but `cost_measured=False` → `cost_micro_usd=None`                                            | ✔ `test_emit.py`, `test_cost_tracking.py`                                    |
+| Verb **display** gates on evidence      | `cost_measured=False`+total 0 → `reported:false`/"unavailable"; scope recomputes from `reported_request_count` | ✔ `test_proxy_costs.py` (`TestVerbCostReported`, scope tests)                |
+| **Real-wire matrix** (integration)      | OR reported (stream+non), LiteLLM gateway_calculated (non), LiteLLM stream `unavailable`/`None`                | ✔ `test_cost_visibility_e2e.py` (5 pass incl. panel canary, catalog removed) |
 
 **Closeout**: ✔ Done (2026-06-05). Forge no longer prices requests from a local table — cost is reported-or-unavailable
 end-to-end, the catalog is deleted, and the integration matrix confirms each cell on the real wire. **Verified gap

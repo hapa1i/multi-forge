@@ -18,7 +18,7 @@ import pytest
 from click.testing import CliRunner
 
 from forge.cli.main import main
-from forge.review.models import DEFAULT_MODELS, ModelSpec
+from forge.review.models import AVAILABLE_MODELS, ModelSpec
 from tests.integration.proxy.conftest import RegisteredProxyServer
 
 pytestmark = [pytest.mark.integration, pytest.mark.slow]
@@ -303,8 +303,12 @@ def test_panel_with_subprocess_proxy_records_verb_cost(
     monkeypatch.setenv("FORGE_SUBPROCESS_PROXY", proxy.proxy_id)
     monkeypatch.setenv("FORGE_E2E_CLAUDE_CAPTURE", str(capture_path))
     monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}")
+    # Register the canary in AVAILABLE_MODELS — the registry resolve_model_specs()
+    # validates an explicit --models against. DEFAULT_MODELS is only the no-args
+    # fallback quorum, never consulted when --models is passed, so patching it left
+    # the model "Unknown".
     monkeypatch.setitem(
-        DEFAULT_MODELS,
+        AVAILABLE_MODELS,
         "e2e-haiku-subprocess",
         ModelSpec(
             name="e2e-haiku-subprocess",
