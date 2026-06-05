@@ -86,15 +86,22 @@ def _post_tiny_message(proxy: RegisteredProxyServer) -> httpx.Response:
 
 
 @pytest.mark.parametrize(
-    "fixture_name",
-    ["registered_proxy_server_openrouter", "registered_proxy_server_local_gemini"],
+    "fixture_name,expected_reporter,expected_confidence",
+    [
+        # OpenRouter reports actual spend in the response body (usage.cost).
+        ("registered_proxy_server_openrouter", "openrouter", "reported"),
+        # A LiteLLM gateway computes spend and returns it in x-litellm-response-cost.
+        ("registered_proxy_server_local_gemini", "litellm", "gateway_calculated"),
+    ],
 )
 def test_proxy_non_streaming_cost_smoke(
     request: pytest.FixtureRequest,
     fixture_name: str,
+    expected_reporter: str,
+    expected_confidence: str,
     module_forge_home: Path,
 ) -> None:
-    """A real proxy request writes a scoped cost record and returns cost headers."""
+    """A real proxy request writes a route-reported cost record and returns cost headers."""
     proxy: RegisteredProxyServer = request.getfixturevalue(fixture_name)
     all_before = _request_records(module_forge_home)
     before_matching = len([r for r in all_before if r.get("proxy_id") == proxy.proxy_id])
@@ -119,6 +126,11 @@ def test_proxy_non_streaming_cost_smoke(
     assert record["output_tokens"] > 0
     assert record["cost_micros"] > 0
     assert record["failed"] is False
+    # Provenance proves the figure is route-reported, not a catalog estimate.
+    # This is the gate for Step 3: if a gateway can't report cost, this fails here
+    # rather than silently regressing to 'unavailable' once the catalog is gone.
+    assert record["reporter"] == expected_reporter
+    assert record["confidence"] == expected_confidence
 
 
 def test_openrouter_streaming_cost_smoke(
@@ -150,6 +162,51 @@ def test_openrouter_streaming_cost_smoke(
     )
     assert new_records, f"No cost records for proxy_id={proxy.proxy_id}"
     assert new_records[-1]["cost_micros"] > 0
+    # Streaming reported cost rides the final usage chunk (OpenRouter usage.cost).
+    assert new_records[-1]["reporter"] == "openrouter"
+    assert new_records[-1]["confidence"] == "reported"
+
+
+def test_local_litellm_streaming_cost_unavailable(
+    registered_proxy_server_local_gemini: RegisteredProxyServer,
+    module_forge_home: Path,
+) -> None:
+    """A LiteLLM gateway does NOT report cost on the streaming (SSE) path.
+
+    Verified gap (card risk): LiteLLM's x-litellm-response-cost header is emitted at
+    stream start, before token counts/cost exist, and this gateway does not put cost
+    in the final usage chunk body. So streaming LiteLLM cost is never route-reported —
+    catalog-inferred while the catalog exists (Step 2), 'unavailable' once Step 3
+    removes it. Tokens are always captured regardless. This asserts the durable
+    invariant (never a false gateway/reported claim) so it survives the Step 3 flip.
+    """
+    proxy = registered_proxy_server_local_gemini
+    all_before = _request_records(module_forge_home)
+    before_matching = len([r for r in all_before if r.get("proxy_id") == proxy.proxy_id])
+
+    with httpx.Client(timeout=60) as client:
+        with client.stream(
+            "POST",
+            f"{proxy.base_url}/v1/messages",
+            json=_tiny_message_payload(stream=True),
+            headers={"x-api-key": "test", "user-agent": "claude-code/cost-e2e"},
+        ) as resp:
+            assert resp.status_code == 200
+            events = [line for line in resp.iter_lines() if line.startswith("data: ")]
+
+    assert events
+    new_records = _wait_for_matching_records(
+        lambda: _request_records(module_forge_home),
+        before_matching,
+        proxy_id=proxy.proxy_id,
+    )
+    assert new_records, f"No cost records for proxy_id={proxy.proxy_id}"
+    record = new_records[-1]
+    # Tokens are captured even when cost is unavailable.
+    assert record["output_tokens"] > 0
+    # Never a false route-reported cost on the LiteLLM stream (the documented gap).
+    assert record["reporter"] != "litellm"
+    assert record["confidence"] not in ("reported", "gateway_calculated")
 
 
 def _install_proxying_claude_shim(tmp_path: Path) -> Path:
