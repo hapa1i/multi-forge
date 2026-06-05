@@ -158,7 +158,8 @@ forge config set statusline.cost_mode=subscription
 - `subscription` — show the 5-hour quota instead of dollars.
 - `auto` (default) — `$` when `ANTHROPIC_API_KEY` is set, otherwise the quota (or a hedged `≈$` when no quota data).
 
-Under a proxy the cost field always shows the proxy's estimated `~$`.
+Under a proxy the cost field shows the proxy's *reported* `~$`; the `~` flags that it can undercount, since
+cost-unavailable routes are excluded rather than priced from a local table.
 
 **Removed:** the old flat `show_rate_limits` key. Add `rate_limits` to `statusline.segments` instead (e.g.
 `forge config set statusline.segments=path,model,rate_limits`).

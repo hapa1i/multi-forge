@@ -6,7 +6,12 @@ import json
 
 from click.testing import CliRunner
 
-from forge.cli.proxy_costs import _format_usd, _scope_verb_records_to_proxy, costs_cmd
+from forge.cli.proxy_costs import (
+    _format_usd,
+    _scope_verb_records_to_proxy,
+    _verb_cost_reported,
+    costs_cmd,
+)
 
 
 class TestFormatUsd:
@@ -198,3 +203,136 @@ def test_costs_human_output_renders_unavailable(monkeypatch) -> None:
     by_verb = CliRunner().invoke(costs_cmd, ["--by-verb"])
     assert by_verb.exit_code == 0, by_verb.output
     assert "cost unavailable" in by_verb.output
+
+
+class TestVerbCostReported:
+    """`_verb_cost_reported` reads the evidence flag, not the (always-int) total."""
+
+    def test_evidence_flag_true_with_zero_total_is_reported(self) -> None:
+        # Reported $0 (all-free models): the flag, not the total, is the signal.
+        assert _verb_cost_reported({"cost_measured": True, "total_cost_micros": 0}) is True
+
+    def test_evidence_flag_false_with_zero_total_is_unavailable(self) -> None:
+        # The user's reproduction: passthrough verb, tokens but no reported cost.
+        assert _verb_cost_reported({"cost_measured": False, "total_cost_micros": 0}) is False
+
+    def test_evidence_flag_authoritative_over_positive_total(self) -> None:
+        # A present flag always wins; a stray positive total cannot override it.
+        assert _verb_cost_reported({"cost_measured": False, "total_cost_micros": 50_000}) is False
+
+    def test_legacy_record_infers_from_positive_total(self) -> None:
+        # Pre cost-evidence record (no flag): positive catalog total still renders.
+        assert _verb_cost_reported({"total_cost_micros": 50_000}) is True
+
+    def test_legacy_record_zero_total_is_unavailable(self) -> None:
+        # Legacy 0 stays unavailable, not a measured $0.
+        assert _verb_cost_reported({"total_cost_micros": 0}) is False
+
+
+def test_costs_json_verb_evidence_flag_gates_reported(monkeypatch) -> None:
+    """A passthrough verb (cost_measured=False, total 0) is NOT reported as $0.
+
+    Reproduces the reported regression: numeric total_cost_micros (including 0)
+    was treated as reported. The evidence flag must gate `reported`.
+    """
+    verb_records = [
+        # Passthrough window: tokens advanced, but no reported-cost request.
+        {"verb": "passthrough", "total_cost_micros": 0, "cost_measured": False, "request_count": 2},
+        # Reported window with a genuine $0 (free model): still reported.
+        {"verb": "freebie", "total_cost_micros": 0, "cost_measured": True, "request_count": 1},
+        # Reported window with real cost.
+        {"verb": "panel", "total_cost_micros": 15_000, "cost_measured": True, "request_count": 3},
+    ]
+    monkeypatch.setattr("forge.proxy.cost_logger.read_cost_logs", lambda *a, **k: [])
+    monkeypatch.setattr("forge.core.reactive.cost_tracking.read_verb_logs", lambda *a, **k: verb_records)
+
+    result = CliRunner().invoke(costs_cmd, ["--json"])
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert data["by_verb"]["passthrough"]["reported"] is False
+    assert data["by_verb"]["passthrough"]["cost_micros"] == 0
+    assert data["by_verb"]["freebie"]["reported"] is True
+    assert data["by_verb"]["panel"]["reported"] is True
+    assert data["by_verb"]["panel"]["cost_micros"] == 15_000
+
+
+def test_costs_human_verb_evidence_flag_renders_unavailable(monkeypatch) -> None:
+    """Human view shows 'unavailable' for a cost_measured=False verb, not $0.00."""
+    verb_records = [
+        {"verb": "passthrough", "total_cost_micros": 0, "cost_measured": False, "request_count": 2},
+    ]
+    monkeypatch.setattr("forge.proxy.cost_logger.read_cost_logs", lambda *a, **k: [])
+    monkeypatch.setattr("forge.core.reactive.cost_tracking.read_verb_logs", lambda *a, **k: verb_records)
+
+    result = CliRunner().invoke(costs_cmd, ["--by-verb"])
+
+    assert result.exit_code == 0, result.output
+    # The verb row reads 'unavailable'; it must not be rendered as a measured $0.00.
+    assert "unavailable" in result.output
+
+
+def test_scope_verb_recomputes_cost_measured_from_reported_counter() -> None:
+    """Scoping re-derives cost_measured from the matching per_proxy subset.
+
+    The unscoped flag covers all proxies; a single-proxy view may have no
+    reported-cost request even when the whole-window flag is true.
+    """
+    records = [
+        {
+            "verb": "panel",
+            "total_cost_micros": 80_000,
+            "cost_measured": True,  # true across BOTH proxies
+            "request_count": 3,
+            "per_proxy": [
+                {
+                    "base_url": "http://localhost:8084",
+                    "cost_micros": 80_000,
+                    "request_count": 2,
+                    "reported_request_count": 2,
+                },
+                {
+                    # Passthrough proxy: tokens but no reported cost.
+                    "base_url": "http://localhost:8085",
+                    "cost_micros": 0,
+                    "request_count": 1,
+                    "reported_request_count": 0,
+                },
+            ],
+        }
+    ]
+
+    # Scope to the reporting proxy → still measured.
+    reporting = _scope_verb_records_to_proxy(records, "http://localhost:8084")
+    assert reporting[0]["cost_measured"] is True
+
+    # Scope to the passthrough proxy → no reported cost in this view.
+    passthrough = _scope_verb_records_to_proxy(records, "http://localhost:8085")
+    assert passthrough[0]["cost_measured"] is False
+    assert _verb_cost_reported(passthrough[0]) is False
+
+
+def test_scope_verb_legacy_per_proxy_drops_stale_flag() -> None:
+    """Legacy per_proxy (no reported_request_count) drops the unscoped flag.
+
+    Without the evidence counter we can't re-derive cost-evidence for the subset,
+    so the stale top-level flag is removed and _verb_cost_reported falls back to
+    the positive-total rule.
+    """
+    records = [
+        {
+            "verb": "panel",
+            "total_cost_micros": 80_000,
+            "cost_measured": True,
+            "request_count": 2,
+            "per_proxy": [
+                {"base_url": "http://localhost:8084", "cost_micros": 80_000, "request_count": 2},
+            ],
+        }
+    ]
+
+    scoped = _scope_verb_records_to_proxy(records, "http://localhost:8084")
+
+    assert "cost_measured" not in scoped[0]
+    # Positive scoped total → still reported via the legacy fallback.
+    assert _verb_cost_reported(scoped[0]) is True

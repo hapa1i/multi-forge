@@ -921,11 +921,12 @@ cost-capture or log write failures must not break successful LLM responses.
 #### Per-session usage read surface
 
 `forge usage [session]` aggregates the two already-captured per-session planes into one human-readable view: the **usage
-ledger** (`usage/events`, the uncapped source for per-command run/error counts, tokens, and estimated cost) and the
-manifest's **`confirmed.policy.decisions`** (supervisor allow/warn/deny and warning text, capped at `MAX_DECISION_LOG`).
-The aggregation is a UI-agnostic command-core builder (`forge.core.ops.usage_summary.build_session_activity_summary`,
-§3.12) shared by the CLI and a compact session-end line the launcher prints on exit (host, sidecar, and fork). Cost is
-labeled estimated — `forge proxy costs` stays the authoritative spend view. Events are scoped by the `session` field
+ledger** (`usage/events`, the uncapped source for per-command run/error counts, tokens, and reported-or-unavailable
+cost) and the manifest's **`confirmed.policy.decisions`** (supervisor allow/warn/deny and warning text, capped at
+`MAX_DECISION_LOG`). The aggregation is a UI-agnostic command-core builder
+(`forge.core.ops.usage_summary.build_session_activity_summary`, §3.12) shared by the CLI and a compact session-end line
+the launcher prints on exit (host, sidecar, and fork). Cost is reported-or-unavailable, with per-session attribution
+best-effort — `forge proxy costs` stays the authoritative spend view. Events are scoped by the `session` field
 (`event.session == manifest.name`); emitters that do not tag a session (e.g. the action tagger) are not attributed to
 one, so the summary records that coverage is partial. See
 [design_appendix.md §A.13](design_appendix.md#a13-usage-attribution-ledger-schema-314) for the read surface and

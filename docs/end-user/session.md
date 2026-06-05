@@ -646,7 +646,8 @@ overlay. See [proxy.md](proxy.md) for proxy configuration.
 ## What a session did (`forge usage` + session-end summary)
 
 Two read surfaces report what Forge actually did during a session, over data the usage ledger and the policy-decision
-log already capture. Spend figures are **estimates** — `forge proxy costs` stays the authoritative dollar view (see
+log already capture. Session-scoped spend figures are **best-effort attribution** (reported dollars, snapshot-attributed
+under concurrency) — `forge proxy costs` stays the authoritative dollar view (see
 [proxy.md](proxy.md#cost-tracking-and-spend-caps)).
 
 **Session-end summary (automatic).** When a session exits, the launcher prints a one-line rollup before the reconnect
@@ -670,9 +671,9 @@ forge usage my-feature --all     # full history
 forge usage my-feature --json    # machine-readable
 ```
 
-It reports per-command calls/errors/tokens/estimated-cost plus the supervisor allow/warn/deny breakdown with recent
-warning text. A workflow fan-out (panel/debate/...) counts as **one** call with its worker count tracked in a separate
-column, so a 4-worker panel reads as one workflow, not five.
+It reports per-command calls/errors/tokens/reported-cost (or *unavailable*) plus the supervisor allow/warn/deny
+breakdown with recent warning text. A workflow fan-out (panel/debate/...) counts as **one** call with its worker count
+tracked in a separate column, so a 4-worker panel reads as one workflow, not five.
 
 > **Sidecar:** both surfaces work in sidecar mode when the session launched with a proxy id (the in-container usage
 > ledger is mounted back to the host). A template-only sidecar shows only the policy-decision half.

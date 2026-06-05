@@ -75,6 +75,20 @@ def _reported_micros(record: dict, key: str = "cost_micros") -> int | None:
     return val if isinstance(val, int) else None
 
 
+def _verb_cost_reported(record: dict) -> bool:
+    """Whether a verb invocation has reported-cost evidence.
+
+    Verb records carry ``total_cost_micros`` as a plain int (0 for a passthrough
+    window), so presence-of-number is NOT evidence — the unknown-as-zero trap. New
+    records carry ``cost_measured`` (true only when the window had a reported-cost
+    request); trust it. Legacy records (pre cost-evidence) have no flag, so infer it
+    from a positive catalog total — a legacy 0 stays unavailable, not a measured $0.
+    """
+    if "cost_measured" in record:
+        return bool(record["cost_measured"])
+    return _reported_micros(record, "total_cost_micros") not in (None, 0)
+
+
 @click.command("costs")
 @click.argument("proxy_id", required=False, default=None)
 @click.option(
@@ -184,6 +198,15 @@ def _scope_verb_records_to_proxy(verb_records: list[dict], proxy_base_url: str |
         scoped_record["output_tokens"] = _sum_proxy_field(matching, "output_tokens")
         scoped_record["cached_tokens"] = _sum_proxy_field(matching, "cached_tokens")
         scoped_record["request_count"] = _sum_proxy_field(matching, "request_count")
+        # Re-derive cost-evidence for the scoped subset: the unscoped record's
+        # cost_measured covers all proxies, but a single-proxy view may have no
+        # reported-cost request. Trust the per-proxy counter when present; legacy
+        # deltas lack it, so drop the stale flag and let _verb_cost_reported fall
+        # back to the positive-total rule.
+        if any("reported_request_count" in p for p in matching):
+            scoped_record["cost_measured"] = _sum_proxy_field(matching, "reported_request_count") > 0
+        else:
+            scoped_record.pop("cost_measured", None)
         scoped.append(scoped_record)
 
     return scoped
@@ -204,9 +227,8 @@ def _display_by_verb(
         verb = v.get("verb", "unknown")
         if verb not in verb_costs:
             verb_costs[verb] = {"cost_micros": 0, "reported": False, "request_count": 0, "invocations": 0}
-        vc = _reported_micros(v, "total_cost_micros")
-        if vc is not None:
-            verb_costs[verb]["cost_micros"] += vc
+        if _verb_cost_reported(v):
+            verb_costs[verb]["cost_micros"] += _reported_micros(v, "total_cost_micros") or 0
             verb_costs[verb]["reported"] = True
         verb_costs[verb]["request_count"] += v.get("request_count", 0)
         verb_costs[verb]["invocations"] += 1
@@ -312,9 +334,8 @@ def _output_json(
         verb = v.get("verb", "unknown")
         if verb not in verb_summary:
             verb_summary[verb] = {"cost_micros": 0, "reported": False, "request_count": 0, "invocations": 0}
-        vc = _reported_micros(v, "total_cost_micros")
-        if vc is not None:
-            verb_summary[verb]["cost_micros"] += vc
+        if _verb_cost_reported(v):
+            verb_summary[verb]["cost_micros"] += _reported_micros(v, "total_cost_micros") or 0
             verb_summary[verb]["reported"] = True
         verb_summary[verb]["request_count"] += v.get("request_count", 0)
         verb_summary[verb]["invocations"] += 1

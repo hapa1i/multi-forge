@@ -58,9 +58,7 @@ def test_cap_mode_in_costs_dict_rejected_at_parse(stale: str) -> None:
     from forge.config.loader import load_proxy_instance_config_from_dict
 
     with pytest.raises(ValueError, match="cap_mode is no longer supported"):
-        load_proxy_instance_config_from_dict(
-            {**_VALID_PROXY, "costs": {"caps": {"per_day": 10.0}, "cap_mode": stale}}
-        )
+        load_proxy_instance_config_from_dict({**_VALID_PROXY, "costs": {"caps": {"per_day": 10.0}, "cap_mode": stale}})
 
 
 def _create_proxy(proxy_id: str) -> Path:

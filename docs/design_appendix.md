@@ -264,7 +264,7 @@ removed (clean break) — `rate_limits` is now an opt-in segment. Default-off se
 **Billing-aware cost.** `cost_mode` + raw `os.environ["ANTHROPIC_API_KEY"]` (not credential resolution, which would
 misclassify OAuth as API) resolve a billing mode: `api` shows real `$`, `subscription` shows the 5h quota (dollars are a
 phantom on a subscription), `auto` infers from the key (hedged `≈$` when ambiguous). Proxy mode always shows the proxy's
-estimated `~$`.
+*reported* `~$` (may undercount; cost-unavailable routes are excluded, not locally priced).
 
 **Rendering.** The `where` bucket (`path`, `branch`) leads concatenated; all other segments are separator-joined in the
 configured order. `RenderContext` derivations are lazy `cached_property` — a segment not in the active set does zero I/O
@@ -490,8 +490,8 @@ aggregates it with the manifest's `confirmed.policy.decisions` into a `SessionAc
 `CommandUsage` run/error/token/cost rows; decisions -> `PolicyActivity` supervisor allow/warn/deny + warnings, with
 `log_capped` when the decision log hit `MAX_DECISION_LOG`). The builder re-reads the manifest fresh from disk because
 hooks mutate `confirmed.*` during the run. `forge usage [session]` renders a table (`--json`/`--days`/`--all`); the
-launcher prints a one-line `render_summary_line(...)` on exit (host, sidecar, fork). Cost is estimated and may be
-partial (`cost_partial`); `forge proxy costs` is authoritative.
+launcher prints a one-line `render_summary_line(...)` on exit (host, sidecar, fork). Cost is reported-or-unavailable and
+may be partial (`cost_partial`); `forge proxy costs` is authoritative.
 
 Per-emitter session coverage (a per-session summary is honest about what it can attribute):
 

@@ -78,7 +78,8 @@ leaves it null (Forge is not the HTTP client — deferred to Phase 4g).
 `metrics = proxy_metrics.snapshot()` with `_attach_cap_summary()` nesting `CostTracker.cap_summary()` under
 `metrics.costs.caps`. Key fields consumers read:
 
-- `metrics.costs.total_usd` (estimated), `metrics.costs.caps.{daily,monthly}.{current_usd,limit_usd,percent}`
+- `metrics.costs.total_usd` (reported-only sum; cost-unavailable requests excluded),
+  `metrics.costs.caps.{daily,monthly}.{current_usd,limit_usd,percent}`
 - `metrics.cache_hit_rate`, per-tier/per-model breakdown
 - `wire_shape`, `intercept_mode` (audit posture; see design.md §7.x)
 
@@ -115,10 +116,11 @@ Producers in `cli/statusline/registry.py`; formatters in `cli/status_line.py`.
 | `rate_limits`     | `_produce_rate_limits:103` | `format_rate_limits:1051`                              | stdin `rate_limits.{five_hour,seven_day}`                                                                        | no (opt-in; self-suppresses when `cost` shows quota) |
 | `spend_cap`       | `_produce_spend_cap:240`   | `format_spend_cap`                                     | proxy `metrics.costs.caps`                                                                                       | no (opt-in, **proxy-only**)                          |
 
-Cost-rendering distinctions (all in `status_line.py`): `~$` proxy estimated (`get_session_metrics`, `is_proxy=True`),
-plain `$` direct API real (`_fmt_dollars:713`), `≈$` ambiguous hedge (`format_billing_cost`, only when no quota data),
-quota `RL:N%`+reset (`format_rate_limits` via `_extract_short_window:986` + `_format_reset_countdown:1016`). Spend-cap
-amounts use `_fmt_cap_money:720` (4 decimals below a cent, so sub-cent smoke caps don't collapse to `0c`).
+Cost-rendering distinctions (all in `status_line.py`): `~$` proxy reported, may undercount (`get_session_metrics`,
+`is_proxy=True`), plain `$` direct API real (`_fmt_dollars:713`), `≈$` ambiguous hedge (`format_billing_cost`, only when
+no quota data), quota `RL:N%`+reset (`format_rate_limits` via `_extract_short_window:986` +
+`_format_reset_countdown:1016`). Spend-cap amounts use `_fmt_cap_money:720` (4 decimals below a cent, so sub-cent smoke
+caps don't collapse to `0c`).
 
 Cache-hit throttle (direct mode): `statusline/throttle.py`, cached at
 `$FORGE_HOME/cache/statusline/<sha256(session_id or transcript_path)>.json` (`throttle.py:34-35`; the digest input is
@@ -276,17 +278,17 @@ yet bind these literals to a specific runtime.
 
 ### 17. Auth state -> what each surface reports
 
-| Auth state (this run)                                 | Interactive billing (status line)                  | Headless verb billing (ledger)                | Proxy plane                     |
-| ----------------------------------------------------- | -------------------------------------------------- | --------------------------------------------- | ------------------------------- |
-| Direct + `ANTHROPIC_API_KEY` resolvable               | `auto`->`api` -> **`$`** (phantom if really OAuth) | `direct=true,key=true` -> `api`               | n/a                             |
-| Direct + no key anywhere                              | `auto`->`ambiguous` -> quota / `≈$`                | `unknown` (and `--bare` cannot run)           | n/a                             |
-| Proxy mode (`ANTHROPIC_BASE_URL` set)                 | proxy -> **`~$`** estimated                        | `direct=false` -> `unknown` (upstream opaque) | `forge proxy costs` (estimated) |
-| `--subprocess-proxy` (direct main + proxied children) | interactive: `api`/`ambiguous`                     | children: `unknown` (proxied)                 | proxy plane for children        |
+| Auth state (this run)                                 | Interactive billing (status line)                  | Headless verb billing (ledger)                | Proxy plane                                |
+| ----------------------------------------------------- | -------------------------------------------------- | --------------------------------------------- | ------------------------------------------ |
+| Direct + `ANTHROPIC_API_KEY` resolvable               | `auto`->`api` -> **`$`** (phantom if really OAuth) | `direct=true,key=true` -> `api`               | n/a                                        |
+| Direct + no key anywhere                              | `auto`->`ambiguous` -> quota / `≈$`                | `unknown` (and `--bare` cannot run)           | n/a                                        |
+| Proxy mode (`ANTHROPIC_BASE_URL` set)                 | proxy -> **`~$`** reported (may undercount)        | `direct=false` -> `unknown` (upstream opaque) | `forge proxy costs` (reported/unavailable) |
+| `--subprocess-proxy` (direct main + proxied children) | interactive: `api`/`ambiguous`                     | children: `unknown` (proxied)                 | proxy plane for children                   |
 
 "Usage is a combination" is literally **three coexisting billing realities on one machine**: interactive `api`/quota
-(status line) + headless verbs `api`/`unknown` (ledger) + proxied work `unknown` + estimated proxy `$`. No surface
-unifies them; the ledger is the closest unifier but **cannot see the interactive OAuth session's quota consumption at
-all** (Forge is not the HTTP client for it).
+(status line) + headless verbs `api`/`unknown` (ledger) + proxied work `unknown` + reported (may-undercount) proxy `$`.
+No surface unifies them; the ledger is the closest unifier but **cannot see the interactive OAuth session's quota
+consumption at all** (Forge is not the HTTP client for it).
 
 ---
 
@@ -339,8 +341,8 @@ all** (Forge is not the HTTP client for it).
    from `.env`/shell **and** remove it from `~/.forge/credentials.yaml` — otherwise `_hydrate_credentials` injects it
    back (Finding F1). Declaring `cost_mode=subscription` (step 1) is the lower-effort path.
 
-**Authority for spend questions:** `forge proxy costs` (proxy plane). `forge usage` is per-session and estimated. The
-status-line number is the single interactive session only.
+**Authority for spend questions:** `forge proxy costs` (proxy plane). `forge usage` is per-session; its cost is
+reported-or-unavailable, attributed by snapshot delta. The status-line number is the single interactive session only.
 
 ---
 
