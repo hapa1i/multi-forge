@@ -12,6 +12,17 @@ import pytest
 from forge.proxy.cost_tracker import CostTracker
 
 
+class TestParseRecordGuard:
+    """`_parse_record` skips valid-but-non-object JSON lines (returns None)."""
+
+    @pytest.mark.parametrize("bad_line", ["[]", "1", '"x"', "null", "true"])
+    def test_parse_record_skips_non_object_line(self, bad_line: str) -> None:
+        # Exercised directly: bootstrap_from_logs wraps _parse_record in a broad
+        # `except Exception: continue`, so a bootstrap-level test passes even with
+        # the bug present. The direct call is what proves the guard exists.
+        assert CostTracker._parse_record(bad_line) is None
+
+
 class TestCostTrackerBasic:
     def test_no_caps_never_exceeded(self):
         t = CostTracker()

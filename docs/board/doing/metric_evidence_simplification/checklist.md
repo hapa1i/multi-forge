@@ -67,18 +67,20 @@ notes below). One guard pattern, applied consistently across the cost plane.
 Mirror the canonical guard at `core/usage/ledger.py:215-218` (`if not isinstance(record, dict): continue`, with the
 explanatory comment). Place the guard immediately after the `json.loads` / `JSONDecodeError` block, before any `.get()`.
 
-- [ ] `proxy/cost_logger.py` `read_cost_logs()` — add `isinstance(record, dict)` guard after `json.loads` (line ~123),
-  before the `schema_version` `.get` (line 127), the period `.get` (137), and the sort `.get` (152).
-- [ ] `proxy/cost_tracker.py` `_parse_record()` — guard returning `None` after `json.loads` (line 136) before `.get`
-  (137). **Correctness/honesty fix, not a crash fix**: `bootstrap_from_logs()` already wraps `_parse_record` in
-  `except Exception: continue` (`cost_tracker.py:103-106`), so a non-dict line is silently swallowed there today. The
-  guard makes `_parse_record` honest (explicit `None`, not reliant on a broad-except backstop). Its test must exercise
-  `_parse_record` **directly** — a bootstrap-level test passes before the fix and proves nothing.
-- [ ] `core/reactive/cost_tracking.py` `read_verb_logs()` — guard after `json.loads` (line ~284) before `.get` (289,
-  303). **Genuine crasher** (no broad-except around the loop) and **not named in the card** — found during scoping;
-  crashes `forge proxy costs` verb display on a non-object line.
-- [ ] Verify no other `.get`-on-decoded-line readers in the cost plane (grep `json.loads` in `proxy/` + `core/reactive/`
-  cost paths).
+- [x] `proxy/cost_logger.py` `read_cost_logs()` — `isinstance(record, dict)` guard added after the `json.loads` /
+  `JSONDecodeError` block, before the `schema_version`/period/sort `.get`s. **Genuine crasher** fixed.
+- [x] `proxy/cost_tracker.py` `_parse_record()` — guard returns `None` after `json.loads` before `.get`.
+  **Correctness/honesty fix, not a crash fix**: `bootstrap_from_logs()` already wraps `_parse_record` in
+  `except Exception: continue` (`cost_tracker.py:103-106`), so a non-dict line was silently swallowed. The guard makes
+  `_parse_record` honest (explicit `None`); its test (`TestParseRecordGuard`) exercises `_parse_record` **directly** —
+  verified to fail with the guard stashed (a bootstrap-level test would not).
+- [x] `core/reactive/cost_tracking.py` `read_verb_logs()` — guard added after `json.loads` before `.get`. **Genuine
+  crasher** (no broad-except around the loop), **not named in the card** — found during scoping.
+- [x] `proxy/audit_logger.py` `read_audit_logs()` — same guard. **Genuine crasher** in the *audit* plane (not the cost
+  plane), surfaced by the sweep below; folded into Phase 0 by user decision so no unguarded JSONL reader remains across
+  cost/audit/usage. Crashed `forge proxy audit show` on a non-object line.
+- [x] Swept `json.loads` across `proxy/` + `core/reactive/` + `core/usage/`: the four readers above were the only
+  `.get`-on-decoded-line readers lacking a guard (`core/usage/ledger.py` already had it). None others remain.
 
 **Acceptance**
 
@@ -89,8 +91,10 @@ explanatory comment). Place the guard immediately after the `json.loads` / `JSON
 | Verb-log read survives non-object line    | verb shard with `null` then valid record | returns valid record only; no `AttributeError`                   | `tests/regression/test_bug_cost_log_non_dict_line.py`                                                                          |
 | Existing reads unchanged                  | normal shards                            | byte-for-byte same aggregation                                   | `tests/src/proxy/test_cost_logger.py`, `tests/src/proxy/test_cost_tracker.py`, `tests/src/core/reactive/test_cost_tracking.py` |
 
-**Closeout**: regression test green; targeted unit suites green; `make pre-commit` clean. Changelog entry (bug-fix
-size). No design-doc change (internal corruption fix).
+**Closeout**: ✔ Done (2026-06-04). 92 targeted tests pass (`test_bug_cost_log_non_dict_line` 15 + `TestParseRecordGuard`
+5 + existing `test_cost_logger`/`test_cost_tracker`/`test_cost_tracking`/`test_audit_logger`); all 20 new tests verified
+to FAIL with the guards stashed (non-vacuous); `make pre-commit` clean. Changelog entry added. No design-doc change
+(internal corruption fix).
 
 ---
 

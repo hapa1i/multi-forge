@@ -27,6 +27,26 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-04
 
+### Fix: cost/audit JSONL readers crash on valid-but-non-object lines (metric-evidence Phase 0)
+
+**Goal**: A valid-but-non-object JSONL line (`[]`/`1`/`"x"`/`null`/`true`) must not abort cost/audit-plane log reads —
+the metric-evidence card's self-contained, ship-first slice (Bug #4).
+
+**Key changes**:
+
+- Added the canonical `isinstance(record, dict)` guard (mirrors `core/usage/ledger.py:215-218`) to the four unguarded
+  `.get`-after-`json.loads` readers: `read_cost_logs` (`proxy/cost_logger.py`), `read_verb_logs`
+  (`core/reactive/cost_tracking.py`), `read_audit_logs` (`proxy/audit_logger.py`), and `CostTracker._parse_record`
+  (`proxy/cost_tracker.py`). `read_audit_logs` (audit plane) was folded in by scope decision so no JSONL reader stays
+  unguarded across cost/audit/usage.
+- The three readers were genuine crashers (`AttributeError` is not caught by their `except OSError`, so one bad line
+  aborted the whole read and crashed `forge proxy costs` / `forge proxy audit show`); `_parse_record` was an honesty fix
+  — its caller already broad-excepts, so its test calls it directly.
+
+**Verification**: new `tests/regression/test_bug_cost_log_non_dict_line.py` (3 readers × 5 values) +
+`TestParseRecordGuard` (5) — all 20 verified to fail with the guards stashed, pass with them; 92 targeted tests green;
+`make pre-commit` clean.
+
 ### Fix: status-line enhancement post-PR review — 5 findings (PR #16)
 
 **Goal**: A second self-review pass after opening PR #16 surfaced five issues across the proxy GET / path, status-line

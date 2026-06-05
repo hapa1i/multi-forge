@@ -284,6 +284,10 @@ def read_verb_logs(
                         record = json.loads(line)
                     except json.JSONDecodeError:
                         continue
+                    # A line can be valid JSON yet not an object (`[]`, `"x"`, `1`). Skip it
+                    # rather than let `.get` raise AttributeError and abort the whole read.
+                    if not isinstance(record, dict):
+                        continue
 
                     if period_start or period_end:
                         ts_str = record.get("ts", "")

@@ -134,6 +134,10 @@ class CostTracker:
         import json
 
         data = json.loads(line)
+        # Valid JSON can still be a non-object (`[]`, `1`); return None rather than let
+        # `.get` raise AttributeError (bootstrap's broad except would otherwise mask it).
+        if not isinstance(data, dict):
+            return None
         ts_str = data.get("ts", "")
         cost_micros = int(data.get("cost_micros", 0))
         if cost_micros <= 0:
