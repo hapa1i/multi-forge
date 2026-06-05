@@ -27,6 +27,26 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-05
 
+### Phase 2 follow-up: Verb cost-evidence in `forge proxy costs` + docs sync (review fixes)
+
+**Goal**: Close two review findings on the shipped Phase 2 work — the verb display ignored the cost-evidence flag
+(reintroducing unknown-as-zero), and several proxy/request dollar-cost references still said "estimated."
+
+**Key changes**:
+
+- **Verb display now reads evidence, not a number.** `_display_by_verb` / `_output_json` gated cost-evidence on a
+  numeric `total_cost_micros` (always int, `0` for a passthrough window), so a `cost_measured=False` verb rendered
+  `reported: true, cost_micros: 0`. Added `_verb_cost_reported` (trusts `cost_measured`; legacy records fall back to
+  `total > 0`); `_scope_verb_records_to_proxy` re-derives `cost_measured` for the scoped subset from per-proxy
+  `reported_request_count`. The request display was already correct via nullable `_reported_micros`.
+- **Docs sync.** Aligned remaining "estimated" proxy/request dollar-cost language to reported-or-unavailable across
+  `auth_cost_metric.md`, the normative `design.md` / `design_appendix.md` (they contradicted the synced authority
+  table), and end-user/{proxy,config,session}.md. Preserved the attribution-snapshot sense (`estimated:true` verb field,
+  `verb_snapshot_estimated` enum, concurrency caveat) as accurate.
+
+**Verification**: `test_proxy_costs.py` +5 (reproduces `cost_measured=False` + total 0 → `reported:false`; reported-$0;
+legacy fallback; scoped recompute); 23 focused tests pass; `make pre-commit` clean (commit `b95500d`).
+
 ### Phase 2: Cost source replacement — Forge is not a cost oracle (metric-evidence Slice 2)
 
 **Goal**: Stop inventing dollars from a local price table. Proxy cost is now **reported-or-unavailable**: Forge records

@@ -290,16 +290,17 @@ both gateways) and **remove the catalog entirely** (not flag it). Provenance shi
 
 **Acceptance** — all rows verified (5531 unit+regression pass; mypy/pyright/`make pre-commit` clean):
 
-| Test                                    | Assertion                                                                                       | Status                                                                      |
-| --------------------------------------- | ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| Reported cost persisted with source     | record `reporter="openrouter"`, `confidence="reported"`; no `estimated`/`pricing_source`        | ✔ `test_cost_logger.py`                                                     |
-| Unavailable cost is `None`, not `0`     | record `cost_micros=None`; tokens present; `confidence="unavailable"`                           | ✔ `test_cost_logger.py`, `test_server_cost.py`                              |
-| None cost skips cap aggregate           | `record()` not advanced on `None`; no `TypeError`                                               | ✔ `test_cost_tracker.py`, `test_server_cost.py`                             |
-| Reported-cost capture (carrier)         | `cost_usd` on both types; OpenRouter body + LiteLLM header read end-to-end                      | ✔ `test_openai_compat.py`, `test_litellm_cost.py`, `test_client_adapter.py` |
-| Streaming cost threads to `on_complete` | `reported_cost_micros` in `final_usage`, never emitted to client                                | ✔ `test_converters.py`, `test_openrouter.py`                                |
-| Display/metrics treat `None` ≠ `$0`     | "unavailable" rendered; mixed legacy+reported+null aggregates without crash                     | ✔ `test_proxy_costs.py`, `test_metrics.py`                                  |
-| Verb passthrough logs null cost         | `measured` tokens but `cost_measured=False` → `cost_micro_usd=None`                             | ✔ `test_emit.py`, `test_cost_tracking.py`                                   |
-| **Real-wire matrix** (integration)      | OR reported (stream+non), LiteLLM gateway_calculated (non), LiteLLM stream `unavailable`/`None` | ✔ `test_cost_visibility_e2e.py` (4 pass, catalog removed)                   |
+| Test                                    | Assertion                                                                                                      | Status                                                                      |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| Reported cost persisted with source     | record `reporter="openrouter"`, `confidence="reported"`; no `estimated`/`pricing_source`                       | ✔ `test_cost_logger.py`                                                     |
+| Unavailable cost is `None`, not `0`     | record `cost_micros=None`; tokens present; `confidence="unavailable"`                                          | ✔ `test_cost_logger.py`, `test_server_cost.py`                              |
+| None cost skips cap aggregate           | `record()` not advanced on `None`; no `TypeError`                                                              | ✔ `test_cost_tracker.py`, `test_server_cost.py`                             |
+| Reported-cost capture (carrier)         | `cost_usd` on both types; OpenRouter body + LiteLLM header read end-to-end                                     | ✔ `test_openai_compat.py`, `test_litellm_cost.py`, `test_client_adapter.py` |
+| Streaming cost threads to `on_complete` | `reported_cost_micros` in `final_usage`, never emitted to client                                               | ✔ `test_converters.py`, `test_openrouter.py`                                |
+| Display/metrics treat `None` ≠ `$0`     | "unavailable" rendered; mixed legacy+reported+null aggregates without crash                                    | ✔ `test_proxy_costs.py`, `test_metrics.py`                                  |
+| Verb passthrough logs null cost         | `measured` tokens but `cost_measured=False` → `cost_micro_usd=None`                                            | ✔ `test_emit.py`, `test_cost_tracking.py`                                   |
+| Verb **display** gates on evidence      | `cost_measured=False`+total 0 → `reported:false`/"unavailable"; scope recomputes from `reported_request_count` | ✔ `test_proxy_costs.py` (`TestVerbCostReported`, scope tests)               |
+| **Real-wire matrix** (integration)      | OR reported (stream+non), LiteLLM gateway_calculated (non), LiteLLM stream `unavailable`/`None`                | ✔ `test_cost_visibility_e2e.py` (4 pass, catalog removed)                   |
 
 **Closeout**: ✔ Done (2026-06-05). Forge no longer prices requests from a local table — cost is reported-or-unavailable
 end-to-end, the catalog is deleted, and the integration matrix confirms each cell on the real wire. **Verified gap
@@ -308,6 +309,16 @@ the gateway puts none in the final usage chunk) — documented in design.md §3.
 consequence (G5, accepted):** dollar caps fire only for cost-reporting routes; passthrough/LiteLLM-streaming dollar caps
 are no-ops (tokens still tracked). The deferred Phase-1 "v1 cost record still loads" row is satisfied by Step 1's
 `COST_SCHEMA_VERSION=1` additive change (`test_cost_logger.py` round-trip).
+
+**Follow-up (2026-06-05, commit `b95500d`):** review caught that the verb-display path (`_display_by_verb` /
+`_output_json` in `proxy_costs.py`) still read evidence from a numeric `total_cost_micros` (always int, `0` for a
+passthrough window), so a `cost_measured=False` verb rendered `reported: true, cost_micros: 0` — unknown-as-zero at the
+verb level (the request display was already correct via nullable `_reported_micros`). Fixed with `_verb_cost_reported`
+(trusts `cost_measured`; legacy records fall back to `total > 0`); `_scope_verb_records_to_proxy` now re-derives
+`cost_measured` for the scoped subset from per-proxy `reported_request_count`. Remaining "estimated" proxy/request
+dollar-cost language synced across `auth_cost_metric.md`, `design.md`, `design_appendix.md`, and
+end-user/{proxy,config,session}.md; the attribution-snapshot sense (`estimated:true` verb field,
+`verb_snapshot_estimated` enum, concurrency caveat) is preserved as accurate.
 
 ---
 
