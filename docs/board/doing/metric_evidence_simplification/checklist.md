@@ -14,9 +14,9 @@ provenance-tagged is the heart of this card, not a side detail.
 ## Current Focus
 
 **Phases 0, 1, 3, 2 are shipped and verified (2026-06-05).** The cost plane is now reported-or-unavailable end-to-end
-and the local price catalog is deleted. Remaining lanes: **Phase 4** (status-line honesty) and **Phase 5** (any
-follow-ups), both gated on their own decision gates (G3/G4). The North-star payload (cost is never invented from a local
-table) is delivered; Phase 4 is display polish on top of the now-honest data.
+and the local price catalog is deleted. **G3 and G4 are resolved (2026-06-05)** — see the Phase 4 Resolutions blockquote
+— so **Phase 4** (status-line honesty) is unblocked and ready to start; **Phase 5/6** follow. The North-star payload
+(cost is never invented from a local table) is delivered; Phase 4 is display polish on top of the now-honest data.
 
 ## Sequencing Note (verified against code)
 
@@ -324,26 +324,78 @@ end-user/{proxy,config,session}.md; the attribution-snapshot sense (`estimated:t
 
 ---
 
-## Phase 4 — Status-line honesty (Slice 4) — gated on G3, G4
+## Phase 4 — Status-line honesty (Slice 4) — G3/G4 resolved (2026-06-05), ready
 
 **Scope guardrail (card §Scope)**: Forge never owns/recomputes the main harness cost. Status line shows TWO separated
 things: (a) Claude's native signal as Claude's; (b) Forge's additional `claude -p` cost as a distinct `forge +$Y`
 segment. Never merge.
 
+> **Resolutions (2026-06-05) — G3 + G4 settled (design dialogue, code-verified).**
+>
+> **G3 — launch metadata in the manifest, nested `confirmed.launch` (`LaunchConfirmed`).** Mirrors the existing
+> `confirmed` sub-object convention (`PolicyConfirmed`/`VerificationConfirmed`/`CompactionConfirmed`/`SubagentConfirmed`,
+> `models.py`), not the card's scattered `launch_*` fields. Read by the status line via `FORGE_SESSION`; ambient sessions
+> (no manifest) fall back to stdin + immediate env only.
+>
+> ```yaml
+> confirmed:
+>   launch:                              # LaunchConfirmed — immutable launch facts
+>     routing_mode: direct | proxy | custom_base_url
+>     proxy_id: openrouter-anthropic     # nullable
+>     base_url: http://localhost:...     # nullable
+>     api_key_available_to_child: true
+>     api_key_source: env | credential_file | none | omitted_by_config | unknown
+> ```
+>
+> - **Drop `runtime_mode`.** `confirmed.is_sandboxed` (`models.py:401`; read at `status_line.py:970`,
+>   `session_fork.py:382/452`, `session_start.py:318`) stays the **sole** host/sidecar truth — a second field duplicates
+>   it. Sidecar-ness doesn't affect who pays, so Phase 4 billing honesty doesn't need it.
+> - **`routing_mode`, not `route`** — deliberately distinct from `UsageEvent.route` (invocation channel:
+>   `claude_p`/`forge_proxy`/…). Avoids re-overloading the term this card exists to disambiguate.
+> - **Do NOT persist `runtime_reported_quota_seen` / `user_declared_billing_mode`** (the card "Recommended launch
+>   metadata" table listed them). Those are **render-time reporter evidence**, not immutable launch facts: read stdin
+>   `rate_limits` and current `statusline.cost_mode` at render time (effective-not-confirmed discipline, §A.8). Freezing
+>   them into `confirmed` is a category error.
+>
+> **G4 — new opt-in key, flat sibling to `auth_ignore_env` (NOT nested under `auth:`).**
+>
+> ```yaml
+> # ~/.forge/config.yaml (RuntimeConfig — flat, beside auth_ignore_env at runtime_config.py:189)
+> interactive_anthropic_api_key: inherit   # inherit (default) | omit
+> ```
+>
+> - **Flat, not nested.** A nested `auth:` block would sit inconsistently beside the flat `auth_ignore_env` or force
+>   migrating it (clean-break scope-creep — defer the namespace to its own card; same reasoning as dropping
+>   `runtime_mode`).
+> - **`omit` definition:** for Forge-managed **interactive** Claude launches, remove `ANTHROPIC_API_KEY` from the child
+>   env **and** do not hydrate it from stored credentials — strips **both** the shell-inherited and credential-file key.
+>   Forge **headless** subprocesses (supervisor, memory writer, panel workers, `claude -p --bare`) keep normal credential
+>   resolution. `inherit` (default) = current behavior, no break.
+> - **Wiring:** thread an explicit `interactive` flag into `build_claude_env` (`env.py:156`) → `_hydrate_credentials`
+>   (`:239`); default preserves today's hydration. The key-removal machinery already exists (the `auth_ignore_env` pop at
+>   `env.py:263`) — `omit` mirrors it, gated on `interactive AND interactive_anthropic_api_key == "omit"`. Keep it a
+>   **separate** flag from `derive_run_identity` (interactive launchers already pass `derive_run_identity=False`, so the
+>   callsites are known — but api-key omission ≠ run-identity rooting; do not overload one flag for both).
+> - **Status-line bridge:** when `omit` fires, `api_key_source: omitted_by_config` is the manifest breadcrumb the status
+>   line reads to render billing honestly (closes Bug #1).
+
 - [ ] **Bug #1 — billing inference.** `billing_mode` (`statusline/context.py:87-96`) currently returns `api` whenever
   `has_api_key` in `auto`. Make `auto` **prefer `rate_limits` presence** (subscription/quota evidence) over key
   presence. Key availability is a capability signal, not a payer signal. (`has_api_key` already reads raw env at
   `context.py:84` — keep that; the bug is the `auto`→`api` inference, not the read source.)
-- [ ] **Bug #2 — hydration coupling.** `build_claude_env()` (`core/reactive/env.py:190`) hydrates a resolvable
-  `ANTHROPIC_API_KEY` into **interactive and headless** envs unconditionally. Per **G4**, add an opt-in path that keeps
-  the key out of interactive sessions while preserving headless auth (or keep as labeled default — record G4
-  resolution).
+- [ ] **Bug #2 — hydration coupling (G4 resolved).** `build_claude_env()` (`core/reactive/env.py:156`) →
+  `_hydrate_credentials` (`:239`) hydrates `ANTHROPIC_API_KEY` into **interactive and headless** envs unconditionally.
+  Add the `omit` path (see Resolutions): a new explicit `interactive` flag on `build_claude_env` + flat
+  `interactive_anthropic_api_key: inherit|omit` config key on `RuntimeConfig` (sibling to `auth_ignore_env`). `omit`
+  strips **both** shell + credential-file key for interactive launches only, mirroring the existing `auth_ignore_env` pop
+  (`:263`). Default `inherit` preserves headless auth and current behavior.
 - [ ] **Bug #3 — ambient sessions.** When `forge status-line` runs inside a plain `claude` (no `FORGE_SESSION` /
   manifest), render an **ambient Claude** session using only stdin + immediate env. Do **not** consult Forge
   credential-file resolution to classify billing.
-- [ ] **Launch metadata (G3).** Add the card's launch fields (`launch_route`, `proxy_id`/`base_url`,
-  `api_key_available_to_child`, `api_key_source`, `user_declared_billing_mode`, `runtime_reported_quota_seen`) to
-  `confirmed.launch_*`; status line reads them via `FORGE_SESSION`.
+- [ ] **Launch metadata (G3 resolved).** Add `LaunchConfirmed` under `confirmed.launch` (see Resolutions):
+  `routing_mode`, `proxy_id`/`base_url` (nullable), `api_key_available_to_child`, `api_key_source`. Reuse
+  `confirmed.is_sandboxed` for host/sidecar (no `runtime_mode`). Do **not** persist quota-seen / declared-billing-mode
+  (render-time reporter evidence, not launch facts). Status line reads via `FORGE_SESSION`; ambient → stdin only.
 - [ ] `forge +$Y` distinct segment: render Forge additional `claude -p` cost separately; only when the route reporter
   returned cost. Keep `statusline.cost_mode=api|subscription` as explicit user **declaration**, not inference.
 - [ ] **Design-doc sync**: `design.md` §3.4/§3.7 + `design_appendix.md` §A.8 (status-line sources, billing-aware cost).
