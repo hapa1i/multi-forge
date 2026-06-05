@@ -283,6 +283,15 @@ class TestCompletionResponse:
         assert resp.tool_calls is not None
         assert len(resp.tool_calls) == 1
 
+    def test_cost_usd_defaults_none(self):
+        """cost_usd is None unless the route reported a cost (None != $0)."""
+        resp = CompletionResponse(text="hi")
+        assert resp.cost_usd is None
+
+    def test_cost_usd_carried(self):
+        resp = CompletionResponse(text="hi", cost_usd=0.00234)
+        assert resp.cost_usd == 0.00234
+
 
 class TestStreamEvent:
     """Tests for StreamEvent type."""
@@ -311,6 +320,15 @@ class TestStreamEvent:
         event = StreamEvent(type="error", error="Connection failed")
         assert event.type == "error"
         assert event.error == "Connection failed"
+
+    def test_cost_usd_defaults_none(self):
+        """Streaming cost carrier defaults to None (no cost reported)."""
+        event = StreamEvent(type="usage", usage={"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2})
+        assert event.cost_usd is None
+
+    def test_cost_usd_carried_on_final_event(self):
+        event = StreamEvent(type="response_end", cost_usd=0.0019)
+        assert event.cost_usd == 0.0019
 
     def test_invalid_type_rejected(self):
         with pytest.raises(ValidationError):

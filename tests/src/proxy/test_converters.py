@@ -819,6 +819,43 @@ class TestConvertOpenaiToAnthropicSse:
         assert error_type == "api_error"
 
     @pytest.mark.asyncio
+    async def test_on_complete_receives_reported_cost(self, base_request: MessagesRequest) -> None:
+        """A route-reported cost in a usage chunk reaches on_complete via final_usage."""
+        callback_args: list = []
+
+        def on_complete(usage, failed, error_type):
+            callback_args.append((usage, failed, error_type))
+
+        chunks = [
+            {
+                "choices": [{"delta": {"content": "ok"}, "finish_reason": None}],
+                "usage": {"prompt_tokens": 100, "completion_tokens": 50, "reported_cost_micros": 2300},
+            },
+            {"choices": [{"delta": {}, "finish_reason": "stop"}]},
+        ]
+        await self._collect_events(chunks, base_request, on_complete=on_complete)
+
+        assert len(callback_args) == 1
+        usage, _, _ = callback_args[0]
+        assert usage["reported_cost_micros"] == 2300
+
+    @pytest.mark.asyncio
+    async def test_reported_cost_not_emitted_to_client(self, base_request: MessagesRequest) -> None:
+        """reported_cost_micros stays internal — never in a client-facing usage block."""
+        chunks = [
+            {
+                "choices": [{"delta": {"content": "ok"}, "finish_reason": None}],
+                "usage": {"prompt_tokens": 100, "completion_tokens": 50, "reported_cost_micros": 2300},
+            },
+            {"choices": [{"delta": {}, "finish_reason": "stop"}]},
+        ]
+        events = await self._collect_events(chunks, base_request)
+        for event in events:
+            usage = event["data"].get("usage") if isinstance(event["data"], dict) else None
+            if usage:
+                assert "reported_cost_micros" not in usage
+
+    @pytest.mark.asyncio
     async def test_empty_stream(self, base_request: MessagesRequest) -> None:
         """Empty stream still produces message_start, ping, message_delta, message_stop."""
         events = await self._collect_events([], base_request)

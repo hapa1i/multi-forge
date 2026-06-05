@@ -41,6 +41,7 @@ from forge.core.logging import (
     configure_debug_logging,
     get_effective_log_level,
 )
+from forge.core.usage.vocabulary import Confidence, Reporter
 from forge.proxy.base_client import ProxyStreamError, ToolCallError
 from forge.proxy.client_factory import TierClientFactory
 from forge.proxy.converters import (
@@ -170,6 +171,22 @@ def _ensure_runtime_state() -> None:
     _maybe_prune_audit_logs()
 
 
+def _reported_cost_provenance() -> tuple[Reporter | None, Confidence]:
+    """Map the proxy's resolved provider to (reporter, confidence) for a reported cost.
+
+    OpenRouter returns actual spend in the response body (``usage.cost``) → a
+    directly *reported* figure. A LiteLLM gateway computes spend and returns it in
+    the ``x-litellm-response-cost`` header → *gateway_calculated*. Used only when a
+    reported cost is present; the provider value is otherwise irrelevant.
+    """
+    provider = getattr(config.proxy, "preferred_provider", "") or ""
+    if provider == "openrouter":
+        return "openrouter", "reported"
+    if provider.startswith("litellm"):
+        return "litellm", "gateway_calculated"
+    return None, "reported"  # a number is present but the provider is unrecognized
+
+
 def _calc_and_log_cost(
     *,
     model: str,
@@ -180,18 +197,25 @@ def _calc_and_log_cost(
     latency_ms: float,
     failed: bool,
     request_id: str,
+    reported_cost_micros: int | None = None,
 ) -> int | None:
-    """Calculate cost in microdollars and write to the persistent cost log.
+    """Log a request's cost (microdollars) and return it, or ``None`` if unavailable.
 
-    Returns the cost in microdollars, or ``None`` when cost is unavailable (a
-    calculation/logging failure). Best-effort — never raises; cost tracking must
-    not break the proxy request path. Today the figure is still catalog-derived
-    (``confidence="inferred"``); Phase 2 replaces it with route-reported cost.
+    When the route reported a cost (``reported_cost_micros``), it is logged with the
+    real reporter and ``reported``/``gateway_calculated`` confidence. Otherwise the
+    figure is still catalog-derived (``confidence="inferred"``) — Step 3 removes that
+    fallback so an unreported cost becomes ``None``/``unavailable``. Best-effort:
+    never raises; cost tracking must not break the request path.
     """
     try:
-        from forge.core.models.pricing import calculate_cost
+        if reported_cost_micros is not None:
+            cost_micros: int | None = reported_cost_micros
+            reporter, confidence = _reported_cost_provenance()
+        else:
+            from forge.core.models.pricing import calculate_cost
 
-        cost_micros = calculate_cost(model, input_tokens, output_tokens, cached_tokens)
+            cost_micros = calculate_cost(model, input_tokens, output_tokens, cached_tokens)
+            reporter, confidence = None, "inferred"
 
         log_request_cost(
             proxy_id=PROXY_ID or "unknown",
@@ -204,8 +228,8 @@ def _calc_and_log_cost(
             latency_ms=latency_ms,
             failed=failed,
             request_id=request_id,
-            reporter=None,
-            confidence="inferred",
+            reporter=reporter,
+            confidence=confidence,
         )
 
         if cost_tracker is not None:
@@ -1051,6 +1075,8 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                     latency_ms=elapsed,
                     failed=failed,
                     request_id=request_id,
+                    # final_usage carries the route-reported cost the SSE converter parked there.
+                    reported_cost_micros=usage.get("reported_cost_micros"),
                 )
                 proxy_metrics.record_request(
                     tier=resolved_tier,
@@ -1107,6 +1133,7 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                     latency_ms=duration_ms,
                     failed=False,
                     request_id=request_id,
+                    reported_cost_micros=openai_response.get("_reported_cost_micros"),
                 )
                 proxy_metrics.record_request(
                     tier=resolved_tier,
@@ -1255,6 +1282,7 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                     latency_ms=retry_duration_ms,
                     failed=False,
                     request_id=request_id,
+                    reported_cost_micros=openai_response.get("_reported_cost_micros"),
                 )
                 proxy_metrics.record_request(
                     tier=resolved_tier,

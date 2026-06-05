@@ -200,7 +200,7 @@ class CoreLLMClientAdapter:
                     }
                 )
 
-        return {
+        result: Dict[str, Any] = {
             "id": f"chatcmpl-{int(time.time())}",
             "object": "chat.completion",
             "created": int(time.time()),
@@ -223,6 +223,11 @@ class CoreLLMClientAdapter:
                 "cached_tokens": response.usage.get("cached_tokens", 0) if response.usage else 0,
             },
         }
+        # Internal-only carrier (underscore key, dropped by the Anthropic translation):
+        # the route-reported cost in micros, read by the proxy's _calc_and_log_cost.
+        if response.cost_usd is not None:
+            result["_reported_cost_micros"] = round(response.cost_usd * 1_000_000)
+        return result
 
     async def create_completion(self, openai_request: Dict[str, Any], request_id: str) -> Dict[str, Any]:
         """Create a non-streaming completion.
@@ -393,18 +398,23 @@ class CoreLLMClientAdapter:
             elif event.type == "usage":
                 if event.usage:
                     final_usage = event.usage
+                usage_chunk: Dict[str, Any] = {
+                    "prompt_tokens": event.usage.get("prompt_tokens", 0) if event.usage else 0,
+                    "completion_tokens": event.usage.get("completion_tokens", 0) if event.usage else 0,
+                    "total_tokens": event.usage.get("total_tokens", 0) if event.usage else 0,
+                    "cached_tokens": event.usage.get("cached_tokens", 0) if event.usage else 0,
+                }
+                # Internal-only carrier (dropped by the Anthropic translation): route-reported
+                # cost in micros, read by the SSE converter → _on_stream_complete.
+                if event.cost_usd is not None:
+                    usage_chunk["reported_cost_micros"] = round(event.cost_usd * 1_000_000)
                 yield {
                     "id": response_id,
                     "object": "chat.completion.chunk",
                     "created": int(time.time()),
                     "model": self.model_name,
                     "choices": [],
-                    "usage": {
-                        "prompt_tokens": event.usage.get("prompt_tokens", 0) if event.usage else 0,
-                        "completion_tokens": event.usage.get("completion_tokens", 0) if event.usage else 0,
-                        "total_tokens": event.usage.get("total_tokens", 0) if event.usage else 0,
-                        "cached_tokens": event.usage.get("cached_tokens", 0) if event.usage else 0,
-                    },
+                    "usage": usage_chunk,
                 }
 
             elif event.type == "response_end":

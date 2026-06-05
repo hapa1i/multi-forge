@@ -1,5 +1,6 @@
 """Tests for OpenRouter client."""
 
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -173,3 +174,38 @@ class TestOpenRouterClientStream:
         types = [e.type for e in events]
         assert "text_delta" in types
         assert "response_end" in types
+
+    @pytest.mark.asyncio
+    async def test_stream_captures_reported_cost(self, client):
+        """OpenRouter's final usage chunk cost rides on the usage/response_end events."""
+        mock_chunk1 = MagicMock()
+        mock_chunk1.usage = None
+        mock_chunk1.choices = [MagicMock(delta=MagicMock(content="Hi", tool_calls=None))]
+
+        # Real usage object (not MagicMock) so extract_reported_cost_usd reads a float.
+        mock_chunk2 = MagicMock()
+        mock_chunk2.usage = SimpleNamespace(
+            prompt_tokens=10,
+            completion_tokens=2,
+            total_tokens=12,
+            prompt_tokens_details=None,
+            cost=0.0021,
+        )
+        mock_chunk2.choices = []
+
+        async def mock_stream():
+            yield mock_chunk1
+            yield mock_chunk2
+
+        mock_client = AsyncMock()
+        mock_client.chat.completions.create = AsyncMock(return_value=mock_stream())
+
+        mock_creds = {"api_key": "sk-or-test", "base_url": "https://openrouter.ai/api/v1", "extra_headers": {}}
+        with patch.object(client, "_credentials") as mock_cm:
+            mock_cm.get_credentials = AsyncMock(return_value=mock_creds)
+            client._client = mock_client
+
+            events = [event async for event in client.stream(messages=[Message(role="user", content="Hello")])]
+
+        cost_carriers = [e.cost_usd for e in events if e.cost_usd is not None]
+        assert cost_carriers == [0.0021, 0.0021]  # usage + response_end events
