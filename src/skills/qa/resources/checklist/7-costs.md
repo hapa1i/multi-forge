@@ -30,18 +30,18 @@ forge proxy costs qa-no-such-proxy --json
 forge proxy costs qa-no-such-proxy --json | python3 -c "
 import json, sys
 d = json.load(sys.stdin)
-fields = {'period','proxy_id','total_cost_micros','total_cost_usd','total_requests','interactive_cost_micros','by_verb','by_model','estimated'}
+fields = {'period','proxy_id','total_cost_micros','total_cost_usd','total_requests','interactive_cost_micros','by_verb','by_model','reported_requests','unavailable_requests'}
 missing = fields - set(d.keys())
 print(f'MISSING={missing}' if missing else 'ALL_FIELDS_PRESENT')
 print(f'period={d[\"period\"]}')
-print(f'estimated={d[\"estimated\"]}')
+print(f'reported={d[\"reported_requests\"]} unavailable={d[\"unavailable_requests\"]}')
 "
 ```
 
 - [ ] JSON contains all required fields: `period`, `proxy_id`, `total_cost_micros`, `total_cost_usd`, `total_requests`,
-  `interactive_cost_micros`, `by_verb`, `by_model`, `estimated`
+  `interactive_cost_micros`, `by_verb`, `by_model`, `reported_requests`, `unavailable_requests`
 - [ ] `period` is `today`
-- [ ] `estimated` is `true`
+- [ ] `reported_requests` and `unavailable_requests` are present (provenance replaced the old `estimated` flag)
 
 ### 7.3 Seed Fixture Request Logs
 
@@ -52,9 +52,9 @@ print(f'estimated={d[\"estimated\"]}')
 # Uses qa-fixture prefix and PID 99999 to avoid collision with real proxy logs.
 mkdir -p ~/.forge/costs/requests
 cat > ~/.forge/costs/requests/qa-fixture_99999.jsonl <<'EOF'
-{"ts":"2026-05-01T00:00:00Z","proxy_id":"qa-fixture","model":"test/gemini-2.5-flash","tier":"haiku","input_tokens":200,"output_tokens":80,"cached_tokens":0,"cost_micros":300,"estimated":true,"pricing_source":"catalog","latency_ms":120.0,"failed":false,"request_id":"req-qa-001"}
-{"ts":"2026-05-01T00:01:00Z","proxy_id":"qa-fixture","model":"test/gemini-3.1-pro-preview","tier":"sonnet","input_tokens":500,"output_tokens":150,"cached_tokens":50,"cost_micros":1200,"estimated":true,"pricing_source":"catalog","latency_ms":350.0,"failed":false,"request_id":"req-qa-002"}
-{"ts":"2026-05-01T00:02:00Z","proxy_id":"qa-fixture","model":"test/gemini-3.1-pro-preview","tier":"opus","input_tokens":1000,"output_tokens":400,"cached_tokens":100,"cost_micros":3500,"estimated":true,"pricing_source":"catalog","latency_ms":800.0,"failed":false,"request_id":"req-qa-003"}
+{"ts":"2026-05-01T00:00:00Z","proxy_id":"qa-fixture","model":"test/gemini-2.5-flash","tier":"haiku","input_tokens":200,"output_tokens":80,"cached_tokens":0,"cost_micros":300,"reporter":"litellm","confidence":"gateway_calculated","latency_ms":120.0,"failed":false,"request_id":"req-qa-001"}
+{"ts":"2026-05-01T00:01:00Z","proxy_id":"qa-fixture","model":"test/gemini-3.1-pro-preview","tier":"sonnet","input_tokens":500,"output_tokens":150,"cached_tokens":50,"cost_micros":1200,"reporter":"litellm","confidence":"gateway_calculated","latency_ms":350.0,"failed":false,"request_id":"req-qa-002"}
+{"ts":"2026-05-01T00:02:00Z","proxy_id":"qa-fixture","model":"test/gemini-3.1-pro-preview","tier":"opus","input_tokens":1000,"output_tokens":400,"cached_tokens":100,"cost_micros":3500,"reporter":"litellm","confidence":"gateway_calculated","latency_ms":800.0,"failed":false,"request_id":"req-qa-003"}
 EOF
 
 # Verify fixture is readable -- filter by qa-fixture to isolate from real proxy logs
@@ -74,7 +74,7 @@ forge proxy costs qa-fixture --period all --json
 # Seed QA-prefixed fixture verb logs matching cost_tracking.py verb record schema.
 mkdir -p ~/.forge/costs/verbs
 cat > ~/.forge/costs/verbs/qa-fixture_99999.jsonl <<'EOF'
-{"ts":"2026-05-01T00:05:00Z","verb":"qa-fixture-panel","total_cost_micros":1500,"estimated":true,"input_tokens":700,"output_tokens":230,"cached_tokens":50,"request_count":2,"duration_ms":1200.0,"per_proxy":[{"base_url":"http://localhost:8084","cost_micros":1500,"input_tokens":700,"output_tokens":230,"cached_tokens":50,"request_count":2}]}
+{"ts":"2026-05-01T00:05:00Z","verb":"qa-fixture-panel","total_cost_micros":1500,"estimated":true,"cost_measured":true,"input_tokens":700,"output_tokens":230,"cached_tokens":50,"request_count":2,"duration_ms":1200.0,"per_proxy":[{"base_url":"http://localhost:8084","cost_micros":1500,"input_tokens":700,"output_tokens":230,"cached_tokens":50,"request_count":2}]}
 EOF
 
 # Verify verb attribution appears. Do not proxy-filter this check: verb logs are scoped
@@ -188,7 +188,7 @@ forge proxy set "$FORGE_QA_OPENAI_PROXY" costs.on_cap_hit=reject
 mkdir -p ~/.forge/costs/requests
 MONTH=$(date -u +%Y-%m)
 TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-echo "{\"ts\":\"$TS\",\"proxy_id\":\"$FORGE_QA_OPENAI_PROXY\",\"model\":\"seed\",\"tier\":\"sonnet\",\"input_tokens\":0,\"output_tokens\":0,\"cached_tokens\":0,\"cost_micros\":50000,\"estimated\":true,\"pricing_source\":\"catalog\",\"latency_ms\":0,\"failed\":false,\"request_id\":\"req-qa-cap-seed\"}" \
+echo "{\"ts\":\"$TS\",\"proxy_id\":\"$FORGE_QA_OPENAI_PROXY\",\"model\":\"seed\",\"tier\":\"sonnet\",\"input_tokens\":0,\"output_tokens\":0,\"cached_tokens\":0,\"cost_micros\":50000,\"reporter\":\"litellm\",\"confidence\":\"gateway_calculated\",\"latency_ms\":0,\"failed\":false,\"request_id\":\"req-qa-cap-seed\"}" \
   > ~/.forge/costs/requests/${MONTH}_qa-cap-seed.jsonl
 
 # Restart proxy so it bootstraps from the seeded log (--force bypasses shared-port check)
@@ -228,7 +228,7 @@ forge proxy set "$FORGE_QA_OPENAI_PROXY" costs.on_cap_hit=warn
 mkdir -p ~/.forge/costs/requests
 MONTH=$(date -u +%Y-%m)
 TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-echo "{\"ts\":\"$TS\",\"proxy_id\":\"$FORGE_QA_OPENAI_PROXY\",\"model\":\"seed\",\"tier\":\"sonnet\",\"input_tokens\":0,\"output_tokens\":0,\"cached_tokens\":0,\"cost_micros\":50000,\"estimated\":true,\"pricing_source\":\"catalog\",\"latency_ms\":0,\"failed\":false,\"request_id\":\"req-qa-cap-warn\"}" \
+echo "{\"ts\":\"$TS\",\"proxy_id\":\"$FORGE_QA_OPENAI_PROXY\",\"model\":\"seed\",\"tier\":\"sonnet\",\"input_tokens\":0,\"output_tokens\":0,\"cached_tokens\":0,\"cost_micros\":50000,\"reporter\":\"litellm\",\"confidence\":\"gateway_calculated\",\"latency_ms\":0,\"failed\":false,\"request_id\":\"req-qa-cap-warn\"}" \
   > ~/.forge/costs/requests/${MONTH}_qa-cap-seed.jsonl
 
 # Restart proxy so it bootstraps with the seeded cost (--force bypasses shared-port check)

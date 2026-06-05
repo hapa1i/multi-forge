@@ -864,9 +864,15 @@ Forge records proxy cost telemetry in append-only JSONL files under `~/.forge/co
 | `costs/requests/<month>_<pid>.jsonl` | Proxy request handler   | Per-request token/cost records               |
 | `costs/verbs/<month>_<pid>.jsonl`    | Forge verb cost wrapper | Best-effort cost deltas for panels/workflows |
 
-Request logs are the source of truth for proxy spend. The proxy bootstraps its in-memory `CostTracker` from current and
-previous month request logs on startup so cap enforcement survives restarts. Verb logs are attribution aids for CLI
-visibility; they are estimates because several Forge subprocesses can share a proxy concurrently.
+Request logs are the source of truth for proxy spend. **Forge is not a cost oracle:** it records the cost a route
+actually reported — OpenRouter's response-body `usage.cost` (`confidence="reported"`) or a LiteLLM gateway's
+`x-litellm-response-cost` header (`confidence="gateway_calculated"`) — and writes `cost_micros:null` /
+`confidence="unavailable"` when no route reported one (Anthropic passthrough always; LiteLLM streaming, whose header
+predates the cost). There is no local price catalog; cost is never inferred from token counts. Each record carries
+`reporter` + `confidence` (the Phase-1 metric-evidence vocabulary). The proxy bootstraps its in-memory `CostTracker`
+from current and previous month request logs on startup so cap enforcement survives restarts. Verb logs are attribution
+aids for CLI visibility; they are estimates because several Forge subprocesses can share a proxy concurrently, and they
+mark `cost_measured` so a token-only passthrough verb is not read as a measured $0.
 
 A third plane, the **usage-attribution ledger** (`~/.forge/usage/events/`, schema in
 [§A.13](design_appendix.md#a13-usage-attribution-ledger-schema-314)), records *which run/workflow/session* invoked which
@@ -895,7 +901,9 @@ costs:
 ```
 
 Caps are enforced after each completed request, from accumulated recorded spend: a request may cross a cap and complete,
-then the next request is blocked once spend has reached the cap. `reject` returns HTTP 429 with:
+then the next request is blocked once spend has reached the cap. Because spend accrues only from reported cost, **dollar
+caps fire only for routes that report cost** (OpenRouter, LiteLLM non-streaming); Anthropic-passthrough and
+LiteLLM-streaming dollar caps are no-ops (their tokens are still tracked). `reject` returns HTTP 429 with:
 
 ```json
 {
@@ -908,7 +916,7 @@ then the next request is blocked once spend has reached the cap. `reject` return
 ```
 
 `warn` mode forwards the request and returns the same message in `X-Spend-Warning`. Cost tracking is best effort:
-pricing or log write failures must not break successful LLM responses.
+cost-capture or log write failures must not break successful LLM responses.
 
 #### Per-session usage read surface
 

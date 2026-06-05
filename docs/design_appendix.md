@@ -310,9 +310,11 @@ Runtime logs:
 | `~/.forge/costs/requests/*.jsonl` | `forge.proxy.cost_logger`           | Append-only, user-prune |
 | `~/.forge/costs/verbs/*.jsonl`    | `forge.core.reactive.cost_tracking` | Append-only, user-prune |
 
-Request records contain timestamp, proxy ID, model/tier, token counts, cost in microdollars, request ID, latency, and
-pricing source. Verb records contain timestamp, verb name, proxy URL/ID when known, before/after snapshots, total cost
-delta, request count delta, and `estimated=true`.
+Request records contain timestamp, proxy ID, model/tier, token counts, `cost_micros` (null when no route reported a
+cost), request ID, latency, and metric-evidence provenance (`reporter` + `confidence`) — there is no local price
+catalog, so cost is reported-or-unavailable, never inferred from tokens. Verb records contain timestamp, verb name,
+proxy URL/ID when known, before/after snapshots, total cost delta, request count delta, `estimated=true`, and
+`cost_measured` (false when the window moved tokens but reported no cost, so a passthrough verb is not read as $0).
 
 The proxy `GET /` endpoint reports in-memory metrics and cost totals for live status. The JSONL request logs remain the
 bootstrap source for cap enforcement after restart.
@@ -447,8 +449,10 @@ Enumerations are `Literal`s (provenance is recorded, never inferred):
   event's own `cost_micro_usd` only** (token provenance is `measurement_source`; the two axes are orthogonal — the
   tagger is `measurement_source=provider_usage_exact` with `confidence=unavailable`, *not* a contradiction). A null cost
   is `unavailable` regardless of any `source_refs`-joined cost record. `unknown` is legacy/default (provenance never
-  recorded); a known-no-cost route is `unavailable`, not `unknown`. Catalog-derived proxy cost is `inferred` today
-  (Phase 2 flips it to `reported`/`gateway_calculated` when gateway-reported cost is wired).
+  recorded); a known-no-cost route is `unavailable`, not `unknown`. Proxy cost is `reported` (OpenRouter body
+  `usage.cost`) or `gateway_calculated` (LiteLLM `x-litellm-response-cost` header) when a route reports it, else
+  `unavailable` (Anthropic passthrough; LiteLLM streaming) — the price catalog was removed, so `inferred` is no longer
+  produced on the proxy cost path (the literal remains reserved).
 
 `source_refs` is null on native-runtime events (no proxy) and on `claude -p` traffic until per-request correlation ships
 (Phase 4g); the event stays useful without it (run/model/billing_mode/tokens). Reading skips — with a one-time warning —

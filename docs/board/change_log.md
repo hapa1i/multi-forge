@@ -27,6 +27,49 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-05
 
+### Phase 2: Cost source replacement — Forge is not a cost oracle (metric-evidence Slice 2)
+
+**Goal**: Stop inventing dollars from a local price table. Proxy cost is now **reported-or-unavailable**: Forge records
+the cost a route actually reported and says `unavailable` otherwise, then deletes the price catalog so it cannot
+re-enter the accounting path. Landed in three tree-green steps (1: nullable+provenance plumbing → 2: reported-cost
+capture → 3: de-catalog), Step 2 integration-verified before Step 3 removed the catalog safety net.
+
+**Key changes**:
+
+- **Reported-cost capture, full matrix.** Added a `cost_usd` carrier on `CompletionResponse` **and** `StreamEvent`
+  (review-found: streaming had no carrier). OpenRouter cost comes from the response body (`usage.cost`), extracted in
+  the shared `openai_compat` converter (covers both clients, stream + non-stream). LiteLLM-gateway cost comes from the
+  `x-litellm-response-cost` **header**, recovered by switching non-streaming chat **and** the Responses-API branch to
+  `with_raw_response.create().parse()` + `_merge_header_cost`. The proxy threads cost as an internal
+  `_reported_cost_micros` key (non-stream) / usage-chunk field (stream, parked in the SSE converter's `final_usage` like
+  `cached_tokens`), never leaked to the client.
+- **Provenance at the proxy.** `_calc_and_log_cost` stamps `reporter` + `confidence` from
+  `config.proxy.preferred_provider` (openrouter→`reported`, litellm→`gateway_calculated`); unreported →
+  `cost_micros=None` / `confidence="unavailable"`, tokens still logged, `cost_tracker.record` + metrics cost
+  accumulation skipped.
+- **Verb cost-evidence (review-found conflation fix).** `ProxyCostDelta.reported_request_count` +
+  `VerbCostResult.cost_measured` (derived from that delta, not `bool(deltas)`); `emit.py` logs `cost_micro_usd=None` /
+  `confidence="unavailable"` for a passthrough verb that moved tokens but reported no cost — never a fabricated measured
+  $0.
+- **Catalog deleted** (zero surviving callers): `core/models/pricing.py`, `core/data/pricing.yaml`, the `core/models`
+  re-exports, and `test_pricing.py` + `test_bug_pricing_fallback_logs.py`.
+- **Header evidence gate** (Step 1): `X-Request-Cost` omitted when this request's cost is null (fixes a `None/1_000_000`
+  crash); `X-Cumulative-Cost` omitted until a reported-cost event exists
+  (`reported_request_count`/`unavailable_request_count` on `ProxyMetrics`).
+
+**Breaking change / reset**: Plane-1 cost record fields `estimated:true` and `pricing_source` are **removed**, replaced
+by `reporter` + `confidence` (research-preview clean break; `COST_SCHEMA_VERSION` stays `1` — new records omit the old
+keys, legacy records read with defaults). **Spend caps now fire only for routes that report cost**:
+Anthropic-passthrough and LiteLLM-**streaming** dollar caps become no-ops (tokens still tracked). No user action
+required; existing logs read fine.
+
+**Verification**: 5531 unit+regression pass; mypy/pyright clean; `make pre-commit` clean. Real-wire integration
+(`test_cost_visibility_e2e.py`) confirmed the matrix with the catalog removed — OpenRouter `reported`
+(stream+non-stream), LiteLLM `gateway_calculated` (non-stream), LiteLLM **streaming**
+`cost_micros=None`/`confidence="unavailable"` (the documented gap: the header predates the cost and the gateway puts
+none in the final usage chunk). Design docs (§3.14, §A.9, §A.13), `auth_cost_metric.md`, and the QA `7-costs.md`
+fixtures updated to the reported/unavailable model.
+
 ### Phase 3: Remove `cap_mode` & strict pre-flight (metric-evidence Slice 3)
 
 **Goal**: Collapse the proxy's two cap behaviors (`post` / `strict`) into one — post-event enforcement — by removing

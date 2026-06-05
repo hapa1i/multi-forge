@@ -13,11 +13,10 @@ provenance-tagged is the heart of this card, not a side detail.
 
 ## Current Focus
 
-**Phase 0 (independent, ship first): corruption-class cost-log fix (Bug #4).** It is self-contained, blocks nothing, is
-blocked by nothing, and matches an already-shipped pattern. Land it while the Phase 1 decision gate is being settled.
-
-In parallel, resolve the **Phase 1 schema decision gate** (evolve usage ledger vs. new metric-event ledger) — it shapes
-every later phase.
+**Phases 0, 1, 3, 2 are shipped and verified (2026-06-05).** The cost plane is now reported-or-unavailable end-to-end
+and the local price catalog is deleted. Remaining lanes: **Phase 4** (status-line honesty) and **Phase 5** (any
+follow-ups), both gated on their own decision gates (G3/G4). The North-star payload (cost is never invented from a local
+table) is delivered; Phase 4 is display polish on top of the now-honest data.
 
 ## Sequencing Note (verified against code)
 
@@ -148,16 +147,16 @@ to FAIL with the guards stashed (non-vacuous); `make pre-commit` clean. Changelo
 
 **Acceptance**
 
-| Test                                             | Fixture                                                                                | Assertion                                                                                      | Test File                             | Status                                                         |
-| ------------------------------------------------ | -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------- | -------------------------------------------------------------- |
-| v1 usage event still loads                       | a `schema_version=1` `UsageEvent` JSONL line (pre-change fields only)                  | loads; new fields take defaults (path a) — `route`/`reporter` `None`, `confidence="unknown"`   | `tests/src/core/usage/test_ledger.py` | ✔ `test_v1_record_loads_with_defaults`                         |
-| v1 cost record still loads                       | a `schema_version=1` cost-log line                                                     | same chosen behavior as above                                                                  | `tests/src/proxy/test_cost_logger.py` | → **moved to Phase 2** (cost-record schema change lands there) |
-| New fields round-trip                            | event written with `reporter`/`confidence`/`route` set                                 | read back identical; strict read accepts                                                       | `tests/src/core/usage/test_ledger.py` | ✔ `test_new_fields_roundtrip`                                  |
-| Bad literal is corruption (×3)                   | a record with a bogus `route`/`reporter`/`confidence` value                            | each skipped as corruption (mirrors `test_bad_literal_is_corruption`)                          | `tests/src/core/usage/test_ledger.py` | ✔ `test_bad_vocabulary_literals_are_corruption`                |
-| `confidence` ⟂ `measurement_source`              | `measurement_source="provider_usage_exact"` + `confidence="unavailable"` + `cost=None` | all three coexist on one record; round-trips                                                   | `tests/src/core/usage/test_ledger.py` | ✔ `test_confidence_orthogonal_to_measurement_source`           |
-| `source_refs` don't change event-local cost conf | `emit_direct_llm_usage(..., cost_request_id="req")`                                    | own `cost_micro_usd is None` **and** `confidence == "unavailable"` despite the joined cost ref | `tests/src/core/usage/test_emit.py`   | ✔ `test_proxy_target_sets_cost_request_id`                     |
-| Emitter mapping (4 helpers)                      | each helper, measured vs unmeasured path                                               | stamps route/reporter/confidence per the mapping table                                         | `tests/src/core/usage/test_emit.py`   | ✔ 4 emitter tests + vocab class                                |
-| Newer-schema record skipped                      | `schema_version = current+1`                                                           | skipped with one-time warning (existing contract preserved, **unchanged**)                     | `tests/src/core/usage/test_ledger.py` | ✔ `test_newer_version_skipped_warn_once`                       |
+| Test                                             | Fixture                                                                                 | Assertion                                                                                      | Test File                             | Status                                                                         |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------- | ------------------------------------------------------------------------------ |
+| v1 usage event still loads                       | a `schema_version=1` `UsageEvent` JSONL line (pre-change fields only)                   | loads; new fields take defaults (path a) — `route`/`reporter` `None`, `confidence="unknown"`   | `tests/src/core/usage/test_ledger.py` | ✔ `test_v1_record_loads_with_defaults`                                         |
+| v1 cost record still loads                       | a `schema_version=1` cost-log line (legacy `estimated`/`pricing_source`, no provenance) | loads; lenient reader ignores extra keys; aggregates without crash                             | `tests/src/cli/test_proxy_costs.py`   | ✔ Phase 2 `test_costs_json_mixed_reported_and_unavailable` (legacy record row) |
+| New fields round-trip                            | event written with `reporter`/`confidence`/`route` set                                  | read back identical; strict read accepts                                                       | `tests/src/core/usage/test_ledger.py` | ✔ `test_new_fields_roundtrip`                                                  |
+| Bad literal is corruption (×3)                   | a record with a bogus `route`/`reporter`/`confidence` value                             | each skipped as corruption (mirrors `test_bad_literal_is_corruption`)                          | `tests/src/core/usage/test_ledger.py` | ✔ `test_bad_vocabulary_literals_are_corruption`                                |
+| `confidence` ⟂ `measurement_source`              | `measurement_source="provider_usage_exact"` + `confidence="unavailable"` + `cost=None`  | all three coexist on one record; round-trips                                                   | `tests/src/core/usage/test_ledger.py` | ✔ `test_confidence_orthogonal_to_measurement_source`                           |
+| `source_refs` don't change event-local cost conf | `emit_direct_llm_usage(..., cost_request_id="req")`                                     | own `cost_micro_usd is None` **and** `confidence == "unavailable"` despite the joined cost ref | `tests/src/core/usage/test_emit.py`   | ✔ `test_proxy_target_sets_cost_request_id`                                     |
+| Emitter mapping (4 helpers)                      | each helper, measured vs unmeasured path                                                | stamps route/reporter/confidence per the mapping table                                         | `tests/src/core/usage/test_emit.py`   | ✔ 4 emitter tests + vocab class                                                |
+| Newer-schema record skipped                      | `schema_version = current+1`                                                            | skipped with one-time warning (existing contract preserved, **unchanged**)                     | `tests/src/core/usage/test_ledger.py` | ✔ `test_newer_version_skipped_warn_once`                                       |
 
 **Deferred decision**: aggregate rows beyond cost (tokens/rate-limits/failures/latency/tool-errors — card §"Post-Flight
 Policies" table) are kept **schema-compatible** but NOT implemented in this card.
@@ -238,63 +237,77 @@ must drop it. Deferred to Phase 2: nullable `cost_micros`, reported-cost wiring,
 **Goal**: Reported cost wins. Local pricing is no longer the normal user-facing accounting source. No reported cost →
 record/display *cost unavailable* (but **preserve route-reported tokens**). This is the "not a cost oracle" payload.
 
-**Schema change (prerequisite — the conflation lives here):**
+**Decisions taken (resolved with user during execution):** **Full matrix** (wire reported cost across all proxy paths +
+both gateways) and **remove the catalog entirely** (not flag it). Provenance shipped as Phase-1's `reporter` +
+`confidence` pair (the original `pricing_source` field was dropped, not renamed). Landed in 3 tree-green steps (commits
+`d0850f4` → `12fdabd`/`d89baef` → `019c582`).
 
-- [ ] Make cost **nullable**: `cost_logger.log_request_cost(cost_micros: int)` → `int | None` (line 52), and the
-  record's hardcoded `"estimated": True` (line 72) → a provenance field aligned with Phase 1
-  (`reported | gateway_calculated |     inferred | unavailable`). Today `0` means both "free" and "unknown" — that
-  conflation is the cost-oracle bug.
-- [ ] Make the proxy producer honest: `_calc_and_log_cost` (`server.py:174-216`) returns `int` always (0 on failure).
-  Change so it returns / logs `None` when no reported cost is available instead of a catalog estimate or `0`.
-- [ ] **Unavailable cost must not advance cap aggregates** (latent crash, not just display). `_calc_and_log_cost` calls
-  `cost_tracker.record(cost_micros)` (`server.py:210-211`); `CostTracker.record(cost_micros: int)` guards `<= 0` but a
-  `None` raises `TypeError` (`None <= 0`, `cost_tracker.py:153`). When cost is unavailable, **skip `record()` entirely**
-  — do not advance `_monthly_total`/`_daily_window`. Doc note: caps account only for cost-reported requests;
-  cost-unavailable traffic is uncapped-by-cost (a future token/rate-limit aggregate row, not this card).
-- [ ] **Displays and metrics must not treat unavailable as `$0`:**
-  - [ ] `proxy/metrics.py` `record_request` — skip `None` in `total_cost_micros` accumulation (don't add 0-as-known).
-  - [ ] `cli/proxy_costs.py` `_display_by_model` / `_display_by_verb` — render "cost unavailable", not `$0.00`.
-  - [ ] `cli/usage.py` + `core/ops/usage_summary.py` — `cost_partial`/unavailable surfaced, never summed as 0.
-  - [ ] `cli/status_line.py` cost segment — unavailable renders as such, not `~$0`.
+**Schema change (Step 1 — the conflation lived here):**
 
-**Reported-cost wiring (the proxy path matrix — a `cost_logger` unit test will NOT prove these):**
+- [x] Cost is **nullable**: `log_request_cost(cost_micros: int | None)`; the hardcoded `"estimated": True` and
+  `pricing_source` are **gone**, replaced by `reporter: Reporter | None` + `confidence: Confidence` (imported from Phase
+  1's `core/usage/vocabulary.py`). `COST_SCHEMA_VERSION` stays `1` (additive/removal, legacy reads with defaults).
+- [x] Proxy producer is honest: `_calc_and_log_cost` returns `int | None` — `None` when no route reported a cost (Step 3
+  removed the catalog else-branch; Step 2 kept it as the integration-verified safety net).
+- [x] **Unavailable cost does not advance caps**: `_calc_and_log_cost` skips `cost_tracker.record()` when
+  `cost_micros is None` (explicit guard), and `CostTracker.record(None)`/`_parse_record(null)` return early (no
+  `TypeError`).
+- [x] **Displays/metrics never treat unavailable as `$0`:**
+  - [x] `proxy/metrics.py` `record_request(cost_micros: int | None)` skips `None` in all four accumulations; adds
+    `cost_reported_requests` / `cost_unavailable_requests` (snapshot `reported_request_count` /
+    `unavailable_request_count`).
+  - [x] `cli/proxy_costs.py` renders "unavailable" (never `$0.00`) via `_reported_micros`; JSON drops `estimated`, adds
+    `reported_requests` / `unavailable_requests`.
+  - [x] `core/ops/usage_summary.py` already surfaces `cost_partial` (pre-existing); `cli/usage.py` renders `-`. **No
+    change needed — verified.**
+  - [x] `cli/status_line.py` — the `proxy_cost_usd > 0` guard (`:761`) already omits the segment when cost is
+    reported-only-zero; no `~$0` shown for a no-reported-cost proxy. **No change needed — verified.**
+  - [x] **Header evidence gate** (added in Step 1): `X-Request-Cost` omitted on null cost (fixes a `None/1_000_000`
+    `TypeError`); `X-Cumulative-Cost` omitted until `reported_request_count > 0`.
 
-- [ ] Persist reported cost when the reporter returns it (`pricing_source="openrouter|litellm|reported"`). Cover **every
-  proxy path** where cost is logged — each extracts reported cost differently (or reports none):
-  - [ ] translated **non-streaming** (converted response body usage/cost)
-  - [ ] translated **streaming** (usage in the final SSE event)
-  - [ ] passthrough **non-streaming** (raw provider body)
-  - [ ] passthrough **streaming** (raw provider SSE)
-  - [ ] retry / tool-compat re-request paths (cost not double-counted, or counted once on the final attempt)
-  - [ ] failure logging (`failed=True`) — record tokens/None cost, never a phantom estimate
-- [ ] Identify reported-cost surfaces: OpenRouter response cost, LiteLLM `response.cost` / proxy spend metadata. Wire
-  what is synchronously available from responses; defer follow-up-lookup APIs (open question in card).
-- [ ] Preserve route-reported tokens even when cost is unavailable (`measurement_source` token-only path already
-  exists).
-- [ ] **Display language** (card "Preferred display language"): `$0.23 OpenRouter reported`, `$0.23 LiteLLM reported`,
-  `cost unavailable` — never bare "cost"/"exact"/"authoritative" for estimates.
-- [ ] Decide: keep `pricing.py` as an **isolated, explicitly-labeled estimate** behind a flag, or remove. Sweep for any
-  hidden non-display catalog dependency before deletion (cap path is catalog-free after Phase 3; display CLIs read
-  logged `cost_micro(s)` — both ✔ verified during scoping).
-- [ ] **Design-doc sync**: `design.md` §3.14 + `design_appendix.md` §A.9 (reported-cost as source; catalog isolated;
-  `estimated` flag superseded by provenance).
+**Reported-cost wiring (Step 2 — the proxy path matrix, integration-verified on real wire):**
 
-**Acceptance**
+- [x] `cost_usd: float | None` carrier added to **both** `CompletionResponse` and `StreamEvent` (review-found: streaming
+  had none). Reporter/confidence derived at the proxy from `config.proxy.preferred_provider`.
+  - [x] translated **non-streaming** — OpenRouter body `usage.cost` via `openai_compat.extract_reported_cost_usd`;
+    LiteLLM header via `with_raw_response.create().parse()` + `_merge_header_cost` (chat **and** Responses-API
+    branches).
+  - [x] translated **streaming** — body cost from the final usage chunk → `StreamEvent.cost_usd` → adapter usage chunk →
+    SSE converter parks `reported_cost_micros` in `final_usage` → `_on_stream_complete`.
+  - [x] passthrough (Anthropic) — structurally `unavailable` (no body/SSE cost field); always logs `None`.
+  - [x] retry path counts cost once on the final attempt (`openai_response._reported_cost_micros`); tool-call/failure
+    paths log `None` (never a phantom estimate).
+- [x] Route-reported tokens preserved even when cost is unavailable (tokens logged with `cost_micros=None`).
+- [x] **Catalog removed entirely** (Step 3): grep-verified zero surviving callers, then deleted
+  `core/models/pricing.py`, `core/data/pricing.yaml`, the `core/models` re-exports, and `test_pricing.py` +
+  `test_bug_pricing_fallback_logs.py`.
+- [x] **Verb cost-evidence (review-found):** `ProxyCostDelta.reported_request_count` + `VerbCostResult.cost_measured`
+  (from that delta, not `bool(deltas)`); `emit.py` logs `cost_micro_usd=None` / `confidence="unavailable"` for a
+  passthrough verb that moved tokens but reported no cost.
+- [x] **Design-doc sync**: `design.md` §3.14, `design_appendix.md` §A.9 + §A.13, `auth_cost_metric.md` (planes table +
+  §7
+  - F6), and QA `7-costs.md` fixtures repointed from `estimated`/`pricing_source` to `reporter`/`confidence`.
 
-| Test                                   | Fixture                                      | Assertion                                                                                                 | Test File                                                              |
-| -------------------------------------- | -------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| Reported cost persisted with source    | gateway response carrying reported cost      | log record `pricing_source="openrouter"`, provenance `reported` (not `catalog`/`estimated`)               | `tests/src/proxy/test_cost_logger.py`                                  |
-| Unavailable cost is `None`, not `0`    | response with tokens, no reported cost       | record `cost_micros=None`; tokens present; provenance `unavailable`                                       | `tests/src/proxy/test_cost_logger.py`                                  |
-| None cost skips cap aggregate          | request with unavailable cost                | `CostTracker.record()` not called with `None`; `_monthly_total`/`_daily_window` unchanged; no `TypeError` | `tests/src/proxy/test_cost_tracker.py`                                 |
-| Translated path stops pricing locally  | translated proxy, real request               | logged cost is reported-or-`None`; `calculate_cost` not called for logging                                | `tests/src/proxy/test_server*`                                         |
-| Passthrough path stops pricing locally | passthrough proxy, streaming + non-streaming | reported-or-`None` for each; no catalog call                                                              | `tests/src/proxy/test_passthrough.py`                                  |
-| Streaming usage extracted              | streaming response with final-event usage    | cost/tokens captured from the final SSE event                                                             | `tests/src/proxy/test_passthrough.py` / `test_server*`                 |
-| Display/metrics treat `None` ≠ `$0`    | log with mixed reported + `None` records     | model/verb display shows "unavailable"; metrics total excludes `None`                                     | `tests/src/cli/test_proxy_costs.py`, `tests/src/proxy/test_metrics.py` |
-| Catalog isolation safe                 | catalog absent/flagged off                   | caps + display + logging still function                                                                   | `tests/src/proxy/test_cost_tracker.py`                                 |
+**Acceptance** — all rows verified (5531 unit+regression pass; mypy/pyright/`make pre-commit` clean):
 
-> **Integration (required by CLAUDE.md for proxy-runtime changes):** the path matrix is the reason — unit tests don't
-> exercise real translated/passthrough streaming. Run the proxy integration suite (e.g.
-> `./scripts/test-integration.sh tests/integration/.../test_proxy_*`) and a real-wire check that reported cost lands.
+| Test                                    | Assertion                                                                                       | Status                                                                      |
+| --------------------------------------- | ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| Reported cost persisted with source     | record `reporter="openrouter"`, `confidence="reported"`; no `estimated`/`pricing_source`        | ✔ `test_cost_logger.py`                                                     |
+| Unavailable cost is `None`, not `0`     | record `cost_micros=None`; tokens present; `confidence="unavailable"`                           | ✔ `test_cost_logger.py`, `test_server_cost.py`                              |
+| None cost skips cap aggregate           | `record()` not advanced on `None`; no `TypeError`                                               | ✔ `test_cost_tracker.py`, `test_server_cost.py`                             |
+| Reported-cost capture (carrier)         | `cost_usd` on both types; OpenRouter body + LiteLLM header read end-to-end                      | ✔ `test_openai_compat.py`, `test_litellm_cost.py`, `test_client_adapter.py` |
+| Streaming cost threads to `on_complete` | `reported_cost_micros` in `final_usage`, never emitted to client                                | ✔ `test_converters.py`, `test_openrouter.py`                                |
+| Display/metrics treat `None` ≠ `$0`     | "unavailable" rendered; mixed legacy+reported+null aggregates without crash                     | ✔ `test_proxy_costs.py`, `test_metrics.py`                                  |
+| Verb passthrough logs null cost         | `measured` tokens but `cost_measured=False` → `cost_micro_usd=None`                             | ✔ `test_emit.py`, `test_cost_tracking.py`                                   |
+| **Real-wire matrix** (integration)      | OR reported (stream+non), LiteLLM gateway_calculated (non), LiteLLM stream `unavailable`/`None` | ✔ `test_cost_visibility_e2e.py` (4 pass, catalog removed)                   |
+
+**Closeout**: ✔ Done (2026-06-05). Forge no longer prices requests from a local table — cost is reported-or-unavailable
+end-to-end, the catalog is deleted, and the integration matrix confirms each cell on the real wire. **Verified gap
+(accepted):** LiteLLM **streaming** cost is `unavailable` (its `x-litellm-response-cost` header predates the cost and
+the gateway puts none in the final usage chunk) — documented in design.md §3.14 + the integration test. **Caps
+consequence (G5, accepted):** dollar caps fire only for cost-reporting routes; passthrough/LiteLLM-streaming dollar caps
+are no-ops (tokens still tracked). The deferred Phase-1 "v1 cost record still loads" row is satisfied by Step 1's
+`COST_SCHEMA_VERSION=1` additive change (`test_cost_logger.py` round-trip).
 
 ---
 

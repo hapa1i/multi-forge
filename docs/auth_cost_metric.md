@@ -44,8 +44,8 @@ are physically separate by design (design.md §3.14) and never merge; plane 3 re
 
 | Plane           | Path                                   | Writer (file:symbol)                                   | Record                                                                                                                                                                                                    | Role                                               |
 | --------------- | -------------------------------------- | ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| 1. Request cost | `costs/requests/<YYYY-MM>_<pid>.jsonl` | `proxy/cost_logger.py:44` `log_request_cost`           | proxy_id, model, tier, in/out/cached tokens, `cost_micros`, latency, `failed`, `request_id`, `estimated:true`                                                                                             | **Spend source of truth** + cap bootstrap          |
-| 2. Verb cost    | `costs/verbs/<YYYY-MM>_<pid>.jsonl`    | `core/reactive/cost_tracking.py:207` `track_verb_cost` | verb, cost delta, tokens, request_count, duration, `per_proxy[]`, `estimated:true`                                                                                                                        | Per-command attribution (ESTIMATED snapshot delta) |
+| 1. Request cost | `costs/requests/<YYYY-MM>_<pid>.jsonl` | `proxy/cost_logger.py:44` `log_request_cost`           | proxy_id, model, tier, in/out/cached tokens, `cost_micros` (null when unreported), latency, `failed`, `request_id`, `reporter`, `confidence`                                                              | **Spend source of truth** + cap bootstrap          |
+| 2. Verb cost    | `costs/verbs/<YYYY-MM>_<pid>.jsonl`    | `core/reactive/cost_tracking.py:207` `track_verb_cost` | verb, cost delta, tokens, request_count, duration, `per_proxy[]`, `estimated:true`, `cost_measured`                                                                                                       | Per-command attribution (ESTIMATED snapshot delta) |
 | 3. Usage ledger | `usage/events/<YYYY-MM>_<pid>.jsonl`   | `core/usage/ledger.py:147` `log_usage_event`           | `UsageEvent` (run/parent/root, runtime, command, status, provider/model/proxy, `billing_mode`, `measurement_source`, `route`, `reporter`, `confidence`, tokens, latency, `cost_micro_usd`, `source_refs`) | **Attribution** (who/what/which runtime)           |
 
 Schema/version notes:
@@ -139,11 +139,11 @@ in-flight spend is not coordinated across processes).
 
 ### 7. Authoritative vs estimated (units matter)
 
-| Surface             | Scope                                | Unit                                   | Caveat                                                                                                |
-| ------------------- | ------------------------------------ | -------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| Status-line `cost`  | the one interactive session rendered | `$` (api) / quota (sub) / `~$` (proxy) | phantom `$` on OAuth (see Part III)                                                                   |
-| `forge usage`       | one Forge session's ledger events    | estimated `~$` + tokens                | `cost_partial` / `session_tagging_partial`                                                            |
-| `forge proxy costs` | one proxy's request log              | estimated `$` (catalog pricing)        | canonical Forge spend number, **still an estimate, not a provider invoice** (`estimated:true` always) |
+| Surface             | Scope                                | Unit                                   | Caveat                                                                                                                                               |
+| ------------------- | ------------------------------------ | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Status-line `cost`  | the one interactive session rendered | `$` (api) / quota (sub) / `~$` (proxy) | phantom `$` on OAuth (see Part III)                                                                                                                  |
+| `forge usage`       | one Forge session's ledger events    | reported `$` or `unavailable` + tokens | `cost_partial` / `session_tagging_partial`; passthrough routes report no `$`                                                                         |
+| `forge proxy costs` | one proxy's request log              | reported `$` or `unavailable`          | sums **route-reported** cost only (OpenRouter body / LiteLLM header); unreported requests are counted `unavailable`, never priced from a local table |
 
 ---
 
@@ -307,8 +307,12 @@ all** (Forge is not the HTTP client for it).
   the explicit override for exactly this case.
 - **F5 — `source_refs` is exact only on the direct `core.llm` path.** `claude -p` ledger events carry null `source_refs`
   (Forge is not the HTTP client). Per-request correlation for `claude -p` is deferred to Phase 4g.
-- **F6 — Even "authoritative" proxy spend is estimated.** Plane 1 writes `estimated:true`; `forge proxy costs` is the
-  canonical Forge number for caps, not a provider invoice.
+- **F6 — Proxy spend is reported-or-unavailable; Forge is not a cost oracle.** Plane 1 writes the cost a route actually
+  reported (`reporter` + `confidence`: OpenRouter body `usage.cost` → `reported`, LiteLLM header → `gateway_calculated`)
+  or `cost_micros:null` / `confidence:"unavailable"` when none did (Anthropic passthrough; LiteLLM streaming). There is
+  no local price table. Consequently **spend caps fire only for routes that report cost** —
+  passthrough/streaming-LiteLLM dollar caps are no-ops (tokens still tracked). `forge proxy costs` sums reported cost
+  only and is still not a provider invoice.
 
 ---
 
