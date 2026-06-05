@@ -66,6 +66,23 @@ forge auth login -c anthropic-api   # Store the Forge-specific key
 When active, the resolution chain becomes credential file only. `forge auth status` shows `(env ignored)` for
 credentials that have env vars present but skipped.
 
+### Keeping a key out of interactive sessions (`interactive_anthropic_api_key`)
+
+`auth_ignore_env` changes which key Forge resolves; `interactive_anthropic_api_key` controls whether your
+**interactive** Claude session gets one at all. With `omit`, Forge removes `ANTHROPIC_API_KEY` from Forge-managed
+interactive launches (`forge session start/resume/fork` and `forge claude start`) so the session runs on your Claude
+Code login (OAuth/Max) rather than billing a key meant for other tools:
+
+```bash
+forge config set interactive_anthropic_api_key=omit
+```
+
+This is interactive-only by design. Headless Forge subprocesses (supervisor, memory writer, direct panel workers,
+`claude -p --bare`) still resolve `ANTHROPIC_API_KEY` normally — they have no login to fall back on. Under a sidecar,
+Forge withholds the key from Claude *after* the in-container proxy has captured its upstream credential, so proxy
+routing keeps working for every template. The status line's opt-in `launch` segment shows `key:omit` when the key was
+withheld.
+
 ---
 
 ## Credentials and capabilities

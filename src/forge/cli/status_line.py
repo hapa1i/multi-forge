@@ -1106,9 +1106,10 @@ def format_billing_cost(
 
     ``subscription``/``ambiguous`` show the 5h quota instead of dollars (which are
     a phantom figure on a subscription). When no quota data is available,
-    ``ambiguous`` hedges with ``≈$X.XX`` (we inferred subscription from a missing
-    ANTHROPIC_API_KEY but aren't certain); an explicit ``subscription`` shows no
-    dollar figure at all. Duration is always appended when present.
+    ``ambiguous`` (the ``auto`` default — billing is undeclared and never inferred
+    from an API key) hedges with ``≈$X.XX`` to flag the figure as uncertain; an
+    explicit ``subscription`` shows no dollar figure at all. Duration is always
+    appended when present.
     """
     parts: list[str] = []
     quota = format_rate_limits(rate_limits, is_proxy=False, show_reset=True, now=now)
@@ -1223,6 +1224,46 @@ def format_spend_cap(caps: dict[str, Any]) -> str | None:
     pct, marker, cur, lim = binding
     color = RED if pct >= 90 else YELLOW if pct >= 75 else METRICS_COLOR
     return f"{DIM}cap:{RESET}{color}{marker} {_fmt_cap_money(cur)}/{_fmt_cap_money(lim)} ({int(pct)}%){RESET}"
+
+
+_LAUNCH_KEY_LABELS = {
+    "env": "env",
+    "credential_file": "file",
+    "none": "none",
+    "omitted_by_config": "omit",
+}
+
+
+def format_launch(launch: dict[str, Any]) -> str | None:
+    """Render ``confirmed.launch`` as ``<route>·key:<posture>`` (e.g. ``proxy:p1·key:env``).
+
+    Describes how the interactive session reached the model and whether an API key
+    was made available to it — the honest auth breadcrumb the status line needs
+    (``omit`` means Forge deliberately withheld the key, so a key in the ambient
+    env is not the payer). Shape-defensive: returns None when nothing is showable.
+    """
+    routing_mode = launch.get("routing_mode")
+    proxy_id = launch.get("proxy_id")
+    if routing_mode == "proxy":
+        route = f"proxy:{proxy_id}" if proxy_id else "proxy"
+    elif routing_mode == "custom_base_url":
+        route = "custom"
+    elif routing_mode == "direct":
+        route = "direct"
+    else:
+        route = None
+
+    source = launch.get("api_key_source")
+    key_label = _LAUNCH_KEY_LABELS.get(source) if isinstance(source, str) else None
+
+    parts: list[str] = []
+    if route:
+        parts.append(f"{TEMPLATE_COLOR}{route}{RESET}")
+    if key_label:
+        parts.append(f"{DIM}key:{RESET}{METRICS_COLOR}{key_label}{RESET}")
+    if not parts:
+        return None
+    return f"{DIM}·{RESET}".join(parts)
 
 
 def format_token_breakdown(input_tokens: int, output_tokens: int, cached_tokens: int) -> str | None:

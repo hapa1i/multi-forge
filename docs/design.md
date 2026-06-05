@@ -334,7 +334,8 @@ To avoid writer conflicts:
   - `intent.launch` records relaunch mode plus sidecar-specific options (image, extra mounts) when the session is
     created or derived
   - `confirmed` bootstrap/runtime fields written by the CLI: `derivation` (resume metadata), `is_sandboxed` (updated at
-    launch time to reflect whether Claude is running via sidecar)
+    launch time to reflect whether Claude is running via sidecar), `launch` (immutable launch facts recorded once at
+    start — routing mode, proxy id/base URL, and whether/how an API key was made available to the child)
   - Sets `FORGE_SESSION=<session_name>` when launching Claude
   - Note: `claude_session_id` is **not** pre-seeded by the CLI; it is set by hooks from Claude's live conversation
     payloads. SessionStart sets the initial value, and Stop/StopFailure may reconcile it when native fork launches

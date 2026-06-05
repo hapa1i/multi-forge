@@ -188,6 +188,14 @@ class RuntimeConfig:
     # Useful when shell API keys are for Claude Code (not Forge subprocesses).
     auth_ignore_env: bool = False
 
+    # ANTHROPIC_API_KEY policy for Forge-managed interactive `claude` launches:
+    # "inherit" (default) keeps the normal resolution (shell env, then credential
+    # file); "omit" strips the key from the interactive child only, so a
+    # subscription/OAuth session is not silently billed against a key meant for
+    # other tools. Headless subprocesses (supervisor, memory writer, panel workers)
+    # are unaffected and always keep normal credential resolution.
+    interactive_anthropic_api_key: str = "inherit"
+
     # Nested status-line display preferences (statusline: section in config.yaml).
     statusline: StatusLineConfig = field(default_factory=StatusLineConfig)
 
@@ -222,6 +230,12 @@ class RuntimeConfig:
             raise ValueError(
                 f"Invalid policy_summary_feedback: '{self.policy_summary_feedback}' "
                 f"(must be one of: {', '.join(sorted(valid_feedback))})"
+            )
+        valid_interactive_key_modes = {"inherit", "omit"}
+        if self.interactive_anthropic_api_key not in valid_interactive_key_modes:
+            raise ValueError(
+                f"Invalid interactive_anthropic_api_key: '{self.interactive_anthropic_api_key}' "
+                f"(must be one of: {', '.join(sorted(valid_interactive_key_modes))})"
             )
 
 
@@ -563,10 +577,20 @@ proxy_mode: host
 # but you want Forge subprocesses to use a separate key from the credential file.
 # auth_ignore_env: false
 
+# ANTHROPIC_API_KEY policy for interactive `forge session`/`forge claude` launches.
+# inherit (default) — the session uses the same key as everything else.
+# omit              — keep the key out of the interactive session only, so a
+#                     subscription/OAuth session isn't billed against a key meant
+#                     for other tools. Headless subprocesses keep their key.
+# interactive_anthropic_api_key: inherit
+
 # Status line display (nested section). Choose which segments show, the cost
 # model, palette, and glyphs. Set values with: forge config set statusline.<key>=<value>
-#   cost_mode: auto | api | subscription   (auto detects from ANTHROPIC_API_KEY;
-#              subscription shows quota instead of dollars)
+#   cost_mode: auto | api | subscription
+#              auto         shows the 5h quota when present, else hedges the cost
+#                           with a leading ~= (never inferred from an API key)
+#              api          shows real dollars (you bill per-token)
+#              subscription shows quota instead of dollars
 #   palette:   default | earthy
 #   glyphs:    ascii | unicode
 #   segments:  ordered list; empty = default layout. Valid names: path, branch,

@@ -70,11 +70,23 @@ class TestRuntimeConfigDefaults:
         rc = RuntimeConfig()
         assert rc.auth_ignore_env is False
 
+    def test_interactive_anthropic_api_key_defaults_inherit(self):
+        rc = RuntimeConfig()
+        assert rc.interactive_anthropic_api_key == "inherit"
+
 
 class TestRuntimeConfigValidation:
     def test_invalid_proxy_mode_rejected(self):
         with pytest.raises(ValueError, match="Invalid proxy_mode"):
             RuntimeConfig(proxy_mode="invalid")
+
+    def test_interactive_anthropic_api_key_omit_accepted(self):
+        rc = RuntimeConfig(interactive_anthropic_api_key="omit")
+        assert rc.interactive_anthropic_api_key == "omit"
+
+    def test_invalid_interactive_anthropic_api_key_rejected(self):
+        with pytest.raises(ValueError, match="Invalid interactive_anthropic_api_key"):
+            RuntimeConfig(interactive_anthropic_api_key="strip")
 
     def test_sidecar_proxy_mode_accepted(self):
         rc = RuntimeConfig(proxy_mode="sidecar")

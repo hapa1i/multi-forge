@@ -128,6 +128,54 @@ class TestStatusLineRegistryFallback:
         assert result.returncode == 0
 
 
+class TestLaunchMetadata:
+    """Real-CLI coverage for confirmed.launch recording (G3) + the launch segment."""
+
+    def _manifest_path(self, name: str) -> str:
+        return f"/workspace/.forge/sessions/{name}/forge.session.json"
+
+    def test_session_start_records_launch_metadata(self, mock_claude_workspace: ContainerLike) -> None:
+        """record_launch_confirmed runs before invoke_claude, so a real start writes it."""
+        mock_claude_workspace.exec("cd /workspace && forge session start launch-rec")
+
+        manifest = mock_claude_workspace.read_json(self._manifest_path("launch-rec"))
+        launch = manifest["confirmed"]["launch"]
+        # Default start is direct (no --proxy); api_key_source is always recorded.
+        assert launch["routing_mode"] == "direct"
+        assert launch["api_key_source"] in {"env", "credential_file", "none"}
+
+    def test_omit_records_omitted_by_config(self, mock_claude_workspace: ContainerLike) -> None:
+        """interactive_anthropic_api_key=omit is the status-line breadcrumb for Bug #1."""
+        mock_claude_workspace.mkdir("$HOME/.forge", parents=True)
+        mock_claude_workspace.write_file(
+            "$HOME/.forge/config.yaml",
+            "interactive_anthropic_api_key: omit\n",
+        )
+        mock_claude_workspace.exec("cd /workspace && env ANTHROPIC_API_KEY=sk-ant-test forge session start launch-omit")
+
+        manifest = mock_claude_workspace.read_json(self._manifest_path("launch-omit"))
+        launch = manifest["confirmed"]["launch"]
+        assert launch["api_key_available_to_child"] is False
+        assert launch["api_key_source"] == "omitted_by_config"
+
+    def test_launch_segment_renders_from_manifest(self, mock_claude_workspace: ContainerLike) -> None:
+        """The opt-in launch segment renders confirmed.launch via the real status-line CLI."""
+        mock_claude_workspace.exec("cd /workspace && forge session start launch-seg")
+        mock_claude_workspace.mkdir("$HOME/.forge", parents=True)
+        mock_claude_workspace.write_file(
+            "$HOME/.forge/config.yaml",
+            "statusline:\n  segments: [path, model, launch]\n",
+        )
+        mock_claude_workspace.write_json("/tmp/sl-input.json", {"model": {"display_name": "Claude"}})
+
+        result = mock_claude_workspace.exec(
+            "cd /workspace && env FORGE_SESSION=launch-seg forge status-line < /tmp/sl-input.json"
+        )
+
+        assert result.returncode == 0
+        assert "direct" in result.stdout  # routing_mode from confirmed.launch
+
+
 class TestStatusLineInputContract:
     """Tests for status-line JSON input contract handling."""
 

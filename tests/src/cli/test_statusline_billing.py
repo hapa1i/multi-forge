@@ -61,9 +61,12 @@ class TestBillingModeRendering:
         assert "RL:23%" in visible
         assert "0.42" not in visible  # phantom dollars hidden
 
-    def test_auto_with_api_key_shows_dollars(self):
+    def test_auto_with_api_key_still_hedges(self):
+        # A key in the env is capability, not payer (Forge may have hydrated it
+        # into an OAuth session). auto must NOT assert dollars from key presence;
+        # with no rate_limits it hedges, identical to the no-key case below.
         visible = _render(COST, cost_mode="auto", api_key=True)
-        assert "$0.42" in visible
+        assert "≈$0.42" in visible
 
     def test_auto_without_key_shows_quota(self):
         visible = _render(COST_RL, cost_mode="auto", api_key=False)
@@ -73,6 +76,18 @@ class TestBillingModeRendering:
     def test_auto_without_key_no_rate_limits_hedges_with_approx(self):
         visible = _render(COST, cost_mode="auto", api_key=False)
         assert "\u2248$0.42" in visible
+
+
+class TestAmbientHonesty:
+    """Ambient session (no FORGE_SESSION): classify from stdin + immediate env only."""
+
+    def test_key_in_env_no_rate_limits_hedges_and_hides_launch(self):
+        # The Bug #1 + #3 acceptance: an ambient render with a real key but no quota
+        # signal hedges the cost (never asserts API dollars) and shows no launch
+        # segment (manifest is None -> nothing to read, no credential-store lookup).
+        visible = _render(COST, cost_mode="auto", api_key=True, segments=["model", "cost", "launch"])
+        assert "≈$0.42" in visible
+        assert "key:" not in visible
 
 
 class TestRateLimitsSuppression:

@@ -13,10 +13,12 @@ provenance-tagged is the heart of this card, not a side detail.
 
 ## Current Focus
 
-**Phases 0, 1, 3, 2 are shipped and verified (2026-06-05).** The cost plane is now reported-or-unavailable end-to-end
-and the local price catalog is deleted. **G3 and G4 are resolved (2026-06-05)** — see the Phase 4 Resolutions blockquote
-— so **Phase 4** (status-line honesty) is unblocked and ready to start; **Phase 5/6** follow. The North-star payload
-(cost is never invented from a local table) is delivered; Phase 4 is display polish on top of the now-honest data.
+**Phases 0, 1, 3, 2, 4 are shipped and verified (2026-06-05).** The cost plane is reported-or-unavailable end-to-end
+(price catalog deleted) and the status line is now billing-honest: `auto` never infers an API payer from key presence,
+launch metadata (`confirmed.launch`) is recorded + rendered via the opt-in `launch` segment, and
+`interactive_anthropic_api_key: omit` keeps a key out of interactive sessions (host + sidecar) while headless auth is
+untouched. **Phase 5** (headless runtime reporters) is next; it carries the deferred `forge +$Y` Forge-additional-cost
+segment. **Phase 6** (docs/CLI cleanup) follows.
 
 ## Sequencing Note (verified against code)
 
@@ -324,7 +326,7 @@ end-user/{proxy,config,session}.md; the attribution-snapshot sense (`estimated:t
 
 ---
 
-## Phase 4 — Status-line honesty (Slice 4) — G3/G4 resolved (2026-06-05), ready
+## Phase 4 — Status-line honesty (Slice 4) — SHIPPED (2026-06-05)
 
 **Scope guardrail (card §Scope)**: Forge never owns/recomputes the main harness cost. Status line shows TWO separated
 things: (a) Claude's native signal as Claude's; (b) Forge's additional `claude -p` cost as a distinct `forge +$Y`
@@ -333,9 +335,10 @@ segment. Never merge.
 > **Resolutions (2026-06-05) — G3 + G4 settled (design dialogue, code-verified).**
 >
 > **G3 — launch metadata in the manifest, nested `confirmed.launch` (`LaunchConfirmed`).** Mirrors the existing
-> `confirmed` sub-object convention (`PolicyConfirmed`/`VerificationConfirmed`/`CompactionConfirmed`/`SubagentConfirmed`,
-> `models.py`), not the card's scattered `launch_*` fields. Read by the status line via `FORGE_SESSION`; ambient sessions
-> (no manifest) fall back to stdin + immediate env only.
+> `confirmed` sub-object convention
+> (`PolicyConfirmed`/`VerificationConfirmed`/`CompactionConfirmed`/`SubagentConfirmed`, `models.py`), not the card's
+> scattered `launch_*` fields. Read by the status line via `FORGE_SESSION`; ambient sessions (no manifest) fall back to
+> stdin + immediate env only.
 >
 > ```yaml
 > confirmed:
@@ -369,49 +372,64 @@ segment. Never merge.
 >   `runtime_mode`).
 > - **`omit` definition:** for Forge-managed **interactive** Claude launches, remove `ANTHROPIC_API_KEY` from the child
 >   env **and** do not hydrate it from stored credentials — strips **both** the shell-inherited and credential-file key.
->   Forge **headless** subprocesses (supervisor, memory writer, panel workers, `claude -p --bare`) keep normal credential
->   resolution. `inherit` (default) = current behavior, no break.
+>   Forge **headless** subprocesses (supervisor, memory writer, panel workers, `claude -p --bare`) keep normal
+>   credential resolution. `inherit` (default) = current behavior, no break.
 > - **Wiring:** thread an explicit `interactive` flag into `build_claude_env` (`env.py:156`) → `_hydrate_credentials`
->   (`:239`); default preserves today's hydration. The key-removal machinery already exists (the `auth_ignore_env` pop at
->   `env.py:263`) — `omit` mirrors it, gated on `interactive AND interactive_anthropic_api_key == "omit"`. Keep it a
+>   (`:239`); default preserves today's hydration. The key-removal machinery already exists (the `auth_ignore_env` pop
+>   at `env.py:263`) — `omit` mirrors it, gated on `interactive AND interactive_anthropic_api_key == "omit"`. Keep it a
 >   **separate** flag from `derive_run_identity` (interactive launchers already pass `derive_run_identity=False`, so the
 >   callsites are known — but api-key omission ≠ run-identity rooting; do not overload one flag for both).
 > - **Status-line bridge:** when `omit` fires, `api_key_source: omitted_by_config` is the manifest breadcrumb the status
 >   line reads to render billing honestly (closes Bug #1).
 
-- [ ] **Bug #1 — billing inference.** `billing_mode` (`statusline/context.py:87-96`) currently returns `api` whenever
-  `has_api_key` in `auto`. Make `auto` **prefer `rate_limits` presence** (subscription/quota evidence) over key
-  presence. Key availability is a capability signal, not a payer signal. (`has_api_key` already reads raw env at
-  `context.py:84` — keep that; the bug is the `auto`→`api` inference, not the read source.)
-- [ ] **Bug #2 — hydration coupling (G4 resolved).** `build_claude_env()` (`core/reactive/env.py:156`) →
-  `_hydrate_credentials` (`:239`) hydrates `ANTHROPIC_API_KEY` into **interactive and headless** envs unconditionally.
-  Add the `omit` path (see Resolutions): a new explicit `interactive` flag on `build_claude_env` + flat
-  `interactive_anthropic_api_key: inherit|omit` config key on `RuntimeConfig` (sibling to `auth_ignore_env`). `omit`
-  strips **both** shell + credential-file key for interactive launches only, mirroring the existing `auth_ignore_env` pop
-  (`:263`). Default `inherit` preserves headless auth and current behavior.
-- [ ] **Bug #3 — ambient sessions.** When `forge status-line` runs inside a plain `claude` (no `FORGE_SESSION` /
-  manifest), render an **ambient Claude** session using only stdin + immediate env. Do **not** consult Forge
-  credential-file resolution to classify billing.
-- [ ] **Launch metadata (G3 resolved).** Add `LaunchConfirmed` under `confirmed.launch` (see Resolutions):
-  `routing_mode`, `proxy_id`/`base_url` (nullable), `api_key_available_to_child`, `api_key_source`. Reuse
-  `confirmed.is_sandboxed` for host/sidecar (no `runtime_mode`). Do **not** persist quota-seen / declared-billing-mode
-  (render-time reporter evidence, not launch facts). Status line reads via `FORGE_SESSION`; ambient → stdin only.
-- [ ] `forge +$Y` distinct segment: render Forge additional `claude -p` cost separately; only when the route reporter
-  returned cost. Keep `statusline.cost_mode=api|subscription` as explicit user **declaration**, not inference.
-- [ ] **Design-doc sync**: `design.md` §3.4/§3.7 + `design_appendix.md` §A.8 (status-line sources, billing-aware cost).
+> **Shipped notes (2026-06-05) — as-built vs the resolutions.**
+>
+> - **`forge +$Y` deferred to Phase 5.** Most direct `claude -p` cost is "unavailable" until the headless reporters land
+>   (Phase 5), so the segment would be sparse and needs new hot-path throttle infra. Co-deliver it there.
+> - **Visible `launch` segment added (opt-in, off by default).** The launch metadata is not just recorded — a new
+>   Forge-unique segment renders `<route>·key:<posture>` (`format_launch`). Off by default preserves the golden guard.
+> - **Sidecar omit (4.2b) added.** Sidecar launches bypass `build_claude_env`; `session_lifecycle` sets
+>   `FORGE_OMIT_INTERACTIVE_KEY=1` and `docker/entrypoint.sh` unsets the key for Claude *after* the proxy captured its
+>   upstream credential (works for anthropic-upstream templates).
+> - **Single source-aware api-key helper.** `apply_interactive_api_key`/`compute_interactive_api_key_decision` (env.py)
+>   over `resolve_env_or_credential_with_source` (template_secrets.py) — apply runs LAST (after extra_vars/unset), so
+>   the recorded `source` always equals the child env (no env-first guess; honors `auth_ignore_env`).
+> - **`has_api_key` removed.** After Bug #1, `billing_mode` no longer reads the key; the launch segment reads
+>   `confirmed.launch.api_key_source` (manifest), so the property had no honest consumer left (dead code deleted).
+
+- [x] **Bug #1 — billing inference.** `billing_mode` (`statusline/context.py`) `auto` now returns `ambiguous` (never
+  `api` from key presence); `format_billing_cost` shows quota-if-`rate_limits`-else-`≈$`. Golden `$0.42`→`≈$0.42`; the
+  divergence test became a key-invariance test. Stale `cost_mode` seed comment fixed (`runtime_config.py`).
+- [x] **Bug #2 — hydration coupling (G4).** Flat `interactive_anthropic_api_key: inherit|omit` on `RuntimeConfig`;
+  `interactive` flag on `build_claude_env` suppresses the early hydrate; the interactive wrapper (`invoke.py`) runs
+  `apply_interactive_api_key` LAST. `omit` strips shell + credential-file key for interactive only; headless
+  (`session_runner`, `review/engine`, `--bare`) untouched. Tests: `test_env.py::TestInteractiveApiKey`.
+- [x] **Bug #3 — ambient sessions.** `billing_mode` no longer reads env/credentials at all (declaration + `rate_limits`
+  only); the `launch` producer is manifest-gated. Test: `test_statusline_billing.py::TestAmbientHonesty`.
+- [x] **Launch metadata (G3).** `LaunchConfirmed` under `confirmed.launch` (`models.py`, additive — dacite strict).
+  Wrote via centralized `record_launch_confirmed` (best-effort) from start/resume + host fork closures
+  (`session_fork.py`) + sidecar. Tests: `test_models.py::TestLaunchConfirmed`, `test_launch_confirmed.py`.
+- [x] **Visible `launch` segment.** `format_launch` + `_produce_launch` (shape-defensive, opt-in). Tests:
+  `test_statusline_forge_segments.py::{TestFormatHelpers,TestLaunchProducer}`.
+- [~] `forge +$Y` distinct segment — **deferred to Phase 5** (see Shipped notes). `cost_mode=api|subscription` stays an
+  explicit declaration (Bug #1).
+- [x] **Design + end-user docs sync**: `design_appendix.md` §A.7 (new key) + §A.8 (billing-as-declaration, `launch`
+  segment); `docs/end-user/config.md` + `authentication.md` (new key, corrected `cost_mode=auto`, the `omit` control).
 
 **Acceptance**
 
-| Test                       | Fixture                                              | Assertion                                       | Test File                                                          |
-| -------------------------- | ---------------------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------ |
-| `auto` prefers rate_limits | stdin has `rate_limits`, env has key                 | renders subscription/quota, not `$` API cost    | `tests/src/cli/statusline/test_context.py` / `test_status_line.py` |
-| Key presence ≠ API payer   | env has hydrated key, no rate_limits, no declaration | payer not asserted as API in `auto` (hedged)    | `tests/src/cli/.../test_status_line.py`                            |
-| Ambient session path       | no `FORGE_SESSION`, plain `claude` stdin             | classified ambient; no credential-file lookup   | `tests/src/cli/.../test_status_line.py`                            |
-| Forge +$Y separate         | session with a reported-cost `claude -p` verb        | `forge +$Y` distinct from Claude native segment | `tests/src/cli/.../test_status_line.py`                            |
+| Test                       | Fixture                                            | Assertion                                           | Test File                                                      |
+| -------------------------- | -------------------------------------------------- | --------------------------------------------------- | -------------------------------------------------------------- |
+| Key presence ≠ API payer   | `auto`, env has key, no rate_limits                | hedges `≈$`, not `$` (golden + billing)             | `tests/src/cli/test_statusline_registry.py` + `_billing.py`    |
+| `auto` shows quota         | `auto`, `rate_limits` present                      | renders `RL:%`, hides phantom dollars               | `tests/src/cli/test_statusline_billing.py`                     |
+| Ambient session            | no `FORGE_SESSION`, key in env, no rate_limits     | hedges `≈$`, no launch segment, no cred lookup      | `tests/src/cli/test_statusline_billing.py::TestAmbientHonesty` |
+| omit strips interactive    | `interactive=True`, omit, key in env               | key popped; source `omitted_by_config`              | `tests/src/core/reactive/test_env.py::TestInteractiveApiKey`   |
+| omit recorded (real start) | `forge session start`, omit, shell key             | `confirmed.launch.api_key_source=omitted_by_config` | `tests/integration/cli/test_status_line_integration.py`        |
+| sidecar omit (real)        | sidecar entrypoint, `FORGE_OMIT_INTERACTIVE_KEY=1` | Claude PID has no key; proxy kept it                | `tests/integration/sidecar/test_sidecar_omit.py`               |
 
-> **Integration**: status-line + env hydration touch the launcher/hook path — run
-> `./scripts/test-integration.sh tests/integration/cli/test_status_line_integration.py` (per CLAUDE.md, unit runs don't
-> exercise the real launch/env path).
+> **Verification (done):** focused unit suites + full blast-radius sweep (2991 passed); `make pre-commit` clean;
+> integration `tests/integration/cli/test_status_line_integration.py` (13, incl. launch metadata) +
+> `tests/integration/sidecar/test_sidecar_omit.py` (1) green.
 
 ---
 

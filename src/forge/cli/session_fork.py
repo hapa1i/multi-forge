@@ -45,6 +45,10 @@ def _sess():  # type: ignore[return]
     return sys.modules["forge.cli.session"]
 
 
+from forge.cli.launch_confirmation import (  # noqa: E402
+    _routing_mode_for,
+    record_launch_confirmed,
+)
 from forge.cli.session import (  # noqa: E402
     ResolvedRouting,
     _apply_routing_override_to_state,
@@ -74,6 +78,7 @@ from forge.cli.session_lifecycle import (  # noqa: E402
     _validate_direct_model_pin_for_routing,
     session,
 )
+from forge.core.reactive.env import compute_interactive_api_key_decision  # noqa: E402
 
 __all__ = ["fork"]
 
@@ -999,6 +1004,19 @@ def fork(
     _fork_forge_root = Path(fork_manifest.forge_root) if fork_manifest.forge_root else fork_worktree
     _sess()._warn_if_hooks_missing(_fork_forge_root)
     _sess()._warn_if_version_outdated()
+
+    # Host forks launch via the local _invoke_fork closures (not _launch_claude_for_session),
+    # so record launch facts here. compute mirrors the interactive finalizer's resolution.
+    from forge.session.store import SessionStore as _LaunchStore
+
+    record_launch_confirmed(
+        _LaunchStore(str(_fork_forge_root), fork_manifest.name),
+        routing_mode=_routing_mode_for(runtime_base_url, effective_proxy_id),
+        proxy_id=effective_proxy_id,
+        base_url=runtime_base_url,
+        decision=compute_interactive_api_key_decision(interactive=True),
+    )
+
     active_claude_session_id = _fork_uuid if is_worktree_fork else None
 
     # Scope the post-exit summary to this run (hooks write during the session).

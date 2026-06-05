@@ -186,7 +186,16 @@ context_limit: 200000
 status_timeout: 2.0
 memory_writer_timeout: 300
 log_level: off               # off | debug | info | warning
+interactive_anthropic_api_key: inherit   # inherit | omit
 ```
+
+`interactive_anthropic_api_key: omit` strips `ANTHROPIC_API_KEY` from Forge-managed **interactive** `claude` launches
+only (session start/resume/fork and `forge claude start`), so a subscription/OAuth session is not billed against a key
+meant for other tools. Headless subprocesses (supervisor, memory writer, panel workers, `claude -p --bare`) keep normal
+credential resolution. The omission is recorded as `confirmed.launch.api_key_source = omitted_by_config`. Host launches
+finalize the key in `build_claude_env`'s interactive wrapper (after `extra_vars`); sidecar launches pass
+`FORGE_OMIT_INTERACTIVE_KEY=1` so `entrypoint.sh` unsets the key for Claude *after* the in-container proxy captured its
+upstream credential (so the proxy keeps upstream auth for every template).
 
 - **Optional**: missing file = built-in defaults
 - **Auto-created on first access**: `forge config show` seeds the file with documented defaults
@@ -259,12 +268,19 @@ byte-for-byte). Other keys: `cost_mode` (`auto|api|subscription`), `palette` (`d
 (rejects unknown segment names and bad enums; the on-disk loader fails open per-subtree); the renderer drops unknown
 names and falls back to `DEFAULT_ORDER` if a non-empty config resolves to nothing. The flat `show_rate_limits` key was
 removed (clean break) — `rate_limits` is now an opt-in segment. Default-off segments: `rate_limits`, `cache_hit`,
-`supervisor`, `policy`, `audit`, `drift`, `spend_cap`. Full key/segment reference: `docs/end-user/config.md`.
+`supervisor`, `policy`, `audit`, `drift`, `spend_cap`, `launch`. Full key/segment reference: `docs/end-user/config.md`.
 
-**Billing-aware cost.** `cost_mode` + raw `os.environ["ANTHROPIC_API_KEY"]` (not credential resolution, which would
-misclassify OAuth as API) resolve a billing mode: `api` shows real `$`, `subscription` shows the 5h quota (dollars are a
-phantom on a subscription), `auto` infers from the key (hedged `≈$` when ambiguous). Proxy mode always shows the proxy's
-*reported* `~$` (may undercount; cost-unavailable routes are excluded, not locally priced).
+**Billing-aware cost.** Billing mode is an explicit **declaration**, never inferred from a key. `cost_mode=api` shows
+real `$`; `cost_mode=subscription` shows the 5h quota (dollars are a phantom on a subscription). `cost_mode=auto` shows
+the quota when `rate_limits` is present, else hedges `≈$` — an `ANTHROPIC_API_KEY` in the env is a *capability*, not
+proof of who pays (Forge may have hydrated it into an OAuth session), so it never flips `auto` to API dollars. Proxy
+mode always shows the proxy's *reported* `~$` (may undercount; cost-unavailable routes are excluded, not locally
+priced).
+
+**Launch metadata.** The opt-in `launch` segment renders `confirmed.launch` (CLI-written once at start): the route
+(`direct` / `proxy:<id>` / `custom`) and the api-key posture (`key:env|file|none|omit`). It describes how the session
+reached the model and whether a key was made available — honest auth provenance the status line cannot infer from the
+ambient env. Manifest-gated: absent for ambient sessions (no `FORGE_SESSION`).
 
 **Rendering.** The `where` bucket (`path`, `branch`) leads concatenated; all other segments are separator-joined in the
 configured order. `RenderContext` derivations are lazy `cached_property` — a segment not in the active set does zero I/O

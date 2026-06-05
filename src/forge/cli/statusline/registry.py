@@ -250,6 +250,17 @@ def _produce_spend_cap(ctx: RenderContext) -> Optional[str]:
     return sl.format_spend_cap(caps)
 
 
+def _produce_launch(ctx: RenderContext) -> Optional[str]:
+    # Opt-in route + api-key descriptor from confirmed.launch (CLI-written at start).
+    # Manifest-gated: absent for ambient sessions (no FORGE_SESSION). Shape-defensive
+    # like _confirmed_bundles -- a missing or malformed manifest is "no segment".
+    confirmed = (ctx.manifest or {}).get("confirmed")
+    launch = confirmed.get("launch") if isinstance(confirmed, dict) else None
+    if not isinstance(launch, dict):
+        return None
+    return sl.format_launch(launch)
+
+
 # Every segment name now has a producer (no reserved names remain). The
 # allowlist == producer-names equality test (test_statusline_registry.py)
 # enforces this two-way sync whenever a segment is added.
@@ -271,6 +282,7 @@ SEGMENTS: tuple[Segment, ...] = (
     Segment("audit", _produce_audit),
     Segment("drift", _produce_drift),
     Segment("spend_cap", _produce_spend_cap),
+    Segment("launch", _produce_launch),
 )
 
 _BY_NAME: dict[str, Segment] = {seg.name: seg for seg in SEGMENTS}

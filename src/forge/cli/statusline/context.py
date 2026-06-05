@@ -13,7 +13,6 @@ the module docstring in ``registry.py``).
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass, field
 from functools import cached_property
 from typing import Any
@@ -77,23 +76,19 @@ class RenderContext:
         return resolve_glyphs(self.config.statusline.glyphs)
 
     @property
-    def has_api_key(self) -> bool:
-        # RAW env only. resolve_env_or_credential would fall back to the Forge
-        # credential file (and honor auth_ignore_env), misclassifying an OAuth
-        # session as API. The status line wants the main session's actual auth.
-        return bool(os.environ.get("ANTHROPIC_API_KEY"))
-
-    @property
     def billing_mode(self) -> str:
-        """``api`` | ``subscription`` | ``ambiguous`` (declare + heuristic).
+        """``api`` | ``subscription`` | ``ambiguous`` (explicit declaration only).
 
-        ``auto`` resolves to ``api`` when ANTHROPIC_API_KEY is set, else
-        ``ambiguous`` (we lean subscription but aren't certain).
+        Only an explicit ``cost_mode`` asserts a payer. ``auto`` stays
+        ``ambiguous``: a key in the env is a capability, not proof of who pays
+        (Forge may have hydrated it into an OAuth session), so it must not flip
+        the display to API dollars. ``format_billing_cost`` then shows the 5h
+        quota when present, else hedges ``≈$``.
         """
         mode = self.config.statusline.cost_mode
         if mode in ("api", "subscription"):
             return mode
-        return "api" if self.has_api_key else "ambiguous"
+        return "ambiguous"
 
     # --- Lazy derivations (run once, only if accessed) ---
 

@@ -27,6 +27,36 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-05
 
+### Phase 4: Status-line honesty (metric-evidence-simplification)
+
+**Goal**: Make the status line honest about billing and add the user control the auth/cost audit demands — never infer
+an API payer from key presence, record + show how a session reached the model, and let users keep a key out of
+interactive sessions.
+
+**Key changes**:
+
+- **Bug #1 (billing honesty)**: `RenderContext.billing_mode` `auto` returns `ambiguous` instead of inferring `api` from
+  `ANTHROPIC_API_KEY`; `format_billing_cost` already shows quota-if-`rate_limits`-else-`≈$`. Golden `$0.42`→`≈$0.42`;
+  the old divergence test became a key-invariance test. Removed the now-dead `RenderContext.has_api_key`.
+- **G4 (env omit)**: flat `interactive_anthropic_api_key: inherit|omit` on `RuntimeConfig`; one source-aware
+  `apply_interactive_api_key`/`compute_interactive_api_key_decision` (env.py) over new
+  `resolve_env_or_credential_with_source` (template_secrets.py). Applied LAST via the interactive wrapper in `invoke.py`
+  (after extra_vars/unset), so it's authoritative and the recorded `source` matches the child. Headless callers
+  untouched.
+- **Sidecar omit**: `session_lifecycle` sets `FORGE_OMIT_INTERACTIVE_KEY=1`; `docker/entrypoint.sh` unsets the key for
+  Claude *after* the in-container proxy captured its upstream credential (works for anthropic-upstream templates).
+- **G3 (launch metadata)**: additive `LaunchConfirmed` under `confirmed.launch` (models.py); centralized best-effort
+  `record_launch_confirmed` called from start/resume + host fork closures (session_fork.py) + sidecar.
+- **Visible `launch` segment**: opt-in (off by default) `format_launch`/`_produce_launch` renders
+  `<route>·key:<posture>`.
+- **Deferred**: `forge +$Y` Forge-additional-cost segment → Phase 5 (sparse until headless reporters report cost).
+- **Docs**: design_appendix §A.7/§A.8 + end-user config.md/authentication.md (new key, corrected `cost_mode=auto`).
+
+**Verification**: Focused unit suites + full blast-radius sweep (2991 passed); `make pre-commit` clean
+(ruff/black/isort/mypy/pyright/mdformat/gitleaks); integration `test_status_line_integration.py` (13, incl. real-CLI
+launch-metadata + omit recording) and `test_sidecar_omit.py` (1, `/proc` proof Claude lacks the key while the proxy
+keeps it) green.
+
 ### Phase 2 follow-up: Fix panel cost-visibility canary (wrong monkeypatch target)
 
 **Goal**: Make the panel integration test previously filed as a "pre-existing" failure

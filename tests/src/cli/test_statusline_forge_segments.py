@@ -29,6 +29,7 @@ from forge.cli.status_line import (
     explicit_tier_from_model,
     format_audit,
     format_drift,
+    format_launch,
     format_policy,
     format_spend_cap,
     format_supervisor,
@@ -108,8 +109,55 @@ class TestFormatHelpers:
         out = format_drift("claude-opus-4-8", "o3")
         assert out is not None and "drift:" in _plain(out) and "!=" in _plain(out)
 
+    def test_launch_direct_omit(self):
+        out = format_launch({"routing_mode": "direct", "api_key_source": "omitted_by_config"})
+        assert _plain(out or "") == "direct·key:omit"
+
+    def test_launch_proxy_with_id_and_env_key(self):
+        out = format_launch({"routing_mode": "proxy", "proxy_id": "p1", "api_key_source": "env"})
+        assert _plain(out or "") == "proxy:p1·key:env"
+
+    def test_launch_credential_file_abbreviated(self):
+        out = format_launch({"routing_mode": "direct", "api_key_source": "credential_file"})
+        assert _plain(out or "") == "direct·key:file"
+
+    def test_launch_proxy_without_id(self):
+        out = format_launch({"routing_mode": "proxy", "api_key_source": "none"})
+        assert _plain(out or "") == "proxy·key:none"
+
+    def test_launch_empty_is_none(self):
+        # Unknown routing_mode + unknown source -> nothing showable.
+        assert format_launch({}) is None
+        assert format_launch({"routing_mode": "???", "api_key_source": "???"}) is None
+
 
 # --- Producers via render_segments ---------------------------------------
+
+
+class TestLaunchProducer:
+    def test_renders_from_confirmed_launch(self):
+        manifest = {"confirmed": {"launch": {"routing_mode": "direct", "api_key_source": "omitted_by_config"}}}
+        out = _stream(_ctx(manifest=manifest), ["launch"])
+        assert any("direct·key:omit" in s for s in out)
+
+    def test_ambient_no_manifest_is_hidden(self):
+        # Ambient session (no FORGE_SESSION -> manifest None): segment absent.
+        assert _stream(_ctx(manifest=None), ["launch"]) == []
+
+    def test_no_launch_block_is_hidden(self):
+        assert _stream(_ctx(manifest={"confirmed": {"is_sandboxed": False}}), ["launch"]) == []
+
+    def test_malformed_launch_is_hidden(self):
+        # Shape-defensive: a non-dict launch must not raise, just render nothing.
+        assert _stream(_ctx(manifest={"confirmed": {"launch": "corrupt"}}), ["launch"]) == []
+        assert _stream(_ctx(manifest={"confirmed": "corrupt"}), ["launch"]) == []
+
+    def test_off_by_default(self):
+        # Opt-in: not in DEFAULT_ORDER, so a default render never shows it.
+        assert "launch" not in DEFAULT_ORDER
+        manifest = {"confirmed": {"launch": {"routing_mode": "direct", "api_key_source": "env"}}}
+        out = _stream(_ctx(manifest=manifest), list(DEFAULT_ORDER))
+        assert not any("key:" in s for s in out)
 
 
 class TestSupervisorProducer:
