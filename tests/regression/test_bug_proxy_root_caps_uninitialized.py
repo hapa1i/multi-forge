@@ -41,7 +41,7 @@ def test_fresh_get_root_initializes_caps_before_any_post(monkeypatch):
 
     provider = SimpleNamespace(tiers=SimpleNamespace(haiku="claude-haiku", sonnet="claude-sonnet", opus="claude-opus"))
     proxy = SimpleNamespace(
-        costs=CostConfig(caps=CostCaps(per_day=5.0), cap_mode="post", on_cap_hit="warn"),
+        costs=CostConfig(caps=CostCaps(per_day=5.0), on_cap_hit="warn"),
         get_provider=lambda _name=None: provider,
         default_tier="sonnet",
         preferred_provider="openai",

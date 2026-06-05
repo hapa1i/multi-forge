@@ -115,7 +115,6 @@ def _initialize_cost_tracker_from_config() -> CostTracker:
         cost_tracker = CostTracker(
             daily_cap_usd=cost_cfg.caps.per_day,
             monthly_cap_usd=cost_cfg.caps.per_month,
-            cap_mode=cost_cfg.cap_mode,
             on_cap_hit=cost_cfg.on_cap_hit,
         )
         cost_tracker.bootstrap_from_logs(get_forge_home() / "costs" / "requests", proxy_id=PROXY_ID)
@@ -224,7 +223,6 @@ def _cap_result_message(cap_result) -> str:
     cap_type = cap_result.cap_type or "configured"
     config_key = _CAP_CONFIG_KEY.get(cap_type, f"per_{cap_type}")
     return (
-        f"{'Projected ' if cap_result.projected else ''}"
         f"{cap_type} spend cap reached: "
         f"${cap_result.current_micros / 1_000_000:.2f} / "
         f"${cap_result.limit_micros / 1_000_000:.2f}. "
@@ -237,36 +235,6 @@ def _with_spend_warning(headers: dict[str, str], warning: str | None) -> dict[st
     if warning:
         headers["X-Spend-Warning"] = warning
     return headers
-
-
-def _textish_chars(value: object) -> int:
-    """Approximate text-bearing request payload size for strict cap preflight."""
-    if value is None:
-        return 0
-    if isinstance(value, str):
-        return len(value)
-    if isinstance(value, dict):
-        total = 0
-        for key in ("content", "text", "thinking", "input", "name", "description"):
-            if key in value:
-                total += _textish_chars(value[key])
-        return total
-    if isinstance(value, (list, tuple)):
-        return sum(_textish_chars(item) for item in value)
-
-    total = 0
-    for attr in ("content", "text", "thinking", "input", "name", "description"):
-        if hasattr(value, attr):
-            total += _textish_chars(getattr(value, attr))
-    return total
-
-
-def _estimate_input_tokens(request_data: MessagesRequest) -> int:
-    """Approximate request input tokens for strict cap preflight."""
-    chars = _textish_chars(getattr(request_data, "system", None))
-    chars += _textish_chars(getattr(request_data, "messages", None))
-    chars += _textish_chars(getattr(request_data, "tools", None))
-    return chars // 4
 
 
 def _get_tier_override(tier: str) -> TierOverride | None:
@@ -665,25 +633,11 @@ async def _handle_anthropic_passthrough(raw_request: Request, request_id: str, *
     resolved_tier = _tier_from_model_name(model) or getattr(config.proxy, "default_tier", None) or "sonnet"
     req_headers = dict(raw_request.headers)
 
-    # Spend-cap preflight — same cross-request accumulation as the translated path,
-    # so caps configured on a passthrough proxy are enforced, not silently ignored.
+    # Spend-cap check — same cross-request accumulation as the translated path, so caps
+    # configured on a passthrough proxy are enforced, not silently ignored.
     spend_warning: str | None = None
     if cost_tracker is not None and cost_tracker.has_caps:
-        projected = 0
-        if cost_tracker.cap_mode == "strict":
-            from forge.core.models.pricing import calculate_cost as _est_cost
-
-            est_input = (
-                _textish_chars(raw_body.get("system"))
-                + _textish_chars(raw_body.get("messages"))
-                + _textish_chars(raw_body.get("tools"))
-            ) // 4
-            est_output = int(raw_body.get("max_tokens") or 4096)
-            try:
-                projected = _est_cost(model, est_input, est_output, 0)
-            except Exception:
-                projected = 0
-        cap_result = cost_tracker.check_cap(projected_cost_micros=projected)
+        cap_result = cost_tracker.check_cap()
         if cap_result.exceeded:
             spend_warning = _cap_result_message(cap_result)
             if cost_tracker.on_cap_hit == "reject":
@@ -878,20 +832,9 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
         actual_model_id = _resolve_model_with_alternatives(resolved_tier, original_model_name, tier_default)
         logger.debug(f"[{request_id}] Tier-resolved model: tier={resolved_tier} -> '{actual_model_id}'")
 
-    # Spend cap check (after model resolution so strict preflight prices the actual model)
+    # Spend cap check — post-event enforcement from accumulated spend.
     if cost_tracker is not None and cost_tracker.has_caps:
-        projected = 0
-        if cost_tracker.cap_mode == "strict":
-            from forge.core.models.pricing import calculate_cost as _est_cost
-
-            _est_max_output = request_data.max_tokens or 4096
-            _est_input = _estimate_input_tokens(request_data)
-            try:
-                projected = _est_cost(actual_model_id, _est_input, _est_max_output, 0)
-            except Exception:
-                projected = 0
-
-        cap_result = cost_tracker.check_cap(projected_cost_micros=projected)
+        cap_result = cost_tracker.check_cap()
         if cap_result.exceeded:
             spend_warning = _cap_result_message(cap_result)
             if cost_tracker.on_cap_hit == "reject":

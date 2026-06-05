@@ -891,12 +891,11 @@ costs:
   caps:
     per_day: 20.00
     per_month: 100.00
-  cap_mode: post      # post | strict
   on_cap_hit: reject  # reject | warn
 ```
 
-`post` mode blocks after accumulated spend reaches a configured cap. `strict` mode also estimates the pending request
-before forwarding it. `reject` returns HTTP 429 with:
+Caps are enforced after each completed request, from accumulated recorded spend: a request may cross a cap and complete,
+then the next request is blocked once spend has reached the cap. `reject` returns HTTP 429 with:
 
 ```json
 {

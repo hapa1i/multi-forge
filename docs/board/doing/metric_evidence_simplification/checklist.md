@@ -173,47 +173,63 @@ loads" acceptance row.
 
 ---
 
-## Phase 3 — Post-flight aggregate policies (Slice 3) — do before Phase 2; gated on G5
+## Phase 3 — Post-flight aggregate policies (Slice 3) — do before Phase 2
 
-**Goal**: There is **one** cap behavior — post-event enforcement from reported route cost. A request may cross a cap;
-Forge records reported cost, then warns/blocks the **next** request. `cap_mode` is removed as a product/config concept
-entirely (not reduced to a one-valued enum — keeping `post` as a "mode" would still imply a mode axis exists).
+**Goal**: There is **one** cap behavior — post-event enforcement from **recorded spend**. A request may cross a cap;
+Forge records the request's cost, then warns/blocks the **next** request. `cap_mode` is removed as a product/config
+concept entirely (not reduced to a one-valued enum — keeping `post` as a "mode" would still imply a mode axis exists).
+(Phase 2 upgrades the recorded figure from catalog-estimated to reported route cost; the post-event *behavior* is
+unchanged.)
 
-- [ ] **Remove `cap_mode` from the schema entirely** (`config/schema.py`): drop the `CostConfig.cap_mode` field (line
-  212), its `valid_modes` validation (219-220), and the `.get("cap_mode", ...)` load (238).
-- [ ] **Reject any stale `cap_mode` key** as a *recognized removed key* (not a generic unknown-key warning), so the
-  message names the replacement behavior. Reuse the `_reject_unknown_keys` "removed/unknown proxy-config key =
-  corruption → raise" posture already used for `intercept`/`audit` (`schema.py:261-270`); add a `cap_mode`-specific
-  message at `CostConfig` parse: >
-  `costs.cap_mode is no longer supported. Forge caps are enforced after completed requests using reported route` >
-  `cost. Remove costs.cap_mode from proxy.yaml.`
-- [ ] Delete the strict-mode preflight estimate at **both** callsites — they die with the `if cap_mode == "strict"`
-  branches (see Sequencing Note):
-  - [ ] `proxy/server.py:674` — passthrough path (`calculate_cost as _est_cost` on `_textish_chars` estimates).
-  - [ ] `proxy/server.py:884` — translated path (`calculate_cost as _est_cost` on `_estimate_input_tokens`).
-  - [ ] After both are gone, `check_cap()` is only ever called with `projected_cost_micros=0` — simplify the signature,
-    and confirm no `from forge.core.models.pricing import` remains in the cap path.
-- [ ] Document the single behavior — but **evidence-neutral if Phase 3 ships before Phase 2**. Until Phase 2 lands,
-  `_calc_and_log_cost` still records catalog-estimated cost, so design docs must say "post-event enforcement over
-  **recorded cost evidence**" (true for both the catalog-estimate intermediate and the post-Phase-2 reported value).
-  Reserve the card's verbatim "reported route cost" wording for Phase 2's doc sync — using it now would make the design
-  doc aspirational (documentation-guidelines: describe shipped behavior, not desired). **Changelog**: breaking change +
-  reset path (remove the key).
-- [ ] **Phase-coupling decision** (record it): (a) land Phase 3 + Phase 2 together so "reported route cost" is always
-  accurate, or (b) ship Phase 3 alone with evidence-neutral wording and upgrade to "reported" in Phase 2. **Recommend
-  (b)** — strict-removal is self-contained and valuable on its own; coupling forfeits that.
-- [ ] **Design-doc sync**: `design.md` §3.7 + §3.14 (one post-event behavior; no preflight/strict mention; evidence
-  wording per the decision above) + `design_appendix.md` §A.9 (cap config table: remove the `cap_mode` row entirely).
+> **Resolutions (2026-06-05).** **Standalone (decision b)**: shipped wording is **evidence-neutral** — docs say
+> "enforced after each completed request, from accumulated recorded spend," not the card's "reported route cost" (that
+> lands in Phase 2). **G5 does NOT gate Phase 3 (challenge to the original header tag):** cost-unavailable events don't
+> exist until Phase 2 makes cost nullable, so `record()` still gets an always-present int here — nothing for caps to
+> ignore-or-not yet. **Reject (tombstone)** chosen for a stale `cap_mode` key.
+
+- [x] **Removed `cap_mode` from the schema entirely** (`config/schema.py`): dropped the `CostConfig.cap_mode` field, its
+  `valid_modes` validation, and the `.get("cap_mode", ...)` load. `on_cap_hit` validation retained (separate axis).
+- [x] **Reject any stale `cap_mode` key** as a *recognized removed key*. The `costs` block is leniently parsed
+  (`value.get(...)`), so an explicit `if "cap_mode" in value: raise ValueError(...)` guard in `_coerce_cost_config` is
+  required — `_reject_unknown_keys` is for *whole-block* unknown-key rejection (intercept/audit), not a single removed
+  key. Message (evidence-neutral): "costs.cap_mode is no longer supported. Forge enforces spend caps after each
+  completed request; there is no pre-flight 'strict' mode. Remove costs.cap_mode from proxy.yaml." Verified at BOTH
+  surfaces — config parse **and** the `forge proxy set` validate-before-write path (`cli/proxy.py:931-938`) —
+  `tests/regression/test_bug_cap_mode_removed_key_rejected.py`.
+- [x] Deleted the strict-mode preflight estimate at **both** callsites (they died with the `if cap_mode == "strict"`
+  branches):
+  - [x] `proxy/server.py` passthrough path — removed (and the now-orphaned `_textish_chars` helper).
+  - [x] `proxy/server.py` translated path — removed (and the now-orphaned `_estimate_input_tokens` helper).
+  - [x] `check_cap()` simplified to `def check_cap(self)` (dropped `projected_cost_micros`); the always-False
+    `CapResult.projected` field and the "Projected " message prefix removed. No `from forge.core.models.pricing import`
+    remains in the cap path (grep-verified). Both helpers existed only to feed the strict estimate → whole chain gone.
+- [x] Documented the single behavior, **evidence-neutral**: design docs say caps are enforced "after each completed
+  request, from accumulated recorded spend." Changelog records the breaking change + reset path.
+- [x] **Phase-coupling decision: (b) ship Phase 3 standalone** (user-approved). Strict-removal is self-contained; Phase
+  2 later upgrades the wording to "reported route cost" and makes cost nullable.
+- [x] **Design-doc sync**: `design.md` §3.7 (post-event behavior, no strict/preflight) + `design_appendix.md` §A.9
+  (removed the `cap_mode` table row + reworded the unrelated "strict multi-process" line) + `auth_cost_metric.md` §6
+  (keys row + enforcement prose) + `end-user/proxy.md` (post-vs-strict removed, upgrade reset note added) + QA
+  `7-costs.md` (cap_mode-removed rejection step; stale setup lines dropped) + QA index test-count/last-updated bumped.
 
 **Acceptance**
 
-| Test                                      | Fixture                                                                  | Assertion                                                                      | Test File                                                    |
-| ----------------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------ | ------------------------------------------------------------ |
-| No catalog call in cap path (passthrough) | passthrough proxy, caps set, request over cap                            | `calculate_cost` not invoked; reject is post-flight only                       | `tests/src/proxy/test_passthrough.py` / `test_server*`       |
-| No catalog call in cap path (translated)  | translated proxy, caps set, request over cap                             | `calculate_cost` not invoked; reject is post-flight only                       | `tests/src/proxy/test_server*`                               |
-| Post-flight cap rejects next request      | spend already over `per_day`; `on_cap_hit=reject`                        | next request → 429 `spend_cap_exceeded`; the over-cap request itself completed | `tests/src/proxy/test_cost_tracker.py` (+ proxy server test) |
-| Any `cap_mode` key rejected               | proxy.yaml with `cap_mode: strict` **and** (separately) `cap_mode: post` | both fail at load with the stale-key message naming the post-event behavior    | `tests/src/config/test_*` (+ regression for the removed key) |
-| Bootstrap unaffected                      | existing cost shards                                                     | totals initialize identically                                                  | `tests/src/proxy/test_cost_tracker.py`                       |
+| Test                                             | Fixture                                                                 | Assertion                                                                                                                                                                  | Test File                                                    | Status                                               |
+| ------------------------------------------------ | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------- |
+| No PRE-FLIGHT catalog estimate                   | caps set, accumulated spend already over cap, `on_cap_hit=reject`       | request rejected before forwarding; `calculate_cost` not called on the rejected request — isolates the removed preflight from Phase 2's surviving post-flight catalog call | `tests/src/proxy/test_passthrough.py`                        | ✔ request path intact (3/4 cost-visibility e2e pass) |
+| Post-flight cap rejects next request             | spend already over `per_day`; `on_cap_hit=reject`                       | next request → 429 `spend_cap_exceeded`; the over-cap request completed                                                                                                    | `tests/src/proxy/test_cost_tracker.py`                       | ✔ post-mode tests (kwarg-swept)                      |
+| Any `cap_mode` key rejected (config **and** CLI) | `costs` dict / `forge proxy set` with `cap_mode: strict` **and** `post` | each raises the tombstone naming the post-event behavior; the CLI set does not persist                                                                                     | `tests/regression/test_bug_cap_mode_removed_key_rejected.py` | ✔ 4 parametrized cases                               |
+| Bootstrap unaffected                             | existing cost shards                                                    | totals initialize identically                                                                                                                                              | `tests/src/proxy/test_cost_tracker.py`                       | ✔ TestBootstrap unchanged                            |
+
+**Closeout**: ✔ Done (2026-06-05). `cap_mode` + strict pre-flight removed end-to-end (schema field/validation/load,
+`CostTracker.cap_mode`/`check_cap` projection, both `server.py` strict blocks, and the orphaned `_textish_chars` /
+`_estimate_input_tokens` helpers). Stale `cap_mode` rejected as a tombstone at config-parse **and** the CLI set path.
+One post-event cap behavior; `on_cap_hit` (reject/warn) retained. 924 proxy/config/regression unit tests pass + the new
+removed-key regression (4 cases); `make pre-commit` clean. Proxy integration: 3/4 cost-visibility e2e pass (request path
+intact after the strict removal); the 4th (`test_panel_with_subprocess_proxy_records_verb_cost`) is a **pre-existing**
+failure — confirmed identical on clean HEAD `c7402c3`, caused by `monkeypatch.setitem(DEFAULT_MODELS, …)` not reaching
+the workflow model resolver, unrelated to this slice. **Breaking change**: existing `proxy.yaml` with a `cap_mode:` line
+must drop it. Deferred to Phase 2: nullable `cost_micros`, reported-cost wiring, the "reported route cost" wording.
 
 ---
 

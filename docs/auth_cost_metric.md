@@ -129,12 +129,13 @@ recompute on transcript change or TTL.
 
 | Config           | Location                                                                          | Keys                                                                                                         |
 | ---------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| Proxy spend caps | `proxy.yaml` `costs.*` (`config/schema.py` `CostConfig`/`CostCaps`)               | `caps.per_day`, `caps.per_month` (USD), `cap_mode` (`post`\|`strict`), `on_cap_hit` (`reject`\|`warn`)       |
+| Proxy spend caps | `proxy.yaml` `costs.*` (`config/schema.py` `CostConfig`/`CostCaps`)               | `caps.per_day`, `caps.per_month` (USD), `on_cap_hit` (`reject`\|`warn`)                                      |
 | Status-line cost | `~/.forge/config.yaml` `statusline.*` (`runtime_config.py:66` `StatusLineConfig`) | `cost_mode` (`auto`\|`api`\|`subscription`, default `auto`, `:78`), `cache_hit`, `cache_hit_ttl`, `segments` |
 
-Cap enforcement: `check_cap` runs before forwarding; `post` checks accumulated spend, `strict` adds a pre-flight
-estimate; `reject` returns HTTP 429 `spend_cap_exceeded`, `warn` forwards + sets `X-Spend-Warning`. Enforcement is
-process-local (each proxy process bootstraps from shared JSONL; in-flight spend is not coordinated across processes).
+Cap enforcement: `check_cap` runs before forwarding and checks accumulated recorded spend — post-event, so a request may
+cross a cap and complete and the next request is blocked; `reject` returns HTTP 429 `spend_cap_exceeded`, `warn`
+forwards + sets `X-Spend-Warning`. Enforcement is process-local (each proxy process bootstraps from shared JSONL;
+in-flight spend is not coordinated across processes).
 
 ### 7. Authoritative vs estimated (units matter)
 

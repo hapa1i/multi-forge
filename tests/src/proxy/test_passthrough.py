@@ -546,16 +546,14 @@ async def test_passthrough_enforces_spend_cap_reject(monkeypatch):
     class _CapResult:
         exceeded = True
         cap_type = "daily"
-        projected = False
         current_micros = 11_000_000
         limit_micros = 10_000_000
 
     class _Tracker:
         has_caps = True
-        cap_mode = "post"
         on_cap_hit = "reject"
 
-        def check_cap(self, projected_cost_micros=0):
+        def check_cap(self):
             return _CapResult()
 
         def record(self, micros):

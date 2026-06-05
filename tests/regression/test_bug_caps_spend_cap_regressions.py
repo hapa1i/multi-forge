@@ -4,7 +4,6 @@ These pin the fixes from the spend cap stabilization work:
 - proxy.yaml costs must flow into runtime ProxyConfig,
 - YAML/CLI numeric strings must be coerced,
 - monthly rollover must clear stale totals before cap checks,
-- strict mode must include projected request cost,
 - warn mode must allow requests while surfacing a warning header.
 """
 
@@ -43,7 +42,6 @@ def test_bug_caps_config_load_flows_yaml_costs_to_runtime_proxy_config(tmp_path,
               caps:
                 per_day: 20.00
                 per_month: 100.00
-              cap_mode: strict
               on_cap_hit: warn
             """),
         encoding="utf-8",
@@ -53,7 +51,6 @@ def test_bug_caps_config_load_flows_yaml_costs_to_runtime_proxy_config(tmp_path,
 
     assert config.proxy.costs.caps.per_day == 20.0
     assert config.proxy.costs.caps.per_month == 100.0
-    assert config.proxy.costs.cap_mode == "strict"
     assert config.proxy.costs.on_cap_hit == "warn"
 
 
@@ -95,20 +92,6 @@ def test_bug_caps_monthly_rollover_clears_stale_total_before_rejecting():
 
     assert not result.exceeded
     assert tracker.monthly_spend_micros() == 0
-
-
-def test_bug_caps_strict_mode_includes_projected_request_cost():
-    """Strict mode must reject when current spend plus estimate reaches the cap."""
-    from forge.proxy.cost_tracker import CostTracker
-
-    tracker = CostTracker(daily_cap_usd=1.00, cap_mode="strict")
-    tracker.record(800_000)
-
-    result = tracker.check_cap(projected_cost_micros=300_000)
-
-    assert result.exceeded
-    assert result.projected
-    assert result.cap_type == "daily"
 
 
 class _DummyRequestState:

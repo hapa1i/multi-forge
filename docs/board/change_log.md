@@ -27,6 +27,39 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-05
 
+### Phase 3: Remove `cap_mode` & strict pre-flight (metric-evidence Slice 3)
+
+**Goal**: Collapse the proxy's two cap behaviors (`post` / `strict`) into one — post-event enforcement — by removing
+`cap_mode` and the strict pre-flight cost estimate. Strict was the cost-oracle pattern in the cap path: it priced an
+unsent request from the local catalog and blocked on that guess.
+
+**Key changes**:
+
+- **`cap_mode` removed entirely** from `CostConfig` (field + `valid_modes` validation + load). The `costs` block is
+  leniently parsed, so a stale `cap_mode:` key is rejected with an explicit tombstone in `_coerce_cost_config` rather
+  than silently ignored — verified at both config-parse and the `forge proxy set` validate-before-write path.
+- **Both strict pre-flight callsites deleted** (`server.py` passthrough + translated). With strict gone the whole
+  estimation apparatus is orphaned and removed: the `_textish_chars` / `_estimate_input_tokens` helpers, the cap-path
+  `calculate_cost` imports, `check_cap`'s `projected_cost_micros` parameter, and the always-False `CapResult.projected`
+  field + "Projected " message prefix. The local price catalog no longer touches cap enforcement (the post-flight
+  logging catalog call is separate — Phase 2). `on_cap_hit` (reject/warn) is unchanged.
+- Tests: deleted the strict-only regression file + strict unit tests; swept the removed `cap_mode=`/`projected`/old
+  `check_cap` signature out of every surviving test (the type-checker, not a hand list, was the change-detector); added
+  `tests/regression/test_bug_cap_mode_removed_key_rejected.py` (config-parse + CLI surfaces).
+- Docs (evidence-neutral — shipped, not aspirational): `design.md` §3.7, `design_appendix.md` §A.9,
+  `auth_cost_metric.md` §6, `end-user/proxy.md` (+ upgrade reset note), QA `7-costs.md`.
+
+**Breaking change + reset**: `costs.cap_mode` is removed. An existing `proxy.yaml` carrying any `cap_mode:` line
+(including the old default `post`) now refuses to load with an actionable message; remove the line. Research-preview
+clean break — no migration. **Standalone decision** (recorded once so a future session doesn't pre-date it): docs say
+caps are "enforced after each completed request, from accumulated recorded spend"; Phase 2 upgrades the wording to
+"reported route cost" and makes cost nullable.
+
+**Verification**: 924 proxy/config/regression unit tests pass + the new removed-key regression (4 cases);
+`make pre-commit` clean. Proxy integration: 3/4 cost-visibility e2e pass (request path intact after the strict removal);
+the 4th (`test_panel_with_subprocess_proxy_records_verb_cost`) is a pre-existing, unrelated failure (confirmed identical
+on clean HEAD `c7402c3` — `monkeypatch.setitem(DEFAULT_MODELS, …)` not reaching the workflow model resolver).
+
 ### Phase 1: Metric-evidence schema & vocabulary pass (metric-evidence Slice 1)
 
 **Goal**: Add the card's metric-evidence vocabulary (`route`/`reporter`/`confidence`) to the usage ledger **without

@@ -30,8 +30,8 @@ class TestCostTrackerBasic:
             t.record(1_000_000)
         assert not t.check_cap().exceeded
 
-    def test_daily_cap_post_mode(self):
-        t = CostTracker(daily_cap_usd=1.00, cap_mode="post")
+    def test_daily_cap_blocks_when_exceeded(self):
+        t = CostTracker(daily_cap_usd=1.00)
         t.record(500_000)
         assert not t.check_cap().exceeded
 
@@ -39,10 +39,9 @@ class TestCostTrackerBasic:
         result = t.check_cap()
         assert result.exceeded
         assert result.cap_type == "daily"
-        assert not result.projected
 
-    def test_monthly_cap_post_mode(self):
-        t = CostTracker(monthly_cap_usd=5.00, cap_mode="post")
+    def test_monthly_cap_blocks_when_exceeded(self):
+        t = CostTracker(monthly_cap_usd=5.00)
         t.record(4_000_000)
         assert not t.check_cap().exceeded
 
@@ -51,29 +50,8 @@ class TestCostTrackerBasic:
         assert result.exceeded
         assert result.cap_type == "monthly"
 
-    def test_strict_mode_blocks_projected(self):
-        t = CostTracker(daily_cap_usd=1.00, cap_mode="strict")
-        t.record(800_000)
-        assert not t.check_cap().exceeded
-
-        result = t.check_cap(projected_cost_micros=300_000)
-        assert result.exceeded
-        assert result.projected
-
-    def test_strict_mode_allows_under_projection(self):
-        t = CostTracker(daily_cap_usd=1.00, cap_mode="strict")
-        t.record(800_000)
-        result = t.check_cap(projected_cost_micros=100_000)
-        assert not result.exceeded
-
-    def test_post_mode_ignores_projected(self):
-        t = CostTracker(daily_cap_usd=1.00, cap_mode="post")
-        t.record(800_000)
-        result = t.check_cap(projected_cost_micros=500_000)
-        assert not result.exceeded
-
     def test_daily_checked_before_monthly(self):
-        t = CostTracker(daily_cap_usd=1.00, monthly_cap_usd=100.00, cap_mode="post")
+        t = CostTracker(daily_cap_usd=1.00, monthly_cap_usd=100.00)
         t.record(1_500_000)
         result = t.check_cap()
         assert result.exceeded

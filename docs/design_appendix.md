@@ -284,22 +284,22 @@ costs:
   caps:
     per_day: 20.00
     per_month: 100.00
-  cap_mode: post
   on_cap_hit: reject
 ```
 
-| Field                  | Values           | Meaning                                                                 |
-| ---------------------- | ---------------- | ----------------------------------------------------------------------- |
-| `costs.caps.per_day`   | positive USD     | Rolling 24-hour cap                                                     |
-| `costs.caps.per_month` | positive USD     | Calendar-month cap                                                      |
-| `costs.cap_mode`       | `post`, `strict` | `post` checks accumulated spend; `strict` includes a preflight estimate |
-| `costs.on_cap_hit`     | `reject`, `warn` | `reject` returns 429; `warn` adds `X-Spend-Warning` and continues       |
+| Field                  | Values           | Meaning                                                           |
+| ---------------------- | ---------------- | ----------------------------------------------------------------- |
+| `costs.caps.per_day`   | positive USD     | Rolling 24-hour cap                                               |
+| `costs.caps.per_month` | positive USD     | Calendar-month cap                                                |
+| `costs.on_cap_hit`     | `reject`, `warn` | `reject` returns 429; `warn` adds `X-Spend-Warning` and continues |
+
+Caps are enforced post-event: a request may cross a cap and complete, then the next request is blocked once accumulated
+spend has reached the cap. There is no pre-flight estimate mode (`cap_mode` was removed in the metric-evidence card).
 
 CLI updates use the normal proxy edit surface:
 
 ```bash
 forge proxy set openrouter-anthropic costs.caps.per_day=20.00
-forge proxy set openrouter-anthropic costs.cap_mode=strict
 forge proxy set openrouter-anthropic costs.on_cap_hit=warn
 ```
 
@@ -318,7 +318,7 @@ The proxy `GET /` endpoint reports in-memory metrics and cost totals for live st
 bootstrap source for cap enforcement after restart.
 
 Cap enforcement is process-local. Each proxy process bootstraps from shared JSONL logs at startup, but in-flight spend
-is not coordinated across concurrent processes. For strict multi-process cap enforcement, run a single proxy process per
+is not coordinated across concurrent processes. To coordinate caps across processes, run a single proxy process per
 proxy ID.
 
 Cost logs accumulate indefinitely. Safely delete old JSONL files in `~/.forge/costs/`. The proxy re-bootstraps from

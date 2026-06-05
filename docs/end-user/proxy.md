@@ -353,7 +353,6 @@ costs:
   caps:
     per_day: null
     per_month: null
-  cap_mode: post
   on_cap_hit: reject
 ```
 
@@ -457,13 +456,16 @@ Set caps on the proxy:
 ```bash
 forge proxy set openrouter-anthropic costs.caps.per_day=20.00
 forge proxy set openrouter-anthropic costs.caps.per_month=100.00
-forge proxy set openrouter-anthropic costs.cap_mode=strict
 forge proxy set openrouter-anthropic costs.on_cap_hit=warn
 ```
 
-`cap_mode=post` blocks only after logged spend reaches a cap. `cap_mode=strict` also estimates the pending request
-before forwarding it. `on_cap_hit=reject` returns HTTP 429 with `spend_cap_exceeded`; `on_cap_hit=warn` lets the request
-continue and returns `X-Spend-Warning`.
+Caps are enforced after each completed request: a request may cross a cap and complete, then the next request is blocked
+once logged spend reaches the cap. `on_cap_hit=reject` returns HTTP 429 with `spend_cap_exceeded`; `on_cap_hit=warn`
+lets the request continue and returns `X-Spend-Warning`.
+
+> Earlier versions had a `costs.cap_mode` setting (`post`/`strict`); it was removed and caps are now always post-event.
+> If an older `proxy.yaml` still has a `cap_mode:` line, remove it — the proxy otherwise refuses to load with a message
+> telling you to.
 
 Cap enforcement is process-local and best-effort. For reliable cap enforcement, run a single proxy process per proxy ID.
 Cost logs accumulate in `~/.forge/costs/` — safely delete old JSONL files to reclaim space; the proxy re-bootstraps from
@@ -475,13 +477,12 @@ If your provider gives you a monthly API credit or your team has a fixed budget 
 
 ```bash
 forge proxy set openrouter-openai costs.caps.per_month=100
-forge proxy set openrouter-openai costs.cap_mode=strict
 forge proxy set openrouter-openai costs.on_cap_hit=reject
 ```
 
-`strict` mode estimates each request before forwarding, which helps catch likely over-budget requests before they run.
-Use `on_cap_hit=warn` if you prefer alerts without hard stops. Pair with `forge proxy costs --period month` to monitor
-burn rate.
+Caps are enforced after each completed request — a request may cross the cap and complete, then the next is blocked. Use
+`on_cap_hit=warn` if you prefer alerts without hard stops. Pair with `forge proxy costs --period month` to monitor burn
+rate.
 
 ---
 

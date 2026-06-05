@@ -133,7 +133,6 @@ echo "EXIT=$?"
 # Set spend caps on the test proxy from section 4
 forge proxy set "$FORGE_QA_GEMINI_PROXY" costs.caps.per_day=20.00
 forge proxy set "$FORGE_QA_GEMINI_PROXY" costs.caps.per_month=100.00
-forge proxy set "$FORGE_QA_GEMINI_PROXY" costs.cap_mode=post
 forge proxy set "$FORGE_QA_GEMINI_PROXY" costs.on_cap_hit=reject
 
 # Validate config is healthy after cap changes
@@ -145,10 +144,9 @@ forge proxy show "$FORGE_QA_GEMINI_PROXY" --raw
 
 - [ ] `costs.caps.per_day` appears in raw YAML as `20.0` (float, not string `"20.00"`)
 - [ ] `costs.caps.per_month` appears as `100.0`
-- [ ] `cap_mode` is `post`
 - [ ] `on_cap_hit` is `reject`
 - [ ] Config validates successfully after setting caps
-- [ ] Raw YAML shows complete `costs:` section with `caps`, `cap_mode`, `on_cap_hit`
+- [ ] Raw YAML shows complete `costs:` section with `caps` and `on_cap_hit`
 
 ### 7.8 Spend Cap Config Validation (Invalid Values)
 
@@ -157,16 +155,16 @@ forge proxy show "$FORGE_QA_GEMINI_PROXY" --raw
 <!-- auto -->
 
 ```bash
-# Invalid cap_mode -- should be rejected
-forge proxy set "$FORGE_QA_GEMINI_PROXY" costs.cap_mode=invalid 2>&1; echo "EXIT=$?"
+# cap_mode was removed -- any value must be rejected as a tombstone (not silently accepted)
+forge proxy set "$FORGE_QA_GEMINI_PROXY" costs.cap_mode=post 2>&1; echo "EXIT=$?"
 
 # Invalid on_cap_hit -- should be rejected
 forge proxy set "$FORGE_QA_GEMINI_PROXY" costs.on_cap_hit=invalid 2>&1; echo "EXIT=$?"
 ```
 
-- [ ] Invalid `cap_mode` rejected with validation error (exit non-zero)
+- [ ] `costs.cap_mode` rejected as removed (exit non-zero; message says it is no longer supported and to remove it)
 - [ ] Invalid `on_cap_hit` rejected with validation error (exit non-zero)
-- [ ] Error messages reference valid values (`post`/`strict` and `reject`/`warn`)
+- [ ] `on_cap_hit` error message references valid values (`reject`/`warn`)
 
 ### 7.9 Spend Cap Enforcement (Reject Mode)
 
@@ -184,7 +182,6 @@ models).
 # Set a low daily cap on the working QA OpenAI proxy in the container
 forge proxy set "$FORGE_QA_OPENAI_PROXY" costs.caps.per_day=0.01
 forge proxy set "$FORGE_QA_OPENAI_PROXY" costs.on_cap_hit=reject
-forge proxy set "$FORGE_QA_OPENAI_PROXY" costs.cap_mode=post
 
 # Seed a cost log with a current timestamp so the tracker bootstraps above the cap.
 # The tracker reads YYYY-MM_*.jsonl files on startup (bootstrap_from_logs).
@@ -225,7 +222,6 @@ cost log approach for deterministic cap triggering.
 ```
 # Use the same deterministic cap settings as 7.9, then switch to warn mode.
 forge proxy set "$FORGE_QA_OPENAI_PROXY" costs.caps.per_day=0.01
-forge proxy set "$FORGE_QA_OPENAI_PROXY" costs.cap_mode=post
 forge proxy set "$FORGE_QA_OPENAI_PROXY" costs.on_cap_hit=warn
 
 # Re-seed the cost log (cleanup from 7.9 removed it)
@@ -290,11 +286,9 @@ ls ~/.forge/costs/requests/*_qa-cap-seed.jsonl 2>&1 || echo "QA_CAP_SEED_LOGS_CL
 forge proxy set "$FORGE_QA_GEMINI_PROXY" costs.caps.per_day=none 2>/dev/null || true
 forge proxy set "$FORGE_QA_GEMINI_PROXY" costs.caps.per_month=none 2>/dev/null || true
 forge proxy set "$FORGE_QA_GEMINI_PROXY" costs.on_cap_hit=reject 2>/dev/null || true
-forge proxy set "$FORGE_QA_GEMINI_PROXY" costs.cap_mode=post 2>/dev/null || true
 forge proxy set "$FORGE_QA_OPENAI_PROXY" costs.caps.per_day=none 2>/dev/null || true
 forge proxy set "$FORGE_QA_OPENAI_PROXY" costs.caps.per_month=none 2>/dev/null || true
 forge proxy set "$FORGE_QA_OPENAI_PROXY" costs.on_cap_hit=reject 2>/dev/null || true
-forge proxy set "$FORGE_QA_OPENAI_PROXY" costs.cap_mode=post 2>/dev/null || true
 
 # Restart the QA OpenAI proxy so the running proxy drops seeded spend/cap state from 7.9/7.10
 forge proxy stop "$FORGE_QA_OPENAI_PROXY" --force 2>/dev/null || true
