@@ -25,6 +25,45 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board-contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-06-05
+
+### Phase 1: Metric-evidence schema & vocabulary pass (metric-evidence Slice 1)
+
+**Goal**: Add the card's metric-evidence vocabulary (`route`/`reporter`/`confidence`) to the usage ledger **without
+changing any accounting behavior** — the schema foundation every later phase builds on (Phase 2 reuses `Confidence` for
+cost-log provenance; Phase 4/5 reuse `route`/`reporter`).
+
+**Key changes**:
+
+- New thin `core/usage/vocabulary.py` holds three `Literal` aliases (`Route`, `Reporter`, `Confidence`) with no I/O, so
+  Phase 2's cost plane (`proxy/cost_logger.py`) can import `Confidence` without dragging in the ledger's dacite/lock
+  machinery (`proxy → core` is the clean import direction).
+- `UsageEvent` gains `route`/`reporter`/`confidence` — additive, defaulted (`confidence="unknown"`), re-exported from
+  `core/usage/__init__`. **`USAGE_SCHEMA_VERSION` stays `1` — no bump, by decision**: additive defaulted fields change
+  no meaning, require nothing, remove nothing, so a current reader loads pre- and post-change v1 records identically.
+- The 4 emitters (`emit.py`) stamp **today's** provenance honestly — catalog-derived verb cost → `inferred`;
+  structurally-no-cost routes (tagger via dummy-key LiteLLM, null-cost worker) → `unavailable`; `route` = how work
+  reached the model; `reporter` = source of the *metric* evidence (tokens and/or cost). No dollar/token/`billing_mode`
+  value changed. Phase 2 flips the `inferred` verb cost to `reported`/`gateway_calculated`; `route`/`reporter` are
+  stable across that flip.
+- **`confidence` is scoped to the event's own `cost_micro_usd`** only — orthogonal to `measurement_source` (token
+  provenance). The tagger shape `measurement_source="provider_usage_exact"` + `confidence="unavailable"` is therefore
+  not a contradiction: tokens were reported, dollars were not. A `source_refs`-joined cost record never upgrades
+  event-local `confidence`. `unavailable` (route structurally reports no cost) is distinct from `unknown` (provenance
+  never recorded; the pre-Phase-1 default), pre-declared so Phase 2 adds no enum value.
+- Docs synced for shipped fields only: `design.md` §3.14, `design_appendix.md` §A.13 (Provenance row + 3 `Literal`
+  definitions), `auth_cost_metric.md` §1 plane-3 row.
+
+**Keep-at-1 tradeoff (documented once — do NOT "fix" it with a migration)**: a concurrently-running *pre-Phase-1* reader
+hits `dacite(strict=True)` on the unknown `route` key and **drops** new records as `"malformed"` — it discards keys it
+cannot model, it does not understand them. This is expected for additive fields under strict reads and acceptable
+precisely because the usage ledger is best-effort, PID-sharded, pruned **local telemetry, not durable truth**. No reset,
+no migration path is owed.
+
+**Verification**: 58 targeted tests pass (`tests/src/core/usage/test_ledger.py` + `test_emit.py` + dependent read
+surfaces `test_usage_summary.py`/`test_usage.py` + `test_bug_usage_workflow_double_count.py`); `make pre-commit` clean.
+No integration run — pure host-side dataclass + JSONL round-trip (no Docker/`claude -p`/proxy path; contrast Phase 2/4).
+
 ## 2026-06-04
 
 ### Fix: cost/audit JSONL readers crash on valid-but-non-object lines (metric-evidence Phase 0)

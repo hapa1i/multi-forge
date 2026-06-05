@@ -29,6 +29,7 @@ from forge.core.reactive.env import get_run_identity
 from forge.core.reactive.session_runner import SessionResult
 from forge.core.usage.billing import infer_billing_mode
 from forge.core.usage.ledger import BillingMode, SourceRefs, UsageEvent, log_usage_event
+from forge.core.usage.vocabulary import Confidence, Reporter
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +74,11 @@ def emit_usage_for_session_result(
         # "Direct" for billing only when no proxy is in the path; a proxied call's
         # upstream billing is opaque from here, so it stays "unknown".
         effective_direct = direct and not base_url
+        # A claude -p verb is always route="claude_p"; its cost (when a proxy snapshot
+        # measured it) is catalog-derived today -> "inferred" (Phase 2 flips to "reported"
+        # once gateway cost is wired). No proxy snapshot -> no cost reporter -> "unavailable".
+        reporter: Reporter | None = "forge_proxy" if measured_cost else None
+        confidence: Confidence = "inferred" if measured_cost else "unavailable"
         event = UsageEvent(
             run_id=result.run_id,
             parent_run_id=result.parent_run_id,
@@ -87,6 +93,9 @@ def emit_usage_for_session_result(
             billing_mode=infer_billing_mode(direct=effective_direct, has_api_key=_anthropic_key_present()),
             measurement_source="verb_snapshot_estimated" if measured_cost else "unattributed",
             attribution_granularity="verb",
+            route="claude_p",
+            reporter=reporter,
+            confidence=confidence,
             input_tokens=measured_cost.input_tokens if measured_cost else None,
             output_tokens=measured_cost.output_tokens if measured_cost else None,
             cached_tokens=measured_cost.cached_tokens if measured_cost else None,
@@ -121,6 +130,11 @@ def emit_verb_usage(
         if identity is None:
             return
         measured_cost = cost if (cost is not None and cost.measured) else None
+        # Aggregate over heterogeneous workers -> no single route (None). Cost, when a
+        # proxy snapshot measured it, is catalog-derived today -> "inferred"; else no cost
+        # reporter -> "unavailable". Phase 2 flips "inferred" -> "reported".
+        reporter: Reporter | None = "forge_proxy" if measured_cost else None
+        confidence: Confidence = "inferred" if measured_cost else "unavailable"
         event = UsageEvent(
             run_id=identity.run_id,
             parent_run_id=identity.parent_run_id,
@@ -130,6 +144,9 @@ def emit_verb_usage(
             status=status,
             session=session,
             workflow=workflow,
+            route=None,
+            reporter=reporter,
+            confidence=confidence,
             measurement_source="verb_snapshot_estimated" if measured_cost else "unattributed",
             attribution_granularity="verb",
             input_tokens=measured_cost.input_tokens if measured_cost else None,
@@ -183,6 +200,9 @@ def emit_worker_usage(
             provider=provider,
             model=model,
             proxy_id=proxy_id,
+            route="claude_p",
+            reporter=None,
+            confidence="unavailable",
             measurement_source="unattributed",
             attribution_granularity="worker",
             latency_ms=round(latency_ms, 1) if latency_ms is not None else None,
@@ -225,6 +245,11 @@ def emit_direct_llm_usage(
         if identity is None:
             return
         measured = usage is not None
+        # Direct core.llm call: tokens are provider-reported in-band when present, so
+        # reporter="provider"; this helper never computes a $ figure (cost_micro_usd stays
+        # None), so cost confidence is always "unavailable" -- not a contradiction with the
+        # provider-reported tokens, and a joined source_refs cost ref does not change it.
+        reporter: Reporter | None = "provider" if measured else None
         event = UsageEvent(
             run_id=identity.run_id,
             parent_run_id=identity.parent_run_id,
@@ -240,6 +265,9 @@ def emit_direct_llm_usage(
             billing_mode=billing_mode,
             measurement_source="provider_usage_exact" if measured else "unattributed",
             attribution_granularity="verb",
+            route="core_llm",
+            reporter=reporter,
+            confidence="unavailable",
             input_tokens=usage.get("prompt_tokens") if usage else None,
             output_tokens=usage.get("completion_tokens") if usage else None,
             cached_tokens=usage.get("cached_tokens") if usage else None,

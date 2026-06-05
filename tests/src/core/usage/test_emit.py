@@ -13,7 +13,12 @@ from typing import Any
 
 from forge.core.reactive.cost_tracking import VerbCostResult
 from forge.core.reactive.session_runner import SessionResult
-from forge.core.usage.emit import emit_direct_llm_usage, emit_usage_for_session_result
+from forge.core.usage.emit import (
+    emit_direct_llm_usage,
+    emit_usage_for_session_result,
+    emit_verb_usage,
+    emit_worker_usage,
+)
 from forge.core.usage.ledger import read_usage_events
 
 
@@ -54,6 +59,7 @@ class TestEmitForSessionResult:
         assert e.attribution_granularity == "verb"
         assert e.source_refs is None  # claude -p: proxy request_id unknown (4g)
         assert e.billing_mode == "unknown"  # proxied -> opaque upstream
+        assert (e.route, e.reporter, e.confidence) == ("claude_p", "forge_proxy", "inferred")
 
     def test_unmeasured_no_proxy_is_unattributed(self, monkeypatch) -> None:
         # A direct/no-proxy verb: holder never measured -> null cost, not $0.
@@ -65,6 +71,7 @@ class TestEmitForSessionResult:
         assert e.measurement_source == "unattributed"
         assert e.cost_micro_usd is None and e.input_tokens is None
         assert e.billing_mode == "api"  # direct + key present
+        assert (e.route, e.reporter, e.confidence) == ("claude_p", None, "unavailable")
 
     def test_failure_status_and_type(self) -> None:
         emit_usage_for_session_result(_ok_result(returncode=1, error="boom"), command="supervisor")
@@ -99,6 +106,7 @@ class TestEmitDirectLlmUsage:
         assert e.latency_ms == 12.0
         assert e.source_refs is None  # no proven proxy target
         assert e.billing_mode == "unknown"  # never guessed -- caller didn't prove direct+credential
+        assert (e.route, e.reporter, e.confidence) == ("core_llm", "provider", "unavailable")
 
     def test_proxy_target_sets_cost_request_id(self, monkeypatch) -> None:
         monkeypatch.setenv("FORGE_RUN_ID", "run_amb")
@@ -108,8 +116,36 @@ class TestEmitDirectLlmUsage:
         e = read_usage_events()[0]
         assert e.source_refs is not None and e.source_refs.cost_request_id == "req_join"
         assert e.billing_mode == "unknown"  # proxied
+        # A joined cost ref must NOT upgrade event-local cost confidence: cost stays None
+        # and confidence stays "unavailable" (the $ lives in the cost plane, not here).
+        assert e.cost_micro_usd is None and e.confidence == "unavailable"
+        assert (e.route, e.reporter) == ("core_llm", "provider")
 
     def test_no_ambient_identity_skips(self, monkeypatch) -> None:
         monkeypatch.delenv("FORGE_RUN_ID", raising=False)
         emit_direct_llm_usage(command="tagger", usage={"prompt_tokens": 1, "completion_tokens": 1})
         assert read_usage_events() == []
+
+
+class TestEmitVerbAndWorkerVocabulary:
+    """route/reporter/confidence on the fan-out aggregate and the per-worker leaf."""
+
+    def test_verb_aggregate_measured(self, monkeypatch) -> None:
+        monkeypatch.setenv("FORGE_RUN_ID", "run_v")
+        monkeypatch.setenv("FORGE_ROOT_RUN_ID", "run_v")
+        emit_verb_usage(command="panel", cost=VerbCostResult(verb="panel", total_cost_micros=900, measured=True))
+        e = read_usage_events()[0]
+        # Aggregate spans heterogeneous worker routes -> no single route.
+        assert (e.route, e.reporter, e.confidence) == (None, "forge_proxy", "inferred")
+
+    def test_verb_aggregate_unmeasured(self, monkeypatch) -> None:
+        monkeypatch.setenv("FORGE_RUN_ID", "run_v")
+        monkeypatch.setenv("FORGE_ROOT_RUN_ID", "run_v")
+        emit_verb_usage(command="panel", cost=VerbCostResult(verb="panel"))
+        e = read_usage_events()[0]
+        assert (e.route, e.reporter, e.confidence) == (None, None, "unavailable")
+
+    def test_worker_leaf(self) -> None:
+        emit_worker_usage(run_id="run_leaf", command="panel", status="success")
+        e = read_usage_events()[0]
+        assert (e.route, e.reporter, e.confidence) == ("claude_p", None, "unavailable")

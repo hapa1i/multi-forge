@@ -32,6 +32,7 @@ from typing import Literal
 import dacite
 
 from forge.core.paths import get_forge_home
+from forge.core.usage.vocabulary import Confidence, Reporter, Route
 
 logger = logging.getLogger(__name__)
 
@@ -116,6 +117,13 @@ class UsageEvent:
     billing_mode: BillingMode = "unknown"
     measurement_source: MeasurementSource = "unattributed"
     attribution_granularity: AttributionGranularity = "verb"
+    # How the work reached the model, who supplied the metric evidence, and how
+    # trustworthy the COST figure is. `confidence` is scoped to this event's own
+    # cost_micro_usd ONLY (token provenance is measurement_source); a null cost is
+    # "unavailable" regardless of any source_refs-joined cost record.
+    route: Route | None = None
+    reporter: Reporter | None = None
+    confidence: Confidence = "unknown"
 
     # Consumption (nullable: not always knowable, e.g. per-worker claude -p).
     input_tokens: int | None = None

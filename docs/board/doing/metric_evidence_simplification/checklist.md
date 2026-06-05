@@ -103,39 +103,73 @@ to FAIL with the guards stashed (non-vacuous); `make pre-commit` clean. Changelo
 **Goal**: Name metric evidence plainly. Separate `route`, `reporter`, `measurement_source`, `payer`, `confidence`,
 `scope`, `policy_action` (card terminology table) without yet changing accounting behavior.
 
-- [ ] **Resolve G1** (evolve vs new ledger) and record the resolution inline here with rationale.
-- [ ] (If evolve) Extend `UsageEvent` / cost record schema with the missing metric-evidence fields **additively, with
-  defaults**. `UsageEvent` is explicitly designed for this — its docstring (`ledger.py:90-98`) says "everything else is
-  defaulted so a record stays loadable as the schema grows," and `read_usage_events` is `dacite(strict=True)` (unknown
-  fields rejected, missing fields filled by default). So purely additive defaulted fields keep v1 records loadable
-  **without** a `schema_version` bump.
-- [ ] **Challenge the card's "bump the version" instruction.** Bump `schema_version` (1→2) only if a field's *meaning*
-  changes, a field becomes *required*, or a value is *removed/renamed* — not for additive defaulted fields. Decide and
-  record which case applies. (Strict reads already skip records with `schema_version > current`, so a bump means "old
-  Forge can't read new records," never the reverse.)
-- [ ] **v1-compat decision (explicit, per the durable-state rules).** Choose and TEST one: (a) existing v1
-  `usage/events/*.jsonl` and `costs/requests/*.jsonl` still load under the new schema (the additive path), or (b) they
-  are rejected with a clear reset/migration message. Do not leave this implicit — strict readers will surface it either
-  way.
-- [ ] Map existing values onto the new vocabulary (e.g. `pricing_source="catalog"` → `confidence="inferred"`; provider
-  in-band tokens → `measurement_source="provider_usage_exact"`, already present).
-- [ ] Define the `confidence` literal (`reported | gateway_calculated | inferred | unknown`) and `reporter` enum; keep
-  `measurement_source` and `billing_mode` aligned with the card's terminology table.
-- [ ] Preserve the "provenance is recorded, never inferred" discipline already in `ledger.py`.
-- [ ] **Design-doc sync**: update `design.md` §3.14 + `design_appendix.md` §A.13 (schema) **only for shipped fields**.
-  Begin folding `docs/auth_cost_metric.md` into the internal map (do not delete until superseded).
+- [x] **Resolve G1** (evolve vs new ledger). **Resolved: Evolve `UsageEvent`** (2026-06-05). The existing ledger already
+  carries `measurement_source`/`billing_mode`/`attribution_granularity`, versioned strict reads, and nullable cost (~90%
+  of the metric-event model); a second plane would duplicate the read/prune/shard/version machinery and a reconciliation
+  surface. Added `route`/`reporter`/`confidence` as additive fields instead.
+- [x] (If evolve) Extend `UsageEvent` schema with the missing metric-evidence fields **additively, with defaults**.
+  `UsageEvent` is explicitly designed for this — its docstring (`ledger.py:90-98`) says "everything else is defaulted so
+  a record stays loadable as the schema grows," and `read_usage_events` is `dacite(strict=True)` (unknown fields
+  rejected, missing fields filled by default). So purely additive defaulted fields keep v1 records loadable **without**
+  a `schema_version` bump. **Done**: `route: Route | None = None`, `reporter: Reporter | None = None`,
+  `confidence: Confidence = "unknown"` added to the provenance block; literals live in new `core/usage/vocabulary.py`.
+  **Cost-record (`costs/requests/*.jsonl`) half deferred to Phase 2** — its `cost_micros: int → int | None` +
+  `estimated → provenance` change is coupled to the nullable-cost / `CostTracker.record(None)` guard work.
+- [x] **Challenge the card's "bump the version" instruction. Resolved: KEEP `USAGE_SCHEMA_VERSION = 1` (do NOT bump).**
+  None of the bump triggers apply: no field's *meaning* changed, none became *required* (all defaulted), none was
+  *removed/renamed*. A bump would only make **old** Forge refuse new records (the `ver > current` gate at
+  `ledger.py:221` fires before dacite), never help. **Accepted tradeoff** (documented once in the changelog so a future
+  session does not "fix" it with a migration): a concurrently-running *pre-Phase-1* reader hits dacite-strict on the
+  unknown `route` key and drops new records as `"malformed"` — bounded and acceptable because the ledger is best-effort,
+  PID-sharded, pruned local telemetry, not durable truth. `test_unknown_field_is_corruption` already characterizes that
+  mechanism.
+- [x] **v1-compat decision (explicit, per the durable-state rules). Resolved: path (a) — additive load, and TESTED.**
+  Existing v1 `usage/events/*.jsonl` records (none of the three new keys) load with the new fields filled from defaults
+  (`route=None`, `reporter=None`, `confidence="unknown"`) — `test_v1_record_loads_with_defaults`. The
+  `costs/requests/*.jsonl` half of this decision moves to Phase 2 with the cost-record schema change.
+- [x] Map existing values onto the new vocabulary. **Done in `emit.py`**: catalog-derived verb cost → `inferred`;
+  structurally-no-cost route (tagger via dummy-key LiteLLM, null-cost worker) → `unavailable`; provider in-band tokens
+  remain `measurement_source="provider_usage_exact"` (unchanged). Phase 2 flips the `inferred` verb cost to
+  `reported`/`gateway_calculated` when gateway cost is wired; `route`/`reporter` are stable across that flip.
+- [x] Define the `confidence` literal and `reporter` enum; keep `measurement_source`/`billing_mode` aligned with the
+  card's terminology table. **Done in `vocabulary.py`.** `confidence` shipped as **5** values
+  (`reported | gateway_calculated | inferred | unavailable | unknown`), not the 4 first sketched here — the documented
+  split adds `unavailable` (route structurally reports no cost figure) distinct from `unknown` (provenance never
+  recorded; the pre-Phase-1 default). Pre-declaring `unavailable` means Phase 2 adds no enum value. `confidence` is
+  scoped to the event's **own `cost_micro_usd`** only (orthogonal to `measurement_source`, which is token/attribution
+  provenance) — pinned in a source comment.
+- [x] Preserve the "provenance is recorded, never inferred" discipline already in `ledger.py`. Each emitter **stamps**
+  `route`/`reporter`/`confidence` from what it actually knows at emit time; the reader never derives them, and a
+  `source_refs`-joined cost record never upgrades event-local `confidence` (`test_proxy_target_sets_cost_request_id`).
+- [x] **Design-doc sync**: `design.md` §3.14 (one terse provenance sentence) + `design_appendix.md` §A.13 (Provenance
+  row + the three `Literal` definitions + the cost-scope/`unavailable`-vs-`unknown`/additive-at-v1 notes) updated for
+  **shipped fields only**. `docs/auth_cost_metric.md` §1 plane-3 row extended to list the new fields (folding begun; not
+  deleted until superseded at card close).
 
 **Acceptance**
 
-| Test                        | Fixture                                                               | Assertion                                                                                                   | Test File                             |
-| --------------------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------- |
-| v1 usage event still loads  | a `schema_version=1` `UsageEvent` JSONL line (pre-change fields only) | loads; new fields take defaults (path a) OR rejected with reset message (path b) — match the G1/v1 decision | `tests/src/core/usage/test_ledger.py` |
-| v1 cost record still loads  | a `schema_version=1` cost-log line                                    | same chosen behavior as above                                                                               | `tests/src/proxy/test_cost_logger.py` |
-| New fields round-trip       | event written with `reporter`/`confidence`/`route` set                | read back identical; strict read accepts                                                                    | `tests/src/core/usage/test_ledger.py` |
-| Newer-schema record skipped | `schema_version = current+1`                                          | skipped with one-time warning (existing contract preserved)                                                 | `tests/src/core/usage/test_ledger.py` |
+| Test                                             | Fixture                                                                                | Assertion                                                                                      | Test File                             | Status                                                         |
+| ------------------------------------------------ | -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------- | -------------------------------------------------------------- |
+| v1 usage event still loads                       | a `schema_version=1` `UsageEvent` JSONL line (pre-change fields only)                  | loads; new fields take defaults (path a) — `route`/`reporter` `None`, `confidence="unknown"`   | `tests/src/core/usage/test_ledger.py` | ✔ `test_v1_record_loads_with_defaults`                         |
+| v1 cost record still loads                       | a `schema_version=1` cost-log line                                                     | same chosen behavior as above                                                                  | `tests/src/proxy/test_cost_logger.py` | → **moved to Phase 2** (cost-record schema change lands there) |
+| New fields round-trip                            | event written with `reporter`/`confidence`/`route` set                                 | read back identical; strict read accepts                                                       | `tests/src/core/usage/test_ledger.py` | ✔ `test_new_fields_roundtrip`                                  |
+| Bad literal is corruption (×3)                   | a record with a bogus `route`/`reporter`/`confidence` value                            | each skipped as corruption (mirrors `test_bad_literal_is_corruption`)                          | `tests/src/core/usage/test_ledger.py` | ✔ `test_bad_vocabulary_literals_are_corruption`                |
+| `confidence` ⟂ `measurement_source`              | `measurement_source="provider_usage_exact"` + `confidence="unavailable"` + `cost=None` | all three coexist on one record; round-trips                                                   | `tests/src/core/usage/test_ledger.py` | ✔ `test_confidence_orthogonal_to_measurement_source`           |
+| `source_refs` don't change event-local cost conf | `emit_direct_llm_usage(..., cost_request_id="req")`                                    | own `cost_micro_usd is None` **and** `confidence == "unavailable"` despite the joined cost ref | `tests/src/core/usage/test_emit.py`   | ✔ `test_proxy_target_sets_cost_request_id`                     |
+| Emitter mapping (4 helpers)                      | each helper, measured vs unmeasured path                                               | stamps route/reporter/confidence per the mapping table                                         | `tests/src/core/usage/test_emit.py`   | ✔ 4 emitter tests + vocab class                                |
+| Newer-schema record skipped                      | `schema_version = current+1`                                                           | skipped with one-time warning (existing contract preserved, **unchanged**)                     | `tests/src/core/usage/test_ledger.py` | ✔ `test_newer_version_skipped_warn_once`                       |
 
 **Deferred decision**: aggregate rows beyond cost (tokens/rate-limits/failures/latency/tool-errors — card §"Post-Flight
 Policies" table) are kept **schema-compatible** but NOT implemented in this card.
+
+**Closeout**: ✔ Done (2026-06-05). New `core/usage/vocabulary.py` (3 `Literal`s); `UsageEvent` carries
+`route`/`reporter`/`confidence` (additive, defaulted, schema stays v1); 4 emitters stamp today's provenance
+(catalog→`inferred`, structural-no-cost→`unavailable`); `__init__` re-exports the literals. 58 targeted tests green
+(`test_ledger` + `test_emit` + dependent read surfaces `test_usage_summary`/`test_usage`/double-count regression);
+`make pre-commit` clean. Design-doc sync: `design.md` §3.14, `design_appendix.md` §A.13, `auth_cost_metric.md` §1.
+Changelog entry added. **No integration run** — pure host-side dataclass + JSONL round-trip, no Docker/`claude -p`/proxy
+path (contrast Phase 2/4). Deferred to Phase 2: cost-record nullable `cost_micros` + provenance, and the "v1 cost record
+loads" acceptance row.
 
 ---
 

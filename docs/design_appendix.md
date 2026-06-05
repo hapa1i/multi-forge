@@ -420,13 +420,13 @@ separate and are joined by a shared proxy `request_id`:
 
 `UsageEvent` carries `schema_version` (= 1) plus an auto-stamped `event_id` (`evt_…`, for dedupe/debugging) and `ts`:
 
-| Group            | Fields                                                                                           |
-| ---------------- | ------------------------------------------------------------------------------------------------ |
-| Attribution core | `run_id`, `root_run_id`, `runtime`, `command`, `status` (required); `parent_run_id` (optional)   |
-| Context          | `session`, `workflow`, `provider`, `model`, `proxy_id`                                           |
-| Provenance       | `billing_mode`, `measurement_source`, `attribution_granularity`                                  |
-| Consumption      | `input_tokens`, `output_tokens`, `cached_tokens`, `latency_ms`, `failure_type`, `cost_micro_usd` |
-| Cross-plane refs | `source_refs` = `{cost_request_id, audit_request_id}` (nullable)                                 |
+| Group            | Fields                                                                                             |
+| ---------------- | -------------------------------------------------------------------------------------------------- |
+| Attribution core | `run_id`, `root_run_id`, `runtime`, `command`, `status` (required); `parent_run_id` (optional)     |
+| Context          | `session`, `workflow`, `provider`, `model`, `proxy_id`                                             |
+| Provenance       | `billing_mode`, `measurement_source`, `attribution_granularity`, `route`, `reporter`, `confidence` |
+| Consumption      | `input_tokens`, `output_tokens`, `cached_tokens`, `latency_ms`, `failure_type`, `cost_micro_usd`   |
+| Cross-plane refs | `source_refs` = `{cost_request_id, audit_request_id}` (nullable)                                   |
 
 Enumerations are `Literal`s (provenance is recorded, never inferred):
 
@@ -436,11 +436,27 @@ Enumerations are `Literal`s (provenance is recorded, never inferred):
 - `billing_mode`: `api` | `subscription_interactive` | `subscription_headless_credit` | `subscription_quota` | `unknown`
   (`unknown` is the honest default where the signal is ambiguous).
 - `attribution_granularity`: `worker` | `verb` | `session`.
+- `route`: `claude_interactive` | `claude_p` | `forge_proxy` | `core_llm` | `codex_exec` | `gemini_headless` — how the
+  work reached the model (invocation channel). Emitted now: `claude_p`/`core_llm` (plus `None` on an aggregate spanning
+  mixed routes); the rest are reserved (Phase 4/5), like the unemitted `subscription_*` billing modes. `forge_proxy` is
+  reserved **here** — it is emitted now as a `reporter`, not yet as a `route` (it appears in both literals).
+- `reporter`: `claude_code` | `forge_proxy` | `openrouter` | `litellm` | `provider` | `codex_jsonl` — the source of the
+  **metric** evidence (tokens **and/or** a cost figure, *not* specifically cost), so `reporter=provider` alongside
+  `confidence=unavailable` is coherent: the provider reported tokens, just no dollars.
+- `confidence`: `reported` | `gateway_calculated` | `inferred` | `unavailable` | `unknown` — trustworthiness of **this
+  event's own `cost_micro_usd` only** (token provenance is `measurement_source`; the two axes are orthogonal — the
+  tagger is `measurement_source=provider_usage_exact` with `confidence=unavailable`, *not* a contradiction). A null cost
+  is `unavailable` regardless of any `source_refs`-joined cost record. `unknown` is legacy/default (provenance never
+  recorded); a known-no-cost route is `unavailable`, not `unknown`. Catalog-derived proxy cost is `inferred` today
+  (Phase 2 flips it to `reported`/`gateway_calculated` when gateway-reported cost is wired).
 
 `source_refs` is null on native-runtime events (no proxy) and on `claude -p` traffic until per-request correlation ships
 (Phase 4g); the event stays useful without it (run/model/billing_mode/tokens). Reading skips — with a one-time warning —
 records written by a newer Forge (`schema_version` > current), and (strict on shape) records with unknown fields.
-`read_usage_events()` is the typed read surface.
+`read_usage_events()` is the typed read surface. The `route`/`reporter`/`confidence` fields were **added additively at
+`schema_version` 1 (no bump)**: optional + defaulted, so existing v1 records load unchanged. A *pre-Phase-1* reader, by
+contrast, drops the newer records as unknown-field corruption — acceptable for best-effort, PID-sharded, pruned local
+telemetry, and **not** a state to migrate around.
 
 **Instrumented emitters (Phase 4c).** The workflow verbs (`panel`/`analyze`/`debate`/`consensus`) emit one estimated
 verb-level event each (`measurement_source=verb_snapshot_estimated`, attributed to the ambient run — per-worker cost is
@@ -453,7 +469,10 @@ id); otherwise it sends no header and leaves the ref null (a dangling join is wo
 `billing_mode` stays `unknown` unless the caller proves direct + real-credential billing (the tagger routes via local
 LiteLLM with a dummy key, so it can't). All emit best-effort, never gate the work they measure, and record `latency_ms`;
 `claude -p` events carry null `source_refs` (4g). Helpers: `emit_verb_usage`, `emit_usage_for_session_result`,
-`emit_direct_llm_usage` (`forge.core.usage.emit`).
+`emit_direct_llm_usage` (`forge.core.usage.emit`). Each also stamps `route`/`reporter`/`confidence`: tagger →
+`core_llm`/`provider`/`unavailable`; `claude -p` verbs → `claude_p` with `forge_proxy`/`inferred` when a proxy snapshot
+measured cost (else `None`/`unavailable`); the verb aggregate claims no single `route`; per-worker leaves →
+`claude_p`/`unavailable`.
 
 **Per-worker fan-out events (Phase 4d).** The review fan-out (`run_multi_review` → `ClaudeHeadlessInvoker.run_parallel`)
 emits one event per worker (`attribution_granularity=worker`, `measurement_source=unattributed`): the run-tree leaf

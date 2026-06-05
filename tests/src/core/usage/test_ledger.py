@@ -232,3 +232,67 @@ class TestBestEffort:
 
     def test_read_missing_dir_returns_empty(self) -> None:
         assert read_usage_events() == []
+
+
+class TestMetricVocabulary:
+    """Phase 1 metric-evidence fields: route/reporter/confidence (additive, schema v1)."""
+
+    def test_v1_record_loads_with_defaults(self) -> None:
+        # A pre-Phase-1 record carries none of the new keys; the additive fields fill
+        # from their defaults (this is why no schema bump is needed to read old records).
+        _append_raw(
+            {
+                "schema_version": 1,
+                "event_id": "evt_v1",
+                "ts": "2026-01-01T00:00:00Z",
+                "run_id": "run_v1",
+                "root_run_id": "run_v1",
+                "runtime": "claude_code",
+                "command": "panel",
+                "status": "success",
+            }
+        )
+        e = read_usage_events()[0]
+        assert (e.route, e.reporter, e.confidence) == (None, None, "unknown")
+
+    def test_new_fields_roundtrip(self) -> None:
+        log_usage_event(_event(route="claude_p", reporter="forge_proxy", confidence="inferred"))
+        e = read_usage_events()[0]
+        assert (e.route, e.reporter, e.confidence) == ("claude_p", "forge_proxy", "inferred")
+
+    def test_bad_vocabulary_literals_are_corruption(self) -> None:
+        # Strict read rejects an invalid value in any of the three new Literals.
+        log_usage_event(_event(command="good"))
+        for i, (field, bad) in enumerate(
+            [("route", "teleport"), ("reporter", "carrier_pigeon"), ("confidence", "vibes")]
+        ):
+            _append_raw(
+                {
+                    "schema_version": 1,
+                    "event_id": f"evt_bad_{i}",
+                    "ts": "2026-01-01T00:00:00Z",
+                    "run_id": f"run_{i}",
+                    "root_run_id": f"run_{i}",
+                    "runtime": "claude_code",
+                    "command": "bad",
+                    "status": "success",
+                    field: bad,
+                }
+            )
+        assert {e.command for e in read_usage_events()} == {"good"}
+
+    def test_confidence_orthogonal_to_measurement_source(self) -> None:
+        # The tagger shape: exact tokens (provider_usage_exact) AND no dollars
+        # (confidence="unavailable", cost None) coexist -- two independent provenance axes.
+        log_usage_event(
+            _event(
+                measurement_source="provider_usage_exact",
+                confidence="unavailable",
+                cost_micro_usd=None,
+                input_tokens=7,
+            )
+        )
+        e = read_usage_events()[0]
+        assert e.measurement_source == "provider_usage_exact"
+        assert e.confidence == "unavailable"
+        assert e.cost_micro_usd is None and e.input_tokens == 7
