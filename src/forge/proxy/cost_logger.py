@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from forge.core.paths import get_forge_home
+from forge.core.usage.vocabulary import Confidence, Reporter
 
 logger = logging.getLogger(__name__)
 
@@ -49,15 +50,21 @@ def log_request_cost(
     input_tokens: int,
     output_tokens: int,
     cached_tokens: int,
-    cost_micros: int,
+    cost_micros: int | None,
     latency_ms: float,
     failed: bool,
     request_id: str,
-    pricing_source: str = "catalog",
+    reporter: Reporter | None = None,
+    confidence: Confidence = "unknown",
 ) -> None:
     """Append a cost record to the PID-sharded JSONL log.
 
-    Best-effort: write failures are logged but never block the request.
+    ``cost_micros`` is ``None`` when no route reported a cost — distinct from a
+    reported ``0`` (genuinely free). ``confidence`` records the dollar figure's
+    provenance and ``reporter`` who supplied it; together they replace the old
+    always-``estimated`` / ``pricing_source`` pair (the metric-evidence card:
+    Forge is not a cost oracle). Best-effort: write failures are logged but never
+    block the request.
     """
     record: dict[str, Any] = {
         "schema_version": COST_SCHEMA_VERSION,
@@ -69,8 +76,8 @@ def log_request_cost(
         "output_tokens": output_tokens,
         "cached_tokens": cached_tokens,
         "cost_micros": cost_micros,
-        "estimated": True,
-        "pricing_source": pricing_source,
+        "reporter": reporter,
+        "confidence": confidence,
         "latency_ms": round(latency_ms, 1),
         "failed": failed,
         "request_id": request_id,

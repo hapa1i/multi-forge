@@ -62,6 +62,27 @@ class TestCostTrackerBasic:
         assert CostTracker(daily_cap_usd=1.0).has_caps
         assert CostTracker(monthly_cap_usd=5.0).has_caps
 
+    def test_record_none_is_skipped(self):
+        """Unavailable cost (None) advances no aggregate and never raises.
+
+        Caps account for cost-reported requests only; a None would otherwise
+        raise TypeError at the `<= 0` guard.
+        """
+        t = CostTracker(daily_cap_usd=1.00)
+        t.record(None)
+        assert t.daily_spend_micros() == 0
+        assert t.monthly_spend_micros() == 0
+        assert not t.check_cap().exceeded
+
+    def test_parse_record_skips_null_cost(self):
+        """A valid record whose cost_micros is null is skipped (cost unavailable).
+
+        Direct call (deterministic, no month-window dependency): int(None) would
+        otherwise raise, and the unavailable cost must never advance caps.
+        """
+        line = json.dumps({"ts": "2026-06-01T00:00:00Z", "cost_micros": None, "proxy_id": "p"})
+        assert CostTracker._parse_record(line) is None
+
 
 class TestCapSummary:
     def test_summary_with_both_caps(self):

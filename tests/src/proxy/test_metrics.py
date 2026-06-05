@@ -29,6 +29,52 @@ def _record_simple(m: ProxyMetrics, **overrides: Any) -> None:
     m.record_request(**kwargs)
 
 
+class TestCostEvidence:
+    """Cost-evidence counts tell reported (incl. $0) from unavailable."""
+
+    def test_reported_cost_counts_and_sums(self):
+        m = _make_metrics()
+        _record_simple(m, cost_micros=12345)
+        assert m.cost_reported_requests == 1
+        assert m.cost_unavailable_requests == 0
+        assert m.total_cost_micros == 12345
+        costs = m.snapshot()["costs"]
+        assert costs["reported_request_count"] == 1
+        assert costs["unavailable_request_count"] == 0
+
+    def test_unavailable_cost_counts_but_does_not_sum(self):
+        m = _make_metrics()
+        _record_simple(m, cost_micros=None)
+        assert m.cost_reported_requests == 0
+        assert m.cost_unavailable_requests == 1
+        # No cost total advanced — and no TypeError from None arithmetic.
+        assert m.total_cost_micros == 0
+        # Tokens still recorded even when cost is unavailable.
+        assert m.total_input_tokens == 100
+        costs = m.snapshot()["costs"]
+        assert costs["unavailable_request_count"] == 1
+        assert costs["total_micros"] == 0
+
+    def test_reported_zero_is_distinct_from_unavailable(self):
+        """A reported $0 (free model) advances the reported count; total stays 0."""
+        m = _make_metrics()
+        _record_simple(m, cost_micros=0)
+        _record_simple(m, cost_micros=None)
+        costs = m.snapshot()["costs"]
+        # One request reported (a real $0), one reported nothing.
+        assert costs["reported_request_count"] == 1
+        assert costs["unavailable_request_count"] == 1
+        assert costs["total_micros"] == 0
+
+    def test_evidence_counters_reset(self):
+        m = _make_metrics()
+        _record_simple(m, cost_micros=100)
+        _record_simple(m, cost_micros=None)
+        m.reset()
+        assert m.cost_reported_requests == 0
+        assert m.cost_unavailable_requests == 0
+
+
 class TestInitialState:
     def test_all_counters_zero(self):
         m = _make_metrics()

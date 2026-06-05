@@ -60,6 +60,21 @@ def _format_tokens(n: int) -> str:
     return str(n)
 
 
+def _reported_micros(record: dict, key: str = "cost_micros") -> int | None:
+    """Reported cost in micros, or ``None`` when unavailable.
+
+    ``record.get(key, 0)`` is unsafe here: a present-but-null value (cost
+    unavailable) returns ``None``, which must never be summed as ``0`` (and would
+    crash ``sum``). An ``int`` (including a reported ``0`` — genuinely free) is
+    reported; ``None`` / missing / non-int is unavailable. ``bool`` is excluded
+    because ``isinstance(True, int)`` is True.
+    """
+    val = record.get(key)
+    if isinstance(val, bool):
+        return None
+    return val if isinstance(val, int) else None
+
+
 @click.command("costs")
 @click.argument("proxy_id", required=False, default=None)
 @click.option(
@@ -180,22 +195,26 @@ def _display_by_verb(
     period: str,
     proxy_id: str | None,
 ) -> None:
-    total_cost = sum(r.get("cost_micros", 0) for r in request_records)
+    total_cost = sum(c for r in request_records if (c := _reported_micros(r)) is not None)
     total_requests = len(request_records)
+    unavailable_requests = sum(1 for r in request_records if _reported_micros(r) is None)
 
     verb_costs: dict[str, dict] = {}
     for v in verb_records:
         verb = v.get("verb", "unknown")
         if verb not in verb_costs:
-            verb_costs[verb] = {"cost_micros": 0, "request_count": 0, "invocations": 0}
-        verb_costs[verb]["cost_micros"] += v.get("total_cost_micros", 0)
+            verb_costs[verb] = {"cost_micros": 0, "reported": False, "request_count": 0, "invocations": 0}
+        vc = _reported_micros(v, "total_cost_micros")
+        if vc is not None:
+            verb_costs[verb]["cost_micros"] += vc
+            verb_costs[verb]["reported"] = True
         verb_costs[verb]["request_count"] += v.get("request_count", 0)
         verb_costs[verb]["invocations"] += 1
 
     verb_total = sum(v["cost_micros"] for v in verb_costs.values())
     interactive_cost = max(0, total_cost - verb_total)
 
-    if total_cost == 0 and not verb_costs:
+    if total_cost == 0 and unavailable_requests == 0 and not verb_costs:
         scope = f" ({proxy_id})" if proxy_id else ""
         console.print(f"[dim]No cost data for {period}{scope}.[/dim]")
         return
@@ -209,7 +228,10 @@ def _display_by_verb(
     table.add_column("Detail", style="dim")
     table.add_column("", style="dim")
 
-    table.add_row("Total", _format_usd(total_cost), f"{total_requests} requests", "")
+    total_detail = f"{total_requests} requests"
+    if unavailable_requests:
+        total_detail += f" ({unavailable_requests} cost unavailable)"
+    table.add_row("Total", _format_usd(total_cost), total_detail, "")
     table.add_row(
         "Interactive",
         _format_usd(interactive_cost),
@@ -222,7 +244,8 @@ def _display_by_verb(
         detail = f"{info['invocations']} run{'s' if info['invocations'] != 1 else ''}"
         if info["request_count"]:
             detail += f", {info['request_count']} reqs"
-        table.add_row(verb, _format_usd(info["cost_micros"]), detail, "~")
+        cost_cell = _format_usd(info["cost_micros"]) if info["reported"] else "unavailable"
+        table.add_row(verb, cost_cell, detail, "~" if info["reported"] else "")
 
     console.print(table)
     console.print()
@@ -239,11 +262,15 @@ def _display_by_model(
         if model not in model_costs:
             model_costs[model] = {
                 "cost_micros": 0,
+                "reported": False,
                 "input_tokens": 0,
                 "output_tokens": 0,
                 "requests": 0,
             }
-        model_costs[model]["cost_micros"] += r.get("cost_micros", 0)
+        rc = _reported_micros(r)
+        if rc is not None:
+            model_costs[model]["cost_micros"] += rc
+            model_costs[model]["reported"] = True
         model_costs[model]["input_tokens"] += r.get("input_tokens", 0)
         model_costs[model]["output_tokens"] += r.get("output_tokens", 0)
         model_costs[model]["requests"] += 1
@@ -264,7 +291,8 @@ def _display_by_model(
     for model in sorted(model_costs, key=lambda m: model_costs[m]["cost_micros"], reverse=True):
         info = model_costs[model]
         tokens = f"{_format_tokens(info['input_tokens'])} in, {_format_tokens(info['output_tokens'])} out"
-        table.add_row(model, _format_usd(info["cost_micros"]), tokens)
+        cost_cell = _format_usd(info["cost_micros"]) if info["reported"] else "unavailable"
+        table.add_row(model, cost_cell, tokens)
 
     console.print(table)
     console.print()
@@ -276,14 +304,18 @@ def _output_json(
     period: str,
     proxy_id: str | None,
 ) -> None:
-    total_cost = sum(r.get("cost_micros", 0) for r in request_records)
+    total_cost = sum(c for r in request_records if (c := _reported_micros(r)) is not None)
+    unavailable_requests = sum(1 for r in request_records if _reported_micros(r) is None)
 
     verb_summary: dict[str, dict] = {}
     for v in verb_records:
         verb = v.get("verb", "unknown")
         if verb not in verb_summary:
-            verb_summary[verb] = {"cost_micros": 0, "request_count": 0, "invocations": 0}
-        verb_summary[verb]["cost_micros"] += v.get("total_cost_micros", 0)
+            verb_summary[verb] = {"cost_micros": 0, "reported": False, "request_count": 0, "invocations": 0}
+        vc = _reported_micros(v, "total_cost_micros")
+        if vc is not None:
+            verb_summary[verb]["cost_micros"] += vc
+            verb_summary[verb]["reported"] = True
         verb_summary[verb]["request_count"] += v.get("request_count", 0)
         verb_summary[verb]["invocations"] += 1
 
@@ -291,8 +323,17 @@ def _output_json(
     for r in request_records:
         model = r.get("model", "unknown")
         if model not in model_summary:
-            model_summary[model] = {"cost_micros": 0, "input_tokens": 0, "output_tokens": 0, "requests": 0}
-        model_summary[model]["cost_micros"] += r.get("cost_micros", 0)
+            model_summary[model] = {
+                "cost_micros": 0,
+                "reported": False,
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "requests": 0,
+            }
+        rc = _reported_micros(r)
+        if rc is not None:
+            model_summary[model]["cost_micros"] += rc
+            model_summary[model]["reported"] = True
         model_summary[model]["input_tokens"] += r.get("input_tokens", 0)
         model_summary[model]["output_tokens"] += r.get("output_tokens", 0)
         model_summary[model]["requests"] += 1
@@ -302,12 +343,15 @@ def _output_json(
     output = {
         "period": period,
         "proxy_id": proxy_id,
+        # total_cost_* sums reported cost only; unavailable requests are excluded
+        # (never summed as $0). reported/unavailable counts give cost-evidence scope.
         "total_cost_micros": total_cost,
         "total_cost_usd": round(total_cost / 1_000_000, 6),
         "total_requests": len(request_records),
+        "reported_requests": len(request_records) - unavailable_requests,
+        "unavailable_requests": unavailable_requests,
         "interactive_cost_micros": max(0, total_cost - verb_total),
         "by_verb": verb_summary,
         "by_model": model_summary,
-        "estimated": True,
     }
     click.echo(json.dumps(output, indent=2))

@@ -136,7 +136,13 @@ class CostTracker:
         if not isinstance(data, dict):
             return None
         ts_str = data.get("ts", "")
-        cost_micros = int(data.get("cost_micros", 0))
+        # Cost is nullable: a null (or absent) cost_micros means the route reported
+        # no cost. It never advances spend caps, so skip it explicitly rather than let
+        # int(None) raise (the bootstrap's broad except would otherwise mask the line).
+        raw_cost = data.get("cost_micros")
+        if raw_cost is None:
+            return None
+        cost_micros = int(raw_cost)
         if cost_micros <= 0:
             return None
 
@@ -149,9 +155,14 @@ class CostTracker:
         record_proxy_id = data.get("proxy_id")
         return ts.timestamp(), cost_micros, month_key, record_proxy_id
 
-    def record(self, cost_micros: int) -> None:
-        """Record a completed request's cost."""
-        if cost_micros <= 0:
+    def record(self, cost_micros: int | None) -> None:
+        """Record a completed request's cost.
+
+        ``None`` means the route reported no cost (cost unavailable). Caps account
+        only for cost-reported requests, so an unavailable cost is skipped rather
+        than treated as ``0`` — and ``None <= 0`` would otherwise raise ``TypeError``.
+        """
+        if cost_micros is None or cost_micros <= 0:
             return
 
         now = time.time()

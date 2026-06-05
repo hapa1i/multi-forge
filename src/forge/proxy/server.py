@@ -180,17 +180,18 @@ def _calc_and_log_cost(
     latency_ms: float,
     failed: bool,
     request_id: str,
-) -> int:
+) -> int | None:
     """Calculate cost in microdollars and write to the persistent cost log.
 
-    Best-effort: pricing/logging failures return 0 cost and warn.
-    Never raises — cost tracking must not break the proxy request path.
+    Returns the cost in microdollars, or ``None`` when cost is unavailable (a
+    calculation/logging failure). Best-effort — never raises; cost tracking must
+    not break the proxy request path. Today the figure is still catalog-derived
+    (``confidence="inferred"``); Phase 2 replaces it with route-reported cost.
     """
     try:
-        from forge.core.models.pricing import calculate_cost, get_pricing
+        from forge.core.models.pricing import calculate_cost
 
         cost_micros = calculate_cost(model, input_tokens, output_tokens, cached_tokens)
-        pricing = get_pricing(model)
 
         log_request_cost(
             proxy_id=PROXY_ID or "unknown",
@@ -203,7 +204,8 @@ def _calc_and_log_cost(
             latency_ms=latency_ms,
             failed=failed,
             request_id=request_id,
-            pricing_source=pricing.source,
+            reporter=None,
+            confidence="inferred",
         )
 
         if cost_tracker is not None:
@@ -212,7 +214,30 @@ def _calc_and_log_cost(
         return cost_micros
     except Exception as e:
         logger.warning("Cost calculation failed for model=%s (non-fatal): %s", model, e)
-        return 0
+        return None
+
+
+def _request_cost_header(cost_micros: int | None) -> dict[str, str]:
+    """``X-Request-Cost`` only when this request reported a cost.
+
+    A ``None`` cost is "unavailable" — omit the header rather than emit a
+    misleading ``0.000000`` (and ``None / 1_000_000`` would raise).
+    """
+    if cost_micros is None:
+        return {}
+    return {"X-Request-Cost": f"{cost_micros / 1_000_000:.6f}"}
+
+
+def _cumulative_cost_header() -> dict[str, str]:
+    """``X-Cumulative-Cost`` only once at least one request has reported a cost.
+
+    A cumulative ``0.000000`` on a proxy that has only ever seen cost-unavailable
+    routes (e.g. Anthropic passthrough) is the same "unknown-as-zero" bug in header
+    form — omit it until there is real reported-cost evidence.
+    """
+    if proxy_metrics.cost_reported_requests <= 0:
+        return {}
+    return {"X-Cumulative-Cost": f"{proxy_metrics.total_cost_micros / 1_000_000:.6f}"}
 
 
 _CAP_CONFIG_KEY = {"daily": "per_day", "monthly": "per_month"}
@@ -721,7 +746,7 @@ async def _handle_anthropic_passthrough(raw_request: Request, request_id: str, *
         {
             "X-Resolved-Model": model,
             "X-Resolved-Tier": resolved_tier,
-            "X-Cumulative-Cost": f"{proxy_metrics.total_cost_micros / 1_000_000:.6f}",
+            **_cumulative_cost_header(),
         },
         spend_warning,
     )
@@ -975,7 +1000,7 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                 "X-Request-ID": request_id,
                 "X-Resolved-Tier": resolved_tier,
                 "X-Resolved-Model": actual_model_id,
-                "X-Cumulative-Cost": f"{proxy_metrics.total_cost_micros / 1_000_000:.6f}",
+                **_cumulative_cost_header(),
                 "Cache-Control": "no-cache",
                 "Connection": "keep-alive",
             }
@@ -1131,8 +1156,8 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                             "X-Request-ID": request_id,
                             "X-Resolved-Tier": resolved_tier,
                             "X-Resolved-Model": actual_model_id,
-                            "X-Request-Cost": f"{_cost / 1_000_000:.6f}",
-                            "X-Cumulative-Cost": f"{proxy_metrics.total_cost_micros / 1_000_000:.6f}",
+                            **_request_cost_header(_cost),
+                            **_cumulative_cost_header(),
                         },
                         spend_warning,
                     ),
@@ -1253,8 +1278,8 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                             "X-Request-ID": request_id,
                             "X-Resolved-Tier": resolved_tier,
                             "X-Resolved-Model": actual_model_id,
-                            "X-Request-Cost": f"{_rcost / 1_000_000:.6f}",
-                            "X-Cumulative-Cost": f"{proxy_metrics.total_cost_micros / 1_000_000:.6f}",
+                            **_request_cost_header(_rcost),
+                            **_cumulative_cost_header(),
                         },
                         spend_warning,
                     ),
