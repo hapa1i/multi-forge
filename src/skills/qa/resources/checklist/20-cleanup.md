@@ -22,6 +22,11 @@ rm -f ~/.forge/costs/requests/qa-fixture_*.jsonl
 rm -f ~/.forge/costs/verbs/qa-fixture_*.jsonl
 rm -f ~/.forge/costs/requests/*_qa-cap-seed.jsonl
 
+# Remove QA usage/status-line fixtures from metric-evidence checks.
+rm -f ~/.forge/usage/events/qa-usage-fixture_*.jsonl
+rm -f ~/.forge/usage/events/qa-forgecost_*.jsonl
+rm -f ~/.forge/cache/statusline/fcost-*.json
+
 # Remove test repo entirely (optional)
 # cd .. && rm -rf manual-testing/walkthrough/test-repo
 ```
