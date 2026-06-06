@@ -540,8 +540,9 @@ aggregates it with the manifest's `confirmed.policy.decisions` into a `SessionAc
 `CommandUsage` run/error/token/cost rows; decisions -> `PolicyActivity` supervisor allow/warn/deny + warnings, with
 `log_capped` when the decision log hit `MAX_DECISION_LOG`). The builder re-reads the manifest fresh from disk because
 hooks mutate `confirmed.*` during the run. `forge activity [session]` renders a table (`--json`/`--days`/`--all`); the
-launcher prints a one-line `render_summary_line(...)` on exit (host, sidecar, fork). Cost is reported-or-unavailable and
-may be partial (`cost_partial`); `forge proxy costs` is authoritative.
+launcher prints a one-line `render_summary_line(...)` on exit (host, sidecar, fork). Cost is reported-or-estimated
+(best-effort; the verb-snapshot aggregate contributes estimates) and may be partial (`cost_partial`);
+`forge proxy costs` is authoritative.
 
 Per-emitter session coverage (a per-session summary is honest about what it can attribute):
 

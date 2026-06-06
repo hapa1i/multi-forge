@@ -657,7 +657,7 @@ tip. This is the one session-end channel Claude Code does not suppress — non-b
 **warnings**) is hidden from you mid-session, so without this line a `warn` verdict is invisible:
 
 ```text
-Forge this session — supervisor: 12 checks (2 warn, 0 block, 3 errors) · ~$0.04 est · 21k tok · 2 workflows
+Forge this session — supervisor: 12 checks (2 warn, 0 block, 3 errors) · ~$0.04 · 21k tok · 2 workflows
 ```
 
 The `errors` count surfaces failed supervisor LLM calls directly — for example an OpenRouter content-filter rejection.

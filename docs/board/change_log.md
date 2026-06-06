@@ -62,9 +62,10 @@ no migration.
 **Verification**: 1582 `tests/src/cli` unit tests pass (incl. 9 `test_activity.py` + 2 flag-tolerant tombstone tests) +
 34 `test_capabilities.py` (incl. the `anthropic-passthrough` assertion); guard greps clean (`forge usage` → only the
 tombstone + rename notes; no unsafe dollar "exact"/"authoritative"); `forge activity --help` + both `forge usage`
-tombstone forms smoke-tested; `make pre-commit` clean. Integration `test_session_commands_integration.py` (updated to
-`forge activity`) + `test_audit_plumbing.py` to run before merge. Card stays in `doing/` — awaiting merge to `main` for
-the `doing/ → done/` lane move.
+tombstone forms smoke-tested; `make pre-commit` clean. Integration: the renamed-command test
+`test_session_commands_integration.py::TestActivityCommand` ran green (`-k Activity` → 1 passed, 5.8s, real wheel CLI in
+Docker); `test_audit_plumbing.py` is comment-only (optional re-run before merge). Card stays in `doing/` — awaiting
+merge to `main` for the `doing/ → done/` lane move.
 
 ## 2026-06-05
 

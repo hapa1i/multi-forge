@@ -491,8 +491,10 @@ deliberate, test-visible choice — not silently diverging.
   `forge usage my-session --all --json --days 7` reaches the rename message, not Click's "No such option". Honest scope
   in help/output ("Forge automation activity — not your full interactive session") and the blanket "Estimated spend
   only" label corrected to "reported-or-estimated, best-effort". `test_usage.py` → `test_activity.py` retargeted + 2
-  tombstone tests. Verified: `forge activity --help`, both `forge usage` forms tombstone; 9 unit + the renamed
-  integration test (`forge activity` at `test_session_commands_integration.py:781`).
+  tombstone tests. Verified: `forge activity --help`, both `forge usage` forms tombstone; 9 unit tests + the renamed
+  integration test **ran green**
+  (`./scripts/test-integration.sh tests/integration/cli/test_session_commands_integration.py -k Activity` → 1 passed,
+  5.8s, real wheel CLI in Docker).
 - [x] **Bug #8**: **verified clean, not swept.** A scoped grep of `src/forge` + docs found every "exact"/"authoritative"
   hit applied to tokens (`provider_usage_exact`, "exact tokens"), `request_id` joins (`proxy_request_exact`), enum
   names, or `forge proxy costs` authority — zero unsafe dollar prose survives Phases 2–5. The only substantive change
@@ -526,8 +528,9 @@ deliberate, test-visible choice — not silently diverging.
   presence). **Human promotes** — not yet moved into the durable body.
 - [x] Integration coverage: Phase 6 touches no hooks/session-lifecycle/proxy-runtime/installer **code** — only a CLI
   command rename + a `capabilities.py` line + docs. The one integration test that drives the renamed command
-  (`test_session_commands_integration.py`) was updated to `forge activity`; unit suites cover the rest. (Run it +
-  `test_audit_plumbing.py` before merge per CLAUDE.md.)
+  (`test_session_commands_integration.py::TestActivityCommand`) was updated to `forge activity` and **ran green**
+  (`-k Activity` → 1 passed, 5.8s, real wheel CLI in Docker). `test_audit_plumbing.py` is comment-only (no behavior
+  change) — optional to re-run before merge.
 - [x] Design docs + end-user docs reflect shipped behavior; `docs/auth_cost_metric.md` folded to an internal map.
 - [ ] **Move card `doing/ → done/` after final merge to `main`** — gated: branch not yet merged, no PR (user owns the
   PR/merge/lane-move). Phase 6 complete on branch 2026-06-06; awaiting merge.

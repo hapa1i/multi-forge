@@ -220,7 +220,8 @@ class TestRenderLine:
         line = render_summary_line(summary)
         assert line is not None
         assert "supervisor: 12 checks (2 warn, 0 block, 3 errors)" in line
-        assert "~$0.04 est" in line
+        assert "~$0.04" in line
+        assert " est" not in line  # the stale ' est' suffix was dropped (Phase 6 label honesty)
         assert "21k tok" in line
         assert "2 workflows" in line
         assert "1 subagent" in line
@@ -266,7 +267,7 @@ class TestRenderLine:
         )
         line = render_summary_line(summary)
         assert line is not None
-        assert "~$0.00 est" in line
+        assert "~$0.00" in line
 
 
 class TestSumForgeAddedCost:

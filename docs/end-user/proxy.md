@@ -447,15 +447,17 @@ forge proxy costs openrouter-anthropic         # Filter by proxy
 ```
 
 > **Per-session view:** `forge proxy costs` is the authoritative, **proxy-scoped** dollar view. For a **session-scoped**
-> rollup of what Forge did — supervisor checks (including failed ones), tokens, and *reported* cost (or *unavailable*) —
-> use [`forge activity [session]`](session.md#what-a-session-did-forge-activity--session-end-summary). The two are
+> rollup of what Forge did — supervisor checks (including failed ones), tokens, and *reported-or-estimated* cost
+> (best-effort, may be partial) — use
+> [`forge activity [session]`](session.md#what-a-session-did-forge-activity--session-end-summary). The two are
 > complementary: spend is billed per proxy; activity is attributed per session.
 
 ### Which surface answers which question?
 
 Forge surfaces cost and usage through several views with deliberately different scopes. Pick the one that matches your
-question — and read every dollar figure as **reported-or-unavailable** (Forge never prices a request from a local
-table):
+question. Forge never prices a request from a local table — a missing cost shows as `unavailable`, never invented (per
+the provenance column: `forge proxy costs` is reported-only; `forge activity` also includes best-effort verb-snapshot
+estimates):
 
 | Surface                                | Question it answers                               | Scope                                                                            | Cost provenance                                                                   |
 | -------------------------------------- | ------------------------------------------------- | -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
