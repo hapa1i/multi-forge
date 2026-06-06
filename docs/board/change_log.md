@@ -27,6 +27,40 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-06
 
+### Phase 6 review fixes: PR #18 adversarial review — headless retry/latch + cost-honesty edges
+
+**Goal**: A max-effort adversarial review of PR #18 (9 finder angles, each finding independently verified) surfaced one
+real correctness cluster plus several narrow honesty/robustness edges; fix the merge-gating ones on the branch before the
+`doing/ → done/` lane move.
+
+**Key changes**:
+
+- **Headless `--output-format json` retry/latch (the merge gate)**: tightened `_REJECTION_RE`
+  (`core/reactive/headless_json.py`) — dropped the bare `--output-format` alternative so a transient error echoing the
+  command line (e.g. a 529 printing the argv) no longer misfires the retry, which latched the JSON capability off
+  **process-wide** AND **double-billed** a proxied retry (no `request_id` dedupe on the cost log). `run_parallel`
+  (`core/invoker/claude.py`) retry spawn now mirrors the primary spawn's post-register `cleanup_started` re-check +
+  self-reap, closing a cancellation-hang gap (`shutdown(wait=True)` could otherwise block `timeout_seconds`).
+- **Launch resurrection guard**: `record_launch_confirmed` (`cli/launch_confirmation.py`) gained the `exists()` preflight
+  its sibling `_infer_launch_confirmation` documents — a session deleted mid-launch is no longer resurrected as a
+  lock-only directory.
+- **Negative-delta clamp**: `_compute_delta` (`core/reactive/cost_tracking.py`) clamps every delta `>= 0`, so a proxy
+  restart mid-verb can't log a negative cost that inflates the "Interactive" residual.
+- **`forge +$Y` predicate pinned**: `sum_forge_added_cost` now counts `{reported, gateway_calculated}` (not
+  reported-only) and excludes `inferred`/`unknown`/`unavailable` + the harness route via a typed
+  `ROUTE_CLAUDE_INTERACTIVE` constant (no bare string compare on a load-bearing exclusion).
+- **Legacy verb fallback removed**: `_verb_cost_reported` (`cli/proxy_costs.py`) trusts `cost_measured` only; a pre-PR
+  record (its total was a deleted-catalog estimate) reads as unavailable, never resurrected as reported.
+
+**Verification**: 5294 unit pass; blast-radius 1041 green; the new deterministic retry-cancellation race test 10/10;
+`make pre-commit` clean (mypy/pyright incl. the new `frozenset[Confidence]`); `test_status_line_integration.py` (13)
+green on the real wheel CLI. Fixes committed as `97b2098`.
+
+**Deferred (recorded as checklist debt, non-blocking)**: (1) `sum_forge_added_cost` reads the whole uncapped ledger per
+poll — add a session-start lower bound; (2) dormant `stream-json` parse branch — thread `output_format` through
+`parse_headless_envelope` or remove the advertised support; (3) duplication cleanup (verb/model aggregation in
+`proxy_costs.py`, direct-cost precedence in `emit.py`, the ×4 `isinstance(dict)` JSONL guard).
+
 ### Phase 6 follow-up: QA checklist metric-evidence coverage (audit-driven)
 
 **Goal**: After the Phase 6 docs/CLI cleanup, an adversarially-verified audit of `src/skills/qa/` + `docs/end-user/`

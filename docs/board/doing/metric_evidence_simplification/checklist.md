@@ -537,8 +537,29 @@ deliberate, test-visible choice — not silently diverging.
   §7.12 `forge activity` cost honesty, §7.13 provenance split, §7.14 rename tombstone, §8.5 `forge_cost` segment, §5.21
   `~` marker; test-count 512→532). Every `<!-- auto -->` fixture validated against real code on the host. See the
   `change_log.md` "Phase 6 follow-up" entry.
-- [ ] **Move card `doing/ → done/` after final merge to `main`** — gated: branch not yet merged, no PR (user owns the
-  PR/merge/lane-move). Phase 6 complete on branch 2026-06-06; awaiting merge.
+- [ ] **Move card `doing/ → done/` after final merge to `main`** — gated: branch not yet merged. **PR #18 open** (user
+  owns the merge/lane-move). Phase 6 complete on branch 2026-06-06; PR #18 review fixes landed (commit `97b2098`);
+  awaiting merge.
+
+## Post-Review Follow-ups (deferred, non-blocking)
+
+From the PR #18 adversarial review (2026-06-06). The merge-gating findings were fixed on the branch (commit `97b2098`,
+see the `change_log.md` "Phase 6 review fixes" entry). The items below are verified-but-narrow or cleanup; recorded here
+so the `doing/ → done/` move stays honest. Each can graduate to its own `todo/` card if not done before merge.
+
+- [ ] **Bound the `forge_cost` ledger scan**: `sum_forge_added_cost` (`core/ops/usage_summary.py`) calls
+  `read_usage_events(session=…)` with no `period_start`, so the opt-in `forge_cost` status segment re-globs +
+  JSON-parses the whole uncapped ledger every poll. Pass a session-start lower bound. Assertion: the hot-path call
+  passes a `period_start`; a multi-month ledger fixture is not fully re-parsed per poll.
+- [ ] **Resolve the dormant `stream-json` branch**: `structured_output.py` `_find_result_object` has a `stream-json`
+  branch, but callers never thread `output_format` into `parse_headless_envelope` (dead today; a future
+  `output_format="stream-json"` caller would silently drop cost/usage via a single `json.loads`). Thread the format
+  through both call sites, or remove the advertised support. Assertion: a `stream-json` request round-trips its
+  envelope, or the field/branch is gone.
+- [ ] **Duplication cleanup**: verb/model aggregation duplicated in `proxy_costs.py` (`_display_by_*` vs `_output_json`);
+  the direct `claude -p` cost-precedence rule duplicated in `emit.py` (`emit_usage_for_session_result` vs
+  `emit_worker_usage`); the `isinstance(record, dict)` JSONL guard copy-pasted across 4 readers. Extract shared helpers.
+  Assertion: each rule/guard lives once; the table vs JSON cost surfaces can't drift.
 
 ## Out of Scope (this card)
 
