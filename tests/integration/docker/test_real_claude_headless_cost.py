@@ -82,7 +82,7 @@ class TestRealClaudeHeadlessCost:
         assert result.returncode == 0, f"probe failed: stdout={result.stdout!r} stderr={result.stderr!r}"
         marker = next((ln for ln in result.stdout.splitlines() if ln.startswith("FORGE_RESULT=")), None)
         assert marker is not None, f"no FORGE_RESULT marker; stdout={result.stdout!r}"
-        payload = json.loads(marker[len("FORGE_RESULT="):])
+        payload = json.loads(marker[len("FORGE_RESULT=") :])
 
         assert payload["returncode"] == 0
         assert payload["success"] is True

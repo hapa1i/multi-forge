@@ -103,9 +103,7 @@ def _ok_proc(stdout: str) -> MagicMock:
 
 @patch("forge.core.invoker.claude.subprocess.run")
 @patch("forge.core.invoker.claude.subprocess.Popen")
-def test_invoker_fan_out_retries_once_without_flag_and_latches(
-    mock_popen: MagicMock, mock_run: MagicMock
-) -> None:
+def test_invoker_fan_out_retries_once_without_flag_and_latches(mock_popen: MagicMock, mock_run: MagicMock) -> None:
     # Primary spawn rejects the flag; the retry is a TRACKED Popen (not subprocess.run),
     # so it stays in `children` and remains terminable under cancellation (the fix).
     mock_popen.side_effect = [_reject_proc(), _ok_proc("raw fan-out text")]

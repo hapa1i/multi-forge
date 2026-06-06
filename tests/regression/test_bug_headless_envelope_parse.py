@@ -152,9 +152,7 @@ def test_non_numeric_cost_is_none() -> None:
 
 def test_bool_tokens_rejected() -> None:
     # JSON `true` is not a token count (bool is an int subclass -> must be rejected).
-    env = parse_headless_envelope(
-        _array_envelope(usage={"input_tokens": True, "output_tokens": 5})
-    )
+    env = parse_headless_envelope(_array_envelope(usage={"input_tokens": True, "output_tokens": 5}))
     assert env.parsed is True
     assert env.input_tokens is None
     assert env.output_tokens == 5
@@ -169,8 +167,6 @@ def test_missing_usage_block_leaves_tokens_none_but_parses() -> None:
 
 
 def test_is_error_true_is_surfaced() -> None:
-    env = parse_headless_envelope(
-        _array_envelope(is_error=True, subtype="error_during_execution")
-    )
+    env = parse_headless_envelope(_array_envelope(is_error=True, subtype="error_during_execution"))
     assert env.parsed is True
     assert env.is_error is True

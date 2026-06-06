@@ -65,7 +65,9 @@ class TestHeadlessCostReportContract:
         # .result must round-trip the model text (text consumers depend on this).
         assert env.result_text.strip(), "result text must be non-empty"
         # DECISION (direct API key): GO -> cost AND usage reported.
-        assert env.cost_micro_usd is not None, f"[COST-ABSENT] direct API key must report total_cost_usd (5a); {stderr!r}"
+        assert (
+            env.cost_micro_usd is not None
+        ), f"[COST-ABSENT] direct API key must report total_cost_usd (5a); {stderr!r}"
         assert env.cost_micro_usd >= 0
         assert env.input_tokens is not None, "[USAGE-ABSENT] usage.input_tokens must be reported"
         assert env.output_tokens is not None, "[USAGE-ABSENT] usage.output_tokens must be reported"

@@ -63,8 +63,22 @@ class TestUsdToMicros:
         def proxy_round(usd: float) -> int:
             return round(usd * 1_000_000)
 
-        realistic = [0.0269, 0.0299, 0.0023, 0.1, 0.07, 0.03, 1.23, 0.0,
-                     0.299999, 12.345678, 0.000001, 0.05, 2.5, 0.0011]
+        realistic = [
+            0.0269,
+            0.0299,
+            0.0023,
+            0.1,
+            0.07,
+            0.03,
+            1.23,
+            0.0,
+            0.299999,
+            12.345678,
+            0.000001,
+            0.05,
+            2.5,
+            0.0011,
+        ]
         for usd in realistic:
             assert hj.usd_to_micros(usd) == proxy_round(usd), usd
 

@@ -153,17 +153,34 @@ def test_exactly_one_reporter_across_the_matrix() -> None:
     # and a reported cost always pairs with a reporter (never an orphaned figure).
     emit_usage_for_session_result(
         _result(envelope_parsed=True, cost_micro_usd=7_000, input_tokens=1),
-        command="c-direct-self", cost=None, session="s1", base_url=None, direct=True,
+        command="c-direct-self",
+        cost=None,
+        session="s1",
+        base_url=None,
+        direct=True,
     )
     emit_usage_for_session_result(
         _result(envelope_parsed=True, cost_micro_usd=None, input_tokens=9),
-        command="c-direct-tokens", cost=None, session="s1", base_url=None, direct=True,
+        command="c-direct-tokens",
+        cost=None,
+        session="s1",
+        base_url=None,
+        direct=True,
     )
     emit_usage_for_session_result(
-        _result(), command="c-proxy-cost", cost=_proxy_cost(), session="s1", base_url="http://x",
+        _result(),
+        command="c-proxy-cost",
+        cost=_proxy_cost(),
+        session="s1",
+        base_url="http://x",
     )
     emit_usage_for_session_result(
-        _result(), command="c-none", cost=None, session="s1", base_url=None, direct=True,
+        _result(),
+        command="c-none",
+        cost=None,
+        session="s1",
+        base_url=None,
+        direct=True,
     )
 
     events = read_usage_events()

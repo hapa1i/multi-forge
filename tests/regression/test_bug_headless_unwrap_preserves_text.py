@@ -97,9 +97,7 @@ def test_non_envelope_stdout_falls_back_to_raw(mock_run: MagicMock) -> None:
 def test_token_only_envelope_keeps_tokens_without_cost(mock_run: MagicMock) -> None:
     # Direct OAuth: usage present but no dollar figure. envelope_parsed AND tokens
     # are set; cost is None (independent facts -- #1).
-    mock_run.return_value = MagicMock(
-        stdout=_envelope("text", total_cost_usd=None), stderr="", returncode=0
-    )
+    mock_run.return_value = MagicMock(stdout=_envelope("text", total_cost_usd=None), stderr="", returncode=0)
     result = run_claude_session("prompt")
 
     assert result.envelope_parsed is True
