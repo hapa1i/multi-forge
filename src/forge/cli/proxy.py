@@ -39,7 +39,7 @@ from rich.table import Table
 
 from forge.cli.output import print_error_with_tip, print_tip
 from forge.cli.proxy_audit import audit_cmd
-from forge.cli.proxy_costs import costs_cmd
+from forge.cli.proxy_costs import costs_group
 from forge.config.loader import (
     get_proxy_file_path,
     get_template_path,
@@ -95,7 +95,7 @@ def proxy() -> None:
     """
 
 
-proxy.add_command(costs_cmd)
+proxy.add_command(costs_group)
 proxy.add_command(audit_cmd)
 
 

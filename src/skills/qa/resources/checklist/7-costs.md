@@ -10,14 +10,14 @@
 # Use a guaranteed-empty proxy_id for empty-state tests.
 # Other sections (e.g., section 4 guided sessions) may have created real cost logs,
 # so we cannot assume global cost logs are empty.
-forge proxy costs qa-no-such-proxy 2>&1
+forge proxy costs show qa-no-such-proxy 2>&1
 echo "---"
-forge proxy costs qa-no-such-proxy --period all 2>&1
+forge proxy costs show qa-no-such-proxy --period all 2>&1
 echo "---"
-forge proxy costs qa-no-such-proxy --json
+forge proxy costs show qa-no-such-proxy --json
 ```
 
-- [ ] `forge proxy costs qa-no-such-proxy` shows `No cost data for today (qa-no-such-proxy).`
+- [ ] `forge proxy costs show qa-no-such-proxy` shows `No cost data for today (qa-no-such-proxy).`
 - [ ] `--period all` shows `No cost data for all (qa-no-such-proxy).`
 - [ ] `--json` returns valid JSON with `total_cost_micros: 0` and `total_requests: 0`
 
@@ -27,7 +27,7 @@ forge proxy costs qa-no-such-proxy --json
 
 ```bash
 # Verify JSON output schema using the empty-proxy filter (guaranteed empty)
-forge proxy costs qa-no-such-proxy --json | python3 -c "
+forge proxy costs show qa-no-such-proxy --json | python3 -c "
 import json, sys
 d = json.load(sys.stdin)
 fields = {'period','proxy_id','total_cost_micros','total_cost_usd','total_requests','interactive_cost_micros','by_verb','by_model','reported_requests','unavailable_requests'}
@@ -58,11 +58,11 @@ cat > ~/.forge/costs/requests/qa-fixture_99999.jsonl <<'EOF'
 EOF
 
 # Verify fixture is readable -- filter by qa-fixture to isolate from real proxy logs
-forge proxy costs qa-fixture --period all --json
+forge proxy costs show qa-fixture --period all --json
 ```
 
 - [ ] Fixture file created at `~/.forge/costs/requests/qa-fixture_99999.jsonl`
-- [ ] `forge proxy costs qa-fixture --period all --json` shows `total_cost_micros` of 5000 (300 + 1200 + 3500)
+- [ ] `forge proxy costs show qa-fixture --period all --json` shows `total_cost_micros` of 5000 (300 + 1200 + 3500)
 - [ ] `total_requests` is 3
 - [ ] `by_model` contains both `test/gemini-2.5-flash` and `test/gemini-3.1-pro-preview`
 
@@ -79,11 +79,11 @@ EOF
 
 # Verify verb attribution appears. Do not proxy-filter this check: verb logs are scoped
 # by resolved proxy base_url, while qa-fixture is only a request-log proxy_id fixture.
-forge proxy costs --period all 2>&1
+forge proxy costs show --period all 2>&1
 ```
 
 - [ ] Fixture file created at `~/.forge/costs/verbs/qa-fixture_99999.jsonl`
-- [ ] `forge proxy costs --period all` shows `qa-fixture-panel` verb in output
+- [ ] `forge proxy costs show --period all` shows `qa-fixture-panel` verb in output
 - [ ] Verb cost attributed to `qa-fixture-panel` (1500 micros)
 
 ### 7.5 Cost CLI Breakdowns
@@ -92,12 +92,12 @@ forge proxy costs --period all 2>&1
 
 ```bash
 # By-model breakdown -- filter to qa-fixture to isolate from real proxy logs
-forge proxy costs qa-fixture --by-model --period all 2>&1
+forge proxy costs show qa-fixture --by-model --period all 2>&1
 
 echo "---"
 
 # JSON with proxy_id filter
-forge proxy costs qa-fixture --period all --json
+forge proxy costs show qa-fixture --period all --json
 ```
 
 - [ ] `--by-model` table shows model names with cost and token columns
@@ -115,7 +115,7 @@ echo 'THIS_IS_NOT_JSON' >> ~/.forge/costs/requests/qa-fixture_99999.jsonl
 echo '<<<CORRUPT>>>' >> ~/.forge/costs/requests/qa-fixture_99999.jsonl
 
 # Cost CLI should skip malformed lines -- filter to qa-fixture for deterministic count
-forge proxy costs qa-fixture --period all --json 2>&1
+forge proxy costs show qa-fixture --period all --json 2>&1
 echo "EXIT=$?"
 ```
 
@@ -309,7 +309,7 @@ forge proxy start "$FORGE_QA_OPENAI_PROXY"
 `forge activity [session]` reads the usage-attribution ledger (`~/.forge/usage/events/`) filtered by session. Seed
 fixture events for a throwaway session and assert the rollup -- including the workflow worker/verb split (one panel = 1
 call + N workers, not N+1 calls) and the cost-honesty rendering: the aggregate cost is reported-or-estimated/best-effort
-(flagged with `~` and a footnote), while `forge proxy costs` is the authoritative spend view.
+(flagged with `~` and a footnote), while `forge proxy costs show` is the authoritative spend view.
 
 ```bash
 cd $FORGE_TEST_REPO
@@ -365,17 +365,17 @@ forge session delete qa-usage --yes --force 2>/dev/null || true
   `Total: 7 events` line
 - [ ] Human render cost honesty: the `Total:` line carries a `~` best-effort marker, and the footnotes include
   `best-effort and partial` and `reported-or-estimated` (the always-on
-  `'forge proxy costs' is the authoritative spend view` pointer)
+  `'forge proxy costs show' is the authoritative spend view` pointer)
 - [ ] Fixture shard + `qa-usage` session removed at the end
 
 ### 7.13 Cost Provenance (reported vs `unavailable`)
 
 <!-- auto -->
 
-The north star: a missing cost shows as `unavailable`, never invented from a local price table. `forge proxy costs` (the
-authoritative view) counts a request with no reported cost in `unavailable_requests` and excludes it from the dollar
-total -- it is never summed as `0`. Uses an isolated `qa-prov` proxy_id so the shared `qa-fixture` 3-request invariant
-(7.5/7.6) is untouched.
+The north star: a missing cost shows as `unavailable`, never invented from a local price table. `forge proxy costs show`
+(the authoritative view) counts a request with no reported cost in `unavailable_requests` and excludes it from the
+dollar total -- it is never summed as `0`. Uses an isolated `qa-prov` proxy_id so the shared `qa-fixture` 3-request
+invariant (7.5/7.6) is untouched.
 
 ```bash
 mkdir -p ~/.forge/costs/requests
@@ -384,7 +384,7 @@ cat > ~/.forge/costs/requests/qa-fixture_prov-99999.jsonl <<'EOF'
 {"ts":"2026-05-01T00:01:00Z","proxy_id":"qa-prov","model":"test/gemini-3.1-pro-preview","tier":"sonnet","input_tokens":500,"output_tokens":150,"cached_tokens":0,"cost_micros":null,"reporter":"provider","confidence":"unavailable","latency_ms":300.0,"failed":false,"request_id":"req-prov-002"}
 EOF
 
-forge proxy costs qa-prov --period all --json | python3 -c "
+forge proxy costs show qa-prov --period all --json | python3 -c "
 import json, sys
 d = json.load(sys.stdin)
 print(f'total_requests={d[\"total_requests\"]}')
@@ -398,7 +398,7 @@ rm -f ~/.forge/costs/requests/qa-fixture_prov-99999.jsonl
 
 - [ ] `total_requests=2 reported=1 unavailable=1` (the null-cost `req-prov-002` is counted as unavailable, not dropped)
 - [ ] `total_cost_micros=2500` -- the missing cost is NOT summed as 0 and NOT priced from a local table
-  (reported-or-unavailable: the authoritative `forge proxy costs` view never invents a dollar figure)
+  (reported-or-unavailable: the authoritative `forge proxy costs show` view never invents a dollar figure)
 - [ ] Provenance fixture removed at the end
 
 ### 7.14 Renamed-command Tombstone (`forge usage` -> `forge activity`)
@@ -420,5 +420,65 @@ forge usage my-session --all --json --days 7 2>&1; echo "EXIT=$?"
   `forge activity`
 - [ ] `forge usage my-session --all --json --days 7` also reaches the rename message (no `No such option`) -- the stale
   args/flags are swallowed, not parsed
+
+### 7.15 Reset Telemetry (`forge proxy costs reset`)
+
+<!-- auto -->
+
+<!-- destructive -->
+
+`forge proxy costs reset` wipes every recorded cost + usage plane to zero: request cost logs
+(`~/.forge/costs/requests/`), verb cost logs (`~/.forge/costs/verbs/`), and the usage-attribution ledger
+(`~/.forge/usage/events/`). It also clears the **derived** status-line cost cache
+(`~/.forge/cache/statusline/fcost-*.json`) so `forge +$Y` recomputes from the now-empty ledger instead of replaying a
+cached value within its TTL — but the unrelated transcript cache-hit entries (`{digest}.json`) survive, and the audit
+plane (`~/.forge/audit/`) is left untouched. `--dry-run` lists what would go without deleting; `--yes` skips the confirm
+prompt. A running proxy keeps its cost totals AND cap counters in memory (a separate process the CLI cannot reach), so
+the command prints a restart tip rather than claiming a live proxy's cumulative cost/caps are zeroed. This is
+destructive: it clears all cost telemetry in the container, so it runs last in section 7.
+
+```bash
+# Seed one shard in each of the three reset planes, an audit sentinel that must survive,
+# a derived fcost cache that must clear, and a cache-hit entry that must survive.
+mkdir -p ~/.forge/costs/requests ~/.forge/costs/verbs ~/.forge/usage/events ~/.forge/audit ~/.forge/cache/statusline
+echo '{"ts":"2026-05-01T00:00:00Z","proxy_id":"qa-reset","model":"test/x","tier":"haiku","input_tokens":1,"output_tokens":1,"cached_tokens":0,"cost_micros":100,"reporter":"litellm","confidence":"gateway_calculated","latency_ms":1.0,"failed":false,"request_id":"qa-reset-1"}' > ~/.forge/costs/requests/qa-reset_99999.jsonl
+echo '{"ts":"2026-05-01T00:00:00Z","proxy_id":"qa-reset","verb":"qa","cost_micros":100}' > ~/.forge/costs/verbs/qa-reset_99999.jsonl
+echo '{"schema_version":1,"run_id":"qa-reset-r1","root_run_id":"qa-reset-r1","runtime":"claude_code","command":"qa","status":"success","attribution_granularity":"verb","cost_micro_usd":100,"ts":"2026-05-01T00:00:00Z"}' > ~/.forge/usage/events/qa-reset_99999.jsonl
+echo '{"qa":"audit-sentinel"}' > ~/.forge/audit/qa-reset-sentinel.jsonl
+echo '{"version":1,"computed_at":0,"cost_micro_usd":9999}' > ~/.forge/cache/statusline/fcost-qareset.json
+echo '{"version":1,"cache_hit_rate":0.5}' > ~/.forge/cache/statusline/qaresetdigest.json
+
+# Dry-run must LIST the planes + the cache and delete nothing.
+forge proxy costs reset --dry-run 2>&1
+echo "---"
+
+# Real reset (non-interactive).
+forge proxy costs reset --yes 2>&1
+echo "---"
+
+# Verify the planes + fcost cache are empty, while audit + cache-hit survive.
+echo "requests=$(ls ~/.forge/costs/requests/*.jsonl 2>/dev/null | wc -l | tr -d ' ')"
+echo "verbs=$(ls ~/.forge/costs/verbs/*.jsonl 2>/dev/null | wc -l | tr -d ' ')"
+echo "events=$(ls ~/.forge/usage/events/*.jsonl 2>/dev/null | wc -l | tr -d ' ')"
+echo "fcost=$(ls ~/.forge/cache/statusline/fcost-*.json 2>/dev/null | wc -l | tr -d ' ')"
+echo "cache_hit=$(ls ~/.forge/cache/statusline/qaresetdigest.json 2>/dev/null | wc -l | tr -d ' ')"
+echo "audit_sentinel=$(ls ~/.forge/audit/qa-reset-sentinel.jsonl 2>/dev/null | wc -l | tr -d ' ')"
+echo "---"
+
+# Second reset with nothing left is a clean no-op.
+forge proxy costs reset --yes 2>&1
+
+# Clean up the audit sentinel + the surviving cache-hit entry.
+rm -f ~/.forge/audit/qa-reset-sentinel.jsonl ~/.forge/cache/statusline/qaresetdigest.json
+```
+
+- [ ] `--dry-run` prints `The following will be removed:` with a `request cost logs`, `verb cost logs`, `usage ledger`,
+  and `status-line cost cache` line, then `(dry-run) Nothing deleted.` -- and the planes still hold their shards
+- [ ] `--yes` prints `Reset complete: removed N telemetry file(s).` (N >= 4) followed by the `Tip:` restart guidance
+  naming `forge proxy stop <id>` / `forge proxy start <id>`
+- [ ] After the real reset: `requests=0 verbs=0 events=0 fcost=0` (planes + derived cost cache cleared) while
+  `cache_hit=1` (transcript cache-hit untouched) and `audit_sentinel=1` (audit plane untouched)
+- [ ] The second `reset --yes` with nothing left prints `No cost or usage telemetry to reset.` (clean no-op, no error)
+- [ ] Audit sentinel + cache-hit entry removed at the end
 
 ---

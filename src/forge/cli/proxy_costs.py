@@ -14,6 +14,9 @@ import click
 from rich.console import Console
 from rich.table import Table
 
+from forge.cli.output import print_tip
+from forge.core.paths import display_path, get_forge_home
+
 console = Console(stderr=True)
 
 
@@ -88,7 +91,16 @@ def _verb_cost_reported(record: dict) -> bool:
     return bool(record.get("cost_measured", False))
 
 
-@click.command("costs")
+@click.group("costs")
+def costs_group() -> None:
+    """Show or reset proxy cost telemetry.
+
+    'show' renders the cost summary; 'reset' wipes all recorded cost + usage
+    telemetry. Run a subcommand (a bare 'forge proxy costs' prints this help).
+    """
+
+
+@costs_group.command("show")
 @click.argument("proxy_id", required=False, default=None)
 @click.option(
     "--period",
@@ -99,7 +111,7 @@ def _verb_cost_reported(record: dict) -> bool:
 @click.option("--by-model", is_flag=True, help="Breakdown by model")
 @click.option("--by-verb", is_flag=True, help="Breakdown by verb (default view)")
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
-def costs_cmd(
+def show_cmd(
     proxy_id: str | None,
     period: str,
     by_model: bool,
@@ -110,11 +122,11 @@ def costs_cmd(
 
     \b
     Examples:
-        forge proxy costs                    # Today's costs, by verb
-        forge proxy costs --by-model         # Today's costs, by model
-        forge proxy costs --period week      # This week
-        forge proxy costs --period all       # All time
-        forge proxy costs openrouter         # Filter by proxy
+        forge proxy costs show                    # Today's costs, by verb
+        forge proxy costs show --by-model         # Today's costs, by model
+        forge proxy costs show --period week      # This week
+        forge proxy costs show --period all       # All time
+        forge proxy costs show openrouter         # Filter by proxy
 
     \b
     Tip: pair with 'forge proxy set <id> costs.caps.per_month=<amount>' to keep
@@ -378,3 +390,72 @@ def _output_json(
         "by_model": model_summary,
     }
     click.echo(json.dumps(output, indent=2))
+
+
+# Reset wipes the on-disk planes Forge records spend/usage into, plus the derived
+# status-line cost cache that would otherwise replay a stale `forge +$Y` within its TTL.
+# Each target carries its own glob (planes shard as `*.jsonl`; the cache as `fcost-*.json`).
+# Audit records (audit/) are a separate redacted-wire plane and are intentionally NOT
+# touched. In-memory proxy state (ProxyMetrics totals, cap counters) lives in a separate
+# process the CLI cannot reach -- the printed tip points at a restart for those.
+_RESET_TARGETS: tuple[tuple[str, tuple[str, ...], str], ...] = (
+    ("request cost logs", ("costs", "requests"), "*.jsonl"),
+    ("verb cost logs", ("costs", "verbs"), "*.jsonl"),
+    ("usage ledger", ("usage", "events"), "*.jsonl"),
+    ("status-line cost cache", ("cache", "statusline"), "fcost-*.json"),
+)
+
+
+@costs_group.command("reset")
+@click.option("--yes", is_flag=True, help="Skip the confirmation prompt.")
+@click.option("--dry-run", is_flag=True, help="List what would be removed without deleting.")
+def reset_cmd(yes: bool, dry_run: bool) -> None:
+    """Reset all recorded cost and usage telemetry to zero.
+
+    Deletes the request cost logs, verb cost logs, the usage-attribution ledger, and the
+    derived status-line cost cache (`forge +$Y`) under FORGE_HOME. Audit records are left
+    untouched. This is irreversible.
+
+    A running proxy keeps its cost totals AND cap counters in memory until restarted, so a
+    live proxy's cumulative-cost header, snapshot, and `forge proxy costs show` figures do
+    not zero until it is restarted (see the printed tip).
+    """
+    home = get_forge_home()
+    found = [
+        (label, home.joinpath(*parts), sorted(home.joinpath(*parts).glob(glob)))
+        for label, parts, glob in _RESET_TARGETS
+    ]
+    total_files = sum(len(shards) for _, _, shards in found)
+
+    if total_files == 0:
+        console.print("[dim]No cost or usage telemetry to reset.[/dim]")
+        return
+
+    console.print("[bold]The following will be removed:[/bold]")
+    for label, directory, shards in found:
+        if shards:
+            console.print(f"  {label}: {len(shards)} file(s) under {display_path(directory)}")
+
+    if dry_run:
+        console.print("[dim](dry-run) Nothing deleted.[/dim]")
+        return
+
+    if not yes:
+        click.confirm("Delete all of the above? This cannot be undone.", abort=True)
+
+    deleted = 0
+    for _, _, shards in found:
+        for shard in shards:
+            try:
+                shard.unlink()
+                deleted += 1
+            except OSError as e:
+                console.print(f"[yellow]Could not delete {display_path(shard)}: {e}[/yellow]")
+
+    console.print(f"Reset complete: removed {deleted} telemetry file(s).")
+    print_tip(
+        "A running proxy keeps its cost totals and cap counters in memory until restarted.",
+        "Restart any active proxy so its cumulative cost, snapshot, and caps also zero:",
+        commands=["forge proxy stop <id>", "forge proxy start <id>"],
+        console=console,
+    )

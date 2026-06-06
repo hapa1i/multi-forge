@@ -89,12 +89,13 @@ currently exact only on the direct `core.llm` path (the action tagger; see §14)
 
 ### 4. CLI read surfaces
 
-| Command                    | file:symbol                                                                                      | Reads                                                              | Output                                                                                                                                                                               |
-| -------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `forge proxy costs [id]`   | `cli/proxy_costs.py` `costs_cmd`                                                                 | planes 1 + 2                                                       | `--period today\|week\|month\|all`, `--by-model`, `--by-verb`, `--json`; computes "Interactive" as residual. **Authoritative spend view.**                                           |
-| `forge proxy metrics [id]` | `cli/proxy.py` `metrics_cmd`                                                                     | live `GET /`                                                       | per-tier/per-model, cache-hit, failures; `--json`, `--all`                                                                                                                           |
-| `forge activity [session]` | `cli/activity.py` `activity_cmd` -> `core/ops/usage_summary.py` `build_session_activity_summary` | plane 3 (session-filtered) + manifest `confirmed.policy.decisions` | per-command run/error/token/cost + conditional Workers column; supervisor allow/warn/deny; `--json/--days/--all`. **Reported-or-estimated; footnote points to `forge proxy costs`.** |
-| session-end line           | `usage_summary.py` `render_summary_line`                                                         | same builder                                                       | one-liner on exit (host/sidecar/fork launch paths)                                                                                                                                   |
+| Command                       | file:symbol                                                                                      | Reads                                                              | Output                                                                                                                                                                                    |
+| ----------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `forge proxy costs show [id]` | `cli/proxy_costs.py` `show_cmd`                                                                  | planes 1 + 2                                                       | `--period today\|week\|month\|all`, `--by-model`, `--by-verb`, `--json`; computes "Interactive" as residual. **Authoritative spend view.**                                                |
+| `forge proxy costs reset`     | `cli/proxy_costs.py` `reset_cmd`                                                                 | planes 1 + 2 + 3                                                   | deletes all cost + usage shards (`--yes`, `--dry-run`); audit plane untouched; running proxy keeps in-memory caps until restart                                                           |
+| `forge proxy metrics [id]`    | `cli/proxy.py` `metrics_cmd`                                                                     | live `GET /`                                                       | per-tier/per-model, cache-hit, failures; `--json`, `--all`                                                                                                                                |
+| `forge activity [session]`    | `cli/activity.py` `activity_cmd` -> `core/ops/usage_summary.py` `build_session_activity_summary` | plane 3 (session-filtered) + manifest `confirmed.policy.decisions` | per-command run/error/token/cost + conditional Workers column; supervisor allow/warn/deny; `--json/--days/--all`. **Reported-or-estimated; footnote points to `forge proxy costs show`.** |
+| session-end line              | `usage_summary.py` `render_summary_line`                                                         | same builder                                                       | one-liner on exit (host/sidecar/fork launch paths)                                                                                                                                        |
 
 `forge activity` honesty: joins two sources with different guarantees — the ledger (uncapped) for cost/tokens, and
 `confirmed.policy.decisions` (capped at `MAX_DECISION_LOG=100`) for supervisor verdicts. It re-reads the manifest fresh
@@ -138,11 +139,11 @@ Enforcement is process-local (run one proxy process per id for reliable caps).
 
 ### 7. Authoritative vs reported-or-estimated (units matter)
 
-| Surface             | Scope                                | Unit                                      | Caveat                                                                                                                                               |
-| ------------------- | ------------------------------------ | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Status-line `cost`  | the one interactive session rendered | `$` (declared api) / quota / `~$` (proxy) | **Claude's** native signal; never recomputed by Forge. `auto` shows quota-or-`≈$`, never `$` from key presence                                       |
-| `forge activity`    | one Forge session's ledger events    | reported `$` or `unavailable` + tokens    | `cost_partial` / `session_tagging_partial`; passthrough routes report no `$`; the session total is best-effort                                       |
-| `forge proxy costs` | one proxy's request log              | reported `$` or `unavailable`             | sums **route-reported** cost only (OpenRouter body / LiteLLM header); unreported requests are counted `unavailable`, never priced from a local table |
+| Surface                  | Scope                                | Unit                                      | Caveat                                                                                                                                               |
+| ------------------------ | ------------------------------------ | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Status-line `cost`       | the one interactive session rendered | `$` (declared api) / quota / `~$` (proxy) | **Claude's** native signal; never recomputed by Forge. `auto` shows quota-or-`≈$`, never `$` from key presence                                       |
+| `forge activity`         | one Forge session's ledger events    | reported `$` or `unavailable` + tokens    | `cost_partial` / `session_tagging_partial`; passthrough routes report no `$`; the session total is best-effort                                       |
+| `forge proxy costs show` | one proxy's request log              | reported `$` or `unavailable`             | sums **route-reported** cost only (OpenRouter body / LiteLLM header); unreported requests are counted `unavailable`, never priced from a local table |
 
 See `design_appendix.md §A.9/§A.13` and `end-user/proxy.md` ("which surface answers which question?") for the
 user-facing version.
@@ -268,12 +269,12 @@ native-runtime path that records subscription provenance directly.
 
 ### 17. Auth/declaration state -> what each surface reports
 
-| State (this run)                        | Interactive billing (status line)               | Headless verb billing (ledger)                | Proxy plane                                |
-| --------------------------------------- | ----------------------------------------------- | --------------------------------------------- | ------------------------------------------ |
-| `cost_mode=auto`, `rate_limits` present | quota (`RL:N%`)                                 | `direct=true,key=true` -> `api`               | n/a                                        |
-| `cost_mode=auto`, no `rate_limits`      | hedged `≈$` (never plain `$` from key presence) | `api` or `unknown` by key                     | n/a                                        |
-| `cost_mode=api` (declared)              | real `$` (Claude's `total_cost_usd`)            | `api` or `unknown` by key                     | n/a                                        |
-| Proxy mode (`ANTHROPIC_BASE_URL` set)   | proxy `~$` reported (may undercount)            | `direct=false` -> `unknown` (upstream opaque) | `forge proxy costs` (reported/unavailable) |
+| State (this run)                        | Interactive billing (status line)               | Headless verb billing (ledger)                | Proxy plane                                     |
+| --------------------------------------- | ----------------------------------------------- | --------------------------------------------- | ----------------------------------------------- |
+| `cost_mode=auto`, `rate_limits` present | quota (`RL:N%`)                                 | `direct=true,key=true` -> `api`               | n/a                                             |
+| `cost_mode=auto`, no `rate_limits`      | hedged `≈$` (never plain `$` from key presence) | `api` or `unknown` by key                     | n/a                                             |
+| `cost_mode=api` (declared)              | real `$` (Claude's `total_cost_usd`)            | `api` or `unknown` by key                     | n/a                                             |
+| Proxy mode (`ANTHROPIC_BASE_URL` set)   | proxy `~$` reported (may undercount)            | `direct=false` -> `unknown` (upstream opaque) | `forge proxy costs show` (reported/unavailable) |
 
 No surface unifies them; the ledger is the closest unifier but **cannot see the interactive OAuth session's quota
 consumption** (Forge is not the HTTP client for it). `forge +$Y` (`forge_cost`) deliberately shows only Forge's *added*
@@ -300,7 +301,7 @@ spend, never the main harness.
 - **F6 — Proxy spend is reported-or-unavailable; Forge is not a cost oracle.** Plane 1 writes the cost a route actually
   reported (`reporter` + `confidence`: OpenRouter body `usage.cost` → `reported`, LiteLLM header → `gateway_calculated`)
   or `cost_micros:null` / `confidence:"unavailable"` when none did (Anthropic passthrough; LiteLLM streaming). No local
-  price table. Spend caps fire only for routes that report cost; `forge proxy costs` sums reported cost only and is
+  price table. Spend caps fire only for routes that report cost; `forge proxy costs show` sums reported cost only and is
   still not a provider invoice.
 
 > **Operator playbook (shipped controls).** To show subscription quota on the status line:
@@ -324,7 +325,7 @@ spend, never the main harness.
 | Usage emitters              | `core/usage/emit.py` `emit_*`; `_anthropic_key_present`                                                                                                     |
 | Billing classifier          | `core/usage/billing.py` `infer_billing_mode`                                                                                                                |
 | Per-session read            | `cli/activity.py` `activity_cmd`; `core/ops/usage_summary.py` `build_session_activity_summary`, `render_summary_line`, `sum_forge_added_cost`               |
-| Proxy cost CLI              | `cli/proxy_costs.py` `costs_cmd`; `cli/proxy.py` `metrics_cmd`                                                                                              |
+| Proxy cost CLI              | `cli/proxy_costs.py` `costs_group` (`show_cmd`, `reset_cmd`); `cli/proxy.py` `metrics_cmd`                                                                  |
 | Status-line cost            | `cli/statusline/registry.py` `_produce_cost`/`_produce_forge_cost`; `cli/status_line.py` `get_session_metrics`, `format_billing_cost`, `format_rate_limits` |
 | Status-line billing mode    | `cli/statusline/context.py` `billing_mode` (declaration: `cost_mode` + `rate_limits`; no key read)                                                          |
 | Credential registry         | `core/auth/capabilities.py` `CREDENTIALS`, `credentials_for_template`, `format_missing_credential_error`                                                    |

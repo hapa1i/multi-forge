@@ -2,9 +2,9 @@
 
 <!-- checklist: index -->
 
-<!-- version: 1.0.22 -->
+<!-- version: 1.0.23 -->
 
-<!-- test-count: 532 -->
+<!-- test-count: 537 -->
 
 <!-- last-updated: 2026-06-06 -->
 
@@ -12,12 +12,13 @@
 
 **Test Repo**: `$FORGE_TEST_REPO`
 
-**Last updated**: 2026-06-06 (metric-evidence cost-honesty coverage: `forge activity` cost footnotes/`~` marker (7.12),
-cost provenance reported-vs-`unavailable` split (7.13), `forge usage`->`forge activity` tombstone (7.14), the
-`forge_cost`/`forge +$Y` status-line segment with harness exclusion (8.5), session-end `~` marker (5.21), and the §3.4
-secret-vs-non-secret masking fix (OPENROUTER_BASE_URL shown in full); earlier: renamed the per-session command to
-`forge activity` (7.12/5.21), status-line customization checks (§8.4), the workflow worker/verb double-count assertion
-(7.12), non-interactive docker-exec fixes, policy `--session` targeting, memory 16.4 re-track)
+**Last updated**: 2026-06-06 (cost CLI is now a group: `forge proxy costs` -> `forge proxy costs show`, plus new
+`forge proxy costs reset` telemetry-wipe coverage (7.15); metric-evidence cost-honesty coverage: `forge activity` cost
+footnotes/`~` marker (7.12), cost provenance reported-vs-`unavailable` split (7.13), `forge usage`->`forge activity`
+tombstone (7.14), the `forge_cost`/`forge +$Y` status-line segment with harness exclusion (8.5), session-end `~` marker
+(5.21), and the §3.4 secret-vs-non-secret masking fix (OPENROUTER_BASE_URL shown in full); earlier: renamed the
+per-session command to `forge activity` (7.12/5.21), status-line customization checks (§8.4), the workflow worker/verb
+double-count assertion (7.12), non-interactive docker-exec fixes, policy `--session` targeting, memory 16.4 re-track)
 
 ---
 

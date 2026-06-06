@@ -5,7 +5,7 @@ immediately after ``json.loads``, assuming every line decodes to a dict. A valid
 line (``[]``, ``"x"``, ``1``) raised ``AttributeError`` -- NOT caught by the file-level
 ``except OSError`` (it subclasses ``Exception``, not ``OSError``), so it escaped the reader and
 aborted the ENTIRE read, dropping every shard's records and crashing the caller (e.g.
-``forge proxy costs`` / ``forge proxy audit show``). The contract is "skip malformed records," so
+``forge proxy costs show`` / ``forge proxy audit show``). The contract is "skip malformed records," so
 one bad line must not nuke the read.
 
 Root cause / fix: guard with ``isinstance(record, dict)`` before ``.get``, mirroring

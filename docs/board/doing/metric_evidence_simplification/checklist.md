@@ -570,6 +570,47 @@ follow-up: deferred cleanups" entry.
   `test_emit.py::TestDirectCostProvenance` + `TestVerbWorkerPrecedenceInvariant` (direct verb == worker; proxied
   diverges — no double-count).
 
+## Added Capability — `forge proxy costs reset` (user-requested, folded into PR #18, 2026-06-06)
+
+User asked for a "reset all costs to zero" path while manually testing the branch. Chosen shape (via AskUserQuestion):
+build the command, reset **everything Forge recorded** (the three telemetry planes — not the audit plane), fold into the
+current branch / PR #18. This forced the cost CLI from a single command into a group (Click consumes the first
+positional as a subcommand, colliding with the `proxy_id` arg), a research-preview clean break: `forge proxy costs [id]`
+→ `forge proxy costs show [id]` (house convention "groups orient, leaves act"; precedent `forge config` →
+`forge config show`).
+
+**Review follow-up (2026-06-06)**: a self-review flagged that wiping the JSONL planes leaves *derived* cost displays
+stale. Two classes of stale state, fixed asymmetrically: (1) the **status-line cost cache**
+(`cache/statusline/fcost-*.json`) is on-disk and Forge-owned, so reset now clears it (else `forge +$Y` replays a cached
+value within its TTL after the ledger is empty); (2) a **live proxy's** `ProxyMetrics.total_cost_micros` + `CostTracker`
+cap counters live in a separate process the CLI cannot reach, so the printed `Tip:` was broadened to say cost totals
+(cumulative-cost header, snapshot, `forge proxy costs show`) AND caps stay until restart — not just "cap enforcement".
+`_RESET_PLANES` → `_RESET_TARGETS` (now carries a per-entry glob: planes `*.jsonl`, cache `fcost-*.json`).
+
+| Task                               | Assertion                                                                   | Verification                                                                                       |
+| ---------------------------------- | --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `costs` becomes a group            | bare `forge proxy costs` prints group help, exit 0                          | smoke test in `/tmp/forge-reset-test` (exit 0, help shown)                                         |
+| `show` leaf preserves old behavior | `forge proxy costs show [id] --json/--period/--by-model` unchanged          | `test_proxy_costs.py` (25 passed; invocations now `["show", ...]`)                                 |
+| `reset` wipes 3 planes             | `costs/requests` + `costs/verbs` + `usage/events` shards deleted            | `TestCostsReset::test_yes_wipes_all_three_planes`                                                  |
+| `reset` clears derived fcost cache | `cache/statusline/fcost-*.json` cleared; cache-hit `{digest}.json` survives | `TestCostsReset::test_clears_fcost_cache_but_not_cache_hit_entries`                                |
+| `reset` spares audit               | `~/.forge/audit/**` untouched                                               | `TestCostsReset::test_leaves_audit_plane_untouched`                                                |
+| `--dry-run` lists, deletes nothing | planes intact after dry-run                                                 | `TestCostsReset::test_dry_run_lists_but_deletes_nothing`                                           |
+| confirm gate                       | bare `reset` aborts on `n` (non-zero), keeps files                          | `TestCostsReset::test_confirmation_abort_keeps_files`                                              |
+| empty no-op                        | `reset` with nothing recorded prints `No cost or usage telemetry to reset.` | `TestCostsReset::test_empty_is_noop`                                                               |
+| restart caveat surfaced            | after delete, a `Tip:` names `forge proxy stop/start <id>` + cost totals    | `print_tip` in `reset_cmd`; honest — `ProxyMetrics` totals + `CostTracker` caps live until restart |
+
+- [x] **Production**: `proxy_costs.py` (`costs_cmd` → `costs_group` + `show_cmd` + `reset_cmd`; `_RESET_TARGETS` with
+  the 4th derived-cache target); `proxy.py` registers `costs_group`. **Verified**: 25 unit tests + manual smoke (dry-run
+  lists, `--yes` wiped files + printed restart tip, post-reset `show` reads zero).
+- [x] **Docs**: design.md (§4.0 rows for `show`/`reset`), design_appendix.md (§A.9 reset paragraph), end-user
+  `proxy.md`/`session.md`/`config.md`, `auth_cost_metric.md` command-reference + file/symbol index (`costs_group`); all
+  `forge proxy costs` invocations → `show`. Source/test comments naming the runnable view (`usage_summary.py`,
+  `metrics.py`, `cost_tracking.py`, `test_bug_cost_log_non_dict_line.py`, `test_cost_tracking.py`) updated; board
+  change_log/card *history* left as-is.
+- [x] **QA**: `7-costs.md` invocations → `show` (13), footnote assertion → `'forge proxy costs show'` (mirrors the
+  `activity.py` `notes.append`), new §7.15 reset section (dry-run, wipe-3-planes, audit-spared, empty no-op, restart
+  tip); index test-count 532 → 537, version 1.0.22 → 1.0.23.
+
 ## Out of Scope (this card)
 
 - MITM-by-default / always-on proxy on the wire for harness traffic (runtime-abstraction Phase 2 territory).

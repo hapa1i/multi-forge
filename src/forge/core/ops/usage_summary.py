@@ -161,7 +161,7 @@ def render_summary_line(summary: SessionActivitySummary) -> str | None:
 
     if summary.total_cost_micro_usd is not None:
         # `~` flags the figure as approximate/best-effort (the aggregate mixes route-reported
-        # cost with verb-snapshot estimates); `forge proxy costs` is the authoritative view.
+        # cost with verb-snapshot estimates); `forge proxy costs show` is the authoritative view.
         parts.append(f"~${summary.total_cost_micro_usd / 1_000_000:.2f}")
 
     tokens = summary.total_input_tokens + summary.total_output_tokens

@@ -355,8 +355,13 @@ Cap enforcement is process-local. Each proxy process bootstraps from shared JSON
 is not coordinated across concurrent processes. To coordinate caps across processes, run a single proxy process per
 proxy ID.
 
-Cost logs accumulate indefinitely. Safely delete old JSONL files in `~/.forge/costs/`. The proxy re-bootstraps from
-remaining logs at next startup.
+Cost logs accumulate indefinitely. `forge proxy costs reset` wipes both cost-log planes (`costs/requests/` +
+`costs/verbs/`) **and** the usage-attribution ledger (`usage/events/`) to zero in one step, and clears the derived
+status-line cost cache (`cache/statusline/fcost-*.json`) so `forge +$Y` does not replay a cached value (audit records
+are a separate plane and are left untouched); it prompts for confirmation unless `--yes`, and `--dry-run` previews. You
+can also delete individual JSONL files under `~/.forge/costs/` by hand. Either way, a running proxy keeps its cost
+totals and cap counters in memory until restarted — it re-bootstraps from the remaining logs at next startup, so restart
+any active proxy to also zero its live cumulative cost and cap enforcement.
 
 ---
 
@@ -542,7 +547,7 @@ aggregates it with the manifest's `confirmed.policy.decisions` into a `SessionAc
 hooks mutate `confirmed.*` during the run. `forge activity [session]` renders a table (`--json`/`--days`/`--all`); the
 launcher prints a one-line `render_summary_line(...)` on exit (host, sidecar, fork). Cost is reported-or-estimated
 (best-effort; the verb-snapshot aggregate contributes estimates) and may be partial (`cost_partial`);
-`forge proxy costs` is authoritative.
+`forge proxy costs show` is authoritative.
 
 Per-emitter session coverage (a per-session summary is honest about what it can attribute):
 

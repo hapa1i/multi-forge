@@ -3,7 +3,7 @@ writer, workflow verbs) + policy decisions. NOT your full interactive Claude usa
 
 Reads the two already-captured planes (usage ledger + ``confirmed.policy.decisions``)
 via :func:`forge.core.ops.usage_summary.build_session_activity_summary` and renders a
-table. Cost is reported-or-estimated (best-effort attribution) — ``forge proxy costs``
+table. Cost is reported-or-estimated (best-effort attribution) — ``forge proxy costs show``
 stays the authoritative spend view.
 """
 
@@ -43,7 +43,7 @@ def activity_cmd(session: str | None, as_json: bool, days: int, all_time: bool) 
     and workflow verbs (panel/debate/...) — plus policy decisions. It is **not** your
     full interactive Claude usage. Reads the usage ledger and the session's
     policy-decision log. Cost is reported-or-estimated (best-effort attribution);
-    'forge proxy costs' is the authoritative spend view.
+    'forge proxy costs show' is the authoritative spend view.
 
     \b
     Examples:
@@ -151,7 +151,7 @@ def _footnotes(summary: SessionActivitySummary) -> list[str]:
         notes.append("policy decision log is at capacity — older decisions may not be shown")
     if summary.session_tagging_partial:
         notes.append("some calls (e.g. the action tagger) are not session-attributed")
-    notes.append("cost is reported-or-estimated, best-effort; 'forge proxy costs' is the authoritative spend view")
+    notes.append("cost is reported-or-estimated, best-effort; 'forge proxy costs show' is the authoritative spend view")
     return notes
 
 

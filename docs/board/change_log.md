@@ -27,6 +27,33 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-06
 
+### Added: `forge proxy costs reset` + `costs` → `costs show` group split (metric-evidence, PR #18)
+
+**Goal**: Give users a one-command "reset all recorded costs to zero" path (requested while manually testing the
+branch), covering every telemetry plane Forge writes — without touching the separate audit plane.
+
+**Key changes**:
+
+- **New `forge proxy costs reset`**: wipes the three telemetry planes — request cost logs (`~/.forge/costs/requests/`),
+  verb cost logs (`~/.forge/costs/verbs/`), and the usage-attribution ledger (`~/.forge/usage/events/`) — **plus** the
+  derived status-line cost cache (`~/.forge/cache/statusline/fcost-*.json`) so `forge +$Y` recomputes from the empty
+  ledger instead of replaying a cached value within its TTL. Audit (`~/.forge/audit/`) and the unrelated transcript
+  cache-hit entries are deliberately spared. `--dry-run` lists without deleting; `--yes` skips the confirm prompt.
+- **Honest restart caveat**: prints a `Tip:` naming `forge proxy stop/start <id>` because a live proxy holds its cost
+  totals (`ProxyMetrics` — cumulative-cost header, snapshot, `forge proxy costs show`) **and** cap counters in a
+  separate process the CLI cannot reach — file deletion alone does not zero a running proxy's reported cost or caps.
+- **CLI shape (research-preview clean break)**: `costs` had to become a group (Click consumes the first positional as a
+  subcommand, colliding with the optional `proxy_id`). `forge proxy costs [id]` → `forge proxy costs show [id]`; bare
+  `forge proxy costs` now prints group help ("groups orient, leaves act"; precedent `forge config` →
+  `forge config show`).
+- **Docs/QA synced**: design.md/appendix, end-user `proxy.md`/`session.md`/`config.md`, `auth_cost_metric.md`, and
+  source/test comments naming the runnable view all moved to `show`; QA `7-costs.md` invocations → `show` + new §7.15
+  reset section (index test-count 532 → 537). Board change_log/card *history* left intact (not rewritten).
+
+**Verification**: `test_proxy_costs.py` 25 passed (incl. `TestCostsReset`: dry-run-lists, wipe-3-planes,
+clears-fcost-cache/spares-cache-hit, audit-spared, confirm-abort, empty-noop); manual smoke in `/tmp/forge-reset-test`
+(dry-run listed, `--yes` wiped shards + printed the restart tip, post-reset `show` read zero). `make pre-commit` clean.
+
 ### Phase 6 follow-up: deferred cleanups folded in before closeout (metric-evidence)
 
 **Goal**: Close the three verified-but-narrow / cleanup follow-ups from the PR #18 review on the branch (rather than

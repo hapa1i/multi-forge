@@ -648,7 +648,7 @@ overlay. See [proxy.md](proxy.md) for proxy configuration.
 Two read surfaces report what Forge's automation did during a session (supervisor, memory writer, workflow verbs +
 policy decisions — **not** your full interactive Claude usage), over data the usage ledger and the policy-decision log
 already capture. Session-scoped spend figures are **best-effort attribution** (reported dollars, snapshot-attributed
-under concurrency) — `forge proxy costs` stays the authoritative dollar view (see
+under concurrency) — `forge proxy costs show` stays the authoritative dollar view (see
 [proxy.md](proxy.md#cost-tracking-and-spend-caps), and
 [which surface answers which question?](proxy.md#which-surface-answers-which-question) for when to use each).
 

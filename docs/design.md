@@ -938,7 +938,7 @@ reported-or-estimated cost) and the manifest's **`confirmed.policy.decisions`** 
 text, capped at `MAX_DECISION_LOG`). The aggregation is a UI-agnostic command-core builder
 (`forge.core.ops.usage_summary.build_session_activity_summary`, §3.12) shared by the CLI and a compact session-end line
 the launcher prints on exit (host, sidecar, and fork). Cost is reported-or-estimated (best-effort per-session
-attribution; may be partial; the verb-snapshot aggregate contributes estimates) — `forge proxy costs` stays the
+attribution; may be partial; the verb-snapshot aggregate contributes estimates) — `forge proxy costs show` stays the
 authoritative spend view. Events are scoped by the `session` field (`event.session == manifest.name`); emitters that do
 not tag a session (e.g. the action tagger) are not attributed to one, so the summary records that coverage is partial.
 See [design_appendix.md §A.13](design_appendix.md#a13-usage-attribution-ledger-schema-314) for the read surface and
@@ -1019,25 +1019,27 @@ default to the parent cache; `edit`/`diff` resolve a child (inferred when the pa
 
 #### Proxy management
 
-| Command                              | Purpose                                                 |
-| ------------------------------------ | ------------------------------------------------------- |
-| `forge proxy create <template>`      | Create a proxy from template and start it               |
-| `forge proxy list`                   | List all proxies (`--json`)                             |
-| `forge proxy show <id>`              | Show proxy configuration (`--json`, `--raw`)            |
-| `forge proxy edit <id>`              | Edit proxy overlay in $EDITOR                           |
-| `forge proxy set <id> <key>=<value>` | Set a proxy configuration value                         |
-| `forge proxy start <id>`             | Start server for existing proxy                         |
-| `forge proxy stop <id>`              | Stop server (keeps config)                              |
-| `forge proxy delete <id>...`         | Delete one or more proxies (`--all` for bulk deletion)  |
-| `forge proxy clean`                  | Remove stale proxies (dead pids)                        |
-| `forge proxy validate <id>`          | Validate proxy configuration                            |
-| `forge proxy metrics [id]`           | Show runtime metrics (`--json`, `--all`)                |
-| `forge proxy audit show [id]`        | Show redacted audit records (hashes/counts, no secrets) |
-| `forge proxy audit diff [id]`        | Show system/tool drift + override mutations over time   |
-| `forge proxy template list`          | List available templates                                |
-| `forge proxy template show <name>`   | Show template configuration (`--raw`)                   |
-| `forge proxy template edit <name>`   | Customize a template (copy-on-first-edit)               |
-| `forge proxy template reset <name>`  | Reset template to built-in defaults                     |
+| Command                              | Purpose                                                             |
+| ------------------------------------ | ------------------------------------------------------------------- |
+| `forge proxy create <template>`      | Create a proxy from template and start it                           |
+| `forge proxy list`                   | List all proxies (`--json`)                                         |
+| `forge proxy show <id>`              | Show proxy configuration (`--json`, `--raw`)                        |
+| `forge proxy edit <id>`              | Edit proxy overlay in $EDITOR                                       |
+| `forge proxy set <id> <key>=<value>` | Set a proxy configuration value                                     |
+| `forge proxy start <id>`             | Start server for existing proxy                                     |
+| `forge proxy stop <id>`              | Stop server (keeps config)                                          |
+| `forge proxy delete <id>...`         | Delete one or more proxies (`--all` for bulk deletion)              |
+| `forge proxy clean`                  | Remove stale proxies (dead pids)                                    |
+| `forge proxy validate <id>`          | Validate proxy configuration                                        |
+| `forge proxy metrics [id]`           | Show runtime metrics (`--json`, `--all`)                            |
+| `forge proxy costs show [id]`        | Show cost summary (`--period`, `--by-model`, `--by-verb`, `--json`) |
+| `forge proxy costs reset`            | Wipe all cost + usage telemetry to zero (`--yes`, `--dry-run`)      |
+| `forge proxy audit show [id]`        | Show redacted audit records (hashes/counts, no secrets)             |
+| `forge proxy audit diff [id]`        | Show system/tool drift + override mutations over time               |
+| `forge proxy template list`          | List available templates                                            |
+| `forge proxy template show <name>`   | Show template configuration (`--raw`)                               |
+| `forge proxy template edit <name>`   | Customize a template (copy-on-first-edit)                           |
+| `forge proxy template reset <name>`  | Reset template to built-in defaults                                 |
 
 #### Claude Code management
 
