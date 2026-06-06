@@ -40,6 +40,11 @@ class RenderContext:
     is_session_authoritative: bool
     config: RuntimeConfig
 
+    # FORGE_FORGE_ROOT (None for ambient sessions). Namespaces the forge_cost
+    # throttle cache key so same-named sessions in different forge roots don't
+    # collide; not part of any ledger query (the ledger filters by session name).
+    forge_root: str | None = None
+
     # Set by render_segments() to the resolved render order, so a producer can
     # see what else is active (e.g. rate_limits suppresses itself when cost
     # already shows the quota). Empty until render_segments runs.

@@ -294,6 +294,11 @@ def _prepare_worker(
         model=route.model_ref,
         provider=route.provider,
         proxy_id=routing_result.proxy_id,
+        # base_url drives Phase 5 cost precedence (None = direct -> runtime self-report
+        # may count; set = proxied -> the verb aggregate holds the cost). output_format
+        # defaults to "json" so the invoker injects --output-format (guarded); we never
+        # append it to `cmd` here, so the capability guard covers the review fan-out too.
+        base_url=routing_result.base_url,
         attribution=attribution,
     )
 

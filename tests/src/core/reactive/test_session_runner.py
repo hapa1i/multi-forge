@@ -73,7 +73,9 @@ class TestRunClaudeSession:
             stderr="",
             returncode=0,
         )
-        result = run_claude_session("hello")
+        # output_format=None isolates base-flag construction from the Phase 5
+        # --output-format json default (which has its own tests below).
+        result = run_claude_session("hello", output_format=None)
         assert result.success
         assert result.stdout == "response text"
         assert result.returncode == 0
@@ -88,7 +90,7 @@ class TestRunClaudeSession:
     @patch("forge.core.reactive.session_runner.subprocess.run")
     def test_resume_id_adds_flag(self, mock_run):
         mock_run.return_value = MagicMock(stdout="", stderr="", returncode=0)
-        run_claude_session("prompt", resume_id="abc-123")
+        run_claude_session("prompt", resume_id="abc-123", output_format=None)
 
         cmd = mock_run.call_args[0][0]
         assert cmd == ["claude", "-p", "--resume", "abc-123"]
@@ -96,7 +98,7 @@ class TestRunClaudeSession:
     @patch("forge.core.reactive.session_runner.subprocess.run")
     def test_model_adds_flag(self, mock_run):
         mock_run.return_value = MagicMock(stdout="", stderr="", returncode=0)
-        run_claude_session("prompt", resume_id="abc-123", model="opus")
+        run_claude_session("prompt", resume_id="abc-123", model="opus", output_format=None)
 
         cmd = mock_run.call_args[0][0]
         assert cmd == ["claude", "-p", "--resume", "abc-123", "--model", "opus"]
@@ -255,7 +257,7 @@ class TestRunClaudeSession:
         """--bare appears before --resume when both active."""
         mock_run.return_value = MagicMock(stdout="", stderr="", returncode=0)
         with patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-test"}):
-            run_claude_session("prompt", resume_id="abc-123")
+            run_claude_session("prompt", resume_id="abc-123", output_format=None)
 
         cmd = mock_run.call_args[0][0]
         assert cmd == ["claude", "-p", "--bare", "--resume", "abc-123"]
@@ -264,7 +266,7 @@ class TestRunClaudeSession:
     def test_fork_session_flag_added_with_resume(self, mock_run):
         """--fork-session appears after --resume when both are set."""
         mock_run.return_value = MagicMock(stdout="", stderr="", returncode=0)
-        run_claude_session("prompt", resume_id="abc-123", fork_session=True)
+        run_claude_session("prompt", resume_id="abc-123", fork_session=True, output_format=None)
 
         cmd = mock_run.call_args[0][0]
         assert cmd == ["claude", "-p", "--resume", "abc-123", "--fork-session"]
@@ -282,7 +284,7 @@ class TestRunClaudeSession:
     def test_fork_session_not_added_when_false(self, mock_run):
         """--fork-session is absent when fork_session=False (the default)."""
         mock_run.return_value = MagicMock(stdout="", stderr="", returncode=0)
-        run_claude_session("prompt", resume_id="abc-123", fork_session=False)
+        run_claude_session("prompt", resume_id="abc-123", fork_session=False, output_format=None)
 
         cmd = mock_run.call_args[0][0]
         assert cmd == ["claude", "-p", "--resume", "abc-123"]

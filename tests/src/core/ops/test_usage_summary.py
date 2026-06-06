@@ -17,6 +17,7 @@ from forge.core.ops.usage_summary import (
     SessionActivitySummary,
     build_session_activity_summary,
     render_summary_line,
+    sum_forge_added_cost,
 )
 from forge.core.usage.ledger import UsageEvent, log_usage_event
 from forge.session.models import (
@@ -266,3 +267,91 @@ class TestRenderLine:
         line = render_summary_line(summary)
         assert line is not None
         assert "~$0.00 est" in line
+
+
+class TestSumForgeAddedCost:
+    """`sum_forge_added_cost` -- the `forge +$Y` aggregator. "Forge-added" =
+    reported LLM cost for the session EXCLUDING the main interactive harness."""
+
+    def test_sums_reported_claude_p_cost(self) -> None:
+        log_usage_event(
+            _event(
+                command="memory-writer",
+                route="claude_p",
+                reporter="claude_code",
+                confidence="reported",
+                cost_micro_usd=30_000,
+            )
+        )
+        log_usage_event(
+            _event(
+                command="supervisor",
+                route="claude_p",
+                reporter="forge_proxy",
+                confidence="reported",
+                cost_micro_usd=20_000,
+            )
+        )
+        assert sum_forge_added_cost("planner") == 50_000
+
+    def test_excludes_main_interactive_harness(self) -> None:
+        # Load-bearing: the card forbids blending observed main-harness traffic into
+        # "Forge additional cost". A claude_interactive event must NOT be summed,
+        # even when it carries a reported cost.
+        log_usage_event(
+            _event(
+                command="memory-writer",
+                route="claude_p",
+                reporter="claude_code",
+                confidence="reported",
+                cost_micro_usd=30_000,
+            )
+        )
+        log_usage_event(
+            _event(
+                command="interactive",
+                route="claude_interactive",
+                reporter="claude_code",
+                confidence="reported",
+                cost_micro_usd=500_000,
+            )
+        )
+        assert sum_forge_added_cost("planner") == 30_000  # harness 500_000 excluded
+
+    def test_unavailable_rows_contribute_nothing(self) -> None:
+        log_usage_event(
+            _event(
+                command="memory-writer",
+                route="claude_p",
+                reporter="claude_code",
+                confidence="reported",
+                cost_micro_usd=12_000,
+            )
+        )
+        log_usage_event(_event(command="supervisor", route="claude_p", confidence="unavailable", cost_micro_usd=None))
+        assert sum_forge_added_cost("planner") == 12_000
+
+    def test_no_reported_cost_returns_none_not_zero(self) -> None:
+        # No reported-cost event -> None (no cost evidence), distinct from a real $0.
+        log_usage_event(_event(command="supervisor", route="claude_p", confidence="unavailable", cost_micro_usd=None))
+        assert sum_forge_added_cost("planner") is None
+
+    def test_empty_ledger_returns_none(self) -> None:
+        assert sum_forge_added_cost("planner") is None
+
+    def test_other_sessions_excluded(self) -> None:
+        log_usage_event(
+            _event(
+                session="planner",
+                route="claude_p",
+                reporter="claude_code",
+                confidence="reported",
+                cost_micro_usd=10_000,
+            )
+        )
+        log_usage_event(
+            _event(
+                session="other", route="claude_p", reporter="claude_code", confidence="reported", cost_micro_usd=99_000
+            )
+        )
+        assert sum_forge_added_cost("planner") == 10_000

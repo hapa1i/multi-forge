@@ -264,11 +264,12 @@ for `.forge/` directories.
 **Configuration (`statusline:` in `~/.forge/config.yaml`).** A segment registry renders an ordered, user-selectable set
 of fields. `statusline.segments` is the ordered allowlist (empty -> `DEFAULT_ORDER`, which reproduces the pre-config bar
 byte-for-byte). Other keys: `cost_mode` (`auto|api|subscription`), `palette` (`default|earthy`), `glyphs`
-(`ascii|unicode`), `cache_hit` (`auto|off`), `cache_hit_ttl`. `forge config set`/`edit` is the strict allowlist gate
-(rejects unknown segment names and bad enums; the on-disk loader fails open per-subtree); the renderer drops unknown
-names and falls back to `DEFAULT_ORDER` if a non-empty config resolves to nothing. The flat `show_rate_limits` key was
-removed (clean break) — `rate_limits` is now an opt-in segment. Default-off segments: `rate_limits`, `cache_hit`,
-`supervisor`, `policy`, `audit`, `drift`, `spend_cap`, `launch`. Full key/segment reference: `docs/end-user/config.md`.
+(`ascii|unicode`), `cache_hit` (`auto|off`), `cache_hit_ttl`, `forge_cost_ttl` (`forge_cost` throttle window, seconds,
+default 10, `>= 1`). `forge config set`/`edit` is the strict allowlist gate (rejects unknown segment names and bad
+enums; the on-disk loader fails open per-subtree); the renderer drops unknown names and falls back to `DEFAULT_ORDER` if
+a non-empty config resolves to nothing. The flat `show_rate_limits` key was removed (clean break) — `rate_limits` is now
+an opt-in segment. Default-off segments: `rate_limits`, `cache_hit`, `supervisor`, `policy`, `audit`, `drift`,
+`spend_cap`, `launch`, `forge_cost`. Full key/segment reference: `docs/end-user/config.md`.
 
 **Billing-aware cost.** Billing mode is an explicit **declaration**, never inferred from a key. `cost_mode=api` shows
 real `$`; `cost_mode=subscription` shows the 5h quota (dollars are a phantom on a subscription). `cost_mode=auto` shows
@@ -281,6 +282,18 @@ priced).
 (`direct` / `proxy:<id>` / `custom`) and the api-key posture (`key:env|file|none|omit`). It describes how the session
 reached the model and whether a key was made available — honest auth provenance the status line cannot infer from the
 ambient env. Manifest-gated: absent for ambient sessions (no `FORGE_SESSION`).
+
+**Forge session cost (`forge_cost`, Phase 5).** The opt-in `forge +$Y` segment shows **Forge-added LLM spend for this
+session, excluding the main interactive harness** (`route=claude_interactive`) — what Forge spent *on top of* the
+session the human drives (memory writer, supervisor, review fan-out), visually distinct from Claude's native `cost`.
+Computed live on poll by summing reported-cost ledger events (`sum_forge_added_cost`); reported-or-unavailable, never
+estimated, so subscription/OAuth sessions (cost-absent) render nothing. The harness exclusion is load-bearing: the card
+forbids blending observed main-harness traffic into "Forge additional cost". Manifest-gated (no session → no segment).
+The ledger read is throttled **time-only** by `read_or_compute_session_cost` (key = `sha256(forge_root + session_name)`,
+the Forge identity, NOT the Claude stdin `session_id` which rolls on `/compact`): unlike the cache-hit throttle it has
+no transcript-mtime shortcut, because headless cost accrues via ledger writes that never touch the transcript (which
+would otherwise freeze the value all session). A legitimate `0` is cached; a ledger read error fails open (no segment,
+never cached). Window: `forge_cost_ttl` (default 10s).
 
 **Rendering.** The `where` bucket (`path`, `branch`) leads concatenated; all other segments are separator-joined in the
 configured order. `RenderContext` derivations are lazy `cached_property` — a segment not in the active set does zero I/O
@@ -450,7 +463,10 @@ Enumerations are `Literal`s (provenance is recorded, never inferred):
 
 - `measurement_source`: `proxy_request_exact` | `verb_snapshot_estimated` | `provider_usage_exact` | `runtime_native` |
   `unattributed` — how the cost/token figures were obtained, so an event lacking an exact figure says so rather than
-  guessing (`provider_usage_exact` = a direct `core.llm` call where the provider returned exact token usage in-band).
+  guessing. `provider_usage_exact` = exact in-band token usage from either a direct `core.llm` call **or** a direct
+  `claude -p` envelope that reported `usage` but no cost (Phase 5, e.g. OAuth). `runtime_native` (Phase 5, emitted) = a
+  runtime self-reported its own cost+usage: a direct `claude -p --output-format json` run (`reporter=claude_code`), or a
+  native `codex`/`gemini` runtime later.
 - `billing_mode`: `api` | `subscription_interactive` | `subscription_headless_credit` | `subscription_quota` | `unknown`
   (`unknown` is the honest default where the signal is ambiguous).
 - `attribution_granularity`: `worker` | `verb` | `session`.
@@ -460,7 +476,8 @@ Enumerations are `Literal`s (provenance is recorded, never inferred):
   reserved **here** — it is emitted now as a `reporter`, not yet as a `route` (it appears in both literals).
 - `reporter`: `claude_code` | `forge_proxy` | `openrouter` | `litellm` | `provider` | `codex_jsonl` — the source of the
   **metric** evidence (tokens **and/or** a cost figure, *not* specifically cost), so `reporter=provider` alongside
-  `confidence=unavailable` is coherent: the provider reported tokens, just no dollars.
+  `confidence=unavailable` is coherent: the provider reported tokens, just no dollars. Emitted now: `provider`,
+  `forge_proxy`, and `claude_code` (Phase 5 — a direct `claude -p` verb/worker that self-reports cost+usage).
 - `confidence`: `reported` | `gateway_calculated` | `inferred` | `unavailable` | `unknown` — trustworthiness of **this
   event's own `cost_micro_usd` only** (token provenance is `measurement_source`; the two axes are orthogonal — the
   tagger is `measurement_source=provider_usage_exact` with `confidence=unavailable`, *not* a contradiction). A null cost
@@ -480,25 +497,39 @@ telemetry, and **not** a state to migrate around.
 
 **Instrumented emitters (Phase 4c).** The workflow verbs (`panel`/`analyze`/`debate`/`consensus`) emit one estimated
 verb-level event each (`measurement_source=verb_snapshot_estimated`, attributed to the ambient run — per-worker cost is
-not available); the memory writer, semantic supervisor, and shadow curation emit one event per `claude -p` run
-(attributed to that subprocess's run identity, via the `track_verb_cost` holder); the action tagger emits a
-`provider_usage_exact` event from a direct `core.llm` call (exact in-band provider tokens). On the **direct path**,
-Forge resolves the call's base_url synchronously: if it is a registered Forge proxy, the tagger forwards an
+not available); the memory writer, semantic supervisor, team supervisor (Phase 5), and shadow curation emit one event
+per `claude -p` run (attributed to that subprocess's run identity, via the `track_verb_cost` holder); the action tagger
+emits a `provider_usage_exact` event from a direct `core.llm` call (exact in-band provider tokens). On the **direct
+path**, Forge resolves the call's base_url synchronously: if it is a registered Forge proxy, the tagger forwards an
 `X-Request-ID` and records an exact `source_refs.cost_request_id` join (the proxy logs its cost record under the same
 id); otherwise it sends no header and leaves the ref null (a dangling join is worse than none). Direct-path
 `billing_mode` stays `unknown` unless the caller proves direct + real-credential billing (the tagger routes via local
 LiteLLM with a dummy key, so it can't). All emit best-effort, never gate the work they measure, and record `latency_ms`;
 `claude -p` events carry null `source_refs` (4g). Helpers: `emit_verb_usage`, `emit_usage_for_session_result`,
 `emit_direct_llm_usage` (`forge.core.usage.emit`). Each also stamps `route`/`reporter`/`confidence`: tagger →
-`core_llm`/`provider`/`unavailable`; `claude -p` verbs → `claude_p` with `forge_proxy`/`inferred` when a proxy snapshot
-measured cost (else `None`/`unavailable`); the verb aggregate claims no single `route`; per-worker leaves →
-`claude_p`/`unavailable`.
+`core_llm`/`provider`/`unavailable`; the verb aggregate claims no single `route`.
 
-**Per-worker fan-out events (Phase 4d).** The review fan-out (`run_multi_review` → `ClaudeHeadlessInvoker.run_parallel`)
-emits one event per worker (`attribution_granularity=worker`, `measurement_source=unattributed`): the run-tree leaf
+**Cost precedence on `claude -p` verbs (Phase 5).** Every `claude -p` run requests `--output-format json`
+(capability-gated, retry-once-and-latch), so the runtime can self-report. Exactly **one** reporter attributes cost per
+run:
+
+- **Proxied** (`base_url` set) → the proxy snapshot wins: `forge_proxy` / `reported` / `verb_snapshot_estimated` with
+  snapshot tokens (Claude's Anthropic-priced `total_cost_usd` is ignored — wrong for a non-Anthropic backend and a
+  duplicate of the proxy's report). No snapshot cost → `None` / `unavailable`.
+- **Direct** (no proxy) → the runtime self-reports: `claude_code` / `reported` / `runtime_native` with exact in-band
+  tokens. A parsed envelope with usage but no cost (OAuth) → `provider_usage_exact` / `unavailable` (tokens kept, cost
+  honestly absent). Neither → `unavailable`.
+
+Tokens follow the cost source (no mixed provenance: a `verb_snapshot_estimated` event never carries the exact in-band
+tokens). This is the first emission of `reporter=claude_code` and `measurement_source=runtime_native`.
+
+**Per-worker fan-out events (Phase 4d/5).** The review fan-out (`run_multi_review` →
+`ClaudeHeadlessInvoker.run_parallel`) emits one event per worker (`attribution_granularity=worker`): the run-tree leaf
 (run/parent/root) plus the **actual routed** `model` (`route.model_ref`), `provider`, and `proxy_id`, with `status` and
-`latency_ms`. Per-worker cost/tokens are null — `ReviewResult` carries none, so the verb-level aggregate above holds the
-estimated total. Helper: `emit_worker_usage`.
+`latency_ms`. Cost follows the same one-reporter precedence (Phase 5): a **direct** worker self-reports (`claude_code` /
+`runtime_native`, or `provider_usage_exact` tokens-only); a **proxied** worker stays `unattributed` with null
+cost/tokens — the verb-level aggregate above holds the estimated proxied total, so attributing per-worker would
+double-count. Helper: `emit_worker_usage`.
 
 **Read surface — `forge usage` and the session-end summary.** `read_usage_events(..., session=<name>)` filters the
 ledger by the `session` field; `forge.core.ops.usage_summary.build_session_activity_summary(name, forge_root, since=)`

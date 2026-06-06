@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 from forge.cli.hooks.commands import _safe_cache_key
 from forge.core.reactive.session_runner import SessionResult
 from forge.core.state import now_iso
+from forge.core.usage.ledger import read_usage_events
 from forge.policy.team.config import TeamSupervisorConfig
 from forge.policy.team.handlers import (
     _classify_event,
@@ -174,6 +175,60 @@ class TestRunSupervisor:
         )
         exit_code, _ = _run_supervisor(_config(), "alice", "team", "idle", "")
         assert exit_code == 0
+
+
+# --- usage attribution (Phase 5: the team supervisor is now instrumented) ---
+
+
+class TestRunSupervisorUsageEmission:
+    """The team supervisor's `claude -p` run is attributed to the usage ledger,
+    mirroring the semantic supervisor (direct -> claude_code self-report)."""
+
+    @patch("forge.policy.team.handlers.run_claude_session")
+    def test_direct_run_emits_claude_code_usage_event(self, mock_session):
+        # Default config: direct=False but proxy=None -> base_url resolves to None ->
+        # the direct cost branch (claude_code/runtime_native) applies.
+        mock_session.return_value = SessionResult(
+            stdout='{"verdict": "aligned"}',
+            stderr="",
+            returncode=0,
+            run_id="team-run-1",
+            root_run_id="team-run-1",
+            envelope_parsed=True,
+            cost_micro_usd=5_000,
+            input_tokens=120,
+            output_tokens=30,
+        )
+        _run_supervisor(_config(), "alice", "team", "idle", "")
+
+        events = read_usage_events(command="team-supervisor")
+        assert len(events) == 1
+        ev = events[0]
+        assert ev.route == "claude_p"
+        assert ev.reporter == "claude_code"
+        assert ev.measurement_source == "runtime_native"
+        assert ev.cost_micro_usd == 5_000
+        assert ev.input_tokens == 120
+
+    @patch("forge.policy.team.handlers.run_claude_session")
+    def test_failed_run_is_still_attributed(self, mock_session):
+        # Emission happens before the success gate, so a failed run records an error
+        # event rather than vanishing from the ledger.
+        mock_session.return_value = SessionResult(
+            stdout="",
+            stderr="boom",
+            returncode=1,
+            error="timeout",
+            run_id="team-run-2",
+            root_run_id="team-run-2",
+        )
+        exit_code, _ = _run_supervisor(_config(), "alice", "team", "idle", "")
+        assert exit_code == 0  # fail-open
+
+        events = read_usage_events(command="team-supervisor")
+        assert len(events) == 1
+        assert events[0].status == "error"
+        assert events[0].cost_micro_usd is None
 
 
 # --- FORGE_DEPTH guard for _run_supervisor ---

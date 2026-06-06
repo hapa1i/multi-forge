@@ -433,23 +433,53 @@ segment. Never merge.
 
 ---
 
-## Phase 5 — Headless runtime reporters (Slice 5)
+## Phase 5 — Headless runtime reporters (Slice 5) — SHIPPED (2026-06-05)
 
-**Goal**: Let runtimes report their own cost/usage; keep runtime-native values separate from gateway-reported values.
+**Goal**: Let the Claude runtime report its own cost/usage on the headless `claude -p` path; keep runtime-native values
+distinct from proxy/gateway values; surface Forge's additional headless spend in the status line.
 
-- [ ] Claude headless **(spike → decide → wire, not "consider")**: does `claude -p --output-format json|stream-json`
-  expose per-run cost/usage Forge can record? Acceptance: present → recorded with provenance `reported`; absent →
-  `unavailable` (never estimated). Record the outcome — wire it, or defer with the gap named. ("consider" is not a
-  tickable assertion.)
-- [ ] Codex headless: ingest `codex exec --json` `turn.completed.usage` token counts (cost unavailable unless a Codex/
-  OpenAI surface reports it). Reuses the runtime-neutral `HeadlessInvoker` seam (Phase 4 of runtime-abstraction, already
-  shipped).
-- [ ] Keep runtime-native reported values distinct from proxy/gateway reported values in the ledger
-  (`reporter`/`route`).
-- [ ] **Design-doc sync**: `design_appendix.md` §A.13 (per-emitter coverage table: add runtime reporters).
+**Scope (locked with the user)**: **Claude-only** (Codex deferred — no `CodexHeadlessInvoker` exists; it stays the
+paused `runtime_abstraction` card's work). **Broad wiring** (request JSON for all `claude -p` runs). **`forge +$Y`
+included** (deferred here from Phase 4).
 
-**Deferred**: `claude -p` exact per-request cost correlation stays the runtime-abstraction "Phase 4g" item (null
-`source_refs`); this card does not close it.
+- [x] **5a spike (hard gate)** — `scripts/experiments/headless-cost-report/` (`reproduce.sh` + `README.md`). DECISION =
+  **GO (broad), direct path**. Load-bearing finding: 2.1.165 emits a JSON **array** `[system, assistant, result]`, cost/
+  usage in the last `result` element (NOT the documented single object). Direct API key → COST-REPORTED + USAGE-REPORTED
+  for every flag combo. Verdicts encoded as named constants (`_JSON_INCOMPATIBLE=frozenset()`,
+  `_JSON_IS_ERROR_RELIABLE=True`); capability guard = **retry-once-and-latch, no version probe**.
+- [x] **5b envelope unwrap + capability guard** — shared `core/reactive/headless_json.py` (capability latch,
+  `prepare_json_argv`, `usd_to_micros`); `parse_headless_envelope` (never raises; array + bare-object + stream-json +
+  raw-text fallback) in `structured_output.py`; `SessionResult`/`HeadlessResult` gain nullable cost/usage +
+  `envelope_parsed` + `runtime_is_error`. BOTH runners (`run_claude_session` + `ClaudeHeadlessInvoker`) inject the flag
+  via the shared helper and retry-once on rejection — `.result` unwrapped into `.stdout` so text consumers are
+  unchanged.
+- [x] **5c cost-provenance precedence** (`emit.py`) — exactly **one** reporter per run: proxied → `forge_proxy`/
+  `verb_snapshot_estimated` (snapshot tokens; Anthropic-priced self-cost ignored); direct → `claude_code`/
+  `runtime_native` (self-cost) or `provider_usage_exact`/`unavailable` (tokens-only). Tokens follow the cost source (no
+  mixed provenance). Same precedence in `emit_worker_usage`. First emission of `claude_code` + `runtime_native`.
+- [x] **5d `forge +$Y` segment** — opt-in `forge_cost` (allowlist only, not `DEFAULT_ORDER`); `sum_forge_added_cost`
+  (reported cost, **excludes `route=claude_interactive`**); time-only `read_or_compute_session_cost` throttle (keyed on
+  Forge identity not the Claude UUID, caches a legit 0, fail-open uncached); `forge_cost_ttl` config (default 10).
+- [x] Runtime-native reported values kept distinct from proxy/gateway in the ledger (`reporter`/`route`/
+  `measurement_source`).
+- [x] **5e tests** — 11 new/extended unit+regression files (envelope parse, unwrap-preserves-text, token-only,
+  json-flag-compat **both runners**, is_error→status, `usd_to_micros` parity, verb+worker precedence,
+  `sum_forge_added_cost`, statusline producer/format, session-cost throttle). 2 new Docker tests (5a contract twin +
+  `run_claude_session` seam) + updated memory/workers assertions (direct verb/worker now `runtime_native`).
+  **Verification**: 5285 unit pass; **6 real-Claude integration tests pass on 2.1.165** (98s) — 5a verdict + self-report
+  pipeline confirmed end-to-end; `make pre-commit` clean.
+- [x] **5f design-doc sync**: `design.md` §3.14 (headless self-report + `forge +$Y`), `design_appendix.md` §A.13
+  (`reporter=claude_code` + `measurement_source=runtime_native` emitted; precedence + per-worker paragraphs rewritten;
+  corrected a stale `inferred`→`reported`) + §A.8 (`forge_cost` default-off, `forge_cost_ttl`, "Forge session cost"),
+  `vocabulary.py`/`ledger.py` comments (claude_code/runtime_native emitted).
+
+**Deferred (unchanged)**: Codex headless (`codex exec --json`) → `runtime_abstraction` card. `claude -p` exact
+per-request cost correlation stays "Phase 4g" (null `source_refs`).
+
+**Follow-up (new, non-blocking)**: `usd_to_micros` (truncate-Decimal) and the proxy cost plane's `round(usd*1e6)`
+(`client_adapter.py:229,410`) diverge by ≤1 micro only at exact half-micro fractions real costs never emit, and run on
+separate planes (a run is proxied XOR direct, never both). Pinned by `test_headless_json.py` so aligning them later is a
+deliberate, test-visible choice — not silently diverging.
 
 ---
 

@@ -11,7 +11,10 @@ from __future__ import annotations
 import json
 import logging
 import re
+from dataclasses import dataclass
 from typing import Any
+
+from forge.core.reactive.headless_json import usd_to_micros
 
 _log = logging.getLogger(__name__)
 
@@ -60,3 +63,98 @@ def extract_json_from_response(response: str) -> dict[str, Any] | None:
 
     _log.debug("Could not extract JSON from response (len=%d)", len(response))
     return None
+
+
+@dataclass(frozen=True)
+class HeadlessEnvelope:
+    """Parsed `claude -p --output-format json` envelope (Phase 5).
+
+    ``result_text`` is the unwrapped model text consumers read; the metric fields
+    are the runtime's self-reported cost/usage. ``parsed`` and
+    ``cost_micro_usd is not None`` are INDEPENDENT facts: a parsed envelope may
+    carry exact tokens with no cost (direct OAuth). ``parsed=False`` means the
+    fallback fired and ``result_text`` is the raw stdout (today's behavior).
+    """
+
+    result_text: str
+    cost_micro_usd: int | None = None
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    cached_tokens: int | None = None
+    is_error: bool = False
+    parsed: bool = False
+
+
+def _coerce_token_count(value: Any) -> int | None:
+    """An int token count, or None. Rejects bool (JSON ``true`` is not a count)."""
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
+
+
+def _find_result_object(stdout: str, output_format: str) -> dict[str, Any] | None:
+    """Locate the terminal ``type=="result"`` object across the shapes Claude emits.
+
+    Claude Code 2.1.x `--output-format json` emits a JSON ARRAY of events
+    ``[system, assistant, result]`` (cost/usage in the LAST ``result`` element);
+    the docs also describe a single ``result`` object. ``stream-json`` is
+    newline-delimited with a terminal ``result`` line. Returns None on anything
+    else (caller falls back to raw text).
+    """
+    if output_format == "stream-json":
+        for line in reversed(stdout.strip().splitlines()):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(obj, dict) and obj.get("type") == "result":
+                return obj
+        return None
+
+    try:
+        data = json.loads(stdout)
+    except json.JSONDecodeError:
+        return None
+    if isinstance(data, list):
+        results = [x for x in data if isinstance(x, dict) and x.get("type") == "result"]
+        return results[-1] if results else None
+    if isinstance(data, dict):
+        return data  # documented single-object shape; the result-string check gates it
+    return None
+
+
+def parse_headless_envelope(stdout: str, *, output_format: str = "json") -> HeadlessEnvelope:
+    """Parse a `claude -p` JSON/stream-json envelope. NEVER raises.
+
+    On any non-envelope input (crash, empty, non-JSON, JSON without a usable
+    ``result`` string), returns ``parsed=False`` with ``result_text=stdout`` so
+    existing text consumers see exactly today's raw output. On a valid envelope,
+    unwraps ``.result`` and lifts the runtime's self-reported cost/usage.
+    """
+    raw = stdout or ""
+    if not raw.strip():
+        return HeadlessEnvelope(result_text=raw)
+
+    result_obj = _find_result_object(raw, output_format)
+    if not isinstance(result_obj, dict):
+        return HeadlessEnvelope(result_text=raw)
+
+    result_text = result_obj.get("result")
+    if not isinstance(result_text, str):
+        # No usable model text -> don't claim a parse that would drop the output.
+        return HeadlessEnvelope(result_text=raw)
+
+    usage = result_obj.get("usage")
+    usage = usage if isinstance(usage, dict) else {}
+    return HeadlessEnvelope(
+        result_text=result_text,
+        cost_micro_usd=usd_to_micros(result_obj.get("total_cost_usd")),
+        input_tokens=_coerce_token_count(usage.get("input_tokens")),
+        output_tokens=_coerce_token_count(usage.get("output_tokens")),
+        # cache_read is the conventional "cached" count (cache hits over fresh input),
+        # matching the proxy's cache-hit semantics; cache_creation is a separate cost.
+        cached_tokens=_coerce_token_count(usage.get("cache_read_input_tokens")),
+        is_error=bool(result_obj.get("is_error")),
+        parsed=True,
+    )

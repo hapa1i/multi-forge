@@ -1266,6 +1266,20 @@ def format_launch(launch: dict[str, Any]) -> str | None:
     return f"{DIM}·{RESET}".join(parts)
 
 
+def format_forge_cost(micros: int | None) -> str | None:
+    """Render Forge's *additional* headless cost for the session as ``forge +$X.XX``.
+
+    Visually distinct from Claude's native ``cost`` segment via the ``forge +``
+    prefix — this is what Forge spent on top of the interactive harness (memory
+    writer, supervisor, review fan-out), reported-or-nothing. ``None`` or a
+    non-positive value renders nothing (a not-yet-measured or no-cost session shows
+    no segment rather than a misleading ``+$0.00``).
+    """
+    if micros is None or micros <= 0:
+        return None
+    return f"{DIM}forge{RESET} {METRICS_COLOR}+{_fmt_dollars(micros / 1_000_000)}{RESET}"
+
+
 def format_token_breakdown(input_tokens: int, output_tokens: int, cached_tokens: int) -> str | None:
     """Format cumulative token breakdown: in:12K out:3.2K cache:8K."""
     if input_tokens == 0 and output_tokens == 0 and cached_tokens == 0:
@@ -1618,6 +1632,7 @@ def status_line() -> None:
         manifest=session_manifest,
         is_session_authoritative=is_session_authoritative,
         config=config,
+        forge_root=os.environ.get("FORGE_FORGE_ROOT"),
     )
     where, stream = render_segments(ctx, config.statusline.segments)
 

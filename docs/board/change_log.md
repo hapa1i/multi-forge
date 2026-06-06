@@ -27,6 +27,47 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-05
 
+### Phase 5: Headless runtime reporters (metric-evidence-simplification)
+
+**Goal**: Close the cost-honesty gap on the headless `claude -p` path — let the Claude runtime self-report cost/usage
+(closing today's `unavailable` on direct verbs) without ever estimating, while a proxied run keeps the proxy figure
+authoritative; surface Forge's additional headless spend as the opt-in `forge +$Y` status-line segment. Claude-only
+(Codex deferred to `runtime_abstraction`).
+
+**Key changes**:
+
+- **5a spike (hard gate)** settled an undocumented contract: `claude -p --output-format json` (2.1.165) emits a JSON
+  **array** with cost/usage in the terminal `result` element, not the documented single object. DECISION: GO (broad,
+  direct). Capability guard = **retry-once-and-latch** (no version probe). Verdicts encoded as named constants.
+- **Envelope unwrap (5b)**: shared `core/reactive/headless_json.py` (latch, `prepare_json_argv`, `usd_to_micros`) +
+  `parse_headless_envelope` (never raises; array/object/stream-json/raw-text). Both runners (`run_claude_session` +
+  `ClaudeHeadlessInvoker`) inject the flag through the shared helper, retry once on rejection, and unwrap `.result` into
+  `.stdout` so every text consumer (supervisor/memory-writer/curation) is byte-for-byte unchanged.
+- **Cost precedence (5c)**: exactly **one** reporter per run — proxied → `forge_proxy`/`verb_snapshot_estimated`
+  (snapshot tokens; Anthropic-priced self-cost ignored, no double-count); direct → `claude_code`/`runtime_native`
+  (self-cost) or `provider_usage_exact`/`unavailable` (tokens-only). Tokens follow the cost source (no mixed
+  provenance). First emission of `claude_code` + `runtime_native`. Same precedence per-worker.
+- **`forge +$Y` (5d)**: opt-in `forge_cost` segment; `sum_forge_added_cost` sums reported cost **excluding
+  `route=claude_interactive`** (the card's no-blend rule); time-only `read_or_compute_session_cost` throttle (keyed on
+  Forge identity not the Claude UUID, caches a legit 0, fail-open uncached); `forge_cost_ttl` config (default 10).
+- **Docs (5f)**: `design.md` §3.14, `design_appendix.md` §A.13 + §A.8, `vocabulary.py`/`ledger.py` comments synced;
+  corrected a stale `inferred`→`reported` left from Phase 2.
+- **Review follow-ups**: (1) proxied token-only snapshots now read `verb_snapshot_estimated`, not `unattributed` (a
+  token-carrying event must not claim "no figure"); (2) the `run_parallel` JSON-flag retry is now a tracked `Popen`
+  (own process group, registered in `children`) so it stays terminable under cancellation; (3) the **team supervisor**
+  (`policy/team/handlers.py`) is now instrumented (mirrors the semantic supervisor; emits before the success gate so
+  failures are attributed); (4) `docs/end-user/config.md` gains `forge_cost`/`forge_cost_ttl`; (5) the spike's
+  `reproduce.sh` detects `timeout`/`gtimeout` (macOS portability); (6) name-scoped ledger aggregation documented as a
+  known limitation.
+
+**Verification**: 5287 unit tests pass (13 new/extended files: envelope parse, unwrap, token-only, json-flag-compat on
+**both** runners, is_error→status, `usd_to_micros` parity, verb+worker precedence (incl. proxied token-only),
+`sum_forge_added_cost`, statusline + session-cost throttle, team-supervisor attribution). **6 real-Claude Docker tests
+pass on 2.1.165** (98s) — the 5a verdict and the full self-report pipeline (run → envelope → emit → ledger) confirmed
+end-to-end; updated memory/workers assertions (direct verb/worker now `runtime_native`). `make pre-commit` clean
+(ruff/black/isort/mypy/pyright/mdformat/gitleaks). Follow-up (non-blocking): `usd_to_micros` vs the proxy `round()`
+diverge ≤1 micro at half-micro fractions only (separate planes), pinned by test.
+
 ### Phase 4: Status-line honesty (metric-evidence-simplification)
 
 **Goal**: Make the status line honest about billing and add the user control the auth/cost audit demands — never infer

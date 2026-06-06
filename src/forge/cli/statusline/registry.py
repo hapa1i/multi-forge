@@ -261,6 +261,36 @@ def _produce_launch(ctx: RenderContext) -> Optional[str]:
     return sl.format_launch(launch)
 
 
+def _produce_forge_cost(ctx: RenderContext) -> Optional[str]:
+    # Forge-unique opt-in: Forge's ADDITIONAL headless LLM spend for THIS session
+    # (memory-writer, supervisor, review fan-out), distinct from Claude's native
+    # `cost`. Manifest-gated (no session name -> no segment, like _produce_launch).
+    # The ledger read is throttled time-only: headless cost accrues via ledger
+    # writes that never touch the transcript, so _produce_cache_hit's mtime shortcut
+    # would freeze this segment all session (card R4). compute_fn maps the
+    # no-reported-cost None -> 0 so the throttle caches a legitimate no-cost result.
+    name = (ctx.manifest or {}).get("name")
+    if not isinstance(name, str) or not name:
+        return None
+
+    from forge.cli.statusline.throttle import read_or_compute_session_cost
+    from forge.core.ops.usage_summary import sum_forge_added_cost
+
+    def _compute_session_cost() -> int:
+        # Map "no reported cost" (None) -> 0 explicitly so the throttle caches a
+        # legitimate no-cost result; a ledger read error propagates (uncached).
+        value = sum_forge_added_cost(name)
+        return 0 if value is None else value
+
+    cache_key = f"{ctx.forge_root or ''}\x00{name}"
+    micros = read_or_compute_session_cost(
+        cache_key,
+        ctx.config.statusline.forge_cost_ttl,
+        _compute_session_cost,
+    )
+    return sl.format_forge_cost(micros)
+
+
 # Every segment name now has a producer (no reserved names remain). The
 # allowlist == producer-names equality test (test_statusline_registry.py)
 # enforces this two-way sync whenever a segment is added.
@@ -283,6 +313,7 @@ SEGMENTS: tuple[Segment, ...] = (
     Segment("drift", _produce_drift),
     Segment("spend_cap", _produce_spend_cap),
     Segment("launch", _produce_launch),
+    Segment("forge_cost", _produce_forge_cost),
 )
 
 _BY_NAME: dict[str, Segment] = {seg.name: seg for seg in SEGMENTS}

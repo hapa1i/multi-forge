@@ -172,6 +172,41 @@ def render_summary_line(summary: SessionActivitySummary) -> str | None:
     return "Forge this session — " + " · ".join(parts)
 
 
+def sum_forge_added_cost(session: str) -> int | None:
+    """Sum reported Forge-added LLM cost (micro-USD) for one session.
+
+    "Forge-added" = LLM spend Forge originated on the session's behalf (memory
+    writer, supervisor, review fan-out), **excluding the main interactive harness**
+    (``route="claude_interactive"``). The harness exclusion is load-bearing, not
+    cosmetic: the card forbids blending observed main-harness traffic into "Forge
+    additional cost" (a future MITM scenario where such events land in the ledger).
+
+    Only reported-cost events contribute (the north star: record what a route
+    reported, never estimate); ``unavailable`` rows add nothing. Returns the summed
+    micro-USD, or ``None`` when no in-scope event carried a reported cost — distinct
+    from a measured $0. A ledger read error propagates (the throttle decides whether
+    to cache or skip); this function never fabricates a value.
+
+    Known limitation (matches ``build_session_activity_summary``): the ledger is
+    filtered by session NAME only — ``UsageEvent`` carries no forge-root identity, so
+    two same-named sessions in different forge roots would share this total. The
+    status-line throttle cache key is root-scoped, but the ledger query is not.
+    Adding root/session identity to the ledger schema is deferred to a future card.
+    """
+    events = read_usage_events(session=session)
+    total = 0
+    any_cost = False
+    for event in events:
+        # Exclude the main interactive harness channel: "Forge-added" is what Forge
+        # spends ON TOP of the session the human is driving, never the session itself.
+        if event.route == "claude_interactive":
+            continue
+        if event.confidence == "reported" and event.cost_micro_usd is not None:
+            total += event.cost_micro_usd
+            any_cost = True
+    return total if any_cost else None
+
+
 # --- internals ---------------------------------------------------------------
 
 

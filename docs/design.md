@@ -883,13 +883,24 @@ is the redacted wire record, usage is attribution. Each event also carries metri
 work reached the model), `reporter` (source of the metric evidence), and `confidence` (trustworthiness of *that event's
 own* `cost_micro_usd`: `reported` | `gateway_calculated` | `inferred` | `unavailable` | `unknown`). Emission is wired
 (Phase 4c): the workflow verbs (`panel`/`analyze`/`debate`/`consensus`) record one estimated verb-level event each; the
-memory writer, semantic supervisor, and shadow curation record one event per `claude -p` run; the action tagger records
-exact provider tokens from its direct `core.llm` call (and, when that call resolves to a registered Forge proxy, an
-exact `source_refs.cost_request_id` join via a forwarded `X-Request-ID`; direct `billing_mode` stays `unknown` unless
-provably direct + credentialed). All emit best-effort, never gate the work they measure, and record `latency_ms`.
-`claude -p` events carry null `source_refs` because Forge is not the HTTP client and can't know the proxy `request_id`;
-exact per-request correlation for `claude -p` is deferred to Phase 4g (see
+memory writer, semantic supervisor, team supervisor, and shadow curation record one event per `claude -p` run; the
+action tagger records exact provider tokens from its direct `core.llm` call (and, when that call resolves to a
+registered Forge proxy, an exact `source_refs.cost_request_id` join via a forwarded `X-Request-ID`; direct
+`billing_mode` stays `unknown` unless provably direct + credentialed). All emit best-effort, never gate the work they
+measure, and record `latency_ms`. `claude -p` events carry null `source_refs` because Forge is not the HTTP client and
+can't know the proxy `request_id`; exact per-request correlation for `claude -p` is deferred to Phase 4g (see
 [§A.13](design_appendix.md#a13-usage-attribution-ledger-schema-314)).
+
+**Headless self-report (Phase 5).** Every `claude -p` run requests `--output-format json` (capability-gated with a
+retry-once-and-latch backstop, so an older CLI that rejects the flag self-heals), so the runtime can self-report cost
+and usage. Exactly **one** reporter attributes cost per run: a **proxied** run keeps the proxy snapshot
+(`forge_proxy`/`reported`, Claude's Anthropic-priced `total_cost_usd` ignored as wrong-and-duplicate); a **direct** run
+self-reports (`claude_code`/`reported`/`runtime_native`) — closing the prior `unavailable` gap on direct verbs — or,
+when the envelope carries usage but no dollar figure (OAuth), records exact tokens with cost honestly `unavailable`.
+Tokens follow the cost source (no mixed provenance). The opt-in `forge_cost` status-line segment surfaces this as
+`forge +$Y`: Forge-added LLM spend for the session, **excluding** the main interactive harness
+(`route=claude_interactive`), reported-or-unavailable and distinct from Claude's native cost
+([§A.8](design_appendix.md#a8-status-line-guidance-3611)).
 
 Each proxy may define:
 

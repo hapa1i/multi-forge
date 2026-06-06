@@ -80,6 +80,7 @@ class StatusLineConfig:
     glyphs: str = "ascii"  # ascii | unicode
     cache_hit: str = "auto"  # auto | off
     cache_hit_ttl: int = 12  # direct-mode throttle window (seconds)
+    forge_cost_ttl: int = 10  # forge_cost segment throttle window (seconds)
 
     def __post_init__(self) -> None:
         if self.cost_mode not in _VALID_COST_MODES:
@@ -100,6 +101,8 @@ class StatusLineConfig:
             raise ValueError("statusline.segments must be a list of strings")
         if self.cache_hit_ttl < 1:
             raise ValueError(f"statusline.cache_hit_ttl must be >= 1, got {self.cache_hit_ttl}")
+        if self.forge_cost_ttl < 1:
+            raise ValueError(f"statusline.forge_cost_ttl must be >= 1, got {self.forge_cost_ttl}")
 
 
 def _coerce_statusline_config(value: Any) -> StatusLineConfig:
@@ -595,8 +598,10 @@ proxy_mode: host
 #   glyphs:    ascii | unicode
 #   segments:  ordered list; empty = default layout. Valid names: path, branch,
 #              breadcrumb, model, cost, rate_limits, lines, tokens, think, loop,
-#              sidecar, cache_hit, supervisor, policy, audit, drift, spend_cap
+#              sidecar, cache_hit, supervisor, policy, audit, drift, spend_cap,
+#              forge_cost
 #   cache_hit: auto | off    cache_hit_ttl: <seconds, direct-mode throttle window>
+#   forge_cost_ttl: <seconds, forge_cost segment throttle window (default 10)>
 # statusline:
 #   cost_mode: auto
 #   palette: default

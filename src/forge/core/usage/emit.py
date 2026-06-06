@@ -28,15 +28,28 @@ from forge.core.reactive.cost_tracking import VerbCostResult
 from forge.core.reactive.env import get_run_identity
 from forge.core.reactive.session_runner import SessionResult
 from forge.core.usage.billing import infer_billing_mode
-from forge.core.usage.ledger import BillingMode, SourceRefs, UsageEvent, log_usage_event
+from forge.core.usage.ledger import (
+    BillingMode,
+    MeasurementSource,
+    SourceRefs,
+    UsageEvent,
+    log_usage_event,
+)
 from forge.core.usage.vocabulary import Confidence, Reporter
 
 logger = logging.getLogger(__name__)
 
 
 def _session_status(result: SessionResult) -> tuple[str, str | None]:
-    """Map a SessionResult to (status, failure_type)."""
+    """Map a SessionResult to (status, failure_type).
+
+    A runtime-reported error (envelope ``is_error`` with exit 0) reads as
+    ``error`` -- the run did not succeed even though the process exited cleanly.
+    ``runtime_is_error`` is already is-error-reliable-gated upstream (Phase 5).
+    """
     if result.success:
+        if result.runtime_is_error:
+            return "error", "runtime_reported_error"
         return "success", None
     if result.timed_out:
         return "timeout", "timeout"
@@ -68,21 +81,60 @@ def emit_usage_for_session_result(
         if not result.run_id:
             return
         status, failure_type = _session_status(result)
-        # Narrow to a measured holder (None when no proxy delta was captured) so a
-        # direct/no-proxy verb reports null tokens, not fabricated zeros.
-        measured_cost = cost if (cost is not None and cost.measured) else None
-        # Cost is real evidence only when the proxy window had a reported-cost request.
-        # A passthrough verb is measured (tokens) yet cost-unavailable (no $ evidence) —
-        # so its cost is null, never a fabricated measured $0.
-        cost_evident = cost is not None and cost.cost_measured
+
+        # Cost-provenance precedence (Phase 5). EXACTLY ONE reporter attributes cost
+        # per run: forge_proxy (proxied) XOR claude_code (direct self-report) XOR none.
+        proxied = bool(base_url)
+        proxy_cost_evident = cost is not None and cost.cost_measured
+        # #1: a parsed envelope can carry tokens with NO cost (direct OAuth) -> gate the
+        # self-reported cost on envelope_parsed, not on cost presence.
+        self_cost = result.cost_micro_usd if result.envelope_parsed else None
+
+        cost_micro_usd: int | None
+        reporter: Reporter | None
+        confidence: Confidence
+        measurement_source: MeasurementSource
+        in_tok: int | None
+        out_tok: int | None
+        cache_tok: int | None
+
+        if proxied:
+            # Proxy snapshot wins. Claude's total_cost_usd is Anthropic-priced -> wrong
+            # for a non-Anthropic proxied backend, and a duplicate of the proxy's report.
+            if proxy_cost_evident and cost is not None:
+                cost_micro_usd, reporter, confidence = cost.total_cost_micros, "forge_proxy", "reported"
+            else:
+                cost_micro_usd, reporter, confidence = None, None, "unavailable"
+            # #4: tokens FOLLOW the cost source -- a proxied event keeps SNAPSHOT tokens,
+            # never exact in-band tokens (no mixed provenance). The snapshot is the figure
+            # source whenever tokens were *measured*, so measurement_source is
+            # verb_snapshot_estimated even on a token-only window (cost_measured=False): a
+            # measured-tokens event must not read as "unattributed" (it carries figures).
+            if cost is not None and cost.measured:
+                in_tok, out_tok, cache_tok = cost.input_tokens, cost.output_tokens, cost.cached_tokens
+                measurement_source = "verb_snapshot_estimated"
+            else:
+                in_tok = out_tok = cache_tok = None
+                measurement_source = "unattributed"
+        else:
+            # Direct / non-proxied: the runtime self-reports (closes today's unavailable gap).
+            if self_cost is not None:
+                cost_micro_usd, reporter, confidence = self_cost, "claude_code", "reported"
+                measurement_source = "runtime_native"
+            else:
+                cost_micro_usd, reporter, confidence, measurement_source = None, None, "unavailable", "unattributed"
+            # Exact in-band tokens belong ONLY to a runtime-sourced event. Cost-absent +
+            # usage-present (direct OAuth) -> provider_usage_exact + confidence="unavailable".
+            if result.envelope_parsed and result.input_tokens is not None:
+                in_tok, out_tok, cache_tok = result.input_tokens, result.output_tokens, result.cached_tokens
+                if measurement_source == "unattributed":
+                    measurement_source = "provider_usage_exact"
+            else:
+                in_tok = out_tok = cache_tok = None
+
         # "Direct" for billing only when no proxy is in the path; a proxied call's
         # upstream billing is opaque from here, so it stays "unknown".
         effective_direct = direct and not base_url
-        # A claude -p verb is always route="claude_p"; reported cost makes it "reported"
-        # (the proxy total now sums route-reported costs only). No reported-cost evidence
-        # -> no reporter -> "unavailable".
-        reporter: Reporter | None = "forge_proxy" if cost_evident else None
-        confidence: Confidence = "reported" if cost_evident else "unavailable"
         event = UsageEvent(
             run_id=result.run_id,
             parent_run_id=result.parent_run_id,
@@ -95,15 +147,15 @@ def emit_usage_for_session_result(
             workflow=workflow,
             model=model,
             billing_mode=infer_billing_mode(direct=effective_direct, has_api_key=_anthropic_key_present()),
-            measurement_source="verb_snapshot_estimated" if measured_cost else "unattributed",
+            measurement_source=measurement_source,
             attribution_granularity="verb",
             route="claude_p",
             reporter=reporter,
             confidence=confidence,
-            input_tokens=measured_cost.input_tokens if measured_cost else None,
-            output_tokens=measured_cost.output_tokens if measured_cost else None,
-            cached_tokens=measured_cost.cached_tokens if measured_cost else None,
-            cost_micro_usd=cost.total_cost_micros if (cost is not None and cost.cost_measured) else None,
+            input_tokens=in_tok,
+            output_tokens=out_tok,
+            cached_tokens=cache_tok,
+            cost_micro_usd=cost_micro_usd,
             latency_ms=round(cost.duration_ms, 1) if (cost and cost.duration_ms) else None,
             source_refs=None,  # claude -p: proxy request_id unknown to Forge (4g)
         )
@@ -182,19 +234,52 @@ def emit_worker_usage(
     proxy_id: str | None = None,
     latency_ms: float | None = None,
     runtime: str = "claude_code",
+    base_url: str | None = None,
+    cost_micro_usd: int | None = None,
+    input_tokens: int | None = None,
+    output_tokens: int | None = None,
+    cached_tokens: int | None = None,
+    envelope_parsed: bool = False,
 ) -> None:
     """Emit a per-worker UsageEvent: one run-tree leaf of a fan-out.
 
-    Each worker is a ``claude -p`` subprocess whose *per-worker* cost is unknown
-    (``ReviewResult`` carries none; the verb aggregate from :func:`emit_verb_usage`
-    holds the estimated total). So cost/tokens stay null and
-    ``measurement_source="unattributed"`` -- the event captures the tree shape
-    (run/parent/root + model + status + latency), never a fabricated cost.
+    Cost precedence (Phase 5), mirroring the verb path:
+
+    - **Direct** worker (no proxy) that self-reported cost -> ``claude_code`` /
+      ``reported`` / ``runtime_native`` with its exact in-band tokens.
+    - **Direct** worker, tokens-only (e.g. OAuth, cost absent) ->
+      ``provider_usage_exact`` / ``unavailable`` with exact tokens.
+    - **Proxied** worker -> cost ``None`` / ``unavailable``, tokens null: the
+      per-worker proxy cost is not isolatable here; the verb aggregate
+      (:func:`emit_verb_usage`) holds the estimated total, so attributing cost
+      here would double-count.
+
     Best-effort; no-ops without a ``run_id`` (nothing to attribute).
     """
     try:
         if not run_id:
             return
+        proxied = bool(base_url)
+        self_cost = cost_micro_usd if envelope_parsed else None
+
+        reporter: Reporter | None
+        confidence: Confidence
+        measurement_source: MeasurementSource
+        ev_cost: int | None
+        in_tok: int | None
+        out_tok: int | None
+        cache_tok: int | None
+
+        if (not proxied) and self_cost is not None:
+            ev_cost, reporter, confidence, measurement_source = self_cost, "claude_code", "reported", "runtime_native"
+            in_tok, out_tok, cache_tok = input_tokens, output_tokens, cached_tokens
+        elif (not proxied) and envelope_parsed and input_tokens is not None:
+            ev_cost, reporter, confidence, measurement_source = None, None, "unavailable", "provider_usage_exact"
+            in_tok, out_tok, cache_tok = input_tokens, output_tokens, cached_tokens
+        else:
+            ev_cost, reporter, confidence, measurement_source = None, None, "unavailable", "unattributed"
+            in_tok = out_tok = cache_tok = None
+
         event = UsageEvent(
             run_id=run_id,
             parent_run_id=parent_run_id,
@@ -208,10 +293,14 @@ def emit_worker_usage(
             model=model,
             proxy_id=proxy_id,
             route="claude_p",
-            reporter=None,
-            confidence="unavailable",
-            measurement_source="unattributed",
+            reporter=reporter,
+            confidence=confidence,
+            measurement_source=measurement_source,
             attribution_granularity="worker",
+            input_tokens=in_tok,
+            output_tokens=out_tok,
+            cached_tokens=cache_tok,
+            cost_micro_usd=ev_cost,
             latency_ms=round(latency_ms, 1) if latency_ms is not None else None,
             source_refs=None,
         )

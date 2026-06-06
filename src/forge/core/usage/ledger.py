@@ -48,9 +48,11 @@ _warned_newer_schema = False
 MeasurementSource = Literal[
     "proxy_request_exact",  # joined to a proxy cost record by request_id
     "verb_snapshot_estimated",  # track_verb_cost snapshot delta (estimated; shared-proxy)
-    "provider_usage_exact",  # direct core.llm call: provider reported exact tokens in-band
-    "runtime_native",  # native runtime (codex/gemini) reported its own usage
-    "unattributed",  # no cost/token figure available (e.g. per-worker claude -p)
+    "provider_usage_exact",  # in-band exact tokens: a direct core.llm call, OR a direct
+    # `claude -p` envelope with usage but no cost (Phase 5, e.g. OAuth: tokens, no dollars)
+    "runtime_native",  # a runtime self-reported its own cost+usage: a direct `claude -p
+    # --output-format json` run (Phase 5, claude_code) or a native codex/gemini runtime
+    "unattributed",  # no cost/token figure available (e.g. per-worker proxied claude -p)
 ]
 
 AttributionGranularity = Literal["worker", "verb", "session"]

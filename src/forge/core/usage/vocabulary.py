@@ -32,8 +32,9 @@ Route = Literal[
 # The source that supplied the metric evidence -- tokens AND/OR a cost figure, NOT
 # specifically cost. So reporter="provider" can sit beside confidence="unavailable":
 # the provider reported tokens, just no dollars -- not a contradiction.
-# Emitted now: provider, forge_proxy. Reserved: claude_code (Phase 4),
-# openrouter / litellm / codex_jsonl (Phase 2/5).
+# Emitted now: provider, forge_proxy, claude_code (Phase 5: a direct `claude -p`
+# verb/worker self-reports cost+usage via --output-format json).
+# Reserved: openrouter / litellm / codex_jsonl (Phase 2/5).
 Reporter = Literal[
     "claude_code",
     "forge_proxy",
