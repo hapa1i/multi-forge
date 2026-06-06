@@ -27,6 +27,37 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-06
 
+### Phase 6 follow-up: QA checklist metric-evidence coverage (audit-driven)
+
+**Goal**: After the Phase 6 docs/CLI cleanup, an adversarially-verified audit of `src/skills/qa/` + `docs/end-user/`
+found the end-user docs clean but six QA-checklist gaps (3 confirmed + 3 completeness-critic) where a regression in this
+card's headline cost-honesty behavior would pass the release-validation QA gate. Closed them on the branch.
+
+**Key changes** (all in `src/skills/qa/resources/checklist/`):
+
+- **§3.4 masking misfire (real defect)**: "values are masked (never shown in full)" contradicted the non-secret
+  `OPENROUTER_BASE_URL`/`LITELLM_BASE_URL` (shown in full) — a correct system would have *failed* it. Scoped masking to
+  secret values; added a `(default)` non-secret render assertion.
+- **§7.12 `forge activity` cost honesty**: the fixture already triggers `cost_partial`/`~`/footnotes but asserted none —
+  added `cost_partial=True total_cost_micro_usd=2050` (JSON) + a `~`-marker / footnote human-render check.
+- **§7.13 (new) cost provenance**: isolated `qa-prov` fixture proving a null-cost request lands in
+  `unavailable_requests` and is excluded from the dollar total (never priced from a local table); isolated so the shared
+  `qa-fixture` 3-request invariant (7.5/7.6) is untouched.
+- **§7.14 (new) rename tombstone**: bare + stale-args `forge usage` exits non-zero naming `forge activity` (no "No such
+  option").
+- **§8.5 (new) `forge_cost`/`forge +$Y` segment**: opt-in segment exercised end-to-end — seeded reported events render
+  `forge +$0.25`, a `$9.00 claude_interactive` event is **excluded** (the load-bearing harness exclusion), and a
+  no-reported-cost session renders **no** segment.
+- **§5.21**: session-end one-liner cost names the `~` best-effort shape (no ` est`). Index `test-count` 512 → **532**
+  (recounted actual `- [ ]`, clearing prior drift); version 1.0.21 → 1.0.22.
+
+**Verification**: every new `<!-- auto -->` fixture validated against real code on the host — `sum_forge_added_cost` =
+250000 (harness + unavailable excluded) and `format_forge_cost` → `+$0.25` / `None` (8.5);
+`build_session_activity_summary` → 2050 / `cost_partial=True` (7.12); `forge proxy costs qa-prov` → reported=1,
+unavailable=1, total=2500 (7.13); `forge usage` → exit 1 "has been renamed" (7.14). QA state parser re-parses to exactly
+532 assertions; 206 skills/skill-content unit tests pass; `make pre-commit` clean. `docs/end-user/` needed no change
+(audit confirmed cross-links + per-surface labels already correct).
+
 ### Phase 6: Docs & CLI cleanup + rename `forge usage` → `forge activity` (metric-evidence-simplification)
 
 **Goal**: Fold the card's remaining bugs (#5–#8) and make the per-session command's name honest — it reports Forge

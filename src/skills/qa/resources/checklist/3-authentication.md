@@ -82,12 +82,17 @@ forge authentication status
 #   Credential details:
 #     anthropic-api
 #       * ANTHROPIC_API_KEY = sk-a…5678  (file:default)
+#     openrouter
+#       - OPENROUTER_BASE_URL = https://openrouter.ai/api/v1  (default)
 ```
 
 - [ ] Shows "Configured capabilities:" section with configured credentials
 - [ ] Shows "Not configured (set up if needed):" section for unconfigured credentials
 - [ ] Shows "Credential details:" section with per-variable source attribution
-- [ ] Values are masked (never shown in full)
+- [ ] Secret values are masked (e.g. `sk-a…5678`); non-secret connection values (`OPENROUTER_BASE_URL`,
+  `LITELLM_BASE_URL`) are shown in full, not masked
+- [ ] When `OPENROUTER_BASE_URL` is unset, Credential details shows
+  `OPENROUTER_BASE_URL = https://openrouter.ai/api/v1  (default)` (non-secret default shown in full)
 - [ ] All 5 credentials displayed (openrouter, anthropic-api, openai-api, gemini-api, litellm-remote)
 - [ ] Unconfigured credentials show "not configured" (not "MISSING")
 

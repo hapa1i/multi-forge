@@ -217,4 +217,62 @@ forge config reset statusline
 - [ ] `cost_mode=subscription` shows the 5h quota (e.g. `RL:37%`), NOT a `$` figure
 - [ ] `forge config reset statusline` restores the default multi-segment bar
 
+### 8.5 Forge-added cost segment (`forge_cost` / `forge +$Y`)
+
+<!-- auto -->
+
+The opt-in `forge_cost` segment (off by default) shows Forge's ADDITIONAL headless LLM spend for the session (memory
+writer, supervisor, review fan-out) as `forge +$Y`, distinct from Claude's native `cost`. Its honesty contract is
+stricter than `forge activity`: only `confidence=reported` events count (reported-or-NOTHING, never estimated), and the
+main interactive harness (`route=claude_interactive`) is excluded. A session with no reported Forge cost renders NO
+segment (not a misleading `+$0.00`).
+
+```bash
+cd $FORGE_TEST_REPO
+
+# Two throwaway sessions: one with reported Forge-added cost, one without.
+forge session delete qa-forge-cost --yes --force 2>/dev/null || true
+forge session delete qa-forge-cost-none --yes --force 2>/dev/null || true
+forge session start qa-forge-cost --no-launch >/dev/null
+forge session start qa-forge-cost-none --no-launch >/dev/null
+
+# Seed ledger events.
+#   qa-forge-cost: $0.20 + $0.05 reported & non-interactive (counted) = $0.25; a $9.00 reported
+#     claude_interactive harness event (MUST be excluded); an unavailable row (adds nothing).
+#   qa-forge-cost-none: only a reported harness event + an unavailable row -> sum is None -> no segment.
+mkdir -p ~/.forge/usage/events
+cat > ~/.forge/usage/events/qa-forgecost_99999.jsonl <<'EOF'
+{"schema_version":1,"run_id":"qa-fc1","root_run_id":"qa-fc1","runtime":"claude_code","command":"memory-writer","status":"success","session":"qa-forge-cost","route":"claude_p","confidence":"reported","cost_micro_usd":200000,"ts":"2026-05-01T00:00:00Z"}
+{"schema_version":1,"run_id":"qa-fc2","root_run_id":"qa-fc2","runtime":"claude_code","command":"supervisor","status":"success","session":"qa-forge-cost","route":"core_llm","confidence":"reported","cost_micro_usd":50000,"ts":"2026-05-01T00:01:00Z"}
+{"schema_version":1,"run_id":"qa-fc3","root_run_id":"qa-fc3","runtime":"claude_code","command":"interactive","status":"success","session":"qa-forge-cost","route":"claude_interactive","confidence":"reported","cost_micro_usd":9000000,"ts":"2026-05-01T00:02:00Z"}
+{"schema_version":1,"run_id":"qa-fc4","root_run_id":"qa-fc4","runtime":"claude_code","command":"supervisor","status":"success","session":"qa-forge-cost","route":"claude_p","confidence":"unavailable","cost_micro_usd":null,"ts":"2026-05-01T00:03:00Z"}
+{"schema_version":1,"run_id":"qa-fc5","root_run_id":"qa-fc5","runtime":"claude_code","command":"interactive","status":"success","session":"qa-forge-cost-none","route":"claude_interactive","confidence":"reported","cost_micro_usd":7000000,"ts":"2026-05-01T00:04:00Z"}
+{"schema_version":1,"run_id":"qa-fc6","root_run_id":"qa-fc6","runtime":"claude_code","command":"supervisor","status":"success","session":"qa-forge-cost-none","route":"claude_p","confidence":"unavailable","cost_micro_usd":null,"ts":"2026-05-01T00:05:00Z"}
+EOF
+
+# Opt in to the forge_cost segment (off by default).
+forge config set statusline.segments=path,model,forge_cost
+
+PAYLOAD=$(jq -nc --arg cwd "$FORGE_TEST_REPO" '{workspace:{current_dir:$cwd}, model:{display_name:"Opus 4.6"}}')
+
+echo "== reported (expect: forge +\$0.25; the \$9 harness event excluded) =="
+echo "$PAYLOAD" | FORGE_SESSION=qa-forge-cost forge status-line 2>&1
+echo
+echo "== no reported Forge cost (expect: NO forge + segment) =="
+echo "$PAYLOAD" | FORGE_SESSION=qa-forge-cost-none forge status-line 2>&1
+
+# Clean up: restore segments, drop the fixture shard + throttle caches + sessions.
+forge config reset statusline
+rm -f ~/.forge/usage/events/qa-forgecost_99999.jsonl
+rm -f ~/.forge/cache/statusline/fcost-*.json
+forge session delete qa-forge-cost --yes --force 2>/dev/null || true
+forge session delete qa-forge-cost-none --yes --force 2>/dev/null || true
+```
+
+- [ ] `qa-forge-cost` output contains `forge` and `+$0.25` (the $0.20 + $0.05 reported, non-interactive events)
+- [ ] Harness exclusion: the figure is `+$0.25`, NOT `+$9.25` -- the `$9.00` `claude_interactive` event is excluded
+- [ ] `qa-forge-cost-none` output shows NO `+$` cost segment (only harness + unavailable events -> reported-or-nothing,
+  not `+$0.00`)
+- [ ] Fixture shard, `fcost-*` throttle caches, and both throwaway sessions removed at the end
+
 ---

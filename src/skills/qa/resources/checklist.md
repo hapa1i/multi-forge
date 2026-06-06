@@ -2,9 +2,9 @@
 
 <!-- checklist: index -->
 
-<!-- version: 1.0.21 -->
+<!-- version: 1.0.22 -->
 
-<!-- test-count: 512 -->
+<!-- test-count: 532 -->
 
 <!-- last-updated: 2026-06-06 -->
 
@@ -12,10 +12,12 @@
 
 **Test Repo**: `$FORGE_TEST_REPO`
 
-**Last updated**: 2026-06-06 (renamed the per-session command to `forge activity` (7.12/5.21); earlier: status-line
-customization checks (§8.4), the `forge activity` per-session rollup with the workflow worker/verb double-count
-assertion (7.12), and the session-end activity summary (5.21); non-interactive docker-exec fixes, policy `--session`
-targeting, memory 16.4 re-track, skills-based disable assertions)
+**Last updated**: 2026-06-06 (metric-evidence cost-honesty coverage: `forge activity` cost footnotes/`~` marker (7.12),
+cost provenance reported-vs-`unavailable` split (7.13), `forge usage`->`forge activity` tombstone (7.14), the
+`forge_cost`/`forge +$Y` status-line segment with harness exclusion (8.5), session-end `~` marker (5.21), and the §3.4
+secret-vs-non-secret masking fix (OPENROUTER_BASE_URL shown in full); earlier: renamed the per-session command to
+`forge activity` (7.12/5.21), status-line customization checks (§8.4), the workflow worker/verb double-count assertion
+(7.12), non-interactive docker-exec fixes, policy `--session` targeting, memory 16.4 re-track)
 
 ---
 

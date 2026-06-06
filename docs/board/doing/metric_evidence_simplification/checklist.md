@@ -532,6 +532,11 @@ deliberate, test-visible choice — not silently diverging.
   (`-k Activity` → 1 passed, 5.8s, real wheel CLI in Docker). `test_audit_plumbing.py` is comment-only (no behavior
   change) — optional to re-run before merge.
 - [x] Design docs + end-user docs reflect shipped behavior; `docs/auth_cost_metric.md` folded to an internal map.
+- [x] **QA-checklist coverage (audit-driven follow-up, 2026-06-06)**: an adversarially-verified audit of
+  `src/skills/qa/` + `docs/end-user/` found end-user docs clean and six QA gaps; closed all six (§3.4 masking misfire,
+  §7.12 `forge activity` cost honesty, §7.13 provenance split, §7.14 rename tombstone, §8.5 `forge_cost` segment, §5.21
+  `~` marker; test-count 512→532). Every `<!-- auto -->` fixture validated against real code on the host. See the
+  `change_log.md` "Phase 6 follow-up" entry.
 - [ ] **Move card `doing/ → done/` after final merge to `main`** — gated: branch not yet merged, no PR (user owns the
   PR/merge/lane-move). Phase 6 complete on branch 2026-06-06; awaiting merge.
 

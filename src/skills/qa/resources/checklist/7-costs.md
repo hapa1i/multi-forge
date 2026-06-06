@@ -308,7 +308,8 @@ forge proxy start "$FORGE_QA_OPENAI_PROXY"
 
 `forge activity [session]` reads the usage-attribution ledger (`~/.forge/usage/events/`) filtered by session. Seed
 fixture events for a throwaway session and assert the rollup -- including the workflow worker/verb split (one panel = 1
-call + N workers, not N+1 calls).
+call + N workers, not N+1 calls) and the cost-honesty rendering: the aggregate cost is reported-or-estimated/best-effort
+(flagged with `~` and a footnote), while `forge proxy costs` is the authoritative spend view.
 
 ```bash
 cd $FORGE_TEST_REPO
@@ -342,6 +343,7 @@ print(f'supervisor calls={sup.get(\"calls\")} errors={sup.get(\"errors\")}')
 print(f'panel calls={panel.get(\"calls\")} workers={panel.get(\"workers\")}')
 print('DOUBLE_COUNT_OK' if panel.get('calls') == 1 and panel.get('workers') == 3 else 'DOUBLE_COUNT_FAIL')
 print(f'session={d[\"session\"]} tagging_partial={d[\"session_tagging_partial\"]}')
+print(f'cost_partial={d[\"cost_partial\"]} total_cost_micro_usd={d[\"total_cost_micro_usd\"]}')
 "
 
 echo "---"
@@ -357,8 +359,66 @@ forge session delete qa-usage --yes --force 2>/dev/null || true
 - [ ] `supervisor calls=3 errors=1` (the error mirrors an OpenRouter content-filter failure)
 - [ ] `panel calls=1 workers=3` and the script prints `DOUBLE_COUNT_OK` (verb + workers not double-counted)
 - [ ] `session=qa-usage tagging_partial=True`
+- [ ] `cost_partial=True total_cost_micro_usd=2050` (the 3 reported costs sum to 2050; the supervisor error + 3 workers
+  report no cost, so the aggregate is flagged best-effort/partial -- missing costs are not priced to 0)
 - [ ] Human render shows a `supervisor` row and a `panel` row, a `Workers` column with `3` on the panel row, and a
   `Total: 7 events` line
+- [ ] Human render cost honesty: the `Total:` line carries a `~` best-effort marker, and the footnotes include
+  `best-effort and partial` and `reported-or-estimated` (the always-on
+  `'forge proxy costs' is the authoritative spend view` pointer)
 - [ ] Fixture shard + `qa-usage` session removed at the end
+
+### 7.13 Cost Provenance (reported vs `unavailable`)
+
+<!-- auto -->
+
+The north star: a missing cost shows as `unavailable`, never invented from a local price table. `forge proxy costs` (the
+authoritative view) counts a request with no reported cost in `unavailable_requests` and excludes it from the dollar
+total -- it is never summed as `0`. Uses an isolated `qa-prov` proxy_id so the shared `qa-fixture` 3-request invariant
+(7.5/7.6) is untouched.
+
+```bash
+mkdir -p ~/.forge/costs/requests
+cat > ~/.forge/costs/requests/qa-fixture_prov-99999.jsonl <<'EOF'
+{"ts":"2026-05-01T00:00:00Z","proxy_id":"qa-prov","model":"test/gemini-2.5-flash","tier":"haiku","input_tokens":200,"output_tokens":80,"cached_tokens":0,"cost_micros":2500,"reporter":"litellm","confidence":"gateway_calculated","latency_ms":120.0,"failed":false,"request_id":"req-prov-001"}
+{"ts":"2026-05-01T00:01:00Z","proxy_id":"qa-prov","model":"test/gemini-3.1-pro-preview","tier":"sonnet","input_tokens":500,"output_tokens":150,"cached_tokens":0,"cost_micros":null,"reporter":"provider","confidence":"unavailable","latency_ms":300.0,"failed":false,"request_id":"req-prov-002"}
+EOF
+
+forge proxy costs qa-prov --period all --json | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+print(f'total_requests={d[\"total_requests\"]}')
+print(f'reported={d[\"reported_requests\"]} unavailable={d[\"unavailable_requests\"]}')
+print(f'total_cost_micros={d[\"total_cost_micros\"]}')
+"
+
+# Self-clean (the qa-fixture_* name is also swept by 7.11 as a safety net).
+rm -f ~/.forge/costs/requests/qa-fixture_prov-99999.jsonl
+```
+
+- [ ] `total_requests=2 reported=1 unavailable=1` (the null-cost `req-prov-002` is counted as unavailable, not dropped)
+- [ ] `total_cost_micros=2500` -- the missing cost is NOT summed as 0 and NOT priced from a local table
+  (reported-or-unavailable: the authoritative `forge proxy costs` view never invents a dollar figure)
+- [ ] Provenance fixture removed at the end
+
+### 7.14 Renamed-command Tombstone (`forge usage` -> `forge activity`)
+
+<!-- auto -->
+
+`forge usage` was renamed to `forge activity` (clean break). The hidden `usage` tombstone must reject the old name with
+an actionable message and tolerate stale args/flags, so users see the rename rather than Click's "No such option".
+
+```bash
+cd $FORGE_TEST_REPO
+forge usage 2>&1; echo "EXIT=$?"
+echo "---"
+# Stale args + flags must still reach the rename message, not a Click parse error.
+forge usage my-session --all --json --days 7 2>&1; echo "EXIT=$?"
+```
+
+- [ ] Bare `forge usage` exits non-zero (`EXIT=1`) and the message contains `has been renamed` and names
+  `forge activity`
+- [ ] `forge usage my-session --all --json --days 7` also reaches the rename message (no `No such option`) -- the stale
+  args/flags are swallowed, not parsed
 
 ---

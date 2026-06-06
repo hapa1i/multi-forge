@@ -651,6 +651,8 @@ forge session delete test-session-end --yes --force 2>/dev/null || true
 
 - [ ] When the session had activity, a `Forge this session — …` summary line prints on exit, before the reconnect tip
 - [ ] The line reports supervisor `errors` when an LLM call failed (e.g. an OpenRouter content-filter rejection)
+- [ ] If a cost figure appears, it carries the `~` best-effort marker (e.g. `~$0.04`) with no ` est` suffix (Phase 6
+  dropped ` est`)
 - [ ] `forge activity test-session-end` reports the same session's activity (or `No Forge activity` if the session was
   idle)
 
