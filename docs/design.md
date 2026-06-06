@@ -932,10 +932,10 @@ cost-capture or log write failures must not break successful LLM responses.
 
 #### Per-session usage read surface
 
-`forge usage [session]` aggregates the two already-captured per-session planes into one human-readable view: the **usage
-ledger** (`usage/events`, the uncapped source for per-command run/error counts, tokens, and reported-or-unavailable
-cost) and the manifest's **`confirmed.policy.decisions`** (supervisor allow/warn/deny and warning text, capped at
-`MAX_DECISION_LOG`). The aggregation is a UI-agnostic command-core builder
+`forge activity [session]` aggregates the two already-captured per-session planes into one human-readable view: the
+**usage ledger** (`usage/events`, the uncapped source for per-command run/error counts, tokens, and
+reported-or-unavailable cost) and the manifest's **`confirmed.policy.decisions`** (supervisor allow/warn/deny and
+warning text, capped at `MAX_DECISION_LOG`). The aggregation is a UI-agnostic command-core builder
 (`forge.core.ops.usage_summary.build_session_activity_summary`, §3.12) shared by the CLI and a compact session-end line
 the launcher prints on exit (host, sidecar, and fork). Cost is reported-or-unavailable, with per-session attribution
 best-effort — `forge proxy costs` stays the authoritative spend view. Events are scoped by the `session` field
@@ -1106,7 +1106,7 @@ hints through `ModelSpec.prompt`. All workflow execution commands (panel, analyz
 | Command                       | Purpose                                                                             |
 | ----------------------------- | ----------------------------------------------------------------------------------- |
 | `forge info`                  | Show global system information (`--json`)                                           |
-| `forge usage [session]`       | Per-session activity: supervisor checks, cost, tokens (`--json`, `--days`, `--all`) |
+| `forge activity [session]`    | Per-session activity: supervisor checks, cost, tokens (`--json`, `--days`, `--all`) |
 | `forge clean`                 | Remove orphaned state (`--scope`, `--yes`)                                          |
 | `forge config`                | Manage global runtime preferences                                                   |
 | `forge authentication login`  | Store credentials for LLM providers                                                 |
@@ -1944,10 +1944,10 @@ isolation). **Narrow exception (§7.x audit path):** when a session launches wit
 mounts that proxy's `~/.forge/proxies/<id>/` read-only (so the in-container proxy loads its intercept/audit overlay) and
 `~/.forge/audit/`, `~/.forge/costs/`, and `~/.forge/usage/` read-write (so audit records, cost history, spend-cap
 accounting, and the usage-attribution ledger persist on the host instead of dying with the `--rm` container — the ledger
-is the only record of the in-container supervisor/verb activity, and it feeds `forge usage` and the session-end summary
-for sidecar sessions). These are the only `~/.forge` subdirs mounted, preserving the port-isolation rationale. On Linux
-the sidecar runs as the host `--user uid:gid`; that uid has no passwd entry, so the launcher pins `HOME=/root` and the
-image makes `/root` traversable/writable (`chmod 0777 /root`) so the mapped uid can reach the `/root/.forge` and
+is the only record of the in-container supervisor/verb activity, and it feeds `forge activity` and the session-end
+summary for sidecar sessions). These are the only `~/.forge` subdirs mounted, preserving the port-isolation rationale.
+On Linux the sidecar runs as the host `--user uid:gid`; that uid has no passwd entry, so the launcher pins `HOME=/root`
+and the image makes `/root` traversable/writable (`chmod 0777 /root`) so the mapped uid can reach the `/root/.forge` and
 `/root/.claude` mounts — an accommodation for the ephemeral single-session `--rm` sandbox, **not** a security-sandbox
 guarantee. Sidecar sessions also persist their launch mode, extra mounts, and image in `intent.launch` so
 `forge session resume <name>` can replay the same runtime wiring later.

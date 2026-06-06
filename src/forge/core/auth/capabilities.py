@@ -60,6 +60,7 @@ CREDENTIALS: dict[str, Credential] = {
             "Forge subprocesses (supervisor, memory writer)",
             "direct Anthropic panel/debate workers",
             "litellm-anthropic-local proxy",
+            "anthropic-passthrough proxy template",
         ),
         signup_url="https://console.anthropic.com/",
         note="Pay-per-token API key. Not Claude Code login.",

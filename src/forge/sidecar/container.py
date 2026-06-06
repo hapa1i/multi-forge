@@ -192,12 +192,12 @@ def _ensure_audit_plumbing_mounts(proxy_id: str) -> list[tuple[str, str, str]]:
       intercept/audit overlay.
     - host audit/, costs/, and usage/ read-write, so the proxy's audit records and cost
       history, spend-cap accounting, and the attribution ledger persist where the host
-      reads them (`forge proxy audit|costs`, `forge usage`, the session-end summary)
+      reads them (`forge proxy audit|costs`, `forge activity`, the session-end summary)
       instead of dying with the --rm container. Each would otherwise be lost silently:
       caps bootstrap from cost history, so an unmounted costs/ resets daily/monthly caps
       every launch; and in sidecar mode the in-container supervisor + workflow verbs are
       the *only* writers of their usage events, so an unmounted usage/ makes the whole
-      session invisible to `forge usage`.
+      session invisible to `forge activity`.
     """
     forge_home = get_forge_home()
     mounts: list[tuple[str, str, str]] = [

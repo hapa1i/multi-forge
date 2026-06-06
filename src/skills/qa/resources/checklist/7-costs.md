@@ -300,20 +300,20 @@ forge proxy start "$FORGE_QA_OPENAI_PROXY"
 - [ ] QA cap seed logs removed (no `*_qa-cap-seed.jsonl` in `requests/`)
 - [ ] Spend caps reset on QA OpenAI and Gemini test proxies
 
-### 7.12 Per-Session Usage (`forge usage`)
+### 7.12 Per-Session Activity (`forge activity`)
 
 <!-- prereq: 0.3 -->
 
 <!-- auto -->
 
-`forge usage [session]` reads the usage-attribution ledger (`~/.forge/usage/events/`) filtered by session. Seed fixture
-events for a throwaway session and assert the rollup -- including the workflow worker/verb split (one panel = 1 call + N
-workers, not N+1 calls).
+`forge activity [session]` reads the usage-attribution ledger (`~/.forge/usage/events/`) filtered by session. Seed
+fixture events for a throwaway session and assert the rollup -- including the workflow worker/verb split (one panel = 1
+call + N workers, not N+1 calls).
 
 ```bash
 cd $FORGE_TEST_REPO
 
-# A resolvable session for `forge usage` to target (no Claude launch).
+# A resolvable session for `forge activity` to target (no Claude launch).
 forge session delete qa-usage --yes --force 2>/dev/null || true
 forge session start qa-usage --no-launch
 
@@ -332,7 +332,7 @@ cat > ~/.forge/usage/events/qa-usage-fixture_99999.jsonl <<'EOF'
 EOF
 
 # JSON contract + the double-count assertion
-forge usage qa-usage --all --json | python3 -c "
+forge activity qa-usage --all --json | python3 -c "
 import json, sys
 d = json.load(sys.stdin)
 cmds = {c['command']: c for c in d['commands']}
@@ -346,7 +346,7 @@ print(f'session={d[\"session\"]} tagging_partial={d[\"session_tagging_partial\"]
 
 echo "---"
 # Human-readable render (Rich table -> stderr): the Workers column appears only with a fan-out.
-forge usage qa-usage --all 2>&1
+forge activity qa-usage --all 2>&1
 
 # Clean up
 rm -f ~/.forge/usage/events/qa-usage-fixture_99999.jsonl

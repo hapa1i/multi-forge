@@ -267,7 +267,8 @@ These came out of the auth/cost/usage audit and should be handled with or before
   survive the removal?
 - Should reported-cost caps support token-only fallback policies, or should dollar caps simply ignore cost-unavailable
   events?
-- Should `forge usage` be renamed, or is a clear subtitle enough?
+- ~~Should `forge usage` be renamed, or is a clear subtitle enough?~~ **Resolved 2026-06-06: renamed to `forge activity`
+  (clean break + hidden flag-tolerant tombstone).**
 - Where should launch metadata live: session manifest only, a status-line sidecar file, or both?
 - How much OpenRouter/LiteLLM reported-cost coverage can be implemented synchronously from responses versus follow-up
   lookup APIs?

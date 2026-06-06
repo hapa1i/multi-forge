@@ -3,8 +3,8 @@
 Aggregates two already-captured planes into one view a human can read:
 
 - the usage-attribution ledger (``usage/events``) -> per-command run/error counts,
-  tokens, and estimated cost. Uncapped and reliable; the authoritative source for
-  "how many times did the supervisor run, and how many failed".
+  tokens, and reported-or-estimated cost. Uncapped and reliable; the authoritative
+  source for "how many times did the supervisor run, and how many failed".
 - the session manifest's ``confirmed.policy.decisions`` -> supervisor allow/warn/deny
   and warning text. Capped at ``MAX_DECISION_LOG`` (so ``log_capped`` is surfaced).
 
@@ -13,7 +13,7 @@ The two planes measure related-but-distinct things and are kept separate on purp
 ``claude -p`` is a ledger *error* the decision log may record as a fail-open allow).
 
 Pure logic (no Click, no printing), per design §3.12: returns a
-:class:`SessionActivitySummary`. Rendered by ``forge usage`` (table) and the
+:class:`SessionActivitySummary`. Rendered by ``forge activity`` (table) and the
 session-end launcher line (:func:`render_summary_line`). The manifest is **re-read
 fresh from disk** because hooks mutate ``confirmed.*`` during the run, after the
 launcher's in-memory copy was taken.

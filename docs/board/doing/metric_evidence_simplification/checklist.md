@@ -47,13 +47,13 @@ module. Therefore:
 
 ## Decision Gates (resolve before the dependent phase)
 
-| Gate   | Question                                                                                                     | Phase blocked            | Recommendation (challenge-checked)                                                                                                                                                                                                                                                                                                                               |
-| ------ | ------------------------------------------------------------------------------------------------------------ | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **G1** | Evolve the existing usage ledger, or introduce a broader metric-event ledger?                                | Phase 1 (all downstream) | **Evolve.** `core/usage/ledger.py` already carries `measurement_source`, `billing_mode`, `attribution_granularity`, versioned strict reads, and a nullable cost field. The card's metric-event model is ~90% the existing schema; a parallel ledger would duplicate the read/prune/shard machinery. Add `route`/`reporter`/`confidence` fields rather than fork. |
-| **G2** | Rename `forge usage`, or keep the name with a clear subtitle/scope label? (Bug #7)                           | Phase 6                  | **Subtitle, not rename.** It is a shipped public CLI surface; a rename is a research-preview clean break with tombstone cost. A subtitle ("Forge automation activity — not total interactive usage") plus consistent doc labeling fixes the misread at lower cost. Revisit rename only if subtitle proves insufficient.                                          |
-| **G3** | Where does launch metadata live: session manifest, status-line sidecar file, or both?                        | Phase 4                  | **Manifest `confirmed.launch_*` + read by status line via `FORGE_SESSION`.** Reuses the existing hook-owned `confirmed` writer and `FORGE_SESSION` discovery the status line already uses. A sidecar file adds a second writer/cleanup surface. Ambient sessions (no manifest) fall back to stdin-only.                                                          |
-| **G4** | `auth_ignore_env` redefined narrowly, or new key for interactive/headless credential separation? (Bug #2/#6) | Phase 4                  | **New opt-in key** (e.g. `keep_api_key_out_of_interactive`). `auth_ignore_env` has shipped semantics (credential resolution source); overloading it for a different axis (interactive vs headless hydration) would conflate two concerns. Keep hydration as the labeled default; add an opt-in separation path.                                                  |
-| **G5** | Should dollar caps ignore cost-unavailable events, or support a token-only fallback policy?                  | Phase 3                  | **Ignore for dollar caps in this card; keep schema compatible with token caps.** The card's scope is "no reported cost → record nothing." Token-only caps are a listed future aggregate row, not this card's commitment.                                                                                                                                         |
+| Gate   | Question                                                                                                     | Phase blocked            | Recommendation (challenge-checked)                                                                                                                                                                                                                                                                                                                                                              |
+| ------ | ------------------------------------------------------------------------------------------------------------ | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **G1** | Evolve the existing usage ledger, or introduce a broader metric-event ledger?                                | Phase 1 (all downstream) | **Evolve.** `core/usage/ledger.py` already carries `measurement_source`, `billing_mode`, `attribution_granularity`, versioned strict reads, and a nullable cost field. The card's metric-event model is ~90% the existing schema; a parallel ledger would duplicate the read/prune/shard machinery. Add `route`/`reporter`/`confidence` fields rather than fork.                                |
+| **G2** | Rename `forge usage`, or keep the name with a clear subtitle/scope label? (Bug #7)                           | Phase 6                  | **RESOLVED 2026-06-06: clean-break rename to `forge activity`** (user chose rename over the subtitle recommendation). The name `usage` itself read as "total interactive usage"; `activity` matches the internal `build_session_activity_summary`/`SessionActivitySummary` and fixes the misread at the name level. Shipped with a hidden flag-tolerant `usage` tombstone + honest scope label. |
+| **G3** | Where does launch metadata live: session manifest, status-line sidecar file, or both?                        | Phase 4                  | **Manifest `confirmed.launch_*` + read by status line via `FORGE_SESSION`.** Reuses the existing hook-owned `confirmed` writer and `FORGE_SESSION` discovery the status line already uses. A sidecar file adds a second writer/cleanup surface. Ambient sessions (no manifest) fall back to stdin-only.                                                                                         |
+| **G4** | `auth_ignore_env` redefined narrowly, or new key for interactive/headless credential separation? (Bug #2/#6) | Phase 4                  | **New opt-in key** (e.g. `keep_api_key_out_of_interactive`). `auth_ignore_env` has shipped semantics (credential resolution source); overloading it for a different axis (interactive vs headless hydration) would conflate two concerns. Keep hydration as the labeled default; add an opt-in separation path.                                                                                 |
+| **G5** | Should dollar caps ignore cost-unavailable events, or support a token-only fallback policy?                  | Phase 3                  | **Ignore for dollar caps in this card; keep schema compatible with token caps.** The card's scope is "no reported cost → record nothing." Token-only caps are a listed future aggregate row, not this card's commitment.                                                                                                                                                                        |
 
 > These are the user's calls. G1 and G2 most affect structure; the rest are local to their phase.
 
@@ -483,35 +483,54 @@ deliberate, test-visible choice — not silently diverging.
 
 ---
 
-## Phase 6 — Docs & CLI cleanup (Slice 6) — folds remaining bugs
+## Phase 6 — Docs & CLI cleanup (Slice 6) — folds remaining bugs — SHIPPED (2026-06-06, on branch)
 
-- [ ] **Bug #7 (G2)**: subtitle/label `forge usage` scope ("Forge automation activity, not total interactive usage") in
-  CLI output + docs; consistent labeling. (Rename only if G2 flips.)
-- [ ] **Bug #8**: purge unsafe "exact"/"authoritative" language for dollar values across CLI + docs. Exact is allowed
-  for `request_id` joins and provider token counts, never for dollar estimates.
-- [ ] **Bug #5**: credential docs — add `OPENROUTER_BASE_URL` (non-secret connection value) to end-user + design
-  credential tables; clarify `anthropic-passthrough` template coverage.
-- [ ] **Bug #6**: `auth_ignore_env` docs — state actual hydration behavior (applies to interactive launches too), or
-  point at the G4 separation key once it ships.
-- [ ] Update `docs/end-user/{authentication,config,proxy,session}.md` with new terms/scopes; add the card's user-facing
-  "which surface answers which question?" table.
-- [ ] Fold/supersede `docs/auth_cost_metric.md` as the internal map.
+- [x] **Bug #7 (G2 — flipped to clean-break rename, 2026-06-06)**: `forge usage` → `forge activity` (`cli/usage.py` →
+  `cli/activity.py`, `activity_cmd`), registered in `main.py`. Hidden, **flag-tolerant** `usage` tombstone
+  (`ignore_unknown_options` + `UNPROCESSED`, mirrors `memory_writer.py`) so
+  `forge usage my-session --all --json --days 7` reaches the rename message, not Click's "No such option". Honest scope
+  in help/output ("Forge automation activity — not your full interactive session") and the blanket "Estimated spend
+  only" label corrected to "reported-or-estimated, best-effort". `test_usage.py` → `test_activity.py` retargeted + 2
+  tombstone tests. Verified: `forge activity --help`, both `forge usage` forms tombstone; 9 unit + the renamed
+  integration test (`forge activity` at `test_session_commands_integration.py:781`).
+- [x] **Bug #8**: **verified clean, not swept.** A scoped grep of `src/forge` + docs found every "exact"/"authoritative"
+  hit applied to tokens (`provider_usage_exact`, "exact tokens"), `request_id` joins (`proxy_request_exact`), enum
+  names, or `forge proxy costs` authority — zero unsafe dollar prose survives Phases 2–5. The only substantive change
+  was the `forge activity` honest-label fix (folded into Bug #7).
+- [x] **Bug #5**: `OPENROUTER_BASE_URL` (non-secret connection value) added to both credential tables
+  (`end-user/authentication.md`, `design_appendix.md §A.6`); `anthropic-passthrough` added to
+  `anthropic-api.unlocks_features` (`capabilities.py`, + `test_capabilities.py` assertion) and a "which auth?" row.
+- [x] **Bug #6**: `auth_ignore_env` reworded in `authentication.md` + `design_appendix.md §A.6` — it changes the key
+  **source** (file vs env) for both interactive and headless; the interactive/headless separation is
+  `interactive_anthropic_api_key` (the G4 key, shipped Phase 4). Cross-referenced.
+- [x] Updated `end-user/{authentication,config,proxy,session,policy}.md`; added the user-facing "which surface answers
+  which question?" table to `proxy.md` (adapted from the internal `auth_cost_metric.md` table) with cross-links from
+  `session.md` + `config.md`.
+- [x] Folded `auth_cost_metric.md` into an **internal audit map** — banner + links to `design.md §3.14` /
+  `design_appendix.md §A.8/§A.9/§A.13`; preserved the durable reference (three planes, resolution chain, file index);
+  **rewrote** the Phase-4-falsified findings (F1/F2 → RESOLVED, §14 `has_api_key` deleted, billing-mode-as-declaration)
+  rather than keeping them verbatim; deleted the superseded operator playbook + proposals (P1/P2 shipped in Phase 4).
 
 ---
 
 ## Closeout (card-level)
 
-- [ ] Each phase's acceptance assertions ticked with recorded verification.
-- [ ] Acceptance-shape questions answerable by a user without Forge internals (card §Acceptance Shape): route? reporter?
-  reported/calculated/estimated/unavailable? scope? next-threshold policy? Forge-launched vs ambient?
-- [ ] `change_log.md` entries per shipped phase (newest-first; Goal/Key changes/Verification).
-- [ ] Promote durable lessons to `impl_notes.md` after human review (candidates: the **two** strict-preflight catalog
-  callsites — `server.py:674` passthrough + `:884` translated — must be removed together; cost-unavailable must be
-  `None` not `0` (the `estimated:True` conflation was the cost-oracle bug); the isinstance-guard pattern for all JSONL
-  cost readers, noting `bootstrap_from_logs` is already broad-except-guarded; billing_mode ≠ key presence).
-- [ ] Integration tests run for status-line/env/proxy-runtime/hook changes (not just unit).
-- [ ] Design docs + end-user docs reflect shipped behavior; `docs/auth_cost_metric.md` folded.
-- [ ] Move card `doing/ → done/` after final merge to `main`.
+- [x] Each phase's acceptance assertions ticked with recorded verification (Phases 0–6 above).
+- [x] Acceptance-shape questions answerable by a user without Forge internals: the new `proxy.md` "which surface answers
+  which question?" table (route/reporter/scope/provenance) + the honest `forge activity` scope label + the `launch`
+  segment (Forge-launched vs ambient) close this.
+- [x] `change_log.md` entries per shipped phase (newest-first; Phases 0–5 present, Phase 6 added 2026-06-06).
+- [~] **Durable lessons drafted for human promotion** — added under a clearly-labeled
+  `### Proposed Promotions From Metric Evidence (awaiting human review, 2026-06-06)` subsection in `impl_notes.md` (two
+  strict callsites die together; cost-unavailable = `None` not `0`; the isinstance JSONL guard; `billing_mode` ≠ key
+  presence). **Human promotes** — not yet moved into the durable body.
+- [x] Integration coverage: Phase 6 touches no hooks/session-lifecycle/proxy-runtime/installer **code** — only a CLI
+  command rename + a `capabilities.py` line + docs. The one integration test that drives the renamed command
+  (`test_session_commands_integration.py`) was updated to `forge activity`; unit suites cover the rest. (Run it +
+  `test_audit_plumbing.py` before merge per CLAUDE.md.)
+- [x] Design docs + end-user docs reflect shipped behavior; `docs/auth_cost_metric.md` folded to an internal map.
+- [ ] **Move card `doing/ → done/` after final merge to `main`** — gated: branch not yet merged, no PR (user owns the
+  PR/merge/lane-move). Phase 6 complete on branch 2026-06-06; awaiting merge.
 
 ## Out of Scope (this card)
 

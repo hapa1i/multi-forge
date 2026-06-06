@@ -25,6 +25,47 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board-contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-06-06
+
+### Phase 6: Docs & CLI cleanup + rename `forge usage` → `forge activity` (metric-evidence-simplification)
+
+**Goal**: Fold the card's remaining bugs (#5–#8) and make the per-session command's name honest — it reports Forge
+*automation* activity (supervisor, memory writer, workflow verbs + policy decisions), not total interactive usage. Final
+docs/CLI pass before closeout; complete on branch (PR/merge/lane-move owned by the human).
+
+**Key changes**:
+
+- **Bug #7 / G2 (flipped to clean break)**: renamed `forge usage` → `forge activity` (`cli/usage.py` →
+  `cli/activity.py`, `activity_cmd`; registered in `main.py`). Hidden, **flag-tolerant** `usage` tombstone
+  (`ignore_unknown_options` + `UNPROCESSED`, the `memory_writer.py` pattern) so `forge usage <s> --all --json --days 7`
+  reaches the rename message, not Click's "No such option". Help/output state the scope honestly and the blanket
+  "Estimated spend only" label is corrected to "reported-or-estimated, best-effort" (Phase 5 made direct-run cost
+  reported). The "usage" **ledger** plane name is unchanged — only the command moved (it now matches the internal
+  `build_session_activity_summary`).
+- **Bug #8**: verified **clean, not swept** — a scoped grep found every "exact"/"authoritative" hit applied to tokens,
+  `request_id` joins, enum names, or `forge proxy costs` authority; no unsafe dollar prose survived Phases 2–5.
+- **Bug #5**: `OPENROUTER_BASE_URL` (non-secret connection value) added to both credential tables;
+  `anthropic-passthrough` added to `anthropic-api.unlocks_features` (`capabilities.py` + test) and a "which auth?" row.
+- **Bug #6**: `auth_ignore_env` docs reworded — it changes the key **source** (file vs env) for both interactive and
+  headless; the interactive/headless separation is `interactive_anthropic_api_key` (Phase 4). Cross-referenced.
+- **Surface table**: new user-facing "which surface answers which question?" table in `proxy.md` (`forge proxy costs` vs
+  `forge activity` vs status-line `cost` vs `forge +$Y`), cross-linked from `session.md` + `config.md`.
+- **`auth_cost_metric.md` folded** to an internal map: banner + links to design.md §3.14 / appendix §A.8/§A.9/§A.13;
+  durable reference kept (three planes, resolution chain, file index); the Phase-4-falsified findings **rewritten as
+  resolved** (F1/F2, `has_api_key` deletion, billing-mode-as-declaration); superseded operator playbook + proposals
+  (P1/P2 shipped in Phase 4) deleted.
+
+**Breaking change / reset**: `forge usage` is removed — use `forge activity` (same args/flags). The old command is a
+hidden tombstone that exits non-zero naming the replacement; update any scripts/aliases. Research-preview clean break,
+no migration.
+
+**Verification**: 1582 `tests/src/cli` unit tests pass (incl. 9 `test_activity.py` + 2 flag-tolerant tombstone tests) +
+34 `test_capabilities.py` (incl. the `anthropic-passthrough` assertion); guard greps clean (`forge usage` → only the
+tombstone + rename notes; no unsafe dollar "exact"/"authoritative"); `forge activity --help` + both `forge usage`
+tombstone forms smoke-tested; `make pre-commit` clean. Integration `test_session_commands_integration.py` (updated to
+`forge activity`) + `test_audit_plumbing.py` to run before merge. Card stays in `doing/` — awaiting merge to `main` for
+the `doing/ → done/` lane move.
+
 ## 2026-06-05
 
 ### Phase 5: Headless runtime reporters (metric-evidence-simplification)
@@ -53,8 +94,8 @@ authoritative; surface Forge's additional headless spend as the opt-in `forge +$
 - **Docs (5f)**: `design.md` §3.14, `design_appendix.md` §A.13 + §A.8, `vocabulary.py`/`ledger.py` comments synced;
   corrected a stale `inferred`→`reported` left from Phase 2.
 - **Review follow-ups**: (1) proxied token-only snapshots now read `verb_snapshot_estimated`, not `unattributed` (a
-  token-carrying event must not claim "no figure"); (2) the `run_parallel` JSON-flag retry is now a tracked `Popen`
-  (own process group, registered in `children`) so it stays terminable under cancellation; (3) the **team supervisor**
+  token-carrying event must not claim "no figure"); (2) the `run_parallel` JSON-flag retry is now a tracked `Popen` (own
+  process group, registered in `children`) so it stays terminable under cancellation; (3) the **team supervisor**
   (`policy/team/handlers.py`) is now instrumented (mirrors the semantic supervisor; emits before the success gate so
   failures are attributed); (4) `docs/end-user/config.md` gains `forge_cost`/`forge_cost_ttl`; (5) the spike's
   `reproduce.sh` detects `timeout`/`gtimeout` (macOS portability); (6) name-scoped ledger aggregation documented as a

@@ -140,17 +140,20 @@ store (`~/.forge/credentials.yaml`, managed by `forge auth login`). Env vars ove
 
 Five atomic credentials (defined in `forge.core.auth.capabilities`):
 
-| Credential       | Env var(s)                             | Capabilities                                        |
-| ---------------- | -------------------------------------- | --------------------------------------------------- |
-| `openrouter`     | `OPENROUTER_API_KEY`                   | All `openrouter-*` proxies, OSS workflow models     |
-| `anthropic-api`  | `ANTHROPIC_API_KEY`                    | Forge subprocesses, `litellm-anthropic-local` proxy |
-| `openai-api`     | `OPENAI_API_KEY`                       | `litellm-openai-local` proxy                        |
-| `gemini-api`     | `GEMINI_API_KEY`                       | `litellm-gemini-local` proxy                        |
-| `litellm-remote` | `LITELLM_API_KEY` + `LITELLM_BASE_URL` | All remote `litellm-*` proxy templates              |
+| Credential       | Env var(s)                                              | Capabilities                                                                    |
+| ---------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `openrouter`     | `OPENROUTER_API_KEY` (+ optional `OPENROUTER_BASE_URL`) | All `openrouter-*` proxies, OSS workflow models                                 |
+| `anthropic-api`  | `ANTHROPIC_API_KEY`                                     | Forge subprocesses, `litellm-anthropic-local` + `anthropic-passthrough` proxies |
+| `openai-api`     | `OPENAI_API_KEY`                                        | `litellm-openai-local` proxy                                                    |
+| `gemini-api`     | `GEMINI_API_KEY`                                        | `litellm-gemini-local` proxy                                                    |
+| `litellm-remote` | `LITELLM_API_KEY` + `LITELLM_BASE_URL`                  | All remote `litellm-*` proxy templates                                          |
 
 `auth_ignore_env: true` in runtime config (`~/.forge/config.yaml`) skips all env vars for credential resolution. Both
 the sync path (`resolve_env_or_credential`) and async path (`CredentialManager` via `EnvSecretsProvider`) respect the
-flag. `build_claude_env()` hydrates credential-file values into subprocess env dicts when the flag is active.
+flag. `build_claude_env()` hydrates credential-file values into subprocess env dicts when the flag is active — this
+changes the *source* of the resolved key (file vs env) for **both** interactive and headless launches; it does **not**
+keep a key out of the interactive session. Withholding a key from interactive Claude is the separate
+`interactive_anthropic_api_key: omit` control (§A.7), not `auth_ignore_env`.
 
 **Rule:** Credential storage holds secrets and connection values (e.g., `LITELLM_BASE_URL`). Connection values are a
 convenience fallback for bootstrapping proxy creation (`forge proxy create`). Once `proxy.yaml` exists, proxy-owned
@@ -531,12 +534,12 @@ tokens). This is the first emission of `reporter=claude_code` and `measurement_s
 cost/tokens — the verb-level aggregate above holds the estimated proxied total, so attributing per-worker would
 double-count. Helper: `emit_worker_usage`.
 
-**Read surface — `forge usage` and the session-end summary.** `read_usage_events(..., session=<name>)` filters the
+**Read surface — `forge activity` and the session-end summary.** `read_usage_events(..., session=<name>)` filters the
 ledger by the `session` field; `forge.core.ops.usage_summary.build_session_activity_summary(name, forge_root, since=)`
 aggregates it with the manifest's `confirmed.policy.decisions` into a `SessionActivitySummary` (ledger -> per-command
 `CommandUsage` run/error/token/cost rows; decisions -> `PolicyActivity` supervisor allow/warn/deny + warnings, with
 `log_capped` when the decision log hit `MAX_DECISION_LOG`). The builder re-reads the manifest fresh from disk because
-hooks mutate `confirmed.*` during the run. `forge usage [session]` renders a table (`--json`/`--days`/`--all`); the
+hooks mutate `confirmed.*` during the run. `forge activity [session]` renders a table (`--json`/`--days`/`--all`); the
 launcher prints a one-line `render_summary_line(...)` on exit (host, sidecar, fork). Cost is reported-or-unavailable and
 may be partial (`cost_partial`); `forge proxy costs` is authoritative.
 
@@ -551,9 +554,9 @@ Per-emitter session coverage (a per-session summary is honest about what it can 
 
 **Sidecar.** When a sidecar session launches with a proxy id, the launcher mounts `~/.forge/usage/` rw alongside
 `audit/` + `costs/` (§7), so the in-container supervisor/verb events survive the `--rm` container and a sidecar
-session-end summary + `forge usage` show the full ledger half, not just the policy-decision half. Template-only sidecars
-(no proxy id) mount none of these, so their ledger events stay ephemeral — consistent with how they already drop
-audit/costs.
+session-end summary + `forge activity` show the full ledger half, not just the policy-decision half. Template-only
+sidecars (no proxy id) mount none of these, so their ledger events stay ephemeral — consistent with how they already
+drop audit/costs.
 
 ---
 

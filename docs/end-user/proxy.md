@@ -448,8 +448,21 @@ forge proxy costs openrouter-anthropic         # Filter by proxy
 
 > **Per-session view:** `forge proxy costs` is the authoritative, **proxy-scoped** dollar view. For a **session-scoped**
 > rollup of what Forge did — supervisor checks (including failed ones), tokens, and *reported* cost (or *unavailable*) —
-> use [`forge usage [session]`](session.md#what-a-session-did-forge-usage--session-end-summary). The two are
+> use [`forge activity [session]`](session.md#what-a-session-did-forge-activity--session-end-summary). The two are
 > complementary: spend is billed per proxy; activity is attributed per session.
+
+### Which surface answers which question?
+
+Forge surfaces cost and usage through several views with deliberately different scopes. Pick the one that matches your
+question — and read every dollar figure as **reported-or-unavailable** (Forge never prices a request from a local
+table):
+
+| Surface                                | Question it answers                               | Scope                                                                            | Cost provenance                                                                   |
+| -------------------------------------- | ------------------------------------------------- | -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `forge proxy costs`                    | "What did this proxy actually spend?"             | one proxy's request log (proxy-scoped)                                           | reported `$` or `unavailable`; **authoritative** spend view                       |
+| `forge activity [session]`             | "What did Forge's automation do this session?"    | one Forge session — supervisor, memory writer, workflow verbs + policy decisions | reported-or-estimated `$`, best-effort attribution                                |
+| status-line `cost` segment             | "What is my Claude session costing / quota left?" | the one interactive Claude session                                               | **Claude's** own reported cost, or subscription quota — never recomputed by Forge |
+| status-line `forge +$Y` (`forge_cost`) | "What did Forge add on top of my session?"        | one Forge session, **excluding** the main interactive harness                    | reported-or-nothing (subscription/OAuth → nothing)                                |
 
 Set caps on the proxy:
 

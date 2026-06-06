@@ -170,6 +170,10 @@ forge config set statusline.cost_mode=subscription
 Under a proxy the cost field shows the proxy's *reported* `~$`; the `~` flags that it can undercount, since
 cost-unavailable routes are excluded rather than priced from a local table.
 
+The status-line `cost` is **Claude's** native signal, not Forge's spend. For when to use it vs `forge proxy costs`
+(authoritative spend), `forge activity` (Forge automation activity), and the `forge_cost` segment, see
+[which surface answers which question?](proxy.md#which-surface-answers-which-question).
+
 **Removed:** the old flat `show_rate_limits` key. Add `rate_limits` to `statusline.segments` instead (e.g.
 `forge config set statusline.segments=path,model,rate_limits`).
 

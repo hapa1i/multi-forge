@@ -55,8 +55,9 @@ ANTHROPIC_API_KEY=sk-ant-temp forge session start test
 
 ### Ignoring environment variables (`auth_ignore_env`)
 
-Sometimes your shell `ANTHROPIC_API_KEY` is for a different account or billing context than what you want Forge
-subprocesses to use. Set `auth_ignore_env` to skip all env vars for credential resolution:
+Sometimes your shell `ANTHROPIC_API_KEY` is for a different account or billing context than the one you stored with
+`forge auth login`. Set `auth_ignore_env` to make Forge resolve credentials from the **credential file only**, ignoring
+env vars:
 
 ```bash
 forge config set auth_ignore_env=true
@@ -65,6 +66,11 @@ forge auth login -c anthropic-api   # Store the Forge-specific key
 
 When active, the resolution chain becomes credential file only. `forge auth status` shows `(env ignored)` for
 credentials that have env vars present but skipped.
+
+This changes the **source** of the resolved key (file vs env) for **both** interactive and headless Claude launches — it
+does **not** keep a key out of the interactive session. To run your interactive session on your Claude Code login (no
+API key at all) while headless workers still use one, use `interactive_anthropic_api_key: omit` (next section) — that is
+a separate axis.
 
 ### Keeping a key out of interactive sessions (`interactive_anthropic_api_key`)
 
@@ -89,13 +95,13 @@ withheld.
 
 `forge auth login` shows a credential selection menu. Each credential maps to specific Forge capabilities:
 
-| Credential       | Env var(s)                             | What it unlocks                                                         |
-| ---------------- | -------------------------------------- | ----------------------------------------------------------------------- |
-| `openrouter`     | `OPENROUTER_API_KEY`                   | All `openrouter-*` proxy templates, OSS workflow models                 |
-| `anthropic-api`  | `ANTHROPIC_API_KEY`                    | Forge subprocesses, direct Anthropic workers, `litellm-anthropic-local` |
-| `openai-api`     | `OPENAI_API_KEY`                       | `litellm-openai-local` proxy                                            |
-| `gemini-api`     | `GEMINI_API_KEY`                       | `litellm-gemini-local` proxy                                            |
-| `litellm-remote` | `LITELLM_API_KEY` + `LITELLM_BASE_URL` | All remote `litellm-*` proxy templates                                  |
+| Credential       | Env var(s)                                              | What it unlocks                                                                                  |
+| ---------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `openrouter`     | `OPENROUTER_API_KEY` (+ optional `OPENROUTER_BASE_URL`) | All `openrouter-*` proxy templates, OSS workflow models                                          |
+| `anthropic-api`  | `ANTHROPIC_API_KEY`                                     | Forge subprocesses, direct Anthropic workers, `litellm-anthropic-local`, `anthropic-passthrough` |
+| `openai-api`     | `OPENAI_API_KEY`                                        | `litellm-openai-local` proxy                                                                     |
+| `gemini-api`     | `GEMINI_API_KEY`                                        | `litellm-gemini-local` proxy                                                                     |
+| `litellm-remote` | `LITELLM_API_KEY` + `LITELLM_BASE_URL`                  | All remote `litellm-*` proxy templates                                                           |
 
 ### Anthropic API key disambiguation
 
@@ -110,16 +116,17 @@ If you see authentication errors in workflow output, run `forge auth login -c an
 
 ### Which auth do I need?
 
-| Flow                                         | Needs                                                                  |
-| -------------------------------------------- | ---------------------------------------------------------------------- |
-| `forge session start` (direct)               | Claude Code login/subscription is enough                               |
-| `forge workflow analyze` (default)           | `ANTHROPIC_API_KEY`                                                    |
-| `forge workflow panel` (default)             | `ANTHROPIC_API_KEY` + active `openrouter-openai` + `openrouter-gemini` |
-| `forge session resume --fresh -s ai-curated` | `OPENROUTER_API_KEY`                                                   |
-| OpenRouter proxy (`openrouter-*`)            | `OPENROUTER_API_KEY`                                                   |
-| Remote LiteLLM proxy (`litellm-openai`)      | `LITELLM_API_KEY` + `LITELLM_BASE_URL`                                 |
-| Local LiteLLM proxy (`litellm-openai-local`) | `OPENAI_API_KEY`                                                       |
-| Local LiteLLM proxy (`litellm-gemini-local`) | `GEMINI_API_KEY`                                                       |
+| Flow                                            | Needs                                                                  |
+| ----------------------------------------------- | ---------------------------------------------------------------------- |
+| `forge session start` (direct)                  | Claude Code login/subscription is enough                               |
+| `forge workflow analyze` (default)              | `ANTHROPIC_API_KEY`                                                    |
+| `forge workflow panel` (default)                | `ANTHROPIC_API_KEY` + active `openrouter-openai` + `openrouter-gemini` |
+| `forge session resume --fresh -s ai-curated`    | `OPENROUTER_API_KEY`                                                   |
+| OpenRouter proxy (`openrouter-*`)               | `OPENROUTER_API_KEY`                                                   |
+| Anthropic passthrough (`anthropic-passthrough`) | `ANTHROPIC_API_KEY`                                                    |
+| Remote LiteLLM proxy (`litellm-openai`)         | `LITELLM_API_KEY` + `LITELLM_BASE_URL`                                 |
+| Local LiteLLM proxy (`litellm-openai-local`)    | `OPENAI_API_KEY`                                                       |
+| Local LiteLLM proxy (`litellm-gemini-local`)    | `GEMINI_API_KEY`                                                       |
 
 ---
 

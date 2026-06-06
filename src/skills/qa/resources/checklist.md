@@ -6,15 +6,16 @@
 
 <!-- test-count: 512 -->
 
-<!-- last-updated: 2026-06-05 -->
+<!-- last-updated: 2026-06-06 -->
 
 <!-- aligned-with: v0.1.0 -->
 
 **Test Repo**: `$FORGE_TEST_REPO`
 
-**Last updated**: 2026-06-03 (added status-line customization checks (§8.4), `forge usage` per-session rollup with the
-workflow worker/verb double-count assertion (7.12), and the session-end activity summary (5.21); earlier:
-non-interactive docker-exec fixes, policy `--session` targeting, memory 16.4 re-track, skills-based disable assertions)
+**Last updated**: 2026-06-06 (renamed the per-session command to `forge activity` (7.12/5.21); earlier: status-line
+customization checks (§8.4), the `forge activity` per-session rollup with the workflow worker/verb double-count
+assertion (7.12), and the session-end activity summary (5.21); non-interactive docker-exec fixes, policy `--session`
+targeting, memory 16.4 re-track, skills-based disable assertions)
 
 ---
 
