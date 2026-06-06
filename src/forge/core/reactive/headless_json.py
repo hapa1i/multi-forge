@@ -82,6 +82,10 @@ def prepare_json_argv(argv: list[str], output_format: str | None) -> tuple[list[
     Appends ``--output-format <fmt>`` when ``output_format`` is set AND the
     capability guard allows it. Callers pass the base argv (no ``--output-format``
     token); this is the single injection point shared by both runners.
+
+    Only ``"json"`` is parseable end-to-end today: ``parse_headless_envelope`` reads a
+    batch JSON envelope, not realtime ``stream-json`` (NDJSON). Do not pass
+    ``"stream-json"`` until the parser is wired to consume it, or cost/usage drop.
     """
     if output_format and should_request_json(argv):
         return [*argv, "--output-format", output_format], True

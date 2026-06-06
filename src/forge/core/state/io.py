@@ -19,6 +19,24 @@ from typing import Any
 from .exceptions import StateCorruptedError, StateNotFoundError
 
 
+def decode_json_object(line: str) -> dict[str, Any] | None:
+    """Decode one JSONL line to a dict, or return None to skip it.
+
+    Returns None for a blank line, malformed JSON, or valid-but-non-object JSON
+    (``[]`` / ``1`` / ``"x"`` / ``null``). Centralizes the guard every append-only
+    cost/usage/audit reader needs: a stray non-object line must be skipped, never
+    crashed on with an ``AttributeError`` from a ``.get`` on a list/scalar.
+    """
+    line = line.strip()
+    if not line:
+        return None
+    try:
+        record = json.loads(line)
+    except json.JSONDecodeError:
+        return None
+    return record if isinstance(record, dict) else None
+
+
 def open_secure_append(path: Path) -> Any:
     """Open a file for append with 0600 permissions (owner read/write only).
 

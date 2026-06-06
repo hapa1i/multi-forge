@@ -541,25 +541,34 @@ deliberate, test-visible choice — not silently diverging.
   owns the merge/lane-move). Phase 6 complete on branch 2026-06-06; PR #18 review fixes landed (commit `97b2098`);
   awaiting merge.
 
-## Post-Review Follow-ups (deferred, non-blocking)
+## Post-Review Follow-ups — RESOLVED on branch (2026-06-06)
 
 From the PR #18 adversarial review (2026-06-06). The merge-gating findings were fixed on the branch (commit `97b2098`,
-see the `change_log.md` "Phase 6 review fixes" entry). The items below are verified-but-narrow or cleanup; recorded here
-so the `doing/ → done/` move stays honest. Each can graduate to its own `todo/` card if not done before merge.
+see the `change_log.md` "Phase 6 review fixes" entry). The three verified-but-narrow / cleanup items below were folded
+in before the `doing/ → done/` move (rather than deferred to separate cards) — see the `change_log.md` "Phase 6
+follow-up: deferred cleanups" entry.
 
-- [ ] **Bound the `forge_cost` ledger scan**: `sum_forge_added_cost` (`core/ops/usage_summary.py`) calls
-  `read_usage_events(session=…)` with no `period_start`, so the opt-in `forge_cost` status segment re-globs +
-  JSON-parses the whole uncapped ledger every poll. Pass a session-start lower bound. Assertion: the hot-path call
-  passes a `period_start`; a multi-month ledger fixture is not fully re-parsed per poll.
-- [ ] **Resolve the dormant `stream-json` branch**: `structured_output.py` `_find_result_object` has a `stream-json`
-  branch, but callers never thread `output_format` into `parse_headless_envelope` (dead today; a future
-  `output_format="stream-json"` caller would silently drop cost/usage via a single `json.loads`). Thread the format
-  through both call sites, or remove the advertised support. Assertion: a `stream-json` request round-trips its
-  envelope, or the field/branch is gone.
-- [ ] **Duplication cleanup**: verb/model aggregation duplicated in `proxy_costs.py` (`_display_by_*` vs `_output_json`);
-  the direct `claude -p` cost-precedence rule duplicated in `emit.py` (`emit_usage_for_session_result` vs
-  `emit_worker_usage`); the `isinstance(record, dict)` JSONL guard copy-pasted across 4 readers. Extract shared helpers.
-  Assertion: each rule/guard lives once; the table vs JSON cost surfaces can't drift.
+- [x] **Bound the `forge_cost` ledger scan**: `sum_forge_added_cost` (`core/ops/usage_summary.py`) gained a keyword
+  `since: datetime | None`, threaded to `read_usage_events(period_start=since)`; the status producer
+  (`statusline/registry.py` `_produce_forge_cost`) derives it from the manifest `created_at` (defensive `parse_iso`,
+  unbounded fallback on absent/malformed). An event can't predate its session, so the bound is loss-free. **Verified**:
+  `test_usage_summary.py::TestSumForgeAddedCost::test_since_bounds_the_scan` (06-01 event excluded, unbounded sums
+  both).
+- [x] **Resolve the dormant `stream-json` branch**: **removed** (not threaded — Forge consumes headless output in batch,
+  where `json` is equivalent and simpler; streaming stays a proxy concern). Dropped the `output_format` param + the
+  `stream-json` branch from `_find_result_object`/`parse_headless_envelope`; left a seam note at both halves
+  (`prepare_json_argv` + `_find_result_object`) so a future streaming mode wires the parser AND request side together.
+  **Verified**: `test_bug_headless_envelope_parse.py::test_ndjson_stream_json_falls_back_to_raw_text` (NDJSON →
+  `parsed=False` raw-text fallback, no crash, no silent half-parse).
+- [x] **Duplication cleanup**: (a) the `isinstance(record, dict)` JSONL guard now lives once as
+  `core.state.decode_json_object`, routed through all **5** readers (`cost_logger`, `cost_tracker`, `cost_tracking`,
+  `audit_logger`, `ledger`); (b) `proxy_costs.py` verb/model/total aggregation extracted to `_aggregate_by_verb` /
+  `_aggregate_by_model` / `_request_cost_totals`, shared by `_display_by_*` + `_output_json` (table vs JSON can't
+  drift); (c) `emit.py`'s **direct-path** one-reporter precedence extracted to `_direct_cost_provenance`, shared by the
+  verb + worker emitters — the **proxied** path stays per-caller (verb attributes the snapshot; a worker stays
+  unattributed to avoid double-counting the verb aggregate). **Verified**: `test_io.py::TestDecodeJsonObject`,
+  `test_emit.py::TestDirectCostProvenance` + `TestVerbWorkerPrecedenceInvariant` (direct verb == worker; proxied
+  diverges — no double-count).
 
 ## Out of Scope (this card)
 

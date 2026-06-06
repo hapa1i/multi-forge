@@ -23,6 +23,7 @@ helpers, so per-callsite wiring here does not become throwaway.
 from __future__ import annotations
 
 import logging
+from typing import NamedTuple
 
 from forge.core.reactive.cost_tracking import VerbCostResult
 from forge.core.reactive.env import get_run_identity
@@ -56,6 +57,54 @@ def _session_status(result: SessionResult) -> tuple[str, str | None]:
     if result.error:
         return "error", "subprocess_error"
     return "error", f"exit_{result.returncode}"
+
+
+class _DirectProvenance(NamedTuple):
+    """Cost/token provenance for a direct (non-proxied) ``claude -p`` run."""
+
+    cost_micro_usd: int | None
+    reporter: Reporter | None
+    confidence: Confidence
+    measurement_source: MeasurementSource
+    input_tokens: int | None
+    output_tokens: int | None
+    cached_tokens: int | None
+
+
+def _direct_cost_provenance(
+    self_cost: int | None,
+    envelope_parsed: bool,
+    input_tokens: int | None,
+    output_tokens: int | None,
+    cached_tokens: int | None,
+) -> _DirectProvenance:
+    """One-reporter cost precedence for a DIRECT (non-proxied) ``claude -p`` run.
+
+    ``self_cost`` is the runtime's self-reported cost, already gated on
+    ``envelope_parsed`` by the caller (``None`` when the envelope did not parse).
+    Three outcomes:
+
+    - self-reported cost present -> ``claude_code`` / ``reported`` / ``runtime_native``
+      with the run's exact in-band tokens.
+    - cost absent but tokens present (e.g. OAuth) -> ``provider_usage_exact`` /
+      ``unavailable`` with exact tokens (cost honestly absent, not $0).
+    - neither -> ``unattributed`` / ``unavailable``, no tokens.
+
+    Shared by the verb (:func:`emit_usage_for_session_result`) and per-worker
+    (:func:`emit_worker_usage`) emitters so the direct-path rule lives once. The
+    PROXIED path is deliberately NOT here -- it diverges by caller: the verb attributes
+    the proxy snapshot, a per-worker event stays unattributed so it does not
+    double-count the verb-level aggregate.
+    """
+    if self_cost is not None:
+        return _DirectProvenance(
+            self_cost, "claude_code", "reported", "runtime_native", input_tokens, output_tokens, cached_tokens
+        )
+    if envelope_parsed and input_tokens is not None:
+        return _DirectProvenance(
+            None, None, "unavailable", "provider_usage_exact", input_tokens, output_tokens, cached_tokens
+        )
+    return _DirectProvenance(None, None, "unavailable", "unattributed", None, None, None)
 
 
 def emit_usage_for_session_result(
@@ -118,19 +167,17 @@ def emit_usage_for_session_result(
                 measurement_source = "unattributed"
         else:
             # Direct / non-proxied: the runtime self-reports (closes today's unavailable gap).
-            if self_cost is not None:
-                cost_micro_usd, reporter, confidence = self_cost, "claude_code", "reported"
-                measurement_source = "runtime_native"
-            else:
-                cost_micro_usd, reporter, confidence, measurement_source = None, None, "unavailable", "unattributed"
-            # Exact in-band tokens belong ONLY to a runtime-sourced event. Cost-absent +
-            # usage-present (direct OAuth) -> provider_usage_exact + confidence="unavailable".
-            if result.envelope_parsed and result.input_tokens is not None:
-                in_tok, out_tok, cache_tok = result.input_tokens, result.output_tokens, result.cached_tokens
-                if measurement_source == "unattributed":
-                    measurement_source = "provider_usage_exact"
-            else:
-                in_tok = out_tok = cache_tok = None
+            # Shared one-reporter precedence (also used per-worker) -- tokens follow the cost source.
+            prov = _direct_cost_provenance(
+                self_cost, result.envelope_parsed, result.input_tokens, result.output_tokens, result.cached_tokens
+            )
+            cost_micro_usd, reporter, confidence, measurement_source = (
+                prov.cost_micro_usd,
+                prov.reporter,
+                prov.confidence,
+                prov.measurement_source,
+            )
+            in_tok, out_tok, cache_tok = prov.input_tokens, prov.output_tokens, prov.cached_tokens
 
         # "Direct" for billing only when no proxy is in the path; a proxied call's
         # upstream billing is opaque from here, so it stays "unknown".
@@ -270,15 +317,22 @@ def emit_worker_usage(
         out_tok: int | None
         cache_tok: int | None
 
-        if (not proxied) and self_cost is not None:
-            ev_cost, reporter, confidence, measurement_source = self_cost, "claude_code", "reported", "runtime_native"
-            in_tok, out_tok, cache_tok = input_tokens, output_tokens, cached_tokens
-        elif (not proxied) and envelope_parsed and input_tokens is not None:
-            ev_cost, reporter, confidence, measurement_source = None, None, "unavailable", "provider_usage_exact"
-            in_tok, out_tok, cache_tok = input_tokens, output_tokens, cached_tokens
-        else:
+        if proxied:
+            # A per-worker proxy cost is not isolatable here; the verb-level aggregate
+            # (emit_verb_usage) holds the estimated total, so attributing cost per-worker
+            # would double-count. Stay unattributed with null cost/tokens.
             ev_cost, reporter, confidence, measurement_source = None, None, "unavailable", "unattributed"
             in_tok = out_tok = cache_tok = None
+        else:
+            # Direct worker: same one-reporter precedence as the verb path.
+            prov = _direct_cost_provenance(self_cost, envelope_parsed, input_tokens, output_tokens, cached_tokens)
+            ev_cost, reporter, confidence, measurement_source = (
+                prov.cost_micro_usd,
+                prov.reporter,
+                prov.confidence,
+                prov.measurement_source,
+            )
+            in_tok, out_tok, cache_tok = prov.input_tokens, prov.output_tokens, prov.cached_tokens
 
         event = UsageEvent(
             run_id=run_id,

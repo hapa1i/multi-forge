@@ -90,28 +90,21 @@ def _coerce_token_count(value: Any) -> int | None:
     return value if isinstance(value, int) and not isinstance(value, bool) else None
 
 
-def _find_result_object(stdout: str, output_format: str) -> dict[str, Any] | None:
+def _find_result_object(stdout: str) -> dict[str, Any] | None:
     """Locate the terminal ``type=="result"`` object across the shapes Claude emits.
 
     Claude Code 2.1.x `--output-format json` emits a JSON ARRAY of events
     ``[system, assistant, result]`` (cost/usage in the LAST ``result`` element);
-    the docs also describe a single ``result`` object. ``stream-json`` is
-    newline-delimited with a terminal ``result`` line. Returns None on anything
-    else (caller falls back to raw text).
-    """
-    if output_format == "stream-json":
-        for line in reversed(stdout.strip().splitlines()):
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                obj = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if isinstance(obj, dict) and obj.get("type") == "result":
-                return obj
-        return None
+    the docs also describe a single ``result`` object. Returns None on anything else
+    (caller falls back to raw text).
 
+    Forge requests only ``--output-format json`` today. ``claude -p`` also supports
+    ``stream-json`` (realtime NDJSON), but Forge consumes headless output in batch,
+    where ``json`` is equivalent and simpler. A future streaming mode must add NDJSON
+    parsing here AND thread the format from the caller (see ``prepare_json_argv``);
+    do not request ``stream-json`` until both halves are wired, or cost/usage silently
+    drop.
+    """
     try:
         data = json.loads(stdout)
     except json.JSONDecodeError:
@@ -124,8 +117,8 @@ def _find_result_object(stdout: str, output_format: str) -> dict[str, Any] | Non
     return None
 
 
-def parse_headless_envelope(stdout: str, *, output_format: str = "json") -> HeadlessEnvelope:
-    """Parse a `claude -p` JSON/stream-json envelope. NEVER raises.
+def parse_headless_envelope(stdout: str) -> HeadlessEnvelope:
+    """Parse a `claude -p --output-format json` envelope. NEVER raises.
 
     On any non-envelope input (crash, empty, non-JSON, JSON without a usable
     ``result`` string), returns ``parsed=False`` with ``result_text=stdout`` so
@@ -136,7 +129,7 @@ def parse_headless_envelope(stdout: str, *, output_format: str = "json") -> Head
     if not raw.strip():
         return HeadlessEnvelope(result_text=raw)
 
-    result_obj = _find_result_object(raw, output_format)
+    result_obj = _find_result_object(raw)
     if not isinstance(result_obj, dict):
         return HeadlessEnvelope(result_text=raw)
 

@@ -15,7 +15,13 @@ For domain-specific state operations, use the domain modules:
 """
 
 # IO utilities
-from .io import atomic_write_json, atomic_write_text, open_secure_append, read_json
+from .io import (
+    atomic_write_json,
+    atomic_write_text,
+    decode_json_object,
+    open_secure_append,
+    read_json,
+)
 
 # Locking utilities
 from .lock import (
@@ -40,6 +46,7 @@ __all__ = [
     # IO
     "atomic_write_text",
     "atomic_write_json",
+    "decode_json_object",
     "open_secure_append",
     "read_json",
     # Locking

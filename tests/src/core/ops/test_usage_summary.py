@@ -340,6 +340,34 @@ class TestSumForgeAddedCost:
     def test_empty_ledger_returns_none(self) -> None:
         assert sum_forge_added_cost("planner") is None
 
+    def test_since_bounds_the_scan(self) -> None:
+        # `since` filters the ledger by event ts so the status-line poll need not
+        # re-parse the whole ledger: an event before `since` is excluded; one at/after
+        # is summed. The bound is the ONLY difference from an unbounded scan.
+        log_usage_event(
+            _event(
+                command="memory-writer",
+                route="claude_p",
+                reporter="claude_code",
+                confidence="reported",
+                cost_micro_usd=10_000,
+                ts="2026-06-01T00:00:00+00:00",
+            )
+        )
+        log_usage_event(
+            _event(
+                command="supervisor",
+                route="claude_p",
+                reporter="claude_code",
+                confidence="reported",
+                cost_micro_usd=40_000,
+                ts="2026-06-05T00:00:00+00:00",
+            )
+        )
+        since = datetime(2026, 6, 3, tzinfo=timezone.utc)
+        assert sum_forge_added_cost("planner", since=since) == 40_000  # 06-01 event excluded
+        assert sum_forge_added_cost("planner") == 50_000  # unbounded sums both
+
     def test_other_sessions_excluded(self) -> None:
         log_usage_event(
             _event(

@@ -11,8 +11,34 @@ from forge.core.state import (
     StateNotFoundError,
     atomic_write_json,
     atomic_write_text,
+    decode_json_object,
     read_json,
 )
+
+
+class TestDecodeJsonObject:
+    """The shared JSONL guard every cost/usage/audit reader routes through.
+
+    A valid-but-non-object line must be skipped (None), never crashed on with a
+    ``.get`` AttributeError on a list/scalar."""
+
+    def test_decodes_a_json_object(self) -> None:
+        assert decode_json_object('{"a": 1}') == {"a": 1}
+
+    def test_strips_and_decodes(self) -> None:
+        assert decode_json_object('  {"a": 1}\n') == {"a": 1}
+
+    @pytest.mark.parametrize("line", ["", "   ", "\n"])
+    def test_blank_line_is_none(self, line: str) -> None:
+        assert decode_json_object(line) is None
+
+    def test_malformed_json_is_none(self) -> None:
+        assert decode_json_object("{not json") is None
+
+    @pytest.mark.parametrize("line", ["[]", "1", '"x"', "null", "true", "[1, 2]"])
+    def test_valid_but_non_object_is_none(self, line: str) -> None:
+        # The whole point: these are valid JSON but not dicts -> skip, don't crash.
+        assert decode_json_object(line) is None
 
 
 class TestAtomicWriteText:

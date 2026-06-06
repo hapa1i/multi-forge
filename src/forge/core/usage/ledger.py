@@ -32,6 +32,7 @@ from typing import Literal
 import dacite
 
 from forge.core.paths import get_forge_home
+from forge.core.state import decode_json_object
 from forge.core.usage.vocabulary import Confidence, Reporter, Route
 
 logger = logging.getLogger(__name__)
@@ -215,16 +216,8 @@ def read_usage_events(
         try:
             with open(path) as f:
                 for line in f:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    try:
-                        record = json.loads(line)
-                    except json.JSONDecodeError:
-                        continue
-                    # A line can be valid JSON yet not an object (`[]`, `"x"`, `1`). Skip it
-                    # rather than let `.get` raise AttributeError and abort the whole read.
-                    if not isinstance(record, dict):
+                    record = decode_json_object(line)
+                    if record is None:
                         continue
 
                     ver = record.get("schema_version")

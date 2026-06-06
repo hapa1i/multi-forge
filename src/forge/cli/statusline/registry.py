@@ -275,11 +275,23 @@ def _produce_forge_cost(ctx: RenderContext) -> Optional[str]:
 
     from forge.cli.statusline.throttle import read_or_compute_session_cost
     from forge.core.ops.usage_summary import sum_forge_added_cost
+    from forge.core.state import parse_iso
+
+    # Bound the ledger scan to events at/after session creation so each poll does not
+    # re-glob and re-parse the whole uncapped ledger. A malformed/absent created_at
+    # falls back to an unbounded scan (correct, just slower).
+    since = None
+    created_raw = (ctx.manifest or {}).get("created_at")
+    if isinstance(created_raw, str):
+        try:
+            since = parse_iso(created_raw)
+        except ValueError:
+            since = None
 
     def _compute_session_cost() -> int:
         # Map "no reported cost" (None) -> 0 explicitly so the throttle caches a
         # legitimate no-cost result; a ledger read error propagates (uncached).
-        value = sum_forge_added_cost(name)
+        value = sum_forge_added_cost(name, since=since)
         return 0 if value is None else value
 
     cache_key = f"{ctx.forge_root or ''}\x00{name}"

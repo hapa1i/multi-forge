@@ -27,11 +27,40 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-06
 
+### Phase 6 follow-up: deferred cleanups folded in before closeout (metric-evidence)
+
+**Goal**: Close the three verified-but-narrow / cleanup follow-ups from the PR #18 review on the branch (rather than
+deferring to separate `todo/` cards), so the `doing/ → done/` move carries no known debt. No behavior change to the
+shipped cost-honesty model — these are a perf bound, a dead-branch removal, and three DRY extractions.
+
+**Key changes**:
+
+- **Bound the `forge_cost` scan**: `sum_forge_added_cost` gained `since: datetime | None`, threaded to
+  `read_usage_events(period_start=…)`; the status producer derives it from the manifest `created_at` (defensive
+  `parse_iso`, unbounded fallback). The opt-in `forge +$Y` poll no longer re-parses the whole uncapped ledger; the bound
+  is loss-free (an event can't predate its session).
+- **Removed the dormant `stream-json` parse branch** (chose remove over thread-through — Forge reads headless output in
+  batch, where `json` is equivalent; streaming stays a proxy concern). Dropped the `output_format` param from
+  `_find_result_object`/`parse_headless_envelope` and left a seam note at both halves so a future streaming mode wires
+  parser **and** request side together. Closes the asymmetry where the request side could emit `stream-json` the parser
+  silently dropped.
+- **DRY extractions**: the `isinstance(record, dict)` JSONL guard now lives once as `core.state.decode_json_object` (5
+  readers routed through it); `proxy_costs.py` verb/model/total aggregation shared via `_aggregate_by_verb` /
+  `_aggregate_by_model` / `_request_cost_totals` (table + JSON can't drift); `emit.py`'s **direct-path** one-reporter
+  precedence shared via `_direct_cost_provenance` — the **proxied** path stays per-caller (verb attributes the snapshot,
+  a worker stays unattributed to avoid double-counting the verb aggregate).
+
+**Verification**: 2608 unit tests pass across the affected packages (`core/{reactive,invoker,usage,state,ops}`, `proxy`,
+`cli`); new tests pin each invariant — `decode_json_object` guard (`test_io.py`), `since` bound
+(`test_usage_summary.py`), NDJSON→raw-text fallback (`test_bug_headless_envelope_parse.py`), and the shared-direct /
+divergent-proxied emitter rule (`test_emit.py::TestDirectCostProvenance` + `TestVerbWorkerPrecedenceInvariant`).
+`make pre-commit` clean (ruff/black/isort/mypy/pyright/mdformat/gitleaks). Internal cleanup — no design-doc change.
+
 ### Phase 6 review fixes: PR #18 adversarial review — headless retry/latch + cost-honesty edges
 
 **Goal**: A max-effort adversarial review of PR #18 (9 finder angles, each finding independently verified) surfaced one
-real correctness cluster plus several narrow honesty/robustness edges; fix the merge-gating ones on the branch before the
-`doing/ → done/` lane move.
+real correctness cluster plus several narrow honesty/robustness edges; fix the merge-gating ones on the branch before
+the `doing/ → done/` lane move.
 
 **Key changes**:
 
@@ -41,9 +70,9 @@ real correctness cluster plus several narrow honesty/robustness edges; fix the m
   **process-wide** AND **double-billed** a proxied retry (no `request_id` dedupe on the cost log). `run_parallel`
   (`core/invoker/claude.py`) retry spawn now mirrors the primary spawn's post-register `cleanup_started` re-check +
   self-reap, closing a cancellation-hang gap (`shutdown(wait=True)` could otherwise block `timeout_seconds`).
-- **Launch resurrection guard**: `record_launch_confirmed` (`cli/launch_confirmation.py`) gained the `exists()` preflight
-  its sibling `_infer_launch_confirmation` documents — a session deleted mid-launch is no longer resurrected as a
-  lock-only directory.
+- **Launch resurrection guard**: `record_launch_confirmed` (`cli/launch_confirmation.py`) gained the `exists()`
+  preflight its sibling `_infer_launch_confirmation` documents — a session deleted mid-launch is no longer resurrected
+  as a lock-only directory.
 - **Negative-delta clamp**: `_compute_delta` (`core/reactive/cost_tracking.py`) clamps every delta `>= 0`, so a proxy
   restart mid-verb can't log a negative cost that inflates the "Interactive" residual.
 - **`forge +$Y` predicate pinned**: `sum_forge_added_cost` now counts `{reported, gateway_calculated}` (not

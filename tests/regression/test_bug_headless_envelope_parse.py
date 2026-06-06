@@ -83,17 +83,19 @@ def test_bare_result_object_shape() -> None:
     assert env.cost_micro_usd == 26900
 
 
-def test_stream_json_takes_last_result_line_with_trailing_blanks() -> None:
+def test_ndjson_stream_json_falls_back_to_raw_text() -> None:
+    # Forge requests only `--output-format json`; the parser intentionally does NOT
+    # consume `stream-json` (NDJSON). A multi-line NDJSON blob is not valid single
+    # JSON, so it falls back to raw text rather than being silently half-parsed or
+    # crashing. (The old stream-json parse branch was removed; a future streaming
+    # mode must wire the parser AND the request side together.)
     lines = [
         json.dumps({"type": "system"}),
         json.dumps(_result_obj(result="STREAMED", total_cost_usd=0.003)),
-        "",
-        "   ",
     ]
-    env = parse_headless_envelope("\n".join(lines), output_format="stream-json")
-    assert env.parsed is True
-    assert env.result_text == "STREAMED"
-    assert env.cost_micro_usd == 3000
+    env = parse_headless_envelope("\n".join(lines))
+    assert env.parsed is False
+    assert env.cost_micro_usd is None
 
 
 def test_empty_stdout_falls_back_to_raw() -> None:

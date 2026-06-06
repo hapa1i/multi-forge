@@ -180,7 +180,7 @@ def render_summary_line(summary: SessionActivitySummary) -> str | None:
     return "Forge this session — " + " · ".join(parts)
 
 
-def sum_forge_added_cost(session: str) -> int | None:
+def sum_forge_added_cost(session: str, *, since: datetime | None = None) -> int | None:
     """Sum reported Forge-added LLM cost (micro-USD) for one session.
 
     "Forge-added" = LLM spend Forge originated on the session's behalf (memory
@@ -196,13 +196,19 @@ def sum_forge_added_cost(session: str) -> int | None:
     from a measured $0. A ledger read error propagates (the throttle decides whether
     to cache or skip); this function never fabricates a value.
 
+    ``since`` bounds the scan to events at/after the session's start (pass the
+    manifest ``created_at``) so the status-line poll does not re-glob and re-parse
+    the whole uncapped, PID-sharded ledger each time. Omitting it scans every shard
+    (correct, just slower) — an event can never predate its session's creation, so
+    the bound is loss-free.
+
     Known limitation (matches ``build_session_activity_summary``): the ledger is
     filtered by session NAME only — ``UsageEvent`` carries no forge-root identity, so
     two same-named sessions in different forge roots would share this total. The
     status-line throttle cache key is root-scoped, but the ledger query is not.
     Adding root/session identity to the ledger schema is deferred to a future card.
     """
-    events = read_usage_events(session=session)
+    events = read_usage_events(session=session, period_start=since)
     total = 0
     any_cost = False
     for event in events:

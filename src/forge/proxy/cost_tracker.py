@@ -18,6 +18,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+from forge.core.state import decode_json_object
+
 logger = logging.getLogger(__name__)
 
 _MICROS_PER_DOLLAR = 1_000_000
@@ -128,12 +130,10 @@ class CostTracker:
     @staticmethod
     def _parse_record(line: str) -> tuple[float, int, str, str | None] | None:
         """Parse a JSONL line into (unix_timestamp, cost_micros, month_key, record_proxy_id)."""
-        import json
-
-        data = json.loads(line)
-        # Valid JSON can still be a non-object (`[]`, `1`); return None rather than let
+        # Skip blank / malformed / non-object lines (`[]`, `1`): return None rather than let
         # `.get` raise AttributeError (bootstrap's broad except would otherwise mask it).
-        if not isinstance(data, dict):
+        data = decode_json_object(line)
+        if data is None:
             return None
         ts_str = data.get("ts", "")
         # Cost is nullable: a null (or absent) cost_micros means the route reported

@@ -210,16 +210,25 @@ def _scope_verb_records_to_proxy(verb_records: list[dict], proxy_base_url: str |
     return scoped
 
 
-def _display_by_verb(
-    request_records: list[dict],
-    verb_records: list[dict],
-    period: str,
-    proxy_id: str | None,
-) -> None:
-    total_cost = sum(c for r in request_records if (c := _reported_micros(r)) is not None)
-    total_requests = len(request_records)
-    unavailable_requests = sum(1 for r in request_records if _reported_micros(r) is None)
+def _request_cost_totals(request_records: list[dict]) -> tuple[int, int]:
+    """Return (summed reported cost micros, count of cost-unavailable requests).
 
+    Reported cost only -- a null/unavailable cost is counted in the second value,
+    never summed as $0 into the first (the "not a cost oracle" rule). Shared by the
+    table and JSON surfaces so the two cannot drift.
+    """
+    total_cost = sum(c for r in request_records if (c := _reported_micros(r)) is not None)
+    unavailable_requests = sum(1 for r in request_records if _reported_micros(r) is None)
+    return total_cost, unavailable_requests
+
+
+def _aggregate_by_verb(verb_records: list[dict]) -> dict[str, dict]:
+    """Fold verb cost records into per-verb totals (cost-evidence aware).
+
+    ``reported`` flips True only when a record carries measured cost
+    (:func:`_verb_cost_reported`); an unmeasured window contributes invocations and
+    request counts but never a fabricated $0. Shared by table + JSON surfaces.
+    """
     verb_costs: dict[str, dict] = {}
     for v in verb_records:
         verb = v.get("verb", "unknown")
@@ -230,7 +239,47 @@ def _display_by_verb(
             verb_costs[verb]["reported"] = True
         verb_costs[verb]["request_count"] += v.get("request_count", 0)
         verb_costs[verb]["invocations"] += 1
+    return verb_costs
 
+
+def _aggregate_by_model(request_records: list[dict]) -> dict[str, dict]:
+    """Fold request records into per-model totals (cost-evidence aware).
+
+    ``reported`` flips True only for a request whose cost the route reported; a
+    null-cost request still contributes tokens and a request count. Shared by
+    table + JSON surfaces so they cannot drift.
+    """
+    model_costs: dict[str, dict] = {}
+    for r in request_records:
+        model = r.get("model", "unknown")
+        if model not in model_costs:
+            model_costs[model] = {
+                "cost_micros": 0,
+                "reported": False,
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "requests": 0,
+            }
+        rc = _reported_micros(r)
+        if rc is not None:
+            model_costs[model]["cost_micros"] += rc
+            model_costs[model]["reported"] = True
+        model_costs[model]["input_tokens"] += r.get("input_tokens", 0)
+        model_costs[model]["output_tokens"] += r.get("output_tokens", 0)
+        model_costs[model]["requests"] += 1
+    return model_costs
+
+
+def _display_by_verb(
+    request_records: list[dict],
+    verb_records: list[dict],
+    period: str,
+    proxy_id: str | None,
+) -> None:
+    total_cost, unavailable_requests = _request_cost_totals(request_records)
+    total_requests = len(request_records)
+
+    verb_costs = _aggregate_by_verb(verb_records)
     verb_total = sum(v["cost_micros"] for v in verb_costs.values())
     interactive_cost = max(0, total_cost - verb_total)
 
@@ -276,24 +325,7 @@ def _display_by_model(
     period: str,
     proxy_id: str | None,
 ) -> None:
-    model_costs: dict[str, dict] = {}
-    for r in request_records:
-        model = r.get("model", "unknown")
-        if model not in model_costs:
-            model_costs[model] = {
-                "cost_micros": 0,
-                "reported": False,
-                "input_tokens": 0,
-                "output_tokens": 0,
-                "requests": 0,
-            }
-        rc = _reported_micros(r)
-        if rc is not None:
-            model_costs[model]["cost_micros"] += rc
-            model_costs[model]["reported"] = True
-        model_costs[model]["input_tokens"] += r.get("input_tokens", 0)
-        model_costs[model]["output_tokens"] += r.get("output_tokens", 0)
-        model_costs[model]["requests"] += 1
+    model_costs = _aggregate_by_model(request_records)
 
     if not model_costs:
         scope = f" ({proxy_id})" if proxy_id else ""
@@ -324,38 +356,10 @@ def _output_json(
     period: str,
     proxy_id: str | None,
 ) -> None:
-    total_cost = sum(c for r in request_records if (c := _reported_micros(r)) is not None)
-    unavailable_requests = sum(1 for r in request_records if _reported_micros(r) is None)
+    total_cost, unavailable_requests = _request_cost_totals(request_records)
 
-    verb_summary: dict[str, dict] = {}
-    for v in verb_records:
-        verb = v.get("verb", "unknown")
-        if verb not in verb_summary:
-            verb_summary[verb] = {"cost_micros": 0, "reported": False, "request_count": 0, "invocations": 0}
-        if _verb_cost_reported(v):
-            verb_summary[verb]["cost_micros"] += _reported_micros(v, "total_cost_micros") or 0
-            verb_summary[verb]["reported"] = True
-        verb_summary[verb]["request_count"] += v.get("request_count", 0)
-        verb_summary[verb]["invocations"] += 1
-
-    model_summary: dict[str, dict] = {}
-    for r in request_records:
-        model = r.get("model", "unknown")
-        if model not in model_summary:
-            model_summary[model] = {
-                "cost_micros": 0,
-                "reported": False,
-                "input_tokens": 0,
-                "output_tokens": 0,
-                "requests": 0,
-            }
-        rc = _reported_micros(r)
-        if rc is not None:
-            model_summary[model]["cost_micros"] += rc
-            model_summary[model]["reported"] = True
-        model_summary[model]["input_tokens"] += r.get("input_tokens", 0)
-        model_summary[model]["output_tokens"] += r.get("output_tokens", 0)
-        model_summary[model]["requests"] += 1
+    verb_summary = _aggregate_by_verb(verb_records)
+    model_summary = _aggregate_by_model(request_records)
 
     verb_total = sum(v["cost_micros"] for v in verb_summary.values())
 
