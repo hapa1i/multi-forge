@@ -356,3 +356,25 @@ class TestSumForgeAddedCost:
             )
         )
         assert sum_forge_added_cost("planner") == 10_000
+
+    def test_includes_gateway_calculated_cost(self) -> None:
+        # A gateway-computed figure (e.g. LiteLLM's x-litellm-response-cost) is
+        # trustworthy enough to count toward Forge-added spend, like a directly-
+        # reported one. Pins the predicate so `forge +$Y` and `forge activity` agree.
+        log_usage_event(
+            _event(
+                command="panel",
+                route="claude_p",
+                reporter="litellm",
+                confidence="gateway_calculated",
+                cost_micro_usd=40_000,
+            )
+        )
+        assert sum_forge_added_cost("planner") == 40_000
+
+    def test_excludes_inferred_and_unknown_cost(self) -> None:
+        # Estimates (`inferred`) and un-provenanced (`unknown`) cost never contribute,
+        # even with a dollar figure present -- the north star: never sum an estimate.
+        log_usage_event(_event(command="panel", route="claude_p", confidence="inferred", cost_micro_usd=70_000))
+        log_usage_event(_event(command="panel", route="claude_p", confidence="unknown", cost_micro_usd=80_000))
+        assert sum_forge_added_cost("planner") is None

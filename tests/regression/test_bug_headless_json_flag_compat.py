@@ -140,3 +140,34 @@ def test_invoker_fan_out_skips_flag_when_latched(mock_popen: MagicMock, mock_run
 
     assert "--output-format" not in mock_popen.call_args.args[0]
     assert mock_run.call_count == 0  # no retry path taken
+
+
+# --- over-broad-regex misfire guard --------------------------------------------
+# The retry trigger must require unambiguous rejection phrasing. A non-zero exit
+# whose stderr merely ECHOES the failing command line (a transient 529/overload/auth
+# error that prints the invocation) must NOT be read as a flag rejection -- that
+# misfire latches the JSON capability off process-wide AND, on a proxied worker,
+# re-runs the request for a duplicate proxy-side cost row.
+
+
+def test_is_json_flag_rejection_requires_unambiguous_phrasing() -> None:
+    # Real argparse-style rejections still trigger the retry.
+    assert hj.is_json_flag_rejection(2, "error: unknown option '--output-format'") is True
+    assert hj.is_json_flag_rejection(1, "error: unrecognized arguments: --output-format json") is True
+    # A transient error that merely echoes the failing command line must NOT.
+    assert hj.is_json_flag_rejection(1, "API Error: 529 overloaded_error\n  claude -p --output-format json") is False
+    assert hj.is_json_flag_rejection(1, "request failed while running claude -p --output-format json") is False
+    # rc 0 is never a rejection, whatever the text.
+    assert hj.is_json_flag_rejection(0, "unknown option") is False
+
+
+@patch("forge.core.reactive.session_runner.subprocess.run")
+def test_session_runner_no_retry_when_unrelated_error_echoes_flag(mock_run: MagicMock) -> None:
+    mock_run.return_value = MagicMock(
+        stdout="", stderr="API Error: 529 overloaded_error\n  claude -p --output-format json", returncode=1
+    )
+    result = run_claude_session("prompt")
+
+    assert mock_run.call_count == 1  # no retry: the flag echo is not a rejection
+    assert result.returncode == 1
+    assert hj.should_request_json(["claude", "-p"]) is True  # capability not latched off

@@ -78,15 +78,14 @@ def _reported_micros(record: dict, key: str = "cost_micros") -> int | None:
 def _verb_cost_reported(record: dict) -> bool:
     """Whether a verb invocation has reported-cost evidence.
 
-    Verb records carry ``total_cost_micros`` as a plain int (0 for a passthrough
-    window), so presence-of-number is NOT evidence — the unknown-as-zero trap. New
-    records carry ``cost_measured`` (true only when the window had a reported-cost
-    request); trust it. Legacy records (pre cost-evidence) have no flag, so infer it
-    from a positive catalog total — a legacy 0 stays unavailable, not a measured $0.
+    ``cost_measured`` is the sole evidence: true only when the measurement window had
+    a route-reported-cost request. A verb record's ``total_cost_micros`` is a plain
+    int (0 for a passthrough window), so presence-of-number is NOT evidence -- the
+    unknown-as-zero trap. A legacy record (pre cost-evidence) lacks the flag; its
+    ``total_cost_micros`` was a now-deleted local-catalog ESTIMATE, so it reads as
+    unavailable rather than resurrecting that estimate as route-reported cost.
     """
-    if "cost_measured" in record:
-        return bool(record["cost_measured"])
-    return _reported_micros(record, "total_cost_micros") not in (None, 0)
+    return bool(record.get("cost_measured", False))
 
 
 @click.command("costs")
@@ -200,13 +199,12 @@ def _scope_verb_records_to_proxy(verb_records: list[dict], proxy_base_url: str |
         scoped_record["request_count"] = _sum_proxy_field(matching, "request_count")
         # Re-derive cost-evidence for the scoped subset: the unscoped record's
         # cost_measured covers all proxies, but a single-proxy view may have no
-        # reported-cost request. Trust the per-proxy counter when present; legacy
-        # deltas lack it, so drop the stale flag and let _verb_cost_reported fall
-        # back to the positive-total rule.
+        # reported-cost request. Trust the per-proxy counter when present; a legacy
+        # delta lacks it, so it reads as cost-unavailable (no resurrected estimate).
         if any("reported_request_count" in p for p in matching):
             scoped_record["cost_measured"] = _sum_proxy_field(matching, "reported_request_count") > 0
         else:
-            scoped_record.pop("cost_measured", None)
+            scoped_record["cost_measured"] = False
         scoped.append(scoped_record)
 
     return scoped

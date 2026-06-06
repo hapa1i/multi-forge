@@ -59,12 +59,21 @@ def record_launch_confirmed(
         api_key_available_to_child=decision.available,
         api_key_source=decision.source,
     )
+    # Preflight: if the session was deleted in the window before this best-effort
+    # write (e.g. a concurrent `forge session delete`), skip it. Entering
+    # store.update() would make the lock layer mkdir-parents the session dir to hold
+    # its lockfile, resurrecting a deleted session as a lock-only directory -- the
+    # same guard _infer_launch_confirmation documents below.
+    if not store.exists():
+        logger.debug("record_launch_confirmed: session manifest already removed; skipping launch record")
+        return
     try:
         store.update(timeout_s=5.0, mutate=lambda m: setattr(m.confirmed, "launch", launch))
     except Exception:
         # Best-effort status-line UX: a missing or locked manifest must not break the
         # launch (mirrors the claude_project_root preseed). The launch segment simply
-        # won't render for this session.
+        # won't render for this session. Also covers the narrow exists()->update()
+        # delete race (the manifest vanishing between the preflight and the locked write).
         logger.debug("record_launch_confirmed: manifest update failed", exc_info=True)
 
 

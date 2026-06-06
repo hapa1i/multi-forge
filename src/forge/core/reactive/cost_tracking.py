@@ -91,14 +91,21 @@ def _compute_delta(before: dict[str, Any], after: dict[str, Any], base_url: str)
     b_costs = before.get("costs", {})
     a_costs = after.get("costs", {})
 
+    # Clamp every delta at >= 0. A proxy restart/reset between the before/after
+    # snapshots makes `after < before`, which would otherwise log a negative
+    # "spend"/token delta -- and a negative cost delta inflates the unattributed
+    # "Interactive" residual in `forge proxy costs`. A reset means "no attributable
+    # delta for this verb," not negative usage.
     return ProxyCostDelta(
         base_url=base_url,
-        cost_micros=a_costs.get("total_micros", 0) - b_costs.get("total_micros", 0),
-        input_tokens=a_tokens.get("input", 0) - b_tokens.get("input", 0),
-        output_tokens=a_tokens.get("output", 0) - b_tokens.get("output", 0),
-        cached_tokens=a_tokens.get("cached", 0) - b_tokens.get("cached", 0),
-        request_count=after.get("total_requests", 0) - before.get("total_requests", 0),
-        reported_request_count=(a_costs.get("reported_request_count", 0) - b_costs.get("reported_request_count", 0)),
+        cost_micros=max(0, a_costs.get("total_micros", 0) - b_costs.get("total_micros", 0)),
+        input_tokens=max(0, a_tokens.get("input", 0) - b_tokens.get("input", 0)),
+        output_tokens=max(0, a_tokens.get("output", 0) - b_tokens.get("output", 0)),
+        cached_tokens=max(0, a_tokens.get("cached", 0) - b_tokens.get("cached", 0)),
+        request_count=max(0, after.get("total_requests", 0) - before.get("total_requests", 0)),
+        reported_request_count=max(
+            0, a_costs.get("reported_request_count", 0) - b_costs.get("reported_request_count", 0)
+        ),
     )
 
 

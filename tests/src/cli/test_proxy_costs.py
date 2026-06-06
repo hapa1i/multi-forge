@@ -110,18 +110,35 @@ def test_costs_json_filters_verb_records_by_proxy(monkeypatch) -> None:
         {
             "verb": "panel",
             "total_cost_micros": 120_000,
+            "cost_measured": True,
             "request_count": 3,
             "per_proxy": [
-                {"base_url": "http://localhost:8084", "cost_micros": 80_000, "request_count": 2},
-                {"base_url": "http://localhost:8085", "cost_micros": 40_000, "request_count": 1},
+                {
+                    "base_url": "http://localhost:8084",
+                    "cost_micros": 80_000,
+                    "request_count": 2,
+                    "reported_request_count": 2,
+                },
+                {
+                    "base_url": "http://localhost:8085",
+                    "cost_micros": 40_000,
+                    "request_count": 1,
+                    "reported_request_count": 1,
+                },
             ],
         },
         {
             "verb": "supervisor",
             "total_cost_micros": 40_000,
+            "cost_measured": True,
             "request_count": 1,
             "per_proxy": [
-                {"base_url": "http://localhost:8085", "cost_micros": 40_000, "request_count": 1},
+                {
+                    "base_url": "http://localhost:8085",
+                    "cost_micros": 40_000,
+                    "request_count": 1,
+                    "reported_request_count": 1,
+                },
             ],
         },
     ]
@@ -220,12 +237,14 @@ class TestVerbCostReported:
         # A present flag always wins; a stray positive total cannot override it.
         assert _verb_cost_reported({"cost_measured": False, "total_cost_micros": 50_000}) is False
 
-    def test_legacy_record_infers_from_positive_total(self) -> None:
-        # Pre cost-evidence record (no flag): positive catalog total still renders.
-        assert _verb_cost_reported({"total_cost_micros": 50_000}) is True
+    def test_legacy_record_without_flag_is_unavailable(self) -> None:
+        # Pre cost-evidence record (no flag): its total_cost_micros was a now-deleted
+        # catalog ESTIMATE, so it reads as unavailable -- never resurrected as
+        # route-reported cost (the card's "Forge is not a cost oracle" rule).
+        assert _verb_cost_reported({"total_cost_micros": 50_000}) is False
 
     def test_legacy_record_zero_total_is_unavailable(self) -> None:
-        # Legacy 0 stays unavailable, not a measured $0.
+        # No flag -> unavailable regardless of the (meaningless) total.
         assert _verb_cost_reported({"total_cost_micros": 0}) is False
 
 
@@ -312,12 +331,12 @@ def test_scope_verb_recomputes_cost_measured_from_reported_counter() -> None:
     assert _verb_cost_reported(passthrough[0]) is False
 
 
-def test_scope_verb_legacy_per_proxy_drops_stale_flag() -> None:
-    """Legacy per_proxy (no reported_request_count) drops the unscoped flag.
+def test_scope_verb_legacy_per_proxy_is_unavailable() -> None:
+    """Legacy per_proxy (no reported_request_count) reads as cost-unavailable.
 
-    Without the evidence counter we can't re-derive cost-evidence for the subset,
-    so the stale top-level flag is removed and _verb_cost_reported falls back to
-    the positive-total rule.
+    Without the evidence counter we can't prove the scoped subset had a reported
+    cost, so cost_measured is set False -- the legacy total (a now-deleted catalog
+    estimate) is never resurrected as route-reported cost.
     """
     records = [
         {
@@ -333,6 +352,5 @@ def test_scope_verb_legacy_per_proxy_drops_stale_flag() -> None:
 
     scoped = _scope_verb_records_to_proxy(records, "http://localhost:8084")
 
-    assert "cost_measured" not in scoped[0]
-    # Positive scoped total → still reported via the legacy fallback.
-    assert _verb_cost_reported(scoped[0]) is True
+    assert scoped[0]["cost_measured"] is False
+    assert _verb_cost_reported(scoped[0]) is False

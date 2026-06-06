@@ -69,6 +69,28 @@ class TestRecordLaunchConfirmed:
         assert launch.api_key_available_to_child is True
         assert launch.api_key_source == "env"
 
+    def test_skips_write_and_does_not_resurrect_a_deleted_session(self, tmp_path: Path) -> None:
+        # Resurrection guard (mirrors _infer_launch_confirmation): if the session was
+        # deleted in the window before this best-effort write (e.g. a concurrent
+        # `forge session delete`), record_launch_confirmed must NOT recreate the
+        # session directory. Without the exists() preflight, entering store.update()
+        # makes the lock layer mkdir-parents the dir to hold its lockfile, leaving a
+        # lock-only directory behind.
+        store = _store_with_manifest(tmp_path)
+        assert store.delete() is True
+        assert not store.exists()
+
+        record_launch_confirmed(
+            store,
+            routing_mode="direct",
+            proxy_id=None,
+            base_url=None,
+            decision=InteractiveApiKeyDecision(available=True, source="env"),
+        )
+
+        assert not store.session_dir.exists()  # not resurrected as a lock-only dir
+        assert not store.exists()
+
 
 if __name__ == "__main__":  # pragma: no cover
     pytest.main([__file__, "-v"])

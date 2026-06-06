@@ -100,6 +100,32 @@ class TestComputeDelta:
         delta = _compute_delta(before, after, "http://localhost:8084")
         assert delta.reported_request_count == 0
 
+    def test_clamps_negative_deltas_on_proxy_reset(self):
+        """A proxy restart/reset mid-verb (after < before) clamps every delta at 0.
+
+        A negative cost delta would otherwise be logged and inflate the unattributed
+        "Interactive" residual in `forge proxy costs`; tokens and request counters
+        must not go negative either. A reset means "no attributable delta," not
+        negative usage.
+        """
+        before = {
+            "total_requests": 10,
+            "tokens": {"input": 5000, "output": 2000, "cached": 1000},
+            "costs": {"total_micros": 100_000, "reported_request_count": 4},
+        }
+        after = {  # proxy restarted mid-verb: cumulative counters reset toward 0
+            "total_requests": 0,
+            "tokens": {"input": 0, "output": 0, "cached": 0},
+            "costs": {"total_micros": 0, "reported_request_count": 0},
+        }
+        delta = _compute_delta(before, after, "http://localhost:8084")
+        assert delta.cost_micros == 0
+        assert delta.input_tokens == 0
+        assert delta.output_tokens == 0
+        assert delta.cached_tokens == 0
+        assert delta.request_count == 0
+        assert delta.reported_request_count == 0
+
 
 class TestLogVerbCost:
     def test_writes_jsonl_record(self, verb_log_dir: Path):

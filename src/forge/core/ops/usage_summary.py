@@ -25,7 +25,8 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
-from forge.core.usage.ledger import read_usage_events
+from forge.core.usage.ledger import UsageEvent, read_usage_events
+from forge.core.usage.vocabulary import ROUTE_CLAUDE_INTERACTIVE, Confidence
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +34,11 @@ _SUPERVISOR_POLICY_ID = "semantic.supervisor"
 _ERROR_STATUSES = {"error", "timeout"}
 _WORKFLOW_COMMANDS = {"panel", "analyze", "debate", "consensus"}
 _MAX_RECENT_WARNINGS = 5
+# Confidences whose dollar figure is trustworthy enough to count toward Forge-added
+# spend (`forge +$Y`): a directly-reported figure or a gateway-computed one.
+# `inferred` (a local estimate), `unavailable`, and `unknown` never contribute -- the
+# north star is to sum what a route reported, never an estimate.
+_FORGE_ADDED_COST_CONFIDENCES: frozenset[Confidence] = frozenset({"reported", "gateway_calculated"})
 
 
 @dataclass
@@ -183,8 +189,9 @@ def sum_forge_added_cost(session: str) -> int | None:
     cosmetic: the card forbids blending observed main-harness traffic into "Forge
     additional cost" (a future MITM scenario where such events land in the ledger).
 
-    Only reported-cost events contribute (the north star: record what a route
-    reported, never estimate); ``unavailable`` rows add nothing. Returns the summed
+    Only reported or gateway-calculated cost events contribute (the north star:
+    record what a route reported, never estimate); ``inferred``/``unavailable`` rows
+    add nothing. Returns the summed
     micro-USD, or ``None`` when no in-scope event carried a reported cost — distinct
     from a measured $0. A ledger read error propagates (the throttle decides whether
     to cache or skip); this function never fabricates a value.
@@ -199,17 +206,29 @@ def sum_forge_added_cost(session: str) -> int | None:
     total = 0
     any_cost = False
     for event in events:
-        # Exclude the main interactive harness channel: "Forge-added" is what Forge
-        # spends ON TOP of the session the human is driving, never the session itself.
-        if event.route == "claude_interactive":
-            continue
-        if event.confidence == "reported" and event.cost_micro_usd is not None:
-            total += event.cost_micro_usd
+        micros = _forge_added_cost_micros(event)
+        if micros is not None:
+            total += micros
             any_cost = True
     return total if any_cost else None
 
 
 # --- internals ---------------------------------------------------------------
+
+
+def _forge_added_cost_micros(event: UsageEvent) -> int | None:
+    """The event's cost in micro-USD if it counts as Forge-added spend, else None.
+
+    Excludes the main interactive-harness channel (``route="claude_interactive"``) --
+    the load-bearing no-blend rule: "Forge-added" is what Forge spends ON TOP of the
+    session the human drives, never the session itself -- and any event whose cost
+    figure is not trustworthy (only ``reported``/``gateway_calculated`` count).
+    """
+    if event.route == ROUTE_CLAUDE_INTERACTIVE:
+        return None
+    if event.confidence not in _FORGE_ADDED_COST_CONFIDENCES:
+        return None
+    return event.cost_micro_usd  # int | None -- None when the route reported no figure
 
 
 def _aggregate_ledger(summary: SessionActivitySummary, session_name: str, since: datetime | None) -> None:

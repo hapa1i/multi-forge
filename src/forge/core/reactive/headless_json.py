@@ -49,9 +49,15 @@ _JSON_IS_ERROR_RELIABLE = True
 _json_output_unsupported = False
 
 # argparse-style rejection of an unknown/invalid flag (the retry trigger).
+# Requires UNAMBIGUOUS rejection phrasing. A bare ``--output-format`` alternative
+# was removed: it matched any non-zero exit whose stderr merely echoed the failing
+# command line (e.g. a transient "API Error: 529 ... claude -p --output-format
+# json"), misfiring the retry -- which latches the JSON capability off process-wide
+# AND, on a proxied worker, re-runs the request for a duplicate proxy-side cost row.
+# Real rejections still carry one of the phrases below ("unknown option" covers the
+# regression fixture "error: unknown option '--output-format'").
 _REJECTION_RE = re.compile(
-    r"unknown option|unknown argument|unexpected argument|unrecognized|"
-    r"invalid.{0,40}output-format|allowed choices|--output-format",
+    r"unknown option|unknown argument|unexpected argument|unrecognized|" r"invalid.{0,40}output-format|allowed choices",
     re.IGNORECASE,
 )
 

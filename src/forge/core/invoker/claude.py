@@ -317,6 +317,25 @@ class ClaudeHeadlessInvoker:
                         )
                         with children_lock:
                             children.append(proc)
+                            retry_should_cancel = cleanup_started
+                        if retry_should_cancel:
+                            # Same race as the primary spawn (above): _cleanup() takes a
+                            # one-shot snapshot of `children`, so if it ran between this
+                            # retry Popen returning and the append above, the retry child
+                            # is not in that snapshot. The worker reaps it here -- otherwise
+                            # shutdown(wait=True) blocks on its communicate() for up to
+                            # timeout_seconds, the exact hang the tracked-child design prevents.
+                            _terminate_and_reap([proc])
+                            return HeadlessResult(
+                                label=request.label,
+                                stdout="",
+                                stderr="",
+                                returncode=proc.returncode if proc.returncode is not None else -1,
+                                duration_seconds=time.monotonic() - start,
+                                error="cancelled",
+                                cancelled=True,
+                                **ident,
+                            )
                         stdout, stderr = proc.communicate(input=request.prompt, timeout=request.timeout_seconds)
                         returncode = proc.returncode if proc.returncode is not None else -1
                         json_requested = False

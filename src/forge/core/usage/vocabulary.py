@@ -59,3 +59,12 @@ Confidence = Literal[
     "unavailable",
     "unknown",
 ]
+
+
+# --- named tokens referenced in code (typed against the literals above) ---
+
+# The main interactive-harness channel, as a named token. Referenced by
+# ``sum_forge_added_cost``'s load-bearing exclusion (the no-blend rule); naming it
+# here -- typed ``Route`` -- makes a typo a type error instead of a silently-stale
+# string compare against a bare literal.
+ROUTE_CLAUDE_INTERACTIVE: Route = "claude_interactive"
