@@ -113,21 +113,3 @@ def run_cmd(
 
     if not success:
         raise SystemExit(1)
-
-
-@click.group("handoff", hidden=True)
-def handoff_tombstone() -> None:
-    """[Removed] Use 'forge memory-writer run' instead."""
-
-
-@handoff_tombstone.command(
-    "run",
-    hidden=True,
-    context_settings={"ignore_unknown_options": True, "allow_extra_args": True},
-)
-@click.argument("args", nargs=-1, type=click.UNPROCESSED)
-def _tombstone_run(**_: object) -> None:
-    # ignore_unknown_options + UNPROCESSED args swallow the old --session-name/
-    # --worktree-path/--transcript-rel flags so stale invocations reach this
-    # message instead of Click's generic "No such option" error.
-    raise click.ClickException("forge handoff run has been removed.\n" "Use: forge memory-writer run")

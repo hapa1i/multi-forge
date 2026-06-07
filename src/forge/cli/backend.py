@@ -251,8 +251,7 @@ def stop_cmd(adapter: str, port: int) -> None:
     help="Delete specific instance (if not specified, deletes config)",
 )
 @click.option("--yes", "-y", is_flag=True, help="Skip confirmation prompt")
-@click.option("--force", "-f", is_flag=True, hidden=True, help="Deprecated alias for --yes")
-def delete_cmd(adapter: str, port: int | None, yes: bool, force: bool) -> None:
+def delete_cmd(adapter: str, port: int | None, yes: bool) -> None:
     """Delete a backend instance or config.
 
     Without --port: Deletes the backend config (stops all instances first).
@@ -260,7 +259,6 @@ def delete_cmd(adapter: str, port: int | None, yes: bool, force: bool) -> None:
     """
     import shutil
 
-    yes = yes or force
     console = Console(width=200)
 
     if port is not None:

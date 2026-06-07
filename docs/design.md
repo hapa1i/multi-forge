@@ -956,8 +956,8 @@ The primary entry point for all Forge operations.
 **Command-shape policy:** Forge uses explicit verbs for all commands. Non-leaf groups print help when invoked without a
 subcommand; they do not hide work behind bare group invocation. Leaf commands should do the sensible action when
 optional arguments are omitted (for example, `forge proxy metrics` shows all proxies when more than one is registered).
-Removed group-level shortcuts may remain only as non-executing tombstones that name the replacement. List/show commands
-support `--json` for scripting.
+Removed commands, options, and group-level shortcuts are clean breaks: they are deleted outright and the CLI framework
+reports "no such command/option" — no tombstone shims. List/show commands support `--json` for scripting.
 
 #### Installation
 

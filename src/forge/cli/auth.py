@@ -408,8 +408,7 @@ def status(profile: str | None) -> None:
     help="Profile to remove credentials from (default: 'default' or FORGE_PROFILE)",
 )
 @click.option("--yes", "-y", is_flag=True, help="Skip confirmation prompt")
-@click.option("--force", "-f", is_flag=True, hidden=True, help="Deprecated alias for --yes")
-def logout(profile: str | None, yes: bool, force: bool) -> None:
+def logout(profile: str | None, yes: bool) -> None:
     """Remove stored credentials for a profile.
 
     Deletes the profile from ~/.forge/credentials.yaml.
@@ -421,7 +420,6 @@ def logout(profile: str | None, yes: bool, force: bool) -> None:
         forge authentication logout --profile work
         forge authentication logout -y  # Skip confirmation
     """
-    yes = yes or force
     profile_name = resolve_profile(profile)
 
     if not yes:

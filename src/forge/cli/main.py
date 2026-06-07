@@ -24,7 +24,7 @@ from .config_cmd import config as config_cmd  # noqa: E402
 from .extensions import extensions  # noqa: E402
 from .hooks import hooks  # noqa: E402
 from .memory import memory as memory_cmd  # noqa: E402
-from .memory_writer import handoff_tombstone, memory_writer  # noqa: E402
+from .memory_writer import memory_writer  # noqa: E402
 from .policy import policy  # noqa: E402
 from .proxy import proxy  # noqa: E402
 from .runtime import runtime  # noqa: E402
@@ -336,7 +336,6 @@ main.add_command(session)
 main.add_command(proxy)
 main.add_command(policy)
 main.add_command(memory_writer)
-main.add_command(handoff_tombstone)  # tombstone: `forge handoff run` -> `forge memory-writer run`
 main.add_command(claude)
 main.add_command(config_cmd, name="config")
 main.add_command(hooks)
@@ -349,14 +348,13 @@ main.add_command(workflow_cmd, name="workflow")
 main.add_command(search_cmd, name="search")
 main.add_command(runtime, name="runtime")
 
-from forge.cli.activity import activity_cmd, usage_tombstone  # noqa: E402
+from forge.cli.activity import activity_cmd  # noqa: E402
 from forge.cli.gc import clean_cmd  # noqa: E402
 from forge.cli.logs import logs_cmd  # noqa: E402
 
 main.add_command(clean_cmd, name="clean")
 main.add_command(logs_cmd, name="logs")
 main.add_command(activity_cmd, name="activity")
-main.add_command(usage_tombstone, name="usage")  # tombstone: forge usage -> forge activity
 
 
 if __name__ == "__main__":

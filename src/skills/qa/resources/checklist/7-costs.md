@@ -401,27 +401,7 @@ rm -f ~/.forge/costs/requests/qa-fixture_prov-99999.jsonl
   (reported-or-unavailable: the authoritative `forge proxy costs show` view never invents a dollar figure)
 - [ ] Provenance fixture removed at the end
 
-### 7.14 Renamed-command Tombstone (`forge usage` -> `forge activity`)
-
-<!-- auto -->
-
-`forge usage` was renamed to `forge activity` (clean break). The hidden `usage` tombstone must reject the old name with
-an actionable message and tolerate stale args/flags, so users see the rename rather than Click's "No such option".
-
-```bash
-cd $FORGE_TEST_REPO
-forge usage 2>&1; echo "EXIT=$?"
-echo "---"
-# Stale args + flags must still reach the rename message, not a Click parse error.
-forge usage my-session --all --json --days 7 2>&1; echo "EXIT=$?"
-```
-
-- [ ] Bare `forge usage` exits non-zero (`EXIT=1`) and the message contains `has been renamed` and names
-  `forge activity`
-- [ ] `forge usage my-session --all --json --days 7` also reaches the rename message (no `No such option`) -- the stale
-  args/flags are swallowed, not parsed
-
-### 7.15 Reset Telemetry (`forge proxy costs reset`)
+### 7.14 Reset Telemetry (`forge proxy costs reset`)
 
 <!-- auto -->
 

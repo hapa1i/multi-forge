@@ -73,19 +73,6 @@ def activity_cmd(session: str | None, as_json: bool, days: int, all_time: bool) 
     _render(summary, days=None if all_time else days)
 
 
-@click.command(
-    "usage",
-    hidden=True,
-    context_settings={"ignore_unknown_options": True, "allow_extra_args": True},
-)
-@click.argument("args", nargs=-1, type=click.UNPROCESSED)
-def usage_tombstone(**_: object) -> None:
-    # ignore_unknown_options + UNPROCESSED args swallow the old positional session and
-    # --json/--days/--all flags so stale invocations reach this rename message instead
-    # of Click's generic "No such option" error.
-    raise click.ClickException("forge usage has been renamed.\nUse: forge activity")
-
-
 def _render(summary: SessionActivitySummary, *, days: int | None) -> None:
     scope = "all time" if days is None else f"last {days}d"
     if summary.is_empty:

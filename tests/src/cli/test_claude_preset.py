@@ -47,7 +47,7 @@ class TestPresetReset:
         preset_path = ensure_preset()
         preset_path.write_text('{"custom": true}')
         runner = CliRunner()
-        result = runner.invoke(claude, ["preset", "reset", "--force"])
+        result = runner.invoke(claude, ["preset", "reset", "--yes"])
         assert result.exit_code == 0
         assert "Reset" in result.output
         data = json.loads(preset_path.read_text())
@@ -57,7 +57,7 @@ class TestPresetReset:
         preset_path = get_preset_path()
         assert not preset_path.exists()
         runner = CliRunner()
-        result = runner.invoke(claude, ["preset", "reset", "--force"])
+        result = runner.invoke(claude, ["preset", "reset", "--yes"])
         assert result.exit_code == 0
         assert preset_path.is_file()
 

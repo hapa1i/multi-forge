@@ -1050,12 +1050,9 @@ def _restore_proxy_registry_entry(store: ProxyRegistryStore, entry: ProxyEntry) 
 @click.argument("proxy_ids", nargs=-1)
 @click.option("--all", "-a", "delete_all", is_flag=True, help="Delete all proxies")
 @click.option("--yes", "-y", is_flag=True, help="Skip confirmation prompts")
-@click.option("--force", "-f", is_flag=True, hidden=True, help="Deprecated alias for --yes")
 @click.option("--kill-adopted", is_flag=True, help="Terminate adopted processes during deletion")
 @click.option("--no-kill", is_flag=True, help="Remove from registry without killing the process")
-def delete_cmd(
-    proxy_ids: tuple[str, ...], delete_all: bool, yes: bool, force: bool, kill_adopted: bool, no_kill: bool
-) -> None:
+def delete_cmd(proxy_ids: tuple[str, ...], delete_all: bool, yes: bool, kill_adopted: bool, no_kill: bool) -> None:
     """Delete one or more proxies and stop their servers if running.
 
     \b
@@ -1065,11 +1062,6 @@ def delete_cmd(
       forge proxy delete --all
       forge proxy delete --all --yes
     """
-    # Deprecated --force alias: preserves both old behaviors (skip confirmation
-    # + kill adopted) during the deprecation window.
-    if force:
-        yes = True
-        kill_adopted = True
     console = Console(width=200)
 
     if delete_all and proxy_ids:
@@ -1861,8 +1853,7 @@ def template_edit_cmd(name: str) -> None:
 @template_group.command("reset")
 @click.argument("name")
 @click.option("--yes", "-y", is_flag=True, help="Skip confirmation prompt")
-@click.option("--force", "-f", is_flag=True, hidden=True, help="Deprecated alias for --yes")
-def template_reset_cmd(name: str, yes: bool, force: bool) -> None:
+def template_reset_cmd(name: str, yes: bool) -> None:
     """Reset a template to built-in defaults.
 
     Removes the user-customized copy so the shipped template takes effect.
@@ -1872,7 +1863,6 @@ def template_reset_cmd(name: str, yes: bool, force: bool) -> None:
         forge proxy template reset openrouter-gemini
         forge proxy template reset openrouter-gemini --yes
     """
-    yes = yes or force
     console = Console(width=200)
 
     try:

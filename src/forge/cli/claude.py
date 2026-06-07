@@ -392,13 +392,11 @@ def preset_edit() -> None:
 
 @preset.command("reset")
 @click.option("--yes", "-y", is_flag=True, help="Skip confirmation prompt")
-@click.option("--force", "-f", is_flag=True, hidden=True, help="Deprecated alias for --yes")
-def preset_reset(yes: bool, force: bool) -> None:
+def preset_reset(yes: bool) -> None:
     """Reset settings preset to built-in defaults."""
     from forge.core.state import atomic_write_text
     from forge.install.preset import get_builtin_preset_json, get_preset_path
 
-    yes = yes or force
     preset_path = get_preset_path()
 
     if not yes:

@@ -7,7 +7,6 @@ from unittest.mock import patch
 
 from click.testing import CliRunner
 
-from forge.cli.main import main
 from forge.cli.memory_writer import memory_writer
 from forge.session.models import (
     MemoryIntent,
@@ -179,22 +178,3 @@ def test_run_cmd_shadow_doc_scanned(tmp_path: Path) -> None:
     docs = mock_run.call_args.kwargs["designated_docs"]
     assert len(docs) == 1
     assert docs[0].shadows == "docs/official.md"
-
-
-class TestOldHandoffRunTombstone:
-    """The old ``forge handoff run`` path is a tombstone pointing at the new command."""
-
-    def test_old_command_is_tombstoned(self) -> None:
-        result = CliRunner().invoke(main, ["handoff", "run"])
-        assert result.exit_code != 0
-        assert "forge memory-writer run" in result.output
-
-    def test_tombstone_tolerates_old_flags(self) -> None:
-        """Old --session-name/--worktree-path flags reach the rename message, not Click's 'No such option'."""
-        result = CliRunner().invoke(
-            main,
-            ["handoff", "run", "--session-name", "s", "--worktree-path", "/tmp", "--transcript-rel", "x.jsonl"],
-        )
-        assert result.exit_code != 0
-        assert "forge memory-writer run" in result.output
-        assert "No such option" not in result.output

@@ -25,11 +25,8 @@ import click
 from rich.console import Console
 from rich.syntax import Syntax
 
-from forge.cli.output import print_error_with_tip
 from forge.core.paths import display_path
 from forge.runtime_config import (
-    _REMOVED_KEYS,
-    _RENAMED_KEYS,
     RuntimeConfig,
     ensure_config,
     get_config_path,
@@ -116,23 +113,6 @@ def set_cmd(key_value: str) -> None:
 
     key, value = key_value.split("=", 1)
 
-    if key in _RENAMED_KEYS:
-        new_key = _RENAMED_KEYS[key]
-        print_error_with_tip(
-            f"'{key}' was renamed to '{new_key}'.",
-            f"Run 'forge config set {new_key}={value}' instead.",
-            console=console,
-        )
-        sys.exit(1)
-
-    if key in _REMOVED_KEYS:
-        print_error_with_tip(
-            f"'{key}' was removed.",
-            f"Instead, {_REMOVED_KEYS[key]}.",
-            console=console,
-        )
-        sys.exit(1)
-
     # Nested section keys (e.g. statusline.cost_mode) take the dotted path.
     if "." in key:
         _set_nested_key(key, value, console)
@@ -160,7 +140,6 @@ def set_cmd(key_value: str) -> None:
     else:
         data = {}
 
-    _prune_renamed_keys(data, console)
     data[key] = coerced_value
 
     try:
@@ -259,14 +238,12 @@ def edit_cmd() -> None:
 @config.command("reset")
 @click.argument("key", required=False)
 @click.option("--yes", "-y", is_flag=True, help="Skip confirmation prompt")
-@click.option("--force", "-f", is_flag=True, hidden=True, help="Deprecated alias for --yes")
-def reset_cmd(key: str | None = None, yes: bool = False, force: bool = False) -> None:
+def reset_cmd(key: str | None = None, yes: bool = False) -> None:
     """Reset configuration to defaults.
 
     With KEY: removes that key (reverts to built-in default).
     Without KEY: deletes the entire config file.
     """
-    yes = yes or force
     console = Console(width=200)
     config_path = get_config_path()
 
@@ -286,21 +263,6 @@ def reset_cmd(key: str | None = None, yes: bool = False, force: bool = False) ->
         return
 
     known_fields = {f.name for f in fields(RuntimeConfig)}
-    if key in _RENAMED_KEYS:
-        new_key = _RENAMED_KEYS[key]
-        print_error_with_tip(
-            f"'{key}' was renamed to '{new_key}'.",
-            f"Run 'forge config reset {new_key}' instead.",
-            console=console,
-        )
-        sys.exit(1)
-    if key in _REMOVED_KEYS:
-        print_error_with_tip(
-            f"'{key}' was removed.",
-            f"Instead, {_REMOVED_KEYS[key]}.",
-            console=console,
-        )
-        sys.exit(1)
     if key not in known_fields:
         console.print(f"[red]Error:[/red] Unknown config key: '{key}'")
         console.print(f"\n[dim]Available keys: {', '.join(sorted(known_fields))}[/dim]")
@@ -313,14 +275,8 @@ def reset_cmd(key: str | None = None, yes: bool = False, force: bool = False) ->
     with open(config_path) as f:
         data = ruamel.load(f) or {}
 
-    pruned = _prune_renamed_keys(data, console)
-
     if key not in data:
-        # Requested key already at default; still persist any stale-alias cleanup.
-        if pruned:
-            _persist_or_clear(data, config_path)
-        else:
-            console.print(f"[dim]Key '{key}' not in config (already using default).[/dim]")
+        console.print(f"[dim]Key '{key}' not in config (already using default).[/dim]")
         return
 
     del data[key]
@@ -331,28 +287,6 @@ def reset_cmd(key: str | None = None, yes: bool = False, force: bool = False) ->
 
 
 # --- Helpers ---
-
-
-def _prune_renamed_keys(data: MutableMapping[str, Any], console: Console) -> bool:
-    """Drop dead renamed/removed config keys from ``data`` so they stop re-warning.
-
-    Returns True if any were dropped. Called on the set/reset write paths (not
-    ``edit``, the raw surface) so following the migration tip converges the file.
-    """
-    renamed = [old for old in _RENAMED_KEYS if old in data]
-    for old in renamed:
-        del data[old]
-    if renamed:
-        new_names = ", ".join(_RENAMED_KEYS[old] for old in renamed)
-        console.print(f"[dim]Removed stale key(s): {', '.join(renamed)} (renamed to {new_names})[/dim]")
-
-    gone = [old for old in _REMOVED_KEYS if old in data]
-    for old in gone:
-        del data[old]
-    if gone:
-        console.print(f"[dim]Removed stale key(s): {', '.join(gone)} (no longer supported)[/dim]")
-
-    return bool(renamed or gone)
 
 
 def _persist_or_clear(data: MutableMapping[str, Any], config_path: Path) -> None:
@@ -453,8 +387,6 @@ def _set_nested_key(key: str, value: str, console: Console) -> None:
             data = ruamel.load(f) or {}
     else:
         data = {}
-
-    _prune_renamed_keys(data, console)
 
     section_data = data.get("statusline")
     if not isinstance(section_data, dict):
