@@ -150,7 +150,7 @@ class TestReportPersistence:
             forge_root=tmp_path,
             session_name="s1",
             official_path="docs/notes.md",
-            scope="repo",
+            scope="workspace",
             shadow_count=3,
             content="Body content.",
         )
@@ -158,7 +158,7 @@ class TestReportPersistence:
         assert "docs/notes.md" in text
         assert "s1" in text
         assert "Shadow sources**: 3" in text
-        assert "repo" in text
+        assert "workspace" in text
         assert "Body content." in text
 
     def test_report_glob_pattern_matches_persisted(self, tmp_path: Path) -> None:
@@ -458,8 +458,8 @@ class TestCollectShadowEntries:
         assert len(entries) == 1
         assert entries[0].session == "(project)"
 
-    def test_scope_repo_unions_current_project_root(self, tmp_path: Path, monkeypatch: MagicMock) -> None:
-        """--scope repo includes the current project's passport-origin shadows."""
+    def test_scope_workspace_unions_current_project_root(self, tmp_path: Path, monkeypatch: MagicMock) -> None:
+        """--scope workspace includes the current project's passport-origin shadows."""
         from forge.core.ops.context import ExecutionContext
         from forge.session.shadow_curation import collect_shadow_entries
 
@@ -468,7 +468,7 @@ class TestCollectShadowEntries:
 
         monkeypatch.chdir(forge_root)
         ctx = ExecutionContext.from_cwd(cwd=forge_root)
-        entries, roots = collect_shadow_entries(ctx=ctx, scope="repo", session_filter=None)
+        entries, roots = collect_shadow_entries(ctx=ctx, scope="workspace", session_filter=None)
 
         assert any(e.session == "(project)" and e.official == "docs/notes.md" for e in entries)
         assert str(forge_root) in roots

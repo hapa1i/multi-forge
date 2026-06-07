@@ -84,10 +84,10 @@ class TestResolveTrackedRoots:
         roots = _resolve_tracked_roots(ctx, "project")
         assert roots == {fr}
 
-    def test_scope_repo_includes_index_entries(self, tmp_path: Path) -> None:
+    def test_scope_workspace_includes_index_entries(self, tmp_path: Path) -> None:
         fr = _seed_session(tmp_path, "alpha")
         ctx = _make_ctx(tmp_path, forge_root=fr)
-        roots = _resolve_tracked_roots(ctx, "repo")
+        roots = _resolve_tracked_roots(ctx, "workspace")
         assert fr in roots
 
     def test_scope_all_includes_all_entries(self, tmp_path: Path) -> None:
@@ -446,7 +446,7 @@ class TestCollectCleanReport:
 
         fr = _seed_session(tmp_path, "alpha")
         ctx = _make_ctx(tmp_path, forge_root=fr)
-        report = collect_clean_report(ctx=ctx, scope="repo")
+        report = collect_clean_report(ctx=ctx, scope="workspace")
         assert isinstance(report, CleanReport)
         assert report.is_clean
 
@@ -472,7 +472,7 @@ class TestCollectCleanReport:
         (orphan / "forge.session.json").write_text("{}")
 
         ctx = _make_ctx(tmp_path, forge_root=fr)
-        report = collect_clean_report(ctx=ctx, scope="repo")
+        report = collect_clean_report(ctx=ctx, scope="workspace")
         session_cat = next(c for c in report.categories if c.category == "session_dirs")
         assert session_cat.count == 1
 
@@ -493,7 +493,7 @@ class TestRunClean:
         assert orphan.exists()
 
         ctx = _make_ctx(tmp_path, forge_root=fr)
-        result = run_clean(ctx=ctx, scope="repo")
+        result = run_clean(ctx=ctx, scope="workspace")
 
         assert result.deleted_count >= 1
         assert not orphan.exists()
@@ -511,7 +511,7 @@ class TestRunClean:
         assert orphan_parent.exists()
 
         ctx = _make_ctx(tmp_path, forge_root=fr)
-        result = run_clean(ctx=ctx, scope="repo")
+        result = run_clean(ctx=ctx, scope="workspace")
 
         assert result.deleted_count >= 1
         assert not orphan_parent.exists()
@@ -529,7 +529,7 @@ class TestRunClean:
         assert legacy.exists()
 
         ctx = _make_ctx(tmp_path, forge_root=fr)
-        result = run_clean(ctx=ctx, scope="repo")
+        result = run_clean(ctx=ctx, scope="workspace")
 
         assert result.deleted_count >= 1
         assert not legacy.exists()
@@ -548,7 +548,7 @@ class TestRunClean:
         (children_dir / "deleted-child.md").write_text("# Orphan")
 
         ctx = _make_ctx(tmp_path, forge_root=fr)
-        result = run_clean(ctx=ctx, scope="repo")
+        result = run_clean(ctx=ctx, scope="workspace")
 
         assert "transfer_files" in result.categories_cleaned
         # children/ removed; parent dir removed because only generated.md remained
@@ -559,7 +559,7 @@ class TestRunClean:
 
         fr = _seed_session(tmp_path, "alpha")
         ctx = _make_ctx(tmp_path, forge_root=fr)
-        result = run_clean(ctx=ctx, scope="repo")
+        result = run_clean(ctx=ctx, scope="workspace")
         assert result.deleted_count == 0
         assert not result.failed
 
@@ -588,7 +588,7 @@ class TestEmptyRootRepoScope:
 
         # Run clean from a repo with no forge roots
         ctx = _make_ctx(tmp_path, forge_root=None)
-        report = collect_clean_report(ctx=ctx, scope="repo")
+        report = collect_clean_report(ctx=ctx, scope="workspace")
         active_cat = next(c for c in report.categories if c.category == "active_entries")
         assert active_cat.count == 0, "should not detect entries outside scope"
 
@@ -606,7 +606,7 @@ class TestEmptyRootRepoScope:
         (queue_dir / "foreign.json").write_text(json.dumps(marker))
 
         ctx = _make_ctx(tmp_path, forge_root=None)
-        report = collect_clean_report(ctx=ctx, scope="repo")
+        report = collect_clean_report(ctx=ctx, scope="workspace")
         wq_cat = next(c for c in report.categories if c.category == "work_queue")
         assert wq_cat.count == 0
 
@@ -637,7 +637,7 @@ class TestScopedActiveCleanup:
         )
 
         ctx = _make_ctx(tmp_path, forge_root=fr)
-        run_clean(ctx=ctx, scope="repo")
+        run_clean(ctx=ctx, scope="workspace")
 
         # in-scope should be cleaned
         assert store.get_session("in-scope-dead") is None
@@ -829,4 +829,4 @@ def _make_report_with_orphans(total: int) -> CleanReport:
         OrphanCategory("search_docs", "Orphan search docs", 0, []),
         OrphanCategory("dead_installations", "Dead installations", 0, []),
     ]
-    return CleanReport(categories=cats, scope="repo")
+    return CleanReport(categories=cats, scope="workspace")

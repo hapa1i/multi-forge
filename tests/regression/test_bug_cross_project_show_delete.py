@@ -1,6 +1,6 @@
 """Regression: session list shows sessions that show/delete can't interact with.
 
-Bug: `forge session list` is repo-scoped and shows sessions from all
+Bug: `forge session list` is workspace-scoped and shows sessions from all
 forge_roots in the same git repo, but `show` and `delete` were project-scoped
 (current forge_root only). Users could see sessions in `list` they couldn't
 touch -- "session not found in current project" with a hint to cd elsewhere.
@@ -12,7 +12,7 @@ CLI layer.
 
 Fix: Shared two-tier resolver (`resolve_session_repo_wide`) in
 `src/forge/core/ops/resolution.py`. Commands `show`, `delete`, `set`, `reset`
-now resolve repo-wide with current-project preference.
+now resolve workspace-wide with current-project preference.
 """
 
 from __future__ import annotations

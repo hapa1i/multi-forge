@@ -24,7 +24,7 @@ from .context import ExecutionContext
 
 _log = logging.getLogger(__name__)
 
-VALID_SCOPES = {"repo", "project", "all"}
+VALID_SCOPES = {"workspace", "project", "all"}
 
 
 # ---------------------------------------------------------------------------
@@ -91,14 +91,14 @@ def _resolve_tracked_roots(ctx: ExecutionContext, scope: str) -> set[Path]:
     """
     if scope == "project":
         if ctx.forge_root is None:
-            raise CleanError("Not inside a Forge project. Run from a directory with .forge/ or use --scope repo.")
+            raise CleanError("Not inside a Forge project. Run from a directory with .forge/ or use --scope workspace.")
         return {ctx.forge_root}
 
     from forge.session import SessionManager
 
     manager = SessionManager()
 
-    if scope == "repo":
+    if scope == "workspace":
         entries = manager.list_sessions(
             include_incognito=True,
             project_root_filter=str(ctx.project_root),
@@ -116,11 +116,11 @@ def _resolve_tracked_roots(ctx: ExecutionContext, scope: str) -> set[Path]:
     if ctx.forge_root is not None:
         roots.add(ctx.forge_root)
 
-    # Add installed-manifest roots. For repo scope, match by project_root
+    # Add installed-manifest roots. For workspace scope, match by project_root
     # from the index entries rather than path containment, because git
     # worktrees are typically siblings of the main checkout, not children.
     # `roots` at this point contains index-derived roots (already filtered
-    # by project_root for repo scope).
+    # by project_root for workspace scope).
     index_roots = set(roots)
     try:
         from forge.install.tracking import TrackingStore
@@ -131,7 +131,7 @@ def _resolve_tracked_roots(ctx: ExecutionContext, scope: str) -> set[Path]:
             if pp is None:
                 continue
             p = Path(pp)
-            if scope == "repo" and not _belongs_to_project(p, ctx.project_root, index_roots):
+            if scope == "workspace" and not _belongs_to_project(p, ctx.project_root, index_roots):
                 continue
             if p.is_dir() and (p / ".forge").is_dir():
                 roots.add(p)
@@ -184,7 +184,7 @@ def _list_reference_entries(
             include_incognito=True,
             forge_root_filter=str(ctx.forge_root),
         )
-    elif scope == "repo":
+    elif scope == "workspace":
         entries = manager.list_sessions(
             include_incognito=True,
             project_root_filter=str(ctx.project_root),
@@ -562,7 +562,7 @@ def _path_in_roots(candidate: Path, roots: set[Path]) -> bool:
 # ---------------------------------------------------------------------------
 
 
-def collect_clean_report(*, ctx: ExecutionContext, scope: str = "repo") -> CleanReport:
+def collect_clean_report(*, ctx: ExecutionContext, scope: str = "workspace") -> CleanReport:
     """Scan for orphaned objects and return a report.
 
     Pure detection: no mutations. Safe for dry-run.
@@ -596,7 +596,7 @@ def collect_clean_report(*, ctx: ExecutionContext, scope: str = "repo") -> Clean
 # ---------------------------------------------------------------------------
 
 
-def run_clean(*, ctx: ExecutionContext, scope: str = "repo") -> CleanResult:
+def run_clean(*, ctx: ExecutionContext, scope: str = "workspace") -> CleanResult:
     """Detect orphaned objects and delete them.
 
     Calls collect_clean_report() first, then performs deletions.

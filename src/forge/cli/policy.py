@@ -59,7 +59,7 @@ def _resolve_session_for_display(
     name: str,
     cwd: Path,
 ) -> tuple[SessionStore, SessionState]:
-    """Resolve a named session, repo-scoped with current-project preference.
+    """Resolve a named session, workspace-scoped with current-project preference.
 
     Delegates to the shared two-tier resolver in core.ops.resolution.
     """

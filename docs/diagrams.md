@@ -436,7 +436,7 @@ flowchart TB
 
     ForgeA -.->|"fork --into<br/>(preserves relative_path)"| ForgeB
     ForgeA -.->|"cross-project resume<br/>(reads parent artifacts)"| ForgeB
-    Index -->|"session list --scope repo<br/>(filters by project_root)"| LogicalRepo
+    Index -->|"session list --scope workspace<br/>(filters by project_root)"| LogicalRepo
 
     style LogicalRepo fill:#fafafa,stroke:#999
     style CheckoutA fill:#e3f2fd
@@ -450,5 +450,6 @@ flowchart TB
 
 - Each Forge project (`forge_root`) is self-contained: sessions, artifacts, and search live under its `.forge/`
 - Cross-project operations (fork, resume) are allowed within the same logical repo (`project_root`)
-- `session list` defaults to repo scope (shows sessions across all Forge projects in the logical repo)
+- `session list` defaults to workspace scope (shows sessions across all worktrees and Forge projects in the logical
+  repo)
 - `relative_path` = `forge_root` relative to `checkout_root`; preserved when forking `--into` another worktree

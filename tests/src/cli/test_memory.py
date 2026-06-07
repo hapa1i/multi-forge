@@ -693,9 +693,11 @@ class TestShadowsReview:
         assert result.exit_code != 0
         assert "session" in result.output.lower()
 
-    def test_review_show_latest_rejects_scope_repo(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+    def test_review_show_latest_rejects_scope_workspace(
+        self, runner: CliRunner, seeded_session: tuple[Path, str]
+    ) -> None:
         result = runner.invoke(
-            main, ["memory", "shadows", "review", "--for", "docs/notes.md", "--show-latest", "--scope", "repo"]
+            main, ["memory", "shadows", "review", "--for", "docs/notes.md", "--show-latest", "--scope", "workspace"]
         )
         assert result.exit_code != 0
         assert "not applicable" in result.output.lower()
@@ -807,10 +809,10 @@ class TestShadowsReview:
         assert "report_path" in data
         assert data["shadow_count"] == 1
 
-    def test_review_scope_repo_reads_official_from_session_root(
+    def test_review_scope_workspace_reads_official_from_session_root(
         self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Two forge roots in the same repo. --scope repo collects shadows from
+        """Two forge roots in the same repo. --scope workspace collects shadows from
         both, but the official doc baseline comes from the resolved session's root."""
         import subprocess
 
@@ -917,7 +919,7 @@ class TestShadowsReview:
         monkeypatch.setattr("forge.core.reactive.session_runner.run_claude_session", fake_run)
 
         result = runner.invoke(
-            main, ["memory", "shadows", "review", "--for", "docs/notes.md", "--curate", "--scope", "repo"]
+            main, ["memory", "shadows", "review", "--for", "docs/notes.md", "--curate", "--scope", "workspace"]
         )
         assert result.exit_code == 0, result.output
 

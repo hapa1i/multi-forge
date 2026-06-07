@@ -54,7 +54,7 @@ class ListSessionsResult:
     sessions: list[ListSessionsItem]
 
 
-VALID_SCOPES = {"repo", "project", "all"}
+VALID_SCOPES = {"workspace", "project", "all"}
 
 
 def _scope_filters(ctx: ExecutionContext, scope: str) -> tuple[str | None, str | None]:
@@ -63,25 +63,25 @@ def _scope_filters(ctx: ExecutionContext, scope: str) -> tuple[str | None, str |
     Shared by list_sessions() and list_sessions_older_than() to ensure
     identical fallback behavior.
     """
-    if scope == "repo":
+    if scope == "workspace":
         return str(ctx.project_root), None
     if scope == "project":
         if ctx.forge_root is not None:
             return None, str(ctx.forge_root)
-        _log.debug("No forge_root for --scope project, falling back to repo scope")
+        _log.debug("No forge_root for --scope project, falling back to workspace scope")
         return str(ctx.project_root), None
     # scope == "all"
     return None, None
 
 
-def list_sessions(*, ctx: ExecutionContext, include_incognito: bool, scope: str = "repo") -> ListSessionsResult:
+def list_sessions(*, ctx: ExecutionContext, include_incognito: bool, scope: str = "workspace") -> ListSessionsResult:
     """List sessions with lightweight derived metadata.
 
     Args:
         ctx: execution context (provides project_root and forge_root for filtering).
         include_incognito: whether to include incognito sessions.
         scope: filtering scope:
-            - ``"repo"``: sessions in the same logical repo (project_root match). Default.
+            - ``"workspace"``: sessions in the same workspace / logical repo (project_root match). Default.
             - ``"project"``: sessions in the same Forge project (forge_root match).
             - ``"all"``: no filtering (global).
 
@@ -190,8 +190,8 @@ class ResolveSessionResult:
 def resolve_session(*, ctx: ExecutionContext, session_name: str | None = None) -> ResolveSessionResult:
     """Resolve a session by explicit name or current session from CWD.
 
-    Named sessions use repo-wide two-tier resolution (current forge_root
-    preference, then repo-scoped scan). Unnamed falls back to $FORGE_SESSION.
+    Named sessions use workspace-wide two-tier resolution (current forge_root
+    preference, then workspace-scoped scan). Unnamed falls back to $FORGE_SESSION.
 
     Args:
         ctx: execution context (provides forge_root for scoped resolution).

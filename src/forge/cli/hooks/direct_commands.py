@@ -68,7 +68,7 @@ def _handle_cmd_help() -> None:
                 "reason": "Direct commands:\n"
                 "- %session show [name] | list\n"
                 "- %proxy list | show <id> | audit show|diff [id]\n"
-                "- %clean [--scope repo|project|all]\n"
+                "- %clean [--scope workspace|project|all]\n"
                 "- %plan\n"
                 "- %config (show runtime config)\n"
                 "- %policy status | enable | disable | check\n"
@@ -108,8 +108,8 @@ def _handle_cmd_session(data: dict[str, Any], argv: list[str]) -> None:
     if "--no-incognito" in argv:
         include_incognito = False
 
-    # Parse --scope VALUE or --scope=VALUE (default: repo)
-    scope = "repo"
+    # Parse --scope VALUE or --scope=VALUE (default: workspace)
+    scope = "workspace"
     for i, arg in enumerate(argv):
         if arg.startswith("--scope="):
             scope = arg.split("=", 1)[1].lower()
