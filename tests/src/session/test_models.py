@@ -9,6 +9,7 @@ from forge.session.models import (
     INDEX_VERSION,
     SCHEMA_VERSION,
     DesignatedDoc,
+    LaunchConfirmed,
     LaunchIntent,
     MemoryIntent,
     MemoryWriterConfig,
@@ -99,6 +100,52 @@ class TestSessionConfirmed:
             confirmed_by="hook:SessionStart",
         )
         assert confirmed.claude_session_id == "uuid-1234"
+
+
+class TestLaunchConfirmed:
+    """Test LaunchConfirmed dataclass + additive manifest compatibility (G3)."""
+
+    def test_default_values(self) -> None:
+        launch = LaunchConfirmed()
+        assert launch.routing_mode is None
+        assert launch.proxy_id is None
+        assert launch.base_url is None
+        assert launch.api_key_available_to_child is False
+        assert launch.api_key_source is None
+
+    def test_confirmed_launch_defaults_none(self) -> None:
+        # The new field is optional, so existing constructions are unaffected.
+        assert SessionConfirmed().launch is None
+
+    def test_dacite_round_trip(self) -> None:
+        from dataclasses import asdict
+
+        import dacite
+
+        confirmed = SessionConfirmed(
+            launch=LaunchConfirmed(
+                routing_mode="proxy",
+                proxy_id="p1",
+                base_url="http://localhost:8085",
+                api_key_available_to_child=False,
+                api_key_source="omitted_by_config",
+            )
+        )
+        restored = dacite.from_dict(SessionConfirmed, asdict(confirmed), config=dacite.Config(strict=True))
+        assert restored.launch is not None
+        assert restored.launch.routing_mode == "proxy"
+        assert restored.launch.api_key_source == "omitted_by_config"
+
+    def test_old_manifest_without_launch_deserializes(self) -> None:
+        # Old confirmed blocks lack `launch`; strict dacite must fill None, not raise.
+        import dacite
+
+        restored = dacite.from_dict(
+            SessionConfirmed,
+            {"claude_session_id": "uuid-1234", "is_sandboxed": False},
+            config=dacite.Config(strict=True),
+        )
+        assert restored.launch is None
 
 
 class TestLaunchIntent:

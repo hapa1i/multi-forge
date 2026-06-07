@@ -10,9 +10,12 @@ from forge.core.reactive.env import (
     FORGE_PARENT_RUN_ID_VAR,
     FORGE_ROOT_RUN_ID_VAR,
     FORGE_RUN_ID_VAR,
+    InteractiveApiKeyDecision,
     RunIdentity,
+    apply_interactive_api_key,
     build_claude_env,
     can_use_bare,
+    compute_interactive_api_key_decision,
     derive_child_run_identity,
     get_forge_depth,
     get_run_identity,
@@ -283,6 +286,99 @@ class TestHydrateCredentialsIntegration:
         env = build_claude_env()
 
         assert "ANTHROPIC_API_KEY" not in env
+
+
+def _cfg(*, omit: bool = False, ignore_env: bool = False):
+    """Runtime-config stub exposing the two fields the api-key logic reads."""
+    return type(
+        "C",
+        (),
+        {
+            "interactive_anthropic_api_key": "omit" if omit else "inherit",
+            "auth_ignore_env": ignore_env,
+        },
+    )()
+
+
+class TestInteractiveApiKey:
+    """compute/apply for ANTHROPIC_API_KEY on interactive launches (G4)."""
+
+    def test_omit_strips_key_for_interactive(self, monkeypatch):
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-shell")
+        monkeypatch.setattr("forge.runtime_config.get_runtime_config", lambda: _cfg(omit=True))
+        env = {"ANTHROPIC_API_KEY": "sk-shell"}
+        decision = apply_interactive_api_key(env, interactive=True)
+        assert "ANTHROPIC_API_KEY" not in env
+        assert decision == InteractiveApiKeyDecision(available=False, source="omitted_by_config")
+
+    def test_omit_is_ignored_for_headless(self, monkeypatch):
+        # interactive=False must never honor omit: headless subprocesses keep auth.
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-shell")
+        monkeypatch.setattr("forge.runtime_config.get_runtime_config", lambda: _cfg(omit=True))
+        env: dict[str, str] = {}
+        decision = apply_interactive_api_key(env, interactive=False)
+        assert env["ANTHROPIC_API_KEY"] == "sk-shell"
+        assert decision == InteractiveApiKeyDecision(available=True, source="env")
+
+    def test_inherit_keeps_env_key(self, monkeypatch):
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-shell")
+        monkeypatch.setattr("forge.runtime_config.get_runtime_config", lambda: _cfg())
+        env: dict[str, str] = {}
+        decision = apply_interactive_api_key(env, interactive=True)
+        assert env["ANTHROPIC_API_KEY"] == "sk-shell"
+        assert decision == InteractiveApiKeyDecision(available=True, source="env")
+
+    def test_inherit_file_fallback(self, monkeypatch):
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+        monkeypatch.setattr("forge.runtime_config.get_runtime_config", lambda: _cfg())
+        monkeypatch.setattr(
+            "forge.core.auth.template_secrets._get_file_secrets",
+            lambda: {"ANTHROPIC_API_KEY": "sk-file"},
+        )
+        env: dict[str, str] = {}
+        decision = apply_interactive_api_key(env, interactive=True)
+        assert env["ANTHROPIC_API_KEY"] == "sk-file"
+        assert decision == InteractiveApiKeyDecision(available=True, source="credential_file")
+
+    def test_auth_ignore_env_reports_credential_file_source(self, monkeypatch):
+        # The correctness trap: with auth_ignore_env the child uses the FILE key
+        # even though a shell key exists, so the recorded source must be
+        # credential_file, not env.
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-shell")
+        monkeypatch.setattr("forge.runtime_config.get_runtime_config", lambda: _cfg(ignore_env=True))
+        monkeypatch.setattr(
+            "forge.core.auth.template_secrets._get_file_secrets",
+            lambda: {"ANTHROPIC_API_KEY": "sk-file"},
+        )
+        env: dict[str, str] = {}
+        decision = apply_interactive_api_key(env, interactive=True)
+        assert env["ANTHROPIC_API_KEY"] == "sk-file"
+        assert decision.source == "credential_file"
+
+    def test_inherit_no_key_anywhere(self, monkeypatch):
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+        monkeypatch.setattr("forge.runtime_config.get_runtime_config", lambda: _cfg())
+        monkeypatch.setattr("forge.core.auth.template_secrets._get_file_secrets", lambda: {})
+        env = {"ANTHROPIC_API_KEY": "stale"}
+        decision = apply_interactive_api_key(env, interactive=True)
+        assert "ANTHROPIC_API_KEY" not in env  # authoritative: pops a stale value
+        assert decision == InteractiveApiKeyDecision(available=False, source="none")
+
+    def test_apply_is_authoritative_over_extra_vars(self, monkeypatch):
+        # A stale key injected via extra_vars must not survive omit.
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+        monkeypatch.setattr("forge.runtime_config.get_runtime_config", lambda: _cfg(omit=True))
+        env = {"ANTHROPIC_API_KEY": "sk-from-extra-vars"}
+        apply_interactive_api_key(env, interactive=True)
+        assert "ANTHROPIC_API_KEY" not in env
+
+    def test_compute_matches_apply(self, monkeypatch):
+        # The recorder uses compute; the env build uses apply. Same inputs -> same decision.
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-shell")
+        monkeypatch.setattr("forge.runtime_config.get_runtime_config", lambda: _cfg(omit=True))
+        computed = compute_interactive_api_key_decision(interactive=True)
+        applied = apply_interactive_api_key({}, interactive=True)
+        assert computed == applied
 
 
 class TestRunIdentityHelpers:

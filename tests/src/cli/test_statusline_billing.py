@@ -54,20 +54,23 @@ class TestBillingModeRendering:
     def test_api_mode_shows_dollars(self):
         visible = _render(COST, cost_mode="api")
         assert "$0.42" in visible
-        assert "RL:" not in visible
+        assert "5h:" not in visible
 
     def test_subscription_shows_quota_not_dollars(self):
         visible = _render(COST_RL, cost_mode="subscription")
-        assert "RL:23%" in visible
+        assert "5h:23%" in visible
         assert "0.42" not in visible  # phantom dollars hidden
 
-    def test_auto_with_api_key_shows_dollars(self):
+    def test_auto_with_api_key_still_hedges(self):
+        # A key in the env is capability, not payer (Forge may have hydrated it
+        # into an OAuth session). auto must NOT assert dollars from key presence;
+        # with no rate_limits it hedges, identical to the no-key case below.
         visible = _render(COST, cost_mode="auto", api_key=True)
-        assert "$0.42" in visible
+        assert "≈$0.42" in visible
 
     def test_auto_without_key_shows_quota(self):
         visible = _render(COST_RL, cost_mode="auto", api_key=False)
-        assert "RL:23%" in visible
+        assert "5h:23%" in visible
         assert "0.42" not in visible
 
     def test_auto_without_key_no_rate_limits_hedges_with_approx(self):
@@ -75,20 +78,32 @@ class TestBillingModeRendering:
         assert "\u2248$0.42" in visible
 
 
+class TestAmbientHonesty:
+    """Ambient session (no FORGE_SESSION): classify from stdin + immediate env only."""
+
+    def test_key_in_env_no_rate_limits_hedges_and_hides_launch(self):
+        # The Bug #1 + #3 acceptance: an ambient render with a real key but no quota
+        # signal hedges the cost (never asserts API dollars) and shows no launch
+        # segment (manifest is None -> nothing to read, no credential-store lookup).
+        visible = _render(COST, cost_mode="auto", api_key=True, segments=["model", "cost", "launch"])
+        assert "≈$0.42" in visible
+        assert "key:" not in visible
+
+
 class TestRateLimitsSuppression:
     def test_rate_limits_suppressed_when_cost_shows_quota(self):
         # subscription + both cost and rate_limits enabled -> the quota shows once
         # (via cost); the standalone rate_limits segment suppresses itself.
         visible = _render(COST_RL, cost_mode="subscription", segments=["model", "cost", "rate_limits"])
-        assert visible.count("RL:") == 1
+        assert visible.count("5h:") == 1
 
     def test_rate_limits_shown_when_cost_absent(self):
         # No cost segment -> nothing else shows the quota, so rate_limits renders.
         visible = _render(COST_RL, cost_mode="subscription", segments=["model", "rate_limits"])
-        assert "RL:23%" in visible
+        assert "5h:23%" in visible
 
     def test_api_mode_keeps_both_cost_and_rate_limits(self):
         # In API mode cost shows dollars and rate_limits shows quota — both useful.
         visible = _render(COST_RL, cost_mode="api", segments=["model", "cost", "rate_limits"])
         assert "$0.42" in visible
-        assert "RL:23%" in visible
+        assert "5h:23%" in visible

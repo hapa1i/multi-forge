@@ -18,6 +18,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from forge.core.invoker import Attribution, ClaudeHeadlessInvoker, HeadlessRequest
+from forge.core.reactive import headless_json as hj
 from forge.core.usage.ledger import read_usage_events
 
 
@@ -227,6 +228,87 @@ class TestRunParallel:
 
         assert any(call.args == (888, signal.SIGTERM) for call in mock_killpg.call_args_list)
         proc.communicate.assert_not_called()
+
+    @patch("forge.core.invoker.claude.os.getpgid", side_effect=lambda pid: pid)
+    @patch("forge.core.invoker.claude.os.killpg")
+    @patch("forge.core.invoker.claude.subprocess.Popen")
+    def test_cancellation_reaps_retry_child_registered_after_cleanup(self, mock_popen, mock_killpg, _getpgid):
+        """The JSON-flag retry spawn is covered by the same cancellation guard as the
+        primary spawn (the E3 fix). If _cleanup's one-shot snapshot is taken after the
+        primary append but before the retry child is registered, the worker reaps the
+        retry child itself -- otherwise shutdown(wait=True) would hang on it.
+
+        Deterministic: the retry Popen blocks until an ObservedLock sees _cleanup
+        acquire children_lock (the 3rd acquisition: worker early-check, primary append,
+        then cleanup), so the snapshot excludes the retry; a watchdog failsafe keeps a
+        regression from hanging the suite. getpgid is identity so pgid == pid.
+        """
+        hj.reset_json_capability_cache()
+        real_lock = threading.Lock()
+        cleanup_has_lock = threading.Event()
+        retry_popen_started = threading.Event()
+        watchdog_fired = threading.Event()
+
+        class ObservedLock:
+            def __init__(self) -> None:
+                self.entries = 0
+
+            def __enter__(self):
+                real_lock.acquire()
+                self.entries += 1
+                if self.entries == 3:  # #1 worker early-check, #2 primary append, #3 cleanup
+                    cleanup_has_lock.set()
+                return self
+
+            def __exit__(self, *_exc) -> None:
+                real_lock.release()
+
+        primary = _mock_proc(stdout="", stderr="error: unknown option '--output-format'", returncode=2)
+        primary.pid = 1111  # already exited (poll == returncode == 2): cleanup won't killpg it
+
+        retry = _mock_proc()
+        retry.poll.return_value = None  # "running" until the worker reaps it
+        retry.pid = 2222
+        retry.communicate.side_effect = AssertionError("cancelled retry child must not communicate")
+
+        calls = {"n": 0}
+
+        def make_proc(*_a, **_k):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                return primary  # flagged primary -> flag rejection -> retry path
+            retry_popen_started.set()  # worker is in the retry spawn
+            assert cleanup_has_lock.wait(timeout=5)  # block until cleanup snapshotted (no retry)
+            return retry
+
+        mock_popen.side_effect = make_proc
+
+        def fake_as_completed(_futs):
+            assert retry_popen_started.wait(timeout=5)
+            raise KeyboardInterrupt  # -> finally -> _cleanup (snapshot = [primary], not retry)
+
+        def watchdog() -> None:
+            if not cleanup_has_lock.wait(timeout=3.0):
+                cleanup_has_lock.set()
+                watchdog_fired.set()
+
+        wd = threading.Thread(target=watchdog, daemon=True)
+        wd.start()
+        try:
+            with patch("forge.core.invoker.claude.threading", SimpleNamespace(Lock=ObservedLock)):
+                with patch("forge.core.invoker.claude.as_completed", fake_as_completed):
+                    with pytest.raises(KeyboardInterrupt):
+                        ClaudeHeadlessInvoker().run_parallel([_req(label="w0")])
+        finally:
+            cleanup_has_lock.set()
+            wd.join(timeout=2)
+            hj.reset_json_capability_cache()
+
+        # The retry child (registered after the snapshot) was reaped by the worker, and
+        # never communicated -- so shutdown(wait=True) could not have hung on it.
+        assert any(call.args == (2222, signal.SIGTERM) for call in mock_killpg.call_args_list)
+        retry.communicate.assert_not_called()
+        assert not watchdog_fired.is_set()  # the real cleanup path fired, not the failsafe
 
 
 class TestRun:

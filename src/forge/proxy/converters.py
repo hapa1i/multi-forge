@@ -910,6 +910,13 @@ async def convert_openai_to_anthropic_sse(
                 if cached_tokens > 0:
                     final_usage["cached_tokens"] = cached_tokens
 
+                # Route-reported cost (micros) rides in final_usage like cached_tokens.
+                # It is never emitted to the client (the message_delta usage is tokens
+                # only); _on_stream_complete reads it to log reported cost.
+                reported_cost_micros = chunk_usage.get("reported_cost_micros")
+                if reported_cost_micros is not None:
+                    final_usage["reported_cost_micros"] = reported_cost_micros
+
                 logger.debug(f"[{request_id}] Updated usage from chunk: {final_usage}")
 
             choices = chunk.get("choices", [])

@@ -145,3 +145,30 @@ Shipped 2026-06-03 (statusline-enhancement card). Durable rules for `src/forge/c
 - **Proxy spend caps**: `_attach_cap_summary` nests `CostTracker.cap_summary()` under `GET / metrics.costs.caps`,
   keeping `ProxyMetrics` decoupled from `CostTracker`. Cap amounts use `_fmt_cap_money` (four decimals below a cent),
   NOT `_fmt_dollars` (whose `int(usd*100)` collapses sub-cent caps to `0c`).
+
+### Proposed Promotions From Metric Evidence (awaiting human review, 2026-06-06)
+
+Drafted by the `metric_evidence_simplification` Phase 6 closeout. **Not yet promoted** — a human should review and move
+the durable items into the body above, then delete this section.
+
+- **"Forge is not a cost oracle" — cost-unavailable must be `None`, never `0`.** The original bug was `cost_micros: int`
+  - hardcoded `estimated: True`, so `0` meant both "free" and "unknown". Cost is now nullable + provenance-tagged
+    (`reporter` + `confidence`); a route reporting no dollars logs `cost_micros=null` / `confidence="unavailable"` and
+    does **not** advance spend caps. Never reintroduce a local price table on the accounting path.
+- **The two strict-preflight catalog callsites had to die together.** `cap_mode: strict` priced an unsent request from
+  the catalog at two sites — `server.py` passthrough **and** translated. Removing only one would have left the catalog
+  dependency (and strict semantics) alive on the other path. When deleting a cross-path behavior, the type-checker (not
+  a hand list) is the change-detector — grep every call site.
+- **One `isinstance(record, dict)` guard for every JSONL cost/usage/audit reader.** A valid-but-non-object line
+  (`[]`/`1`/`"x"`) must skip, not crash `.get()`. `cost_tracker.bootstrap_from_logs` is already broad-except guarded
+  (its guard is an honesty fix, tested by calling `_parse_record` directly); the other readers genuinely crash without
+  it.
+- **`billing_mode` ≠ key presence.** The status line must never infer an API payer from `ANTHROPIC_API_KEY` in the env
+  (Forge may hydrate it into an OAuth session). `RenderContext.has_api_key` was deleted; `billing_mode` is a declaration
+  (`cost_mode`) + `rate_limits` evidence. The interactive/headless key axis is `interactive_anthropic_api_key: omit`,
+  distinct from `auth_ignore_env` (source-only, both interactive + headless).
+- **Rename the user-facing surface, not the domain plane.** `forge usage` → `forge activity` (it reports Forge
+  *automation* activity, not total interactive usage), but the durable **usage ledger** plane (`UsageEvent`,
+  `usage/events/`, `read_usage_events`, `usage_summary.py`) keeps its name. Removed CLI commands become hidden,
+  **flag-tolerant** tombstones (`ignore_unknown_options` + `UNPROCESSED`) so old `--flag` invocations reach the rename
+  message, not Click's "No such option".

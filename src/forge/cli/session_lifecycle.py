@@ -16,9 +16,18 @@ from typing import cast
 
 import click
 
+from forge.cli.launch_confirmation import (
+    _infer_launch_confirmation,
+    _routing_mode_for,
+    record_launch_confirmed,
+)
 from forge.config.schema import ProxyInstanceConfig
 from forge.core.paths import display_path
-from forge.core.state import FileLockTimeoutError, now_iso
+from forge.core.reactive.env import (
+    InteractiveApiKeyDecision,
+    compute_interactive_api_key_decision,
+)
+from forge.core.state import FileLockTimeoutError
 from forge.session import (
     LAUNCH_MODE_HOST,
     LAUNCH_MODE_SIDECAR,
@@ -241,56 +250,6 @@ def _warn_if_version_outdated() -> None:
     print_tip("Run 'claude update' to upgrade.", blank_before=False, console=console)
 
 
-def _infer_launch_confirmation(
-    *,
-    store: "SessionStore",
-    manifest: SessionState,
-    session_id: str | None,
-) -> None:
-    """Backfill transcript/runtime confirmation after a successful host launch."""
-    if session_id is None or manifest.confirmed.is_sandboxed:
-        return
-
-    try:
-        from forge.session.claude.paths import (
-            get_transcript_path,
-            resolve_claude_project_root,
-        )
-    except ImportError:
-        return
-
-    # Prefer persisted launch root; fall back to computed root
-    if manifest.confirmed.claude_project_root:
-        transcript_path = get_transcript_path(manifest.confirmed.claude_project_root, session_id)
-    else:
-        transcript_path = get_transcript_path(resolve_claude_project_root(manifest), session_id)
-    if not transcript_path.is_file():
-        return
-
-    def _mutate(state: SessionState) -> None:
-        # 1:1 model: overwrite UUID directly (no accumulation)
-        state.confirmed.claude_session_id = session_id
-        state.confirmed.transcript_path = str(transcript_path)
-        state.confirmed.confirmed_at = now_iso()
-        if state.confirmed.confirmed_by is None:
-            state.confirmed.confirmed_by = "cli:launch:inferred"
-
-    # Preflight: if the session was deleted while Claude ran, skip the backfill.
-    # Entering store.update() would make the lock layer recreate the session dir
-    # to hold its lockfile (file_lock mkdir-parents), resurrecting a deleted
-    # session as a lock-only directory.
-    if not store.exists():
-        logger.debug("Skipping launch confirmation: session %r manifest already removed", manifest.name)
-        return
-
-    try:
-        store.update(timeout_s=5.0, mutate=_mutate)
-    except SessionFileNotFoundError:
-        # Deleted in the narrow window between the exists() check and the locked
-        # read; degrade quietly (no traceback).
-        logger.debug("Skipping launch confirmation: session %r manifest removed mid-run", manifest.name)
-
-
 def _resolve_manifest_prompt_file(manifest: SessionState) -> Path | None:
     """Resolve a session's configured system prompt file, if any."""
     if manifest.intent.system_prompt is None or manifest.intent.system_prompt.file is None:
@@ -336,14 +295,10 @@ def _is_legacy_flat_transfer_path(path: Path) -> bool:
 def _validate_resume_mode(_ctx: click.Context, _param: click.Parameter, value: str | None) -> str | None:
     """Validate ``--resume-mode``; the flag is optional, so pass ``None`` through.
 
-    Accepts ``native`` / ``transfer``. The old value ``handoff`` was renamed to
-    ``transfer``; reject it with actionable guidance rather than Click's generic
-    "invalid choice" error.
+    Accepts ``native`` / ``transfer``.
     """
     if value is None:
         return None
-    if value == "handoff":
-        raise click.BadParameter("'handoff' was renamed to 'transfer'. Use --resume-mode transfer.")
     if value not in {"native", "transfer"}:
         raise click.BadParameter(f"{value!r} is not one of 'native', 'transfer'.")
     return value
@@ -538,7 +493,31 @@ def _launch_claude_for_session(
 
         from forge.runtime_config import get_runtime_config
 
-        sidecar_image = image or get_runtime_config().sidecar_image
+        _runtime_config = get_runtime_config()
+        _omit_interactive_key = _runtime_config.interactive_anthropic_api_key == "omit"
+        if _omit_interactive_key:
+            # Sidecar bypasses build_claude_env's interactive finalizer, so honor omit
+            # here. The flag tells entrypoint.sh to drop ANTHROPIC_API_KEY for the
+            # Claude process only -- AFTER the in-container proxy captured its upstream
+            # credential -- so Claude routes through the proxy without a real key while
+            # the proxy keeps upstream auth (works for anthropic-upstream templates too).
+            container_env["FORGE_OMIT_INTERACTIVE_KEY"] = "1"
+
+        # Launch metadata for the in-container child: omit withholds the key; otherwise
+        # the child sees whatever container_env carries (host env or a template secret),
+        # so availability is read from container_env, not the host's resolution.
+        if _omit_interactive_key:
+            _sidecar_key = InteractiveApiKeyDecision(available=False, source="omitted_by_config")
+        else:
+            _has_container_key = bool(container_env.get("ANTHROPIC_API_KEY"))
+            _sidecar_key = InteractiveApiKeyDecision(
+                available=_has_container_key, source="env" if _has_container_key else "none"
+            )
+        record_launch_confirmed(
+            store, routing_mode="proxy", proxy_id=proxy_id, base_url=runtime_base_url, decision=_sidecar_key
+        )
+
+        sidecar_image = image or _runtime_config.sidecar_image
         console.print("[cyan]Starting sidecar session in container[/cyan]")
         console.print(f"  Image: {sidecar_image}")
         # Preflight: surface the active intercept mode + that audit is host-visible,
@@ -608,6 +587,17 @@ def _launch_claude_for_session(
                 proxy_id = _entry.proxy_id
         except Exception:
             logger.debug("proxy_id recovery from base_url failed", exc_info=True)
+
+    # Record launch facts for the status line: route + the api-key posture the child
+    # will end up with. compute mirrors what build_claude_env's interactive finalizer
+    # applies (both resolve from os.environ/config), so this matches the child env.
+    record_launch_confirmed(
+        store,
+        routing_mode=_routing_mode_for(runtime_base_url, proxy_id),
+        proxy_id=proxy_id,
+        base_url=runtime_base_url,
+        decision=compute_interactive_api_key_decision(interactive=True),
+    )
 
     if runtime_base_url is None:
         # Direct mode: apply explicit --model or fall back to default_direct_model

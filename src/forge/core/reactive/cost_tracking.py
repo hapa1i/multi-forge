@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Any
 
 from forge.core.paths import get_forge_home
+from forge.core.state import decode_json_object
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +41,9 @@ class ProxyCostDelta:
     output_tokens: int = 0
     cached_tokens: int = 0
     request_count: int = 0
+    # Count of requests that reported a cost in the window. Distinguishes a real
+    # reported $0 from "no dollar evidence" — cost_micros is 0 in both cases.
+    reported_request_count: int = 0
 
 
 @dataclass
@@ -48,9 +52,10 @@ class VerbCostResult:
 
     Also serves as the holder ``track_verb_cost`` yields: it is populated in
     place on context exit, so a caller can read the (estimated) delta for usage
-    attribution. ``measured`` is True only when at least one proxy snapshot delta
-    was captured; a direct/no-proxy verb leaves it False (zero cost means "no
-    figure," not "measured $0").
+    attribution. ``measured`` is True when a proxy snapshot delta was captured
+    (tokens are real); ``cost_measured`` is True only when the window also had a
+    reported-cost request — so a passthrough verb (tokens but no reported cost)
+    is ``measured`` yet not ``cost_measured`` (its $0 is "no figure," not a real $0).
     """
 
     verb: str
@@ -62,6 +67,7 @@ class VerbCostResult:
     duration_ms: float = 0.0
     estimated: bool = True
     measured: bool = False
+    cost_measured: bool = False
     per_proxy: list[ProxyCostDelta] = field(default_factory=list)
 
 
@@ -86,13 +92,21 @@ def _compute_delta(before: dict[str, Any], after: dict[str, Any], base_url: str)
     b_costs = before.get("costs", {})
     a_costs = after.get("costs", {})
 
+    # Clamp every delta at >= 0. A proxy restart/reset between the before/after
+    # snapshots makes `after < before`, which would otherwise log a negative
+    # "spend"/token delta -- and a negative cost delta inflates the unattributed
+    # "Interactive" residual in `forge proxy costs show`. A reset means "no attributable
+    # delta for this verb," not negative usage.
     return ProxyCostDelta(
         base_url=base_url,
-        cost_micros=a_costs.get("total_micros", 0) - b_costs.get("total_micros", 0),
-        input_tokens=a_tokens.get("input", 0) - b_tokens.get("input", 0),
-        output_tokens=a_tokens.get("output", 0) - b_tokens.get("output", 0),
-        cached_tokens=a_tokens.get("cached", 0) - b_tokens.get("cached", 0),
-        request_count=after.get("total_requests", 0) - before.get("total_requests", 0),
+        cost_micros=max(0, a_costs.get("total_micros", 0) - b_costs.get("total_micros", 0)),
+        input_tokens=max(0, a_tokens.get("input", 0) - b_tokens.get("input", 0)),
+        output_tokens=max(0, a_tokens.get("output", 0) - b_tokens.get("output", 0)),
+        cached_tokens=max(0, a_tokens.get("cached", 0) - b_tokens.get("cached", 0)),
+        request_count=max(0, after.get("total_requests", 0) - before.get("total_requests", 0)),
+        reported_request_count=max(
+            0, a_costs.get("reported_request_count", 0) - b_costs.get("reported_request_count", 0)
+        ),
     )
 
 
@@ -107,6 +121,7 @@ def _log_verb_cost(result: VerbCostResult) -> None:
         "verb": result.verb,
         "total_cost_micros": result.total_cost_micros,
         "estimated": result.estimated,
+        "cost_measured": result.cost_measured,
         "input_tokens": result.input_tokens,
         "output_tokens": result.output_tokens,
         "cached_tokens": result.cached_tokens,
@@ -255,8 +270,11 @@ def track_verb_cost(verb: str, proxy_base_urls: list[str]):
                 holder.request_count = sum(d.request_count for d in deltas)
                 holder.estimated = True
                 # measured=True only when a real snapshot delta was captured, so callers
-                # can tell "no proxy / no data" (cost is None) from a genuine $0 delta.
+                # can tell "no proxy / no data" from a captured window.
                 holder.measured = bool(deltas)
+                # cost_measured=True only when the window had a reported-cost request, so
+                # a tokens-only passthrough verb reports cost-unavailable, not a fake $0.
+                holder.cost_measured = sum(d.reported_request_count for d in deltas) > 0
                 holder.per_proxy = deltas
                 _log_verb_cost(holder)
             except Exception as e:
@@ -277,12 +295,8 @@ def read_verb_logs(
         try:
             with open(path) as f:
                 for line in f:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    try:
-                        record = json.loads(line)
-                    except json.JSONDecodeError:
+                    record = decode_json_object(line)
+                    if record is None:
                         continue
 
                     if period_start or period_end:

@@ -49,6 +49,11 @@ CTX_WARN = "\033[38;5;173m"  # burnt orange (75-89%)
 CTX_CRIT = "\033[38;5;167m"  # hot coral (90-100%)
 BOLD = "\033[1m"
 
+# "Resets in" marker, bound inline to a rate-limit window (e.g. ``7d:52%↻1d``) so the
+# countdown can't be misread as the trailing session duration. U+21BB is a symbol, not
+# an emoji, so the normalize-text hook leaves it intact.
+RESET_GLYPH = "↻"  # ↻
+
 # Per-tier model colors (Option 4: navy family)
 # 1M variants use a deeper shade of the same hue
 TIER_HAIKU = "\033[38;5;67m"  # steel blue
@@ -983,38 +988,48 @@ def format_native_sandbox() -> str | None:
     return None
 
 
-def _extract_short_window(rate_limits: Any) -> dict[str, Any] | None:
-    """Return the shortest-window dict from either Claude Code rate_limits shape.
+def _extract_windows(rate_limits: Any) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+    """Return ``(five_hour, seven_day)`` windows from either Claude Code shape.
 
     Current payload is an object ``{five_hour: {...}, seven_day: {...}}``; older
-    payloads were a list of ``{type, used_percentage, resets_at}`` entries. The
-    5h window is preferred (it's the one users hit). Returns None for anything
-    that isn't a recognizable rate-limit container (a bare dict without the
-    object keys is rejected, not guessed).
+    payloads were a list of ``{type, used_percentage, resets_at}`` entries. Either
+    window may be absent (``None``). Returns ``(None, None)`` for anything that
+    isn't a recognizable rate-limit container (a bare dict without the object keys
+    is rejected, not guessed). A legacy untyped single-entry list is treated as
+    the 5h window (the prior fallback).
     """
     if isinstance(rate_limits, dict):
-        for key in ("five_hour", "seven_day"):
-            window = rate_limits.get(key)
-            if isinstance(window, dict):
-                return window
-        return None
+        five_obj = rate_limits.get("five_hour")
+        seven_obj = rate_limits.get("seven_day")
+        return (
+            five_obj if isinstance(five_obj, dict) else None,
+            seven_obj if isinstance(seven_obj, dict) else None,
+        )
 
     if isinstance(rate_limits, list):
+        five: dict[str, Any] | None = None
+        seven: dict[str, Any] | None = None
+        untyped: dict[str, Any] | None = None
         for entry in rate_limits:
             if not isinstance(entry, dict):
                 continue
-            window_type = str(entry.get("type", ""))
-            if "5" in window_type or "hour" in window_type.lower():
-                return entry
-        first = rate_limits[0] if rate_limits else None
-        return first if isinstance(first, dict) else None
+            window_type = str(entry.get("type", "")).lower()
+            if "7" in window_type or "day" in window_type or "week" in window_type:
+                seven = seven or entry
+            elif "5" in window_type or "hour" in window_type:
+                five = five or entry
+            elif untyped is None:
+                untyped = entry
+        if five is None and seven is None:
+            five = untyped
+        return five, seven
 
     logger.debug("rate_limits unexpected type: %s", type(rate_limits).__name__)
-    return None
+    return None, None
 
 
 def _format_reset_countdown(resets_at: Any, now: float | None = None) -> str | None:
-    """Compact 'time until reset' (e.g. ``2h``/``5m``) from an ISO or epoch value.
+    """Compact 'time until reset' (e.g. ``3d``/``2h``/``5m``) from an ISO or epoch value.
 
     Returns None when absent, already elapsed, or unparseable (fail-open).
     """
@@ -1043,9 +1058,49 @@ def _format_reset_countdown(resets_at: Any, now: float | None = None) -> str | N
     if remaining > 8 * 86400:
         return None
     hours = int(remaining // 3600)
+    if hours >= 24:
+        return f"{int(remaining // 86400)}d"
     if hours >= 1:
         return f"{hours}h"
     return f"{max(1, int(remaining // 60))}m"
+
+
+def _heat_color(percent: float) -> str:
+    """Heat-map a 0-100 usage percentage onto the shared context gradient.
+
+    Reuses the ``CTX_*`` palette (soft green → warm → hot) so quota burn reads
+    like the context bar. Bands follow the palette's documented intent
+    (<25 / 25-49 / 50-74 / 75-89 / 90-100), NOT the context bar's
+    auto-compact-skewed thresholds — a quota has no auto-compact, so 100% is the
+    real wall.
+    """
+    if percent >= 90:
+        return CTX_CRIT
+    if percent >= 75:
+        return CTX_WARN
+    if percent >= 50:
+        return CTX_HIGH
+    if percent >= 25:
+        return CTX_MED
+    return CTX_LOW
+
+
+def _format_window_entry(label: str, window: dict[str, Any]) -> tuple[str, float, Any] | None:
+    """Render one labeled, heat-mapped window (``5h:34%``) or None if no valid pct.
+
+    Returns ``(rendered, used_pct, resets_at)`` so the caller can pick the
+    higher-pressure window for the reset countdown.
+    """
+    used_pct = window.get("used_percentage")
+    if used_pct is None:
+        return None
+    try:
+        pct_float = float(used_pct)
+    except (TypeError, ValueError):
+        logger.debug("rate_limits used_percentage unexpected value: %r", used_pct)
+        return None
+    rendered = f"{DIM}{label}:{RESET}{_heat_color(pct_float)}{int(pct_float)}%{RESET}"
+    return rendered, pct_float, window.get("resets_at")
 
 
 def format_rate_limits(
@@ -1055,44 +1110,40 @@ def format_rate_limits(
     show_reset: bool = False,
     now: float | None = None,
 ) -> str | None:
-    """Format rate-limit usage from Claude Code's rate_limits field.
+    """Format quota burn from Claude Code's rate_limits field.
 
-    Shows the shortest window (5h) — the one users hit — as ``RL:N%``. Handles
-    both the object and legacy list payload shapes. Skipped in proxy mode (the
-    proxy has its own rate limits). With ``show_reset`` a compact reset countdown
-    is appended when available. Color thresholds: green <50%, yellow 50-80%,
-    red >80%.
+    Shows both windows when present — ``5h:N% · 7d:M%`` — each heat-mapped on the
+    shared context gradient (soft green → hot coral) by its own usage, so the
+    binding limit lights up while the calmer window stays green. The ``5h``/``7d``
+    labels are self-describing, so no segment prefix is added. Handles the object
+    and legacy list payload shapes. Skipped in proxy mode (the proxy has its own
+    rate limits). With ``show_reset`` a reset countdown is bound INLINE to the
+    higher-pressure window (``7d:52%↻1d``) so it can't be misread as the trailing
+    session duration.
     """
     if is_proxy or not rate_limits:
         return None
 
-    window = _extract_short_window(rate_limits)
-    if window is None:
+    five, seven = _extract_windows(rate_limits)
+    entries = [
+        entry
+        for label, window in (("5h", five), ("7d", seven))
+        if window is not None and (entry := _format_window_entry(label, window)) is not None
+    ]
+    if not entries:
         return None
 
-    used_pct = window.get("used_percentage")
-    if used_pct is None:
-        return None
-    try:
-        used_pct_float = float(used_pct)
-    except (TypeError, ValueError):
-        logger.debug("rate_limits used_percentage unexpected value: %r", used_pct)
-        return None
-
-    pct = int(used_pct_float)
-    if used_pct_float > 80:
-        color = RED_BOLD
-    elif used_pct_float >= 50:
-        color = YELLOW
-    else:
-        color = GREEN
-
-    label = f"{DIM}RL:{RESET}{color}{pct}%{RESET}"
-    if show_reset:
-        countdown = _format_reset_countdown(window.get("resets_at"), now)
-        if countdown:
-            label += f"{DIM} {countdown}{RESET}"
-    return label
+    # Bind the countdown to the window under most pressure (the binding limit),
+    # inline after its percentage — never as a trailing token.
+    binding = max(range(len(entries)), key=lambda i: entries[i][1]) if show_reset else -1
+    parts: list[str] = []
+    for i, (rendered, _, resets_at) in enumerate(entries):
+        if i == binding:
+            countdown = _format_reset_countdown(resets_at, now)
+            if countdown:
+                rendered += f"{DIM}{RESET_GLYPH}{countdown}{RESET}"
+        parts.append(rendered)
+    return f"{DIM} · {RESET}".join(parts)
 
 
 def format_billing_cost(
@@ -1106,9 +1157,10 @@ def format_billing_cost(
 
     ``subscription``/``ambiguous`` show the 5h quota instead of dollars (which are
     a phantom figure on a subscription). When no quota data is available,
-    ``ambiguous`` hedges with ``≈$X.XX`` (we inferred subscription from a missing
-    ANTHROPIC_API_KEY but aren't certain); an explicit ``subscription`` shows no
-    dollar figure at all. Duration is always appended when present.
+    ``ambiguous`` (the ``auto`` default — billing is undeclared and never inferred
+    from an API key) hedges with ``≈$X.XX`` to flag the figure as uncertain; an
+    explicit ``subscription`` shows no dollar figure at all. Duration is always
+    appended when present.
     """
     parts: list[str] = []
     quota = format_rate_limits(rate_limits, is_proxy=False, show_reset=True, now=now)
@@ -1223,6 +1275,60 @@ def format_spend_cap(caps: dict[str, Any]) -> str | None:
     pct, marker, cur, lim = binding
     color = RED if pct >= 90 else YELLOW if pct >= 75 else METRICS_COLOR
     return f"{DIM}cap:{RESET}{color}{marker} {_fmt_cap_money(cur)}/{_fmt_cap_money(lim)} ({int(pct)}%){RESET}"
+
+
+_LAUNCH_KEY_LABELS = {
+    "env": "env",
+    "credential_file": "file",
+    "none": "none",
+    "omitted_by_config": "omit",
+}
+
+
+def format_launch(launch: dict[str, Any]) -> str | None:
+    """Render ``confirmed.launch`` as ``<route>·key:<posture>`` (e.g. ``proxy:p1·key:env``).
+
+    Describes how the interactive session reached the model and whether an API key
+    was made available to it — the honest auth breadcrumb the status line needs
+    (``omit`` means Forge deliberately withheld the key, so a key in the ambient
+    env is not the payer). Shape-defensive: returns None when nothing is showable.
+    """
+    routing_mode = launch.get("routing_mode")
+    proxy_id = launch.get("proxy_id")
+    if routing_mode == "proxy":
+        route = f"proxy:{proxy_id}" if proxy_id else "proxy"
+    elif routing_mode == "custom_base_url":
+        route = "custom"
+    elif routing_mode == "direct":
+        route = "direct"
+    else:
+        route = None
+
+    source = launch.get("api_key_source")
+    key_label = _LAUNCH_KEY_LABELS.get(source) if isinstance(source, str) else None
+
+    parts: list[str] = []
+    if route:
+        parts.append(f"{TEMPLATE_COLOR}{route}{RESET}")
+    if key_label:
+        parts.append(f"{DIM}key:{RESET}{METRICS_COLOR}{key_label}{RESET}")
+    if not parts:
+        return None
+    return f"{DIM}·{RESET}".join(parts)
+
+
+def format_forge_cost(micros: int | None) -> str | None:
+    """Render Forge's *additional* headless cost for the session as ``forge +$X.XX``.
+
+    Visually distinct from Claude's native ``cost`` segment via the ``forge +``
+    prefix — this is what Forge spent on top of the interactive harness (memory
+    writer, supervisor, review fan-out), reported-or-nothing. ``None`` or a
+    non-positive value renders nothing (a not-yet-measured or no-cost session shows
+    no segment rather than a misleading ``+$0.00``).
+    """
+    if micros is None or micros <= 0:
+        return None
+    return f"{DIM}forge{RESET} {METRICS_COLOR}+{_fmt_dollars(micros / 1_000_000)}{RESET}"
 
 
 def format_token_breakdown(input_tokens: int, output_tokens: int, cached_tokens: int) -> str | None:
@@ -1577,6 +1683,7 @@ def status_line() -> None:
         manifest=session_manifest,
         is_session_authoritative=is_session_authoritative,
         config=config,
+        forge_root=os.environ.get("FORGE_FORGE_ROOT"),
     )
     where, stream = render_segments(ctx, config.statusline.segments)
 

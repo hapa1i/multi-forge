@@ -76,8 +76,8 @@ class TestBackendCLI:
         config_dir = isolated_forge_home / "backends" / "litellm"
         assert config_dir.exists()
 
-        # Delete with --force to skip confirmation
-        result = runner.invoke(main, ["backend", "delete", "litellm", "--force"])
+        # Delete with --yes to skip confirmation
+        result = runner.invoke(main, ["backend", "delete", "litellm", "--yes"])
         assert result.exit_code == 0
         assert "Deleted" in result.output
         assert not config_dir.exists()
@@ -85,7 +85,7 @@ class TestBackendCLI:
     def test_backend_delete_nonexistent_errors(self, isolated_forge_home: Path) -> None:
         """Verify backend delete errors for nonexistent backend."""
         runner = CliRunner()
-        result = runner.invoke(main, ["backend", "delete", "litellm", "--force"])
+        result = runner.invoke(main, ["backend", "delete", "litellm", "--yes"])
 
         assert result.exit_code == 1
         assert "not found" in result.output.lower()

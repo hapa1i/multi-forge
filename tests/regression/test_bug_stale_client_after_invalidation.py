@@ -98,7 +98,8 @@ async def test_bug_litellm_client_reset_on_auth_failure_complete() -> None:
     """LiteLLMClient.complete() auth path (litellm.py line ~465)."""
     client = _make_litellm_client()
     mock_openai = _inject_mock_client(client)
-    mock_openai.chat.completions.create = AsyncMock(side_effect=Exception("unauthorized"))
+    # Non-streaming LiteLLM reads the response-cost header via with_raw_response.
+    mock_openai.chat.completions.with_raw_response.create = AsyncMock(side_effect=Exception("unauthorized"))
 
     with pytest.raises(Exception, match="unauthorized"):
         await client.complete([Message(role="user", content="test")])
@@ -139,7 +140,8 @@ async def test_bug_litellm_client_reset_on_auth_failure_stream_responses_api() -
     """
     client = _make_litellm_client("openai/gpt-5-pro")
     mock_openai = _inject_mock_client(client)
-    mock_openai.responses.create = AsyncMock(side_effect=Exception("unauthorized request"))
+    # Responses API non-streaming also reads the header via with_raw_response.
+    mock_openai.responses.with_raw_response.create = AsyncMock(side_effect=Exception("unauthorized request"))
 
     events = []
     async for event in client.stream([Message(role="user", content="test")]):
@@ -173,7 +175,7 @@ async def test_bug_litellm_client_not_reset_on_non_auth_error() -> None:
     """Non-auth errors must not clear the LiteLLM client."""
     client = _make_litellm_client()
     mock_openai = _inject_mock_client(client)
-    mock_openai.chat.completions.create = AsyncMock(side_effect=Exception("rate limit exceeded"))
+    mock_openai.chat.completions.with_raw_response.create = AsyncMock(side_effect=Exception("rate limit exceeded"))
 
     with pytest.raises(Exception, match="rate limit"):
         await client.complete([Message(role="user", content="test")])

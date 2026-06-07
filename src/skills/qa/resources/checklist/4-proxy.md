@@ -36,14 +36,14 @@ forge proxy template list
 
 ```bash
 # Clean up from previous runs
-forge proxy delete "$FORGE_QA_GEMINI_PROXY" --force 2>/dev/null || true
-forge proxy delete "$FORGE_QA_OPENAI_PROXY" --force 2>/dev/null || true
-forge proxy delete "$FORGE_QA_ANTHROPIC_PROXY" --force 2>/dev/null || true
-forge proxy delete openrouter-gemini --force 2>/dev/null || true
-forge proxy delete openrouter-openai --force 2>/dev/null || true
-forge proxy delete openrouter-deepseek --force 2>/dev/null || true
-forge proxy delete openrouter-minimax --force 2>/dev/null || true
-forge proxy delete test-proxy-nostart --force 2>/dev/null || true
+forge proxy delete "$FORGE_QA_GEMINI_PROXY" --yes 2>/dev/null || true
+forge proxy delete "$FORGE_QA_OPENAI_PROXY" --yes 2>/dev/null || true
+forge proxy delete "$FORGE_QA_ANTHROPIC_PROXY" --yes 2>/dev/null || true
+forge proxy delete openrouter-gemini --yes 2>/dev/null || true
+forge proxy delete openrouter-openai --yes 2>/dev/null || true
+forge proxy delete openrouter-deepseek --yes 2>/dev/null || true
+forge proxy delete openrouter-minimax --yes 2>/dev/null || true
+forge proxy delete test-proxy-nostart --yes 2>/dev/null || true
 
 # Create named role proxies used by downstream session/review steps.
 forge proxy create "$FORGE_QA_GEMINI_TEMPLATE" --name "$FORGE_QA_GEMINI_PROXY"
@@ -144,7 +144,7 @@ In the **container shell**, create a session bound to a proxy, then launch Claud
 
 ```
 # Clean up from previous runs
-forge session delete proxy-session --yes --force 2>/dev/null || true
+forge session delete proxy-session --yes --yes 2>/dev/null || true
 
 # Create a session bound to the proxy created in 4.2 (accepts proxy_id or template name)
 forge session start proxy-session --proxy "$FORGE_QA_OPENAI_PROXY" --no-launch
@@ -215,7 +215,7 @@ In the **container shell**:
 
 ```
 # Clean up from previous runs
-forge proxy delete delete-test-proxy --force 2>/dev/null || true
+forge proxy delete delete-test-proxy --yes 2>/dev/null || true
 
 # Create an alias on the same shared port as the QA OpenAI proxy
 forge proxy create "$FORGE_QA_OPENAI_TEMPLATE" --no-start --name delete-test-proxy
@@ -439,7 +439,7 @@ forge proxy template show openrouter-qwen
 
 ```bash
 # Clean up from previous runs
-forge proxy delete openrouter-test --force 2>/dev/null || true
+forge proxy delete openrouter-test --yes 2>/dev/null || true
 
 # Create an OpenRouter proxy without starting it (no OPENROUTER_API_KEY needed for config-only)
 forge proxy create openrouter-anthropic --name openrouter-test --no-start
@@ -472,7 +472,7 @@ forge proxy show openrouter-test --raw | grep -A3 model_alternatives
 echo "---"
 
 # Clean up
-forge proxy delete openrouter-test --force 2>/dev/null || true
+forge proxy delete openrouter-test --yes 2>/dev/null || true
 ```
 
 - [ ] Template YAML includes `model_alternatives` section under opus tier
@@ -512,8 +512,8 @@ forge proxy audit diff
 
 ```bash
 # Clean up from previous runs
-forge proxy delete intercept-test --force 2>/dev/null || true
-forge proxy delete passthrough-test --force 2>/dev/null || true
+forge proxy delete intercept-test --yes 2>/dev/null || true
+forge proxy delete passthrough-test --yes 2>/dev/null || true
 
 # A translated proxy (openai_translated wire shape), config-only.
 forge proxy create openrouter-openai --name intercept-test --no-start
@@ -536,8 +536,8 @@ forge proxy show passthrough-test --raw | grep -E "wire_shape|default_port|port:
 forge proxy set passthrough-test intercept.mode=override 2>&1; echo "OVERRIDE_OK_EXIT=$?"
 
 # Clean up
-forge proxy delete intercept-test --force 2>/dev/null || true
-forge proxy delete passthrough-test --force 2>/dev/null || true
+forge proxy delete intercept-test --yes 2>/dev/null || true
+forge proxy delete passthrough-test --yes 2>/dev/null || true
 ```
 
 - [ ] `forge proxy set intercept-test intercept.mode=inspect` succeeds on the translated proxy

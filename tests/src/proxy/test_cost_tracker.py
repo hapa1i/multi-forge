@@ -12,6 +12,17 @@ import pytest
 from forge.proxy.cost_tracker import CostTracker
 
 
+class TestParseRecordGuard:
+    """`_parse_record` skips valid-but-non-object JSON lines (returns None)."""
+
+    @pytest.mark.parametrize("bad_line", ["[]", "1", '"x"', "null", "true"])
+    def test_parse_record_skips_non_object_line(self, bad_line: str) -> None:
+        # Exercised directly: bootstrap_from_logs wraps _parse_record in a broad
+        # `except Exception: continue`, so a bootstrap-level test passes even with
+        # the bug present. The direct call is what proves the guard exists.
+        assert CostTracker._parse_record(bad_line) is None
+
+
 class TestCostTrackerBasic:
     def test_no_caps_never_exceeded(self):
         t = CostTracker()
@@ -19,8 +30,8 @@ class TestCostTrackerBasic:
             t.record(1_000_000)
         assert not t.check_cap().exceeded
 
-    def test_daily_cap_post_mode(self):
-        t = CostTracker(daily_cap_usd=1.00, cap_mode="post")
+    def test_daily_cap_blocks_when_exceeded(self):
+        t = CostTracker(daily_cap_usd=1.00)
         t.record(500_000)
         assert not t.check_cap().exceeded
 
@@ -28,10 +39,9 @@ class TestCostTrackerBasic:
         result = t.check_cap()
         assert result.exceeded
         assert result.cap_type == "daily"
-        assert not result.projected
 
-    def test_monthly_cap_post_mode(self):
-        t = CostTracker(monthly_cap_usd=5.00, cap_mode="post")
+    def test_monthly_cap_blocks_when_exceeded(self):
+        t = CostTracker(monthly_cap_usd=5.00)
         t.record(4_000_000)
         assert not t.check_cap().exceeded
 
@@ -40,29 +50,8 @@ class TestCostTrackerBasic:
         assert result.exceeded
         assert result.cap_type == "monthly"
 
-    def test_strict_mode_blocks_projected(self):
-        t = CostTracker(daily_cap_usd=1.00, cap_mode="strict")
-        t.record(800_000)
-        assert not t.check_cap().exceeded
-
-        result = t.check_cap(projected_cost_micros=300_000)
-        assert result.exceeded
-        assert result.projected
-
-    def test_strict_mode_allows_under_projection(self):
-        t = CostTracker(daily_cap_usd=1.00, cap_mode="strict")
-        t.record(800_000)
-        result = t.check_cap(projected_cost_micros=100_000)
-        assert not result.exceeded
-
-    def test_post_mode_ignores_projected(self):
-        t = CostTracker(daily_cap_usd=1.00, cap_mode="post")
-        t.record(800_000)
-        result = t.check_cap(projected_cost_micros=500_000)
-        assert not result.exceeded
-
     def test_daily_checked_before_monthly(self):
-        t = CostTracker(daily_cap_usd=1.00, monthly_cap_usd=100.00, cap_mode="post")
+        t = CostTracker(daily_cap_usd=1.00, monthly_cap_usd=100.00)
         t.record(1_500_000)
         result = t.check_cap()
         assert result.exceeded
@@ -72,6 +61,27 @@ class TestCostTrackerBasic:
         assert not CostTracker().has_caps
         assert CostTracker(daily_cap_usd=1.0).has_caps
         assert CostTracker(monthly_cap_usd=5.0).has_caps
+
+    def test_record_none_is_skipped(self):
+        """Unavailable cost (None) advances no aggregate and never raises.
+
+        Caps account for cost-reported requests only; a None would otherwise
+        raise TypeError at the `<= 0` guard.
+        """
+        t = CostTracker(daily_cap_usd=1.00)
+        t.record(None)
+        assert t.daily_spend_micros() == 0
+        assert t.monthly_spend_micros() == 0
+        assert not t.check_cap().exceeded
+
+    def test_parse_record_skips_null_cost(self):
+        """A valid record whose cost_micros is null is skipped (cost unavailable).
+
+        Direct call (deterministic, no month-window dependency): int(None) would
+        otherwise raise, and the unavailable cost must never advance caps.
+        """
+        line = json.dumps({"ts": "2026-06-01T00:00:00Z", "cost_micros": None, "proxy_id": "p"})
+        assert CostTracker._parse_record(line) is None
 
 
 class TestCapSummary:

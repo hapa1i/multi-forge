@@ -29,12 +29,16 @@ from .ledger import (
     prune_usage_events,
     read_usage_events,
 )
+from .vocabulary import Confidence, Reporter, Route
 
 __all__ = [
     "USAGE_SCHEMA_VERSION",
     "AttributionGranularity",
     "BillingMode",
+    "Confidence",
     "MeasurementSource",
+    "Reporter",
+    "Route",
     "SourceRefs",
     "UsageEvent",
     "emit_direct_llm_usage",

@@ -35,6 +35,8 @@ class TestLogRequestCost:
             latency_ms=1200.5,
             failed=False,
             request_id="req_abc123",
+            reporter="openrouter",
+            confidence="reported",
         )
 
         assert cost_log_dir.is_dir()
@@ -53,11 +55,60 @@ class TestLogRequestCost:
         assert record["output_tokens"] == 800
         assert record["cached_tokens"] == 500
         assert record["cost_micros"] == 16500
-        assert record["estimated"] is True
-        assert record["pricing_source"] == "catalog"
+        # Provenance replaces the old always-estimated / pricing_source pair.
+        assert record["reporter"] == "openrouter"
+        assert record["confidence"] == "reported"
+        assert "estimated" not in record
+        assert "pricing_source" not in record
         assert record["failed"] is False
         assert record["request_id"] == "req_abc123"
         assert record["ts"].endswith("Z")
+
+    def test_unavailable_cost_is_none_not_zero(self, cost_log_dir: Path):
+        """No reported cost → cost_micros is None (not 0); tokens still recorded."""
+        log_request_cost(
+            proxy_id="anthropic-passthrough",
+            model="claude-opus-4-6",
+            tier="opus",
+            input_tokens=1200,
+            output_tokens=300,
+            cached_tokens=0,
+            cost_micros=None,
+            latency_ms=900.0,
+            failed=False,
+            request_id="req_unavail",
+            reporter=None,
+            confidence="unavailable",
+        )
+
+        records = read_cost_logs()
+        assert len(records) == 1
+        record = records[0]
+        assert record["cost_micros"] is None
+        assert record["confidence"] == "unavailable"
+        assert record["reporter"] is None
+        # Tokens are preserved even when cost is unavailable.
+        assert record["input_tokens"] == 1200
+        assert record["output_tokens"] == 300
+
+    def test_default_provenance_is_unknown(self, cost_log_dir: Path):
+        """A caller that doesn't stamp provenance gets confidence='unknown'."""
+        log_request_cost(
+            proxy_id="p",
+            model="m",
+            tier="sonnet",
+            input_tokens=10,
+            output_tokens=5,
+            cached_tokens=0,
+            cost_micros=100,
+            latency_ms=10.0,
+            failed=False,
+            request_id="req_default",
+        )
+
+        record = read_cost_logs()[0]
+        assert record["confidence"] == "unknown"
+        assert record["reporter"] is None
 
     def test_appends_multiple_records(self, cost_log_dir: Path):
         for i in range(3):

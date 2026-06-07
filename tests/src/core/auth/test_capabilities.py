@@ -281,6 +281,9 @@ class TestFormatMissingCredentialError:
         msg = format_missing_credential_error(cred, missing_vars=["ANTHROPIC_API_KEY"])
         assert "supervisor" in msg
         assert "memory writer" in msg
+        # Bug #5: the anthropic-passthrough template requires ANTHROPIC_API_KEY
+        # (template_secrets.py), so it must appear in this credential's feature list.
+        assert "anthropic-passthrough" in msg
 
     def test_note_shown(self):
         cred = CREDENTIALS["anthropic-api"]

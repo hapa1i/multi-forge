@@ -114,7 +114,7 @@ print("ADDED_QA_TEMP_PRESET=1")
 PY
 
 # Reset to built-in defaults without prompting
-forge claude preset reset --force
+forge claude preset reset --yes
 
 # Verify temporary key removed and built-in env preserved
 python3 - <<'PY'
@@ -131,7 +131,7 @@ print("HAS_QA_TEMP_PRESET=" + str(has_qa_temp_preset))
 PY
 ```
 
-- [ ] `reset --force` restores the built-in preset non-interactively
+- [ ] `reset --yes` restores the built-in preset non-interactively
 - [ ] Custom preset additions are removed while built-in values remain
 
 ### 11.7 Edit Claude Preset in Editor

@@ -28,6 +28,31 @@ def verb_log_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return log_dir
 
 
+def _two_snapshot_urlopen(before_metrics: dict, after_metrics: dict):
+    """Return a urlopen stub yielding ``before`` then ``after`` proxy snapshots."""
+    snaps = [{"is_proxy": True, "metrics": before_metrics}, {"is_proxy": True, "metrics": after_metrics}]
+    call_count = 0
+
+    def mock_urlopen(url, timeout=None):
+        nonlocal call_count
+        data = snaps[0] if call_count == 0 else snaps[1]
+        call_count += 1
+
+        class MockResp:
+            def read(self):
+                return json.dumps(data).encode()
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                pass
+
+        return MockResp()
+
+    return mock_urlopen
+
+
 class TestComputeDelta:
     def test_basic_delta(self):
         before = {
@@ -57,6 +82,49 @@ class TestComputeDelta:
         delta = _compute_delta(snap, snap, "http://localhost:8084")
         assert delta.cost_micros == 0
         assert delta.request_count == 0
+
+    def test_reported_request_count_delta(self):
+        """reported_request_count delta distinguishes reported $0 from no evidence."""
+        before = {"total_requests": 2, "costs": {"total_micros": 0, "reported_request_count": 1}}
+        after = {"total_requests": 5, "costs": {"total_micros": 0, "reported_request_count": 3}}
+        delta = _compute_delta(before, after, "http://localhost:8084")
+        # Three requests happened; two of them reported a cost (here, a reported $0).
+        assert delta.request_count == 3
+        assert delta.reported_request_count == 2
+        assert delta.cost_micros == 0
+
+    def test_reported_request_count_absent_defaults_zero(self):
+        """Legacy snapshots without the evidence counter yield a 0 delta, not a crash."""
+        before = {"total_requests": 1, "costs": {"total_micros": 10}}
+        after = {"total_requests": 2, "costs": {"total_micros": 20}}
+        delta = _compute_delta(before, after, "http://localhost:8084")
+        assert delta.reported_request_count == 0
+
+    def test_clamps_negative_deltas_on_proxy_reset(self):
+        """A proxy restart/reset mid-verb (after < before) clamps every delta at 0.
+
+        A negative cost delta would otherwise be logged and inflate the unattributed
+        "Interactive" residual in `forge proxy costs`; tokens and request counters
+        must not go negative either. A reset means "no attributable delta," not
+        negative usage.
+        """
+        before = {
+            "total_requests": 10,
+            "tokens": {"input": 5000, "output": 2000, "cached": 1000},
+            "costs": {"total_micros": 100_000, "reported_request_count": 4},
+        }
+        after = {  # proxy restarted mid-verb: cumulative counters reset toward 0
+            "total_requests": 0,
+            "tokens": {"input": 0, "output": 0, "cached": 0},
+            "costs": {"total_micros": 0, "reported_request_count": 0},
+        }
+        delta = _compute_delta(before, after, "http://localhost:8084")
+        assert delta.cost_micros == 0
+        assert delta.input_tokens == 0
+        assert delta.output_tokens == 0
+        assert delta.cached_tokens == 0
+        assert delta.request_count == 0
+        assert delta.reported_request_count == 0
 
 
 class TestLogVerbCost:
@@ -232,6 +300,54 @@ class TestTrackVerbCost:
         assert records[0]["total_cost_micros"] == 75_000
         assert records[0]["request_count"] == 2
         assert records[0]["input_tokens"] == 1500
+
+    def test_cost_measured_true_when_reported_advances(self, verb_log_dir: Path):
+        """A window with a reported-cost request marks the verb cost_measured=True."""
+        before = {
+            "total_requests": 5,
+            "tokens": {"input": 1000},
+            "costs": {"total_micros": 50_000, "reported_request_count": 2},
+        }
+        after = {
+            "total_requests": 7,
+            "tokens": {"input": 2000},
+            "costs": {"total_micros": 120_000, "reported_request_count": 4},
+        }
+
+        with patch("forge.core.reactive.cost_tracking.urllib.request.urlopen", _two_snapshot_urlopen(before, after)):
+            with track_verb_cost("panel", ["http://localhost:8084"]):
+                pass
+
+        record = read_verb_logs()[0]
+        assert record["cost_measured"] is True
+        assert record["total_cost_micros"] == 70_000
+
+    def test_cost_measured_false_when_only_tokens_advance(self, verb_log_dir: Path):
+        """Passthrough verb: tokens/requests advance, no reported cost → cost_measured=False.
+
+        The proxy total_micros is reported-only (Step 1), so a passthrough window shows a
+        0 cost delta with reported_request_count unchanged — must not read as a measured $0.
+        """
+        before = {
+            "total_requests": 5,
+            "tokens": {"input": 1000},
+            "costs": {"total_micros": 0, "reported_request_count": 3},
+        }
+        after = {
+            "total_requests": 8,
+            "tokens": {"input": 4000},
+            "costs": {"total_micros": 0, "reported_request_count": 3},
+        }
+
+        with patch("forge.core.reactive.cost_tracking.urllib.request.urlopen", _two_snapshot_urlopen(before, after)):
+            with track_verb_cost("panel", ["http://localhost:8084"]):
+                pass
+
+        record = read_verb_logs()[0]
+        # Tokens/requests captured, but cost is not evidence-backed.
+        assert record["request_count"] == 3
+        assert record["input_tokens"] == 3000
+        assert record["cost_measured"] is False
 
 
 class TestResolveProxyUrls:

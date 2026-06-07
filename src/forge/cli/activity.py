@@ -1,8 +1,10 @@
-"""``forge usage`` — per-session Forge activity (supervisor checks, cost, tokens).
+"""``forge activity`` — per-session Forge *automation* activity (supervisor, memory
+writer, workflow verbs) + policy decisions. NOT your full interactive Claude usage.
 
 Reads the two already-captured planes (usage ledger + ``confirmed.policy.decisions``)
 via :func:`forge.core.ops.usage_summary.build_session_activity_summary` and renders a
-table. Estimated spend only — ``forge proxy costs`` stays the authoritative spend view.
+table. Cost is reported-or-estimated (best-effort attribution) — ``forge proxy costs show``
+stays the authoritative spend view.
 """
 
 from __future__ import annotations
@@ -29,22 +31,25 @@ from forge.core.ops.usage_summary import (
 console = Console()
 
 
-@click.command("usage")
+@click.command("activity")
 @click.argument("session", required=False)
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
 @click.option("--days", "-d", type=int, default=30, help="Look back this many days (default: 30)")
 @click.option("--all", "all_time", is_flag=True, help="Report all time (ignore --days)")
-def usage_cmd(session: str | None, as_json: bool, days: int, all_time: bool) -> None:
-    """Show what a session did with Forge: supervisor checks, cost, and tokens.
+def activity_cmd(session: str | None, as_json: bool, days: int, all_time: bool) -> None:
+    """Show Forge's automation activity for a session: supervisor checks, cost, tokens.
 
-    Reads the usage ledger and the session's policy-decision log. Cost is estimated;
-    'forge proxy costs' is the authoritative spend view.
+    This is what Forge did *on top of* your session — the supervisor, memory writer,
+    and workflow verbs (panel/debate/...) — plus policy decisions. It is **not** your
+    full interactive Claude usage. Reads the usage ledger and the session's
+    policy-decision log. Cost is reported-or-estimated (best-effort attribution);
+    'forge proxy costs show' is the authoritative spend view.
 
     \b
     Examples:
-        forge usage                  # current session ($FORGE_SESSION)
-        forge usage planner          # a named session (or Claude UUID)
-        forge usage --all --json     # full history, JSON
+        forge activity                  # current session ($FORGE_SESSION)
+        forge activity planner          # a named session (or Claude UUID)
+        forge activity --all --json     # full history, JSON
     """
     try:
         session_name, forge_root = resolve_session_identifier(session)
@@ -74,7 +79,11 @@ def _render(summary: SessionActivitySummary, *, days: int | None) -> None:
         console.print(f"[dim]No Forge activity for session '{summary.session}' ({scope}).[/dim]")
         return
 
-    console.print(f"\n[bold]Forge usage — {summary.session}[/bold] [dim]({scope})[/dim]")
+    console.print(f"\n[bold]Forge activity — {summary.session}[/bold] [dim]({scope})[/dim]")
+    console.print(
+        "[dim]Forge automation (supervisor, memory writer, workflow verbs) — "
+        "not your full interactive session.[/dim]"
+    )
 
     if summary.commands:
         # The Workers column only earns its width when a fan-out (panel/debate/...) ran;
@@ -111,7 +120,7 @@ def _render(summary: SessionActivitySummary, *, days: int | None) -> None:
     if summary.subagents:
         console.print(f"\n[bold]Subagents[/bold]: {summary.subagents}")
 
-    total_cost = f"~{_fmt_usd(summary.total_cost_micro_usd)} est" if summary.total_cost_micro_usd is not None else "n/a"
+    total_cost = f"~{_fmt_usd(summary.total_cost_micro_usd)}" if summary.total_cost_micro_usd is not None else "n/a"
     console.print(
         f"\n[dim]Total:[/dim] {summary.total_events} events · "
         f"{summary.total_input_tokens}/{summary.total_output_tokens} tok · {total_cost}"
@@ -124,12 +133,12 @@ def _render(summary: SessionActivitySummary, *, days: int | None) -> None:
 def _footnotes(summary: SessionActivitySummary) -> list[str]:
     notes: list[str] = []
     if summary.cost_partial:
-        notes.append("cost is estimated and partial (some calls report no cost)")
+        notes.append("cost is best-effort and partial (some calls report no cost)")
     if summary.policy is not None and summary.policy.log_capped:
         notes.append("policy decision log is at capacity — older decisions may not be shown")
     if summary.session_tagging_partial:
         notes.append("some calls (e.g. the action tagger) are not session-attributed")
-    notes.append("estimated; see 'forge proxy costs' for authoritative spend")
+    notes.append("cost is reported-or-estimated, best-effort; 'forge proxy costs show' is the authoritative spend view")
     return notes
 
 

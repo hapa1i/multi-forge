@@ -155,7 +155,15 @@ class TestRealClaudeMemory:
         assert event["session"] == session_name
         assert event["status"] == "success"
         assert event["attribution_granularity"] == "verb"
-        assert event["measurement_source"] == "unattributed"
+        # Phase 5: a direct (API-key, --bare) claude -p verb now self-reports cost via
+        # --output-format json (5a verdict: direct API key -> COST-REPORTED +
+        # USAGE-REPORTED), so the memory-writer verb is runtime_native / claude_code,
+        # not the pre-5 unattributed.
+        assert event["measurement_source"] == "runtime_native"
+        assert event["reporter"] == "claude_code"
+        assert event["confidence"] == "reported"
+        assert event["cost_micro_usd"] is not None  # cost was reported (north star: recorded, not estimated)
+        assert event["input_tokens"] is not None  # exact in-band tokens captured
         assert event["run_id"].startswith("run_")
         assert event["root_run_id"] == event["run_id"]
         assert event["parent_run_id"] is None

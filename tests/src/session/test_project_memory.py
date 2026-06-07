@@ -8,7 +8,6 @@ from forge.session.project_memory import (
     is_under_scan_roots,
     scan_passported_docs,
     scan_shadow_passports,
-    scan_stale_passports,
 )
 
 # ---------------------------------------------------------------------------
@@ -338,28 +337,3 @@ def test_collision_skips_malformed_unrelated(tmp_path):
     (tmp_path / "docs").mkdir(parents=True, exist_ok=True)
     (tmp_path / "docs/bad.md").write_text("---\nforge_memory:\n  version: not-an-int\n---\n# Body\n", encoding="utf-8")
     assert check_shadow_path_collision_in_roots(".forge/memory/x.md", "docs/b.md", tmp_path, ("docs/",)) is None
-
-
-def test_scan_stale_finds_removed_strategies(tmp_path):
-    """scan_stale_passports detects docs with removed strategies."""
-    (tmp_path / "docs").mkdir(parents=True, exist_ok=True)
-    (tmp_path / "docs/debug.md").write_text(
-        "---\nforge_memory:\n  version: 1\n  intent: debug notes\n"
-        "  update:\n    strategy: debugging\n---\n# Debug\n",
-        encoding="utf-8",
-    )
-    _write_doc(tmp_path, "docs/changelog.md", strategy="changelog")
-    stale = scan_stale_passports(tmp_path, ["docs/"])
-    assert len(stale) == 1
-    rel, strategy, hint = stale[0]
-    assert rel == "docs/debug.md"
-    assert strategy == "debugging"
-    assert "generic" in hint
-
-
-def test_scan_stale_ignores_valid_strategies(tmp_path):
-    """scan_stale_passports returns empty for valid strategies."""
-    _write_doc(tmp_path, "docs/changelog.md", strategy="changelog")
-    _write_doc(tmp_path, "docs/notes.md", strategy="generic")
-    stale = scan_stale_passports(tmp_path, ["docs/"])
-    assert stale == []

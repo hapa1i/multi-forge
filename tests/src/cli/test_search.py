@@ -147,14 +147,6 @@ class TestSearchCommand:
         assert "query" in result.output
         assert "rebuild-index" in result.output
 
-    def test_legacy_q_errors_with_replacement_tip(self, runner: CliRunner) -> None:
-        """The old group-level -q path is a tombstone, not a compatibility alias."""
-        result = runner.invoke(main, ["search", "-q", "timeout config", "-n", "5", "--scope", "all"])
-        assert result.exit_code != 0
-        assert "forge search -q was removed" in result.output
-        assert "Tip:" in result.output
-        assert "forge search query 'timeout config' -n 5 --scope all" in result.output
-
     def test_search_outputs_json(self, runner: CliRunner, populated_store: SearchDocumentStore) -> None:
         """Search outputs valid JSON with results (project scope, the default)."""
         result = runner.invoke(main, ["search", "query", "timeout"])

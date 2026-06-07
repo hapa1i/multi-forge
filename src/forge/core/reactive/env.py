@@ -158,6 +158,7 @@ def build_claude_env(
     extra_vars: dict[str, str] | None = None,
     direct: bool = False,
     derive_run_identity: bool = True,
+    interactive: bool = False,
 ) -> dict[str, str]:
     """Build environment dict for a Claude subprocess.
 
@@ -182,12 +183,22 @@ def build_claude_env(
             ``extra_vars`` untouched — used by interactive frontends that
             supply an explicit root identity (so the process IS the root, not
             a child of itself).
+        interactive: When True, skip the inline ANTHROPIC_API_KEY hydrate; the
+            interactive frontend calls ``apply_interactive_api_key`` as the final
+            step so the key policy (``interactive_anthropic_api_key``) wins over
+            ``extra_vars``. Orthogonal to ``derive_run_identity`` (auth omission is
+            not run-identity rooting). Headless callers leave this False.
 
     Returns:
         Complete environment dict ready for ``subprocess.run(env=...)``.
     """
     env = os.environ.copy()
-    _hydrate_credentials(env)
+    # Interactive launches finalize ANTHROPIC_API_KEY last (after extra_vars and
+    # unset_vars) via apply_interactive_api_key, so skip the early hydrate to avoid
+    # a redundant write the finalizer would only overwrite. Headless callers keep
+    # the inline hydrate so can_use_bare(env) and the subprocess agree.
+    if not interactive:
+        _hydrate_credentials(env)
 
     # Apply extra_vars AFTER hydration so explicit caller overrides
     # take precedence over credential-file values.
@@ -263,6 +274,74 @@ def _hydrate_credentials(env: dict[str, str]) -> None:
             env.pop(_BARE_AUTH_KEY, None)
     elif resolved and not env.get(_BARE_AUTH_KEY):
         env[_BARE_AUTH_KEY] = resolved
+
+
+@dataclass(frozen=True)
+class InteractiveApiKeyDecision:
+    """What an interactive Claude launch did with ANTHROPIC_API_KEY.
+
+    ``source`` is the provenance breadcrumb recorded in the session manifest:
+    ``env``/``credential_file`` (the child got the key from there), ``none`` (no
+    key anywhere), or ``omitted_by_config`` (``interactive_anthropic_api_key: omit``
+    withheld it). ``available`` is whether the child can see a key at all.
+    """
+
+    available: bool
+    source: str
+
+
+def _interactive_omit() -> bool:
+    """True when ``interactive_anthropic_api_key`` is ``omit`` (fail-safe to inherit)."""
+    try:
+        from forge.runtime_config import get_runtime_config
+
+        return get_runtime_config().interactive_anthropic_api_key == "omit"
+    except Exception as e:
+        logger.debug("Could not read interactive_anthropic_api_key; inheriting key: %s", e)
+        return False
+
+
+def _resolve_interactive_api_key(interactive: bool) -> tuple[str | None, str]:
+    """Resolve (value, source) for an interactive child's ANTHROPIC_API_KEY.
+
+    ``omit`` wins for interactive launches: returns ``(None, "omitted_by_config")``
+    so the key is withheld. Otherwise defers to the shared source-aware resolver
+    (which honors ``auth_ignore_env``). Resolving from os.environ/credential file --
+    never a caller's mutated env dict -- is what lets the launch-site recorder
+    reproduce the same decision the child env ends up with.
+    """
+    if interactive and _interactive_omit():
+        return None, "omitted_by_config"
+    from forge.core.auth.template_secrets import resolve_env_or_credential_with_source
+
+    return resolve_env_or_credential_with_source(_BARE_AUTH_KEY)
+
+
+def compute_interactive_api_key_decision(*, interactive: bool) -> InteractiveApiKeyDecision:
+    """Decide ANTHROPIC_API_KEY provenance for an interactive launch, without mutating.
+
+    Used by the launch-metadata recorder. Matches ``apply_interactive_api_key``
+    because both resolve from os.environ/config and ``apply`` is the child's sole
+    last writer of the key.
+    """
+    value, source = _resolve_interactive_api_key(interactive)
+    return InteractiveApiKeyDecision(available=bool(value), source=source)
+
+
+def apply_interactive_api_key(env: dict[str, str], *, interactive: bool) -> InteractiveApiKeyDecision:
+    """Set or strip ANTHROPIC_API_KEY in ``env`` per the interactive key policy.
+
+    Authoritative over whatever ``extra_vars`` injected: overwrites the key with the
+    resolved value, or pops it for ``omit``/unresolved. Call this LAST in the
+    interactive env build (after extra_vars and unset_vars). Returns the same
+    decision the recorder computes.
+    """
+    value, source = _resolve_interactive_api_key(interactive)
+    if value:
+        env[_BARE_AUTH_KEY] = value
+    else:
+        env.pop(_BARE_AUTH_KEY, None)
+    return InteractiveApiKeyDecision(available=bool(value), source=source)
 
 
 def _resolve_subprocess_proxy(proxy_id: str) -> str | None:

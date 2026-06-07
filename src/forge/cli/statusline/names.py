@@ -39,6 +39,8 @@ SEGMENT_NAMES: tuple[str, ...] = (
     "audit",
     "drift",
     "spend_cap",
+    "launch",
+    "forge_cost",
 )
 
 # Default render order — reproduces the pre-enhancement status line exactly.

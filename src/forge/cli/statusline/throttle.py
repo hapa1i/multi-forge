@@ -119,3 +119,54 @@ def read_or_compute(
         },
     )
     return rate
+
+
+def _session_cost_cache_path(forge_session_key: str) -> Path:
+    # Distinct `fcost-` namespace from the cache-hit entries above. The key is a
+    # FORGE session identity (forge_root + manifest name), NOT the Claude stdin
+    # session_id -- the Claude UUID rolls on every /compact and would fragment the
+    # cache, refusing to ever reuse. usedforsecurity=False: filename derivation only.
+    digest = hashlib.sha256(forge_session_key.encode("utf-8"), usedforsecurity=False).hexdigest()
+    return get_forge_home() / "cache" / "statusline" / f"fcost-{digest}.json"
+
+
+def read_or_compute_session_cost(
+    forge_session_key: str,
+    ttl: int,
+    compute_fn: Callable[[], int],
+    *,
+    now: float | None = None,
+) -> int | None:
+    """Return a cached per-session Forge cost (micro-USD) or recompute + persist it.
+
+    **Time-only** throttle, deliberately unlike :func:`read_or_compute`: headless
+    cost accrues via usage-ledger writes that never touch the transcript, so the
+    transcript-mtime "unchanged" shortcut would freeze ``forge +$Y`` for the whole
+    session. Reuse happens only within ``ttl`` seconds.
+
+    Caches **any successful int, including ``0``** (a no-cost session must not
+    re-scan the PID-sharded ledger every poll). A compute *failure* (``compute_fn``
+    raises) is left uncached and returns ``None`` (fail-open: a transient ledger
+    read error means "no segment this poll", never a crash, and never a frozen 0).
+    """
+    if now is None:
+        now = time.time()
+
+    path = _session_cost_cache_path(forge_session_key)
+    cached = _read(path)
+    if cached is not None and cached.get("version") == CACHE_VERSION:
+        value = cached.get("cost_micro_usd")
+        computed_at = cached.get("computed_at")
+        fresh = isinstance(computed_at, (int, float)) and (now - computed_at) < ttl
+        # bool is an int subclass; a corrupt `true` must not read as cost 1.
+        if fresh and isinstance(value, int) and not isinstance(value, bool):
+            return value
+
+    try:
+        value = compute_fn()
+    except Exception:
+        # Fail-open: do NOT cache (retry next poll). Caching a failure would freeze
+        # the segment empty until the TTL elapsed even after the ledger recovered.
+        return None
+    _write(path, {"version": CACHE_VERSION, "computed_at": now, "cost_micro_usd": value})
+    return value

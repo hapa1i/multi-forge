@@ -67,9 +67,17 @@ class ProxyMetrics:
     failed_input_tokens: int = 0
     failed_output_tokens: int = 0
 
-    # Cost estimates (microdollars, 1 USD = 1_000_000)
+    # Cost (microdollars, 1 USD = 1_000_000). Only reported cost is summed; a
+    # request whose route reported no cost advances neither total.
     total_cost_micros: int = 0
     failed_cost_micros: int = 0
+
+    # Cost-evidence counts — the single signal that tells "known $0" (reported,
+    # count>0) from "no dollar evidence" (unavailable). Downstream surfaces (verb
+    # snapshot, forge proxy costs show, status line, the X-Cumulative-Cost gate) all key
+    # off these instead of re-deriving evidence from request/token presence.
+    cost_reported_requests: int = 0
+    cost_unavailable_requests: int = 0
 
     # Per-tier breakdown
     requests_by_tier: dict[str, int] = field(default_factory=dict)
@@ -100,21 +108,33 @@ class ProxyMetrics:
         streaming: bool,
         failed: bool,
         error_type: str | None = None,
-        cost_micros: int = 0,
+        cost_micros: int | None = None,
     ) -> None:
-        """Record a completed request. All fields updated atomically under lock."""
+        """Record a completed request. All fields updated atomically under lock.
+
+        ``cost_micros`` is ``None`` when the route reported no cost: tokens and
+        request counts still advance, but no cost total does, and the request is
+        counted as cost-unavailable evidence (never as a known ``$0``).
+        """
         with self._lock:
             self.total_requests += 1
             if streaming:
                 self.total_streaming += 1
+
+            # Cost-evidence (reported vs unavailable) — independent of token/request presence
+            if cost_micros is not None:
+                self.cost_reported_requests += 1
+            else:
+                self.cost_unavailable_requests += 1
 
             # Tokens (always, success + failure)
             self.total_input_tokens += input_tokens
             self.total_output_tokens += output_tokens
             self.total_cached_tokens += cached_tokens
 
-            # Cost
-            self.total_cost_micros += cost_micros
+            # Cost (reported only)
+            if cost_micros is not None:
+                self.total_cost_micros += cost_micros
 
             # Per-tier
             self.requests_by_tier[tier] = self.requests_by_tier.get(tier, 0) + 1
@@ -127,7 +147,8 @@ class ProxyMetrics:
             tier_tokens.cached_tokens += cached_tokens
             tier_tokens.total_latency_ms += latency_ms
             tier_tokens.request_count += 1
-            tier_tokens.estimated_cost_micros += cost_micros
+            if cost_micros is not None:
+                tier_tokens.estimated_cost_micros += cost_micros
 
             # Per-model
             self.requests_by_model[model] = self.requests_by_model.get(model, 0) + 1
@@ -140,14 +161,16 @@ class ProxyMetrics:
             model_tokens.cached_tokens += cached_tokens
             model_tokens.total_latency_ms += latency_ms
             model_tokens.request_count += 1
-            model_tokens.estimated_cost_micros += cost_micros
+            if cost_micros is not None:
+                model_tokens.estimated_cost_micros += cost_micros
 
             # Failures
             if failed:
                 self.total_failures += 1
                 self.failed_input_tokens += input_tokens
                 self.failed_output_tokens += output_tokens
-                self.failed_cost_micros += cost_micros
+                if cost_micros is not None:
+                    self.failed_cost_micros += cost_micros
                 if error_type:
                     self.failures_by_type[error_type] = self.failures_by_type.get(error_type, 0) + 1
 
@@ -192,6 +215,11 @@ class ProxyMetrics:
                     "failed_usd": round(self.failed_cost_micros / 1_000_000, 6),
                     "total_micros": self.total_cost_micros,
                     "failed_micros": self.failed_cost_micros,
+                    # Cost-evidence: total_* sums reported cost only; these counts say
+                    # how many requests reported a cost vs reported none (so a $0 total
+                    # with reported_request_count>0 is "all free", not "no evidence").
+                    "reported_request_count": self.cost_reported_requests,
+                    "unavailable_request_count": self.cost_unavailable_requests,
                 },
                 "last_request_at": self.last_request_at,
             }
@@ -209,6 +237,8 @@ class ProxyMetrics:
             self.failed_output_tokens = 0
             self.total_cost_micros = 0
             self.failed_cost_micros = 0
+            self.cost_reported_requests = 0
+            self.cost_unavailable_requests = 0
             self.requests_by_tier.clear()
             self.tokens_by_tier.clear()
             self.requests_by_model.clear()

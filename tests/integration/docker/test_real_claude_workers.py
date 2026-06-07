@@ -117,7 +117,15 @@ class TestRealClaudeWorkers:
         assert worker_event["provider"] == "direct"
         assert worker_event["model"] == anthropic_opus
         assert worker_event["proxy_id"] is None
-        assert worker_event["measurement_source"] == "unattributed"
+        # Phase 5: a direct (API-key) worker self-reports cost via --output-format json
+        # (5a verdict: direct API key -> COST-REPORTED + USAGE-REPORTED), so the leaf is
+        # runtime_native / claude_code, not the pre-5 unattributed. A PROXIED worker would
+        # stay unattributed here (the verb aggregate owns proxied cost) -- this is direct.
+        assert worker_event["measurement_source"] == "runtime_native"
+        assert worker_event["reporter"] == "claude_code"
+        assert worker_event["confidence"] == "reported"
+        assert worker_event["cost_micro_usd"] is not None
+        assert worker_event["input_tokens"] is not None
         assert worker_event["source_refs"] is None
 
         verb_events = [event for event in usage_events if event["attribution_granularity"] == "verb"]

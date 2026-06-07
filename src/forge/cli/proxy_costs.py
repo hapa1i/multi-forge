@@ -14,6 +14,9 @@ import click
 from rich.console import Console
 from rich.table import Table
 
+from forge.cli.output import print_tip
+from forge.core.paths import display_path, get_forge_home
+
 console = Console(stderr=True)
 
 
@@ -60,7 +63,44 @@ def _format_tokens(n: int) -> str:
     return str(n)
 
 
-@click.command("costs")
+def _reported_micros(record: dict, key: str = "cost_micros") -> int | None:
+    """Reported cost in micros, or ``None`` when unavailable.
+
+    ``record.get(key, 0)`` is unsafe here: a present-but-null value (cost
+    unavailable) returns ``None``, which must never be summed as ``0`` (and would
+    crash ``sum``). An ``int`` (including a reported ``0`` — genuinely free) is
+    reported; ``None`` / missing / non-int is unavailable. ``bool`` is excluded
+    because ``isinstance(True, int)`` is True.
+    """
+    val = record.get(key)
+    if isinstance(val, bool):
+        return None
+    return val if isinstance(val, int) else None
+
+
+def _verb_cost_reported(record: dict) -> bool:
+    """Whether a verb invocation has reported-cost evidence.
+
+    ``cost_measured`` is the sole evidence: true only when the measurement window had
+    a route-reported-cost request. A verb record's ``total_cost_micros`` is a plain
+    int (0 for a passthrough window), so presence-of-number is NOT evidence -- the
+    unknown-as-zero trap. A legacy record (pre cost-evidence) lacks the flag; its
+    ``total_cost_micros`` was a now-deleted local-catalog ESTIMATE, so it reads as
+    unavailable rather than resurrecting that estimate as route-reported cost.
+    """
+    return bool(record.get("cost_measured", False))
+
+
+@click.group("costs")
+def costs_group() -> None:
+    """Show or reset proxy cost telemetry.
+
+    'show' renders the cost summary; 'reset' wipes all recorded cost + usage
+    telemetry. Run a subcommand (a bare 'forge proxy costs' prints this help).
+    """
+
+
+@costs_group.command("show")
 @click.argument("proxy_id", required=False, default=None)
 @click.option(
     "--period",
@@ -71,7 +111,7 @@ def _format_tokens(n: int) -> str:
 @click.option("--by-model", is_flag=True, help="Breakdown by model")
 @click.option("--by-verb", is_flag=True, help="Breakdown by verb (default view)")
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
-def costs_cmd(
+def show_cmd(
     proxy_id: str | None,
     period: str,
     by_model: bool,
@@ -82,11 +122,11 @@ def costs_cmd(
 
     \b
     Examples:
-        forge proxy costs                    # Today's costs, by verb
-        forge proxy costs --by-model         # Today's costs, by model
-        forge proxy costs --period week      # This week
-        forge proxy costs --period all       # All time
-        forge proxy costs openrouter         # Filter by proxy
+        forge proxy costs show                    # Today's costs, by verb
+        forge proxy costs show --by-model         # Today's costs, by model
+        forge proxy costs show --period week      # This week
+        forge proxy costs show --period all       # All time
+        forge proxy costs show openrouter         # Filter by proxy
 
     \b
     Tip: pair with 'forge proxy set <id> costs.caps.per_month=<amount>' to keep
@@ -169,9 +209,77 @@ def _scope_verb_records_to_proxy(verb_records: list[dict], proxy_base_url: str |
         scoped_record["output_tokens"] = _sum_proxy_field(matching, "output_tokens")
         scoped_record["cached_tokens"] = _sum_proxy_field(matching, "cached_tokens")
         scoped_record["request_count"] = _sum_proxy_field(matching, "request_count")
+        # Re-derive cost-evidence for the scoped subset: the unscoped record's
+        # cost_measured covers all proxies, but a single-proxy view may have no
+        # reported-cost request. Trust the per-proxy counter when present; a legacy
+        # delta lacks it, so it reads as cost-unavailable (no resurrected estimate).
+        if any("reported_request_count" in p for p in matching):
+            scoped_record["cost_measured"] = _sum_proxy_field(matching, "reported_request_count") > 0
+        else:
+            scoped_record["cost_measured"] = False
         scoped.append(scoped_record)
 
     return scoped
+
+
+def _request_cost_totals(request_records: list[dict]) -> tuple[int, int]:
+    """Return (summed reported cost micros, count of cost-unavailable requests).
+
+    Reported cost only -- a null/unavailable cost is counted in the second value,
+    never summed as $0 into the first (the "not a cost oracle" rule). Shared by the
+    table and JSON surfaces so the two cannot drift.
+    """
+    total_cost = sum(c for r in request_records if (c := _reported_micros(r)) is not None)
+    unavailable_requests = sum(1 for r in request_records if _reported_micros(r) is None)
+    return total_cost, unavailable_requests
+
+
+def _aggregate_by_verb(verb_records: list[dict]) -> dict[str, dict]:
+    """Fold verb cost records into per-verb totals (cost-evidence aware).
+
+    ``reported`` flips True only when a record carries measured cost
+    (:func:`_verb_cost_reported`); an unmeasured window contributes invocations and
+    request counts but never a fabricated $0. Shared by table + JSON surfaces.
+    """
+    verb_costs: dict[str, dict] = {}
+    for v in verb_records:
+        verb = v.get("verb", "unknown")
+        if verb not in verb_costs:
+            verb_costs[verb] = {"cost_micros": 0, "reported": False, "request_count": 0, "invocations": 0}
+        if _verb_cost_reported(v):
+            verb_costs[verb]["cost_micros"] += _reported_micros(v, "total_cost_micros") or 0
+            verb_costs[verb]["reported"] = True
+        verb_costs[verb]["request_count"] += v.get("request_count", 0)
+        verb_costs[verb]["invocations"] += 1
+    return verb_costs
+
+
+def _aggregate_by_model(request_records: list[dict]) -> dict[str, dict]:
+    """Fold request records into per-model totals (cost-evidence aware).
+
+    ``reported`` flips True only for a request whose cost the route reported; a
+    null-cost request still contributes tokens and a request count. Shared by
+    table + JSON surfaces so they cannot drift.
+    """
+    model_costs: dict[str, dict] = {}
+    for r in request_records:
+        model = r.get("model", "unknown")
+        if model not in model_costs:
+            model_costs[model] = {
+                "cost_micros": 0,
+                "reported": False,
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "requests": 0,
+            }
+        rc = _reported_micros(r)
+        if rc is not None:
+            model_costs[model]["cost_micros"] += rc
+            model_costs[model]["reported"] = True
+        model_costs[model]["input_tokens"] += r.get("input_tokens", 0)
+        model_costs[model]["output_tokens"] += r.get("output_tokens", 0)
+        model_costs[model]["requests"] += 1
+    return model_costs
 
 
 def _display_by_verb(
@@ -180,22 +288,14 @@ def _display_by_verb(
     period: str,
     proxy_id: str | None,
 ) -> None:
-    total_cost = sum(r.get("cost_micros", 0) for r in request_records)
+    total_cost, unavailable_requests = _request_cost_totals(request_records)
     total_requests = len(request_records)
 
-    verb_costs: dict[str, dict] = {}
-    for v in verb_records:
-        verb = v.get("verb", "unknown")
-        if verb not in verb_costs:
-            verb_costs[verb] = {"cost_micros": 0, "request_count": 0, "invocations": 0}
-        verb_costs[verb]["cost_micros"] += v.get("total_cost_micros", 0)
-        verb_costs[verb]["request_count"] += v.get("request_count", 0)
-        verb_costs[verb]["invocations"] += 1
-
+    verb_costs = _aggregate_by_verb(verb_records)
     verb_total = sum(v["cost_micros"] for v in verb_costs.values())
     interactive_cost = max(0, total_cost - verb_total)
 
-    if total_cost == 0 and not verb_costs:
+    if total_cost == 0 and unavailable_requests == 0 and not verb_costs:
         scope = f" ({proxy_id})" if proxy_id else ""
         console.print(f"[dim]No cost data for {period}{scope}.[/dim]")
         return
@@ -209,7 +309,10 @@ def _display_by_verb(
     table.add_column("Detail", style="dim")
     table.add_column("", style="dim")
 
-    table.add_row("Total", _format_usd(total_cost), f"{total_requests} requests", "")
+    total_detail = f"{total_requests} requests"
+    if unavailable_requests:
+        total_detail += f" ({unavailable_requests} cost unavailable)"
+    table.add_row("Total", _format_usd(total_cost), total_detail, "")
     table.add_row(
         "Interactive",
         _format_usd(interactive_cost),
@@ -222,7 +325,8 @@ def _display_by_verb(
         detail = f"{info['invocations']} run{'s' if info['invocations'] != 1 else ''}"
         if info["request_count"]:
             detail += f", {info['request_count']} reqs"
-        table.add_row(verb, _format_usd(info["cost_micros"]), detail, "~")
+        cost_cell = _format_usd(info["cost_micros"]) if info["reported"] else "unavailable"
+        table.add_row(verb, cost_cell, detail, "~" if info["reported"] else "")
 
     console.print(table)
     console.print()
@@ -233,20 +337,7 @@ def _display_by_model(
     period: str,
     proxy_id: str | None,
 ) -> None:
-    model_costs: dict[str, dict] = {}
-    for r in request_records:
-        model = r.get("model", "unknown")
-        if model not in model_costs:
-            model_costs[model] = {
-                "cost_micros": 0,
-                "input_tokens": 0,
-                "output_tokens": 0,
-                "requests": 0,
-            }
-        model_costs[model]["cost_micros"] += r.get("cost_micros", 0)
-        model_costs[model]["input_tokens"] += r.get("input_tokens", 0)
-        model_costs[model]["output_tokens"] += r.get("output_tokens", 0)
-        model_costs[model]["requests"] += 1
+    model_costs = _aggregate_by_model(request_records)
 
     if not model_costs:
         scope = f" ({proxy_id})" if proxy_id else ""
@@ -264,7 +355,8 @@ def _display_by_model(
     for model in sorted(model_costs, key=lambda m: model_costs[m]["cost_micros"], reverse=True):
         info = model_costs[model]
         tokens = f"{_format_tokens(info['input_tokens'])} in, {_format_tokens(info['output_tokens'])} out"
-        table.add_row(model, _format_usd(info["cost_micros"]), tokens)
+        cost_cell = _format_usd(info["cost_micros"]) if info["reported"] else "unavailable"
+        table.add_row(model, cost_cell, tokens)
 
     console.print(table)
     console.print()
@@ -276,38 +368,94 @@ def _output_json(
     period: str,
     proxy_id: str | None,
 ) -> None:
-    total_cost = sum(r.get("cost_micros", 0) for r in request_records)
+    total_cost, unavailable_requests = _request_cost_totals(request_records)
 
-    verb_summary: dict[str, dict] = {}
-    for v in verb_records:
-        verb = v.get("verb", "unknown")
-        if verb not in verb_summary:
-            verb_summary[verb] = {"cost_micros": 0, "request_count": 0, "invocations": 0}
-        verb_summary[verb]["cost_micros"] += v.get("total_cost_micros", 0)
-        verb_summary[verb]["request_count"] += v.get("request_count", 0)
-        verb_summary[verb]["invocations"] += 1
-
-    model_summary: dict[str, dict] = {}
-    for r in request_records:
-        model = r.get("model", "unknown")
-        if model not in model_summary:
-            model_summary[model] = {"cost_micros": 0, "input_tokens": 0, "output_tokens": 0, "requests": 0}
-        model_summary[model]["cost_micros"] += r.get("cost_micros", 0)
-        model_summary[model]["input_tokens"] += r.get("input_tokens", 0)
-        model_summary[model]["output_tokens"] += r.get("output_tokens", 0)
-        model_summary[model]["requests"] += 1
+    verb_summary = _aggregate_by_verb(verb_records)
+    model_summary = _aggregate_by_model(request_records)
 
     verb_total = sum(v["cost_micros"] for v in verb_summary.values())
 
     output = {
         "period": period,
         "proxy_id": proxy_id,
+        # total_cost_* sums reported cost only; unavailable requests are excluded
+        # (never summed as $0). reported/unavailable counts give cost-evidence scope.
         "total_cost_micros": total_cost,
         "total_cost_usd": round(total_cost / 1_000_000, 6),
         "total_requests": len(request_records),
+        "reported_requests": len(request_records) - unavailable_requests,
+        "unavailable_requests": unavailable_requests,
         "interactive_cost_micros": max(0, total_cost - verb_total),
         "by_verb": verb_summary,
         "by_model": model_summary,
-        "estimated": True,
     }
     click.echo(json.dumps(output, indent=2))
+
+
+# Reset wipes the on-disk planes Forge records spend/usage into, plus the derived
+# status-line cost cache that would otherwise replay a stale `forge +$Y` within its TTL.
+# Each target carries its own glob (planes shard as `*.jsonl`; the cache as `fcost-*.json`).
+# Audit records (audit/) are a separate redacted-wire plane and are intentionally NOT
+# touched. In-memory proxy state (ProxyMetrics totals, cap counters) lives in a separate
+# process the CLI cannot reach -- the printed tip points at a restart for those.
+_RESET_TARGETS: tuple[tuple[str, tuple[str, ...], str], ...] = (
+    ("request cost logs", ("costs", "requests"), "*.jsonl"),
+    ("verb cost logs", ("costs", "verbs"), "*.jsonl"),
+    ("usage ledger", ("usage", "events"), "*.jsonl"),
+    ("status-line cost cache", ("cache", "statusline"), "fcost-*.json"),
+)
+
+
+@costs_group.command("reset")
+@click.option("--yes", is_flag=True, help="Skip the confirmation prompt.")
+@click.option("--dry-run", is_flag=True, help="List what would be removed without deleting.")
+def reset_cmd(yes: bool, dry_run: bool) -> None:
+    """Reset all recorded cost and usage telemetry to zero.
+
+    Deletes the request cost logs, verb cost logs, the usage-attribution ledger, and the
+    derived status-line cost cache (`forge +$Y`) under FORGE_HOME. Audit records are left
+    untouched. This is irreversible.
+
+    A running proxy keeps its cost totals AND cap counters in memory until restarted, so a
+    live proxy's cumulative-cost header, snapshot, and `forge proxy costs show` figures do
+    not zero until it is restarted (see the printed tip).
+    """
+    home = get_forge_home()
+    found = [
+        (label, home.joinpath(*parts), sorted(home.joinpath(*parts).glob(glob)))
+        for label, parts, glob in _RESET_TARGETS
+    ]
+    total_files = sum(len(shards) for _, _, shards in found)
+
+    if total_files == 0:
+        console.print("[dim]No cost or usage telemetry to reset.[/dim]")
+        return
+
+    console.print("[bold]The following will be removed:[/bold]")
+    for label, directory, shards in found:
+        if shards:
+            console.print(f"  {label}: {len(shards)} file(s) under {display_path(directory)}")
+
+    if dry_run:
+        console.print("[dim](dry-run) Nothing deleted.[/dim]")
+        return
+
+    if not yes:
+        click.confirm("Delete all of the above? This cannot be undone.", abort=True)
+
+    deleted = 0
+    for _, _, shards in found:
+        for shard in shards:
+            try:
+                shard.unlink()
+                deleted += 1
+            except OSError as e:
+                console.print(f"[yellow]Could not delete {display_path(shard)}: {e}[/yellow]")
+
+    console.print(f"Reset complete: removed {deleted} telemetry file(s).")
+    print_tip(
+        "A running proxy keeps its cost totals and cap counters in memory until restarted.",
+        "Restart any active proxy so its cumulative cost, snapshot, and caps also zero:",
+        commands=["forge proxy stop <id>", "forge proxy start <id>"],
+        console=console,
+    )

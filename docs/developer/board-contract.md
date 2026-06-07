@@ -12,6 +12,7 @@ The work board is Forge's lightweight implementation-memory system for multi-ses
 - proposed ideas
 - accepted but parked work
 - active execution
+- paused partially-done work
 - completed snapshots
 - project lifetime memory
 
@@ -24,9 +25,13 @@ Cards may be aspirational. Design docs are normative and describe shipped code.
 | `docs/board/proposed/<slug>/card.md` | Idea or design sketch not yet accepted for execution  | Move to `todo/` when accepted or scheduled        |
 | `docs/board/todo/<slug>/card.md`     | Accepted work parked until an execution branch exists | Move to `doing/` when execution starts            |
 | `docs/board/doing/<slug>/card.md`    | Work currently in flight                              | Keep `checklist.md` current during implementation |
+| `docs/board/paused/<slug>/card.md`   | Partially-done work on hold                           | Move back to `doing/` when work resumes           |
 | `docs/board/done/<slug>/card.md`     | Completed work snapshot                               | Keep paired `checklist.md` when one existed       |
 
 `todo/` is not the active cursor. It means the work is accepted, but no execution branch is active for it.
+
+`paused/` is for partially-done work that is temporarily on hold. Unlike `todo/`, a paused card already has a
+`checklist.md` with progress. Move back to `doing/` when work resumes; the checklist picks up where it left off.
 
 When the user says to work on a `todo/` card, the operating contract is:
 

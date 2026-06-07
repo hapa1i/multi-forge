@@ -334,7 +334,8 @@ To avoid writer conflicts:
   - `intent.launch` records relaunch mode plus sidecar-specific options (image, extra mounts) when the session is
     created or derived
   - `confirmed` bootstrap/runtime fields written by the CLI: `derivation` (resume metadata), `is_sandboxed` (updated at
-    launch time to reflect whether Claude is running via sidecar)
+    launch time to reflect whether Claude is running via sidecar), `launch` (immutable launch facts recorded once at
+    start — routing mode, proxy id/base URL, and whether/how an API key was made available to the child)
   - Sets `FORGE_SESSION=<session_name>` when launching Claude
   - Note: `claude_session_id` is **not** pre-seeded by the CLI; it is set by hooks from Claude's live conversation
     payloads. SessionStart sets the initial value, and Stop/StopFailure may reconcile it when native fork launches
@@ -864,23 +865,42 @@ Forge records proxy cost telemetry in append-only JSONL files under `~/.forge/co
 | `costs/requests/<month>_<pid>.jsonl` | Proxy request handler   | Per-request token/cost records               |
 | `costs/verbs/<month>_<pid>.jsonl`    | Forge verb cost wrapper | Best-effort cost deltas for panels/workflows |
 
-Request logs are the source of truth for proxy spend. The proxy bootstraps its in-memory `CostTracker` from current and
-previous month request logs on startup so cap enforcement survives restarts. Verb logs are attribution aids for CLI
-visibility; they are estimates because several Forge subprocesses can share a proxy concurrently.
+Request logs are the source of truth for proxy spend. **Forge is not a cost oracle:** it records the cost a route
+actually reported — OpenRouter's response-body `usage.cost` (`confidence="reported"`) or a LiteLLM gateway's
+`x-litellm-response-cost` header (`confidence="gateway_calculated"`) — and writes `cost_micros:null` /
+`confidence="unavailable"` when no route reported one (Anthropic passthrough always; LiteLLM streaming, whose header
+predates the cost). There is no local price catalog; cost is never inferred from token counts. Each record carries
+`reporter` + `confidence` (the Phase-1 metric-evidence vocabulary). The proxy bootstraps its in-memory `CostTracker`
+from current and previous month request logs on startup so cap enforcement survives restarts. Verb logs are attribution
+aids for CLI visibility; they are estimates because several Forge subprocesses can share a proxy concurrently, and they
+mark `cost_measured` so a token-only passthrough verb is not read as a measured $0.
 
 A third plane, the **usage-attribution ledger** (`~/.forge/usage/events/`, schema in
 [§A.13](design_appendix.md#a13-usage-attribution-ledger-schema-314)), records *which run/workflow/session* invoked which
 runtime/provider/model and what it consumed, referencing the cost and audit planes via a shared proxy `request_id`
 (nullable `source_refs`). The three planes stay physically separate by design — cost is the spend source of truth, audit
-is the redacted wire record, usage is attribution. Emission is wired (Phase 4c): the workflow verbs
-(`panel`/`analyze`/`debate`/`consensus`) record one estimated verb-level event each; the memory writer, semantic
-supervisor, and shadow curation record one event per `claude -p` run; the action tagger records exact provider tokens
-from its direct `core.llm` call (and, when that call resolves to a registered Forge proxy, an exact
-`source_refs.cost_request_id` join via a forwarded `X-Request-ID`; direct `billing_mode` stays `unknown` unless provably
-direct + credentialed). All emit best-effort, never gate the work they measure, and record `latency_ms`. `claude -p`
-events carry null `source_refs` because Forge is not the HTTP client and can't know the proxy `request_id`; exact
-per-request correlation for `claude -p` is deferred to Phase 4g (see
+is the redacted wire record, usage is attribution. Each event also carries metric-evidence provenance — `route` (how the
+work reached the model), `reporter` (source of the metric evidence), and `confidence` (trustworthiness of *that event's
+own* `cost_micro_usd`: `reported` | `gateway_calculated` | `inferred` | `unavailable` | `unknown`). Emission is wired
+(Phase 4c): the workflow verbs (`panel`/`analyze`/`debate`/`consensus`) record one estimated verb-level event each; the
+memory writer, semantic supervisor, team supervisor, and shadow curation record one event per `claude -p` run; the
+action tagger records exact provider tokens from its direct `core.llm` call (and, when that call resolves to a
+registered Forge proxy, an exact `source_refs.cost_request_id` join via a forwarded `X-Request-ID`; direct
+`billing_mode` stays `unknown` unless provably direct + credentialed). All emit best-effort, never gate the work they
+measure, and record `latency_ms`. `claude -p` events carry null `source_refs` because Forge is not the HTTP client and
+can't know the proxy `request_id`; exact per-request correlation for `claude -p` is deferred to Phase 4g (see
 [§A.13](design_appendix.md#a13-usage-attribution-ledger-schema-314)).
+
+**Headless self-report (Phase 5).** Every `claude -p` run requests `--output-format json` (capability-gated with a
+retry-once-and-latch backstop, so an older CLI that rejects the flag self-heals), so the runtime can self-report cost
+and usage. Exactly **one** reporter attributes cost per run: a **proxied** run keeps the proxy snapshot
+(`forge_proxy`/`reported`, Claude's Anthropic-priced `total_cost_usd` ignored as wrong-and-duplicate); a **direct** run
+self-reports (`claude_code`/`reported`/`runtime_native`) — closing the prior `unavailable` gap on direct verbs — or,
+when the envelope carries usage but no dollar figure (OAuth), records exact tokens with cost honestly `unavailable`.
+Tokens follow the cost source (no mixed provenance). The opt-in `forge_cost` status-line segment surfaces this as
+`forge +$Y`: Forge-added LLM spend for the session, **excluding** the main interactive harness
+(`route=claude_interactive`), reported-or-unavailable and distinct from Claude's native cost
+([§A.8](design_appendix.md#a8-status-line-guidance-3611)).
 
 Each proxy may define:
 
@@ -889,12 +909,13 @@ costs:
   caps:
     per_day: 20.00
     per_month: 100.00
-  cap_mode: post      # post | strict
   on_cap_hit: reject  # reject | warn
 ```
 
-`post` mode blocks after accumulated spend reaches a configured cap. `strict` mode also estimates the pending request
-before forwarding it. `reject` returns HTTP 429 with:
+Caps are enforced after each completed request, from accumulated recorded spend: a request may cross a cap and complete,
+then the next request is blocked once spend has reached the cap. Because spend accrues only from reported cost, **dollar
+caps fire only for routes that report cost** (OpenRouter, LiteLLM non-streaming); Anthropic-passthrough and
+LiteLLM-streaming dollar caps are no-ops (their tokens are still tracked). `reject` returns HTTP 429 with:
 
 ```json
 {
@@ -907,19 +928,20 @@ before forwarding it. `reject` returns HTTP 429 with:
 ```
 
 `warn` mode forwards the request and returns the same message in `X-Spend-Warning`. Cost tracking is best effort:
-pricing or log write failures must not break successful LLM responses.
+cost-capture or log write failures must not break successful LLM responses.
 
 #### Per-session usage read surface
 
-`forge usage [session]` aggregates the two already-captured per-session planes into one human-readable view: the **usage
-ledger** (`usage/events`, the uncapped source for per-command run/error counts, tokens, and estimated cost) and the
-manifest's **`confirmed.policy.decisions`** (supervisor allow/warn/deny and warning text, capped at `MAX_DECISION_LOG`).
-The aggregation is a UI-agnostic command-core builder (`forge.core.ops.usage_summary.build_session_activity_summary`,
-§3.12) shared by the CLI and a compact session-end line the launcher prints on exit (host, sidecar, and fork). Cost is
-labeled estimated — `forge proxy costs` stays the authoritative spend view. Events are scoped by the `session` field
-(`event.session == manifest.name`); emitters that do not tag a session (e.g. the action tagger) are not attributed to
-one, so the summary records that coverage is partial. See
-[design_appendix.md §A.13](design_appendix.md#a13-usage-attribution-ledger-schema-314) for the read surface and
+`forge activity [session]` aggregates the two already-captured per-session planes into one human-readable view: the
+**usage ledger** (`usage/events`, the uncapped source for per-command run/error counts, tokens, and
+reported-or-estimated cost) and the manifest's **`confirmed.policy.decisions`** (supervisor allow/warn/deny and warning
+text, capped at `MAX_DECISION_LOG`). The aggregation is a UI-agnostic command-core builder
+(`forge.core.ops.usage_summary.build_session_activity_summary`, §3.12) shared by the CLI and a compact session-end line
+the launcher prints on exit (host, sidecar, and fork). Cost is reported-or-estimated (best-effort per-session
+attribution; may be partial; the verb-snapshot aggregate contributes estimates) — `forge proxy costs show` stays the
+authoritative spend view. Events are scoped by the `session` field (`event.session == manifest.name`); emitters that do
+not tag a session (e.g. the action tagger) are not attributed to one, so the summary records that coverage is partial.
+See [design_appendix.md §A.13](design_appendix.md#a13-usage-attribution-ledger-schema-314) for the read surface and
 per-emitter coverage.
 
 ## 4. Unified CLI (`forge`)
@@ -934,8 +956,8 @@ The primary entry point for all Forge operations.
 **Command-shape policy:** Forge uses explicit verbs for all commands. Non-leaf groups print help when invoked without a
 subcommand; they do not hide work behind bare group invocation. Leaf commands should do the sensible action when
 optional arguments are omitted (for example, `forge proxy metrics` shows all proxies when more than one is registered).
-Removed group-level shortcuts may remain only as non-executing tombstones that name the replacement. List/show commands
-support `--json` for scripting.
+Removed commands, options, and group-level shortcuts are clean breaks: they are deleted outright and the CLI framework
+reports "no such command/option" — no tombstone shims. List/show commands support `--json` for scripting.
 
 #### Installation
 
@@ -997,25 +1019,27 @@ default to the parent cache; `edit`/`diff` resolve a child (inferred when the pa
 
 #### Proxy management
 
-| Command                              | Purpose                                                 |
-| ------------------------------------ | ------------------------------------------------------- |
-| `forge proxy create <template>`      | Create a proxy from template and start it               |
-| `forge proxy list`                   | List all proxies (`--json`)                             |
-| `forge proxy show <id>`              | Show proxy configuration (`--json`, `--raw`)            |
-| `forge proxy edit <id>`              | Edit proxy overlay in $EDITOR                           |
-| `forge proxy set <id> <key>=<value>` | Set a proxy configuration value                         |
-| `forge proxy start <id>`             | Start server for existing proxy                         |
-| `forge proxy stop <id>`              | Stop server (keeps config)                              |
-| `forge proxy delete <id>...`         | Delete one or more proxies (`--all` for bulk deletion)  |
-| `forge proxy clean`                  | Remove stale proxies (dead pids)                        |
-| `forge proxy validate <id>`          | Validate proxy configuration                            |
-| `forge proxy metrics [id]`           | Show runtime metrics (`--json`, `--all`)                |
-| `forge proxy audit show [id]`        | Show redacted audit records (hashes/counts, no secrets) |
-| `forge proxy audit diff [id]`        | Show system/tool drift + override mutations over time   |
-| `forge proxy template list`          | List available templates                                |
-| `forge proxy template show <name>`   | Show template configuration (`--raw`)                   |
-| `forge proxy template edit <name>`   | Customize a template (copy-on-first-edit)               |
-| `forge proxy template reset <name>`  | Reset template to built-in defaults                     |
+| Command                              | Purpose                                                             |
+| ------------------------------------ | ------------------------------------------------------------------- |
+| `forge proxy create <template>`      | Create a proxy from template and start it                           |
+| `forge proxy list`                   | List all proxies (`--json`)                                         |
+| `forge proxy show <id>`              | Show proxy configuration (`--json`, `--raw`)                        |
+| `forge proxy edit <id>`              | Edit proxy overlay in $EDITOR                                       |
+| `forge proxy set <id> <key>=<value>` | Set a proxy configuration value                                     |
+| `forge proxy start <id>`             | Start server for existing proxy                                     |
+| `forge proxy stop <id>`              | Stop server (keeps config)                                          |
+| `forge proxy delete <id>...`         | Delete one or more proxies (`--all` for bulk deletion)              |
+| `forge proxy clean`                  | Remove stale proxies (dead pids)                                    |
+| `forge proxy validate <id>`          | Validate proxy configuration                                        |
+| `forge proxy metrics [id]`           | Show runtime metrics (`--json`, `--all`)                            |
+| `forge proxy costs show [id]`        | Show cost summary (`--period`, `--by-model`, `--by-verb`, `--json`) |
+| `forge proxy costs reset`            | Wipe all cost + usage telemetry to zero (`--yes`, `--dry-run`)      |
+| `forge proxy audit show [id]`        | Show redacted audit records (hashes/counts, no secrets)             |
+| `forge proxy audit diff [id]`        | Show system/tool drift + override mutations over time               |
+| `forge proxy template list`          | List available templates                                            |
+| `forge proxy template show <name>`   | Show template configuration (`--raw`)                               |
+| `forge proxy template edit <name>`   | Customize a template (copy-on-first-edit)                           |
+| `forge proxy template reset <name>`  | Reset template to built-in defaults                                 |
 
 #### Claude Code management
 
@@ -1084,7 +1108,7 @@ hints through `ModelSpec.prompt`. All workflow execution commands (panel, analyz
 | Command                       | Purpose                                                                             |
 | ----------------------------- | ----------------------------------------------------------------------------------- |
 | `forge info`                  | Show global system information (`--json`)                                           |
-| `forge usage [session]`       | Per-session activity: supervisor checks, cost, tokens (`--json`, `--days`, `--all`) |
+| `forge activity [session]`    | Per-session activity: supervisor checks, cost, tokens (`--json`, `--days`, `--all`) |
 | `forge clean`                 | Remove orphaned state (`--scope`, `--yes`)                                          |
 | `forge config`                | Manage global runtime preferences                                                   |
 | `forge authentication login`  | Store credentials for LLM providers                                                 |
@@ -1922,10 +1946,10 @@ isolation). **Narrow exception (§7.x audit path):** when a session launches wit
 mounts that proxy's `~/.forge/proxies/<id>/` read-only (so the in-container proxy loads its intercept/audit overlay) and
 `~/.forge/audit/`, `~/.forge/costs/`, and `~/.forge/usage/` read-write (so audit records, cost history, spend-cap
 accounting, and the usage-attribution ledger persist on the host instead of dying with the `--rm` container — the ledger
-is the only record of the in-container supervisor/verb activity, and it feeds `forge usage` and the session-end summary
-for sidecar sessions). These are the only `~/.forge` subdirs mounted, preserving the port-isolation rationale. On Linux
-the sidecar runs as the host `--user uid:gid`; that uid has no passwd entry, so the launcher pins `HOME=/root` and the
-image makes `/root` traversable/writable (`chmod 0777 /root`) so the mapped uid can reach the `/root/.forge` and
+is the only record of the in-container supervisor/verb activity, and it feeds `forge activity` and the session-end
+summary for sidecar sessions). These are the only `~/.forge` subdirs mounted, preserving the port-isolation rationale.
+On Linux the sidecar runs as the host `--user uid:gid`; that uid has no passwd entry, so the launcher pins `HOME=/root`
+and the image makes `/root` traversable/writable (`chmod 0777 /root`) so the mapped uid can reach the `/root/.forge` and
 `/root/.claude` mounts — an accommodation for the ephemeral single-session `--rm` sandbox, **not** a security-sandbox
 guarantee. Sidecar sessions also persist their launch mode, extra mounts, and image in `intent.launch` so
 `forge session resume <name>` can replay the same runtime wiring later.

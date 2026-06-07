@@ -34,6 +34,13 @@ from forge.core.reactive.env import (
     FORGE_ROOT_RUN_ID_VAR,
     FORGE_RUN_ID_VAR,
 )
+from forge.core.reactive.headless_json import (
+    is_json_flag_rejection,
+    mark_json_output_unsupported,
+    prepare_json_argv,
+    treat_is_error_as_failure,
+)
+from forge.core.reactive.structured_output import parse_headless_envelope
 
 
 class _Identity(TypedDict):
@@ -55,10 +62,58 @@ def _identity(env: dict[str, str]) -> _Identity:
 
 
 def _status(result: HeadlessResult) -> str:
-    """Map a result to a usage-event status string."""
+    """Map a result to a usage-event status string.
+
+    A runtime-reported error (envelope ``is_error`` with exit 0) reads as
+    ``error`` -- the run did not succeed even though the process exited cleanly.
+    """
     if result.timed_out:
         return "timeout"
-    return "success" if result.success else "error"
+    if not result.success:
+        return "error"
+    return "error" if result.runtime_is_error else "success"
+
+
+def _result_from_outcome(
+    request: HeadlessRequest,
+    *,
+    stdout: str,
+    stderr: str,
+    returncode: int,
+    duration_seconds: float,
+    ident: _Identity,
+    json_requested: bool,
+) -> HeadlessResult:
+    """Build a HeadlessResult from a completed run.
+
+    When JSON was requested and a valid envelope is found, unwrap ``.result`` into
+    ``stdout`` (text consumers unchanged) and lift the runtime's self-reported
+    cost/usage onto the result. Non-envelope output keeps raw ``stdout``.
+    """
+    envelope = parse_headless_envelope(stdout) if json_requested else None
+    if envelope is not None and envelope.parsed:
+        return HeadlessResult(
+            label=request.label,
+            stdout=envelope.result_text,
+            stderr=stderr,
+            returncode=returncode,
+            duration_seconds=duration_seconds,
+            cost_micro_usd=envelope.cost_micro_usd,
+            input_tokens=envelope.input_tokens,
+            output_tokens=envelope.output_tokens,
+            cached_tokens=envelope.cached_tokens,
+            envelope_parsed=True,
+            runtime_is_error=envelope.is_error and treat_is_error_as_failure(),
+            **ident,
+        )
+    return HeadlessResult(
+        label=request.label,
+        stdout=stdout,
+        stderr=stderr,
+        returncode=returncode,
+        duration_seconds=duration_seconds,
+        **ident,
+    )
 
 
 class ClaudeHeadlessInvoker:
@@ -73,9 +128,11 @@ class ClaudeHeadlessInvoker:
         """
         start = time.monotonic()
         ident = _identity(request.env)
+        # Capability-gated JSON request (shared with run_claude_session via headless_json).
+        run_argv, json_requested = prepare_json_argv(request.argv, request.output_format)
         try:
             completed = subprocess.run(
-                request.argv,
+                run_argv,
                 input=request.prompt,
                 capture_output=True,
                 text=True,
@@ -83,13 +140,33 @@ class ClaudeHeadlessInvoker:
                 cwd=request.cwd,
                 env=request.env,
             )
-            result = HeadlessResult(
-                label=request.label,
-                stdout=completed.stdout,
-                stderr=completed.stderr,
-                returncode=completed.returncode,
+            stdout, stderr, returncode = completed.stdout, completed.stderr, completed.returncode
+            # Retry-once backstop: version gate allowed the flag but the CLI rejected it.
+            if json_requested and is_json_flag_rejection(returncode, stderr):
+                mark_json_output_unsupported()
+                completed = subprocess.run(
+                    request.argv,
+                    input=request.prompt,
+                    capture_output=True,
+                    text=True,
+                    timeout=request.timeout_seconds,
+                    cwd=request.cwd,
+                    env=request.env,
+                )
+                stdout, stderr, returncode, json_requested = (
+                    completed.stdout,
+                    completed.stderr,
+                    completed.returncode,
+                    False,
+                )
+            result = _result_from_outcome(
+                request,
+                stdout=stdout,
+                stderr=stderr,
+                returncode=returncode,
                 duration_seconds=time.monotonic() - start,
-                **ident,
+                ident=ident,
+                json_requested=json_requested,
             )
         except subprocess.TimeoutExpired:
             result = HeadlessResult(
@@ -170,6 +247,9 @@ class ClaudeHeadlessInvoker:
         def _run_one(request: HeadlessRequest) -> HeadlessResult:
             start = time.monotonic()
             ident = _identity(request.env)
+            # Capability-gated JSON request, per worker (so each self-heals if a
+            # rejection races the shared latch). Same helper as the single-shot path.
+            run_argv, json_requested = prepare_json_argv(request.argv, request.output_format)
             proc: subprocess.Popen[str] | None = None
             try:
                 with children_lock:
@@ -186,7 +266,7 @@ class ClaudeHeadlessInvoker:
                         )
 
                 proc = subprocess.Popen(
-                    request.argv,
+                    run_argv,
                     stdin=subprocess.PIPE,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
@@ -216,13 +296,57 @@ class ClaudeHeadlessInvoker:
                     )
                 else:
                     stdout, stderr = proc.communicate(input=request.prompt, timeout=request.timeout_seconds)
-                    result = HeadlessResult(
-                        label=request.label,
+                    returncode = proc.returncode if proc.returncode is not None else -1
+                    # Retry-once backstop: flag rejected despite the capability latch. The
+                    # original (flagged) process already exited; spawn the unflagged retry as
+                    # a TRACKED child (own process group + registered in `children`, with `proc`
+                    # reassigned to it) so the SIGTERM->SIGKILL cleanup and timeout handler below
+                    # cover it too -- a plain subprocess.run here would be unterminable on
+                    # cancellation and could hang shutdown for up to timeout_seconds.
+                    if json_requested and is_json_flag_rejection(returncode, stderr):
+                        mark_json_output_unsupported()
+                        proc = subprocess.Popen(
+                            request.argv,
+                            stdin=subprocess.PIPE,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE,
+                            text=True,
+                            cwd=request.cwd,
+                            env=request.env,
+                            start_new_session=True,
+                        )
+                        with children_lock:
+                            children.append(proc)
+                            retry_should_cancel = cleanup_started
+                        if retry_should_cancel:
+                            # Same race as the primary spawn (above): _cleanup() takes a
+                            # one-shot snapshot of `children`, so if it ran between this
+                            # retry Popen returning and the append above, the retry child
+                            # is not in that snapshot. The worker reaps it here -- otherwise
+                            # shutdown(wait=True) blocks on its communicate() for up to
+                            # timeout_seconds, the exact hang the tracked-child design prevents.
+                            _terminate_and_reap([proc])
+                            return HeadlessResult(
+                                label=request.label,
+                                stdout="",
+                                stderr="",
+                                returncode=proc.returncode if proc.returncode is not None else -1,
+                                duration_seconds=time.monotonic() - start,
+                                error="cancelled",
+                                cancelled=True,
+                                **ident,
+                            )
+                        stdout, stderr = proc.communicate(input=request.prompt, timeout=request.timeout_seconds)
+                        returncode = proc.returncode if proc.returncode is not None else -1
+                        json_requested = False
+                    result = _result_from_outcome(
+                        request,
                         stdout=stdout,
                         stderr=stderr,
-                        returncode=proc.returncode,
+                        returncode=returncode,
                         duration_seconds=time.monotonic() - start,
-                        **ident,
+                        ident=ident,
+                        json_requested=json_requested,
                     )
             except subprocess.TimeoutExpired:
                 try:
@@ -322,4 +446,12 @@ def _emit_worker(request: HeadlessRequest, result: HeadlessResult) -> None:
         proxy_id=request.proxy_id,
         status=_status(result),
         latency_ms=round(result.duration_seconds * 1000, 1) if result.duration_seconds else None,
+        # Phase 5 cost precedence: base_url decides whether the runtime self-report
+        # counts (direct) or the verb aggregate holds it (proxied). See emit_worker_usage.
+        base_url=request.base_url,
+        cost_micro_usd=result.cost_micro_usd,
+        input_tokens=result.input_tokens,
+        output_tokens=result.output_tokens,
+        cached_tokens=result.cached_tokens,
+        envelope_parsed=result.envelope_parsed,
     )

@@ -59,9 +59,12 @@ Research-preview breaking changes require:
 - **Direct update**: update the command, schema, docs, tests, and examples to the new shape.
 - **No default shims**: do not keep old aliases, adapters, or compatibility wrappers unless the proposal explicitly
   justifies them.
-- **Helpful failure**: removed CLI commands/options and rejected stale durable state should fail with an actionable
-  message that names the replacement command or reset path. A hidden tombstone command that only errors is acceptable
-  when it prevents a generic "unknown command" dead end; it must not execute old behavior.
+- **Clean break for commands/options**: removed CLI commands and options rely on the framework's native "no such
+  command/option" error. Do not add hidden tombstone commands or flag aliases that only exist to error — delete the
+  surface and let Click report it. Name the replacement in the changelog and docs, not in a runtime shim.
+- **Actionable failure for durable state**: rejected stale durable state must still fail with a clear message that names
+  the reset or migration path (see [Forge-owned durable state](#forge-owned-durable-state)). Unlike a missing command, a
+  file that silently stops loading is a dead end the user cannot diagnose from a generic error.
 - **Clear reset/migration instructions**: tell users what to delete, recreate, or re-run.
 - **Changelog entry**: document the breaking change and the reset/migration path.
 
@@ -156,8 +159,9 @@ Best-effort patterns MUST:
   group command; use an explicit leaf such as `forge config show` or `forge search query`.
 - **Leaves act**: leaf commands should do the sensible action when optional arguments are omitted. For example,
   `forge proxy metrics` may show all metrics instead of failing only because no proxy ID was supplied.
-- **Removed shortcuts are tombstones**: if an old group-level shortcut is removed, keep only a non-executing diagnostic
-  path when needed. It must exit non-zero and name the replacement command.
+- **Removed shortcuts are clean breaks**: when a command, option, or group-level shortcut is removed, delete it outright
+  and let the framework report "no such command/option". Do not leave a non-executing diagnostic shim behind; the
+  replacement belongs in the changelog and docs, not in a runtime tombstone.
 
 ---
 

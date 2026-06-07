@@ -13,7 +13,13 @@ from typing import Any
 
 from forge.core.reactive.cost_tracking import VerbCostResult
 from forge.core.reactive.session_runner import SessionResult
-from forge.core.usage.emit import emit_direct_llm_usage, emit_usage_for_session_result
+from forge.core.usage.emit import (
+    _direct_cost_provenance,
+    emit_direct_llm_usage,
+    emit_usage_for_session_result,
+    emit_verb_usage,
+    emit_worker_usage,
+)
 from forge.core.usage.ledger import read_usage_events
 
 
@@ -39,6 +45,7 @@ class TestEmitForSessionResult:
             output_tokens=20,
             duration_ms=1234.5,
             measured=True,
+            cost_measured=True,  # the window had a reported-cost request
         )
         emit_usage_for_session_result(
             _ok_result(), command="memory-writer", session="s1", cost=cost, base_url="http://localhost:8084"
@@ -54,6 +61,31 @@ class TestEmitForSessionResult:
         assert e.attribution_granularity == "verb"
         assert e.source_refs is None  # claude -p: proxy request_id unknown (4g)
         assert e.billing_mode == "unknown"  # proxied -> opaque upstream
+        assert (e.route, e.reporter, e.confidence) == ("claude_p", "forge_proxy", "reported")
+
+    def test_measured_tokens_but_unreported_cost_logs_null_cost(self) -> None:
+        """Passthrough verb: snapshot measured tokens, but no reported cost → null $.
+
+        Regression for the verb cost-evidence conflation: measured=True (a snapshot
+        delta existed) must not fabricate a measured $0 when cost_measured=False.
+        Tokens are still attributed; cost is unavailable.
+        """
+        cost = VerbCostResult(
+            verb="memory-writer",
+            total_cost_micros=0,
+            input_tokens=10,
+            output_tokens=20,
+            measured=True,
+            cost_measured=False,  # no reported-cost request in the window
+        )
+        emit_usage_for_session_result(
+            _ok_result(), command="memory-writer", session="s1", cost=cost, base_url="http://localhost:8084"
+        )
+        e = read_usage_events()[0]
+        # Tokens attributed; cost is null (not a fabricated $0).
+        assert (e.input_tokens, e.output_tokens) == (10, 20)
+        assert e.cost_micro_usd is None
+        assert (e.reporter, e.confidence) == (None, "unavailable")
 
     def test_unmeasured_no_proxy_is_unattributed(self, monkeypatch) -> None:
         # A direct/no-proxy verb: holder never measured -> null cost, not $0.
@@ -65,6 +97,7 @@ class TestEmitForSessionResult:
         assert e.measurement_source == "unattributed"
         assert e.cost_micro_usd is None and e.input_tokens is None
         assert e.billing_mode == "api"  # direct + key present
+        assert (e.route, e.reporter, e.confidence) == ("claude_p", None, "unavailable")
 
     def test_failure_status_and_type(self) -> None:
         emit_usage_for_session_result(_ok_result(returncode=1, error="boom"), command="supervisor")
@@ -99,6 +132,7 @@ class TestEmitDirectLlmUsage:
         assert e.latency_ms == 12.0
         assert e.source_refs is None  # no proven proxy target
         assert e.billing_mode == "unknown"  # never guessed -- caller didn't prove direct+credential
+        assert (e.route, e.reporter, e.confidence) == ("core_llm", "provider", "unavailable")
 
     def test_proxy_target_sets_cost_request_id(self, monkeypatch) -> None:
         monkeypatch.setenv("FORGE_RUN_ID", "run_amb")
@@ -108,8 +142,160 @@ class TestEmitDirectLlmUsage:
         e = read_usage_events()[0]
         assert e.source_refs is not None and e.source_refs.cost_request_id == "req_join"
         assert e.billing_mode == "unknown"  # proxied
+        # A joined cost ref must NOT upgrade event-local cost confidence: cost stays None
+        # and confidence stays "unavailable" (the $ lives in the cost plane, not here).
+        assert e.cost_micro_usd is None and e.confidence == "unavailable"
+        assert (e.route, e.reporter) == ("core_llm", "provider")
 
     def test_no_ambient_identity_skips(self, monkeypatch) -> None:
         monkeypatch.delenv("FORGE_RUN_ID", raising=False)
         emit_direct_llm_usage(command="tagger", usage={"prompt_tokens": 1, "completion_tokens": 1})
         assert read_usage_events() == []
+
+
+class TestEmitVerbAndWorkerVocabulary:
+    """route/reporter/confidence on the fan-out aggregate and the per-worker leaf."""
+
+    def test_verb_aggregate_measured(self, monkeypatch) -> None:
+        monkeypatch.setenv("FORGE_RUN_ID", "run_v")
+        monkeypatch.setenv("FORGE_ROOT_RUN_ID", "run_v")
+        emit_verb_usage(
+            command="panel",
+            cost=VerbCostResult(verb="panel", total_cost_micros=900, measured=True, cost_measured=True),
+        )
+        e = read_usage_events()[0]
+        # Aggregate spans heterogeneous worker routes -> no single route; reported cost.
+        assert (e.route, e.reporter, e.confidence) == (None, "forge_proxy", "reported")
+
+    def test_verb_aggregate_measured_tokens_unreported_cost(self, monkeypatch) -> None:
+        """A fan-out that moved tokens but reported no cost logs null $, not a fake $0."""
+        monkeypatch.setenv("FORGE_RUN_ID", "run_v")
+        monkeypatch.setenv("FORGE_ROOT_RUN_ID", "run_v")
+        emit_verb_usage(
+            command="panel",
+            cost=VerbCostResult(verb="panel", total_cost_micros=0, input_tokens=5, measured=True, cost_measured=False),
+        )
+        e = read_usage_events()[0]
+        assert e.cost_micro_usd is None
+        assert (e.reporter, e.confidence) == (None, "unavailable")
+
+    def test_verb_aggregate_unmeasured(self, monkeypatch) -> None:
+        monkeypatch.setenv("FORGE_RUN_ID", "run_v")
+        monkeypatch.setenv("FORGE_ROOT_RUN_ID", "run_v")
+        emit_verb_usage(command="panel", cost=VerbCostResult(verb="panel"))
+        e = read_usage_events()[0]
+        assert (e.route, e.reporter, e.confidence) == (None, None, "unavailable")
+
+    def test_worker_leaf(self) -> None:
+        emit_worker_usage(run_id="run_leaf", command="panel", status="success")
+        e = read_usage_events()[0]
+        assert (e.route, e.reporter, e.confidence) == ("claude_p", None, "unavailable")
+
+
+class TestDirectCostProvenance:
+    """The shared one-reporter precedence for a DIRECT (non-proxied) claude -p run.
+
+    Lives once in ``_direct_cost_provenance`` so the verb and per-worker emitters
+    cannot drift. The proxied path is deliberately NOT here (see the divergence test
+    below)."""
+
+    def test_self_reported_cost_is_runtime_native(self) -> None:
+        p = _direct_cost_provenance(7000, True, 10, 20, 3)
+        assert (p.cost_micro_usd, p.reporter, p.confidence, p.measurement_source) == (
+            7000,
+            "claude_code",
+            "reported",
+            "runtime_native",
+        )
+        assert (p.input_tokens, p.output_tokens, p.cached_tokens) == (10, 20, 3)
+
+    def test_tokens_only_is_provider_usage_exact_cost_unavailable(self) -> None:
+        # OAuth: usage present, cost absent -> exact tokens kept, cost honestly None.
+        p = _direct_cost_provenance(None, True, 10, 20, 3)
+        assert (p.cost_micro_usd, p.reporter, p.confidence, p.measurement_source) == (
+            None,
+            None,
+            "unavailable",
+            "provider_usage_exact",
+        )
+        assert p.input_tokens == 10
+
+    def test_neither_is_unattributed(self) -> None:
+        p = _direct_cost_provenance(None, True, None, None, None)
+        assert (p.cost_micro_usd, p.confidence, p.measurement_source) == (None, "unavailable", "unattributed")
+        assert (p.input_tokens, p.output_tokens, p.cached_tokens) == (None, None, None)
+
+    def test_unparsed_envelope_drops_tokens(self) -> None:
+        # envelope_parsed=False -> tokens are not trustworthy as provider-exact.
+        p = _direct_cost_provenance(None, False, 10, 20, 3)
+        assert p.measurement_source == "unattributed"
+        assert p.input_tokens is None
+
+
+class TestVerbWorkerPrecedenceInvariant:
+    """Pin the refactor invariant: the DIRECT rule is shared (verb == worker) while
+    the PROXIED rule diverges by caller (verb attributes the snapshot; a worker stays
+    unattributed so it does not double-count the verb-level aggregate)."""
+
+    def test_direct_path_identical_for_verb_and_worker(self) -> None:
+        emit_usage_for_session_result(
+            _ok_result(cost_micro_usd=7000, envelope_parsed=True, input_tokens=10, output_tokens=20, cached_tokens=3),
+            command="memory-writer",
+            direct=True,
+        )
+        emit_worker_usage(
+            run_id="run_leaf",
+            command="panel",
+            status="success",
+            cost_micro_usd=7000,
+            envelope_parsed=True,
+            input_tokens=10,
+            output_tokens=20,
+            cached_tokens=3,
+        )
+        events = read_usage_events()
+        verb = next(e for e in events if e.attribution_granularity == "verb")
+        worker = next(e for e in events if e.attribution_granularity == "worker")
+
+        def prov(e: object) -> tuple:
+            return (
+                e.reporter,  # type: ignore[attr-defined]
+                e.confidence,  # type: ignore[attr-defined]
+                e.measurement_source,  # type: ignore[attr-defined]
+                e.cost_micro_usd,  # type: ignore[attr-defined]
+                e.input_tokens,  # type: ignore[attr-defined]
+                e.output_tokens,  # type: ignore[attr-defined]
+                e.cached_tokens,  # type: ignore[attr-defined]
+            )
+
+        assert prov(verb) == prov(worker) == ("claude_code", "reported", "runtime_native", 7000, 10, 20, 3)
+
+    def test_proxied_worker_stays_unattributed_while_verb_attributes(self) -> None:
+        # The no-double-count invariant. Even handed a self-cost, a PROXIED worker must
+        # not attribute it: the verb-level aggregate owns the proxied total.
+        emit_usage_for_session_result(
+            _ok_result(),
+            command="panel",
+            base_url="http://localhost:8085",
+            cost=VerbCostResult(verb="panel", total_cost_micros=900, measured=True, cost_measured=True),
+        )
+        emit_worker_usage(
+            run_id="run_leaf",
+            command="panel",
+            status="success",
+            base_url="http://localhost:8085",
+            cost_micro_usd=7000,
+            envelope_parsed=True,
+            input_tokens=10,
+        )
+        events = read_usage_events()
+        verb = next(e for e in events if e.attribution_granularity == "verb")
+        worker = next(e for e in events if e.attribution_granularity == "worker")
+        assert (verb.reporter, verb.confidence, verb.cost_micro_usd) == ("forge_proxy", "reported", 900)
+        assert (worker.reporter, worker.confidence, worker.cost_micro_usd, worker.measurement_source) == (
+            None,
+            "unavailable",
+            None,
+            "unattributed",
+        )
+        assert worker.input_tokens is None  # proxied worker drops tokens too (no mixed provenance)

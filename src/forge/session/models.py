@@ -363,6 +363,30 @@ class Derivation:
 
 
 @dataclass
+class LaunchConfirmed:
+    """Immutable launch facts captured by the CLI when the interactive session starts.
+
+    CLI-owned (like Derivation), written once at launch: how the session reached the
+    model and whether an ANTHROPIC_API_KEY was made available to the child. Lets the
+    status line describe route + auth honestly without inferring a payer from key
+    presence. Plain ``str`` (not ``Literal``) to match the sibling *Confirmed style
+    and stay fail-open under strict dacite reads.
+
+    Fields:
+        routing_mode: "direct" | "proxy" | "custom_base_url".
+        proxy_id / base_url: route identity when proxied (None for direct).
+        api_key_available_to_child: whether the child can see an ANTHROPIC_API_KEY.
+        api_key_source: "env" | "credential_file" | "none" | "omitted_by_config".
+    """
+
+    routing_mode: str | None = None
+    proxy_id: str | None = None
+    base_url: str | None = None
+    api_key_available_to_child: bool = False
+    api_key_source: str | None = None
+
+
+@dataclass
 class SessionConfirmed:
     """What Claude Code actually reported via hooks.
 
@@ -399,6 +423,9 @@ class SessionConfirmed:
 
     # Sidecar execution mode (proxy bundled in Docker container)
     is_sandboxed: bool = False
+
+    # Immutable launch facts (route + api-key posture), CLI-owned, set once at start.
+    launch: LaunchConfirmed | None = None
 
     # Context derivation tracking (for resumed or forked sessions)
     derivation: Derivation | None = None

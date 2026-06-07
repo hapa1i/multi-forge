@@ -29,6 +29,8 @@ from forge.cli.status_line import (
     explicit_tier_from_model,
     format_audit,
     format_drift,
+    format_forge_cost,
+    format_launch,
     format_policy,
     format_spend_cap,
     format_supervisor,
@@ -108,8 +110,55 @@ class TestFormatHelpers:
         out = format_drift("claude-opus-4-8", "o3")
         assert out is not None and "drift:" in _plain(out) and "!=" in _plain(out)
 
+    def test_launch_direct_omit(self):
+        out = format_launch({"routing_mode": "direct", "api_key_source": "omitted_by_config"})
+        assert _plain(out or "") == "direct·key:omit"
+
+    def test_launch_proxy_with_id_and_env_key(self):
+        out = format_launch({"routing_mode": "proxy", "proxy_id": "p1", "api_key_source": "env"})
+        assert _plain(out or "") == "proxy:p1·key:env"
+
+    def test_launch_credential_file_abbreviated(self):
+        out = format_launch({"routing_mode": "direct", "api_key_source": "credential_file"})
+        assert _plain(out or "") == "direct·key:file"
+
+    def test_launch_proxy_without_id(self):
+        out = format_launch({"routing_mode": "proxy", "api_key_source": "none"})
+        assert _plain(out or "") == "proxy·key:none"
+
+    def test_launch_empty_is_none(self):
+        # Unknown routing_mode + unknown source -> nothing showable.
+        assert format_launch({}) is None
+        assert format_launch({"routing_mode": "???", "api_key_source": "???"}) is None
+
 
 # --- Producers via render_segments ---------------------------------------
+
+
+class TestLaunchProducer:
+    def test_renders_from_confirmed_launch(self):
+        manifest = {"confirmed": {"launch": {"routing_mode": "direct", "api_key_source": "omitted_by_config"}}}
+        out = _stream(_ctx(manifest=manifest), ["launch"])
+        assert any("direct·key:omit" in s for s in out)
+
+    def test_ambient_no_manifest_is_hidden(self):
+        # Ambient session (no FORGE_SESSION -> manifest None): segment absent.
+        assert _stream(_ctx(manifest=None), ["launch"]) == []
+
+    def test_no_launch_block_is_hidden(self):
+        assert _stream(_ctx(manifest={"confirmed": {"is_sandboxed": False}}), ["launch"]) == []
+
+    def test_malformed_launch_is_hidden(self):
+        # Shape-defensive: a non-dict launch must not raise, just render nothing.
+        assert _stream(_ctx(manifest={"confirmed": {"launch": "corrupt"}}), ["launch"]) == []
+        assert _stream(_ctx(manifest={"confirmed": "corrupt"}), ["launch"]) == []
+
+    def test_off_by_default(self):
+        # Opt-in: not in DEFAULT_ORDER, so a default render never shows it.
+        assert "launch" not in DEFAULT_ORDER
+        manifest = {"confirmed": {"launch": {"routing_mode": "direct", "api_key_source": "env"}}}
+        out = _stream(_ctx(manifest=manifest), list(DEFAULT_ORDER))
+        assert not any("key:" in s for s in out)
 
 
 class TestSupervisorProducer:
@@ -343,12 +392,68 @@ class TestSpendCapProducer:
         assert _stream(_ctx(is_proxy=False, runtime=None), ["spend_cap"]) == []
 
 
+class TestFormatForgeCost:
+    def test_none_and_nonpositive_render_nothing(self):
+        # No segment for not-yet-measured / no-cost / (defensively) negative.
+        assert format_forge_cost(None) is None
+        assert format_forge_cost(0) is None
+        assert format_forge_cost(-5) is None
+
+    def test_dollars_and_subcent(self):
+        assert _plain(format_forge_cost(40_000) or "") == "forge +$0.04"
+        assert _plain(format_forge_cost(1_234_567) or "") == "forge +$1.23"
+        # Reuses _fmt_dollars, which collapses sub-cent to "Nc".
+        assert _plain(format_forge_cost(4_000) or "") == "forge +0c"
+
+    def test_distinct_from_native_cost_prefix(self):
+        # Visually distinguishable from Claude's native cost: carries a `forge +` prefix.
+        assert "forge" in _plain(format_forge_cost(50_000) or "")
+        assert "+" in _plain(format_forge_cost(50_000) or "")
+
+
+class TestForgeCostProducer:
+    """`forge_cost` reads the usage ledger (throttled, time-only). sum_forge_added_cost
+    is patched so the producer's shape-defense and fail-open are deterministic; the
+    throttle writes to the autouse-isolated forge home."""
+
+    _MANIFEST = {"name": "sess-a"}
+
+    def test_renders_added_cost_for_session(self):
+        with patch("forge.core.ops.usage_summary.sum_forge_added_cost", return_value=40_000):
+            out = _stream(_ctx(manifest=self._MANIFEST), ["forge_cost"])
+        assert any("forge +$0.04" in s for s in out)
+
+    def test_no_manifest_is_hidden(self):
+        # Ambient session: nothing to attribute, no ledger read.
+        assert _stream(_ctx(manifest=None), ["forge_cost"]) == []
+
+    def test_manifest_without_name_is_hidden(self):
+        assert _stream(_ctx(manifest={"confirmed": {}}), ["forge_cost"]) == []
+        assert _stream(_ctx(manifest={"name": ""}), ["forge_cost"]) == []
+        assert _stream(_ctx(manifest={"name": 123}), ["forge_cost"]) == []  # type: ignore[dict-item]
+
+    def test_no_reported_cost_renders_nothing(self):
+        # sum returns None (no reported cost) -> compute maps to 0 -> format -> None.
+        with patch("forge.core.ops.usage_summary.sum_forge_added_cost", return_value=None):
+            assert _stream(_ctx(manifest=self._MANIFEST), ["forge_cost"]) == []
+
+    def test_ledger_read_error_fails_open_to_hidden(self):
+        # A raising ledger read must degrade to "no segment", never crash the line.
+        with patch("forge.core.ops.usage_summary.sum_forge_added_cost", side_effect=RuntimeError("ledger boom")):
+            assert _stream(_ctx(manifest=self._MANIFEST), ["forge_cost"]) == []
+
+    def test_off_by_default(self):
+        with patch("forge.core.ops.usage_summary.sum_forge_added_cost", return_value=40_000):
+            out = _stream(_ctx(manifest=self._MANIFEST), list(DEFAULT_ORDER))
+        assert not any("forge +" in s for s in out)
+
+
 # --- Registry wiring ------------------------------------------------------
 
 
 class TestOptInWiring:
     def test_all_forge_segments_named_and_opt_in(self):
-        for name in ("supervisor", "policy", "audit", "drift", "spend_cap"):
+        for name in ("supervisor", "policy", "audit", "drift", "spend_cap", "forge_cost"):
             assert name in SEGMENT_NAMES
             assert name not in DEFAULT_ORDER
 

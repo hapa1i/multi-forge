@@ -57,6 +57,29 @@ def extract_cached_tokens(usage: object) -> int:
     return int(raw)
 
 
+def extract_reported_cost_usd(usage: object) -> float | None:
+    """Extract route-reported cost (USD) from an OpenAI-shaped usage object.
+
+    OpenRouter includes ``usage.cost`` (total spend in USD) in the response
+    body when usage accounting is available; it is auto-included, so we read
+    it when present rather than depending on a request flag. The typed SDK
+    surfaces it as an attribute (and in ``model_extra``); the dict path covers
+    responses already serialized to JSON.
+
+    Returns None when no cost field is present (cost unavailable, not $0).
+    """
+    cost = getattr(usage, "cost", None)
+    if cost is None and isinstance(usage, dict):
+        cost = usage.get("cost")
+    if cost is None:
+        extra = getattr(usage, "model_extra", None)  # SDK stashes unknown fields here
+        if isinstance(extra, dict):
+            cost = extra.get("cost")
+    if isinstance(cost, bool) or not isinstance(cost, (int, float)):
+        return None
+    return float(cost)
+
+
 def message_to_openai(msg: Message) -> dict[str, Any]:
     """Convert canonical Message to OpenAI chat completion format."""
     result: dict[str, Any] = {"role": msg.role, "content": msg.content}
@@ -152,6 +175,7 @@ def openai_response_to_completion(response: Any, provider: str) -> CompletionRes
             )
 
     usage = None
+    cost_usd = None
     if response.usage:
         usage = {
             "prompt_tokens": response.usage.prompt_tokens,
@@ -161,11 +185,13 @@ def openai_response_to_completion(response: Any, provider: str) -> CompletionRes
         cached = extract_cached_tokens(response.usage)
         if cached:
             usage["cached_tokens"] = cached
+        cost_usd = extract_reported_cost_usd(response.usage)
 
     return CompletionResponse(
         text=text,
         tool_calls=tool_calls,
         usage=usage,
+        cost_usd=cost_usd,
         raw=response.model_dump(),
     )
 

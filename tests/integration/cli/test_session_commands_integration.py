@@ -747,14 +747,14 @@ class TestTransactionalBehavior:
         assert content_before == content_after
 
 
-class TestUsageCommand:
-    """'forge usage' reads the real on-disk ledger + manifest through the wheel CLI.
+class TestActivityCommand:
+    """'forge activity' reads the real on-disk ledger + manifest through the wheel CLI.
 
     Exercises the real session resolver and ledger read (which unit tests mock) so a
     supervisor's error count -- e.g. OpenRouter content-filter failures -- is visible.
     """
 
-    def test_usage_reports_supervisor_errors(self, mock_claude_workspace: ContainerLike) -> None:
+    def test_activity_reports_supervisor_errors(self, mock_claude_workspace: ContainerLike) -> None:
         mock_claude_workspace.exec("cd /workspace && forge session start usage-test")
 
         # Emit real ledger events via the real code path (not hand-rolled JSON), so
@@ -778,7 +778,7 @@ class TestUsageCommand:
             """,
         )
 
-        result = mock_claude_workspace.exec("cd /workspace && forge usage usage-test --all --json")
+        result = mock_claude_workspace.exec("cd /workspace && forge activity usage-test --all --json")
         assert result.returncode == 0, result.stderr
 
         data = json.loads(result.stdout)

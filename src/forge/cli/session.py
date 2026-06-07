@@ -857,21 +857,6 @@ def session() -> None:
     pass
 
 
-# Register subgroups attached to `session` at import time so the
-# `forge session handoff` and `forge session memory` tombstone groups resolve.
-# Deferred (not a top-of-module import) to keep subgroup registration out of the
-# import path and avoid import-order fragility across the session CLI surface.
-def _register_subgroups() -> None:
-    from forge.cli.session_handoff import handoff_group  # noqa: E402
-    from forge.cli.session_memory import memory_group  # noqa: E402
-
-    session.add_command(handoff_group)
-    session.add_command(memory_group)
-
-
-_register_subgroups()
-
-
 # Re-export names that tests patch on forge.cli.session (originally top-level imports).
 # These must be in this module's namespace for patch("forge.cli.session.XXX") to work.
 from forge.core.naming import generate_unique_name as generate_unique_name  # noqa: E402,F401

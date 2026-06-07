@@ -157,7 +157,6 @@ def test_python_m_proxy_app_import_initializes_spend_caps(tmp_path: Path):
         proxy_data = yaml.safe_load(proxy_path.read_text())
         proxy_data["costs"] = {
             "caps": {"per_day": 0.000001},
-            "cap_mode": "post",
             "on_cap_hit": "reject",
         }
         proxy_path.write_text(yaml.safe_dump(proxy_data), encoding="utf-8")
@@ -420,31 +419,6 @@ async def test_metrics_accumulate(monkeypatch):
     assert snap["total_requests"] == 3
     assert snap["tokens"]["input"] == 300
     assert snap["tokens"]["output"] == 150
-
-
-@pytest.mark.asyncio
-async def test_strict_cap_counts_pydantic_message_content(monkeypatch):
-    """Strict cap preflight should count validated Message objects, not only dicts."""
-    import forge.proxy.server as server
-    from forge.proxy.cost_tracker import CostTracker
-    from forge.proxy.data_models import MessagesRequest
-
-    monkeypatch.setattr(server, "reload", lambda: None)
-    monkeypatch.setattr(
-        server,
-        "cost_tracker",
-        CostTracker(daily_cap_usd=0.0005, cap_mode="strict", on_cap_hit="reject"),
-    )
-
-    request_data = MessagesRequest(
-        model="claude-sonnet-4-6",
-        max_tokens=1,
-        messages=[{"role": "user", "content": "x" * 1000}],
-    )
-
-    resp = await server.create_message(request_data, _DummyRawRequest())
-
-    assert resp.status_code == 429
 
 
 @pytest.mark.asyncio

@@ -533,14 +533,12 @@ class TestProxyInstanceConfigValidation:
             tiers=TierModels(haiku="h", sonnet="s", opus="o"),
             costs={
                 "caps": {"per_day": "20.00"},
-                "cap_mode": "strict",
                 "on_cap_hit": "warn",
             },
         )
 
         assert isinstance(config.costs, CostConfig)
         assert config.costs.caps.per_day == 20.0
-        assert config.costs.cap_mode == "strict"
         assert config.costs.on_cap_hit == "warn"
 
     def test_invalid_cost_action_rejected(self):

@@ -32,6 +32,8 @@ from typing import Literal
 import dacite
 
 from forge.core.paths import get_forge_home
+from forge.core.state import decode_json_object
+from forge.core.usage.vocabulary import Confidence, Reporter, Route
 
 logger = logging.getLogger(__name__)
 
@@ -47,9 +49,11 @@ _warned_newer_schema = False
 MeasurementSource = Literal[
     "proxy_request_exact",  # joined to a proxy cost record by request_id
     "verb_snapshot_estimated",  # track_verb_cost snapshot delta (estimated; shared-proxy)
-    "provider_usage_exact",  # direct core.llm call: provider reported exact tokens in-band
-    "runtime_native",  # native runtime (codex/gemini) reported its own usage
-    "unattributed",  # no cost/token figure available (e.g. per-worker claude -p)
+    "provider_usage_exact",  # in-band exact tokens: a direct core.llm call, OR a direct
+    # `claude -p` envelope with usage but no cost (Phase 5, e.g. OAuth: tokens, no dollars)
+    "runtime_native",  # a runtime self-reported its own cost+usage: a direct `claude -p
+    # --output-format json` run (Phase 5, claude_code) or a native codex/gemini runtime
+    "unattributed",  # no cost/token figure available (e.g. per-worker proxied claude -p)
 ]
 
 AttributionGranularity = Literal["worker", "verb", "session"]
@@ -116,6 +120,13 @@ class UsageEvent:
     billing_mode: BillingMode = "unknown"
     measurement_source: MeasurementSource = "unattributed"
     attribution_granularity: AttributionGranularity = "verb"
+    # How the work reached the model, who supplied the metric evidence, and how
+    # trustworthy the COST figure is. `confidence` is scoped to this event's own
+    # cost_micro_usd ONLY (token provenance is measurement_source); a null cost is
+    # "unavailable" regardless of any source_refs-joined cost record.
+    route: Route | None = None
+    reporter: Reporter | None = None
+    confidence: Confidence = "unknown"
 
     # Consumption (nullable: not always knowable, e.g. per-worker claude -p).
     input_tokens: int | None = None
@@ -205,16 +216,8 @@ def read_usage_events(
         try:
             with open(path) as f:
                 for line in f:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    try:
-                        record = json.loads(line)
-                    except json.JSONDecodeError:
-                        continue
-                    # A line can be valid JSON yet not an object (`[]`, `"x"`, `1`). Skip it
-                    # rather than let `.get` raise AttributeError and abort the whole read.
-                    if not isinstance(record, dict):
+                    record = decode_json_object(line)
+                    if record is None:
                         continue
 
                     ver = record.get("schema_version")

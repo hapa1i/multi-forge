@@ -13,7 +13,7 @@ can assert the two end-to-end properties the slice promises:
 3. Usage-ledger events written inside the container are host-visible on the *writable*
    usage mount after the container stops. In sidecar mode the in-container supervisor +
    workflow verbs are the only writers of these events, so without the mount a sidecar
-   session is invisible to ``forge usage`` and the session-end summary.
+   session is invisible to ``forge activity`` and the session-end summary.
 
 The container always runs under the host ``--user uid:gid`` mapping (the Linux
 launch path), so this also exercises arbitrary-uid support on macOS: HOME=/root +
@@ -202,7 +202,7 @@ def test_sidecar_proxy_id_overlay_and_host_visible_audit_and_usage(tmp_path: Pat
     assert PROXY_ID in show_output, f"audit show did not surface the record: {show_output!r}"
 
     # 6) Usage events are likewise host-visible on the writable usage/ mount after the
-    #    --rm container is gone — this is what feeds `forge usage` + the session-end
+    #    --rm container is gone — this is what feeds `forge activity` + the session-end
     #    summary for sidecar sessions (the supervisor error mirrors the OpenRouter
     #    content-filter failures that motivated the read surface).
     usage_shards = list((usage_dir / "events").glob("*.jsonl"))

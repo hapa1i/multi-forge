@@ -54,6 +54,11 @@ class HeadlessRequest:
     provider: str | None = None
     proxy_id: str | None = None
     attribution: Attribution | None = None
+    # Phase 5: the invoker injects `--output-format <fmt>` (capability-gated) -- callers
+    # set this, NEVER a raw --output-format in argv. base_url drives cost precedence
+    # (proxied -> proxy cost wins; direct -> the runtime self-report wins; see emit.py).
+    output_format: str | None = "json"
+    base_url: str | None = None
 
 
 @dataclass
@@ -76,6 +81,16 @@ class HeadlessResult:
     run_id: str | None = None
     parent_run_id: str | None = None
     root_run_id: str | None = None
+    # Phase 5: runtime-self-reported cost/usage from --output-format json (nullable;
+    # cost None when the route reported none). ``envelope_parsed`` is independent of
+    # cost presence. ``runtime_is_error`` (already is-error-reliable-gated) steers the
+    # usage status only; ``success`` stays returncode-based (no consumer regression).
+    cost_micro_usd: int | None = None
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    cached_tokens: int | None = None
+    envelope_parsed: bool = False
+    runtime_is_error: bool = False
 
     @property
     def success(self) -> bool:

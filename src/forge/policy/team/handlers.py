@@ -191,11 +191,27 @@ def _run_supervisor(
         event_type=event_type,
         task_context=task_context,
     )
-    result = run_claude_session(
-        prompt,
-        resume_id=config.resume_id,
+    # Instrument like the semantic supervisor (Phase 5): snapshot proxy cost around the
+    # run, then emit one verb-level UsageEvent so the team supervisor's claude -p spend is
+    # attributed too (direct -> claude_code self-report; proxied -> forge_proxy snapshot).
+    from forge.core.reactive.cost_tracking import track_verb_cost
+    from forge.core.usage import emit_usage_for_session_result
+
+    with track_verb_cost("team-supervisor", [base_url] if base_url else []) as cost:
+        result = run_claude_session(
+            prompt,
+            resume_id=config.resume_id,
+            base_url=base_url,
+            timeout_seconds=config.timeout_seconds,
+        )
+    # Emit before the success gate so failures/timeouts are attributed too (the emit
+    # helper maps status itself and is best-effort -- it never raises).
+    emit_usage_for_session_result(
+        result,
+        command="team-supervisor",
+        cost=cost,
         base_url=base_url,
-        timeout_seconds=config.timeout_seconds,
+        direct=config.direct,
     )
     if not result.success:
         _log.warning("Team supervisor failed: %s", result.error)

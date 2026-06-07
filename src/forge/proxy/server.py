@@ -41,6 +41,7 @@ from forge.core.logging import (
     configure_debug_logging,
     get_effective_log_level,
 )
+from forge.core.usage.vocabulary import Confidence, Reporter
 from forge.proxy.base_client import ProxyStreamError, ToolCallError
 from forge.proxy.client_factory import TierClientFactory
 from forge.proxy.converters import (
@@ -115,7 +116,6 @@ def _initialize_cost_tracker_from_config() -> CostTracker:
         cost_tracker = CostTracker(
             daily_cap_usd=cost_cfg.caps.per_day,
             monthly_cap_usd=cost_cfg.caps.per_month,
-            cap_mode=cost_cfg.cap_mode,
             on_cap_hit=cost_cfg.on_cap_hit,
         )
         cost_tracker.bootstrap_from_logs(get_forge_home() / "costs" / "requests", proxy_id=PROXY_ID)
@@ -171,6 +171,22 @@ def _ensure_runtime_state() -> None:
     _maybe_prune_audit_logs()
 
 
+def _reported_cost_provenance() -> tuple[Reporter | None, Confidence]:
+    """Map the proxy's resolved provider to (reporter, confidence) for a reported cost.
+
+    OpenRouter returns actual spend in the response body (``usage.cost``) → a
+    directly *reported* figure. A LiteLLM gateway computes spend and returns it in
+    the ``x-litellm-response-cost`` header → *gateway_calculated*. Used only when a
+    reported cost is present; the provider value is otherwise irrelevant.
+    """
+    provider = getattr(config.proxy, "preferred_provider", "") or ""
+    if provider == "openrouter":
+        return "openrouter", "reported"
+    if provider.startswith("litellm"):
+        return "litellm", "gateway_calculated"
+    return None, "reported"  # a number is present but the provider is unrecognized
+
+
 def _calc_and_log_cost(
     *,
     model: str,
@@ -181,17 +197,23 @@ def _calc_and_log_cost(
     latency_ms: float,
     failed: bool,
     request_id: str,
-) -> int:
-    """Calculate cost in microdollars and write to the persistent cost log.
+    reported_cost_micros: int | None = None,
+) -> int | None:
+    """Log a request's cost (microdollars) and return it, or ``None`` if unavailable.
 
-    Best-effort: pricing/logging failures return 0 cost and warn.
-    Never raises — cost tracking must not break the proxy request path.
+    Forge records what the route reported, nothing more. When the route reported a
+    cost (``reported_cost_micros``), it is logged with the real reporter and
+    ``reported``/``gateway_calculated`` confidence. Otherwise cost is ``None`` /
+    ``confidence="unavailable"`` — tokens are still logged, but no dollar figure is
+    invented from a local price table. Best-effort: never raises; cost tracking must
+    not break the request path.
     """
     try:
-        from forge.core.models.pricing import calculate_cost, get_pricing
-
-        cost_micros = calculate_cost(model, input_tokens, output_tokens, cached_tokens)
-        pricing = get_pricing(model)
+        if reported_cost_micros is not None:
+            cost_micros: int | None = reported_cost_micros
+            reporter, confidence = _reported_cost_provenance()
+        else:
+            cost_micros, reporter, confidence = None, None, "unavailable"
 
         log_request_cost(
             proxy_id=PROXY_ID or "unknown",
@@ -204,16 +226,41 @@ def _calc_and_log_cost(
             latency_ms=latency_ms,
             failed=failed,
             request_id=request_id,
-            pricing_source=pricing.source,
+            reporter=reporter,
+            confidence=confidence,
         )
 
-        if cost_tracker is not None:
+        # Spend caps account for reported costs only; an unavailable cost advances nothing.
+        if cost_tracker is not None and cost_micros is not None:
             cost_tracker.record(cost_micros)
 
         return cost_micros
     except Exception as e:
         logger.warning("Cost calculation failed for model=%s (non-fatal): %s", model, e)
-        return 0
+        return None
+
+
+def _request_cost_header(cost_micros: int | None) -> dict[str, str]:
+    """``X-Request-Cost`` only when this request reported a cost.
+
+    A ``None`` cost is "unavailable" — omit the header rather than emit a
+    misleading ``0.000000`` (and ``None / 1_000_000`` would raise).
+    """
+    if cost_micros is None:
+        return {}
+    return {"X-Request-Cost": f"{cost_micros / 1_000_000:.6f}"}
+
+
+def _cumulative_cost_header() -> dict[str, str]:
+    """``X-Cumulative-Cost`` only once at least one request has reported a cost.
+
+    A cumulative ``0.000000`` on a proxy that has only ever seen cost-unavailable
+    routes (e.g. Anthropic passthrough) is the same "unknown-as-zero" bug in header
+    form — omit it until there is real reported-cost evidence.
+    """
+    if proxy_metrics.cost_reported_requests <= 0:
+        return {}
+    return {"X-Cumulative-Cost": f"{proxy_metrics.total_cost_micros / 1_000_000:.6f}"}
 
 
 _CAP_CONFIG_KEY = {"daily": "per_day", "monthly": "per_month"}
@@ -224,7 +271,6 @@ def _cap_result_message(cap_result) -> str:
     cap_type = cap_result.cap_type or "configured"
     config_key = _CAP_CONFIG_KEY.get(cap_type, f"per_{cap_type}")
     return (
-        f"{'Projected ' if cap_result.projected else ''}"
         f"{cap_type} spend cap reached: "
         f"${cap_result.current_micros / 1_000_000:.2f} / "
         f"${cap_result.limit_micros / 1_000_000:.2f}. "
@@ -237,36 +283,6 @@ def _with_spend_warning(headers: dict[str, str], warning: str | None) -> dict[st
     if warning:
         headers["X-Spend-Warning"] = warning
     return headers
-
-
-def _textish_chars(value: object) -> int:
-    """Approximate text-bearing request payload size for strict cap preflight."""
-    if value is None:
-        return 0
-    if isinstance(value, str):
-        return len(value)
-    if isinstance(value, dict):
-        total = 0
-        for key in ("content", "text", "thinking", "input", "name", "description"):
-            if key in value:
-                total += _textish_chars(value[key])
-        return total
-    if isinstance(value, (list, tuple)):
-        return sum(_textish_chars(item) for item in value)
-
-    total = 0
-    for attr in ("content", "text", "thinking", "input", "name", "description"):
-        if hasattr(value, attr):
-            total += _textish_chars(getattr(value, attr))
-    return total
-
-
-def _estimate_input_tokens(request_data: MessagesRequest) -> int:
-    """Approximate request input tokens for strict cap preflight."""
-    chars = _textish_chars(getattr(request_data, "system", None))
-    chars += _textish_chars(getattr(request_data, "messages", None))
-    chars += _textish_chars(getattr(request_data, "tools", None))
-    return chars // 4
 
 
 def _get_tier_override(tier: str) -> TierOverride | None:
@@ -665,25 +681,11 @@ async def _handle_anthropic_passthrough(raw_request: Request, request_id: str, *
     resolved_tier = _tier_from_model_name(model) or getattr(config.proxy, "default_tier", None) or "sonnet"
     req_headers = dict(raw_request.headers)
 
-    # Spend-cap preflight — same cross-request accumulation as the translated path,
-    # so caps configured on a passthrough proxy are enforced, not silently ignored.
+    # Spend-cap check — same cross-request accumulation as the translated path, so caps
+    # configured on a passthrough proxy are enforced, not silently ignored.
     spend_warning: str | None = None
     if cost_tracker is not None and cost_tracker.has_caps:
-        projected = 0
-        if cost_tracker.cap_mode == "strict":
-            from forge.core.models.pricing import calculate_cost as _est_cost
-
-            est_input = (
-                _textish_chars(raw_body.get("system"))
-                + _textish_chars(raw_body.get("messages"))
-                + _textish_chars(raw_body.get("tools"))
-            ) // 4
-            est_output = int(raw_body.get("max_tokens") or 4096)
-            try:
-                projected = _est_cost(model, est_input, est_output, 0)
-            except Exception:
-                projected = 0
-        cap_result = cost_tracker.check_cap(projected_cost_micros=projected)
+        cap_result = cost_tracker.check_cap()
         if cap_result.exceeded:
             spend_warning = _cap_result_message(cap_result)
             if cost_tracker.on_cap_hit == "reject":
@@ -767,7 +769,7 @@ async def _handle_anthropic_passthrough(raw_request: Request, request_id: str, *
         {
             "X-Resolved-Model": model,
             "X-Resolved-Tier": resolved_tier,
-            "X-Cumulative-Cost": f"{proxy_metrics.total_cost_micros / 1_000_000:.6f}",
+            **_cumulative_cost_header(),
         },
         spend_warning,
     )
@@ -878,20 +880,9 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
         actual_model_id = _resolve_model_with_alternatives(resolved_tier, original_model_name, tier_default)
         logger.debug(f"[{request_id}] Tier-resolved model: tier={resolved_tier} -> '{actual_model_id}'")
 
-    # Spend cap check (after model resolution so strict preflight prices the actual model)
+    # Spend cap check — post-event enforcement from accumulated spend.
     if cost_tracker is not None and cost_tracker.has_caps:
-        projected = 0
-        if cost_tracker.cap_mode == "strict":
-            from forge.core.models.pricing import calculate_cost as _est_cost
-
-            _est_max_output = request_data.max_tokens or 4096
-            _est_input = _estimate_input_tokens(request_data)
-            try:
-                projected = _est_cost(actual_model_id, _est_input, _est_max_output, 0)
-            except Exception:
-                projected = 0
-
-        cap_result = cost_tracker.check_cap(projected_cost_micros=projected)
+        cap_result = cost_tracker.check_cap()
         if cap_result.exceeded:
             spend_warning = _cap_result_message(cap_result)
             if cost_tracker.on_cap_hit == "reject":
@@ -1032,7 +1023,7 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                 "X-Request-ID": request_id,
                 "X-Resolved-Tier": resolved_tier,
                 "X-Resolved-Model": actual_model_id,
-                "X-Cumulative-Cost": f"{proxy_metrics.total_cost_micros / 1_000_000:.6f}",
+                **_cumulative_cost_header(),
                 "Cache-Control": "no-cache",
                 "Connection": "keep-alive",
             }
@@ -1083,6 +1074,8 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                     latency_ms=elapsed,
                     failed=failed,
                     request_id=request_id,
+                    # final_usage carries the route-reported cost the SSE converter parked there.
+                    reported_cost_micros=usage.get("reported_cost_micros"),
                 )
                 proxy_metrics.record_request(
                     tier=resolved_tier,
@@ -1139,6 +1132,7 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                     latency_ms=duration_ms,
                     failed=False,
                     request_id=request_id,
+                    reported_cost_micros=openai_response.get("_reported_cost_micros"),
                 )
                 proxy_metrics.record_request(
                     tier=resolved_tier,
@@ -1188,8 +1182,8 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                             "X-Request-ID": request_id,
                             "X-Resolved-Tier": resolved_tier,
                             "X-Resolved-Model": actual_model_id,
-                            "X-Request-Cost": f"{_cost / 1_000_000:.6f}",
-                            "X-Cumulative-Cost": f"{proxy_metrics.total_cost_micros / 1_000_000:.6f}",
+                            **_request_cost_header(_cost),
+                            **_cumulative_cost_header(),
                         },
                         spend_warning,
                     ),
@@ -1287,6 +1281,7 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                     latency_ms=retry_duration_ms,
                     failed=False,
                     request_id=request_id,
+                    reported_cost_micros=openai_response.get("_reported_cost_micros"),
                 )
                 proxy_metrics.record_request(
                     tier=resolved_tier,
@@ -1310,8 +1305,8 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                             "X-Request-ID": request_id,
                             "X-Resolved-Tier": resolved_tier,
                             "X-Resolved-Model": actual_model_id,
-                            "X-Request-Cost": f"{_rcost / 1_000_000:.6f}",
-                            "X-Cumulative-Cost": f"{proxy_metrics.total_cost_micros / 1_000_000:.6f}",
+                            **_request_cost_header(_rcost),
+                            **_cumulative_cost_header(),
                         },
                         spend_warning,
                     ),

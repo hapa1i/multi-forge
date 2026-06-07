@@ -27,6 +27,7 @@ from .openai_compat import (
     ToolCallAccumulator,
     build_chat_completion_kwargs,
     extract_cached_tokens,
+    extract_reported_cost_usd,
     is_retryable_error,
     message_to_openai,
     openai_response_to_completion,
@@ -159,6 +160,7 @@ class OpenRouterClient:
 
         accumulator = ToolCallAccumulator()
         usage_data: dict[str, int] | None = None
+        cost_usd: float | None = None
 
         try:
             kwargs = build_chat_completion_kwargs(self._model, messages, tools, merged_params)
@@ -178,6 +180,10 @@ class OpenRouterClient:
                     cached = extract_cached_tokens(chunk.usage)
                     if cached:
                         usage_data["cached_tokens"] = cached
+                    # OpenRouter reports spend in the final usage chunk (usage.cost).
+                    chunk_cost = extract_reported_cost_usd(chunk.usage)
+                    if chunk_cost is not None:
+                        cost_usd = chunk_cost
 
                 if not chunk.choices:
                     continue
@@ -203,13 +209,14 @@ class OpenRouterClient:
                         yield StreamEvent(type="tool_call_delta", tool_call_delta=tool_delta)
 
             if usage_data:
-                yield StreamEvent(type="usage", usage=usage_data)
+                yield StreamEvent(type="usage", usage=usage_data, cost_usd=cost_usd)
 
             final_tool_calls = accumulator.finalize() if accumulator.has_pending() else None
             yield StreamEvent(
                 type="response_end",
                 tool_calls=final_tool_calls,
                 usage=usage_data,
+                cost_usd=cost_usd,
             )
 
         except Exception as e:

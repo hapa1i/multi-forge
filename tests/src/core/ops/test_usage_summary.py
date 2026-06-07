@@ -17,6 +17,7 @@ from forge.core.ops.usage_summary import (
     SessionActivitySummary,
     build_session_activity_summary,
     render_summary_line,
+    sum_forge_added_cost,
 )
 from forge.core.usage.ledger import UsageEvent, log_usage_event
 from forge.session.models import (
@@ -219,7 +220,8 @@ class TestRenderLine:
         line = render_summary_line(summary)
         assert line is not None
         assert "supervisor: 12 checks (2 warn, 0 block, 3 errors)" in line
-        assert "~$0.04 est" in line
+        assert "~$0.04" in line
+        assert " est" not in line  # the stale ' est' suffix was dropped (Phase 6 label honesty)
         assert "21k tok" in line
         assert "2 workflows" in line
         assert "1 subagent" in line
@@ -265,4 +267,142 @@ class TestRenderLine:
         )
         line = render_summary_line(summary)
         assert line is not None
-        assert "~$0.00 est" in line
+        assert "~$0.00" in line
+
+
+class TestSumForgeAddedCost:
+    """`sum_forge_added_cost` -- the `forge +$Y` aggregator. "Forge-added" =
+    reported LLM cost for the session EXCLUDING the main interactive harness."""
+
+    def test_sums_reported_claude_p_cost(self) -> None:
+        log_usage_event(
+            _event(
+                command="memory-writer",
+                route="claude_p",
+                reporter="claude_code",
+                confidence="reported",
+                cost_micro_usd=30_000,
+            )
+        )
+        log_usage_event(
+            _event(
+                command="supervisor",
+                route="claude_p",
+                reporter="forge_proxy",
+                confidence="reported",
+                cost_micro_usd=20_000,
+            )
+        )
+        assert sum_forge_added_cost("planner") == 50_000
+
+    def test_excludes_main_interactive_harness(self) -> None:
+        # Load-bearing: the card forbids blending observed main-harness traffic into
+        # "Forge additional cost". A claude_interactive event must NOT be summed,
+        # even when it carries a reported cost.
+        log_usage_event(
+            _event(
+                command="memory-writer",
+                route="claude_p",
+                reporter="claude_code",
+                confidence="reported",
+                cost_micro_usd=30_000,
+            )
+        )
+        log_usage_event(
+            _event(
+                command="interactive",
+                route="claude_interactive",
+                reporter="claude_code",
+                confidence="reported",
+                cost_micro_usd=500_000,
+            )
+        )
+        assert sum_forge_added_cost("planner") == 30_000  # harness 500_000 excluded
+
+    def test_unavailable_rows_contribute_nothing(self) -> None:
+        log_usage_event(
+            _event(
+                command="memory-writer",
+                route="claude_p",
+                reporter="claude_code",
+                confidence="reported",
+                cost_micro_usd=12_000,
+            )
+        )
+        log_usage_event(_event(command="supervisor", route="claude_p", confidence="unavailable", cost_micro_usd=None))
+        assert sum_forge_added_cost("planner") == 12_000
+
+    def test_no_reported_cost_returns_none_not_zero(self) -> None:
+        # No reported-cost event -> None (no cost evidence), distinct from a real $0.
+        log_usage_event(_event(command="supervisor", route="claude_p", confidence="unavailable", cost_micro_usd=None))
+        assert sum_forge_added_cost("planner") is None
+
+    def test_empty_ledger_returns_none(self) -> None:
+        assert sum_forge_added_cost("planner") is None
+
+    def test_since_bounds_the_scan(self) -> None:
+        # `since` filters the ledger by event ts so the status-line poll need not
+        # re-parse the whole ledger: an event before `since` is excluded; one at/after
+        # is summed. The bound is the ONLY difference from an unbounded scan.
+        log_usage_event(
+            _event(
+                command="memory-writer",
+                route="claude_p",
+                reporter="claude_code",
+                confidence="reported",
+                cost_micro_usd=10_000,
+                ts="2026-06-01T00:00:00+00:00",
+            )
+        )
+        log_usage_event(
+            _event(
+                command="supervisor",
+                route="claude_p",
+                reporter="claude_code",
+                confidence="reported",
+                cost_micro_usd=40_000,
+                ts="2026-06-05T00:00:00+00:00",
+            )
+        )
+        since = datetime(2026, 6, 3, tzinfo=timezone.utc)
+        assert sum_forge_added_cost("planner", since=since) == 40_000  # 06-01 event excluded
+        assert sum_forge_added_cost("planner") == 50_000  # unbounded sums both
+
+    def test_other_sessions_excluded(self) -> None:
+        log_usage_event(
+            _event(
+                session="planner",
+                route="claude_p",
+                reporter="claude_code",
+                confidence="reported",
+                cost_micro_usd=10_000,
+            )
+        )
+        log_usage_event(
+            _event(
+                session="other", route="claude_p", reporter="claude_code", confidence="reported", cost_micro_usd=99_000
+            )
+        )
+        assert sum_forge_added_cost("planner") == 10_000
+
+    def test_includes_gateway_calculated_cost(self) -> None:
+        # A gateway-computed figure (e.g. LiteLLM's x-litellm-response-cost) is
+        # trustworthy enough to count toward Forge-added spend, like a directly-
+        # reported one. Pins the predicate so `forge +$Y` and `forge activity` agree.
+        log_usage_event(
+            _event(
+                command="panel",
+                route="claude_p",
+                reporter="litellm",
+                confidence="gateway_calculated",
+                cost_micro_usd=40_000,
+            )
+        )
+        assert sum_forge_added_cost("planner") == 40_000
+
+    def test_excludes_inferred_and_unknown_cost(self) -> None:
+        # Estimates (`inferred`) and un-provenanced (`unknown`) cost never contribute,
+        # even with a dollar figure present -- the north star: never sum an estimate.
+        log_usage_event(_event(command="panel", route="claude_p", confidence="inferred", cost_micro_usd=70_000))
+        log_usage_event(_event(command="panel", route="claude_p", confidence="unknown", cost_micro_usd=80_000))
+        assert sum_forge_added_cost("planner") is None

@@ -75,6 +75,7 @@ Cards may contain aspirational target architecture. Design docs should not.
 | Aspirational proposal         | `docs/board/proposed/<slug>/card.md`        | When drafting or revising a proposal       |
 | Accepted/scheduled work       | `docs/board/todo/<slug>/card.md`            | When work is accepted but not active       |
 | Active execution plan         | `docs/board/doing/<slug>/checklist.md`      | During active card work                    |
+| Paused in-progress work       | `docs/board/paused/<slug>/card.md`          | When partially-done work goes on hold      |
 | Completed work                | `docs/board/change_log.md`                  | At phase/card closeout                     |
 | Durable implementation memory | `docs/board/impl_notes.md`                  | After human review                         |
 | Normative architecture        | `docs/design.md`, `docs/design_appendix.md` | As code ships                              |

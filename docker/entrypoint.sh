@@ -80,6 +80,16 @@ fi
 export ANTHROPIC_BASE_URL=http://localhost:8085
 export CLAUDE_CODE_AUTO_COMPACT_WINDOW="${CLAUDE_CODE_AUTO_COMPACT_WINDOW:-200000}"
 
+# interactive_anthropic_api_key=omit: drop ANTHROPIC_API_KEY for Claude only. The
+# proxy already started above with the key (captured for upstream), so this affects
+# only Claude -- its apiKeyHelper falls back to the dummy passthrough and Claude
+# routes through the local proxy without a real Anthropic key. Works for every
+# template, including anthropic-upstream, because the per-process unset happens here.
+if [ "$FORGE_OMIT_INTERACTIVE_KEY" = "1" ]; then
+  unset ANTHROPIC_API_KEY
+  echo "interactive_anthropic_api_key=omit: ANTHROPIC_API_KEY withheld from Claude (proxy keeps upstream auth)"
+fi
+
 # Configure Claude Code auth for container environment.
 # Containers have no keychain/console login. apiKeyHelper calls a helper script
 # to resolve the API key, and hasCompletedOnboarding skips the first-run screen.

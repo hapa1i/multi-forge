@@ -209,15 +209,11 @@ class CostConfig:
     """Cost tracking and cap configuration for a proxy."""
 
     caps: CostCaps = field(default_factory=CostCaps)
-    cap_mode: str = "post"  # "post" (block after exceeded) or "strict" (pre-flight estimate)
     on_cap_hit: str = "reject"  # "reject" (HTTP 429) or "warn" (header only)
 
     def __post_init__(self) -> None:
         self.caps = _coerce_cost_caps(self.caps)
 
-        valid_modes = {"post", "strict"}
-        if self.cap_mode not in valid_modes:
-            raise ValueError(f"Invalid cap_mode: '{self.cap_mode}' (must be one of: {', '.join(sorted(valid_modes))})")
         valid_actions = {"reject", "warn"}
         if self.on_cap_hit not in valid_actions:
             raise ValueError(
@@ -233,9 +229,17 @@ def _coerce_cost_config(value: Any) -> CostConfig:
         return value
     if not isinstance(value, dict):
         raise ValueError("Invalid costs: must be a mapping")
+    if "cap_mode" in value:
+        # Removed in metric-evidence Phase 3: caps have one behavior now (post-event). The
+        # costs block is otherwise leniently parsed, so a removed key must be rejected
+        # explicitly or it would be silently ignored (coding-standards: removed = tombstone).
+        raise ValueError(
+            "costs.cap_mode is no longer supported. Forge enforces spend caps after each "
+            "completed request; there is no pre-flight 'strict' mode. Remove costs.cap_mode "
+            "from proxy.yaml."
+        )
     return CostConfig(
         caps=_coerce_cost_caps(value.get("caps", {}) or {}),
-        cap_mode=value.get("cap_mode", "post"),
         on_cap_hit=value.get("on_cap_hit", "reject"),
     )
 

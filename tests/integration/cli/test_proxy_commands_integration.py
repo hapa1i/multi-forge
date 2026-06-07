@@ -312,7 +312,7 @@ class TestProxyDelete:
         )
 
     def test_delete_removes_proxy_and_registry(self, mock_claude_workspace: ContainerLike) -> None:
-        """Should remove proxy file and registry entry with --force."""
+        """Should remove proxy file and registry entry with --yes."""
         proxy_yaml = """\
 template: litellm-openai
 provider: litellm
@@ -337,7 +337,7 @@ tiers:
             },
         )
 
-        result = mock_claude_workspace.exec("forge proxy delete delete-me --force")
+        result = mock_claude_workspace.exec("forge proxy delete delete-me --yes")
 
         assert result.returncode == 0
 
@@ -354,7 +354,7 @@ tiers:
 
     def test_delete_not_found_error(self, mock_claude_workspace: ContainerLike) -> None:
         """Should error when proxy not in registry."""
-        result = mock_claude_workspace.exec("forge proxy delete nonexistent --force")
+        result = mock_claude_workspace.exec("forge proxy delete nonexistent --yes")
 
         assert result.returncode != 0
         assert "not found" in (result.stdout + result.stderr).lower()
@@ -442,7 +442,7 @@ tiers:
         )
 
         try:
-            result = mock_claude_workspace.exec("forge proxy delete alias-a --force")
+            result = mock_claude_workspace.exec("forge proxy delete alias-a --yes")
 
             assert result.returncode == 0
             assert "Server kept alive" in result.stdout

@@ -712,8 +712,7 @@ def sync_cmd(scope: str | None, force: bool) -> None:
     help="Disable ALL tracked installations",
 )
 @click.option("--yes", "-y", is_flag=True, help="Skip confirmation prompt")
-@click.option("--force", "-f", is_flag=True, hidden=True, help="Deprecated alias for --yes")
-def disable_cmd(scope: str | None, uninstall_all: bool, yes: bool, force: bool) -> None:
+def disable_cmd(scope: str | None, uninstall_all: bool, yes: bool) -> None:
     """Disable Forge extensions.
 
     Removes only files and settings entries that were added by Forge.
@@ -737,8 +736,6 @@ def disable_cmd(scope: str | None, uninstall_all: bool, yes: bool, force: bool) 
         forge extension disable --scope local     # Disable local scope
         forge extension disable --all --yes       # Disable everything
     """
-    yes = yes or force
-
     if uninstall_all and scope is not None:
         raise click.UsageError("--all and --scope are mutually exclusive.")
     try:
@@ -791,7 +788,7 @@ def disable_cmd(scope: str | None, uninstall_all: bool, yes: bool, force: bool) 
             console.print("[bold]Settings:[/bold]")
             console.print(table)
 
-        if not (force or yes):
+        if not yes:
             if not click.confirm("\nProceed with disable?"):
                 console.print("[dim]Cancelled.[/dim]")
                 return

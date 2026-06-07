@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any
 
 from forge.core.paths import get_forge_home
+from forge.core.state import decode_json_object
 
 logger = logging.getLogger(__name__)
 
@@ -381,12 +382,8 @@ def read_audit_logs(
         try:
             with open(path) as f:
                 for line in f:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    try:
-                        record = json.loads(line)
-                    except json.JSONDecodeError:
+                    record = decode_json_object(line)
+                    if record is None:
                         continue
 
                     ver = record.get("schema_version")

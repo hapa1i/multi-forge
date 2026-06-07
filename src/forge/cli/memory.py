@@ -27,7 +27,6 @@ from forge.session.exceptions import (
     PassportError,
 )
 from forge.session.passport import (
-    _REMOVED_STRATEGIES,
     VALID_STRATEGY_NAMES,
     Passport,
     derive_shadow_path,
@@ -207,8 +206,6 @@ def _set_memory_activation(session_name: str, *, enabled: bool, mode: str | None
 @click.option("--writers", default=None, help="Writer spec (default: all-sessions).")
 @click.option("--propose", is_flag=True, default=False, help="Author a shadow-only passport (proposal mode).")
 @click.option("--shadow-path", "shadow_override", default=None, help="Explicit shadow file path (use with --propose).")
-@click.option("--as", "removed_as", type=str, default=None, hidden=True, help="(removed) renamed to --strategy.")
-@click.option("--session", "-s", "session_name", default=None, hidden=True, help="(removed) track is sessionless.")
 def track_cmd(
     path: str,
     strategy: str | None,
@@ -216,8 +213,6 @@ def track_cmd(
     writers: str | None,
     propose: bool,
     shadow_override: str | None,
-    removed_as: str | None,
-    session_name: str | None,
 ) -> None:
     """Author a project-memory passport on a doc (project-lifetime, sessionless).
 
@@ -238,26 +233,11 @@ def track_cmd(
       generic        Add any new information missing from the file
       project-state  Update current focus, decisions, and handoff notes
     """
-    # Tombstone: --as was renamed to --strategy (coding-standards §5).
-    if removed_as is not None:
-        raise click.ClickException("--as was renamed to --strategy.")
-
-    # Tombstone: track no longer takes a session (clean break, coding-standards §5).
-    if session_name is not None:
+    # Strategy validation: unknown strategy names get the list of valid options.
+    if strategy is not None and strategy not in VALID_STRATEGY_NAMES:
         raise click.ClickException(
-            "track authors project passports and does not take a session.\n"
-            "For one-off updates, instruct the agent directly."
+            f"Unknown strategy '{strategy}'. " f"Valid strategies: {', '.join(sorted(VALID_STRATEGY_NAMES))}"
         )
-
-    # Strategy validation: removed strategies get helpful hints, unknown get a list.
-    if strategy is not None:
-        removed_hint = _REMOVED_STRATEGIES.get(strategy)
-        if removed_hint:
-            raise click.ClickException(f"Strategy '{strategy}' was removed. {removed_hint}")
-        if strategy not in VALID_STRATEGY_NAMES:
-            raise click.ClickException(
-                f"Unknown strategy '{strategy}'. " f"Valid strategies: {', '.join(sorted(VALID_STRATEGY_NAMES))}"
-            )
 
     # Early flag-combination validation
     if shadow_override and not propose:
@@ -533,10 +513,7 @@ def list_cmd(as_json: bool) -> None:
     """List passported memory docs under scan roots."""
     import json
 
-    from forge.session.project_memory import (
-        scan_all_passported_docs,
-        scan_stale_passports,
-    )
+    from forge.session.project_memory import scan_all_passported_docs
 
     ctx = ExecutionContext.from_cwd()
     if ctx.forge_root is None:
@@ -570,20 +547,13 @@ def list_cmd(as_json: bool) -> None:
             }
         )
 
-    stale = scan_stale_passports(forge_root, DEFAULT_SCAN_ROOTS)
-
     if as_json:
         click.echo(json.dumps(enriched, indent=2))
-        for rel, strategy, hint in stale:
-            console.print(f"[yellow]Warning:[/yellow] {rel}: strategy '{strategy}' was removed. {hint}")
         return
 
     if not enriched:
-        if not stale:
-            console.print("[dim]No passported memory docs found under scan roots.[/dim]")
-            print_tip("Run 'forge memory track <path> --strategy <strategy>'.", blank_before=False, console=console)
-        for rel, strategy, hint in stale:
-            console.print(f"[yellow]Warning:[/yellow] {rel}: strategy '{strategy}' was removed. {hint}")
+        console.print("[dim]No passported memory docs found under scan roots.[/dim]")
+        print_tip("Run 'forge memory track <path> --strategy <strategy>'.", blank_before=False, console=console)
         return
 
     from rich.table import Table
@@ -610,9 +580,6 @@ def list_cmd(as_json: bool) -> None:
         )
         table.add_row(*row)
     console.print(table)
-
-    for rel, strategy, hint in stale:
-        console.print(f"[yellow]Warning:[/yellow] {rel}: strategy '{strategy}' was removed. {hint}")
 
 
 # ---------------------------------------------------------------------------
@@ -1231,8 +1198,8 @@ def passport_remove_cmd(path: str, as_json: bool) -> None:
 
 
 # Registered at module bottom via a late import to avoid deepening the
-# memory -> session -> session_handoff import cycle (memory.py already imports
-# forge.cli.session at module top). Mirrors session.py's _register_subgroups.
+# memory -> session import cycle (memory.py already imports forge.cli.session at
+# module top).
 from forge.cli.memory_report import report_group  # noqa: E402
 
 memory.add_command(report_group)

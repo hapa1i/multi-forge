@@ -158,6 +158,9 @@ class CompletionResponse(BaseModel):
     text: str
     tool_calls: list[ToolCall] | None = None
     usage: dict[str, int] | None = None  # {prompt_tokens, completion_tokens, total_tokens}
+    # Route-reported cost in USD (OpenRouter body usage.cost / LiteLLM response-cost header).
+    # None = the route reported no cost. Reporter/confidence are derived at the proxy.
+    cost_usd: float | None = None
     raw: dict[str, Any] | None = None  # Original provider response (debugging only)
 
 
@@ -173,4 +176,7 @@ class StreamEvent(BaseModel):
     tool_call_delta: ToolCallDelta | None = None
     tool_calls: list[ToolCall] | None = None  # Finalized tool calls at response_end
     usage: dict[str, int] | None = None
+    # Route-reported cost in USD, carried on the final usage/response_end event.
+    # None = no cost reported on this stream. Reporter/confidence derived at the proxy.
+    cost_usd: float | None = None
     error: str | None = None

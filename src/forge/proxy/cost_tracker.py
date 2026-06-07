@@ -4,9 +4,9 @@ On proxy startup, reads the current (and previous) month's cost JSONL
 logs to initialize in-memory spend counters. Caps are enforced per
 request via check_cap().
 
-Two enforcement modes:
-  post   -- block once accumulated spend already exceeds the cap
-  strict -- estimate incoming request cost and block if projected total exceeds
+One enforcement behavior: a request may cross a cap and complete; Forge
+records its cost, then blocks (or warns on) the next request once
+accumulated spend has exceeded the cap.
 """
 
 from __future__ import annotations
@@ -17,6 +17,8 @@ from collections import deque
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+
+from forge.core.state import decode_json_object
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +34,6 @@ class CapResult:
     cap_type: str | None = None  # "daily" or "monthly"
     current_micros: int = 0
     limit_micros: int = 0
-    projected: bool = False  # True if this is a pre-flight estimate
 
 
 class CostTracker:
@@ -47,12 +48,10 @@ class CostTracker:
         *,
         daily_cap_usd: float | None = None,
         monthly_cap_usd: float | None = None,
-        cap_mode: str = "post",
         on_cap_hit: str = "reject",
     ) -> None:
         self.daily_cap_micros = int(daily_cap_usd * _MICROS_PER_DOLLAR) if daily_cap_usd is not None else None
         self.monthly_cap_micros = int(monthly_cap_usd * _MICROS_PER_DOLLAR) if monthly_cap_usd is not None else None
-        self.cap_mode = cap_mode
         self.on_cap_hit = on_cap_hit
 
         self._daily_window: deque[tuple[float, int]] = deque()
@@ -131,11 +130,19 @@ class CostTracker:
     @staticmethod
     def _parse_record(line: str) -> tuple[float, int, str, str | None] | None:
         """Parse a JSONL line into (unix_timestamp, cost_micros, month_key, record_proxy_id)."""
-        import json
-
-        data = json.loads(line)
+        # Skip blank / malformed / non-object lines (`[]`, `1`): return None rather than let
+        # `.get` raise AttributeError (bootstrap's broad except would otherwise mask it).
+        data = decode_json_object(line)
+        if data is None:
+            return None
         ts_str = data.get("ts", "")
-        cost_micros = int(data.get("cost_micros", 0))
+        # Cost is nullable: a null (or absent) cost_micros means the route reported
+        # no cost. It never advances spend caps, so skip it explicitly rather than let
+        # int(None) raise (the bootstrap's broad except would otherwise mask the line).
+        raw_cost = data.get("cost_micros")
+        if raw_cost is None:
+            return None
+        cost_micros = int(raw_cost)
         if cost_micros <= 0:
             return None
 
@@ -148,9 +155,14 @@ class CostTracker:
         record_proxy_id = data.get("proxy_id")
         return ts.timestamp(), cost_micros, month_key, record_proxy_id
 
-    def record(self, cost_micros: int) -> None:
-        """Record a completed request's cost."""
-        if cost_micros <= 0:
+    def record(self, cost_micros: int | None) -> None:
+        """Record a completed request's cost.
+
+        ``None`` means the route reported no cost (cost unavailable). Caps account
+        only for cost-reported requests, so an unavailable cost is skipped rather
+        than treated as ``0`` — and ``None <= 0`` would otherwise raise ``TypeError``.
+        """
+        if cost_micros is None or cost_micros <= 0:
             return
 
         now = time.time()
@@ -182,42 +194,33 @@ class CostTracker:
         self._roll_month_if_needed()
         return self._monthly_total
 
-    def check_cap(self, projected_cost_micros: int = 0) -> CapResult:
-        """Check if spend would exceed any configured caps.
+    def check_cap(self) -> CapResult:
+        """Return whether accumulated spend has exceeded any configured cap.
 
-        Args:
-            projected_cost_micros: Estimated cost of the pending request.
-                In strict mode, added to current spend for pre-flight check.
-                In post mode, ignored (only accumulated spend matters).
-
-        Returns:
-            CapResult indicating whether any cap is exceeded.
+        Enforcement is post-event: this checks already-recorded spend only, so a
+        request may cross a cap and complete; the next request is what gets blocked.
         """
         if not self.has_caps:
             return CapResult(exceeded=False)
 
-        extra = projected_cost_micros if self.cap_mode == "strict" else 0
-
         if self.daily_cap_micros is not None:
-            daily = self.daily_spend_micros() + extra
+            daily = self.daily_spend_micros()
             if daily >= self.daily_cap_micros:
                 return CapResult(
                     exceeded=True,
                     cap_type="daily",
                     current_micros=daily,
                     limit_micros=self.daily_cap_micros,
-                    projected=extra > 0,
                 )
 
         if self.monthly_cap_micros is not None:
-            monthly = self.monthly_spend_micros() + extra
+            monthly = self.monthly_spend_micros()
             if monthly >= self.monthly_cap_micros:
                 return CapResult(
                     exceeded=True,
                     cap_type="monthly",
                     current_micros=monthly,
                     limit_micros=self.monthly_cap_micros,
-                    projected=extra > 0,
                 )
 
         return CapResult(exceeded=False)

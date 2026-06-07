@@ -66,19 +66,33 @@ def _auth_ignore_env() -> bool:
         return False
 
 
-def resolve_env_or_credential(var_name: str) -> str | None:
-    """Resolve a single value from environment, then credential file.
+def resolve_env_or_credential_with_source(var_name: str) -> tuple[str | None, str]:
+    """Resolve a value and report which source supplied it.
 
-    When ``auth_ignore_env`` is active, skips os.environ and reads from
-    the credential file only.
-
-    Returns the first truthy (non-empty) value found, or None.
+    Source is ``"env"`` (shell environment), ``"credential_file"`` (the Forge
+    credential file), or ``"none"`` (unresolved). When ``auth_ignore_env`` is
+    active the shell environment is skipped, so a value present in both places is
+    reported as ``credential_file`` -- the source the child actually uses. Callers
+    recording provenance (e.g. interactive launch metadata) must use this rather
+    than re-deriving the branch, which would drift from the value actually chosen.
     """
     if not _auth_ignore_env():
         value = os.environ.get(var_name)
         if value:
-            return value
-    return _get_file_secrets().get(var_name) or None
+            return value, "env"
+    file_value = _get_file_secrets().get(var_name) or None
+    if file_value:
+        return file_value, "credential_file"
+    return None, "none"
+
+
+def resolve_env_or_credential(var_name: str) -> str | None:
+    """Resolve a single value from environment, then credential file.
+
+    When ``auth_ignore_env`` is active, skips os.environ and reads from
+    the credential file only. Returns the first truthy (non-empty) value, or None.
+    """
+    return resolve_env_or_credential_with_source(var_name)[0]
 
 
 def get_secrets_for_template(template: str) -> dict[str, str]:

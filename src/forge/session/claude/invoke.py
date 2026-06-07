@@ -182,16 +182,20 @@ def _build_environment(
     """
     from forge.core.reactive.env import (
         FORGE_PARENT_RUN_ID_VAR,
+        apply_interactive_api_key,
         build_claude_env,
         new_root_run_identity,
     )
 
     root = new_root_run_identity()
     merged = {**(extra_vars or {}), **root.as_env()}
-    env = build_claude_env(extra_vars=merged, derive_run_identity=False)
+    env = build_claude_env(extra_vars=merged, derive_run_identity=False, interactive=True)
     env.pop(FORGE_PARENT_RUN_ID_VAR, None)  # a root has no parent; scrub any inherited
     for key in unset_vars or ():
         env.pop(key, None)
+    # Finalize ANTHROPIC_API_KEY LAST -- after extra_vars and unset_vars -- so the
+    # interactive_anthropic_api_key policy wins over anything merged above.
+    apply_interactive_api_key(env, interactive=True)
     return env
 
 

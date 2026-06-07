@@ -13,6 +13,7 @@ This README is a directory guide plus dogfood examples for people inspecting `do
 | `proposed/<slug>/card.md` | Idea or design sketch not yet scheduled               | Move to `todo/` when accepted for execution                                |
 | `todo/<slug>/card.md`     | Accepted work parked until an execution branch exists | Move to `doing/` when the branch is created                                |
 | `doing/<slug>/card.md`    | Work currently in flight                              | Add or update `checklist.md` during implementation                         |
+| `paused/<slug>/card.md`   | Partially-done work on hold                           | Move back to `doing/` when work resumes                                    |
 | `done/<slug>/card.md`     | Completed work snapshot                               | Keep paired `checklist.md` when one existed                                |
 | `change_log.md`           | Completed-work record                                 | Memory writer may update with `strategy=changelog`; humans keep it compact |
 | `impl_notes.md`           | Approved memory for future sessions                   | Human-approved only; memory writer proposes to a shadow doc                |
@@ -29,9 +30,11 @@ Moving a card across lanes is a workflow event:
 
 1. `proposed -> todo`: accepted or scheduled, but no execution branch yet.
 2. `todo -> doing`: execution branch exists and the work is in flight.
-3. `doing -> done`: shipped, verified, design docs updated, and closeout recorded.
+3. `doing -> paused`: work is partially done but on hold (higher-priority card took over, or waiting on a dependency).
+4. `paused -> doing`: work resumes; checklist picks up where it left off.
+5. `doing -> done`: shipped, verified, design docs updated, and closeout recorded.
 
-Parking work means leaving it in `todo/`. `todo/` is not the active cursor; it is accepted work waiting for a branch.
+Parking *new* work means leaving it in `todo/`. Parking *in-progress* work means moving it to `paused/`.
 
 ## Project Memory
 

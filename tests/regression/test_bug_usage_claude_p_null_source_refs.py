@@ -27,7 +27,14 @@ def test_claude_p_verb_event_has_null_source_refs() -> None:
     result = SessionResult(
         stdout="", stderr="", returncode=0, run_id="run_c", parent_run_id="run_par", root_run_id="run_root"
     )
-    cost = VerbCostResult(verb="memory-writer", total_cost_micros=2500, input_tokens=12, output_tokens=8, measured=True)
+    cost = VerbCostResult(
+        verb="memory-writer",
+        total_cost_micros=2500,
+        input_tokens=12,
+        output_tokens=8,
+        measured=True,
+        cost_measured=True,
+    )
     emit_usage_for_session_result(
         result, command="memory-writer", session="s", cost=cost, base_url="http://localhost:8084"
     )

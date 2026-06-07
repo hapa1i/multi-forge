@@ -400,7 +400,6 @@ class TestProxyFileIO:
             tiers=TierModels(haiku="h", sonnet="s", opus="o"),
             costs={
                 "caps": {"per_day": 20.0, "per_month": 100.0},
-                "cap_mode": "strict",
                 "on_cap_hit": "warn",
             },
         )
@@ -411,7 +410,6 @@ class TestProxyFileIO:
         assert loaded is not None
         assert loaded.costs.caps.per_day == 20.0
         assert loaded.costs.caps.per_month == 100.0
-        assert loaded.costs.cap_mode == "strict"
         assert loaded.costs.on_cap_hit == "warn"
 
     def test_proxy_instance_config_round_trips_intercept_audit(self, tmp_path, monkeypatch):
@@ -583,7 +581,6 @@ class TestLoadConfigWithProxy:
             tiers=TierModels(haiku="test-haiku", sonnet="test-sonnet", opus="test-opus"),
             costs={
                 "caps": {"per_day": "20.00", "per_month": "100.00"},
-                "cap_mode": "strict",
                 "on_cap_hit": "warn",
             },
         )
@@ -593,7 +590,6 @@ class TestLoadConfigWithProxy:
 
         assert config.proxy.costs.caps.per_day == 20.0
         assert config.proxy.costs.caps.per_month == 100.0
-        assert config.proxy.costs.cap_mode == "strict"
         assert config.proxy.costs.on_cap_hit == "warn"
 
     def test_load_config_with_nonexistent_lease_raises(self, tmp_path, monkeypatch):

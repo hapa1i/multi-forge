@@ -3,8 +3,8 @@
 Aggregates two already-captured planes into one view a human can read:
 
 - the usage-attribution ledger (``usage/events``) -> per-command run/error counts,
-  tokens, and estimated cost. Uncapped and reliable; the authoritative source for
-  "how many times did the supervisor run, and how many failed".
+  tokens, and reported-or-estimated cost. Uncapped and reliable; the authoritative
+  source for "how many times did the supervisor run, and how many failed".
 - the session manifest's ``confirmed.policy.decisions`` -> supervisor allow/warn/deny
   and warning text. Capped at ``MAX_DECISION_LOG`` (so ``log_capped`` is surfaced).
 
@@ -13,7 +13,7 @@ The two planes measure related-but-distinct things and are kept separate on purp
 ``claude -p`` is a ledger *error* the decision log may record as a fail-open allow).
 
 Pure logic (no Click, no printing), per design §3.12: returns a
-:class:`SessionActivitySummary`. Rendered by ``forge usage`` (table) and the
+:class:`SessionActivitySummary`. Rendered by ``forge activity`` (table) and the
 session-end launcher line (:func:`render_summary_line`). The manifest is **re-read
 fresh from disk** because hooks mutate ``confirmed.*`` during the run, after the
 launcher's in-memory copy was taken.
@@ -25,7 +25,8 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
-from forge.core.usage.ledger import read_usage_events
+from forge.core.usage.ledger import UsageEvent, read_usage_events
+from forge.core.usage.vocabulary import ROUTE_CLAUDE_INTERACTIVE, Confidence
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +34,11 @@ _SUPERVISOR_POLICY_ID = "semantic.supervisor"
 _ERROR_STATUSES = {"error", "timeout"}
 _WORKFLOW_COMMANDS = {"panel", "analyze", "debate", "consensus"}
 _MAX_RECENT_WARNINGS = 5
+# Confidences whose dollar figure is trustworthy enough to count toward Forge-added
+# spend (`forge +$Y`): a directly-reported figure or a gateway-computed one.
+# `inferred` (a local estimate), `unavailable`, and `unknown` never contribute -- the
+# north star is to sum what a route reported, never an estimate.
+_FORGE_ADDED_COST_CONFIDENCES: frozenset[Confidence] = frozenset({"reported", "gateway_calculated"})
 
 
 @dataclass
@@ -154,7 +160,9 @@ def render_summary_line(summary: SessionActivitySummary) -> str | None:
             parts.append(seg)
 
     if summary.total_cost_micro_usd is not None:
-        parts.append(f"~${summary.total_cost_micro_usd / 1_000_000:.2f} est")
+        # `~` flags the figure as approximate/best-effort (the aggregate mixes route-reported
+        # cost with verb-snapshot estimates); `forge proxy costs show` is the authoritative view.
+        parts.append(f"~${summary.total_cost_micro_usd / 1_000_000:.2f}")
 
     tokens = summary.total_input_tokens + summary.total_output_tokens
     if tokens:
@@ -172,7 +180,61 @@ def render_summary_line(summary: SessionActivitySummary) -> str | None:
     return "Forge this session — " + " · ".join(parts)
 
 
+def sum_forge_added_cost(session: str, *, since: datetime | None = None) -> int | None:
+    """Sum reported Forge-added LLM cost (micro-USD) for one session.
+
+    "Forge-added" = LLM spend Forge originated on the session's behalf (memory
+    writer, supervisor, review fan-out), **excluding the main interactive harness**
+    (``route="claude_interactive"``). The harness exclusion is load-bearing, not
+    cosmetic: the card forbids blending observed main-harness traffic into "Forge
+    additional cost" (a future MITM scenario where such events land in the ledger).
+
+    Only reported or gateway-calculated cost events contribute (the north star:
+    record what a route reported, never estimate); ``inferred``/``unavailable`` rows
+    add nothing. Returns the summed
+    micro-USD, or ``None`` when no in-scope event carried a reported cost — distinct
+    from a measured $0. A ledger read error propagates (the throttle decides whether
+    to cache or skip); this function never fabricates a value.
+
+    ``since`` bounds the scan to events at/after the session's start (pass the
+    manifest ``created_at``) so the status-line poll does not re-glob and re-parse
+    the whole uncapped, PID-sharded ledger each time. Omitting it scans every shard
+    (correct, just slower) — an event can never predate its session's creation, so
+    the bound is loss-free.
+
+    Known limitation (matches ``build_session_activity_summary``): the ledger is
+    filtered by session NAME only — ``UsageEvent`` carries no forge-root identity, so
+    two same-named sessions in different forge roots would share this total. The
+    status-line throttle cache key is root-scoped, but the ledger query is not.
+    Adding root/session identity to the ledger schema is deferred to a future card.
+    """
+    events = read_usage_events(session=session, period_start=since)
+    total = 0
+    any_cost = False
+    for event in events:
+        micros = _forge_added_cost_micros(event)
+        if micros is not None:
+            total += micros
+            any_cost = True
+    return total if any_cost else None
+
+
 # --- internals ---------------------------------------------------------------
+
+
+def _forge_added_cost_micros(event: UsageEvent) -> int | None:
+    """The event's cost in micro-USD if it counts as Forge-added spend, else None.
+
+    Excludes the main interactive-harness channel (``route="claude_interactive"``) --
+    the load-bearing no-blend rule: "Forge-added" is what Forge spends ON TOP of the
+    session the human drives, never the session itself -- and any event whose cost
+    figure is not trustworthy (only ``reported``/``gateway_calculated`` count).
+    """
+    if event.route == ROUTE_CLAUDE_INTERACTIVE:
+        return None
+    if event.confidence not in _FORGE_ADDED_COST_CONFIDENCES:
+        return None
+    return event.cost_micro_usd  # int | None -- None when the route reported no figure
 
 
 def _aggregate_ledger(summary: SessionActivitySummary, session_name: str, since: datetime | None) -> None:

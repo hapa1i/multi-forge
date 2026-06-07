@@ -199,6 +199,8 @@ def test_bug_streaming_error_no_provider_detail() -> None:
                 with patch("forge.proxy.server.cost_tracker", None):
                     with patch("forge.proxy.server.proxy_metrics") as mock_metrics:
                         mock_metrics.total_cost_micros = 0
+                        # The X-Cumulative-Cost evidence gate reads this counter.
+                        mock_metrics.cost_reported_requests = 0
                         with patch("forge.proxy.server.log_request_beautifully"):
                             with patch("forge.proxy.server.log_request_response", new_callable=AsyncMock):
                                 with patch("forge.proxy.server._check_client_tool_failures", new_callable=AsyncMock):

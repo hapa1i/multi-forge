@@ -353,7 +353,6 @@ costs:
   caps:
     per_day: null
     per_month: null
-  cap_mode: post
   on_cap_hit: reject
 ```
 
@@ -441,29 +440,58 @@ Proxy request costs are logged to `~/.forge/costs/requests/` as JSONL. Forge sub
 `~/.forge/costs/verbs/` as best-effort attribution records.
 
 ```bash
-forge proxy costs                    # Today's costs, by verb
-forge proxy costs --by-model         # Today's costs, by model
-forge proxy costs --period week      # This week
-forge proxy costs openrouter-anthropic         # Filter by proxy
+forge proxy costs show                    # Today's costs, by verb
+forge proxy costs show --by-model         # Today's costs, by model
+forge proxy costs show --period week      # This week
+forge proxy costs show openrouter-anthropic    # Filter by proxy
+
+forge proxy costs reset                   # Wipe ALL cost + usage telemetry to zero (prompts; --yes to skip)
+forge proxy costs reset --dry-run         # Preview what would be removed, delete nothing
 ```
 
-> **Per-session view:** `forge proxy costs` is the authoritative, **proxy-scoped** dollar view. For a **session-scoped**
-> rollup of what Forge did — supervisor checks (including failed ones), tokens, and *estimated* cost — use
-> [`forge usage [session]`](session.md#what-a-session-did-forge-usage--session-end-summary). The two are complementary:
-> spend is billed per proxy; activity is attributed per session.
+`forge proxy costs reset` deletes the request cost logs, verb cost logs, **and** the usage-attribution ledger
+(`forge activity`/`forge +$Y` data) under `~/.forge/`. It also clears the derived status-line cost cache so the
+`forge +$Y` segment recomputes from the now-empty ledger instead of replaying a cached value. Audit records are a
+separate plane and are left untouched. It is irreversible (confirm prompt unless `--yes`). A running proxy keeps its
+cost totals **and** cap counters in memory until restarted — so a live proxy's cumulative-cost header, snapshot, and
+`forge proxy costs show` figures do not zero until you restart it (`forge proxy stop <id>` then
+`forge proxy start <id>`).
+
+> **Per-session view:** `forge proxy costs show` is the authoritative, **proxy-scoped** dollar view. For a
+> **session-scoped** rollup of what Forge did — supervisor checks (including failed ones), tokens, and
+> *reported-or-estimated* cost (best-effort, may be partial) — use
+> [`forge activity [session]`](session.md#what-a-session-did-forge-activity--session-end-summary). The two are
+> complementary: spend is billed per proxy; activity is attributed per session.
+
+### Which surface answers which question?
+
+Forge surfaces cost and usage through several views with deliberately different scopes. Pick the one that matches your
+question. Forge never prices a request from a local table — a missing cost shows as `unavailable`, never invented (per
+the provenance column: `forge proxy costs show` is reported-only; `forge activity` also includes best-effort
+verb-snapshot estimates):
+
+| Surface                                | Question it answers                               | Scope                                                                            | Cost provenance                                                                   |
+| -------------------------------------- | ------------------------------------------------- | -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `forge proxy costs show`               | "What did this proxy actually spend?"             | one proxy's request log (proxy-scoped)                                           | reported `$` or `unavailable`; **authoritative** spend view                       |
+| `forge activity [session]`             | "What did Forge's automation do this session?"    | one Forge session — supervisor, memory writer, workflow verbs + policy decisions | reported-or-estimated `$`, best-effort attribution                                |
+| status-line `cost` segment             | "What is my Claude session costing / quota left?" | the one interactive Claude session                                               | **Claude's** own reported cost, or subscription quota — never recomputed by Forge |
+| status-line `forge +$Y` (`forge_cost`) | "What did Forge add on top of my session?"        | one Forge session, **excluding** the main interactive harness                    | reported-or-nothing (subscription/OAuth → nothing)                                |
 
 Set caps on the proxy:
 
 ```bash
 forge proxy set openrouter-anthropic costs.caps.per_day=20.00
 forge proxy set openrouter-anthropic costs.caps.per_month=100.00
-forge proxy set openrouter-anthropic costs.cap_mode=strict
 forge proxy set openrouter-anthropic costs.on_cap_hit=warn
 ```
 
-`cap_mode=post` blocks only after logged spend reaches a cap. `cap_mode=strict` also estimates the pending request
-before forwarding it. `on_cap_hit=reject` returns HTTP 429 with `spend_cap_exceeded`; `on_cap_hit=warn` lets the request
-continue and returns `X-Spend-Warning`.
+Caps are enforced after each completed request: a request may cross a cap and complete, then the next request is blocked
+once logged spend reaches the cap. `on_cap_hit=reject` returns HTTP 429 with `spend_cap_exceeded`; `on_cap_hit=warn`
+lets the request continue and returns `X-Spend-Warning`.
+
+> Earlier versions had a `costs.cap_mode` setting (`post`/`strict`); it was removed and caps are now always post-event.
+> If an older `proxy.yaml` still has a `cap_mode:` line, remove it — the proxy otherwise refuses to load with a message
+> telling you to.
 
 Cap enforcement is process-local and best-effort. For reliable cap enforcement, run a single proxy process per proxy ID.
 Cost logs accumulate in `~/.forge/costs/` — safely delete old JSONL files to reclaim space; the proxy re-bootstraps from
@@ -475,12 +503,11 @@ If your provider gives you a monthly API credit or your team has a fixed budget 
 
 ```bash
 forge proxy set openrouter-openai costs.caps.per_month=100
-forge proxy set openrouter-openai costs.cap_mode=strict
 forge proxy set openrouter-openai costs.on_cap_hit=reject
 ```
 
-`strict` mode estimates each request before forwarding, which helps catch likely over-budget requests before they run.
-Use `on_cap_hit=warn` if you prefer alerts without hard stops. Pair with `forge proxy costs --period month` to monitor
+Caps are enforced after each completed request — a request may cross the cap and complete, then the next is blocked. Use
+`on_cap_hit=warn` if you prefer alerts without hard stops. Pair with `forge proxy costs show --period month` to monitor
 burn rate.
 
 ---

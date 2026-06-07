@@ -215,6 +215,101 @@ async def test_create_streaming_completion_logs_cache_info(
 
 
 # ---------------------------------------------------------------------------
+# Reported-cost threading tests (Phase 2 Step 2)
+# ---------------------------------------------------------------------------
+
+
+class TestReportedCostThreading:
+    """cost_usd rides into the OpenAI dict as an internal _reported_cost_micros key."""
+
+    def test_core_response_carries_reported_cost(self) -> None:
+        adapter = _make_adapter_with_mock_client()
+        resp = CompletionResponse(
+            text="hi",
+            usage={"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
+            cost_usd=0.0023,
+        )
+        out = adapter._core_response_to_openai(resp, "openai/gpt-5.2")
+        assert out["_reported_cost_micros"] == 2300  # 0.0023 USD → micros
+
+    def test_core_response_omits_cost_when_none(self) -> None:
+        adapter = _make_adapter_with_mock_client()
+        resp = CompletionResponse(text="hi", cost_usd=None)
+        out = adapter._core_response_to_openai(resp, "openai/gpt-5.2")
+        assert "_reported_cost_micros" not in out
+
+    def test_reported_zero_is_carried_not_dropped(self) -> None:
+        """A reported $0 still produces the carrier key (0), distinct from unavailable."""
+        adapter = _make_adapter_with_mock_client()
+        resp = CompletionResponse(text="hi", cost_usd=0.0)
+        out = adapter._core_response_to_openai(resp, "openai/gpt-5.2")
+        assert out["_reported_cost_micros"] == 0
+
+    @pytest.mark.asyncio
+    async def test_create_completion_threads_cost(self) -> None:
+        adapter = _make_adapter_with_mock_client()
+        adapter._client = MagicMock(  # type: ignore[assignment]
+            complete=AsyncMock(return_value=CompletionResponse(text="hi", cost_usd=0.0019))
+        )
+        result = await adapter.create_completion(
+            {"messages": [{"role": "user", "content": "hi"}], "max_tokens": 100},
+            request_id="req-cost",
+        )
+        assert result["_reported_cost_micros"] == 1900
+
+    @pytest.mark.asyncio
+    async def test_streaming_usage_chunk_carries_cost(self) -> None:
+        adapter = _make_adapter_with_mock_client()
+
+        async def _fake_stream(*args, **kwargs):  # type: ignore[no-untyped-def]
+            yield StreamEvent(type="text_delta", text="Hi")
+            yield StreamEvent(
+                type="usage",
+                usage={"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
+                cost_usd=0.0023,
+            )
+            yield StreamEvent(type="response_end", cost_usd=0.0023)
+
+        adapter._client = MagicMock(stream=_fake_stream)  # type: ignore[assignment]
+
+        usage_chunks = [
+            c
+            async for c in adapter.create_streaming_completion(
+                {"messages": [{"role": "user", "content": "hi"}], "max_tokens": 100},
+                request_id="req-stream-cost",
+            )
+            if c.get("usage")
+        ]
+        assert usage_chunks
+        assert usage_chunks[0]["usage"]["reported_cost_micros"] == 2300
+
+    @pytest.mark.asyncio
+    async def test_streaming_usage_chunk_omits_cost_when_none(self) -> None:
+        adapter = _make_adapter_with_mock_client()
+
+        async def _fake_stream(*args, **kwargs):  # type: ignore[no-untyped-def]
+            yield StreamEvent(type="text_delta", text="Hi")
+            yield StreamEvent(
+                type="usage",
+                usage={"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
+            )
+            yield StreamEvent(type="response_end")
+
+        adapter._client = MagicMock(stream=_fake_stream)  # type: ignore[assignment]
+
+        usage_chunks = [
+            c
+            async for c in adapter.create_streaming_completion(
+                {"messages": [{"role": "user", "content": "hi"}], "max_tokens": 100},
+                request_id="req-stream-nocost",
+            )
+            if c.get("usage")
+        ]
+        assert usage_chunks
+        assert "reported_cost_micros" not in usage_chunks[0]["usage"]
+
+
+# ---------------------------------------------------------------------------
 # User-Agent forwarding tests
 # ---------------------------------------------------------------------------
 

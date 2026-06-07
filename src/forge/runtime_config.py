@@ -33,28 +33,6 @@ _ENV_OVERRIDES: dict[str, str] = {
     "FORGE_DEBUG": "log_level",
 }
 
-# Renamed config keys: old name -> new name. Surfaced with migration guidance
-# instead of the generic "unknown key" path. The old value is NOT migrated --
-# runtime config is a system boundary that degrades to the built-in default
-# (coding-standards.md §5).
-_RENAMED_KEYS: dict[str, str] = {
-    "handoff_timeout": "memory_writer_timeout",
-}
-
-# Removed config keys: old name -> actionable guidance naming the replacement
-# path. Unlike a rename, there is no 1:1 successor key, so the guidance is a
-# human sentence. Surfaced on load (one-time warning) and rejected by
-# set/edit/reset with the same guidance (clean break, coding-standards.md §5:
-# "known legacy state that is intentionally ignored must still be surfaced with
-# an actionable warning").
-_REMOVED_KEYS: dict[str, str] = {
-    "show_rate_limits": (
-        "add 'rate_limits' to statusline.segments "
-        "(e.g. 'forge config set statusline.segments=path,model,rate_limits')"
-    ),
-}
-
-
 # Valid enum values for StatusLineConfig fields.
 _VALID_COST_MODES = ("auto", "api", "subscription")
 _VALID_PALETTES = ("default", "earthy")
@@ -80,6 +58,7 @@ class StatusLineConfig:
     glyphs: str = "ascii"  # ascii | unicode
     cache_hit: str = "auto"  # auto | off
     cache_hit_ttl: int = 12  # direct-mode throttle window (seconds)
+    forge_cost_ttl: int = 10  # forge_cost segment throttle window (seconds)
 
     def __post_init__(self) -> None:
         if self.cost_mode not in _VALID_COST_MODES:
@@ -100,6 +79,8 @@ class StatusLineConfig:
             raise ValueError("statusline.segments must be a list of strings")
         if self.cache_hit_ttl < 1:
             raise ValueError(f"statusline.cache_hit_ttl must be >= 1, got {self.cache_hit_ttl}")
+        if self.forge_cost_ttl < 1:
+            raise ValueError(f"statusline.forge_cost_ttl must be >= 1, got {self.forge_cost_ttl}")
 
 
 def _coerce_statusline_config(value: Any) -> StatusLineConfig:
@@ -188,6 +169,14 @@ class RuntimeConfig:
     # Useful when shell API keys are for Claude Code (not Forge subprocesses).
     auth_ignore_env: bool = False
 
+    # ANTHROPIC_API_KEY policy for Forge-managed interactive `claude` launches:
+    # "inherit" (default) keeps the normal resolution (shell env, then credential
+    # file); "omit" strips the key from the interactive child only, so a
+    # subscription/OAuth session is not silently billed against a key meant for
+    # other tools. Headless subprocesses (supervisor, memory writer, panel workers)
+    # are unaffected and always keep normal credential resolution.
+    interactive_anthropic_api_key: str = "inherit"
+
     # Nested status-line display preferences (statusline: section in config.yaml).
     statusline: StatusLineConfig = field(default_factory=StatusLineConfig)
 
@@ -222,6 +211,12 @@ class RuntimeConfig:
             raise ValueError(
                 f"Invalid policy_summary_feedback: '{self.policy_summary_feedback}' "
                 f"(must be one of: {', '.join(sorted(valid_feedback))})"
+            )
+        valid_interactive_key_modes = {"inherit", "omit"}
+        if self.interactive_anthropic_api_key not in valid_interactive_key_modes:
+            raise ValueError(
+                f"Invalid interactive_anthropic_api_key: '{self.interactive_anthropic_api_key}' "
+                f"(must be one of: {', '.join(sorted(valid_interactive_key_modes))})"
             )
 
 
@@ -361,34 +356,11 @@ def _dict_to_runtime_config(data: dict[str, Any], source: Path) -> RuntimeConfig
     known_fields = {f.name for f in fields(RuntimeConfig)}
     unknown = set(data.keys()) - known_fields
 
-    # Renamed keys get migration guidance, not the generic "unknown" warning.
-    # The old value is ignored (degrade to default) -- see _RENAMED_KEYS.
-    renamed = unknown & set(_RENAMED_KEYS)
-    for old in sorted(renamed):
-        logger.warning(
-            "%s: '%s' was renamed to '%s' and is ignored. " "Update your config (the old value is not applied).",
-            source,
-            old,
-            _RENAMED_KEYS[old],
-        )
-
-    # Removed keys get a specific replacement hint (not the generic warning), so
-    # stale recognized config doesn't silently degrade to default.
-    removed = unknown & set(_REMOVED_KEYS)
-    for old in sorted(removed):
-        logger.warning(
-            "%s: '%s' was removed and is ignored; %s.",
-            source,
-            old,
-            _REMOVED_KEYS[old],
-        )
-
-    truly_unknown = unknown - renamed - removed
-    if truly_unknown:
+    if unknown:
         logger.warning(
             "Unknown keys in %s (ignored): %s",
             source,
-            ", ".join(sorted(truly_unknown)),
+            ", ".join(sorted(unknown)),
         )
 
     kwargs: dict[str, Any] = {}
@@ -563,16 +535,28 @@ proxy_mode: host
 # but you want Forge subprocesses to use a separate key from the credential file.
 # auth_ignore_env: false
 
+# ANTHROPIC_API_KEY policy for interactive `forge session`/`forge claude` launches.
+# inherit (default) — the session uses the same key as everything else.
+# omit              — keep the key out of the interactive session only, so a
+#                     subscription/OAuth session isn't billed against a key meant
+#                     for other tools. Headless subprocesses keep their key.
+# interactive_anthropic_api_key: inherit
+
 # Status line display (nested section). Choose which segments show, the cost
 # model, palette, and glyphs. Set values with: forge config set statusline.<key>=<value>
-#   cost_mode: auto | api | subscription   (auto detects from ANTHROPIC_API_KEY;
-#              subscription shows quota instead of dollars)
+#   cost_mode: auto | api | subscription
+#              auto         shows the 5h quota when present, else hedges the cost
+#                           with a leading ~= (never inferred from an API key)
+#              api          shows real dollars (you bill per-token)
+#              subscription shows quota instead of dollars
 #   palette:   default | earthy
 #   glyphs:    ascii | unicode
 #   segments:  ordered list; empty = default layout. Valid names: path, branch,
 #              breadcrumb, model, cost, rate_limits, lines, tokens, think, loop,
-#              sidecar, cache_hit, supervisor, policy, audit, drift, spend_cap
+#              sidecar, cache_hit, supervisor, policy, audit, drift, spend_cap,
+#              forge_cost
 #   cache_hit: auto | off    cache_hit_ttl: <seconds, direct-mode throttle window>
+#   forge_cost_ttl: <seconds, forge_cost segment throttle window (default 10)>
 # statusline:
 #   cost_mode: auto
 #   palette: default

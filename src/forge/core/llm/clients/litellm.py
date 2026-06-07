@@ -44,12 +44,38 @@ from .openai_compat import (
     ToolCallAccumulator,
     build_chat_completion_kwargs,
     extract_cached_tokens,
+    extract_reported_cost_usd,
     is_retryable_error,
     message_to_openai,
     openai_response_to_completion,
 )
 
 logger = logging.getLogger(__name__)
+
+# LiteLLM proxy reports the computed spend for a request in this response header.
+# Direct providers (and surfaces that drop raw headers) don't set it → cost unavailable.
+LITELLM_COST_HEADER = "x-litellm-response-cost"
+
+
+def cost_from_response_headers(headers: Any) -> float | None:
+    """Read the LiteLLM-gateway reported cost (USD) from response headers.
+
+    Returns None when the header is absent or unparseable — the gateway didn't
+    report a cost, which the proxy records as 'unavailable' (never a $0 guess).
+    """
+    if headers is None:
+        return None
+    get = getattr(headers, "get", None)
+    if not callable(get):
+        return None
+    raw = get(LITELLM_COST_HEADER)
+    # Header values are strings; guard the type so a malformed value degrades to None.
+    if not isinstance(raw, (str, int, float)) or isinstance(raw, bool):
+        return None
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return None
 
 
 class LiteLLMClient:
@@ -308,6 +334,19 @@ class LiteLLMClient:
         """Convert OpenAI response to canonical CompletionResponse."""
         return openai_response_to_completion(response, self._provider)
 
+    def _merge_header_cost(self, completion: CompletionResponse, headers: Any) -> CompletionResponse:
+        """Attach the LiteLLM-gateway header cost when the body reported none.
+
+        Body cost (OpenRouter-style usage.cost) wins; for a plain LiteLLM proxy
+        the body has no cost and the x-litellm-response-cost header supplies it.
+        """
+        if completion.cost_usd is not None:
+            return completion
+        header_cost = cost_from_response_headers(headers)
+        if header_cost is None:
+            return completion
+        return completion.model_copy(update={"cost_usd": header_cost})
+
     def _build_request_kwargs(
         self,
         messages: list[Message],
@@ -375,9 +414,9 @@ class LiteLLMClient:
             f"verbosity={hyperparams.verbosity}, reasoning={hyperparams.reasoning_effort}{tools_log}"
         )
 
-        response = await client.responses.create(**request_params)
-
-        return self._parse_responses_output(response, self._model)
+        raw = await client.responses.with_raw_response.create(**request_params)
+        completion = self._parse_responses_output(raw.parse(), self._model)
+        return self._merge_header_cost(completion, raw.headers)
 
     @retry(
         retry=retry_if_exception(lambda e: isinstance(e, Exception) and LiteLLMClient._is_retryable_error(e)),
@@ -402,8 +441,11 @@ class LiteLLMClient:
             return await self._complete_with_responses_api(client, messages, merged_params, tools=tools)
 
         kwargs = self._build_request_kwargs(messages, tools, merged_params)
-        response = await client.chat.completions.create(**kwargs)
-        return self._openai_to_completion(response)
+        # with_raw_response exposes the x-litellm-response-cost header the typed
+        # .create() drops; .parse() returns the same ChatCompletion model.
+        raw = await client.chat.completions.with_raw_response.create(**kwargs)
+        completion = self._openai_to_completion(raw.parse())
+        return self._merge_header_cost(completion, raw.headers)
 
     async def complete(
         self,
@@ -512,12 +554,13 @@ class LiteLLMClient:
                         )
 
                 if response.usage:
-                    yield StreamEvent(type="usage", usage=response.usage)
+                    yield StreamEvent(type="usage", usage=response.usage, cost_usd=response.cost_usd)
 
                 yield StreamEvent(
                     type="response_end",
                     tool_calls=response.tool_calls,
                     usage=response.usage,
+                    cost_usd=response.cost_usd,
                 )
                 return
 
@@ -532,6 +575,7 @@ class LiteLLMClient:
         # Standard Chat Completions API streaming path
         accumulator = ToolCallAccumulator()
         usage_data: dict[str, int] | None = None
+        cost_usd: float | None = None
 
         try:
             kwargs = self._build_request_kwargs(messages, tools, merged_params)
@@ -551,6 +595,12 @@ class LiteLLMClient:
                     cached = extract_cached_tokens(chunk.usage)
                     if cached:
                         usage_data["cached_tokens"] = cached
+                    # Cost when the gateway puts it in the final usage chunk body
+                    # (OpenRouter-via-LiteLLM). The x-litellm-response-cost header is
+                    # not reliably final on streams, so the stream carries body cost only.
+                    chunk_cost = extract_reported_cost_usd(chunk.usage)
+                    if chunk_cost is not None:
+                        cost_usd = chunk_cost
 
                 if not chunk.choices:
                     continue
@@ -576,13 +626,14 @@ class LiteLLMClient:
                         yield StreamEvent(type="tool_call_delta", tool_call_delta=tool_delta)
 
             if usage_data:
-                yield StreamEvent(type="usage", usage=usage_data)
+                yield StreamEvent(type="usage", usage=usage_data, cost_usd=cost_usd)
 
             final_tool_calls = accumulator.finalize() if accumulator.has_pending() else None
             yield StreamEvent(
                 type="response_end",
                 tool_calls=final_tool_calls,
                 usage=usage_data,
+                cost_usd=cost_usd,
             )
 
         except Exception as e:

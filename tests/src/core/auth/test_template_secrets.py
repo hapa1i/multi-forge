@@ -10,6 +10,7 @@ from forge.core.auth.template_secrets import (
     TEMPLATE_ENV_VARS,
     get_secrets_for_template,
     resolve_env_or_credential,
+    resolve_env_or_credential_with_source,
 )
 
 
@@ -83,6 +84,42 @@ class TestResolveEnvOrCredential:
             return_value={"MY_KEY": "from-file"},
         ):
             assert resolve_env_or_credential("MY_KEY") == "from-file"
+
+
+class TestResolveEnvOrCredentialWithSource:
+    """The source breadcrumb must name where the value actually came from."""
+
+    def test_env_source(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("MY_KEY", "from-env")
+        with patch(
+            "forge.core.auth.template_secrets._get_file_secrets",
+            return_value={"MY_KEY": "from-file"},
+        ):
+            assert resolve_env_or_credential_with_source("MY_KEY") == ("from-env", "env")
+
+    def test_credential_file_source(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("MY_KEY", raising=False)
+        with patch(
+            "forge.core.auth.template_secrets._get_file_secrets",
+            return_value={"MY_KEY": "from-file"},
+        ):
+            assert resolve_env_or_credential_with_source("MY_KEY") == ("from-file", "credential_file")
+
+    def test_none_source(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("MY_KEY", raising=False)
+        with patch("forge.core.auth.template_secrets._get_file_secrets", return_value={}):
+            assert resolve_env_or_credential_with_source("MY_KEY") == (None, "none")
+
+    def test_ignore_env_reports_credential_file_not_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # Shell key present, file key present, auth_ignore_env active: the child uses
+        # the FILE key, so the source must be credential_file (the review-2 trap).
+        monkeypatch.setattr("forge.core.auth.template_secrets._auth_ignore_env", lambda: True)
+        monkeypatch.setenv("MY_KEY", "from-env")
+        with patch(
+            "forge.core.auth.template_secrets._get_file_secrets",
+            return_value={"MY_KEY": "from-file"},
+        ):
+            assert resolve_env_or_credential_with_source("MY_KEY") == ("from-file", "credential_file")
 
 
 class TestGetSecretsForTemplate:
