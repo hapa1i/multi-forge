@@ -3327,16 +3327,6 @@ class TestResumeNativeMode:
         assert kwargs.get("resume_id") is None
         assert kwargs.get("fork_session") is False
 
-    def test_resume_fresh_handoff_value_rejected(self, runner: CliRunner, temp_env: Path) -> None:
-        """The old --resume-mode handoff value is rejected with rename guidance."""
-        with patch("forge.cli.session.invoke_claude", return_value=0):
-            runner.invoke(main, ["session", "start", "rename-test"])
-
-        result = runner.invoke(main, ["session", "resume", "rename-test", "--fresh", "--resume-mode", "handoff"])
-
-        assert result.exit_code != 0
-        assert "renamed to 'transfer'" in result.output
-
     def test_resume_fresh_native_uses_resume_fork_session(self, runner: CliRunner, temp_env: Path) -> None:
         """--fresh --resume-mode native should use --resume --fork-session."""
         with patch("forge.cli.session.invoke_claude", return_value=0):

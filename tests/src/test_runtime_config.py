@@ -259,31 +259,6 @@ class TestLoadRuntimeConfig:
         rc = load_runtime_config(config_file)
         assert rc.memory_writer_timeout == 120
 
-    def test_renamed_handoff_timeout_warned_and_ignored(self, tmp_path: Path, caplog):
-        """Old key 'handoff_timeout' warns with rename guidance; value is ignored (degrades to default)."""
-        config_file = tmp_path / "config.yaml"
-        config_file.write_text("handoff_timeout: 600\n")
-        with caplog.at_level(logging.WARNING):
-            rc = load_runtime_config(config_file)
-        assert rc.memory_writer_timeout == 300  # old value NOT applied
-        assert "handoff_timeout" in caplog.text
-        assert "memory_writer_timeout" in caplog.text
-        assert "renamed" in caplog.text
-        # Renamed keys get a targeted warning, not the generic "Unknown keys" line.
-        assert "Unknown keys" not in caplog.text
-
-    def test_removed_show_rate_limits_warned_with_replacement(self, tmp_path: Path, caplog):
-        """Removed key 'show_rate_limits' warns naming the statusline.segments replacement."""
-        config_file = tmp_path / "config.yaml"
-        config_file.write_text("show_rate_limits: true\n")
-        with caplog.at_level(logging.WARNING):
-            load_runtime_config(config_file)
-        assert "show_rate_limits" in caplog.text
-        assert "removed" in caplog.text
-        assert "statusline.segments" in caplog.text
-        # Removed keys get a targeted warning, not the generic "Unknown keys" line.
-        assert "Unknown keys" not in caplog.text
-
 
 # ---------------------------------------------------------------------------
 # get_runtime_config() singleton

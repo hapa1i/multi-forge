@@ -16,11 +16,9 @@ from forge.session.exceptions import PassportError
 from forge.session.memory_inheritance import create_shadow_file
 from forge.session.models import DesignatedDoc, SessionIntent, SessionState
 from forge.session.passport import (
-    _REMOVED_STRATEGIES,
     Passport,
     check_writer_access,
     derive_shadow_path,
-    extract_frontmatter,
     read_passport,
 )
 from forge.session.validation import is_safe_designated_doc_path
@@ -221,37 +219,6 @@ def scan_all_passported_docs(forge_root: Path, roots: Sequence[str]) -> list[Des
             continue
         docs.append(doc)
     return docs
-
-
-def scan_stale_passports(forge_root: Path, roots: Sequence[str]) -> list[tuple[str, str, str]]:
-    """Find docs with removed strategies that normal scans silently skip.
-
-    Reads raw frontmatter instead of ``read_passport()`` (which raises
-    for removed strategies). Returns ``(relative_path, strategy, hint)``.
-    """
-    forge_root = forge_root.resolve()
-    stale: list[tuple[str, str, str]] = []
-    for rel in _iter_candidate_markdown(forge_root, roots):
-        try:
-            text = (forge_root / rel).read_text(encoding="utf-8", errors="replace")
-        except OSError:
-            continue
-        fm, _ = extract_frontmatter(text)
-        if fm is None:
-            continue
-        mem = fm.get("forge_memory")
-        if not isinstance(mem, dict):
-            continue
-        update = mem.get("update")
-        if not isinstance(update, dict):
-            continue
-        strategy = update.get("strategy")
-        if not isinstance(strategy, str):
-            continue
-        hint = _REMOVED_STRATEGIES.get(strategy)
-        if hint:
-            stale.append((rel, strategy, hint))
-    return stale
 
 
 def _iter_shadow_passports(forge_root: Path, roots: Sequence[str]) -> Iterator[tuple[str, str, str]]:

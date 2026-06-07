@@ -295,14 +295,10 @@ def _is_legacy_flat_transfer_path(path: Path) -> bool:
 def _validate_resume_mode(_ctx: click.Context, _param: click.Parameter, value: str | None) -> str | None:
     """Validate ``--resume-mode``; the flag is optional, so pass ``None`` through.
 
-    Accepts ``native`` / ``transfer``. The old value ``handoff`` was renamed to
-    ``transfer``; reject it with actionable guidance rather than Click's generic
-    "invalid choice" error.
+    Accepts ``native`` / ``transfer``.
     """
     if value is None:
         return None
-    if value == "handoff":
-        raise click.BadParameter("'handoff' was renamed to 'transfer'. Use --resume-mode transfer.")
     if value not in {"native", "transfer"}:
         raise click.BadParameter(f"{value!r} is not one of 'native', 'transfer'.")
     return value

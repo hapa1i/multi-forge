@@ -599,7 +599,7 @@ tiers:
             }
         )
 
-        result = runner.invoke(main, ["proxy", "delete", "delete-me", "--force"])
+        result = runner.invoke(main, ["proxy", "delete", "delete-me", "--yes"])
 
         assert result.exit_code == 0
         assert not proxy_file.exists()
@@ -608,8 +608,8 @@ tiers:
         registry = store.read()
         assert "delete-me" not in registry.proxies
 
-    def test_delete_prompts_without_force(self, runner: CliRunner, temp_env: Path) -> None:
-        """Delete prompts for confirmation when --force not provided."""
+    def test_delete_prompts_without_yes(self, runner: CliRunner, temp_env: Path) -> None:
+        """Delete prompts for confirmation when --yes not provided."""
         proxy_yaml = """\
 template: litellm-openai
 provider: litellm
@@ -633,7 +633,7 @@ tiers:
             }
         )
 
-        # Invoke without --force and with 'n' input to decline
+        # Invoke without --yes and with 'n' input to decline
         result = runner.invoke(main, ["proxy", "delete", "prompt-test"], input="n\n")
 
         assert result.exit_code == 0
@@ -666,7 +666,7 @@ tiers:
             }
         )
 
-        # Invoke without --force and with 'y' input to confirm
+        # Invoke without --yes and with 'y' input to confirm
         result = runner.invoke(main, ["proxy", "delete", "confirm-test"], input="y\n")
 
         assert result.exit_code == 0
@@ -675,7 +675,7 @@ tiers:
 
     def test_delete_not_found_error(self, runner: CliRunner, temp_env: Path) -> None:
         """Delete errors when proxy not in registry."""
-        result = runner.invoke(main, ["proxy", "delete", "nonexistent", "--force"])
+        result = runner.invoke(main, ["proxy", "delete", "nonexistent", "--yes"])
 
         assert result.exit_code != 0
         assert "not found" in result.output.lower()
@@ -820,8 +820,8 @@ tiers:
         assert "Warning" not in result.output
         assert "Deleted" in result.output
 
-    def test_delete_force_skips_session_warning(self, runner: CliRunner, temp_env: Path) -> None:
-        """Delete with --force skips session warning."""
+    def test_delete_yes_skips_session_warning(self, runner: CliRunner, temp_env: Path) -> None:
+        """Delete with --yes skips the confirmation prompt despite a referencing session."""
         proxy_yaml = """\
 template: litellm-openai
 provider: litellm
@@ -868,7 +868,7 @@ tiers:
             )
         )
 
-        result = runner.invoke(main, ["proxy", "delete", "force-test", "--force"])
+        result = runner.invoke(main, ["proxy", "delete", "force-test", "--yes"])
 
         assert result.exit_code == 0
         assert "Warning" not in result.output
@@ -900,7 +900,7 @@ tiers:
         )
 
         # No session index file at all
-        result = runner.invoke(main, ["proxy", "delete", "no-index-test", "--force"])
+        result = runner.invoke(main, ["proxy", "delete", "no-index-test", "--yes"])
 
         assert result.exit_code == 0
         assert "Deleted" in result.output
@@ -1005,7 +1005,7 @@ tiers:
         monkeypatch.setattr("forge.cli.proxy.is_pid_alive", lambda pid: True)
         monkeypatch.setattr("os.kill", lambda pid, sig: killed_pids.append(pid))
 
-        result = runner.invoke(main, ["proxy", "delete", "alias-a", "--force"])
+        result = runner.invoke(main, ["proxy", "delete", "alias-a", "--yes"])
 
         assert result.exit_code == 0
         assert "Deleted" in result.output
@@ -1151,7 +1151,7 @@ tiers:
         monkeypatch.setattr("forge.cli.proxy.is_pid_alive", lambda pid: True)
         monkeypatch.setattr("os.kill", lambda pid, sig: killed_pids.append(pid))
 
-        result = runner.invoke(main, ["proxy", "delete", "only-entry", "--force"])
+        result = runner.invoke(main, ["proxy", "delete", "only-entry", "--yes"])
 
         assert result.exit_code == 0
         assert "Deleted" in result.output
@@ -1255,7 +1255,7 @@ tiers:
         """Should delete multiple proxies in one command."""
         self._setup_proxies(temp_env, "p1", "p2", "p3")
 
-        result = runner.invoke(main, ["proxy", "delete", "p1", "p2", "p3", "--force"])
+        result = runner.invoke(main, ["proxy", "delete", "p1", "p2", "p3", "--yes"])
 
         assert result.exit_code == 0
         assert "Deleted" in result.output
@@ -1272,7 +1272,7 @@ tiers:
         """--all should delete every proxy."""
         self._setup_proxies(temp_env, "all-1", "all-2")
 
-        result = runner.invoke(main, ["proxy", "delete", "--all", "--force"])
+        result = runner.invoke(main, ["proxy", "delete", "--all", "--yes"])
 
         assert result.exit_code == 0
         assert "Deleted" in result.output
@@ -1284,7 +1284,7 @@ tiers:
 
     def test_delete_all_with_ids_errors(self, runner: CliRunner, temp_env: Path) -> None:
         """--all with explicit IDs should error."""
-        result = runner.invoke(main, ["proxy", "delete", "--all", "some-id", "--force"])
+        result = runner.invoke(main, ["proxy", "delete", "--all", "some-id", "--yes"])
 
         assert result.exit_code == 1
         assert "Cannot combine --all" in result.output
@@ -1298,7 +1298,7 @@ tiers:
 
     def test_delete_all_empty_is_noop(self, runner: CliRunner, temp_env: Path) -> None:
         """--all with no proxies should show a message and succeed."""
-        result = runner.invoke(main, ["proxy", "delete", "--all", "--force"])
+        result = runner.invoke(main, ["proxy", "delete", "--all", "--yes"])
 
         assert result.exit_code == 0
         assert "No proxies to delete" in result.output
@@ -1307,7 +1307,7 @@ tiers:
         """Should continue deleting after a failure and report summary."""
         self._setup_proxies(temp_env, "real-proxy")
 
-        result = runner.invoke(main, ["proxy", "delete", "real-proxy", "ghost", "--force"])
+        result = runner.invoke(main, ["proxy", "delete", "real-proxy", "ghost", "--yes"])
 
         assert result.exit_code == 1
         assert "Deleted" in result.output
@@ -1316,8 +1316,8 @@ tiers:
         assert "1 deleted" in result.output
         assert "1 failed" in result.output
 
-    def test_delete_all_prompts_without_force(self, runner: CliRunner, temp_env: Path) -> None:
-        """--all without --force should prompt with proxy list."""
+    def test_delete_all_prompts_without_yes(self, runner: CliRunner, temp_env: Path) -> None:
+        """--all without --yes should prompt with proxy list."""
         self._setup_proxies(temp_env, "pr-1", "pr-2")
 
         result = runner.invoke(main, ["proxy", "delete", "--all"], input="n\n")
@@ -1491,7 +1491,7 @@ class TestProxyRegistryCorruption:
         """Delete command handles invalid JSON registry."""
         _create_proxy_registry_raw("invalid json")
 
-        result = runner.invoke(main, ["proxy", "delete", "some-proxy", "--force"])
+        result = runner.invoke(main, ["proxy", "delete", "some-proxy", "--yes"])
 
         assert result.exit_code != 0
         assert "error" in result.output.lower()
@@ -1786,7 +1786,7 @@ class TestDeleteAdoptedProxy:
     def test_delete_adopted_leaves_process_alone(
         self, runner: CliRunner, temp_env: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Delete adopted proxy without --force leaves process alive."""
+        """Delete adopted proxy without --kill-adopted leaves process alive."""
         _create_proxy_registry_from_entries(
             {
                 "adopted": ProxyEntry(
@@ -1825,11 +1825,11 @@ class TestDeleteAdoptedProxy:
                 )
             }
         )
-        # --force + adopted → kill_adopted=True → must mock process discovery
+        # --kill-adopted on an adopted proxy → must mock process discovery
         # to avoid killing a real proxy on port 8085
         monkeypatch.setattr("forge.cli.proxy.find_pid_by_port", lambda port: None)
 
-        result = runner.invoke(main, ["proxy", "delete", "adopted", "--force"])
+        result = runner.invoke(main, ["proxy", "delete", "adopted", "--yes", "--kill-adopted"])
 
         assert result.exit_code == 0
         store = ProxyRegistryStore()
@@ -1904,7 +1904,7 @@ class TestDeleteAdoptedProxy:
         killed_pids: list[int] = []
         monkeypatch.setattr("forge.cli.proxy.os.kill", lambda pid, sig: killed_pids.append(pid))
 
-        result = runner.invoke(main, ["proxy", "delete", "proxy-a", "--force", "--no-kill"])
+        result = runner.invoke(main, ["proxy", "delete", "proxy-a", "--yes", "--no-kill"])
 
         assert result.exit_code == 0
         assert killed_pids == []
@@ -1939,7 +1939,7 @@ class TestDeleteAdoptedProxy:
         killed_pids: list[int] = []
         monkeypatch.setattr("forge.cli.proxy.os.kill", lambda pid, sig: killed_pids.append(pid))
 
-        result = runner.invoke(main, ["proxy", "delete", "adopted-a", "--force"])
+        result = runner.invoke(main, ["proxy", "delete", "adopted-a", "--yes"])
 
         assert result.exit_code == 0
         assert killed_pids == []
@@ -2306,7 +2306,7 @@ class TestProxyTemplate:
         user_path.write_text("# user override\n")
 
         with patch("forge.review.routing.clear_template_cache") as mock_clear:
-            result = runner.invoke(main, ["proxy", "template", "reset", "litellm-openai", "--force"])
+            result = runner.invoke(main, ["proxy", "template", "reset", "litellm-openai", "--yes"])
         assert result.exit_code == 0
         mock_clear.assert_called_once()
         assert "Reset" in result.output
@@ -2334,7 +2334,7 @@ class TestProxyTemplate:
         assert "Invalid template name" in result.output
 
     def test_template_reset_rejects_path_traversal(self, runner: CliRunner, temp_env: Path) -> None:
-        result = runner.invoke(main, ["proxy", "template", "reset", "../outside", "--force"])
+        result = runner.invoke(main, ["proxy", "template", "reset", "../outside", "--yes"])
         assert result.exit_code != 0
         assert "Invalid template name" in result.output
 

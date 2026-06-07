@@ -127,19 +127,3 @@ class TestShowCommand:
         assert result.exit_code == 0, result.output
         assert "current" in result.output
         assert "run 0" in result.output
-
-
-class TestOldHandoffShowTombstone:
-    """The old ``forge session handoff show`` path is a tombstone pointing at the new command."""
-
-    def test_old_command_is_tombstoned(self, runner: CliRunner) -> None:
-        result = runner.invoke(main, ["session", "handoff", "show"])
-        assert result.exit_code != 0
-        assert "forge memory report show" in result.output
-
-    def test_tombstone_tolerates_old_flags(self, runner: CliRunner) -> None:
-        """--latest/--all and a session name reach the rename message, not Click's 'No such option'."""
-        result = runner.invoke(main, ["session", "handoff", "show", "my-session", "--latest"])
-        assert result.exit_code != 0
-        assert "forge memory report show" in result.output
-        assert "No such option" not in result.output

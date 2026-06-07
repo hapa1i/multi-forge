@@ -61,7 +61,7 @@ def test_delete_adopted_proxy_kills_by_port(tmp_path: Path, monkeypatch: pytest.
     monkeypatch.setattr("forge.cli.proxy.os.kill", lambda pid, sig: killed_pids.append(pid))
 
     runner = CliRunner()
-    result = runner.invoke(main, ["proxy", "delete", "orphan-proxy", "--force"])
+    result = runner.invoke(main, ["proxy", "delete", "orphan-proxy", "--yes", "--kill-adopted"])
 
     assert result.exit_code == 0, result.output
     assert 99999 in killed_pids, f"Expected port-based kill, got: {killed_pids}"

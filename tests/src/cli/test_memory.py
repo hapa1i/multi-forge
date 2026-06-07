@@ -235,14 +235,6 @@ class TestMemoryTrack:
         state = SessionStore(str(forge_root), "s1").read()
         assert "memory" not in state.overrides
 
-    def test_track_session_flag_is_tombstoned(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
-        """track no longer takes a session; the removed flag errors and says to instruct the agent."""
-        result = runner.invoke(
-            main, ["memory", "track", "docs/checklist.md", "--strategy", "checklist", "--session", "s1"]
-        )
-        assert result.exit_code != 0
-        assert "instruct the agent directly" in result.output
-
     def test_track_warns_out_of_root(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
         """A passported doc outside the scan roots warns it won't be project-discovered."""
         forge_root = seeded_session[0]
@@ -302,17 +294,6 @@ class TestMemoryTrack:
         pp = read_passport(forge_root / "docs/checklist.md")
         assert pp is not None
         assert pp.intent == "Active task tracking"
-
-    def test_as_tombstone_errors(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
-        result = runner.invoke(main, ["memory", "track", "docs/checklist.md", "--as", "changelog"])
-        assert result.exit_code != 0
-        assert "renamed to --strategy" in result.output
-
-    def test_removed_strategy_error(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
-        result = runner.invoke(main, ["memory", "track", "docs/checklist.md", "--strategy", "suggested"])
-        assert result.exit_code != 0
-        assert "removed" in result.output.lower()
-        assert "shadow" in result.output.lower() or "--propose" in result.output
 
 
 # ---------------------------------------------------------------------------
@@ -551,18 +532,6 @@ class TestMemoryList:
         docs = json.loads(result.output)
         assert len(docs) == 1
         assert docs[0]["writers"] == "planner"
-
-    def test_list_warns_on_stale_passport(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
-        """Docs with removed strategies get a user-visible warning."""
-        forge_root = seeded_session[0]
-        doc = forge_root / "docs" / "stale.md"
-        doc.write_text(
-            "---\nforge_memory:\n  version: 1\n  intent: test\n" "  update:\n    strategy: debugging\n---\nContent\n"
-        )
-        result = runner.invoke(main, ["memory", "list"])
-        assert result.exit_code == 0, result.output
-        assert "was removed" in result.output
-        assert "docs/stale.md" in result.output
 
 
 # ---------------------------------------------------------------------------

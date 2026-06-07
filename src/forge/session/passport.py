@@ -43,12 +43,6 @@ class MemoryStrategy(str, Enum):
 
 VALID_STRATEGY_NAMES: frozenset[str] = frozenset(s.value for s in MemoryStrategy)
 
-_REMOVED_STRATEGIES: dict[str, str] = {
-    "suggested": "Shadow mode is now orthogonal to strategy. Use --propose with any strategy.",
-    "debugging": "Use 'generic' and scope via the passport's intent/captures fields.",
-    "patterns": "Use 'generic' and scope via the passport's intent/captures fields.",
-}
-
 STRATEGY_INSTRUCTIONS: dict[str, str] = {
     "project-state": (
         "Update current focus, active work, recent decisions, and handoff notes. "
@@ -369,13 +363,6 @@ def _parse_update(data: Any) -> PassportUpdate:
             "forge_memory.update.strategy",
             f"must be a string (got {type(strategy).__name__})",
         )
-    removed_hint = _REMOVED_STRATEGIES.get(strategy)
-    if removed_hint:
-        raise PassportError(
-            "forge_memory.update.strategy",
-            f"strategy '{strategy}' was removed",
-            hint=removed_hint,
-        )
     if strategy not in VALID_STRATEGY_NAMES:
         raise PassportError(
             "forge_memory.update.strategy",
@@ -577,13 +564,6 @@ def synthesize_passport(
     Auto-generates intent from strategy when not provided.
     Always writes an explicit ``update`` section.
     """
-    removed_hint = _REMOVED_STRATEGIES.get(strategy)
-    if removed_hint:
-        raise PassportError(
-            "forge_memory.update.strategy",
-            f"strategy '{strategy}' was removed",
-            hint=removed_hint,
-        )
     if strategy not in VALID_STRATEGY_NAMES:
         raise PassportError(
             "forge_memory.update.strategy",
@@ -701,13 +681,6 @@ def resolve_with_overrides(
     warnings: list[str] = []
 
     if strategy is not None and strategy != resolved.update.strategy:
-        removed_hint = _REMOVED_STRATEGIES.get(strategy)
-        if removed_hint:
-            raise PassportError(
-                "forge_memory.update.strategy",
-                f"strategy '{strategy}' was removed",
-                hint=removed_hint,
-            )
         if strategy not in VALID_STRATEGY_NAMES:
             raise PassportError(
                 "forge_memory.update.strategy",

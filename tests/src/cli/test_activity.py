@@ -1,4 +1,4 @@
-"""Tests for ``forge activity`` (and the ``forge usage`` rename tombstone).
+"""Tests for ``forge activity``.
 
 Session resolution is exercised by ``test_session_context``; here we monkeypatch the
 resolver so the tests focus on the command's rendering / JSON contract / error tip.
@@ -11,7 +11,6 @@ import json
 from click.testing import CliRunner
 
 from forge.cli.activity import activity_cmd
-from forge.cli.main import main
 from forge.core.usage.ledger import UsageEvent, log_usage_event
 
 
@@ -114,19 +113,3 @@ def test_days_window_excludes_nothing_recent(monkeypatch) -> None:
     assert result.exit_code == 0
     data = json.loads(result.output)
     assert data["total_events"] == 1
-
-
-class TestOldUsageTombstone:
-    """The old ``forge usage`` path is a tombstone pointing at ``forge activity``."""
-
-    def test_bare_usage_is_tombstoned(self) -> None:
-        result = CliRunner().invoke(main, ["usage"])
-        assert result.exit_code != 0
-        assert "forge activity" in result.output
-
-    def test_tombstone_tolerates_old_args_and_flags(self) -> None:
-        """Old positional session + --all/--json/--days reach the rename message, not Click's 'No such option'."""
-        result = CliRunner().invoke(main, ["usage", "my-session", "--all", "--json", "--days", "7"])
-        assert result.exit_code != 0
-        assert "forge activity" in result.output
-        assert "No such option" not in result.output

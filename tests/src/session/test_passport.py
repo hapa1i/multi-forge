@@ -14,7 +14,6 @@ import pytest
 from forge.session.exceptions import PassportError
 from forge.session.models import DesignatedDoc
 from forge.session.passport import (
-    _REMOVED_STRATEGIES,
     PASSPORT_VERSION,
     STRATEGY_INSTRUCTIONS,
     VALID_STRATEGY_NAMES,
@@ -275,18 +274,6 @@ class TestParsePassport:
             "update": {"writers": "IN-VALID"},
         }
         with pytest.raises(PassportError, match="invalid session name"):
-            parse_passport(data)
-
-    @pytest.mark.parametrize("removed_strategy", ["suggested", "debugging", "patterns"])
-    def test_removed_strategy_raises_with_hint(self, removed_strategy: str) -> None:
-        """Removed strategies produce a PassportError with a migration hint."""
-        assert removed_strategy in _REMOVED_STRATEGIES  # guard: keep test in sync
-        data = {
-            "version": 1,
-            "intent": "Test",
-            "update": {"strategy": removed_strategy},
-        }
-        with pytest.raises(PassportError, match=removed_strategy):
             parse_passport(data)
 
 

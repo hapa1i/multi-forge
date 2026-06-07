@@ -207,8 +207,8 @@ class TestForgeExtensionDisable:
         check1 = synced_container.exec("test -d ~/.claude && echo 'exists'")
         assert "exists" in check1.stdout
 
-        # Uninstall (--force to avoid confirmation prompt hanging)
-        result = synced_container.exec("cd /forge && uv run forge extensions disable --scope user --force")
+        # Uninstall (--yes to avoid confirmation prompt hanging)
+        result = synced_container.exec("cd /forge && uv run forge extensions disable --scope user --yes")
         assert result.returncode == 0
 
         # Verify tracking entry removed (file may still exist but scope entry gone)
@@ -233,7 +233,7 @@ else:
         """Verify forge extensions disable on empty system is a graceful no-op."""
         synced_container.exec("rm -rf ~/.claude ~/.forge")
 
-        result = synced_container.exec("cd /forge && uv run forge extensions disable --scope user --force 2>&1")
+        result = synced_container.exec("cd /forge && uv run forge extensions disable --scope user --yes 2>&1")
         # CLI returns 0 and informs user - graceful no-op behavior
         assert result.returncode == 0
         assert "no forge installation" in result.stdout.lower()

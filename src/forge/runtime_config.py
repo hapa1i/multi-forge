@@ -33,28 +33,6 @@ _ENV_OVERRIDES: dict[str, str] = {
     "FORGE_DEBUG": "log_level",
 }
 
-# Renamed config keys: old name -> new name. Surfaced with migration guidance
-# instead of the generic "unknown key" path. The old value is NOT migrated --
-# runtime config is a system boundary that degrades to the built-in default
-# (coding-standards.md §5).
-_RENAMED_KEYS: dict[str, str] = {
-    "handoff_timeout": "memory_writer_timeout",
-}
-
-# Removed config keys: old name -> actionable guidance naming the replacement
-# path. Unlike a rename, there is no 1:1 successor key, so the guidance is a
-# human sentence. Surfaced on load (one-time warning) and rejected by
-# set/edit/reset with the same guidance (clean break, coding-standards.md §5:
-# "known legacy state that is intentionally ignored must still be surfaced with
-# an actionable warning").
-_REMOVED_KEYS: dict[str, str] = {
-    "show_rate_limits": (
-        "add 'rate_limits' to statusline.segments "
-        "(e.g. 'forge config set statusline.segments=path,model,rate_limits')"
-    ),
-}
-
-
 # Valid enum values for StatusLineConfig fields.
 _VALID_COST_MODES = ("auto", "api", "subscription")
 _VALID_PALETTES = ("default", "earthy")
@@ -378,34 +356,11 @@ def _dict_to_runtime_config(data: dict[str, Any], source: Path) -> RuntimeConfig
     known_fields = {f.name for f in fields(RuntimeConfig)}
     unknown = set(data.keys()) - known_fields
 
-    # Renamed keys get migration guidance, not the generic "unknown" warning.
-    # The old value is ignored (degrade to default) -- see _RENAMED_KEYS.
-    renamed = unknown & set(_RENAMED_KEYS)
-    for old in sorted(renamed):
-        logger.warning(
-            "%s: '%s' was renamed to '%s' and is ignored. " "Update your config (the old value is not applied).",
-            source,
-            old,
-            _RENAMED_KEYS[old],
-        )
-
-    # Removed keys get a specific replacement hint (not the generic warning), so
-    # stale recognized config doesn't silently degrade to default.
-    removed = unknown & set(_REMOVED_KEYS)
-    for old in sorted(removed):
-        logger.warning(
-            "%s: '%s' was removed and is ignored; %s.",
-            source,
-            old,
-            _REMOVED_KEYS[old],
-        )
-
-    truly_unknown = unknown - renamed - removed
-    if truly_unknown:
+    if unknown:
         logger.warning(
             "Unknown keys in %s (ignored): %s",
             source,
-            ", ".join(sorted(truly_unknown)),
+            ", ".join(sorted(unknown)),
         )
 
     kwargs: dict[str, Any] = {}
