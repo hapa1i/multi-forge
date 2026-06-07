@@ -537,9 +537,11 @@ deliberate, test-visible choice — not silently diverging.
   §7.12 `forge activity` cost honesty, §7.13 provenance split, §7.14 rename tombstone, §8.5 `forge_cost` segment, §5.21
   `~` marker; test-count 512→532). Every `<!-- auto -->` fixture validated against real code on the host. See the
   `change_log.md` "Phase 6 follow-up" entry.
-- [ ] **Move card `doing/ → done/` after final merge to `main`** — gated: branch not yet merged. **PR #18 open** (user
-  owns the merge/lane-move). Phase 6 complete on branch 2026-06-06; PR #18 review fixes landed (commit `97b2098`);
-  awaiting merge.
+- [x] **Move card `doing/ → done/` (2026-06-06)** — done as part of PR #18 (via `git mv`, history preserved), so the
+  card lands in `done/` on `main` at the same moment the shipped code does, when PR #18 merges. Version bumped to
+  `0.4.0` (breaking CLI: `costs show`, `forge activity`). **Until PR #18 merges, `main` still shows the card under
+  `doing/`** — this branch reflects the post-merge state. Durable lessons remain drafted under impl_notes' "Proposed
+  Promotions" subsection, awaiting human promotion (closeout step 3).
 
 ## Post-Review Follow-ups — RESOLVED on branch (2026-06-06)
 

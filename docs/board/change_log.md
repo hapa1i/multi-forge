@@ -27,6 +27,23 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-06
 
+### Closeout: metric-evidence card → `done/`, version `0.4.0` (PR #18)
+
+**Goal**: Close out the metric-evidence card and cut the release version for the PR #18 line.
+
+**Key changes**:
+
+- **Version `0.3.0` → `0.4.0`** (`pyproject.toml` + `src/forge/__init__.py`). Minor bump (0.x convention for breaking
+  changes): PR #18 carries breaking CLI changes (`forge proxy costs` → `costs show`, `forge usage` → `forge activity`)
+  plus the cost-honesty overhaul, `costs reset`, and the weekly-quota status line.
+- **Card moved `doing/ → done/`** via `git mv` (history preserved), as a commit on PR #18 so it lands in `done/` on
+  `main` at merge. Until then `main` still shows it under `doing/`.
+- **Durable lessons NOT auto-promoted**: they stay drafted under impl_notes' "Proposed Promotions" subsection awaiting
+  human review (closeout step 3 is a human gate).
+
+**Verification**: `import forge` → `0.4.0`; no test hardcodes the version (consistency tests compare against
+`forge.__version__` at runtime); `make pre-commit` clean.
+
 ### Added: weekly quota + heat-mapped rate-limit display in the status line (metric-evidence, PR #18)
 
 **Goal**: Surface the **weekly** quota (the limit that actually bites Max/Pro users) in the status line, which
