@@ -121,8 +121,9 @@ Producers in `cli/statusline/registry.py`; formatters in `cli/status_line.py`. K
 - `rate_limits` (opt-in; self-suppresses when `cost` shows quota), `cache_hit` (opt-in, throttled).
 
 Cost-rendering distinctions: `~$` proxy reported (may undercount), plain `$` only when `cost_mode=api`, `≈$` ambiguous
-hedge (only when no quota data), quota `RL:N%`+reset. Billing mode is a **declaration**, not inferred from the env key
-(§14–16).
+hedge (only when no quota data), quota `5h:N% · 7d:M%`+reset (both windows, labeled, heat-mapped on the context
+gradient; reset countdown follows the higher-pressure window). Billing mode is a **declaration**, not inferred from the
+env key (§14–16).
 
 ### 6. Cost config surfaces
 
@@ -271,7 +272,7 @@ native-runtime path that records subscription provenance directly.
 
 | State (this run)                        | Interactive billing (status line)               | Headless verb billing (ledger)                | Proxy plane                                     |
 | --------------------------------------- | ----------------------------------------------- | --------------------------------------------- | ----------------------------------------------- |
-| `cost_mode=auto`, `rate_limits` present | quota (`RL:N%`)                                 | `direct=true,key=true` -> `api`               | n/a                                             |
+| `cost_mode=auto`, `rate_limits` present | quota (`5h:N% · 7d:M%`)                         | `direct=true,key=true` -> `api`               | n/a                                             |
 | `cost_mode=auto`, no `rate_limits`      | hedged `≈$` (never plain `$` from key presence) | `api` or `unknown` by key                     | n/a                                             |
 | `cost_mode=api` (declared)              | real `$` (Claude's `total_cost_usd`)            | `api` or `unknown` by key                     | n/a                                             |
 | Proxy mode (`ANTHROPIC_BASE_URL` set)   | proxy `~$` reported (may undercount)            | `direct=false` -> `unknown` (upstream opaque) | `forge proxy costs show` (reported/unavailable) |

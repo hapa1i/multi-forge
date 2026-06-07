@@ -222,7 +222,7 @@ class TestStatusLineInputContract:
         result = mock_claude_workspace.exec("forge status-line < /tmp/status-line-input.json")
 
         assert result.returncode == 0
-        assert "RL:" in result.stdout
+        assert "5h:" in result.stdout
         assert "30%" in result.stdout
 
     def test_hides_rate_limits_for_proxy_sessions(self, mock_claude_workspace: ContainerLike) -> None:
@@ -258,4 +258,4 @@ class TestStatusLineInputContract:
         )
 
         assert result.returncode == 0
-        assert "RL:" not in result.stdout
+        assert "5h:" not in result.stdout

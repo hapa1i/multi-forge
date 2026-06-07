@@ -27,6 +27,28 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-06
 
+### Added: weekly quota + heat-mapped rate-limit display in the status line (metric-evidence, PR #18)
+
+**Goal**: Surface the **weekly** quota (the limit that actually bites Max/Pro users) in the status line, which
+previously showed only the 5h window.
+
+**Key changes**:
+
+- **Both windows now shown**: Claude Code already sends `rate_limits` as `{five_hour, seven_day}`, but
+  `_extract_short_window` returned only the 5h window and discarded `seven_day`. Replaced it with `_extract_windows`
+  (clean break) and `format_rate_limits` now renders `5h:N% · 7d:M%`.
+- **Heat-mapped**: each window's % is colored by its own usage on the **shared context gradient** (`CTX_*`, soft green →
+  hot coral) via a new `_heat_color`, so the binding window stands out — same color scheme as the context bar, but with
+  quota-appropriate bands (\<25/25-49/50-74/75-89/90-100), not the context bar's auto-compact-skewed thresholds.
+- **`RL` prefix dropped** (the `5h`/`7d` labels are self-evident) and the **reset countdown binds inline** to the hotter
+  window with a `↻` glyph (`7d:52%↻1d`) so it can't be misread as the trailing session duration.
+  `_format_reset_countdown` gained day formatting (`Nd`) for weekly resets.
+- **Docs/QA synced**: `config.md`, `design_appendix.md`, `auth_cost_metric.md`, QA `8-status-line.md`; `RL:` assertions
+  across `test_statusline_billing.py` + `test_status_line_integration.py` updated to `5h:`.
+
+**Verification**: 164 status-line unit tests pass (incl. `TestHeatColor`, both-window/inline-`↻`/day-countdown cases);
+live render `5h:8% · 7d:52%↻1d` confirmed; `make pre-commit` clean.
+
 ### Added: `forge proxy costs reset` + `costs` → `costs show` group split (metric-evidence, PR #18)
 
 **Goal**: Give users a one-command "reset all recorded costs to zero" path (requested while manually testing the

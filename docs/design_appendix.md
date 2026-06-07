@@ -275,11 +275,12 @@ an opt-in segment. Default-off segments: `rate_limits`, `cache_hit`, `supervisor
 `spend_cap`, `launch`, `forge_cost`. Full key/segment reference: `docs/end-user/config.md`.
 
 **Billing-aware cost.** Billing mode is an explicit **declaration**, never inferred from a key. `cost_mode=api` shows
-real `$`; `cost_mode=subscription` shows the 5h quota (dollars are a phantom on a subscription). `cost_mode=auto` shows
-the quota when `rate_limits` is present, else hedges `≈$` — an `ANTHROPIC_API_KEY` in the env is a *capability*, not
-proof of who pays (Forge may have hydrated it into an OAuth session), so it never flips `auto` to API dollars. Proxy
-mode always shows the proxy's *reported* `~$` (may undercount; cost-unavailable routes are excluded, not locally
-priced).
+real `$`; `cost_mode=subscription` shows quota burn (dollars are a phantom on a subscription) — both the 5h and weekly
+windows, `5h:N% · 7d:M%`, heat-mapped on the context gradient with the reset bound to the hotter window (`7d:52%↻1d`).
+`cost_mode=auto` shows the quota when `rate_limits` is present, else hedges `≈$` — an `ANTHROPIC_API_KEY` in the env is
+a *capability*, not proof of who pays (Forge may have hydrated it into an OAuth session), so it never flips `auto` to
+API dollars. Proxy mode always shows the proxy's *reported* `~$` (may undercount; cost-unavailable routes are excluded,
+not locally priced).
 
 **Launch metadata.** The opt-in `launch` segment renders `confirmed.launch` (CLI-written once at start): the route
 (`direct` / `proxy:<id>` / `custom`) and the api-key posture (`key:env|file|none|omit`). It describes how the session

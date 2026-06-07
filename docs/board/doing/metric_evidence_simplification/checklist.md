@@ -421,7 +421,7 @@ segment. Never merge.
 | Test                       | Fixture                                            | Assertion                                           | Test File                                                      |
 | -------------------------- | -------------------------------------------------- | --------------------------------------------------- | -------------------------------------------------------------- |
 | Key presence ≠ API payer   | `auto`, env has key, no rate_limits                | hedges `≈$`, not `$` (golden + billing)             | `tests/src/cli/test_statusline_registry.py` + `_billing.py`    |
-| `auto` shows quota         | `auto`, `rate_limits` present                      | renders `RL:%`, hides phantom dollars               | `tests/src/cli/test_statusline_billing.py`                     |
+| `auto` shows quota         | `auto`, `rate_limits` present                      | renders `5h:%`, hides phantom dollars               | `tests/src/cli/test_statusline_billing.py`                     |
 | Ambient session            | no `FORGE_SESSION`, key in env, no rate_limits     | hedges `≈$`, no launch segment, no cred lookup      | `tests/src/cli/test_statusline_billing.py::TestAmbientHonesty` |
 | omit strips interactive    | `interactive=True`, omit, key in env               | key popped; source `omitted_by_config`              | `tests/src/core/reactive/test_env.py::TestInteractiveApiKey`   |
 | omit recorded (real start) | `forge session start`, omit, shell key             | `confirmed.launch.api_key_source=omitted_by_config` | `tests/integration/cli/test_status_line_integration.py`        |
@@ -610,6 +610,38 @@ cap counters live in a separate process the CLI cannot reach, so the printed `Ti
 - [x] **QA**: `7-costs.md` invocations → `show` (13), footnote assertion → `'forge proxy costs show'` (mirrors the
   `activity.py` `notes.append`), new §7.15 reset section (dry-run, wipe-3-planes, audit-spared, empty no-op, restart
   tip); index test-count 532 → 537, version 1.0.22 → 1.0.23.
+
+## Added Capability — weekly quota + heat-mapped rate-limit display (user-requested, folded into PR #18, 2026-06-06)
+
+While dogfooding the branch the user asked for the **weekly** quota ("the more important one") in the status line. Root
+cause: Claude Code already sends `rate_limits` as `{five_hour, seven_day}`, but `_extract_short_window`
+(`cli/status_line.py`) returned only the 5h window and discarded `seven_day`. Pure presentation fix — no new data
+source. Chosen shape (via AskUserQuestion): show **both** windows labeled; **heat-map** each on the shared context
+gradient (`CTX_*`, same scheme as the context bar) by its own usage; **drop** the `RL` prefix (labels are self-evident);
+**bind** the reset countdown inline to the hotter window with a `↻` glyph (so it can't be misread as the trailing
+session duration). Folded into PR #18.
+
+Format: `5h:8% · 7d:52%↻1d` (5h soft-green, 7d warm-gold, weekly resets in 1d). When 5h is the hotter window the reset
+binds there: `5h:85%↻2h · 7d:30%`.
+
+| Task                                  | Assertion                                                                                    | Verification                                        |
+| ------------------------------------- | -------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| Both windows surfaced                 | `_extract_windows` returns `(five_hour, seven_day)` from object + list shapes                | `test_extract_windows_both_shapes`                  |
+| Labeled, no `RL` prefix               | renders `5h:N% · 7d:M%` (self-evident labels)                                                | `test_both_windows_ordered_5h_then_7d`              |
+| Heat-mapped on `CTX_*`                | each % colored by its own band (\<25/25-49/50-74/75-89/90-100), reusing the context gradient | `TestHeatColor::test_bands_are_the_context_palette` |
+| Reset binds to hotter window          | `↻{countdown}` inline after the higher-pressure window, not trailing                         | `test_reset_binds_to_higher_pressure_window`        |
+| Weekly reset renders days             | `_format_reset_countdown` emits `Nd` for >=24h (8-day cap kept)                              | `test_days_for_weekly_reset`                        |
+| One bad window doesn't drop the other | invalid 5h pct still renders 7d                                                              | `test_one_invalid_window_drops_only_that_window`    |
+
+- [x] **Production**: `status_line.py` — `_extract_short_window` → `_extract_windows` (both windows, clean break);
+  `_heat_color` (reuses `CTX_*`); `_format_window_entry` (labeled + heat-mapped); `format_rate_limits` renders both +
+  inline `↻` reset on the binding window; `_format_reset_countdown` gained day formatting; new `RESET_GLYPH = "↻"`.
+  **Verified**: 164 status-line unit tests; live render `5h:8% · 7d:52%↻1d`.
+- [x] **Tests**: `test_status_line.py` (`TestHeatColor`, rewritten `TestFormatRateLimits`/`TestRateLimitsObjectShape`,
+  day + inline-reset tests); `test_statusline_billing.py` + `test_status_line_integration.py` assertions `RL:` → `5h:`.
+- [x] **Docs**: `config.md` (cost_mode quota = both windows + heat + `↻`), `design_appendix.md` §status-line,
+  `auth_cost_metric.md` (format + state table); QA `8-status-line.md` (fixture seeds `seven_day` + `resets_at`, asserts
+  `5h:37% · 7d:82%` heat-mapped with `7d:82%↻2d`).
 
 ## Out of Scope (this card)
 

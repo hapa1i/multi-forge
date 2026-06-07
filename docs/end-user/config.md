@@ -162,10 +162,16 @@ forge config set statusline.cost_mode=subscription
 (dollars are a phantom; quota burn is the real signal). `cost_mode` picks the honest view:
 
 - `api` — show real `$` spend.
-- `subscription` — show the 5-hour quota instead of dollars.
-- `auto` (default) — the 5-hour quota when Claude reports it, otherwise a hedged `≈$`. An `ANTHROPIC_API_KEY` in your
+- `subscription` — show quota burn instead of dollars.
+- `auto` (default) — quota burn when Claude reports it, otherwise a hedged `≈$`. An `ANTHROPIC_API_KEY` in your
   environment is a capability, not proof of who pays (Forge may have hydrated it into an OAuth session), so `auto` never
   shows plain `$` from key presence — declare `cost_mode=api` if you bill per token and want real dollars.
+
+Quota burn shows **both** rolling windows when Claude reports them — `5h:N% · 7d:M%` (the 5-hour limit and the weekly
+limit) — each colored on the same heat gradient as the context bar (soft green → hot coral) by its own usage, so the
+binding window stands out. A reset countdown binds inline to the hotter window with a `↻` marker (e.g. `7d:52%↻1d` means
+the weekly quota resets in ~1 day), so it never reads as the session duration. On a Max/Pro plan the weekly window is
+usually the one that matters.
 
 Under a proxy the cost field shows the proxy's *reported* `~$`; the `~` flags that it can undercount, since
 cost-unavailable routes are excluded rather than priced from a local table.

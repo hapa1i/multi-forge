@@ -198,10 +198,13 @@ echo "$SUBSET" | FORGE_SESSION=test-session-1 ANTHROPIC_BASE_URL="$BASE_URL" for
 
 # Billing-aware cost (DIRECT mode — no proxy, so cost_mode applies; under a proxy the cost is always ~$).
 forge config reset statusline
-COSTY=$(jq -nc --arg cwd "$FORGE_TEST_REPO" \
+# Weekly window resets ~2 days out so the ↻ reset marker is exercised.
+RESET_AT=$(( $(date +%s) + 172800 ))
+COSTY=$(jq -nc --arg cwd "$FORGE_TEST_REPO" --argjson reset "$RESET_AT" \
   '{workspace:{current_dir:$cwd}, model:{display_name:"Opus 4.6"},
     context_window:{context_window_size:200000, used_percentage:6, current_usage:{input_tokens:8500}},
-    cost:{total_cost_usd:0.42}, rate_limits:{five_hour:{used_percentage:37}}}')
+    cost:{total_cost_usd:0.42},
+    rate_limits:{five_hour:{used_percentage:37}, seven_day:{used_percentage:82, resets_at:$reset}}}')
 forge config set statusline.cost_mode=api
 echo "$COSTY" | FORGE_SESSION=test-session-1 forge status-line
 forge config set statusline.cost_mode=subscription
@@ -214,7 +217,8 @@ forge config reset statusline
 - [ ] `set statusline.segments=...,bogus` exits non-zero and lists the valid segment names
 - [ ] `segments=path,model` + `palette=earthy`: only path + `[Opus 4.6]`, no cost/tokens/breadcrumb, earthy tones
 - [ ] `cost_mode=api` renders the dollar figure `$0.42`
-- [ ] `cost_mode=subscription` shows the 5h quota (e.g. `RL:37%`), NOT a `$` figure
+- [ ] `cost_mode=subscription` shows both quota windows heat-mapped (`5h:37% · 7d:82%`, the 7d hotter/oranger), the
+  reset bound to the hotter window as `7d:82%↻2d`, and NOT a `$` figure
 - [ ] `forge config reset statusline` restores the default multi-segment bar
 
 ### 8.5 Forge-added cost segment (`forge_cost` / `forge +$Y`)

@@ -15,12 +15,18 @@ import pytest
 
 from forge.cli.status_line import (
     _ANSI_RE,
+    CTX_CRIT,
+    CTX_HIGH,
+    CTX_LOW,
+    CTX_MED,
+    CTX_WARN,
     DEFAULT_TERM_WIDTH,
     TRAILING_MARGIN,
     ProxyRuntimeTruth,
     TranscriptStats,
-    _extract_short_window,
+    _extract_windows,
     _format_reset_countdown,
+    _heat_color,
     _visible_width,
     _wrap_output,
     compute_cache_hit_rate,
@@ -933,42 +939,39 @@ class TestFormatTokenBreakdown:
         assert "out:" not in visible
 
 
-class TestFormatRateLimits:
-    """Tests for rate limit display formatting."""
+class TestHeatColor:
+    """Quota % heat-maps onto the shared context gradient (same CTX_* palette)."""
 
-    def test_green_under_50(self):
+    def test_bands_are_the_context_palette(self):
+        assert _heat_color(0) == CTX_LOW
+        assert _heat_color(24.9) == CTX_LOW
+        assert _heat_color(25) == CTX_MED
+        assert _heat_color(49) == CTX_MED
+        assert _heat_color(50) == CTX_HIGH
+        assert _heat_color(74) == CTX_HIGH
+        assert _heat_color(75) == CTX_WARN
+        assert _heat_color(89) == CTX_WARN
+        assert _heat_color(90) == CTX_CRIT
+        assert _heat_color(100) == CTX_CRIT
+
+
+class TestFormatRateLimits:
+    """Quota burn: both windows, labeled + heat-mapped on the context gradient."""
+
+    def test_single_window_labeled_and_heat_colored(self):
         limits = [{"type": "5_hour", "used_percentage": 30.0, "resets_at": "2026-03-21T15:00:00Z"}]
         result = format_rate_limits(limits, is_proxy=False)
         assert result is not None
-        assert "\033[32m" in result  # GREEN
-        visible = _ANSI_RE.sub("", result)
-        assert "RL:30%" == visible
+        assert "5h:30%" == _ANSI_RE.sub("", result)
+        assert _heat_color(30) in result  # CTX_MED, not a 3-bucket green/yellow/red
 
-    def test_yellow_at_50(self):
-        limits = [{"type": "5_hour", "used_percentage": 50.0}]
-        result = format_rate_limits(limits, is_proxy=False)
+    def test_each_window_colored_by_its_own_usage(self):
+        # 5h calm (green), weekly hot (coral) — the binding limit lights up.
+        rl = {"five_hour": {"used_percentage": 7}, "seven_day": {"used_percentage": 95}}
+        result = format_rate_limits(rl, is_proxy=False)
         assert result is not None
-        assert "\033[33m" in result  # YELLOW
-
-    def test_yellow_at_80(self):
-        limits = [{"type": "5_hour", "used_percentage": 80.0}]
-        result = format_rate_limits(limits, is_proxy=False)
-        assert result is not None
-        assert "\033[33m" in result  # YELLOW
-
-    def test_red_above_80(self):
-        limits = [{"type": "5_hour", "used_percentage": 95.0}]
-        result = format_rate_limits(limits, is_proxy=False)
-        assert result is not None
-        assert "\033[31;1m" in result  # RED_BOLD
-        visible = _ANSI_RE.sub("", result)
-        assert "RL:95%" == visible
-
-    def test_red_above_80_fractional(self):
-        limits = [{"type": "5_hour", "used_percentage": 80.1}]
-        result = format_rate_limits(limits, is_proxy=False)
-        assert result is not None
-        assert "\033[31;1m" in result  # RED_BOLD
+        assert "5h:7% · 7d:95%" == _ANSI_RE.sub("", result)
+        assert _heat_color(7) in result and _heat_color(95) in result
 
     def test_suppressed_in_proxy_mode(self):
         limits = [{"type": "5_hour", "used_percentage": 42.0}]
@@ -980,25 +983,20 @@ class TestFormatRateLimits:
     def test_empty_list(self):
         assert format_rate_limits([], is_proxy=False) is None
 
-    def test_non_list_input(self):
-        assert format_rate_limits({"unexpected": "dict"}, is_proxy=False) is None
-
-    def test_falls_back_to_first_entry(self):
+    def test_seven_day_only_labeled(self):
         limits = [{"type": "7_day", "used_percentage": 15.0}]
         result = format_rate_limits(limits, is_proxy=False)
         assert result is not None
-        visible = _ANSI_RE.sub("", result)
-        assert "RL:15%" == visible
+        assert "7d:15%" == _ANSI_RE.sub("", result)
 
-    def test_prefers_5h_window(self):
+    def test_both_windows_ordered_5h_then_7d(self):
         limits = [
-            {"type": "7_day", "used_percentage": 10.0},
-            {"type": "5_hour", "used_percentage": 75.0},
+            {"type": "7_day", "used_percentage": 34.0},
+            {"type": "5_hour", "used_percentage": 7.0},
         ]
         result = format_rate_limits(limits, is_proxy=False)
         assert result is not None
-        visible = _ANSI_RE.sub("", result)
-        assert "RL:75%" == visible
+        assert "5h:7% · 7d:34%" == _ANSI_RE.sub("", result)
 
     def test_missing_used_percentage(self):
         limits = [{"type": "5_hour", "resets_at": "2026-03-21T15:00:00Z"}]
@@ -1008,32 +1006,45 @@ class TestFormatRateLimits:
         limits = [{"type": "5_hour", "used_percentage": "not-a-number"}]
         assert format_rate_limits(limits, is_proxy=False) is None
 
+    def test_one_invalid_window_drops_only_that_window(self):
+        # A bad 5h pct drops only that entry; weekly still renders.
+        limits = [
+            {"type": "5_hour", "used_percentage": "x"},
+            {"type": "7_day", "used_percentage": 20.0},
+        ]
+        assert "7d:20%" == _ANSI_RE.sub("", format_rate_limits(limits, is_proxy=False) or "")
+
 
 class TestRateLimitsObjectShape:
-    """Current Claude Code payload is an object, not a list (bug fix)."""
+    """Current Claude Code payload is an object, not a list."""
 
-    def test_object_shape_five_hour(self):
+    def test_object_shape_both_windows(self):
         rl = {"five_hour": {"used_percentage": 23.5, "resets_at": 0}, "seven_day": {"used_percentage": 80}}
         result = format_rate_limits(rl, is_proxy=False)
         assert result is not None
-        assert "RL:23%" == _ANSI_RE.sub("", result)  # prefers 5h over 7d
+        assert "5h:23% · 7d:80%" == _ANSI_RE.sub("", result)
 
-    def test_object_shape_falls_back_to_seven_day(self):
+    def test_object_shape_seven_day_only(self):
         rl = {"seven_day": {"used_percentage": 42}}
-        assert "RL:42%" == _ANSI_RE.sub("", format_rate_limits(rl, is_proxy=False) or "")
+        assert "7d:42%" == _ANSI_RE.sub("", format_rate_limits(rl, is_proxy=False) or "")
 
     def test_unrecognized_dict_rejected(self):
-        # A dict without five_hour/seven_day is not guessed (back-compat: the old
-        # list-only code returned None for any dict).
+        # A dict without five_hour/seven_day is not guessed.
         assert format_rate_limits({"unexpected": "dict"}, is_proxy=False) is None
 
-    def test_extract_short_window_both_shapes(self):
-        obj = {"five_hour": {"used_percentage": 10}}
-        assert _extract_short_window(obj) == {"used_percentage": 10}
+    def test_extract_windows_both_shapes(self):
+        obj = {"five_hour": {"used_percentage": 10}, "seven_day": {"used_percentage": 70}}
+        five, seven = _extract_windows(obj)
+        assert five == {"used_percentage": 10} and seven == {"used_percentage": 70}
         lst = [{"type": "7_day", "used_percentage": 5}, {"type": "5_hour", "used_percentage": 9}]
-        win = _extract_short_window(lst)
-        assert win is not None and win["used_percentage"] == 9
-        assert _extract_short_window("nonsense") is None
+        five, seven = _extract_windows(lst)
+        assert five is not None and five["used_percentage"] == 9
+        assert seven is not None and seven["used_percentage"] == 5
+        assert _extract_windows("nonsense") == (None, None)
+
+    def test_extract_windows_legacy_untyped_single_is_5h(self):
+        five, seven = _extract_windows([{"used_percentage": 12}])
+        assert five == {"used_percentage": 12} and seven is None
 
 
 class TestResetCountdown:
@@ -1064,19 +1075,36 @@ class TestResetCountdown:
         # Malformed timestamp far in the future -> omit, don't render "616518h".
         assert _format_reset_countdown(4_000_000_000, now=1_780_000_000.0) is None
 
-    def test_show_reset_appends_countdown(self):
+    def test_days_for_weekly_reset(self):
+        # A weekly window resets days out -> render days, not "72h".
+        now = 1_000_000.0
+        assert _format_reset_countdown(now + 3 * 86400, now=now) == "3d"
+        assert _format_reset_countdown(now + 24 * 3600, now=now) == "1d"
+        assert _format_reset_countdown(now + 23 * 3600, now=now) == "23h"
+
+    def test_show_reset_binds_countdown_inline(self):
         rl = {"five_hour": {"used_percentage": 30, "resets_at": 7200}}
         out = format_rate_limits(rl, is_proxy=False, show_reset=True, now=0.0)
         assert out is not None
+        # ↻ binds the countdown to the window so it can't read as session duration.
+        assert "5h:30%↻2h" == _ANSI_RE.sub("", out)
+
+    def test_reset_binds_to_higher_pressure_window(self):
+        # 5h resets in 2h, weekly in 3d; weekly is hotter (80 > 10), so 3d binds to 7d.
+        rl = {
+            "five_hour": {"used_percentage": 10, "resets_at": 7200},
+            "seven_day": {"used_percentage": 80, "resets_at": 3 * 86400},
+        }
+        out = format_rate_limits(rl, is_proxy=False, show_reset=True, now=0.0)
+        assert out is not None
         visible = _ANSI_RE.sub("", out)
-        assert "RL:30%" in visible
-        assert "2h" in visible
+        assert "5h:10% · 7d:80%↻3d" == visible  # weekly's reset, bound to 7d, not the 5h 2h
 
     def test_default_omits_countdown(self):
         rl = {"five_hour": {"used_percentage": 30, "resets_at": 7200}}
         out = format_rate_limits(rl, is_proxy=False)  # show_reset defaults False
         assert out is not None
-        assert "RL:30%" == _ANSI_RE.sub("", out)
+        assert "5h:30%" == _ANSI_RE.sub("", out)
 
 
 class TestFormatBillingCost:
@@ -1088,7 +1116,7 @@ class TestFormatBillingCost:
         out = format_billing_cost("subscription", cost, rl, now=0.0)
         assert out is not None
         visible = _ANSI_RE.sub("", out)
-        assert "RL:23%" in visible
+        assert "5h:23%" in visible
         assert "$" not in visible  # dollars are phantom on a subscription
         assert "3m" in visible  # duration still shown
 
@@ -1110,7 +1138,7 @@ class TestFormatBillingCost:
         out = format_billing_cost("ambiguous", cost, rl, now=0.0)
         assert out is not None
         visible = _ANSI_RE.sub("", out)
-        assert "RL:60%" in visible
+        assert "5h:60%" in visible
         assert "$" not in visible
 
 
