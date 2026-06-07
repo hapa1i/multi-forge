@@ -87,14 +87,14 @@ def _seed_sessions(tmp_path: Path) -> None:
     )
 
 
-def test_list_scope_repo_filters_by_project_root(tmp_path: Path, monkeypatch) -> None:
-    """scope=repo shows sessions from the same logical repo only."""
+def test_list_scope_workspace_filters_by_project_root(tmp_path: Path, monkeypatch) -> None:
+    """scope=workspace shows sessions from the same workspace (logical repo) only."""
     monkeypatch.setenv("HOME", str(tmp_path))
     _seed_sessions(tmp_path)
 
     repo_a = tmp_path / "repo-a"
     ctx = ExecutionContext(cwd=repo_a, worktree_root=repo_a, project_root=repo_a, forge_root=repo_a)
-    result = list_sessions(ctx=ctx, include_incognito=True, scope="repo")
+    result = list_sessions(ctx=ctx, include_incognito=True, scope="workspace")
 
     names = {s.name for s in result.sessions}
     assert names == {"sess-a", "sess-a-feat"}
@@ -127,8 +127,8 @@ def test_list_scope_all_returns_everything(tmp_path: Path, monkeypatch) -> None:
     assert names == {"sess-a", "sess-a-feat", "sess-b"}
 
 
-def test_list_default_scope_is_repo(tmp_path: Path, monkeypatch) -> None:
-    """Default scope is repo (filters by project_root)."""
+def test_list_default_scope_is_workspace(tmp_path: Path, monkeypatch) -> None:
+    """Default scope is workspace (filters by project_root)."""
     monkeypatch.setenv("HOME", str(tmp_path))
     _seed_sessions(tmp_path)
 
@@ -205,7 +205,7 @@ def test_list_sessions_reads_manifest_with_entry_scope(tmp_path: Path, monkeypat
     )
 
     ctx = ExecutionContext(cwd=project_root, worktree_root=project_root, project_root=project_root)
-    result = list_sessions(ctx=ctx, include_incognito=True, scope="repo")
+    result = list_sessions(ctx=ctx, include_incognito=True, scope="workspace")
 
     assert len(result.sessions) == 2
     templates = sorted(item.proxy_template or "" for item in result.sessions)

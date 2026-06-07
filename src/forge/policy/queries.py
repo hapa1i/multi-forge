@@ -51,13 +51,13 @@ def find_sessions_supervised_by(
     target_uuid: str | None,
     target_forge_root: str | None,
 ) -> list[str]:
-    """Find repo-scoped sessions whose supervisor points to the target.
+    """Find workspace-scoped sessions whose supervisor points to the target.
 
     Matches on session name or Claude UUID. Verifies forge_root alignment
     when set to prevent false matches from duplicate names across projects.
     Best-effort: skips broken manifests, never crashes.
 
-    Cost: O(N) manifest reads where N = repo-scoped sessions. Acceptable
+    Cost: O(N) manifest reads where N = workspace-scoped sessions. Acceptable
     for typical workflows (2-10 sessions per repo).
     """
     try:

@@ -352,7 +352,7 @@ class TestSessionList:
         """--older-than should not pull in same-name sessions from a different forge_root."""
         forge_root_a, forge_root_b = _seed_duplicate_list_sessions(temp_env)
 
-        result = runner.invoke(main, ["session", "list", "--older-than", "30", "--scope", "repo"])
+        result = runner.invoke(main, ["session", "list", "--older-than", "30", "--scope", "workspace"])
 
         assert result.exit_code == 0
         assert result.output.count("shared") == 1
@@ -363,7 +363,7 @@ class TestSessionList:
         """Duplicate display names should show a location column for humans."""
         _seed_scoped_duplicate_sessions(temp_env)
 
-        result = runner.invoke(main, ["session", "list", "--scope", "repo"])
+        result = runner.invoke(main, ["session", "list", "--scope", "workspace"])
 
         assert result.exit_code == 0
         assert "LOCATION" in result.output

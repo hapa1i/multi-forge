@@ -19,7 +19,6 @@ from forge.core.state import now_iso
 
 from .artifacts import resolve_artifact_path
 from .claude.paths import (
-    find_project_root,
     get_transcript_path,
     resolve_claude_project_root,
 )
@@ -539,13 +538,17 @@ class SessionManager:
                 _rollback_worktree(resolved_worktree_path=worktree_path)
             raise SessionExistsError(name)
 
-        # Find project root - use main repo root if we created a worktree
+        # project_root is the workspace anchor (design.md §3): the git-common-dir
+        # root, identical for every linked worktree of a repo, so sessions started
+        # in sibling worktrees group together under `--scope workspace`. When Forge
+        # created the worktree we already have it; otherwise derive it via
+        # resolve_project_root() (get_main_repo_root, graceful non-git fallback) —
+        # NOT find_project_root(), which returns the worktree's own root for a
+        # manually-created linked worktree and silently breaks workspace grouping.
         if main_repo_root is not None:
             project_root: str | Path = main_repo_root
         else:
-            # For non-worktree sessions, find the project root
-            # (which is the same as worktree_path for regular checkouts)
-            project_root = find_project_root(worktree_path)
+            project_root = self.resolve_project_root(worktree_path)
         # checkout_root = git --show-toplevel (not CWD). For worktree-created sessions
         # main_repo_root is the logical repo, not the checkout; use get_repo_root() instead.
         from .worktree import get_repo_root
@@ -1235,7 +1238,9 @@ class SessionManager:
             target_forge_root = parent_forge_root
             fork_worktree_path = str(parent_worktree_path)
             fork_branch = parent.worktree.branch if parent.worktree else None
-            project_root = str(find_project_root(fork_worktree_path))
+            # Workspace anchor: git-common-dir root (groups sibling worktrees),
+            # not the per-worktree root find_project_root() would return.
+            project_root = self.resolve_project_root(fork_worktree_path)
             is_into = False
             assert target_forge_root is not None
             target_store, target_entry, target_state = self._load_existing_fork_target(

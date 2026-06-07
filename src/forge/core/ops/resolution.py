@@ -1,8 +1,8 @@
-"""Repo-wide session resolution.
+"""Workspace-wide session resolution.
 
 Shared two-tier resolver used by session CLI commands and policy CLI.
 Resolves a named session with current-project preference, falling back
-to a repo-scoped scan when the session lives in a sibling forge_root.
+to a workspace-scoped scan when the session lives in a sibling forge_root.
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ _log = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class ResolvedSession:
-    """Result of repo-wide session resolution."""
+    """Result of workspace-wide session resolution."""
 
     name: str
     entry: SessionIndexEntry
@@ -39,12 +39,12 @@ def resolve_session_repo_wide(
     *,
     manager: SessionManager | None = None,
 ) -> ResolvedSession:
-    """Resolve a named session with repo-wide scope and current-project preference.
+    """Resolve a named session with workspace-wide scope and current-project preference.
 
     Two-tier resolution (no global fast path to prevent cross-repo jumps):
 
     1. Tier 1: Try cwd_forge_root (O(1) compound-key index lookup).
-    2. Tier 2: Repo-scoped scan (project_root_filter) for cross-worktree matches.
+    2. Tier 2: Workspace-scoped scan (project_root_filter) for cross-worktree matches.
 
     Tiebreaker: if multiple matches in the same repo, prefer cwd_forge_root.
 
@@ -71,7 +71,7 @@ def resolve_session_repo_wide(
         except (ForgeSessionError, FileNotFoundError):
             pass
 
-    # Tier 2: repo-scoped scan (cross-worktree)
+    # Tier 2: workspace-scoped scan (cross-worktree)
     project_root = _derive_project_root(cwd_forge_root, manager)
     if project_root is None:
         raise SessionNotFoundError(name)
@@ -118,7 +118,7 @@ def _derive_project_root(cwd_forge_root: str | None, manager: SessionManager) ->
         try:
             pr = manager.resolve_project_root(cwd_forge_root)
             # resolve_project_root falls back to returning the input path
-            # when git fails. That's not useful for repo-scoped filtering,
+            # when git fails. That's not useful for workspace-scoped filtering,
             # so fall through to CWD-based derivation.
             if pr != str(Path(cwd_forge_root).resolve()):
                 return pr

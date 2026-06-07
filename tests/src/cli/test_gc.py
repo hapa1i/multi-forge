@@ -10,7 +10,7 @@ from forge.cli.gc import clean_cmd
 from forge.core.ops.gc import CleanReport, OrphanCategory
 
 
-def _make_report(scope: str = "repo", total: int = 0) -> CleanReport:
+def _make_report(scope: str = "workspace", total: int = 0) -> CleanReport:
     """Build a CleanReport with optional orphans."""
     cats = [
         OrphanCategory("session_dirs", "Orphan session dirs", total, ["/fake/path"] * total),

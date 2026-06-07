@@ -1,4 +1,4 @@
-"""Tests for repo-wide session resolution (core.ops.resolution)."""
+"""Tests for workspace-wide session resolution (core.ops.resolution)."""
 
 from __future__ import annotations
 
@@ -35,7 +35,7 @@ def _seed_session(
 
 
 class TestResolveSessionRepoWide:
-    """Two-tier resolver: current-project preference with repo-wide fallback."""
+    """Two-tier resolver: current-project preference with workspace-wide fallback."""
 
     def test_same_forge_root(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """Session in current forge_root resolves as Tier 1 (not cross-project)."""

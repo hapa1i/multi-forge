@@ -579,7 +579,7 @@ scope rationale remain in design.md.
 | Session / plan        | `%session list`, `%plan`                                                                                            | --                                                            |
 | Proxy                 | `%proxy list`, `%proxy show`, `%proxy audit show/diff` (read-only)                                                  | `%proxy create`, `%proxy edit`, `%proxy set`, `%proxy delete` |
 | Policy / verification | `%policy status`, `%policy enable`, `%policy disable`, `%policy check`, `%policy supervise`, `%cancel-verification` | --                                                            |
-| Cleanup               | `%clean [--scope repo\|project\|all]` (read-only report)                                                            | destructive cleanup (use `forge clean --yes` from terminal)   |
+| Cleanup               | `%clean [--scope workspace\|project\|all]` (read-only report)                                                       | destructive cleanup (use `forge clean --yes` from terminal)   |
 | Utilities / config    | `%h`, `%help`, `%config`                                                                                            | --                                                            |
 
 ### B.2 Current shipped commands
@@ -603,7 +603,7 @@ Shared commands (mirrors CLI syntax):
 - `%policy supervise <target>` (set supervisor), `off` (suspend), `on` (resume), `remove` (delete)
 - `%policy supervise reload [path]` (reload latest approved plan, or from explicit path)
 - `%cancel-verification` (bypasses the active Stop-hook verification loop)
-- `%clean [--scope repo|project|all]` (read-only: shows orphaned state report, default scope=project)
+- `%clean [--scope workspace|project|all]` (read-only: shows orphaned state report, default scope=project)
 
 ---
 

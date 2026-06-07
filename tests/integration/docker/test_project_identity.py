@@ -184,10 +184,10 @@ print(f'resolved={name}')
 
 
 class TestPhase3SessionListScopes:
-    """Session list defaults to repo scope and supports --scope."""
+    """Session list defaults to workspace scope and supports --scope."""
 
     def test_session_list_scope_matrix(self, forge_workspace: ContainerLike) -> None:
-        """repo/project/all scopes should split sessions by logical repo vs Forge project."""
+        """workspace/project/all scopes should split sessions by workspace (logical repo) vs Forge project."""
         forge_workspace.exec("cd /workspace && forge extensions enable --scope local --profile minimal")
 
         root_result = forge_workspace.exec("cd /workspace && forge session start repo-root --no-launch")
@@ -211,7 +211,7 @@ class TestPhase3SessionListScopes:
         assert other_repo_result.returncode == 0, f"Other repo session start failed: {other_repo_result.stderr}"
 
         repo_list = forge_workspace.exec("cd /workspace && forge session list --json")
-        assert repo_list.returncode == 0, f"Repo-scope list failed: {repo_list.stderr}"
+        assert repo_list.returncode == 0, f"Workspace-scope list failed: {repo_list.stderr}"
         repo_names = {item["name"] for item in json.loads(repo_list.stdout)}
         assert repo_names == {"repo-root", "repo-worktree"}
 

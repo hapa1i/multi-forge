@@ -415,9 +415,9 @@ def _delete_single_session(
 )
 @click.option(
     "--scope",
-    type=click.Choice(["repo", "project", "all"], case_sensitive=False),
-    default="repo",
-    help="Scope: repo (default, same logical repo), project (same forge_root), all (global)",
+    type=click.Choice(["workspace", "project", "all"], case_sensitive=False),
+    default="workspace",
+    help="Scope: workspace (default, all worktrees of the same repo), project (same forge_root), all (global)",
 )
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
 def list_sessions(include_incognito: bool, older_than: int | None, scope: str, as_json: bool) -> None:
@@ -788,7 +788,7 @@ def show(session_id: str | None, as_json: bool, field_path: str | None) -> None:
 
     # Resolve the forge_root once -- either from get_session_context's prior
     # UUID/name lookup (preserves exact scope for UUIDs) or via the two-tier
-    # repo-wide resolver as fallback.
+    # workspace-wide resolver as fallback.
     from forge.core.ops.resolution import resolve_session_repo_wide
     from forge.core.ops.session_context import resolve_session_identifier
 
@@ -815,7 +815,7 @@ def show(session_id: str | None, as_json: bool, field_path: str | None) -> None:
                 return st, ent, is_cross
             except ForgeSessionError:
                 pass
-        # Fallback: two-tier repo-wide resolution
+        # Fallback: two-tier workspace-wide resolution
         try:
             res = resolve_session_repo_wide(ctx.session_name, _fr, manager=manager)
             return res.state, res.entry, res.is_cross_project

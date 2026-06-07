@@ -25,6 +25,85 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board-contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-06-07
+
+### Docs: correct the `claude_session_id` pre-seed lifecycle (design.md §3.3/§3.5 + session.md)
+
+**Goal**: design.md §3.3/§3.5 and the end-user session guide said `claude_session_id` is "not pre-seeded by the CLI" /
+"`None` until Claude starts" / "a non-null value means it has been used" — true only for the native `--fork-session`
+path. The `forge session start` path (and transfer/fresh children) actually **pre-seed** it (the CLI generates the UUID,
+writes it at creation, imposes it via `--session-id`) and the SessionStart hook **validates** it. Align the normative
+and user docs to the shipped code (documentation-guidelines Rule 2: design docs describe shipped behavior).
+
+**Key changes**:
+
+- **design.md §3.3** (1:1 invariant): every launch that starts a **new** Claude conversation pre-seeds —
+  `forge session start` and transfer/fresh children (`fork`, `resume --fresh`) generate a UUID and impose it via
+  `--session-id`, which the hook validates; only **native** `--fork-session` forks do not pre-seed (Claude mints, hook
+  records; `native-relocate` reuses the parent UUID). A non-null UUID alone is **not** "used" (a `--no-launch` start
+  session already carries a pre-seeded UUID) — "used"/resumable requires hook confirmation or transcript-backed
+  evidence, matching `_is_resumable_session` ("Pre-seeded UUIDs without other evidence are still rejected").
+- **design.md §3.5**: the CLI-writes note now states the CLI pre-seeds for start + transfer/fresh children; the
+  Hooks-write note says SessionStart validates (those paths) or records (native `--fork-session`).
+- **end-user/session.md**: same corrections, and fixed a self-contradictory resume section — the stale "never-launched →
+  launch in-place / previously-used → fork" bullets now describe reattach-by-default vs `--fresh`-derives-a-child,
+  matching the adjacent intro/Gates text and `_reconnect_in_place` (`--resume`, no `--fork-session`).
+
+**Verification**: Docs-only — no code change (the code was already self-consistent: `models.py:400` comment, the
+start/fork launch paths, and `_is_resumable_session` all agree). Grep confirms no stale "not pre-seeded" / "None until
+Claude starts" / "non-null means used" claims remain outside `done/`. `make pre-commit` clean.
+
+### Fix: `project_root` consistently git-common-dir-derived (workspace_scope Slice 1)
+
+**Goal**: Sessions started in a **manually**-created linked worktree (`git worktree add`, then `forge session start` —
+not `--worktree`) did not group under `--scope workspace`, defeating the core motivation of the `workspace_scope`
+proposal. Fix the latent `project_root` derivation bug rather than layer a new scope concept over it.
+
+**Key changes**:
+
+- `SessionManager.start_session` and the same-directory `fork` path derived `project_root` via
+  `find_project_root(worktree_path)`, which returns the *worktree's own* root for a linked worktree (its `.git` is a
+  file). Both now route through the existing canonical `resolve_project_root()` (`get_main_repo_root` + graceful non-git
+  fallback), so `project_root` is the shared git-common-dir root for every worktree of a repo — aligning the code with
+  design.md §3, which already names `get_main_repo_root()` as the `project_root` identity source. Removed the now-unused
+  `find_project_root` import.
+- Minor improvement: a `.forge/`-enabled non-git directory no longer raises mid-`start_session`; `project_root` degrades
+  to the directory itself, consistent with how `checkout_root` already falls back.
+
+**Verification**: New regression `tests/regression/test_bug_workspace_scope_manual_worktree.py` (confirmed failing on
+the old derivation — `wt-sess` missing from `--scope workspace` — and passing after the fix). 1031 session+ops unit
+tests pass; `make pre-commit` clean. No design-doc change (the fix makes code match the existing §3 contract).
+
+### Rename `--scope repo` → `--scope workspace` (workspace_scope precursor, clean break)
+
+**Goal**: Resolve concern #1 from the `workspace_scope` proposal review — the proposed `--scope workspace` would have
+been a synonym of the existing `--scope repo` (the logical-repo / worktree-family grouping). Rename the flag value
+instead of adding a second name, so the CLI keeps one scope vocabulary.
+
+**Key changes**:
+
+- **Flag value renamed across all four command families** that share the `repo|project|all` scope: `forge session list`,
+  `forge clean`, `forge memory status|shadows *`, and the `%session list` / `%clean` direct commands. `VALID_SCOPES`
+  (`core/ops/session.py`, `core/ops/gc.py`), Click `Choice`/`default`/help, error messages, and the `%`-dispatcher
+  defaults all use `workspace`. `session list` + `%session list` defaults flip `repo` → `workspace` (identical
+  filtering, new name); `clean`/`memory`/`%clean` keep their existing `project` defaults.
+- **Clean break (research-preview)**: `--scope repo` now fails with Click's native "invalid choice" — no alias or
+  tombstone (coding-standards §5). This is a pure CLI-surface + `--json` `"scope"` output rename; the durable session
+  index is untouched (the `project_root` field is kept — workspace membership is still derived from it, not stored).
+- **Vocabulary swept** in prose/docstrings: "repo-scoped"/"repo-wide" → "workspace-scoped"/"workspace-wide" across
+  design.md §3/§3.2/§4.0, design_appendix §B, end-user `session.md`, `diagrams.md`, and internal resolution docstrings.
+  **Preserved deliberately** (workspace_scope card Open Q1, deferred): the `resolve_session_repo_wide` function symbol,
+  the `project_root` field name, and the git-identity term "logical repo". `done/` board cards left as historical
+  snapshots (board contract).
+
+**Breaking change / reset**: `forge session list --scope repo`, `forge clean --scope repo`,
+`forge memory ... --scope repo`, and `%clean --scope repo` are removed — use `--scope workspace` (same behavior). Update
+any scripts/aliases.
+
+**Verification**: 438 unit+regression tests pass across the affected suites (session ops, gc, resolution, clean CLI,
+session/memory CLI, `%`-dispatcher, shadow curation, cross-project regression). Final grep confirms no `--scope repo` /
+"repo-scoped" / "repo-wide" prose remains outside `done/`. `make pre-commit` clean.
+
 ## 2026-06-06
 
 ### Remove CLI rename-migration tombstones (clean break at `0.4.0`)

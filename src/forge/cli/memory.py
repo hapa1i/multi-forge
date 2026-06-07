@@ -85,7 +85,7 @@ def memory() -> None:
         forge memory track docs/changelog.md --strategy changelog    # author a passport (sessionless)
         forge memory enable --session planner                  # enable memory for a session
         forge memory list                                      # show passported docs
-        forge memory status --scope repo                       # show activation across sessions
+        forge memory status --scope workspace                  # show activation across sessions
     """
 
 
@@ -590,7 +590,7 @@ def list_cmd(as_json: bool) -> None:
 @memory.command("status")
 @click.option(
     "--scope",
-    type=click.Choice(["project", "repo", "all"]),
+    type=click.Choice(["project", "workspace", "all"]),
     default="project",
     show_default=True,
     help="Scope for discovery.",
@@ -689,7 +689,7 @@ def _collect_shadow_entries(
 @shadows_group.command("list")
 @click.option(
     "--scope",
-    type=click.Choice(["project", "repo", "all"]),
+    type=click.Choice(["project", "workspace", "all"]),
     default="project",
     show_default=True,
     help="Scope for discovery.",
@@ -754,7 +754,7 @@ def shadows_list_cmd(scope: str, as_json: bool) -> None:
 @click.option("--for", "for_doc", required=True, help="Official doc to show shadow content for.")
 @click.option(
     "--scope",
-    type=click.Choice(["project", "repo", "all"]),
+    type=click.Choice(["project", "workspace", "all"]),
     default="project",
     show_default=True,
     help="Scope for discovery.",
@@ -820,7 +820,7 @@ def shadows_show_cmd(for_doc: str, scope: str) -> None:
 @click.option("--session", "-s", "session_name", default=None, help="Session name.")
 @click.option(
     "--scope",
-    type=click.Choice(["project", "repo", "all"]),
+    type=click.Choice(["project", "workspace", "all"]),
     default="project",
     show_default=True,
     help="Scope for shadow discovery.",
@@ -923,7 +923,7 @@ def _review_curate(
     )
 
     if scope == "all":
-        raise click.ClickException("Cross-project curation deferred; use --scope project or --scope repo.")
+        raise click.ClickException("Cross-project curation deferred; use --scope project or --scope workspace.")
 
     ctx = ExecutionContext.from_cwd()
     try:

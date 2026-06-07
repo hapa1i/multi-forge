@@ -101,12 +101,13 @@ project_root    (logical repo -- git identity, shared across worktrees)
 
 **Session command scoping (normative):**
 
-- **`session list`**: repo-scoped by default (filter by `project_root`). Shows sessions across all Forge projects within
-  the logical repo. `--scope project` narrows to current `forge_root`. `--scope all` shows everything globally.
-- **`session show`, `session delete` (named), `session set`, `session reset`**: repo-scoped with current-project
-  preference. Two-tier resolution: try current `forge_root` first (O(1)), fall back to repo-scoped scan. Prefers current
-  `forge_root` as tiebreaker when the same name exists in multiple projects. Raises `AmbiguousSessionError` if truly
-  ambiguous. Prints a cross-project note when resolving from a different `forge_root`.
+- **`session list`**: workspace-scoped by default (`--scope workspace`, filters by `project_root`). Shows sessions
+  across all worktrees and Forge projects within the same logical repo (the workspace). `--scope project` narrows to
+  current `forge_root`. `--scope all` shows everything globally.
+- **`session show`, `session delete` (named), `session set`, `session reset`**: workspace-scoped with current-project
+  preference. Two-tier resolution: try current `forge_root` first (O(1)), fall back to a workspace-scoped scan. Prefers
+  current `forge_root` as tiebreaker when the same name exists in multiple projects. Raises `AmbiguousSessionError` if
+  truly ambiguous. Prints a cross-project note when resolving from a different `forge_root`.
 - **`session delete --all`**: project-scoped (current `forge_root` only). Requires being inside a Forge project
   (`_cwd_forge_root() != None`); refuses to run outside one to prevent accidental global deletion.
 - **`session resume`, `session fork`**: project-scoped. Cannot resolve cross-project because Claude Code's `--resume`
@@ -196,18 +197,25 @@ class SessionIndexEntry:
     claude_session_id: str | None = None
 ```
 
-`session list --scope` controls filtering: **`repo`** (default) filters by `project_root` -- shows sessions across all
-worktrees and Forge projects within the logical repo. **`project`** filters by `forge_root` -- just this Forge project.
-**`all`** shows everything globally.
+`session list --scope` controls filtering: **`workspace`** (default) filters by `project_root` -- shows sessions across
+all worktrees and Forge projects within the same logical repo (the workspace). **`project`** filters by `forge_root` --
+just this Forge project. **`all`** shows everything globally.
 
 ### 3.3 Session file schema (`forge.session.json`)
 
 **1:1 invariant:** Each Forge session corresponds to exactly one Claude process invocation.
-`confirmed.claude_session_id` is **launch-owned** — it starts as `None` when a session is created, and is set by the
-SessionStart hook when Claude actually starts. A non-null `claude_session_id` means "this session has been used." Stop
-and StopFailure also reconcile `claude_session_id` and `transcript_path` from their hook payloads to correct
-fork-session launches where SessionStart sees an inherited parent UUID. Relaunching a used session creates a child with
-lineage (`parent_session`), not a reuse of the same session.
+`confirmed.claude_session_id` is **launch-owned**, but how it is first set depends on the launch path.
+`forge session start` **pre-seeds** it: the CLI generates a UUID, writes it to the manifest at creation, and imposes it
+on Claude via `--session-id`; the SessionStart hook then **validates** that UUID. The same pre-seed applies to
+**transfer/fresh children** (the cross-worktree default for `session fork` and `resume --fresh`): the CLI mints a
+**new** UUID and imposes it via `--session-id`. The exception is a **native** fork (`--resume-mode native`, which passes
+`--fork-session`): there the CLI does **not** pre-seed — Claude mints the child UUID and SessionStart **discovers and
+records** it (`native-relocate` instead reuses the parent's UUID). Stop and StopFailure also reconcile
+`claude_session_id` and `transcript_path` from their hook payloads to correct fork-session launches where SessionStart
+sees an inherited parent UUID. Because the start path pre-seeds, a non-null `claude_session_id` does **not** by itself
+mean the session ran (a `--no-launch` or not-yet-launched start session already carries a pre-seeded UUID);
+"used"/resumable requires hook confirmation or transcript-backed evidence (see Default resume behavior). Relaunching a
+used session creates a child with lineage (`parent_session`), not a reuse of the same session.
 
 **Default resume behavior.** `forge session resume <name>` reattaches to the same Claude conversation without creating a
 child. This relaxes the 1:1 model (a new process invocation on the same Forge session) and is the default path: the
@@ -337,13 +345,16 @@ To avoid writer conflicts:
     launch time to reflect whether Claude is running via sidecar), `launch` (immutable launch facts recorded once at
     start — routing mode, proxy id/base URL, and whether/how an API key was made available to the child)
   - Sets `FORGE_SESSION=<session_name>` when launching Claude
-  - Note: `claude_session_id` is **not** pre-seeded by the CLI; it is set by hooks from Claude's live conversation
-    payloads. SessionStart sets the initial value, and Stop/StopFailure may reconcile it when native fork launches
-    materialize a child UUID after startup.
+  - `claude_session_id` whenever the CLI starts a **new** Claude conversation — `forge session start` and transfer/fresh
+    children (`session fork`, `resume --fresh`): the CLI **pre-seeds** it (generates a UUID, writes it at creation,
+    imposes it via `--session-id`) and the SessionStart hook validates it. **Native** fork launches
+    (`--resume-mode native`, `--fork-session`) do **not** pre-seed — Claude mints the child UUID and the hook records
+    it; Stop/StopFailure reconcile when native fork launches materialize a child UUID after startup.
 - Hooks write:
   - `confirmed` section **during the session**: `claude_session_id`, proxy identity, artifacts, policy state, transcript
-    paths. SessionStart is the first source for `claude_session_id`; Stop and StopFailure are authoritative
-    reconciliation points for the final live conversation identity.
+    paths. SessionStart **validates** the pre-seeded `claude_session_id` (start and transfer/fresh-child paths) or
+    **records** the Claude-minted one (native `--fork-session`); Stop and StopFailure are authoritative reconciliation
+    points for the final live conversation identity.
   - Locate session via `FORGE_SESSION`
 - Forge Proxy Orchestrator writes:
   - `~/.forge/proxies/index.json`
@@ -976,7 +987,7 @@ reports "no such command/option" — no tombstone shims. List/show commands supp
 | `forge session resume [name]`          | Reattach to an existing session (default), or derive a fresh child with `--fresh` |
 | `forge session fork <parent> [--name]` | Fork a session (same dir by default; `--worktree` for isolation)                  |
 | `forge session show [session]`         | Show session details (`--json`, `--field`); accepts name or UUID                  |
-| `forge session list`                   | List sessions (`--scope repo\|project\|all`; default `repo`; `--json`)            |
+| `forge session list`                   | List sessions (`--scope workspace\|project\|all`; default `workspace`; `--json`)  |
 | `forge session set <key> <value>`      | Set a mid-session override                                                        |
 | `forge session reset [key]`            | Reset overrides to intent                                                         |
 | `forge session delete <name>...`       | Delete one or more sessions (`--all` for bulk deletion)                           |

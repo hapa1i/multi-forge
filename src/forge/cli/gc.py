@@ -16,9 +16,9 @@ from forge.core.ops.gc import CleanError, CleanReport, collect_clean_report, run
 @click.command("clean")
 @click.option(
     "--scope",
-    type=click.Choice(["repo", "project", "all"]),
-    default="repo",
-    help="Scope: repo (default), project, or all",
+    type=click.Choice(["workspace", "project", "all"]),
+    default="workspace",
+    help="Scope: workspace (default), project, or all",
 )
 @click.option("--yes", "-y", is_flag=True, help="Actually delete (default is dry-run)")
 @click.option("--verbose", "-v", is_flag=True, help="Show individual items")
@@ -31,7 +31,7 @@ def clean_cmd(scope: str, yes: bool, verbose: bool, as_json: bool) -> None:
     Examples:
 
     \b
-        forge clean                       # Dry-run (scope: repo)
+        forge clean                       # Dry-run (scope: workspace)
         forge clean --yes                 # Actually clean
         forge clean --scope all --yes     # Clean globally
         forge clean --scope project       # Current Forge project only
