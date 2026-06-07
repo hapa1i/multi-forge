@@ -2,9 +2,10 @@
 
 Branch: `feat/remove-tombstones` (stacked on PR #18). Clean break at `0.4.0`; no compatibility shims.
 
-## Current focus
+## Status
 
-Closeout: all source + test + doc changes landed and verified; ready for `make pre-commit`, commit, push, PR.
+**Done.** Shipped via PR #19 (squash `6ca5362`) merged into the #18 branch; all source + test + doc changes landed and
+verified. Card moved to `done/` on the #18 branch — lands in `done/` on `main` when #18 merges.
 
 ## Phase 1 — Bucket 2: command/flag rename tombstones (REMOVE)
 
@@ -68,4 +69,5 @@ Closeout: all source + test + doc changes landed and verified; ready for `make p
 - [x] Relevant integration tests pass — `test_proxy_commands_integration.py` (27) + `test_backend_cli.py` (8) green
   against the real CLI subprocess (`proxy delete --yes`/`--yes --kill-adopted`, `backend delete --yes`).
 - [x] Commit + push `feat/remove-tombstones`; PR #19 opened, stacked on #18 (`feat/metric-evidence-simplification`).
-- [ ] Move card `doing/` → `done/` after #19 merges to `main`.
+- [x] PR #19 squash-merged into the #18 branch (`6ca5362`); card moved `doing/` → `done/` on the #18 branch so it lands
+  in `done/` on `main` when #18 merges.
