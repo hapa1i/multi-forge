@@ -18,11 +18,15 @@ A **session** is a human unit of work with a **1:1 relationship** to a Claude pr
 - session manifest (`<forge_root>/.forge/sessions/<name>/forge.session.json`) storing intent/overrides/confirmed facts,
   including relaunch preferences
 - artifacts (approved plans, transcripts)
-- exactly one `claude_session_id` (set by the SessionStart hook when Claude starts, not pre-seeded)
+- exactly one `claude_session_id` (pre-seeded by `forge session start` and by transfer/fresh children, then validated by
+  the SessionStart hook; only a native `--fork-session` lets Claude mint it, which the hook records)
 
-**1:1 invariant:** `claude_session_id = None` means the session was never launched. A non-null value means it has been
-used. Relaunching a used session creates a **child session** (a fork with lineage), not a reuse of the same session.
-Related sessions are grouped by lineage (`parent_session`), not by UUID accumulation.
+**1:1 invariant:** Each Forge session maps to one Claude process invocation. `forge session start` **pre-seeds**
+`claude_session_id` (the CLI generates it and imposes it via `--session-id`; the SessionStart hook validates it), so a
+non-null value does **not** by itself mean the session ran — "used" means it has hook-confirmed or transcript-backed
+evidence (a `--no-launch` session carries a pre-seeded UUID but never launched). `forge session resume` **reattaches**
+to the same conversation by default; `resume --fresh` derives a **child session** (a fork with lineage). Related
+sessions are grouped by lineage (`parent_session`), not by UUID accumulation.
 
 A session is **not** a proxy routing identity.
 
@@ -45,7 +49,8 @@ Multiple sessions can coexist in the same Forge project, each with its own direc
 
 The session file includes hook-confirmed facts such as:
 
-- `confirmed.claude_session_id` (launch-owned: set by SessionStart hook, `None` until Claude starts)
+- `confirmed.claude_session_id` (launch-owned: pre-seeded by `forge session start` and by transfer/fresh children, then
+  validated by the SessionStart hook; only a native `--fork-session` lets Claude mint it, which the hook records)
 - `confirmed.transcript_path`
 - `confirmed.started_with_proxy` (snapshot from the SessionStart hook; `{base_url, proxy_id?, template?, port?}`)
 
@@ -121,7 +126,7 @@ forge session resume [parent] --fresh \
 # Show / list
 forge session show            # Current session (from $FORGE_SESSION)
 forge session show <name>     # Named session details
-forge session list            # Sessions in current repo (default: --scope repo)
+forge session list            # Sessions across the workspace (default: --scope workspace)
 forge session list --scope project  # Sessions in current Forge project only
 forge session list --scope all      # All sessions globally
 
@@ -214,16 +219,16 @@ common worktree cases are:
 
 ### Which commands resolve cross-project?
 
-Most session commands resolve sessions **repo-wide** — if `list` shows a session, you can interact with it regardless of
-which Forge project you're currently in (within the same git repo):
+Most session commands resolve sessions **workspace-wide** — if `list` shows a session, you can interact with it
+regardless of which Forge project you're currently in (within the same git repo):
 
 | Command                   | Scope                | Notes                                             |
 | :------------------------ | :------------------- | :------------------------------------------------ |
-| `session list`            | Repo (default)       | `--scope project` / `--scope all`                 |
-| `session show`            | Repo-wide            | Prefers current project; shows cross-project note |
-| `session delete` (named)  | Repo-wide            | Prefers current project; shows cross-project note |
+| `session list`            | Workspace (default)  | `--scope project` / `--scope all`                 |
+| `session show`            | Workspace-wide       | Prefers current project; shows cross-project note |
+| `session delete` (named)  | Workspace-wide       | Prefers current project; shows cross-project note |
 | `session delete --all`    | Current project only | Requires being inside a Forge project             |
-| `session set` / `reset`   | Repo-wide            | Via `--session` flag                              |
+| `session set` / `reset`   | Workspace-wide       | Via `--session` flag                              |
 | `session resume` / `fork` | Current project only | CWD-dependent (Claude Code constraint)            |
 | `session clean`           | Global               | All projects regardless of CWD                    |
 
@@ -301,12 +306,11 @@ forge session resume auth-refactor
 Default behavior: **reattach** — resumes the **same** Claude conversation in the **same** Forge session. This reopens
 the existing conversation in place after the previous launch has ended.
 
-Behavior depends on whether the session was previously used (1:1 invariant):
-
-- **Never launched** (`claude_session_id` is None): launches Claude in-place, bound to this session. The SessionStart
-  hook sets `claude_session_id` on first start.
-- **Previously used** (`claude_session_id` is set): creates a **child session** (a fork) and resumes the parent's Claude
-  conversation via `--resume --fork-session`. Claude gets a distinct new UUID in the child.
+- **Reattach** (default): relaunches the **same** Claude conversation on the same Forge session
+  (`--resume <claude_session_id>`, no fork) and refreshes `confirmed` runtime facts (`confirmed_at`, `transcript_path`).
+- **Fresh child** (`--fresh`): derives a new **child session** (a fork with lineage) with context assembled from the
+  parent — this is the path that mints a distinct child UUID (native mode uses `--resume --fork-session`). See "Derive a
+  fresh session from an existing one" below.
 - If the session was created in sidecar mode, Forge relaunches it in sidecar mode again using the recorded image and
   extra mounts.
 
