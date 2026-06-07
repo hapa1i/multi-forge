@@ -126,6 +126,7 @@ constraint-dependencies = [
     "cryptography>=46.0.7",
     "python-multipart>=0.0.26",
     "Pygments>=2.20.0",
+    "starlette>=1.0.1",
 ]
 # litellm pins fastapi-sso<0.17.0 but 0.16.x has a CSRF vulnerability.
 # Forge doesn't use fastapi-sso directly; override to force the patched version.
@@ -148,6 +149,7 @@ dev = [
     "types-PyYAML>=6.0.0",
     "types-requests>=2.31.0",
     "python-dotenv>=1.2.1",
+    "httpx2>=2.3.0",
 ]
 provider-check = [
     "anthropic>=0.100.0",

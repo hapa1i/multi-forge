@@ -426,7 +426,7 @@ class TestRemoveFiles:
         """Review fix: non-log files in log subdirectories are not deleted."""
         subdir = tmp_path / "tool_events"
         subdir.mkdir()
-        (subdir / "20260327_proxy.123.jsonl").write_text("log data")
+        (subdir / "20260327_proxy.99999999.jsonl").write_text("log data")
         (subdir / "metadata.json").write_text("important metadata")
         (subdir / "notes.txt").write_text("notes")
 
