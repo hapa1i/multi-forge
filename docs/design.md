@@ -1611,11 +1611,11 @@ half). A frozen `RuntimeSpec` per runtime in a module-level `RUNTIMES` table (mi
 installed (`is_installed()` = PATH presence; `detect()` = best-effort `--version`), interactive, headless, hooks, usage
 source, native resume, and install scopes (plus curated-transfer in/out). Partial or planned support is a tri-state
 `Literal`, not a `bool` — Codex `pretool_policy="partial"` (its `PreToolUse` is not a full enforcement boundary),
-`interactive="beta"` (a target, not shipped), and `native_hooks="gated"` carrying machine-readable
-`hook_min_version`/`hook_feature_flag` (a preflight verifies the gate rather than parsing prose) — so a consumer never
-mistakes a Codex limit for Claude parity. `forge runtime list [--json]` renders the matrix. Claude Code is fully
-populated; Codex/Gemini declare their limits as values. Phase 5's Codex invoker and the auth/runtime preflight will read
-this registry; nothing branches on it yet.
+`interactive="beta"` (a Forge-integration target, not shipped), and `native_hooks="gated"` carrying a machine-readable
+`hook_min_version` (a preflight verifies the version gate rather than parsing prose; `hook_feature_flag` is `None` now
+that Codex hooks are default-on) — so a consumer never mistakes a Codex limit for Claude parity.
+`forge runtime list [--json]` renders the matrix. Claude Code is fully populated; Codex/Gemini declare their limits as
+values. Phase 5's Codex invoker and the auth/runtime preflight will read this registry; nothing branches on it yet.
 
 #### 5.5.6 Relationship to policies (workflow unification)
 

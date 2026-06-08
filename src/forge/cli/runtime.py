@@ -99,7 +99,7 @@ def list_cmd(as_json: bool) -> None:
 
     console.print(table)
     # Escape note text: a free-text note may contain bracketed tokens (e.g.
-    # `[features] codex_hooks = true`) that Rich would otherwise eat as markup.
+    # `[features] hooks`) that Rich would otherwise eat as markup.
     for s in specs:
         if s.note:
             console.print(f"[dim]{s.id}: {escape(s.note)}[/dim]")

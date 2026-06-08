@@ -181,10 +181,19 @@ sign-in follows ChatGPT workspace controls and credits. See
 OpenAI also documents `codex exec` as non-interactive mode for scripts and CI, including JSONL output with usage events.
 See [Codex non-interactive mode](https://developers.openai.com/codex/noninteractive).
 
-Codex hooks are stable as of Codex CLI 0.124.0 and still require explicit activation with
-`[features] codex_hooks = true`. Lifecycle events include `PreToolUse`, `PermissionRequest`, `PostToolUse`,
-`UserPromptSubmit`, and `Stop`. See [Codex hooks](https://developers.openai.com/codex/hooks) and the
-[Codex changelog](https://developers.openai.com/codex/changelog).
+Codex hooks are **default-on** as of Codex CLI 0.131.0 (the canonical `[features] hooks` key); `[features] codex_hooks`
+is a **deprecated alias** that still works -- do not author new config with it (the 0.134.0 "Remove plugin hooks feature
+flag" change dropped the plugin-hooks on/off *gate*, not the `codex_hooks` alias). The lifecycle has **ten** events:
+`SessionStart`, `SubagentStart`, `PreToolUse`, `PermissionRequest`, `PostToolUse`, `PreCompact`, `PostCompact`,
+`UserPromptSubmit`, `SubagentStop`, and `Stop`. `PreToolUse` can also **rewrite** a tool call in-flight
+(`permissionDecision: "allow"` + `updatedInput`), and `PermissionRequest` is the dedicated approval seam. Hook delivery
+is **conditional on trust**: non-managed hooks must be reviewed/trusted (trust is keyed to the hook's hash, so a
+new/changed hook is skipped until trusted), and untrusted/first-run projects skip project-local `.codex/` hooks
+entirely; only managed hooks (`requirements.toml`, system/MDM/cloud) are trusted by policy. Enterprise
+`allow_managed_hooks_only = true` (in `requirements.toml`) makes Codex ignore user/project/session hooks. See
+[Codex hooks](https://developers.openai.com/codex/hooks) and the
+[Codex changelog](https://developers.openai.com/codex/changelog). *(Verified 2026-06-08 against Codex CLI 0.137.0; the
+original "0.124.0 / `codex_hooks = true` required / five-event" wording reflected a now-stale pin.)*
 
 Forge posture:
 
@@ -195,6 +204,16 @@ Forge posture:
 - ChatGPT-subscription-backed Codex through LiteLLM should remain a candidate compatibility route only after version
   verification and an explicit product decision about how subscription quota appears in Forge usage output. Native
   `codex exec` remains the preferred route for Codex-as-runtime work.
+- **Prefer first-party non-interactive auth for headless Codex** (verified 2026-06-08): `CODEX_API_KEY`,
+  `codex login --device-auth`, or an enterprise-issued Codex access token, resolved/validated via `codex doctor`. These
+  are ToS-clean and supersede the LiteLLM `chatgpt/` subscription route (undocumented by OpenAI, client-identity header
+  spoofing, volatile model roster), which stays a gated last resort.
+- **A Forge proxy fronting Codex must serve the OpenAI Responses API on its Codex-facing endpoint.** Codex now emits
+  `wire_api = "responses"` only -- the custom-provider `wire_api = "chat"` option was removed (hard error) ~Feb 2026 per
+  `config-reference` (the `codex/models` prose still shows a stale either/or). This is a requirement on the
+  **Codex-facing surface only**: the proxy's *backend* may still speak Chat Completions and be translated (e.g.
+  LiteLLM), so the preflight blocks only when the proxy cannot serve Responses to Codex -- never on the backend wire
+  protocol.
 
 ### Anthropic Claude Code
 
@@ -780,20 +799,20 @@ inspectable traffic.
 
 Initial target matrix:
 
-| Capability                                                      | Claude Code                      | Codex CLI                                       | Gemini CLI                     |
-| --------------------------------------------------------------- | -------------------------------- | ----------------------------------------------- | ------------------------------ |
-| Interactive frontend                                            | Current default                  | Target beta                                     | Not planned initially          |
-| Headless worker                                                 | `claude -p`                      | `codex exec`                                    | `gemini -p`                    |
-| Native hooks                                                    | Existing Forge integration       | Stable in 0.124.0+; enable `codex_hooks`        | No comparable hook target yet  |
-| Pre-tool policy                                                 | Current Claude hooks             | `PreToolUse` adapter                            | Not initially                  |
-| Usage source                                                    | Transcript/status/proxy fallback | JSONL usage events                              | JSON stats                     |
-| Native resume (within runtime, within CWD)                      | `claude --resume`                | `codex exec resume`                             | Capability-check first         |
-| Curated transfer *input* (accept context doc at start)          | `--append-system-prompt-file`    | Initial user message                            | Initial message                |
-| Curated transfer *output* (generate curation of own transcript) | Yes (transfer curator)           | Yes (via headless invoker)                      | Yes (via headless invoker)     |
-| Always-on proxy compatible                                      | Yes (host or sidecar)            | Yes (host or sidecar)                           | TBD per CLI                    |
-| Request inspectable by Forge                                    | Only through Forge proxy/sidecar | Only through Forge proxy/sidecar; direct opaque | Route-dependent; direct opaque |
-| Gateway route                                                   | Anthropic-compatible base URLs   | Native CLI or first-class ChatGPT LiteLLM route | API/Vertex route only          |
-| Consumer auth as gateway                                        | Not supported by Forge           | Supported only through documented Codex routes  | Not supported                  |
+| Capability                                                      | Claude Code                      | Codex CLI                                                          | Gemini CLI                     |
+| --------------------------------------------------------------- | -------------------------------- | ------------------------------------------------------------------ | ------------------------------ |
+| Interactive frontend                                            | Current default                  | Target beta                                                        | Not planned initially          |
+| Headless worker                                                 | `claude -p`                      | `codex exec`                                                       | `gemini -p`                    |
+| Native hooks                                                    | Existing Forge integration       | Default-on (>= 0.131.0); `codex_hooks` deprecated alias            | No comparable hook target yet  |
+| Pre-tool policy                                                 | Current Claude hooks             | `PreToolUse` adapter                                               | Not initially                  |
+| Usage source                                                    | Transcript/status/proxy fallback | JSONL usage events                                                 | JSON stats                     |
+| Native resume (within runtime, within CWD)                      | `claude --resume`                | `codex exec resume`                                                | Capability-check first         |
+| Curated transfer *input* (accept context doc at start)          | `--append-system-prompt-file`    | `SessionStart` additionalContext (trusted hook) or initial message | Initial message                |
+| Curated transfer *output* (generate curation of own transcript) | Yes (transfer curator)           | Yes (via headless invoker)                                         | Yes (via headless invoker)     |
+| Always-on proxy compatible                                      | Yes (host or sidecar)            | Yes (host or sidecar)                                              | TBD per CLI                    |
+| Request inspectable by Forge                                    | Only through Forge proxy/sidecar | Only through Forge proxy/sidecar; direct opaque                    | Route-dependent; direct opaque |
+| Gateway route                                                   | Anthropic-compatible base URLs   | Native CLI or first-class ChatGPT LiteLLM route                    | API/Vertex route only          |
+| Consumer auth as gateway                                        | Not supported by Forge           | Supported only through documented Codex routes                     | Not supported                  |
 
 ## Shipping Strategy (Phases)
 
@@ -886,13 +905,30 @@ Native-relocate is an experimental spike, not a committed UX until contract test
 - `CodexHeadlessInvoker` using `codex exec` and JSONL usage events.
 - Runtime capability checks and auth preflight for native Codex execution.
 - `forge session start --runtime codex --resume-from <claude-session>` workflow.
-- Target-runtime-aware curator (`--target-runtime codex` adjusts the transfer for Codex's conventions).
+- Target-runtime-aware curator (`--target-runtime codex` adjusts the transfer for Codex's conventions); injected via
+  Codex `SessionStart` additionalContext (the native resume-vs-fresh seam) **when hooks are enabled and the hook is
+  trusted**, with an **initial-user-message fallback** -- `SessionStart` silently no-ops on untrusted/first-run projects
+  or a new/changed (unreviewed) hook, so it cannot be the sole channel.
 - First end-to-end "plan in Claude, implement in Codex via curated transfer" demonstration.
+
+> **Detailed sliced plan + 2026-06-08 research verdict** live in
+> [`checklist.md` Phase 5](./checklist.md#phase-5---cross-runtime-resume). Decided: one-shot `codex exec` transport (the
+> app-server transport is a deferred follow-up). Re-pinned to Codex CLI 0.137.0. The cross-runtime hop stays **curated
+> transfer** (reasoning signatures are non-portable); Codex-side continuation after the hop can use `codex exec resume`
+> (cwd-aware since 0.135.0).
 
 ### Phase 6 -- Codex frontend beta
 
 - Evaluate Codex as an interactive frontend runtime once headless invocation, usage accounting, policy semantics, and
   curated transfer are clear.
+- **Re-scope note (verified 2026-06-08):** Codex's *own* interactive mode is now GA/Stable (`codex`, `codex exec`,
+  `codex resume` all "Stable" in the CLI reference) -- so "beta" describes Forge's integration target, not Codex
+  maturity. A first-class **headless app-server** also shipped (`codex remote-control` 0.130.0; `codex app-server` --
+  default stdio transport, `--stdio`, or `--listen stdio://`; 0.136.0; app-server v2 pairing RPCs 0.137.0): evaluate it
+  as a long-lived RPC transport alternative to one-shot `codex exec` for resumed multi-turn sessions. (Note: official
+  app-server docs describe `--listen stdio://` as the transport selector, while local Codex CLI 0.137.0 also exposes
+  `--stdio` as an alias.) The full Codex hook adapter/responder (exploiting `updatedInput` + `PermissionRequest`)
+  belongs here; Phase 5 uses only `SessionStart` for transfer injection.
 
 ## Non-Goals
 

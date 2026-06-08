@@ -44,8 +44,8 @@ def test_list_json_carries_capability_fields() -> None:
     assert codex["pretool_policy"] == "partial"  # limit encoded, not parity
     # Hooks are gated, and the gate is machine-readable (not buried in the note).
     assert codex["native_hooks"] == "gated"
-    assert codex["hook_min_version"] == "0.124.0"
-    assert codex["hook_feature_flag"] == "codex_hooks"
+    assert codex["hook_min_version"] == "0.131.0"
+    assert codex["hook_feature_flag"] is None  # no required hook flag; codex_hooks remains a deprecated alias
     assert codex["installed"] is False  # nothing on PATH (stubbed)
     assert codex["version"] is None
     assert "detect" not in codex  # the callable is dropped from JSON

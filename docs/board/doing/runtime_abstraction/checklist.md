@@ -599,7 +599,7 @@ internal/refactorable -- it does not mint a durable contract, so it does not gat
     `native_hooks="none"`/`native_resume=False` (capability-check-first). Data is the card's Runtime Capability Matrix;
     Claude fully populated, Codex/Gemini declare limits as values not omissions. `forge runtime list [--json]` renders
     it (registered in `cli/main.py`; the table escapes free-text notes so a bracketed token like
-    `[features] codex_hooks = true` survives Rich markup instead of being eaten as a tag). 16 unit tests
+    `[features] hooks = false` survives Rich markup instead of being eaten as a tag). 16 unit tests
     (`tests/src/core/runtime/test_registry.py`: shape/order, per-runtime capability fields, Codex/Gemini limits,
     `is_installed` PATH reflection, `_probe_version` parse/both-streams/nonzero/unparseable;
     `tests/src/cli/test_runtime.py`: hermetic render + `--json` shape + the markup-escape regression) pass; mypy clean
@@ -774,15 +774,172 @@ ids; no credential extraction; interactive OAuth session untouched). The deferre
 
 ## Phase 5 - Cross-Runtime Resume
 
-- [ ] Add `CodexHeadlessInvoker`.
-  - Assertion: uses `codex exec` JSONL output and captures usage events when available.
-- [ ] Add runtime/auth preflight for native Codex execution.
-  - Assertion: unsupported auth paths fail before launch with setup guidance.
-- [ ] Add target-runtime-aware curator.
-  - Assertion: consumes the stable Phase 1 transfer schema so output can be tuned for Codex without changing source
-    transcript artifacts or schema semantics.
-- [ ] Demonstrate Claude-to-Codex resume.
-  - Assertion: a documented workflow can plan in Claude and implement in Codex using curated transfer.
+**Status (2026-06-08): planning, Slice 5.0 shipped.** Two adversarially-verified research sweeps re-pinned the external
+tools and corrected stale card assumptions before scoping (verdict below). **Decided:** one-shot `codex exec` transport
+(the app-server transport is a deferred follow-up, tracked under 5b). The cross-runtime hop is **curated transfer**
+(reasoning signatures are non-portable -- confirmed); Codex-side continuation after the hop can use `codex exec resume`.
+Goal: run Codex as a first-class headless runtime and demonstrate "plan in Claude -> implement in Codex" with correct
+auth preflight and usage attribution. Depends on shipped Phase 4 seams (`HeadlessInvoker`/`run_parallel` 4d, runtime
+registry 4e, usage ledger + reserved `codex_exec`/`codex_jsonl`/`runtime_native` literals 4b/4c, run-tree env 4a/4g) and
+the Phase 1 transfer schema (`target_runtime` reserved).
+
+### Research verdict (verified 2026-06-08; every claim re-fetched from official docs/changelogs)
+
+**Version drift:** Codex CLI **0.124.0 (card pin) -> 0.137.0 stable** (~13 minors; 0.138.0-alpha exists) -- re-pinned.
+Claude Code **2.1.168 = at head** (no CLI drift; model layer moved). Gemini CLI 0.45.2, **folding into "Antigravity CLI"
+on 2026-06-18** -> out of Phase 5 scope; defer the GeminiHeadlessInvoker and target paid/Vertex auth.
+
+**Codex corrections (applied to card.md + registry in Slice 5.0):**
+
+- Hooks are **default-on** (`[features] hooks`); `codex_hooks` is a **deprecated alias** of `hooks` (still works -- do
+  not author new config with it; 0.134.0 removed the plugin-hooks *gate*, not the alias). \[codex/hooks +
+  config-reference\]
+- Lifecycle is **10 events** (was 5): +`SessionStart`, `SubagentStart`, `SubagentStop`, `PreCompact`, `PostCompact`.
+- **`SessionStart` additionalContext** is the native injection seam but **conditional** -- it fires only when hooks are
+  enabled AND the hook is trusted (trust keyed to the hook hash; untrusted/first-run projects skip project-local
+  `.codex/` hooks; managed hooks are review-exempt). So 5d keeps an **initial-message fallback** and 5a checks hook
+  state, or the curated context silently vanishes.
+- `PreToolUse` can **mutate** tool input (`permissionDecision:"allow"` + `updatedInput`); `PermissionRequest` is the
+  approval seam; PreToolUse stays a **partial** guard (registry `pretool_policy="partial"` kept).
+- First-party **non-interactive auth** exists: `CODEX_API_KEY`, `codex login --device-auth`, enterprise tokens;
+  `codex doctor` is a preflight primitive. Prefer over the LiteLLM `chatgpt/` route (undocumented by OpenAI, header
+  spoofing, volatile model roster) -> gated last resort.
+- A proxy fronting Codex must serve **Responses on its Codex-facing endpoint** -- Codex emits `wire_api="responses"`
+  only (custom-provider `wire_api="chat"` removed ~Feb 2026 per `config-reference`; the `codex/models` prose is stale).
+  The **backend** may speak Chat Completions and be translated (LiteLLM), so block only on the Codex-facing surface,
+  never the backend wire. [config-reference + discussion #7782]
+- Enterprise `allow_managed_hooks_only=true` (`requirements.toml`) silently suppresses user/project hooks.
+- JSONL usage schema: `item.completed`->`{type: agent_message}`; `turn.completed.usage` carries
+  `input/cached_input/output/reasoning_output_tokens` (reasoning added 0.125.0).
+- Interactive Codex is GA in the Codex CLI (C10 "superseded"); a headless **app-server** (`codex remote-control`,
+  `codex app-server` -- default stdio / `--listen stdio://` / `--stdio`) now exists -> Phase 6 re-scope (in card.md).
+
+**Claude Code (Forge already owns this side) -- all headless mechanics confirmed on 2.1.168:**
+`ANTHROPIC_CUSTOM_HEADERS` (doc-implied forwarding; **Forge-validated by the 4g canary** on 2.1.168 -- keep that canary
+as the standing regression guard), `--output-format json` (`total_cost_usd` + per-model `modelUsage`),
+`--resume`/`--fork-session`/`--session-id`/`--bare`/`--append-system-prompt-file`, parallel-tool floor `>= 2.1.80`,
+`CLAUDE_CODE_AUTO_COMPACT_WINDOW`. New + relevant: `claude setup-token` / `claude auth status --json` (preflight
+primitives), `--max-budget-usd` / `--max-turns` (in-invoker governors with `error_max_budget_usd`/`error_max_turns`
+subtypes), Opus 4.7/4.8 **reject manual `thinking.budget_tokens`** (400 -> use `effort`, 5 levels), `fallbackModel` can
+change the active model **mid-turn**, and the **June 15 2026 Agent SDK credit** splits subscription `claude -p` billing
+(no change to `total_cost_usd` reporting). `--bare` will become the `-p` default in a future release -> set Forge's
+flags explicitly.
+
+### Slice 5.0 - Re-pin + correct stale assumptions (DONE 2026-06-08)
+
+- [x] Correct the Codex hook/version facts in `card.md` and the runtime registry; sync `design.md` §5.5.5.
+  - Assertion: the card no longer claims `codex_hooks = true` is required or lists 5 events; the registry's Codex
+    `RuntimeSpec` drops the removed flag and records the version gate honestly; tests pass.
+  - Verification (2026-06-08): `card.md` Codex hooks paragraph + capability matrix (Native hooks, Curated transfer
+    input) + posture bullets (non-interactive auth, Responses-API) + Phase 5/6 notes corrected;
+    `src/forge/core/runtime/registry.py` Codex spec -> `hook_feature_flag=None`, `hook_min_version="0.131.0"`,
+    `native_hooks="gated"` (version-only), default-on note (10 events, `updatedInput`, `allow_managed_hooks_only`,
+    Responses-API, verified vs 0.137.0); `HookSupport` Literal comment generalized; `cli/runtime.py` markup comment
+    updated. `design.md` §5.5.5 synced. Tests updated + green: `tests/src/core/runtime/test_registry.py::TestCodexSpec`
+    - `tests/src/cli/test_runtime.py` (17 passed); `mypy` clean on changed src.
+  - [ ] (debt, pre-commit) run `make pre-commit` before committing -- `mdformat` re-aligns the capability-matrix cells
+    edited above and validates links/anchors.
+
+### Slice 5a - Codex auth/runtime preflight
+
+- [ ] Build a native-Codex preflight (the card's "Compliance and Auth Preflight" for Codex), run by the launcher before
+  any `codex exec`. Reads the runtime registry (4e); does the dynamic environment checks the static matrix cannot.
+  - Assertion: resolves a non-interactive credential (`CODEX_API_KEY` -> device-token -> enterprise token) and **fails
+    closed** with setup guidance when none resolves; reports `codex doctor` state; verifies hook **enablement + trust**
+    (so the 5d `SessionStart` transfer seam won't silently no-op -- else 5d falls back to an initial message) and
+    surfaces `allow_managed_hooks_only` as a capability limitation; blocks only when the proxy cannot serve the
+    **Responses API on its Codex-facing endpoint** (a translated chat-completions *backend* does NOT block); tags
+    API-key vs ChatGPT-subscription as distinct billing pools.
+
+| Test                               | Fixture                                              | Assertion                                                                                                            | Test File                                        |
+| ---------------------------------- | ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| No credential -> fail closed       | no `CODEX_API_KEY`, no codex auth                    | blocking error names the 3 setup paths; no `codex exec` spawned                                                      | `tests/src/core/runtime/test_codex_preflight.py` |
+| Managed-hooks suppression surfaced | `requirements.toml` `allow_managed_hooks_only=true`  | preflight reports "Forge hooks ignored" limitation                                                                   | same                                             |
+| Hook seam unavailable -> fallback  | hooks disabled OR transfer hook untrusted/unreviewed | preflight flags the `SessionStart` seam unavailable so 5d uses the initial-message fallback (no silent context loss) | same                                             |
+| Responses-API guard (Codex-facing) | proxy can't serve Responses to Codex                 | blocks; a chat-completions *backend* (translated) does NOT block                                                     | `tests/src/proxy/test_codex_responses_guard.py`  |
+| Billing pool tagged                | API-key vs ChatGPT-subscription                      | `billing_mode` tagged (`api` vs `subscription_quota`)                                                                | unit                                             |
+
+### Slice 5b - CodexHeadlessInvoker (one-shot `codex exec`)
+
+- [ ] Implement `CodexHeadlessInvoker` satisfying the `core/invoker/types.py` `HeadlessInvoker` protocol, reusing the
+  **shipped** `run_parallel` lifecycle (process groups, `os.killpg` SIGTERM->SIGKILL, timeouts, cancellation) from 4d.
+  - Assertion: a Codex headless run returns a `HeadlessResult` with parsed usage; fan-out + cancellation parity with
+    `ClaudeHeadlessInvoker`; uses explicit `--sandbox`/`--profile` (not the deprecated `--full-auto`); Codex-side
+    continuation uses `codex exec resume <SESSION_ID>` (cwd-aware since 0.135.0).
+
+| Test                            | Fixture                             | Assertion                                                                                                                                                             | Test File                                      |
+| ------------------------------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| JSONL parse (pinned schema)     | recorded `codex exec --json` stream | parses `item.completed`->`{type: agent_message}` + `turn.completed.usage` incl. `reasoning_output_tokens`; **fails loudly** on missing usage                          | `tests/src/core/invoker/test_codex_invoker.py` |
+| Lifecycle parity                | parallel fan-out + Ctrl+C           | process-group SIGTERM->SIGKILL, deterministic ordering, no orphan (same as 4d)                                                                                        | same                                           |
+| Resume                          | `codex exec resume <id>`            | continuation reuses the prior Codex session                                                                                                                           | same                                           |
+| (deferred) app-server transport | --                                  | recorded follow-up spike: invoker abstraction must not foreclose `codex app-server` (default stdio; `--listen stdio://` or `--stdio`) for resumed multi-turn sessions | (note)                                         |
+
+### Slice 5c - Codex usage attribution (ledger)
+
+- [ ] Emit `UsageEvent`s for Codex runs using the literals reserved in §A.13.
+  - Assertion: Codex runs emit `route=codex_exec`, `reporter=codex_jsonl`, `measurement_source=runtime_native`;
+    consumption fields mapped from `turn.completed.usage`; run-tree ids (4a) carried; `model` = the **actual routed**
+    model (tolerate `fallbackModel` on the Claude side).
+
+| Test                      | Fixture                                                 | Assertion                                                                                 | Test File                                 |
+| ------------------------- | ------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------- |
+| Reserved literals emitted | a Codex run with usage                                  | event carries `route=codex_exec`/`reporter=codex_jsonl`/`runtime_native` + tokens         | `tests/src/core/usage/test_codex_emit.py` |
+| Billing buckets           | API-key vs subscription Codex; subscription `claude -p` | `billing_mode` in {`api`, `subscription_quota`, `subscription_headless_credit`} per route | unit                                      |
+| Run-tree continuity       | spawned under a Forge run                               | `run_id`/`parent`/`root` present; honors the 4a env contract                              | regression                                |
+
+### Slice 5d - Target-runtime-aware transfer curator
+
+- [ ] Add `--target-runtime codex` to `assemble_transfer_context` (`src/forge/session/transfer.py`), consuming the Phase
+  1 schema's reserved `target_runtime`; tunes **presentation only**.
+  - Assertion: a Codex-targeted transfer renders the 7 AI-snapshot sections tuned for Codex conventions (terseness, tool
+    naming, no Anthropic-thinking assumptions) **without** changing transcript source artifacts or schema semantics
+    (Phase 1 invariant); injected via `SessionStart` additionalContext when hooks are enabled + trusted, **else an
+    initial-user-message fallback** (the seam silently no-ops on untrusted/first-run/unreviewed-hook setups).
+
+| Test                             | Fixture                                           | Assertion                                                         | Test File                                         |
+| -------------------------------- | ------------------------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------- |
+| Presentation-only retune         | same transcript, `--target-runtime codex`         | 7 sections present; source artifacts + `schema_version` unchanged | `tests/src/session/test_transfer.py`              |
+| SessionStart injection (trusted) | fresh Codex session, hooks enabled + hook trusted | doc delivered via `SessionStart` additionalContext                | `tests/src/session/test_codex_transfer_inject.py` |
+| Fallback when seam unavailable   | hooks disabled OR hook untrusted/unreviewed       | doc delivered as the initial user message; never silently dropped | same                                              |
+
+### Slice 5e - Claude->Codex resume demo (the payoff)
+
+- [ ] End-to-end: plan in Claude -> `assemble_transfer_context --target-runtime codex` -> `CodexHeadlessInvoker`
+  launches Codex with the transfer injected at `SessionStart` -> Codex implements; usage attributed across one run tree.
+  - Assertion: a documented workflow demonstrates plan-in-Claude / implement-in-Codex via curated transfer; the hop uses
+    **curated transfer** (signatures non-portable); `forge activity` shows both sides under one run tree.
+
+| Test        | Fixture                                           | Assertion                                                                         | Test File                                              |
+| ----------- | ------------------------------------------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| E2E hop     | real `codex` if available (else recorded fixture) | Codex completes the handed-off task; curated transfer was the only context bridge | `tests/integration/.../test_claude_to_codex_resume.py` |
+| Attribution | the demo run                                      | `forge activity` attributes Claude + Codex work to one run tree                   | integration                                            |
+
+### Slice 5f - Design/end-user doc sync + Phase 6 re-scope (record)
+
+- [ ] Update `design.md` (§3.9 transfer / §5.5.5 registry / §3.14 usage) and the relevant end-user guide for shipped
+  Phase 5 behavior; the Phase 6 re-scope note is already recorded in `card.md` (interactive Codex GA; evaluate the
+  app-server transport; full Codex hook adapter/responder stays Phase 6).
+  - Assertion: design docs describe shipped Phase 5 behavior (documentation-guidelines Rule 2); no stale 5-event /
+    `codex_hooks` claim remains outside `done/`.
+
+### Open risks (carry into execution; verify empirically)
+
+- **Transport:** one-shot `codex exec` vs the app-server (`--stdio`) for resumed multi-turn Codex sessions is unproven
+  -- the chosen `codex exec` path ships first; spike the app-server before committing if multi-turn resume is clumsy.
+- **Custom-header forwarding** is doc-*implied*, not doc-stated -- the 4g canary is the standing empirical guard; re-run
+  it on Codex/Claude version bumps.
+- **Codex hooks graduation version** (0.131.0 default-on) carries mild uncertainty -- the 5a preflight should verify
+  against the installed build via `codex doctor`, not trust `hook_min_version` blindly.
+- **`fallbackModel`** (CC 2.1.166/168) can change the active model mid-turn -> the usage event `model` must be the
+  actual routed model, and the 4g run-tree join must tolerate it.
+- **LiteLLM `chatgpt/` route** is ToS-gray (header spoofing) with a volatile model roster -- gated last resort only.
+- **`SessionStart` transfer injection is conditional**, not guaranteed: it fires only when hooks are enabled and the
+  hook is trusted (untrusted/first-run projects skip project-local `.codex/` hooks; new/changed hooks are skipped until
+  reviewed). 5d MUST keep an initial-message fallback and 5a MUST check hook state, or the curated context silently
+  vanishes. The one review-exempt delivery is a managed hook (`requirements.toml`).
+- **Codex wire (V1 nuance):** the requirement is Responses on the proxy's *Codex-facing* endpoint only; the backend may
+  be Chat Completions translated. Do not block a route just because the upstream model speaks chat-completions. The
+  `codex/models` prose still shows a stale either/or; `config-reference` (`wire_api="responses"` only) is authoritative.
 
 ## Phase 6 - Codex Frontend Beta
 

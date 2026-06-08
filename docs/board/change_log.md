@@ -27,6 +27,35 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-08
 
+### Phase 5 planning + Slice 5.0: Codex/Claude runtime-fact corrections
+
+**Goal**: Scope Phase 5 (cross-runtime resume) and, before planning, re-verify the `runtime_abstraction` card's
+external-tool assumptions against current Claude Code + Codex CLI — the card pinned Codex 0.124.0, now 0.137.0 stable
+(~13 minors stale).
+
+**Key changes**:
+
+- **Research**: three adversarially-verified web sweeps (every claim grounded in fetched official docs or the installed
+  `codex` binary) produced a per-assumption diff. Corrected stale Codex facts: hooks are **default-on**
+  (`[features] hooks`; `codex_hooks` is a **deprecated alias**, not "required" and not "removed"); **10** lifecycle
+  events (was 5); `SessionStart` additionalContext is the transfer-injection seam but **conditional** on hook
+  enablement+trust (keep an initial-message fallback); `PreToolUse` can mutate via `updatedInput`; first-party
+  non-interactive auth (`CODEX_API_KEY` / `codex login --device-auth` / enterprise tokens) + `codex doctor`; Codex emits
+  `wire_api="responses"` only, so a proxy must serve Responses on its **Codex-facing** surface (a translated
+  chat-completions backend does not block); `codex app-server --stdio` is a real alias for `--listen stdio://` (verified
+  against the 0.137.0 binary — the rendered docs table omitted it).
+- **Slice 5.0 (registry, shipped)**: `core/runtime/registry.py` Codex `RuntimeSpec` → `hook_feature_flag=None`,
+  `hook_min_version="0.131.0"`, default-on note (10 events, `updatedInput`, `allow_managed_hooks_only`, Responses,
+  SessionStart-trust caveat); `HookSupport` comment generalized to version-gated. `card.md` hooks paragraph + capability
+  matrix + posture bullets + Phase 5/6 notes and `design.md` §5.5.5 corrected.
+- **Plan**: `checklist.md` Phase 5 expanded from a 4-task stub to slices 5.0 (done) → 5a auth/runtime preflight → 5b
+  `CodexHeadlessInvoker` (one-shot `codex exec`) → 5c usage attribution → 5d target-runtime curator (SessionStart +
+  fallback) → 5e Claude→Codex demo → 5f doc sync, with fixture-grounded acceptance tables, a research verdict, and an
+  Open Risks list. Transport decision recorded: one-shot `codex exec` (app-server a deferred follow-up).
+
+**Verification**: `tests/src/core/runtime/test_registry.py` + `tests/src/cli/test_runtime.py` → 17 passed; mypy clean on
+changed src. Otherwise docs/planning (no runtime behavior change beyond registry data). `make pre-commit` clean.
+
 ### Phase 4g: Exact cost attribution for proxied `claude -p` (run-tree correlation)
 
 **Goal**: Replace the concurrency-fragile before/after proxy snapshot delta for proxied `claude -p` cost
