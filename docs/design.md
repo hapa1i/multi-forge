@@ -899,7 +899,12 @@ action tagger records exact provider tokens from its direct `core.llm` call (and
 registered Forge proxy, an exact `source_refs.cost_request_id` join via a forwarded `X-Request-ID`; direct
 `billing_mode` stays `unknown` unless provably direct + credentialed). All emit best-effort, never gate the work they
 measure, and record `latency_ms`. `claude -p` events carry null `source_refs` because Forge is not the HTTP client and
-can't know the proxy `request_id`; exact per-request correlation for `claude -p` is deferred to Phase 4g (see
+can't know the proxy `request_id`. Phase 4g instead correlates a proxied `claude -p` run to its **exact** cost through
+the run tree, not a per-request ref: Forge stamps the headless subprocess's outbound requests with validated
+`X-Forge-Run-ID`/`X-Forge-Root-Run-ID` headers (only when the target is a proven Forge proxy), the proxy records
+`forge_run_id`/`forge_root_run_id` on each cost record, and the read surface (`forge activity`, `forge +$Y`) sums cost
+records by `forge_root_run_id` — superseding the concurrency-fragile verb snapshot rather than adding to it.
+`source_refs` stays null by design (one run makes many requests; the single-valued ref is the wrong shape — see
 [§A.13](design_appendix.md#a13-usage-attribution-ledger-schema-314)).
 
 **Headless self-report (Phase 5).** Every `claude -p` run requests `--output-format json` (capability-gated with a

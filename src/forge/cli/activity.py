@@ -100,7 +100,10 @@ def _render(summary: SessionActivitySummary, *, days: int | None) -> None:
         for c in summary.commands:
             errors = f"[red]{c.errors}[/red]" if c.errors else "0"
             tokens = f"{c.input_tokens}/{c.output_tokens}" if (c.input_tokens or c.output_tokens) else "-"
-            cost = f"~{_fmt_usd(c.cost_micro_usd)}" if c.cost_micro_usd is not None else "-"
+            if c.cost_micro_usd is None:
+                cost = "-"
+            else:
+                cost = f"{'~' if c.cost_estimated else ''}{_fmt_usd(c.cost_micro_usd)}"
             row = [c.command, str(c.calls)]
             if show_workers:
                 row.append(str(c.workers) if c.workers else "-")
@@ -120,7 +123,10 @@ def _render(summary: SessionActivitySummary, *, days: int | None) -> None:
     if summary.subagents:
         console.print(f"\n[bold]Subagents[/bold]: {summary.subagents}")
 
-    total_cost = f"~{_fmt_usd(summary.total_cost_micro_usd)}" if summary.total_cost_micro_usd is not None else "n/a"
+    if summary.total_cost_micro_usd is None:
+        total_cost = "n/a"
+    else:
+        total_cost = f"{'~' if summary.cost_estimated else ''}{_fmt_usd(summary.total_cost_micro_usd)}"
     console.print(
         f"\n[dim]Total:[/dim] {summary.total_events} events · "
         f"{summary.total_input_tokens}/{summary.total_output_tokens} tok · {total_cost}"
@@ -138,7 +144,8 @@ def _footnotes(summary: SessionActivitySummary) -> list[str]:
         notes.append("policy decision log is at capacity — older decisions may not be shown")
     if summary.session_tagging_partial:
         notes.append("some calls (e.g. the action tagger) are not session-attributed")
-    notes.append("cost is reported-or-estimated, best-effort; 'forge proxy costs show' is the authoritative spend view")
+    evidence = "reported-or-estimated" if summary.cost_estimated else "reported (exact via run-tree join)"
+    notes.append(f"cost is {evidence}, best-effort; 'forge proxy costs show' is the authoritative spend view")
     return notes
 
 

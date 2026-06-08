@@ -382,6 +382,14 @@ That layer is useful now, but it is not the final runtime usage system. It sees 
 estimate command attribution by snapshotting proxy metrics around a verb; and it does not represent native runtime usage
 from future `codex exec` or `gemini -p` runs.
 
+The snapshot-estimation gap for proxied `claude -p` is closed by Slice 4g (shipped 2026-06-08): Forge stamps its own
+headless subprocess's outbound requests with validated `X-Forge-Run-ID`/`X-Forge-Root-Run-ID` headers (only toward a
+proven Forge proxy), the proxy records `forge_run_id`/`forge_root_run_id` on each cost record, and the read surface sums
+cost records by the **run tree** (`forge_root_run_id`) — an exact join that supersedes the concurrency-fragile snapshot.
+The key is the run tree, not a single-valued `source_refs.cost_request_id` (one run makes many requests), so
+`source_refs` stays null on `claude -p` by design. The deferred OAuth-interactive MITM tier is unrelated: 4g touches
+only Forge's own headless subprocesses through Forge's own proxy with opaque non-secret run ids.
+
 Phase 4 (this runtime-refactor PR) adds the durable usage ledger:
 
 ```text

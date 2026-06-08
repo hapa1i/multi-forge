@@ -344,8 +344,11 @@ Runtime logs:
 | `~/.forge/costs/verbs/*.jsonl`    | `forge.core.reactive.cost_tracking` | Append-only, user-prune |
 
 Request records contain timestamp, proxy ID, model/tier, token counts, `cost_micros` (null when no route reported a
-cost), request ID, latency, and metric-evidence provenance (`reporter` + `confidence`) — there is no local price
-catalog, so cost is reported-or-unavailable, never inferred from tokens. Verb records contain timestamp, verb name,
+cost), request ID, latency, metric-evidence provenance (`reporter` + `confidence`), and the **run-tree correlation**
+`forge_run_id`/`forge_root_run_id` (§3.14 / §A.13: null for the interactive harness and any non-Forge-originated
+traffic; set when a Forge-routed `claude -p` subprocess forwarded the validated `X-Forge-Run-ID`/`X-Forge-Root-Run-ID`
+headers). There is no local price catalog, so cost is reported-or-unavailable, never inferred from tokens. Both fields
+are additive at `schema_version: 1` (old readers `.get` them as `None`). Verb records contain timestamp, verb name,
 proxy URL/ID when known, before/after snapshots, total cost delta, request count delta, `estimated=true`, and
 `cost_measured` (false when the window moved tokens but reported no cost, so a passthrough verb is not read as $0).
 
@@ -475,7 +478,15 @@ Enumerations are `Literal`s (provenance is recorded, never inferred):
   guessing. `provider_usage_exact` = exact in-band token usage from either a direct `core.llm` call **or** a direct
   `claude -p` envelope that reported `usage` but no cost (Phase 5, e.g. OAuth). `runtime_native` (Phase 5, emitted) = a
   runtime self-reported its own cost+usage: a direct `claude -p --output-format json` run (`reporter=claude_code`), or a
-  native `codex`/`gemini` runtime later.
+  native `codex`/`gemini` runtime later. `proxy_request_exact` (Phase 4g) is the provenance of a **read-time** figure,
+  not a stored event source: a proxied `claude -p` event keeps `verb_snapshot_estimated` in the ledger, but
+  `forge activity` / `forge +$Y` recompute that run tree's cost exactly from the cost plane (sum of cost records by
+  `forge_root_run_id`) and label the result `proxy_request_exact`, **suppressing** the snapshot to avoid
+  double-counting. Suppression is **per-run-subtree** (the snapshot's own run, or a verb whose direct children produced
+  records — derived from worker `parent_run_id`), never whole-root, so a correctly-unstamped sibling sharing the session
+  root keeps its snapshot instead of being silently dropped. A fully cost-plane-exact figure renders **without** the `~`
+  estimate marker (`cost_estimated=False` on the summary/command DTOs); a figure mixing exact dollars with a snapshot
+  estimate keeps `~`.
 - `billing_mode`: `api` | `subscription_interactive` | `subscription_headless_credit` | `subscription_quota` | `unknown`
   (`unknown` is the honest default where the signal is ambiguous).
 - `attribution_granularity`: `worker` | `verb` | `session`.
@@ -496,13 +507,17 @@ Enumerations are `Literal`s (provenance is recorded, never inferred):
   `unavailable` (Anthropic passthrough; LiteLLM streaming) — the price catalog was removed, so `inferred` is no longer
   produced on the proxy cost path (the literal remains reserved).
 
-`source_refs` is null on native-runtime events (no proxy) and on `claude -p` traffic until per-request correlation ships
-(Phase 4g); the event stays useful without it (run/model/billing_mode/tokens). Reading skips — with a one-time warning —
-records written by a newer Forge (`schema_version` > current), and (strict on shape) records with unknown fields.
-`read_usage_events()` is the typed read surface. The `route`/`reporter`/`confidence` fields were **added additively at
-`schema_version` 1 (no bump)**: optional + defaulted, so existing v1 records load unchanged. A *pre-Phase-1* reader, by
-contrast, drops the newer records as unknown-field corruption — acceptable for best-effort, PID-sharded, pruned local
-telemetry, and **not** a state to migrate around.
+`source_refs` is null on native-runtime events (no proxy) and stays null on `claude -p` traffic: Phase 4g correlates a
+proxied `claude -p` run to its exact cost through the **run tree** (`forge_root_run_id` stamped on each cost record),
+not through a single-valued `source_refs.cost_request_id` — one run makes many requests, so the run-tree join is the
+right shape and `source_refs` is intentionally left null (the
+`tests/regression/test_bug_usage_claude_p_null_source_refs.py` invariant holds). The event stays useful without it
+(run/model/billing_mode/tokens). Reading skips — with a one-time warning — records written by a newer Forge
+(`schema_version` > current), and (strict on shape) records with unknown fields. `read_usage_events()` is the typed read
+surface. The `route`/`reporter`/`confidence` fields were **added additively at `schema_version` 1 (no bump)**: optional
+\+ defaulted, so existing v1 records load unchanged. A *pre-Phase-1* reader, by contrast, drops the newer records as
+unknown-field corruption — acceptable for best-effort, PID-sharded, pruned local telemetry, and **not** a state to
+migrate around.
 
 **Instrumented emitters (Phase 4c).** The workflow verbs (`panel`/`analyze`/`debate`/`consensus`) emit one estimated
 verb-level event each (`measurement_source=verb_snapshot_estimated`, attributed to the ambient run — per-worker cost is
@@ -514,9 +529,10 @@ path**, Forge resolves the call's base_url synchronously: if it is a registered 
 id); otherwise it sends no header and leaves the ref null (a dangling join is worse than none). Direct-path
 `billing_mode` stays `unknown` unless the caller proves direct + real-credential billing (the tagger routes via local
 LiteLLM with a dummy key, so it can't). All emit best-effort, never gate the work they measure, and record `latency_ms`;
-`claude -p` events carry null `source_refs` (4g). Helpers: `emit_verb_usage`, `emit_usage_for_session_result`,
-`emit_direct_llm_usage` (`forge.core.usage.emit`). Each also stamps `route`/`reporter`/`confidence`: tagger →
-`core_llm`/`provider`/`unavailable`; the verb aggregate claims no single `route`.
+`claude -p` events carry null `source_refs` and join to exact cost by run tree (`forge_root_run_id`, Phase 4g). Helpers:
+`emit_verb_usage`, `emit_usage_for_session_result`, `emit_direct_llm_usage` (`forge.core.usage.emit`). Each also stamps
+`route`/`reporter`/`confidence`: tagger → `core_llm`/`provider`/`unavailable`; the verb aggregate claims no single
+`route`.
 
 **Cost precedence on `claude -p` verbs (Phase 5).** Every `claude -p` run requests `--output-format json`
 (capability-gated, retry-once-and-latch), so the runtime can self-report. Exactly **one** reporter attributes cost per
@@ -524,7 +540,9 @@ run:
 
 - **Proxied** (`base_url` set) → the proxy snapshot wins: `forge_proxy` / `reported` / `verb_snapshot_estimated` with
   snapshot tokens (Claude's Anthropic-priced `total_cost_usd` is ignored — wrong for a non-Anthropic backend and a
-  duplicate of the proxy's report). No snapshot cost → `None` / `unavailable`.
+  duplicate of the proxy's report). No snapshot cost → `None` / `unavailable`. The stored event stays
+  `verb_snapshot_estimated`, but the read surface recomputes the run tree's cost exactly from the cost plane and
+  supersedes this snapshot (Phase 4g `proxy_request_exact`; see §A.13).
 - **Direct** (no proxy) → the runtime self-reports: `claude_code` / `reported` / `runtime_native` with exact in-band
   tokens. A parsed envelope with usage but no cost (OAuth) → `provider_usage_exact` / `unavailable` (tokens kept, cost
   honestly absent). Neither → `unavailable`.

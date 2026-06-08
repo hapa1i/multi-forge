@@ -52,11 +52,13 @@ top-level `forge transfer show|regenerate|edit|diff` CLI shipped in commit `2b70
 Next: **Phase 4 (runtime-abstraction core)** -- **Slices 4a (run-tree env contract) + 4b (usage-ledger schema) + 4c
 (instrument native + direct paths) + 4d (`HeadlessInvoker` + review fan-out migration + per-worker usage events) + 4e
 (runtime registry capability matrix) + 4f (runtime-tagged `ActionContext` + named Claude hook adapter/responder behind
-runtime-neutral protocols) shipped 2026-06-01**. The only remaining Phase 4 item is **Slice 4g (proxied per-request
-correlation), which stays DEFERRED** (needs a Claude-Code custom-header feasibility check) -- so Phase 4's core is
-complete; the next phase is **Phase 5 (cross-runtime resume / `CodexHeadlessInvoker`)**. The two cross-cutting Phase 4
-decisions are resolved (data-plane: separate planes linked by `request_id`; `FORGE_DEPTH`: additive run-tree env,
-integer guard unchanged) -- see Open Decisions for the de-risked build sequence, recorded at the top of the Phase 4
+runtime-neutral protocols) shipped 2026-06-01**, and **Slice 4g (proxied per-request correlation) shipped 2026-06-08**
+(Claude-Code custom-header feasibility confirmed; run-tree join, leak-gated injection, proxy-side validation, read-time
+suppression) -- so all of Phase 4 is complete; the next phase is **Phase 5 (cross-runtime resume /
+`CodexHeadlessInvoker`)**. The 4g feasibility canary PASSED 2026-06-08 (Claude Code 2.1.168, all 6 cases against a live
+OpenRouter-backed proxy), so the external-forwarding dependency is verified, not just authored. The two cross-cutting
+Phase 4 decisions are resolved (data-plane: separate planes linked by `request_id`; `FORGE_DEPTH`: additive run-tree
+env, integer guard unchanged) -- see Open Decisions for the de-risked build sequence, recorded at the top of the Phase 4
 section. Deferred Phase 3 follow-ups (`--rewrite-paths`, sidecar/resume native-relocate, the gated default flip) are
 recorded as trackable boxes under Phase 3 and land when prioritized. The card stays in `doing/` until Phases 3-6 land
 (board-contract: move to `done/` only when fully executed). A 2026-06-02 review pass hardened 4a-4d (cancellation race,
@@ -703,6 +705,73 @@ clean.
   `_memory_writer_env` and pinned the defensive fallback (only-`origin_run_id` -> parent=root=origin, fresh child) with
   `test_env_tolerates_partial_origin_marker`, so it is not re-flagged as a parent/root bug.
 
+### Slice 4g - Proxied per-request correlation (exact `claude -p` cost) (2026-06-08)
+
+Resolves the last Phase 4 open decision (above). Replaces the concurrency-fragile before/after proxy snapshot delta for
+proxied `claude -p` cost with an **exact** run-tree join: Forge stamps its own headless subprocess's outbound requests
+with validated run ids (via `ANTHROPIC_CUSTOM_HEADERS`), the proxy records them on each cost record, and the read
+surface sums by `forge_root_run_id`. ToS-clean (Forge's own subprocesses through Forge's own proxy, opaque non-secret
+ids; no credential extraction; interactive OAuth session untouched). The deferred OAuth-MITM tier is unrelated.
+
+- [x] **4g.1 - Proxy stamp + validate (write side).** Middleware reads `X-Forge-Run-ID`/`X-Forge-Root-Run-ID`, validates
+  each (`is_valid_run_id`, `^run_[0-9a-f]{12}$`) and stores `None` on mismatch, threading
+  `forge_run_id`/`forge_root_run_id` through `_calc_and_log_cost` -> `log_request_cost` as additive cost-record fields
+  (no `COST_SCHEMA_VERSION` bump; one middleware site covers translated + passthrough wire shapes).
+  - Files: `src/forge/proxy/server.py`, `src/forge/proxy/cost_logger.py`, new dependency-free `src/forge/core/run_id.py`
+    (shared `RUN_ID_RE`/`is_valid_run_id`/`mint_run_id` + header constants, so the proxy imports the validator without
+    dragging `core.reactive`'s eager tagger/`core.llm` imports).
+  - Tests: `tests/src/proxy/test_cost_logger.py::TestForgeRunCorrelation` (fields persisted additively at
+    `schema_version` 1; default `None`; root join sums by root; present-without-cost), `tests/src/core/test_run_id.py`
+    (mint/validate + injection/spoof rejection). Inert until headers arrive (records carry `None`).
+- [x] **4g.2 - Env injection (gated, Forge-owned).** `build_claude_env` stamps the two headers only when
+  `derive_run_identity` (a headless child -- excludes the interactive harness, preserving the `forge +$Y` boundary)
+  **AND** the target is a **proven Forge proxy** (`target_is_forge_proxy(base_url)` OR `FORGE_SUBPROCESS_PROXY_ID`
+  present **AND** `base_url == FORGE_SUBPROCESS_BASE_URL`). The URL-match defeats an inherited marker paired with an
+  explicit opaque `base_url` override. Headers are Forge-owned: strip inherited `X-Forge-*` lines, re-stamp the child's
+  ids, preserve user lines.
+  - Files: `src/forge/core/reactive/env.py` (`_apply_correlation_headers`, `_target_is_proven_forge_proxy`).
+  - Tests: `tests/src/core/reactive/test_env.py::TestCorrelationHeaders` (proven proxy -> stamped; opaque base_url -> no
+    header; inherited marker + explicit opaque base_url -> no header; interactive -> no header; user lines preserved;
+    inherited `X-Forge-Run-ID` replaced not duplicated).
+- [x] **4g.3 / 4g.4 - Read-time root join + suppression + fan-out/orphan.** `sum_reported_cost_by_root(roots, *, since)`
+  (`cost_logger.py`) returns `has_records`/`runs_with_records` (presence, incl. dollar-less records) and
+  `has_cost`/`per_run` (dollars) separately; `usage_summary._join_session_cost` sums by `forge_root_run_id` three ways:
+  exact dollars -> suppress the snapshot; records-but-no-dollars -> suppress snapshot, render **unavailable** (not
+  `$0`); no records -> event-sourced fallback (direct `runtime_native` + pre-4g).
+  - **Suppression is per-run-subtree, not whole-root** (review fix 2026-06-08): a `verb_snapshot_estimated` event is
+    superseded only when its OWN run produced records (`run_id in runs_with_records`) OR it is a verb whose DIRECT
+    children did (`run_id in producer_parents`, derived from worker `parent_run_id`). Whole-root suppression
+    (`root_run_id in roots_with_records`) silently dropped a correctly-unstamped sibling's snapshot whenever any run
+    under the shared session root was stamped. Root-summing still captures orphan cancelled leaves (cost counted; a verb
+    whose workers were ALL cancelled has no fan-out parentage to reconstruct, but skips its own emit too -- documented
+    edge).
+  - **Exact figures render without `~`** (review fix 2026-06-08): `cost_estimated` on `SessionActivitySummary`/
+    `CommandUsage` (default `True`, the safe caveat for hand-built summaries) is `False` when the figure is entirely
+    cost-plane-exact, so `forge activity` / the session-end line drop the estimate marker and the footnote reads "exact
+    via run-tree join" -- realizing the `proxy_request_exact` read-surface label the docs claim.
+  - Files: `src/forge/core/ops/usage_summary.py` (`_join_session_cost` -> `_CostJoin`, used by `sum_forge_added_cost`
+    and `_aggregate_ledger`), `src/forge/cli/activity.py` (per-command + total `~` gating, footnote).
+  - Tests: `tests/src/core/ops/test_usage_summary.py::TestRootJoin4g` (exact supersedes snapshot; fan-out no
+    double-count; no-cost route unavailable-not-zero; mixed exact+no-cost partial; orphan cancelled leaf via root;
+    interactive isolated; direct `runtime_native` kept; pre-4g snapshot; exact-not-estimated +
+    exact+snapshot-estimated); `test_cost_logger.py` (`runs_with_records` presence); `test_activity.py` (exact renders
+    without `~`); regression `tests/regression/test_bug_4g_mixed_stamped_unstamped_undercount.py` (shared-root
+    undercount guard).
+- [x] **4g.5 - Docs + board sync.** design.md §3.14 (run-tree join sentence), design_appendix.md §A.9 (cost-record
+  schema gains `forge_run_id`/`forge_root_run_id`, additive at `schema_version` 1) + §A.13 (`proxy_request_exact` as a
+  read-time provenance label; `source_refs` stays null by design), this Open Decision resolution, and this slice block.
+- [x] **4g.0 - Feasibility canary (GATING) -- PASSED 2026-06-08 on Claude Code 2.1.168.**
+  `tests/integration/proxy/test_forge_run_id_correlation.py`: all 6 cases green against a live OpenRouter-backed Forge
+  proxy (28.6s). A live Forge proxy validates + stamps valid headers, drops malformed ones, and -- the load-bearing
+  external dependency -- a real `claude` forwards `ANTHROPIC_CUSTOM_HEADERS` so the proxy stamps the run ids. Covers
+  plain `claude -p`, `claude -p --bare` (env vars survive `--bare`; settings.json does not), and a multi-request tool
+  loop that confirmed **every** cost record in the window is stamped (the tool loop did force >= 2 requests; a harness
+  that set the header only on the first request would fail here). The validated Claude Code version is captured +
+  reported (`CLAUDE_VERSION_VALIDATED = "2.1.168"`); the standing version-regression guard against a future Claude Code
+  that drops/renames the env var. **Requires** an OpenRouter key + the `claude` binary on PATH (no Docker LiteLLM -- the
+  `openrouter-anthropic` template routes directly); re-run with
+  `uv run pytest tests/integration/proxy/test_forge_run_id_correlation.py -v`.
+
 ## Phase 5 - Cross-Runtime Resume
 
 - [ ] Add `CodexHeadlessInvoker`.
@@ -770,13 +839,29 @@ Tracks Forge-local execution decisions for this checklist. For broader card ques
   `review/engine.py:145`). Real Phase 4 task: audit that every spawn path (incl. review-engine fan-out, sidecar) stamps
   both at one site.
 
-- [ ] Proxied per-request correlation: how does the attribution id reach the proxy cost/audit plane for `claude -p`
-  subprocess traffic, where **Forge is not the HTTP client** (Claude is)? `source_refs.cost_request_id` is exact only on
-  the direct `core.llm` path (set/read `X-Request-ID`). Options: **(a)** header propagation -- inject `FORGE_RUN_ID`
-  into the subprocess env, have Claude forward it as a custom request header, proxy stamps it onto each record (needs a
-  Claude-Code custom-header feasibility check); **(b)** out-of-band `(run_id, proxy_id, time_window)` correlation
-  (inherits today's `estimated=True` snapshot concurrency fragility, `cost_tracking.py:7`). **Sequenced last (Phase 4
-  step 4)** -- validate the ledger on native + direct paths first, then resolve this fork as its own slice.
+- [x] Proxied per-request correlation: how does the attribution id reach the proxy cost/audit plane for `claude -p`
+  subprocess traffic, where **Forge is not the HTTP client** (Claude is)? **Resolved 2026-06-08 (Slice 4g): option (a)
+  header propagation, joining by the run tree, not `source_refs`.** Claude Code forwards `ANTHROPIC_CUSTOM_HEADERS`
+  (verified: `-p`, `--bare`, custom `ANTHROPIC_BASE_URL`; env vars survive `--bare`), so `build_claude_env` stamps
+  `X-Forge-Run-ID`/`X-Forge-Root-Run-ID` and the proxy validates + records `forge_run_id`/`forge_root_run_id` on each
+  cost record. Five review refinements shaped the final shape: **(1)** the join key is the **run tree**
+  (`forge_root_run_id`), not single-valued `source_refs.cost_request_id` — one run makes many requests, so `source_refs`
+  stays null and `test_bug_usage_claude_p_null_source_refs.py` holds (no `UsageEvent` schema change); **(2)** injection
+  is gated on a **proven Forge proxy** (`target_is_forge_proxy(base_url)` OR marker `FORGE_SUBPROCESS_PROXY_ID` present
+  **AND** `base_url == FORGE_SUBPROCESS_BASE_URL`), so an opaque/third-party `base_url` — including an inherited marker
+  paired with an explicit opaque override — never leaks the header; **(3)** the two header names are **Forge-owned**
+  (strip inherited `X-Forge-*` lines, re-stamp the current child's ids, preserve user lines); **(4)** the proxy
+  **validates** the inbound ids (`^run_[0-9a-f]{12}$`, shared with `mint_run_id` via the dependency-free
+  `forge.core.run_id` leaf) and stores `None` on a malformed/spoofed value — never persists a raw client header; **(5)**
+  the correctness join is **read-time** (cost records flush in the proxy's stream-end callback *after* the client sees
+  end-of-stream, so a write-time join at subprocess exit would miss the last record) — `forge activity`/`forge +$Y` sum
+  cost records by `forge_root_run_id` and **suppress** every `verb_snapshot_estimated` aggregate when the root-join has
+  records, killing the fan-out double-count by construction. A records-present/no-dollars route
+  (`has_records && !has_cost`, e.g. Anthropic passthrough) suppresses the snapshot yet renders cost **unavailable**,
+  never a fabricated `$0`. Orphan leaves (a cancelled worker that emitted no ledger event but still produced a cost
+  record) are captured because the join is by root, not the ledger-derived run set. The deferred **OAuth-interactive
+  MITM** tier is unrelated and stays deferred (resolved above): 4g touches only Forge's own headless subprocesses
+  through Forge's own proxy with opaque non-secret run ids — ToS-clean, no credential extraction.
 
 - [ ] On-demand policy CLI runtime origin (4f follow-up, surfaced by review 2026-06-02): the manual `forge policy check`
   (`cli/policy.py` `check`, :519) and `forge policy supervisor` (`supervisor_cmd`, :693) leaf commands tag

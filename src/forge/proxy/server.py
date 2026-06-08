@@ -41,6 +41,11 @@ from forge.core.logging import (
     configure_debug_logging,
     get_effective_log_level,
 )
+from forge.core.run_id import (
+    FORGE_ROOT_RUN_ID_HEADER,
+    FORGE_RUN_ID_HEADER,
+    is_valid_run_id,
+)
 from forge.core.usage.vocabulary import Confidence, Reporter
 from forge.proxy.base_client import ProxyStreamError, ToolCallError
 from forge.proxy.client_factory import TierClientFactory
@@ -187,6 +192,17 @@ def _reported_cost_provenance() -> tuple[Reporter | None, Confidence]:
     return None, "reported"  # a number is present but the provider is unrecognized
 
 
+def _valid_run_header(value: str | None) -> str | None:
+    """Return a validated Forge run id from an inbound header, else None (Slice 4g)."""
+    return value if is_valid_run_id(value) else None
+
+
+def _forge_run_ids(request: Request) -> tuple[str | None, str | None]:
+    """The validated ``(forge_run_id, forge_root_run_id)`` the middleware stored."""
+    state = request.state
+    return getattr(state, "forge_run_id", None), getattr(state, "forge_root_run_id", None)
+
+
 def _calc_and_log_cost(
     *,
     model: str,
@@ -198,6 +214,8 @@ def _calc_and_log_cost(
     failed: bool,
     request_id: str,
     reported_cost_micros: int | None = None,
+    forge_run_id: str | None = None,
+    forge_root_run_id: str | None = None,
 ) -> int | None:
     """Log a request's cost (microdollars) and return it, or ``None`` if unavailable.
 
@@ -228,6 +246,8 @@ def _calc_and_log_cost(
             request_id=request_id,
             reporter=reporter,
             confidence=confidence,
+            forge_run_id=forge_run_id,
+            forge_root_run_id=forge_root_run_id,
         )
 
         # Spend caps account for reported costs only; an unavailable cost advances nothing.
@@ -614,6 +634,7 @@ async def _handle_anthropic_passthrough(raw_request: Request, request_id: str, *
     from forge.proxy.passthrough import forward
 
     start_time = time.time()
+    forge_run_id, forge_root_run_id = _forge_run_ids(raw_request)  # Slice 4g run-tree correlation
 
     base_url = config.proxy.get_provider().base_url
     if not base_url:
@@ -727,6 +748,8 @@ async def _handle_anthropic_passthrough(raw_request: Request, request_id: str, *
             latency_ms=elapsed,
             failed=failed,
             request_id=request_id,
+            forge_run_id=forge_run_id,
+            forge_root_run_id=forge_root_run_id,
         )
         proxy_metrics.record_request(
             tier=resolved_tier,
@@ -795,6 +818,7 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
     automatically routing to the appropriate provider based on model name.
     """
     request_id = raw_request.state.request_id
+    forge_run_id, forge_root_run_id = _forge_run_ids(raw_request)  # Slice 4g run-tree correlation
     start_time = time.time()
 
     _ensure_runtime_state()
@@ -1076,6 +1100,8 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                     request_id=request_id,
                     # final_usage carries the route-reported cost the SSE converter parked there.
                     reported_cost_micros=usage.get("reported_cost_micros"),
+                    forge_run_id=forge_run_id,
+                    forge_root_run_id=forge_root_run_id,
                 )
                 proxy_metrics.record_request(
                     tier=resolved_tier,
@@ -1133,6 +1159,8 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                     failed=False,
                     request_id=request_id,
                     reported_cost_micros=openai_response.get("_reported_cost_micros"),
+                    forge_run_id=forge_run_id,
+                    forge_root_run_id=forge_root_run_id,
                 )
                 proxy_metrics.record_request(
                     tier=resolved_tier,
@@ -1202,6 +1230,8 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                     latency_ms=duration_ms,
                     failed=True,
                     request_id=request_id,
+                    forge_run_id=forge_run_id,
+                    forge_root_run_id=forge_root_run_id,
                 )
                 proxy_metrics.record_request(
                     tier=resolved_tier,
@@ -1282,6 +1312,8 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                     failed=False,
                     request_id=request_id,
                     reported_cost_micros=openai_response.get("_reported_cost_micros"),
+                    forge_run_id=forge_run_id,
+                    forge_root_run_id=forge_root_run_id,
                 )
                 proxy_metrics.record_request(
                     tier=resolved_tier,
@@ -1327,6 +1359,8 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
             latency_ms=duration_ms,
             failed=True,
             request_id=request_id,
+            forge_run_id=forge_run_id,
+            forge_root_run_id=forge_root_run_id,
         )
         proxy_metrics.record_request(
             tier=resolved_tier,
@@ -1670,6 +1704,14 @@ async def log_requests_middleware(request: Request, call_next):
 
     request_id = request.headers.get("X-Request-ID") or f"{prefix}{uuid.uuid4().hex[:12]}"
     request.state.request_id = request_id
+
+    # Slice 4g: run-tree correlation. Read + VALIDATE the Forge run-id headers a
+    # proxy-routed `claude -p` subprocess stamps, so each cost record can join to the
+    # run tree. Validation drops a malformed/spoofed value (stored None, never trusted
+    # into the cost log). Set before BOTH the passthrough branch and call_next so both
+    # wire shapes see them on request.state.
+    request.state.forge_run_id = _valid_run_header(request.headers.get(FORGE_RUN_ID_HEADER))
+    request.state.forge_root_run_id = _valid_run_header(request.headers.get(FORGE_ROOT_RUN_ID_HEADER))
 
     # Transparent Anthropic passthrough is intercepted HERE, before the route's
     # MessagesRequest binding runs — FastAPI validates the body against a closed

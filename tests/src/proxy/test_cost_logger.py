@@ -243,3 +243,93 @@ class TestReadCostLogs:
         records = read_cost_logs()
         assert len(records) == 1
         assert records[0]["ok"] is True
+
+
+class TestForgeRunCorrelation:
+    """Slice 4g: cost records carry the Forge run-tree ids; the root-join sums them."""
+
+    def _log(self, dir_: Path, *, root: str | None, run: str | None, cost: int | None) -> None:
+        log_request_cost(
+            proxy_id="p1",
+            model="gpt-5.5",
+            tier="sonnet",
+            input_tokens=10,
+            output_tokens=4,
+            cached_tokens=1,
+            cost_micros=cost,
+            latency_ms=1.0,
+            failed=False,
+            request_id="req_" + (run or root or "x"),
+            reporter="openrouter" if cost is not None else None,
+            confidence="reported" if cost is not None else "unavailable",
+            forge_run_id=run,
+            forge_root_run_id=root,
+        )
+
+    def test_fields_persisted_additively(self, cost_log_dir: Path):
+        self._log(cost_log_dir, root="run_root00000", run="run_leaf00000", cost=12345)
+        rec = read_cost_logs()[0]
+        assert rec["forge_run_id"] == "run_leaf00000"
+        assert rec["forge_root_run_id"] == "run_root00000"
+        # Additive: schema version unchanged (old readers .get() these as None).
+        assert rec["schema_version"] == 1
+
+    def test_fields_default_none_when_absent(self, cost_log_dir: Path):
+        log_request_cost(
+            proxy_id="p1",
+            model="m",
+            tier="sonnet",
+            input_tokens=1,
+            output_tokens=1,
+            cached_tokens=0,
+            cost_micros=10,
+            latency_ms=1.0,
+            failed=False,
+            request_id="req_x",
+        )
+        rec = read_cost_logs()[0]
+        assert rec["forge_run_id"] is None
+        assert rec["forge_root_run_id"] is None
+
+    def test_root_join_sums_by_root(self, cost_log_dir: Path):
+        from forge.proxy.cost_logger import sum_reported_cost_by_root
+
+        self._log(cost_log_dir, root="run_A", run="run_a1", cost=100)
+        self._log(cost_log_dir, root="run_A", run="run_a2", cost=50)
+        self._log(cost_log_dir, root="run_B", run="run_b1", cost=999)  # different root, excluded
+        join = sum_reported_cost_by_root({"run_A"})
+        assert join.has_records and join.has_cost
+        assert join.cost_micros == 150
+        assert join.roots_with_records == {"run_A"}
+        assert join.per_run == {"run_a1": 100, "run_a2": 50}
+        assert join.runs_with_records == {"run_a1", "run_a2"}
+
+    def test_root_join_present_without_cost(self, cost_log_dir: Path):
+        from forge.proxy.cost_logger import sum_reported_cost_by_root
+
+        self._log(cost_log_dir, root="run_A", run="run_a1", cost=None)  # passthrough: no dollars
+        join = sum_reported_cost_by_root({"run_A"})
+        assert join.has_records is True  # the run went through the proxy
+        assert join.has_cost is False  # but no price -> not $0
+        assert join.cost_micros is None
+        assert join.input_tokens == 10  # tokens still summed
+        # Presence is tracked even with no dollars (per_run holds only dollar-bearing runs),
+        # so read-time suppression can supersede the snapshot of a records-but-priceless run.
+        assert join.runs_with_records == {"run_a1"}
+        assert join.per_run == {}
+
+    def test_root_join_runs_with_records_mixes_dollar_and_priceless(self, cost_log_dir: Path):
+        from forge.proxy.cost_logger import sum_reported_cost_by_root
+
+        self._log(cost_log_dir, root="run_A", run="run_paid", cost=70)
+        self._log(cost_log_dir, root="run_A", run="run_free", cost=None)  # passthrough
+        join = sum_reported_cost_by_root({"run_A"})
+        assert join.runs_with_records == {"run_paid", "run_free"}  # both present
+        assert join.per_run == {"run_paid": 70}  # only the dollar-bearing run
+
+    def test_root_join_empty_roots_no_disk_read(self, cost_log_dir: Path):
+        from forge.proxy.cost_logger import sum_reported_cost_by_root
+
+        # Common no-proxied-run case: returns empty without globbing shards.
+        join = sum_reported_cost_by_root(set())
+        assert not join.has_records and join.cost_micros is None

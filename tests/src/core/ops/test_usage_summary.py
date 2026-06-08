@@ -269,6 +269,19 @@ class TestRenderLine:
         assert line is not None
         assert "~$0.00" in line
 
+    def test_exact_cost_renders_without_tilde(self) -> None:
+        # cost_estimated=False (4g cost-plane-exact total) -> the `~` marker is dropped.
+        summary = SessionActivitySummary(
+            session="planner",
+            commands=[CommandUsage(command="memory-writer", calls=1)],
+            total_cost_micro_usd=40_000,
+            cost_estimated=False,
+        )
+        line = render_summary_line(summary)
+        assert line is not None
+        assert "$0.04" in line
+        assert "~$0.04" not in line
+
 
 class TestSumForgeAddedCost:
     """`sum_forge_added_cost` -- the `forge +$Y` aggregator. "Forge-added" =
@@ -406,3 +419,239 @@ class TestSumForgeAddedCost:
         log_usage_event(_event(command="panel", route="claude_p", confidence="inferred", cost_micro_usd=70_000))
         log_usage_event(_event(command="panel", route="claude_p", confidence="unknown", cost_micro_usd=80_000))
         assert sum_forge_added_cost("planner") is None
+
+
+def _cost_record(*, root: str, run: str | None = None, cost_micros: int | None, **overrides: object) -> None:
+    """Write one proxy cost record (4g run-tree-stamped) into the isolated FORGE_HOME."""
+    from forge.proxy.cost_logger import log_request_cost
+
+    kwargs: dict[str, object] = {
+        "proxy_id": "p1",
+        "model": "gpt-5.5",
+        "tier": "sonnet",
+        "input_tokens": 10,
+        "output_tokens": 5,
+        "cached_tokens": 0,
+        "cost_micros": cost_micros,
+        "latency_ms": 1.0,
+        "failed": False,
+        "request_id": "req_" + (run or root),
+        "reporter": "openrouter" if cost_micros is not None else None,
+        "confidence": "reported" if cost_micros is not None else "unavailable",
+        "forge_run_id": run if run is not None else root,
+        "forge_root_run_id": root,
+    }
+    kwargs.update(overrides)
+    log_request_cost(**kwargs)  # type: ignore[arg-type]
+
+
+class TestRootJoin4g:
+    """Slice 4g: proxied ``claude -p`` cost comes from the cost plane (exact, by
+    ``forge_root_run_id``), superseding the concurrency-fragile verb snapshot."""
+
+    def test_exact_supersedes_snapshot(self) -> None:
+        # A proxied verb event carries a SNAPSHOT estimate; the cost plane has the exact
+        # per-request cost under the same run tree -> exact wins, snapshot suppressed.
+        log_usage_event(
+            _event(
+                command="memory-writer",
+                run_id="run_mw",
+                root_run_id="run_mw",
+                route="claude_p",
+                reporter="forge_proxy",
+                confidence="reported",
+                measurement_source="verb_snapshot_estimated",
+                cost_micro_usd=999_000,  # the (wrong) snapshot estimate
+            )
+        )
+        _cost_record(root="run_mw", cost_micros=120_000)
+        _cost_record(root="run_mw", run="run_mw", cost_micros=80_000)
+        # 120k + 80k exact, NOT the 999k snapshot.
+        assert sum_forge_added_cost("planner") == 200_000
+
+    def test_fanout_no_double_count(self) -> None:
+        # A 4-worker panel: ONE verb-aggregate snapshot event (ambient run) + 4 worker
+        # leaf events (null cost), all sharing one root. Cost records carry the WORKER
+        # run ids. Session cost = sum of the 4 worker records, counted ONCE.
+        root = "run_root"
+        log_usage_event(
+            _event(
+                command="panel",
+                run_id="run_root",
+                root_run_id=root,
+                route="claude_p",
+                reporter="forge_proxy",
+                confidence="reported",
+                measurement_source="verb_snapshot_estimated",
+                cost_micro_usd=500_000,  # the aggregate snapshot -- must be suppressed
+            )
+        )
+        for i in range(4):
+            log_usage_event(
+                _event(
+                    command="panel",
+                    run_id=f"run_w{i}",
+                    parent_run_id=root,
+                    root_run_id=root,
+                    route="claude_p",
+                    attribution_granularity="worker",
+                    measurement_source="unattributed",
+                    confidence="unavailable",
+                    cost_micro_usd=None,
+                )
+            )
+            _cost_record(root=root, run=f"run_w{i}", cost_micros=25_000)
+        assert sum_forge_added_cost("planner") == 100_000  # 4 x 25k once, not + 500k snapshot
+
+    def test_no_cost_route_unavailable_not_zero(self) -> None:
+        # Proxied run whose route reported NO price (anthropic-passthrough): records
+        # exist (suppress the snapshot) but no dollars -> total None (unavailable, NOT
+        # $0 and NOT the 42k snapshot). With no figure shown at all, cost_partial stays
+        # False -- the None itself conveys "unavailable".
+        log_usage_event(
+            _event(
+                command="supervisor",
+                run_id="run_sup",
+                root_run_id="run_sup",
+                route="claude_p",
+                measurement_source="verb_snapshot_estimated",
+                confidence="reported",
+                cost_micro_usd=42_000,  # snapshot -- suppressed because records exist
+            )
+        )
+        _cost_record(root="run_sup", cost_micros=None)  # passthrough: tokens, no dollars
+        assert sum_forge_added_cost("planner") is None  # not $0, not the 42k snapshot
+        summary = build_session_activity_summary("planner", None)
+        assert summary.total_cost_micro_usd is None
+        assert summary.cost_partial is False
+
+    def test_mixed_exact_and_no_cost_route_is_partial(self) -> None:
+        # One run reports exact dollars, another (passthrough) reports none -> the shown
+        # total is real but incomplete: cost_partial True.
+        log_usage_event(_event(command="memory-writer", run_id="run_a", root_run_id="run_a", route="claude_p"))
+        log_usage_event(_event(command="supervisor", run_id="run_b", root_run_id="run_b", route="claude_p"))
+        _cost_record(root="run_a", cost_micros=70_000)  # reported
+        _cost_record(root="run_b", cost_micros=None)  # passthrough, no dollars
+        summary = build_session_activity_summary("planner", None)
+        assert summary.total_cost_micro_usd == 70_000
+        assert summary.cost_partial is True
+
+    def test_orphan_cancelled_leaf_captured_by_root(self) -> None:
+        # A cancelled worker made a request (cost record under the root) but emitted NO
+        # ledger event. The root-join still captures it via forge_root_run_id.
+        root = "run_root"
+        log_usage_event(_event(command="panel", run_id=root, root_run_id=root, route="claude_p", cost_micro_usd=None))
+        _cost_record(root=root, run="run_emitted", cost_micros=30_000)
+        _cost_record(root=root, run="run_cancelled_orphan", cost_micros=20_000)  # no ledger event
+        assert sum_forge_added_cost("planner") == 50_000
+
+    def test_interactive_isolated_from_forge_added(self) -> None:
+        # The interactive harness shares the proxy but never gets the header, so its
+        # cost records carry no forge_root_run_id. Only the headless run is summed.
+        log_usage_event(
+            _event(
+                command="memory-writer",
+                run_id="run_hl",
+                root_run_id="run_hl",
+                route="claude_p",
+                measurement_source="verb_snapshot_estimated",
+                confidence="reported",
+                cost_micro_usd=1,
+            )
+        )
+        _cost_record(root="run_hl", cost_micros=15_000)  # headless, stamped
+        # interactive harness traffic: no forge_root_run_id on its records (not stamped)
+        _cost_record(root="run_hl", run="run_hl", cost_micros=0, forge_root_run_id=None, forge_run_id=None)
+        assert sum_forge_added_cost("planner") == 15_000
+
+    def test_direct_runtime_native_kept_alongside_proxied(self) -> None:
+        # A session with BOTH a proxied run (cost plane) and a direct runtime_native run
+        # (self-reported, no cost record): both contribute, neither double-counted.
+        log_usage_event(
+            _event(
+                command="memory-writer",
+                run_id="run_px",
+                root_run_id="run_px",
+                route="claude_p",
+                measurement_source="verb_snapshot_estimated",
+                confidence="reported",
+                cost_micro_usd=999_000,  # snapshot -- superseded
+            )
+        )
+        _cost_record(root="run_px", cost_micros=60_000)
+        log_usage_event(
+            _event(
+                command="supervisor",
+                run_id="run_dir",
+                root_run_id="run_dir",
+                route="claude_p",
+                measurement_source="runtime_native",
+                reporter="claude_code",
+                confidence="reported",
+                cost_micro_usd=40_000,  # direct self-report, no cost record
+            )
+        )
+        assert sum_forge_added_cost("planner") == 100_000  # 60k exact + 40k direct
+
+    def test_pre_4g_snapshot_still_counts(self) -> None:
+        # A pre-4g proxied session: snapshot event, but NO cost records carry its root.
+        # Nothing to supersede -> the snapshot estimate is kept (graceful fallback).
+        log_usage_event(
+            _event(
+                command="memory-writer",
+                run_id="run_old",
+                root_run_id="run_old",
+                route="claude_p",
+                measurement_source="verb_snapshot_estimated",
+                confidence="reported",
+                cost_micro_usd=33_000,
+            )
+        )
+        assert sum_forge_added_cost("planner") == 33_000
+
+    def test_exact_proxied_cost_is_not_estimated(self) -> None:
+        # A fully cost-plane-exact session: the snapshot is superseded by the exact
+        # record, so the figure is exact (4g proxy_request_exact) -> NO `~` marker.
+        log_usage_event(
+            _event(
+                command="memory-writer",
+                run_id="run_mw",
+                root_run_id="run_mw",
+                route="claude_p",
+                measurement_source="verb_snapshot_estimated",
+                confidence="reported",
+                cost_micro_usd=999_000,  # snapshot -- superseded by the exact record
+            )
+        )
+        _cost_record(root="run_mw", run="run_mw", cost_micros=120_000)
+        summary = build_session_activity_summary("planner", None)
+        assert summary.total_cost_micro_usd == 120_000
+        assert summary.cost_estimated is False  # exact -> rendered without `~`
+        assert summary.cost_partial is False
+        mw = next(c for c in summary.commands if c.command == "memory-writer")
+        assert mw.cost_micro_usd == 120_000
+        assert mw.cost_estimated is False
+
+    def test_exact_plus_snapshot_residual_is_estimated(self) -> None:
+        # Exact proxied run + a pre-4g run whose snapshot has no records to supersede it:
+        # the total mixes exact dollars with an estimate -> cost_estimated True (`~`).
+        log_usage_event(_event(command="memory-writer", run_id="run_px", root_run_id="run_px", route="claude_p"))
+        _cost_record(root="run_px", run="run_px", cost_micros=60_000)  # exact
+        log_usage_event(
+            _event(
+                command="supervisor",
+                run_id="run_old",
+                root_run_id="run_old",
+                route="claude_p",
+                measurement_source="verb_snapshot_estimated",  # no records -> kept as estimate
+                confidence="reported",
+                cost_micro_usd=40_000,
+            )
+        )
+        summary = build_session_activity_summary("planner", None)
+        assert summary.total_cost_micro_usd == 100_000
+        assert summary.cost_estimated is True  # exact + snapshot -> approximate
+        sup = next(c for c in summary.commands if c.command == "supervisor")
+        assert sup.cost_estimated is True
+        mw = next(c for c in summary.commands if c.command == "memory-writer")
+        assert mw.cost_estimated is False  # the exact half stays clean per-command

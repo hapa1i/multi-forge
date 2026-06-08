@@ -113,3 +113,43 @@ def test_days_window_excludes_nothing_recent(monkeypatch) -> None:
     assert result.exit_code == 0
     data = json.loads(result.output)
     assert data["total_events"] == 1
+
+
+def test_exact_proxied_cost_renders_without_tilde(monkeypatch) -> None:
+    # 4g: a proxied run whose exact cost-plane record supersedes its snapshot renders the
+    # total WITHOUT the `~` estimate marker, and the footnote reports exact-via-run-tree.
+    from forge.proxy.cost_logger import log_request_cost
+
+    _patch_resolver(monkeypatch)
+    log_usage_event(
+        _event(
+            command="memory-writer",
+            run_id="run_mw",
+            root_run_id="run_mw",
+            route="claude_p",
+            measurement_source="verb_snapshot_estimated",
+            confidence="reported",
+            cost_micro_usd=999_000,  # snapshot -- superseded
+        )
+    )
+    log_request_cost(
+        proxy_id="p1",
+        model="gpt-5.5",
+        tier="sonnet",
+        input_tokens=10,
+        output_tokens=5,
+        cached_tokens=0,
+        cost_micros=120_000,
+        latency_ms=1.0,
+        failed=False,
+        request_id="req_mw",
+        reporter="openrouter",
+        confidence="reported",
+        forge_run_id="run_mw",
+        forge_root_run_id="run_mw",
+    )
+    result = CliRunner().invoke(activity_cmd, ["planner", "--all"])
+    assert result.exit_code == 0
+    assert "$0.12" in result.output
+    assert "~$0.12" not in result.output  # exact -> no estimate marker
+    assert "exact via run-tree join" in result.output

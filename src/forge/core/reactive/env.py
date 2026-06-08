@@ -11,9 +11,15 @@ from __future__ import annotations
 
 import logging
 import os
-import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass
+
+from forge.core.run_id import (
+    ANTHROPIC_CUSTOM_HEADERS_VAR,
+    FORGE_ROOT_RUN_ID_HEADER,
+    FORGE_RUN_ID_HEADER,
+    mint_run_id,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -102,11 +108,6 @@ class RunIdentity:
         if self.parent_run_id:
             env[FORGE_PARENT_RUN_ID_VAR] = self.parent_run_id
         return env
-
-
-def mint_run_id() -> str:
-    """Mint a fresh run id (mirrors the proxy's ``request_id`` prefix style)."""
-    return f"run_{uuid.uuid4().hex[:12]}"
 
 
 def get_run_identity(env: Mapping[str, str] | None = None) -> RunIdentity | None:
@@ -243,6 +244,11 @@ def build_claude_env(
             env[FORGE_PARENT_RUN_ID_VAR] = child.parent_run_id
         else:
             env.pop(FORGE_PARENT_RUN_ID_VAR, None)
+        # Slice 4g: stamp run-tree correlation headers for a proxy-routed headless
+        # child so the Forge proxy can attribute its cost records to this run tree.
+        # Gated to a *proven* Forge proxy (never an opaque gateway) and to
+        # derive_run_identity=True (headless), so interactive sessions are excluded.
+        _apply_correlation_headers(env)
 
     return env
 
@@ -274,6 +280,59 @@ def _hydrate_credentials(env: dict[str, str]) -> None:
             env.pop(_BARE_AUTH_KEY, None)
     elif resolved and not env.get(_BARE_AUTH_KEY):
         env[_BARE_AUTH_KEY] = resolved
+
+
+def _target_is_proven_forge_proxy(env: Mapping[str, str]) -> bool:
+    """True only if the resolved ANTHROPIC_BASE_URL is a *proven* Forge proxy.
+
+    Two proofs (Slice 4g leak gate). The marker path requires the marker to own the
+    *selected* url: an explicit ``base_url`` arg can override routing while an
+    inherited ``FORGE_SUBPROCESS_PROXY_ID`` survives ``os.environ.copy()``, so
+    "marker present" alone could point at an opaque override -- require the marker's
+    url to equal the resolved base_url. The registry path is host-only (the proxy
+    registry isn't mounted in the sidecar); a miss degrades to no header (snapshot
+    estimate), never a leak.
+    """
+    base_url = env.get("ANTHROPIC_BASE_URL")
+    if not base_url:
+        return False
+    if env.get(FORGE_SUBPROCESS_PROXY_ID_VAR) and env.get(FORGE_SUBPROCESS_BASE_URL_VAR) == base_url:
+        return True
+    try:
+        from forge.core.usage.correlation import target_is_forge_proxy
+
+        return target_is_forge_proxy(base_url)
+    except Exception as e:  # best-effort: an unreadable registry is "not proven", never a leak
+        logger.debug("forge-proxy check failed for %s: %s", base_url, e)
+        return False
+
+
+def _apply_correlation_headers(env: dict[str, str]) -> None:
+    """Stamp X-Forge-Run-ID/-Root-Run-ID into ANTHROPIC_CUSTOM_HEADERS (Slice 4g).
+
+    No-ops unless the subprocess is proxy-routed to a *proven* Forge proxy, so the
+    opaque run id never reaches a non-Forge gateway. The two headers are
+    Forge-owned: strip any inherited ``X-Forge-*`` line (the env starts from
+    ``os.environ.copy()``, so a nested subprocess inherits the parent's value), then
+    append the current child's ids; all other (user) header lines are preserved.
+    """
+    run_id = env.get(FORGE_RUN_ID_VAR)
+    if not run_id or not _target_is_proven_forge_proxy(env):
+        return
+
+    forge_owned = {FORGE_RUN_ID_HEADER.lower(), FORGE_ROOT_RUN_ID_HEADER.lower()}
+    kept: list[str] = []
+    for raw in env.get(ANTHROPIC_CUSTOM_HEADERS_VAR, "").split("\n"):
+        line = raw.strip()
+        if not line:
+            continue
+        name = line.split(":", 1)[0].strip().lower()
+        if name in forge_owned:
+            continue  # drop inherited Forge-owned line; re-added fresh below
+        kept.append(line)
+    kept.append(f"{FORGE_RUN_ID_HEADER}: {run_id}")
+    kept.append(f"{FORGE_ROOT_RUN_ID_HEADER}: {env.get(FORGE_ROOT_RUN_ID_VAR) or run_id}")
+    env[ANTHROPIC_CUSTOM_HEADERS_VAR] = "\n".join(kept)
 
 
 @dataclass(frozen=True)

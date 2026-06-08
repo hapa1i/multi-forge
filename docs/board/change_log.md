@@ -25,6 +25,51 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board-contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-06-08
+
+### Phase 4g: Exact cost attribution for proxied `claude -p` (run-tree correlation)
+
+**Goal**: Replace the concurrency-fragile before/after proxy snapshot delta for proxied `claude -p` cost
+(`verb_snapshot_estimated`, polluted when a session shares the proxy) with an **exact** join that correlates each cost
+record to the Forge run that incurred it. ToS-clean: Forge's own headless subprocesses through Forge's own proxy, opaque
+non-secret run ids; no credential extraction; the interactive OAuth session is untouched. Resolves the last Phase 4 open
+decision.
+
+**Key changes**:
+
+- **Join key is the run tree, not `source_refs`.** One `claude -p` run makes many requests, so the single-valued
+  `source_refs.cost_request_id` is the wrong shape — `source_refs` stays null on `claude -p`
+  (`test_bug_usage_claude_p_null_source_refs.py` holds, no `UsageEvent` schema change). Cost records gain additive
+  `forge_run_id`/`forge_root_run_id` (`schema_version` 1, no bump; reader uses `.get()`).
+- **Env injection (gated, Forge-owned).** `build_claude_env` stamps `X-Forge-Run-ID`/`X-Forge-Root-Run-ID` via
+  `ANTHROPIC_CUSTOM_HEADERS` only for a headless child (`derive_run_identity`) targeting a **proven Forge proxy**
+  (`target_is_forge_proxy` OR marker present **and** `base_url == FORGE_SUBPROCESS_BASE_URL`) — an opaque/third-party
+  base_url, including an inherited marker + explicit opaque override, never leaks the header. Strips inherited
+  `X-Forge-*` lines, preserves user lines.
+- **Proxy validate + stamp.** Middleware validates each inbound id (`^run_[0-9a-f]{12}$`, shared with `mint_run_id` via
+  the new dependency-free `forge.core.run_id` leaf) and stores `None` on a spoof/malformed value; threads the ids
+  through `_calc_and_log_cost` -> `log_request_cost`. One site covers both wire shapes.
+- **Read-time root join + suppression.** `sum_reported_cost_by_root` returns `has_records`/`runs_with_records`
+  (presence, incl. dollar-less records) and `has_cost`/`per_run` (dollars) separately;
+  `usage_summary._join_session_cost` sums by `forge_root_run_id` and suppresses a `verb_snapshot_estimated` event
+  **per-run-subtree** — only when its OWN run produced records, or it is a verb whose DIRECT children did (fan-out, via
+  worker `parent_run_id`). Whole-root suppression was wrong: it dropped a correctly-unstamped sibling's snapshot
+  whenever any run under the shared session root was stamped (silent undercount). A no-dollars route renders
+  **unavailable**, never `$0`; root-summing still captures orphan cancelled leaves. The event stays
+  `verb_snapshot_estimated`; the read surface recomputes the exact figure (`proxy_request_exact`) and renders it
+  **without the `~` estimate marker** (`cost_estimated=False` on the summary/command DTOs drives `forge activity` and
+  the session-end line).
+
+**Verification**: Unit + regression suites green — `test_run_id.py`, `test_cost_logger.py::TestForgeRunCorrelation`
+(+`runs_with_records` presence), `test_env.py::TestCorrelationHeaders`, `test_usage_summary.py::TestRootJoin4g`
+(+exactness flags), `test_activity.py` (exact renders without `~`), and
+`tests/regression/test_bug_4g_mixed_stamped_unstamped_undercount.py` (the shared-root undercount guard); mypy clean.
+Docs synced (design.md §3.14, design_appendix.md §A.9/§A.13, card + checklist). **4g.0 feasibility canary PASSED**
+(`tests/integration/proxy/test_forge_run_id_correlation.py`, all 6 cases, 28.6s) against a live OpenRouter-backed Forge
+proxy on **Claude Code 2.1.168** — proving the load-bearing external dependency on the real wire: plain `claude -p`,
+`claude -p --bare`, and a multi-request tool loop where the tool loop forced >= 2 requests and **every** record carried
+the run ids. The standing version-regression guard records the validated version (`CLAUDE_VERSION_VALIDATED`).
+
 ## 2026-06-07
 
 ### Docs: correct the `claude_session_id` pre-seed lifecycle (design.md §3.3/§3.5 + session.md)
