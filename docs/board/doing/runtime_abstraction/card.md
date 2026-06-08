@@ -564,6 +564,88 @@ layer. It must not resell access, bypass rate limits or safety controls, obscure
 prompts for third-party training, or substitute models without explicit user-visible routing decisions. The purpose is
 to help users verify and control legitimate traffic using their own authorized credentials.
 
+**OAuth interactive wire observability -- deferred decision (2026-06-07).** *Recorded in full so it does not need
+re-deriving. If Anthropic ships another silent harness regression and we reconsider acting on it, start here -- this
+captures the whole reasoning, not just the verdict.*
+
+*The capability under consideration.* Intercept the **interactive OAuth/subscription** Claude session so Forge can
+`inspect` it (drift detection on the system prompt + tool surface) and optionally `override` it (pin reasoning effort
+against silent downgrades) -- the same engine the app-level audit proxy already runs, but applied to the session that
+matters most to subscription (Max/Pro) users. This is the direct counter to the April-2026 postmortem (silent reasoning
+downgrade, thinking-cache bug, hidden "\<=100 words" system-prompt injection), whose strongest motivation is the
+*interactive* session -- which for subscription users is OAuth.
+
+*Why it requires MITM specifically.* OAuth/subscription traffic does **not** honor `ANTHROPIC_BASE_URL`, so the shipped
+app-level passthrough (which works by being the endpoint Claude routes to) cannot see it. The only way onto that wire is
+transparent MITM: TLS-terminate inside the sidecar with a Forge CA, inspect/optionally-mutate, then re-originate to real
+Anthropic **forwarding the user's own OAuth bearer untouched**. (Contrast: today's sidecar interactive session is
+*API-key* -- the in-container proxy holds the upstream key and Claude reaches it via `ANTHROPIC_BASE_URL` -- so it
+sidesteps OAuth entirely. There is nothing to "just turn on.")
+
+*What already exists, so "later" is cheap:*
+
+- The `inspect`/`override` engine (effort pin, `system_prompt_augment`, guards, mutation-safety invariant) -- shipped
+  Phase 2. MITM reuses it verbatim; only the **transport** is new.
+- The CA trust anchor -- `docker/Dockerfile.forge` injects `/forge/docker/certs/*` via `update-ca-certificates` +
+  `NODE_EXTRA_CA_CERTS`, inherited by the sidecar. Built for **Zscaler** (a corporate TLS-terminating MITM), which is
+  also strong evidence Claude Code does **not** cert-pin the messages API (it works behind Zscaler).
+- The redaction layer with the `Authorization`-header denylist + no-plaintext guarantee
+  (`tests/regression/test_bug_audit_header_redaction_no_leak.py`) -- the "forward the bearer, never store it" invariant.
+
+*What's still missing:* (1) a transparent-MITM transport mode on the in-container proxy + redirect (`HTTPS_PROXY` env,
+or iptables/DNS); (2) resolving how the OAuth credential reaches a **Linux** container -- macOS Keychain does **not**
+cross; `~/.claude/.credentials.json` could be mounted, but then the container holds a long-lived subscription token
+**and** the CA private key; (3) a feasibility spike.
+
+*Why deferred -- the real reasons, NOT "Anthropic will behave now":*
+
+1. **The cost motivation is already gone.** `metric_evidence_simplification` (done, PR #18) made Forge track only the
+   cost *it* incurred; the interactive harness stays Claude's number in every regime (OAuth or API), and `payer` is a
+   separate, only-when-provable field (that card's Scope + line 97: "narrows once MITM-by-default puts Forge on the
+   wire... out of scope"). So MITM has **no accounting justification** left -- its only remaining value is
+   observability/control, which is the deferrable part.
+2. **The cost is high and intrinsic** (it does not shrink if the threat recurs):
+   - *Account-safety / detection (the scariest):* a re-originated TLS session fingerprints (JA3, HTTP/2 settings,
+     User-Agent) as **non-Claude-Code** on a **subscription** account -- realistic worst case is account suspension, not
+     credential leakage. "Mimic the CC fingerprint" is an arms race that itself smells like the provider-evasion the
+     compliance posture above forbids.
+   - *ToS gray zone:* TLS-intercepting a subscription session can read as circumventing a security control even
+     read-only; `override` (mutating subscription traffic) is the sharpest corner.
+   - *Criticality:* MITM moves into the critical path of the user's **main** session -- a streaming/TLS/refresh bug or a
+     future Claude Code cert-pin breaks the primary UX, not a best-effort background job.
+   - *Credential exposure:* OAuth token + CA private key co-resident in the `--rm` container.
+   - *UX friction:* the user must run their **entire** interactive session inside a Linux container.
+3. **Spend caps silently become no-ops** under OAuth (subscription = quota, no dollar figure to cap) -- a cost-safety
+   regression for anyone relying on `on_cap_hit: reject`.
+
+*Timing trap (important).* An always-on observer only has value if it is **running before** an incident -- it is a
+flight recorder, not post-crash forensics. So "wait until Anthropic drops the ball again, *then* build" is partly
+self-defeating: by the time you see the regression, the baseline / drift-history / pre-incident audit window is already
+gone. The mitigation is the cheap alternative below, kept warm -- **not** a scramble to build MITM after the fact.
+
+*Gate to build (double -- both required):* (a) a recurring harness-degradation incident that justifies paying the
+account-safety/ToS cost, AND (b) a feasibility spike (mirror the native-relocate spike) proving: OAuth can authenticate
+inside the container; OAuth survives MITM for the **messages API and the token-refresh flow** (refresh hits a different
+host than Zscaler-proven `api.anthropic.com`); and a re-originated TLS session draws no visibly different treatment.
+Explicitly **not** gated on "wait and see if Anthropic behaves."
+
+*Posture if/when built:* `inspect`-first (observe only -- the lowest ToS surface). `override`-on-OAuth is a separate,
+even-more-gated decision (it may be the line we never cross). Keep the metric-evidence **`payer` firewall**: observe the
+wire for drift/control, **never** recompute / re-attribute / blend OAuth cost into "Forge additional cost."
+
+*Containment (already true -- do not break it):* host `claude -p` is direct by construction (the un-proxied escape
+hatch). The in-container proxy binds `127.0.0.1` and publishes **no** port (`docker/entrypoint.sh`), so it is reachable
+only by in-container clients -- a host process gets connection-refused. Do **not** publish the port to "reach" it from
+the host; that sacrifices the design.md §7 port-isolation property. Host-vs-container *is* the direct-vs-proxied choice;
+there is no third option without giving up isolation. Everything here is **sidecar-only** -- host mode, the default, the
+proxy registry, the routing chain, and the app-level passthrough are all untouched.
+
+*Cheap, ToS-clean alternative (worth doing on its own merits, not MITM-coupled):* a golden-prompt / eval canary
+(design.md §"Optional Always-On Proxy" counterweight note) detects harness-drift *effects* -- including the
+wire-invisible system-prompt injection -- by periodically re-running fixed prompts and watching the output distribution.
+No interception, no account risk, not runtime-abstraction-coupled. Tracked as
+`docs/board/proposed/harness_drift_canary/`.
+
 **Audit privacy and retention.** `audit_full_body` is high-risk logging. Full request/response logs can contain source
 code, file contents, tool results, prompts, and accidentally surfaced secrets. Therefore:
 
@@ -818,8 +900,11 @@ Native-relocate is an experimental spike, not a committed UX until contract test
   via sidecar mode for users who want audit/control without separate proxy lifecycle).
 - Do not silently mutate signed thinking blocks; the mutation-safety invariant in §"Optional Always-On Proxy (Audit and
   Control)" is load-bearing.
-- Do not implement transparent MITM interception, CA injection, binary modification, or credential extraction. Forge
-  proxy inspection requires explicit Forge routing.
+- Do not extract or store credentials, and do not modify the Claude Code binary -- these stay **categorically
+  forbidden**. Transparent MITM interception + CA injection are **deferred and gated, not forbidden** (see "OAuth
+  interactive wire observability -- deferred decision" under "Optional Always-On Proxy"): they are the only mechanism
+  that can observe an OAuth/subscription *interactive* session, but carry account-safety/ToS cost and stay out of scope
+  until both gates clear. App-level proxy inspection still requires explicit Forge routing.
 
 ## Open Questions
 

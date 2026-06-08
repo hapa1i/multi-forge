@@ -726,17 +726,30 @@ clean.
 Tracks Forge-local execution decisions for this checklist. For broader card questions, see
 [`card.md` Open Questions](./card.md#open-questions).
 
+- [x] Should Forge MITM the **interactive OAuth/subscription** session for wire observability (inspect /
+  effort-override)? **Resolved 2026-06-07: deferred + double-gated, not forbidden.** The cost motivation is gone
+  (`metric_evidence_simplification` makes Forge track only its own cost; `payer` stays separate), so MITM's only
+  remaining justification is observability (April-2026 postmortem) -- which carries high, intrinsic account-safety/ToS
+  cost. Gate to build: (a) a recurring harness-degradation incident AND (b) a feasibility spike (OAuth auths
+  in-container; survives MITM incl. token refresh). NOT gated on "wait and see if Anthropic behaves." Full reasoning +
+  mechanism + containment facts recorded in `card.md` ("OAuth interactive wire observability -- deferred decision"); the
+  `card.md` Non-Goal was softened from "never" to "deferred/gated" to match. Cheap ToS-clean alternative spun out to
+  `docs/board/proposed/harness_drift_canary/`. No execution tasks here until the gates clear.
+
 - [x] Should `forge session resume --fresh --review` become default for curated transfer workflows? **Resolved
   2026-05-31: no -- keep `--review` opt-in.** A plain `--fresh` resume launches immediately; `--review` stays an
   explicit flag so non-interactive/scripted resume never blocks on `$EDITOR`. Curation is deliberate. Docs-only, no code
   change.
+
 - [x] Which transfer-owned namespace should the resume-context commands use? **Resolved 2026-05-30: top-level
   `forge transfer ...`** (not `forge session transfer ...`), pairing with `forge memory`. Rationale and free/occupied
   verification are recorded in the Phase 1 namespace task above.
+
 - [x] Should Phase 1 remain prose/schema-only, or should it change the default strategy after schema tests land?
   **Resolved 2026-05-31: prose/schema-only -- keep `structured` as the CLI default.** `ai-curated` stays opt-in via
   `--strategy ai-curated`, keeping the resume hot path deterministic, free, and LLM-free (matches design.md §3.9).
   Docs-only, no code change.
+
 - [x] Where do proxy cost logs, audit logs, and the future usage ledger converge? **Resolved 2026-06-01: they do not
   physically converge -- three separate planes linked by a shared `request_id`.** `costs/requests/*.jsonl` stays the
   cap-enforcement spend log + bootstrap source; `audit/requests/*.jsonl` stays the privacy-sensitive wire record with
@@ -747,6 +760,7 @@ Tracks Forge-local execution decisions for this checklist. For broader card ques
   cost writer (`cost_logger.py:50`) and every audit writer (`audit_logger.py`). Denormalize `cost_micro_usd` into the
   event for greppability while keeping `source_refs` for provenance; native-runtime events (Codex/Gemini) carry units
   directly and leave `source_refs` null.
+
 - [x] How should `FORGE_DEPTH` compose with future run-tree attribution ids? **Resolved 2026-06-01: run identity is
   authoritative; `FORGE_DEPTH` stays an additive integer guard, not reinterpreted.** New env
   `FORGE_RUN_ID`/`FORGE_PARENT_RUN_ID`/`FORGE_ROOT_RUN_ID` (root sets root to its own run_id; children inherit
@@ -755,6 +769,7 @@ Tracks Forge-local execution decisions for this checklist. For broader card ques
   integer -- three recursion guards depend on `>= 2` (`supervisor.py:393`, `team/handlers.py:180`,
   `review/engine.py:145`). Real Phase 4 task: audit that every spawn path (incl. review-engine fan-out, sidecar) stamps
   both at one site.
+
 - [ ] Proxied per-request correlation: how does the attribution id reach the proxy cost/audit plane for `claude -p`
   subprocess traffic, where **Forge is not the HTTP client** (Claude is)? `source_refs.cost_request_id` is exact only on
   the direct `core.llm` path (set/read `X-Request-ID`). Options: **(a)** header propagation -- inject `FORGE_RUN_ID`
@@ -762,6 +777,7 @@ Tracks Forge-local execution decisions for this checklist. For broader card ques
   Claude-Code custom-header feasibility check); **(b)** out-of-band `(run_id, proxy_id, time_window)` correlation
   (inherits today's `estimated=True` snapshot concurrency fragility, `cost_tracking.py:7`). **Sequenced last (Phase 4
   step 4)** -- validate the ledger on native + direct paths first, then resolve this fork as its own slice.
+
 - [ ] On-demand policy CLI runtime origin (4f follow-up, surfaced by review 2026-06-02): the manual `forge policy check`
   (`cli/policy.py` `check`, :519) and `forge policy supervisor` (`supervisor_cmd`, :693) leaf commands tag
   `ActionContext.runtime="claude_code"`, but their actual actor is a human at a terminal, not Claude (synthetic
