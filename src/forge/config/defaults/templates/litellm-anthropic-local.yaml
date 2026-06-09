@@ -6,6 +6,9 @@
 #
 # Backend (LiteLLM on port 4000) starts automatically.
 #
+# Opus tier defaults to Fable 5. Use --model claude-opus-4-8 or
+# --model claude-opus-4-6 to select an Opus alternative instead.
+#
 # Note: If you added ANTHROPIC_API_KEY after the backend started,
 # restart with: forge backend stop litellm-4000
 
@@ -25,9 +28,10 @@ proxy:
     tiers:
       haiku: anthropic/claude-haiku-4-5
       sonnet: anthropic/claude-sonnet-4-6
-      opus: anthropic/claude-opus-4-6
+      opus: anthropic/claude-fable-5
     model_alternatives:
       opus:
         claude-opus-4-8: anthropic/claude-opus-4-8
+        claude-opus-4-6: anthropic/claude-opus-4-6
     prompt_caching: passthrough
     error_hints: true

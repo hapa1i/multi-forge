@@ -62,6 +62,51 @@ class TestGetModelSpec:
             get_model_spec("nonexistent-model")
 
 
+class TestClaudeFable5:
+    """Tests for the claude-fable-5 catalog entry and its aliases."""
+
+    def test_fable_is_canonical(self):
+        """claude-fable-5 exists as a canonical model, not an alias."""
+        catalog = load_model_catalog()
+
+        assert "claude-fable-5" in catalog.models
+        assert "claude-fable-5" not in catalog.aliases
+
+    @pytest.mark.parametrize(
+        "alias",
+        ["anthropic/claude-fable-5", "claude-fable", "fable", "fable-5"],
+    )
+    def test_aliases_resolve_to_fable(self, alias):
+        """Convenience and provider-prefixed aliases resolve to claude-fable-5."""
+        assert resolve_model_id(alias) == "claude-fable-5"
+
+    def test_fable_intrinsic_properties(self):
+        """Fable 5 shares the Opus 4.8 request surface: 1M context, adaptive-only."""
+        spec = get_model_spec("claude-fable-5")
+
+        assert spec.context_window_tokens == 1_000_000
+        assert spec.max_output_tokens == 128_000
+        assert spec.supports_1m_context is True
+        assert spec.supports_top_p is False  # sampling overrides removed
+        assert spec.supports_sampling_overrides is False
+        assert spec.native_thinking_param == "output_config.effort"
+
+    def test_fable_is_not_a_catalog_default(self):
+        """Catalog tier defaults stay on Opus 4.6; Fable is opt-in via template/--model."""
+        catalog = load_model_catalog()
+
+        for provider in ("anthropic", "openrouter"):
+            assert catalog.defaults[provider]["opus"] == "claude-opus-4-6"
+
+    def test_fable_outranks_opus_and_peers_gpt55_pro(self):
+        """Fable tops the ladder with gpt-5.5-pro; Opus 4.8 / gpt-5.5 / Gemini 3.1 are one tier below."""
+        score = lambda m: get_model_spec(m).intelligence_score  # noqa: E731
+
+        assert score("claude-fable-5") == score("gpt-5.5-pro")
+        assert score("claude-fable-5") > score("claude-opus-4-8")
+        assert score("gpt-5.5") == score("claude-opus-4-8") == score("gemini-3.1-pro-preview")
+
+
 class TestGemini31ProPreviewIsCanonical:
     """Tests ensuring gemini-3.1-pro-preview is a canonical model."""
 

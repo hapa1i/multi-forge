@@ -8,7 +8,8 @@
 # `provider: litellm` is only a config slot used for credential and upstream
 # resolution — `wire_shape: anthropic_passthrough` is the authoritative wire truth
 # (GET / reports it). Tiers are informational here; the client's model is forwarded
-# unchanged. Requires ANTHROPIC_API_KEY in .env (or environment).
+# unchanged (so --model claude-fable-5 reaches the API as-is; no model_alternatives
+# remap applies on this wire shape). Requires ANTHROPIC_API_KEY in .env (or environment).
 
 proxy:
   family: anthropic
@@ -26,5 +27,5 @@ proxy:
     tiers:
       haiku: claude-haiku-4-5
       sonnet: claude-sonnet-4-6
-      opus: claude-opus-4-6
+      opus: claude-fable-5
     base_url: "https://api.anthropic.com"

@@ -162,14 +162,15 @@ Models not in Forge's catalog (e.g., `meta-llama/llama-3.1-70b`) work -- the pro
 ## Model alternatives
 
 Anthropic proxy templates (`openrouter-anthropic`, `litellm-anthropic`, `litellm-anthropic-local`) configure user-facing
-`model_alternatives` to support multiple Claude model versions at the same tier. The default opus model is Claude Opus
-4.6; use `--model` to select an alternative:
+`model_alternatives` to support multiple Claude model versions at the same tier. Their opus tier defaults to Claude
+Fable 5, with Opus 4.8 and Opus 4.6 as alternatives. (`anthropic-passthrough` forwards the client's model unchanged, so
+`--model` selects the model directly with no alternatives map.) Use `--model` to select an alternative:
 
 ```bash
-# Default: opus tier routes to Claude Opus 4.6
+# Default: opus tier routes to Claude Fable 5
 forge session start my-session --proxy openrouter-anthropic
 
-# Select Opus 4.8 instead
+# Select an Opus alternative instead (4.8 or 4.6)
 forge session start my-session --proxy openrouter-anthropic --model claude-opus-4-8
 ```
 
@@ -186,10 +187,11 @@ To add or edit alternatives, use `forge proxy edit <proxy_id>`:
 model_alternatives:
   opus:
     claude-opus-4-8: anthropic/claude-opus-4.8
+    claude-opus-4-6: anthropic/claude-opus-4.6
 ```
 
-For per-role guidance on when to pin `--model claude-opus-4-8` vs leave the default 4.6 mapping in place — including the
-supervisor-vs-executor split, the structural reasons MRCR varies across model versions, and per-family cost +
+For per-role guidance on when to pin `--model claude-opus-4-8` vs leave the default Fable 5 mapping in place — including
+the supervisor-vs-executor split, the structural reasons MRCR varies across model versions, and per-family cost +
 multi-needle retrieval data — see [model-selection.md](model-selection.md).
 
 ---

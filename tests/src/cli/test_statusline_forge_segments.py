@@ -319,6 +319,7 @@ class TestDriftProducer:
 
         corpus = [
             "claude-opus-4-8",
+            "claude-fable-5",  # Fable rides the opus tier in both mirrors
             "claude-sonnet-4-5",
             "claude-3-5-haiku-20241022",
             "Claude-OPUS-4",  # case-insensitive
@@ -331,6 +332,12 @@ class TestDriftProducer:
         ]
         for model in corpus:
             assert explicit_tier_from_model(model) == _tier_from_model_name(model), model
+
+    def test_fable_rides_opus_tier(self):
+        # Fable has no tier word of its own; both the model-id and display-name
+        # detectors must classify it as opus (else the status line mis-colors it).
+        assert explicit_tier_from_model("claude-fable-5") == "opus"
+        assert sl.get_tier_from_display_name("Claude Fable 5") == "opus"
 
 
 class TestSpendCapFormat:

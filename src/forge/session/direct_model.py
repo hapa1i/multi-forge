@@ -98,6 +98,10 @@ def token_estimate_multiplier_for_direct_model(value: str | None) -> float:
 
 
 def _claude_tier(canonical_model: str) -> str | None:
+    # Fable has no per-tier name of its own; it is the most-capable model and
+    # rides the opus tier (matching the OpenRouter opus-tier default).
+    if canonical_model.startswith("claude-fable-"):
+        return "opus"
     if canonical_model.startswith("claude-opus-"):
         return "opus"
     if canonical_model.startswith("claude-sonnet-"):

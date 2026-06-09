@@ -202,6 +202,13 @@ def _build_available_models() -> dict[str, ModelSpec]:
             prompt=_CLAUDE_48_BOUNDED_REVIEW_PROMPT,
             prompt_mode="prefix",
         ),
+        "claude-fable": ModelSpec(
+            name="claude-fable",
+            model_id="claude-fable",
+            family="anthropic",
+            provider_refs=(("direct", "claude-fable-5"),),
+            description="Most capable Claude; direct single-shot review and quorum dissent",
+        ),
     }
 
 

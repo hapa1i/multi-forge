@@ -551,6 +551,9 @@ def _tier_from_model_name(model: str) -> str | None:
     for tier in ("haiku", "sonnet", "opus"):
         if tier in name:
             return tier
+    # Fable carries no tier word of its own; it rides the opus tier.
+    if "fable" in name:
+        return "opus"
     return None
 
 
