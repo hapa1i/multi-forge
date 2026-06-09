@@ -40,7 +40,10 @@ from forge.core.reactive.env import (
     get_forge_depth,
     stamp_run_identity,
 )
-from forge.core.runtime.codex_preflight import CodexPreflight, codex_api_key_for_subprocess
+from forge.core.runtime.codex_preflight import (
+    CodexPreflight,
+    codex_api_key_for_subprocess,
+)
 from forge.core.runtime.registry import get_runtime
 
 CodexSandbox = Literal["read-only", "workspace-write", "danger-full-access"]

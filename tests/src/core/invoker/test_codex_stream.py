@@ -80,18 +80,14 @@ class TestReducerRobustness:
 
     def test_malformed_json_line_is_skipped_not_fatal(self) -> None:
         stream = (
-            "not json at all\n"
-            '{"type":"item.completed","item":{"id":"a","type":"agent_message","text":"survived"}}\n'
+            "not json at all\n" '{"type":"item.completed","item":{"id":"a","type":"agent_message","text":"survived"}}\n'
         )
         result = parse_codex_jsonl_stream(stream)
         assert result.final_text == "survived"
         assert result.is_error is False
 
     def test_non_dict_json_line_is_skipped(self) -> None:
-        stream = (
-            "[1, 2, 3]\n"
-            '{"type":"item.completed","item":{"id":"a","type":"agent_message","text":"ok"}}\n'
-        )
+        stream = "[1, 2, 3]\n" '{"type":"item.completed","item":{"id":"a","type":"agent_message","text":"ok"}}\n'
         assert parse_codex_jsonl_stream(stream).final_text == "ok"
 
     def test_empty_stream_is_empty_not_error(self) -> None:

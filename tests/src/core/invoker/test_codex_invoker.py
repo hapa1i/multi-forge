@@ -14,7 +14,12 @@ import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from forge.core.invoker import Attribution, CodexHeadlessInvoker, HeadlessRequest, prepare_codex_request
+from forge.core.invoker import (
+    Attribution,
+    CodexHeadlessInvoker,
+    HeadlessRequest,
+    prepare_codex_request,
+)
 from forge.core.runtime.codex_preflight import CodexPreflight
 
 _FIXTURES = Path(__file__).resolve().parents[3] / "fixtures" / "codex"
@@ -267,9 +272,7 @@ class TestPrepareCodexRequest:
         monkeypatch.setenv("FORGE_RUN_ID", "parent_run")
         monkeypatch.setenv("FORGE_ROOT_RUN_ID", "tree_root")
         monkeypatch.delenv("FORGE_PARENT_RUN_ID", raising=False)
-        req = prepare_codex_request(
-            prompt="hi", preflight=_preflight(), attribution=Attribution(command="bridge")
-        )
+        req = prepare_codex_request(prompt="hi", preflight=_preflight(), attribution=Attribution(command="bridge"))
         # Child gets a fresh run_id, parent == the spawner, root inherited (one run tree).
         assert req.env["FORGE_RUN_ID"] != "parent_run"
         assert req.env["FORGE_PARENT_RUN_ID"] == "parent_run"
@@ -277,7 +280,5 @@ class TestPrepareCodexRequest:
 
     def test_forge_depth_incremented_for_codex_child(self, monkeypatch):
         monkeypatch.setenv("FORGE_DEPTH", "1")
-        req = prepare_codex_request(
-            prompt="hi", preflight=_preflight(), attribution=Attribution(command="bridge")
-        )
+        req = prepare_codex_request(prompt="hi", preflight=_preflight(), attribution=Attribution(command="bridge"))
         assert req.env["FORGE_DEPTH"] == "2"
