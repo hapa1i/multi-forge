@@ -837,27 +837,105 @@ flags explicitly.
     Responses-API, verified vs 0.137.0); `HookSupport` Literal comment generalized; `cli/runtime.py` markup comment
     updated. `design.md` §5.5.5 synced. Tests updated + green: `tests/src/core/runtime/test_registry.py::TestCodexSpec`
     - `tests/src/cli/test_runtime.py` (17 passed); `mypy` clean on changed src.
-  - [ ] (debt, pre-commit) run `make pre-commit` before committing -- `mdformat` re-aligns the capability-matrix cells
-    edited above and validates links/anchors.
+  - [x] (debt, pre-commit) run `make pre-commit` before committing -- `mdformat` re-aligns the capability-matrix cells
+    edited above and validates links/anchors. Cleared 2026-06-08 (Slice 5a; full `make pre-commit` clean).
 
 ### Slice 5a - Codex auth/runtime preflight
 
-- [ ] Build a native-Codex preflight (the card's "Compliance and Auth Preflight" for Codex), run by the launcher before
+**Stage A probe (verified 2026-06-08, codex-cli 0.137.0) -- binary-authoritative facts (sanitized; no raw
+output/secrets/paths):**
+
+- **`codex --version`** -> `codex-cli 0.137.0` (>= 0.131.0 floor; `detect()`/`_probe_version` must parse the
+  `codex-cli <ver>` two-token shape).
+
+- **`codex doctor --json`** -> `schemaVersion: 1`; exited 0 this run (the earlier exit-1 was transient provider
+  reachability) -- "parse stdout regardless of returncode" (B3) stands as defensive coding.
+
+  - `overallStatus: "warning"` **while `auth.credentials.status="ok"`** -- the warning is an unrelated
+    `state.rollout_db_parity` (stale rollout rows), NOT auth. **Empirical proof `overallStatus` must NOT gate `ready`**
+    (B3/B4); it is informational `doctor_status` only.
+  - `auth.credentials.details` uses **string booleans** (`"true"`/`"false"`, not JSON booleans). Confirmed exact field
+    names: `stored API key`, `stored ChatGPT tokens`, `stored agent identity`, `stored auth mode`. Parser MUST compare
+    `== "true"` (a non-empty `"false"` is truthy).
+  - **No hook-trust check exists in `doctor`** (checks are
+    auth/config/git/install/mcp/network/sandbox/state/updates/...; there is no `hooks` check). **RESOLVES the plan's one
+    open unknown:** 5a cannot read per-hook trust from doctor -> 5a never returns `hook_seam="active"`; `unknown` is the
+    honest normal case (B4). (`config.load` lists `hooks` among "enabled feature flags" -- that is enablement, not
+    trust.)
+  - `doctor` reports `auth env vars present: OPENAI_API_KEY` yet `stored API key=false` / `stored auth mode=chatgpt`:
+    confirms an `OPENAI_API_KEY` in env does NOT satisfy Codex auth (the `codex-api` note's "not OPENAI_API_KEY" holds).
+
+- **`codex features list`** (no `--json`) -> columnar `<name> <stability> <bool>`; this machine: `hooks  stable  true`.
+  Stability column can be multi-word (`under development`), so parse by **first token == `hooks`, last token == bool**;
+  match the exact token (a `plugin_hooks  removed  false` row also exists; the `codex_hooks` alias is not present).
+
+- **`codex exec --help`** -> confirms `--sandbox {read-only,workspace-write,danger-full-access}`, `-p/--profile`,
+  `--dangerously-bypass-hook-trust`, and the `exec resume` subcommand for 5b; no `--full-auto` (use sandbox/profile).
+
+- **`codex app-server --help`** -> `--stdio` and `--listen stdio://` (default) are real (the stale-docs case);
+  subcommands `daemon|proxy|generate-ts|generate-json-schema` (5b/Phase 6 input).
+
+- **`codex login status`** -> "Logged in using ChatGPT" (this machine's active auth = `chatgpt_tokens`).
+
+- **Managed config**: neither `$CODEX_HOME/requirements.toml` nor `/etc/codex/requirements.toml` present -> `hook_seam`
+  falls through to `unknown` here (absence is not proof of "not suppressed"; B4).
+
+- **This machine's expected preflight:** installed, `0.137.0`, `version_ok`; `auth_method=chatgpt_tokens` /
+  `auth_source=codex_store` / `billing_mode=subscription_quota`; `ready=True` (no `--proxy`); `hook_seam=unknown`;
+  `proxy_responses=native_direct`; `doctor_status="warning"` (informational only).
+
+- [x] Build a native-Codex preflight (the card's "Compliance and Auth Preflight" for Codex), run by the launcher before
   any `codex exec`. Reads the runtime registry (4e); does the dynamic environment checks the static matrix cannot.
+
   - Assertion: resolves a non-interactive credential (`CODEX_API_KEY` -> device-token -> enterprise token) and **fails
     closed** with setup guidance when none resolves; reports `codex doctor` state; verifies hook **enablement + trust**
     (so the 5d `SessionStart` transfer seam won't silently no-op -- else 5d falls back to an initial message) and
     surfaces `allow_managed_hooks_only` as a capability limitation; blocks only when the proxy cannot serve the
     **Responses API on its Codex-facing endpoint** (a translated chat-completions *backend* does NOT block); tags
     API-key vs ChatGPT-subscription as distinct billing pools.
+  - Verification (2026-06-08): shipped `src/forge/core/runtime/codex_preflight.py` -- frozen `CodexPreflight` contract +
+    `preflight_codex`/`assert_codex_ready` (typed `CodexPreflightError`, mirroring `validate_proxy_startup`) + the
+    non-rendered `codex_api_key_for_subprocess()` (the resolved key value is NEVER a result field -- would leak via
+    `asdict()`/`--json`); the `codex-api` (`CODEX_API_KEY`) credential; and
+    `forge runtime preflight codex [--proxy] [--json]`. Binary-authoritative per the Stage-A note: doctor parsed
+    regardless of exit code, string-boolean details (`== "true"`), `overallStatus` NEVER gates `ready`
+    (`ready = installed AND auth resolved AND not responses-blocked`). **Stage-A-driven honesty deviations from the
+    original assertion:** doctor exposes NO per-hook trust, so 5a verifies hook **enablement** only and `hook_seam`
+    never returns `active` (per-hook-hash trust is a 5d check); the Responses concern is a capability **report** read
+    from an existing proxy's `wire_shape` via `config.loader` (no `forge.proxy` import, no `/v1/responses` route), not
+    an over-blocking guard. Live `forge runtime preflight codex` (0.137.0):
+    `chatgpt_tokens`/`codex_store`/`subscription_quota`, `hook_seam=unknown`, `doctor=warning`, **Ready YES**, exit 0;
+    unknown `--proxy` -> exit 1; non-codex runtime -> exit 2. Tests: 85 focused green (`test_codex_preflight.py`,
+    `test_runtime.py` preflight, `test_capabilities.py` codex-api) + 244 broader (auth/runtime/CLI); mypy + pyright
+    0/0/0 on changed src. No Docker/integration tier (5a spawns nothing).
+  - Review hardening (2026-06-08, 7 findings): (1) `_resolve_responses_posture` catches the loader's
+    `ValueError`/`TypeError` (invalid id / corrupt `proxy.yaml`) -> `proxy_unsupported`, never a traceback (the
+    never-raise contract held); (3) managed-suppression tests monkeypatch `_managed_requirements_paths` (no `/etc`
+    leak); (4) nested `[hooks]` TOML branch covered; (5) version compare pads components (`0.131` meets `0.131.0`); (6)
+    **decision:** stored-auth is PRESENCE-based -- do NOT gate on `auth.credentials.status` (same false-fail-closed risk
+    as overallStatus; validity is proven at 5b), documented + tested; (2) stale credential docs fixed
+    (`authentication.md` + `design_appendix.md`); (7) per-worker doctor cost recorded as the 5b note above.
+  - Design-doc debt (-> 5f): `design.md` §5.5.5 still frames the preflight as a *future* first consumer of the registry;
+    flip it to "shipped" in 5f's comprehensive Phase 5 design sync (the approved plan batches Phase 5 design sync
+    there).
 
-| Test                               | Fixture                                              | Assertion                                                                                                            | Test File                                        |
-| ---------------------------------- | ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
-| No credential -> fail closed       | no `CODEX_API_KEY`, no codex auth                    | blocking error names the 3 setup paths; no `codex exec` spawned                                                      | `tests/src/core/runtime/test_codex_preflight.py` |
-| Managed-hooks suppression surfaced | `requirements.toml` `allow_managed_hooks_only=true`  | preflight reports "Forge hooks ignored" limitation                                                                   | same                                             |
-| Hook seam unavailable -> fallback  | hooks disabled OR transfer hook untrusted/unreviewed | preflight flags the `SessionStart` seam unavailable so 5d uses the initial-message fallback (no silent context loss) | same                                             |
-| Responses-API guard (Codex-facing) | proxy can't serve Responses to Codex                 | blocks; a chat-completions *backend* (translated) does NOT block                                                     | `tests/src/proxy/test_codex_responses_guard.py`  |
-| Billing pool tagged                | API-key vs ChatGPT-subscription                      | `billing_mode` tagged (`api` vs `subscription_quota`)                                                                | unit                                             |
+| Test                                 | Fixture                                                                                 | Assertion                                                                                                                                                   | Test File                                        |
+| ------------------------------------ | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| No credential -> fail closed         | doctor stored apikey/agent/chatgpt all `"false"`; no env token                          | `assert_codex_ready` raises; reason names `CODEX_API_KEY` + `codex login --device-auth` + `CODEX_ACCESS_TOKEN` + `forge auth login -c codex-api`; not ready | `tests/src/core/runtime/test_codex_preflight.py` |
+| Installed is a precondition of ready | `which`->None but `CODEX_API_KEY` in env                                                | `installed`/`ready` False; reason names install (a resolved key alone is not ready)                                                                         | same                                             |
+| Doctor authoritative (env absent)    | doctor stored ChatGPT tokens `"true"`                                                   | ready; `chatgpt_tokens`/`codex_store`/`subscription_quota` (env-only would wrongly fail closed)                                                             | same                                             |
+| Doctor parsed on non-zero exit       | `subprocess.run` returncode=1 + valid JSON stdout                                       | parsed; auth resolves; `doctor_status` captured but does not gate `ready`                                                                                   | same                                             |
+| String-boolean parsing               | detail `stored API key == "false"` (truthy string)                                      | treated as absent, not present                                                                                                                              | same                                             |
+| Billing + auth method                | env `CODEX_API_KEY` / doctor chatgpt / env `CODEX_ACCESS_TOKEN` / doctor agent identity | api_key/api; chatgpt_tokens/subscription_quota; enterprise_token/unknown (x2)                                                                               | same                                             |
+| Credential-store hydration           | `CODEX_API_KEY` only in credential file                                                 | `credential_file`; ready; `codex_api_key_for_subprocess()` returns it; value absent from `asdict(result)`                                                   | same                                             |
+| Managed suppression (explicit only)  | tmp `requirements.toml` `allow_managed_hooks_only=true` / no file                       | `managed_suppressed` (NOT a ready blocker) / not inferred (`unknown`)                                                                                       | same                                             |
+| Hook seam never `active`             | features=false / version `0.130.0` / unparseable version / enabled + doctor trust hint  | disabled / disabled / unknown / unknown                                                                                                                     | same                                             |
+| Responses report                     | proxy `None` / `proxy.yaml` `wire_shape` / unknown id                                   | `native_direct` / `proxy_unsupported` (cites wire_shape) / `proxy_unsupported` ("not found")                                                                | same                                             |
+| CLI                                  | stubbed `preflight_codex`                                                               | `--json` shape (no secret) + exit 0 ready / exit 1 not-ready / unknown runtime exit 2                                                                       | `tests/src/cli/test_runtime.py`                  |
+
+**5b-5f below are PROVISIONAL** (planned from docs, pre-probe). Per the incremental decision, re-plan them in ONE pass
+from the Stage-A probe note above + 5a's shipped contract (`CodexPreflight`, `hook_seam` honesty, Responses-as-report,
+`billing_mode` values) before executing any of them.
 
 ### Slice 5b - CodexHeadlessInvoker (one-shot `codex exec`)
 
@@ -866,6 +944,10 @@ flags explicitly.
   - Assertion: a Codex headless run returns a `HeadlessResult` with parsed usage; fan-out + cancellation parity with
     `ClaudeHeadlessInvoker`; uses explicit `--sandbox`/`--profile` (not the deprecated `--full-auto`); Codex-side
     continuation uses `codex exec resume <SESSION_ID>` (cwd-aware since 0.135.0).
+  - 5a carryover (review 2026-06-08): run `preflight_codex` **once per launch** and pass/cache the `CodexPreflight` (and
+    the `codex_api_key_for_subprocess()` value, when `auth_source in {env, credential_file}`) to the workers -- do NOT
+    call it per worker. `run_doctor=True` is a ~20s ceiling (the full `codex doctor` suite), so a per-worker preflight
+    would multiply that across the fan-out; use `run_doctor=False` for any post-launch re-check.
 
 | Test                            | Fixture                             | Assertion                                                                                                                                                             | Test File                                      |
 | ------------------------------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |

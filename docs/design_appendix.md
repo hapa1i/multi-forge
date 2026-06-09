@@ -138,7 +138,7 @@ Credentials resolve from environment variables first (`.env`, shell exports), th
 store (`~/.forge/credentials.yaml`, managed by `forge auth login`). Env vars override stored credentials unless
 `auth_ignore_env` is set in `~/.forge/config.yaml`.
 
-Five atomic credentials (defined in `forge.core.auth.capabilities`):
+Six atomic credentials (defined in `forge.core.auth.capabilities`):
 
 | Credential       | Env var(s)                                              | Capabilities                                                                    |
 | ---------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------- |
@@ -146,6 +146,7 @@ Five atomic credentials (defined in `forge.core.auth.capabilities`):
 | `anthropic-api`  | `ANTHROPIC_API_KEY`                                     | Forge subprocesses, `litellm-anthropic-local` + `anthropic-passthrough` proxies |
 | `openai-api`     | `OPENAI_API_KEY`                                        | `litellm-openai-local` proxy                                                    |
 | `gemini-api`     | `GEMINI_API_KEY`                                        | `litellm-gemini-local` proxy                                                    |
+| `codex-api`      | `CODEX_API_KEY`                                         | Native Codex headless runs (`codex exec`); not `OPENAI_API_KEY` / ChatGPT login |
 | `litellm-remote` | `LITELLM_API_KEY` + `LITELLM_BASE_URL`                  | All remote `litellm-*` proxy templates                                          |
 
 `auth_ignore_env: true` in runtime config (`~/.forge/config.yaml`) skips all env vars for credential resolution. Both
@@ -174,7 +175,8 @@ format_missing_credential_error(credential, *, missing_vars, template=None,
 
 `credentials_for_template()` bridges `TEMPLATE_ENV_VARS` (template → env var names) to `CREDENTIALS` (credential →
 metadata) via reverse lookup. `format_missing_credential_error()` produces actionable messages with signup URLs,
-`forge auth login` commands, and `not_needed_for` disambiguation (rendered only for `anthropic-api`).
+`forge auth login` commands, and `not_needed_for` disambiguation (rendered for credentials that define it:
+`anthropic-api` and `codex-api`).
 
 ### A.7 Runtime config (§3.6.10 -- `~/.forge/config.yaml`)
 

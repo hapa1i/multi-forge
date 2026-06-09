@@ -27,6 +27,47 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-08
 
+### Phase 5a: Codex auth/runtime preflight (probe-first)
+
+**Goal**: Ship a read-only native-Codex preflight -- run before any `codex exec` -- that resolves a non-interactive
+credential, fails closed with setup guidance, and exposes a stable `CodexPreflight` contract for slices 5b/5c/5d, after
+a live probe of the installed `codex` binary to correct doc-implied assumptions.
+
+**Key changes**:
+
+- **Stage-A probe (codex-cli 0.137.0, binary-authoritative)**: `codex doctor --json` is `schemaVersion: 1` with
+  **string-boolean** auth details (`stored API key`/`stored ChatGPT tokens`/`stored agent identity` =
+  `"true"`/`"false"`), parses a valid report **even on non-zero exit**, and reports `overallStatus="warning"` while auth
+  is fine (so it must NOT gate readiness). It exposes **no per-hook trust** check -- so 5a never claims a trusted hook.
+  Sanitized note in the 5a checklist.
+- **`src/forge/core/runtime/codex_preflight.py`** (render-free core): frozen `CodexPreflight` + `preflight_codex` /
+  `assert_codex_ready` (typed `CodexPreflightError`, mirroring `validate_proxy_startup`). Auth resolution is
+  binary-authoritative: Forge `CODEX_API_KEY` (env/file) -> `CODEX_ACCESS_TOKEN` (env) -> `codex doctor` stored auth ->
+  fail closed. `ready = installed AND auth resolved AND not responses-blocked` -- never `overallStatus`. `hook_seam`
+  never returns `active` (trust is a 5d per-hook-hash check); managed suppression is claimed only on explicit
+  `requirements.toml` evidence. The resolved key value is **never** a result field (would leak via `asdict()`/`--json`);
+  5b reads it via the non-rendered `codex_api_key_for_subprocess()`.
+- **Responses as a report, not a route**: `--proxy <id>` reads an existing proxy's `wire_shape` via
+  `config.loader.load_proxy_instance_config` (lazy import; no `forge.proxy` dependency, no `/v1/responses` route);
+  neither wire shape serves Codex Responses, so a proxied route is `proxy_unsupported` and direct `codex exec` is
+  preferred.
+- **`codex-api` (`CODEX_API_KEY`) credential** added to `CREDENTIALS`; note clarifies it is not OPENAI_API_KEY and not
+  the ChatGPT login (Codex owns its own store).
+- **CLI** `forge runtime preflight codex [--proxy] [--json]`: Rich report; `--json` dumps the secret-free dataclass;
+  exit 1 when not ready.
+- **Review hardening (2026-06-08)**: `_resolve_responses_posture` catches the config loader's `ValueError`/`TypeError`
+  (invalid id / corrupt `proxy.yaml`) -> `proxy_unsupported`, not a traceback (preserves the never-raise contract);
+  version comparison pads components (`0.131` meets the `0.131.0` floor); stored-auth resolution documented as
+  PRESENCE-based (a non-"ok" `auth.credentials.status` does not fail-close -- validity is proven at 5b). Stale
+  credential docs updated (`authentication.md` + `design_appendix.md`: six credentials, `codex-api` row,
+  `not_needed_for` note); managed-suppression tests made fully hermetic + the nested-TOML parser branch covered.
+
+**Verification**: 85 focused tests (`test_codex_preflight.py`, `test_runtime.py` preflight, `test_capabilities.py`
+codex-api) + 244 broader (auth/runtime/CLI) green; mypy + pyright 0/0/0 on changed src. Live
+`forge runtime preflight codex` on 0.137.0: `chatgpt_tokens`/`subscription_quota`, `hook_seam=unknown`,
+`doctor=warning`, **Ready YES**, exit 0 (unknown `--proxy` -> exit 1; non-codex runtime -> exit 2). No
+Docker/integration tier (5a spawns nothing). 5b-5f remain provisional pending a re-plan from the Stage-A findings.
+
 ### Phase 5 planning + Slice 5.0: Codex/Claude runtime-fact corrections
 
 **Goal**: Scope Phase 5 (cross-runtime resume) and, before planning, re-verify the `runtime_abstraction` card's
