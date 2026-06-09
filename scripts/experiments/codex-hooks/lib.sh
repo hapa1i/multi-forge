@@ -169,7 +169,9 @@ run_exec() {
     local stderr_f="$PROBE_CAPTURE_DIR/results/$label.stderr.txt"
     local lm="$PROBE_CAPTURE_DIR/results/$label.last-message.txt"
     note "turn [$label] sandbox=$sandbox"
-    (cd "$PROJ" && with_timeout codex exec --json --sandbox "$sandbox" -o "$lm" "$@" "$prompt") \
+    # </dev/null: the prompt is positional; an ambient pipe would otherwise be
+    # read as an appended <stdin> block ("Reading additional input from stdin...").
+    (cd "$PROJ" && with_timeout codex exec --json --sandbox "$sandbox" -o "$lm" "$@" "$prompt" </dev/null) \
         >"$stream" 2>"$stderr_f"
     local rc=$?
     printf '%s\n' "$rc" >"$PROBE_CAPTURE_DIR/results/$label.exit"

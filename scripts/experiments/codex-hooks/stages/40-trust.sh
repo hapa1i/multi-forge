@@ -77,11 +77,20 @@ EOI
                 } >>"$PROBE_CAPTURE_DIR/meta/sqlite-tables.txt"
             done <"$PROBE_CAPTURE_DIR/meta/sqlite-candidates.txt"
         fi
+        # 40c2: THE ENABLEMENT TEST -- headless re-run in the SAME home right
+        # after interactive review/trust, hook content UNchanged. If this fires
+        # where 40a/40b did not, "enabled" is a per-hook state granted by the
+        # interactive review flow and headless-only environments can never
+        # self-enable (the unifying hypothesis for stage 10/20's zero firings).
+        run_exec 40c2-posttrust read-only 'reply with the single word OK'
+        C2_FIRED="$(count_fired 40-ProjHook)"
+        note "40c2: project hook fired ${C2_FIRED}x total (delta vs 40b = $((C2_FIRED - B_FIRED)))"
+
         # 40d: hash-keying -- change the hook script content, re-run headless.
         echo "# content change to break the hook hash" >>"$PROJ_HOOK"
         run_exec 40d-hash-change read-only 'reply with the single word OK'
         D_FIRED="$(count_fired 40-ProjHook)"
-        note "40d: project hook fired ${D_FIRED}x total (delta vs 40b = $((D_FIRED - B_FIRED)))"
+        note "40d: project hook fired ${D_FIRED}x total (delta vs 40c2 = $((D_FIRED - C2_FIRED)))"
     else
         note "40c/40d SKIPPED by operator"
     fi

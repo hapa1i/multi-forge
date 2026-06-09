@@ -15,13 +15,14 @@ set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 
-HEADLESS_STAGES=(00-preflight 10-headless-fire 20-payloads 30-responses 60-exec-resume 70-bypass)
+HEADLESS_STAGES=(00-preflight 05-config-schema 10-headless-fire 20-payloads 30-responses 60-exec-resume 70-bypass)
 GUIDED_STAGES=(40-trust 50-interactive)
 
 declare_budget() {
     cat <<'EOB'
 Approximate model-turn budget (short, one-word-reply prompts; ChatGPT quota):
   00-preflight      0 turns
+  05-config-schema  0 turns (bogus-model rejections only)
   10-headless-fire  1-2 turns
   20-payloads       2 turns
   30-responses      8 turns
