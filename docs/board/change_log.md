@@ -27,6 +27,43 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-09
 
+### Phase 6: Codex frontend evaluation (probe-only; runtime_abstraction complete)
+
+**Goal**: Evaluate Codex as a Forge frontend runtime -- a reproducible probe + a go/no-go decision record + a follow-up
+build card -- without shipping product code. Closes the last open phase of `runtime_abstraction`.
+
+**Key changes**:
+
+- **Probe harness** `scripts/experiments/codex-hooks/` (mirrors the native-resume precedent): staged `reproduce.sh`,
+  isolated `CODEX_HOME` (auth copied 0600 into a disposable tree), per-label tee/respond hooks, JSON/TOML registration
+  generator, scan-and-fail `sanitize.sh`. Stages 00/05 (preflight + schema, 0 turns), 10 (headless-fire gate), 20
+  (payloads), 30 (responses, moot-headless), 40/50 (trust/interactive -- headless parts + operator-gated TTY steps), 60
+  (exec-resume), 70 (bypass, moot-headless). A capture-dir false-positive bug was found and fixed (probe_init clears the
+  per-stage dir).
+- **Gate finding (codex-cli 0.138.0):** Codex hooks do **NOT** fire under headless `codex exec` -- 0 firings across all
+  4 registration surfaces, with `--dangerously-bypass-hook-trust`, on repeated same-home runs, confirmed by 5
+  independent clean isolated tests. So headless policy enforcement and SessionStart transfer injection are unavailable
+  on `codex exec`; interactive firing is UNVERIFIED (needs a TTY operator session).
+- **Other pinned facts:** `codex exec resume <thread_id>` works and is **cross-CWD** (`--json` composes; `--last`
+  unreliable); payload shape is snake_case as documented; registration validation is shallow (bogus event names load
+  silently); session files at `$CODEX_HOME/sessions/.../rollout-<ts>-<session_id>.jsonl`; `FORGE_SESSION` reaches the
+  model shell.
+- **Go/no-go:** bridge CLI = **GO** (no hook dep; resume verified); SessionStart delivery = **NO-GO headless ->
+  initial-message stays primary** (vindicates the Phase 5 deferral); hook adapter + interactive frontend = **gated on an
+  interactive-firing probe**; app-server = deferred. Build work seeded in `docs/board/proposed/codex_frontend/`.
+- **Registry correction** (`src/forge/core/runtime/registry.py`): the Codex `RuntimeSpec` note read as "hooks work once
+  version-gated"; corrected to state headless `codex exec` does not deliver hooks (interactive unverified). Note prose
+  only; capability values unchanged.
+- **Checklist compaction:** Phase 6 planning pushed the checklist over the 30k-token board hook; Phases 2/3-hardening/4
+  (4a-4f) slice bodies compacted (state + decisions + debt preserved; verification bodies in git history + these
+  entries). 31.2k -> ~25k tokens.
+
+**Verification**: `bash -n` + shellcheck clean on the harness; stages 00/05/10/20/60 + headless 40/50 run green with
+captures; `test_registry.py`/`test_runtime.py` 21 passed + mypy clean after the note edit. Probe spent ~10 short
+ChatGPT-quota turns. No product behavior changed (probe under `scripts/experiments/`, registry note is internal data).
+**`runtime_abstraction` is fully executed (Phases 0-6)**; the `doing/ -> done/` lane move is gated on the merge to
+`main`.
+
 ### Phase 5f: Phase 5 doc sync + `forge transfer` end-user guide (docs-only closeout)
 
 **Goal**: Sync the normative + end-user docs to shipped Phase 5 (Codex headless runtime) behavior and close out Phase 5.

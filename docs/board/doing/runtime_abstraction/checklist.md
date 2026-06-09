@@ -730,11 +730,12 @@ for the **broader hook set** (PreToolUse + PermissionRequest + Stop + UserPrompt
 delivery with initial-message fallback** is the build direction whose trust/`additionalContext` feasibility the probe
 must settle; **app-server transport is deferred, unevaluated** (recorded verbatim, not probed).
 
-- [ ] Evaluate Codex as an interactive frontend runtime.
+- [x] Evaluate Codex as an interactive frontend runtime.
   - Assertion: decision is based on headless invocation, usage accounting, policy semantics, and curated transfer
     results from earlier phases.
-  - Execution: satisfied by the Slice 6.1 decision record (go/no-go table, every verdict citing probe-stage
-    artifacts), not by shipped frontend code.
+  - Execution (2026-06-09): satisfied by the Slice 6.1 decision record (go/no-go table, every verdict citing
+    probe-stage artifacts), not by shipped frontend code. Net: bridge CLI is GO; all hook-dependent deliverables are
+    headless-impossible or gated on unverified interactive firing -> the `codex_frontend` build card.
 
 ### Slice 6.0 - Probe harness (pin the unverified facts)
 
@@ -753,53 +754,106 @@ all -- the gating unknown; (6) interactive management facts (initial-prompt arg,
 session/rollout file location + discoverable session id); (7) `codex exec resume` semantics (`thread_id`, `--json`
 composition, cross-cwd, `--last`); (8) PreToolUse bypass paths (simple/compound shell, apply_patch, optional MCP).
 
-- [ ] Stage 00 preflight (0 turns): version floor + drift stamp, `features list` hooks=true, `CODEX_HOME` isolation
-  verified, `--help` captures.
-- [ ] Stage 10 headless-fire **(gate)**: SessionStart tee on all 4 registration surfaces, one exec turn (+
-  `--dangerously-bypass-hook-trust` retry). Verdict re-routes (not blocks) stages 20/30/70 between headless and
-  guided-interactive: `[FIRES-HEADLESS]` | `[FIRES-HEADLESS-TRUST-GATED]` | `[INTERACTIVE-ONLY]` |
-  `[NO-FIRE-UNCATEGORIZED]`.
-- [ ] Stage 20 payloads (facts 1, 3): tee on all 10 events; one read-only shell turn + one workspace-write
-  (apply_patch) turn.
-- [ ] Stage 30 responses (fact 2): seven sub-probes, each respond-hook + oracle; JSONL stream items are ground truth
-  for what actually ran; 30e magic-token echo is the SessionStart-delivery go/no-go core.
-- [ ] Stage 40 trust (fact 4): fresh `CODEX_HOME` per scenario; operator-guided TTY step for the interactive trust
-  prompt + tree-diff/sqlite discovery of where trust state lives.
-- [ ] Stage 50 interactive (fact 6): operator-guided; `FORGE_SESSION` visibility in hook env, session-file tree-diff,
-  `--ephemeral` negative control.
-- [ ] Stage 60 exec-resume (fact 7): seed -> same-cwd resume (`--json` composition) -> cross-cwd -> `--last`.
-  Hook-independent; feeds the bridge-CLI verdict.
-- [ ] Stage 70 bypass (fact 8): PreToolUse fired-vs-executed per tool path; verdict per path
-  `intercepted | bypassed | not-probed`.
+- [x] Stage 00 preflight (0 turns): codex-cli **0.138.0** (drift-stamped from the 0.137.0 pin), `features list`
+  hooks=true, `CODEX_HOME` isolation verified, `--help` captured.
+- [x] Stage 05 config-schema (0 turns; added during execution): `--strict-config` + bogus-model classifies registration
+  acceptance without a completion. **Refutes the doc-implied "strict registration":** required inner fields ARE
+  validated (a `comand` typo errors "missing field `command`"; unknown top-level keys error), but unknown inner/outer
+  hook-entry fields **and bogus event names** (`[[hooks.NotARealEvent]]`) load **silently** -- a misspelled event never
+  errors.
+- [x] Stage 10 headless-fire **(GATE)**: SessionStart tee on all 4 surfaces, plain exec + `--dangerously-bypass-hook-trust`
+  retry -> **0 firings**. Verdict **`[NO-FIRE-UNCATEGORIZED]` -> confirmed `[INTERACTIVE-ONLY]`** by 5 independent clean
+  controlled runs (see decision record).
+- [x] Stage 20 payloads (facts 1, 3): real read-only + workspace-write turns. A real `SessionStart`/`Stop` payload was
+  captured (snake_case, doc-shape confirmed) but **only via a non-reproducible codex first-run/bootstrap session** --
+  clean isolated turns fire 0. Payload **shape** pinned; reliable headless capture is not available.
+- [~] Stage 30 responses (fact 2): **moot headless** -- a hook that never fires cannot demonstrate a deny/mutate/
+  additionalContext contract. Deferred to an interactive (operator/build-card) probe. Not spent (saved ~8 turns).
+- [x] Stage 40 trust (fact 4): headless sub-steps run; 0 firings even with project `trust_level` set and bypass-trust.
+  The interactive trust-flow + trust-store-location discovery is **operator-gated (TTY)** -> build card.
+- [x] Stage 50 interactive (fact 6): headless sub-steps run. **Pinned:** session/rollout path
+  `$CODEX_HOME/sessions/YYYY/MM/DD/rollout-<ts>-<session_id>.jsonl` (filename embeds the session id); `FORGE_SESSION`
+  reaches the model shell; codex does a first-run plugin-marketplace clone into `$CODEX_HOME/.tmp/plugins`. Interactive
+  initial-prompt arg + interactive hook firing are **operator-gated (TTY)** -> build card.
+- [x] Stage 60 exec-resume (fact 7): **`codex exec resume <thread_id>` works, recalls context, and resumes
+  CROSS-CWD** (unlike Claude's CWD-bound `--resume`); `--json` composes with options before the `resume` subcommand;
+  the id is the stream `thread_id`. `--last` is unreliable headless (spawned a fresh thread). Feeds bridge-CLI = GO.
+- [~] Stage 70 bypass (fact 8): **moot headless** (PreToolUse never fires headless) -> interactive/build-card.
 
-### Slice 6.1 - Fixtures + decision record (+ conditional registry correction)
+### Slice 6.1 - Decision record (+ registry correction)
 
-- [ ] Promote sanitized captures to `tests/fixtures/codex/hooks/` with a README cloning the
-  `tests/fixtures/codex/README.md` provenance structure: one representative payload per event, one per response
-  contract, one resumed `--json` stream. These pin the future adapter's parsers exactly as `exec_json_success.jsonl`
-  pins `parse_codex_jsonl_stream`.
-  - Assertion: `sanitize.sh` secret-scan green; `make pre-commit` (gitleaks) clean.
-- [ ] Write the decision record in this Phase 6 section: dated Stage-A-style block (each bullet marked confirmed-doc /
-  refuted-doc / doc-silent-now-pinned) plus the go/no-go table for (i) hook adapter/responder (broader set), (ii)
-  SessionStart delivery w/ fallback, (iii) one-command bridge CLI (expected trivially-go), (iv) interactive frontend
-  under Forge sessions, (v) app-server (deferred, unevaluated).
-  - Assertion: every verdict cites stage artifacts; no unverified doc-claim survives unmarked.
-- [ ] Conditional registry correction (own commit, only if the binary contradicts declared facts):
-  `src/forge/core/runtime/registry.py` Codex note/comment fields (SessionStart-trust sentence, `curated_transfer_in`
-  comment, `native_resume` "cwd-aware" comment, `pretool_policy` justification). If a readable trust store is found,
-  flag (not fix) the `codex_preflight.py` "doctor exposes no per-hook trust" docstring for the build card.
+- [~] Fixtures to `tests/fixtures/codex/hooks/`: **descoped to the build card.** The only reliably-reproducible
+  artifact headless is the `codex exec resume` stream (≈ the existing `exec_json_success.jsonl` + `thread_id`
+  continuity), and hook **payload** fixtures require firing, which is headless-unavailable -- they must be captured on
+  the interactive path (operator/build-card). The confirmed payload **shape** is recorded below; no raw hook fixtures
+  are committed this phase.
+- [x] Decision record written (below).
+- [x] Registry correction: the binary contradicts the declared facts -- `native_hooks="gated"` + `hook_min_version`
+  read as "hooks work once version-gated," but hooks are enabled + version-OK yet **do not fire headless**. Correct the
+  Codex `RuntimeSpec` note (own commit) to state headless `codex exec` does not deliver hooks (interactive unverified).
+  `codex_preflight.py` "doctor exposes no per-hook trust" docstring is **not** contradicted (no readable trust store was
+  found headless) -- left as-is.
+
+#### Phase 6 probe -- Codex hooks/frontend evaluation (verified 2026-06-09, codex-cli 0.138.0)
+
+**Harness:** `scripts/experiments/codex-hooks/` (`./reproduce.sh`); captures outside the repo. Re-pinned 0.137.0 ->
+**0.138.0** (changelog claims 0.138/0.139 hook-neutral). Markers: confirmed-doc / refuted-doc / doc-silent-now-pinned.
+
+- **(fact 5, GATE -- doc-silent-now-pinned) Headless `codex exec` does NOT deliver hooks.** 0 firings across **5
+  independent clean isolated runs**: 4 registration surfaces (user/project x `config.toml`/`hooks.json`); plain exec,
+  `--dangerously-bypass-hook-trust`, and repeated same-home turns; real turns including one that executed a shell tool.
+  No hook/trust warning on stderr. Two harness stages (40/50) first showed firings -- traced to a stale per-stage
+  capture dir (harness bug, fixed: `probe_init` now clears it) and/or a non-reproducible codex first-run bootstrap
+  session; neither reproduced under isolation. **For Forge: headless hook delivery is not dependable.**
+- **(fact 1 -- confirmed-doc) Payload shape is snake_case as documented.** A real `SessionStart` payload:
+  `{session_id, transcript_path, cwd, hook_event_name, model, permission_mode, source}` with `source:"startup"`;
+  `Stop` carries the same `session_id`. Reliable *capture* needs the interactive path; the shape is pinned.
+- **(fact 3 -- refuted-doc) Registration validation is shallow.** `--strict-config` validates required inner fields
+  (missing `command` errors) and unknown top-level keys, but **silently accepts unknown hook-entry fields and bogus
+  event names** -- a typo'd event (`[[hooks.NotARealEvent]]`) never errors. A Forge installer must validate event names
+  itself.
+- **(fact 7 -- confirmed + refined) `codex exec resume <thread_id>` is solid and CROSS-CWD.** Recalls prior context
+  from a *different* project dir (Claude's `--resume` cannot); `--json` composes (options before the `resume`
+  subcommand); id = stream `thread_id`. `--last` unreliable headless (spawned a fresh thread). Codex-side continuation
+  after the bridge hop is viable by id.
+- **(fact 6 -- partly pinned) Session files + env.** `$CODEX_HOME/sessions/YYYY/MM/DD/rollout-<ts>-<session_id>.jsonl`
+  (filename embeds the session id -> discoverable for a `confirmed` manifest field); `FORGE_SESSION` reaches the model
+  shell; first-run plugin-marketplace clone into `$CODEX_HOME/.tmp/plugins`. Initial-prompt arg + interactive hook
+  firing: **operator-gated (TTY); not verifiable from a non-interactive harness** (`codex` refuses non-TTY stdin; a pty
+  via `script` starts the TUI but it needs real terminal interaction).
+- **(facts 2, 4, 8 -- interactive-gated) Not observable headless.** Response contracts, trust flow + trust-store
+  location, and PreToolUse bypass all require firing hooks; deferred to an interactive operator probe in the build card.
+- **(scope) app-server: not probed -- deferred, unevaluated** (decision 2026-06-09).
+
+**Go/no-go (every verdict cites stages above):**
+
+| # | Deliverable | Verdict | Basis |
+| - | ----------- | ------- | ----- |
+| iii | One-command bridge CLI over `bridge_session_to_codex` | **GO** | No hook dep; `exec resume` incl. cross-CWD verified (60); the core op already ships (Phase 5e) |
+| ii | SessionStart curated-transfer delivery | **NO-GO for the (headless) bridge -> initial-message stays primary, permanently** | Headless hooks never fire (5,10) -- a `codex exec` bridge can't use `additionalContext`. Vindicates the Phase 5 deferral. Interactive frontend *could*, iff (iv) clears |
+| i | Codex hook adapter/responder (policy on Codex) | **NO-GO headless; UNVERIFIED interactive** | Policy on `codex exec` fan-out impossible (5,10,30-moot). Payload->`ActionContext` mapping is shape-ready (1); responder contracts unverified (2 interactive-gated) |
+| iv | Interactive Codex frontend under Forge sessions | **UNVERIFIED -- gated on interactive hook firing** | Requires a TTY operator session (50); folded into the build card as its first gating probe |
+| v | App-server transport | **DEFERRED, unevaluated** | Scope decision 2026-06-09 |
+
+**Net:** the bridge CLI is the one clearly-shippable Phase 6 deliverable; everything hook-dependent is gated on a
+firing capability that `codex exec` lacks on 0.138.0 and that interactive Codex has not been verified to provide. The
+interactive-firing probe + hook-payload fixtures move to the build card (you only need them if you build the interactive
+frontend).
 
 ### Slice 6.2 - Follow-up card + closeout
 
-- [ ] Author `docs/board/proposed/codex_frontend/card.md` seeded with probe facts + fixture paths: (a) Codex hook
-  adapter/responder (broader coverage) + the `ActionContext.runtime -> origin` rename (the adapter is its first
-  consumer; direction resolved 2026-06-09 in Open Decisions), (b) SessionStart delivery with initial-message fallback,
-  (c) one-command bridge CLI over `bridge_session_to_codex`, (d) interactive frontend per the (iv) verdict, (e)
-  app-server as a deferred follow-up, (f) the installer Codex-preset question (13 Claude hook names hardcoded in
-  `src/forge/install/preset.py`; Codex `RuntimeSpec.install_scopes=()`).
-- [ ] Card closeout per board-contract: tick Phase 6 with verification, compact `change_log.md` entry, shadow
-  impl_notes proposals, design-doc check (no shipped behavior changes expected), `git mv` the card `doing/ -> done/`
-  after the final merge to `main`.
+- [x] Authored `docs/board/proposed/codex_frontend/card.md`, seeded with the probe facts: bridge CLI (GO, build first),
+  the interactive-firing gating probe, hook adapter/responder + the `ActionContext.runtime -> origin` rename,
+  SessionStart-with-fallback, interactive frontend, installer Codex support, app-server (deferred).
+- [x] Closeout per board-contract: Phase 6 boxes ticked with verification; `change_log.md` Phase 6 entry added; durable
+  lessons proposed via `.forge/memory/shadow_impl_notes.md` (human-promote gate). **Design-doc check: no design-doc
+  change** -- Phase 6 shipped no product behavior; the only `src/` edit is the `registry.py` Codex *note* correction
+  (internal data, not a design contract), and the harness lives under `scripts/experiments/`.
+  - [ ] `git mv docs/board/doing/runtime_abstraction docs/board/done/` -- **deferred to immediately after the final
+    merge to `main`** (board-contract: move only once merged; matches how Phases 2-5 stayed in `doing/` on-branch).
+
+**Phase 6 complete (2026-06-09) -- the card is fully executed (Phases 0-6).** The lane move to `done/` is the only
+remaining step and is gated on the merge to `main`.
 
 ## Open Decisions
 
