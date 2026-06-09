@@ -55,6 +55,10 @@ probe_init() { # probe_init <stage-name> [--persistent-home]
     export CAPTURE_ROOT
     PROBE_CAPTURE_DIR="$CAPTURE_ROOT/$stage"
     export PROBE_CAPTURE_DIR
+    # Clear prior captures: the per-stage capture dir is persistent across runs,
+    # and stale payloads (from an earlier PROBE_ROOT) otherwise read as this
+    # run's firings -- the false-positive that masked the headless no-fire result.
+    rm -rf "$PROBE_CAPTURE_DIR"
     mkdir -p "$PROBE_CAPTURE_DIR"/{payloads,results,streams,trees,meta,env,guards}
 
     PROBE_ROOT="$(mktemp -d)" || err "mktemp -d failed."
