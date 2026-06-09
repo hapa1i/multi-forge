@@ -159,6 +159,28 @@ class TestTemporaryRunEnv:
         assert os.environ["FORGE_RUN_ID"] == "outer"
         assert os.environ["FORGE_ROOT_RUN_ID"] == "outer_root"
 
+    def test_overlapping_use_raises_and_guard_releases(self) -> None:
+        """os.environ is process-global: overlapping bridge runs must fail loudly (never
+        silently cross-attribute), and the guard must release on both normal exit and
+        exception so sequential runs keep working."""
+        ident = RunIdentity(run_id="run_x", parent_run_id=None, root_run_id="run_x")
+
+        with _temporary_run_env(ident, "sess"):
+            with pytest.raises(RuntimeError, match="already active"):
+                with _temporary_run_env(ident, "sess"):
+                    pass  # pragma: no cover -- entry must raise
+
+        # Released on normal exit: a sequential run works.
+        with _temporary_run_env(ident, "sess"):
+            pass
+
+        # Released after an exception inside the block, too.
+        with pytest.raises(ValueError):
+            with _temporary_run_env(ident, "sess"):
+                raise ValueError("boom")
+        with _temporary_run_env(ident, "sess"):
+            pass
+
 
 # --- bridge_session_to_codex ------------------------------------------------------------
 

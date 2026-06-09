@@ -117,7 +117,7 @@ def test_days_window_excludes_nothing_recent(monkeypatch) -> None:
 
 def test_exact_proxied_cost_renders_without_tilde(monkeypatch) -> None:
     # 4g: a proxied run whose exact cost-plane record supersedes its snapshot renders the
-    # total WITHOUT the `~` estimate marker, and the footnote reports exact-via-run-tree.
+    # total WITHOUT the `~` estimate marker, and the footnote reports no-estimates-mixed-in.
     from forge.proxy.cost_logger import log_request_cost
 
     _patch_resolver(monkeypatch)
@@ -152,4 +152,4 @@ def test_exact_proxied_cost_renders_without_tilde(monkeypatch) -> None:
     assert result.exit_code == 0
     assert "$0.12" in result.output
     assert "~$0.12" not in result.output  # exact -> no estimate marker
-    assert "exact via run-tree join" in result.output
+    assert "no snapshot estimates mixed in" in result.output

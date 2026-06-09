@@ -31,6 +31,7 @@ from forge.session.prev_sessions import (
     notes_has_user_content,
 )
 from forge.session.transfer import (
+    TRANSFER_TARGET_RUNTIMES,
     ResumeStrategy,
     assemble_transfer_context,
     parse_transfer_frontmatter,
@@ -52,9 +53,6 @@ class TransferView:
     has_notes: bool  # whether the child has a non-empty user-notes overlay
     warning: str | None  # frontmatter parse warning (best-effort), if any
     sections: list[dict[str, Any]]  # ordered ATX-heading map: [{"level", "title"}]
-
-
-_TARGET_RUNTIME_CHOICES = ("claude", "codex")
 
 
 @dataclass(frozen=True)
@@ -244,8 +242,8 @@ def regenerate_transfer(
         valid = ", ".join(s.value for s in ResumeStrategy)
         raise ForgeOpError(f"Unknown strategy '{eff_strategy}' (valid: {valid}).") from e
 
-    if eff_target_runtime not in _TARGET_RUNTIME_CHOICES:
-        valid = ", ".join(_TARGET_RUNTIME_CHOICES)
+    if eff_target_runtime not in TRANSFER_TARGET_RUNTIMES:
+        valid = ", ".join(TRANSFER_TARGET_RUNTIMES)
         raise ForgeOpError(f"Unknown target runtime '{eff_target_runtime}' (valid: {valid}).")
 
     manager = SessionManager()

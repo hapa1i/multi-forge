@@ -231,7 +231,8 @@ def sum_reported_cost_by_root(
         if isinstance(run, str):
             out.runs_with_records.add(run)  # presence (dollars or not)
         micros = record.get("cost_micros")
-        if isinstance(micros, int):
+        # bool is an int subclass; a corrupt `cost_micros: true` must not sum as 1.
+        if isinstance(micros, int) and not isinstance(micros, bool):
             out.cost_micros = (out.cost_micros or 0) + micros
             if isinstance(run, str):
                 out.per_run[run] = out.per_run.get(run, 0) + micros

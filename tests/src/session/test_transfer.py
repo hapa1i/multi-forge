@@ -1354,6 +1354,20 @@ class TestTransferFrontmatter:
         # The human-readable body is preserved beneath the frontmatter.
         assert body.lstrip().startswith("# Session Context")
 
+    def test_unknown_target_runtime_rejected(self, tmp_path: Path) -> None:
+        """Internal boundary: assemble validates against TRANSFER_TARGET_RUNTIMES (the
+        single source the ops layer and the CLI Choice also consume)."""
+        with pytest.raises(ValueError, match="Unknown target runtime 'gemini'"):
+            assemble_transfer_context(
+                parent_name="parent",
+                parent_state=self._parent(tmp_path),
+                forge_root=tmp_path,
+                strategy=ResumeStrategy.MINIMAL,
+                depth=1,
+                get_session=lambda _: None,
+                target_runtime="gemini",
+            )
+
     def test_frontmatter_has_no_child_field(self, tmp_path: Path) -> None:
         """A child: field would break the byte-for-byte generated->child copy."""
         result = assemble_transfer_context(
@@ -1467,3 +1481,44 @@ class TestCurationUsageEmission:
         self._run_curation(sample_transcript)
 
         assert [e for e in read_usage_events() if e.command == "transfer-curate"] == []
+
+    def test_parse_failure_still_emits_error_event(
+        self, sample_transcript: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A successful ``.complete()`` whose output is unparseable spent real tokens;
+        the spend is attributed with ``status="error"`` BEFORE the structured fallback
+        (the team-supervisor emit-before-success-gate precedent)."""
+        from unittest.mock import MagicMock, patch
+
+        from forge.core.usage.ledger import read_usage_events
+
+        monkeypatch.setenv("FORGE_RUN_ID", "run_root")
+        monkeypatch.setenv("FORGE_ROOT_RUN_ID", "run_root")
+        monkeypatch.delenv("FORGE_PARENT_RUN_ID", raising=False)
+
+        mock_adapter = MagicMock()
+        mock_adapter.complete.return_value = _fake_completion(
+            "definitely not json", usage={"prompt_tokens": 222, "completion_tokens": 9}
+        )
+        with (
+            patch("forge.core.llm.SyncAdapter", return_value=mock_adapter),
+            patch("forge.core.llm.get_client"),
+        ):
+            _content, warnings, schema = _generate_ai_curated_context(
+                parent_name="p",
+                lineage=["p"],
+                transcript_path=sample_transcript,
+                artifacts_path=None,
+                proxy_template=None,
+                latest_plan_path=None,
+            )
+
+        # The fallback still happens (unusable result), but the spend is not lost.
+        assert schema == "compatibility-fallback"
+        assert any("using structured" in w.lower() for w in warnings)
+        events = [e for e in read_usage_events() if e.command == "transfer-curate"]
+        assert len(events) == 1, events
+        e = events[0]
+        assert e.status == "error"
+        assert e.failure_type == "unparseable_output"
+        assert e.input_tokens == 222  # provider tokens attributed despite the bad output

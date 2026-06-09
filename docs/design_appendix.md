@@ -486,9 +486,9 @@ Enumerations are `Literal`s (provenance is recorded, never inferred):
   `forge_root_run_id`) and label the result `proxy_request_exact`, **suppressing** the snapshot to avoid
   double-counting. Suppression is **per-run-subtree** (the snapshot's own run, or a verb whose direct children produced
   records — derived from worker `parent_run_id`), never whole-root, so a correctly-unstamped sibling sharing the session
-  root keeps its snapshot instead of being silently dropped. A fully cost-plane-exact figure renders **without** the `~`
-  estimate marker (`cost_estimated=False` on the summary/command DTOs); a figure mixing exact dollars with a snapshot
-  estimate keeps `~`.
+  root keeps its snapshot instead of being silently dropped. A figure with no snapshot estimate mixed in — cost-plane
+  exact (4g root-join) and/or runtime-reported (`runtime_native`) — renders **without** the `~` estimate marker
+  (`cost_estimated=False` on the summary/command DTOs); a figure mixing in a snapshot estimate keeps `~`.
 - `billing_mode`: `api` | `subscription_interactive` | `subscription_headless_credit` | `subscription_quota` | `unknown`
   (`unknown` is the honest default where the signal is ambiguous).
 - `attribution_granularity`: `worker` | `verb` | `session`.

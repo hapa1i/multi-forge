@@ -24,6 +24,7 @@ Two deliberate properties:
 from __future__ import annotations
 
 import os
+import threading
 from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -93,6 +94,12 @@ def compose_codex_initial_message(transfer_body: str, task: str) -> str:
     )
 
 
+# Guards _temporary_run_env: os.environ is process-global, so two concurrent bridge
+# runs would cross-contaminate run identities and session attribution. Non-blocking
+# (fail, don't queue) -- a silently serialized bridge would hide the caller's bug.
+_RUN_ENV_LOCK = threading.Lock()
+
+
 @contextmanager
 def _temporary_run_env(identity: RunIdentity, session: str) -> Generator[None, None, None]:
     """Make ``identity`` + ``session`` the ambient run-tree env for the block.
@@ -103,7 +110,18 @@ def _temporary_run_env(identity: RunIdentity, session: str) -> Generator[None, N
     ``codex exec`` run under one root. Saves and restores the prior values -- including
     absence -- on exit, even on exception, so this core op never leaks run identity into
     the rest of the process.
+
+    **Single-use-at-a-time**: ``os.environ`` is process-global state, so concurrent or
+    nested use would attribute one bridge's events to another's run tree. Guarded by a
+    non-blocking lock -- a second concurrent entry raises ``RuntimeError`` instead of
+    silently corrupting attribution. A long-lived surface that wants parallel bridges
+    (Phase 6) must replace this ambient-env contract, not relax the guard.
     """
+    if not _RUN_ENV_LOCK.acquire(blocking=False):
+        raise RuntimeError(
+            "_temporary_run_env is already active in this process; "
+            "bridge runs cannot overlap (run-tree env is process-global)."
+        )
     keys = (FORGE_RUN_ID_VAR, FORGE_ROOT_RUN_ID_VAR, FORGE_PARENT_RUN_ID_VAR, _FORGE_SESSION_VAR)
     saved = {key: os.environ.get(key) for key in keys}
     try:
@@ -113,11 +131,14 @@ def _temporary_run_env(identity: RunIdentity, session: str) -> Generator[None, N
         os.environ[_FORGE_SESSION_VAR] = session
         yield
     finally:
-        for key, value in saved.items():
-            if value is None:
-                os.environ.pop(key, None)
-            else:
-                os.environ[key] = value
+        try:
+            for key, value in saved.items():
+                if value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value
+        finally:
+            _RUN_ENV_LOCK.release()
 
 
 def bridge_session_to_codex(

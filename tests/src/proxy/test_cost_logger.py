@@ -327,6 +327,27 @@ class TestForgeRunCorrelation:
         assert join.runs_with_records == {"run_paid", "run_free"}  # both present
         assert join.per_run == {"run_paid": 70}  # only the dollar-bearing run
 
+    def test_root_join_skips_bool_cost_micros(self, cost_log_dir: Path):
+        """bool is an int subclass: a corrupt ``cost_micros: true`` line must read as
+        presence-without-dollars (like null), never sum as 1 micro."""
+        from forge.proxy.cost_logger import sum_reported_cost_by_root
+
+        self._log(cost_log_dir, root="run_A", run="run_a1", cost=100)
+        # The typed writer cannot produce a bool; append the corrupt line directly.
+        shard = next(cost_log_dir.glob("*.jsonl"))
+        with shard.open("a", encoding="utf-8") as f:
+            corrupt = {
+                "ts": "2099-01-01T00:00:00+00:00",
+                "forge_root_run_id": "run_A",
+                "forge_run_id": "run_a2",
+                "cost_micros": True,
+            }
+            f.write(json.dumps(corrupt) + "\n")
+        join = sum_reported_cost_by_root({"run_A"})
+        assert join.cost_micros == 100  # the bool contributed no dollars
+        assert join.per_run == {"run_a1": 100}
+        assert join.runs_with_records == {"run_a1", "run_a2"}  # presence still counted
+
     def test_root_join_empty_roots_no_disk_read(self, cost_log_dir: Path):
         from forge.proxy.cost_logger import sum_reported_cost_by_root
 

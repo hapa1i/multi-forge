@@ -57,9 +57,10 @@ class CommandUsage:
     output_tokens: int = 0
     cached_tokens: int = 0
     cost_micro_usd: int | None = None  # sum where measured; None if no event carried cost
-    # False only when this command's whole figure is cost-plane-exact (4g root-join, no
-    # verb-snapshot estimate mixed in) -> rendered without the `~` estimate marker. Defaults
-    # True: the safe caveat for hand-built summaries (see SessionActivitySummary.cost_estimated).
+    # False when no verb-snapshot estimate is mixed into this command's figure -- i.e. it
+    # is entirely cost-plane-exact (4g root-join) and/or runtime-reported (runtime_native)
+    # -> rendered without the `~` estimate marker. Defaults True: the safe caveat for
+    # hand-built summaries (see SessionActivitySummary.cost_estimated).
     cost_estimated: bool = True
 
 
@@ -94,10 +95,11 @@ class SessionActivitySummary:
     subagents: int = 0
     # Explicit coverage flags (JSON-friendly) so a sparse summary reads honestly.
     cost_partial: bool = False  # some in-scope events lacked a measured cost
-    # False only when the shown total is entirely cost-plane-exact (4g root-join) with no
-    # verb-snapshot estimate -> rendered without the `~` marker as the exact spend. Defaults
-    # True so a hand-built summary stays honestly approximate until the builder proves exact
-    # (same safe-caveat rationale as session_tagging_partial below).
+    # False when no verb-snapshot estimate is mixed into the shown total -- the figure is
+    # entirely cost-plane-exact (4g root-join) and/or runtime-reported (runtime_native) ->
+    # rendered without the `~` marker. Defaults True so a hand-built summary stays honestly
+    # approximate until the builder proves it (same safe-caveat rationale as
+    # session_tagging_partial below).
     cost_estimated: bool = True
     # Some Forge LLM calls (e.g. the action tagger) never tag a session, so a per-session
     # view can undercount. The builder sets this True only when the session has activity
@@ -170,8 +172,8 @@ def render_summary_line(summary: SessionActivitySummary) -> str | None:
 
     if summary.total_cost_micro_usd is not None:
         # `~` flags the figure as approximate (the aggregate mixes route-reported cost with
-        # verb-snapshot estimates); when the total is entirely cost-plane-exact (4g root-join)
-        # it is dropped. `forge proxy costs show` stays the authoritative view either way.
+        # verb-snapshot estimates); when no snapshot estimate is mixed in (cost-plane-exact
+        # and/or runtime-reported) it is dropped. `forge proxy costs show` stays authoritative.
         prefix = "~" if summary.cost_estimated else ""
         parts.append(f"{prefix}${summary.total_cost_micro_usd / 1_000_000:.2f}")
 

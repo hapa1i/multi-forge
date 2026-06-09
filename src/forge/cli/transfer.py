@@ -31,7 +31,7 @@ from forge.core.ops.transfer import (
     show_transfer,
 )
 from forge.core.paths import display_path
-from forge.session.transfer import ResumeStrategy
+from forge.session.transfer import TRANSFER_TARGET_RUNTIMES, ResumeStrategy
 
 _STRATEGY_CHOICES = [s.value for s in ResumeStrategy]
 
@@ -114,7 +114,7 @@ def show_cmd(parent: str, child: str | None, as_json: bool) -> None:
 @click.option("--depth", type=int, default=None, help="Override lineage depth (default: the cache's current depth).")
 @click.option(
     "--target-runtime",
-    type=click.Choice(["claude", "codex"]),
+    type=click.Choice(list(TRANSFER_TARGET_RUNTIMES)),
     default=None,
     help="Which runtime will consume this context (default: the cache's current target runtime).",
 )

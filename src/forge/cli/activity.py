@@ -144,7 +144,11 @@ def _footnotes(summary: SessionActivitySummary) -> list[str]:
         notes.append("policy decision log is at capacity — older decisions may not be shown")
     if summary.session_tagging_partial:
         notes.append("some calls (e.g. the action tagger) are not session-attributed")
-    evidence = "reported-or-estimated" if summary.cost_estimated else "reported (exact via run-tree join)"
+    # "no snapshot estimates" covers both exact sources: the 4g cost-plane root-join
+    # and runtime-reported (runtime_native) self-reports. A cost-less summary keeps
+    # the generic caveat -- there is no figure to call exact.
+    exact = summary.total_cost_micro_usd is not None and not summary.cost_estimated
+    evidence = "reported (no snapshot estimates mixed in)" if exact else "reported-or-estimated"
     notes.append(f"cost is {evidence}, best-effort; 'forge proxy costs show' is the authoritative spend view")
     return notes
 

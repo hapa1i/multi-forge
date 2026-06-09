@@ -55,6 +55,10 @@ TOOL_RESULT_TRUNCATE_CHARS = 500
 # readers branch. ``target_runtime`` is reserved for Phase 5 cross-runtime tuning.
 TRANSFER_SCHEMA_VERSION = 1
 TRANSFER_TARGET_RUNTIME = "claude"
+# Single source for the valid target runtimes: the ops layer and the CLI Choice both
+# consume this tuple, and assemble_transfer_context validates against it, so a new
+# runtime (e.g. gemini) is added in exactly one place.
+TRANSFER_TARGET_RUNTIMES: tuple[str, ...] = ("claude", "codex")
 
 # AI-curated strategy constants. Use OpenRouter directly for the OSS default path;
 # old remote-LiteLLM deployments still fall back to structured if OpenRouter auth
@@ -650,9 +654,14 @@ def _format_transcript_for_llm(entries: list[dict[str, Any]]) -> tuple[str, bool
 
 @dataclass(frozen=True)
 class _CurationCall:
-    """One curation LLM call: parsed fields plus provenance for usage attribution."""
+    """One curation LLM call: parsed fields plus provenance for usage attribution.
 
-    curated: dict[str, Any]
+    ``curated`` is ``None`` when the LLM responded but its output was unparseable --
+    real spend with no usable result. The call is still returned (not raised) so the
+    caller can attribute the spend with ``status="error"`` before falling back.
+    """
+
+    curated: dict[str, Any] | None
     model_used: str
     usage: dict[str, int] | None
     latency_ms: float
@@ -668,11 +677,13 @@ def _call_llm_for_curation(transcript_text: str) -> _CurationCall:
         A ``_CurationCall``: the parsed fields (``goal``, ``decisions``,
         ``current_state``, ``files``, ``open_questions``) plus the provider ``usage``
         and wall-clock latency, so the caller can attribute this real spend to the
-        usage ledger.
+        usage ledger. Unparseable output returns ``curated=None`` rather than raising
+        -- the tokens were spent and must still reach the ledger (the caller emits
+        with ``status="error"``, then falls back).
 
     Raises:
-        Exception: On any LLM error or unparseable output (caller falls back to
-            a deterministic strategy).
+        Exception: On any LLM/transport error (no response, so nothing measurable
+            to attribute; caller falls back to a deterministic strategy).
     """
     # Lazy import to avoid circular dependencies and startup cost
     import time
@@ -698,9 +709,10 @@ def _call_llm_for_curation(transcript_text: str) -> _CurationCall:
         ),
     )
     latency_ms = (time.monotonic() - start) * 1000
+    # Unparseable output is returned (curated=None), not raised: the .complete() above
+    # spent real tokens, and the caller emits BEFORE the parse gate decides the fallback
+    # (the team-supervisor precedent: failures are attributed, not lost).
     parsed = extract_json_from_response(response.text)
-    if parsed is None:
-        raise ValueError("AI curation did not return a parseable JSON object")
     return _CurationCall(
         curated=parsed,
         model_used=f"{AI_CURATION_MODEL} via {AI_CURATION_PROVIDER}",
@@ -717,17 +729,22 @@ def _emit_curation_usage(call: _CurationCall) -> None:
     ``runtime="forge_cli"`` because this is Forge core invoking ``core.llm``, not Claude
     Code producing an action; the curation model identity is carried in ``model``. The
     cross-runtime bridge sets the run identity + ``FORGE_SESSION`` so the event lands
-    under the bridge's run tree (Slice 5e).
+    under the bridge's run tree (Slice 5e). An unparseable curation (``curated=None``)
+    is emitted as ``status="error"`` -- the spend happened even though the result was
+    unusable.
     """
     import os
 
     from forge.core.usage import emit_direct_llm_usage
 
+    parse_failed = call.curated is None
     emit_direct_llm_usage(
         command="transfer-curate",
         model=AI_CURATION_MODEL,
         provider=AI_CURATION_PROVIDER,
         usage=call.usage,
+        status="error" if parse_failed else "success",
+        failure_type="unparseable_output" if parse_failed else None,
         latency_ms=call.latency_ms,
         session=os.environ.get("FORGE_SESSION"),
         runtime="forge_cli",
@@ -945,10 +962,8 @@ def _generate_ai_curated_context(
     if was_truncated:
         warnings.append("Transcript truncated to fit context limit")
 
-    try:
-        call = _call_llm_for_curation(transcript_text)
-    except Exception as e:
-        logger.warning("AI curation failed: %s, falling back to structured", e)
+    def _structured_fallback(reason: str) -> tuple[str, list[str], str]:
+        logger.warning("AI curation failed: %s, falling back to structured", reason)
         content, struct_warnings = _generate_structured_context(
             parent_name,
             lineage,
@@ -960,12 +975,23 @@ def _generate_ai_curated_context(
         )
         return (
             content,
-            [f"AI curation failed ({e}); using structured strategy"] + struct_warnings,
+            [f"AI curation failed ({reason}); using structured strategy"] + struct_warnings,
             "compatibility-fallback",
         )
 
-    curated, model_used = call.curated, call.model_used
+    try:
+        call = _call_llm_for_curation(transcript_text)
+    except Exception as e:
+        # Transport/LLM error: no response, so there is no spend to attribute.
+        return _structured_fallback(str(e))
+
+    # Emit BEFORE the parse gate: an unparseable response still spent real tokens
+    # (status="error"), matching the team-supervisor emit-before-success-gate precedent.
     _emit_curation_usage(call)
+    if call.curated is None:
+        return _structured_fallback("AI curation did not return a parseable JSON object")
+
+    curated, model_used = call.curated, call.model_used
 
     # Security notice: transcript was sent to LLM provider for processing
     warnings.append(f"AI-curated: transcript content sent to {model_used} for processing")
@@ -1070,6 +1096,10 @@ def assemble_transfer_context(
     Returns:
         TransferResult with the launch-time context file path and metadata.
     """
+    if target_runtime not in TRANSFER_TARGET_RUNTIMES:
+        valid = ", ".join(TRANSFER_TARGET_RUNTIMES)
+        raise ValueError(f"Unknown target runtime '{target_runtime}' (valid: {valid}).")
+
     warnings: list[str] = []
 
     lineage = resolve_lineage(parent_name, depth, get_session)
