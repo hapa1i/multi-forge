@@ -61,9 +61,7 @@ def main() -> int:
             entry: dict = {}
             if matcher is not None:
                 entry["matcher"] = matcher
-            entry["hooks"] = [
-                {"type": "command", "command": command, "timeout": args.timeout}
-            ]
+            entry["hooks"] = [{"type": "command", "command": command, "timeout": args.timeout}]
             hooks.setdefault(event, []).append(entry)
         json.dump({"hooks": hooks}, sys.stdout, indent=2)
         sys.stdout.write("\n")

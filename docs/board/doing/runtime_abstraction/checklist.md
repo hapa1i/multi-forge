@@ -181,11 +181,11 @@ Phase 0 gaps carried forward:
 
 ## Phase 2 - Optional Audit Proxy (compacted 2026-06-09; shipped 2026-05-31 -> 2026-06-01)
 
-Compacted per the board-contract size policy when Phase 6 planning pushed this file over the 30k-token hook. Full
-slice detail (acceptance tables, review-fix lists) lives in git history and the change_log 2026-06-01 "Phase 2:
-optional audit proxy" entry; `design.md` §7.x and `design_appendix.md` §A.11/§A.12 are normative for shipped behavior.
-Sliced OBSERVE-before-MUTATE; two axes kept distinct everywhere: **wire shape** (`openai_translated` |
-`anthropic_passthrough`) and **intercept mode** (`passthrough` | `inspect` | `override`).
+Compacted per the board-contract size policy when Phase 6 planning pushed this file over the 30k-token hook. Full slice
+detail (acceptance tables, review-fix lists) lives in git history and the change_log 2026-06-01 "Phase 2: optional audit
+proxy" entry; `design.md` §7.x and `design_appendix.md` §A.11/§A.12 are normative for shipped behavior. Sliced
+OBSERVE-before-MUTATE; two axes kept distinct everywhere: **wire shape** (`openai_translated` | `anthropic_passthrough`)
+and **intercept mode** (`passthrough` | `inspect` | `override`).
 
 - [x] 2a config schema + loader propagation + `wire_shape` (strict unknown-key rejection; defaults inert).
 - [x] 2b anthropic-passthrough forward path + template (raw body forwarded byte-identical; thinking blocks preserved).
@@ -198,10 +198,9 @@ Sliced OBSERVE-before-MUTATE; two axes kept distinct everywhere: **wire shape** 
   latent entrypoint bugs fixed; sidecar image wired into the canonical test runner).
 - [x] 2f docs + always-on posture + closeout.
 
-Carried-forward debt (unchanged): (a) real-upstream `@slow` passthrough signature-replay e2e (release-validation
-tier); (b) streamed full-body capture stays request-body + response-metadata only; (c) optional shared helper for the
-sidecar `docker run` argv so `tests/integration/sidecar/test_audit_plumbing.py` and `run_sidecar_session` cannot
-drift.
+Carried-forward debt (unchanged): (a) real-upstream `@slow` passthrough signature-replay e2e (release-validation tier);
+(b) streamed full-body capture stays request-body + response-metadata only; (c) optional shared helper for the sidecar
+`docker run` argv so `tests/integration/sidecar/test_audit_plumbing.py` and `run_sidecar_session` cannot drift.
 
 ## Phase 3 - Native-Relocate Spike
 
@@ -255,12 +254,12 @@ split + derivation/GC provenance) is the deferred **Stage C** follow-up (touch p
 
 #### Phase 3 hardening - review fixes (DONE 2026-06-01; compacted 2026-06-09)
 
-10 review issues (5 Medium / 5 Low) verified and fixed; both gates re-run green after the changes (host repro
-`[PASS]`, Docker contract test 23.0s). Durable kernels preserved: the contract test uses an underscore-bearing child
-root so the `encode_project_path` `_`->`-` branch is exercised end-to-end against real Claude; both gates emit
-`[INCONCLUSIVE]` (never `[PASS]`) when no signed thinking block was present -- a clean resume with nothing to
-revalidate is not evidence for signature survival; only `/` `.` `_` are characterized against real Claude -- do not
-broaden the encoding rule without a characterization test. Full per-issue detail in git history.
+10 review issues (5 Medium / 5 Low) verified and fixed; both gates re-run green after the changes (host repro `[PASS]`,
+Docker contract test 23.0s). Durable kernels preserved: the contract test uses an underscore-bearing child root so the
+`encode_project_path` `_`->`-` branch is exercised end-to-end against real Claude; both gates emit `[INCONCLUSIVE]`
+(never `[PASS]`) when no signed thinking block was present -- a clean resume with nothing to revalidate is not evidence
+for signature survival; only `/` `.` `_` are characterized against real Claude -- do not broaden the encoding rule
+without a characterization test. Full per-issue detail in git history.
 
 ### Phase 3 - Deferred follow-ups (parked; land when prioritized)
 
@@ -297,34 +296,38 @@ Compacted per the board-contract size policy. Full slice detail (assertions, ver
 lives in git history and the change_log 2026-06-01 "runtime_abstraction Phase 4 (Slices 4a-4f)" + 2026-06-02 hardening
 entries; `design.md` §3.14/§4.1.4/§4.1.5/§5.5.5 and `design_appendix.md` §A.13/§C.1/§F.5 are normative.
 
-- [x] 4a run-tree env contract: `(FORGE_RUN_ID, FORGE_PARENT_RUN_ID, FORGE_ROOT_RUN_ID)` stamped at the single env
-  choke point, orthogonal to `FORGE_DEPTH` (its three recursion guards unchanged); interactive launches mint a fresh
-  root in `invoke._build_environment`; the queue-decoupled memory writer re-roots under its originating session's
-  snapshotted origin identity.
+- [x] 4a run-tree env contract: `(FORGE_RUN_ID, FORGE_PARENT_RUN_ID, FORGE_ROOT_RUN_ID)` stamped at the single env choke
+  point, orthogonal to `FORGE_DEPTH` (its three recursion guards unchanged); interactive launches mint a fresh root in
+  `invoke._build_environment`; the queue-decoupled memory writer re-roots under its originating session's snapshotted
+  origin identity.
+
 - [x] 4d `HeadlessInvoker` + `ClaudeHeadlessInvoker` (`core/invoker/`): the seam is the **lifecycle, not the routing**
   (requests arrive already-routed); review fan-out moved verbatim behind `run_parallel` (process groups, `os.killpg`
   SIGTERM->SIGKILL, deterministic ordering, SIGTERM-before-executor-join); the 4 single-shot callers keep
-  `run_claude_session`. Per-worker usage events emit here (worker granularity, cost null -- the verb aggregate holds
-  the estimate; events record the actual routed model/provider/proxy_id).
+  `run_claude_session`. Per-worker usage events emit here (worker granularity, cost null -- the verb aggregate holds the
+  estimate; events record the actual routed model/provider/proxy_id).
 
 - [x] 4e runtime registry (`core/runtime/`): frozen `RuntimeSpec` per runtime in a module-level `RUNTIMES` table;
   tri-state capability literals declare Codex/Gemini limits as values, never parity-implying omissions
   (`pretool_policy="partial"`, `native_hooks="gated"` + machine-readable version gate); `forge runtime list [--json]`.
+
 - [x] 4f runtime-tagged `ActionContext` (required `runtime: str`; `PolicyEngine.evaluate` never branches on it --
   attribution metadata, not control flow) + the Claude adapter/responder named behind runtime-neutral
-  `HookAdapter`/`HookResponder` protocols (`src/forge/cli/hooks/protocols.py`); output bytes + exit codes unchanged
-  (77 hook-command snapshot tests untouched); a `CodexHookAdapter`/`CodexHookResponder` is the stub the protocols make
-  room for. Integration: `test_policy_hooks.py` 10/10 through the real wheel CLI.
+  `HookAdapter`/`HookResponder` protocols (`src/forge/cli/hooks/protocols.py`); output bytes + exit codes unchanged (77
+  hook-command snapshot tests untouched); a `CodexHookAdapter`/`CodexHookResponder` is the stub the protocols make room
+  for. Integration: `test_policy_hooks.py` 10/10 through the real wheel CLI.
+
 - [x] 4b durable usage ledger (`~/.forge/usage/events/<month>_<pid>.jsonl`): versioned `UsageEvent`
-  (`schema_version=1`), strict typed reads (unknown field == corruption), PID-sharded, best-effort 0600 writer;
-  modeled on `audit_logger.py`.
-- [x] 4c instrumented emitters: the 4 workflow verbs, memory writer, semantic supervisor, shadow curation, action
-  tagger (exact provider tokens; `X-Request-ID` join when the target is a registered Forge proxy);
-  deferred-by-design: interactive launchers (own concern), native Codex/Gemini (landed Phase 5).
-- [x] Phase 4 hardening (2026-06-02): 4d spawn/register cancellation race fixed (lock-guarded `cleanup_started`;
-  every child reaped by exactly one of cleanup/worker); cancelled workers emit no usage (typed
-  `HeadlessResult.cancelled`); direct-LLM `cached_tokens` copied; the both-or-neither origin-marker contract pinned
-  with a test.
+  (`schema_version=1`), strict typed reads (unknown field == corruption), PID-sharded, best-effort 0600 writer; modeled
+  on `audit_logger.py`.
+
+- [x] 4c instrumented emitters: the 4 workflow verbs, memory writer, semantic supervisor, shadow curation, action tagger
+  (exact provider tokens; `X-Request-ID` join when the target is a registered Forge proxy); deferred-by-design:
+  interactive launchers (own concern), native Codex/Gemini (landed Phase 5).
+
+- [x] Phase 4 hardening (2026-06-02): 4d spawn/register cancellation race fixed (lock-guarded `cleanup_started`; every
+  child reaped by exactly one of cleanup/worker); cancelled workers emit no usage (typed `HeadlessResult.cancelled`);
+  direct-LLM `cached_tokens` copied; the both-or-neither origin-marker contract pinned with a test.
 
 ### Slice 4g - Proxied per-request correlation (exact `claude -p` cost) (2026-06-08)
 
@@ -723,18 +726,18 @@ shipped CLI; the documented `regenerate -> show -> codex exec` path is covered e
 
 **Scope (resolved 2026-06-09; see Open Decisions):** Phase 6 is **evaluation only** -- no product features.
 Deliverables: a reproducible probe harness (`scripts/experiments/codex-hooks/`), sanitized fixtures
-(`tests/fixtures/codex/hooks/`), a Stage-A-style decision record with per-deliverable go/no-go verdicts, and a
-follow-up build card (`docs/board/proposed/codex_frontend/`). The decision record satisfies this phase's evaluate box
-and completes the card (build work moves to the follow-up card). Evaluation coverage decisions: the probe pins facts
-for the **broader hook set** (PreToolUse + PermissionRequest + Stop + UserPromptSubmit); **SessionStart transfer
-delivery with initial-message fallback** is the build direction whose trust/`additionalContext` feasibility the probe
-must settle; **app-server transport is deferred, unevaluated** (recorded verbatim, not probed).
+(`tests/fixtures/codex/hooks/`), a Stage-A-style decision record with per-deliverable go/no-go verdicts, and a follow-up
+build card (`docs/board/proposed/codex_frontend/`). The decision record satisfies this phase's evaluate box and
+completes the card (build work moves to the follow-up card). Evaluation coverage decisions: the probe pins facts for the
+**broader hook set** (PreToolUse + PermissionRequest + Stop + UserPromptSubmit); **SessionStart transfer delivery with
+initial-message fallback** is the build direction whose trust/`additionalContext` feasibility the probe must settle;
+**app-server transport is deferred, unevaluated** (recorded verbatim, not probed).
 
 - [x] Evaluate Codex as an interactive frontend runtime.
   - Assertion: decision is based on headless invocation, usage accounting, policy semantics, and curated transfer
     results from earlier phases.
-  - Execution (2026-06-09): satisfied by the Slice 6.1 decision record (go/no-go table, every verdict citing
-    probe-stage artifacts), not by shipped frontend code. Net: bridge CLI is GO; all hook-dependent deliverables are
+  - Execution (2026-06-09): satisfied by the Slice 6.1 decision record (go/no-go table, every verdict citing probe-stage
+    artifacts), not by shipped frontend code. Net: bridge CLI is GO; all hook-dependent deliverables are
     headless-impossible or gated on unverified interactive firing -> the `codex_frontend` build card.
 
 ### Slice 6.0 - Probe harness (pin the unverified facts)
@@ -742,17 +745,17 @@ must settle; **app-server transport is deferred, unevaluated** (recorded verbati
 Every Phase 6 deliverable rests on facts that are doc-implied or never exercised against the binary. Standing rule
 (5.0/5a precedent): the installed binary is authoritative; docs are leads. Harness mirrors
 `scripts/experiments/native-resume/` (staged `reproduce.sh`, verdict vocabulary, hermetic mktemp root + isolated
-`CODEX_HOME`, auth copied 0600 into the temp tree, loud secret-scan in `sanitize.sh`, cheap one-word-reply turns,
-~18-22 total turns).
+`CODEX_HOME`, auth copied 0600 into the temp tree, loud secret-scan in `sanitize.sh`, cheap one-word-reply turns, ~18-22
+total turns).
 
 Fact groups: (1) hook payload JSON shapes per event; (2) response wire contracts (deny JSON/exit-2, `updatedInput`,
 UserPromptSubmit block -- the `%`-command seam, SessionStart `additionalContext` landing verifiably in model context,
 PermissionRequest `decision.behavior`, Stop block-once, malformed-output fail-closed); (3) registration mechanics
-(user/proj x toml/json surfaces, matchers); (4) trust mechanics (untrusted-skip, project `trust_level` vs
-per-hook-hash, where trust state lives, hash-keying on content change); (5) whether hooks fire under `codex exec` at
-all -- the gating unknown; (6) interactive management facts (initial-prompt arg, `FORGE_SESSION` reaching hooks,
-session/rollout file location + discoverable session id); (7) `codex exec resume` semantics (`thread_id`, `--json`
-composition, cross-cwd, `--last`); (8) PreToolUse bypass paths (simple/compound shell, apply_patch, optional MCP).
+(user/proj x toml/json surfaces, matchers); (4) trust mechanics (untrusted-skip, project `trust_level` vs per-hook-hash,
+where trust state lives, hash-keying on content change); (5) whether hooks fire under `codex exec` at all -- the gating
+unknown; (6) interactive management facts (initial-prompt arg, `FORGE_SESSION` reaching hooks, session/rollout file
+location + discoverable session id); (7) `codex exec resume` semantics (`thread_id`, `--json` composition, cross-cwd,
+`--last`); (8) PreToolUse bypass paths (simple/compound shell, apply_patch, optional MCP).
 
 - [x] Stage 00 preflight (0 turns): codex-cli **0.138.0** (drift-stamped from the 0.137.0 pin), `features list`
   hooks=true, `CODEX_HOME` isolation verified, `--help` captured.
@@ -761,9 +764,9 @@ composition, cross-cwd, `--last`); (8) PreToolUse bypass paths (simple/compound 
   validated (a `comand` typo errors "missing field `command`"; unknown top-level keys error), but unknown inner/outer
   hook-entry fields **and bogus event names** (`[[hooks.NotARealEvent]]`) load **silently** -- a misspelled event never
   errors.
-- [x] Stage 10 headless-fire **(GATE)**: SessionStart tee on all 4 surfaces, plain exec + `--dangerously-bypass-hook-trust`
-  retry -> **0 firings**. Verdict **`[NO-FIRE-UNCATEGORIZED]` -> confirmed `[INTERACTIVE-ONLY]`** by 5 independent clean
-  controlled runs (see decision record).
+- [x] Stage 10 headless-fire **(GATE)**: SessionStart tee on all 4 surfaces, plain exec +
+  `--dangerously-bypass-hook-trust` retry -> **0 firings**. Verdict **`[NO-FIRE-UNCATEGORIZED]` -> confirmed
+  `[INTERACTIVE-ONLY]`** by 5 independent clean controlled runs (see decision record).
 - [x] Stage 20 payloads (facts 1, 3): real read-only + workspace-write turns. A real `SessionStart`/`Stop` payload was
   captured (snake_case, doc-shape confirmed) but **only via a non-reproducible codex first-run/bootstrap session** --
   clean isolated turns fire 0. Payload **shape** pinned; reliable headless capture is not available.
@@ -775,22 +778,22 @@ composition, cross-cwd, `--last`); (8) PreToolUse bypass paths (simple/compound 
   `$CODEX_HOME/sessions/YYYY/MM/DD/rollout-<ts>-<session_id>.jsonl` (filename embeds the session id); `FORGE_SESSION`
   reaches the model shell; codex does a first-run plugin-marketplace clone into `$CODEX_HOME/.tmp/plugins`. Interactive
   initial-prompt arg + interactive hook firing are **operator-gated (TTY)** -> build card.
-- [x] Stage 60 exec-resume (fact 7): **`codex exec resume <thread_id>` works, recalls context, and resumes
-  CROSS-CWD** (unlike Claude's CWD-bound `--resume`); `--json` composes with options before the `resume` subcommand;
-  the id is the stream `thread_id`. `--last` is unreliable headless (spawned a fresh thread). Feeds bridge-CLI = GO.
+- [x] Stage 60 exec-resume (fact 7): **`codex exec resume <thread_id>` works, recalls context, and resumes CROSS-CWD**
+  (unlike Claude's CWD-bound `--resume`); `--json` composes with options before the `resume` subcommand; the id is the
+  stream `thread_id`. `--last` is unreliable headless (spawned a fresh thread). Feeds bridge-CLI = GO.
 - [~] Stage 70 bypass (fact 8): **moot headless** (PreToolUse never fires headless) -> interactive/build-card.
 
 ### Slice 6.1 - Decision record (+ registry correction)
 
-- [~] Fixtures to `tests/fixtures/codex/hooks/`: **descoped to the build card.** The only reliably-reproducible
-  artifact headless is the `codex exec resume` stream (≈ the existing `exec_json_success.jsonl` + `thread_id`
-  continuity), and hook **payload** fixtures require firing, which is headless-unavailable -- they must be captured on
-  the interactive path (operator/build-card). The confirmed payload **shape** is recorded below; no raw hook fixtures
-  are committed this phase.
+- [~] Fixtures to `tests/fixtures/codex/hooks/`: **descoped to the build card.** The only reliably-reproducible artifact
+  headless is the `codex exec resume` stream (≈ the existing `exec_json_success.jsonl` + `thread_id` continuity), and
+  hook **payload** fixtures require firing, which is headless-unavailable -- they must be captured on the interactive
+  path (operator/build-card). The confirmed payload **shape** is recorded below; no raw hook fixtures are committed this
+  phase.
 - [x] Decision record written (below).
-- [x] Registry correction: the binary contradicts the declared facts -- `native_hooks="gated"` + `hook_min_version`
-  read as "hooks work once version-gated," but hooks are enabled + version-OK yet **do not fire headless**. Correct the
-  Codex `RuntimeSpec` note (own commit) to state headless `codex exec` does not deliver hooks (interactive unverified).
+- [x] Registry correction: the binary contradicts the declared facts -- `native_hooks="gated"` + `hook_min_version` read
+  as "hooks work once version-gated," but hooks are enabled + version-OK yet **do not fire headless**. Correct the Codex
+  `RuntimeSpec` note (own commit) to state headless `codex exec` does not deliver hooks (interactive unverified).
   `codex_preflight.py` "doctor exposes no per-hook trust" docstring is **not** contradicted (no readable trust store was
   found headless) -- left as-is.
 
@@ -806,16 +809,16 @@ composition, cross-cwd, `--last`); (8) PreToolUse bypass paths (simple/compound 
   capture dir (harness bug, fixed: `probe_init` now clears it) and/or a non-reproducible codex first-run bootstrap
   session; neither reproduced under isolation. **For Forge: headless hook delivery is not dependable.**
 - **(fact 1 -- confirmed-doc) Payload shape is snake_case as documented.** A real `SessionStart` payload:
-  `{session_id, transcript_path, cwd, hook_event_name, model, permission_mode, source}` with `source:"startup"`;
-  `Stop` carries the same `session_id`. Reliable *capture* needs the interactive path; the shape is pinned.
+  `{session_id, transcript_path, cwd, hook_event_name, model, permission_mode, source}` with `source:"startup"`; `Stop`
+  carries the same `session_id`. Reliable *capture* needs the interactive path; the shape is pinned.
 - **(fact 3 -- refuted-doc) Registration validation is shallow.** `--strict-config` validates required inner fields
   (missing `command` errors) and unknown top-level keys, but **silently accepts unknown hook-entry fields and bogus
   event names** -- a typo'd event (`[[hooks.NotARealEvent]]`) never errors. A Forge installer must validate event names
   itself.
-- **(fact 7 -- confirmed + refined) `codex exec resume <thread_id>` is solid and CROSS-CWD.** Recalls prior context
-  from a *different* project dir (Claude's `--resume` cannot); `--json` composes (options before the `resume`
-  subcommand); id = stream `thread_id`. `--last` unreliable headless (spawned a fresh thread). Codex-side continuation
-  after the bridge hop is viable by id.
+- **(fact 7 -- confirmed + refined) `codex exec resume <thread_id>` is solid and CROSS-CWD.** Recalls prior context from
+  a *different* project dir (Claude's `--resume` cannot); `--json` composes (options before the `resume` subcommand); id
+  = stream `thread_id`. `--last` unreliable headless (spawned a fresh thread). Codex-side continuation after the bridge
+  hop is viable by id.
 - **(fact 6 -- partly pinned) Session files + env.** `$CODEX_HOME/sessions/YYYY/MM/DD/rollout-<ts>-<session_id>.jsonl`
   (filename embeds the session id -> discoverable for a `confirmed` manifest field); `FORGE_SESSION` reaches the model
   shell; first-run plugin-marketplace clone into `$CODEX_HOME/.tmp/plugins`. Initial-prompt arg + interactive hook
@@ -827,16 +830,16 @@ composition, cross-cwd, `--last`); (8) PreToolUse bypass paths (simple/compound 
 
 **Go/no-go (every verdict cites stages above):**
 
-| # | Deliverable | Verdict | Basis |
-| - | ----------- | ------- | ----- |
-| iii | One-command bridge CLI over `bridge_session_to_codex` | **GO** | No hook dep; `exec resume` incl. cross-CWD verified (60); the core op already ships (Phase 5e) |
-| ii | SessionStart curated-transfer delivery | **NO-GO for the (headless) bridge -> initial-message stays primary, permanently** | Headless hooks never fire (5,10) -- a `codex exec` bridge can't use `additionalContext`. Vindicates the Phase 5 deferral. Interactive frontend *could*, iff (iv) clears |
-| i | Codex hook adapter/responder (policy on Codex) | **NO-GO headless; UNVERIFIED interactive** | Policy on `codex exec` fan-out impossible (5,10,30-moot). Payload->`ActionContext` mapping is shape-ready (1); responder contracts unverified (2 interactive-gated) |
-| iv | Interactive Codex frontend under Forge sessions | **UNVERIFIED -- gated on interactive hook firing** | Requires a TTY operator session (50); folded into the build card as its first gating probe |
-| v | App-server transport | **DEFERRED, unevaluated** | Scope decision 2026-06-09 |
+| #   | Deliverable                                           | Verdict                                                                           | Basis                                                                                                                                                                   |
+| --- | ----------------------------------------------------- | --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| iii | One-command bridge CLI over `bridge_session_to_codex` | **GO**                                                                            | No hook dep; `exec resume` incl. cross-CWD verified (60); the core op already ships (Phase 5e)                                                                          |
+| ii  | SessionStart curated-transfer delivery                | **NO-GO for the (headless) bridge -> initial-message stays primary, permanently** | Headless hooks never fire (5,10) -- a `codex exec` bridge can't use `additionalContext`. Vindicates the Phase 5 deferral. Interactive frontend *could*, iff (iv) clears |
+| i   | Codex hook adapter/responder (policy on Codex)        | **NO-GO headless; UNVERIFIED interactive**                                        | Policy on `codex exec` fan-out impossible (5,10,30-moot). Payload->`ActionContext` mapping is shape-ready (1); responder contracts unverified (2 interactive-gated)     |
+| iv  | Interactive Codex frontend under Forge sessions       | **UNVERIFIED -- gated on interactive hook firing**                                | Requires a TTY operator session (50); folded into the build card as its first gating probe                                                                              |
+| v   | App-server transport                                  | **DEFERRED, unevaluated**                                                         | Scope decision 2026-06-09                                                                                                                                               |
 
-**Net:** the bridge CLI is the one clearly-shippable Phase 6 deliverable; everything hook-dependent is gated on a
-firing capability that `codex exec` lacks on 0.138.0 and that interactive Codex has not been verified to provide. The
+**Net:** the bridge CLI is the one clearly-shippable Phase 6 deliverable; everything hook-dependent is gated on a firing
+capability that `codex exec` lacks on 0.138.0 and that interactive Codex has not been verified to provide. The
 interactive-firing probe + hook-payload fixtures move to the build card (you only need them if you build the interactive
 frontend).
 
@@ -866,8 +869,8 @@ Tracks Forge-local execution decisions for this checklist. For broader card ques
   (PreToolUse + PermissionRequest + Stop + UserPromptSubmit), answering the card's "minimum Codex hook coverage" open
   question at the evaluation layer; (3) **SessionStart transfer delivery with initial-message fallback** is the build
   direction -- the probe must pin trust/`additionalContext` feasibility so the build card can implement it (or record
-  "fallback stays primary" if trust is opaque); (4) **app-server transport is deferred, unevaluated** -- recorded in
-  the decision record verbatim, not probed. Build work lands in `docs/board/proposed/codex_frontend/`.
+  "fallback stays primary" if trust is opaque); (4) **app-server transport is deferred, unevaluated** -- recorded in the
+  decision record verbatim, not probed. Build work lands in `docs/board/proposed/codex_frontend/`.
 
 - [x] Should Forge MITM the **interactive OAuth/subscription** session for wire observability (inspect /
   effort-override)? **Resolved 2026-06-07: deferred + double-gated, not forbidden.** The cost motivation is gone

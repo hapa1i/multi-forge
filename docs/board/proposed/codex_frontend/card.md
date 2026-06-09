@@ -21,25 +21,26 @@ From the Phase 6 decision record + `scripts/experiments/codex-hooks/`:
   SessionStart transfer injection are therefore not available on `codex exec`.
 - **`codex exec resume <thread_id>` works and is cross-CWD** (unlike Claude's CWD-bound `--resume`); `--json` composes
   (options before the `resume` subcommand); id = stream `thread_id`; `--last` is unreliable headless.
-- **Hook payload shape is snake_case as documented**: `{session_id, transcript_path, cwd, hook_event_name, model,
-  permission_mode, source}`. Capturing payloads reliably needs the interactive path.
+- **Hook payload shape is snake_case as documented**:
+  `{session_id, transcript_path, cwd, hook_event_name, model, permission_mode, source}`. Capturing payloads reliably
+  needs the interactive path.
 - **Registration validation is shallow**: required inner fields are validated, but unknown fields and **bogus event
   names load silently** -- a Forge installer must validate event names itself.
 - **Session/rollout files**: `$CODEX_HOME/sessions/YYYY/MM/DD/rollout-<ts>-<session_id>.jsonl` (filename embeds the
   session id -- discoverable for a `confirmed` manifest field). `FORGE_SESSION` reaches the model shell. First-run
   plugin-marketplace clone into `$CODEX_HOME/.tmp/plugins`.
-- **Interactive hook firing is UNVERIFIED** -- requires a TTY operator session (`codex` refuses non-TTY stdin; a pty
-  via `script` starts the TUI but it needs real terminal interaction). This is this card's first gating probe.
+- **Interactive hook firing is UNVERIFIED** -- requires a TTY operator session (`codex` refuses non-TTY stdin; a pty via
+  `script` starts the TUI but it needs real terminal interaction). This is this card's first gating probe.
 
 ## Deliverables (verdicts carried from the decision record)
 
-1. **One-command bridge CLI (GO -- build first).** A `forge`-surface frontend over the shipped
-   `bridge_session_to_codex` core op (`core/ops/codex_bridge.py`): e.g. `forge session start --runtime codex
-   --resume-from <claude-session>` (exact shape TBD). No hook dependency. Needs: a `runtime` field on the session
-   manifest (`SessionIntent`/`SessionConfirmed`), a runtime-aware dispatch in the launcher (today hard-wired to
-   `invoke_claude`), and recording the Codex `thread_id` (resume id) + rollout path into `confirmed`. Use
-   `codex exec resume <thread_id>` for multi-turn continuation. Also: GC the synthetic `<parent>-codex-<suffix>`
-   transfer children the bridge accumulates (recorded debt from Phase 5e).
+1. **One-command bridge CLI (GO -- build first).** A `forge`-surface frontend over the shipped `bridge_session_to_codex`
+   core op (`core/ops/codex_bridge.py`): e.g. `forge session start --runtime codex --resume-from <claude-session>`
+   (exact shape TBD). No hook dependency. Needs: a `runtime` field on the session manifest
+   (`SessionIntent`/`SessionConfirmed`), a runtime-aware dispatch in the launcher (today hard-wired to `invoke_claude`),
+   and recording the Codex `thread_id` (resume id) + rollout path into `confirmed`. Use `codex exec resume <thread_id>`
+   for multi-turn continuation. Also: GC the synthetic `<parent>-codex-<suffix>` transfer children the bridge
+   accumulates (recorded debt from Phase 5e).
 
 2. **First gating probe: interactive hook firing.** Run `scripts/experiments/codex-hooks/` stages 40 + 50 from a real
    terminal (the operator-guided steps) to settle: do hooks fire in interactive `codex`? where does trust state live?
@@ -57,8 +58,9 @@ From the Phase 6 decision record + `scripts/experiments/codex-hooks/`:
    `pretool_policy="partial"`; headless `codex exec` workers get **no** policy (registry note).
 
 4. **SessionStart curated-transfer delivery with initial-message fallback (gated on probe 2).** Only meaningful for an
-   interactive frontend -- the headless bridge stays initial-message permanently. Build only if (2) confirms SessionStart
-   `additionalContext` fires + lands in model context (the harness's 30e magic-token oracle, re-run interactively).
+   interactive frontend -- the headless bridge stays initial-message permanently. Build only if (2) confirms
+   SessionStart `additionalContext` fires + lands in model context (the harness's 30e magic-token oracle, re-run
+   interactively).
 
 5. **Interactive Codex frontend (gated on probe 2).** Forge-managed interactive `codex` sessions: `install_scopes` for
    Codex config (today `()` on the RuntimeSpec), flip `interactive="beta" -> ...`, FORGE_SESSION wiring (reaches the
