@@ -648,38 +648,90 @@ def _format_transcript_for_llm(entries: list[dict[str, Any]]) -> tuple[str, bool
     return result, was_truncated, emitted_turns
 
 
-def _call_llm_for_curation(transcript_text: str) -> tuple[dict[str, Any], str]:
+@dataclass(frozen=True)
+class _CurationCall:
+    """One curation LLM call: parsed fields plus provenance for usage attribution."""
+
+    curated: dict[str, Any]
+    model_used: str
+    usage: dict[str, int] | None
+    latency_ms: float
+
+
+def _call_llm_for_curation(transcript_text: str) -> _CurationCall:
     """Call the curation LLM and parse its structured JSON response.
 
     Args:
         transcript_text: Formatted transcript text (already bounded, turn-anchored).
 
     Returns:
-        Tuple of (curated_fields, model_used). ``curated_fields`` has keys
-        ``goal``, ``decisions``, ``current_state``, ``files``, ``open_questions``.
+        A ``_CurationCall``: the parsed fields (``goal``, ``decisions``,
+        ``current_state``, ``files``, ``open_questions``) plus the provider ``usage``
+        and wall-clock latency, so the caller can attribute this real spend to the
+        usage ledger.
 
     Raises:
         Exception: On any LLM error or unparseable output (caller falls back to
             a deterministic strategy).
     """
     # Lazy import to avoid circular dependencies and startup cost
-    from forge.core.llm import SyncAdapter, get_client
+    import time
+
+    from forge.core.llm import Message, SyncAdapter, get_client
     from forge.core.llm.types import ModelHyperparameters
     from forge.core.reactive.structured_output import extract_json_from_response
 
     client = SyncAdapter(get_client(AI_CURATION_MODEL, provider=AI_CURATION_PROVIDER))
-    response = client.ask(
-        prompt=AI_CURATION_USER_PROMPT_TEMPLATE.format(transcript_text=transcript_text),
-        system=AI_CURATION_SYSTEM_PROMPT,
+    # .complete (not .ask) so the provider's in-band token usage is captured for
+    # ledger attribution; .ask returns text only. Same two-message shape .ask builds
+    # internally, so model input is unchanged. Mirrors core/reactive/tagger.py.
+    messages = [
+        Message(role="system", content=AI_CURATION_SYSTEM_PROMPT),
+        Message(role="user", content=AI_CURATION_USER_PROMPT_TEMPLATE.format(transcript_text=transcript_text)),
+    ]
+    start = time.monotonic()
+    response = client.complete(
+        messages,
         hyperparams=ModelHyperparameters(
             max_tokens=AI_CURATION_MAX_OUTPUT_TOKENS,
             temperature=AI_CURATION_TEMPERATURE,
         ),
     )
-    parsed = extract_json_from_response(response)
+    latency_ms = (time.monotonic() - start) * 1000
+    parsed = extract_json_from_response(response.text)
     if parsed is None:
         raise ValueError("AI curation did not return a parseable JSON object")
-    return parsed, f"{AI_CURATION_MODEL} via {AI_CURATION_PROVIDER}"
+    return _CurationCall(
+        curated=parsed,
+        model_used=f"{AI_CURATION_MODEL} via {AI_CURATION_PROVIDER}",
+        usage=response.usage,
+        latency_ms=latency_ms,
+    )
+
+
+def _emit_curation_usage(call: _CurationCall) -> None:
+    """Attribute the ai-curated transfer's ``core.llm`` call to the usage ledger.
+
+    Best-effort, and no-ops without an ambient run identity -- a normal
+    ``resume --fresh --strategy ai-curated`` outside a Forge run tree stays silent.
+    ``runtime="forge_cli"`` because this is Forge core invoking ``core.llm``, not Claude
+    Code producing an action; the curation model identity is carried in ``model``. The
+    cross-runtime bridge sets the run identity + ``FORGE_SESSION`` so the event lands
+    under the bridge's run tree (Slice 5e).
+    """
+    import os
+
+    from forge.core.usage import emit_direct_llm_usage
+
+    emit_direct_llm_usage(
+        command="transfer-curate",
+        model=AI_CURATION_MODEL,
+        provider=AI_CURATION_PROVIDER,
+        usage=call.usage,
+        latency_ms=call.latency_ms,
+        session=os.environ.get("FORGE_SESSION"),
+        runtime="forge_cli",
+    )
 
 
 def _coerce_text(value: Any) -> str:
@@ -894,7 +946,7 @@ def _generate_ai_curated_context(
         warnings.append("Transcript truncated to fit context limit")
 
     try:
-        curated, model_used = _call_llm_for_curation(transcript_text)
+        call = _call_llm_for_curation(transcript_text)
     except Exception as e:
         logger.warning("AI curation failed: %s, falling back to structured", e)
         content, struct_warnings = _generate_structured_context(
@@ -911,6 +963,9 @@ def _generate_ai_curated_context(
             [f"AI curation failed ({e}); using structured strategy"] + struct_warnings,
             "compatibility-fallback",
         )
+
+    curated, model_used = call.curated, call.model_used
+    _emit_curation_usage(call)
 
     # Security notice: transcript was sent to LLM provider for processing
     warnings.append(f"AI-curated: transcript content sent to {model_used} for processing")

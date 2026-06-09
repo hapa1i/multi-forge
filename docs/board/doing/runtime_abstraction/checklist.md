@@ -774,15 +774,15 @@ ids; no credential extraction; interactive OAuth session untouched). The deferre
 
 ## Phase 5 - Cross-Runtime Resume
 
-**Status (2026-06-08): build group shipped (5.0, 5a, 5b, 5c, 5d). 5e (demo) + 5f (end-user docs + Phase 6 record)
-remain.** Two adversarially-verified research sweeps re-pinned the external tools and corrected stale card assumptions
-before scoping (verdict below). **Decided:** one-shot `codex exec` transport (the app-server transport is a deferred
-follow-up, tracked under 5b). The cross-runtime hop is **curated transfer** (reasoning signatures are non-portable --
-confirmed); Codex-side continuation after the hop can use `codex exec resume`. Goal: run Codex as a first-class headless
-runtime and demonstrate "plan in Claude -> implement in Codex" with correct auth preflight and usage attribution.
-Depends on shipped Phase 4 seams (`HeadlessInvoker`/`run_parallel` 4d, runtime registry 4e, usage ledger + reserved
-`codex_exec`/`codex_jsonl`/`runtime_native` literals 4b/4c, run-tree env 4a/4g) and the Phase 1 transfer schema
-(`target_runtime` reserved).
+**Status (2026-06-09): build group + bridge shipped (5.0, 5a, 5b, 5c, 5d, 5e). 5f (design/end-user doc sync + Phase 6
+record) remains.** Two adversarially-verified research sweeps re-pinned the external tools and corrected stale card
+assumptions before scoping (verdict below). **Decided:** one-shot `codex exec` transport (the app-server transport is a
+deferred follow-up, tracked under 5b). The cross-runtime hop is **curated transfer** (reasoning signatures are
+non-portable -- confirmed); Codex-side continuation after the hop can use `codex exec resume`. Goal: run Codex as a
+first-class headless runtime and demonstrate "plan in Claude -> implement in Codex" with correct auth preflight and
+usage attribution. Depends on shipped Phase 4 seams (`HeadlessInvoker`/`run_parallel` 4d, runtime registry 4e, usage
+ledger + reserved `codex_exec`/`codex_jsonl`/`runtime_native` literals 4b/4c, run-tree env 4a/4g) and the Phase 1
+transfer schema (`target_runtime` reserved).
 
 ### Research verdict (verified 2026-06-08; every claim re-fetched from official docs/changelogs)
 
@@ -934,9 +934,9 @@ output/secrets/paths):**
 | Responses report                     | proxy `None` / `proxy.yaml` `wire_shape` / unknown id                                   | `native_direct` / `proxy_unsupported` (cites wire_shape) / `proxy_unsupported` ("not found")                                                                | same                                             |
 | CLI                                  | stubbed `preflight_codex`                                                               | `--json` shape (no secret) + exit 0 ready / exit 1 not-ready / unknown runtime exit 2                                                                       | `tests/src/cli/test_runtime.py`                  |
 
-**5b-5d shipped (2026-06-08); 5e-5f remain PROVISIONAL** (planned, pre-demo). The build group was executed probe-first
-from the approved plan: a real `codex exec --json` run pins the parser, then parser -> shared lifecycle -> invoker ->
-emitter -> transfer relabel.
+**5b-5e shipped; 5f remains** (design/end-user doc sync + Phase 6 record). The build group was executed probe-first from
+the approved plan: a real `codex exec --json` run pins the parser, then parser -> shared lifecycle -> invoker -> emitter
+-> transfer relabel; 5e composes them into the Claude->Codex bridge under one run tree.
 
 **Resolved decisions (baked into shipped code):**
 
@@ -945,9 +945,10 @@ emitter -> transfer relabel.
   branch `_direct_cost_provenance`.
 - **5d depth = minimal relabel** (frontmatter `target_runtime` + `## Runtime Hints` body). The curated body stays
   Claude-worded; curation-prompt tuning is a follow-up.
-- **SessionStart-hook delivery -> Phase 6.** `hook_seam` can't confirm per-hook trust (5a), so the curated transfer will
-  be delivered as the **initial `codex exec` message** (prepended to the prompt) rather than a SessionStart
-  additionalContext hook. 5b/5d ship the request-builder + relabel; the prompt-composition seam is **5e**.
+- **SessionStart-hook delivery -> Phase 6.** `hook_seam` can't confirm per-hook trust (5a), so the curated transfer is
+  delivered as the **initial `codex exec` message** (prepended to the prompt) rather than a SessionStart
+  additionalContext hook. 5b/5d ship the request-builder + relabel; the prompt-composition seam shipped in **5e**
+  (`core/ops/codex_bridge.py::compose_codex_initial_message`).
 
 ### Slice 5b - CodexHeadlessInvoker (one-shot `codex exec`) (DONE 2026-06-08)
 
@@ -1013,17 +1014,42 @@ touch the plan scheduled at the build-group tail): `design.md` §5.5.5 (shared `
 (native Codex `runtime_native` emitter), §3.9 (`target_runtime` relabel + initial-message delivery; SessionStart ->
 Phase 6). This resolves 5a's deferred §5.5.5 "future" note; 5f's remaining scope is the end-user guide + Phase 6 record.
 
-### Slice 5e - Claude->Codex resume demo (the payoff)
+### Slice 5e - Claude->Codex resume bridge (the payoff) (DONE 2026-06-09)
 
-- [ ] End-to-end: plan in Claude -> `assemble_transfer_context --target-runtime codex` -> `CodexHeadlessInvoker`
-  launches Codex with the transfer injected at `SessionStart` -> Codex implements; usage attributed across one run tree.
-  - Assertion: a documented workflow demonstrates plan-in-Claude / implement-in-Codex via curated transfer; the hop uses
-    **curated transfer** (signatures non-portable); `forge activity` shows both sides under one run tree.
+Scope (planning Q&A): UI-agnostic **core-ops function** only -- the user-facing `--runtime codex` frontend is Phase 6;
+drive the demo with `--strategy ai-curated` and **instrument the transfer curation** to emit the non-Codex side of the
+run tree; the end-user demo doc is **deferred to 5f**.
 
-| Test        | Fixture                                           | Assertion                                                                         | Test File                                              |
-| ----------- | ------------------------------------------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| E2E hop     | real `codex` if available (else recorded fixture) | Codex completes the handed-off task; curated transfer was the only context bridge | `tests/integration/.../test_claude_to_codex_resume.py` |
-| Attribution | the demo run                                      | `forge activity` attributes Claude + Codex work to one run tree                   | integration                                            |
+- [x] `core/ops/codex_bridge.py::bridge_session_to_codex`: parent session -> ai-curated transfer
+  (`target_runtime=codex`) -> transfer body **prepended to the `codex exec` prompt** (initial-message delivery, _not_ a
+  `SessionStart` hook -- per-hook trust is unconfirmable, 5a) -> `CodexHeadlessInvoker().run` -> Codex implements;
+  curation + codex events attributed across **one run tree**.
+  - Assertion: the hop uses **curated transfer** (signatures non-portable); a fresh root minted via
+    `new_root_run_identity()` and set into `os.environ` for the block is what places both the curation `core.llm` call
+    and the `codex exec` run under one root; `read_usage_events(root_run_id=...)` + `build_session_activity_summary`
+    show both sides, same session.
+- [x] Part A: transfer curation now emits a usage event (`.ask`->`.complete` to capture in-band tokens; `route=core_llm`
+  / `runtime=forge_cli` / `command=transfer-curate`). General gap-fix: no-ops without an ambient run identity, so a
+  normal `resume --strategy ai-curated` outside a run tree stays silent.
+
+| Test                            | Fixture                                                    | Assertion                                                                                                                                                                            | Test File                                               |
+| ------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------- |
+| Bridge orchestration (hermetic) | mock curation `.complete` + Codex `Popen` (success stream) | per-run child key; frontmatter `target_runtime: codex`; `read_usage_events(root)` -> exactly one `core_llm`/`forge_cli` + one `codex_exec`, same root+session; `os.environ` restored | `tests/src/core/ops/test_codex_bridge.py`               |
+| Seam + env manager              | unit                                                       | `compose_codex_initial_message` body precedes task, Codex framing, no frontmatter; `_temporary_run_env` sets root+session, scrubs parent, restores on exception                      | same                                                    |
+| Curation emits under run tree   | run identity set vs unset                                  | one `core_llm`/`forge_cli` event with identity; none without                                                                                                                         | `tests/src/session/test_transfer.py`                    |
+| Real-codex E2E (`@slow`)        | real `codex`; curation mocked at `_call_llm_for_curation`  | real `codex exec` consumes the curated-transfer prompt + completes; both events under one root; activity summary shows both                                                          | `tests/integration/core/test_claude_to_codex_resume.py` |
+
+**Verification (2026-06-09):** hermetic + transfer + codex-emit suites pass (99); real-codex E2E green (~8s, real
+`codex 0.137.0` chatgpt_tokens); 5b smoke regression green (~5s); `mypy` clean (changed src); `make pre-commit` clean.
+
+**Deferred to 5f (design-sync debt):** `design.md` §3.9 (Codex **initial-message** delivery via the bridge), §3.14
+(transfer curation now emits a `core_llm`/`forge_cli` usage event), §5.5.5 (the bridge composes preflight + invoker);
+the end-user cross-runtime workflow doc. No CLI command and no `SessionStart`-hook delivery (both Phase 6).
+
+**Minor follow-up (non-blocking):** each bridge run writes a synthetic `<parent>-codex-<run-suffix>` child under
+`prev_sessions/<parent>/children/` with no backing child session; these accumulate. A namespacing/GC pass can land later
+(out of 5e scope). The action tagger's pre-existing `emit_direct_llm_usage` default `runtime="claude_code"` is unchanged
+here; reconciling it with `forge_cli` for `core.llm` calls is also out of scope.
 
 ### Slice 5f - Design/end-user doc sync + Phase 6 re-scope (record)
 
@@ -1131,14 +1157,31 @@ Tracks Forge-local execution decisions for this checklist. For broader card ques
   MITM** tier is unrelated and stays deferred (resolved above): 4g touches only Forge's own headless subprocesses
   through Forge's own proxy with opaque non-secret run ids — ToS-clean, no credential extraction.
 
-- [ ] On-demand policy CLI runtime origin (4f follow-up, surfaced by review 2026-06-02): the manual `forge policy check`
+- [x] On-demand policy CLI runtime origin (4f follow-up, surfaced by review 2026-06-02): the manual `forge policy check`
   (`cli/policy.py` `check`, :519) and `forge policy supervisor` (`supervisor_cmd`, :693) leaf commands tag
   `ActionContext.runtime="claude_code"`, but their actual actor is a human at a terminal, not Claude (synthetic
   `session_name="on-demand"`, no session). 4f's contract is "which runtime *produced* the action" -- the file under
   review may be Claude's output, but that is the check's *subject*, not its *invoker*. **Inert today**: nothing reads
-  `ActionContext.runtime` (the engine ignores it; it does not flow to the usage ledger, whose emit helpers take a
-  separate `runtime` param), so no behavior is wrong yet. The `%policy check` path
-  (`direct_commands.py:_handle_policy_check`, :1173) is **genuinely Claude-context** (a UserPromptSubmit `%`-command)
-  and correctly stays `claude_code` -- only the two CLI leaves are the over-claim. **Phase 5/6 decision** (when a
-  consumer first reads `runtime`): give the manual CLI checks a distinct origin -- prefer `forge_cli` (the actor is
-  known) over `unknown` (reserve that for genuinely-undeterminable payloads).
+  `ActionContext.runtime` (`policy/types.py:57` is a plain `str`, no `Literal`/registry validation; the engine ignores
+  it; it does not flow to the usage ledger, whose emit helpers take a separate `runtime` param), so no behavior is wrong
+  yet. The `%policy check` path (`direct_commands.py:_handle_policy_check`, :1173) is **genuinely Claude-context** (a
+  UserPromptSubmit `%`-command) and correctly stays `claude_code` -- only the two CLI leaves are the over-claim.
+
+  - **Resolved 2026-06-09 (direction; execution gated on first consumer):** the field is the event's *origin* (the
+    runtime that produced the action), not the subject under review. The manual CLI checks get a distinct origin --
+    `forge_cli`, **not** `unknown` (the actor is known; reserve `unknown` for genuinely-undeterminable/lossy payloads).
+  - **Rename `ActionContext.runtime` -> `origin`** when this lands, rather than overloading the name `runtime` with a
+    widened domain. The latent footgun is the *name*: it invites a future `get_runtime(ctx.runtime)` bridge, which
+    raises `ValueError` for any non-registry value (`core/runtime/registry.py:213`). A field named `origin` with values
+    `{forge_cli, claude_code, codex, ...}` simply does not invite that lookup; `runtime` does.
+  - **No `subject_runtime` axis (YAGNI, structural not just "not now"):** `PolicyEngine.evaluate` is runtime-agnostic by
+    contract and policies match on **content** (`new_content`/`raw_diff`), so the subject's runtime is never an
+    evaluation input; the field's only purpose is attribution, and an attribution fact about *a check* is its invoker,
+    not who authored the file. The split has no consumer on either side. (Prior art that validates the *origin* axis
+    while bounding it to one field: the usage ledger already separates `UsageEvent.runtime` = which agent from `route` =
+    invocation channel -- `core/usage/{ledger.py:111,vocabulary.py:23}`.)
+  - **Doc nit to fix with the rename:** the `ActionContext.runtime` docstring claims it "flows into attribution," but it
+    does not reach the ledger yet (the emit helpers take a separate `runtime` param) -- correct the docstring when the
+    consumer lands.
+  - **Trigger:** execute only when a consumer first reads the field (Phase 5/6). Pure churn before then -- the field is
+    wired through 4 production constructors + ~45 test constructions with zero behavioral payoff today.

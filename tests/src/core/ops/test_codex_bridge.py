@@ -1,0 +1,244 @@
+"""Tests for the Claude->Codex bridge (Slice 5e).
+
+The bridge composes shipped Phase 5 parts (curated transfer + ``CodexHeadlessInvoker``) into
+the "plan in Claude -> implement in Codex" hop. These tests are hermetic: the curation LLM and
+the ``codex exec`` subprocess are both mocked, and the autouse ``isolate_forge_home`` gives a
+clean usage ledger so the run-tree join can be asserted. The real-codex stack is covered in
+``tests/integration/core/test_claude_to_codex_resume.py``.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+from pathlib import Path
+from types import SimpleNamespace
+from typing import Any
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+from forge.core.ops.codex_bridge import (
+    CodexBridgeResult,
+    _temporary_run_env,
+    bridge_session_to_codex,
+    compose_codex_initial_message,
+)
+from forge.core.ops.context import ExecutionContext
+from forge.core.ops.session import ForgeOpError
+from forge.core.reactive.env import RunIdentity
+from forge.core.runtime.codex_preflight import CodexPreflight
+from forge.core.usage.ledger import read_usage_events
+from forge.session.models import SessionState, create_session_state
+from forge.session.transfer import parse_transfer_frontmatter
+
+_FIXTURES = Path(__file__).resolve().parents[3] / "fixtures" / "codex"
+_SUCCESS_STREAM = (_FIXTURES / "exec_json_success.jsonl").read_text()
+
+_CURATED = {
+    "goal": "Ship the cross-runtime bridge",
+    "decisions": [{"text": "Curated transfer is the only cross-runtime substrate", "citation": "turn 1"}],
+    "current_state": "Bridge wired; demo pending",
+    "files": ["src/forge/core/ops/codex_bridge.py"],
+    "open_questions": ["Sandbox default?"],
+}
+
+
+def _preflight() -> CodexPreflight:
+    """A ready ``codex_store`` preflight -- ``prepare_codex_request`` injects no key for it."""
+    return CodexPreflight(
+        installed=True,
+        version="0.137.0",
+        version_ok=True,
+        auth_method="chatgpt_tokens",
+        auth_source="codex_store",
+        billing_mode="subscription_quota",
+        ready=True,
+        blocking_reason=None,
+        hook_seam="unknown",
+        proxy_responses="native_direct",
+        doctor_status="ok",
+    )
+
+
+def _mock_codex_proc(stdout: str = _SUCCESS_STREAM) -> MagicMock:
+    proc = MagicMock()
+    proc.communicate.return_value = (stdout, "")
+    proc.returncode = 0
+    proc.poll.return_value = 0
+    proc.pid = 4242
+    proc.wait.return_value = 0
+    return proc
+
+
+def _fake_completion(text: str) -> Any:
+    return SimpleNamespace(text=text, usage={"prompt_tokens": 200, "completion_tokens": 40})
+
+
+def _write_transcript(path: Path) -> None:
+    lines = [
+        json.dumps(
+            {
+                "requestId": "r1",
+                "timestamp": "2026-01-01T00:00:00Z",
+                "message": {"role": "user", "content": [{"type": "text", "text": "Plan the bridge."}]},
+            }
+        ),
+        json.dumps(
+            {
+                "requestId": "r1",
+                "timestamp": "2026-01-01T00:00:01Z",
+                "message": {"role": "assistant", "content": [{"type": "text", "text": "Curated transfer is it."}]},
+            }
+        ),
+    ]
+    path.write_text("\n".join(lines), encoding="utf-8")
+
+
+def _planner_state(tmp_path: Path, transcript: Path) -> SessionState:
+    state = create_session_state(name="planner", worktree_path=str(tmp_path))
+    state.confirmed.transcript_path = str(transcript)
+    return state
+
+
+def _ctx(tmp_path: Path, *, forge_root: Path | None) -> ExecutionContext:
+    return ExecutionContext(cwd=tmp_path, worktree_root=tmp_path, project_root=tmp_path, forge_root=forge_root)
+
+
+# --- compose_codex_initial_message ------------------------------------------------------
+
+
+class TestComposeInitialMessage:
+    def test_body_precedes_task_with_codex_framing(self) -> None:
+        msg = compose_codex_initial_message("CURATED-BODY", "TASK-TEXT")
+        assert "# Handoff context" in msg
+        assert "# Your task" in msg
+        assert msg.index("CURATED-BODY") < msg.index("TASK-TEXT")
+        # No leftover transfer frontmatter delimiter leaks into the prompt.
+        assert not msg.lstrip().startswith("---")
+
+    def test_strips_surrounding_whitespace(self) -> None:
+        msg = compose_codex_initial_message("  body  ", "  task  ")
+        assert "body" in msg and "task" in msg
+
+
+# --- _temporary_run_env -----------------------------------------------------------------
+
+
+class TestTemporaryRunEnv:
+    def test_sets_scrubs_parent_then_restores_prior_absence(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("FORGE_RUN_ID", raising=False)
+        monkeypatch.delenv("FORGE_ROOT_RUN_ID", raising=False)
+        monkeypatch.setenv("FORGE_PARENT_RUN_ID", "stale_parent")
+        monkeypatch.delenv("FORGE_SESSION", raising=False)
+
+        ident = RunIdentity(run_id="run_x", parent_run_id=None, root_run_id="run_x")
+        with _temporary_run_env(ident, "sess"):
+            assert os.environ["FORGE_RUN_ID"] == "run_x"
+            assert os.environ["FORGE_ROOT_RUN_ID"] == "run_x"
+            assert os.environ["FORGE_SESSION"] == "sess"
+            assert "FORGE_PARENT_RUN_ID" not in os.environ  # scrubbed -- a fresh root has no parent
+
+        # Restored exactly: absent run ids stay absent, the stale parent is put back, no session.
+        assert "FORGE_RUN_ID" not in os.environ
+        assert "FORGE_ROOT_RUN_ID" not in os.environ
+        assert os.environ["FORGE_PARENT_RUN_ID"] == "stale_parent"
+        assert "FORGE_SESSION" not in os.environ
+
+    def test_restores_pre_existing_values_on_exception(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("FORGE_RUN_ID", "outer")
+        monkeypatch.setenv("FORGE_ROOT_RUN_ID", "outer_root")
+
+        ident = RunIdentity(run_id="inner", parent_run_id=None, root_run_id="inner")
+        with pytest.raises(RuntimeError):
+            with _temporary_run_env(ident, "sess"):
+                assert os.environ["FORGE_RUN_ID"] == "inner"
+                raise RuntimeError("boom")
+
+        # Nested pre-existing values restored even though the block raised.
+        assert os.environ["FORGE_RUN_ID"] == "outer"
+        assert os.environ["FORGE_ROOT_RUN_ID"] == "outer_root"
+
+
+# --- bridge_session_to_codex ------------------------------------------------------------
+
+
+class TestBridgeSessionToCodex:
+    def test_unknown_strategy_raises(self, tmp_path: Path) -> None:
+        with pytest.raises(ForgeOpError, match="Unknown strategy"):
+            bridge_session_to_codex(
+                ctx=_ctx(tmp_path, forge_root=tmp_path),
+                parent="planner",
+                task="t",
+                cwd=str(tmp_path),
+                strategy="bogus",
+            )
+
+    def test_no_forge_root_raises(self, tmp_path: Path) -> None:
+        with pytest.raises(ForgeOpError, match="Forge project"):
+            bridge_session_to_codex(ctx=_ctx(tmp_path, forge_root=None), parent="planner", task="t", cwd=str(tmp_path))
+
+    def test_bridge_runs_codex_with_curated_transfer_under_one_run_tree(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv("FORGE_RUN_ID", raising=False)
+        monkeypatch.delenv("FORGE_ROOT_RUN_ID", raising=False)
+
+        transcript = tmp_path / "transcript.jsonl"
+        _write_transcript(transcript)
+        state = _planner_state(tmp_path, transcript)
+
+        manager = MagicMock()
+        manager.get_session.return_value = state
+        mock_adapter = MagicMock()
+        mock_adapter.complete.return_value = _fake_completion(json.dumps(_CURATED))
+
+        with (
+            patch("forge.core.ops.codex_bridge.SessionManager", return_value=manager),
+            patch("forge.core.ops.codex_bridge.assert_codex_ready", return_value=_preflight()),
+            patch("forge.core.llm.SyncAdapter", return_value=mock_adapter),
+            patch("forge.core.llm.get_client"),
+            patch("forge.core.invoker._lifecycle.subprocess.Popen", return_value=_mock_codex_proc()) as mock_popen,
+        ):
+            result = bridge_session_to_codex(
+                ctx=_ctx(tmp_path, forge_root=tmp_path),
+                parent="planner",
+                task="Implement the parser",
+                cwd=str(tmp_path),
+                strategy="ai-curated",
+            )
+
+        # Codex ran and completed the handed-off task.
+        assert isinstance(result, CodexBridgeResult)
+        assert result.codex.success
+        assert result.codex.stdout == "OK"
+        assert result.curation_ran is True
+
+        # Per-run unique child key (a fixed name would re-feed Codex a stale snapshot).
+        assert result.child.startswith("planner-codex-")
+        assert result.child.endswith(result.root_run_id[-6:])
+
+        # The transfer fed to Codex is Codex-targeted.
+        frontmatter, body, _ = parse_transfer_frontmatter(result.transfer_path.read_text(encoding="utf-8"))
+        assert frontmatter is not None
+        assert frontmatter["target_runtime"] == "codex"
+        assert "## Runtime Hints" in body
+        assert "codex exec" in body
+
+        # The composed initial message prepended the transfer body before the task.
+        codex_input = mock_popen.return_value.communicate.call_args.kwargs["input"]
+        assert "# Handoff context" in codex_input
+        assert codex_input.index("Implement the parser") > codex_input.index("# Handoff context")
+
+        # Both sides under one run tree, same session (default = parent name).
+        events = read_usage_events(root_run_id=result.root_run_id)
+        by_route = {e.route: e for e in events}
+        assert set(by_route) == {"core_llm", "codex_exec"}
+        assert by_route["core_llm"].command == "transfer-curate"
+        assert by_route["core_llm"].runtime == "forge_cli"
+        assert by_route["codex_exec"].command == "codex-bridge"
+        assert {e.session for e in events} == {"planner"}
+
+        # The bridge is a transient root: os.environ run identity was restored after.
+        assert "FORGE_RUN_ID" not in os.environ
+        assert "FORGE_ROOT_RUN_ID" not in os.environ

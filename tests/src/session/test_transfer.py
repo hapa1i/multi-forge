@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, cast
 
 import pytest
@@ -32,6 +33,19 @@ from forge.session.transfer import (
 # -----------------------------------------------------------------------------
 # Test fixtures
 # -----------------------------------------------------------------------------
+
+
+def _fake_completion(text: str, *, usage: dict[str, int] | None = None) -> Any:
+    """Stand-in for the ``CompletionResponse`` returned by ``SyncAdapter.complete``.
+
+    ``_call_llm_for_curation`` reads ``.text`` (parsed for JSON) and ``.usage`` (for ledger
+    attribution); a bare ``MagicMock`` would return non-str/non-dict for those, so build an
+    explicit object.
+    """
+    return SimpleNamespace(
+        text=text,
+        usage=usage if usage is not None else {"prompt_tokens": 120, "completion_tokens": 60},
+    )
 
 
 @pytest.fixture
@@ -704,7 +718,7 @@ class TestTargetRuntimeRelabel:
         from unittest.mock import MagicMock, patch
 
         mock_adapter = MagicMock()
-        mock_adapter.ask.return_value = json.dumps(self._CURATED)
+        mock_adapter.complete.return_value = _fake_completion(json.dumps(self._CURATED))
         with (
             patch("forge.core.llm.SyncAdapter", return_value=mock_adapter),
             patch("forge.core.llm.get_client"),
@@ -812,7 +826,7 @@ class TestAICuratedStrategy:
             "open_questions": ["Do we change the default strategy?"],
         }
         mock_adapter = MagicMock()
-        mock_adapter.ask.return_value = json.dumps(curated)
+        mock_adapter.complete.return_value = _fake_completion(json.dumps(curated))
 
         # Patch at source module since lazy import is used
         with (
@@ -829,7 +843,7 @@ class TestAICuratedStrategy:
             )
 
         mock_get_client.assert_called_once_with(AI_CURATION_MODEL, provider=AI_CURATION_PROVIDER)
-        mock_adapter.ask.assert_called_once()
+        mock_adapter.complete.assert_called_once()
         # Full 8-section schema: sections 1-7 live in the snapshot body.
         assert schema == "full"
         for header in (
@@ -870,7 +884,7 @@ class TestAICuratedStrategy:
             "open_questions": [],
         }
         mock_adapter = MagicMock()
-        mock_adapter.ask.return_value = json.dumps(curated)
+        mock_adapter.complete.return_value = _fake_completion(json.dumps(curated))
 
         with (
             patch("forge.core.llm.SyncAdapter", return_value=mock_adapter),
@@ -903,7 +917,7 @@ class TestAICuratedStrategy:
         from unittest.mock import MagicMock, patch
 
         mock_adapter = MagicMock()
-        mock_adapter.ask.side_effect = Exception("API timeout")
+        mock_adapter.complete.side_effect = Exception("API timeout")
 
         # Patch at source module since lazy import is used
         with (
@@ -983,7 +997,7 @@ class TestAICuratedStrategy:
 
         # Mock LLM (patch at source module since lazy import is used)
         mock_adapter = MagicMock()
-        mock_adapter.ask.return_value = json.dumps({"goal": "g", "current_state": "s"})
+        mock_adapter.complete.return_value = _fake_completion(json.dumps({"goal": "g", "current_state": "s"}))
 
         with (
             patch("forge.core.llm.SyncAdapter", return_value=mock_adapter),
@@ -1385,3 +1399,71 @@ class TestTransferFrontmatter:
         assert frontmatter is None
         assert warning is None
         assert "Just a body" in body
+
+
+class TestCurationUsageEmission:
+    """Slice 5e: the ai-curated curation ``core.llm`` call is attributed to the usage
+    ledger (closing a prior gap) -- but only under an ambient run identity, so a normal
+    resume outside a Forge run tree stays silent."""
+
+    _CURATED = {
+        "goal": "g",
+        "decisions": [],
+        "current_state": "s",
+        "files": [],
+        "open_questions": [],
+    }
+
+    def _run_curation(self, sample_transcript: Path) -> None:
+        from unittest.mock import MagicMock, patch
+
+        mock_adapter = MagicMock()
+        mock_adapter.complete.return_value = _fake_completion(
+            json.dumps(self._CURATED), usage={"prompt_tokens": 321, "completion_tokens": 12}
+        )
+        with (
+            patch("forge.core.llm.SyncAdapter", return_value=mock_adapter),
+            patch("forge.core.llm.get_client"),
+        ):
+            _content, _warnings, schema = _generate_ai_curated_context(
+                parent_name="p",
+                lineage=["p"],
+                transcript_path=sample_transcript,
+                artifacts_path=None,
+                proxy_template=None,
+                latest_plan_path=None,
+            )
+        assert schema == "full"
+
+    def test_emits_one_core_llm_event_under_run_identity(
+        self, sample_transcript: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from forge.core.usage.ledger import read_usage_events
+
+        monkeypatch.setenv("FORGE_RUN_ID", "run_root")
+        monkeypatch.setenv("FORGE_ROOT_RUN_ID", "run_root")
+        monkeypatch.setenv("FORGE_SESSION", "planner")
+        monkeypatch.delenv("FORGE_PARENT_RUN_ID", raising=False)
+
+        self._run_curation(sample_transcript)
+
+        events = [e for e in read_usage_events() if e.command == "transfer-curate"]
+        assert len(events) == 1, events
+        e = events[0]
+        assert e.route == "core_llm"
+        assert e.runtime == "forge_cli"  # Forge core invoking core.llm, not Claude Code
+        assert e.reporter == "provider"
+        assert e.session == "planner"
+        assert (e.run_id, e.root_run_id) == ("run_root", "run_root")
+        assert e.input_tokens == 321  # provider tokens flow through
+        assert e.cost_micro_usd is None  # the core.llm helper computes no $ figure
+
+    def test_no_event_without_run_identity(self, sample_transcript: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        from forge.core.usage.ledger import read_usage_events
+
+        monkeypatch.delenv("FORGE_RUN_ID", raising=False)
+        monkeypatch.delenv("FORGE_ROOT_RUN_ID", raising=False)
+
+        self._run_curation(sample_transcript)
+
+        assert [e for e in read_usage_events() if e.command == "transfer-curate"] == []
