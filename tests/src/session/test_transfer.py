@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, cast
 
 import pytest
@@ -15,6 +16,7 @@ from forge.session.transfer import (
     AI_CURATION_PROVIDER,
     MAX_TRANSCRIPT_CHARS,
     ResumeStrategy,
+    _build_frontmatter,
     _citation_is_grounded,
     _format_transcript_for_llm,
     _generate_ai_curated_context,
@@ -31,6 +33,19 @@ from forge.session.transfer import (
 # -----------------------------------------------------------------------------
 # Test fixtures
 # -----------------------------------------------------------------------------
+
+
+def _fake_completion(text: str, *, usage: dict[str, int] | None = None) -> Any:
+    """Stand-in for the ``CompletionResponse`` returned by ``SyncAdapter.complete``.
+
+    ``_call_llm_for_curation`` reads ``.text`` (parsed for JSON) and ``.usage`` (for ledger
+    attribution); a bare ``MagicMock`` would return non-str/non-dict for those, so build an
+    explicit object.
+    """
+    return SimpleNamespace(
+        text=text,
+        usage=usage if usage is not None else {"prompt_tokens": 120, "completion_tokens": 60},
+    )
 
 
 @pytest.fixture
@@ -686,6 +701,116 @@ class TestDecisionCitationValidation:
         assert warnings == []
 
 
+class TestTargetRuntimeRelabel:
+    """Slice 5d: ``target_runtime`` threads to frontmatter + Runtime Hints. The claude
+    (default) variant renders byte-identically to pre-5d output -- a relabel, not a
+    schema change."""
+
+    _CURATED = {
+        "goal": "Ship the Codex bridge",
+        "decisions": [{"text": "One run tree across runtimes", "citation": "turn 1"}],
+        "current_state": "Mid-implementation",
+        "files": ["src/forge/core/invoker/codex.py"],
+        "open_questions": ["Sandbox default?"],
+    }
+
+    def _curated_body(self, sample_transcript: Path, target_runtime: str) -> str:
+        from unittest.mock import MagicMock, patch
+
+        mock_adapter = MagicMock()
+        mock_adapter.complete.return_value = _fake_completion(json.dumps(self._CURATED))
+        with (
+            patch("forge.core.llm.SyncAdapter", return_value=mock_adapter),
+            patch("forge.core.llm.get_client"),
+        ):
+            content, _warnings, schema = _generate_ai_curated_context(
+                parent_name="p",
+                lineage=["p"],
+                transcript_path=sample_transcript,
+                artifacts_path=None,
+                proxy_template=None,
+                latest_plan_path=None,
+                target_runtime=target_runtime,
+            )
+        assert schema == "full"
+        return content
+
+    def _frontmatter(self, target_runtime: str | None) -> dict:
+        kwargs: dict[str, Any] = dict(
+            parent_name="p",
+            strategy="ai-curated",
+            schema="full",
+            depth=1,
+            lineage=["p"],
+            transcript_artifact=None,
+            token_estimate=None,
+        )
+        if target_runtime is not None:
+            kwargs["target_runtime"] = target_runtime
+        fm, _, _ = parse_transfer_frontmatter(_build_frontmatter(**kwargs))
+        assert fm is not None
+        return fm
+
+    def test_frontmatter_default_is_claude(self) -> None:
+        fm = self._frontmatter(None)
+        assert fm["target_runtime"] == "claude"
+        assert fm["schema_version"] == 1
+
+    def test_frontmatter_codex_keeps_schema_version(self) -> None:
+        fm = self._frontmatter("codex")
+        assert fm["target_runtime"] == "codex"
+        assert fm["schema_version"] == 1  # relabel, never a schema bump
+
+    def test_runtime_hints_claude_is_the_historical_single_line(self, sample_transcript: Path) -> None:
+        body = self._curated_body(sample_transcript, "claude")
+        assert "Target runtime: claude." in body
+        assert "codex exec" not in body  # no Codex guidance leaks into the claude variant
+
+    def test_runtime_hints_codex_names_codex_idioms(self, sample_transcript: Path) -> None:
+        body = self._curated_body(sample_transcript, "codex")
+        assert "Target runtime: codex." in body
+        assert "codex exec" in body
+        assert "sandbox" in body.lower()
+
+    def test_only_runtime_hints_differ_between_variants(self, sample_transcript: Path) -> None:
+        claude_body = self._curated_body(sample_transcript, "claude")
+        codex_body = self._curated_body(sample_transcript, "codex")
+        # Section skeleton (## headers) is identical across variants.
+        claude_headers = [ln for ln in claude_body.splitlines() if ln.startswith("## ")]
+        codex_headers = [ln for ln in codex_body.splitlines() if ln.startswith("## ")]
+        assert claude_headers == codex_headers
+        # Everything before Runtime Hints (Decisions, Files, citations) is byte-identical.
+        assert claude_body.split("## Runtime Hints")[0] == codex_body.split("## Runtime Hints")[0]
+
+    @pytest.mark.parametrize(
+        "strategy",
+        [ResumeStrategy.MINIMAL, ResumeStrategy.STRUCTURED, ResumeStrategy.FULL],
+    )
+    def test_compatibility_fallback_codex_body_gets_runtime_hints(
+        self, tmp_path: Path, strategy: ResumeStrategy
+    ) -> None:
+        from forge.session.models import create_session_state
+
+        result = assemble_transfer_context(
+            parent_name="parent",
+            parent_state=create_session_state(name="parent", worktree_path=str(tmp_path)),
+            forge_root=tmp_path,
+            strategy=strategy,
+            depth=1,
+            get_session=lambda _: None,
+            target_runtime="codex",
+        )
+        assert result.context_file is not None
+        frontmatter, body, warning = parse_transfer_frontmatter(result.context_file.read_text())
+        assert warning is None
+        assert frontmatter is not None
+        assert frontmatter["schema"] == "compatibility-fallback"
+        assert frontmatter["target_runtime"] == "codex"
+        assert "## Runtime Hints" in body
+        assert "codex exec" in body
+        assert "sandbox" in body.lower()
+
+
 class TestAICuratedStrategy:
     """Tests for AI-curated strategy with mocked LLM."""
 
@@ -701,7 +826,7 @@ class TestAICuratedStrategy:
             "open_questions": ["Do we change the default strategy?"],
         }
         mock_adapter = MagicMock()
-        mock_adapter.ask.return_value = json.dumps(curated)
+        mock_adapter.complete.return_value = _fake_completion(json.dumps(curated))
 
         # Patch at source module since lazy import is used
         with (
@@ -718,7 +843,7 @@ class TestAICuratedStrategy:
             )
 
         mock_get_client.assert_called_once_with(AI_CURATION_MODEL, provider=AI_CURATION_PROVIDER)
-        mock_adapter.ask.assert_called_once()
+        mock_adapter.complete.assert_called_once()
         # Full 8-section schema: sections 1-7 live in the snapshot body.
         assert schema == "full"
         for header in (
@@ -759,7 +884,7 @@ class TestAICuratedStrategy:
             "open_questions": [],
         }
         mock_adapter = MagicMock()
-        mock_adapter.ask.return_value = json.dumps(curated)
+        mock_adapter.complete.return_value = _fake_completion(json.dumps(curated))
 
         with (
             patch("forge.core.llm.SyncAdapter", return_value=mock_adapter),
@@ -792,7 +917,7 @@ class TestAICuratedStrategy:
         from unittest.mock import MagicMock, patch
 
         mock_adapter = MagicMock()
-        mock_adapter.ask.side_effect = Exception("API timeout")
+        mock_adapter.complete.side_effect = Exception("API timeout")
 
         # Patch at source module since lazy import is used
         with (
@@ -872,7 +997,7 @@ class TestAICuratedStrategy:
 
         # Mock LLM (patch at source module since lazy import is used)
         mock_adapter = MagicMock()
-        mock_adapter.ask.return_value = json.dumps({"goal": "g", "current_state": "s"})
+        mock_adapter.complete.return_value = _fake_completion(json.dumps({"goal": "g", "current_state": "s"}))
 
         with (
             patch("forge.core.llm.SyncAdapter", return_value=mock_adapter),
@@ -1229,6 +1354,20 @@ class TestTransferFrontmatter:
         # The human-readable body is preserved beneath the frontmatter.
         assert body.lstrip().startswith("# Session Context")
 
+    def test_unknown_target_runtime_rejected(self, tmp_path: Path) -> None:
+        """Internal boundary: assemble validates against TRANSFER_TARGET_RUNTIMES (the
+        single source the ops layer and the CLI Choice also consume)."""
+        with pytest.raises(ValueError, match="Unknown target runtime 'gemini'"):
+            assemble_transfer_context(
+                parent_name="parent",
+                parent_state=self._parent(tmp_path),
+                forge_root=tmp_path,
+                strategy=ResumeStrategy.MINIMAL,
+                depth=1,
+                get_session=lambda _: None,
+                target_runtime="gemini",
+            )
+
     def test_frontmatter_has_no_child_field(self, tmp_path: Path) -> None:
         """A child: field would break the byte-for-byte generated->child copy."""
         result = assemble_transfer_context(
@@ -1274,3 +1413,112 @@ class TestTransferFrontmatter:
         assert frontmatter is None
         assert warning is None
         assert "Just a body" in body
+
+
+class TestCurationUsageEmission:
+    """Slice 5e: the ai-curated curation ``core.llm`` call is attributed to the usage
+    ledger (closing a prior gap) -- but only under an ambient run identity, so a normal
+    resume outside a Forge run tree stays silent."""
+
+    _CURATED = {
+        "goal": "g",
+        "decisions": [],
+        "current_state": "s",
+        "files": [],
+        "open_questions": [],
+    }
+
+    def _run_curation(self, sample_transcript: Path) -> None:
+        from unittest.mock import MagicMock, patch
+
+        mock_adapter = MagicMock()
+        mock_adapter.complete.return_value = _fake_completion(
+            json.dumps(self._CURATED), usage={"prompt_tokens": 321, "completion_tokens": 12}
+        )
+        with (
+            patch("forge.core.llm.SyncAdapter", return_value=mock_adapter),
+            patch("forge.core.llm.get_client"),
+        ):
+            _content, _warnings, schema = _generate_ai_curated_context(
+                parent_name="p",
+                lineage=["p"],
+                transcript_path=sample_transcript,
+                artifacts_path=None,
+                proxy_template=None,
+                latest_plan_path=None,
+            )
+        assert schema == "full"
+
+    def test_emits_one_core_llm_event_under_run_identity(
+        self, sample_transcript: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from forge.core.usage.ledger import read_usage_events
+
+        monkeypatch.setenv("FORGE_RUN_ID", "run_root")
+        monkeypatch.setenv("FORGE_ROOT_RUN_ID", "run_root")
+        monkeypatch.setenv("FORGE_SESSION", "planner")
+        monkeypatch.delenv("FORGE_PARENT_RUN_ID", raising=False)
+
+        self._run_curation(sample_transcript)
+
+        events = [e for e in read_usage_events() if e.command == "transfer-curate"]
+        assert len(events) == 1, events
+        e = events[0]
+        assert e.route == "core_llm"
+        assert e.runtime == "forge_cli"  # Forge core invoking core.llm, not Claude Code
+        assert e.reporter == "provider"
+        assert e.session == "planner"
+        assert (e.run_id, e.root_run_id) == ("run_root", "run_root")
+        assert e.input_tokens == 321  # provider tokens flow through
+        assert e.cost_micro_usd is None  # the core.llm helper computes no $ figure
+
+    def test_no_event_without_run_identity(self, sample_transcript: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        from forge.core.usage.ledger import read_usage_events
+
+        monkeypatch.delenv("FORGE_RUN_ID", raising=False)
+        monkeypatch.delenv("FORGE_ROOT_RUN_ID", raising=False)
+
+        self._run_curation(sample_transcript)
+
+        assert [e for e in read_usage_events() if e.command == "transfer-curate"] == []
+
+    def test_parse_failure_still_emits_error_event(
+        self, sample_transcript: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A successful ``.complete()`` whose output is unparseable spent real tokens;
+        the spend is attributed with ``status="error"`` BEFORE the structured fallback
+        (the team-supervisor emit-before-success-gate precedent)."""
+        from unittest.mock import MagicMock, patch
+
+        from forge.core.usage.ledger import read_usage_events
+
+        monkeypatch.setenv("FORGE_RUN_ID", "run_root")
+        monkeypatch.setenv("FORGE_ROOT_RUN_ID", "run_root")
+        monkeypatch.delenv("FORGE_PARENT_RUN_ID", raising=False)
+
+        mock_adapter = MagicMock()
+        mock_adapter.complete.return_value = _fake_completion(
+            "definitely not json", usage={"prompt_tokens": 222, "completion_tokens": 9}
+        )
+        with (
+            patch("forge.core.llm.SyncAdapter", return_value=mock_adapter),
+            patch("forge.core.llm.get_client"),
+        ):
+            _content, warnings, schema = _generate_ai_curated_context(
+                parent_name="p",
+                lineage=["p"],
+                transcript_path=sample_transcript,
+                artifacts_path=None,
+                proxy_template=None,
+                latest_plan_path=None,
+            )
+
+        # The fallback still happens (unusable result), but the spend is not lost.
+        assert schema == "compatibility-fallback"
+        assert any("using structured" in w.lower() for w in warnings)
+        events = [e for e in read_usage_events() if e.command == "transfer-curate"]
+        assert len(events) == 1, events
+        e = events[0]
+        assert e.status == "error"
+        assert e.failure_type == "unparseable_output"
+        assert e.input_tokens == 222  # provider tokens attributed despite the bad output

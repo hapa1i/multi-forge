@@ -46,10 +46,12 @@ InteractiveSupport = Literal["default", "beta", "none"]
 # Claude-equivalent enforcement.
 PolicyEnforcement = Literal["full", "partial", "none"]
 
-# Native-hook support. "gated" exists for Codex: hooks are real but require a
-# minimum CLI version AND a config feature flag (the machine-readable gate lives in
-# ``hook_min_version`` / ``hook_feature_flag``), so a preflight must verify the gate
-# rather than assume parity from a bare "yes".
+# Native-hook support. "gated" exists for Codex: hooks are real but require a minimum
+# CLI version (the machine-readable gate lives in ``hook_min_version``), so a preflight
+# must verify the gate rather than assume parity from a bare "yes". A config feature
+# flag (``hook_feature_flag``) is recorded only when one is *also* required; Codex's
+# hooks are default-on (``codex_hooks`` is a deprecated alias of ``hooks`` -- still
+# works, but do not author it), so that field is None.
 HookSupport = Literal["full", "gated", "none"]
 
 # Where a runtime's usage/token figures come from.
@@ -111,10 +113,12 @@ class RuntimeSpec:
     install_scopes: tuple[str, ...]  # config scopes Forge manages (empty = not Forge-managed)
     curated_transfer_in: bool  # can accept a context doc at session start
     curated_transfer_out: bool  # can generate a curation of its own transcript
-    # Machine-readable gate for ``native_hooks == "gated"`` (both None otherwise): a
+    # Machine-readable gate for ``native_hooks == "gated"`` (None when ungated): a
     # Phase 5 preflight checks these instead of parsing the human ``note``.
-    hook_min_version: str | None = None  # e.g. "0.124.0"
-    hook_feature_flag: str | None = None  # e.g. "codex_hooks"
+    # ``hook_min_version`` is the floor where hooks work without extra config;
+    # ``hook_feature_flag`` is recorded only when a config flag is *also* required.
+    hook_min_version: str | None = None  # e.g. "0.131.0" (Codex hooks default-on)
+    hook_feature_flag: str | None = None  # set only when a config flag is also required
     note: str | None = None  # human-facing caveats (exact activation syntax, partial support)
 
     def is_installed(self) -> bool:
@@ -153,20 +157,28 @@ RUNTIMES: dict[str, RuntimeSpec] = {
         display_name="Codex CLI",
         headless_cmd=("codex", "exec"),
         detect=_detect_codex,
-        interactive="beta",  # target beta, not a shipped Forge frontend
+        interactive="beta",  # Codex's own interactive mode is GA; Forge frontend integration is the Phase 6 target
         headless=True,
-        native_hooks="gated",  # real hooks, but version + feature-flag gated (see hook_* fields)
-        hook_min_version="0.124.0",
-        hook_feature_flag="codex_hooks",
-        pretool_policy="partial",  # PreToolUse adapter; NOT a full enforcement boundary
+        native_hooks="gated",  # real hooks, default-on; version-gated only (see hook_* fields)
+        hook_min_version="0.131.0",  # hooks default-on since 0.131.0; 0.134.0 dropped the plugin-hooks gate, not the alias
+        hook_feature_flag=None,  # hooks default-on (no gate); codex_hooks is a deprecated alias -- do not author it
+        pretool_policy="partial",  # PreToolUse adapter; NOT a full enforcement boundary (no WebSearch/complex shell)
         usage_source="jsonl_events",
-        native_resume=True,  # codex exec resume
+        native_resume=True,  # codex exec resume (cwd-aware since 0.135.0)
         install_scopes=(),  # Forge does not manage Codex install scopes yet
-        curated_transfer_in=True,  # initial user message
+        curated_transfer_in=True,  # SessionStart additionalContext (preferred) or initial user message
         curated_transfer_out=True,  # via headless invoker
         note=(
-            "Hooks require `[features] codex_hooks = true` (Codex CLI 0.124.0+). "
-            "PreToolUse does not intercept every tool path -- partial enforcement, not parity."
+            "Hooks are default-on (`[features] hooks`, Codex CLI >= 0.131.0); `codex_hooks` is a deprecated "
+            "alias (still works -- do not author new config with it). Ten lifecycle events incl. SessionStart/"
+            "PreToolUse/PermissionRequest. PreToolUse is a partial guard (does not intercept every tool path) "
+            "but can mutate tool input via updatedInput; PermissionRequest is the approval seam. SessionStart "
+            "additionalContext can inject a transfer doc, but only when hooks are enabled AND the hook is "
+            "trusted (untrusted/first-run projects skip project-local `.codex/` hooks) -- keep an "
+            "initial-message fallback. Enterprise `allow_managed_hooks_only` (requirements.toml) can suppress "
+            "user/project hooks. Codex emits the Responses API (custom-provider `wire_api=chat` removed ~Feb "
+            "2026); a proxy fronting Codex must serve Responses on its Codex-facing endpoint (backend may be "
+            "translated). Verified vs Codex CLI 0.137.0 (2026-06-08)."
         ),
     ),
     "gemini": RuntimeSpec(

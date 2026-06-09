@@ -55,6 +55,10 @@ TOOL_RESULT_TRUNCATE_CHARS = 500
 # readers branch. ``target_runtime`` is reserved for Phase 5 cross-runtime tuning.
 TRANSFER_SCHEMA_VERSION = 1
 TRANSFER_TARGET_RUNTIME = "claude"
+# Single source for the valid target runtimes: the ops layer and the CLI Choice both
+# consume this tuple, and assemble_transfer_context validates against it, so a new
+# runtime (e.g. gemini) is added in exactly one place.
+TRANSFER_TARGET_RUNTIMES: tuple[str, ...] = ("claude", "codex")
 
 # AI-curated strategy constants. Use OpenRouter directly for the OSS default path;
 # old remote-LiteLLM deployments still fall back to structured if OpenRouter auth
@@ -112,6 +116,7 @@ def _build_frontmatter(
     lineage: list[str],
     transcript_artifact: str | None,
     token_estimate: int | None,
+    target_runtime: str = TRANSFER_TARGET_RUNTIME,
 ) -> str:
     """Build the child-agnostic YAML frontmatter block for a transfer document.
 
@@ -135,7 +140,7 @@ def _build_frontmatter(
             "lineage": list(lineage),
             "transcript_artifact": transcript_artifact,
             "token_estimate": token_estimate,
-            "target_runtime": TRANSFER_TARGET_RUNTIME,
+            "target_runtime": target_runtime,
         }
     }
     block = yaml.safe_dump(payload, sort_keys=False, default_flow_style=False).rstrip()
@@ -647,38 +652,103 @@ def _format_transcript_for_llm(entries: list[dict[str, Any]]) -> tuple[str, bool
     return result, was_truncated, emitted_turns
 
 
-def _call_llm_for_curation(transcript_text: str) -> tuple[dict[str, Any], str]:
+@dataclass(frozen=True)
+class _CurationCall:
+    """One curation LLM call: parsed fields plus provenance for usage attribution.
+
+    ``curated`` is ``None`` when the LLM responded but its output was unparseable --
+    real spend with no usable result. The call is still returned (not raised) so the
+    caller can attribute the spend with ``status="error"`` before falling back.
+    """
+
+    curated: dict[str, Any] | None
+    model_used: str
+    usage: dict[str, int] | None
+    latency_ms: float
+
+
+def _call_llm_for_curation(transcript_text: str) -> _CurationCall:
     """Call the curation LLM and parse its structured JSON response.
 
     Args:
         transcript_text: Formatted transcript text (already bounded, turn-anchored).
 
     Returns:
-        Tuple of (curated_fields, model_used). ``curated_fields`` has keys
-        ``goal``, ``decisions``, ``current_state``, ``files``, ``open_questions``.
+        A ``_CurationCall``: the parsed fields (``goal``, ``decisions``,
+        ``current_state``, ``files``, ``open_questions``) plus the provider ``usage``
+        and wall-clock latency, so the caller can attribute this real spend to the
+        usage ledger. Unparseable output returns ``curated=None`` rather than raising
+        -- the tokens were spent and must still reach the ledger (the caller emits
+        with ``status="error"``, then falls back).
 
     Raises:
-        Exception: On any LLM error or unparseable output (caller falls back to
-            a deterministic strategy).
+        Exception: On any LLM/transport error (no response, so nothing measurable
+            to attribute; caller falls back to a deterministic strategy).
     """
     # Lazy import to avoid circular dependencies and startup cost
-    from forge.core.llm import SyncAdapter, get_client
+    import time
+
+    from forge.core.llm import Message, SyncAdapter, get_client
     from forge.core.llm.types import ModelHyperparameters
     from forge.core.reactive.structured_output import extract_json_from_response
 
     client = SyncAdapter(get_client(AI_CURATION_MODEL, provider=AI_CURATION_PROVIDER))
-    response = client.ask(
-        prompt=AI_CURATION_USER_PROMPT_TEMPLATE.format(transcript_text=transcript_text),
-        system=AI_CURATION_SYSTEM_PROMPT,
+    # .complete (not .ask) so the provider's in-band token usage is captured for
+    # ledger attribution; .ask returns text only. Same two-message shape .ask builds
+    # internally, so model input is unchanged. Mirrors core/reactive/tagger.py.
+    messages = [
+        Message(role="system", content=AI_CURATION_SYSTEM_PROMPT),
+        Message(role="user", content=AI_CURATION_USER_PROMPT_TEMPLATE.format(transcript_text=transcript_text)),
+    ]
+    start = time.monotonic()
+    response = client.complete(
+        messages,
         hyperparams=ModelHyperparameters(
             max_tokens=AI_CURATION_MAX_OUTPUT_TOKENS,
             temperature=AI_CURATION_TEMPERATURE,
         ),
     )
-    parsed = extract_json_from_response(response)
-    if parsed is None:
-        raise ValueError("AI curation did not return a parseable JSON object")
-    return parsed, f"{AI_CURATION_MODEL} via {AI_CURATION_PROVIDER}"
+    latency_ms = (time.monotonic() - start) * 1000
+    # Unparseable output is returned (curated=None), not raised: the .complete() above
+    # spent real tokens, and the caller emits BEFORE the parse gate decides the fallback
+    # (the team-supervisor precedent: failures are attributed, not lost).
+    parsed = extract_json_from_response(response.text)
+    return _CurationCall(
+        curated=parsed,
+        model_used=f"{AI_CURATION_MODEL} via {AI_CURATION_PROVIDER}",
+        usage=response.usage,
+        latency_ms=latency_ms,
+    )
+
+
+def _emit_curation_usage(call: _CurationCall) -> None:
+    """Attribute the ai-curated transfer's ``core.llm`` call to the usage ledger.
+
+    Best-effort, and no-ops without an ambient run identity -- a normal
+    ``resume --fresh --strategy ai-curated`` outside a Forge run tree stays silent.
+    ``runtime="forge_cli"`` because this is Forge core invoking ``core.llm``, not Claude
+    Code producing an action; the curation model identity is carried in ``model``. The
+    cross-runtime bridge sets the run identity + ``FORGE_SESSION`` so the event lands
+    under the bridge's run tree (Slice 5e). An unparseable curation (``curated=None``)
+    is emitted as ``status="error"`` -- the spend happened even though the result was
+    unusable.
+    """
+    import os
+
+    from forge.core.usage import emit_direct_llm_usage
+
+    parse_failed = call.curated is None
+    emit_direct_llm_usage(
+        command="transfer-curate",
+        model=AI_CURATION_MODEL,
+        provider=AI_CURATION_PROVIDER,
+        usage=call.usage,
+        status="error" if parse_failed else "success",
+        failure_type="unparseable_output" if parse_failed else None,
+        latency_ms=call.latency_ms,
+        session=os.environ.get("FORGE_SESSION"),
+        runtime="forge_cli",
+    )
 
 
 def _coerce_text(value: Any) -> str:
@@ -758,6 +828,40 @@ def _render_str_list(items: Any) -> list[str]:
     return lines or ["_None captured._"]
 
 
+# Extra Runtime Hints guidance appended for a Codex target. Claude omits this so its
+# rendered body stays byte-identical to the historical single-line hint.
+_CODEX_RUNTIME_HINTS = (
+    "Consumed by `codex exec` (sandboxed, one-shot): implement with Codex idioms -- no "
+    "Anthropic extended-thinking, stay within the sandbox (workspace-write), and drive "
+    "changes through the Codex tool surface."
+)
+
+
+def _runtime_hints_lines(target_runtime: str) -> list[str]:
+    """Render the ``## Runtime Hints`` body for ``target_runtime``.
+
+    Claude (default) is byte-identical to the historical single line so existing caches
+    do not churn; ``codex`` appends one-shot/sandbox guidance.
+    """
+    lines = [f"Target runtime: {target_runtime}."]
+    if target_runtime == "codex":
+        lines += ["", _CODEX_RUNTIME_HINTS]
+    return lines
+
+
+def _append_runtime_hints_if_needed(body: str, target_runtime: str) -> str:
+    """Append a Runtime Hints section for non-Claude compatibility-fallback bodies.
+
+    The historical ``minimal|structured|full`` Claude bodies are preserved byte-for-byte.
+    A Codex-targeted fallback still needs runtime guidance because the body is what 5e
+    will prepend into the initial ``codex exec`` prompt.
+    """
+    if target_runtime == TRANSFER_TARGET_RUNTIME:
+        return body
+    suffix = "\n".join(["", "", "## Runtime Hints", "", *_runtime_hints_lines(target_runtime)])
+    return body.rstrip() + suffix + "\n"
+
+
 def _build_ai_curated_output(
     parent_name: str,
     lineage: list[str],
@@ -767,6 +871,7 @@ def _build_ai_curated_output(
     proxy_template: str | None,
     latest_plan_path: str | None,
     plan_content: str | None = None,
+    target_runtime: str = TRANSFER_TARGET_RUNTIME,
 ) -> str:
     """Render the full schema body from structured curation fields.
 
@@ -807,7 +912,7 @@ def _build_ai_curated_output(
         "",
         "## Runtime Hints",
         "",
-        f"Target runtime: {TRANSFER_TARGET_RUNTIME}.",
+        *_runtime_hints_lines(target_runtime),
         "",
     ]
 
@@ -824,6 +929,7 @@ def _generate_ai_curated_context(
     proxy_template: str | None,
     latest_plan_path: str | None,
     plan_content: str | None = None,
+    target_runtime: str = TRANSFER_TARGET_RUNTIME,
 ) -> tuple[str, list[str], str]:
     """Generate context using an LLM to curate the transcript into the schema.
 
@@ -856,10 +962,8 @@ def _generate_ai_curated_context(
     if was_truncated:
         warnings.append("Transcript truncated to fit context limit")
 
-    try:
-        curated, model_used = _call_llm_for_curation(transcript_text)
-    except Exception as e:
-        logger.warning("AI curation failed: %s, falling back to structured", e)
+    def _structured_fallback(reason: str) -> tuple[str, list[str], str]:
+        logger.warning("AI curation failed: %s, falling back to structured", reason)
         content, struct_warnings = _generate_structured_context(
             parent_name,
             lineage,
@@ -871,9 +975,23 @@ def _generate_ai_curated_context(
         )
         return (
             content,
-            [f"AI curation failed ({e}); using structured strategy"] + struct_warnings,
+            [f"AI curation failed ({reason}); using structured strategy"] + struct_warnings,
             "compatibility-fallback",
         )
+
+    try:
+        call = _call_llm_for_curation(transcript_text)
+    except Exception as e:
+        # Transport/LLM error: no response, so there is no spend to attribute.
+        return _structured_fallback(str(e))
+
+    # Emit BEFORE the parse gate: an unparseable response still spent real tokens
+    # (status="error"), matching the team-supervisor emit-before-success-gate precedent.
+    _emit_curation_usage(call)
+    if call.curated is None:
+        return _structured_fallback("AI curation did not return a parseable JSON object")
+
+    curated, model_used = call.curated, call.model_used
 
     # Security notice: transcript was sent to LLM provider for processing
     warnings.append(f"AI-curated: transcript content sent to {model_used} for processing")
@@ -891,6 +1009,7 @@ def _generate_ai_curated_context(
         proxy_template,
         latest_plan_path,
         plan_content=plan_content,
+        target_runtime=target_runtime,
     )
 
     return content, warnings, "full"
@@ -942,6 +1061,7 @@ def assemble_transfer_context(
     inline_plan: bool = False,
     parent_worktree_root: Path | None = None,
     child_name: str | None = None,
+    target_runtime: str = TRANSFER_TARGET_RUNTIME,
 ) -> TransferResult:
     """Process parent context for resume and generate context file.
 
@@ -969,10 +1089,17 @@ def assemble_transfer_context(
             ``TransferResult.context_file`` points at the per-child file.
             When omitted, points at the parent-scoped ``generated.md`` (caller
             handles the child copy itself).
+        target_runtime: Which runtime will consume this context (``"claude"`` |
+            ``"codex"``). Stamped into the frontmatter and the ``## Runtime Hints``
+            body. ``"claude"`` (default) renders byte-identically to pre-5d output.
 
     Returns:
         TransferResult with the launch-time context file path and metadata.
     """
+    if target_runtime not in TRANSFER_TARGET_RUNTIMES:
+        valid = ", ".join(TRANSFER_TARGET_RUNTIMES)
+        raise ValueError(f"Unknown target runtime '{target_runtime}' (valid: {valid}).")
+
     warnings: list[str] = []
 
     lineage = resolve_lineage(parent_name, depth, get_session)
@@ -1063,8 +1190,12 @@ def assemble_transfer_context(
             proxy_template,
             latest_plan_path,
             plan_content=plan_content,
+            target_runtime=target_runtime,
         )
         warnings.extend(strategy_warnings)
+
+    if schema_marker != "full":
+        body = _append_runtime_hints_if_needed(body, target_runtime)
 
     content = (
         _build_frontmatter(
@@ -1075,6 +1206,7 @@ def assemble_transfer_context(
             lineage=lineage,
             transcript_artifact=artifacts_path,
             token_estimate=token_estimate,
+            target_runtime=target_runtime,
         )
         + body
     )

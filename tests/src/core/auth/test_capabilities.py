@@ -90,6 +90,7 @@ class TestCredentialForEnvVar:
         assert credential_for_env_var("ANTHROPIC_API_KEY") is CREDENTIALS["anthropic-api"]
         assert credential_for_env_var("OPENAI_API_KEY") is CREDENTIALS["openai-api"]
         assert credential_for_env_var("GEMINI_API_KEY") is CREDENTIALS["gemini-api"]
+        assert credential_for_env_var("CODEX_API_KEY") is CREDENTIALS["codex-api"]
         assert credential_for_env_var("LITELLM_API_KEY") is CREDENTIALS["litellm-remote"]
         assert credential_for_env_var("LITELLM_BASE_URL") is CREDENTIALS["litellm-remote"]
 
@@ -151,8 +152,9 @@ class TestEnvVarMetadata:
 
 class TestCredentialRegistry:
 
-    def test_five_credentials(self):
-        assert len(CREDENTIALS) == 5
+    def test_credential_count(self):
+        # openrouter, anthropic-api, openai-api, gemini-api, codex-api, litellm-remote
+        assert len(CREDENTIALS) == 6
 
     def test_credential_names_match_keys(self):
         for key, cred in CREDENTIALS.items():
@@ -162,14 +164,15 @@ class TestCredentialRegistry:
         for cred in CREDENTIALS.values():
             assert len(cred.env_vars) >= 1, f"Credential '{cred.name}' has no env vars"
 
-    def test_only_anthropic_api_has_not_needed_for(self):
+    def test_not_needed_for_only_on_confusable_credentials(self):
+        # not_needed_for is for credentials prone to false urgency: anthropic-api (vs the
+        # Claude Code login) and codex-api (vs an existing codex login / ChatGPT sub).
+        have_not_needed_for = {"anthropic-api", "codex-api"}
         for cred in CREDENTIALS.values():
-            if cred.name == "anthropic-api":
-                assert cred.not_needed_for is not None
+            if cred.name in have_not_needed_for:
+                assert cred.not_needed_for is not None, f"'{cred.name}' should define not_needed_for"
             else:
-                assert (
-                    cred.not_needed_for is None
-                ), f"Only anthropic-api should have not_needed_for, but '{cred.name}' has it"
+                assert cred.not_needed_for is None, f"'{cred.name}' should not define not_needed_for"
 
 
 # ── Error formatting ──────────────────────────────────────────────
@@ -289,3 +292,36 @@ class TestFormatMissingCredentialError:
         cred = CREDENTIALS["anthropic-api"]
         msg = format_missing_credential_error(cred, missing_vars=["ANTHROPIC_API_KEY"])
         assert "Pay-per-token" in msg
+
+
+# ── codex-api credential (Phase 5a) ───────────────────────────────
+
+
+class TestCodexCredential:
+
+    def test_registered_with_codex_api_key(self):
+        cred = CREDENTIALS["codex-api"]
+        assert cred.name == "codex-api"
+        assert any(ev.name == "CODEX_API_KEY" for ev in cred.env_vars)
+
+    def test_error_names_codex_login_command_and_caveats(self):
+        cred = CREDENTIALS["codex-api"]
+        msg = format_missing_credential_error(
+            cred,
+            missing_vars=["CODEX_API_KEY"],
+            context="Native Codex preflight",
+            extra_hint="Or run 'codex login --device-auth' (ChatGPT) / set CODEX_ACCESS_TOKEN (enterprise).",
+        )
+        assert "Native Codex preflight requires CODEX_API_KEY" in msg
+        assert "forge auth login -c codex-api" in msg
+        # The extra hint surfaces the two non-API-key paths.
+        assert "codex login --device-auth" in msg
+        assert "CODEX_ACCESS_TOKEN" in msg
+        # not_needed_for surfaces so users aren't misled into thinking they need the key.
+        assert "NOT needed for:" in msg
+        assert "ChatGPT subscription" in msg
+
+    def test_note_clarifies_not_openai_key_or_chatgpt_login(self):
+        note = CREDENTIALS["codex-api"].note or ""
+        assert "OPENAI_API_KEY" in note  # clarifies it is NOT OPENAI_API_KEY
+        assert "codex login" in note  # nor the ChatGPT login

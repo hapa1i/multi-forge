@@ -102,7 +102,9 @@ forge session resume my-feature                                # Reattach to con
 forge session show my-feature                                  # Session details
 ```
 
-See [session.md](session.md) for worktrees, fork, incognito, and `%` commands.
+See [session.md](session.md) for worktrees, fork, incognito, and `%` commands. See [transfer.md](transfer.md) for the
+`forge transfer` group (inspect and reshape resume context) and the cross-runtime workflow (plan in Claude, implement in
+Codex).
 
 ### Policies -- Code Quality Gates
 

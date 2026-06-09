@@ -47,7 +47,11 @@ _warned_newer_schema = False
 # How the cost/token figures on an event were obtained. Never inferred or faked --
 # an event that lacks an exact figure says so rather than guessing.
 MeasurementSource = Literal[
-    "proxy_request_exact",  # joined to a proxy cost record by request_id
+    # Read-time provenance label only (Slice 4g): a stored event keeps
+    # verb_snapshot_estimated, but the read surface recomputes a proxied run tree's
+    # exact cost from the cost plane (sum of cost records by forge_root_run_id) and
+    # labels that figure proxy_request_exact. Never written onto a stored event.
+    "proxy_request_exact",
     "verb_snapshot_estimated",  # track_verb_cost snapshot delta (estimated; shared-proxy)
     "provider_usage_exact",  # in-band exact tokens: a direct core.llm call, OR a direct
     # `claude -p` envelope with usage but no cost (Phase 5, e.g. OAuth: tokens, no dollars)

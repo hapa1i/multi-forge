@@ -138,7 +138,7 @@ Credentials resolve from environment variables first (`.env`, shell exports), th
 store (`~/.forge/credentials.yaml`, managed by `forge auth login`). Env vars override stored credentials unless
 `auth_ignore_env` is set in `~/.forge/config.yaml`.
 
-Five atomic credentials (defined in `forge.core.auth.capabilities`):
+Six atomic credentials (defined in `forge.core.auth.capabilities`):
 
 | Credential       | Env var(s)                                              | Capabilities                                                                    |
 | ---------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------- |
@@ -146,6 +146,7 @@ Five atomic credentials (defined in `forge.core.auth.capabilities`):
 | `anthropic-api`  | `ANTHROPIC_API_KEY`                                     | Forge subprocesses, `litellm-anthropic-local` + `anthropic-passthrough` proxies |
 | `openai-api`     | `OPENAI_API_KEY`                                        | `litellm-openai-local` proxy                                                    |
 | `gemini-api`     | `GEMINI_API_KEY`                                        | `litellm-gemini-local` proxy                                                    |
+| `codex-api`      | `CODEX_API_KEY`                                         | Native Codex headless runs (`codex exec`); not `OPENAI_API_KEY` / ChatGPT login |
 | `litellm-remote` | `LITELLM_API_KEY` + `LITELLM_BASE_URL`                  | All remote `litellm-*` proxy templates                                          |
 
 `auth_ignore_env: true` in runtime config (`~/.forge/config.yaml`) skips all env vars for credential resolution. Both
@@ -174,7 +175,8 @@ format_missing_credential_error(credential, *, missing_vars, template=None,
 
 `credentials_for_template()` bridges `TEMPLATE_ENV_VARS` (template → env var names) to `CREDENTIALS` (credential →
 metadata) via reverse lookup. `format_missing_credential_error()` produces actionable messages with signup URLs,
-`forge auth login` commands, and `not_needed_for` disambiguation (rendered only for `anthropic-api`).
+`forge auth login` commands, and `not_needed_for` disambiguation (rendered for credentials that define it:
+`anthropic-api` and `codex-api`).
 
 ### A.7 Runtime config (§3.6.10 -- `~/.forge/config.yaml`)
 
@@ -344,8 +346,11 @@ Runtime logs:
 | `~/.forge/costs/verbs/*.jsonl`    | `forge.core.reactive.cost_tracking` | Append-only, user-prune |
 
 Request records contain timestamp, proxy ID, model/tier, token counts, `cost_micros` (null when no route reported a
-cost), request ID, latency, and metric-evidence provenance (`reporter` + `confidence`) — there is no local price
-catalog, so cost is reported-or-unavailable, never inferred from tokens. Verb records contain timestamp, verb name,
+cost), request ID, latency, metric-evidence provenance (`reporter` + `confidence`), and the **run-tree correlation**
+`forge_run_id`/`forge_root_run_id` (§3.14 / §A.13: null for the interactive harness and any non-Forge-originated
+traffic; set when a Forge-routed `claude -p` subprocess forwarded the validated `X-Forge-Run-ID`/`X-Forge-Root-Run-ID`
+headers). There is no local price catalog, so cost is reported-or-unavailable, never inferred from tokens. Both fields
+are additive at `schema_version: 1` (old readers `.get` them as `None`). Verb records contain timestamp, verb name,
 proxy URL/ID when known, before/after snapshots, total cost delta, request count delta, `estimated=true`, and
 `cost_measured` (false when the window moved tokens but reported no cost, so a passthrough verb is not read as $0).
 
@@ -475,18 +480,28 @@ Enumerations are `Literal`s (provenance is recorded, never inferred):
   guessing. `provider_usage_exact` = exact in-band token usage from either a direct `core.llm` call **or** a direct
   `claude -p` envelope that reported `usage` but no cost (Phase 5, e.g. OAuth). `runtime_native` (Phase 5, emitted) = a
   runtime self-reported its own cost+usage: a direct `claude -p --output-format json` run (`reporter=claude_code`), or a
-  native `codex`/`gemini` runtime later.
+  native `codex`/`gemini` runtime later. `proxy_request_exact` (Phase 4g) is the provenance of a **read-time** figure,
+  not a stored event source: a proxied `claude -p` event keeps `verb_snapshot_estimated` in the ledger, but
+  `forge activity` / `forge +$Y` recompute that run tree's cost exactly from the cost plane (sum of cost records by
+  `forge_root_run_id`) and label the result `proxy_request_exact`, **suppressing** the snapshot to avoid
+  double-counting. Suppression is **per-run-subtree** (the snapshot's own run, or a verb whose direct children produced
+  records — derived from worker `parent_run_id`), never whole-root, so a correctly-unstamped sibling sharing the session
+  root keeps its snapshot instead of being silently dropped. A figure with no snapshot estimate mixed in — cost-plane
+  exact (4g root-join) and/or runtime-reported (`runtime_native`) — renders **without** the `~` estimate marker
+  (`cost_estimated=False` on the summary/command DTOs); a figure mixing in a snapshot estimate keeps `~`.
 - `billing_mode`: `api` | `subscription_interactive` | `subscription_headless_credit` | `subscription_quota` | `unknown`
   (`unknown` is the honest default where the signal is ambiguous).
 - `attribution_granularity`: `worker` | `verb` | `session`.
 - `route`: `claude_interactive` | `claude_p` | `forge_proxy` | `core_llm` | `codex_exec` | `gemini_headless` — how the
-  work reached the model (invocation channel). Emitted now: `claude_p`/`core_llm` (plus `None` on an aggregate spanning
-  mixed routes); the rest are reserved (Phase 4/5), like the unemitted `subscription_*` billing modes. `forge_proxy` is
-  reserved **here** — it is emitted now as a `reporter`, not yet as a `route` (it appears in both literals).
+  work reached the model (invocation channel). Emitted now: `claude_p`/`core_llm`/`codex_exec` (plus `None` on an
+  aggregate spanning mixed routes); `claude_interactive`/`gemini_headless` stay reserved, like the unemitted
+  `subscription_*` billing modes. `forge_proxy` is reserved **here** — it is emitted now as a `reporter`, not yet as a
+  `route` (it appears in both literals).
 - `reporter`: `claude_code` | `forge_proxy` | `openrouter` | `litellm` | `provider` | `codex_jsonl` — the source of the
   **metric** evidence (tokens **and/or** a cost figure, *not* specifically cost), so `reporter=provider` alongside
   `confidence=unavailable` is coherent: the provider reported tokens, just no dollars. Emitted now: `provider`,
-  `forge_proxy`, and `claude_code` (Phase 5 — a direct `claude -p` verb/worker that self-reports cost+usage).
+  `forge_proxy`, `claude_code` (Phase 5 — a direct `claude -p` verb/worker that self-reports cost+usage), and
+  `codex_jsonl` (Phase 5c — a `codex exec` run's JSONL `turn.completed.usage`).
 - `confidence`: `reported` | `gateway_calculated` | `inferred` | `unavailable` | `unknown` — trustworthiness of **this
   event's own `cost_micro_usd` only** (token provenance is `measurement_source`; the two axes are orthogonal — the
   tagger is `measurement_source=provider_usage_exact` with `confidence=unavailable`, *not* a contradiction). A null cost
@@ -496,13 +511,17 @@ Enumerations are `Literal`s (provenance is recorded, never inferred):
   `unavailable` (Anthropic passthrough; LiteLLM streaming) — the price catalog was removed, so `inferred` is no longer
   produced on the proxy cost path (the literal remains reserved).
 
-`source_refs` is null on native-runtime events (no proxy) and on `claude -p` traffic until per-request correlation ships
-(Phase 4g); the event stays useful without it (run/model/billing_mode/tokens). Reading skips — with a one-time warning —
-records written by a newer Forge (`schema_version` > current), and (strict on shape) records with unknown fields.
-`read_usage_events()` is the typed read surface. The `route`/`reporter`/`confidence` fields were **added additively at
-`schema_version` 1 (no bump)**: optional + defaulted, so existing v1 records load unchanged. A *pre-Phase-1* reader, by
-contrast, drops the newer records as unknown-field corruption — acceptable for best-effort, PID-sharded, pruned local
-telemetry, and **not** a state to migrate around.
+`source_refs` is null on native-runtime events (no proxy) and stays null on `claude -p` traffic: Phase 4g correlates a
+proxied `claude -p` run to its exact cost through the **run tree** (`forge_root_run_id` stamped on each cost record),
+not through a single-valued `source_refs.cost_request_id` — one run makes many requests, so the run-tree join is the
+right shape and `source_refs` is intentionally left null (the
+`tests/regression/test_bug_usage_claude_p_null_source_refs.py` invariant holds). The event stays useful without it
+(run/model/billing_mode/tokens). Reading skips — with a one-time warning — records written by a newer Forge
+(`schema_version` > current), and (strict on shape) records with unknown fields. `read_usage_events()` is the typed read
+surface. The `route`/`reporter`/`confidence` fields were **added additively at `schema_version` 1 (no bump)**: optional
+\+ defaulted, so existing v1 records load unchanged. A *pre-Phase-1* reader, by contrast, drops the newer records as
+unknown-field corruption — acceptable for best-effort, PID-sharded, pruned local telemetry, and **not** a state to
+migrate around.
 
 **Instrumented emitters (Phase 4c).** The workflow verbs (`panel`/`analyze`/`debate`/`consensus`) emit one estimated
 verb-level event each (`measurement_source=verb_snapshot_estimated`, attributed to the ambient run — per-worker cost is
@@ -514,9 +533,10 @@ path**, Forge resolves the call's base_url synchronously: if it is a registered 
 id); otherwise it sends no header and leaves the ref null (a dangling join is worse than none). Direct-path
 `billing_mode` stays `unknown` unless the caller proves direct + real-credential billing (the tagger routes via local
 LiteLLM with a dummy key, so it can't). All emit best-effort, never gate the work they measure, and record `latency_ms`;
-`claude -p` events carry null `source_refs` (4g). Helpers: `emit_verb_usage`, `emit_usage_for_session_result`,
-`emit_direct_llm_usage` (`forge.core.usage.emit`). Each also stamps `route`/`reporter`/`confidence`: tagger →
-`core_llm`/`provider`/`unavailable`; the verb aggregate claims no single `route`.
+`claude -p` events carry null `source_refs` and join to exact cost by run tree (`forge_root_run_id`, Phase 4g). Helpers:
+`emit_verb_usage`, `emit_usage_for_session_result`, `emit_direct_llm_usage` (`forge.core.usage.emit`). Each also stamps
+`route`/`reporter`/`confidence`: tagger → `core_llm`/`provider`/`unavailable`; the verb aggregate claims no single
+`route`.
 
 **Cost precedence on `claude -p` verbs (Phase 5).** Every `claude -p` run requests `--output-format json`
 (capability-gated, retry-once-and-latch), so the runtime can self-report. Exactly **one** reporter attributes cost per
@@ -524,7 +544,9 @@ run:
 
 - **Proxied** (`base_url` set) → the proxy snapshot wins: `forge_proxy` / `reported` / `verb_snapshot_estimated` with
   snapshot tokens (Claude's Anthropic-priced `total_cost_usd` is ignored — wrong for a non-Anthropic backend and a
-  duplicate of the proxy's report). No snapshot cost → `None` / `unavailable`.
+  duplicate of the proxy's report). No snapshot cost → `None` / `unavailable`. The stored event stays
+  `verb_snapshot_estimated`, but the read surface recomputes the run tree's cost exactly from the cost plane and
+  supersedes this snapshot (Phase 4g `proxy_request_exact`; see §A.13).
 - **Direct** (no proxy) → the runtime self-reports: `claude_code` / `reported` / `runtime_native` with exact in-band
   tokens. A parsed envelope with usage but no cost (OAuth) → `provider_usage_exact` / `unavailable` (tokens kept, cost
   honestly absent). Neither → `unavailable`.
@@ -552,12 +574,13 @@ launcher prints a one-line `render_summary_line(...)` on exit (host, sidecar, fo
 
 Per-emitter session coverage (a per-session summary is honest about what it can attribute):
 
-| Emitter                                               | Tags `session`? | Notes                                                                     |
-| ----------------------------------------------------- | --------------- | ------------------------------------------------------------------------- |
-| Semantic supervisor (`emit_usage_for_session_result`) | Yes             | `session=context.session_name` (= manifest name)                          |
-| Memory writer (`emit_usage_for_session_result`)       | Yes             | `session=session_name`                                                    |
-| Workflow verbs panel/analyze/debate/consensus         | Yes             | threaded `session=$FORGE_SESSION` (verb aggregate + per-worker)           |
-| Action tagger (`emit_direct_llm_usage`)               | No              | policy-internal classification; left untagged (`session_tagging_partial`) |
+| Emitter                                                        | Tags `session`? | Notes                                                                                    |
+| -------------------------------------------------------------- | --------------- | ---------------------------------------------------------------------------------------- |
+| Semantic supervisor (`emit_usage_for_session_result`)          | Yes             | `session=context.session_name` (= manifest name)                                         |
+| Memory writer (`emit_usage_for_session_result`)                | Yes             | `session=session_name`                                                                   |
+| Workflow verbs panel/analyze/debate/consensus                  | Yes             | threaded `session=$FORGE_SESSION` (verb aggregate + per-worker)                          |
+| Transfer curation (`emit_direct_llm_usage`, `transfer-curate`) | Yes             | `session=$FORGE_SESSION`; ai-curated strategy only; `route=core_llm`/`runtime=forge_cli` |
+| Action tagger (`emit_direct_llm_usage`)                        | No              | policy-internal classification; left untagged (`session_tagging_partial`)                |
 
 **Sidecar.** When a sidecar session launches with a proxy id, the launcher mounts `~/.forge/usage/` rw alongside
 `audit/` + `costs/` (§7), so the in-container supervisor/verb events survive the `--rm` container and a sidecar
@@ -1358,7 +1381,7 @@ forge_transfer:
   lineage: [<parent>, <grandparent>, ...]
   transcript_artifact: <forge-root-rel path | null>
   token_estimate: <int | null>
-  target_runtime: claude                    # reserved for Phase 5 cross-runtime tuning
+  target_runtime: claude                    # claude (default) | codex — shipped (5d relabel, 5e bridge)
 ---
 ```
 

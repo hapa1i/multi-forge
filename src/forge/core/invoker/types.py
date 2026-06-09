@@ -16,6 +16,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol
 
+from forge.core.usage.ledger import BillingMode
+
 
 @dataclass(frozen=True)
 class Attribution:
@@ -24,12 +26,16 @@ class Attribution:
     When a request carries one, the invoker emits a per-job :class:`UsageEvent`
     (granularity ``"worker"``). ``command`` is the verb (``"panel"`` ...);
     ``workflow``/``session`` are optional context; ``runtime`` tags the engine.
+    ``billing_mode`` carries a runtime's resolved billing posture (Codex's
+    :class:`CodexPreflight.billing_mode`) to the usage event -- the invoker can't
+    infer it from argv, and Claude leaves it ``None`` (its mode is inferred at emit).
     """
 
     command: str
     workflow: str | None = None
     session: str | None = None
     runtime: str = "claude_code"
+    billing_mode: BillingMode | None = None
 
 
 @dataclass

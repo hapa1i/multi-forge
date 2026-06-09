@@ -52,17 +52,19 @@ class TestCodexSpec:
         s = get_runtime("codex")
         # The card: Codex PreToolUse is NOT a full enforcement boundary.
         assert s.pretool_policy == "partial"
-        assert s.interactive == "beta"  # target, not shipped
-        # Hooks are real but version + feature-flag GATED -- not a bare "yes" a Phase
-        # 5 preflight could mistake for parity; the gate is machine-readable.
+        assert s.interactive == "beta"  # Forge frontend integration is the Phase 6 target
+        # Hooks are real and default-on but version-GATED (>= 0.131.0) -- not a bare
+        # "yes" a Phase 5 preflight could mistake for parity; the gate is machine-readable.
+        # No required hook flag remains; codex_hooks still works as a deprecated alias.
         assert s.native_hooks == "gated"
-        assert s.hook_min_version == "0.124.0"
-        assert s.hook_feature_flag == "codex_hooks"
+        assert s.hook_min_version == "0.131.0"
+        assert s.hook_feature_flag is None
         assert s.native_resume is True
         assert s.usage_source == "jsonl_events"
         assert s.headless_cmd == ("codex", "exec")
         assert s.install_scopes == ()  # Forge does not manage Codex install
-        assert s.note is not None and "codex_hooks" in s.note
+        # Note records the default-on reality + partial-enforcement caveat.
+        assert s.note is not None and "default-on" in s.note
 
 
 class TestGeminiSpec:

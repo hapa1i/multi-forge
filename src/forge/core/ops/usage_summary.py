@@ -57,6 +57,11 @@ class CommandUsage:
     output_tokens: int = 0
     cached_tokens: int = 0
     cost_micro_usd: int | None = None  # sum where measured; None if no event carried cost
+    # False when no verb-snapshot estimate is mixed into this command's figure -- i.e. it
+    # is entirely cost-plane-exact (4g root-join) and/or runtime-reported (runtime_native)
+    # -> rendered without the `~` estimate marker. Defaults True: the safe caveat for
+    # hand-built summaries (see SessionActivitySummary.cost_estimated).
+    cost_estimated: bool = True
 
 
 @dataclass
@@ -90,6 +95,12 @@ class SessionActivitySummary:
     subagents: int = 0
     # Explicit coverage flags (JSON-friendly) so a sparse summary reads honestly.
     cost_partial: bool = False  # some in-scope events lacked a measured cost
+    # False when no verb-snapshot estimate is mixed into the shown total -- the figure is
+    # entirely cost-plane-exact (4g root-join) and/or runtime-reported (runtime_native) ->
+    # rendered without the `~` marker. Defaults True so a hand-built summary stays honestly
+    # approximate until the builder proves it (same safe-caveat rationale as
+    # session_tagging_partial below).
+    cost_estimated: bool = True
     # Some Forge LLM calls (e.g. the action tagger) never tag a session, so a per-session
     # view can undercount. The builder sets this True only when the session has activity
     # (an empty summary has nothing to be partial about); the default True is the safe
@@ -160,9 +171,11 @@ def render_summary_line(summary: SessionActivitySummary) -> str | None:
             parts.append(seg)
 
     if summary.total_cost_micro_usd is not None:
-        # `~` flags the figure as approximate/best-effort (the aggregate mixes route-reported
-        # cost with verb-snapshot estimates); `forge proxy costs show` is the authoritative view.
-        parts.append(f"~${summary.total_cost_micro_usd / 1_000_000:.2f}")
+        # `~` flags the figure as approximate (the aggregate mixes route-reported cost with
+        # verb-snapshot estimates); when no snapshot estimate is mixed in (cost-plane-exact
+        # and/or runtime-reported) it is dropped. `forge proxy costs show` stays authoritative.
+        prefix = "~" if summary.cost_estimated else ""
+        parts.append(f"{prefix}${summary.total_cost_micro_usd / 1_000_000:.2f}")
 
     tokens = summary.total_input_tokens + summary.total_output_tokens
     if tokens:
@@ -209,32 +222,120 @@ def sum_forge_added_cost(session: str, *, since: datetime | None = None) -> int 
     Adding root/session identity to the ledger schema is deferred to a future card.
     """
     events = read_usage_events(session=session, period_start=since)
-    total = 0
-    any_cost = False
-    for event in events:
-        micros = _forge_added_cost_micros(event)
-        if micros is not None:
-            total += micros
-            any_cost = True
-    return total if any_cost else None
+    return _join_session_cost(events, since, exclude_interactive=True, trusted_only=True).total
 
 
 # --- internals ---------------------------------------------------------------
 
 
-def _forge_added_cost_micros(event: UsageEvent) -> int | None:
-    """The event's cost in micro-USD if it counts as Forge-added spend, else None.
+@dataclass
+class _CostJoin:
+    """Result of :func:`_join_session_cost`: the session's cost with provenance flags."""
 
-    Excludes the main interactive-harness channel (``route="claude_interactive"``) --
-    the load-bearing no-blend rule: "Forge-added" is what Forge spends ON TOP of the
-    session the human drives, never the session itself -- and any event whose cost
-    figure is not trustworthy (only ``reported``/``gateway_calculated`` count).
+    total: int | None  # summed micro-USD, or None when nothing in scope carried cost
+    partial: bool  # some in-scope run/event carried no usable cost (incomplete coverage)
+    by_command: dict[str, int]  # per-command micro-USD
+    estimated: bool  # the total mixes in at least one verb-snapshot estimate (-> `~`)
+    estimated_commands: set[str]  # commands whose figure includes a snapshot estimate
+
+
+def _join_session_cost(
+    events: list[UsageEvent],
+    since: datetime | None,
+    *,
+    exclude_interactive: bool,
+    trusted_only: bool,
+) -> _CostJoin:
+    """Authoritative session cost (micro-USD) via the 4g root-join, with event fallback.
+
+    Proxied ``claude -p`` runs that flowed through a Forge proxy take their cost from
+    the **cost plane** (exact, summed by ``forge_root_run_id``) and their event
+    snapshots are **suppressed** so nothing double-counts; direct (``runtime_native``)
+    and pre-4g runs keep their event-sourced cost. The split is race-free: the cost
+    plane is read at query time, long after every request flushed its record.
+
+    Suppression is **per-run-subtree**, not whole-root: a snapshot is superseded only
+    when its OWN run produced cost records, or it is a verb whose DIRECT children did
+    (fan-out). Keying on the whole root would silently drop the snapshot of a
+    correctly-unstamped sibling (e.g. a supervisor routed off-Forge) that shares the
+    session root with a stamped run -- an undercount with no exact figure to replace it.
+    Known edge: a verb whose workers were ALL cancelled (no worker events) can't have
+    its fan-out parentage reconstructed; in practice that run also skips its own emit,
+    so no orphaned snapshot survives to double-count.
+
+    ``exclude_interactive`` drops the harness channel (``route="claude_interactive"``)
+    -- the load-bearing no-blend rule for ``forge +$Y``. ``trusted_only`` keeps only
+    ``reported``/``gateway_calculated`` event cost (``forge +$Y``); the activity table
+    passes False to preserve its "reported-or-estimated, best-effort" semantics. The
+    cost-plane figures are always reported (the writer only sums reported micros).
     """
-    if event.route == ROUTE_CLAUDE_INTERACTIVE:
-        return None
-    if event.confidence not in _FORGE_ADDED_COST_CONFIDENCES:
-        return None
-    return event.cost_micro_usd  # int | None -- None when the route reported no figure
+    roots = {e.root_run_id for e in events if e.root_run_id}
+    per_run: dict[str, int] = {}
+    runs_with_records: set[str] = set()
+    if roots:
+        try:
+            from forge.proxy.cost_logger import sum_reported_cost_by_root
+
+            join = sum_reported_cost_by_root(roots, since=since)
+            per_run = join.per_run
+            runs_with_records = join.runs_with_records
+        except Exception as e:  # best-effort: a cost-plane read failure falls back to event cost
+            logger.debug("4g cost-plane root join failed; using event cost: %s", e)
+
+    run_to_command = {e.run_id: e.command for e in events if e.run_id}
+    # Fan-out parentage: a verb whose DIRECT children produced cost records is superseded
+    # by those exact records. Derived from worker events (parent_run_id == the verb's run,
+    # set by build_claude_env and threaded onto the worker event), so suppression stays
+    # per-subtree -- never whole-root.
+    producer_parents = {e.parent_run_id for e in events if e.run_id in runs_with_records and e.parent_run_id}
+
+    by_command: dict[str, int] = {}
+    estimated_commands: set[str] = set()
+    total = 0
+    any_cost = False
+    estimated = False
+    # A run that reached the proxy but reported no dollars (records present, not in
+    # per_run -- e.g. anthropic-passthrough) is accounted (snapshot suppressed) yet
+    # priceless: the figure shown is incomplete -> partial.
+    partial = bool(runs_with_records - set(per_run))
+
+    # Exact cost-plane cost (proxied 4g), attributed per run -> command.
+    for run_id, micros in per_run.items():
+        total += micros
+        any_cost = True
+        cmd = run_to_command.get(run_id)
+        if cmd is not None:
+            by_command[cmd] = by_command.get(cmd, 0) + micros
+
+    # Event-sourced residual for runs the cost plane did NOT supersede.
+    for event in events:
+        if exclude_interactive and event.route == ROUTE_CLAUDE_INTERACTIVE:
+            continue
+        superseded = event.run_id in runs_with_records or (
+            event.measurement_source == "verb_snapshot_estimated" and event.run_id in producer_parents
+        )
+        if superseded:
+            continue  # cost comes from the cost plane (exact), not this event's snapshot
+        ev_micros = event.cost_micro_usd
+        if trusted_only and event.confidence not in _FORGE_ADDED_COST_CONFIDENCES:
+            ev_micros = None
+        if ev_micros is not None:
+            total += ev_micros
+            any_cost = True
+            by_command[event.command] = by_command.get(event.command, 0) + ev_micros
+            if event.measurement_source == "verb_snapshot_estimated":
+                estimated = True  # a snapshot estimate, not an exact cost-plane figure
+                estimated_commands.add(event.command)
+        else:
+            partial = True
+
+    return _CostJoin(
+        total=total if any_cost else None,
+        partial=any_cost and partial,
+        by_command=by_command,
+        estimated=estimated,
+        estimated_commands=estimated_commands,
+    )
 
 
 def _aggregate_ledger(summary: SessionActivitySummary, session_name: str, since: datetime | None) -> None:
@@ -246,10 +347,10 @@ def _aggregate_ledger(summary: SessionActivitySummary, session_name: str, since:
 
     summary.total_events = len(events)
     by_command: dict[str, CommandUsage] = {}
-    total_cost = 0
-    any_cost = False
-    missing_cost = False
 
+    # Counts + tokens come straight off the events. Cost is computed separately by the
+    # 4g root-join below (proxied claude -p exact, snapshot-suppressed) -- summing
+    # event cost inline here would double-count a fan-out (verb snapshot + exact workers).
     for event in events:
         cu = by_command.setdefault(event.command, CommandUsage(command=event.command))
         # A fan-out's per-worker leaves share the verb's command; count them apart so
@@ -268,16 +369,17 @@ def _aggregate_ledger(summary: SessionActivitySummary, session_name: str, since:
             summary.total_output_tokens += event.output_tokens
         if event.cached_tokens:
             cu.cached_tokens += event.cached_tokens
-        if event.cost_micro_usd is not None:
-            cu.cost_micro_usd = (cu.cost_micro_usd or 0) + event.cost_micro_usd
-            total_cost += event.cost_micro_usd
-            any_cost = True
-        else:
-            missing_cost = True
+
+    cost = _join_session_cost(events, since, exclude_interactive=True, trusted_only=False)
+    for cmd, micros in cost.by_command.items():
+        cu = by_command.setdefault(cmd, CommandUsage(command=cmd))
+        cu.cost_micro_usd = micros
+        cu.cost_estimated = cmd in cost.estimated_commands  # exact (cost-plane) -> no `~`
 
     summary.commands = sorted(by_command.values(), key=lambda c: (c.calls + c.workers, c.calls), reverse=True)
-    summary.total_cost_micro_usd = total_cost if any_cost else None
-    summary.cost_partial = any_cost and missing_cost
+    summary.total_cost_micro_usd = cost.total
+    summary.cost_partial = cost.partial
+    summary.cost_estimated = cost.estimated
 
 
 def _load_manifest(session_name: str, forge_root: str | None):  # type: ignore[no-untyped-def]

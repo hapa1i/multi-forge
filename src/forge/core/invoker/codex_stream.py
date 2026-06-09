@@ -1,0 +1,141 @@
+"""Reducer for the ``codex exec --json`` event stream (Phase 5b).
+
+``codex exec --json`` prints a JSONL *event stream* (one ``{"type": ...}`` object per
+line), not a single result envelope like ``claude -p --output-format json``. This
+module reduces that stream to the three things the invoker needs:
+
+- ``final_text``  -- the assistant's answer (concatenated ``agent_message`` items);
+- token counts    -- lifted from the terminal ``turn.completed.usage``;
+- ``is_error``    -- whether the turn failed (an ``error`` or ``turn.failed`` event).
+
+The shape is pinned to a recorded fixture (``tests/fixtures/codex/``), not the docs:
+when the binary disagrees with a doc, the fixture wins. See that directory's README
+for the authoritative stream shape (codex-cli 0.137.0).
+
+The stream is external subprocess output (a system boundary): malformed lines are
+skipped best-effort (a stray non-JSON log line must not lose the whole answer), but a
+failed turn is always surfaced as ``is_error`` so the caller cannot read a failure as
+success.
+"""
+
+from __future__ import annotations
+
+import json
+from dataclasses import dataclass
+
+# Event ``type`` values we react to. Others (``thread.started``, ``turn.started``,
+# reasoning items, tool items) carry no data the invoker needs and are ignored.
+_AGENT_MESSAGE = "agent_message"
+_ITEM_COMPLETED = "item.completed"
+_TURN_COMPLETED = "turn.completed"
+_ERROR_EVENTS = ("error", "turn.failed")
+
+
+@dataclass(frozen=True)
+class CodexStreamResult:
+    """Reduced outcome of one ``codex exec --json`` stream.
+
+    ``cached_tokens`` is the cache-read subset of ``input_tokens`` (Codex reports it
+    as ``cached_input_tokens``). Token fields are ``None`` when the stream carried no
+    ``turn.completed.usage`` (e.g. a failed turn). ``error_message`` is the first
+    provider error string, kept for diagnostics; ``is_error`` is the decision flag.
+    """
+
+    final_text: str
+    input_tokens: int | None
+    output_tokens: int | None
+    cached_tokens: int | None
+    is_error: bool
+    error_message: str | None
+
+
+def parse_codex_jsonl_stream(stdout: str) -> CodexStreamResult:
+    """Reduce a ``codex exec --json`` JSONL event stream to a :class:`CodexStreamResult`."""
+    texts: list[str] = []
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    cached_tokens: int | None = None
+    is_error = False
+    error_message: str | None = None
+
+    for line in stdout.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            event = json.loads(line)
+        except (json.JSONDecodeError, ValueError):
+            # System boundary: one bad line (stray log output) must not discard the
+            # whole answer. Skip it and keep reducing the rest of the stream.
+            continue
+        if not isinstance(event, dict):
+            continue
+
+        etype = event.get("type")
+        if etype == _ITEM_COMPLETED:
+            text = _agent_message_text(event.get("item"))
+            if text is not None:
+                texts.append(text)
+        elif etype == _TURN_COMPLETED:
+            usage = event.get("usage")
+            if isinstance(usage, dict):
+                # Last-wins: a one-shot `codex exec` emits exactly one terminal
+                # turn.completed, so this assigns once. If a future multi-turn stream emits
+                # several, this keeps the LAST (the final cumulative figure). Revisit to sum
+                # only if probes show per-turn *incremental* usage instead.
+                input_tokens = _as_int(usage.get("input_tokens"))
+                output_tokens = _as_int(usage.get("output_tokens"))
+                cached_tokens = _as_int(usage.get("cached_input_tokens"))
+                # NOTE: `reasoning_output_tokens` is a SUBSET of `output_tokens` (Responses
+                # usage is inclusive), so it is deliberately NOT lifted -- adding it would
+                # double-count. There is no HeadlessResult field for it.
+        elif etype in _ERROR_EVENTS:
+            is_error = True
+            if error_message is None:
+                error_message = _extract_error_message(event)
+
+    return CodexStreamResult(
+        final_text="\n".join(texts),
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        cached_tokens=cached_tokens,
+        is_error=is_error,
+        error_message=error_message,
+    )
+
+
+def _agent_message_text(item: object) -> str | None:
+    """Return the text of an ``item.completed`` item iff it is an ``agent_message``."""
+    if isinstance(item, dict) and item.get("type") == _AGENT_MESSAGE:
+        text = item.get("text")
+        if isinstance(text, str):
+            return text
+    return None
+
+
+def _extract_error_message(event: dict[str, object]) -> str | None:
+    """Pull the provider error string from an ``error`` or ``turn.failed`` event.
+
+    ``error`` carries ``message`` at the top level; ``turn.failed`` nests it under
+    ``error.message``. Both values are the provider's (already stringified) error.
+    """
+    message = event.get("message")
+    if isinstance(message, str):
+        return message
+    nested = event.get("error")
+    if isinstance(nested, dict):
+        nested_message = nested.get("message")
+        if isinstance(nested_message, str):
+            return nested_message
+    return None
+
+
+def _as_int(value: object) -> int | None:
+    """Coerce a usage value to int, tolerating absent/non-numeric fields (boundary)."""
+    if isinstance(value, bool):  # bool is an int subclass; a usage count is never a bool
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    return None

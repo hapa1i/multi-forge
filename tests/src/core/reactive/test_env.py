@@ -500,3 +500,56 @@ class TestBuildClaudeEnvRunIdentity:
             # ...while the source os.environ is untouched.
             assert os.environ[FORGE_DEPTH_VAR] == "1"
             assert os.environ[FORGE_RUN_ID_VAR] == "run_src"
+
+
+class TestCorrelationHeaders:
+    """Slice 4g: build_claude_env stamps X-Forge-Run-ID/-Root-Run-ID into
+    ANTHROPIC_CUSTOM_HEADERS only for a proxy-routed headless child of a PROVEN Forge
+    proxy, treating the two headers as Forge-owned (replace, never duplicate)."""
+
+    from forge.core.run_id import ANTHROPIC_CUSTOM_HEADERS_VAR as _H
+    from forge.core.run_id import FORGE_ROOT_RUN_ID_HEADER as _ROOT_H
+    from forge.core.run_id import FORGE_RUN_ID_HEADER as _RUN_H
+
+    BASE = "http://localhost:8085"
+
+    def _marker_vars(self, base: str | None = None) -> dict[str, str]:
+        # FORGE_SUBPROCESS_PROXY_ID present AND FORGE_SUBPROCESS_BASE_URL == selected url
+        # is the registry-free "proven Forge proxy" path (covers sidecar).
+        return {"FORGE_SUBPROCESS_PROXY_ID": "p1", "FORGE_SUBPROCESS_BASE_URL": base or self.BASE}
+
+    def test_stamps_both_headers_for_proven_proxy(self) -> None:
+        env = build_claude_env(extra_vars=self._marker_vars(), base_url=self.BASE)
+        headers = env.get(self._H, "")
+        assert f"{self._RUN_H}: run_" in headers
+        assert f"{self._ROOT_H}: run_" in headers
+
+    def test_no_header_for_opaque_override_with_inherited_marker(self) -> None:
+        # Inherited marker (points at BASE) but an explicit OPAQUE base_url override:
+        # the marker does NOT own the selected url -> no header (leak gate).
+        env = build_claude_env(extra_vars=self._marker_vars(), base_url="http://evil.example:9999")
+        assert self._H not in env
+
+    def test_no_header_without_base_url(self) -> None:
+        env = build_claude_env(extra_vars=self._marker_vars(), direct=True)
+        assert self._H not in env
+
+    def test_no_header_for_interactive(self) -> None:
+        # derive_run_identity=False is the interactive/root path -> excluded (harness boundary).
+        env = build_claude_env(extra_vars=self._marker_vars(), base_url=self.BASE, derive_run_identity=False)
+        assert self._H not in env
+
+    def test_forge_owned_merge_preserves_user_replaces_stale(self) -> None:
+        vars_ = self._marker_vars()
+        vars_[self._H] = f"X-User: keep\n{self._RUN_H}: run_stale0000000"
+        env = build_claude_env(extra_vars=vars_, base_url=self.BASE)
+        lines = env[self._H].split("\n")
+        assert "X-User: keep" in lines  # user header preserved
+        run_lines = [ln for ln in lines if ln.lower().startswith(self._RUN_H.lower())]
+        assert len(run_lines) == 1  # exactly one (no duplicate)
+        assert "run_stale0000000" not in env[self._H]  # stale value replaced
+
+    def test_header_run_id_matches_env_run_id(self) -> None:
+        env = build_claude_env(extra_vars=self._marker_vars(), base_url=self.BASE)
+        run_id = env[FORGE_RUN_ID_VAR]
+        assert f"{self._RUN_H}: {run_id}" in env[self._H]

@@ -7,6 +7,7 @@ ordered fan-out, timeouts) and per-job usage emission. Phase 5 adds a
 """
 
 from .claude import ClaudeHeadlessInvoker
+from .codex import CodexHeadlessInvoker, prepare_codex_request
 from .types import (
     Attribution,
     HeadlessInvoker,
@@ -17,7 +18,9 @@ from .types import (
 __all__ = [
     "Attribution",
     "ClaudeHeadlessInvoker",
+    "CodexHeadlessInvoker",
     "HeadlessInvoker",
     "HeadlessRequest",
     "HeadlessResult",
+    "prepare_codex_request",
 ]

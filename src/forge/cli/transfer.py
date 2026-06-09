@@ -31,7 +31,7 @@ from forge.core.ops.transfer import (
     show_transfer,
 )
 from forge.core.paths import display_path
-from forge.session.transfer import ResumeStrategy
+from forge.session.transfer import TRANSFER_TARGET_RUNTIMES, ResumeStrategy
 
 _STRATEGY_CHOICES = [s.value for s in ResumeStrategy]
 
@@ -112,11 +112,19 @@ def show_cmd(parent: str, child: str | None, as_json: bool) -> None:
     help="Override strategy (default: the cache's current strategy).",
 )
 @click.option("--depth", type=int, default=None, help="Override lineage depth (default: the cache's current depth).")
-def regenerate_cmd(parent: str, strategy: str | None, depth: int | None) -> None:
+@click.option(
+    "--target-runtime",
+    type=click.Choice(list(TRANSFER_TARGET_RUNTIMES)),
+    default=None,
+    help="Which runtime will consume this context (default: the cache's current target runtime).",
+)
+def regenerate_cmd(parent: str, strategy: str | None, depth: int | None, target_runtime: str | None) -> None:
     """Rebuild the parent cache (generated.md). Never touches children or notes."""
     ctx = ExecutionContext.from_cwd()
     try:
-        result = regenerate_transfer(ctx=ctx, parent=parent, strategy=strategy, depth=depth)
+        result = regenerate_transfer(
+            ctx=ctx, parent=parent, strategy=strategy, depth=depth, target_runtime=target_runtime
+        )
     except ForgeOpError as e:
         print_error_with_tip(
             str(e),
@@ -127,7 +135,7 @@ def regenerate_cmd(parent: str, strategy: str | None, depth: int | None) -> None
 
     console.print(
         f"Regenerated [green]{display_path(result.path)}[/green] "
-        f"[dim](strategy={result.strategy}, depth={result.depth})[/dim]"
+        f"[dim](strategy={result.strategy}, depth={result.depth}, runtime={result.target_runtime})[/dim]"
     )
     for warning in result.warnings:
         console.print(f"[yellow]Warning:[/yellow] {warning}")

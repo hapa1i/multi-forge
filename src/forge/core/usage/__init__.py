@@ -13,6 +13,7 @@ from .correlation import (
     with_forge_request_id,
 )
 from .emit import (
+    emit_codex_usage,
     emit_direct_llm_usage,
     emit_usage_for_session_result,
     emit_verb_usage,
@@ -41,6 +42,7 @@ __all__ = [
     "Route",
     "SourceRefs",
     "UsageEvent",
+    "emit_codex_usage",
     "emit_direct_llm_usage",
     "emit_usage_for_session_result",
     "emit_verb_usage",

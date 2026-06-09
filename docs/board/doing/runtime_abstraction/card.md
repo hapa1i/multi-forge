@@ -181,10 +181,19 @@ sign-in follows ChatGPT workspace controls and credits. See
 OpenAI also documents `codex exec` as non-interactive mode for scripts and CI, including JSONL output with usage events.
 See [Codex non-interactive mode](https://developers.openai.com/codex/noninteractive).
 
-Codex hooks are stable as of Codex CLI 0.124.0 and still require explicit activation with
-`[features] codex_hooks = true`. Lifecycle events include `PreToolUse`, `PermissionRequest`, `PostToolUse`,
-`UserPromptSubmit`, and `Stop`. See [Codex hooks](https://developers.openai.com/codex/hooks) and the
-[Codex changelog](https://developers.openai.com/codex/changelog).
+Codex hooks are **default-on** as of Codex CLI 0.131.0 (the canonical `[features] hooks` key); `[features] codex_hooks`
+is a **deprecated alias** that still works -- do not author new config with it (the 0.134.0 "Remove plugin hooks feature
+flag" change dropped the plugin-hooks on/off *gate*, not the `codex_hooks` alias). The lifecycle has **ten** events:
+`SessionStart`, `SubagentStart`, `PreToolUse`, `PermissionRequest`, `PostToolUse`, `PreCompact`, `PostCompact`,
+`UserPromptSubmit`, `SubagentStop`, and `Stop`. `PreToolUse` can also **rewrite** a tool call in-flight
+(`permissionDecision: "allow"` + `updatedInput`), and `PermissionRequest` is the dedicated approval seam. Hook delivery
+is **conditional on trust**: non-managed hooks must be reviewed/trusted (trust is keyed to the hook's hash, so a
+new/changed hook is skipped until trusted), and untrusted/first-run projects skip project-local `.codex/` hooks
+entirely; only managed hooks (`requirements.toml`, system/MDM/cloud) are trusted by policy. Enterprise
+`allow_managed_hooks_only = true` (in `requirements.toml`) makes Codex ignore user/project/session hooks. See
+[Codex hooks](https://developers.openai.com/codex/hooks) and the
+[Codex changelog](https://developers.openai.com/codex/changelog). *(Verified 2026-06-08 against Codex CLI 0.137.0; the
+original "0.124.0 / `codex_hooks = true` required / five-event" wording reflected a now-stale pin.)*
 
 Forge posture:
 
@@ -195,6 +204,16 @@ Forge posture:
 - ChatGPT-subscription-backed Codex through LiteLLM should remain a candidate compatibility route only after version
   verification and an explicit product decision about how subscription quota appears in Forge usage output. Native
   `codex exec` remains the preferred route for Codex-as-runtime work.
+- **Prefer first-party non-interactive auth for headless Codex** (verified 2026-06-08): `CODEX_API_KEY`,
+  `codex login --device-auth`, or an enterprise-issued Codex access token, resolved/validated via `codex doctor`. These
+  are ToS-clean and supersede the LiteLLM `chatgpt/` subscription route (undocumented by OpenAI, client-identity header
+  spoofing, volatile model roster), which stays a gated last resort.
+- **A Forge proxy fronting Codex must serve the OpenAI Responses API on its Codex-facing endpoint.** Codex now emits
+  `wire_api = "responses"` only -- the custom-provider `wire_api = "chat"` option was removed (hard error) ~Feb 2026 per
+  `config-reference` (the `codex/models` prose still shows a stale either/or). This is a requirement on the
+  **Codex-facing surface only**: the proxy's *backend* may still speak Chat Completions and be translated (e.g.
+  LiteLLM), so the preflight blocks only when the proxy cannot serve Responses to Codex -- never on the backend wire
+  protocol.
 
 ### Anthropic Claude Code
 
@@ -382,6 +401,14 @@ That layer is useful now, but it is not the final runtime usage system. It sees 
 estimate command attribution by snapshotting proxy metrics around a verb; and it does not represent native runtime usage
 from future `codex exec` or `gemini -p` runs.
 
+The snapshot-estimation gap for proxied `claude -p` is closed by Slice 4g (shipped 2026-06-08): Forge stamps its own
+headless subprocess's outbound requests with validated `X-Forge-Run-ID`/`X-Forge-Root-Run-ID` headers (only toward a
+proven Forge proxy), the proxy records `forge_run_id`/`forge_root_run_id` on each cost record, and the read surface sums
+cost records by the **run tree** (`forge_root_run_id`) — an exact join that supersedes the concurrency-fragile snapshot.
+The key is the run tree, not a single-valued `source_refs.cost_request_id` (one run makes many requests), so
+`source_refs` stays null on `claude -p` by design. The deferred OAuth-interactive MITM tier is unrelated: 4g touches
+only Forge's own headless subprocesses through Forge's own proxy with opaque non-secret run ids.
+
 Phase 4 (this runtime-refactor PR) adds the durable usage ledger:
 
 ```text
@@ -564,6 +591,88 @@ layer. It must not resell access, bypass rate limits or safety controls, obscure
 prompts for third-party training, or substitute models without explicit user-visible routing decisions. The purpose is
 to help users verify and control legitimate traffic using their own authorized credentials.
 
+**OAuth interactive wire observability -- deferred decision (2026-06-07).** *Recorded in full so it does not need
+re-deriving. If Anthropic ships another silent harness regression and we reconsider acting on it, start here -- this
+captures the whole reasoning, not just the verdict.*
+
+*The capability under consideration.* Intercept the **interactive OAuth/subscription** Claude session so Forge can
+`inspect` it (drift detection on the system prompt + tool surface) and optionally `override` it (pin reasoning effort
+against silent downgrades) -- the same engine the app-level audit proxy already runs, but applied to the session that
+matters most to subscription (Max/Pro) users. This is the direct counter to the April-2026 postmortem (silent reasoning
+downgrade, thinking-cache bug, hidden "\<=100 words" system-prompt injection), whose strongest motivation is the
+*interactive* session -- which for subscription users is OAuth.
+
+*Why it requires MITM specifically.* OAuth/subscription traffic does **not** honor `ANTHROPIC_BASE_URL`, so the shipped
+app-level passthrough (which works by being the endpoint Claude routes to) cannot see it. The only way onto that wire is
+transparent MITM: TLS-terminate inside the sidecar with a Forge CA, inspect/optionally-mutate, then re-originate to real
+Anthropic **forwarding the user's own OAuth bearer untouched**. (Contrast: today's sidecar interactive session is
+*API-key* -- the in-container proxy holds the upstream key and Claude reaches it via `ANTHROPIC_BASE_URL` -- so it
+sidesteps OAuth entirely. There is nothing to "just turn on.")
+
+*What already exists, so "later" is cheap:*
+
+- The `inspect`/`override` engine (effort pin, `system_prompt_augment`, guards, mutation-safety invariant) -- shipped
+  Phase 2. MITM reuses it verbatim; only the **transport** is new.
+- The CA trust anchor -- `docker/Dockerfile.forge` injects `/forge/docker/certs/*` via `update-ca-certificates` +
+  `NODE_EXTRA_CA_CERTS`, inherited by the sidecar. Built for **Zscaler** (a corporate TLS-terminating MITM), which is
+  also strong evidence Claude Code does **not** cert-pin the messages API (it works behind Zscaler).
+- The redaction layer with the `Authorization`-header denylist + no-plaintext guarantee
+  (`tests/regression/test_bug_audit_header_redaction_no_leak.py`) -- the "forward the bearer, never store it" invariant.
+
+*What's still missing:* (1) a transparent-MITM transport mode on the in-container proxy + redirect (`HTTPS_PROXY` env,
+or iptables/DNS); (2) resolving how the OAuth credential reaches a **Linux** container -- macOS Keychain does **not**
+cross; `~/.claude/.credentials.json` could be mounted, but then the container holds a long-lived subscription token
+**and** the CA private key; (3) a feasibility spike.
+
+*Why deferred -- the real reasons, NOT "Anthropic will behave now":*
+
+1. **The cost motivation is already gone.** `metric_evidence_simplification` (done, PR #18) made Forge track only the
+   cost *it* incurred; the interactive harness stays Claude's number in every regime (OAuth or API), and `payer` is a
+   separate, only-when-provable field (that card's Scope + line 97: "narrows once MITM-by-default puts Forge on the
+   wire... out of scope"). So MITM has **no accounting justification** left -- its only remaining value is
+   observability/control, which is the deferrable part.
+2. **The cost is high and intrinsic** (it does not shrink if the threat recurs):
+   - *Account-safety / detection (the scariest):* a re-originated TLS session fingerprints (JA3, HTTP/2 settings,
+     User-Agent) as **non-Claude-Code** on a **subscription** account -- realistic worst case is account suspension, not
+     credential leakage. "Mimic the CC fingerprint" is an arms race that itself smells like the provider-evasion the
+     compliance posture above forbids.
+   - *ToS gray zone:* TLS-intercepting a subscription session can read as circumventing a security control even
+     read-only; `override` (mutating subscription traffic) is the sharpest corner.
+   - *Criticality:* MITM moves into the critical path of the user's **main** session -- a streaming/TLS/refresh bug or a
+     future Claude Code cert-pin breaks the primary UX, not a best-effort background job.
+   - *Credential exposure:* OAuth token + CA private key co-resident in the `--rm` container.
+   - *UX friction:* the user must run their **entire** interactive session inside a Linux container.
+3. **Spend caps silently become no-ops** under OAuth (subscription = quota, no dollar figure to cap) -- a cost-safety
+   regression for anyone relying on `on_cap_hit: reject`.
+
+*Timing trap (important).* An always-on observer only has value if it is **running before** an incident -- it is a
+flight recorder, not post-crash forensics. So "wait until Anthropic drops the ball again, *then* build" is partly
+self-defeating: by the time you see the regression, the baseline / drift-history / pre-incident audit window is already
+gone. The mitigation is the cheap alternative below, kept warm -- **not** a scramble to build MITM after the fact.
+
+*Gate to build (double -- both required):* (a) a recurring harness-degradation incident that justifies paying the
+account-safety/ToS cost, AND (b) a feasibility spike (mirror the native-relocate spike) proving: OAuth can authenticate
+inside the container; OAuth survives MITM for the **messages API and the token-refresh flow** (refresh hits a different
+host than Zscaler-proven `api.anthropic.com`); and a re-originated TLS session draws no visibly different treatment.
+Explicitly **not** gated on "wait and see if Anthropic behaves."
+
+*Posture if/when built:* `inspect`-first (observe only -- the lowest ToS surface). `override`-on-OAuth is a separate,
+even-more-gated decision (it may be the line we never cross). Keep the metric-evidence **`payer` firewall**: observe the
+wire for drift/control, **never** recompute / re-attribute / blend OAuth cost into "Forge additional cost."
+
+*Containment (already true -- do not break it):* host `claude -p` is direct by construction (the un-proxied escape
+hatch). The in-container proxy binds `127.0.0.1` and publishes **no** port (`docker/entrypoint.sh`), so it is reachable
+only by in-container clients -- a host process gets connection-refused. Do **not** publish the port to "reach" it from
+the host; that sacrifices the design.md §7 port-isolation property. Host-vs-container *is* the direct-vs-proxied choice;
+there is no third option without giving up isolation. Everything here is **sidecar-only** -- host mode, the default, the
+proxy registry, the routing chain, and the app-level passthrough are all untouched.
+
+*Cheap, ToS-clean alternative (worth doing on its own merits, not MITM-coupled):* a golden-prompt / eval canary
+(design.md §"Optional Always-On Proxy" counterweight note) detects harness-drift *effects* -- including the
+wire-invisible system-prompt injection -- by periodically re-running fixed prompts and watching the output distribution.
+No interception, no account risk, not runtime-abstraction-coupled. Tracked as
+`docs/board/proposed/harness_drift_canary/`.
+
 **Audit privacy and retention.** `audit_full_body` is high-risk logging. Full request/response logs can contain source
 code, file contents, tool results, prompts, and accidentally surfaced secrets. Therefore:
 
@@ -690,20 +799,20 @@ inspectable traffic.
 
 Initial target matrix:
 
-| Capability                                                      | Claude Code                      | Codex CLI                                       | Gemini CLI                     |
-| --------------------------------------------------------------- | -------------------------------- | ----------------------------------------------- | ------------------------------ |
-| Interactive frontend                                            | Current default                  | Target beta                                     | Not planned initially          |
-| Headless worker                                                 | `claude -p`                      | `codex exec`                                    | `gemini -p`                    |
-| Native hooks                                                    | Existing Forge integration       | Stable in 0.124.0+; enable `codex_hooks`        | No comparable hook target yet  |
-| Pre-tool policy                                                 | Current Claude hooks             | `PreToolUse` adapter                            | Not initially                  |
-| Usage source                                                    | Transcript/status/proxy fallback | JSONL usage events                              | JSON stats                     |
-| Native resume (within runtime, within CWD)                      | `claude --resume`                | `codex exec resume`                             | Capability-check first         |
-| Curated transfer *input* (accept context doc at start)          | `--append-system-prompt-file`    | Initial user message                            | Initial message                |
-| Curated transfer *output* (generate curation of own transcript) | Yes (transfer curator)           | Yes (via headless invoker)                      | Yes (via headless invoker)     |
-| Always-on proxy compatible                                      | Yes (host or sidecar)            | Yes (host or sidecar)                           | TBD per CLI                    |
-| Request inspectable by Forge                                    | Only through Forge proxy/sidecar | Only through Forge proxy/sidecar; direct opaque | Route-dependent; direct opaque |
-| Gateway route                                                   | Anthropic-compatible base URLs   | Native CLI or first-class ChatGPT LiteLLM route | API/Vertex route only          |
-| Consumer auth as gateway                                        | Not supported by Forge           | Supported only through documented Codex routes  | Not supported                  |
+| Capability                                                      | Claude Code                      | Codex CLI                                                          | Gemini CLI                     |
+| --------------------------------------------------------------- | -------------------------------- | ------------------------------------------------------------------ | ------------------------------ |
+| Interactive frontend                                            | Current default                  | Target beta                                                        | Not planned initially          |
+| Headless worker                                                 | `claude -p`                      | `codex exec`                                                       | `gemini -p`                    |
+| Native hooks                                                    | Existing Forge integration       | Default-on (>= 0.131.0); `codex_hooks` deprecated alias            | No comparable hook target yet  |
+| Pre-tool policy                                                 | Current Claude hooks             | `PreToolUse` adapter                                               | Not initially                  |
+| Usage source                                                    | Transcript/status/proxy fallback | JSONL usage events                                                 | JSON stats                     |
+| Native resume (within runtime, within CWD)                      | `claude --resume`                | `codex exec resume`                                                | Capability-check first         |
+| Curated transfer *input* (accept context doc at start)          | `--append-system-prompt-file`    | `SessionStart` additionalContext (trusted hook) or initial message | Initial message                |
+| Curated transfer *output* (generate curation of own transcript) | Yes (transfer curator)           | Yes (via headless invoker)                                         | Yes (via headless invoker)     |
+| Always-on proxy compatible                                      | Yes (host or sidecar)            | Yes (host or sidecar)                                              | TBD per CLI                    |
+| Request inspectable by Forge                                    | Only through Forge proxy/sidecar | Only through Forge proxy/sidecar; direct opaque                    | Route-dependent; direct opaque |
+| Gateway route                                                   | Anthropic-compatible base URLs   | Native CLI or first-class ChatGPT LiteLLM route                    | API/Vertex route only          |
+| Consumer auth as gateway                                        | Not supported by Forge           | Supported only through documented Codex routes                     | Not supported                  |
 
 ## Shipping Strategy (Phases)
 
@@ -796,13 +905,32 @@ Native-relocate is an experimental spike, not a committed UX until contract test
 - `CodexHeadlessInvoker` using `codex exec` and JSONL usage events.
 - Runtime capability checks and auth preflight for native Codex execution.
 - `forge session start --runtime codex --resume-from <claude-session>` workflow.
-- Target-runtime-aware curator (`--target-runtime codex` adjusts the transfer for Codex's conventions).
+- Target-runtime-aware curator (`--target-runtime codex` adjusts the transfer for Codex's conventions); injected via
+  Codex `SessionStart` additionalContext (the native resume-vs-fresh seam) **when hooks are enabled and the hook is
+  trusted**, with an **initial-user-message fallback** -- `SessionStart` silently no-ops on untrusted/first-run projects
+  or a new/changed (unreviewed) hook, so it cannot be the sole channel.
 - First end-to-end "plan in Claude, implement in Codex via curated transfer" demonstration.
+
+> **Detailed sliced plan + 2026-06-08 research verdict** live in
+> [`checklist.md` Phase 5](./checklist.md#phase-5---cross-runtime-resume). Decided: one-shot `codex exec` transport (the
+> app-server transport is a deferred follow-up). Re-pinned to Codex CLI 0.137.0. The cross-runtime hop stays **curated
+> transfer** (reasoning signatures are non-portable); Codex-side continuation after the hop can use `codex exec resume`
+> (cwd-aware since 0.135.0).
 
 ### Phase 6 -- Codex frontend beta
 
 - Evaluate Codex as an interactive frontend runtime once headless invocation, usage accounting, policy semantics, and
   curated transfer are clear.
+- **Re-scope note (verified 2026-06-08):** Codex's *own* interactive mode is now GA/Stable (`codex`, `codex exec`,
+  `codex resume` all "Stable" in the CLI reference) -- so "beta" describes Forge's integration target, not Codex
+  maturity. A first-class **headless app-server** also shipped (`codex remote-control` 0.130.0; `codex app-server` --
+  default stdio transport, `--stdio`, or `--listen stdio://`; 0.136.0; app-server v2 pairing RPCs 0.137.0): evaluate it
+  as a long-lived RPC transport alternative to one-shot `codex exec` for resumed multi-turn sessions. (Note: official
+  app-server docs describe `--listen stdio://` as the transport selector, while local Codex CLI 0.137.0 also exposes
+  `--stdio` as an alias.) The full Codex hook adapter/responder (exploiting `updatedInput` + `PermissionRequest`)
+  belongs here. Phase 5 instead delivers the curated transfer as the **initial `codex exec` message** (prepended to the
+  prompt via `bridge_session_to_codex`), _not_ a `SessionStart` hook — 5a can't confirm per-hook trust, so hook-based
+  delivery is deferred to this phase.
 
 ## Non-Goals
 
@@ -818,8 +946,11 @@ Native-relocate is an experimental spike, not a committed UX until contract test
   via sidecar mode for users who want audit/control without separate proxy lifecycle).
 - Do not silently mutate signed thinking blocks; the mutation-safety invariant in §"Optional Always-On Proxy (Audit and
   Control)" is load-bearing.
-- Do not implement transparent MITM interception, CA injection, binary modification, or credential extraction. Forge
-  proxy inspection requires explicit Forge routing.
+- Do not extract or store credentials, and do not modify the Claude Code binary -- these stay **categorically
+  forbidden**. Transparent MITM interception + CA injection are **deferred and gated, not forbidden** (see "OAuth
+  interactive wire observability -- deferred decision" under "Optional Always-On Proxy"): they are the only mechanism
+  that can observe an OAuth/subscription *interactive* session, but carry account-safety/ToS cost and stay out of scope
+  until both gates clear. App-level proxy inspection still requires explicit Forge routing.
 
 ## Open Questions
 

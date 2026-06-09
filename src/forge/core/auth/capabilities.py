@@ -84,6 +84,21 @@ CREDENTIALS: dict[str, Credential] = {
         signup_url="https://aistudio.google.com/apikey",
         note="Gemini API key for local LiteLLM proxy routing",
     ),
+    "codex-api": Credential(
+        name="codex-api",
+        env_vars=(EnvVar("CODEX_API_KEY"),),
+        unlocks_features=("Native Codex headless runs (codex exec)",),
+        signup_url="https://platform.openai.com/api-keys",
+        note=(
+            "Non-interactive Codex override. Codex keeps its OWN credential store; run "
+            "'codex doctor' to see resolved auth. Not your ChatGPT login (codex login "
+            "--device-auth) and not OPENAI_API_KEY."
+        ),
+        not_needed_for=(
+            "Codex already logged in via 'codex login'",
+            "Codex via ChatGPT subscription (codex login --device-auth)",
+        ),
+    ),
     "litellm-remote": Credential(
         name="litellm-remote",
         env_vars=(
@@ -158,8 +173,8 @@ def format_missing_credential_error(
     """Build an actionable error message for missing credentials.
 
     Includes what failed, which key(s), signup URL, and the exact
-    ``forge auth login`` command. Renders ``not_needed_for`` only for
-    anthropic-api (where false urgency is common).
+    ``forge auth login`` command. Renders ``not_needed_for`` when the credential
+    defines it (anthropic-api, codex-api -- where false urgency is common).
     """
     key_word = "key" if len(missing_vars) == 1 else "keys"
     var_list = ", ".join(missing_vars)

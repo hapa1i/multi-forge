@@ -7,12 +7,19 @@ headless, hooks, usage source, native resume, install scopes).
 
 from __future__ import annotations
 
+import sys
+
 import click
 from rich.console import Console
 from rich.markup import escape
 from rich.table import Table
 
-from forge.core.runtime import RuntimeSpec, list_runtimes
+from forge.core.runtime import (
+    CodexPreflight,
+    RuntimeSpec,
+    list_runtimes,
+    preflight_codex,
+)
 
 
 @click.group(context_settings={"help_option_names": ["-h", "--help"]})
@@ -99,7 +106,75 @@ def list_cmd(as_json: bool) -> None:
 
     console.print(table)
     # Escape note text: a free-text note may contain bracketed tokens (e.g.
-    # `[features] codex_hooks = true`) that Rich would otherwise eat as markup.
+    # `[features] hooks`) that Rich would otherwise eat as markup.
     for s in specs:
         if s.note:
             console.print(f"[dim]{s.id}: {escape(s.note)}[/dim]")
+
+
+def _render_preflight(console: Console, result: CodexPreflight) -> None:
+    """Render a CodexPreflight as a labeled report (escapes free-text; carries no secret)."""
+    version = result.version or "-"
+    floor_met = "yes" if result.version_ok else "no"
+    ready = "[green]YES[/green]" if result.ready else "[red]NO[/red]"
+
+    console.print("[bold]Codex preflight[/bold]")
+    console.print(f"  Installed:  {'yes' if result.installed else 'no'}")
+    console.print(f"  Version:    {escape(version)} (hook floor met: {floor_met})")
+    console.print(
+        f"  Auth:       {escape(result.auth_method)}  "
+        f"(source: {escape(result.auth_source)}, billing: {escape(result.billing_mode)})"
+    )
+    console.print(f"  Hook seam:  {escape(result.hook_seam)}")
+    console.print(f"  Responses:  {escape(result.proxy_responses)}")
+    if result.doctor_status:
+        console.print(f"  Doctor:     {escape(result.doctor_status)} [dim](informational)[/dim]")
+    console.print(f"  Ready:      {ready}")
+    if not result.ready and result.blocking_reason:
+        console.print()
+        console.print(escape(result.blocking_reason))
+
+
+@runtime.command("preflight")
+@click.argument("runtime_name", metavar="RUNTIME")
+@click.option(
+    "--proxy",
+    "proxy_id",
+    default=None,
+    metavar="PROXY_ID",
+    help="Check Responses support against an existing proxy id (reads proxy.yaml; starts nothing).",
+)
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def preflight_cmd(runtime_name: str, proxy_id: str | None, as_json: bool) -> None:
+    """Preflight a runtime for headless runs: auth, hooks, and Responses readiness.
+
+    Runs the dynamic, per-machine checks the static `forge runtime list` matrix cannot:
+    resolves a non-interactive credential, reads `codex doctor`, checks hook state, and
+    -- with --proxy -- whether that proxy can serve Codex its Responses API. Exits
+    non-zero when the runtime is not ready.
+
+    \b
+    Examples:
+        forge runtime preflight codex
+        forge runtime preflight codex --json
+        forge runtime preflight codex --proxy my-openai-proxy
+    """
+    if runtime_name != "codex":
+        # Codex is the only runtime with a preflight today; this is the dispatch seam.
+        raise click.BadParameter(
+            f"No preflight available for '{runtime_name}' (supported: codex).",
+            param_hint="RUNTIME",
+        )
+
+    result = preflight_codex(proxy_id=proxy_id)
+
+    if as_json:
+        import json
+        from dataclasses import asdict
+
+        click.echo(json.dumps(asdict(result), indent=2))
+    else:
+        _render_preflight(Console(), result)
+
+    if not result.ready:
+        sys.exit(1)

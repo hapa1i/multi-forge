@@ -372,7 +372,8 @@ launch. Your notes are preserved on disk regardless. If you abort, the child rem
 
 Re-resuming the same parent regenerates `generated.md` but never disturbs an existing `children/<child>.md` **or** its
 `.notes.md` overlay. Write your edits to the notes overlay (via `--review` or `forge transfer edit`) so they survive
-regeneration. Inspect or reshape any of this with `forge transfer show|regenerate|edit|diff`.
+regeneration. Inspect or reshape any of this with the `forge transfer` group (`show`/`regenerate`/`edit`/`diff`) — see
+[transfer.md](transfer.md), which also covers the cross-runtime (Codex) workflow.
 
 Resume and fork-recovery launches inject the per-child file directly with `--append-system-prompt-file`. If you
 customize `CLAUDE.md`, do not also add manual references to `.forge/prev_sessions/...` there, or you may duplicate the
