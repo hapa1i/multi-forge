@@ -159,26 +159,28 @@ RUNTIMES: dict[str, RuntimeSpec] = {
         detect=_detect_codex,
         interactive="beta",  # Codex's own interactive mode is GA; Forge frontend integration is the Phase 6 target
         headless=True,
-        native_hooks="gated",  # real hooks, default-on; version-gated only (see hook_* fields)
+        native_hooks="gated",  # hooks exist + enabled, but do NOT fire under headless `codex exec` (see note)
         hook_min_version="0.131.0",  # hooks default-on since 0.131.0; 0.134.0 dropped the plugin-hooks gate, not the alias
         hook_feature_flag=None,  # hooks default-on (no gate); codex_hooks is a deprecated alias -- do not author it
         pretool_policy="partial",  # PreToolUse adapter; NOT a full enforcement boundary (no WebSearch/complex shell)
         usage_source="jsonl_events",
-        native_resume=True,  # codex exec resume (cwd-aware since 0.135.0)
+        native_resume=True,  # codex exec resume, by thread_id; works cross-CWD (Phase 6 probe, 0.138.0)
         install_scopes=(),  # Forge does not manage Codex install scopes yet
-        curated_transfer_in=True,  # SessionStart additionalContext (preferred) or initial user message
+        curated_transfer_in=True,  # headless: initial user message ONLY (SessionStart does not fire under codex exec)
         curated_transfer_out=True,  # via headless invoker
         note=(
             "Hooks are default-on (`[features] hooks`, Codex CLI >= 0.131.0); `codex_hooks` is a deprecated "
-            "alias (still works -- do not author new config with it). Ten lifecycle events incl. SessionStart/"
-            "PreToolUse/PermissionRequest. PreToolUse is a partial guard (does not intercept every tool path) "
-            "but can mutate tool input via updatedInput; PermissionRequest is the approval seam. SessionStart "
-            "additionalContext can inject a transfer doc, but only when hooks are enabled AND the hook is "
-            "trusted (untrusted/first-run projects skip project-local `.codex/` hooks) -- keep an "
-            "initial-message fallback. Enterprise `allow_managed_hooks_only` (requirements.toml) can suppress "
-            "user/project hooks. Codex emits the Responses API (custom-provider `wire_api=chat` removed ~Feb "
-            "2026); a proxy fronting Codex must serve Responses on its Codex-facing endpoint (backend may be "
-            "translated). Verified vs Codex CLI 0.137.0 (2026-06-08)."
+            "alias (still works -- do not author new config with it). BUT the Phase 6 probe (codex-cli 0.138.0, "
+            "2026-06-09: scripts/experiments/codex-hooks/) found hooks do NOT fire under headless `codex exec` -- "
+            "0 firings across all registration surfaces, with `--dangerously-bypass-hook-trust`, and on repeated "
+            "same-home runs. So headless policy enforcement and SessionStart transfer injection are NOT available "
+            "on codex exec; the bridge uses initial-message delivery. Interactive hook firing is UNVERIFIED "
+            "(needs a TTY operator session). Doc-claimed but unverified-by-Forge: ten lifecycle events, "
+            "PreToolUse `updatedInput` mutation, PermissionRequest approval seam, SessionStart additionalContext, "
+            "per-hook-hash trust. Registration validation is shallow -- bogus event names load silently. "
+            "Enterprise `allow_managed_hooks_only` (requirements.toml) can suppress user/project hooks. Codex "
+            "emits the Responses API (custom-provider `wire_api=chat` removed ~Feb 2026); a proxy fronting Codex "
+            "must serve Responses on its Codex-facing endpoint (backend may be translated)."
         ),
     ),
     "gemini": RuntimeSpec(
