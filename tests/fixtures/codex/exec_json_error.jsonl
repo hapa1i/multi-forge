@@ -1,0 +1,4 @@
+{"type":"thread.started","thread_id":"019eaa51-f236-7bc2-be86-6903c9339b46"}
+{"type":"turn.started"}
+{"type":"error","message":"{\"type\":\"error\",\"status\":400,\"error\":{\"type\":\"invalid_request_error\",\"message\":\"The 'totally-invalid-model-zzz-999' model is not supported when using Codex with a ChatGPT account.\"}}"}
+{"type":"turn.failed","error":{"message":"{\"type\":\"error\",\"status\":400,\"error\":{\"type\":\"invalid_request_error\",\"message\":\"The 'totally-invalid-model-zzz-999' model is not supported when using Codex with a ChatGPT account.\"}}"}}

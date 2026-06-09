@@ -93,7 +93,7 @@ class TestStanceSpec:
 
 class TestRunAdversarial:
     @patch("forge.review.routing.resolve_invocation_routing", side_effect=_auto_plan)
-    @patch("forge.core.invoker.claude.subprocess.Popen")
+    @patch("forge.core.invoker._lifecycle.subprocess.Popen")
     def test_replaces_stance_marker(self, mock_popen_cls, mock_routing, tmp_path):
         resource = tmp_path / "eval.md"
         resource.write_text(f"Evaluate: {STANCE_MARKER}\nEnd.")
@@ -111,7 +111,7 @@ class TestRunAdversarial:
         assert STANCE_MARKER not in worker_prompt
 
     @patch("forge.review.routing.resolve_invocation_routing", side_effect=_auto_plan)
-    @patch("forge.core.invoker.claude.subprocess.Popen")
+    @patch("forge.core.invoker._lifecycle.subprocess.Popen")
     def test_ethical_guardrail_present(self, mock_popen_cls, mock_routing, tmp_path):
         """Ethical guardrail is appended to ALL worker prompts."""
         resource = tmp_path / "eval.md"
@@ -127,7 +127,7 @@ class TestRunAdversarial:
         assert ETHICAL_GUARDRAIL in worker_prompt
 
     @patch("forge.review.routing.resolve_invocation_routing", side_effect=_auto_plan)
-    @patch("forge.core.invoker.claude.subprocess.Popen")
+    @patch("forge.core.invoker._lifecycle.subprocess.Popen")
     def test_mandatory_blinding(self, mock_popen_cls, mock_routing, tmp_path):
         """resume_id is always None (mandatory blinding)."""
         resource = tmp_path / "eval.md"
@@ -144,7 +144,7 @@ class TestRunAdversarial:
         assert "--resume" not in cmd
 
     @patch("forge.review.routing.resolve_invocation_routing", side_effect=_auto_plan)
-    @patch("forge.core.invoker.claude.subprocess.Popen")
+    @patch("forge.core.invoker._lifecycle.subprocess.Popen")
     def test_worker_names_include_stance(self, mock_popen_cls, mock_routing, tmp_path):
         resource = tmp_path / "eval.md"
         resource.write_text(f"Evaluate: {STANCE_MARKER}")
@@ -169,7 +169,7 @@ class TestRunAdversarial:
             run_adversarial(str(resource), stances)
 
     @patch("forge.review.routing.resolve_invocation_routing", side_effect=_auto_plan)
-    @patch("forge.core.invoker.claude.subprocess.Popen")
+    @patch("forge.core.invoker._lifecycle.subprocess.Popen")
     def test_output_includes_stances(self, mock_popen_cls, mock_routing, tmp_path):
         resource = tmp_path / "eval.md"
         resource.write_text(f"Evaluate: {STANCE_MARKER}")

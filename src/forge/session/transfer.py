@@ -112,6 +112,7 @@ def _build_frontmatter(
     lineage: list[str],
     transcript_artifact: str | None,
     token_estimate: int | None,
+    target_runtime: str = TRANSFER_TARGET_RUNTIME,
 ) -> str:
     """Build the child-agnostic YAML frontmatter block for a transfer document.
 
@@ -135,7 +136,7 @@ def _build_frontmatter(
             "lineage": list(lineage),
             "transcript_artifact": transcript_artifact,
             "token_estimate": token_estimate,
-            "target_runtime": TRANSFER_TARGET_RUNTIME,
+            "target_runtime": target_runtime,
         }
     }
     block = yaml.safe_dump(payload, sort_keys=False, default_flow_style=False).rstrip()
@@ -758,6 +759,40 @@ def _render_str_list(items: Any) -> list[str]:
     return lines or ["_None captured._"]
 
 
+# Extra Runtime Hints guidance appended for a Codex target. Claude omits this so its
+# rendered body stays byte-identical to the historical single-line hint.
+_CODEX_RUNTIME_HINTS = (
+    "Consumed by `codex exec` (sandboxed, one-shot): implement with Codex idioms -- no "
+    "Anthropic extended-thinking, stay within the sandbox (workspace-write), and drive "
+    "changes through the Codex tool surface."
+)
+
+
+def _runtime_hints_lines(target_runtime: str) -> list[str]:
+    """Render the ``## Runtime Hints`` body for ``target_runtime``.
+
+    Claude (default) is byte-identical to the historical single line so existing caches
+    do not churn; ``codex`` appends one-shot/sandbox guidance.
+    """
+    lines = [f"Target runtime: {target_runtime}."]
+    if target_runtime == "codex":
+        lines += ["", _CODEX_RUNTIME_HINTS]
+    return lines
+
+
+def _append_runtime_hints_if_needed(body: str, target_runtime: str) -> str:
+    """Append a Runtime Hints section for non-Claude compatibility-fallback bodies.
+
+    The historical ``minimal|structured|full`` Claude bodies are preserved byte-for-byte.
+    A Codex-targeted fallback still needs runtime guidance because the body is what 5e
+    will prepend into the initial ``codex exec`` prompt.
+    """
+    if target_runtime == TRANSFER_TARGET_RUNTIME:
+        return body
+    suffix = "\n".join(["", "", "## Runtime Hints", "", *_runtime_hints_lines(target_runtime)])
+    return body.rstrip() + suffix + "\n"
+
+
 def _build_ai_curated_output(
     parent_name: str,
     lineage: list[str],
@@ -767,6 +802,7 @@ def _build_ai_curated_output(
     proxy_template: str | None,
     latest_plan_path: str | None,
     plan_content: str | None = None,
+    target_runtime: str = TRANSFER_TARGET_RUNTIME,
 ) -> str:
     """Render the full schema body from structured curation fields.
 
@@ -807,7 +843,7 @@ def _build_ai_curated_output(
         "",
         "## Runtime Hints",
         "",
-        f"Target runtime: {TRANSFER_TARGET_RUNTIME}.",
+        *_runtime_hints_lines(target_runtime),
         "",
     ]
 
@@ -824,6 +860,7 @@ def _generate_ai_curated_context(
     proxy_template: str | None,
     latest_plan_path: str | None,
     plan_content: str | None = None,
+    target_runtime: str = TRANSFER_TARGET_RUNTIME,
 ) -> tuple[str, list[str], str]:
     """Generate context using an LLM to curate the transcript into the schema.
 
@@ -891,6 +928,7 @@ def _generate_ai_curated_context(
         proxy_template,
         latest_plan_path,
         plan_content=plan_content,
+        target_runtime=target_runtime,
     )
 
     return content, warnings, "full"
@@ -942,6 +980,7 @@ def assemble_transfer_context(
     inline_plan: bool = False,
     parent_worktree_root: Path | None = None,
     child_name: str | None = None,
+    target_runtime: str = TRANSFER_TARGET_RUNTIME,
 ) -> TransferResult:
     """Process parent context for resume and generate context file.
 
@@ -969,6 +1008,9 @@ def assemble_transfer_context(
             ``TransferResult.context_file`` points at the per-child file.
             When omitted, points at the parent-scoped ``generated.md`` (caller
             handles the child copy itself).
+        target_runtime: Which runtime will consume this context (``"claude"`` |
+            ``"codex"``). Stamped into the frontmatter and the ``## Runtime Hints``
+            body. ``"claude"`` (default) renders byte-identically to pre-5d output.
 
     Returns:
         TransferResult with the launch-time context file path and metadata.
@@ -1063,8 +1105,12 @@ def assemble_transfer_context(
             proxy_template,
             latest_plan_path,
             plan_content=plan_content,
+            target_runtime=target_runtime,
         )
         warnings.extend(strategy_warnings)
+
+    if schema_marker != "full":
+        body = _append_runtime_hints_if_needed(body, target_runtime)
 
     content = (
         _build_frontmatter(
@@ -1075,6 +1121,7 @@ def assemble_transfer_context(
             lineage=lineage,
             transcript_artifact=artifacts_path,
             token_estimate=token_estimate,
+            target_runtime=target_runtime,
         )
         + body
     )

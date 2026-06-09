@@ -15,6 +15,7 @@ from forge.session.transfer import (
     AI_CURATION_PROVIDER,
     MAX_TRANSCRIPT_CHARS,
     ResumeStrategy,
+    _build_frontmatter,
     _citation_is_grounded,
     _format_transcript_for_llm,
     _generate_ai_curated_context,
@@ -684,6 +685,116 @@ class TestDecisionCitationValidation:
         sanitized, warnings = _validate_decision_citations(decisions, emitted_turns={1, 2})
         assert sanitized[0]["text"] == "No cite here"
         assert warnings == []
+
+
+class TestTargetRuntimeRelabel:
+    """Slice 5d: ``target_runtime`` threads to frontmatter + Runtime Hints. The claude
+    (default) variant renders byte-identically to pre-5d output -- a relabel, not a
+    schema change."""
+
+    _CURATED = {
+        "goal": "Ship the Codex bridge",
+        "decisions": [{"text": "One run tree across runtimes", "citation": "turn 1"}],
+        "current_state": "Mid-implementation",
+        "files": ["src/forge/core/invoker/codex.py"],
+        "open_questions": ["Sandbox default?"],
+    }
+
+    def _curated_body(self, sample_transcript: Path, target_runtime: str) -> str:
+        from unittest.mock import MagicMock, patch
+
+        mock_adapter = MagicMock()
+        mock_adapter.ask.return_value = json.dumps(self._CURATED)
+        with (
+            patch("forge.core.llm.SyncAdapter", return_value=mock_adapter),
+            patch("forge.core.llm.get_client"),
+        ):
+            content, _warnings, schema = _generate_ai_curated_context(
+                parent_name="p",
+                lineage=["p"],
+                transcript_path=sample_transcript,
+                artifacts_path=None,
+                proxy_template=None,
+                latest_plan_path=None,
+                target_runtime=target_runtime,
+            )
+        assert schema == "full"
+        return content
+
+    def _frontmatter(self, target_runtime: str | None) -> dict:
+        kwargs: dict[str, Any] = dict(
+            parent_name="p",
+            strategy="ai-curated",
+            schema="full",
+            depth=1,
+            lineage=["p"],
+            transcript_artifact=None,
+            token_estimate=None,
+        )
+        if target_runtime is not None:
+            kwargs["target_runtime"] = target_runtime
+        fm, _, _ = parse_transfer_frontmatter(_build_frontmatter(**kwargs))
+        assert fm is not None
+        return fm
+
+    def test_frontmatter_default_is_claude(self) -> None:
+        fm = self._frontmatter(None)
+        assert fm["target_runtime"] == "claude"
+        assert fm["schema_version"] == 1
+
+    def test_frontmatter_codex_keeps_schema_version(self) -> None:
+        fm = self._frontmatter("codex")
+        assert fm["target_runtime"] == "codex"
+        assert fm["schema_version"] == 1  # relabel, never a schema bump
+
+    def test_runtime_hints_claude_is_the_historical_single_line(self, sample_transcript: Path) -> None:
+        body = self._curated_body(sample_transcript, "claude")
+        assert "Target runtime: claude." in body
+        assert "codex exec" not in body  # no Codex guidance leaks into the claude variant
+
+    def test_runtime_hints_codex_names_codex_idioms(self, sample_transcript: Path) -> None:
+        body = self._curated_body(sample_transcript, "codex")
+        assert "Target runtime: codex." in body
+        assert "codex exec" in body
+        assert "sandbox" in body.lower()
+
+    def test_only_runtime_hints_differ_between_variants(self, sample_transcript: Path) -> None:
+        claude_body = self._curated_body(sample_transcript, "claude")
+        codex_body = self._curated_body(sample_transcript, "codex")
+        # Section skeleton (## headers) is identical across variants.
+        claude_headers = [ln for ln in claude_body.splitlines() if ln.startswith("## ")]
+        codex_headers = [ln for ln in codex_body.splitlines() if ln.startswith("## ")]
+        assert claude_headers == codex_headers
+        # Everything before Runtime Hints (Decisions, Files, citations) is byte-identical.
+        assert claude_body.split("## Runtime Hints")[0] == codex_body.split("## Runtime Hints")[0]
+
+    @pytest.mark.parametrize(
+        "strategy",
+        [ResumeStrategy.MINIMAL, ResumeStrategy.STRUCTURED, ResumeStrategy.FULL],
+    )
+    def test_compatibility_fallback_codex_body_gets_runtime_hints(
+        self, tmp_path: Path, strategy: ResumeStrategy
+    ) -> None:
+        from forge.session.models import create_session_state
+
+        result = assemble_transfer_context(
+            parent_name="parent",
+            parent_state=create_session_state(name="parent", worktree_path=str(tmp_path)),
+            forge_root=tmp_path,
+            strategy=strategy,
+            depth=1,
+            get_session=lambda _: None,
+            target_runtime="codex",
+        )
+        assert result.context_file is not None
+        frontmatter, body, warning = parse_transfer_frontmatter(result.context_file.read_text())
+        assert warning is None
+        assert frontmatter is not None
+        assert frontmatter["schema"] == "compatibility-fallback"
+        assert frontmatter["target_runtime"] == "codex"
+        assert "## Runtime Hints" in body
+        assert "codex exec" in body
+        assert "sandbox" in body.lower()
 
 
 class TestAICuratedStrategy:

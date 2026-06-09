@@ -594,6 +594,15 @@ The resume command supports two **resume modes** (`--resume-mode`):
 - **`native`**: Uses `--resume --fork-session` to carry full conversation history. Lossless but lost on `/compact`. No
   context file generated. Requires the parent to have a confirmed `claude_session_id`.
 
+The transfer doc carries a `target_runtime` frontmatter field and a `## Runtime Hints` section (Phase 5d). `claude`
+(default) renders byte-identically to pre-5d output; `codex` relabels both (the curated body stays Claude-worded —
+curation-prompt tuning is a follow-up). Delivery is runtime-specific: Claude uses `--append-system-prompt-file`. Codex
+has **no** system-prompt-file flag, so the curated context will be delivered as the initial `codex exec` message
+(prepended to the prompt) — the prompt-composition seam lands in **5e**; 5b/5d ship the request-builder and the relabel.
+SessionStart-hook delivery for Codex needs the Phase 6 hook adapter (5a's `hook_seam` can't confirm per-hook trust).
+`forge transfer regenerate <parent> --target-runtime {claude|codex}` re-stamps a cache, defaulting the runtime from the
+existing frontmatter so a regenerate never silently flips it back.
+
 > **Why not native for worktree forks?** Claude stores sessions at `~/.claude/projects/<encoded-cwd>/`, so a bare
 > `--resume` can't cross the CWD boundary (2.1.90/2.1.158 fail "No conversation found"). **Worktree forks default to
 > transfer.** The opt-in `fork --resume-mode native-relocate` (host only) relocates the parent JSONL and resumes
@@ -917,6 +926,14 @@ Tokens follow the cost source (no mixed provenance). The opt-in `forge_cost` sta
 `forge +$Y`: Forge-added LLM spend for the session, **excluding** the main interactive harness
 (`route=claude_interactive`), reported-or-unavailable and distinct from Claude's native cost
 ([§A.8](design_appendix.md#a8-status-line-guidance-3611)).
+
+**Native Codex usage (Phase 5b/5c).** A `codex exec` run goes **direct to OpenAI** (no Forge proxy), so there is no
+proxy cost record to join: `emit_codex_usage` records `route=codex_exec`/`reporter=codex_jsonl`/`runtime_native` with
+the **exact** tokens from the JSONL `turn.completed.usage`, but `cost_micro_usd=null`/`source_refs=null` and
+`confidence=unavailable` (the ledger's `confidence` is a cost signal, and Codex reports no dollars — honest absence, not
+a fabricated $0). The event carries the resolved `billing_mode` from `CodexPreflight`. Because the Codex child shares
+its parent's run tree (`stamp_run_identity`), a Codex leaf and a Claude leaf join under the same `root_run_id` in
+`forge activity`.
 
 Each proxy may define:
 
@@ -1597,13 +1614,16 @@ differently by different entry points.
 - Conservative set: fundamental patterns only
 
 The **fan-out runner** (`run_multi_review()`) shapes one already-routed `HeadlessRequest` per worker (model/proxy +
-optional per-worker prompt) and delegates the parallel `claude -p` lifecycle -- per-worker process groups, `os.killpg`
-SIGTERM->SIGKILL cleanup, `ThreadPoolExecutor`, and deterministic `result_map[idx]` ordering -- to
-`ClaudeHeadlessInvoker.run_parallel` (`core/invoker/`). The invoker is the runtime seam Phase 5 swaps for a
-`CodexHeadlessInvoker` without changing the review callers; it also emits one per-worker usage event when a request
-carries attribution (run/model/status/latency; cost null -- the verb aggregate holds the estimated total). The
-**adversarial runner** constrains workers to review/eval skills with stance injection (`{stance_prompt}`), mandatory
-blinding (no peer outputs), and evidence-weighted synthesis.
+optional per-worker prompt) and delegates the parallel lifecycle -- per-worker process groups, `os.killpg`
+SIGTERM->SIGKILL cleanup, `ThreadPoolExecutor`, and deterministic `result_map[idx]` ordering -- to a headless invoker
+(`core/invoker/`). That lifecycle is now runtime-neutral: it lives in `_HeadlessLifecycleBase` (`_lifecycle.py`), and
+two concrete invokers fill template hooks (`_prepare_argv`/`_build_result`/`_emit`/`_is_recoverable_format_rejection`).
+`ClaudeHeadlessInvoker` (the review caller) requests capability-gated `--output-format json`; `CodexHeadlessInvoker`
+runs `codex exec --json` and reduces its JSONL event stream via `parse_codex_jsonl_stream` (Codex's predicate is always
+`False`, so the JSON-retry branch is dead for it). Both emit one per-worker usage event when a request carries
+attribution (run/model/status/latency; cost null -- the verb aggregate holds the estimated total). The **adversarial
+runner** constrains workers to review/eval skills with stance injection (`{stance_prompt}`), mandatory blinding (no peer
+outputs), and evidence-weighted synthesis.
 
 **Runtime registry (`core/runtime/`).** The capability half of the runtime seam (the invoker above is the lifecycle
 half). A frozen `RuntimeSpec` per runtime in a module-level `RUNTIMES` table (mirrors `core/auth/capabilities.py`'s
@@ -1615,7 +1635,8 @@ source, native resume, and install scopes (plus curated-transfer in/out). Partia
 `hook_min_version` (a preflight verifies the version gate rather than parsing prose; `hook_feature_flag` is `None` now
 that Codex hooks are default-on) — so a consumer never mistakes a Codex limit for Claude parity.
 `forge runtime list [--json]` renders the matrix. Claude Code is fully populated; Codex/Gemini declare their limits as
-values. Phase 5's Codex invoker and the auth/runtime preflight will read this registry; nothing branches on it yet.
+values. Phase 5's `CodexHeadlessInvoker` and auth/runtime preflight now read this registry (e.g.
+`get_runtime("codex").headless_cmd` builds the `codex exec` argv; the preflight checks the version gate).
 
 #### 5.5.6 Relationship to policies (workflow unification)
 

@@ -150,6 +150,30 @@ class TestTransferRegenerate:
         assert result.exit_code == 0, result.output
         assert notes.read_text(encoding="utf-8") == "## User Notes\n\nkeep me"
 
+    def test_regenerate_default_target_runtime_is_claude(self, runner: CliRunner, transfer_project: Path) -> None:
+        # The seeded cache is target_runtime=claude; a no-flag regenerate stays claude.
+        result = runner.invoke(main, ["transfer", "regenerate", "planner"])
+        assert result.exit_code == 0, result.output
+        assert "runtime=claude" in result.output
+
+    def test_regenerate_target_runtime_codex_flips_frontmatter(self, runner: CliRunner, transfer_project: Path) -> None:
+        result = runner.invoke(main, ["transfer", "regenerate", "planner", "--target-runtime", "codex"])
+        assert result.exit_code == 0, result.output
+        assert "runtime=codex" in result.output
+        show = runner.invoke(main, ["transfer", "show", "planner", "--json"])
+        assert json.loads(show.output)["frontmatter"]["target_runtime"] == "codex"
+
+    def test_regenerate_defaults_target_runtime_from_cache(self, runner: CliRunner, transfer_project: Path) -> None:
+        # Flip to codex, then a no-flag regenerate must NOT silently flip back to claude.
+        runner.invoke(main, ["transfer", "regenerate", "planner", "--target-runtime", "codex"])
+        result = runner.invoke(main, ["transfer", "regenerate", "planner"])
+        assert result.exit_code == 0, result.output
+        assert "runtime=codex" in result.output
+
+    def test_regenerate_rejects_unknown_target_runtime(self, runner: CliRunner, transfer_project: Path) -> None:
+        result = runner.invoke(main, ["transfer", "regenerate", "planner", "--target-runtime", "gemini"])
+        assert result.exit_code != 0  # click.Choice rejects before the op runs
+
 
 class TestTransferDiff:
     def test_diff_no_drift(self, runner: CliRunner, transfer_project: Path) -> None:

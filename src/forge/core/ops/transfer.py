@@ -54,6 +54,9 @@ class TransferView:
     sections: list[dict[str, Any]]  # ordered ATX-heading map: [{"level", "title"}]
 
 
+_TARGET_RUNTIME_CHOICES = ("claude", "codex")
+
+
 @dataclass(frozen=True)
 class RegenerateResult:
     """Outcome of regenerating a parent cache."""
@@ -64,6 +67,7 @@ class RegenerateResult:
     path: Path  # the rewritten generated.md
     token_estimate: int | None
     warnings: list[str]
+    target_runtime: str
 
 
 def _require_forge_root(ctx: ExecutionContext) -> Path:
@@ -206,33 +210,43 @@ def regenerate_transfer(
     parent: str,
     strategy: str | None = None,
     depth: int | None = None,
+    target_runtime: str | None = None,
 ) -> RegenerateResult:
     """Rewrite only the parent cache (``generated.md``); never touch children.
 
-    Defaults ``strategy``/``depth`` to the existing cache's frontmatter so a
-    regenerate does not silently downgrade an ai-curated or full cache to
-    structured. Falls back to ``structured``/``1`` only when no metadata exists.
+    Defaults ``strategy``/``depth``/``target_runtime`` to the existing cache's
+    frontmatter so a regenerate does not silently downgrade an ai-curated or full
+    cache to structured, nor flip a codex cache back to claude. Falls back to
+    ``structured``/``1``/``claude`` only when no metadata exists.
     """
     forge_root = _require_forge_root(ctx)
     cache = generated_path(forge_root, parent)
 
     eff_strategy = strategy
     eff_depth = depth
-    if (eff_strategy is None or eff_depth is None) and cache.is_file():
+    eff_target_runtime = target_runtime
+    if (eff_strategy is None or eff_depth is None or eff_target_runtime is None) and cache.is_file():
         frontmatter, _, _ = parse_transfer_frontmatter(cache.read_text(encoding="utf-8"))
         if frontmatter:
             if eff_strategy is None and isinstance(frontmatter.get("strategy"), str):
                 eff_strategy = frontmatter["strategy"]
             if eff_depth is None and isinstance(frontmatter.get("depth"), int):
                 eff_depth = frontmatter["depth"]
+            if eff_target_runtime is None and isinstance(frontmatter.get("target_runtime"), str):
+                eff_target_runtime = frontmatter["target_runtime"]
     eff_strategy = eff_strategy or "structured"
     eff_depth = 1 if eff_depth is None else eff_depth
+    eff_target_runtime = eff_target_runtime or "claude"
 
     try:
         resume_strategy = ResumeStrategy(eff_strategy)
     except ValueError as e:
         valid = ", ".join(s.value for s in ResumeStrategy)
         raise ForgeOpError(f"Unknown strategy '{eff_strategy}' (valid: {valid}).") from e
+
+    if eff_target_runtime not in _TARGET_RUNTIME_CHOICES:
+        valid = ", ".join(_TARGET_RUNTIME_CHOICES)
+        raise ForgeOpError(f"Unknown target runtime '{eff_target_runtime}' (valid: {valid}).")
 
     manager = SessionManager()
     try:
@@ -254,6 +268,7 @@ def regenerate_transfer(
         depth=eff_depth,
         get_session=_get,
         child_name=None,  # parent cache only -- children/* stay frozen
+        target_runtime=eff_target_runtime,
     )
     return RegenerateResult(
         parent=parent,
@@ -262,4 +277,5 @@ def regenerate_transfer(
         path=cache,
         token_estimate=result.token_estimate,
         warnings=result.warnings,
+        target_runtime=eff_target_runtime,
     )

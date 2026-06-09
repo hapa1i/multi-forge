@@ -154,6 +154,28 @@ def derive_child_run_identity(env: Mapping[str, str] | None = None) -> RunIdenti
     return RunIdentity(run_id=run_id, parent_run_id=parent.run_id, root_run_id=parent.root_run_id)
 
 
+def stamp_run_identity(env: dict[str, str], *, derive: bool = True) -> None:
+    """Stamp the run-tree triple (FORGE_RUN_ID/PARENT/ROOT) into ``env`` in place.
+
+    Runtime-neutral: shared by ``build_claude_env`` and the Codex request-builder, so a
+    ``codex exec`` child joins the same run tree as its Claude parent (Phase 5 "one run
+    tree"). When ``derive`` is True, derive a child identity from the spawner's
+    ``FORGE_RUN_ID`` already in ``env`` (parent = spawner, root inherited); when False,
+    leave the triple the caller supplied untouched (the process IS the root). Proxy
+    correlation headers and ``FORGE_DEPTH`` are deliberately NOT stamped here -- those
+    are Claude-proxy and recursion-guard concerns the caller owns.
+    """
+    if not derive:
+        return
+    child = derive_child_run_identity(env)
+    env[FORGE_RUN_ID_VAR] = child.run_id
+    env[FORGE_ROOT_RUN_ID_VAR] = child.root_run_id
+    if child.parent_run_id:
+        env[FORGE_PARENT_RUN_ID_VAR] = child.parent_run_id
+    else:
+        env.pop(FORGE_PARENT_RUN_ID_VAR, None)
+
+
 def build_claude_env(
     base_url: str | None = None,
     extra_vars: dict[str, str] | None = None,
@@ -232,18 +254,12 @@ def build_claude_env(
     current_depth = get_forge_depth(env)
     env[FORGE_DEPTH_VAR] = str(current_depth + 1)
 
-    # Stamp the run-tree identity (orthogonal to FORGE_DEPTH). derive_child_run_identity
-    # reads the spawner's FORGE_RUN_ID from `env` BEFORE we overwrite it, so the child's
-    # parent is the spawner and the root is inherited. derive_run_identity=False means the
-    # caller supplied an explicit identity (e.g. an interactive root) via extra_vars.
+    # Stamp the run-tree identity (orthogonal to FORGE_DEPTH). stamp_run_identity reads
+    # the spawner's FORGE_RUN_ID from `env` BEFORE we overwrite it, so the child's parent
+    # is the spawner and the root is inherited. derive_run_identity=False means the caller
+    # supplied an explicit identity (e.g. an interactive root) via extra_vars.
+    stamp_run_identity(env, derive=derive_run_identity)
     if derive_run_identity:
-        child = derive_child_run_identity(env)
-        env[FORGE_RUN_ID_VAR] = child.run_id
-        env[FORGE_ROOT_RUN_ID_VAR] = child.root_run_id
-        if child.parent_run_id:
-            env[FORGE_PARENT_RUN_ID_VAR] = child.parent_run_id
-        else:
-            env.pop(FORGE_PARENT_RUN_ID_VAR, None)
         # Slice 4g: stamp run-tree correlation headers for a proxy-routed headless
         # child so the Forge proxy can attribute its cost records to this run tree.
         # Gated to a *proven* Forge proxy (never an opaque gateway) and to

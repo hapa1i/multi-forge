@@ -101,8 +101,8 @@ def _ok_proc(stdout: str) -> MagicMock:
     return proc
 
 
-@patch("forge.core.invoker.claude.subprocess.run")
-@patch("forge.core.invoker.claude.subprocess.Popen")
+@patch("forge.core.invoker._lifecycle.subprocess.run")
+@patch("forge.core.invoker._lifecycle.subprocess.Popen")
 def test_invoker_fan_out_retries_once_without_flag_and_latches(mock_popen: MagicMock, mock_run: MagicMock) -> None:
     # Primary spawn rejects the flag; the retry is a TRACKED Popen (not subprocess.run),
     # so it stays in `children` and remains terminable under cancellation (the fix).
@@ -123,8 +123,8 @@ def test_invoker_fan_out_retries_once_without_flag_and_latches(mock_popen: Magic
     assert hj.should_request_json(["claude", "-p"]) is False  # latched
 
 
-@patch("forge.core.invoker.claude.subprocess.run")
-@patch("forge.core.invoker.claude.subprocess.Popen")
+@patch("forge.core.invoker._lifecycle.subprocess.run")
+@patch("forge.core.invoker._lifecycle.subprocess.Popen")
 def test_invoker_fan_out_skips_flag_when_latched(mock_popen: MagicMock, mock_run: MagicMock) -> None:
     hj.mark_json_output_unsupported()
     proc = MagicMock()

@@ -27,6 +27,42 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-08
 
+### Phase 5b-5d: Codex headless runtime (invoker + usage + transfer relabel)
+
+**Goal**: Ship the Codex build group -- a `CodexHeadlessInvoker` reusing the hardened lifecycle, a native usage emitter,
+and a `target_runtime`-aware transfer relabel -- so the Phase 5e plan-in-Claude/implement-in-Codex bridge has its parts.
+
+**Key changes**:
+
+- **Probe-first (B0)**: captured a real `codex exec --json` run (codex-cli 0.137.0) verbatim into
+  `tests/fixtures/codex/` (success + error streams + `-o` oracle + provenance README). The fixture is authoritative over
+  docs; it confirmed the doc-sourced token field names (`input_tokens`/`cached_input_tokens`/`output_tokens`).
+- **Parser (B1)**: `core/invoker/codex_stream.py` reduces the JSONL event stream -> `(final_text, tokens, is_error)`; a
+  failed turn (`error`+`turn.failed`) maps to `runtime_is_error`.
+- **Shared lifecycle (B2)**: extracted the hardened `run`/`run_parallel` lifecycle into `_HeadlessLifecycleBase`
+  (`core/invoker/_lifecycle.py`) with six template hooks; `ClaudeHeadlessInvoker` subclasses it ("moved, not changed").
+  Migrated ~30 test patch-strings `claude.<sym>` -> `_lifecycle.<sym>` across the invoker test + 3 review drivers + the
+  json-flag regression; both retry-race canaries stayed green.
+- **Invoker + builder (B3/B4)**: `core/invoker/codex.py` -- `CodexHeadlessInvoker` (format-retry predicate always
+  `False`) + `prepare_codex_request` (argv `codex exec --json --sandbox`, key injected only for env/credential_file
+  auth, no proxy, run-tree triple stamped via the neutral `stamp_run_identity` factored out of `build_claude_env`).
+- **Usage (5c)**: `emit_codex_usage` -- `route=codex_exec`/`reporter=codex_jsonl`/`runtime_native`,
+  `confidence=unavailable` + `cost=None`/`source_refs=None` (direct to OpenAI; honest cost absence), `billing_mode` from
+  `CodexPreflight` via a new optional `Attribution.billing_mode`.
+- **Transfer (5d)**: `target_runtime` threads through `assemble_transfer_context` (default `claude`, byte-identical to
+  pre-5d) -> frontmatter + `## Runtime Hints`; `forge transfer regenerate --target-runtime {claude|codex}` defaults from
+  the cache (no silent flip). Delivery is initial-message (no SessionStart hook -> Phase 6).
+- **Design sync**: `design.md` §5.5.5 (shared `_lifecycle` base + two invokers), §3.14 (native Codex emitter), §3.9
+  (`target_runtime` + initial-message delivery).
+
+**Decisions**: 5c `confidence=unavailable` (ledger confidence is cost-only; Codex reports no $); 5d minimal relabel
+(body stays Claude-worded; curation tuning deferred); SessionStart-hook delivery deferred to Phase 6 (`hook_seam` can't
+confirm per-hook trust).
+
+**Verification**: 430 hermetic unit tests (invoker/usage/transfer/CLI + migrated review/regression); real-codex `@slow`
+smoke green (8s, full stack: builder -> invoker -> real `codex exec` -> parser -> emitter); `mypy` clean (15 files);
+`make pre-commit` clean.
+
 ### Phase 5a: Codex auth/runtime preflight (probe-first)
 
 **Goal**: Ship a read-only native-Codex preflight -- run before any `codex exec` -- that resolves a non-interactive
@@ -1341,110 +1377,48 @@ on `$EDITOR`) and `structured` stays the CLI default (`ai-curated` opt-in via `-
 deterministic and LLM-free). Schema confirmed stable for Phase 5 (`target_runtime` reserved). All Phase 1 boxes ticked;
 card stays in `doing/` for Phases 2-6. No code or tests changed.
 
-## 2026-05-29
+## 2026-05-28 — 2026-05-29 (compacted)
 
-### fix: tombstone `forge handoff run` (memory_substrate follow-up)
+Older entries condensed per the board-contract size policy. Dates, decisions, and verification highlights preserved;
+per-file play-by-play dropped. Full detail in git history.
 
-**Goal**: Make the removed runner path fail with an actionable message, matching the report path.
+### memory_substrate: "handoff" → memory writer + transfer (2026-05-29, PR #8)
 
-**Key changes**: The memory_substrate closeout tombstoned `forge session handoff show` but left `forge handoff run` as a
-generic Click "No such command 'handoff'" dead-end. Added a hidden top-level `handoff` tombstone group
-(`cli/memory_writer.py`, registered in `main.py`) whose `run` command errors with "Use: forge memory-writer run",
-mirroring `session_handoff.py`.
+**Goal**: Split the overloaded "handoff" term into two concepts: **memory writer** (Stop-time project-doc curation) and
+**transfer** (resume/fork context assembly), across code/CLI/config/durable state/docs/skills.
 
-**Verification**: `forge handoff run` (bare and with old flags) exits non-zero naming `forge memory-writer run`, not
-Click's "No such option"; regression `TestOldHandoffRunTombstone` in `test_memory_writer_cli.py` (2 tests).
+**Key changes**: `handoff_agent.py → memory_writer.py`, `handoff.py → transfer.py`
+(`HandoffConfig→MemoryWriterConfig`, `process_handoff→assemble_transfer_context`); CLI
+`forge handoff run → forge memory-writer run`, `forge session handoff show → forge memory report show` (old paths
+tombstoned, error with the replacement). Durable state accept-and-tolerate: `--resume-mode handoff → transfer` (legacy
+read as transfer), `handoff_timeout → memory_writer_timeout` (warn-and-ignore). Internal sweep drove residual `handoff`
+207 → 39, all intentional KEEPs (work-queue `kind="handoff"`, `enqueue_handoff_marker`, the
+`.forge/artifacts/<session>/handoff/` path, the `queued_handoff` Stop field — recorded in `impl_notes.md`).
 
-### memory_substrate: resolve "handoff" naming → memory writer + transfer
+**Verification**: full unit+regression green (4902); `test_handoff_integration.py` (10) green; `make pre-commit` clean.
+Shipped as PR #8 (gemini-3.5-flash catalog work split to PR #9).
 
-**Goal**: Split the overloaded "handoff" term into two clear concepts — the **memory writer** (Stop-time project-doc
-curation) and **transfer** (resume/fork context assembly) — across code, CLI, config, durable state, docs, and skills.
+### Add Claude Opus 4.8 (2026-05-28, retain 4.6 + 4.7)
 
-**Key changes**:
+**Goal**: Add Opus 4.8 as the opt-in Anthropic alternative without shrinking the registry.
 
-- **Session layer**: `git mv handoff_agent.py → memory_writer.py`, `handoff.py → transfer.py`; renamed
-  `HandoffConfig→MemoryWriterConfig`, `HandoffResult→TransferResult`, `process_handoff→assemble_transfer_context`,
-  `run_handoff_agent→run_memory_writer`, `review_dir→memory_report_dir`.
-- **CLI**: `forge session handoff show → forge memory report show` (new `cli/memory_report.py`);
-  `forge handoff run → forge memory-writer run`; old paths are actionable tombstones.
-- **Durable state**: `--resume-mode handoff → transfer` with `confirmed.derivation.resume_mode` accept-and-tolerate
-  (legacy `"handoff"`/`None` read as transfer); config key `handoff_timeout → memory_writer_timeout` (stale-key
-  warn-and-ignore).
-- **Docs/skills**: `docs/end-user/handoff.md → memory.md`; QA `16-handoff.md → 16-memory.md`; 3-layer memory taxonomy
-  table added to design.md §5.6; design/appendix/diagrams/skills synced.
-- **Internal naming sweep (closeout)**: drove residual `handoff` in `src/forge/` from 207 (Phase 0) to 39, all
-  intentional KEEPs. Renamed `handoff_result→transfer_result` (manager.py, session_lifecycle.py); the GC
-  transfer-context subsystem (`_detect_orphan_handoff_files`, `_build_handoff_context_reference_set`,
-  `_clean_handoff_files` → `…transfer…`, incl. the **user-visible** `forge clean` category key
-  `handoff_files→transfer_files`); the cost-tracking verb `handoff→memory-writer`; user-facing resume messages/help; and
-  ~12 `core/reactive`/proxy docstrings ("handoff agent"→"memory writer"). Coupled tests updated (`test_gc.py` ×2,
-  `test_session_resume_review.py`).
+**Key changes**: added `claude-opus-4-8` (5 aliases; $5/$25/$0.50, 1M context, 128K output, adaptive-only, `xhigh`)
+alongside the retained 4.7 and 4.6 — three distinct registry models (`intelligence_score` 98/99/100). The
+`opus`/`claude-opus` defaults + proxy tier mappings stay on **4.6**; 4.8 is opt-in (`--model claude-opus-4-8`), taking
+over 4.7's *role* in review/templates/docs. Review guide `claude-4.7.md → claude-4.8.md`. (Additive correction
+2026-05-29: an initial pass dropped 4.7 from the registry; re-added so catalog/pricing stay additive.)
 
-**Intentional KEEPs** (durable state / routing / fixtures): work-queue marker `kind="handoff"`,
-`enqueue_handoff_marker()`, `marker_id="handoff-<id>"`, the `.forge/artifacts/<session>/handoff/` artifact path, the
-`queued_handoff` Stop-hook field, the `forge session handoff` tombstone, the legacy-value migration messages, and the
-generic-English passport "project-state" wording.
+**Verification**: catalog/pricing + full unit suite green; built-wheel smoke confirms `opus` still resolves to 4.6.
 
-**Verification**: full unit+regression green (4902 passed); the 2 failures
-(`test_session_resume_review::test_editor_nonzero_aborts_launch`,
-`test_removal_patching_system::test_forge_info_no_traceback`) reproduce identically on `origin/main` (f8c07d9) —
-pre-existing, unrelated. `test_handoff_integration.py` (10) green — renamed runtime + `forge memory report show`
-end-to-end. `make pre-commit` clean. Shipped as PR #8; unrelated gemini-3.5-flash catalog work split to PR #9.
+### Simplify memory strategies 7 → 4 (2026-05-28)
 
-## 2026-05-28
+**Goal**: Reduce the strategy enum from 7 to 4, make shadow mode orthogonal, rename `--as → --strategy`.
 
-### Add Claude Opus 4.8 (retain 4.6 + 4.7)
+**Key changes**: removed `debugging`/`patterns` (topic scoping moves to passport `intent`/`captures`) and `suggested`
+(shadow mode is now orthogonal — `--propose` works with any strategy; path prefix `suggested_* → shadow_*`). Renamed
+`--as → --strategy` (`--as` a hidden tombstone). Stale removed-strategy passports rejected with actionable hints.
 
-**Goal**: Add Opus 4.8 (released 2026-05-28) as the opt-in Anthropic alternative without shrinking the registry. The
-catalog and pricing keep Opus 4.6 (default) and Opus 4.7 (prior opt-in) as distinct models; 4.8 takes over 4.7's opt-in
-*role* in selections (review, templates, docs), not its place in the registry.
-
-**Key changes**:
-
-- Catalog + pricing: **added** `claude-opus-4-8` (entry, 5 aliases, `friendly_name`) alongside the retained
-  `claude-opus-4-7` and `claude-opus-4-6` — three distinct registry models (`intelligence_score` 98 / 99 / 100).
-  Researched 4.8 specs ($5/$25/$0.50, 1M context, 128K output, adaptive-only, fixed temperature, `xhigh`);
-  `pricing.yaml` `updated_at` bumped. The `opus`/`claude-opus` defaults and proxy tier mappings stay on 4.6 — 4.8 is
-  opt-in (`--model claude-opus-4-8`), taking over 4.7's role.
-- Review workflow: `claude-opus-4.8` ModelSpec + `_CLAUDE_48_BOUNDED_REVIEW_PROMPT`; three Anthropic proxy templates'
-  `model_alternatives.opus` repointed.
-- Review guide `references/claude-4.7.md` → `claude-4.8.md`, rewritten against the live 4.8 docs (release date, from-4.7
-  migration framing, dropped "new xhigh"; added mid-conversation system messages, fast mode, 1,024-token cache minimum,
-  refusal `stop_details`; kept inherited constraints and 4.6 comparisons).
-- Did NOT add a `max` effort tier (pre-existing cross-model Anthropic effort Forge omits; would fail `_EFFORT_RANK`
-  validation). Left `glm-4.7-flash`, Sonnet/Haiku versions, and `### 4.7` QA section headings untouched.
-- Tests moved in lockstep (catalog/pricing/review/proxy/session/config/supervisor); cosmetic test renames; negative
-  tests now `claude-opus-4.8.1`; new `claude-opus-4-8` pricing test.
-
-**Verification**: full unit suite green (4649 passed; the lone failure is a pre-existing COLUMNS-width-dependent test in
-`test_session_resume_review.py`, reproduced identically on `origin/main`); integration tests pass; `make pre-commit`
-clean; built-wheel clean-install smoke confirms catalog/pricing/guide load via `importlib.resources` and `opus` still
-resolves to `claude-opus-4-6`.
-
-**Additive correction (2026-05-29)**: the initial change renamed `claude-opus-4-7` → `claude-opus-4-8`, dropping 4.7
-from the registry. Re-added `claude-opus-4-7` as a distinct catalog model (`intelligence_score` 99, `friendly_name`
-`Claude Opus 4.7`) with its 5 aliases (pricing unchanged), so catalog/pricing stay additive; 4.8 keeps 4.7's opt-in role
-in review/templates/docs. Verified: model-catalog unit suite green (128 tests); 4.6/4.7/4.8 resolve with
-`intelligence_score` 98/99/100 and `opus` still defaulting to 4.6.
-
-### Simplify memory strategies: 7 to 4, shadow mode orthogonal
-
-**Goal**: Reduce strategy enum from 7 to 4 by removing redundant entries, make shadow mode orthogonal to strategy, and
-rename `--as` to `--strategy`.
-
-**Key changes**:
-
-- Removed `debugging`, `patterns` strategies (topic scoping via passport `intent`/`captures` fields instead).
-- Removed `suggested` strategy (shadow mode is now orthogonal -- `--propose` works with any strategy).
-- Renamed `--as` to `--strategy`; `--as` is a hidden tombstone with rename guidance.
-- Shadow path prefix changed from `suggested_*` to `shadow_*` in `derive_shadow_path()`.
-- Shadow framing in `build_multi_doc_prompt()` now includes proposal-format instructions (checkboxes, rationale,
-  self-prune) that were previously in the `suggested` strategy instruction.
-- Stale passports with removed strategies rejected with actionable hints (`_REMOVED_STRATEGIES`).
-- `_validate_designated_docs()` empty-shadows guard applies unconditionally; `suggested` coupling removed.
-- `--propose` preserves existing passport strategy unless `--strategy` is explicitly passed.
-
-**Verification**: full unit suite passes; `make pre-commit` clean.
+**Verification**: full unit suite + `make pre-commit` clean.
 
 ## 2026-05-22 — 2026-05-26 (compacted)
 

@@ -363,6 +363,71 @@ def emit_worker_usage(
         logger.debug("emit_worker_usage(%s) failed: %s", command, e)
 
 
+def emit_codex_usage(
+    *,
+    run_id: str,
+    command: str,
+    status: str,
+    parent_run_id: str | None = None,
+    root_run_id: str | None = None,
+    workflow: str | None = None,
+    session: str | None = None,
+    model: str | None = None,
+    provider: str | None = "openai",
+    billing_mode: BillingMode | None = None,
+    latency_ms: float | None = None,
+    input_tokens: int | None = None,
+    output_tokens: int | None = None,
+    cached_tokens: int | None = None,
+    runtime: str = "codex",
+) -> None:
+    """Emit a per-run UsageEvent for a native ``codex exec --json`` run.
+
+    Codex runs DIRECT to OpenAI -- there is no Forge proxy in the path, so there is no
+    proxy cost record to join (``source_refs=None``) and no dollar figure
+    (``cost_micro_usd=None``). The JSONL stream still reports exact tokens, so:
+
+    - ``reporter="codex_jsonl"`` / ``measurement_source="runtime_native"`` with the
+      stream's exact tokens (the *tokens* are attributed);
+    - ``confidence="unavailable"`` -- the ledger's ``confidence`` is a **cost** signal,
+      and Codex reports no cost (mirrors the tokens-only direct branch in
+      :func:`_direct_cost_provenance`). Honest absence, never a fabricated $0.
+
+    ``billing_mode`` is the resolved Codex posture (from ``CodexPreflight``); the
+    invoker can't infer it. Best-effort; no-ops without a ``run_id``.
+    """
+    try:
+        if not run_id:
+            return
+        event = UsageEvent(
+            run_id=run_id,
+            parent_run_id=parent_run_id,
+            root_run_id=root_run_id or run_id,
+            runtime=runtime,
+            command=command,
+            status=status,
+            session=session,
+            workflow=workflow,
+            provider=provider,
+            model=model,
+            billing_mode=billing_mode or "unknown",
+            route="codex_exec",
+            reporter="codex_jsonl",
+            confidence="unavailable",
+            measurement_source="runtime_native",
+            attribution_granularity="worker",
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            cached_tokens=cached_tokens,
+            cost_micro_usd=None,  # native runtime: no $ figure (no proxy record to join)
+            latency_ms=round(latency_ms, 1) if latency_ms is not None else None,
+            source_refs=None,  # direct to OpenAI: no Forge proxy request_id exists
+        )
+        log_usage_event(event)
+    except Exception as e:  # best-effort: telemetry must not break the run
+        logger.debug("emit_codex_usage(%s) failed: %s", command, e)
+
+
 def emit_direct_llm_usage(
     *,
     command: str,

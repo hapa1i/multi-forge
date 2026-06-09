@@ -774,14 +774,15 @@ ids; no credential extraction; interactive OAuth session untouched). The deferre
 
 ## Phase 5 - Cross-Runtime Resume
 
-**Status (2026-06-08): planning, Slice 5.0 shipped.** Two adversarially-verified research sweeps re-pinned the external
-tools and corrected stale card assumptions before scoping (verdict below). **Decided:** one-shot `codex exec` transport
-(the app-server transport is a deferred follow-up, tracked under 5b). The cross-runtime hop is **curated transfer**
-(reasoning signatures are non-portable -- confirmed); Codex-side continuation after the hop can use `codex exec resume`.
-Goal: run Codex as a first-class headless runtime and demonstrate "plan in Claude -> implement in Codex" with correct
-auth preflight and usage attribution. Depends on shipped Phase 4 seams (`HeadlessInvoker`/`run_parallel` 4d, runtime
-registry 4e, usage ledger + reserved `codex_exec`/`codex_jsonl`/`runtime_native` literals 4b/4c, run-tree env 4a/4g) and
-the Phase 1 transfer schema (`target_runtime` reserved).
+**Status (2026-06-08): build group shipped (5.0, 5a, 5b, 5c, 5d). 5e (demo) + 5f (end-user docs + Phase 6 record)
+remain.** Two adversarially-verified research sweeps re-pinned the external tools and corrected stale card assumptions
+before scoping (verdict below). **Decided:** one-shot `codex exec` transport (the app-server transport is a deferred
+follow-up, tracked under 5b). The cross-runtime hop is **curated transfer** (reasoning signatures are non-portable --
+confirmed); Codex-side continuation after the hop can use `codex exec resume`. Goal: run Codex as a first-class headless
+runtime and demonstrate "plan in Claude -> implement in Codex" with correct auth preflight and usage attribution.
+Depends on shipped Phase 4 seams (`HeadlessInvoker`/`run_parallel` 4d, runtime registry 4e, usage ledger + reserved
+`codex_exec`/`codex_jsonl`/`runtime_native` literals 4b/4c, run-tree env 4a/4g) and the Phase 1 transfer schema
+(`target_runtime` reserved).
 
 ### Research verdict (verified 2026-06-08; every claim re-fetched from official docs/changelogs)
 
@@ -933,56 +934,84 @@ output/secrets/paths):**
 | Responses report                     | proxy `None` / `proxy.yaml` `wire_shape` / unknown id                                   | `native_direct` / `proxy_unsupported` (cites wire_shape) / `proxy_unsupported` ("not found")                                                                | same                                             |
 | CLI                                  | stubbed `preflight_codex`                                                               | `--json` shape (no secret) + exit 0 ready / exit 1 not-ready / unknown runtime exit 2                                                                       | `tests/src/cli/test_runtime.py`                  |
 
-**5b-5f below are PROVISIONAL** (planned from docs, pre-probe). Per the incremental decision, re-plan them in ONE pass
-from the Stage-A probe note above + 5a's shipped contract (`CodexPreflight`, `hook_seam` honesty, Responses-as-report,
-`billing_mode` values) before executing any of them.
+**5b-5d shipped (2026-06-08); 5e-5f remain PROVISIONAL** (planned, pre-demo). The build group was executed probe-first
+from the approved plan: a real `codex exec --json` run pins the parser, then parser -> shared lifecycle -> invoker ->
+emitter -> transfer relabel.
 
-### Slice 5b - CodexHeadlessInvoker (one-shot `codex exec`)
+**Resolved decisions (baked into shipped code):**
 
-- [ ] Implement `CodexHeadlessInvoker` satisfying the `core/invoker/types.py` `HeadlessInvoker` protocol, reusing the
-  **shipped** `run_parallel` lifecycle (process groups, `os.killpg` SIGTERM->SIGKILL, timeouts, cancellation) from 4d.
-  - Assertion: a Codex headless run returns a `HeadlessResult` with parsed usage; fan-out + cancellation parity with
-    `ClaudeHeadlessInvoker`; uses explicit `--sandbox`/`--profile` (not the deprecated `--full-auto`); Codex-side
-    continuation uses `codex exec resume <SESSION_ID>` (cwd-aware since 0.135.0).
-  - 5a carryover (review 2026-06-08): run `preflight_codex` **once per launch** and pass/cache the `CodexPreflight` (and
-    the `codex_api_key_for_subprocess()` value, when `auth_source in {env, credential_file}`) to the workers -- do NOT
-    call it per worker. `run_doctor=True` is a ~20s ceiling (the full `codex doctor` suite), so a per-worker preflight
-    would multiply that across the fan-out; use `run_doctor=False` for any post-launch re-check.
+- **5c `confidence` = `unavailable`** (not `reported`): the ledger's `confidence` is a **cost** signal and Codex reports
+  no dollars; tokens are still attributed (`reporter=codex_jsonl`/`runtime_native`). Mirrors the Claude tokens-only
+  branch `_direct_cost_provenance`.
+- **5d depth = minimal relabel** (frontmatter `target_runtime` + `## Runtime Hints` body). The curated body stays
+  Claude-worded; curation-prompt tuning is a follow-up.
+- **SessionStart-hook delivery -> Phase 6.** `hook_seam` can't confirm per-hook trust (5a), so the curated transfer will
+  be delivered as the **initial `codex exec` message** (prepended to the prompt) rather than a SessionStart
+  additionalContext hook. 5b/5d ship the request-builder + relabel; the prompt-composition seam is **5e**.
 
-| Test                            | Fixture                             | Assertion                                                                                                                                                             | Test File                                      |
-| ------------------------------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
-| JSONL parse (pinned schema)     | recorded `codex exec --json` stream | parses `item.completed`->`{type: agent_message}` + `turn.completed.usage` incl. `reasoning_output_tokens`; **fails loudly** on missing usage                          | `tests/src/core/invoker/test_codex_invoker.py` |
-| Lifecycle parity                | parallel fan-out + Ctrl+C           | process-group SIGTERM->SIGKILL, deterministic ordering, no orphan (same as 4d)                                                                                        | same                                           |
-| Resume                          | `codex exec resume <id>`            | continuation reuses the prior Codex session                                                                                                                           | same                                           |
-| (deferred) app-server transport | --                                  | recorded follow-up spike: invoker abstraction must not foreclose `codex app-server` (default stdio; `--listen stdio://` or `--stdio`) for resumed multi-turn sessions | (note)                                         |
+### Slice 5b - CodexHeadlessInvoker (one-shot `codex exec`) (DONE 2026-06-08)
 
-### Slice 5c - Codex usage attribution (ledger)
+- [x] **B0 probe-first fixtures.** One real cheap `codex exec --json` captured verbatim (secret-scanned) to
+  `tests/fixtures/codex/{exec_json_success.jsonl,exec_json_error.jsonl,exec_last_message_success.txt,README.md}`
+  (codex-cli 0.137.0). Authoritative over docs; confirmed the doc-sourced token field names.
+- [x] **B1 `parse_codex_jsonl_stream`** (`core/invoker/codex_stream.py`): pure JSONL reducer ->
+  `(final_text, tokens, is_error)`. `final_text == -o oracle`; error stream (`error`+`turn.failed`, exit 1, no usage) ->
+  `runtime_is_error`.
+- [x] **B2 shared lifecycle** moved verbatim into `_HeadlessLifecycleBase` (`core/invoker/_lifecycle.py`) with six
+  template hooks; `ClaudeHeadlessInvoker` subclasses it. ~30 test patch-strings migrated `claude.<sym>` ->
+  `_lifecycle.<sym>` across `test_claude_invoker.py` + 3 review drivers + the json-flag regression; both retry-race
+  canaries + cancellation green ("moved, not changed").
+- [x] **B3/B4 `CodexHeadlessInvoker` + `prepare_codex_request`** (`core/invoker/codex.py`): argv
+  `codex exec --json --sandbox <mode> [-m <model>]`; env built once per launch (inject `CODEX_API_KEY` only when
+  `auth_source in {env, credential_file}`; no `ANTHROPIC_*`/`base_url`); run-tree triple stamped via the neutral
+  `stamp_run_identity` (factored out of `build_claude_env`). Codex's format-retry predicate is always `False` (dead
+  branch). Preflight runs **once** per launch -- the ~20s `codex doctor` ceiling is not multiplied across a fan-out.
 
-- [ ] Emit `UsageEvent`s for Codex runs using the literals reserved in §A.13.
-  - Assertion: Codex runs emit `route=codex_exec`, `reporter=codex_jsonl`, `measurement_source=runtime_native`;
-    consumption fields mapped from `turn.completed.usage`; run-tree ids (4a) carried; `model` = the **actual routed**
-    model (tolerate `fallbackModel` on the Claude side).
+| Test                       | Fixture                                        | Assertion                                                                                                                                                                                | Test File                                                   |
+| -------------------------- | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| Stream parse (pinned)      | `exec_json_success.jsonl` + `-o` oracle        | `final_text == oracle == "OK"`; tokens `(14936, 22, 10624)`; error fixture -> `is_error`                                                                                                 | `tests/src/core/invoker/test_codex_stream.py`               |
+| Claude lifecycle unchanged | 17 existing tests, patch paths -> `_lifecycle` | all green incl. both retry-race + cancellation + ordering                                                                                                                                | `tests/src/core/invoker/test_claude_invoker.py`             |
+| Codex invoker              | Popen replays the fixture                      | `stdout=="OK"`, tokens lifted; error stream -> `runtime_is_error`+rc1; missing binary -> `"codex CLI not found in PATH"`; input-order; run_id surfaced                                   | `tests/src/core/invoker/test_codex_invoker.py`              |
+| No-format-retry            | Claude-rejection stderr                        | exactly one Popen (predicate `False`)                                                                                                                                                    | same                                                        |
+| Request-builder            | preflight stub                                 | argv `codex exec --json`; `CODEX_API_KEY` injected for `credential_file`, NOT for `codex_store`; run-tree triple; `base_url is None`; attribution stamped `runtime=codex`+`billing_mode` | same                                                        |
+| (gated) real smoke         | real `codex` + auth                            | `codex exec --json` returns parsed text + tokens; one `runtime_native` event                                                                                                             | `tests/integration/core/test_codex_exec_smoke.py` (`@slow`) |
 
-| Test                      | Fixture                                                 | Assertion                                                                                 | Test File                                 |
-| ------------------------- | ------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------- |
-| Reserved literals emitted | a Codex run with usage                                  | event carries `route=codex_exec`/`reporter=codex_jsonl`/`runtime_native` + tokens         | `tests/src/core/usage/test_codex_emit.py` |
-| Billing buckets           | API-key vs subscription Codex; subscription `claude -p` | `billing_mode` in {`api`, `subscription_quota`, `subscription_headless_credit`} per route | unit                                      |
-| Run-tree continuity       | spawned under a Forge run                               | `run_id`/`parent`/`root` present; honors the 4a env contract                              | regression                                |
+Deferred (recorded): the `codex app-server`/`--stdio` transport for resumed multi-turn Codex sessions -- one-shot
+`codex exec` ships first; spike before committing if multi-turn resume is clumsy.
 
-### Slice 5d - Target-runtime-aware transfer curator
+### Slice 5c - Codex usage attribution (ledger) (DONE 2026-06-08)
 
-- [ ] Add `--target-runtime codex` to `assemble_transfer_context` (`src/forge/session/transfer.py`), consuming the Phase
-  1 schema's reserved `target_runtime`; tunes **presentation only**.
-  - Assertion: a Codex-targeted transfer renders the 7 AI-snapshot sections tuned for Codex conventions (terseness, tool
-    naming, no Anthropic-thinking assumptions) **without** changing transcript source artifacts or schema semantics
-    (Phase 1 invariant); injected via `SessionStart` additionalContext when hooks are enabled + trusted, **else an
-    initial-user-message fallback** (the seam silently no-ops on untrusted/first-run/unreviewed-hook setups).
+- [x] `emit_codex_usage` (`core/usage/emit.py`): `route=codex_exec`/`reporter=codex_jsonl`/`runtime_native`,
+  `confidence=unavailable`, `cost_micro_usd=None`, `source_refs=None`; tokens from the JSONL; `billing_mode` from
+  `CodexPreflight` (carried via a new optional `Attribution.billing_mode`). Wired through `_emit_codex` in `codex.py`.
 
-| Test                             | Fixture                                           | Assertion                                                         | Test File                                         |
-| -------------------------------- | ------------------------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------- |
-| Presentation-only retune         | same transcript, `--target-runtime codex`         | 7 sections present; source artifacts + `schema_version` unchanged | `tests/src/session/test_transfer.py`              |
-| SessionStart injection (trusted) | fresh Codex session, hooks enabled + hook trusted | doc delivered via `SessionStart` additionalContext                | `tests/src/session/test_codex_transfer_inject.py` |
-| Fallback when seam unavailable   | hooks disabled OR hook untrusted/unreviewed       | doc delivered as the initial user message; never silently dropped | same                                              |
+| Test                      | Fixture                                            | Assertion                                                                                                                         | Test File                                 |
+| ------------------------- | -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| Reserved-literal event    | tokens + `billing_mode="api"`                      | `route=codex_exec`/`reporter=codex_jsonl`/`runtime_native`/`confidence=unavailable`/`cost None`/`source_refs None` + exact tokens | `tests/src/core/usage/test_codex_emit.py` |
+| Invoker-path emission     | `run_parallel` w/ `Attribution(runtime=codex,...)` | one worker event; run-tree ids == stamped env                                                                                     | same                                      |
+| Opt-out / no run id       | no attribution / empty run_id                      | no event                                                                                                                          | same                                      |
+| Run-tree join (5e anchor) | Codex + Claude leaf share root                     | `read_usage_events(root_run_id=...)` returns both                                                                                 | same                                      |
+
+### Slice 5d - Target-runtime transfer (minimal relabel) (DONE 2026-06-08)
+
+- [x] `target_runtime` threaded through `assemble_transfer_context` (default `claude`, byte-identical to pre-5d);
+  replaces the hardcoded `TRANSFER_TARGET_RUNTIME` at the frontmatter stamp + `## Runtime Hints` body.
+  `forge transfer regenerate <parent> --target-runtime {claude|codex}` (`cli/transfer.py` -> `core/ops/transfer.py`),
+  defaulting the runtime from the existing cache frontmatter (never silently flips). Delivery will be initial-message
+  (no system-prompt-file flag; no `$CODEX_HOME/hooks` write); the prompt-composition seam that prepends the transfer
+  body to the `codex exec` prompt is **5e**. Curation-prompt tuning is the deferred follow-up.
+
+| Test                  | Fixture                  | Assertion                                                                                                    | Test File                            |
+| --------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------ | ------------------------------------ |
+| Frontmatter + relabel | `target_runtime="codex"` | frontmatter `target_runtime: codex`; Runtime Hints names Codex idioms (`codex exec`, sandbox)                | `tests/src/session/test_transfer.py` |
+| Invariants            | claude vs codex variant  | `schema_version` unchanged (==1); section skeleton identical; everything before Runtime Hints byte-identical | same                                 |
+| CLI regenerate        | `--target-runtime codex` | frontmatter flips to codex; defaults from cache (no silent flip back); unknown runtime rejected              | `tests/src/cli/test_transfer_cli.py` |
+
+**Verification (build group):** the unit suites above + migrated review/regression suites (430 passing); real-codex
+`@slow` smoke green (8s); `mypy` clean (15 files); `make pre-commit` clean. Design sync done here (the thin/consolidated
+touch the plan scheduled at the build-group tail): `design.md` §5.5.5 (shared `_lifecycle` base + two invokers), §3.14
+(native Codex `runtime_native` emitter), §3.9 (`target_runtime` relabel + initial-message delivery; SessionStart ->
+Phase 6). This resolves 5a's deferred §5.5.5 "future" note; 5f's remaining scope is the end-user guide + Phase 6 record.
 
 ### Slice 5e - Claude->Codex resume demo (the payoff)
 
