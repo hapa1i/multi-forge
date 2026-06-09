@@ -493,13 +493,15 @@ Enumerations are `Literal`s (provenance is recorded, never inferred):
   (`unknown` is the honest default where the signal is ambiguous).
 - `attribution_granularity`: `worker` | `verb` | `session`.
 - `route`: `claude_interactive` | `claude_p` | `forge_proxy` | `core_llm` | `codex_exec` | `gemini_headless` — how the
-  work reached the model (invocation channel). Emitted now: `claude_p`/`core_llm` (plus `None` on an aggregate spanning
-  mixed routes); the rest are reserved (Phase 4/5), like the unemitted `subscription_*` billing modes. `forge_proxy` is
-  reserved **here** — it is emitted now as a `reporter`, not yet as a `route` (it appears in both literals).
+  work reached the model (invocation channel). Emitted now: `claude_p`/`core_llm`/`codex_exec` (plus `None` on an
+  aggregate spanning mixed routes); `claude_interactive`/`gemini_headless` stay reserved, like the unemitted
+  `subscription_*` billing modes. `forge_proxy` is reserved **here** — it is emitted now as a `reporter`, not yet as a
+  `route` (it appears in both literals).
 - `reporter`: `claude_code` | `forge_proxy` | `openrouter` | `litellm` | `provider` | `codex_jsonl` — the source of the
   **metric** evidence (tokens **and/or** a cost figure, *not* specifically cost), so `reporter=provider` alongside
   `confidence=unavailable` is coherent: the provider reported tokens, just no dollars. Emitted now: `provider`,
-  `forge_proxy`, and `claude_code` (Phase 5 — a direct `claude -p` verb/worker that self-reports cost+usage).
+  `forge_proxy`, `claude_code` (Phase 5 — a direct `claude -p` verb/worker that self-reports cost+usage), and
+  `codex_jsonl` (Phase 5c — a `codex exec` run's JSONL `turn.completed.usage`).
 - `confidence`: `reported` | `gateway_calculated` | `inferred` | `unavailable` | `unknown` — trustworthiness of **this
   event's own `cost_micro_usd` only** (token provenance is `measurement_source`; the two axes are orthogonal — the
   tagger is `measurement_source=provider_usage_exact` with `confidence=unavailable`, *not* a contradiction). A null cost
@@ -572,12 +574,13 @@ launcher prints a one-line `render_summary_line(...)` on exit (host, sidecar, fo
 
 Per-emitter session coverage (a per-session summary is honest about what it can attribute):
 
-| Emitter                                               | Tags `session`? | Notes                                                                     |
-| ----------------------------------------------------- | --------------- | ------------------------------------------------------------------------- |
-| Semantic supervisor (`emit_usage_for_session_result`) | Yes             | `session=context.session_name` (= manifest name)                          |
-| Memory writer (`emit_usage_for_session_result`)       | Yes             | `session=session_name`                                                    |
-| Workflow verbs panel/analyze/debate/consensus         | Yes             | threaded `session=$FORGE_SESSION` (verb aggregate + per-worker)           |
-| Action tagger (`emit_direct_llm_usage`)               | No              | policy-internal classification; left untagged (`session_tagging_partial`) |
+| Emitter                                                        | Tags `session`? | Notes                                                                                    |
+| -------------------------------------------------------------- | --------------- | ---------------------------------------------------------------------------------------- |
+| Semantic supervisor (`emit_usage_for_session_result`)          | Yes             | `session=context.session_name` (= manifest name)                                         |
+| Memory writer (`emit_usage_for_session_result`)                | Yes             | `session=session_name`                                                                   |
+| Workflow verbs panel/analyze/debate/consensus                  | Yes             | threaded `session=$FORGE_SESSION` (verb aggregate + per-worker)                          |
+| Transfer curation (`emit_direct_llm_usage`, `transfer-curate`) | Yes             | `session=$FORGE_SESSION`; ai-curated strategy only; `route=core_llm`/`runtime=forge_cli` |
+| Action tagger (`emit_direct_llm_usage`)                        | No              | policy-internal classification; left untagged (`session_tagging_partial`)                |
 
 **Sidecar.** When a sidecar session launches with a proxy id, the launcher mounts `~/.forge/usage/` rw alongside
 `audit/` + `costs/` (§7), so the in-container supervisor/verb events survive the `--rm` container and a sidecar
@@ -1378,7 +1381,7 @@ forge_transfer:
   lineage: [<parent>, <grandparent>, ...]
   transcript_artifact: <forge-root-rel path | null>
   token_estimate: <int | null>
-  target_runtime: claude                    # reserved for Phase 5 cross-runtime tuning
+  target_runtime: claude                    # claude (default) | codex — shipped (5d relabel, 5e bridge)
 ---
 ```
 

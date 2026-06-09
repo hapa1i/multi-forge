@@ -27,6 +27,32 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-09
 
+### Phase 5f: Phase 5 doc sync + `forge transfer` end-user guide (docs-only closeout)
+
+**Goal**: Sync the normative + end-user docs to shipped Phase 5 (Codex headless runtime) behavior and close out Phase 5.
+
+**Key changes**:
+
+- `design.md` §3.9 rewritten from pre-5e future tense to shipped: the `bridge_session_to_codex` cross-runtime hop
+  (parent -> ai-curated Codex-targeted transfer -> body prepended to the `codex exec` prompt -> `CodexHeadlessInvoker`,
+  one run tree), initial-message delivery as the Phase 5 mechanism (SessionStart-hook delivery deferred to Phase 6), and
+  the honest CLI status (no `--runtime codex` frontend yet; user surface = `regenerate --target-runtime codex` + manual
+  `codex exec`). §3.14 gained a "Transfer curation usage (Phase 5e)" paragraph. The bridge is documented in §3.9 (a
+  cross-runtime resume-delivery op), not §5.5.5, which was already correct.
+- `design_appendix.md` §A.13: `codex_exec` (route) + `codex_jsonl` (reporter) flipped reserved -> emitted; the
+  per-emitter table gained the `transfer-curate` row; §M.1 `target_runtime` comment de-staled.
+- New end-user guide `docs/end-user/transfer.md` (the chosen home): documents the previously-undocumented
+  `forge transfer show|regenerate|edit|diff` group + the three-file model + the cross-runtime "plan in Claude, implement
+  in Codex" workflow (honest that the one-command bridge is Phase 6). Registered in `README.md`; `session.md` repointed.
+- `card.md` Phase 6 note corrected ("Phase 5 uses only `SessionStart`" was wrong -> initial-message delivery). The dated
+  5a change_log "provisional" line is left as a historical snapshot.
+
+**Verification**: `make pre-commit` clean (mdformat + the new guide); design docs under the tiktoken size hook; grep
+gates clean (`SessionStart` outside `done/` names initial-message delivery; `codex_exec`/`codex_jsonl` shown as
+emitted); `forge transfer --help`/`regenerate --help` confirm the guide matches the shipped CLI; the documented
+`regenerate -> show -> codex exec` path is covered end-to-end by the 5e real-codex E2E
+(`tests/integration/core/test_claude_to_codex_resume.py`). **Phase 5 is complete** (5.0/5a-5f shipped).
+
 ### Phase 5e: Claude->Codex resume bridge (the payoff)
 
 **Goal**: Compose the Phase 5 build-group parts into the "plan in Claude -> implement in Codex via curated transfer"
@@ -799,8 +825,8 @@ Condensed per the board-contract size policy (decisions/breaking changes/deferre
   `session=$FORGE_SESSION`; action tagger left untagged (documented). design §3.14/§4.0, appendix §A.13.
 - **Sidecar usage-ledger mount**: `usage/` mounted rw (symmetric with audit/costs, proxy-id gated) so in-container
   supervisor/verb events survive `--rm`; integration-verified host-side after teardown.
-- **Review fixes**: workflow double-count (an N-worker panel read as N+1 workflows) fixed by splitting worker events into
-  `CommandUsage.workers`; supervisor-warning misattribution fixed (warnings now from the `semantic.supervisor`
+- **Review fixes**: workflow double-count (an N-worker panel read as N+1 workflows) fixed by splitting worker events
+  into `CommandUsage.workers`; supervisor-warning misattribution fixed (warnings now from the `semantic.supervisor`
   sub-decision only). Regressions for both.
 - **QA-surfaced proxy bugs**: proxy accepts Claude mid-conversation `{"role":"system"}` messages (was a local 422);
   passthrough streaming errors surface their real status + malformed/non-object JSON -> 400/422; `smoke_test_proxy`
@@ -811,14 +837,16 @@ Condensed per the board-contract size policy (decisions/breaking changes/deferre
 
 Config-driven status line shipped in five phases: (1) segment registry + lazy `RenderContext` + earthy palette/glyphs as
 an output-level ANSI remap -- **break**: the flat `show_rate_limits` key removed -> opt-in `rate_limits` segment
-(actionable reset message on load/set/reset); (2) billing-aware cost (`api`->$ / `subscription`->quota / `ambiguous`->`≈$`)
-+ `rate_limits` object-shape fix + a sanity-capped reset countdown; (3) throttled file-backed `cache_hit` (a
-deduped-by-`requestId` transcript primitive matching the proxy's cache-read formula; hashed session-id key, runtime-only
--- never raises); (4) four Forge-unique opt-in segments -- `supervisor`/`policy` over effective session state,
-`audit`/`drift` over proxy `GET /` truth, real-route drift; (5) spend-cap proximity (`_attach_cap_summary` ->
-`metrics.costs.caps`; a binding-window `cap:…` segment; sub-cent `_fmt_cap_money` precision). A golden no-op guard
-freezes byte-identical default output (API billing path); each phase shipped `make pre-commit` clean with
-`test_status_line_integration.py` green.
+(actionable reset message on load/set/reset); (2) billing-aware cost (`api`->$ / `subscription`->quota /
+`ambiguous`->`≈$`)
+
+- `rate_limits` object-shape fix + a sanity-capped reset countdown; (3) throttled file-backed `cache_hit` (a
+  deduped-by-`requestId` transcript primitive matching the proxy's cache-read formula; hashed session-id key,
+  runtime-only -- never raises); (4) four Forge-unique opt-in segments -- `supervisor`/`policy` over effective session
+  state, `audit`/`drift` over proxy `GET /` truth, real-route drift; (5) spend-cap proximity (`_attach_cap_summary` ->
+  `metrics.costs.caps`; a binding-window `cap:…` segment; sub-cent `_fmt_cap_money` precision). A golden no-op guard
+  freezes byte-identical default output (API billing path); each phase shipped `make pre-commit` clean with
+  `test_status_line_integration.py` green.
 
 ## 2026-06-02
 
@@ -873,21 +901,21 @@ fix to the post-#6 shadow-curation invocation; tracked for whoever owns #6's sur
 
 ## 2026-06-01 (compacted)
 
-Condensed per the board-contract size policy (dates, decisions, breaking changes, deferred items, and design.md
-pointers preserved; per-file play-by-play dropped -- full detail in git history).
+Condensed per the board-contract size policy (dates, decisions, breaking changes, deferred items, and design.md pointers
+preserved; per-file play-by-play dropped -- full detail in git history).
 
 ### runtime_abstraction Phase 4 (Slices 4a-4f): runtime-abstraction core
 
 - **4a run-tree env contract**: `RunIdentity` + `FORGE_RUN_ID`/`FORGE_PARENT_RUN_ID`/`FORGE_ROOT_RUN_ID`, orthogonal to
-  the `FORGE_DEPTH` recursion guard; interactive launches mint a fresh root (centralized in `invoke._build_environment`);
-  the memory writer re-roots under the session's snapshotted origin identity and scrubs the drainer's run-tree/session
-  vars. design_appendix §F.5/§C.1.
-- **4b usage-attribution ledger**: durable versioned `~/.forge/usage/events/` -- the third plane, joined to cost/audit by
-  `request_id`. `UsageEvent` (schema v1, strict typed reads where an unknown field == corruption), PID-sharded shards, a
-  best-effort never-raising writer (modeled on `audit_logger`, not the unversioned `cost_logger`). design §3.14, appendix
-  §A.13.
-- **4c instrument native+direct paths**: `track_verb_cost` yields a cost holder; emitters wired for the 4 workflow verbs +
-  memory-writer/supervisor/shadow + the action tagger (`ask`->`complete` to capture exact provider tokens + forward
+  the `FORGE_DEPTH` recursion guard; interactive launches mint a fresh root (centralized in
+  `invoke._build_environment`); the memory writer re-roots under the session's snapshotted origin identity and scrubs
+  the drainer's run-tree/session vars. design_appendix §F.5/§C.1.
+- **4b usage-attribution ledger**: durable versioned `~/.forge/usage/events/` -- the third plane, joined to cost/audit
+  by `request_id`. `UsageEvent` (schema v1, strict typed reads where an unknown field == corruption), PID-sharded
+  shards, a best-effort never-raising writer (modeled on `audit_logger`, not the unversioned `cost_logger`). design
+  §3.14, appendix §A.13.
+- **4c instrument native+direct paths**: `track_verb_cost` yields a cost holder; emitters wired for the 4 workflow verbs
+  \+ memory-writer/supervisor/shadow + the action tagger (`ask`->`complete` to capture exact provider tokens + forward
   `X-Request-ID`); conservative `billing_mode` (no key-presence inference); `measurement_source=provider_usage_exact`
   added. Review fixes: the direct-path `request_id` join actually records its ref; `latency_ms` populated on every path.
 - **4d HeadlessInvoker + review fan-out migration**: new `core/invoker/` (`HeadlessRequest`/`Result`/`Attribution` + the
@@ -901,9 +929,9 @@ pointers preserved; per-file play-by-play dropped -- full detail in git history)
   Nothing branches on it yet. design §5.5.5.
 - **4f runtime-tagged ActionContext + named Claude hook adapter/responder**: `ActionContext.runtime` is **required**
   attribution metadata (the policy engine never branches on it, stays runtime-agnostic); the two Claude-specific halves
-  named behind runtime-neutral `HookAdapter`/`HookResponder` protocols (the Codex adapter/responder is the Phase 6 stub).
-  Output bytes + exit codes unchanged (77 hook-command snapshot tests untouched). design §4.1.4/§4.1.5. Integration:
-  `test_policy_hooks.py` 10/10 through the real wheel CLI.
+  named behind runtime-neutral `HookAdapter`/`HookResponder` protocols (the Codex adapter/responder is the Phase 6
+  stub). Output bytes + exit codes unchanged (77 hook-command snapshot tests untouched). design §4.1.4/§4.1.5.
+  Integration: `test_policy_hooks.py` 10/10 through the real wheel CLI.
 
 ### Phase 3: native-relocate cross-CWD resume (spike PASS + Stage C v1 opt-in)
 
@@ -921,15 +949,16 @@ pointers preserved; per-file play-by-play dropped -- full detail in git history)
 
 ### Phase 2: optional audit proxy
 
-Opt-in, user-controlled wire chokepoint that can observe and (optionally) control the Claude<->provider wire with
+Opt-in, user-controlled wire chokepoint that can observe and (optionally) control the Claude\<->provider wire with
 redacted audit logs -- all new config inert by default. Two orthogonal axes kept distinct: `wire_shape`
 (`openai_translated`|`anthropic_passthrough`) and `intercept.mode`. Shipped: a thinking-preserving
 `anthropic_passthrough` wire (preserves `thinking`/`redacted_thinking` byte-for-byte); redact-before-persist audit JSONL
-+ `forge proxy audit show|diff`; override-mode system-prompt augment/guards + reasoning-effort pin with a mutation-safety
-fingerprint tripwire (never rewrites history, fails closed); sidecar host-persistent audit/costs mounts + arbitrary-uid
-support (fixed two latent entrypoint bugs that meant the sidecar proxy could never start). design §7.x/§3.4/§3.7/§4.0,
-appendix §A.11/§A.12, end-user/proxy.md. **Deferred debt**: real-upstream `@slow` passthrough signature-replay e2e;
-streamed full-body capture.
+
+- `forge proxy audit show|diff`; override-mode system-prompt augment/guards + reasoning-effort pin with a
+  mutation-safety fingerprint tripwire (never rewrites history, fails closed); sidecar host-persistent audit/costs
+  mounts + arbitrary-uid support (fixed two latent entrypoint bugs that meant the sidecar proxy could never start).
+  design §7.x/§3.4/§3.7/§4.0, appendix §A.11/§A.12, end-user/proxy.md. **Deferred debt**: real-upstream `@slow`
+  passthrough signature-replay e2e; streamed full-body capture.
 
 **Verification (range)**: every slice shipped tree-green, `make pre-commit` clean; unit suites 4866->5531 passed across
 the slices; integration/real-wire as noted (policy hooks 10/10, native-relocate contract 23.6s, cost-visibility matrix).

@@ -774,15 +774,15 @@ ids; no credential extraction; interactive OAuth session untouched). The deferre
 
 ## Phase 5 - Cross-Runtime Resume
 
-**Status (2026-06-09): build group + bridge shipped (5.0, 5a, 5b, 5c, 5d, 5e). 5f (design/end-user doc sync + Phase 6
-record) remains.** Two adversarially-verified research sweeps re-pinned the external tools and corrected stale card
-assumptions before scoping (verdict below). **Decided:** one-shot `codex exec` transport (the app-server transport is a
-deferred follow-up, tracked under 5b). The cross-runtime hop is **curated transfer** (reasoning signatures are
-non-portable -- confirmed); Codex-side continuation after the hop can use `codex exec resume`. Goal: run Codex as a
-first-class headless runtime and demonstrate "plan in Claude -> implement in Codex" with correct auth preflight and
-usage attribution. Depends on shipped Phase 4 seams (`HeadlessInvoker`/`run_parallel` 4d, runtime registry 4e, usage
-ledger + reserved `codex_exec`/`codex_jsonl`/`runtime_native` literals 4b/4c, run-tree env 4a/4g) and the Phase 1
-transfer schema (`target_runtime` reserved).
+**Status (2026-06-09): Phase 5 complete — all slices shipped (5.0, 5a, 5b, 5c, 5d, 5e, 5f).** Two adversarially-verified
+research sweeps re-pinned the external tools and corrected stale card assumptions before scoping (verdict below).
+**Decided:** one-shot `codex exec` transport (the app-server transport is a deferred follow-up, tracked under 5b). The
+cross-runtime hop is **curated transfer** (reasoning signatures are non-portable -- confirmed); Codex-side continuation
+after the hop can use `codex exec resume`. Goal: run Codex as a first-class headless runtime and demonstrate "plan in
+Claude -> implement in Codex" with correct auth preflight and usage attribution. Depends on shipped Phase 4 seams
+(`HeadlessInvoker`/`run_parallel` 4d, runtime registry 4e, usage ledger + reserved
+`codex_exec`/`codex_jsonl`/`runtime_native` literals 4b/4c, run-tree env 4a/4g) and the Phase 1 transfer schema
+(`target_runtime` reserved).
 
 ### Research verdict (verified 2026-06-08; every claim re-fetched from official docs/changelogs)
 
@@ -934,9 +934,9 @@ output/secrets/paths):**
 | Responses report                     | proxy `None` / `proxy.yaml` `wire_shape` / unknown id                                   | `native_direct` / `proxy_unsupported` (cites wire_shape) / `proxy_unsupported` ("not found")                                                                | same                                             |
 | CLI                                  | stubbed `preflight_codex`                                                               | `--json` shape (no secret) + exit 0 ready / exit 1 not-ready / unknown runtime exit 2                                                                       | `tests/src/cli/test_runtime.py`                  |
 
-**5b-5e shipped; 5f remains** (design/end-user doc sync + Phase 6 record). The build group was executed probe-first from
-the approved plan: a real `codex exec --json` run pins the parser, then parser -> shared lifecycle -> invoker -> emitter
--> transfer relabel; 5e composes them into the Claude->Codex bridge under one run tree.
+**5b-5f shipped; Phase 5 complete** (5f = docs-only design/end-user sync + Phase 6 record). The build group was executed
+probe-first from the approved plan: a real `codex exec --json` run pins the parser, then parser -> shared lifecycle ->
+invoker -> emitter -> transfer relabel; 5e composes them into the Claude->Codex bridge under one run tree.
 
 **Resolved decisions (baked into shipped code):**
 
@@ -1051,13 +1051,33 @@ the end-user cross-runtime workflow doc. No CLI command and no `SessionStart`-ho
 (out of 5e scope). The action tagger's pre-existing `emit_direct_llm_usage` default `runtime="claude_code"` is unchanged
 here; reconciling it with `forge_cli` for `core.llm` calls is also out of scope.
 
-### Slice 5f - Design/end-user doc sync + Phase 6 re-scope (record)
+### Slice 5f - Design/end-user doc sync + Phase 6 re-scope (record) (DONE 2026-06-09)
 
-- [ ] Update `design.md` (§3.9 transfer / §5.5.5 registry / §3.14 usage) and the relevant end-user guide for shipped
-  Phase 5 behavior; the Phase 6 re-scope note is already recorded in `card.md` (interactive Codex GA; evaluate the
-  app-server transport; full Codex hook adapter/responder stays Phase 6).
+Docs-only closeout of Phase 5. No code. (Design sync lands in §3.9, **not** §5.5.5 as the checklist loosely scoped: the
+bridge is a cross-runtime resume-delivery op, not a workflow runner; §5.5.5 was already correct and untouched.)
+
+- [x] `design.md` §3.9 rewritten future->past: the shipped `bridge_session_to_codex` (parent -> ai-curated
+  Codex-targeted transfer -> body prepended to the `codex exec` prompt -> `CodexHeadlessInvoker().run`, one run tree);
+  initial-message delivery is the Phase 5 mechanism, `SessionStart`-hook delivery deferred to Phase 6; no CLI yet (user
+  surface = `forge transfer regenerate --target-runtime codex` + manual `codex exec`). §3.14 gained a "Transfer curation
+  usage (Phase 5e)" paragraph (`route=core_llm`/`runtime=forge_cli`/`transfer-curate`).
   - Assertion: design docs describe shipped Phase 5 behavior (documentation-guidelines Rule 2); no stale 5-event /
-    `codex_hooks` claim remains outside `done/`.
+    `codex_hooks` claim remains outside `done/` (sweep confirmed none survived; the `design.md`/`card.md` `SessionStart`
+    refs now name initial-message delivery).
+- [x] `design_appendix.md`: §A.13 enums flip `codex_exec` (route) + `codex_jsonl` (reporter) from reserved -> emitted;
+  per-emitter table gains the `transfer-curate` row (tags `session`); §M.1 `target_runtime` comment de-staled.
+- [x] New end-user guide `docs/end-user/transfer.md`: the `forge transfer show|regenerate|edit|diff` group + the
+  three-file model + the honest cross-runtime workflow (`regenerate --target-runtime codex` -> `show` -> manual
+  `codex exec`; one-command bridge is Phase 6). Registered in `README.md`; `session.md` artifact note repointed to it.
+- [x] `card.md` Phase 6 note corrected ("Phase 5 uses only `SessionStart`" -> initial-message delivery; SessionStart
+  deferred). The dated 5a change_log "provisional" line is left as a historical snapshot (board-contract: don't rewrite
+  dated entries).
+
+**Verification (2026-06-09):** `make pre-commit` clean (mdformat + the new guide); `design.md`/`design_appendix.md`
+under the tiktoken size hook; grep gates clean (`SessionStart` outside `done/` names initial-message delivery;
+`codex_exec`/`codex_jsonl` shown as emitted); `forge transfer --help`/`regenerate --help` confirm the guide matches the
+shipped CLI; the documented `regenerate -> show -> codex exec` path is covered end-to-end by the 5e real-codex E2E
+(`tests/integration/core/test_claude_to_codex_resume.py`). **Phase 5 complete.**
 
 ### Open risks (carry into execution; verify empirically)
 

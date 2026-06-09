@@ -597,11 +597,15 @@ The resume command supports two **resume modes** (`--resume-mode`):
 The transfer doc carries a `target_runtime` frontmatter field and a `## Runtime Hints` section (Phase 5d). `claude`
 (default) renders byte-identically to pre-5d output; `codex` relabels both (the curated body stays Claude-worded —
 curation-prompt tuning is a follow-up). Delivery is runtime-specific: Claude uses `--append-system-prompt-file`. Codex
-has **no** system-prompt-file flag, so the curated context will be delivered as the initial `codex exec` message
-(prepended to the prompt) — the prompt-composition seam lands in **5e**; 5b/5d ship the request-builder and the relabel.
-SessionStart-hook delivery for Codex needs the Phase 6 hook adapter (5a's `hook_seam` can't confirm per-hook trust).
-`forge transfer regenerate <parent> --target-runtime {claude|codex}` re-stamps a cache, defaulting the runtime from the
-existing frontmatter so a regenerate never silently flips it back.
+has **no** system-prompt-file flag, so the curated context is delivered as the **initial `codex exec` message**
+(prepended to the prompt), **not** a Codex `SessionStart`/additionalContext hook — 5a's preflight can't confirm per-hook
+trust, so hook delivery is deferred to Phase 6. Phase 5e composes the parts into the cross-runtime hop
+`bridge_session_to_codex` (`core/ops/codex_bridge.py`): a parent session -> an ai-curated Codex-targeted transfer -> the
+body prepended via `compose_codex_initial_message` -> `CodexHeadlessInvoker().run`, all under **one run tree** so the
+curation `core.llm` call and the `codex exec` run join on `root_run_id` (§3.14). It is a UI-agnostic command-core op;
+the one-command `forge … --runtime codex` frontend is Phase 6, so the Phase 5 user surface is
+`forge transfer regenerate <parent> --target-runtime {claude|codex}` (re-stamps a cache, defaulting the runtime from the
+existing frontmatter so a regenerate never silently flips it back) plus a manual `codex exec` handoff.
 
 > **Why not native for worktree forks?** Claude stores sessions at `~/.claude/projects/<encoded-cwd>/`, so a bare
 > `--resume` can't cross the CWD boundary (2.1.90/2.1.158 fail "No conversation found"). **Worktree forks default to
@@ -934,6 +938,14 @@ the **exact** tokens from the JSONL `turn.completed.usage`, but `cost_micro_usd=
 a fabricated $0). The event carries the resolved `billing_mode` from `CodexPreflight`. Because the Codex child shares
 its parent's run tree (`stamp_run_identity`), a Codex leaf and a Claude leaf join under the same `root_run_id` in
 `forge activity`.
+
+**Transfer curation usage (Phase 5e).** The `ai-curated` transfer's curation step makes a `core.llm` call (an Anthropic
+model via OpenRouter) that is now attributed: it emits `route=core_llm`/`reporter=provider`/`runtime=forge_cli`/
+`command=transfer-curate` with the provider's exact tokens (cost `unavailable` — `emit_direct_llm_usage` computes no
+dollar figure for a direct `core.llm` call, so the event records exact tokens but no cost). The emit no-ops without an
+ambient run identity, so a plain `forge session resume --strategy ai-curated` stays silent; the cross-runtime bridge
+mints a run-tree root, so there the curation event and the `codex exec` run share one `root_run_id` and `forge activity`
+shows both sides of the hop.
 
 Each proxy may define:
 

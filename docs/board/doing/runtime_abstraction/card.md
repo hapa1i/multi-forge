@@ -928,7 +928,9 @@ Native-relocate is an experimental spike, not a committed UX until contract test
   as a long-lived RPC transport alternative to one-shot `codex exec` for resumed multi-turn sessions. (Note: official
   app-server docs describe `--listen stdio://` as the transport selector, while local Codex CLI 0.137.0 also exposes
   `--stdio` as an alias.) The full Codex hook adapter/responder (exploiting `updatedInput` + `PermissionRequest`)
-  belongs here; Phase 5 uses only `SessionStart` for transfer injection.
+  belongs here. Phase 5 instead delivers the curated transfer as the **initial `codex exec` message** (prepended to the
+  prompt via `bridge_session_to_codex`), _not_ a `SessionStart` hook — 5a can't confirm per-hook trust, so hook-based
+  delivery is deferred to this phase.
 
 ## Non-Goals
 
