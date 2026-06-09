@@ -153,7 +153,7 @@ those are different jobs that reward different capabilities. The same provider's
 for one role and the wrong pick for another:
 
 ```bash
-# Planner/supervisor source on the proxy default Opus 4.6
+# Planner/supervisor source on the proxy default (Fable 5)
 forge session start planner --proxy openrouter-anthropic
 
 # Executor on Opus 4.8, checked against the planner by a read-only supervisor

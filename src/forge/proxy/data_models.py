@@ -34,7 +34,8 @@ def _detect_tier(values: dict) -> dict:
         elif "sonnet" in model_lower:
             values["tier"] = "sonnet"
             values["has_explicit_tier"] = True
-        elif "opus" in model_lower:
+        elif "opus" in model_lower or "fable" in model_lower:
+            # Fable carries no tier word of its own; it rides the opus tier.
             values["tier"] = "opus"
             values["has_explicit_tier"] = True
         else:
@@ -227,7 +228,8 @@ def map_model_name(anthropic_model_name: str) -> str:
             return "haiku"
         if "sonnet" in name:
             return "sonnet"
-        if "opus" in name:
+        # Fable carries no tier word of its own; it rides the opus tier.
+        if "opus" in name or "fable" in name:
             return "opus"
         return None
 

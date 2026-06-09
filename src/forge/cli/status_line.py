@@ -338,7 +338,8 @@ def get_tier_display(runtime: ProxyRuntimeTruth | None) -> str | None:
 def get_tier_from_display_name(display_name: str) -> str:
     """Map Claude Code's display name to tier."""
     display_lower = display_name.lower()
-    if "opus" in display_lower:
+    # Fable carries no tier word of its own; it rides the opus tier.
+    if "opus" in display_lower or "fable" in display_lower:
         return "opus"
     elif "sonnet" in display_lower:
         return "sonnet"
@@ -360,6 +361,9 @@ def explicit_tier_from_model(model_id: str) -> str | None:
     for tier in ("haiku", "sonnet", "opus"):
         if tier in name:
             return tier
+    # Fable carries no tier word of its own; it rides the opus tier.
+    if "fable" in name:
+        return "opus"
     return None
 
 

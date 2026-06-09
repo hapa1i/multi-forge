@@ -190,9 +190,36 @@ class TestLoadConfig:
         assert config.proxy.default_port == 8095
         assert config.proxy.openrouter.tiers.haiku == "anthropic/claude-haiku-4.5"
         assert config.proxy.openrouter.tiers.sonnet == "anthropic/claude-sonnet-4.6"
-        assert config.proxy.openrouter.tiers.opus == "anthropic/claude-opus-4.6"
+        # Opus tier defaults to Fable 5; Opus 4.8/4.6 stay selectable via --model.
+        assert config.proxy.openrouter.tiers.opus == "anthropic/claude-fable-5"
         assert config.proxy.openrouter.base_url == "https://openrouter.ai/api/v1"
-        assert config.proxy.openrouter.model_alternatives == {"opus": {"claude-opus-4-8": "anthropic/claude-opus-4.8"}}
+        assert config.proxy.openrouter.model_alternatives == {
+            "opus": {
+                "claude-opus-4-8": "anthropic/claude-opus-4.8",
+                "claude-opus-4-6": "anthropic/claude-opus-4.6",
+            }
+        }
+
+    def test_litellm_anthropic_templates_default_opus_to_fable(self):
+        """LiteLLM Anthropic templates default opus to Fable 5 with 4.8/4.6 alternatives."""
+        for template in ("litellm-anthropic", "litellm-anthropic-local"):
+            config = load_config(template=template)
+
+            assert config.proxy.preferred_provider == "litellm", template
+            assert config.proxy.litellm.tiers.opus == "anthropic/claude-fable-5", template
+            assert config.proxy.litellm.model_alternatives == {
+                "opus": {
+                    "claude-opus-4-8": "anthropic/claude-opus-4-8",
+                    "claude-opus-4-6": "anthropic/claude-opus-4-6",
+                }
+            }, template
+
+    def test_anthropic_passthrough_opus_tier_is_fable(self):
+        """Passthrough forwards the client model unchanged; opus tier default is Fable 5 (no alternatives map)."""
+        config = load_config(template="anthropic-passthrough")
+
+        assert config.proxy.litellm.tiers.opus == "claude-fable-5"
+        assert config.proxy.litellm.model_alternatives == {}
 
     def test_openrouter_config_placed_on_correct_field(self):
         """OpenRouter config should land on proxy.openrouter, not proxy.litellm."""

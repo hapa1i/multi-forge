@@ -94,14 +94,14 @@ and local validation result whenever you change a proxy default.
 
 ### Use `model_alternatives` Instead Of Multiple Proxies
 
-The bundled Anthropic proxy templates keep the validated `opus` tier default and expose newer alternatives for explicit
-session pins. You do not need separate proxies just to compare two Claude versions:
+The bundled `openrouter-anthropic` template maps the `opus` tier to Claude Fable 5 and exposes Opus 4.8 and Opus 4.6 as
+alternatives for explicit session pins. You do not need separate proxies just to compare Claude versions:
 
 ```bash
-# Planner/supervisor source on the proxy's default opus tier
+# Planner/supervisor source on the proxy's default opus tier (Fable 5)
 forge session start planner --proxy openrouter-anthropic
 
-# Executor pinned to an alternative exposed by the same proxy
+# Executor pinned to an alternative exposed by the same proxy (Opus 4.8 or 4.6)
 forge session start exec --proxy openrouter-anthropic --model claude-opus-4-8 --supervise planner
 ```
 

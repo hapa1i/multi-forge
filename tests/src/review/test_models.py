@@ -113,6 +113,14 @@ class TestDefaultModels:
         assert spec.prompt_mode == "prefix"
         assert "file:line" in spec.prompt
 
+    def test_claude_fable_is_selectable_direct_worker(self):
+        assert "claude-fable" in AVAILABLE_MODELS
+        assert "claude-fable" not in DEFAULT_MODELS
+
+        spec = AVAILABLE_MODELS["claude-fable"]
+        assert spec.family == "anthropic"
+        assert spec.provider_refs == (("direct", "claude-fable-5"),)
+
 
 class TestReviewResult:
     def test_success_result(self):
