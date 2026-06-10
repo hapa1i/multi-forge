@@ -56,7 +56,7 @@
 
 - [x] `cli/hooks/commands.py`: cascade on -> register `PlanCheckPolicy` + supervisor as resolver; off -> exactly today's
   registration (before `restore_state`).
-- [x] `PolicyActivity.plan_check_allow`/`plan_check_escalated` (decision-log-derived, cached allows counted) +
+- [x] `PolicyActivity.plan_check_allow`/`plan_check_needs_review` (decision-log-derived, cached allows counted) +
   `has_content` + `forge activity` table/`--json` rendering + `render_summary_line` plan-check segment (and the
   supervisor segment is skipped at zero checks, so all-short-circuit sessions don't read "supervisor: 0 checks").
 - [x] Tests: `tests/src/cli/hooks/test_policy_check_cascade.py` (6 hook-level wiring cases: short-circuit skips

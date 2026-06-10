@@ -44,8 +44,10 @@ Key decisions:
 - **Plan text precondition**: tier-1 requires `plan_override_path`. Enabling cascade auto-resolves it via the `--reload`
   supervision-graph search and fails with an actionable error if no approved snapshot exists.
 - **Measurement built in**: `plan-check` usage-ledger events (session-tagged) show uncached call volume, tokens, and
-  errors; decision-log-derived `plan_check_allow`/`plan_check_escalated` counters in `forge activity` give short-circuit
-  vs escalation rates (cached allows included — the log records them; the ledger cannot).
+  errors; decision-log-derived `plan_check_allow`/`plan_check_needs_review` counters in `forge activity` give the
+  short-circuit rate (cached allows included — the log records them; the ledger cannot). Supervisor counters are the
+  resolver runs; a tier-1 `needs_review` co-occurring with a deterministic deny skips the resolver, so the counters can
+  legitimately differ.
 
 ## Risks
 

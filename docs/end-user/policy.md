@@ -247,9 +247,10 @@ How it behaves:
   degrades to exactly the non-cascade behavior; supervision is never silently skipped.
 - `%policy supervise cascade on` / `%policy supervise cascade off` toggles it in-session.
 
-Reading the results in `forge activity`: the **Plan check (tier-1)** line shows allow vs escalated counts (your
-short-circuit rate), the **Supervisor** line shows what the frontier decided on escalations, and the `plan-check`
-command row shows tier-1 call volume, tokens, and errors.
+Reading the results in `forge activity`: the **Plan check (tier-1)** line shows allow vs needs-review counts (your
+short-circuit rate), the **Supervisor** line shows what the frontier decided when it ran, and the `plan-check` command
+row shows tier-1 call volume, tokens, and errors. The two lines can differ: a needs-review verdict that coincides with a
+deterministic block (for example TDD) never reaches the supervisor.
 
 ### Why supervision matters (beyond TDD)
 

@@ -71,15 +71,17 @@ class PolicyActivity:
 
     The plan-check counters come from the decision log, not the usage ledger, so
     cached tier-1 allows ARE counted (a cached allow is logged but emits no ledger
-    event). Short-circuit rate = plan_check_allow vs plan_check_escalated; the
-    supervisor counters are the frontier-escalation outcomes.
+    event). Short-circuit rate = plan_check_allow vs plan_check_needs_review; the
+    supervisor counters are the resolver runs (a tier-1 needs_review co-occurring
+    with a deterministic deny skips the resolver, so needs_review can exceed
+    supervisor checks).
     """
 
     supervisor_allow: int = 0
     supervisor_warn: int = 0
     supervisor_deny: int = 0
     plan_check_allow: int = 0
-    plan_check_escalated: int = 0
+    plan_check_needs_review: int = 0
     total_warnings: int = 0
     recent_warnings: list[str] = field(default_factory=list)
     log_capped: bool = False
@@ -91,7 +93,7 @@ class PolicyActivity:
             or self.supervisor_warn
             or self.supervisor_deny
             or self.plan_check_allow
-            or self.plan_check_escalated
+            or self.plan_check_needs_review
             or self.total_warnings
         )
 
@@ -168,8 +170,8 @@ def render_summary_line(summary: SessionActivitySummary) -> str | None:
     sup_errors = next((c.errors for c in summary.commands if c.command == "supervisor"), 0)
     pol = summary.policy
     if pol and pol.has_content:
-        if pol.plan_check_allow or pol.plan_check_escalated:
-            parts.append(f"plan-check: {pol.plan_check_allow} allow, {pol.plan_check_escalated} escalated")
+        if pol.plan_check_allow or pol.plan_check_needs_review:
+            parts.append(f"plan-check: {pol.plan_check_allow} allow, {pol.plan_check_needs_review} needs-review")
         # `checks` (allow+warn+deny) is the capped decision-log count; `sup_errors` is the
         # uncapped ledger count -- different planes. A supervisor error fails open to an
         # `allow`, so normally errors <= checks; only decision-log eviction breaks that. So
@@ -443,7 +445,8 @@ def _policy_activity(manifest, since: datetime | None) -> PolicyActivity | None:
         # evaluation (engine.py accumulates `all_warnings.extend(d.warnings)`), so a
         # deterministic policy (e.g. TDD permissive) warning would otherwise render as
         # phantom supervisor activity. Plan-check (cascade tier-1) sub-decisions are
-        # counted separately: allow = short-circuit, needs_review = escalation.
+        # counted separately: allow = short-circuit, needs_review = tier-1 requested
+        # review (the resolver may still be skipped when a deterministic policy denied).
         for sub in entry.get("decisions") or ():
             if not isinstance(sub, dict):
                 continue
@@ -453,7 +456,7 @@ def _policy_activity(manifest, since: datetime | None) -> PolicyActivity | None:
                 if decision == "allow":
                     activity.plan_check_allow += 1
                 elif decision == "needs_review":
-                    activity.plan_check_escalated += 1
+                    activity.plan_check_needs_review += 1
                 continue
             if policy_id != _SUPERVISOR_POLICY_ID:
                 continue

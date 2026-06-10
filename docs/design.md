@@ -1306,9 +1306,10 @@ unreadable plan) escalates, so the system degrades to frontier-always, never to 
 supervisor is registered as the engine's **resolver** (see §4.1.5): it is invoked only when a policy emitted
 `needs_review` and nothing denied, so clearly-aligned actions never pay the frontier call. Tier-1 reasons ride in
 low-severity violations (persisted to the decision log, never printed on resolved allows). Measurement is built in:
-session-tagged `plan-check` usage events plus decision-log-derived `plan_check_allow`/`plan_check_escalated` counters in
-`forge activity` expose the short-circuit vs escalation rate. Cascade off (the default) is exactly the pre-cascade
-behavior — the supervisor runs as a regular policy on every throttle-missing check.
+session-tagged `plan-check` usage events plus decision-log-derived `plan_check_allow`/`plan_check_needs_review` counters
+in `forge activity` expose the short-circuit rate; the supervisor counters are the resolver runs (a tier-1
+`needs_review` alongside a deterministic deny skips the resolver, so the two can differ). Cascade off (the default) is
+exactly the pre-cascade behavior — the supervisor runs as a regular policy on every throttle-missing check.
 
 **Supervisor stuck playbook:** When the supervisor blocks because the plan evolved:
 

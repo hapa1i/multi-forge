@@ -182,7 +182,7 @@ def test_json_includes_plan_check_counters(monkeypatch, tmp_path) -> None:
     result = CliRunner().invoke(activity_cmd, ["planner", "--all", "--json"])
     assert result.exit_code == 0
     data = json.loads(result.output)
-    assert data["policy"]["plan_check_escalated"] == 1
+    assert data["policy"]["plan_check_needs_review"] == 1
     assert data["policy"]["plan_check_allow"] == 0
     assert data["policy"]["supervisor_allow"] == 1
 

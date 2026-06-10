@@ -47,8 +47,10 @@ clearly-aligned Write/Edit actions short-circuit and only uncertain ones pay the
   `forge policy supervise --cascade/--no-cascade --checker-model` (modifiers with target, standalone toggle without);
   enabling auto-resolves the plan snapshot via the `--reload` machinery and fails loud pre-mutation when none resolves;
   `%policy supervise cascade on|off`; status/show surfaces.
-- Measurement: decision-log-derived `plan_check_allow`/`plan_check_escalated` counters (cached allows counted) in
-  `forge activity` + summary line; session-tagged `plan-check` ledger events via `emit_direct_llm_usage`.
+- Measurement: decision-log-derived `plan_check_allow`/`plan_check_needs_review` counters (cached allows counted) in
+  `forge activity` + summary line; session-tagged `plan-check` ledger events via `emit_direct_llm_usage`. Named
+  needs-review (not "escalated") because a tier-1 `needs_review` co-occurring with a deterministic deny skips the
+  resolver; actual frontier runs are the supervisor counters.
 - Docs: design.md §4.1.2 cascade block + §4.1.5 resolver bullet + CLI row; design_appendix §D ownership + §A.13 emitter
   rows; end-user policy.md cascade subsection.
 
