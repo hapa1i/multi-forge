@@ -275,6 +275,15 @@ class TestCascadeE2E:
         ws.exec("cd /workspace && forge session start cascade-d --no-proxy --no-launch")
         ws.write_file("/workspace/plan.md", "# Approved Plan\n")
 
+        # supervise <target> validates conversation evidence; a --no-launch session has
+        # only a pre-seeded UUID. Fabricate hook confirmation (same pattern as
+        # tests/integration/cli/test_session_commands_integration.py).
+        planner_path = "/workspace/.forge/sessions/cascade-planner/forge.session.json"
+        planner = ws.read_json(planner_path)
+        planner["confirmed"]["claude_session_id"] = SUPERVISOR_RESUME_ID
+        planner["confirmed"]["confirmed_by"] = "hook:SessionStart:startup"
+        ws.write_json(planner_path, planner)
+
         set_target = ws.exec("cd /workspace && forge policy supervise cascade-planner --session cascade-d")
         assert set_target.returncode == 0, set_target.stderr
 
