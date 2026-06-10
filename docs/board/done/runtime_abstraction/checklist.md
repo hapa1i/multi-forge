@@ -855,14 +855,16 @@ frontend).
   the interactive-firing gating probe, hook adapter/responder + the `ActionContext.runtime -> origin` rename,
   SessionStart-with-fallback, interactive frontend, installer Codex support, app-server (deferred).
 - [x] Closeout per board-contract: Phase 6 boxes ticked with verification; `change_log.md` Phase 6 entry added; durable
-  lessons proposed via `.forge/memory/shadow_impl_notes.md` (human-promote gate). **Design-doc check: no design-doc
-  change** -- Phase 6 shipped no product behavior; the only `src/` edit is the `registry.py` Codex *note* correction
-  (internal data, not a design contract), and the harness lives under `scripts/experiments/`.
-  - [ ] `git mv docs/board/doing/runtime_abstraction docs/board/done/` -- **deferred to immediately after the final
-    merge to `main`** (board-contract: move only once merged; matches how Phases 2-5 stayed in `doing/` on-branch).
+  lessons proposed via `.forge/memory/shadow_impl_notes.md` (human-promote gate). **Design-doc check: `design.md`
+  runtime-registry section synced** to the corrected Codex capability values. Phase 6 changed no runtime/execution
+  behavior; the `src/` edits are `registry.py` + `codex_preflight.py` capability-honesty corrections
+  (`native_hooks="headless_inert"`, `pretool_policy="none"`, `hook_seam`) -- machine-readable data nothing branches on,
+  surfaced only in `forge runtime list`/`preflight` output. The probe harness lives under `scripts/experiments/`.
+  - [x] `git mv docs/board/doing/runtime_abstraction docs/board/done/` -- **done after the #23 squash-merge to `main`**
+    (board-contract: move only once merged; matches how Phases 2-5 stayed in `doing/` on-branch).
 
-**Phase 6 complete (2026-06-09) -- the card is fully executed (Phases 0-6).** The lane move to `done/` is the only
-remaining step and is gated on the merge to `main`.
+**Phase 6 complete (2026-06-09) -- the card is fully executed (Phases 0-6).** Merged via #23 (squash) and moved to
+`done/`; the card is closed.
 
 ## Open Decisions
 
