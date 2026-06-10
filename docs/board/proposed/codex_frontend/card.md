@@ -46,7 +46,10 @@ From the Phase 6 decision record + `scripts/experiments/codex-hooks/`:
    terminal (the operator-guided steps) to settle: do hooks fire in interactive `codex`? where does trust state live?
    what is the initial-prompt arg? Capture real payloads per event for fixtures. **All of (i)/(ii)/(iv) depend on a GO
    here.** If interactive also does not fire, Codex-frontend policy + hook-based transfer are dead on this Codex line
-   and this card reduces to the bridge CLI (1) alone.
+   and this card reduces to the bridge CLI (1) alone. Trust must cover **both** hash dimensions: stage 40d changes the
+   hook script *content*; also test changing the registered command *path/string* to learn whether trust keys to the
+   definition hash or the resolved path. Once firing is settled, encode the result in `codex_preflight.py`'s `hook_seam`
+   (today honestly `unknown` -- it never claims `active`; a confirmed interactive verdict could replace that).
 
 3. **Codex hook adapter/responder (gated on probe 2).** `CodexHookAdapter`/`CodexHookResponder` filling the
    runtime-neutral protocols in `src/forge/cli/hooks/protocols.py` (the Phase 4f seam already makes room). Map the
@@ -54,8 +57,10 @@ From the Phase 6 decision record + `scripts/experiments/codex-hooks/`:
    PermissionRequest `decision.behavior` -- contracts to pin in probe 2). Broader coverage target: PreToolUse +
    PermissionRequest + Stop + UserPromptSubmit. Carry the **`ActionContext.runtime` -> `origin` rename** here (the
    adapter is its first real consumer; direction resolved in the `runtime_abstraction` Open Decisions 2026-06-09 --
-   values `{forge_cli, claude_code, codex}`; do NOT add a `subject_runtime` axis). Honest capability ceiling:
-   `pretool_policy="partial"`; headless `codex exec` workers get **no** policy (registry note).
+   values `{forge_cli, claude_code, codex}`; do NOT add a `subject_runtime` axis). Honest capability ceiling: the
+   registry encodes `native_hooks="headless_inert"` + `pretool_policy="none"` (headless `codex exec` workers get **no**
+   policy -- hooks do not fire); interactive PreToolUse, if probe (2) confirms firing, is at best a non-comprehensive
+   `partial` guard -- bump the registry values to that only when interactive firing is verified.
 
 4. **SessionStart curated-transfer delivery with initial-message fallback (gated on probe 2).** Only meaningful for an
    interactive frontend -- the headless bridge stays initial-message permanently. Build only if (2) confirms

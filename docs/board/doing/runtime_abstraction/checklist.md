@@ -725,13 +725,14 @@ shipped CLI; the documented `regenerate -> show -> codex exec` path is covered e
 ## Phase 6 - Codex Frontend Beta (evaluation only)
 
 **Scope (resolved 2026-06-09; see Open Decisions):** Phase 6 is **evaluation only** -- no product features.
-Deliverables: a reproducible probe harness (`scripts/experiments/codex-hooks/`), sanitized fixtures
-(`tests/fixtures/codex/hooks/`), a Stage-A-style decision record with per-deliverable go/no-go verdicts, and a follow-up
-build card (`docs/board/proposed/codex_frontend/`). The decision record satisfies this phase's evaluate box and
-completes the card (build work moves to the follow-up card). Evaluation coverage decisions: the probe pins facts for the
-**broader hook set** (PreToolUse + PermissionRequest + Stop + UserPromptSubmit); **SessionStart transfer delivery with
-initial-message fallback** is the build direction whose trust/`additionalContext` feasibility the probe must settle;
-**app-server transport is deferred, unevaluated** (recorded verbatim, not probed).
+Deliverables: a reproducible probe harness (`scripts/experiments/codex-hooks/`), a Stage-A-style decision record with
+per-deliverable go/no-go verdicts, and a follow-up build card (`docs/board/proposed/codex_frontend/`). Hook fixtures are
+descoped to the build card (see Slice 6.1): hook payloads need a firing hook, which is headless-unavailable. The
+decision record satisfies this phase's evaluate box and completes the card (build work moves to the follow-up card).
+Evaluation coverage decisions: the probe pins facts for the **broader hook set** (PreToolUse + PermissionRequest + Stop
+\+ UserPromptSubmit); **SessionStart transfer delivery with initial-message fallback** is the build direction whose
+trust/`additionalContext` feasibility the probe must settle; **app-server transport is deferred, unevaluated** (recorded
+verbatim, not probed).
 
 - [x] Evaluate Codex as an interactive frontend runtime.
   - Assertion: decision is based on headless invocation, usage accounting, policy semantics, and curated transfer
@@ -765,8 +766,9 @@ location + discoverable session id); (7) `codex exec resume` semantics (`thread_
   hook-entry fields **and bogus event names** (`[[hooks.NotARealEvent]]`) load **silently** -- a misspelled event never
   errors.
 - [x] Stage 10 headless-fire **(GATE)**: SessionStart tee on all 4 surfaces, plain exec +
-  `--dangerously-bypass-hook-trust` retry -> **0 firings**. Verdict **`[NO-FIRE-UNCATEGORIZED]` -> confirmed
-  `[INTERACTIVE-ONLY]`** by 5 independent clean controlled runs (see decision record).
+  `--dangerously-bypass-hook-trust` retry -> **0 firings**. Stage verdict **`[NO-FIRE-UNCATEGORIZED]`**; 5 independent
+  clean controlled runs confirmed headless hooks do not fire. Interactive firing is **unverified** (operator-gated ->
+  build card), so the result is NOT "[INTERACTIVE-ONLY]" -- that classification would require interactive evidence.
 - [x] Stage 20 payloads (facts 1, 3): real read-only + workspace-write turns. A real `SessionStart`/`Stop` payload was
   captured (snake_case, doc-shape confirmed) but **only via a non-reproducible codex first-run/bootstrap session** --
   clean isolated turns fire 0. Payload **shape** pinned; reliable headless capture is not available.
@@ -792,10 +794,14 @@ location + discoverable session id); (7) `codex exec resume` semantics (`thread_
   phase.
 - [x] Decision record written (below).
 - [x] Registry correction: the binary contradicts the declared facts -- `native_hooks="gated"` + `hook_min_version` read
-  as "hooks work once version-gated," but hooks are enabled + version-OK yet **do not fire headless**. Correct the Codex
-  `RuntimeSpec` note (own commit) to state headless `codex exec` does not deliver hooks (interactive unverified).
-  `codex_preflight.py` "doctor exposes no per-hook trust" docstring is **not** contradicted (no readable trust store was
-  found headless) -- left as-is.
+  as "hooks work once version-gated," but hooks are enabled + version-OK yet **do not fire headless**. Corrected the
+  Codex `RuntimeSpec` machine-readable fields (not just the note): `native_hooks="headless_inert"` (new `HookSupport`
+  value -- registers/enables but does not fire under `codex exec`; interactive unverified) and `pretool_policy="none"`
+  (PreToolUse never fires headless -> no verified enforcement). A consumer reading the field, not just the prose, now
+  sees the limit. `codex_preflight.py` `hook_seam` updated to match: the normal enabled+version-OK headless case now
+  returns `headless_inert` (was `unknown`/"trust unproven") -- a new `HookSeam` literal mirroring the registry value, so
+  `forge runtime preflight codex` no longer reads as "might work, trust unproven." Still never returns `active` (that
+  verdict belongs to 5d's real hook); `unknown` is kept only for the moot not-installed / unparseable-version cases.
 
 #### Phase 6 probe -- Codex hooks/frontend evaluation (verified 2026-06-09, codex-cli 0.138.0)
 

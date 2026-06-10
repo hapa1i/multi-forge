@@ -51,18 +51,23 @@ build card -- without shipping product code. Closes the last open phase of `runt
 - **Go/no-go:** bridge CLI = **GO** (no hook dep; resume verified); SessionStart delivery = **NO-GO headless ->
   initial-message stays primary** (vindicates the Phase 5 deferral); hook adapter + interactive frontend = **gated on an
   interactive-firing probe**; app-server = deferred. Build work seeded in `docs/board/proposed/codex_frontend/`.
-- **Registry correction** (`src/forge/core/runtime/registry.py`): the Codex `RuntimeSpec` note read as "hooks work once
-  version-gated"; corrected to state headless `codex exec` does not deliver hooks (interactive unverified). Note prose
-  only; capability values unchanged.
+- **Registry correction** (`src/forge/core/runtime/registry.py`): the Codex `RuntimeSpec` read as "hooks work once
+  version-gated" (`native_hooks="gated"`, `pretool_policy="partial"`), but hooks are enabled + version-OK yet do not
+  fire headless. Corrected the **machine-readable fields**, not just the note: `native_hooks="headless_inert"` (new
+  `HookSupport` value) + `pretool_policy="none"`, so a consumer reading the field -- not just the prose -- sees the
+  limit. `codex_preflight.py` aligned: `hook_seam` now returns `headless_inert` (new `HookSeam` literal) for the normal
+  enabled+version-OK headless case instead of `unknown`, so `forge runtime preflight codex` reports a known negative,
+  not "trust unproven" (still never `active`).
 - **Checklist compaction:** Phase 6 planning pushed the checklist over the 30k-token board hook; Phases 2/3-hardening/4
   (4a-4f) slice bodies compacted (state + decisions + debt preserved; verification bodies in git history + these
   entries). 31.2k -> ~25k tokens.
 
 **Verification**: `bash -n` + shellcheck clean on the harness; stages 00/05/10/20/60 + headless 40/50 run green with
-captures; `test_registry.py`/`test_runtime.py` 21 passed + mypy clean after the note edit. Probe spent ~10 short
-ChatGPT-quota turns. No product behavior changed (probe under `scripts/experiments/`, registry note is internal data).
-**`runtime_abstraction` is fully executed (Phases 0-6)**; the `doing/ -> done/` lane move is gated on the merge to
-`main`.
+captures; the runtime/preflight/CLI suites (`test_registry.py`/`test_runtime.py`/`test_codex_preflight.py`) pass + mypy
+clean after the field/seam/note edits. Probe spent ~10 short ChatGPT-quota turns. No runtime/execution behavior changed
+(nothing branches on these capability values); only `forge runtime list`/`preflight codex` now render the corrected
+`native_hooks`/`pretool_policy`/`hook_seam`. **`runtime_abstraction` is fully executed (Phases 0-6)**; the
+`doing/ -> done/` lane move is gated on the merge to `main`.
 
 ### Phase 5f: Phase 5 doc sync + `forge transfer` end-user guide (docs-only closeout)
 
