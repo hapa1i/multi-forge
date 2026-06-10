@@ -315,7 +315,7 @@ class TestManagedSuppression:
         result = preflight_codex()
 
         assert result.hook_seam != "managed_suppressed"  # absence is not proof of "not suppressed"
-        assert result.hook_seam == "unknown"
+        assert result.hook_seam == "headless_inert"  # enabled + version-OK normal headless case (Phase 6)
 
 
 class TestTomlFlagTrue:
@@ -347,14 +347,16 @@ class TestHookSeamNeverActive:
         _stub_probes(monkeypatch, version=None, features=True, doctor=_doctor(chatgpt="true"))
         assert preflight_codex().hook_seam == "unknown"
 
-    def test_enabled_with_trust_hint_is_unknown_never_active(self, monkeypatch) -> None:
-        # Even a (fabricated) doctor trust hint never yields "active" in 5a.
+    def test_enabled_is_headless_inert_never_active(self, monkeypatch) -> None:
+        # Enabled + version-OK: the normal headless case is "headless_inert" (Phase 6 -- hooks
+        # do not fire under `codex exec`). Even a (fabricated) doctor trust hint never yields
+        # "active" in 5a (trust-provability belongs to 5d).
         doctor = _doctor(chatgpt="true", extra_details={"project trusted": "true"})
         _stub_probes(monkeypatch, features=True, doctor=doctor)
 
         seam = preflight_codex().hook_seam
 
-        assert seam == "unknown"
+        assert seam == "headless_inert"
         assert seam != "active"
 
 
@@ -467,7 +469,7 @@ class TestHappyPathAndAssert:
             billing_mode="subscription_quota",
             ready=True,
             blocking_reason=None,
-            hook_seam="unknown",
+            hook_seam="headless_inert",
             proxy_responses="native_direct",
             doctor_status="warning",
         )

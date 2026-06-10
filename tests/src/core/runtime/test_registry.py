@@ -50,20 +50,22 @@ class TestClaudeSpec:
 class TestCodexSpec:
     def test_limits_encoded_not_parity(self) -> None:
         s = get_runtime("codex")
-        # The card: Codex PreToolUse is NOT a full enforcement boundary.
-        assert s.pretool_policy == "partial"
+        # Phase 6 probe: PreToolUse does not fire under headless `codex exec`, so there is
+        # no verified pretool enforcement (interactive unverified) -- "none", not "partial".
+        assert s.pretool_policy == "none"
         assert s.interactive == "beta"  # Forge frontend integration is the Phase 6 target
-        # Hooks are real and default-on but version-GATED (>= 0.131.0) -- not a bare
-        # "yes" a Phase 5 preflight could mistake for parity; the gate is machine-readable.
-        # No required hook flag remains; codex_hooks still works as a deprecated alias.
-        assert s.native_hooks == "gated"
+        # Hooks register + enable (floor met) but do NOT fire headless -> "headless_inert",
+        # not "gated": the version floor is satisfied yet hooks still do not fire. The floor
+        # stays recorded (registration/enablement, not a firing guarantee); no hook flag
+        # required (codex_hooks is a deprecated alias).
+        assert s.native_hooks == "headless_inert"
         assert s.hook_min_version == "0.131.0"
         assert s.hook_feature_flag is None
         assert s.native_resume is True
         assert s.usage_source == "jsonl_events"
         assert s.headless_cmd == ("codex", "exec")
         assert s.install_scopes == ()  # Forge does not manage Codex install
-        # Note records the default-on reality + partial-enforcement caveat.
+        # Note records the default-on reality + the headless no-fire finding.
         assert s.note is not None and "default-on" in s.note
 
 

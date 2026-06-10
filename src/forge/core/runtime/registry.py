@@ -12,10 +12,10 @@ the runtime-abstraction card; the registry answers the seven questions that card
 poses -- installed? interactive? headless? hooks? usage? native resume? which
 install scopes?
 
-Honest capability encoding: where a runtime's support is *partial* (Codex
-``PreToolUse`` is a real hook but not a full enforcement boundary) or merely
-*planned* (Codex interactive is a target beta, not shipped), the field is a
-tri-state ``Literal`` rather than a ``bool`` -- the type itself carries the
+Honest capability encoding: where a runtime's support is *limited* (Codex hooks
+register but are ``headless_inert`` -- they do not fire under ``codex exec``) or
+merely *planned* (Codex interactive is a target beta, not shipped), the field is a
+multi-state ``Literal`` rather than a ``bool`` -- the type itself carries the
 limitation instead of overstating parity.
 
 Layering note: the Claude version probe lives in ``forge.install.version`` and is
@@ -41,18 +41,23 @@ logger = logging.getLogger(__name__)
 # ``== "default"``.)
 InteractiveSupport = Literal["default", "beta", "none"]
 
-# Pre-tool policy enforcement strength. "partial" exists for Codex: its PreToolUse
-# hook does not intercept every tool path, so it is a beta-grade guard, not
-# Claude-equivalent enforcement.
+# Pre-tool policy enforcement strength, full -> partial -> none. No runtime is
+# "partial" today: the Phase 6 probe found Codex's PreToolUse hook does not fire under
+# headless `codex exec`, so its headless enforcement is "none" and interactive
+# enforcement is unverified. "partial" stays the value for a non-comprehensive guard
+# (the likely shape if interactive Codex PreToolUse is later confirmed).
 PolicyEnforcement = Literal["full", "partial", "none"]
 
-# Native-hook support. "gated" exists for Codex: hooks are real but require a minimum
-# CLI version (the machine-readable gate lives in ``hook_min_version``), so a preflight
-# must verify the gate rather than assume parity from a bare "yes". A config feature
-# flag (``hook_feature_flag``) is recorded only when one is *also* required; Codex's
-# hooks are default-on (``codex_hooks`` is a deprecated alias of ``hooks`` -- still
-# works, but do not author it), so that field is None.
-HookSupport = Literal["full", "gated", "none"]
+# Native-hook support. "headless_inert" covers Codex: its hooks register and enable
+# (config loads, version floor met) but the Phase 6 probe found they do NOT fire under
+# headless `codex exec` (0 firings across every surface, with
+# --dangerously-bypass-hook-trust, on repeated runs); interactive firing is unverified.
+# "gated" stays reserved for "real but needs a minimum CLI version" (the gate lives in
+# ``hook_min_version``) -- Codex is NOT merely version-gated: the floor is met and hooks
+# still do not fire. ``hook_feature_flag`` is recorded only when a config flag is *also*
+# required; Codex hooks are default-on (``codex_hooks`` is a deprecated alias of
+# ``hooks`` -- still works, do not author it), so that field is None.
+HookSupport = Literal["full", "gated", "headless_inert", "none"]
 
 # Where a runtime's usage/token figures come from.
 UsageSource = Literal["transcript_proxy", "jsonl_events", "json_stats"]
@@ -113,10 +118,11 @@ class RuntimeSpec:
     install_scopes: tuple[str, ...]  # config scopes Forge manages (empty = not Forge-managed)
     curated_transfer_in: bool  # can accept a context doc at session start
     curated_transfer_out: bool  # can generate a curation of its own transcript
-    # Machine-readable gate for ``native_hooks == "gated"`` (None when ungated): a
-    # Phase 5 preflight checks these instead of parsing the human ``note``.
-    # ``hook_min_version`` is the floor where hooks work without extra config;
-    # ``hook_feature_flag`` is recorded only when a config flag is *also* required.
+    # Hook registration/enablement floor (None when ungated): a preflight checks these
+    # instead of parsing the human ``note``. ``hook_min_version`` is the version where
+    # hooks register and enable without extra config -- it is NOT a firing guarantee
+    # (Codex meets the floor yet is ``headless_inert``). ``hook_feature_flag`` is
+    # recorded only when a config flag is *also* required.
     hook_min_version: str | None = None  # e.g. "0.131.0" (Codex hooks default-on)
     hook_feature_flag: str | None = None  # set only when a config flag is also required
     note: str | None = None  # human-facing caveats (exact activation syntax, partial support)
@@ -159,10 +165,10 @@ RUNTIMES: dict[str, RuntimeSpec] = {
         detect=_detect_codex,
         interactive="beta",  # Codex's own interactive mode is GA; Forge frontend integration is the Phase 6 target
         headless=True,
-        native_hooks="gated",  # hooks exist + enabled, but do NOT fire under headless `codex exec` (see note)
-        hook_min_version="0.131.0",  # hooks default-on since 0.131.0; 0.134.0 dropped the plugin-hooks gate, not the alias
+        native_hooks="headless_inert",  # register + enable, but do NOT fire under headless `codex exec` (Phase 6 probe); interactive unverified
+        hook_min_version="0.131.0",  # registration/enablement floor (default-on); NOT a firing guarantee -- see native_hooks
         hook_feature_flag=None,  # hooks default-on (no gate); codex_hooks is a deprecated alias -- do not author it
-        pretool_policy="partial",  # PreToolUse adapter; NOT a full enforcement boundary (no WebSearch/complex shell)
+        pretool_policy="none",  # PreToolUse does not fire headless -> no verified enforcement; interactive unverified
         usage_source="jsonl_events",
         native_resume=True,  # codex exec resume, by thread_id; works cross-CWD (Phase 6 probe, 0.138.0)
         install_scopes=(),  # Forge does not manage Codex install scopes yet
