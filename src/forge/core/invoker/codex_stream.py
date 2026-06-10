@@ -6,7 +6,9 @@ module reduces that stream to the three things the invoker needs:
 
 - ``final_text``  -- the assistant's answer (concatenated ``agent_message`` items);
 - token counts    -- lifted from the terminal ``turn.completed.usage``;
-- ``is_error``    -- whether the turn failed (an ``error`` or ``turn.failed`` event).
+- ``is_error``    -- whether the turn failed (an ``error`` or ``turn.failed`` event);
+- ``thread_id``   -- the resume/session id from the leading ``thread.started`` event
+  (probe stage 61 paired it with the rollout filename's ``<session_id>``).
 
 The shape is pinned to a recorded fixture (``tests/fixtures/codex/``), not the docs:
 when the binary disagrees with a doc, the fixture wins. See that directory's README
@@ -23,11 +25,12 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 
-# Event ``type`` values we react to. Others (``thread.started``, ``turn.started``,
-# reasoning items, tool items) carry no data the invoker needs and are ignored.
+# Event ``type`` values we react to. Others (``turn.started``, reasoning items,
+# tool items) carry no data the invoker needs and are ignored.
 _AGENT_MESSAGE = "agent_message"
 _ITEM_COMPLETED = "item.completed"
 _TURN_COMPLETED = "turn.completed"
+_THREAD_STARTED = "thread.started"
 _ERROR_EVENTS = ("error", "turn.failed")
 
 
@@ -39,6 +42,8 @@ class CodexStreamResult:
     as ``cached_input_tokens``). Token fields are ``None`` when the stream carried no
     ``turn.completed.usage`` (e.g. a failed turn). ``error_message`` is the first
     provider error string, kept for diagnostics; ``is_error`` is the decision flag.
+    ``thread_id`` is the ``codex exec resume`` id (None when the stream never opened
+    a thread, e.g. an immediate CLI failure).
     """
 
     final_text: str
@@ -47,6 +52,7 @@ class CodexStreamResult:
     cached_tokens: int | None
     is_error: bool
     error_message: str | None
+    thread_id: str | None = None
 
 
 def parse_codex_jsonl_stream(stdout: str) -> CodexStreamResult:
@@ -57,6 +63,7 @@ def parse_codex_jsonl_stream(stdout: str) -> CodexStreamResult:
     cached_tokens: int | None = None
     is_error = False
     error_message: str | None = None
+    thread_id: str | None = None
 
     for line in stdout.splitlines():
         line = line.strip()
@@ -89,6 +96,13 @@ def parse_codex_jsonl_stream(stdout: str) -> CodexStreamResult:
                 # NOTE: `reasoning_output_tokens` is a SUBSET of `output_tokens` (Responses
                 # usage is inclusive), so it is deliberately NOT lifted -- adding it would
                 # double-count. There is no HeadlessResult field for it.
+        elif etype == _THREAD_STARTED:
+            # First-wins: one stream opens one thread; a resumed stream re-announces
+            # the SAME id (probe 60b), so later events could only confirm the first.
+            if thread_id is None:
+                candidate = event.get("thread_id")
+                if isinstance(candidate, str) and candidate:
+                    thread_id = candidate
         elif etype in _ERROR_EVENTS:
             is_error = True
             if error_message is None:
@@ -101,6 +115,7 @@ def parse_codex_jsonl_stream(stdout: str) -> CodexStreamResult:
         cached_tokens=cached_tokens,
         is_error=is_error,
         error_message=error_message,
+        thread_id=thread_id,
     )
 
 

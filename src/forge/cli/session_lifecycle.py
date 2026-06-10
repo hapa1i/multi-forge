@@ -98,6 +98,13 @@ from forge.cli.session_addendum import (  # noqa: E402
     resolve_addendum_content_for_proxy,
     write_managed_addendum,
 )
+from forge.cli.session_codex import (  # noqa: E402
+    codex_resume_options,
+    codex_start_options,
+    reject_codex_flags_for_claude,
+    run_codex_resume,
+    run_codex_start,
+)
 
 # Functions below are accessed through _sess() because tests patch them
 # on forge.cli.session. Direct imports would bypass those patches.
@@ -346,6 +353,17 @@ def _launch_claude_for_session(
     proxy_id: str | None = None,
 ) -> int:
     """Launch Claude for a session, handling sidecar/host split."""
+    # Dispatch backstop: every entry point routes Codex sessions to session_codex
+    # before reaching this launcher; a manifest arriving here anyway is a bug, and
+    # launching Claude against it would corrupt the session's runtime facts.
+    _runtime = manifest.intent.launch.runtime if manifest.intent.launch else "claude_code"
+    if _runtime != "claude_code":
+        console.print(
+            f"[red]Error:[/red] session '{manifest.name}' has runtime '{_runtime}' "
+            "and cannot be launched with Claude. Use the matching runtime command."
+        )
+        return 1
+
     worktree_path = Path(manifest.worktree.path) if manifest.worktree else Path.cwd()
     # State lives under forge_root (may differ from worktree_path in nested projects)
     forge_root = Path(manifest.forge_root) if manifest.forge_root else worktree_path
@@ -1324,6 +1342,7 @@ def launch_new_session(
     default=None,
     help="Enable/disable memory auto-update for this session (default: off).",
 )
+@codex_start_options
 def start(
     name: str | None,
     proxy_name: str | None,
@@ -1345,6 +1364,12 @@ def start(
     supervisor_direct: bool,
     subprocess_proxy: str | None,
     memory_flag: str | None,
+    runtime: str,
+    resume_from: str | None,
+    task: str | None,
+    transfer_strategy: str | None,
+    depth: int | None,
+    sandbox: str | None,
 ) -> None:
     """Create and start a new session.
 
@@ -1368,7 +1393,16 @@ def start(
         forge session start my-feature --subprocess-proxy openrouter-anthropic # Direct + proxied subprocesses
         forge session start my-feature --worktree                              # Isolated worktree
         forge session start my-feature --supervise planner                     # With plan supervision
+        forge session start impl --runtime codex --resume-from planner --task "Build it"
     """
+    if runtime == "codex":
+        sys.exit(run_codex_start(click.get_current_context()))
+
+    # Codex-only flags are meaningless on the Claude path: reject, don't ignore.
+    codex_rc = reject_codex_flags_for_claude(click.get_current_context().params)
+    if codex_rc is not None:
+        sys.exit(codex_rc)
+
     if direct and proxy_name:
         console.print("[red]Error:[/red] --no-proxy and --proxy are mutually exclusive")
         sys.exit(1)
@@ -1512,6 +1546,7 @@ def start(
     default=None,
     help="Override child memory activation (default: inherit parent).",
 )
+@codex_resume_options
 @click.pass_context
 def resume(
     ctx: click.Context,
@@ -1527,6 +1562,7 @@ def resume(
     review: bool,
     force: bool,
     memory_flag: str | None,
+    task: str | None,
 ) -> None:
     """Resume a session.
 
@@ -1620,6 +1656,16 @@ def resume(
     except ForgeSessionError as e:
         handle_session_error(e)
         return
+
+    # Runtime dispatch BEFORE any Claude predicate: a Codex session has no Claude
+    # conversation to reattach, so the Claude resume machinery below never applies.
+    manifest_runtime = manifest.intent.launch.runtime if manifest.intent.launch else "claude_code"
+    if manifest_runtime == "codex":
+        sys.exit(run_codex_resume(ctx, name, task))
+
+    if task is not None:
+        console.print("[red]Error:[/red] --task is only supported for Codex sessions")
+        sys.exit(1)
 
     _, validation_base_url, validation_proxy_id = _get_effective_proxy_for_session(manifest)
     if routing:

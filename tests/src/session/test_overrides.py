@@ -134,6 +134,17 @@ class TestValidateKey:
             validate_key("nonexistent_field")
         assert "unknown field" in str(exc_info.value)
 
+    def test_launch_runtime_rejected_as_immutable(self) -> None:
+        """launch.runtime is immutable launch identity (dispatch reads raw intent)."""
+        with pytest.raises(InvalidOverrideKeyError) as exc_info:
+            validate_key("launch.runtime")
+        assert "immutable launch identity" in str(exc_info.value)
+        assert "--runtime" in str(exc_info.value)
+
+    def test_other_launch_keys_still_valid(self) -> None:
+        """Only launch.runtime is blocked; sibling launch keys keep working."""
+        assert validate_key("launch.mode") == ["launch", "mode"]
+
     def test_unknown_nested_key_rejected(self) -> None:
         """Unknown nested keys are rejected."""
         with pytest.raises(InvalidOverrideKeyError) as exc_info:

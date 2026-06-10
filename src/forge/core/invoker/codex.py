@@ -103,6 +103,7 @@ class CodexHeadlessInvoker(_HeadlessLifecycleBase):
             # (is_error) still parsed. An empty/garbage stream -> False, stdout "".
             envelope_parsed=bool(stream.final_text) or stream.input_tokens is not None or stream.is_error,
             runtime_is_error=stream.is_error,
+            runtime_session_id=stream.thread_id,
             **ident,
         )
 
@@ -123,11 +124,17 @@ def prepare_codex_request(
     sandbox: CodexSandbox = "workspace-write",
     timeout_seconds: int = 600,
     label: str | None = None,
+    resume_thread_id: str | None = None,
 ) -> HeadlessRequest:
     """Shape one ``codex exec --json`` job into a :class:`HeadlessRequest`.
 
     The caller runs :func:`assert_codex_ready` ONCE and passes the frozen ``preflight``
     in, so the ~20s ``codex doctor`` probe is not repeated per worker in a fan-out.
+
+    ``resume_thread_id`` continues an existing Codex thread via the ``resume``
+    subcommand. Options go BEFORE the subcommand (probe stage 60 form A:
+    ``codex exec --json --sandbox X resume <thread_id>``); the prompt still arrives on
+    stdin (probe stage 61 verified the stdin-prompt + resume combination).
 
     Codex runs DIRECT to OpenAI: no Forge proxy, no ``ANTHROPIC_*`` env, ``base_url`` is
     ``None``. The child env is **sanitized** so it cannot contradict the preflight: all
@@ -143,6 +150,8 @@ def prepare_codex_request(
     argv = [*get_runtime("codex").headless_cmd, "--json", "--sandbox", sandbox]
     if model:
         argv += ["-m", model]
+    if resume_thread_id:
+        argv += ["resume", resume_thread_id]
 
     env = os.environ.copy()
     for var in _CODEX_CHILD_STRIP_VARS:

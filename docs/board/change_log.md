@@ -27,6 +27,55 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-10
 
+### codex_frontend Phase 2: One-command Codex bridge CLI (`session start --runtime codex`)
+
+**Goal**: Wrap the Phase-5e `bridge_session_to_codex` op in a real session lifecycle -- one command derives a
+Codex-runtime session from a Claude parent, runs the first `codex exec` turn, and makes continuation a first-class
+`session resume` path.
+
+**Key changes**:
+
+- **CLI**: `forge session start [name] --runtime codex --resume-from <parent> --task "..."` (per the resolved flag-shape
+  decision) with `--strategy` (default `ai-curated`), `--depth`, `--sandbox`, `--worktree/--branch`; 17 Claude-only
+  flags rejected with codex and 5 codex-only flags rejected without it. `forge session resume <name> --task "..."`
+  dispatches on `intent.launch.runtime` before any Claude predicate and runs `codex exec resume <thread_id>` (cross-CWD,
+  in the session's recorded worktree, prompt on stdin); `_launch_claude_for_session` refuses codex manifests as a
+  backstop. New `cli/session_codex.py` (rendering) + `core/ops/codex_session.py`
+  (`start_codex_session`/`continue_codex_session`). `session show` renders Runtime/Thread/Rollout/Auth; JSON adds
+  `intent.runtime` + `confirmed.codex`.
+- **Manifest**: `LaunchIntent.runtime` (registry ids `claude_code`/`codex`; CLI maps `claude` -> `claude_code`;
+  `launch.runtime` blocked in `session set`), new `SessionConfirmed.codex` (`thread_id`, `rollout_path`,
+  `rollout_source="discovered_by_thread_id"`, `auth_method`/`auth_source`/`billing_mode` from preflight, `last_run_at`).
+  `confirmed.launch` + `claude_session_id` stay unset for codex (Claude-resume predicates refuse for free; ANTHROPIC-key
+  posture would misread). Older Forge cannot read new manifests (strict dacite) -- accepted research-preview break; old
+  manifests read fine (additive field with default).
+- **Invoker**: `CodexStreamResult.thread_id` parsed from `thread.started`; runtime-neutral
+  `HeadlessResult.runtime_session_id`; `prepare_codex_request(resume_thread_id=...)` appends the probe-60 form-A
+  `resume <tid>` argv. New `core/runtime/codex_rollouts.py` (`find_rollout_path` by thread_id, newest-mtime wins).
+- **Transfer/GC**: the snapshot is keyed by the **real session name** (Derivation.context_file -> GC-protected),
+  structurally retiring the Phase-5e synthetic-children debt; bridge gains `child`/`preflight`/`output_root` (snapshot
+  written under the child's indexed forge_root for nested-project worktrees, same output-root pattern as the fork
+  precedent); stale-snapshot guard (reference-checked via new public `gc.referenced_transfer_context_paths()`;
+  unreferenced -> replaced with paired `.notes.md`; referenced -> error) and two-phase rollback (guard failure deletes
+  only the session; post-guard failure also deletes this run's snapshot+notes).
+- **Docs**: design.md §3.4/§3.5/§3.9/§4.0 (one-command frontend shipped, runtime dispatch, `confirmed.codex` ownership);
+  end-user `session.md` (Codex workflow + cheat sheet) + `transfer.md` (one-command flow promoted, manual recipe kept
+  for sessionless handoffs).
+- **Review fixes (pre-merge)**: post-creation lookup/rollback-delete scoped to the child's forge_root -- session names
+  are project-scoped, so the unscoped strict resolution raised `AmbiguousSessionError` and stranded the just-created
+  session whenever another project had the same name (child root now read from `state.forge_root`, no index round-trip);
+  resume refreshes the recorded auth posture (`auth_method`/`auth_source`/`billing_mode`) from the fresh preflight so
+  `session show` cannot report the first turn's auth after the user switches Codex auth. Regressions:
+  `test_codex_session.py` (cross-project duplicate start + rollback isolation, changed-preflight resume).
+
+**Verification**: ~150 new/extended unit tests green (invoker stream/argv, manifest roundtrip + override rejection,
+rollout discovery, bridge extensions, op lifecycle incl. rollback/collision/worktree-ownership GC pinning, CLI flag
+matrix/dispatch/rendering); full CLI package 1619 green; mypy/pyright clean. **Live**: real-codex E2E
+`tests/integration/core/test_codex_session_start.py` passed (2 real turns) -- verifies the two probe-61 claims as a
+standing guard: the `$CODEX_HOME` rollout filename ends with the live stream's thread_id, and stdin-prompt +
+`exec resume` recalls turn-1 state with a stable thread id. (Probe stage 61 script written + wired into `reproduce.sh`;
+the E2E supersedes its one-shot run.)
+
 ### codex_frontend Phase 1 closeout: `pretool_policy` rise + preflight `[hooks.state]` decision
 
 **Goal**: Ship the one code unit Phase 1 deferred for an explicit decision -- align the capability encoding with the

@@ -54,6 +54,7 @@ from forge.core.auth.template_secrets import (
     resolve_env_or_credential,
     resolve_env_or_credential_with_source,
 )
+from forge.core.runtime.codex_rollouts import codex_home
 from forge.core.runtime.registry import RuntimeSpec, get_runtime
 from forge.core.usage.ledger import BillingMode
 
@@ -313,9 +314,7 @@ def _read_managed_only() -> bool:
 
 
 def _managed_requirements_paths() -> list[Path]:
-    codex_home = os.environ.get("CODEX_HOME")
-    user_dir = Path(codex_home) if codex_home else Path.home() / ".codex"
-    return [user_dir / "requirements.toml", Path("/etc/codex/requirements.toml")]
+    return [codex_home() / "requirements.toml", Path("/etc/codex/requirements.toml")]
 
 
 def _read_toml(path: Path) -> dict[str, Any] | None:

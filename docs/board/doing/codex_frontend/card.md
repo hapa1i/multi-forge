@@ -118,17 +118,32 @@ Gating probe round 3 (2026-06-10, codex-cli **0.138.0**, headless from one enrol
   one-time ceremony** (the installer ships a guided `codex` trust step; programmatic `[hooks.state]` writing stays
   blocked until/unless a source-dive makes the hash computable).
 
+Phase 2 live verification (2026-06-10, codex-cli 0.138.0, via the standing real-codex E2E
+`tests/integration/core/test_codex_session_start.py` -- 2 live turns; probe stage 61
+`scripts/experiments/codex-hooks/stages/61-rollout-identity.sh` is written + wired into `reproduce.sh` for the
+experiment harness but the E2E supersedes its one-shot run):
+
+- **Stream `thread_id` == rollout filename `session_id`** (was doc-asserted only): the live run's
+  `$CODEX_HOME/sessions/YYYY/MM/DD/rollout-<ts>-<id>.jsonl` ends with the `thread.started` thread_id -- hook-free
+  rollout discovery by thread_id glob is sound.
+- **stdin-prompt + `codex exec resume` works** (the invoker delivers prompts via stdin, which probe 60 never combined
+  with `resume`): a seed token planted in turn 1 was recalled in turn 2 with the prompt on stdin, and the resumed stream
+  re-announced the **same** thread_id (60b's stability holds through the invoker path; the op's drift-warning path
+  stayed cold).
+
 ## Deliverables (verdicts carried from the decision record)
 
-1. **One-command bridge CLI (GO -- build first).** A `forge`-surface frontend over the shipped `bridge_session_to_codex`
-   core op (`core/ops/codex_bridge.py`): e.g. `forge session start --runtime codex --resume-from <claude-session>`
-   (exact shape TBD). No hook dependency. Needs: a `runtime` field on the session manifest
-   (`SessionIntent`/`SessionConfirmed`), a runtime-aware dispatch in the launcher (today hard-wired to `invoke_claude`),
-   and hook-free recording of the Codex `thread_id` (resume id) from the `thread.started` JSONL event. Rollout path
-   recording must stay honest about its source: derive it separately by discovering the matching
-   `$CODEX_HOME/sessions/.../rollout-*.jsonl`, or populate it from the SessionStart hook only when the home is
-   trust-enrolled. Use `codex exec resume <thread_id>` for multi-turn continuation. Also: GC the synthetic
-   `<parent>-codex-<suffix>` transfer children the bridge accumulates (recorded debt from Phase 5e).
+1. **One-command bridge CLI -- SHIPPED 2026-06-10 (Phase 2; see the checklist + change_log entry).**
+   `forge session start [name] --runtime codex --resume-from <parent> --task "..."` +
+   `forge session resume <name> --task "..."` over the new command-core op `core/ops/codex_session.py` (composing
+   `bridge_session_to_codex`). All the needs landed: `LaunchIntent.runtime` (immutable, registry-id vocabulary) with
+   runtime-aware dispatch in every entry point (plus a `_launch_claude_for_session` backstop); hook-free `thread_id`
+   from `thread.started` into `confirmed.codex`; rollout path discovered by thread_id and recorded with
+   `rollout_source="discovered_by_thread_id"` (None when absent -- a future hook-sourced value gets its own label);
+   `codex exec resume <thread_id>` continuation (cross-CWD, prompt on stdin -- both verified live, see the "Phase 2 live
+   verification" facts above). The synthetic-children debt was retired *structurally*: the CLI path keys the snapshot by
+   the real session name so `Derivation.context_file` GC-protects it; existing orphan detection sweeps pre-Phase-2
+   leftovers.
 
 2. **Gating probe -- COMPLETE 2026-06-10 (Phase 0 + Phase 1).** Firing GO (interactive 50c, enrolled-headless 40c2/40d),
    and the enrollment mechanics are now pinned -- see "Gating probe round 3" above and the change_log Phase 1 entry; do

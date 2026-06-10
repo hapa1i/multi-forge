@@ -73,6 +73,10 @@ class LaunchIntent:
     mode: str = LAUNCH_MODE_HOST  # "host" or "sidecar"
     sidecar: SidecarLaunchIntent | None = None
     direct_model: str | None = None  # Claude Code env-ready direct model pin (e.g. claude-opus-4-8[1m])
+    # Runtime registry id ("claude_code" | "codex") driving launcher dispatch. Immutable
+    # launch identity: `forge session set launch.runtime` is rejected (overrides.py) and
+    # dispatch reads this raw intent field, never effective state.
+    runtime: str = "claude_code"
 
 
 @dataclass
@@ -387,6 +391,37 @@ class LaunchConfirmed:
 
 
 @dataclass
+class CodexConfirmed:
+    """Codex runtime facts captured by the CLI (hook-free), refreshed per run.
+
+    CLI-owned like ``LaunchConfirmed``: Codex hooks only fire from trust-enrolled
+    homes (registry ``native_hooks="enrollment_gated"``), so the CLI records these
+    from the ``codex exec --json`` stream and filesystem discovery instead.
+
+    Fields:
+        thread_id: the ``codex exec resume`` id, from the stream's ``thread.started``.
+        rollout_path: absolute path to the matching ``$CODEX_HOME/sessions/.../
+            rollout-*-<thread_id>.jsonl``, when discovered.
+        rollout_source: how ``rollout_path`` was obtained ("discovered_by_thread_id");
+            None when no rollout was found. A future hook-sourced value gets its own
+            label so the provenance stays honest.
+        auth_method / auth_source / billing_mode: the secret-free auth posture from
+            ``CodexPreflight``. ``confirmed.launch`` stays None for Codex sessions
+            (it describes the ANTHROPIC key posture of interactive Claude), so this
+            is the manifest's only auth breadcrumb.
+        last_run_at: ISO8601 of the most recent ``codex exec`` turn.
+    """
+
+    thread_id: str | None = None
+    rollout_path: str | None = None
+    rollout_source: str | None = None
+    auth_method: str | None = None
+    auth_source: str | None = None
+    billing_mode: str | None = None
+    last_run_at: str | None = None
+
+
+@dataclass
 class SessionConfirmed:
     """What Claude Code actually reported via hooks.
 
@@ -425,7 +460,11 @@ class SessionConfirmed:
     is_sandboxed: bool = False
 
     # Immutable launch facts (route + api-key posture), CLI-owned, set once at start.
+    # Stays None for Codex-runtime sessions (codex below is their auth breadcrumb).
     launch: LaunchConfirmed | None = None
+
+    # Codex runtime facts (thread_id, rollout, auth posture), CLI-owned, hook-free.
+    codex: CodexConfirmed | None = None
 
     # Context derivation tracking (for resumed or forked sessions)
     derivation: Derivation | None = None
@@ -527,6 +566,7 @@ def create_session_state(
     sidecar_mounts: list[str] | None = None,
     sidecar_image: str | None = None,
     direct_model: str | None = None,
+    runtime: str = "claude_code",
 ) -> SessionState:
     """Create a new session state with defaults.
 
@@ -543,6 +583,7 @@ def create_session_state(
         sidecar_mounts: Raw sidecar mount specs to persist for relaunch.
         sidecar_image: Optional sidecar image override to persist for relaunch.
         direct_model: Optional Claude Code env-ready direct model pin.
+        runtime: Runtime registry id driving launcher dispatch ("claude_code" | "codex").
 
     Returns:
         A new SessionState with timestamps set to now.
@@ -556,7 +597,7 @@ def create_session_state(
     if proxy_template is not None and proxy_base_url is not None:
         proxy = ProxyIntent(template=proxy_template, base_url=proxy_base_url)
 
-    launch = LaunchIntent(mode=launch_mode, direct_model=direct_model)
+    launch = LaunchIntent(mode=launch_mode, direct_model=direct_model, runtime=runtime)
     if launch_mode == LAUNCH_MODE_SIDECAR or sidecar_mounts or sidecar_image is not None:
         launch.sidecar = SidecarLaunchIntent(
             mounts=list(sidecar_mounts or []),

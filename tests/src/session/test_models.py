@@ -8,6 +8,7 @@ from forge.core.state import now_iso
 from forge.session.models import (
     INDEX_VERSION,
     SCHEMA_VERSION,
+    CodexConfirmed,
     DesignatedDoc,
     LaunchConfirmed,
     LaunchIntent,
@@ -183,6 +184,60 @@ class TestLaunchIntent:
         )
         assert intent.launch is None
 
+    def test_runtime_defaults_to_claude_code(self) -> None:
+        assert LaunchIntent().runtime == "claude_code"
+
+    def test_old_launch_block_without_runtime_deserializes(self) -> None:
+        # Pre-codex manifests carry a launch block without `runtime`; strict dacite
+        # must fill the default, not raise.
+        import dacite
+
+        launch = dacite.from_dict(
+            LaunchIntent,
+            {"mode": "host", "sidecar": None, "direct_model": None},
+            config=dacite.Config(strict=True),
+        )
+        assert launch.runtime == "claude_code"
+
+
+class TestCodexConfirmed:
+    """CodexConfirmed dataclass + additive manifest compatibility (codex_frontend Phase 2)."""
+
+    def test_confirmed_codex_defaults_none(self) -> None:
+        assert SessionConfirmed().codex is None
+
+    def test_dacite_round_trip(self) -> None:
+        from dataclasses import asdict
+
+        import dacite
+
+        confirmed = SessionConfirmed(
+            codex=CodexConfirmed(
+                thread_id="019eaa51-6920-7c41-ae34-d4f7f368d55a",
+                rollout_path="/home/u/.codex/sessions/2026/06/10/rollout-x-019eaa51.jsonl",
+                rollout_source="discovered_by_thread_id",
+                auth_method="chatgpt_tokens",
+                auth_source="codex_store",
+                billing_mode="subscription_quota",
+                last_run_at="2026-06-10T12:00:00Z",
+            )
+        )
+        restored = dacite.from_dict(SessionConfirmed, asdict(confirmed), config=dacite.Config(strict=True))
+        assert restored.codex is not None
+        assert restored.codex.thread_id == "019eaa51-6920-7c41-ae34-d4f7f368d55a"
+        assert restored.codex.rollout_source == "discovered_by_thread_id"
+        assert restored.codex.auth_source == "codex_store"
+
+    def test_old_manifest_without_codex_deserializes(self) -> None:
+        import dacite
+
+        restored = dacite.from_dict(
+            SessionConfirmed,
+            {"claude_session_id": "uuid-1234", "is_sandboxed": False},
+            config=dacite.Config(strict=True),
+        )
+        assert restored.codex is None
+
 
 class TestSessionState:
     """Test SessionState dataclass."""
@@ -274,6 +329,18 @@ class TestCreateSessionState:
         assert manifest.intent.proxy.template == self.DEFAULT_PROXY_TEMPLATE
         assert manifest.intent.proxy.base_url == self.DEFAULT_PROXY_URL
         assert manifest.confirmed.claude_session_id is None
+        assert manifest.intent.launch is not None
+        assert manifest.intent.launch.runtime == "claude_code"
+
+    def test_codex_runtime_recorded_on_launch_intent(self) -> None:
+        manifest = create_session_state(
+            "codex-session",
+            parent_session="planner",
+            runtime="codex",
+        )
+        assert manifest.intent.launch is not None
+        assert manifest.intent.launch.runtime == "codex"
+        assert manifest.parent_session == "planner"
 
     def test_timestamps_are_set(self) -> None:
         """Factory should set timestamps to now."""

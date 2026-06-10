@@ -132,6 +132,12 @@ class TestCodexResultBuilding:
         r = out[0]
         assert (r.run_id, r.parent_run_id, r.root_run_id) == ("run_c", "run_verb", "run_root")
 
+    @patch("forge.core.invoker._lifecycle.subprocess.Popen")
+    def test_thread_id_surfaced_as_runtime_session_id(self, mock_popen):
+        mock_popen.return_value = _mock_proc(_SUCCESS_STREAM)
+        out = CodexHeadlessInvoker().run(_codex_req())
+        assert out.runtime_session_id == "019eaa51-6920-7c41-ae34-d4f7f368d55a"
+
 
 class TestCodexLifecycleHooks:
     @patch("forge.core.invoker._lifecycle.os.getpgid", return_value=321)
@@ -176,6 +182,32 @@ class TestPrepareCodexRequest:
             prompt="hi", preflight=_preflight(), attribution=Attribution(command="bridge"), sandbox="read-only"
         )
         assert req.argv[:5] == ["codex", "exec", "--json", "--sandbox", "read-only"]
+
+    def test_resume_thread_id_appends_resume_subcommand_after_options(self):
+        # Probe 60 form A: options BEFORE the `resume` subcommand; prompt stays on stdin.
+        req = prepare_codex_request(
+            prompt="continue",
+            preflight=_preflight(),
+            attribution=Attribution(command="codex-resume"),
+            model="gpt-5.5",
+            resume_thread_id="019eaa51-6920-7c41-ae34-d4f7f368d55a",
+        )
+        assert req.argv == [
+            "codex",
+            "exec",
+            "--json",
+            "--sandbox",
+            "workspace-write",
+            "-m",
+            "gpt-5.5",
+            "resume",
+            "019eaa51-6920-7c41-ae34-d4f7f368d55a",
+        ]
+        assert req.prompt == "continue"
+
+    def test_no_resume_subcommand_without_thread_id(self):
+        req = prepare_codex_request(prompt="hi", preflight=_preflight(), attribution=Attribution(command="bridge"))
+        assert "resume" not in req.argv
 
     @patch("forge.core.invoker.codex.codex_api_key_for_subprocess", return_value="sk-test-key")
     def test_credential_file_auth_injects_key(self, _key):

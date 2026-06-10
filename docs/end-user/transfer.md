@@ -1,7 +1,8 @@
 # Forge Transfer — Resume/Fork Context Guide
 
-**Status:** Implemented (`forge transfer show|regenerate|edit|diff`). The `codex` target runtime and the cross-runtime
-hop are part of the Phase 5 Codex headless runtime; the one-command Codex frontend is Phase 6.
+**Status:** Implemented (`forge transfer show|regenerate|edit|diff`). The cross-runtime hop is one command:
+`forge session start <name> --runtime codex --resume-from <parent> --task "…"` (see [session.md](session.md)); the
+manual `regenerate → show → codex exec` recipe below remains for sessionless handoffs.
 
 - Canonical architecture: [`docs/design.md`](../design.md) §3.9 (transfer) · schema:
   [`design_appendix.md`](../design_appendix.md) §M
@@ -68,16 +69,33 @@ native resume: you plan in Claude, then hand the distilled context to a headless
 **Prerequisites:** `codex` installed and authenticated (`forge runtime preflight codex` → `Ready YES`);
 `OPENROUTER_API_KEY` for `ai-curated`.
 
+**The one-command flow** creates a real Codex-runtime Forge session — derivation lineage, the `codex exec` thread id,
+and per-turn usage all recorded — and runs the first turn:
+
 ```bash
 # 1. Plan in a normal Claude session (e.g. `forge session start planner`), then exit.
 
-# 2. Distil it into a Codex-targeted curated transfer (creates the cache if absent):
+# 2. Derive a Codex session from it and run the first turn (curates the transfer for you):
+forge session start impl --runtime codex --resume-from planner --task "Implement the plan."
+
+# 3. Continue the same Codex thread, turn by turn:
+forge session resume impl --task "Now add tests for the edge cases."
+
+# 4. Inspect what happened:
+forge session show impl     # Runtime, thread id, rollout path, auth posture
+forge activity impl         # transfer-curate + codex turns under one run tree
+```
+
+**The manual recipe** stays available when you want the handoff without a Forge session:
+
+```bash
+# Distil into a Codex-targeted curated transfer (creates the cache if absent):
 forge transfer regenerate planner --target-runtime codex --strategy ai-curated
 
-# 3. Review the curated context:
+# Review the curated context:
 forge transfer show planner
 
-# 4. Hand the curated context to Codex as the initial message, with your task appended:
+# Hand it to Codex as the initial message, with your task appended:
 codex exec "$(forge transfer show planner)
 
 Your task: implement the change described in the context above."
@@ -92,10 +110,9 @@ does, but a bare `forge transfer regenerate` from a shell runs the curation with
 > `target_runtime`) ahead of the curated body; both are harmless context for Codex, and the `## Runtime Hints` section
 > tells Codex how to run.
 
-> **Note:** The **one-command bridge** — plan → curate → launch Codex under one run tree in a single
-> `forge … --runtime codex` invocation — has its orchestration shipped in Phase 5 (`bridge_session_to_codex`) but is
-> **not yet exposed as a CLI**; the Phase 5 workflow is the manual `regenerate → show → codex exec` above. The
-> interactive Codex frontend is Phase 6.
+> **Note:** The one-command flow rejects `--resume-from` without `--runtime codex` — with the default (Claude) runtime
+> it would just be `forge session resume <parent> --fresh`, which already exists. Interactive Codex sessions (a bare
+> `forge session start --runtime codex` with no parent) are a later phase.
 
 ## Troubleshooting
 

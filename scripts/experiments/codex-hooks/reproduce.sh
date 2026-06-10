@@ -5,7 +5,7 @@
 # verdict vocabulary, and safety/cost notes.
 #
 # Usage:
-#   ./reproduce.sh              # headless set: 00 05 10 20 30 60 70
+#   ./reproduce.sh              # headless set: 00 05 10 20 30 60 61 70
 #   ./reproduce.sh all          # + operator-guided 40 50 80 (needs a TTY)
 #   ./reproduce.sh 00 30        # specific stages, in the given order
 #   ./reproduce.sh 80           # round-3 enrollment ceremony (builds the fixture)
@@ -17,7 +17,7 @@ set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 
-HEADLESS_STAGES=(00-preflight 05-config-schema 10-headless-fire 20-payloads 30-responses 60-exec-resume 70-bypass)
+HEADLESS_STAGES=(00-preflight 05-config-schema 10-headless-fire 20-payloads 30-responses 60-exec-resume 61-rollout-identity 70-bypass)
 # 80 (enroll the round-3 fixture) is guided: it needs a TTY for the trust ceremony.
 GUIDED_STAGES=(40-trust 50-interactive 80-enroll-fixture)
 # 81-83 consume the stage-80 enrolled fixture and run headless. EXPLICIT-ONLY:
@@ -37,6 +37,7 @@ Approximate model-turn budget (short, one-word-reply prompts; ChatGPT quota):
   40-trust          3 turns + 1 operator-guided interactive run
   50-interactive    2 turns + 1 operator-guided interactive run
   60-exec-resume    4 turns
+  61-rollout-ident  2 turns (thread_id==rollout filename; stdin-prompt resume)
   70-bypass         1 turn
   --- round 3 (enrollment mechanics; explicit-only) ---
   80-enroll-fixture 2 turns + 1 operator-guided trust ceremony (builds the fixture)

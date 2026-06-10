@@ -123,6 +123,12 @@ forge session resume [parent] --fresh \
   [--resume-mode native|transfer] \
   [--proxy <template>]
 
+# Codex-runtime session (derive from a Claude parent; runs headless `codex exec` turns)
+forge session start [name] --runtime codex --resume-from <parent> --task "<first task>" \
+  [--strategy minimal|structured|full|ai-curated] [--depth <n>] \
+  [--sandbox read-only|workspace-write|danger-full-access] [--worktree/-w] [--branch/-b <branch>]
+forge session resume <name> --task "<next task>"   # next turn on the same Codex thread
+
 # Show / list
 forge session show            # Current session (from $FORGE_SESSION)
 forge session show <name>     # Named session details
@@ -379,7 +385,22 @@ Resume and fork-recovery launches inject the per-child file directly with `--app
 customize `CLAUDE.md`, do not also add manual references to `.forge/prev_sessions/...` there, or you may duplicate the
 same transfer context.
 
-### Fork a session (branch the conversation)
+### Derive a Codex session from a Claude parent (cross-runtime)
+
+```bash
+forge session start impl --runtime codex --resume-from planner --task "Implement the plan."
+forge session resume impl --task "Now add tests."
+forge session show impl      # Runtime, Codex thread id, rollout path, auth posture
+forge activity impl          # transfer-curate + codex turns under one run tree
+```
+
+Requires `codex` installed and authenticated (`forge runtime preflight codex` → `Ready YES`). The start command curates
+the parent's context (default `--strategy ai-curated`), prepends it to your `--task` as the initial `codex exec`
+message, and records the Codex **thread id** so each `resume --task` continues the same conversation — from any
+directory; the turn always runs in the session's recorded worktree. Codex sessions go direct to OpenAI: proxy,
+supervision, memory, and other Claude-only flags are rejected. `--task` is required (headless turns need a prompt) and
+only valid for Codex sessions. If the first turn fails before Codex opens a thread, resume refuses with guidance —
+delete the session and start again.
 
 ```bash
 forge session fork auth-refactor --name auth-refactor-alt

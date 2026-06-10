@@ -44,7 +44,11 @@ from forge.core.reactive.env import (
     RunIdentity,
     new_root_run_identity,
 )
-from forge.core.runtime.codex_preflight import CodexPreflightError, assert_codex_ready
+from forge.core.runtime.codex_preflight import (
+    CodexPreflight,
+    CodexPreflightError,
+    assert_codex_ready,
+)
 from forge.session import ForgeSessionError, SessionManager, SessionState
 from forge.session.prev_sessions import child_path, compose_child_context
 from forge.session.transfer import (
@@ -69,6 +73,11 @@ class CodexBridgeResult:
     root_run_id: str  # the run tree the curation + codex events share
     codex: HeadlessResult  # the Codex run's own outcome (success/error is here, not raised)
     curation_ran: bool  # the transfer produced a full ai-curated body (vs a deterministic fallback)
+    thread_id: str | None = None  # the `codex exec resume` id (stream `thread.started`)
+    # Transfer facts the codex session op mirrors into Derivation (manager.resume_session shape).
+    lineage: tuple[str, ...] = ()
+    parent_transcript: str | None = None
+    context_file_rel: str | None = None
 
 
 def compose_codex_initial_message(transfer_body: str, task: str) -> str:
@@ -153,6 +162,9 @@ def bridge_session_to_codex(
     depth: int = 1,
     session: str | None = None,
     timeout_seconds: int = 600,
+    child: str | None = None,
+    preflight: CodexPreflight | None = None,
+    output_root: Path | None = None,
 ) -> CodexBridgeResult:
     """Hand ``parent``'s curated transfer to a headless ``codex exec`` run implementing ``task``.
 
@@ -160,6 +172,15 @@ def bridge_session_to_codex(
     session, prepends it to the task as the ``codex exec`` initial message, and runs Codex
     in ``cwd`` (expected to be a git worktree) -- so the curation ``core.llm`` event and the
     ``codex_exec`` event share one root.
+
+    ``child`` overrides the per-run synthetic transfer-child key -- the codex session op
+    passes the real session name so the snapshot is referenced by that session's
+    ``Derivation.context_file`` (GC-protected) instead of accumulating as an orphan.
+    ``preflight`` skips the internal ``assert_codex_ready()`` (~20s ``codex doctor``) when
+    the caller already ran it once. ``output_root`` is the transfer write/read root when
+    the child session's forge_root differs from ``ctx.forge_root`` (worktree sessions) --
+    GC resolves the child's relative ``context_file`` under the child's indexed
+    forge_root, so writing the snapshot anywhere else would orphan it.
 
     Raises ``ForgeOpError`` for an unknown strategy, a missing parent, or a non-ready Codex
     runtime (with setup guidance). The Codex run's own success/failure is reported on the
@@ -190,31 +211,36 @@ def bridge_session_to_codex(
             return None
 
     # Fail closed if Codex can't run (mirrors validate_proxy_startup); the message names
-    # the setup path. Runs `codex doctor` (~20s) once -- the bridge is a real launch.
-    try:
-        preflight = assert_codex_ready()
-    except CodexPreflightError as e:
-        raise ForgeOpError(f"Codex runtime not ready: {e}") from e
+    # the setup path. Runs `codex doctor` (~20s) once -- the bridge is a real launch --
+    # unless the caller already ran it and passed the frozen result in.
+    if preflight is None:
+        try:
+            preflight = assert_codex_ready()
+        except CodexPreflightError as e:
+            raise ForgeOpError(f"Codex runtime not ready: {e}") from e
 
     root = new_root_run_identity()
     sess = session or parent
-    # Unique per run: ``ensure_child`` "leaves an existing child alone" (a durability
-    # guarantee for user-curated Claude resume), so a fixed key would feed Codex a stale
-    # snapshot on re-runs. The run id makes each bridge run its own immutable snapshot.
-    child = f"{parent}-codex-{root.run_id[-6:]}"
+    if child is None:
+        # Unique per run: ``ensure_child`` "leaves an existing child alone" (a durability
+        # guarantee for user-curated Claude resume), so a fixed key would feed Codex a stale
+        # snapshot on re-runs. The run id makes each bridge run its own immutable snapshot.
+        child = f"{parent}-codex-{root.run_id[-6:]}"
+    transfer_root = output_root if output_root is not None else forge_root
 
     with _temporary_run_env(root, sess):
         transfer = assemble_transfer_context(
             parent_name=parent,
             parent_state=parent_state,
             forge_root=forge_root,
+            output_root=output_root,
             strategy=resume_strategy,
             depth=depth,
             get_session=_get,
             child_name=child,
             target_runtime="codex",
         )
-        composed = compose_child_context(forge_root, parent, child)
+        composed = compose_child_context(transfer_root, parent, child)
         frontmatter, body, _ = parse_transfer_frontmatter(composed)
         full_prompt = compose_codex_initial_message(body, task)
 
@@ -237,8 +263,12 @@ def bridge_session_to_codex(
     return CodexBridgeResult(
         parent=parent,
         child=child,
-        transfer_path=transfer.context_file or child_path(forge_root, parent, child),
+        transfer_path=transfer.context_file or child_path(transfer_root, parent, child),
         root_run_id=root.root_run_id,
         codex=result,
         curation_ran=curation_ran,
+        thread_id=result.runtime_session_id,
+        lineage=tuple(transfer.lineage),
+        parent_transcript=transfer.transcript_artifact_path,
+        context_file_rel=transfer.context_file_rel,
     )

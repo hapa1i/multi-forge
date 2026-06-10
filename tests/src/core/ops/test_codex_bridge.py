@@ -264,3 +264,60 @@ class TestBridgeSessionToCodex:
         # The bridge is a transient root: os.environ run identity was restored after.
         assert "FORGE_RUN_ID" not in os.environ
         assert "FORGE_ROOT_RUN_ID" not in os.environ
+
+        # The seed thread_id from the fixture stream surfaces on the result (Phase 2).
+        assert result.thread_id == "019eaa51-6920-7c41-ae34-d4f7f368d55a"
+
+
+def _run_bridge(tmp_path: Path, **bridge_kwargs: Any) -> tuple[CodexBridgeResult, MagicMock]:
+    """Run the bridge with the standard hermetic mocks; return (result, assert_ready mock)."""
+    transcript = tmp_path / "transcript.jsonl"
+    _write_transcript(transcript)
+    state = _planner_state(tmp_path, transcript)
+
+    manager = MagicMock()
+    manager.get_session.return_value = state
+    mock_adapter = MagicMock()
+    mock_adapter.complete.return_value = _fake_completion(json.dumps(_CURATED))
+
+    with (
+        patch("forge.core.ops.codex_bridge.SessionManager", return_value=manager),
+        patch("forge.core.ops.codex_bridge.assert_codex_ready", return_value=_preflight()) as mock_ready,
+        patch("forge.core.llm.SyncAdapter", return_value=mock_adapter),
+        patch("forge.core.llm.get_client"),
+        patch("forge.core.invoker._lifecycle.subprocess.Popen", return_value=_mock_codex_proc()),
+    ):
+        result = bridge_session_to_codex(
+            ctx=_ctx(tmp_path, forge_root=tmp_path),
+            parent="planner",
+            task="Implement the parser",
+            cwd=str(tmp_path),
+            strategy="ai-curated",
+            **bridge_kwargs,
+        )
+    return result, mock_ready
+
+
+class TestBridgePhase2Extensions:
+    """Phase 2 bridge params: explicit child key, provided preflight, output_root."""
+
+    def test_explicit_child_key_honored(self, tmp_path: Path) -> None:
+        result, _ = _run_bridge(tmp_path, child="impl")
+        assert result.child == "impl"
+        snapshot = tmp_path / ".forge" / "prev_sessions" / "planner" / "children" / "impl.md"
+        assert snapshot.is_file()
+        assert result.transfer_path == snapshot
+
+    def test_provided_preflight_short_circuits_assert(self, tmp_path: Path) -> None:
+        _, mock_ready = _run_bridge(tmp_path, preflight=_preflight())
+        mock_ready.assert_not_called()
+
+    def test_output_root_places_snapshot_under_child_root(self, tmp_path: Path) -> None:
+        child_root = tmp_path / "wt"
+        child_root.mkdir()
+        result, _ = _run_bridge(tmp_path, child="impl", output_root=child_root)
+        snapshot = child_root / ".forge" / "prev_sessions" / "planner" / "children" / "impl.md"
+        assert snapshot.is_file()
+        assert result.transfer_path == snapshot
+        # Nothing was written under the invocation root.
+        assert not (tmp_path / ".forge" / "prev_sessions" / "planner" / "children" / "impl.md").exists()

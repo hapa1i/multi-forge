@@ -401,6 +401,8 @@ class SessionManager:
         sidecar_image: str | None = None,
         direct_model: str | None = None,
         claude_session_id: str | None = None,
+        runtime: str = "claude_code",
+        parent_session: str | None = None,
     ) -> SessionState:
         """Create and register a new session.
 
@@ -421,6 +423,9 @@ class SessionManager:
             sidecar_mounts: Raw sidecar mount specs to persist for relaunch.
             sidecar_image: Optional sidecar image override to persist for relaunch.
             direct_model: Optional Claude Code env-ready direct model pin.
+            runtime: Runtime registry id for launcher dispatch ("claude_code" | "codex").
+            parent_session: Derivation source recorded on the state (codex start path;
+                Claude resume/fork paths record it via their own child-creation flows).
 
         Returns:
             The created session state with candidate UUID.
@@ -583,6 +588,7 @@ class SessionManager:
             name=name,
             proxy_template=template,
             proxy_base_url=base_url,
+            parent_session=parent_session,
             is_incognito=is_incognito,
             worktree_path=worktree_path,
             worktree_branch=worktree_branch,
@@ -590,6 +596,7 @@ class SessionManager:
             sidecar_mounts=sidecar_mounts,
             sidecar_image=sidecar_image,
             direct_model=direct_model,
+            runtime=runtime,
         )
 
         if claude_session_id:

@@ -298,6 +298,70 @@ class TestDetectOrphanHandoffFiles:
 
 
 # ---------------------------------------------------------------------------
+# Codex-session transfer pinning (codex_frontend Phase 2)
+# ---------------------------------------------------------------------------
+
+
+def _seed_codex_child_files(tmp_path: Path) -> tuple[Path, Path, Path, Path]:
+    """Index planner + a codex-runtime impl whose derivation references its snapshot.
+
+    Returns (forge_root, real_child, notes_overlay, synthetic_leftover).
+    """
+    from forge.session import SessionStore, create_session_state
+    from forge.session.models import Derivation
+
+    fr = _seed_session(tmp_path, "planner")
+    _seed_session(tmp_path, "impl", forge_root=fr)
+    state = create_session_state("impl", worktree_path=str(fr), runtime="codex")
+    state.forge_root = str(fr)
+    state.confirmed.derivation = Derivation(
+        parent_session="planner",
+        resume_mode="transfer",
+        context_file=".forge/prev_sessions/planner/children/impl.md",
+    )
+    SessionStore(str(fr), "impl").write(state)
+
+    parent_dir = fr / ".forge" / "prev_sessions" / "planner"
+    children = parent_dir / "children"
+    children.mkdir(parents=True)
+    (parent_dir / "generated.md").write_text("# Cache")
+    real_child = children / "impl.md"
+    real_child.write_text("# Codex transfer context")
+    notes = children / "impl.notes.md"
+    notes.write_text("# User notes")
+    # Pre-Phase-2 manual bridge runs keyed snapshots by synthetic per-run child
+    # names; no derivation references them, so they are plain orphans.
+    synthetic = children / "planner-codex-abc123.md"
+    synthetic.write_text("# Synthetic child")
+    return fr, real_child, notes, synthetic
+
+
+class TestCodexTransferPinning:
+    """The Phase 2 start op keys snapshots by real session name; GC must keep
+    those (and their notes overlays) while still sweeping the synthetic
+    per-run children the manual bridge used to leak."""
+
+    def test_synthetic_child_flagged_real_child_and_notes_survive(self, tmp_path: Path) -> None:
+        fr, _real_child, _notes, synthetic = _seed_codex_child_files(tmp_path)
+
+        ref_set = {("planner", str(fr)), ("impl", str(fr))}
+        result = _detect_orphan_transfer_files(ref_set, {fr})
+
+        assert result.items == [str(synthetic)]
+
+    def test_run_clean_removes_synthetic_keeps_codex_child(self, tmp_path: Path) -> None:
+        fr, real_child, notes, synthetic = _seed_codex_child_files(tmp_path)
+
+        ctx = _make_ctx(tmp_path, forge_root=fr)
+        result = run_clean(ctx=ctx, scope="workspace")
+
+        assert "transfer_files" in result.categories_cleaned
+        assert not synthetic.exists()
+        assert real_child.is_file()
+        assert notes.is_file()
+
+
+# ---------------------------------------------------------------------------
 # _detect_stale_active_entries
 # ---------------------------------------------------------------------------
 

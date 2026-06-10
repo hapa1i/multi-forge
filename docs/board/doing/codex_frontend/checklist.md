@@ -46,8 +46,15 @@ black-box computable so a record cannot be validated, and a path-keyed read woul
 stays `enrollment_gated`, `untrusted` stays reserved for a future codex-cli source-dive. (b) the registry
 `pretool_policy` rose `"none" -> "partial"` (deny + `updatedInput` confirmed; partial not full -- enforcement is
 enrollment-gated, malformed hook output fails open, PermissionRequest unpinned), with the stale Codex `note` sentences
-rewritten to the round-3 facts and `design.md` §5.5.5 synced. **Next: Phase 2 (bridge CLI)**, starting with the
-CLI-shape Open Decision.
+rewritten to the round-3 facts and `design.md` §5.5.5 synced.
+
+**Phase 2 shipped 2026-06-10** (see change_log):
+`forge session start [name] --runtime codex --resume-from <parent> --task "..."` +
+`forge session resume <name> --task "..."` over new `core/ops/codex_session.py`; manifest `runtime` + `confirmed.codex`;
+snapshot keyed by real session name (synthetic-children debt retired structurally); all five acceptance rows green
+including the live real-codex E2E, which also closed the two open probe-61 seams (rollout filename == stream thread_id;
+stdin-prompt + `exec resume` recall). **Next: Phase 3 (hook adapter/responder) or Phase 5 (interactive frontend)** --
+both unblocked; Phase 4 viable per 30e.
 
 ## Phase 0 - Registry correction (owed from probe round 2)
 
@@ -151,26 +158,40 @@ post-enrollment event coverage / 30e / PreToolUse = `stage 81`; user-vs-project 
 Frontend over the shipped `bridge_session_to_codex` (`core/ops/codex_bridge.py`). Plan the slice in detail when started;
 the acceptance sketch:
 
-- [ ] CLI shape decision (e.g. `forge session start --runtime codex --resume-from <parent>`) -- recorded in Open
-  Decisions before implementation.
-- [ ] `runtime` field on the session manifest (`SessionIntent`/`SessionConfirmed`) + runtime-aware launcher dispatch
-  (today hard-wired to `invoke_claude`).
-- [ ] Codex `thread_id` (resume id) recorded into `confirmed` from the hook-free `thread.started` JSONL stream event;
-  continuation via `codex exec resume <thread_id>`.
-- [ ] Rollout path recorded into `confirmed` without pretending it is hook-free: either discover the matching
-  `$CODEX_HOME/sessions/.../rollout-*.jsonl` by `thread_id`, or populate it from the SessionStart payload only when the
-  home is trust-enrolled. Discovery assumes stream `thread_id` == the rollout filename's `session_id` -- doc-asserted
-  (`tests/fixtures/codex/README.md` calls `thread_id` "the resume/session id") but never binary-paired from one run;
-  verify the equality as the first implementation step.
-- [ ] GC the synthetic `<parent>-codex-<suffix>` transfer children the bridge accumulates (Phase 5e recorded debt).
+- [x] CLI shape decision -- **resolved 2026-06-10: `forge session start [name] --runtime codex --resume-from <parent>`**
+  (rationale + scoping caveats recorded in Open Decisions: `--resume-from` requires `--runtime codex` in Phase 2;
+  task/prompt surface needed for the headless turn; ai-curated default for the Codex path).
+- [x] `runtime` field on the session manifest + runtime-aware launcher dispatch -- **shipped 2026-06-10**:
+  `LaunchIntent.runtime` (registry ids; CLI maps `claude` -> `claude_code`; immutable -- `session set launch.runtime`
+  rejected in `overrides.validate_key`); `start`/`resume` dispatch on `intent.launch.runtime` before any Claude
+  predicate; `_launch_claude_for_session` backstop refuses codex manifests. Verified: `tests/src/session/test_models.py`
+  (roundtrip + old-manifest reads), `test_overrides.py`, `tests/src/cli/test_session_codex.py` (42 tests: flag matrix,
+  dispatch, backstop, show).
+- [x] Codex `thread_id` recorded into `confirmed.codex` from the hook-free `thread.started` stream event; continuation
+  via `forge session resume <name> --task` -> `codex exec resume <thread_id>` (probe-60 form-A argv, prompt on stdin,
+  cross-CWD in the session's recorded worktree) -- **shipped 2026-06-10**. Verified:
+  `tests/src/core/invoker/test_codex_stream.py`/`test_codex_invoker.py` (parse + argv),
+  `tests/src/core/ops/test_codex_session.py` (resume argv/cwd/stdin, drift warning, missing-tid guidance).
+- [x] Rollout path recorded honestly -- **shipped 2026-06-10**: discovered by `thread_id` glob
+  (`core/runtime/codex_rollouts.py`), recorded with `rollout_source="discovered_by_thread_id"` only on a hit (None when
+  absent; a future hook-sourced value gets its own label). The `thread_id` == rollout-filename equality was
+  binary-paired from one live run by the standing E2E (see the @slow row below) rather than a one-shot probe run --
+  probe stage 61 (`scripts/experiments/codex-hooks/stages/61-rollout-identity.sh`) is written + wired into
+  `reproduce.sh` for the experiment harness, superseded for verification by the E2E.
+- [x] Synthetic transfer-children debt retired **structurally** (better than GC'ing them): the CLI path keys the
+  snapshot by the **real session name**, so `Derivation.context_file` GC-protects it; leftover synthetic
+  `<parent>-codex-<suffix>` files from pre-Phase-2 manual bridge runs are swept by the existing orphan detection.
+  Stale-snapshot guard (reference-checked, removes paired `.notes.md`) + two-phase rollback ship with the op. Verified:
+  `tests/src/core/ops/test_gc.py::TestCodexTransferPinning`, `test_codex_session.py::TestStartCodexSessionGC` (zero
+  orphans, nested-worktree ownership via `output_root`, rollback/retry, referenced-collision refusal).
 
-| Test                   | Fixture                              | Assertion                                                          | Test File |
-| ---------------------- | ------------------------------------ | ------------------------------------------------------------------ | --------- |
-| Bridge CLI happy path  | mocked curation + codex Popen replay | manifest `runtime=codex`; `thread_id` parsed from `thread.started` | TBD       |
-| Continuation           | recorded `thread_id`                 | relaunch invokes `codex exec resume <thread_id>` cross-CWD         | TBD       |
-| Rollout discovery      | stream `thread_id` + session files   | matching rollout path recorded without requiring hooks             | TBD       |
-| Transfer-child GC      | bridge run x2                        | synthetic children GC'd; real children untouched                   | TBD       |
-| Real-codex E2E (@slow) | real codex, curation mocked          | one run tree: curation + codex events; `forge activity` shows both | TBD       |
+| Test                   | Fixture                              | Assertion                                                          | Test File                                                                         |
+| ---------------------- | ------------------------------------ | ------------------------------------------------------------------ | --------------------------------------------------------------------------------- |
+| Bridge CLI happy path  | mocked curation + codex Popen replay | manifest `runtime=codex`; `thread_id` parsed from `thread.started` | `tests/src/core/ops/test_codex_session.py`, `tests/src/cli/test_session_codex.py` |
+| Continuation           | recorded `thread_id`                 | relaunch invokes `codex exec resume <thread_id>` cross-CWD         | `tests/src/core/ops/test_codex_session.py`                                        |
+| Rollout discovery      | stream `thread_id` + session files   | matching rollout path recorded without requiring hooks             | `tests/src/core/runtime/test_codex_rollouts.py`, `test_codex_session.py`          |
+| Transfer-child GC      | real-name snapshot + synthetic file  | synthetic children GC'd; real children + notes untouched           | `tests/src/core/ops/test_gc.py`, `test_codex_session.py`                          |
+| Real-codex E2E (@slow) | real codex, curation mocked          | one run tree: curation + codex events; rollout id; stdin resume    | `tests/integration/core/test_codex_session_start.py` (passed live)                |
 
 ## Phase 3 - Codex hook adapter/responder (gated on Phase 1 event coverage)
 
@@ -221,7 +242,26 @@ per-hook-trust story from Phase 1.
   the worktree/project path, or the hash diverges and trust breaks; one interactive ceremony per `CODEX_HOME` still
   seeds the first record; and **cross-project trust (a different repo reusing the command) is UNTESTED** -- a
   fresh-project probe is owed before any "one ceremony for all projects" story.
-- [ ] Bridge CLI shape (Phase 2): flag on `forge session start` vs a dedicated verb.
+- [x] Bridge CLI shape (Phase 2): **resolved 2026-06-10 -- flag shape on `forge session start`:**
+  `forge session start [name] --runtime codex --resume-from <parent>`. Rationale: this is a session-creation operation
+  (new manifest with a `runtime` field, runtime-specific `confirmed` facts, runtime-aware launcher dispatch), so it
+  belongs on `start`; `runtime` stays a first-class session attribute rather than a Codex side path; it composes with
+  Phase 5 (bare `forge session start --runtime codex` later means "start Codex directly" -- `--resume-from` is just the
+  derivation source); and a dedicated verb would freeze today's Claude->Codex hop as a permanent concept when the
+  architecture wants runtime-neutral session launch. Scoping caveats for the slice plan: (a) Phase 2 rejects
+  `--resume-from` without `--runtime codex` -- with the default (Claude) runtime it would be a synonym of
+  `resume --fresh`, and same-runtime derivation keeps its existing verbs (`resume --fresh`/`fork`); broadening later
+  stays open. (b) The headless Codex turn needs an initial task: `bridge_session_to_codex` takes a required `task`
+  composed with the transfer body into the `codex exec` initial message, and `start` has no prompt argument today -- the
+  task/prompt surface spelling is decided in the slice plan. (c) The Codex path defaults `--strategy ai-curated` (the
+  shipped bridge default; design.md §3.9 names curated transfer the cross-boundary substrate), deliberately diverging
+  from `resume --fresh`'s `structured` default (whose LLM-free hot path was a recorded Phase 1 closeout decision of
+  `runtime_abstraction`).
+- [x] Task surface spelling (caveat (b) above): **resolved 2026-06-10 -- `--task TEXT` on both `start` and `resume`**,
+  required with `--runtime codex` / Codex sessions and rejected otherwise (no positional prompt -- it would conflict
+  with `start`'s optional `[name]` argument). Deferred without prejudice: `--task-file`/stdin task input (spell it when
+  a real task outgrows a shell argument), and `--model` for Codex (today the flag goes through the Claude-specific
+  `resolve_direct_model_pin`; rejected with codex, wiring a Codex model mapping later is cheap).
 
 ## Closeout
 

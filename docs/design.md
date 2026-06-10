@@ -312,6 +312,12 @@ proxy-owned routing properties. (Proxy requests do not carry a stable session id
 - Validates preconditions (proxy healthy, session file exists)
 - Records `confirmed.proxy` at session start when proxy mode is active
 
+**Codex-runtime sessions** (`forge session start --runtime codex`, see §3.9) use the same session-managed path, but
+every entry point dispatches on `intent.launch.runtime` **before** any Claude machinery: the session runs headless
+`codex exec` turns direct to OpenAI (no proxy, no `ANTHROPIC_BASE_URL`), Claude-only flags are rejected rather than
+ignored, and `_launch_claude_for_session` refuses codex manifests as a backstop. The CLI accepts
+`--runtime claude|codex` but manifests persist registry ids only (`claude_code`/`codex`), mapped at the CLI boundary.
+
 **Bare launch** (`forge claude start`):
 
 - Convenience proxy launcher -- does NOT create session state
@@ -344,6 +350,11 @@ To avoid writer conflicts:
   - `confirmed` bootstrap/runtime fields written by the CLI: `derivation` (resume metadata), `is_sandboxed` (updated at
     launch time to reflect whether Claude is running via sidecar), `launch` (immutable launch facts recorded once at
     start — routing mode, proxy id/base URL, and whether/how an API key was made available to the child)
+  - `confirmed.codex` for Codex-runtime sessions — `thread_id`, rollout path/source, auth posture, `last_run_at` — is
+    CLI-written like `launch`: Codex hooks only fire from trust-enrolled homes (`enrollment_gated`), so the CLI records
+    these from the `codex exec --json` stream and filesystem discovery, refreshed per turn. `confirmed.launch` stays
+    unset for Codex sessions (it documents the ANTHROPIC key posture of interactive Claude and would misread), and
+    `claude_session_id` stays `None` — which is what makes every Claude-resume predicate refuse Codex sessions.
   - Sets `FORGE_SESSION=<session_name>` when launching Claude
   - `claude_session_id` whenever the CLI starts a **new** Claude conversation — `forge session start` and transfer/fresh
     children (`session fork`, `resume --fresh`): the CLI **pre-seeds** it (generates a UUID, writes it at creation,
@@ -602,10 +613,23 @@ has **no** system-prompt-file flag, so the curated context is delivered as the *
 trust, so hook delivery is deferred to Phase 6. Phase 5e composes the parts into the cross-runtime hop
 `bridge_session_to_codex` (`core/ops/codex_bridge.py`): a parent session -> an ai-curated Codex-targeted transfer -> the
 body prepended via `compose_codex_initial_message` -> `CodexHeadlessInvoker().run`, all under **one run tree** so the
-curation `core.llm` call and the `codex exec` run join on `root_run_id` (§3.14). It is a UI-agnostic command-core op;
-the one-command `forge … --runtime codex` frontend is Phase 6, so the Phase 5 user surface is
-`forge transfer regenerate <parent> --target-runtime {claude|codex}` (re-stamps a cache, defaulting the runtime from the
-existing frontmatter so a regenerate never silently flips it back) plus a manual `codex exec` handoff.
+curation `core.llm` call and the `codex exec` run join on `root_run_id` (§3.14). It is a UI-agnostic command-core op.
+
+The one-command frontend over it is **`forge session start <name> --runtime codex --resume-from <parent> --task "…"`**
+(`core/ops/codex_session.py`, shipped with the `codex_frontend` card Phase 2): it creates a real Codex-runtime session
+(manifest `intent.launch.runtime="codex"`, immutable — `forge session set launch.runtime` is rejected), keys the
+transfer snapshot by the **real session name** so `Derivation.context_file` GC-protects it (no synthetic per-run
+transfer children), runs the first `codex exec` turn, and records hook-free Codex facts into `confirmed.codex`:
+`thread_id` from the stream's `thread.started` event, the matching `$CODEX_HOME/sessions/…/rollout-*-<thread_id>.jsonl`
+discovered by thread_id (`rollout_source="discovered_by_thread_id"`), the preflight's secret-free auth posture
+(`auth_method`/`auth_source`/`billing_mode`), and `last_run_at`. `confirmed.launch` and `claude_session_id` stay unset
+(§3.5). Continuation is `forge session resume <name> --task "…"` -> `codex exec resume <thread_id>`, cross-CWD in the
+session's recorded worktree with the prompt on stdin — both the rollout-filename identity and stdin+resume recall are
+verified live by the standing E2E `tests/integration/core/test_codex_session_start.py`. A failed first turn keeps the
+session (the outcome is on the result; a turn that never reached `thread.started` leaves no `thread_id` and resume
+refuses with delete-and-retry guidance). `forge transfer regenerate <parent> --target-runtime {claude|codex}` remains
+the sessionless surface (re-stamps a cache, defaulting the runtime from the existing frontmatter so a regenerate never
+silently flips it back).
 
 > **Why not native for worktree forks?** Claude stores sessions at `~/.claude/projects/<encoded-cwd>/`, so a bare
 > `--resume` can't cross the CWD boundary (2.1.90/2.1.158 fail "No conversation found"). **Worktree forks default to
@@ -1032,6 +1056,11 @@ reports "no such command/option" — no tombstone shims. List/show commands supp
 Note: `session context` is a deprecated alias for `session show`. `session resume --fresh --review` opens the per-child
 user-notes overlay (`children/<child>.notes.md`) in `$EDITOR` before launching Claude; the AI snapshot stays read-only.
 `forge session memory` is removed; use `forge memory`.
+
+Codex runtime (§3.9): `forge session start <name> --runtime codex --resume-from <parent> --task "…"` derives a
+Codex-runtime session and runs its first headless turn (`--strategy` default `ai-curated`, `--sandbox` default
+`workspace-write`; Claude-only flags rejected). `forge session resume <name> --task "…"` runs the next
+`codex exec resume <thread_id>` turn; `--task` is Codex-only and required there.
 
 #### Transfer context
 
