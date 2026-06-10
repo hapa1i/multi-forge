@@ -1,6 +1,6 @@
 # Supervisor Cascade — Execution Checklist
 
-**Current focus**: Slice 5 (Docker integration run) + Slice 6 closeout.
+**Current focus**: Closeout — card moves `doing/ -> done/` after merge to `main`.
 
 ## Slice 0 — Board card + checklist
 
@@ -68,24 +68,26 @@
 
 ## Slice 5 — Integration (Docker)
 
-- [ ] Escalation path e2e: unreachable checker endpoint -> tier-1 error -> needs_review -> mock-claude resolves (aligned
+- [x] Escalation path e2e: unreachable checker endpoint -> tier-1 error -> needs_review -> mock-claude resolves (aligned
   \+ divergent); exactly one mock-claude invocation; `plan-check` ledger event `status="error"` (harness exports
   `FORGE_RUN_ID`/`FORGE_ROOT_RUN_ID` — emit no-ops without ambient run identity).
-- [ ] Cascade-off regression: existing supervisor e2e modes unchanged.
-- [ ] Wiring e2e: in-container `supervise <target> --cascade` persists `cascade` + `plan_override_path`.
+- [x] Cascade-off regression: existing supervisor e2e modes unchanged (4 pre-existing `TestSupervisorE2E` cases pass).
+- [x] Wiring e2e: in-container `supervise <target> --cascade` persists `cascade` + `plan_override_path` (target needs
+  fabricated hook confirmation — `validate_supervisor_target` rejects pre-seeded UUIDs without conversation evidence).
 - [x] Short-circuit path e2e: investigated — the docker conftest has no stubbable OpenAI-compatible endpoint reachable
   from the container (no `OPENAI_BASE_URL`/stub-server fixture; only the mock-claude binary pattern). Short-circuit
   coverage stays unit-level (`test_plan_check.py`, `test_policy_check_cascade.py`); recorded as debt below.
-- [ ] Run:
+- [x] Run:
   `./scripts/test-integration.sh tests/integration/docker/test_supervisor_e2e.py tests/integration/docker/test_policy_hooks.py -v`
+  — 18/18 pass (8 supervisor e2e incl. 4 new cascade cases; 10 policy-hook regressions).
 
 ## Slice 6 — Docs + closeout
 
-- [ ] `design.md` §4.1.2 cascade block + §4.1.5 resolver-hop sentence + CLI table row.
-- [ ] `design_appendix.md` §D ownership rows; §A.13 per-emitter table `plan-check` row.
-- [ ] `docs/end-user/policy.md` cascade subsection.
-- [ ] `change_log.md` entry (Goal / Key changes / Verification); durable lessons drafted for impl_notes (human gate);
-  card `doing/ -> done/` after merge.
+- [x] `design.md` §4.1.2 cascade block + §4.1.5 resolver-hop sentence + CLI table row.
+- [x] `design_appendix.md` §D ownership rows; §A.13 per-emitter table `plan-check` row.
+- [x] `docs/end-user/policy.md` cascade subsection.
+- [x] `change_log.md` entry (Goal / Key changes / Verification). Durable lessons drafted for impl_notes (human gate) and
+  card `doing/ -> done/` remain post-merge steps.
 
 ## Acceptance tests (risky/multi-file changes)
 

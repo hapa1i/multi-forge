@@ -25,6 +25,42 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board-contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-06-10
+
+### Supervisor cascade: tier-1 plan check before the frontier supervisor
+
+**Goal**: Route semantic-supervisor checks through a cheap stateless tier-1 plan check (opt-in `--cascade`) so
+clearly-aligned Write/Edit actions short-circuit and only uncertain ones pay the frontier `claude -p --resume` call.
+
+**Key changes**:
+
+- `PolicyEngine.register_resolver()`: a resolver policy runs only when pass-1 emitted `needs_review` and nothing denied;
+  `_run_policy()` extraction keeps applies_to/fail-mode/state semantics identical for both passes; `_collected_state`
+  cleared per `evaluate()`; `rules_active` uses `registered_policy_ids` (includes the resolver). Cascade off is
+  bit-identical to the pre-cascade engine.
+- `PlanCheckPolicy` (`semantic.plan_check`, new `policy/semantic/plan_check.py`): one cheap `core.llm` call (tagger
+  mechanics, default `gemini/gemini-2.0-flash`) judging the action against the approved-plan snapshot. Emits only
+  `allow` (cached via ThrottleCache, plan fingerprint in key) or `needs_review`; every failure path escalates — degrades
+  to frontier-always, never to unsupervised. Reasons ride in low-severity violations (clamped 500 chars), never
+  `decision.warnings`, so resolved escalations stay silent on the allow path.
+- CLI/config: `SupervisorConfig.cascade`/`checker_model`;
+  `forge policy supervise --cascade/--no-cascade --checker-model` (modifiers with target, standalone toggle without);
+  enabling auto-resolves the plan snapshot via the `--reload` machinery and fails loud pre-mutation when none resolves;
+  `%policy supervise cascade on|off`; status/show surfaces.
+- Measurement: decision-log-derived `plan_check_allow`/`plan_check_escalated` counters (cached allows counted) in
+  `forge activity` + summary line; session-tagged `plan-check` ledger events via `emit_direct_llm_usage`.
+- Docs: design.md §4.1.2 cascade block + §4.1.5 resolver bullet + CLI row; design_appendix §D ownership + §A.13 emitter
+  rows; end-user policy.md cascade subsection.
+
+**Verification**: 5950+ unit/regression tests pass (`-m "not integration"`) incl. 80+ new cases (engine resolver,
+plan-check policy, CLI, dispatcher, hook wiring, activity); Docker tier 18/18 (`test_supervisor_e2e.py` +
+`test_policy_hooks.py` — escalation resolves aligned/divergent with exactly one frontier invocation, plan-check error
+ledger event, CLI wiring persistence, cascade-off regression); `make pre-commit` hooks clean on all touched files.
+
+**Deferred**: short-circuit-path docker e2e needs a stubbable OpenAI-compatible endpoint inside the test container (none
+exists); unit tests cover that path. Allow-verdict rationale is debug-logged only — validating false-aligned rates needs
+shadow-sampling (follow-up idea on the card).
+
 ## 2026-06-09
 
 ### Phase 6: Codex frontend evaluation (probe-only; runtime_abstraction complete)
