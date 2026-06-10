@@ -722,6 +722,7 @@ def _handle_policy_supervise(argv: list[str]) -> None:
     - ``%policy supervise on``: resume suspended supervisor
     - ``%policy supervise remove``: remove supervisor entirely
     - ``%policy supervise reload [path]``: reload latest relevant approved plan
+    - ``%policy supervise cascade on|off``: toggle the tier-1 plan check
     - ``%policy supervise``: show current config
     """
     from forge.session.models import SessionState
@@ -881,6 +882,94 @@ def _handle_policy_supervise(argv: list[str]) -> None:
         click.echo(json.dumps({"decision": "block", "reason": f"Supervisor plan updated from {source_desc}"}))
         return
 
+    # %policy supervise cascade on|off — toggle the tier-1 plan check
+    if cmd == "cascade":
+        sub = argv[1].lower() if len(argv) == 2 else None
+        if sub not in ("on", "off"):
+            click.echo(json.dumps({"decision": "block", "reason": "Usage: %policy supervise cascade on|off"}))
+            return
+
+        sup = manifest.intent.policy.supervisor if manifest.intent.policy else None
+        if not (sup and sup.resume_id):
+            click.echo(
+                json.dumps(
+                    {
+                        "decision": "block",
+                        "reason": "No supervisor configured. Use '%policy supervise <target>' to set one.",
+                    }
+                )
+            )
+            return
+
+        if sub == "off":
+
+            def _cascade_off(m: object) -> None:
+                if not isinstance(m, SessionState):
+                    raise TypeError(f"Expected SessionState, got {type(m)}")
+                if m.intent.policy and m.intent.policy.supervisor:
+                    m.intent.policy.supervisor.cascade = False
+
+            try:
+                store.update(timeout_s=HOOK_LOCK_TIMEOUT_S, mutate=_cascade_off)
+            except Exception as e:
+                click.echo(json.dumps({"decision": "block", "reason": f"Error: {e}"}))
+                return
+            click.echo(json.dumps({"decision": "block", "reason": "Cascade disabled"}))
+            return
+
+        # Enabling: the tier-1 checker needs plan snapshot text. Resolve before mutating.
+        plan_path = sup.plan_override_path
+        cascade_source: str | None = None
+        if not plan_path:
+            from forge.policy.semantic.supervisor import (
+                resolve_supervisor_reload_plan_path,
+            )
+            from forge.session.effective import compute_effective_intent
+
+            effective = compute_effective_intent(manifest)
+            sup_effective = effective.policy.supervisor if effective.policy else None
+            result = resolve_supervisor_reload_plan_path(sup_effective, manifest) if sup_effective else None
+            if result is None:
+                click.echo(
+                    json.dumps(
+                        {
+                            "decision": "block",
+                            "reason": (
+                                "No approved plan snapshot found for the cascade's tier-1 checker. "
+                                "Approve a plan (ExitPlanMode), or use '%policy supervise reload <path>' "
+                                "to set one explicitly, then retry."
+                            ),
+                        }
+                    )
+                )
+                return
+            plan_path = result.path
+            source_map = {
+                "self": "current session",
+                "fork": f"review fork '{result.session_name}'",
+                "target": "supervisor target",
+            }
+            cascade_source = source_map.get(result.source, result.source)
+
+        def _cascade_on(m: object) -> None:
+            if not isinstance(m, SessionState):
+                raise TypeError(f"Expected SessionState, got {type(m)}")
+            if m.intent.policy and m.intent.policy.supervisor:
+                m.intent.policy.supervisor.cascade = True
+                if not m.intent.policy.supervisor.plan_override_path:
+                    m.intent.policy.supervisor.plan_override_path = plan_path
+
+        try:
+            store.update(timeout_s=HOOK_LOCK_TIMEOUT_S, mutate=_cascade_on)
+        except Exception as e:
+            click.echo(json.dumps({"decision": "block", "reason": f"Error: {e}"}))
+            return
+        msg = "Cascade enabled"
+        if cascade_source:
+            msg += f" (tier-1 plan from {cascade_source})"
+        click.echo(json.dumps({"decision": "block", "reason": msg}))
+        return
+
     # %policy supervise <target> — set supervisor
     if argv:
         target = argv[0]
@@ -963,6 +1052,7 @@ def _handle_policy_supervise(argv: list[str]) -> None:
         lines.append("  Routing: direct (no proxy)")
     lines.append(f"  Fork: {'yes' if sup.fork_session else 'no'}")
     lines.append(f"  Timeout: {sup.timeout_seconds}s, Throttle: {sup.throttle_seconds}s")
+    lines.append(f"  Cascade: {'on' if sup.cascade else 'off'}")
     if sup.plan_override_path:
         lines.append(f"  Plan override: {sup.plan_override_path}")
 

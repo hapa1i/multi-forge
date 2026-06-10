@@ -165,6 +165,52 @@ def _hold_manifest_lock(lock_path: str, hold_s: float, ready_event: synchronize.
         time.sleep(hold_s)
 
 
+class TestSupervisorConfigCompat:
+    """Manifests written before the cascade fields existed load with defaults."""
+
+    def test_old_manifest_without_cascade_fields_loads_defaults(self, tmp_path: Path) -> None:
+        from forge.session.models import PolicyIntent, SupervisorConfig
+
+        store = SessionStore(str(tmp_path), "old-session")
+        state = create_session_state("old-session", worktree_path=str(tmp_path))
+        state.intent.policy = PolicyIntent(enabled=True, supervisor=SupervisorConfig(resume_id="planner"))
+        store.write(state)
+
+        # Simulate a manifest written by an older Forge: strip the new keys.
+        data = json.loads(store.manifest_path.read_text())
+        sup = data["intent"]["policy"]["supervisor"]
+        del sup["cascade"]
+        del sup["checker_model"]
+        store.manifest_path.write_text(json.dumps(data))
+
+        loaded = store.read()
+        assert loaded.intent.policy is not None
+        assert loaded.intent.policy.supervisor is not None
+        assert loaded.intent.policy.supervisor.cascade is False
+        assert loaded.intent.policy.supervisor.checker_model is None
+
+    def test_new_fields_round_trip(self, tmp_path: Path) -> None:
+        from forge.session.models import PolicyIntent, SupervisorConfig
+
+        store = SessionStore(str(tmp_path), "new-session")
+        state = create_session_state("new-session", worktree_path=str(tmp_path))
+        state.intent.policy = PolicyIntent(
+            enabled=True,
+            supervisor=SupervisorConfig(
+                resume_id="planner",
+                cascade=True,
+                checker_model="gemini/gemini-2.0-flash",
+            ),
+        )
+        store.write(state)
+
+        loaded = store.read()
+        assert loaded.intent.policy is not None
+        assert loaded.intent.policy.supervisor is not None
+        assert loaded.intent.policy.supervisor.cascade is True
+        assert loaded.intent.policy.supervisor.checker_model == "gemini/gemini-2.0-flash"
+
+
 class TestSessionStoreUpdate:
     def test_update_merges_concurrent_writes(self, temp_worktree: Path, sample_manifest: SessionState) -> None:
         """update() should prevent lost updates when multiple processes write."""

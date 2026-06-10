@@ -20,7 +20,7 @@ from rich.console import Console
 from rich.table import Table
 from rich.text import Text
 
-from forge.cli.output import print_tip
+from forge.cli.output import print_error_with_tip, print_tip
 from forge.core.paths import display_path
 from forge.policy.queries import (
     find_sessions_supervised_by,
@@ -30,7 +30,7 @@ from forge.session import SessionStore
 from forge.session.effective import compute_effective_intent
 from forge.session.exceptions import AmbiguousSessionError, ForgeSessionError
 from forge.session.hooks.session_start import ENV_SESSION
-from forge.session.models import PolicyIntent, SessionState
+from forge.session.models import PolicyIntent, SessionState, SupervisorConfig
 from forge.session.store import HOOK_LOCK_TIMEOUT_S, MANIFEST_FILENAME, get_sessions_dir
 
 console = Console()
@@ -303,6 +303,8 @@ def status(as_json: bool, session_name: str | None) -> None:
                     "fork_session": sup.fork_session,
                     "timeout_seconds": sup.timeout_seconds,
                     "throttle_seconds": sup.throttle_seconds,
+                    "cascade": sup.cascade,
+                    "checker_model": sup.checker_model,
                     "resolved_uuid": None,
                     "source_model": None,
                 }
@@ -378,6 +380,11 @@ def status(as_json: bool, session_name: str | None) -> None:
             table.add_row("  Fork session", "Yes" if sup.fork_session else "No")
             table.add_row("  Timeout", f"{sup.timeout_seconds}s")
             table.add_row("  Throttle", f"{sup.throttle_seconds}s")
+            table.add_row("  Cascade", "On" if sup.cascade else "Off")
+            if sup.cascade:
+                from forge.policy.semantic.plan_check import DEFAULT_PLAN_CHECK_MODEL
+
+                table.add_row("  Checker model", sup.checker_model or DEFAULT_PLAN_CHECK_MODEL)
             if sup.plan_override_path:
                 table.add_row("  Plan override", sup.plan_override_path)
         else:
@@ -767,6 +774,31 @@ def supervisor_cmd(
     sys.exit(exit_code)
 
 
+def _resolve_cascade_plan(sup_config: SupervisorConfig, manifest: SessionState) -> tuple[str, str]:
+    """Resolve the approved-plan snapshot the cascade's tier-1 checker will read.
+
+    Returns (plan_path, source_description). Exits 1 with a tip when no approved
+    snapshot is resolvable -- before any manifest mutation.
+    """
+    from forge.policy.semantic.supervisor import resolve_supervisor_reload_plan_path
+
+    result = resolve_supervisor_reload_plan_path(sup_config, manifest)
+    if result is None:
+        print_error_with_tip(
+            "No approved plan snapshot found for the cascade's tier-1 checker.",
+            "Approve a plan (ExitPlanMode) in the planning session, or run "
+            "'forge policy supervise --reload-from <path>' to set one explicitly, then retry.",
+            console=console,
+        )
+        sys.exit(1)
+    source_map = {
+        "self": "current session",
+        "fork": f"review fork '{result.session_name}'",
+        "target": "supervisor target",
+    }
+    return result.path, source_map.get(result.source, result.source)
+
+
 @policy.command(name="supervise")
 @click.argument("target", required=False)
 @click.option("--off", is_flag=True, help="Suspend supervisor (preserves config)")
@@ -790,6 +822,18 @@ def supervisor_cmd(
     default=None,
     help="Supervisor check timeout in seconds (default: 45)",
 )
+@click.option(
+    "--cascade/--no-cascade",
+    "cascade_flag",
+    default=None,
+    help="Enable/disable the tier-1 plan check before the frontier supervisor",
+)
+@click.option(
+    "--checker-model",
+    "checker_model",
+    default=None,
+    help="Tier-1 checker model (prefixed id, e.g. gemini/gemini-2.0-flash)",
+)
 def supervise_cmd(
     target: str | None,
     off: bool,
@@ -801,6 +845,8 @@ def supervise_cmd(
     supervisor_proxy: str | None,
     supervisor_direct: bool,
     timeout_seconds: int | None,
+    cascade_flag: bool | None,
+    checker_model: str | None,
 ) -> None:
     """Configure the semantic supervisor for the current session.
 
@@ -811,6 +857,9 @@ def supervise_cmd(
     Examples:
         forge policy supervise planner           # Set planner as supervisor
         forge policy supervise planner --timeout 90  # Set with a longer check timeout
+        forge policy supervise planner --cascade # Set supervisor with tier-1 cascade
+        forge policy supervise --cascade         # Enable cascade on existing config
+        forge policy supervise --no-cascade      # Disable cascade
         forge policy supervise --off             # Suspend (preserves config)
         forge policy supervise --on              # Resume
         forge policy supervise --remove          # Remove entirely
@@ -828,10 +877,34 @@ def supervise_cmd(
     if timeout_seconds is not None and not target:
         console.print("[red]Error:[/red] --timeout requires a target argument")
         sys.exit(1)
-    actions = sum([bool(off), bool(on_flag), bool(remove), bool(reload_auto), bool(reload_path), bool(target)])
+    if cascade_flag is False and target:
+        console.print("[red]Error:[/red] --no-cascade with a target is redundant (cascade defaults to off)")
+        sys.exit(1)
+    if checker_model and not (target or cascade_flag is True):
+        console.print("[red]Error:[/red] --checker-model requires a target argument or --cascade")
+        sys.exit(1)
+    if checker_model and "/" not in checker_model:
+        console.print(f"[red]Error:[/red] --checker-model must be a prefixed model id (got '{checker_model}')")
+        print_tip("Example: gemini/gemini-2.0-flash", blank_before=False, console=console)
+        sys.exit(1)
+    # Cascade flags are modifiers when a target is present; standalone they are a
+    # toggle action on the existing config (like --off/--on).
+    cascade_standalone = cascade_flag is not None and not target
+    actions = sum(
+        [
+            bool(off),
+            bool(on_flag),
+            bool(remove),
+            bool(reload_auto),
+            bool(reload_path),
+            bool(target),
+            cascade_standalone,
+        ]
+    )
     if actions > 1:
         console.print(
-            "[red]Error:[/red] Specify only one action (target, --off, --on, --remove, --reload, --reload-from)"
+            "[red]Error:[/red] Specify only one action "
+            "(target, --off, --on, --remove, --reload, --reload-from, --cascade/--no-cascade)"
         )
         sys.exit(1)
     cwd = Path.cwd().resolve()
@@ -871,6 +944,50 @@ def supervise_cmd(
 
         store.update(timeout_s=5.0, mutate=_resume_sup)
         console.print(f"Supervisor resumed for session [cyan]{name}[/cyan]")
+        return
+
+    if cascade_standalone:
+        manifest = store.read()
+        sup = manifest.intent.policy.supervisor if manifest.intent.policy else None
+        if not (sup and sup.resume_id):
+            console.print("No supervisor configured. Use 'forge policy supervise <target>' to set one.")
+            return
+
+        if not cascade_flag:
+
+            def _disable_cascade(m: SessionState) -> None:
+                if m.intent.policy and m.intent.policy.supervisor:
+                    m.intent.policy.supervisor.cascade = False
+
+            store.update(timeout_s=5.0, mutate=_disable_cascade)
+            console.print(f"Cascade disabled for session [cyan]{name}[/cyan]")
+            return
+
+        # Enabling: the tier-1 checker needs plan snapshot text. Resolve it (exits 1
+        # with a tip when unresolvable) before any manifest mutation.
+        plan_path: str | None = sup.plan_override_path
+        source_desc: str | None = None
+        if not plan_path:
+            effective = compute_effective_intent(manifest)
+            assert effective.policy and effective.policy.supervisor  # guarded via intent above
+            plan_path, source_desc = _resolve_cascade_plan(effective.policy.supervisor, manifest)
+
+        def _enable_cascade(m: SessionState) -> None:
+            if m.intent.policy and m.intent.policy.supervisor:
+                m.intent.policy.supervisor.cascade = True
+                if checker_model:
+                    m.intent.policy.supervisor.checker_model = checker_model
+                if not m.intent.policy.supervisor.plan_override_path:
+                    m.intent.policy.supervisor.plan_override_path = plan_path
+
+        store.update(timeout_s=5.0, mutate=_enable_cascade)
+
+        from forge.policy.semantic.plan_check import DEFAULT_PLAN_CHECK_MODEL
+
+        model_label = checker_model or sup.checker_model or DEFAULT_PLAN_CHECK_MODEL
+        console.print(f"Cascade enabled for session [cyan]{name}[/cyan] (checker: {model_label})")
+        if source_desc:
+            console.print(f"  Tier-1 plan resolved from {source_desc}: {plan_path}")
         return
 
     if remove:
@@ -936,7 +1053,6 @@ def supervise_cmd(
             ensure_supervisor_proxy,
             validate_supervisor_target,
         )
-        from forge.session.models import SupervisorConfig
 
         manifest = store.read()
         # Validate supervisor target in the selected session's scope, not CWD.
@@ -980,6 +1096,18 @@ def supervise_cmd(
             current_direct=current_direct,
         )
 
+        cascade_source_desc: str | None = None
+        if cascade_flag:
+            # The tier-1 checker needs plan snapshot text. Resolve it (exits 1 with a
+            # tip when unresolvable) before any manifest mutation.
+            sup_config.cascade = True
+            if checker_model:
+                sup_config.checker_model = checker_model
+            plan_path, cascade_source_desc = _resolve_cascade_plan(sup_config, manifest)
+            sup_config.plan_override_path = plan_path
+        elif checker_model:
+            sup_config.checker_model = checker_model
+
         store.update(timeout_s=5.0, mutate=lambda m: apply_supervisor_to_intent(m, sup_config))
         console.print(f"Supervisor set to [green]{target}[/green] for session [cyan]{name}[/cyan]")
         if routing_display:
@@ -987,6 +1115,12 @@ def supervise_cmd(
             console.print(f"  Routing ({label}): {routing_display}")
         if timeout_seconds is not None:
             console.print(f"  Timeout: {timeout_seconds}s")
+        if sup_config.cascade:
+            from forge.policy.semantic.plan_check import DEFAULT_PLAN_CHECK_MODEL
+
+            console.print(f"  Cascade: on (checker: {sup_config.checker_model or DEFAULT_PLAN_CHECK_MODEL})")
+            if cascade_source_desc:
+                console.print(f"  Tier-1 plan resolved from {cascade_source_desc}: {sup_config.plan_override_path}")
         return
 
     # No args: show current supervisor config
@@ -1019,5 +1153,10 @@ def supervise_cmd(
     console.print(f"  Fork session: {'yes' if sup.fork_session else 'no'}")
     console.print(f"  Timeout: {sup.timeout_seconds}s")
     console.print(f"  Throttle: {sup.throttle_seconds}s")
+    console.print(f"  Cascade: {'on' if sup.cascade else 'off'}")
+    if sup.cascade:
+        from forge.policy.semantic.plan_check import DEFAULT_PLAN_CHECK_MODEL
+
+        console.print(f"  Checker model: {sup.checker_model or DEFAULT_PLAN_CHECK_MODEL}")
     if sup.plan_override_path:
         console.print(f"  Plan override: {sup.plan_override_path}")

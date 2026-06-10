@@ -1240,50 +1240,53 @@ class TestGuardCheck:
         assert "check" in out["reason"]
 
 
+def _make_supervised_session(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *, suspended: bool = False
+) -> SessionStore:
+    """Shared harness for the %policy supervise toggle/cascade test classes."""
+    from forge.session import create_session_state
+    from forge.session.models import PolicyIntent, SupervisorConfig
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("FORGE_SESSION", "test-session")
+    monkeypatch.setenv("FORGE_FORGE_ROOT", str(tmp_path))
+
+    store = SessionStore(str(tmp_path), "test-session")
+    manifest = create_session_state(
+        "test-session",
+        proxy_template="test-family",
+        proxy_base_url="http://localhost:8080",
+    )
+    manifest.intent.policy = PolicyIntent(
+        enabled=True,
+        supervisor=SupervisorConfig(
+            resume_id="planner",
+            proxy="litellm-openai",
+            suspended=suspended,
+        ),
+    )
+    store.write(manifest)
+    return store
+
+
+def _make_bare_session(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> SessionStore:
+    from forge.session import create_session_state
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("FORGE_SESSION", "test-session")
+    monkeypatch.setenv("FORGE_FORGE_ROOT", str(tmp_path))
+
+    store = SessionStore(str(tmp_path), "test-session")
+    manifest = create_session_state("test-session")
+    store.write(manifest)
+    return store
+
+
 class TestGuardSuperviseToggle:
     """Test %policy supervise off/on/remove/reload toggle commands."""
 
-    def _make_supervised_session(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *, suspended: bool = False
-    ) -> SessionStore:
-        from forge.session import create_session_state
-        from forge.session.models import PolicyIntent, SupervisorConfig
-
-        monkeypatch.chdir(tmp_path)
-        monkeypatch.setenv("FORGE_SESSION", "test-session")
-        monkeypatch.setenv("FORGE_FORGE_ROOT", str(tmp_path))
-
-        store = SessionStore(str(tmp_path), "test-session")
-        manifest = create_session_state(
-            "test-session",
-            proxy_template="test-family",
-            proxy_base_url="http://localhost:8080",
-        )
-        manifest.intent.policy = PolicyIntent(
-            enabled=True,
-            supervisor=SupervisorConfig(
-                resume_id="planner",
-                proxy="litellm-openai",
-                suspended=suspended,
-            ),
-        )
-        store.write(manifest)
-        return store
-
-    def _make_bare_session(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> SessionStore:
-        from forge.session import create_session_state
-
-        monkeypatch.chdir(tmp_path)
-        monkeypatch.setenv("FORGE_SESSION", "test-session")
-        monkeypatch.setenv("FORGE_FORGE_ROOT", str(tmp_path))
-
-        store = SessionStore(str(tmp_path), "test-session")
-        manifest = create_session_state("test-session")
-        store.write(manifest)
-        return store
-
     def test_off_suspends_not_removes(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        store = self._make_supervised_session(tmp_path, monkeypatch)
+        store = _make_supervised_session(tmp_path, monkeypatch)
 
         runner = CliRunner()
         payload = {"prompt": "%policy supervise off", "transcript_path": ""}
@@ -1300,7 +1303,7 @@ class TestGuardSuperviseToggle:
         assert updated.intent.policy.supervisor.resume_id == "planner"
 
     def test_on_resumes(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        store = self._make_supervised_session(tmp_path, monkeypatch, suspended=True)
+        store = _make_supervised_session(tmp_path, monkeypatch, suspended=True)
 
         runner = CliRunner()
         payload = {"prompt": "%policy supervise on", "transcript_path": ""}
@@ -1316,7 +1319,7 @@ class TestGuardSuperviseToggle:
         assert updated.intent.policy.supervisor.suspended is False
 
     def test_on_without_supervisor_noop(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        self._make_bare_session(tmp_path, monkeypatch)
+        _make_bare_session(tmp_path, monkeypatch)
 
         runner = CliRunner()
         payload = {"prompt": "%policy supervise on", "transcript_path": ""}
@@ -1327,7 +1330,7 @@ class TestGuardSuperviseToggle:
         assert "no supervisor configured" in out["reason"].lower()
 
     def test_remove_destroys_config(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        store = self._make_supervised_session(tmp_path, monkeypatch)
+        store = _make_supervised_session(tmp_path, monkeypatch)
 
         runner = CliRunner()
         payload = {"prompt": "%policy supervise remove", "transcript_path": ""}
@@ -1344,7 +1347,7 @@ class TestGuardSuperviseToggle:
     def test_off_without_supervisor_reports_not_configured(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        self._make_bare_session(tmp_path, monkeypatch)
+        _make_bare_session(tmp_path, monkeypatch)
 
         runner = CliRunner()
         payload = {"prompt": "%policy supervise off", "transcript_path": ""}
@@ -1355,7 +1358,7 @@ class TestGuardSuperviseToggle:
         assert "no supervisor configured" in out["reason"].lower()
 
     def test_reload_explicit_path(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        store = self._make_supervised_session(tmp_path, monkeypatch)
+        store = _make_supervised_session(tmp_path, monkeypatch)
         plan = tmp_path / "plan.md"
         plan.write_text("# The Plan")
 
@@ -1373,7 +1376,7 @@ class TestGuardSuperviseToggle:
         assert updated.intent.policy.supervisor.plan_override_path == str(plan.resolve())
 
     def test_reload_extra_args_rejected(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        self._make_supervised_session(tmp_path, monkeypatch)
+        _make_supervised_session(tmp_path, monkeypatch)
 
         runner = CliRunner()
         payload = {"prompt": "%policy supervise reload a b", "transcript_path": ""}
@@ -1384,7 +1387,7 @@ class TestGuardSuperviseToggle:
         assert "usage" in out["reason"].lower()
 
     def test_reload_without_supervisor_reports_error(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        self._make_bare_session(tmp_path, monkeypatch)
+        _make_bare_session(tmp_path, monkeypatch)
         plan = tmp_path / "plan.md"
         plan.write_text("# The Plan")
 
@@ -1397,7 +1400,7 @@ class TestGuardSuperviseToggle:
         assert "no supervisor configured" in out["reason"].lower()
 
     def test_show_includes_suspended_status(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        self._make_supervised_session(tmp_path, monkeypatch, suspended=True)
+        _make_supervised_session(tmp_path, monkeypatch, suspended=True)
 
         runner = CliRunner()
         payload = {"prompt": "%policy supervise", "transcript_path": ""}
@@ -1408,7 +1411,7 @@ class TestGuardSuperviseToggle:
         assert "suspended" in out["reason"].lower()
 
     def test_show_includes_plan_override(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        store = self._make_supervised_session(tmp_path, monkeypatch)
+        store = _make_supervised_session(tmp_path, monkeypatch)
 
         def _set_plan(m):
             m.intent.policy.supervisor.plan_override_path = "/some/plan.md"
@@ -1422,3 +1425,137 @@ class TestGuardSuperviseToggle:
         assert result.exit_code == 0
         out = json.loads(result.output)
         assert "/some/plan.md" in out["reason"]
+
+    def test_show_includes_cascade_line(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        _make_supervised_session(tmp_path, monkeypatch)
+
+        runner = CliRunner()
+        payload = {"prompt": "%policy supervise", "transcript_path": ""}
+        result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
+
+        assert result.exit_code == 0
+        out = json.loads(result.output)
+        assert "Cascade: off" in out["reason"]
+
+
+class TestGuardSuperviseCascade:
+    """Test %policy supervise cascade on|off."""
+
+    def test_cascade_on_with_existing_plan(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        store = _make_supervised_session(tmp_path, monkeypatch)
+        plan = tmp_path / "plan.md"
+        plan.write_text("# Plan")
+
+        def _set_plan(m):
+            m.intent.policy.supervisor.plan_override_path = str(plan)
+
+        store.update(timeout_s=5.0, mutate=_set_plan)
+
+        runner = CliRunner()
+        payload = {"prompt": "%policy supervise cascade on", "transcript_path": ""}
+        result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
+
+        assert result.exit_code == 0
+        out = json.loads(result.output)
+        assert "cascade enabled" in out["reason"].lower()
+
+        updated = store.read()
+        assert updated.intent.policy is not None
+        assert updated.intent.policy.supervisor is not None
+        assert updated.intent.policy.supervisor.cascade is True
+
+    def test_cascade_on_auto_resolves_plan(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        from types import SimpleNamespace
+        from unittest.mock import patch as mock_patch
+
+        store = _make_supervised_session(tmp_path, monkeypatch)
+        plan = tmp_path / "resolved.md"
+        plan.write_text("# Plan")
+        fake = SimpleNamespace(path=str(plan), source="self", session_name="test-session", captured_at=None)
+
+        runner = CliRunner()
+        payload = {"prompt": "%policy supervise cascade on", "transcript_path": ""}
+        with mock_patch(
+            "forge.policy.semantic.supervisor.resolve_supervisor_reload_plan_path",
+            return_value=fake,
+        ):
+            result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
+
+        assert result.exit_code == 0
+        out = json.loads(result.output)
+        assert "cascade enabled" in out["reason"].lower()
+        assert "current session" in out["reason"]
+
+        updated = store.read()
+        assert updated.intent.policy is not None
+        assert updated.intent.policy.supervisor is not None
+        assert updated.intent.policy.supervisor.cascade is True
+        assert updated.intent.policy.supervisor.plan_override_path == str(plan)
+
+    def test_cascade_on_unresolvable_blocks_untouched(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        from unittest.mock import patch as mock_patch
+
+        store = _make_supervised_session(tmp_path, monkeypatch)
+
+        runner = CliRunner()
+        payload = {"prompt": "%policy supervise cascade on", "transcript_path": ""}
+        with mock_patch(
+            "forge.policy.semantic.supervisor.resolve_supervisor_reload_plan_path",
+            return_value=None,
+        ):
+            result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
+
+        assert result.exit_code == 0
+        out = json.loads(result.output)
+        assert "no approved plan snapshot" in out["reason"].lower()
+
+        updated = store.read()
+        assert updated.intent.policy is not None
+        assert updated.intent.policy.supervisor is not None
+        assert updated.intent.policy.supervisor.cascade is False
+
+    def test_cascade_off_disables(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        store = _make_supervised_session(tmp_path, monkeypatch)
+
+        def _enable(m):
+            m.intent.policy.supervisor.cascade = True
+            m.intent.policy.supervisor.plan_override_path = "/some/plan.md"
+
+        store.update(timeout_s=5.0, mutate=_enable)
+
+        runner = CliRunner()
+        payload = {"prompt": "%policy supervise cascade off", "transcript_path": ""}
+        result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
+
+        assert result.exit_code == 0
+        out = json.loads(result.output)
+        assert "cascade disabled" in out["reason"].lower()
+
+        updated = store.read()
+        assert updated.intent.policy is not None
+        assert updated.intent.policy.supervisor is not None
+        assert updated.intent.policy.supervisor.cascade is False
+
+    def test_cascade_bad_subcommand_shows_usage(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        _make_supervised_session(tmp_path, monkeypatch)
+
+        runner = CliRunner()
+        payload = {"prompt": "%policy supervise cascade maybe", "transcript_path": ""}
+        result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
+
+        assert result.exit_code == 0
+        out = json.loads(result.output)
+        assert "usage" in out["reason"].lower()
+
+    def test_cascade_on_without_supervisor_reports_not_configured(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _make_bare_session(tmp_path, monkeypatch)
+
+        runner = CliRunner()
+        payload = {"prompt": "%policy supervise cascade on", "transcript_path": ""}
+        result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
+
+        assert result.exit_code == 0
+        out = json.loads(result.output)
+        assert "no supervisor configured" in out["reason"].lower()
