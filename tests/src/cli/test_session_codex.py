@@ -400,3 +400,14 @@ class TestShowCodexSession:
         assert "direct (OpenAI via codex CLI)" in result.output
         assert "Thread:" in result.output and _TID in result.output
         assert "chatgpt_tokens (codex_store)" in result.output
+
+    def test_show_human_suppresses_claude_vestiges(self, runner: CliRunner, project: Path) -> None:
+        """The display-only intent.agent ("claude-code") and the Claude-computed
+        Model Family ("anthropic") would misread on a Codex session."""
+        self._seed(project)
+        result = runner.invoke(main, ["session", "show", "impl"])
+
+        assert result.exit_code == 0
+        assert "Agent:" not in result.output
+        assert "Model Family" not in result.output
+        assert "Computed Context" not in result.output

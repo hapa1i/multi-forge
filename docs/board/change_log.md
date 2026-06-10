@@ -27,6 +27,16 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-10
 
+### codex_frontend Phase 2 follow-up: suppress Claude display vestiges on Codex `session show`
+
+**Goal**: Stop `session show` printing `Agent: claude-code` and `Model Family: anthropic` for Codex sessions.
+
+**Key changes**: `_print_session_detail` gates the `Agent:` line (display-only `intent.agent` vestige, superseded by
+`Runtime:`) and the whole Computed Context block (Claude routing/tier/policy state) on `runtime == "claude_code"`.
+Claude sessions render unchanged; `--json` keeps its documented env-derived `context` shape.
+
+**Verification**: new `test_show_human_suppresses_claude_vestiges` + 229 session CLI tests green; mypy clean.
+
 ### codex_frontend Phase 2: One-command Codex bridge CLI (`session start --runtime codex`)
 
 **Goal**: Wrap the Phase-5e `bridge_session_to_codex` op in a real session lifecycle -- one command derives a
