@@ -1298,7 +1298,7 @@ ambiguities.
 
 **Cascade (tier-1 plan check, opt-in):** `forge policy supervise --cascade` (or `<target> --cascade`) routes checks
 through a cheap tier before the frontier. A stateless `core.llm` call (`PlanCheckPolicy`, `semantic.plan_check`, default
-model `gemini/gemini-2.0-flash`, configurable via `--checker-model`) evaluates the action against the **approved-plan
+model `gemini/gemini-2.5-flash`, configurable via `--checker-model`) evaluates the action against the **approved-plan
 snapshot text** (`plan_override_path`, auto-resolved at wiring time via the `--reload` machinery; enabling fails with an
 actionable error when no approved snapshot resolves). Tier-1 emits only `allow` (clearly aligned; cached per the
 throttle window) or `needs_review` — it never warns or denies, and **every** tier-1 failure (LLM error, parse failure,

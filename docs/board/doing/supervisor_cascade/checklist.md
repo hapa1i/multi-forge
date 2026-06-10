@@ -74,12 +74,15 @@
 - [x] Cascade-off regression: existing supervisor e2e modes unchanged (4 pre-existing `TestSupervisorE2E` cases pass).
 - [x] Wiring e2e: in-container `supervise <target> --cascade` persists `cascade` + `plan_override_path` (target needs
   fabricated hook confirmation — `validate_supervisor_target` rejects pre-seeded UUIDs without conversation evidence).
-- [x] Short-circuit path e2e: investigated — the docker conftest has no stubbable OpenAI-compatible endpoint reachable
-  from the container (no `OPENAI_BASE_URL`/stub-server fixture; only the mock-claude binary pattern). Short-circuit
-  coverage stays unit-level (`test_plan_check.py`, `test_policy_check_cascade.py`); recorded as debt below.
+- [x] Short-circuit path e2e (`slow`-marked, real LLM): the default checker model is served by the test LiteLLM that
+  `test-integration.sh` starts on port 4001; the container reaches it via
+  `LITELLM_LOCAL_BASE_URL=http://host.docker.internal:4001` (gemini/\* -> `litellm_local`; provider keys stay on the
+  host). `mode=divergent` makes it self-proving: exit 0 + zero `--resume` invocations is only reachable via the tier-1
+  allow. Requires `GEMINI_API_KEY`; runs when the file is targeted explicitly (routine `make test-integration` filters
+  `not slow`).
 - [x] Run:
   `./scripts/test-integration.sh tests/integration/docker/test_supervisor_e2e.py tests/integration/docker/test_policy_hooks.py -v`
-  — 18/18 pass (8 supervisor e2e incl. 4 new cascade cases; 10 policy-hook regressions).
+  — 19/19 pass (9 supervisor e2e incl. 5 cascade cases; 10 policy-hook regressions).
 
 ## Slice 6 — Docs + closeout
 
@@ -103,10 +106,9 @@
 
 ## Blockers / deferred decisions
 
-- **Debt**: short-circuit-path docker e2e needs a stubbable OpenAI-compatible endpoint for `core.llm` inside the test
-  container; none exists (checked Slice 5: docker conftest only stubs the claude binary, no `OPENAI_BASE_URL`/HTTP-stub
-  fixture). Unit tests cover the short-circuit verdict mapping and hook wiring; the docker tier covers escalation,
-  cascade-off, and CLI wiring. Build the stub fixture if/when a default-on decision needs end-to-end short-circuit
-  proof.
 - `forge session set policy.supervisor.cascade true` bool coercion verified by code read
   (`session/overrides.py:240-265`: `json.loads` before dacite strict) — e2e helper assumption holds.
+- Default checker model fixed during Slice 5 follow-up: `gemini/gemini-2.0-flash` (workflow-config precedent) is not in
+  the local LiteLLM backend's model list, and `gemini/*` always routes `litellm_local` — default-config cascade would
+  have failed every tier-1 call. Default is now `gemini/gemini-2.5-flash` (served, equally cheap); the short-circuit e2e
+  runs against the real default to keep this honest.

@@ -6,8 +6,10 @@ path so the suite can deterministically cover:
 - divergent plan checks (exit 1)
 - supervisor infrastructure failures (exit 2)
 
-This file intentionally does not use real LLM calls. Real Claude worker coverage
-for ``claude -p --bare`` lives in a separate slow test.
+This file intentionally does not use real LLM calls, with one exception: the
+``slow``-marked cascade short-circuit test calls a real cheap checker model
+through the host's test LiteLLM (port 4001). Real Claude worker coverage for
+``claude -p --bare`` lives in a separate slow test.
 """
 
 from __future__ import annotations
@@ -197,30 +199,39 @@ HOOK_PAYLOAD = json.dumps(
 RUN_ENV = "FORGE_RUN_ID=run_cascadee2e0 FORGE_ROOT_RUN_ID=run_cascadee2e0"
 
 
-def _wire_cascade_session(ws: ContainerLike, name: str = "cascade-exec") -> None:
+def _wire_cascade_session(
+    ws: ContainerLike,
+    name: str = "cascade-exec",
+    *,
+    checker_model: str | None = "gemini/cascade-test-unreachable",
+    plan_text: str = "# Approved Plan\nCreate src/demo.py with greet(name) only.\n",
+) -> None:
     """Create a session with cascade enabled via session-set overrides.
 
-    The tier-1 checker model points at an unreachable backend so the cheap check
-    fails fast and the cascade's degrade-to-frontier guarantee is exercised.
+    The default checker model points at an unreachable backend so the cheap check
+    fails fast and the cascade's degrade-to-frontier guarantee is exercised. Pass
+    ``checker_model=None`` to use the real default (plan_check.DEFAULT_PLAN_CHECK_MODEL).
     """
     ws.exec(f"cd /workspace && forge session start {name} --no-proxy --no-launch")
-    ws.write_file("/workspace/plan.md", "# Approved Plan\nCreate src/demo.py with greet(name) only.\n")
-    for key, value in (
+    ws.write_file("/workspace/plan.md", plan_text)
+    overrides = [
         ("policy.enabled", "true"),
         ("policy.supervisor.resume_id", SUPERVISOR_RESUME_ID),
         ("policy.supervisor.direct", "true"),
         ("policy.supervisor.cascade", "true"),
         ("policy.supervisor.plan_override_path", "/workspace/plan.md"),
-        ("policy.supervisor.checker_model", "gemini/cascade-test-unreachable"),
-    ):
+    ]
+    if checker_model is not None:
+        overrides.append(("policy.supervisor.checker_model", checker_model))
+    for key, value in overrides:
         result = ws.exec(f"cd /workspace && forge session set --session {name} {key} {value}")
         assert result.returncode == 0, f"session set {key} failed: {result.stderr}"
 
 
-def _run_hook_check(ws: ContainerLike, *, session: str, mode: str) -> tuple[int, str, str]:
+def _run_hook_check(ws: ContainerLike, *, session: str, mode: str, extra_env: str = "") -> tuple[int, str, str]:
     result = ws.exec(
         f"cd /workspace && echo '{HOOK_PAYLOAD}' | "
-        f"FORGE_SESSION={session} FORGE_TEST_SUPERVISOR_MODE={mode} {RUN_ENV} forge hook policy-check"
+        f"FORGE_SESSION={session} FORGE_TEST_SUPERVISOR_MODE={mode} {RUN_ENV} {extra_env} forge hook policy-check"
     )
     invocations = ws.read_file("/tmp/claude_invocations.log")
     return result.returncode, result.stderr, invocations
@@ -267,6 +278,45 @@ class TestCascadeE2E:
         assert event["status"] == "error"
         assert event["session"] == "cascade-c"
         assert event["root_run_id"] == "run_cascadee2e0"
+
+    @pytest.mark.slow
+    def test_short_circuit_real_checker_skips_frontier(self, supervisor_workspace: ContainerLike) -> None:
+        """Real tier-1 short-circuit: the default checker model, served by the host's
+        test LiteLLM (port 4001, started by test-integration.sh), approves a
+        clearly-aligned action and the frontier supervisor is never invoked.
+
+        Requires GEMINI_API_KEY on the host; provider keys never enter the
+        container (litellm_local sends them from the proxy side). mode=divergent
+        makes the test self-proving: had the frontier been consulted it would
+        have blocked, so exit 0 + zero --resume invocations is only reachable
+        via the tier-1 allow.
+        """
+        ws = supervisor_workspace
+        _wire_cascade_session(
+            ws,
+            "cascade-sc",
+            checker_model=None,  # real default; must be served by the local backend
+            plan_text="# Approved Plan\nCreate src/demo.py containing exactly: def widget(): pass\n",
+        )
+
+        exit_code, stderr, invocations = _run_hook_check(
+            ws,
+            session="cascade-sc",
+            mode="divergent",
+            extra_env="LITELLM_LOCAL_BASE_URL=http://host.docker.internal:4001",
+        )
+
+        assert exit_code == 0, f"tier-1 should approve a clearly-aligned action: {stderr}"
+        assert invocations.count(f"--resume {SUPERVISOR_RESUME_ID}") == 0
+
+        # The uncached tier-1 call is on the ledger, session-tagged, not an error.
+        events = ws.exec("cat $HOME/.forge/usage/events/*.jsonl")
+        plan_check_lines = [
+            json.loads(line) for line in events.stdout.splitlines() if line.strip() and '"plan-check"' in line
+        ]
+        assert plan_check_lines, f"no plan-check ledger event found: {events.stdout!r}"
+        assert plan_check_lines[-1]["session"] == "cascade-sc"
+        assert plan_check_lines[-1]["status"] != "error"
 
     def test_supervise_cli_cascade_wiring(self, supervisor_workspace: ContainerLike) -> None:
         """Real CLI chain: supervise target -> reload-from -> --cascade toggles intent."""

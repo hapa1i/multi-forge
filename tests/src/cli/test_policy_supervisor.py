@@ -789,7 +789,7 @@ class TestSuperviseCascade:
         assert "redundant" in result.output
 
     def test_bare_checker_model_rejected(self, runner: CliRunner, temp_guard_env: Path) -> None:
-        result = runner.invoke(main, ["policy", "supervise", "--checker-model", "gemini/gemini-2.0-flash"])
+        result = runner.invoke(main, ["policy", "supervise", "--checker-model", "gemini/gemini-2.5-flash"])
         assert result.exit_code == 1
         assert "requires a target argument or --cascade" in result.output
 
@@ -879,7 +879,7 @@ class TestSuperviseCascade:
         result = runner.invoke(main, ["policy", "supervise"])
         assert result.exit_code == 0
         assert "Cascade: on" in result.output
-        assert "Checker model: gemini/gemini-2.0-flash" in result.output
+        assert "Checker model: gemini/gemini-2.5-flash" in result.output
 
     def test_show_displays_cascade_off_by_default(self, runner: CliRunner, temp_guard_env: Path, monkeypatch) -> None:
         _make_supervised_project(temp_guard_env, monkeypatch)

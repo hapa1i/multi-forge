@@ -832,7 +832,7 @@ def _resolve_cascade_plan(sup_config: SupervisorConfig, manifest: SessionState) 
     "--checker-model",
     "checker_model",
     default=None,
-    help="Tier-1 checker model (prefixed id, e.g. gemini/gemini-2.0-flash)",
+    help="Tier-1 checker model (prefixed id, e.g. gemini/gemini-2.5-flash)",
 )
 def supervise_cmd(
     target: str | None,
@@ -885,7 +885,7 @@ def supervise_cmd(
         sys.exit(1)
     if checker_model and "/" not in checker_model:
         console.print(f"[red]Error:[/red] --checker-model must be a prefixed model id (got '{checker_model}')")
-        print_tip("Example: gemini/gemini-2.0-flash", blank_before=False, console=console)
+        print_tip("Example: gemini/gemini-2.5-flash", blank_before=False, console=console)
         sys.exit(1)
     # Cascade flags are modifiers when a target is present; standalone they are a
     # toggle action on the existing config (like --off/--on).

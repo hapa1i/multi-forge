@@ -22,8 +22,9 @@ from forge.session.models import SupervisorConfig
 
 _log = logging.getLogger(__name__)
 
-# Same cheap-model convention as policy/workflow/config.py
-DEFAULT_PLAN_CHECK_MODEL = "gemini/gemini-2.0-flash"
+# gemini/* routes to the litellm_local provider, so the default must be a model the
+# local LiteLLM backend serves (src/forge/config/defaults/backends/litellm.yaml).
+DEFAULT_PLAN_CHECK_MODEL = "gemini/gemini-2.5-flash"
 
 PLAN_CHECK_INTENT = (
     "Fast first-pass alignment check against the approved plan. Clearly aligned "

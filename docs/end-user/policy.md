@@ -234,7 +234,7 @@ forge policy supervise --cascade          # enable on existing config
 forge policy supervise --no-cascade       # disable (supervisor checks every action again)
 
 # Optional: pick the tier-1 model (prefixed id)
-forge policy supervise --cascade --checker-model gemini/gemini-2.0-flash
+forge policy supervise --cascade --checker-model gemini/gemini-2.5-flash
 ```
 
 How it behaves:
