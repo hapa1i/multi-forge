@@ -580,6 +580,7 @@ Per-emitter session coverage (a per-session summary is honest about what it can 
 | Memory writer (`emit_usage_for_session_result`)                | Yes             | `session=session_name`                                                                   |
 | Workflow verbs panel/analyze/debate/consensus                  | Yes             | threaded `session=$FORGE_SESSION` (verb aggregate + per-worker)                          |
 | Transfer curation (`emit_direct_llm_usage`, `transfer-curate`) | Yes             | `session=$FORGE_SESSION`; ai-curated strategy only; `route=core_llm`/`runtime=forge_cli` |
+| Plan check (`emit_direct_llm_usage`, `plan-check`)             | Yes             | cascade tier-1; `session=context.session_name`; `route=core_llm`                         |
 | Action tagger (`emit_direct_llm_usage`)                        | No              | policy-internal classification; left untagged (`session_tagging_partial`)                |
 
 **Sidecar.** When a sidecar session launches with a proxy id, the launcher mounts `~/.forge/usage/` rw alongside
@@ -733,23 +734,24 @@ user rather than working around the check.
 
 ### D.3 Policy definition ownership (from §4.1.6)
 
-| Setting                                             | Owner   | Location                           |
-| --------------------------------------------------- | ------- | ---------------------------------- |
-| Supervisor model (which model to use as supervisor) | Proxy   | `~/.forge/proxies/<id>/proxy.yaml` |
-| Throttling settings (check frequency)               | Proxy   | `~/.forge/proxies/<id>/proxy.yaml` |
-| TDD mode (off/permissive/strict)                    | Session | Session file `intent.tdd_mode`     |
-| Policy enabled/disabled                             | Session | Session file `intent.policy_mode`  |
-| Verification config                                 | Session | Session file `intent.verification` |
+| Setting                                             | Owner   | Location                                            |
+| --------------------------------------------------- | ------- | --------------------------------------------------- |
+| Supervisor model (which model to use as supervisor) | Proxy   | `~/.forge/proxies/<id>/proxy.yaml`                  |
+| Throttling settings (check frequency)               | Proxy   | `~/.forge/proxies/<id>/proxy.yaml`                  |
+| TDD mode (off/permissive/strict)                    | Session | Session file `intent.tdd_mode`                      |
+| Policy enabled/disabled                             | Session | Session file `intent.policy_mode`                   |
+| Verification config                                 | Session | Session file `intent.verification`                  |
+| Cascade on/off + tier-1 checker model               | Session | `intent.policy.supervisor.cascade`/`.checker_model` |
 
 ### D.4 Policy state ownership (from §4.1.6)
 
-| State                    | Owner           | Location                             |
-| ------------------------ | --------------- | ------------------------------------ |
-| Enforcement decisions    | Session (hooks) | `confirmed.policy` in session file   |
-| Cached verdicts          | Session (hooks) | `confirmed.policy` in session file   |
-| "Tests touched" tracking | Session (hooks) | `confirmed.policy` in session file   |
-| Verification iteration   | Session (hooks) | `confirmed.verification.iterations`  |
-| Last verification result | Session (hooks) | `confirmed.verification.last_result` |
+| State                                     | Owner           | Location                                         |
+| ----------------------------------------- | --------------- | ------------------------------------------------ |
+| Enforcement decisions                     | Session (hooks) | `confirmed.policy` in session file               |
+| Cached verdicts (supervisor + plan-check) | Session (hooks) | `confirmed.policy.policy_states` in session file |
+| "Tests touched" tracking                  | Session (hooks) | `confirmed.policy` in session file               |
+| Verification iteration                    | Session (hooks) | `confirmed.verification.iterations`              |
+| Last verification result                  | Session (hooks) | `confirmed.verification.last_result`             |
 
 ---
 
