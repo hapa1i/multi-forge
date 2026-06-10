@@ -1,6 +1,6 @@
 # Codex Frontend (build)
 
-Status: proposed. Spun out of `runtime_abstraction` Phase 6 (evaluation only, closed 2026-06-09).
+Status: doing. Spun out of `runtime_abstraction` Phase 6 (evaluation only, closed 2026-06-09).
 
 ## Summary
 
@@ -69,9 +69,11 @@ Gating probe round 2 (2026-06-10, stages 40+50 run with a TTY operator; captures
    core op (`core/ops/codex_bridge.py`): e.g. `forge session start --runtime codex --resume-from <claude-session>`
    (exact shape TBD). No hook dependency. Needs: a `runtime` field on the session manifest
    (`SessionIntent`/`SessionConfirmed`), a runtime-aware dispatch in the launcher (today hard-wired to `invoke_claude`),
-   and recording the Codex `thread_id` (resume id) + rollout path into `confirmed`. Use `codex exec resume <thread_id>`
-   for multi-turn continuation. Also: GC the synthetic `<parent>-codex-<suffix>` transfer children the bridge
-   accumulates (recorded debt from Phase 5e).
+   and hook-free recording of the Codex `thread_id` (resume id) from the `thread.started` JSONL event. Rollout path
+   recording must stay honest about its source: derive it separately by discovering the matching
+   `$CODEX_HOME/sessions/.../rollout-*.jsonl`, or populate it from the SessionStart hook only when the home is
+   trust-enrolled. Use `codex exec resume <thread_id>` for multi-turn continuation. Also: GC the synthetic
+   `<parent>-codex-<suffix>` transfer children the bridge accumulates (recorded debt from Phase 5e).
 
 2. **Gating probe -- ANSWERED 2026-06-10 (firing), reshaped to enrollment mechanics.** The original go/no-go ("do hooks
    fire at all?") is settled: GO -- interactive fires (50c) AND trust-enrolled headless fires (40c2/40d). The remaining

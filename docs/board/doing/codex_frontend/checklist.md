@@ -72,14 +72,20 @@ the acceptance sketch:
   Decisions before implementation.
 - [ ] `runtime` field on the session manifest (`SessionIntent`/`SessionConfirmed`) + runtime-aware launcher dispatch
   (today hard-wired to `invoke_claude`).
-- [ ] Codex `thread_id` (resume id) + rollout path recorded into `confirmed` (both carried in the SessionStart payload /
-  `thread.started` stream event); continuation via `codex exec resume <thread_id>`.
+- [ ] Codex `thread_id` (resume id) recorded into `confirmed` from the hook-free `thread.started` JSONL stream event;
+  continuation via `codex exec resume <thread_id>`.
+- [ ] Rollout path recorded into `confirmed` without pretending it is hook-free: either discover the matching
+  `$CODEX_HOME/sessions/.../rollout-*.jsonl` by `thread_id`, or populate it from the SessionStart payload only when the
+  home is trust-enrolled. Discovery assumes stream `thread_id` == the rollout filename's `session_id` -- doc-asserted
+  (`tests/fixtures/codex/README.md` calls `thread_id` "the resume/session id") but never binary-paired from one run;
+  verify the equality as the first implementation step.
 - [ ] GC the synthetic `<parent>-codex-<suffix>` transfer children the bridge accumulates (Phase 5e recorded debt).
 
 | Test                   | Fixture                              | Assertion                                                          | Test File |
 | ---------------------- | ------------------------------------ | ------------------------------------------------------------------ | --------- |
-| Bridge CLI happy path  | mocked curation + codex Popen replay | manifest `runtime=codex`; `thread_id` + rollout path in confirmed  | TBD       |
+| Bridge CLI happy path  | mocked curation + codex Popen replay | manifest `runtime=codex`; `thread_id` parsed from `thread.started` | TBD       |
 | Continuation           | recorded `thread_id`                 | relaunch invokes `codex exec resume <thread_id>` cross-CWD         | TBD       |
+| Rollout discovery      | stream `thread_id` + session files   | matching rollout path recorded without requiring hooks             | TBD       |
 | Transfer-child GC      | bridge run x2                        | synthetic children GC'd; real children untouched                   | TBD       |
 | Real-codex E2E (@slow) | real codex, curation mocked          | one run tree: curation + codex events; `forge activity` shows both | TBD       |
 
@@ -126,4 +132,5 @@ per-hook-trust story from Phase 1.
 2. Durable lessons proposed via `.forge/memory/shadow_impl_notes.md` (human promotes).
 3. Design docs + end-user docs verified against shipped behavior (registry/design.md §5.5.5 in Phase 0; session manifest
    \+ `transfer.md`/`session.md` in Phase 2; hooks docs in Phase 3+).
-4. `git mv docs/board/doing/codex_frontend docs/board/done/` after the final merge to `main`.
+4. `git mv docs/board/doing/codex_frontend docs/board/done/` as the final closeout commit once shipped and verified, so
+   `main` lands with the card already in `done/`.
