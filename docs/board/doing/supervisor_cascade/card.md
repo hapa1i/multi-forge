@@ -67,4 +67,4 @@ Key decisions:
 
 - Cascade flag at `%policy supervise <target>` time (set the target first, then `%policy supervise cascade on`).
 - Default-on cascade (gated on measured checker quality).
-- Shadow-sampling mode for false-aligned measurement.
+- Shadow-sampling mode for false-aligned measurement — proposed as `proposed/supervisor_shadow_sampling/`.
