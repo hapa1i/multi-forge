@@ -1,1 +1,6 @@
-{"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": "The handoff token for this session is MAGIC-CTX-7F3A9."}}
+{
+  "hookSpecificOutput": {
+    "hookEventName": "SessionStart",
+    "additionalContext": "The handoff token for this session is MAGIC-CTX-7F3A9."
+  }
+}

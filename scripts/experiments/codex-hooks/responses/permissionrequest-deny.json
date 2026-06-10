@@ -1,1 +1,9 @@
-{"hookSpecificOutput": {"hookEventName": "PermissionRequest", "decision": {"behavior": "deny", "message": "PROBE-PERMREQ-DENY"}}}
+{
+  "hookSpecificOutput": {
+    "hookEventName": "PermissionRequest",
+    "decision": {
+      "behavior": "deny",
+      "message": "PROBE-PERMREQ-DENY"
+    }
+  }
+}
