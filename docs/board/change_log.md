@@ -25,6 +25,30 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board-contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-06-10
+
+### codex_frontend Phase 0: Registry correction -- `headless_inert` -> `enrollment_gated`
+
+**Goal**: Correct the Codex hooks capability encoding refuted by gating-probe round 2: trust-enrolled hooks DO fire
+under headless `codex exec` (40c2/40d) and interactively (50c) -- the gate is a one-time trust enrollment, not the
+execution mode. First code commit of the `codex_frontend` card.
+
+**Key changes**:
+
+- `HookSupport` (registry) and `HookSeam` (preflight) renamed `headless_inert` -> `enrollment_gated` **together**, so
+  neither half of the capability model retains the refuted value. Resolves the card's literal-name Open Decision.
+- The preflight verdict is pinned as capability-not-state: "hooks can fire, but this preflight has not checked the
+  `[hooks.state]` record" -- never treat it as `active`. The per-hook enrollment read is Phase 1.
+- Codex `RuntimeSpec` note rewritten to the round-2 facts (trust lives in user `config.toml` `[hooks.state]` keyed by
+  the registering config's absolute path; survives script-*content* changes; only SessionStart observed firing).
+  `pretool_policy` stays `"none"` (post-enrollment PreToolUse unprobed). `design.md` §5.5.5 synced; card.md stale
+  "hook_seam is today honestly `unknown`" line fixed.
+
+**Verification**: 63 runtime/CLI/preflight unit tests green (incl. renamed
+`test_enabled_is_enrollment_gated_never_active`); mypy clean; `rg headless_inert docs/design.md src/ tests/` empty; live
+`forge runtime list` renders `enrollment_gated` and `forge runtime preflight codex` renders
+`Hook seam: enrollment_gated` (render asserted, exit code orthogonal); `make pre-commit` clean.
+
 ## 2026-06-09
 
 ### Phase 6: Codex frontend evaluation (probe-only; runtime_abstraction complete)

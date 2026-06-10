@@ -19,10 +19,12 @@ the slice-5a checklist note). Concretely:
   ``"warning"`` for unrelated reasons (stale rollout DB rows, update checks) while
   auth is perfectly fine.
 * ``doctor`` exposes **no per-hook trust** signal, so 5a can never prove the (not yet
-  built) 5d transfer hook is trusted -- ``hook_seam`` never returns ``"active"``. And the
-  Phase 6 probe pinned that headless ``codex exec`` does not fire hooks at all (registry
-  ``native_hooks="headless_inert"``), so the normal enabled+version-OK case returns
-  ``"headless_inert"``, not a trust-hedged ``"unknown"`` (which would read as "might work").
+  built) transfer hook is trusted -- ``hook_seam`` never returns ``"active"``. The round-2
+  probe (2026-06-10) pinned that hooks DO fire under headless ``codex exec`` once
+  trust-enrolled (registry ``native_hooks="enrollment_gated"``), so the normal
+  enabled+version-OK case returns ``"enrollment_gated"``: hooks can fire, but this
+  preflight has not checked the ``[hooks.state]`` record for any hook (that read is
+  codex_frontend Phase 1).
 
 Render-free (core, not CLI): every function returns data or plain strings. The
 ``forge runtime preflight codex`` command renders the result; ``CodexPreflight``
@@ -70,14 +72,16 @@ _MANAGED_HOOKS_KEY = "allow_managed_hooks_only"
 # is just one way to obtain the former.
 CodexAuthMethod = Literal["api_key", "chatgpt_tokens", "enterprise_token", "none"]
 
-# Whether Forge's (future, 5d) SessionStart transfer hook can deliver context. 5a never
-# returns ``active`` -- Codex trust is keyed to a specific hook *hash*, unprovable before
-# the hook exists; that verdict belongs to 5d. ``headless_inert`` is the normal headless
-# verdict: hooks are enabled + version-OK, but the Phase 6 probe pinned that they do NOT
-# fire under headless ``codex exec`` (mirrors the registry ``native_hooks="headless_inert"``),
-# so trust-provability is moot -- firing is a known negative. ``unknown`` now only covers
-# the moot cases: not installed, or version unparseable (the floor cannot even be proven).
-HookSeam = Literal["active", "untrusted", "managed_suppressed", "headless_inert", "disabled", "unknown"]
+# Whether Forge's (future) SessionStart transfer hook can deliver context. This
+# preflight never returns ``active`` -- Codex trust is keyed to a specific hook entry,
+# unprovable before the hook exists. ``enrollment_gated`` is the normal
+# enabled+version-OK verdict and is NOT a per-home enrolled-state claim: it means
+# "hooks can fire (round-2 probe: enrolled hooks fire headless AND interactively), but
+# this preflight has not checked the ``[hooks.state]`` record for this hook" -- never
+# treat it as ``active``. Reading ``[hooks.state]`` to report enrolled-vs-not per hook
+# is codex_frontend Phase 1. ``unknown`` covers only the moot cases: not installed, or
+# version unparseable (the floor cannot even be proven).
+HookSeam = Literal["active", "untrusted", "managed_suppressed", "enrollment_gated", "disabled", "unknown"]
 
 # Whether a Codex run can get the Responses API it requires. Codex emits
 # ``wire_api="responses"`` only; no current Forge proxy serves Responses on its
@@ -104,7 +108,9 @@ class CodexPreflight:
     billing_mode: BillingMode  # 5c writes this onto the ledger event
     ready: bool  # installed AND auth resolved AND not responses-blocked; NEVER doctor overallStatus
     blocking_reason: str | None  # actionable setup guidance; None iff ready
-    hook_seam: HookSeam  # 5d seam; 5a never returns "active" (normal headless case is "headless_inert")
+    hook_seam: (
+        HookSeam  # never "active" here (normal enabled case is "enrollment_gated": can fire, enrollment unchecked)
+    )
     proxy_responses: ProxyResponses
     doctor_status: str | None  # codex doctor overallStatus -- informational, never gates ready
 
@@ -391,15 +397,16 @@ def _resolve_hook_seam(
     features_hooks_enabled: bool | None,
     managed_only: bool,
 ) -> HookSeam:
-    """Honest hook-delivery posture. 5a never returns ``"active"`` (see module note).
+    """Honest hook-delivery posture. This preflight never returns ``"active"`` (see module note).
 
-    The ``"untrusted"`` verdict is reserved for 5d: Codex keys trust to a specific hook
-    *hash*, and Stage A confirmed ``codex doctor`` (0.137.0) exposes no trust signal.
-    Post-Phase-6 the normal enabled+version-OK case is ``"headless_inert"``: the probe
-    pinned that headless ``codex exec`` does not fire hooks regardless of trust, so it is a
-    known negative, not a trust-hedged ``"unknown"``. ``"unknown"`` remains only for the
-    moot cases -- not installed, or version unparseable (the floor cannot even be proven,
-    so we cannot assert hooks register).
+    The ``"untrusted"`` verdict is reserved for the Phase 1 ``[hooks.state]`` read:
+    Codex keys trust to the registering config entry, and Stage A confirmed
+    ``codex doctor`` (0.137.0) exposes no trust signal. The normal enabled+version-OK
+    case is ``"enrollment_gated"`` -- a capability statement, NOT a per-home
+    enrolled-state verdict: hooks can fire (round-2 probe, 2026-06-10), but this
+    preflight has not checked whether any hook is actually trust-enrolled. ``"unknown"``
+    remains only for the moot cases -- not installed, or version unparseable (the floor
+    cannot even be proven, so we cannot assert hooks register).
     """
     if not installed:
         return "unknown"  # moot; ready is already False
@@ -419,10 +426,10 @@ def _resolve_hook_seam(
         # even register -- the honest verdict stays "unknown".
         return "unknown"
 
-    # Enabled, version meets the floor, not suppressed: hooks DO register/enable, but the
-    # Phase 6 probe pinned that they do not fire under headless `codex exec` (regardless of
-    # trust). For a headless-readiness check that is a known negative -> headless_inert.
-    return "headless_inert"
+    # Enabled, version meets the floor, not suppressed: hooks register/enable AND fire
+    # once trust-enrolled (round-2 probe), but enrollment state is unchecked here --
+    # the [hooks.state] read is codex_frontend Phase 1. Not a per-home enrolled claim.
+    return "enrollment_gated"
 
 
 class _Responses(NamedTuple):

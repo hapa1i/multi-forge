@@ -315,7 +315,7 @@ class TestManagedSuppression:
         result = preflight_codex()
 
         assert result.hook_seam != "managed_suppressed"  # absence is not proof of "not suppressed"
-        assert result.hook_seam == "headless_inert"  # enabled + version-OK normal headless case (Phase 6)
+        assert result.hook_seam == "enrollment_gated"  # enabled + version-OK normal case (enrollment unchecked)
 
 
 class TestTomlFlagTrue:
@@ -347,16 +347,17 @@ class TestHookSeamNeverActive:
         _stub_probes(monkeypatch, version=None, features=True, doctor=_doctor(chatgpt="true"))
         assert preflight_codex().hook_seam == "unknown"
 
-    def test_enabled_is_headless_inert_never_active(self, monkeypatch) -> None:
-        # Enabled + version-OK: the normal headless case is "headless_inert" (Phase 6 -- hooks
-        # do not fire under `codex exec`). Even a (fabricated) doctor trust hint never yields
-        # "active" in 5a (trust-provability belongs to 5d).
+    def test_enabled_is_enrollment_gated_never_active(self, monkeypatch) -> None:
+        # Enabled + version-OK: the normal case is "enrollment_gated" -- hooks can fire
+        # (round-2 probe), but the preflight has not checked [hooks.state] enrollment.
+        # Even a (fabricated) doctor trust hint never yields "active" here (the per-hook
+        # enrollment read is codex_frontend Phase 1).
         doctor = _doctor(chatgpt="true", extra_details={"project trusted": "true"})
         _stub_probes(monkeypatch, features=True, doctor=doctor)
 
         seam = preflight_codex().hook_seam
 
-        assert seam == "headless_inert"
+        assert seam == "enrollment_gated"
         assert seam != "active"
 
 
@@ -469,7 +470,7 @@ class TestHappyPathAndAssert:
             billing_mode="subscription_quota",
             ready=True,
             blocking_reason=None,
-            hook_seam="headless_inert",
+            hook_seam="enrollment_gated",
             proxy_responses="native_direct",
             doctor_status="warning",
         )

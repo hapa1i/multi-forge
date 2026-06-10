@@ -1642,9 +1642,10 @@ half). A frozen `RuntimeSpec` per runtime in a module-level `RUNTIMES` table (mi
 `Credential`/`CREDENTIALS` pattern) answers the card's seven questions without hard-coding Claude Code assumptions:
 installed (`is_installed()` = PATH presence; `detect()` = best-effort `--version`), interactive, headless, hooks, usage
 source, native resume, and install scopes (plus curated-transfer in/out). Limited or planned support is a multi-state
-`Literal`, not a `bool` — Codex `native_hooks="headless_inert"` (Phase 6 probe: hooks register and enable but do not
-fire under headless `codex exec`; interactive unverified), `pretool_policy="none"` (PreToolUse never fires headless, so
-no verified enforcement), and `interactive="beta"` (a Forge-integration target, not shipped). `hook_min_version` stays
+`Literal`, not a `bool` — Codex `native_hooks="enrollment_gated"` (round-2 probe 2026-06-10: hooks fire headless and
+interactively once trust-enrolled; enrollment is a one-time interactive TUI ceremony until the codex_frontend card
+settles pre-enrollment), `pretool_policy="none"` (post-enrollment PreToolUse firing/deny unprobed — only SessionStart
+has been observed), and `interactive="beta"` (a Forge-integration target, not shipped). `hook_min_version` stays
 machine-readable as the registration/enablement floor a preflight checks (not a firing guarantee); `hook_feature_flag`
 is `None` since Codex hooks are default-on — so a consumer reading the field, not just the prose, never mistakes a Codex
 limit for Claude parity. `forge runtime list [--json]` renders the matrix. Claude Code is fully populated; Codex/Gemini

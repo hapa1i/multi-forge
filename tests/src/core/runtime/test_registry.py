@@ -50,23 +50,24 @@ class TestClaudeSpec:
 class TestCodexSpec:
     def test_limits_encoded_not_parity(self) -> None:
         s = get_runtime("codex")
-        # Phase 6 probe: PreToolUse does not fire under headless `codex exec`, so there is
-        # no verified pretool enforcement (interactive unverified) -- "none", not "partial".
+        # Round-2 probe: only SessionStart has been observed firing; post-enrollment
+        # PreToolUse firing/deny is unprobed (codex_frontend Phase 1) -- "none", not "partial".
         assert s.pretool_policy == "none"
-        assert s.interactive == "beta"  # Forge frontend integration is the Phase 6 target
-        # Hooks register + enable (floor met) but do NOT fire headless -> "headless_inert",
-        # not "gated": the version floor is satisfied yet hooks still do not fire. The floor
-        # stays recorded (registration/enablement, not a firing guarantee); no hook flag
-        # required (codex_hooks is a deprecated alias).
-        assert s.native_hooks == "headless_inert"
+        assert s.interactive == "beta"  # Forge frontend integration target (codex_frontend Phase 5)
+        # Round-2 probe (2026-06-10): trust-enrolled hooks fire headless AND interactively ->
+        # "enrollment_gated", not "gated": the version floor is satisfied yet untrusted hooks
+        # do not fire -- the gate is trust enrollment, not the version. The floor stays
+        # recorded (registration/enablement, not a firing guarantee); no hook flag required
+        # (codex_hooks is a deprecated alias).
+        assert s.native_hooks == "enrollment_gated"
         assert s.hook_min_version == "0.131.0"
         assert s.hook_feature_flag is None
         assert s.native_resume is True
         assert s.usage_source == "jsonl_events"
         assert s.headless_cmd == ("codex", "exec")
         assert s.install_scopes == ()  # Forge does not manage Codex install
-        # Note records the default-on reality + the headless no-fire finding.
-        assert s.note is not None and "default-on" in s.note
+        # Note records the default-on reality + the trust-enrollment finding.
+        assert s.note is not None and "default-on" in s.note and "trust-enrolled" in s.note
 
 
 class TestGeminiSpec:

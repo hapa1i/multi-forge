@@ -19,13 +19,13 @@ closeout.
 parking skipped because execution starts immediately -- the lane's "accepted but no execution branch" state never
 existed). Probe round 2 findings are recorded in `card.md` ("Probe-established facts"); do not re-derive them.
 
-Next: **Phase 0 (registry correction)** -- small, owed from the probe -- then **Phase 1 (enrollment-mechanics probe
-round)**, which pins the facts that gate Phases 3/4/6. **Phase 2 (bridge CLI)** is the first product deliverable and has
-no dependency on Phase 1; it can interleave.
+**Phase 0 shipped 2026-06-10** (registry + preflight `headless_inert -> enrollment_gated` rename; see change_log). Next:
+**Phase 1 (enrollment-mechanics probe round)**, which pins the facts that gate Phases 3/4/6. **Phase 2 (bridge CLI)** is
+the first product deliverable and has no dependency on Phase 1; it can interleave.
 
 ## Phase 0 - Registry correction (owed from probe round 2)
 
-- [ ] Correct the Codex `RuntimeSpec` hooks encoding: `native_hooks="headless_inert"` is refuted by the binary -- hooks
+- [x] Correct the Codex `RuntimeSpec` hooks encoding: `native_hooks="headless_inert"` is refuted by the binary -- hooks
   fire under headless `codex exec` once trust-enrolled (card facts, 40c2/40d). Encode enrollment gating as a value (new
   `HookSupport` literal; name decided at implementation -- see Open Decisions). `pretool_policy` stays `"none"` until
   Phase 1 pins PreToolUse post-enrollment.
@@ -33,6 +33,12 @@ no dependency on Phase 1; it can interleave.
     enrollment requires the interactive ceremony until Phase 1 settles pre-enrollment);
     `tests/src/core/runtime/test_registry.py` + `tests/src/cli/test_runtime.py` updated and green; mypy clean;
     `design.md` §5.5.5 matches; change_log entry.
+  - **Done 2026-06-10**: `enrollment_gated` landed on BOTH literals -- registry `HookSupport` and preflight `HookSeam`
+    (renamed together; keeping one as `headless_inert` would split the capability model). The preflight value is
+    documented as capability-not-state ("hooks can fire; `[hooks.state]` unchecked -- never treat as `active`"; the
+    enrollment read is Phase 1). 63 runtime/CLI/preflight unit tests green (incl. renamed
+    `test_enabled_is_enrollment_gated_never_active`); mypy clean; `rg headless_inert docs/design.md src/ tests/` empty;
+    `design.md` §5.5.5 synced; card.md stale hook_seam line fixed; change_log entry added.
 
 ## Phase 1 - Enrollment-mechanics probe (headless from one enrolled home)
 
@@ -118,8 +124,10 @@ per-hook-trust story from Phase 1.
 
 ## Open Decisions
 
-- [ ] `HookSupport` literal name for enrollment gating (Phase 0): e.g. `enrollment_gated`. Decide at implementation; the
-  comment must distinguish it from `gated` (version floor) which Codex meets yet did not fire untrusted.
+- [x] `HookSupport` literal name for enrollment gating (Phase 0): **resolved 2026-06-10 -- `enrollment_gated`**, applied
+  to both the registry `HookSupport` and the preflight `HookSeam` (renamed together so no half of the capability model
+  retains the refuted `headless_inert`). The comment distinguishes it from `gated` (version floor -- Codex meets the
+  floor yet untrusted hooks do not fire) and pins the preflight verdict as capability-not-state (never `active`).
 - [ ] Pre-enrollment posture (Phase 1): write `[hooks.state]` records programmatically vs guided one-time ceremony.
   Precedent: Forge already writes Claude's `settings.json` hooks with user consent -- but bypassing another tool's
   review gate is a posture decision, made explicitly.

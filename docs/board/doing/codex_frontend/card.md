@@ -94,8 +94,9 @@ Gating probe round 2 (2026-06-10, stages 40+50 run with a TTY operator; captures
    - **Harness note**: mktemp-per-run kills enrollment with the run. The follow-up probe needs a *stable* project path
      and a persistent enrolled `CODEX_HOME` fixture (the existing 40-trust persistent-home pattern, minus the teardown)
      so one ceremony serves many headless probe turns.
-   - Once enrollment semantics are pinned, encode them in `codex_preflight.py`'s `hook_seam` (today honestly `unknown`;
-     it can now learn to read `[hooks.state]` and report enrolled-vs-not per hook).
+   - Once enrollment semantics are pinned, encode them in `codex_preflight.py`'s `hook_seam` (today `enrollment_gated`
+     -- a capability statement, not a per-home enrolled-state verdict, per the Phase 0 rename; it can now learn to read
+     `[hooks.state]` and report enrolled-vs-not per hook).
 
 3. **Codex hook adapter/responder (gated on probe 2's response-contract leg).** `CodexHookAdapter`/`CodexHookResponder`
    filling the runtime-neutral protocols in `src/forge/cli/hooks/protocols.py` (the Phase 4f seam already makes room).
