@@ -27,6 +27,36 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-10
 
+### codex_frontend Phase 1 closeout: `pretool_policy` rise + preflight `[hooks.state]` decision
+
+**Goal**: Ship the one code unit Phase 1 deferred for an explicit decision -- align the capability encoding with the
+round-3 probe findings before Phase 2 sessions load `design.md` §5.5.5 as context.
+
+**Key changes**:
+
+- **Registry (`core/runtime/registry.py`)**: Codex `pretool_policy` `"none"` -> `"partial"` -- Phase 1 confirmed
+  post-enrollment PreToolUse deny (JSON + exit-2) and `updatedInput` mutation headless, refuting the old "unprobed"
+  rationale. `"partial"`, not `"full"`: enforcement exists only in trust-enrolled homes, malformed hook output FAILS
+  OPEN, and PermissionRequest is unpinned headless. `PolicyEnforcement` comment rewritten (Codex is now the partial
+  runtime); the stale Codex `note` claims ("only SessionStart observed", "registration-string dimension unprobed",
+  "until pre-enrollment is settled") replaced with the round-3 facts (full event coverage incl. 30e, command string in
+  the `trusted_hash`, guided-ceremony posture, worktree survival, fails-open caveat, `Bash`/`apply_patch` tool names).
+- **Preflight (`codex_preflight.py`, comments/docstrings only -- behavior unchanged)**: the four forward-pointing "the
+  `[hooks.state]` read is Phase 1" notes now record the resolved decision -- the read is deliberately NOT implemented
+  (the `trusted_hash` is not black-box computable so a record cannot be validated; enrollment survives worktrees with no
+  record at the worktree's config path, so a path-keyed read would false-negative). The seam stays `enrollment_gated`;
+  `untrusted` stays reserved, reachable only if a codex-cli source-dive recovers the hash.
+- **`design.md` §5.5.5 synced**: `pretool_policy="partial"` with probe facts + caveats; the enrollment parenthetical
+  states the settled guided-ceremony posture. Board: card Deliverables 2/3 + checklist Current Focus/Phase 1/Phase 3
+  updated.
+
+**Verification**: 63 runtime/preflight/CLI unit tests green (assertions updated to `partial`); mypy clean; stale-claim
+grep (`unprobed|only SessionStart|settles pre-enrollment|...`) empty over the normative surfaces (`docs/design.md`,
+`docs/design_appendix.md`, `src/`, `tests/src/`) -- the active card/checklist round-2 snapshot lines that quote the
+superseded wording are annotated as historical (superseded by round 3) rather than deleted; live
+`forge runtime list --json` renders `pretool_policy: partial` + `native_hooks: enrollment_gated`; `make pre-commit`
+clean.
+
 ### codex_frontend Phase 1: Enrollment-mechanics probe (harness + round-3 findings, codex 0.138.0)
 
 **Goal**: Build the Phase 1 probe harness that pins Codex's enrollment mechanics (what `trusted_hash` covers, whether

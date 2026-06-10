@@ -42,7 +42,9 @@ def test_list_json_carries_capability_fields() -> None:
     assert {d["id"] for d in data} == {"claude_code", "codex", "gemini"}
 
     codex = next(d for d in data if d["id"] == "codex")
-    assert codex["pretool_policy"] == "none"  # post-enrollment PreToolUse unprobed -> no verified enforcement
+    assert (
+        codex["pretool_policy"] == "partial"
+    )  # Phase 1: deny + updatedInput confirmed; enrollment-gated + fails open -> not "full"
     # Hooks are enrollment_gated (fire only once trust-enrolled); the floor stays
     # machine-readable but is not a firing guarantee.
     assert codex["native_hooks"] == "enrollment_gated"

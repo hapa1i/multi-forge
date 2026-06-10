@@ -348,10 +348,11 @@ class TestHookSeamNeverActive:
         assert preflight_codex().hook_seam == "unknown"
 
     def test_enabled_is_enrollment_gated_never_active(self, monkeypatch) -> None:
-        # Enabled + version-OK: the normal case is "enrollment_gated" -- hooks can fire
-        # (round-2 probe), but the preflight has not checked [hooks.state] enrollment.
-        # Even a (fabricated) doctor trust hint never yields "active" here (the per-hook
-        # enrollment read is codex_frontend Phase 1).
+        # Enabled + version-OK: the normal case is "enrollment_gated" -- hooks can fire,
+        # but enrollment state is unchecked BY DECISION (codex_frontend Phase 1: the
+        # trusted_hash is not black-box computable and a path-keyed [hooks.state] read
+        # false-negatives in worktrees, so no per-hook read exists). Even a (fabricated)
+        # doctor trust hint never yields "active" here.
         doctor = _doctor(chatgpt="true", extra_details={"project trusted": "true"})
         _stub_probes(monkeypatch, features=True, doctor=doctor)
 

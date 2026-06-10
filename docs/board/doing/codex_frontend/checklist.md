@@ -38,11 +38,16 @@ in `card.md`. **30e PASSED (Phase 4 viable)**; **PreToolUse deny + `updatedInput
 rise)**; the `trusted_hash` is not computable -> **posture = guided ceremony**; **enrollment survives worktrees of the
 enrolled project** (82w2 valid run -> project-scope registration with a path-stable command string survives worktrees;
 broad cross-project trust is untested). The three Phase-0/1 Open Decisions are resolved; the Phase 2 bridge CLI shape
-remains open. Two follow-ups remain, deferred for an explicit decision: (a) the findings-gated `codex_preflight.py`
-`[hooks.state]` slice (plan item 8) -- shaped by "hash-not-computable" (a static `active`-via-validation verdict is
-unachievable, so the seam stays `enrollment_gated`; path-independence adds that even a path-keyed `[hooks.state]` read
-would false-negative in a worktree), and (b) the registry `pretool_policy` rise from `"none"` (justified by the
-confirmed deny+mutation). Both touch `src/` + tests + `design.md` §5.5.5 and are a coherent next unit.
+remains open.
+
+**Phase 1 closeout unit shipped 2026-06-10** (the two deferred follow-ups; see change_log): (a) the `codex_preflight.py`
+`[hooks.state]` decision is recorded in code -- the read is deliberately NOT implemented (the `trusted_hash` is not
+black-box computable so a record cannot be validated, and a path-keyed read would false-negative in worktrees); the seam
+stays `enrollment_gated`, `untrusted` stays reserved for a future codex-cli source-dive. (b) the registry
+`pretool_policy` rose `"none" -> "partial"` (deny + `updatedInput` confirmed; partial not full -- enforcement is
+enrollment-gated, malformed hook output fails open, PermissionRequest unpinned), with the stale Codex `note` sentences
+rewritten to the round-3 facts and `design.md` §5.5.5 synced. **Next: Phase 2 (bridge CLI)**, starting with the
+CLI-shape Open Decision.
 
 ## Phase 0 - Registry correction (owed from probe round 2)
 
@@ -50,10 +55,10 @@ confirmed deny+mutation). Both touch `src/` + tests + `design.md` §5.5.5 and ar
   fire under headless `codex exec` once trust-enrolled (card facts, 40c2/40d). Encode enrollment gating as a value (new
   `HookSupport` literal; name decided at implementation -- see Open Decisions). `pretool_policy` stays `"none"` until
   Phase 1 pins PreToolUse post-enrollment.
-  - Assertion: registry value + `HookSupport` comment + Codex `note` state the round-2 finding (enrolled-headless fires;
-    enrollment requires the interactive ceremony until Phase 1 settles pre-enrollment);
-    `tests/src/core/runtime/test_registry.py` + `tests/src/cli/test_runtime.py` updated and green; mypy clean;
-    `design.md` §5.5.5 matches; change_log entry.
+  - Assertion (round-2 snapshot; Phase 1 has since settled pre-enrollment as the guided ceremony): registry value +
+    `HookSupport` comment + Codex `note` state the round-2 finding (enrolled-headless fires; enrollment requires the
+    interactive ceremony); `tests/src/core/runtime/test_registry.py` + `tests/src/cli/test_runtime.py` updated and
+    green; mypy clean; `design.md` §5.5.5 matches; change_log entry.
   - **Done 2026-06-10**: `enrollment_gated` landed on BOTH literals -- registry `HookSupport` and preflight `HookSeam`
     (renamed together; keeping one as `headless_inert` would split the capability model). The preflight value is
     documented as capability-not-state ("hooks can fire; `[hooks.state]` unchecked -- never treat as `active`"; the
@@ -128,6 +133,18 @@ post-enrollment event coverage / 30e / PreToolUse = `stage 81`; user-vs-project 
     (`session_start`/`pre_tool_use`/`post_tool_use`/`user_prompt_submit`/`stop`) with the provenance table filled.
     `sanitize.sh` passes (a real over-match -- `task-*` plugin filenames tripping the `sk-` scan -- was fixed with a
     word-boundary anchor); `make pre-commit` (gitleaks) clean on the fixtures.
+- [x] Phase 1 closeout code unit (the two deferred follow-ups): registry `pretool_policy` `"none" -> "partial"` (Phase 1
+  confirmed post-enrollment PreToolUse deny + `updatedInput`; partial not full -- enrollment-gated, malformed output
+  fails open, PermissionRequest unpinned) + the preflight `[hooks.state]` decision recorded in code (read deliberately
+  not implemented; seam stays `enrollment_gated`; `untrusted` reserved for a future source-dive) + the stale registry
+  `note`/comment claims rewritten + `design.md` §5.5.5 sync.
+  - Assertion: no "unprobed"/"only SessionStart"/"settles pre-enrollment" claim remains in the normative surfaces
+    (`docs/design.md`, `docs/design_appendix.md`, `src/`, `tests/src/`); board card/checklist round-2 snapshot lines
+    annotated as superseded by round 3; registry + preflight + CLI tests assert the new values; preflight behavior
+    unchanged.
+  - **Done 2026-06-10**: 63 runtime/preflight/CLI unit tests green (assertions updated to `partial`); mypy clean;
+    stale-claim grep empty over the normative surfaces above; card.md/checklist.md round-2 snapshots annotated; live
+    `forge runtime list --json` renders `pretool_policy: partial`; change_log entry.
 
 ## Phase 2 - One-command bridge CLI (GO; no hook dependency)
 
@@ -157,10 +174,11 @@ the acceptance sketch:
 
 ## Phase 3 - Codex hook adapter/responder (gated on Phase 1 event coverage)
 
-Stub -- expand when Phase 1 lands. `CodexHookAdapter`/`CodexHookResponder` filling `src/forge/cli/hooks/protocols.py`;
+Stub -- expand when started. `CodexHookAdapter`/`CodexHookResponder` filling `src/forge/cli/hooks/protocols.py`;
 snake_case payload -> `ActionContext`; carry the **`ActionContext.runtime` -> `origin` rename** (first real consumer;
-direction resolved in `runtime_abstraction` Open Decisions 2026-06-09). `pretool_policy` rises from `"none"` only on
-Phase 1's PreToolUse verdicts.
+direction resolved in `runtime_abstraction` Open Decisions 2026-06-09). `pretool_policy` rose to `"partial"` in the
+Phase 1 closeout unit (2026-06-10); the adapter must emit strictly valid output (Codex fails OPEN on malformed hook
+responses) and match Codex tool names (`Bash`, `apply_patch`).
 
 ## Phase 4 - SessionStart transfer delivery with initial-message fallback (gated on Phase 1 30e)
 

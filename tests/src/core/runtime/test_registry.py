@@ -50,11 +50,13 @@ class TestClaudeSpec:
 class TestCodexSpec:
     def test_limits_encoded_not_parity(self) -> None:
         s = get_runtime("codex")
-        # Round-2 probe: only SessionStart has been observed firing; post-enrollment
-        # PreToolUse firing/deny is unprobed (codex_frontend Phase 1) -- "none", not "partial".
-        assert s.pretool_policy == "none"
+        # Phase 1 probe (2026-06-10): post-enrollment PreToolUse deny + updatedInput
+        # mutation confirmed headless -> "partial", not "full" -- enforcement exists only
+        # in trust-enrolled homes, malformed hook output fails open, and PermissionRequest
+        # is unpinned headless.
+        assert s.pretool_policy == "partial"
         assert s.interactive == "beta"  # Forge frontend integration target (codex_frontend Phase 5)
-        # Round-2 probe (2026-06-10): trust-enrolled hooks fire headless AND interactively ->
+        # Probes (2026-06-10): trust-enrolled hooks fire headless AND interactively ->
         # "enrollment_gated", not "gated": the version floor is satisfied yet untrusted hooks
         # do not fire -- the gate is trust enrollment, not the version. The floor stays
         # recorded (registration/enablement, not a firing guarantee); no hook flag required

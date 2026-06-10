@@ -41,12 +41,13 @@ logger = logging.getLogger(__name__)
 # ``== "default"``.)
 InteractiveSupport = Literal["default", "beta", "none"]
 
-# Pre-tool policy enforcement strength, full -> partial -> none. No runtime is
-# "partial" today: only Codex's SessionStart hook has been observed firing (round-2
-# probe, 2026-06-10) -- PreToolUse firing and deny/`updatedInput` behavior in a
-# trust-enrolled home are unprobed (codex_frontend Phase 1), so Codex enforcement
-# stays "none" until pinned. "partial" stays the value for a non-comprehensive guard
-# (the likely shape once post-enrollment PreToolUse is confirmed).
+# Pre-tool policy enforcement strength, full -> partial -> none. Codex is "partial"
+# (codex_frontend Phase 1 probe, 2026-06-10): post-enrollment PreToolUse deny (JSON +
+# exit-2) and `updatedInput` mutation are confirmed headless, but the guard is not
+# comprehensive -- it exists only in trust-enrolled homes, malformed hook output FAILS
+# OPEN (Codex honors an `allow` and ignores unknown/`continue` fields), and
+# PermissionRequest has not been observed firing headless. "full" is reserved for a
+# comprehensive, fail-closable guard (Claude Code).
 PolicyEnforcement = Literal["full", "partial", "none"]
 
 # Native-hook support. "enrollment_gated" covers Codex: hooks are real and fire both
@@ -169,32 +170,35 @@ RUNTIMES: dict[str, RuntimeSpec] = {
         detect=_detect_codex,
         interactive="beta",  # Codex's own interactive mode is GA; Forge frontend integration is the Phase 6 target
         headless=True,
-        native_hooks="enrollment_gated",  # fire headless + interactive once trust-enrolled (round-2 probe); enrollment needs the interactive ceremony until Phase 1 settles pre-enrollment
+        native_hooks="enrollment_gated",  # fire headless + interactive once trust-enrolled; enrollment is a guided one-time TUI ceremony (Phase 1: trusted_hash not black-box computable, so no programmatic pre-enrollment)
         hook_min_version="0.131.0",  # registration/enablement floor (default-on); NOT a firing guarantee -- see native_hooks
         hook_feature_flag=None,  # hooks default-on (no gate); codex_hooks is a deprecated alias -- do not author it
-        pretool_policy="none",  # post-enrollment PreToolUse firing/deny unprobed (codex_frontend Phase 1); only SessionStart observed
+        pretool_policy="partial",  # Phase 1 probe: deny + updatedInput confirmed post-enrollment; partial -- enrollment-gated, malformed output fails open, PermissionRequest unpinned (see PolicyEnforcement)
         usage_source="jsonl_events",
         native_resume=True,  # codex exec resume, by thread_id; works cross-CWD (Phase 6 probe, 0.138.0)
         install_scopes=(),  # Forge does not manage Codex install scopes yet
-        curated_transfer_in=True,  # initial user message is the zero-setup default; SessionStart delivery is the post-enrollment upgrade (gated on Phase 1 30e)
+        curated_transfer_in=True,  # initial user message is the zero-setup default; SessionStart additionalContext delivery is probe-confirmed in enrolled homes (Phase 1 30e PASS; build is codex_frontend Phase 4)
         curated_transfer_out=True,  # via headless invoker
         note=(
             "Hooks are default-on (`[features] hooks`, Codex CLI >= 0.131.0); `codex_hooks` is a deprecated "
             "alias (still works -- do not author new config with it). Hooks fire once trust-enrolled: the "
-            "round-2 probe (codex-cli 0.138.0, 2026-06-10: scripts/experiments/codex-hooks/) confirmed a "
-            "trust-enrolled hook fires under headless `codex exec` (40c2/40d) and interactively (50c). "
-            "Untrusted hooks do NOT fire under `codex exec` -- 0 firings across all registration surfaces, "
-            "with `--dangerously-bypass-hook-trust` (Phase 6 + 40a/40b); headless cannot self-enroll, so "
-            "enrollment is a one-time interactive TUI ceremony until pre-enrollment is settled "
-            "(codex_frontend Phase 1). Trust lives in the user config.toml `[hooks.state]`, keyed by the "
-            "registering config's absolute path, and survives hook-script *content* changes (the "
-            "registration-string dimension is unprobed). Only SessionStart has been observed firing; other "
-            "events (PreToolUse `updatedInput`, PermissionRequest, SessionStart additionalContext) are "
-            "extrapolated until Phase 1 pins them. Registration validation is shallow -- bogus event names "
-            "load silently. Enterprise `allow_managed_hooks_only` (requirements.toml) can suppress "
-            "user/project hooks regardless of enrollment. Codex emits the Responses API (custom-provider "
-            "`wire_api=chat` removed ~Feb 2026); a proxy fronting Codex must serve Responses on its "
-            "Codex-facing endpoint (backend may be translated)."
+            "codex_frontend probes (codex-cli 0.138.0, 2026-06-10: scripts/experiments/codex-hooks/) "
+            "confirmed trust-enrolled hooks fire under headless `codex exec` and interactively, across the "
+            "event set -- SessionStart (incl. additionalContext delivery), PreToolUse deny + `updatedInput` "
+            "mutation, Stop block-once, UserPromptSubmit block. Untrusted hooks do NOT fire under "
+            "`codex exec` -- 0 firings across all registration surfaces, with "
+            "`--dangerously-bypass-hook-trust`; headless cannot self-enroll. Enrollment is a guided one-time "
+            "interactive TUI ceremony per CODEX_HOME (one 'trust all' grant enrolls every entry): the "
+            "`[hooks.state]` trusted_hash covers the registration *command string* (not the script bytes) "
+            "and is not black-box computable, so Forge cannot pre-enroll programmatically. Enrollment "
+            "survives `git worktree` checkouts of the enrolled project when the command string is "
+            "path-stable. Caveats: malformed PreToolUse output FAILS OPEN (never rely on Codex fail-closing "
+            "on bad hook output); PermissionRequest has not been observed firing headless; PreToolUse "
+            "matchers must use Codex tool names (`Bash`, `apply_patch`). Registration validation is shallow "
+            "-- bogus event names load silently. Enterprise `allow_managed_hooks_only` (requirements.toml) "
+            "can suppress user/project hooks regardless of enrollment. Codex emits the Responses API "
+            "(custom-provider `wire_api=chat` removed ~Feb 2026); a proxy fronting Codex must serve "
+            "Responses on its Codex-facing endpoint (backend may be translated)."
         ),
     ),
     "gemini": RuntimeSpec(

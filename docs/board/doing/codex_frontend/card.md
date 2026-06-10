@@ -47,17 +47,20 @@ Gating probe round 2 (2026-06-10, stages 40+50 run with a TTY operator; captures
   `permission_mode:"default"`.
 - **Trust state lives in the user `config.toml`** as plain TOML, written by the TUI trust flow:
   `[hooks.state."<abs-path-of-registering-config>:session_start:0:0"]` with `trusted_hash = "sha256:..."`. Keyed by
-  (registering config path, snake_case event, entry indices) -- NOT stored in sqlite, NOT in the project. The hash
-  preimage is unknown (open question below).
+  (registering config path, snake_case event, entry indices) -- NOT stored in sqlite, NOT in the project. *(Round-2
+  snapshot: the hash preimage was an open question here; round 3 (83) settled the posture -- not black-box computable,
+  so guided ceremony. See Risks.)*
 - **Trust survives hook-script content change** (40d): appending to the registered wrapper script did not stop firing.
   The `trusted_hash` covers the registration *definition*, not the executable's bytes -- good for Forge upgrades (the
   `forge hook ...` command string stays stable), security-relevant for the installer story (a trusted hook's executable
-  can be silently swapped). The registration-string dimension (changing `command` itself) is still unprobed.
+  can be silently swapped). *(Round-2 snapshot: the registration-string dimension was unprobed here; round 3 (40e)
+  settled it -- the command string IS in the per-entry `trusted_hash`.)*
 - **`FORGE_SESSION` reaches the hook env** (50c interactive capture: `FORGE_SESSION=probe-fs-xyz` in the hook's env) --
   hooks can locate the Forge session manifest exactly as Claude hooks do. Ambient env passthrough to hooks also holds
   headless (40c2 env capture).
 - **`permission_mode` discriminates execution mode** in the payload: `"bypassPermissions"` on `codex exec` turns vs
-  `"default"` in the TUI (single observation each -- a lead for the adapter, not yet a pinned contract).
+  `"default"` in the TUI *(round-2: single observation each; round 3 re-observed both values across the enrolled-home
+  runs -- see the round-3 payload-shape bullet)*.
 - **Payload fixtures are now capturable headless**: an enrolled home fires reproducibly, so the Phase 6 "fixtures need
   the interactive path" descope rationale is obsolete -- one enrollment ceremony, then headless capture.
 - **`--ephemeral` negative control**: no session rollout is created (only sqlite WAL noise) -- maps cleanly to
@@ -134,10 +137,11 @@ Gating probe round 3 (2026-06-10, codex-cli **0.138.0**, headless from one enrol
    30a-30h response contracts ran (30e PASS gates Phase 4; PreToolUse deny + `updatedInput` gate Phase 3 and the
    `pretool_policy` value); user- and project-level hooks both fire; enrollment survives worktrees of the enrolled
    project. The persistent enrolled-fixture harness (`scripts/experiments/codex-hooks/` stages 80-83) is the reproducer.
-   **Remaining code unit (deferred for a decision):** the `codex_preflight.py` `[hooks.state]` decision (stays
-   `enrollment_gated` -- a path-keyed read would false-negative in a worktree, and the hash is not computable, so
-   preflight cannot report `active`) plus the registry `pretool_policy` rise from `"none"` (justified by the confirmed
-   deny + mutation). See Risks.
+   **Closeout code unit shipped 2026-06-10:** the `codex_preflight.py` `[hooks.state]` decision is recorded in code (the
+   read is deliberately not implemented -- a path-keyed read would false-negative in a worktree, and the hash is not
+   computable, so preflight can never report `active`; the seam stays `enrollment_gated`) and the registry
+   `pretool_policy` rose `"none"` -> `"partial"` (deny + mutation confirmed; partial because enforcement is
+   enrollment-gated, malformed output fails open, and PermissionRequest is unpinned). See Risks.
 
 3. **Codex hook adapter/responder (gated on probe 2's response-contract leg).** `CodexHookAdapter`/`CodexHookResponder`
    filling the runtime-neutral protocols in `src/forge/cli/hooks/protocols.py` (the Phase 4f seam already makes room).
@@ -147,8 +151,8 @@ Gating probe round 3 (2026-06-10, codex-cli **0.138.0**, headless from one enrol
    rename** here (the adapter is its first real consumer; direction resolved in the `runtime_abstraction` Open Decisions
    2026-06-09 -- values `{forge_cli, claude_code, codex}`; do NOT add a `subject_runtime` axis). **Registry correction
    DONE in Phase 0 (2026-06-10):** `native_hooks="headless_inert"` was refuted and renamed to `enrollment_gated` on both
-   the registry `HookSupport` and the preflight `HookSeam`. The `pretool_policy` rise from `"none"` is now justified
-   (Phase 1 pinned PreToolUse deny + `updatedInput`) and is the deferred code unit alongside the preflight decision.
+   the registry `HookSupport` and the preflight `HookSeam`. The `pretool_policy` rise shipped in the Phase 1 closeout
+   unit (2026-06-10): `"none"` -> `"partial"` (see Deliverable 2).
 
 4. **SessionStart curated-transfer delivery with initial-message fallback (gated on probe 2's 30e leg).** Now viable for
    BOTH the interactive frontend AND the headless bridge (enrolled homes fire headless -- the Phase 6 "headless stays

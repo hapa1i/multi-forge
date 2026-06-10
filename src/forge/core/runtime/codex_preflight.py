@@ -19,12 +19,15 @@ the slice-5a checklist note). Concretely:
   ``"warning"`` for unrelated reasons (stale rollout DB rows, update checks) while
   auth is perfectly fine.
 * ``doctor`` exposes **no per-hook trust** signal, so 5a can never prove the (not yet
-  built) transfer hook is trusted -- ``hook_seam`` never returns ``"active"``. The round-2
-  probe (2026-06-10) pinned that hooks DO fire under headless ``codex exec`` once
-  trust-enrolled (registry ``native_hooks="enrollment_gated"``), so the normal
-  enabled+version-OK case returns ``"enrollment_gated"``: hooks can fire, but this
-  preflight has not checked the ``[hooks.state]`` record for any hook (that read is
-  codex_frontend Phase 1).
+  built) transfer hook is trusted -- ``hook_seam`` never returns ``"active"``. The
+  codex_frontend probes (2026-06-10) pinned that hooks DO fire under headless
+  ``codex exec`` once trust-enrolled (registry ``native_hooks="enrollment_gated"``),
+  so the normal enabled+version-OK case returns ``"enrollment_gated"``: hooks can
+  fire, but enrollment state is unchecked. A direct ``[hooks.state]`` read was
+  considered and **rejected by decision** (Phase 1): the ``trusted_hash`` preimage is
+  not black-box computable (a record cannot be validated), and enrollment survives
+  worktrees that have NO ``[hooks.state]`` record at their own config path, so a
+  path-keyed read would false-negative in Forge's main isolation workflow.
 
 Render-free (core, not CLI): every function returns data or plain strings. The
 ``forge runtime preflight codex`` command renders the result; ``CodexPreflight``
@@ -76,11 +79,14 @@ CodexAuthMethod = Literal["api_key", "chatgpt_tokens", "enterprise_token", "none
 # preflight never returns ``active`` -- Codex trust is keyed to a specific hook entry,
 # unprovable before the hook exists. ``enrollment_gated`` is the normal
 # enabled+version-OK verdict and is NOT a per-home enrolled-state claim: it means
-# "hooks can fire (round-2 probe: enrolled hooks fire headless AND interactively), but
-# this preflight has not checked the ``[hooks.state]`` record for this hook" -- never
-# treat it as ``active``. Reading ``[hooks.state]`` to report enrolled-vs-not per hook
-# is codex_frontend Phase 1. ``unknown`` covers only the moot cases: not installed, or
-# version unparseable (the floor cannot even be proven).
+# "hooks can fire (probe-confirmed: enrolled hooks fire headless AND interactively),
+# but enrollment state is unchecked" -- never treat it as ``active``. Reading
+# ``[hooks.state]`` to report enrolled-vs-not per hook was rejected by decision
+# (codex_frontend Phase 1, 2026-06-10): the ``trusted_hash`` is not black-box
+# computable and a path-keyed read false-negatives in worktrees. ``untrusted`` stays
+# reserved -- reachable only if a codex-cli source-dive makes the hash computable.
+# ``unknown`` covers only the moot cases: not installed, or version unparseable (the
+# floor cannot even be proven).
 HookSeam = Literal["active", "untrusted", "managed_suppressed", "enrollment_gated", "disabled", "unknown"]
 
 # Whether a Codex run can get the Responses API it requires. Codex emits
@@ -399,14 +405,16 @@ def _resolve_hook_seam(
 ) -> HookSeam:
     """Honest hook-delivery posture. This preflight never returns ``"active"`` (see module note).
 
-    The ``"untrusted"`` verdict is reserved for the Phase 1 ``[hooks.state]`` read:
-    Codex keys trust to the registering config entry, and Stage A confirmed
-    ``codex doctor`` (0.137.0) exposes no trust signal. The normal enabled+version-OK
-    case is ``"enrollment_gated"`` -- a capability statement, NOT a per-home
-    enrolled-state verdict: hooks can fire (round-2 probe, 2026-06-10), but this
-    preflight has not checked whether any hook is actually trust-enrolled. ``"unknown"``
-    remains only for the moot cases -- not installed, or version unparseable (the floor
-    cannot even be proven, so we cannot assert hooks register).
+    The ``"untrusted"`` verdict stays reserved: the codex_frontend Phase 1 probe
+    (2026-06-10) found the ``[hooks.state]`` ``trusted_hash`` is not black-box
+    computable and that enrollment survives worktrees with no record at the worktree's
+    config path, so a per-hook enrollment read cannot produce a trustworthy verdict
+    and is deliberately not implemented (``codex doctor`` exposes no trust signal
+    either, Stage A). The normal enabled+version-OK case is ``"enrollment_gated"`` --
+    a capability statement, NOT a per-home enrolled-state verdict: hooks can fire, but
+    enrollment state is unchecked. ``"unknown"`` remains only for the moot cases --
+    not installed, or version unparseable (the floor cannot even be proven, so we
+    cannot assert hooks register).
     """
     if not installed:
         return "unknown"  # moot; ready is already False
@@ -427,8 +435,9 @@ def _resolve_hook_seam(
         return "unknown"
 
     # Enabled, version meets the floor, not suppressed: hooks register/enable AND fire
-    # once trust-enrolled (round-2 probe), but enrollment state is unchecked here --
-    # the [hooks.state] read is codex_frontend Phase 1. Not a per-home enrolled claim.
+    # once trust-enrolled, but enrollment state is unchecked by decision (Phase 1: the
+    # trusted_hash cannot be validated, and a path-keyed [hooks.state] read would
+    # false-negative in worktrees). Not a per-home enrolled claim.
     return "enrollment_gated"
 
 
