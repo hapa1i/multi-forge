@@ -30,7 +30,9 @@ class PolicyEngine:
     Composition rules:
     - Policies are evaluated in registration order
     - Any deny blocks the action (unless fail_mode is "open" and it's an error)
-    - needs_review is resolved by semantic supervisor when it participates
+    - needs_review is resolved by the registered resolver policy (the semantic
+      supervisor), invoked only when a policy requested review and nothing denied;
+      a supervisor registered as a regular policy resolves it the same way
     - Warnings accumulate from all policies
     - State is collected from stateful policies for persistence
 
@@ -42,6 +44,9 @@ class PolicyEngine:
     policies: list[Policy] = field(default_factory=list)
     fail_mode: FailMode = "open"
 
+    # Resolver policy invoked only to resolve needs_review escalations
+    _resolver: Policy | None = None
+
     # Collected state from stateful policies (for persistence)
     _collected_state: dict[str, dict[str, Any]] = field(default_factory=dict)
 
@@ -50,8 +55,28 @@ class PolicyEngine:
         self.policies.append(policy)
         _log.debug("Registered policy: %s", policy.policy_id)
 
+    def register_resolver(self, policy: Policy) -> None:
+        """Register the policy invoked only to resolve ``needs_review`` escalations.
+
+        Unlike regular policies, the resolver does not run on every event: it is
+        evaluated once per ``evaluate()`` call, and only when a regular policy
+        emitted ``needs_review`` and nothing denied.
+        """
+        self._resolver = policy
+        _log.debug("Registered resolver policy: %s", policy.policy_id)
+
+    @property
+    def registered_policy_ids(self) -> list[str]:
+        """All registered policy ids, including the resolver when one is set."""
+        return [p.policy_id for p in self._all_policies()]
+
+    def _all_policies(self) -> list[Policy]:
+        if self._resolver is not None:
+            return [*self.policies, self._resolver]
+        return list(self.policies)
+
     def restore_state(self, persisted_state: dict[str, Any] | None) -> None:
-        """Restore state to all stateful policies.
+        """Restore state to all stateful policies (including the resolver).
 
         Called at the start of evaluation to restore state from the session manifest.
 
@@ -61,7 +86,7 @@ class PolicyEngine:
         if persisted_state is None:
             return
 
-        for policy in self.policies:
+        for policy in self._all_policies():
             if isinstance(policy, StatefulPolicy):
                 policy_state = persisted_state.get(policy.policy_id)
                 if policy_state is not None:
@@ -99,67 +124,23 @@ class PolicyEngine:
         all_warnings: list[str] = []
         needs_review = False
 
+        # Fresh per evaluation: build_policy_state_update merges per-policy-id, so a
+        # policy absent from collected state retains its prior persisted state. Without
+        # the clear, an evaluation that skips the resolver would re-persist the
+        # resolver's stale snapshot from an earlier evaluate() on this engine instance.
+        self._collected_state.clear()
+
         for policy in self.policies:
-            # Check if policy applies
-            try:
-                if not policy.applies_to(context):
-                    _log.debug(
-                        "Policy %s does not apply to %s",
-                        policy.policy_id,
-                        context.tool_name,
-                    )
-                    continue
-            except Exception as e:
-                _log.warning("Policy %s.applies_to() failed: %s", policy.policy_id, e)
-                if self.fail_mode == "closed":
-                    decisions.append(
-                        PolicyDecision(
-                            decision="deny",
-                            policy_id=policy.policy_id,
-                            warnings=[f"Policy applies_to() failed (fail-closed): {e}"],
-                        )
-                    )
-                continue
+            self._run_policy(policy, context, decisions)
 
-            # Evaluate policy
-            try:
-                decision = policy.evaluate(context)
-                decision.evaluated_at = now_iso()
-                decisions.append(decision)
-
-                _log.debug(
-                    "Policy %s evaluated: %s (%d violations)",
-                    policy.policy_id,
-                    decision.decision,
-                    len(decision.violations),
-                )
-
-            except Exception as e:
-                _log.warning("Policy %s.evaluate() failed: %s", policy.policy_id, e)
-                if self.fail_mode == "open":
-                    decisions.append(
-                        PolicyDecision(
-                            decision="allow",
-                            policy_id=policy.policy_id,
-                            warnings=[f"Policy evaluation failed (fail-open): {e}"],
-                        )
-                    )
-                else:
-                    decisions.append(
-                        PolicyDecision(
-                            decision="deny",
-                            policy_id=policy.policy_id,
-                            warnings=[f"Policy evaluation failed (fail-closed): {e}"],
-                        )
-                    )
-                continue
-
-            # Collect state from stateful policies
-            if isinstance(policy, StatefulPolicy):
-                try:
-                    self._collected_state[policy.policy_id] = policy.get_state()
-                except Exception as e:
-                    _log.warning("Failed to get state from %s: %s", policy.policy_id, e)
+        # Resolver hop: invoke the resolver only when a policy requested review and
+        # nothing denied (a deny already blocks; no point paying for resolution).
+        if (
+            self._resolver is not None
+            and any(d.decision == "needs_review" for d in decisions)
+            and not any(d.decision == "deny" for d in decisions)
+        ):
+            self._run_policy(self._resolver, context, decisions)
 
         # Compose decisions
         final_decision: DecisionType = "allow"
@@ -175,7 +156,12 @@ class PolicyEngine:
             elif d.decision == "warn" and final_decision == "allow":
                 final_decision = "warn"
 
-        review_resolved = any(d.policy_id == "semantic.supervisor" and d.decision != "needs_review" for d in decisions)
+        # The legacy literal keeps cascade-off behavior identical: a supervisor
+        # registered as a regular policy resolves review without a resolver being set.
+        resolver_ids = {"semantic.supervisor"}
+        if self._resolver is not None:
+            resolver_ids.add(self._resolver.policy_id)
+        review_resolved = any(d.policy_id in resolver_ids and d.decision != "needs_review" for d in decisions)
 
         # If any policy needs review and no supervisor resolved it, escalate.
         if needs_review and not review_resolved and final_decision not in ("deny",):
@@ -187,6 +173,72 @@ class PolicyEngine:
             blocking_violations=blocking_violations,
             all_warnings=all_warnings,
         )
+
+    def _run_policy(self, policy: Policy, context: ActionContext, decisions: list[PolicyDecision]) -> None:
+        """Run one policy: applies_to gate, evaluate with fail-mode handling, state collection.
+
+        Appends the resulting decision (if any) to ``decisions``.
+        """
+        # Check if policy applies
+        try:
+            if not policy.applies_to(context):
+                _log.debug(
+                    "Policy %s does not apply to %s",
+                    policy.policy_id,
+                    context.tool_name,
+                )
+                return
+        except Exception as e:
+            _log.warning("Policy %s.applies_to() failed: %s", policy.policy_id, e)
+            if self.fail_mode == "closed":
+                decisions.append(
+                    PolicyDecision(
+                        decision="deny",
+                        policy_id=policy.policy_id,
+                        warnings=[f"Policy applies_to() failed (fail-closed): {e}"],
+                    )
+                )
+            return
+
+        # Evaluate policy
+        try:
+            decision = policy.evaluate(context)
+            decision.evaluated_at = now_iso()
+            decisions.append(decision)
+
+            _log.debug(
+                "Policy %s evaluated: %s (%d violations)",
+                policy.policy_id,
+                decision.decision,
+                len(decision.violations),
+            )
+
+        except Exception as e:
+            _log.warning("Policy %s.evaluate() failed: %s", policy.policy_id, e)
+            if self.fail_mode == "open":
+                decisions.append(
+                    PolicyDecision(
+                        decision="allow",
+                        policy_id=policy.policy_id,
+                        warnings=[f"Policy evaluation failed (fail-open): {e}"],
+                    )
+                )
+            else:
+                decisions.append(
+                    PolicyDecision(
+                        decision="deny",
+                        policy_id=policy.policy_id,
+                        warnings=[f"Policy evaluation failed (fail-closed): {e}"],
+                    )
+                )
+            return
+
+        # Collect state from stateful policies
+        if isinstance(policy, StatefulPolicy):
+            try:
+                self._collected_state[policy.policy_id] = policy.get_state()
+            except Exception as e:
+                _log.warning("Failed to get state from %s: %s", policy.policy_id, e)
 
 
 def build_engine(

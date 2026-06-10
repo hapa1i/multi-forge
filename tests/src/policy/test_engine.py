@@ -18,6 +18,7 @@ class MockPolicy:
         self._decision = decision
         self._applies = applies
         self._violations = violations or []
+        self.evaluate_calls = 0
 
     @property
     def policy_id(self) -> str:
@@ -31,11 +32,30 @@ class MockPolicy:
         return self._applies
 
     def evaluate(self, context: ActionContext) -> PolicyDecision:
+        self.evaluate_calls += 1
         return PolicyDecision(
             decision=self._decision,  # type: ignore
             policy_id=self._policy_id,
             violations=self._violations,
         )
+
+
+class StatefulMockPolicy(MockPolicy):
+    """Mock policy implementing the StatefulPolicy protocol."""
+
+    def __init__(self, policy_id: str = "stateful", decision: str = "allow") -> None:
+        super().__init__(policy_id=policy_id, decision=decision)
+        self.state: dict = {"count": 0}
+
+    def evaluate(self, context: ActionContext) -> PolicyDecision:
+        self.state["count"] += 1
+        return super().evaluate(context)
+
+    def get_state(self) -> dict:
+        return dict(self.state)
+
+    def set_state(self, state: dict) -> None:
+        self.state = dict(state)
 
 
 class TestPolicyEngine:
@@ -175,6 +195,170 @@ class TestPolicyEngine:
 
         result = engine.evaluate(write_context)
         assert result.final_decision == "deny"
+
+
+class TestResolver:
+    """Tests for the needs_review resolver hop."""
+
+    def test_resolver_resolves_allow(self, write_context: ActionContext) -> None:
+        """Resolver allow resolves an escalated review."""
+        engine = PolicyEngine()
+        engine.register(MockPolicy(policy_id="checker", decision="needs_review"))
+        resolver = MockPolicy(policy_id="semantic.supervisor", decision="allow")
+        engine.register_resolver(resolver)
+
+        result = engine.evaluate(write_context)
+        assert result.final_decision == "allow"
+        assert resolver.evaluate_calls == 1
+        assert any(d.policy_id == "semantic.supervisor" for d in result.decisions)
+
+    def test_resolver_resolves_warn(self, write_context: ActionContext) -> None:
+        """Resolver warn resolves review while preserving the warning verdict."""
+        engine = PolicyEngine()
+        engine.register(MockPolicy(policy_id="checker", decision="needs_review"))
+        engine.register_resolver(MockPolicy(policy_id="semantic.supervisor", decision="warn"))
+
+        result = engine.evaluate(write_context)
+        assert result.final_decision == "warn"
+
+    def test_resolver_resolves_deny(self, write_context: ActionContext) -> None:
+        """Resolver deny blocks with its violations."""
+        v = Violation(rule_id="sup", message="divergent", severity="high")
+        engine = PolicyEngine()
+        engine.register(MockPolicy(policy_id="checker", decision="needs_review"))
+        engine.register_resolver(MockPolicy(policy_id="semantic.supervisor", decision="deny", violations=[v]))
+
+        result = engine.evaluate(write_context)
+        assert result.final_decision == "deny"
+        assert result.blocking_violations == [v]
+
+    def test_resolver_with_custom_policy_id_resolves(self, write_context: ActionContext) -> None:
+        """Resolution keys off the registered resolver's id, not a hardcoded literal."""
+        engine = PolicyEngine()
+        engine.register(MockPolicy(policy_id="checker", decision="needs_review"))
+        engine.register_resolver(MockPolicy(policy_id="custom.resolver", decision="allow"))
+
+        result = engine.evaluate(write_context)
+        assert result.final_decision == "allow"
+
+    def test_deny_in_pass_one_skips_resolver(self, write_context: ActionContext) -> None:
+        """A deny already blocks; the resolver is never invoked."""
+        v = Violation(rule_id="det", message="blocked", severity="high")
+        engine = PolicyEngine()
+        engine.register(MockPolicy(policy_id="checker", decision="needs_review"))
+        engine.register(MockPolicy(policy_id="det", decision="deny", violations=[v]))
+        resolver = MockPolicy(policy_id="semantic.supervisor", decision="allow")
+        engine.register_resolver(resolver)
+
+        result = engine.evaluate(write_context)
+        assert result.final_decision == "deny"
+        assert resolver.evaluate_calls == 0
+
+    def test_no_needs_review_skips_resolver(self, write_context: ActionContext) -> None:
+        """No escalation -> the resolver never runs (the whole point of the hop)."""
+        engine = PolicyEngine()
+        engine.register(MockPolicy(policy_id="checker", decision="allow"))
+        resolver = MockPolicy(policy_id="semantic.supervisor", decision="allow")
+        engine.register_resolver(resolver)
+
+        result = engine.evaluate(write_context)
+        assert result.final_decision == "allow"
+        assert resolver.evaluate_calls == 0
+
+    def test_needs_review_without_resolver_blocks(self, write_context: ActionContext) -> None:
+        """No resolver registered -> review stays unresolved (existing contract)."""
+        engine = PolicyEngine()
+        engine.register(MockPolicy(policy_id="checker", decision="needs_review"))
+
+        result = engine.evaluate(write_context)
+        assert result.final_decision == "needs_review"
+
+    def test_resolver_returning_needs_review_blocks(self, write_context: ActionContext) -> None:
+        """A resolver that itself returns needs_review composes to an unresolved block."""
+        engine = PolicyEngine()
+        engine.register(MockPolicy(policy_id="checker", decision="needs_review"))
+        resolver = MockPolicy(policy_id="semantic.supervisor", decision="needs_review")
+        engine.register_resolver(resolver)
+
+        result = engine.evaluate(write_context)
+        assert result.final_decision == "needs_review"
+        assert resolver.evaluate_calls == 1  # ran once; no infinite hop
+
+    def test_resolver_not_applicable_blocks_unresolved(self, write_context: ActionContext) -> None:
+        """A non-applicable resolver appends no decision; review stays unresolved."""
+        engine = PolicyEngine()
+        engine.register(MockPolicy(policy_id="checker", decision="needs_review"))
+        engine.register_resolver(MockPolicy(policy_id="semantic.supervisor", decision="allow", applies=False))
+
+        result = engine.evaluate(write_context)
+        assert result.final_decision == "needs_review"
+
+    def test_resolver_error_fail_open_resolves_with_warning(self, write_context: ActionContext) -> None:
+        """Resolver raise under fail-open -> allow-with-warning under the resolver's id resolves review."""
+
+        class ErrorResolver(MockPolicy):
+            def evaluate(self, context: ActionContext) -> PolicyDecision:
+                raise RuntimeError("Boom!")
+
+        engine = PolicyEngine(fail_mode="open")
+        engine.register(MockPolicy(policy_id="checker", decision="needs_review"))
+        engine.register_resolver(ErrorResolver(policy_id="semantic.supervisor"))
+
+        result = engine.evaluate(write_context)
+        assert result.final_decision == "allow"
+        assert any("fail-open" in w for w in result.all_warnings)
+
+    def test_resolver_error_fail_closed_denies(self, write_context: ActionContext) -> None:
+        """Resolver raise under fail-closed -> deny."""
+
+        class ErrorResolver(MockPolicy):
+            def evaluate(self, context: ActionContext) -> PolicyDecision:
+                raise RuntimeError("Boom!")
+
+        engine = PolicyEngine(fail_mode="closed")
+        engine.register(MockPolicy(policy_id="checker", decision="needs_review"))
+        engine.register_resolver(ErrorResolver(policy_id="semantic.supervisor"))
+
+        result = engine.evaluate(write_context)
+        assert result.final_decision == "deny"
+
+    def test_resolver_state_collected_and_restored(self, write_context: ActionContext) -> None:
+        """A stateful resolver participates in state collection and restore."""
+        engine = PolicyEngine()
+        engine.register(MockPolicy(policy_id="checker", decision="needs_review"))
+        resolver = StatefulMockPolicy(policy_id="semantic.supervisor", decision="allow")
+        engine.register_resolver(resolver)
+
+        engine.restore_state({"semantic.supervisor": {"count": 7}})
+        assert resolver.state == {"count": 7}
+
+        result = engine.evaluate(write_context)
+        assert result.final_decision == "allow"
+        assert engine.get_collected_state()["semantic.supervisor"] == {"count": 8}
+
+    def test_short_circuit_does_not_repersist_stale_resolver_state(self, write_context: ActionContext) -> None:
+        """Eval 2 without escalation must not carry eval 1's resolver state snapshot."""
+        checker = MockPolicy(policy_id="checker", decision="needs_review")
+        engine = PolicyEngine()
+        engine.register(checker)
+        resolver = StatefulMockPolicy(policy_id="semantic.supervisor", decision="allow")
+        engine.register_resolver(resolver)
+
+        engine.evaluate(write_context)
+        assert "semantic.supervisor" in engine.get_collected_state()
+
+        checker._decision = "allow"  # eval 2 short-circuits
+        engine.evaluate(write_context)
+        assert "semantic.supervisor" not in engine.get_collected_state()
+
+    def test_registered_policy_ids_includes_resolver(self) -> None:
+        """registered_policy_ids lists regular policies plus the resolver."""
+        engine = PolicyEngine()
+        engine.register(MockPolicy(policy_id="checker"))
+        assert engine.registered_policy_ids == ["checker"]
+
+        engine.register_resolver(MockPolicy(policy_id="semantic.supervisor"))
+        assert engine.registered_policy_ids == ["checker", "semantic.supervisor"]
 
 
 class TestBuildEngine:
