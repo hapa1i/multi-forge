@@ -1,0 +1,11 @@
+{
+  "session_id": "019eb075-ef05-7702-9045-0a8a88b512d2",
+  "turn_id": "019eb075-ef68-71a3-9212-41e9ff5612cc",
+  "transcript_path": "<HOME>/.cache/forge-codex-hooks-probe/fixture/codex-home/sessions/2026/06/10/rollout-2026-06-10T03-36-19-019eb075-ef05-7702-9045-0a8a88b512d2.jsonl",
+  "cwd": "<HOME>/.cache/forge-codex-hooks-probe/fixture/proj",
+  "hook_event_name": "Stop",
+  "model": "gpt-5.5",
+  "permission_mode": "bypassPermissions",
+  "stop_hook_active": false,
+  "last_assistant_message": "OK"
+}

@@ -63,6 +63,56 @@ Gating probe round 2 (2026-06-10, stages 40+50 run with a TTY operator; captures
 - **`--ephemeral` negative control**: no session rollout is created (only sqlite WAL noise) -- maps cleanly to
   incognito-style sessions.
 
+Gating probe round 3 (2026-06-10, codex-cli **0.138.0**, headless from one enrolled fixture; harness
+`scripts/experiments/codex-hooks/` stages 80-83, captures at `~/.cache/forge-codex-hooks-probe/`):
+
+- **One "trust all" grant enrolls every entry** (operator-observed wording: *"You can trust all - no command or hash"*).
+  A single ceremony wrote **13** `[hooks.state]` keys (all 10 events + a matcher'd PreToolUse + a user-level + a
+  sacrificial entry) and a `[projects."<proj>"] trust_level = "trusted"` line. So enrollment is a per-config grant, not
+  per-entry review, and the TUI shows neither the command string nor a hash.
+- **40d holds on 0.138.0** (re-validated): a wrapper-body swap kept trust (SessionStart still fired) -- the harness's
+  stable-path / swappable-body design is sound.
+- **40e -- the command string IS in the per-entry `trusted_hash`**: changing one entry's registered `command` untrusted
+  *that* entry (it stopped firing) while the unchanged primary kept firing. Combined with 40d (script *content*
+  survives), `trusted_hash` covers the registration *definition* (command string), not the executable's bytes.
+- **Response contracts headless (enrolled, no bypass)**: PreToolUse **deny** (JSON `permissionDecision:"deny"`) blocked
+  the command; PreToolUse **deny via exit 2** blocked it too; PreToolUse **allow + `updatedInput`** mutation **took
+  effect** (the rewritten command ran); **UserPromptSubmit block** suppressed the model turn; **Stop block-once** forced
+  exactly one extra pass; **SessionStart `additionalContext` PASSED** -- the model echoed the injected token (Phase 4
+  delivery viable headless). **PermissionRequest did NOT fire** under the read-only sandbox.
+- **Malformed PreToolUse output FAILS OPEN, not closed** (refutes the doc-claim): a response with
+  `permissionDecision:"allow"` + unknown `bogusFieldZzz` + `continue:false` ran the command -- Codex honored the allow
+  and ignored the unknown/`continue` fields. The adapter must NOT rely on Codex fail-closing on bad hook output.
+- **Payload shape (snake_case, confirmed; fixtures at `tests/fixtures/codex/hooks/`)**: common `session_id`,
+  `transcript_path` (the rollout JSONL path -- directly usable for `confirmed`), `cwd`, `hook_event_name`, `model`,
+  `permission_mode`; turn-scoped add `turn_id`; SessionStart adds `source` (`"startup"`); PreToolUse adds
+  `tool_name`/`tool_input`/`tool_use_id`; PostToolUse adds `tool_response`; UserPromptSubmit adds `prompt`; Stop adds
+  `last_assistant_message`/`stop_hook_active`. **`tool_name` is `"Bash"` (shell) and `"apply_patch"` (file write)** -- a
+  PreToolUse matcher must match those names; the probe's `matcher="shell"` never fired. `permission_mode` is
+  `"bypassPermissions"` on `codex exec` (vs `"default"` interactively, round 2) -- the execution-mode discriminator.
+- **User-level AND project-level hooks fire headless** when enrolled; trust records key by the registering config's path
+  (user record under `codex-home/config.toml`, project records under `proj/.codex/config.toml`).
+- **Worktree trust is PATH-INDEPENDENT (resolved 82w2, valid run).** The project SessionStart hook fired in a
+  `git worktree` checkout (`proj-codexwt`, a sibling path) **with no folder `trust_level` and no `[hooks.state]` record
+  at the worktree config path** (proj=1, user=1). Cross-checked against the captured clean base
+  (`meta/user-config.no-wt-trustlevel.toml`): the worktree `[projects."<wt>"]` block was stripped, no `[hooks.state]`
+  key exists at the worktree path, and all 13 enrolled records sit at `codex-home/config.toml` /
+  `proj/.codex/config.toml`. Chained with **40b** (folder `trust_level` alone does NOT fire hooks), the firing can only
+  be a `trusted_hash` match -- and since no record keys to the worktree path, Codex validates the hash *value* (over the
+  registration definition), not the config path. The byte-identical command string (`$HOOKBIN/<event>.sh`, an absolute
+  path outside both trees) is what makes the hashes match. **Phase 6: project-scope registration with a path-stable
+  command string survives `git worktree` checkouts -- no per-worktree re-enrollment** (a path-varying command string
+  would break this). One interactive ceremony per `CODEX_HOME` is still required to seed the first record; thereafter
+  any config registering the same command string inherits trust within that home. *(First 82w2 run was VOID -- the
+  persistent fixture had retained a worktree `trust_level` block; stage 82 hardened with a strip-first clean base and an
+  INVALID self-guard, then re-run.)*
+- **`trusted_hash` preimage is NOT black-box computable**: 15 candidate canonicalizations (command, JSON struct, TOML
+  block, key variants) reproduced **0/13** harvested hashes. The command string is in the hash (40e) but the algorithm
+  is not a simple sha256 of obvious inputs -- recovering it needs a source-dive of the codex-cli Rust. The empirical
+  pre-enrollment test was correctly skipped (can't forge without the algorithm). **-> pre-enrollment posture = guided
+  one-time ceremony** (the installer ships a guided `codex` trust step; programmatic `[hooks.state]` writing stays
+  blocked until/unless a source-dive makes the hash computable).
+
 ## Deliverables (verdicts carried from the decision record)
 
 1. **One-command bridge CLI (GO -- build first).** A `forge`-surface frontend over the shipped `bridge_session_to_codex`

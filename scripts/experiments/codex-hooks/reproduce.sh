@@ -6,8 +6,10 @@
 #
 # Usage:
 #   ./reproduce.sh              # headless set: 00 05 10 20 30 60 70
-#   ./reproduce.sh all          # + operator-guided 40 50 (needs a TTY)
+#   ./reproduce.sh all          # + operator-guided 40 50 80 (needs a TTY)
 #   ./reproduce.sh 00 30        # specific stages, in the given order
+#   ./reproduce.sh 80           # round-3 enrollment ceremony (builds the fixture)
+#   ./reproduce.sh 81 82 83     # round-3 headless probes (require the stage-80 fixture)
 #
 # Captures land OUTSIDE the repo at ${CODEX_HOOKS_CAPTURE_DIR:-~/.cache/forge-codex-hooks-probe}.
 # Deliberately NOT `set -e`: several probes measure failure.
@@ -16,7 +18,13 @@ set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 
 HEADLESS_STAGES=(00-preflight 05-config-schema 10-headless-fire 20-payloads 30-responses 60-exec-resume 70-bypass)
-GUIDED_STAGES=(40-trust 50-interactive)
+# 80 (enroll the round-3 fixture) is guided: it needs a TTY for the trust ceremony.
+GUIDED_STAGES=(40-trust 50-interactive 80-enroll-fixture)
+# 81-83 consume the stage-80 enrolled fixture and run headless. EXPLICIT-ONLY:
+# excluded from both './reproduce.sh' and './reproduce.sh all' (running them blind
+# would burn quota against a fixture that may not exist), but resolve_stage must
+# still recognize them by name so `./reproduce.sh 81` works.
+FIXTURE_STAGES=(81-enrolled-coverage 82-trust-dimensions 83-preimage)
 
 declare_budget() {
     cat <<'EOB'
@@ -30,12 +38,17 @@ Approximate model-turn budget (short, one-word-reply prompts; ChatGPT quota):
   50-interactive    2 turns + 1 operator-guided interactive run
   60-exec-resume    4 turns
   70-bypass         1 turn
+  --- round 3 (enrollment mechanics; explicit-only) ---
+  80-enroll-fixture 2 turns + 1 operator-guided trust ceremony (builds the fixture)
+  81-enrolled-...   ~11 turns (event matrix + 30a-30h response contracts)
+  82-trust-dims     4 turns (40e command-string, user-vs-project, worktree x2)
+  83-preimage       0-2 turns (offline scan; +empirical only if the hash is computable)
 EOB
 }
 
 resolve_stage() { # accept "30" or "30-responses"
     local want="$1" s
-    for s in "${HEADLESS_STAGES[@]}" "${GUIDED_STAGES[@]}"; do
+    for s in "${HEADLESS_STAGES[@]}" "${GUIDED_STAGES[@]}" "${FIXTURE_STAGES[@]}"; do
         case "$s" in "$want" | "$want"-*)
             printf '%s\n' "$s"
             return 0

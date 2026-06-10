@@ -48,9 +48,13 @@ Fetched 2026-06-09 from developers.openai.com/codex (hooks, config-reference, no
 
 ```bash
 ./reproduce.sh              # headless set: 00 05 10 20 30 60 70 (~16-18 short turns)
-./reproduce.sh all          # + operator-guided 40 50 (needs a TTY; 2 interactive runs)
+./reproduce.sh all          # + operator-guided 40 50 80 (needs a TTY)
 ./reproduce.sh 60           # one stage
 ./sanitize.sh               # raw captures -> sanitized fixture candidates + loud secret scan
+
+# Round 3 (enrollment mechanics; explicit-only -- see below):
+./reproduce.sh 80           # operator trust ceremony; builds the persistent enrolled fixture
+./reproduce.sh 81 82 83     # headless probes against that fixture (refuse to run without it)
 ```
 
 Captures land **outside the repo** at `${CODEX_HOOKS_CAPTURE_DIR:-~/.cache/forge-codex-hooks-probe}/<stage>/`
@@ -92,6 +96,66 @@ misregistration is a cross-stage call (it needs stage 50's interactive evidence)
 Every model turn is a one-sentence prompt demanding a one-word reply (`--sandbox read-only` unless the probe needs
 writes, `-o` last-message oracle). Full headless set ≈ 16–18 short turns; `all` adds ~5 turns + 2 interactive runs — in
 total roughly one trivial conversation of ChatGPT-subscription quota. Re-run individual stages, not the world.
+
+## Round 3 — enrollment mechanics (codex_frontend Phase 1)
+
+Rounds 1-2 settled the firing question: Codex hooks **do** fire under headless `codex exec` once trust-enrolled
+(40c2/40d) and interactively (50c); headless cannot *self-enroll*. Round 3 pins the *enrollment mechanics* that gate the
+build deliverables — what `trusted_hash` covers, whether Forge can pre-enroll programmatically, which events actually
+fire post-enrollment, whether enrollment survives worktrees, and where user-level trust lands. **No
+`--dangerously-bypass-hook-trust` anywhere in 80-83**: enrollment is the variable under test, not something to bypass.
+
+### The fixture model
+
+One operator trust ceremony (stage 80) builds a **persistent** enrolled home that serves every later headless probe. It
+lives OUTSIDE the per-stage capture dirs and survives across runs:
+
+```
+${CODEX_HOOKS_CAPTURE_DIR}/fixture/
+├── codex-home/     # persistent CODEX_HOME (trust state in config.toml; auth.json copied per run, removed on exit)
+├── proj/           # stable git-inited project; proj/.codex/config.toml registers all hooks
+├── hookbin/        # STABLE wrapper paths (the registered command strings -> the trust key never changes)
+└── ENROLLED        # sentinel written after stage 80 verifies SessionStart fires headless
+```
+
+**Why stable paths + rewritten bodies.** Trust keys embed the registering config's *absolute path* and a hash of the
+hook *definition* (which includes the command string = the wrapper path). 40d proved trust survives a wrapper-*content*
+change. So the harness keeps each wrapper PATH fixed (trust holds) but rewrites its BODY every stage (`make_hook_cmd`
+bakes the stage's `PROBE_CAPTURE_DIR`; a stale body would silently misattribute captures). `fixture_tee`/`fixture_arm`
+(in `lib.sh`) own that swap; stage 81 re-validates the 40d assumption as its first step.
+
+### Ceremony (one required, ~3 min)
+
+`./reproduce.sh 80` registers everything, then prints an OPERATOR block: in a second terminal,
+`cd <fixture>/proj && CODEX_HOME=<fixture>/codex-home codex`, accept the project + hook trust prompts (noting the exact
+wording), `/quit`, then press ENTER. Stage 80 snapshots the trust delta, harvests the `[hooks.state]` keys + hashes, and
+runs two headless verification turns. Re-running 80 rebuilds the home and needs a fresh ceremony (never idempotent);
+81-83 are the repeatable headless consumers.
+
+### Stage map
+
+| Stage | Mode             | Pins                                                                                                                                                                |
+| ----- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 80    | guided (TTY)     | builds + enrolls the fixture; SessionStart fires headless on two fresh runs                                                                                         |
+| 81    | headless+fixture | 40d body-swap re-validation; per-event fired matrix; 30a-30h response contracts (30e gates Phase 4; PreToolUse deny/`updatedInput` gate Phase 3 + `pretool_policy`) |
+| 82    | headless+fixture | 40e command-string mutation; user-vs-project trust location; worktree path-sensitivity (-> Phase 6 installer scope)                                                 |
+| 83    | offline (+1-2)   | `hash-preimage.py` reverse-engineers `trusted_hash`; if computable, forges a `[hooks.state]` record and proves programmatic pre-enrollment end-to-end               |
+
+### Verdict vocabulary (round 3)
+
+- Stage 80: `FIXTURE-ENROLLED` | `ENROLLMENT-UNCONFIRMED` (SessionStart did not fire on both verification turns —
+  inspect `results/enrollment-matrix.txt`, re-ceremony).
+- Stage 81 `81-revalidate`: `PASS` (body swap kept trust) | `FAIL (MAJOR)` (40d does not hold here — fall back to
+  per-change ceremonies; 81/82 results become suspect).
+- Stage 83: `PREIMAGE-COMPUTABLE` (+ empirical `PROVEN`/`UNCONFIRMED`) | `PREIMAGE-NOT-COMPUTABLE` (posture = guided
+  ceremony; not a failure). `hash-preimage.py` reports `PREIMAGE FOUND: '<candidate>'` only when one canonicalization
+  reproduces **every** harvested hash.
+
+### Safety (round 3 additions)
+
+The fixture's `codex-home/` is never copied by `sanitize.sh` (the existing `*/codex-home/*` exclusion covers it), and
+its `auth.json` is removed on every stage exit. Stage 83's empirical test runs in a fresh `mktemp` home, removed on
+exit. Trust state (`config.toml`) persists by design; delete the fixture dir when the round-3 record is written.
 
 ## Relationship to the decision record
 

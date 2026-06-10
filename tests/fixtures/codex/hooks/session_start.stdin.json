@@ -1,0 +1,9 @@
+{
+  "session_id": "019eb075-ef05-7702-9045-0a8a88b512d2",
+  "transcript_path": "<HOME>/.cache/forge-codex-hooks-probe/fixture/codex-home/sessions/2026/06/10/rollout-2026-06-10T03-36-19-019eb075-ef05-7702-9045-0a8a88b512d2.jsonl",
+  "cwd": "<HOME>/.cache/forge-codex-hooks-probe/fixture/proj",
+  "hook_event_name": "SessionStart",
+  "model": "gpt-5.5",
+  "permission_mode": "bypassPermissions",
+  "source": "startup"
+}

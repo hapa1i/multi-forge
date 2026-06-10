@@ -172,10 +172,13 @@ run_exec() {
     local stream="$PROBE_CAPTURE_DIR/streams/$label.jsonl"
     local stderr_f="$PROBE_CAPTURE_DIR/results/$label.stderr.txt"
     local lm="$PROBE_CAPTURE_DIR/results/$label.last-message.txt"
-    note "turn [$label] sandbox=$sandbox"
+    local cwd="${PROBE_EXEC_CWD:-$PROJ}"
+    note "turn [$label] sandbox=$sandbox cwd=$cwd"
     # </dev/null: the prompt is positional; an ambient pipe would otherwise be
     # read as an appended <stdin> block ("Reading additional input from stdin...").
-    (cd "$PROJ" && with_timeout codex exec --json --sandbox "$sandbox" -o "$lm" "$@" "$prompt" </dev/null) \
+    # PROBE_EXEC_CWD overrides the project dir for one turn (stage 82 runs from a
+    # git worktree to test whether trust survives a changed project-config path).
+    (cd "$cwd" && with_timeout codex exec --json --sandbox "$sandbox" -o "$lm" "$@" "$prompt" </dev/null) \
         >"$stream" 2>"$stderr_f"
     local rc=$?
     printf '%s\n' "$rc" >"$PROBE_CAPTURE_DIR/results/$label.exit"
@@ -201,4 +204,180 @@ need_trust_bypass() {
     0) return 1 ;;
     esac
     grep -q 'TRUST-GATED' "$CAPTURE_ROOT/10-headless-fire/results/verdict.txt" 2>/dev/null
+}
+
+# =============================================================================
+# Fixture mode (stages 80-83): a PERSISTENT enrolled CODEX_HOME + project +
+# hookbin under $CAPTURE_ROOT/fixture, so ONE operator trust ceremony (stage 80)
+# serves many headless probe turns (81-83). Round 2 settled that hooks fire
+# headless once trust-enrolled but headless cannot self-enroll; this mode makes
+# the enrolled state reusable.
+#
+# Contract vs probe_init:
+#   - No mktemp tree, no EXIT-trap tree removal: the fixture survives across runs.
+#   - Per-run captures still go to a cleared per-stage $PROBE_CAPTURE_DIR.
+#   - auth.json is copied per run (probe_auth) and removed on EXIT; trust lives in
+#     config.toml and is unaffected.
+#   - Registered hook COMMAND STRINGS (wrapper paths) are STABLE so the trust key
+#     never changes; wrapper BODIES are rewritten per stage (make_hook_cmd bakes
+#     the stage's PROBE_CAPTURE_DIR -- a stale body silently misattributes
+#     captures). 40d proved trust survives a body change; stage 81 re-validates it.
+# =============================================================================
+
+# Codex events registered in the fixture, mapped to STABLE wrapper keys (the
+# wrapper file stem, also the default capture label). PreToolUse appears twice
+# (plain + matcher) to exercise the matcher-idx trust-key dimension; SessionStart
+# appears three times (primary project, a Sacrificial entry reserved for stage
+# 82's 40e registration-string mutation, and a UserSessionStart entry for the
+# user-vs-project trust-location question).
+FIXTURE_WRAPPER_KEYS="SessionStart SubagentStart PreToolUse PreToolUseMatched PermissionRequest PostToolUse PreCompact PostCompact UserPromptSubmit SubagentStop Stop Sacrificial UserSessionStart"
+
+fixture_init() { # fixture_init <stage-name>  -- shared setup for stages 80-83
+    local stage="${1:?stage name}"
+    command -v codex >/dev/null 2>&1 || err "codex is not on PATH."
+    command -v python3 >/dev/null 2>&1 || err "python3 is not on PATH."
+
+    LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+    export LIB_DIR
+
+    CAPTURE_ROOT="${CODEX_HOOKS_CAPTURE_DIR:-$HOME/.cache/forge-codex-hooks-probe}"
+    export CAPTURE_ROOT
+    PROBE_CAPTURE_DIR="$CAPTURE_ROOT/$stage"
+    export PROBE_CAPTURE_DIR
+    rm -rf "$PROBE_CAPTURE_DIR"
+    mkdir -p "$PROBE_CAPTURE_DIR"/{payloads,results,streams,trees,meta,env,guards}
+
+    FIXTURE_ROOT="$CAPTURE_ROOT/fixture"
+    export FIXTURE_ROOT
+    CODEX_HOME="$FIXTURE_ROOT/codex-home"
+    PROJ="$FIXTURE_ROOT/proj"
+    HOOKBIN="$FIXTURE_ROOT/hookbin"
+    export CODEX_HOME PROJ HOOKBIN
+
+    # Auth (copied per run by probe_auth) is removed on exit; the fixture tree is
+    # NOT removed (that is the whole point). shellcheck disable=SC2064: expand now.
+    # shellcheck disable=SC2064
+    trap "rm -f '$CODEX_HOME/auth.json'" EXIT
+
+    note "stage=$stage (fixture mode)"
+    note "FIXTURE_ROOT=$FIXTURE_ROOT"
+    note "CODEX_HOME=$CODEX_HOME captures -> $PROBE_CAPTURE_DIR"
+}
+
+# fixture_build -- (stage 80 only) (re)create the fixture from scratch: fresh
+# codex-home (forces re-enrollment), stable git-inited proj, empty hookbin.
+# Deliberately NOT idempotent: re-running stage 80 means a fresh trust ceremony.
+fixture_build() {
+    [ -n "${FIXTURE_ROOT:-}" ] || err "fixture_build: call fixture_init first."
+    rm -rf "$FIXTURE_ROOT"
+    mkdir -p "$CODEX_HOME" "$HOOKBIN"
+    chmod 700 "$CODEX_HOME"
+    mkdir -p "$PROJ"
+    (cd "$PROJ" &&
+        git init -q &&
+        git config user.email probe@example.invalid &&
+        git config user.name probe &&
+        echo "# probe fixture project" >README.md &&
+        git add README.md &&
+        git commit -qm init) || err "fixture project git init failed."
+    note "fixture built: $FIXTURE_ROOT"
+}
+
+# fixture_mark_enrolled <summary...> -- write the enrollment sentinel (stage 80).
+fixture_mark_enrolled() {
+    {
+        echo "enrolled_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+        echo "codex_version=${CODEX_VERSION:-unknown}"
+        echo "$*"
+    } >"$FIXTURE_ROOT/ENROLLED"
+}
+
+# fixture_require -- (stages 81-83) refuse to run without an enrolled fixture.
+fixture_require() {
+    [ -n "${FIXTURE_ROOT:-}" ] || err "fixture_require: call fixture_init first."
+    if [ ! -f "$FIXTURE_ROOT/ENROLLED" ] || [ ! -f "$CODEX_HOME/config.toml" ]; then
+        err "no enrolled fixture at $FIXTURE_ROOT -- run stage 80 (operator trust ceremony) first."
+    fi
+    note "fixture present: $(tr '\n' ' ' <"$FIXTURE_ROOT/ENROLLED")"
+}
+
+# _fixture_write_wrapper <wrapper-key> <handler> <capture-label> [template]
+# Rewrites the STABLE wrapper $HOOKBIN/<wrapper-key>.sh body to invoke <handler>
+# with <capture-label> as argv[1], stamped with the CURRENT $PROBE_CAPTURE_DIR.
+# Touches only the body (40d: trust survives this); the registered command string
+# never changes. Clears stale block-once guards for the label so a prior *-once
+# responder cannot leak across subprobes (respond-hook.sh keys guards on the label).
+_fixture_write_wrapper() {
+    local key="${1:?wrapper key}" handler="${2:?handler}" label="${3:?label}" template="${4:-}"
+    local wrapper="$HOOKBIN/$key.sh"
+    {
+        echo '#!/usr/bin/env bash'
+        echo "export PROBE_CAPTURE_DIR='$PROBE_CAPTURE_DIR'"
+        if [ -n "$template" ]; then
+            echo "exec '$LIB_DIR/hooks/$handler' '$label' '$template'"
+        else
+            echo "exec '$LIB_DIR/hooks/$handler' '$label'"
+        fi
+    } >"$wrapper"
+    chmod +x "$wrapper"
+    rm -f "$PROBE_CAPTURE_DIR"/guards/"$label"-*.fired 2>/dev/null || true
+}
+
+# fixture_tee <wrapper-key> [capture-label] -- observe-only body (the default).
+fixture_tee() {
+    _fixture_write_wrapper "${1:?wrapper key}" tee-hook.sh "${2:-$1}"
+}
+
+# fixture_arm <wrapper-key> <handler> <template> [capture-label] -- active responder.
+fixture_arm() {
+    local key="${1:?wrapper key}" handler="${2:?handler}" template="${3:?template}"
+    _fixture_write_wrapper "$key" "$handler" "${4:-$key}" "$template"
+}
+
+# fixture_tee_all -- reset EVERY registered wrapper to its observe-only default,
+# re-stamped to the current stage capture dir. Call at stage start and between
+# subprobes so no armed deny/block body leaks into the next turn.
+fixture_tee_all() {
+    local k
+    for k in $FIXTURE_WRAPPER_KEYS; do fixture_tee "$k"; done
+}
+
+# fixture_project_specs [sacrificial-command] -- emit project-level HOOKSPEC lines
+# (EVENT[:MATCHER]=COMMAND) for gen_hooks_config, via STABLE wrapper paths so trust
+# keys are reproducible. $1 overrides the sacrificial entry's command (stage 82's
+# 40e registration-string mutation); empty/unset uses the stable sacrificial path.
+# The matcher on the extra PreToolUse exists to exercise the matcher-idx key + the
+# matcher field in the hashed definition; whether it actually matches a tool (so
+# fires) is incidental to that purpose.
+fixture_project_specs() {
+    local sac="${1:-$HOOKBIN/Sacrificial.sh}"
+    printf '%s\n' \
+        "SessionStart=$HOOKBIN/SessionStart.sh" \
+        "SubagentStart=$HOOKBIN/SubagentStart.sh" \
+        "PreToolUse=$HOOKBIN/PreToolUse.sh" \
+        "PreToolUse:shell=$HOOKBIN/PreToolUseMatched.sh" \
+        "PermissionRequest=$HOOKBIN/PermissionRequest.sh" \
+        "PostToolUse=$HOOKBIN/PostToolUse.sh" \
+        "PreCompact=$HOOKBIN/PreCompact.sh" \
+        "PostCompact=$HOOKBIN/PostCompact.sh" \
+        "UserPromptSubmit=$HOOKBIN/UserPromptSubmit.sh" \
+        "SubagentStop=$HOOKBIN/SubagentStop.sh" \
+        "Stop=$HOOKBIN/Stop.sh" \
+        "SessionStart=$sac"
+}
+
+# fixture_register_project [sacrificial-command] -- write $PROJ/.codex/config.toml.
+fixture_register_project() {
+    mkdir -p "$PROJ/.codex"
+    local specs=() line
+    # Process substitution (not a pipe) so the array fills in THIS shell. bash 3.2 OK.
+    while IFS= read -r line; do
+        [ -n "$line" ] && specs+=("$line")
+    done < <(fixture_project_specs "${1:-}")
+    gen_hooks_config toml "${specs[@]}" >"$PROJ/.codex/config.toml"
+}
+
+# fixture_register_user -- append the user-level SessionStart registration.
+fixture_register_user() {
+    gen_hooks_config toml "SessionStart=$HOOKBIN/UserSessionStart.sh" >>"$CODEX_HOME/config.toml"
 }

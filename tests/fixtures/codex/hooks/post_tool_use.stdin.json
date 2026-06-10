@@ -1,0 +1,15 @@
+{
+  "session_id": "019eb075-fd3f-7381-9008-9ef8df491237",
+  "turn_id": "019eb075-fd77-7992-b35d-73a30bfe9614",
+  "transcript_path": "<HOME>/.cache/forge-codex-hooks-probe/fixture/codex-home/sessions/2026/06/10/rollout-2026-06-10T03-36-23-019eb075-fd3f-7381-9008-9ef8df491237.jsonl",
+  "cwd": "<HOME>/.cache/forge-codex-hooks-probe/fixture/proj",
+  "hook_event_name": "PostToolUse",
+  "model": "gpt-5.5",
+  "permission_mode": "bypassPermissions",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "echo PROBE-RT-1"
+  },
+  "tool_response": "PROBE-RT-1\n",
+  "tool_use_id": "call_W4ZJM5K6Vs1jzHJ0adb3iT6Q"
+}

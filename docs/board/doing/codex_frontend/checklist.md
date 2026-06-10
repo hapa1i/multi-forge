@@ -23,6 +23,27 @@ existed). Probe round 2 findings are recorded in `card.md` ("Probe-established f
 **Phase 1 (enrollment-mechanics probe round)**, which pins the facts that gate Phases 3/4/6. **Phase 2 (bridge CLI)** is
 the first product deliverable and has no dependency on Phase 1; it can interleave.
 
+**Phase 1 harness implemented 2026-06-10 (the executable half).** `scripts/experiments/codex-hooks/` extended with the
+fixture mode (`lib.sh`: `fixture_init`/`fixture_build`/`fixture_require`, the stable-path/swappable-body `fixture_tee`/
+`fixture_arm`, `fixture_project_specs`), stages `80-enroll-fixture` (guided ceremony) / `81-enrolled-coverage` /
+`82-trust-dimensions` / `83-preimage`, the offline `hooks/hash-preimage.py` (trusted_hash reverse-engineering +
+`--emit-state` forging), `reproduce.sh` wiring (`FIXTURE_STAGES`, explicit-only), and a round-3 README section. Also:
+`tests/fixtures/codex/hooks/README.md` (the post-capture payload-fixture contract). `bash -n` + `shellcheck 0.11.0`
+clean on every script; `hash-preimage.py` self-test passes (parse -> join -> candidate discovery -> emit-state) on a
+synthetic enrolled fixture.
+
+**Phase 1 probe COMPLETE 2026-06-10 (codex 0.138.0); all findings in.** Operator ran `./reproduce.sh 80` (ceremony) +
+`81 82 83`, plus a hardened `82` re-run. **All 7 Phase-1 boxes ticked below** with recorded verification; round-3 facts
+in `card.md`. **30e PASSED (Phase 4 viable)**; **PreToolUse deny + `updatedInput` work (Phase 3 + `pretool_policy` can
+rise)**; the `trusted_hash` is not computable -> **posture = guided ceremony**; **worktree trust is PATH-INDEPENDENT**
+(82w2 valid run -> project-scope registration with a path-stable command string survives worktrees). All three Open
+Decisions resolved. Two follow-ups remain, deferred for an explicit decision: (a) the findings-gated
+`codex_preflight.py` `[hooks.state]` slice (plan item 8) -- shaped by "hash-not-computable" (a static
+`active`-via-validation verdict is unachievable, so the seam stays `enrollment_gated`; path-independence adds that even
+a path-keyed `[hooks.state]` read would false-negative in a worktree), and (b) the registry `pretool_policy` rise from
+`"none"` (justified by the confirmed deny+mutation). Both touch `src/` + tests + `design.md` §5.5.5 and are a coherent
+next unit.
+
 ## Phase 0 - Registry correction (owed from probe round 2)
 
 - [x] Correct the Codex `RuntimeSpec` hooks encoding: `native_hooks="headless_inert"` is refuted by the binary -- hooks
@@ -45,29 +66,65 @@ the first product deliverable and has no dependency on Phase 1; it can interleav
 Build the persistent enrolled fixture first; every other item runs headless from it. Harness:
 `scripts/experiments/codex-hooks/` (extend, do not fork).
 
-- [ ] Persistent enrolled fixture: stable project path + persistent `CODEX_HOME` (the 40-trust persistent-home pattern
+**Harness -> stage map (built 2026-06-10; run to fill in the findings):** persistent fixture + ceremony = `stage 80`;
+40e registration-string = `stage 82` (82e); `trusted_hash` preimage + posture = `stage 83` + `hooks/hash-preimage.py`;
+post-enrollment event coverage / 30e / PreToolUse = `stage 81`; user-vs-project + worktree sensitivity = `stage 82`
+(82u/82w); sanitized payload fixtures = `stage 81` captures -> `sanitize.sh` -> `tests/fixtures/codex/hooks/`. Run:
+`./reproduce.sh 80` (operator TTY), then `./reproduce.sh 81 82 83` (headless).
+
+- [x] Persistent enrolled fixture: stable project path + persistent `CODEX_HOME` (the 40-trust persistent-home pattern
   minus the teardown), one operator trust ceremony. Record the operator-observed TUI prompt wording (project/folder
   trust vs hook-specific review vs both; `/hooks` availability) -- the one fact captures cannot hold.
   - Assertion: a headless `codex exec` turn in the fixture fires SessionStart reproducibly across separate runs.
-- [ ] 40e -- registration-string trust dimension: change the registered `command` string in the enrolled fixture;
+  - **Done 2026-06-10** (codex 0.138.0): stage 80 enrolled 13 trust keys from ONE grant; SessionStart fired headless on
+    both verification turns (80v1=1, 80v2=2) and again in 81/82. Operator wording: *"You can trust all - no command or
+    hash"* -> a single per-config grant, not per-entry review (`meta/operator-notes.txt`).
+- [x] 40e -- registration-string trust dimension: change the registered `command` string in the enrolled fixture;
   observe whether trust invalidates (40d proved script-*content* changes survive).
   - Assertion: fired/not-fired recorded for a changed `command`; conclusion states what the `trusted_hash` covers.
-- [ ] `trusted_hash` preimage: determine what Codex hashes (candidate preimages vs the known `sha256:0d63...` from round
+  - **Done 2026-06-10** (82e): moved entry fired=0, unchanged primary fired=1 -> the command string IS in the per-entry
+    `trusted_hash`. With 40d (content survives), the hash covers the registration *definition*, not the script bytes.
+- [x] `trusted_hash` preimage: determine what Codex hashes (candidate preimages vs the known `sha256:0d63...` from round
   2, or source-dive the codex-cli release). Then decide the **pre-enrollment posture** (installer writes `[hooks.state]`
   records vs ships a guided one-time `codex` trust ceremony) -- an explicit decision recorded here and in `card.md`, not
   an implementation detail.
-- [ ] Event coverage post-enrollment: re-run stage 20 (10-event tee) and stage 30 response contracts (30a-30h, including
+  - **Done 2026-06-10** (83): NOT black-box computable -- 15 canonicalizations matched 0/13 harvested hashes
+    (`meta/preimage-report.txt`). The command string is in the hash (82e) but the algorithm needs a codex-cli Rust
+    source-dive. **Posture RESOLVED: guided one-time ceremony** (see Open Decisions); programmatic `[hooks.state]`
+    writing stays blocked until/unless a source-dive makes the hash computable (`hash-preimage.py` already supports
+    `--emit-state` for that future).
+- [x] Event coverage post-enrollment: re-run stage 20 (10-event tee) and stage 30 response contracts (30a-30h, including
   the 30e `additionalContext` magic-token oracle and PreToolUse deny/`updatedInput`) inside the enrolled home.
   - Assertion: per-event fired/not-fired matrix recorded; 30e oracle PASS/FAIL recorded (gates Phase 4); PreToolUse deny
     \+ mutation verdicts recorded (gates Phase 3 and the `pretool_policy` value).
-- [ ] User-level vs project-level trust: where a user-level hook's trust record lands (50c fired one interactively but
+  - **Done 2026-06-10** (81): matrix in `results/event-matrix.txt`. **30e PASS** (token echoed -> Phase 4 viable).
+    PreToolUse **deny** (JSON + exit-2) blocked; **`updatedInput` mutation took effect** (-> Phase 3 + `pretool_policy`
+    can rise). Stop block-once forced one extra pass; UserPromptSubmit block suppressed the turn; PermissionRequest did
+    not fire under read-only. **Malformed output FAILED OPEN** (refutes the doc-claim -- Phase 3 caveat). `tool_name` is
+    `"Bash"`/`"apply_patch"`, so `matcher="shell"` never fired.
+- [x] User-level vs project-level trust: where a user-level hook's trust record lands (50c fired one interactively but
   its home died with the run).
-- [ ] Worktree/path sensitivity: trust keys on the registering config's **absolute path** -- verify whether enrollment
+  - **Done 2026-06-10** (82u): both user- and project-level hooks fire headless when enrolled; the user record keys by
+    `codex-home/config.toml`, project records by `proj/.codex/config.toml` (`meta/trust-locations.txt`).
+- [x] Worktree/path sensitivity: trust keys on the registering config's **absolute path** -- verify whether enrollment
   survives a `git worktree` checkout of the same project (Forge's main isolation workflow).
-- [ ] Sanitized payload fixtures to `tests/fixtures/codex/hooks/` with a provenance README (the Phase 6 descoped
+  - **Done 2026-06-10 (82w2, valid run): trust is PATH-INDEPENDENT.** The project hook fired in the worktree checkout
+    (`proj-codexwt`) with proj=1 user=1 and **no folder `trust_level` and no `[hooks.state]` record at the worktree
+    path** -- cross-checked against the captured clean base (`meta/user-config.no-wt-trustlevel.toml`: worktree block
+    stripped, 13 records all at the codex-home/proj paths). With **40b** (folder trust alone does NOT fire hooks), the
+    firing can only be a `trusted_hash` match keyed by the definition (byte-identical `$HOOKBIN/<event>.sh` command
+    string), not the config path. **-> Phase 6: project-scope registration with a path-stable command string survives
+    worktrees** (no per-worktree re-enrollment; resolves the scope Open Decision). *(First 82w2 run was VOID -- leftover
+    worktree `trust_level` in the persistent fixture; stage 82 hardened with a strip-first clean base and an INVALID
+    self-guard, unit-tested, then re-run.)*
+- [x] Sanitized payload fixtures to `tests/fixtures/codex/hooks/` with a provenance README (the Phase 6 descoped
   deliverable; capturable headless now).
   - Assertion: `sanitize.sh` passes; `make pre-commit` (gitleaks) clean on the fixture commit; per-file provenance table
     cloned from `tests/fixtures/codex/README.md`.
+  - **Done 2026-06-10**: 5 payloads promoted
+    (`session_start`/`pre_tool_use`/`post_tool_use`/`user_prompt_submit`/`stop`) with the provenance table filled.
+    `sanitize.sh` passes (a real over-match -- `task-*` plugin filenames tripping the `sk-` scan -- was fixed with a
+    word-boundary anchor); `make pre-commit` (gitleaks) clean on the fixtures.
 
 ## Phase 2 - One-command bridge CLI (GO; no hook dependency)
 
@@ -128,9 +185,18 @@ per-hook-trust story from Phase 1.
   to both the registry `HookSupport` and the preflight `HookSeam` (renamed together so no half of the capability model
   retains the refuted `headless_inert`). The comment distinguishes it from `gated` (version floor -- Codex meets the
   floor yet untrusted hooks do not fire) and pins the preflight verdict as capability-not-state (never `active`).
-- [ ] Pre-enrollment posture (Phase 1): write `[hooks.state]` records programmatically vs guided one-time ceremony.
-  Precedent: Forge already writes Claude's `settings.json` hooks with user consent -- but bypassing another tool's
-  review gate is a posture decision, made explicitly.
+- [x] Pre-enrollment posture (Phase 1): **resolved 2026-06-10 -- guided one-time ceremony.** Stage 83 found the
+  `trusted_hash` is not black-box computable (0/13), so Forge cannot reliably forge `[hooks.state]` records; the
+  installer ships a guided `codex` trust step instead. Re-openable only if a codex-cli source-dive recovers the hash
+  algorithm (`hash-preimage.py --emit-state` is ready for that path). Programmatic pre-enrollment is therefore NOT the
+  posture, sidestepping the "bypass another tool's review gate" concern for now.
+- [x] Worktree/installer scope (Phase 6): **resolved 2026-06-10 (82w2, valid run) -- trust is path-independent, so
+  project-scope registration is viable.** The project hook fired in a worktree with no folder `trust_level` and no
+  `[hooks.state]` record at the worktree path; chained with 40b, trust is keyed by the definition hash (byte-identical
+  command string), not the config path. **Phase 6 registers Codex hooks at project scope with a path-stable command
+  string** (`.codex/config.toml` travels with git AND keeps trust across worktrees -- no per-worktree re-enrollment).
+  Caveat for the installer: the command string must not embed the worktree/project path, or the hash diverges and trust
+  breaks; one interactive ceremony per `CODEX_HOME` still seeds the first record.
 - [ ] Bridge CLI shape (Phase 2): flag on `forge session start` vs a dedicated verb.
 
 ## Closeout

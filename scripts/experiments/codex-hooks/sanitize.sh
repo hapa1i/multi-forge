@@ -67,7 +67,11 @@ scan() { # scan <label> <grep-args...>
         HITS=1
     fi
 }
-scan "openai-style key" -E 'sk-[A-Za-z0-9_-]{8,}'
+# Anchor at a word boundary + require key length: real sk- keys appear at token
+# boundaries (after a quote/space/=) and are long. Without \b the pattern matched
+# mid-word filename fragments in codex-home's plugin clone (e.g. "task-creation",
+# "task-abstraction-...") that show up in trees/ path listings.
+scan "openai-style key" -E '\bsk-[A-Za-z0-9_-]{16,}'
 scan "bearer token" -E 'Bearer [A-Za-z0-9._-]{8,}'
 scan "jwt-ish blob" -E 'eyJ[A-Za-z0-9_-]{10,}'
 scan "home path" -F "$HOME"
