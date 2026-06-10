@@ -1641,13 +1641,14 @@ outputs), and evidence-weighted synthesis.
 half). A frozen `RuntimeSpec` per runtime in a module-level `RUNTIMES` table (mirrors `core/auth/capabilities.py`'s
 `Credential`/`CREDENTIALS` pattern) answers the card's seven questions without hard-coding Claude Code assumptions:
 installed (`is_installed()` = PATH presence; `detect()` = best-effort `--version`), interactive, headless, hooks, usage
-source, native resume, and install scopes (plus curated-transfer in/out). Partial or planned support is a tri-state
-`Literal`, not a `bool` — Codex `pretool_policy="partial"` (its `PreToolUse` is not a full enforcement boundary),
-`interactive="beta"` (a Forge-integration target, not shipped), and `native_hooks="gated"` carrying a machine-readable
-`hook_min_version` (a preflight verifies the version gate rather than parsing prose; `hook_feature_flag` is `None` now
-that Codex hooks are default-on) — so a consumer never mistakes a Codex limit for Claude parity.
-`forge runtime list [--json]` renders the matrix. Claude Code is fully populated; Codex/Gemini declare their limits as
-values. Phase 5's `CodexHeadlessInvoker` and auth/runtime preflight now read this registry (e.g.
+source, native resume, and install scopes (plus curated-transfer in/out). Limited or planned support is a multi-state
+`Literal`, not a `bool` — Codex `native_hooks="headless_inert"` (Phase 6 probe: hooks register and enable but do not
+fire under headless `codex exec`; interactive unverified), `pretool_policy="none"` (PreToolUse never fires headless, so
+no verified enforcement), and `interactive="beta"` (a Forge-integration target, not shipped). `hook_min_version` stays
+machine-readable as the registration/enablement floor a preflight checks (not a firing guarantee); `hook_feature_flag`
+is `None` since Codex hooks are default-on — so a consumer reading the field, not just the prose, never mistakes a Codex
+limit for Claude parity. `forge runtime list [--json]` renders the matrix. Claude Code is fully populated; Codex/Gemini
+declare their limits as values. Phase 5's `CodexHeadlessInvoker` and auth/runtime preflight now read this registry (e.g.
 `get_runtime("codex").headless_cmd` builds the `codex exec` argv; the preflight checks the version gate).
 
 #### 5.5.6 Relationship to policies (workflow unification)

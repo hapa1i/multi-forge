@@ -1,0 +1,8 @@
+{
+  "hookSpecificOutput": {
+    "hookEventName": "PreToolUse",
+    "permissionDecision": "allow",
+    "continue": false,
+    "bogusFieldZzz": true
+  }
+}

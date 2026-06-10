@@ -179,239 +179,28 @@ Phase 0 gaps carried forward:
     Decisions are resolved (keep `--review` opt-in, keep `structured` default). All Phase 1 boxes are now ticked; the
     card stays in `doing/` for Phases 2-6.
 
-## Phase 2 - Optional Audit Proxy
+## Phase 2 - Optional Audit Proxy (compacted 2026-06-09; shipped 2026-05-31 -> 2026-06-01)
 
-Execution plan: `~/.claude/plans/yeah-let-s-move-on-proud-kernighan.md` (approved). Sliced OBSERVE-before-MUTATE; each
-slice leaves the proxy working because new config defaults are inert. Two axes kept distinct everywhere: **wire shape**
-(`openai_translated` | `anthropic_passthrough`) and **intercept mode** (`passthrough` | `inspect` | `override`).
+Compacted per the board-contract size policy when Phase 6 planning pushed this file over the 30k-token hook. Full slice
+detail (acceptance tables, review-fix lists) lives in git history and the change_log 2026-06-01 "Phase 2: optional audit
+proxy" entry; `design.md` §7.x and `design_appendix.md` §A.11/§A.12 are normative for shipped behavior. Sliced
+OBSERVE-before-MUTATE; two axes kept distinct everywhere: **wire shape** (`openai_translated` | `anthropic_passthrough`)
+and **intercept mode** (`passthrough` | `inspect` | `override`).
 
-### Slice 2a - Config schema + loader propagation + wire_shape (DONE 2026-05-31)
+- [x] 2a config schema + loader propagation + `wire_shape` (strict unknown-key rejection; defaults inert).
+- [x] 2b anthropic-passthrough forward path + template (raw body forwarded byte-identical; thinking blocks preserved).
+- [x] 2c audit logging + redaction + drift + `forge proxy audit show` + preflight (OBSERVE) + 10 review fixes (the
+  middleware is the SOLE passthrough entry point; caps/cost wired; no-leak regression through the server path).
+- [x] 2d override mode: cache-aware augment + guards + reasoning pin + mutation-safety fingerprint + `audit diff`
+  (MUTATE) + 14 review fixes (override REQUIRES `anthropic_passthrough`; guards validated at config load;
+  all-blocks-before-any-strip).
+- [x] 2e sidecar audit plumbing + hardening (host-persistent audit/costs mounts; Linux `--user`/`HOME=/root` fix; two
+  latent entrypoint bugs fixed; sidecar image wired into the canonical test runner).
+- [x] 2f docs + always-on posture + closeout.
 
-- [x] Add `InterceptConfig`/`InterceptOverrideConfig`/`AuditConfig` + `wire_shape` to `ProxyInstanceConfig` and runtime
-  `ProxyConfig` (strict unknown-key rejection); propagate through `loader.load_proxy_instance_config_from_dict` +
-  `_proxy_instance_to_forge_config` + `proxy_orchestrator`; report `wire_shape`/`intercept_mode` in `GET /`; add
-  `forge proxy set` int-coercion for `audit.retention_days`/`max_total_mb`.
-  - Assertion: defaults inert (`wire_shape="openai_translated"`, `intercept.mode="passthrough"`,
-    `audit_full_body=False`); unknown sub-keys raise (`audit.full_body` typo); config reaches runtime `ProxyConfig`
-    (propagation trap guarded).
-  - Verification: `tests/src/config/test_schema.py::TestInterceptAuditConfig`,
-    `tests/src/config/test_loader.py::test_proxy_instance_{config_round_trips,to_forge_config_propagates}_intercept_audit`;
-    107 config tests pass; mypy/pyright/ruff clean.
-
-### Slice 2b - Anthropic passthrough forward path + template (DONE 2026-05-31)
-
-| Test               | Fixture                                               | Assertion                                                          | Test File                                                     |
-| ------------------ | ----------------------------------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------- |
-| Raw body preserved | passthrough proxy; unknown field + thinking blocks    | forwarded body byte-identical; unknown field + `signature` survive | `tests/regression/test_bug_passthrough_preserves_raw_body.py` |
-| ASGI body re-read  | real app via `TestClient`                             | branch re-reads full raw body after `MessagesRequest` parse        | `tests/src/proxy/test_passthrough.py`                         |
-| Template create    | `forge proxy create anthropic-passthrough --no-start` | `proxy.yaml` carries `wire_shape: anthropic_passthrough`           | manual CLI smoke (verified)                                   |
-
-- [x] New `src/forge/proxy/passthrough.py` forwarder (httpx, raw SSE, no converters); early branch in
-  `create_message`/`count_tokens` on `wire_shape`; `anthropic-passthrough.yaml` template (`provider: litellm` slot,
-  `wire_shape` truth, `base_url: api.anthropic.com`); `ANTHROPIC_API_KEY` registered in `template_secrets.py`.
-  - Verification: 10 passthrough/regression tests pass; full 1467-test proxy+config+core sweep green; mypy/pyright/ruff
-    clean; CLI create smoke confirms `proxy.yaml` round-trip.
-  - Deferred (checklist debt): real-upstream `@pytest.mark.slow` signature-replay e2e
-    (`tests/integration/proxy/test_passthrough_e2e.py`) needs `ANTHROPIC_API_KEY` + Docker (release-validation tier).
-    The in-process `TestClient` test covers the body-reparse risk now.
-
-### Slice 2c - Audit logging + redaction + drift + `forge proxy audit show` + preflight (OBSERVE) (DONE 2026-05-31)
-
-| Test                    | Fixture                                                            | Assertion                                                               | Test File                                                                                  |
-| ----------------------- | ------------------------------------------------------------------ | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| No plaintext secret     | full-body record w/ planted secrets in headers+body+tools+response | none of the secrets appear in the JSONL; structure retained             | `tests/regression/test_bug_audit_header_redaction_no_leak.py`                              |
-| Metadata-only default   | passthrough proxy in `inspect` mode, one request                   | audit record has hashes + counts, no body text, no secret header values | `tests/src/proxy/test_passthrough.py::test_passthrough_inspect_mode_writes_audit_metadata` |
-| Drift fires on change   | two inspect requests, changed system prompt                        | second produces a `drift` record; baseline survives a simulated restart | `tests/src/proxy/test_audit_logger.py::TestDrift`                                          |
-| `audit show` no secrets | audit records written for two proxies                              | `forge proxy audit show <id>` scopes by id, prints hashes not plaintext | `tests/src/cli/test_proxy_audit.py`                                                        |
-
-- [x] `audit_logger.py` (`log_audit_record`/`read_audit_logs`/`prune_audit_logs`, `record_type` request/drift, hashing,
-  `schema_version`, owner-only 0600/0700); `redact_headers` in `utils.py` (denylist + substring fallback) reusing
-  `_redact_body_for_log`/`_redact_tools`; inspect-mode hook in both wire-shape paths (best-effort, guarded inert in
-  `passthrough` mode); drift detection + per-proxy `audit_state.json`; `audit_full_body` opt-in (request body + headers
-  redacted; streaming response = metadata only — full streamed-body capture deferred); retention pruning at startup;
-  `GET /` `intercept` preflight (`can_inspect`/`thinking_blocks_preserved`); `forge proxy audit show` (`proxy_audit.py`)
-  - `%proxy audit show`; `forge proxy set audit.audit_full_body=true` privacy warning; template flipped to
-    `intercept.mode: inspect`.
-  * Verification: 27 `test_audit_logger` + 4 `test_proxy_audit` + inspect server test + no-leak regression pass; broad
-    697-test proxy+cli+config sweep green; mypy/pyright/ruff clean.
-
-#### Slice 2c hardening - OBSERVE-half review fixes (DONE 2026-05-31)
-
-Review of the OBSERVE half surfaced 10 issues (4 Blocker / 3 Medium / 3 Low); all verified against code and fixed.
-
-| Test                              | Fixture                                                         | Assertion                                                           | Test File                                                                                                            |
-| --------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| Unknown block bypasses validation | passthrough proxy, nested `future_block_99` block via real ASGI | 200 (not 422); raw block forwarded; `X-Resolved-Model` set          | `tests/src/proxy/test_passthrough.py::test_passthrough_middleware_bypasses_validation_for_unknown_block`             |
-| Translated proxy not intercepted  | `openai_translated` config via real ASGI                        | passthrough handler never reached                                   | `..::test_translated_proxy_not_intercepted_by_passthrough_middleware`                                                |
-| Usage -> cost                     | non-streaming response w/ usage                                 | `_calc_and_log_cost` gets input/output/cached=100/50/10             | `..::test_passthrough_logs_cost_from_response_usage`                                                                 |
-| Caps enforced                     | passthrough + cap exceeded, `on_cap_hit=reject`                 | 429 `spend_cap_exceeded`; forward not reached                       | `..::test_passthrough_enforces_spend_cap_reject`                                                                     |
-| Streaming usage tap               | SSE `message_start`+`message_delta`, split chunk                | `on_complete` usage = in 200 / out 77 / cached 20                   | `..::test_forward_streaming_taps_usage`, `..::test_usage_accumulator_handles_split_chunks`                           |
-| Full-body response + no leak      | inspect+`audit_full_body`, secret sys/user/resp/header          | record has redacted `response_body` + hashes/counts; zero plaintext | `..::test_passthrough_full_body_captures_redacted_response`                                                          |
-| No-leak via server path           | TestClient passthrough, secret Authorization+body+response      | no plaintext in shard; wiring (not just writer) covered             | `tests/regression/test_bug_audit_header_redaction_no_leak.py::test_full_body_audit_through_server_path_no_plaintext` |
-| Size retention                    | 3x 0.5 MiB shards, cap 1 MiB                                    | oldest pruned, newer kept                                           | `tests/src/proxy/test_audit_logger.py::TestPrune::test_prune_by_total_size_oldest_first`                             |
-| Non-text system block             | system list w/ text + image block                               | image block excluded from hash                                      | `..::TestHashing::test_system_prompt_excludes_non_text_blocks`                                                       |
-
-- [x] **B1** raw-validation bypass: passthrough intercepted in `log_requests_middleware` BEFORE FastAPI binds
-  `MessagesRequest`, so unknown/future content blocks forward byte-for-byte. The middleware is the SOLE passthrough
-  entry point — the old in-handler `wire_shape` branches in `create_message`/`count_tokens` were removed (they were dead
-  for real requests once the middleware short-circuits `call_next`); handler-logic tests call
-  `_handle_anthropic_passthrough` directly, middleware delegation is covered by two `TestClient` tests.
-- [x] **B2** caps/cost: passthrough now runs the same spend-cap preflight + `_calc_and_log_cost` + `record_request`;
-  usage captured from the non-streaming body and tapped from the streaming SSE (`_UsageAccumulator`).
-- [x] **B3/M5** response-side audit: full-body record written response-side with redacted response + request
-  hashes/counts; CLI label honest (`[req+resp]` vs `[req-body]`). **B4** no-leak now also covered through the server
-  path.
-- [x] **M6** event loop: request-side observation offloaded via `await asyncio.to_thread` (deterministic, off-loop).
-  **M7** headers: `X-Resolved-Model/Tier`, `X-Cumulative-Cost`, `X-Spend-Warning`. **L8** parent `audit/` chmod 0700.
-  **L10** system-prompt hash filters to text blocks.
-  - Verification: 43 passthrough+audit_logger + broad 2147-test sweep green; mypy/pyright/ruff clean. (One pre-existing,
-    unrelated failure on this branch: `test_removal_patching_system::...test_forge_info_no_traceback` — confirmed via
-    stash; not touched by this work.)
-  - Deferred (debt): translated-path full-body capture stays request-only (honest `[req-body]` label); passthrough
-    streaming full-body carries response usage metadata, not the full streamed body. Docker proxy-runtime integration
-    not yet run for 2a-2c (middleware change warrants it before merge).
-
-### Slice 2d - Override mode + augment/guards + reasoning pin + mutation safety + `audit diff` (MUTATE) (DONE 2026-05-31)
-
-| Test                                  | Fixture                                                                              | Assertion                                                                                         | Test File                                                                                           |
-| ------------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| History byte-identical under override | history with signed `thinking`+`redacted_thinking`; augment+guard+pin all on         | `messages` unchanged byte-for-byte; control surfaces (system/thinking) mutated                    | `tests/regression/test_bug_override_preserves_thinking_blocks.py`                                   |
-| Augment is cache-aware                | system with a `cache_control` marker                                                 | augment inserted AFTER the last marker (prefix byte-identical); markerless flags invalidation     | `tests/regression/test_bug_augment_cache_aware_insertion.py`                                        |
-| Override mutates + records (server)   | passthrough proxy, `mode=override`, augment + `tier_overrides.reasoning_effort=high` | forwarded body augmented + `thinking.budget_tokens=10000`; redacted mutation record, no plaintext | `tests/src/proxy/test_passthrough.py::test_passthrough_override_mutates_body_and_records`           |
-| Guard block -> 403                    | `mode=override`, block guard matches system                                          | 403 `intercept_guard_blocked`; forward not reached; `blocked` mutation record                     | `..::test_passthrough_override_guard_block_returns_403`                                             |
-| Non-override is inert                 | `mode=inspect` with augment configured                                               | body unmutated; no mutation record                                                                | `..::test_non_override_mode_does_not_apply_override`                                                |
-| Pin floor consistent                  | each effort floor                                                                    | round-trips back to the same effort via `server._derive_reasoning_effort` (no table drift)        | `tests/src/proxy/test_intercept.py::TestReasoningPin::test_floor_consistent_with_server_thresholds` |
-| `audit diff` view                     | drift + mutation records                                                             | renders both, tagged drift/mutation, hashes only                                                  | `tests/src/cli/test_proxy_audit.py`, `tests/src/cli/test_user_prompt_dispatcher.py`                 |
-
-- [x] New `src/forge/proxy/intercept.py` (pure): `messages_fingerprint`, cache-aware `insert_augment_cache_aware`,
-  `apply_guards` (warn/block/strip), `pin_reasoning` (effort floor -> Anthropic `thinking.budget_tokens`, clamped
-  `>=1024`/`<max_tokens`), `apply_override` (build -> validate -> apply, mutation-safety `RuntimeError` tripwire).
-  Reuses `audit_logger.hash_system_prompt`; reasoning pin reuses `tier_overrides.<tier>.reasoning_effort` (no new config
-  key).
-- [x] `override` branch wired into `_handle_anthropic_passthrough` AFTER the inspect record, BEFORE forward
-  (mutate-after-observe); guard `block` short-circuits 403; mutation-safety violation fails closed (no forward).
-  `audit_logger.write_mutation_record` (already-redacted payload). Non-override modes skip the branch entirely.
-- [x] `forge proxy audit diff` leaf (`proxy_audit.py`) + `%proxy audit diff` (`direct_commands.py`): drift + mutation
-  folded into one timeline, hashes/lengths/budgets only.
-  - Verification: 126 focused (intercept+passthrough+audit CLI+dispatcher+regression) + broad 2184-test sweep green;
-    mypy/pyright/ruff clean on changed src. One pre-existing unrelated failure (`test_forge_info_no_traceback`).
-  - Deferred: override on the `openai_translated` wire shape (the lossy path) is out of scope — override targets the
-    signature-safe passthrough path per the plan; translated proxies already apply tier_overrides via their own path.
-
-#### Slice 2d hardening - review fixes (DONE 2026-05-31)
-
-Review of 2d surfaced 14 issues (2 High / 4 Med / 5 Low / 3 nit); all verified against code and fixed.
-
-- [x] **High**: (1) `intercept.mode=override` now REQUIRED to pair with `wire_shape=anthropic_passthrough` — rejected at
-  `ProxyInstanceConfig.__post_init__` (was silently inert on translated, and GET / mislabelled it active). (2) guard
-  config validated at config time — unknown keys rejected, `pattern` must be a non-empty str, regex compiled (a bad
-  regex was silently disabling a security control).
-- [x] **Medium**: (3) guards evaluate all `block` checks BEFORE any strip/augment, so a strip-before-block can't
-  half-mutate a blocked body (+ regression). (4) passthrough reasoning pin resolves tier from the request model
-  (`_tier_from_model_name`), not just `default_tier`, so an explicit opus request hits `tier_overrides.opus`. (5)
-  mutation audit write offloaded via `asyncio.to_thread` (parity with inspect). (6) full-body records recompute hashes
-  from the forwarded (post-override) body so the row is self-consistent.
-- [x] **Low/nits**: (7) reasoning pin preserves unknown `thinking` sibling keys (forward-safe). (8) server-path
-  fail-closed test (fingerprint mismatch -> raise, no forward). (9) force-enable floor semantics documented (consistent
-  with translated `_max_effort`). (10) count_tokens override-skip commented. (11) guard matching per-block for all
-  actions. (12) dropped unused `flatten_system_text`. (13) explicit `action == "warn"` branch. (14) renamed
-  `intercept._short_hash` -> `_pattern_hash` (distinct from `proxy_audit._short_hash`).
-  - Verification: 192 focused + broad 2194-test sweep green; mypy/pyright/ruff clean on 6 changed src; `make pre-commit`
-    clean. New tests: config (override-requires-passthrough, 3 guard-validation), intercept (strip-then-block,
-    siblings), server-path (model-tier pin, fail-closed, full-body consistency).
-
-### Slice 2e - Sidecar audit plumbing (DONE 2026-06-01)
-
-| Test                               | Fixture                                                        | Assertion                                                                             | Test File                                                                   |
-| ---------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| proxy_id adds env + mounts         | `run_sidecar_session(proxy_id=...)`, `proxy.yaml` present      | cmd has `FORGE_PROXY_ID`, `FORGE_HOME=/root/.forge`, config `:ro` + audit/costs `:rw` | `tests/src/sidecar/test_container.py::...test_proxy_id_adds_env_and_mounts` |
-| missing proxy.yaml fails fast      | `proxy_id` set, no `proxy.yaml` on host                        | raises `FileNotFoundError` before `docker run` (no late in-container failure)         | `..::test_missing_proxy_yaml_fails_fast`                                    |
-| template-only unchanged            | `proxy_id=None`                                                | no `FORGE_PROXY_ID`/`FORGE_HOME`/`/root/.forge` in cmd                                | `..::test_no_proxy_id_is_template_only`                                     |
-| drift state redirect in sidecar    | `FORGE_SIDECAR=1`                                              | `_audit_state_path` -> `audit/state/<id>.json` (not the read-only config dir)         | `tests/src/proxy/test_audit_logger.py::TestAuditStatePath`                  |
-| validation skipped in sidecar      | `FORGE_SIDECAR` set                                            | `server._sidecar_mode_active()` True -> host-registry check bypassed                  | `tests/src/proxy/test_proxy_startup.py::TestSidecarModeActive`              |
-| sidecar overlay + host audit (E2E) | real image+entrypoint, `--proxy-id`, inspect passthrough proxy | in-container `GET /` `intercept_mode==inspect`; host audit shard has the record       | `tests/integration/sidecar/test_audit_plumbing.py`                          |
-
-- [x] `FORGE_PROXY_ID` into `container.py` env + narrow read-only per-proxy config mount + writable host `audit/` mount;
-  `docker/entrypoint.sh` passes `--proxy-id` when set; drift state writable in sidecar; preflight reports mode +
-  host-visible audit. Docker E2E gate passes via the canonical runner.
-  - **Plan correction (verified against code):** the plan's "no server CLI change needed" was wrong.
-    `validate_proxy_startup` (`proxy_startup.py`) requires the proxy_id in the host registry AND registry port ==
-    runtime port; in-container the registry isn't mounted and the port is fixed (8085), so `--proxy-id` would abort
-    startup. Fix: `server._sidecar_mode_active()` skips that registry/port cross-check under `FORGE_SIDECAR` (the
-    overlay is the in-container source of truth). Semantically correct — the check guards host-side registry coherence,
-    absent in a one-proxy container.
-  - **Drift-state redirect:** the per-proxy config dir is mounted read-only, so `audit_state.json` (written beside
-    `proxy.yaml` on host) moves to the writable audit mount (`~/.forge/audit/state/<id>.json`) under `FORGE_SIDECAR`.
-  - **Mounts:** `container.py` pins `FORGE_HOME=/root/.forge` and mounts host `~/.forge/proxies/<id>` (ro) +
-    `~/.forge/audit` (rw) at that home; `get_forge_home()` is `/root/.forge` in-container (no USER in
-    `Dockerfile.sidecar`).
-- [x] **Two latent `entrypoint.sh` bugs found by the E2E and fixed** (the sidecar proxy could never start; never caught
-  because `forge-sidecar:latest` was never in any test path): (1) bare `python -m forge.proxy.server` hit the system
-  interpreter with no forge — now `/forge/.venv/bin/python` (the editable venv), PATH fallback for non-standard bases;
-  (2) `--log-level warning` is not a server option (log level is env-driven, defaults to `off`) — removed. The E2E is
-  the regression for both.
-- [x] **Sidecar image wired into the canonical runner** (tooling gap: nothing built `forge-sidecar:latest`, and
-  `Dockerfile.sidecar` pinned `FROM forge-claude-test:latest` while the runner tags by Claude version):
-  `Dockerfile.sidecar` now takes `ARG BASE_IMAGE`; `scripts/test-integration.sh` builds `forge-sidecar:latest` from the
-  freshly-built base after the base build; conftest failure message points at the runner.
-  - Verification: **`./scripts/test-integration.sh tests/integration/sidecar/test_audit_plumbing.py` PASSES**
-    (in-container `GET /` `intercept_mode==inspect`/`wire_shape==anthropic_passthrough`; host `forge proxy audit show`
-    surfaces the record after the `--rm` container exits). Host gates green: 70 focused unit (`test_container` +
-    `test_audit_logger` + `test_proxy_startup`), 516 proxy+sidecar+audit-CLI sweep, 177 session-command; ruff/mypy
-    clean; fresh `uv run pyright` 0/0/0 on changed src; `bash -n` on entrypoint + runner OK.
-
-#### Slice 2e hardening - review fixes (DONE 2026-06-01)
-
-Review of 2e surfaced 9 issues (2 High / 1 Med / 4 Low / 2 nits/docs); all verified against code and fixed.
-
-- [x] **High**: (1) **costs not host-persistent** — mounted `audit/` but not `costs/`, so cost history AND cumulative
-  spend-cap accounting reset every `--rm` launch (caps bootstrap from cost logs). Added a writable `costs/` mount beside
-  `audit/`. (2) **Linux `--user` vs `/root`** — under `--user uid:gid` the process is a non-root uid with no passwd
-  entry, so HOME collapsed to `/` and `/root` (0700) was un-traversable, breaking both forge (`~/.forge`) and claude
-  (`~/.claude.json`). **Fixed:** `container.py` pins `HOME=/root` and `Dockerfile.sidecar` runs `chmod 0777 /root` so
-  the mapped uid can reach the /root mounts (sandbox-justified; ephemeral single-session `--rm`). Reproduced + verified
-  on macOS by forcing `--user` (container `/root` perms are real regardless of host OS).
-- [x] **Medium**: (3) `--proxy-id` startup no longer hard-gates on `template_exists` — proxy.yaml is authoritative when
-  a proxy id is supplied, so a proxy from a non-shipped user template starts in-container (`server.main`:
-  `if proxy_id is None and not template_exists`).
-- [x] **Low/nits**: (4) `run_sidecar_session` fails fast on the host when `proxy_id` has no `proxy.yaml` (was a late
-  in-container health failure). (5) integration test carries a cross-reference comment to
-  `run_sidecar_session`/`_ensure_audit_plumbing_mounts` (hand-rolled `docker run` can't drive `-it`+`exec claude`). (6)
-  renamed `_audit_plumbing_mounts` -> `_ensure_audit_plumbing_mounts` and documented the host-dir `mkdir` side effect.
-  (7) drift-state redirect gated on `FORGE_SIDECAR` **and** `FORGE_PROXY_ID` (template-only sidecars mount no audit/).
-  (8) `_SIDECAR_FORGE_HOME` comment corrected re: Linux `--user`. (9) confirmed checklist 2f keeps the narrow-mount §7
-  exception as a docs item.
-  - Verification: **E2E PASSES under forced `--user` against a freshly-rebuilt base** (current source incl. #2/#3/#7
-    baked; the test now always runs with `--user uid:gid` + `HOME=/root`, exercising the arbitrary-uid path on macOS);
-    71 focused unit + 799 proxy+sidecar+config+session sweep; ruff/mypy clean; fresh `uv run pyright` 0/0/0 on changed
-    src; `pre-commit` clean.
-
-### Slice 2f - Docs + always-on posture + closeout (DONE 2026-06-01)
-
-- [x] `docs/design.md` §7.x (intercept modes, sidecar-recommended/host-supported, narrow-mount §7 exception),
-  `intercept_mode`/`wire_shape` in §3.7 `GET /`, `forge proxy audit` rows in §4.0, §3.4 line; `docs/design_appendix.md`
-  §A.11 (config schema) + §A.12 (audit log schema); `docs/end-user/proxy.md` audit/intercept section + `audit_full_body`
-  privacy warning; `docs/board/change_log.md` Phase 2 entry.
-  - Design docs describe **shipped** behavior (documentation-guidelines Rule 2): §A.11/§A.12 anchors are linked from
-    §7.x; the `chmod 0777 /root` + `HOME=/root` sandbox decision is recorded in §7.
-  - **Doc-accuracy review fixes (6 issues, all verified against code):** full-body capture contract corrected (redacted
-    request body every path; redacted **response** body only for non-streaming passthrough — streaming/translated
-    deferred) in §7.x + §A.12 + `proxy.md`; §7 now records the `--user`/`HOME=/root`/`chmod 0777 /root` decision (the
-    earlier "recorded in §7" claim was premature); "inert by default" reworded to note the `anthropic-passthrough`
-    template opts into `inspect`; stale 2e mount table fixed (config `:ro` + audit/costs `:rw`; the silent-skip row
-    replaced by the fail-fast test); `tool-surface` hyphen-wrap typo fixed.
-  - Verification: `make pre-commit` clean (mdformat + link/anchor consistency); design.md/appendix/proxy.md/change_log
-    render and cross-link.
-  - **Carried forward as debt (not closed):** (a) deferred 2b real-upstream `@pytest.mark.slow` passthrough
-    signature-replay e2e needs `ANTHROPIC_API_KEY` (release-validation tier); (b) streamed full-body capture stays
-    request-body + response-metadata only; (c) optional cleanup — extract the `docker run` argv construction into a
-    shared helper so `tests/integration/sidecar/test_audit_plumbing.py` and `run_sidecar_session` can't drift (cross
-    -reference comment in place for now). (a)/(b) noted in the change_log Phase 2 entry.
-
-**Phase 2 complete (2026-06-01).** The card **stays in `doing/`** — the `runtime_abstraction` card spans Phases 2-6.
-Phase 3 shipped (native-relocate spike + fork Stage C v1); Phases 4-6 (runtime-abstraction core, cross-runtime resume,
-Codex frontend) and the deferred Phase 3 follow-ups are not yet executed. Do **not** move the card to `done/` until
-those land (board-contract: move only when the card is fully executed).
+Carried-forward debt (unchanged): (a) real-upstream `@slow` passthrough signature-replay e2e (release-validation tier);
+(b) streamed full-body capture stays request-body + response-metadata only; (c) optional shared helper for the sidecar
+`docker run` argv so `tests/integration/sidecar/test_audit_plumbing.py` and `run_sidecar_session` cannot drift.
 
 ## Phase 3 - Native-Relocate Spike
 
@@ -463,38 +252,14 @@ split + derivation/GC provenance) is the deferred **Stage C** follow-up (touch p
     UUID, so failed/partial launches still clean up) — dir-scoped to the child, never the parent's original. Covered by
     `test_fork_into.py::TestForkNativeRelocate` (derivation, same-dir fallback, cleanup-without-child-UUID).
 
-#### Phase 3 hardening - review fixes (DONE 2026-06-01)
+#### Phase 3 hardening - review fixes (DONE 2026-06-01; compacted 2026-06-09)
 
-Review of the spike surfaced 10 issues (5 Medium / 5 Low); all verified against code and fixed. Both gates were re-run
-green after the changes: host repro `[PASS]`, Docker contract test PASSED (23.0s).
-
-- [x] **Medium**: (M1) the contract test's child root is now an **underscore-bearing path** (`/tmp/relocate_child_wt`),
-  so real Claude exercises the `encode_project_path` `_`->`-` branch end-to-end — an encoder regression now surfaces as
-  DISCOVERY-FAIL instead of passing silently on a clean `/workspace`-style path. (M2) host repro drops
-  `--dangerously-skip-permissions` to match the contract test's root posture (Claude rejects the flag under root; the
-  read-only `Read` tool runs without it). (M4) both gates digest the relocated parent JSONL before/after resume and
-  assert it is unchanged (`--fork-session` must not mutate the relocated copy). (M5) both gates track whether a **signed
-  thinking block** was actually present and emit `[INCONCLUSIVE]` (host) / `pytest.fail("INCONCLUSIVE: ...")` (Docker)
-  rather than `[PASS]` when it was not — a clean resume with nothing to revalidate is not evidence for the
-  signature-survival hypothesis.
-- [x] **M3 real-Claude helper smoke (decision recorded)**: the conftest helper refactor (`run_claude_print` signature,
-  `setup_real_claude`, `relocate_and_resume`) is exercised by **two passing real-Claude tests** — the new contract test
-  and `tests/integration/docker/test_real_claude_hooks.py` (2 passed, 15.95s). The other three consumers
-  (`test_real_claude_workers.py`, `test_real_claude_memory.py`, `test_real_claude_supervisor.py`) are **deferred to
-  release-validation**: all call sites pass the changed args by keyword and the new params are keyword-only with
-  unchanged defaults, so the change is backward-compatible by construction (statically verified).
-- [x] **Low**: (L6) conftest detects the signed block by parsing JSONL **content blocks** (`type=="thinking"` with
-  `signature`, or `type=="redacted_thinking"` with `data`), not a naive substring grep. (L7) the experiment README
-  documents that `/`, `.`, and `_` all map to `-`. (L8) `relocate_transcript` writes via `tempfile.mkstemp` +
-  `os.replace` (atomic, owner-only `0600`, unique temp name so concurrent same-UUID relocations can't collide; temp
-  removed on any failure). (L9) discovery classification matches the **exact** `"no conversation found"` marker in both
-  gates; a bare `"not found"` could mislabel an unrelated failure that should fall through to UNCATEGORIZED. (L10)
-  `encode_project_path` carries a note that only `/`, `.`, `_` are characterized against real Claude — do not broaden
-  the rule without a characterization test.
-  - Verification: 30 host unit/regression tests pass (`test_claude_relocate` + `test_claude_paths` +
-    `test_bug_encode_project_path_underscore`); `bash -n` + shellcheck clean on `reproduce.sh`; host repro `[PASS]` and
-    `tests/integration/docker/test_native_relocate_contract.py` PASSED (23.0s) after the changes; `make pre-commit`
-    clean.
+10 review issues (5 Medium / 5 Low) verified and fixed; both gates re-run green after the changes (host repro `[PASS]`,
+Docker contract test 23.0s). Durable kernels preserved: the contract test uses an underscore-bearing child root so the
+`encode_project_path` `_`->`-` branch is exercised end-to-end against real Claude; both gates emit `[INCONCLUSIVE]`
+(never `[PASS]`) when no signed thinking block was present -- a clean resume with nothing to revalidate is not evidence
+for signature survival; only `/` `.` `_` are characterized against real Claude -- do not broaden the encoding rule
+without a characterization test. Full per-issue detail in git history.
 
 ### Phase 3 - Deferred follow-ups (parked; land when prioritized)
 
@@ -525,185 +290,44 @@ schema with nullable `source_refs`; (3) instrument native + direct `core.llm` pa
 proxied per-request correlation fork last. The `HeadlessInvoker` refactor is the largest *implementation* risk but is
 internal/refactorable -- it does not mint a durable contract, so it does not gate the schema work.
 
-### Slice 4a - Run-tree env contract (DONE 2026-06-01)
+### Slices 4a-4f (DONE 2026-06-01; hardened 2026-06-02; compacted 2026-06-09)
 
-- [x] Run-tree identity minted at the single env choke point, orthogonal to `FORGE_DEPTH`.
+Compacted per the board-contract size policy. Full slice detail (assertions, verification bodies, review-fix lists)
+lives in git history and the change_log 2026-06-01 "runtime_abstraction Phase 4 (Slices 4a-4f)" + 2026-06-02 hardening
+entries; `design.md` §3.14/§4.1.4/§4.1.5/§5.5.5 and `design_appendix.md` §A.13/§C.1/§F.5 are normative.
 
-  - Assertion: every Forge-spawned process carries `(FORGE_RUN_ID, FORGE_PARENT_RUN_ID, FORGE_ROOT_RUN_ID)`; the
-    interactive top is a fresh root; the queue-decoupled memory-writer roots under its originating session;
-    `FORGE_DEPTH` and its three recursion guards (`supervisor.py`, `team/handlers.py`, `review/engine.py`) are
-    unchanged.
-  - Verification (2026-06-01): `RunIdentity` + `mint_run_id`/`get_run_identity`/`new_root_run_identity`/
-    `derive_child_run_identity` in `core/reactive/env.py`; `build_claude_env(derive_run_identity=True)` stamps the
-    triple right after the depth block (reads spawner id before overwrite; a stale `FORGE_PARENT_RUN_ID` is recomputed,
-    not leaked). `SessionResult` (all 6 returns) and `ReviewResult` (5 post-env returns; 2 pre-env failures stay null)
-    surface `run_id/parent_run_id/root_run_id`. Interactive root centralized in `invoke._build_environment`
-    (`derive_run_identity=False` + fresh root + parent scrub) -- covers session start/resume/fork + bare
-    `forge claude start`; sidecar mints its own root in `container.py`. Memory-writer: `enqueue_handoff_marker`
-    snapshots `origin_run_id/origin_root_run_id`; `main._memory_writer_env` re-roots the detached spawn under the origin
-    (parent=origin_run_id, root=origin_root_run_id, fresh run_id) and scrubs the drainer's id. Targeted unit/regression
-    tests pass (incl. `tests/regression/test_run_tree_env_contract.py` orthogonality + source-env-unmutated, and
-    `test_claude_invoke.py` interactive fresh-root carve-out -- inherited run vars must not leak into a root);
-    `tests/src -m "not integration"` green (4866 passed); `pre-commit` clean (mypy + pyright). **Refinement vs plan:**
-    interactive root minted once in `_build_environment` (the shared interactive choke point) rather than per-builder,
-    so no caller (resume/fork) can drift.
+- [x] 4a run-tree env contract: `(FORGE_RUN_ID, FORGE_PARENT_RUN_ID, FORGE_ROOT_RUN_ID)` stamped at the single env choke
+  point, orthogonal to `FORGE_DEPTH` (its three recursion guards unchanged); interactive launches mint a fresh root in
+  `invoke._build_environment`; the queue-decoupled memory writer re-roots under its originating session's snapshotted
+  origin identity.
 
-- [x] Introduce `HeadlessInvoker` interface and `ClaudeHeadlessInvoker`. *(Slice 4d -- shipped 2026-06-01)*
+- [x] 4d `HeadlessInvoker` + `ClaudeHeadlessInvoker` (`core/invoker/`): the seam is the **lifecycle, not the routing**
+  (requests arrive already-routed); review fan-out moved verbatim behind `run_parallel` (process groups, `os.killpg`
+  SIGTERM->SIGKILL, deterministic ordering, SIGTERM-before-executor-join); the 4 single-shot callers keep
+  `run_claude_session`. Per-worker usage events emit here (worker granularity, cost null -- the verb aggregate holds the
+  estimate; events record the actual routed model/provider/proxy_id).
 
-  - Assertion: existing single headless callers of `run_claude_session()` keep user-visible behavior, timeout semantics,
-    environment routing, and fail-open/fail-closed choices.
-  - Verification (2026-06-01): new `src/forge/core/invoker/` package -- `HeadlessRequest`/`HeadlessResult`/`Attribution`
-    - the `HeadlessInvoker` Protocol (`run` single-shot, `run_parallel` fan-out) in `types.py`, `ClaudeHeadlessInvoker`
-      in `claude.py`. The seam is the **lifecycle, not the routing**: a request arrives already-routed (`argv`+`env`),
-      so routing stays review-domain and Phase 5's Codex invoker reuses the same `run_parallel`. The 4 single-shot
-      callers (supervisor/memory-writer/shadow-curation/team-handlers) **keep `run_claude_session`** (already the right
-      single-shot abstraction with its bare/proxy guards; routing them through the invoker buys nothing until the
-      runtime registry in 4e, and avoids churning hook/session callsites in the riskiest slice). `run()` exists for
-      protocol completeness + Phase 5, covered by a single-shot parity test.
+- [x] 4e runtime registry (`core/runtime/`): frozen `RuntimeSpec` per runtime in a module-level `RUNTIMES` table;
+  tri-state capability literals declare Codex/Gemini limits as values, never parity-implying omissions
+  (`pretool_policy="partial"`, `native_hooks="gated"` + machine-readable version gate); `forge runtime list [--json]`.
 
-- [x] Move review-engine fan-out behind invoker lifecycle management. *(Slice 4d -- shipped 2026-06-01)*
+- [x] 4f runtime-tagged `ActionContext` (required `runtime: str`; `PolicyEngine.evaluate` never branches on it --
+  attribution metadata, not control flow) + the Claude adapter/responder named behind runtime-neutral
+  `HookAdapter`/`HookResponder` protocols (`src/forge/cli/hooks/protocols.py`); output bytes + exit codes unchanged (77
+  hook-command snapshot tests untouched); a `CodexHookAdapter`/`CodexHookResponder` is the stub the protocols make room
+  for. Integration: `test_policy_hooks.py` 10/10 through the real wheel CLI.
 
-  - Assertion: `src/forge/review/engine.py` parallel `subprocess.Popen()` fan-out, process-group cleanup, timeout
-    handling, cancellation, and deterministic result ordering are preserved and covered by tests.
-  - Verification (2026-06-01): `run_multi_review` now shapes per-worker `HeadlessRequest`s (`_prepare_worker`: routing
-    -> env+argv+prompt) and delegates to `ClaudeHeadlessInvoker().run_parallel`, mapping back via `_to_review_result`
-    (original status conventions preserved: strip-on-success, `Exit code N`, `Timeout after Ns`). The lifecycle moved
-    **verbatim** (`Popen(start_new_session=True)`, `os.killpg` SIGTERM->SIGKILL under `children_lock`,
-    `ThreadPoolExecutor(min(N,5))`, `result_map[idx]` ordering), so the 62 existing review tests
-    (`test_engine`/`test_adversarial`/`test_consensus`) pass with only a patch-target retarget
-    (`forge.review.engine.subprocess.Popen` -> `forge.core.invoker.claude.subprocess.Popen`). **Per-worker usage
-    events** (deferred from 4c) emit here: when a request carries `Attribution` (threaded from the 4 verbs via
-    `run_multi_review`/`run_adversarial`/`run_consensus`), `run_parallel` emits one `emit_worker_usage` per worker
-    (`attribution_granularity=worker`, `measurement_source=unattributed`, cost null -- the verb aggregate holds the
-    estimated total; the event records the **actual routed** model/provider/proxy_id, not the friendly catalog id).
-    **Review fixes:** cancellation cleanup now SIGTERMs children *before* the blocking executor join (manual executor
-    management -- the `with ThreadPoolExecutor` `__exit__` would otherwise join-then-cleanup, delaying SIGTERM up to
-    `timeout_seconds` on Ctrl+C; the spawn/register race + cancelled-worker emission were further hardened 2026-06-02,
-    see *Phase 4 hardening - review fixes*). 15 invoker tests + an engine routed-metadata test
-    (`tests/src/core/invoker/test_claude_invoker.py`: ordering, concurrency cap, timeout + cancellation killpg, run-id
-    surfaced, single-shot parity, per-worker emission). Full unit suite 4925 passed; mypy clean.
+- [x] 4b durable usage ledger (`~/.forge/usage/events/<month>_<pid>.jsonl`): versioned `UsageEvent`
+  (`schema_version=1`), strict typed reads (unknown field == corruption), PID-sharded, best-effort 0600 writer; modeled
+  on `audit_logger.py`.
 
-- [x] Add runtime registry capability matrix. *(Slice 4e -- shipped 2026-06-01)*
+- [x] 4c instrumented emitters: the 4 workflow verbs, memory writer, semantic supervisor, shadow curation, action tagger
+  (exact provider tokens; `X-Request-ID` join when the target is a registered Forge proxy); deferred-by-design:
+  interactive launchers (own concern), native Codex/Gemini (landed Phase 5).
 
-  - Assertion: registry answers installed, interactive, headless, hooks, usage, native resume, and scope capabilities.
-  - Verification (2026-06-01): new `src/forge/core/runtime/` package -- a frozen `RuntimeSpec` per runtime in a
-    module-level `RUNTIMES` table (mirrors `core/auth/capabilities.py`'s `Credential`/`CREDENTIALS` pattern) + lookup
-    helpers (`get_runtime` raises on unknown id; `list_runtimes`/`installed_runtimes`). Answers the card's seven
-    questions: **installed** (`is_installed()` = PATH presence, independent of version parsing; `detect()` = best-effort
-    `--version` probe -- Claude reuses `install/version.py:get_claude_runtime_version` via a lazy import, matching the
-    `core->install` lazy-import precedent in `core/ops/gc.py`), **interactive**/**headless**/**hooks**/**usage
-    source**/**native resume**/**install scopes** (+ curated-transfer in/out). **Honesty:** partial/planned support is a
-    tri-state `Literal`, not a `bool` -- Codex `pretool_policy="partial"` (card: PreToolUse is not a full enforcement
-    boundary), `interactive="beta"`, and `native_hooks="gated"` with machine-readable
-    `hook_min_version`/`hook_feature_flag` (a Phase 5 preflight verifies the gate instead of parsing a note); Gemini
-    `native_hooks="none"`/`native_resume=False` (capability-check-first). Data is the card's Runtime Capability Matrix;
-    Claude fully populated, Codex/Gemini declare limits as values not omissions. `forge runtime list [--json]` renders
-    it (registered in `cli/main.py`; the table escapes free-text notes so a bracketed token like
-    `[features] hooks = false` survives Rich markup instead of being eaten as a tag). 16 unit tests
-    (`tests/src/core/runtime/test_registry.py`: shape/order, per-runtime capability fields, Codex/Gemini limits,
-    `is_installed` PATH reflection, `_probe_version` parse/both-streams/nonzero/unparseable;
-    `tests/src/cli/test_runtime.py`: hermetic render + `--json` shape + the markup-escape regression) pass; mypy clean
-    on the 3 new source files; `design.md` §5.5.5 documents the registry as the capability half of the runtime seam (the
-    invoker is the lifecycle half). **Nothing branches on the registry yet** -- Phase 5's Codex invoker + auth/runtime
-    preflight are its first consumers.
-
-- [x] Generalize existing `ActionContext` / `PolicyDecision` for runtime adapters. *(Slice 4f -- shipped 2026-06-01)*
-
-  - Assertion: current Claude hook adapter behavior is unchanged, runtime identity is represented explicitly, and Codex
-    adapter limitations are represented as capabilities instead of implied parity.
-  - Verification (2026-06-01): `ActionContext` gains a **required** `runtime: str` (no default -- forces every adapter
-    to declare its origin runtime; `PolicyEngine.evaluate` still never branches on it, so it is attribution metadata,
-    not control flow). The Claude-specific halves are now named behind runtime-neutral protocols
-    (`src/forge/cli/hooks/protocols.py`): `ClaudeHookAdapter.build_context` (payload -> `ActionContext`, tags
-    `runtime="claude_code"`) and `ClaudeHookResponder` (decision -> wire: `format_deny`/`format_needs_review`/
-    `allow_feedback` + `BLOCK_EXIT`/`ALLOW_EXIT`); `policy_check` routes through both, with the `[forge]`
-    summary/warning overlay kept as a separate telemetry concern. Codex parity is NOT implied -- its limits live in the
-    4e runtime registry (`pretool_policy="partial"`, `native_hooks="gated"`); a `CodexHookAdapter`/`CodexHookResponder`
-    is the Phase 6 stub the protocols make room for. All 4 production constructors + ~45 test constructions pass
-    `runtime`; `_build_action_context` is replaced by the adapter (no compat shim). 340 policy + 77 hook-command
-    (output/exit-code snapshot -- behavior unchanged) + 23 new responder/adapter tests pass; mypy clean (the precise
-    `ActionContext | None` return surfaced + fixed two latent `new_content` narrowing gaps). `design.md` §4.1.4/§4.1.5
-    document the seam. Integration (CLAUDE.md-mandated for hook changes):
-    `tests/integration/docker/test_policy_hooks.py` -- the real wheel-installed `forge hook policy-check` subprocess in
-    an isolated container -- **10 passed (16.7s)** (deny exit 2, allow exit 0 + manifest state updates, all three
-    fail-open paths), confirming the adapter->engine->responder dispatch is byte-identical through the real CLI
-    boundary.
-
-- [x] Define durable usage ledger schema. *(Slice 4b -- shipped 2026-06-01)*
-
-  - Assertion: the `~/.forge/usage/events/<month>_<pid>.jsonl` `UsageEvent` schema covers runtime, provider, model,
-    proxy, billing mode, tokens, latency, status, and attribution ids (run/parent/root + cross-plane `source_refs`).
-  - Verification (2026-06-01): new `src/forge/core/usage/` package -- `UsageEvent` (`schema_version=1`, auto-stamped
-    `event_id`/`ts`, every non-core field defaulted), `SourceRefs`, and `BillingMode`/`MeasurementSource`/
-    `AttributionGranularity` literals; `log_usage_event` (best-effort, `open_secure_append` 0600, dirs 0700,
-    PID-sharded, module `_lock`) + strict typed `read_usage_events` (`dacite.Config(strict=True)`: unknown fields,
-    invalid literals, and wrong nested types are all corruption; skips non-object / newer-schema / malformed lines with
-    a one-time warning) + `prune_usage_events`. Modeled on `audit_logger.py` (versioned), not the unversioned cost
-    logger. **Path refinement:** shipped PID-sharded `usage/events/<month>_<pid>.jsonl` (not a single `events.jsonl`),
-    like every sibling log, so concurrent (cross-process) review workers never contend on one file. 16 unit tests
-    (`tests/src/core/usage/test_ledger.py`: roundtrip, version stamp, 0600/0700 perms, null and nested `source_refs`,
-    newer-skip-warn-once, unknown-field / bad-literal / bad-nested corruption, non-object + malformed line skip,
-    filters, ts-window, best-effort writer) + a parametrized regression
-    (`tests/regression/test_bug_usage_ledger_non_dict_line.py`); `design.md` §3.2/§3.14 + `design_appendix.md` §A.13
-    document the schema + three-plane model. `pre-commit` clean. Callsite instrumentation is the next box (Slice 4c).
-
-- [x] Instrument usage ledger callsites in staged order. *(Slice 4c -- shipped 2026-06-01)*
-
-  - Assertion: workflow verbs (`src/forge/cli/workflow.py`), memory writer (`src/forge/session/memory_writer.py`),
-    review engine (`src/forge/review/engine.py`), semantic supervisor (`src/forge/policy/semantic/supervisor.py`), team
-    supervisor (`src/forge/policy/team/handlers.py`), Claude launcher (`src/forge/cli/claude.py`), and session launcher
-    (`src/forge/cli/session.py`) each have an explicit done/deferred status.
-  - Verification (2026-06-01): two commits -- 4c-i foundation (holder + helpers) `1477d3b`, then 4c-ii wiring. **Done:**
-    the four workflow verbs (`cli/workflow.py`, one estimated verb-level event each via `emit_verb_usage`, ambient run,
-    `attribution_granularity=verb`); memory writer, semantic supervisor, shadow curation -- one event per `claude -p`
-    run via `emit_usage_for_session_result` + the `track_verb_cost` holder, attributed to the subprocess's run identity,
-    null `source_refs`; action tagger (`core/reactive/tagger.py`) -- direct worked example, `ask()` -> `complete()` to
-    capture `provider_usage_exact` tokens, forwards `X-Request-ID` via `with_forge_request_id` (behavior-preserving: a
-    None-default client returns the hp verbatim, so only the header is added). **Deferred:** review-engine per-worker
-    events (`review/engine.py` -- land behind `HeadlessInvoker` in 4d, where each spawn is owned; the verb aggregate
-    already covers the fan-out); team supervisor (`policy/team/handlers.py`) + team tagger + `policy/workflow/stages.py`
-    (no cost wrapper / proxy-only direct); interactive launchers (`cli/claude.py`, `cli/session.py` --
-    interactive-session usage is its own concern, not a headless verb); native Codex/Gemini (Phase 5).
-  - `track_verb_cost` now yields a `VerbCostResult` holder (`measured` flag separates a real snapshot delta from a
-    no-proxy verb -> null cost, not a fabricated $0); backward-compatible (callers without `as cost` unaffected;
-    verb-cost log unchanged). **Refinement vs plan:** added `measurement_source=provider_usage_exact` (a direct call's
-    exact in-band tokens fit none of the original four values); enum finalized with its first emitters (nothing emitted
-    before, so no migration).
-  - Tests: billing/correlation/emit unit (20), tagger updated to `.complete()` + emits a `provider_usage_exact` event,
-    `test_workflow.py` verb-event emission (one aggregate, ambient run; none without identity), regression
-    `test_bug_usage_claude_p_null_source_refs.py`. Targeted suites green (usage + tagger + cost_tracking + workflow +
-    memory_writer + supervisor + shadow); mypy clean on all 11 wired files. design.md §3.14 + appendix §A.13 updated
-    (emitters shipped).
-  - **Review fixes (2026-06-01):** (1) direct-path join now works -- the tagger resolves its base_url sync
-    (`resolve_client_base_url` -> `resolve_provider_base_url`) and sets `source_refs.cost_request_id` when the target is
-    a registered Forge proxy (was minted+forwarded then discarded -> always null); (2) `emit_direct_llm_usage` billing
-    defaults to `unknown` (no more hardcoded `api`/`has_api_key=True` -- the tagger uses a dummy local-LiteLLM key); (3)
-    `latency_ms` populated -- `track_verb_cost` records duration on every path and the emitters copy it. +4 unit tests;
-    unit suite 4910 green.
-
-#### Phase 4 hardening - review fixes (DONE 2026-06-02)
-
-Post-merge review of the shipped 4a-4d slices surfaced 4 fixes (1 concurrency race / 3 correctness/clarity); all
-verified against code, each with a test. Targeted suites green (24 invoker+emit passed); mypy/pyright/`pre-commit`
-clean.
-
-- [x] **4d cancellation race (spawn/register TOCTOU)**: `run_parallel` could spawn a child in the window between `Popen`
-  returning and its registration in `children`; if `_cleanup` snapshotted `children` then, the child escaped SIGTERM and
-  `executor.shutdown(wait=True)` blocked on its `communicate(timeout=...)` (a Ctrl+C hang + a transiently-orphaned
-  `claude -p`). Fix: a lock-guarded `cleanup_started` flag -- a worker re-checks it after registering and self-reaps its
-  just-spawned child (`_terminate_and_reap`), skips spawning once cancellation began, and
-  `shutdown(cancel_futures=True)` drops never-started workers. Append and flag-read are atomic under `children_lock`, so
-  every child is reaped by exactly one of {cleanup snapshot, worker} -- none escapes, none double-waited. Deterministic
-  test `test_cancellation_reaps_child_registered_after_cleanup` forces the window via an observed lock.
-- [x] **4d cancelled workers no longer emit usage**: a cancelled job did no attributable work but fell through to
-  `_emit_worker` (logged `status="error"`). Added a typed `HeadlessResult.cancelled` (keeps `error="cancelled"` for the
-  review layer's `_to_review_result` display); `_emit_worker` skips cancelled -- the single policy point. Test
-  `test_cancelled_worker_emits_no_event`.
-- [x] **4c direct-LLM `cached_tokens`**: `emit_direct_llm_usage` recorded input/output but dropped `cached_tokens`; now
-  copied from the provider usage. Test updated.
-- [x] **4a partial-origin marker**: documented the both-or-neither `origin_run_id`/`origin_root_run_id` contract on
-  `_memory_writer_env` and pinned the defensive fallback (only-`origin_run_id` -> parent=root=origin, fresh child) with
-  `test_env_tolerates_partial_origin_marker`, so it is not re-flagged as a parent/root bug.
+- [x] Phase 4 hardening (2026-06-02): 4d spawn/register cancellation race fixed (lock-guarded `cleanup_started`; every
+  child reaped by exactly one of cleanup/worker); cancelled workers emit no usage (typed `HeadlessResult.cancelled`);
+  direct-LLM `cached_tokens` copied; the both-or-neither origin-marker contract pinned with a test.
 
 ### Slice 4g - Proxied per-request correlation (exact `claude -p` cost) (2026-06-08)
 
@@ -1098,16 +722,161 @@ shipped CLI; the documented `regenerate -> show -> codex exec` path is covered e
   be Chat Completions translated. Do not block a route just because the upstream model speaks chat-completions. The
   `codex/models` prose still shows a stale either/or; `config-reference` (`wire_api="responses"` only) is authoritative.
 
-## Phase 6 - Codex Frontend Beta
+## Phase 6 - Codex Frontend Beta (evaluation only)
 
-- [ ] Evaluate Codex as an interactive frontend runtime.
+**Scope (resolved 2026-06-09; see Open Decisions):** Phase 6 is **evaluation only** -- no product features.
+Deliverables: a reproducible probe harness (`scripts/experiments/codex-hooks/`), a Stage-A-style decision record with
+per-deliverable go/no-go verdicts, and a follow-up build card (`docs/board/proposed/codex_frontend/`). Hook fixtures are
+descoped to the build card (see Slice 6.1): hook payloads need a firing hook, which is headless-unavailable. The
+decision record satisfies this phase's evaluate box and completes the card (build work moves to the follow-up card).
+Evaluation coverage decisions: the probe pins facts for the **broader hook set** (PreToolUse + PermissionRequest + Stop
+\+ UserPromptSubmit); **SessionStart transfer delivery with initial-message fallback** is the build direction whose
+trust/`additionalContext` feasibility the probe must settle; **app-server transport is deferred, unevaluated** (recorded
+verbatim, not probed).
+
+- [x] Evaluate Codex as an interactive frontend runtime.
   - Assertion: decision is based on headless invocation, usage accounting, policy semantics, and curated transfer
     results from earlier phases.
+  - Execution (2026-06-09): satisfied by the Slice 6.1 decision record (go/no-go table, every verdict citing probe-stage
+    artifacts), not by shipped frontend code. Net: bridge CLI is GO; all hook-dependent deliverables are
+    headless-impossible or gated on unverified interactive firing -> the `codex_frontend` build card.
+
+### Slice 6.0 - Probe harness (pin the unverified facts)
+
+Every Phase 6 deliverable rests on facts that are doc-implied or never exercised against the binary. Standing rule
+(5.0/5a precedent): the installed binary is authoritative; docs are leads. Harness mirrors
+`scripts/experiments/native-resume/` (staged `reproduce.sh`, verdict vocabulary, hermetic mktemp root + isolated
+`CODEX_HOME`, auth copied 0600 into the temp tree, loud secret-scan in `sanitize.sh`, cheap one-word-reply turns, ~18-22
+total turns).
+
+Fact groups: (1) hook payload JSON shapes per event; (2) response wire contracts (deny JSON/exit-2, `updatedInput`,
+UserPromptSubmit block -- the `%`-command seam, SessionStart `additionalContext` landing verifiably in model context,
+PermissionRequest `decision.behavior`, Stop block-once, malformed-output fail-closed); (3) registration mechanics
+(user/proj x toml/json surfaces, matchers); (4) trust mechanics (untrusted-skip, project `trust_level` vs per-hook-hash,
+where trust state lives, hash-keying on content change); (5) whether hooks fire under `codex exec` at all -- the gating
+unknown; (6) interactive management facts (initial-prompt arg, `FORGE_SESSION` reaching hooks, session/rollout file
+location + discoverable session id); (7) `codex exec resume` semantics (`thread_id`, `--json` composition, cross-cwd,
+`--last`); (8) PreToolUse bypass paths (simple/compound shell, apply_patch, optional MCP).
+
+- [x] Stage 00 preflight (0 turns): codex-cli **0.138.0** (drift-stamped from the 0.137.0 pin), `features list`
+  hooks=true, `CODEX_HOME` isolation verified, `--help` captured.
+- [x] Stage 05 config-schema (0 turns; added during execution): `--strict-config` + bogus-model classifies registration
+  acceptance without a completion. **Refutes the doc-implied "strict registration":** required inner fields ARE
+  validated (a `comand` typo errors "missing field `command`"; unknown top-level keys error), but unknown inner/outer
+  hook-entry fields **and bogus event names** (`[[hooks.NotARealEvent]]`) load **silently** -- a misspelled event never
+  errors.
+- [x] Stage 10 headless-fire **(GATE)**: SessionStart tee on all 4 surfaces, plain exec +
+  `--dangerously-bypass-hook-trust` retry -> **0 firings**. Stage verdict **`[NO-FIRE-UNCATEGORIZED]`**; 5 independent
+  clean controlled runs confirmed headless hooks do not fire. Interactive firing is **unverified** (operator-gated ->
+  build card), so the result is NOT "[INTERACTIVE-ONLY]" -- that classification would require interactive evidence.
+- [x] Stage 20 payloads (facts 1, 3): real read-only + workspace-write turns. A real `SessionStart`/`Stop` payload was
+  captured (snake_case, doc-shape confirmed) but **only via a non-reproducible codex first-run/bootstrap session** --
+  clean isolated turns fire 0. Payload **shape** pinned; reliable headless capture is not available.
+- [~] Stage 30 responses (fact 2): **moot headless** -- a hook that never fires cannot demonstrate a deny/mutate/
+  additionalContext contract. Deferred to an interactive (operator/build-card) probe. Not spent (saved ~8 turns).
+- [x] Stage 40 trust (fact 4): headless sub-steps run; 0 firings even with project `trust_level` set and bypass-trust.
+  The interactive trust-flow + trust-store-location discovery is **operator-gated (TTY)** -> build card.
+- [x] Stage 50 interactive (fact 6): headless sub-steps run. **Pinned:** session/rollout path
+  `$CODEX_HOME/sessions/YYYY/MM/DD/rollout-<ts>-<session_id>.jsonl` (filename embeds the session id); `FORGE_SESSION`
+  reaches the model shell; codex does a first-run plugin-marketplace clone into `$CODEX_HOME/.tmp/plugins`. Interactive
+  initial-prompt arg + interactive hook firing are **operator-gated (TTY)** -> build card.
+- [x] Stage 60 exec-resume (fact 7): **`codex exec resume <thread_id>` works, recalls context, and resumes CROSS-CWD**
+  (unlike Claude's CWD-bound `--resume`); `--json` composes with options before the `resume` subcommand; the id is the
+  stream `thread_id`. `--last` is unreliable headless (spawned a fresh thread). Feeds bridge-CLI = GO.
+- [~] Stage 70 bypass (fact 8): **moot headless** (PreToolUse never fires headless) -> interactive/build-card.
+
+### Slice 6.1 - Decision record (+ registry correction)
+
+- [~] Fixtures to `tests/fixtures/codex/hooks/`: **descoped to the build card.** The only reliably-reproducible artifact
+  headless is the `codex exec resume` stream (≈ the existing `exec_json_success.jsonl` + `thread_id` continuity), and
+  hook **payload** fixtures require firing, which is headless-unavailable -- they must be captured on the interactive
+  path (operator/build-card). The confirmed payload **shape** is recorded below; no raw hook fixtures are committed this
+  phase.
+- [x] Decision record written (below).
+- [x] Registry correction: the binary contradicts the declared facts -- `native_hooks="gated"` + `hook_min_version` read
+  as "hooks work once version-gated," but hooks are enabled + version-OK yet **do not fire headless**. Corrected the
+  Codex `RuntimeSpec` machine-readable fields (not just the note): `native_hooks="headless_inert"` (new `HookSupport`
+  value -- registers/enables but does not fire under `codex exec`; interactive unverified) and `pretool_policy="none"`
+  (PreToolUse never fires headless -> no verified enforcement). A consumer reading the field, not just the prose, now
+  sees the limit. `codex_preflight.py` `hook_seam` updated to match: the normal enabled+version-OK headless case now
+  returns `headless_inert` (was `unknown`/"trust unproven") -- a new `HookSeam` literal mirroring the registry value, so
+  `forge runtime preflight codex` no longer reads as "might work, trust unproven." Still never returns `active` (that
+  verdict belongs to 5d's real hook); `unknown` is kept only for the moot not-installed / unparseable-version cases.
+
+#### Phase 6 probe -- Codex hooks/frontend evaluation (verified 2026-06-09, codex-cli 0.138.0)
+
+**Harness:** `scripts/experiments/codex-hooks/` (`./reproduce.sh`); captures outside the repo. Re-pinned 0.137.0 ->
+**0.138.0** (changelog claims 0.138/0.139 hook-neutral). Markers: confirmed-doc / refuted-doc / doc-silent-now-pinned.
+
+- **(fact 5, GATE -- doc-silent-now-pinned) Headless `codex exec` does NOT deliver hooks.** 0 firings across **5
+  independent clean isolated runs**: 4 registration surfaces (user/project x `config.toml`/`hooks.json`); plain exec,
+  `--dangerously-bypass-hook-trust`, and repeated same-home turns; real turns including one that executed a shell tool.
+  No hook/trust warning on stderr. Two harness stages (40/50) first showed firings -- traced to a stale per-stage
+  capture dir (harness bug, fixed: `probe_init` now clears it) and/or a non-reproducible codex first-run bootstrap
+  session; neither reproduced under isolation. **For Forge: headless hook delivery is not dependable.**
+- **(fact 1 -- confirmed-doc) Payload shape is snake_case as documented.** A real `SessionStart` payload:
+  `{session_id, transcript_path, cwd, hook_event_name, model, permission_mode, source}` with `source:"startup"`; `Stop`
+  carries the same `session_id`. Reliable *capture* needs the interactive path; the shape is pinned.
+- **(fact 3 -- refuted-doc) Registration validation is shallow.** `--strict-config` validates required inner fields
+  (missing `command` errors) and unknown top-level keys, but **silently accepts unknown hook-entry fields and bogus
+  event names** -- a typo'd event (`[[hooks.NotARealEvent]]`) never errors. A Forge installer must validate event names
+  itself.
+- **(fact 7 -- confirmed + refined) `codex exec resume <thread_id>` is solid and CROSS-CWD.** Recalls prior context from
+  a *different* project dir (Claude's `--resume` cannot); `--json` composes (options before the `resume` subcommand); id
+  = stream `thread_id`. `--last` unreliable headless (spawned a fresh thread). Codex-side continuation after the bridge
+  hop is viable by id.
+- **(fact 6 -- partly pinned) Session files + env.** `$CODEX_HOME/sessions/YYYY/MM/DD/rollout-<ts>-<session_id>.jsonl`
+  (filename embeds the session id -> discoverable for a `confirmed` manifest field); `FORGE_SESSION` reaches the model
+  shell; first-run plugin-marketplace clone into `$CODEX_HOME/.tmp/plugins`. Initial-prompt arg + interactive hook
+  firing: **operator-gated (TTY); not verifiable from a non-interactive harness** (`codex` refuses non-TTY stdin; a pty
+  via `script` starts the TUI but it needs real terminal interaction).
+- **(facts 2, 4, 8 -- interactive-gated) Not observable headless.** Response contracts, trust flow + trust-store
+  location, and PreToolUse bypass all require firing hooks; deferred to an interactive operator probe in the build card.
+- **(scope) app-server: not probed -- deferred, unevaluated** (decision 2026-06-09).
+
+**Go/no-go (every verdict cites stages above):**
+
+| #   | Deliverable                                           | Verdict                                                                           | Basis                                                                                                                                                                   |
+| --- | ----------------------------------------------------- | --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| iii | One-command bridge CLI over `bridge_session_to_codex` | **GO**                                                                            | No hook dep; `exec resume` incl. cross-CWD verified (60); the core op already ships (Phase 5e)                                                                          |
+| ii  | SessionStart curated-transfer delivery                | **NO-GO for the (headless) bridge -> initial-message stays primary, permanently** | Headless hooks never fire (5,10) -- a `codex exec` bridge can't use `additionalContext`. Vindicates the Phase 5 deferral. Interactive frontend *could*, iff (iv) clears |
+| i   | Codex hook adapter/responder (policy on Codex)        | **NO-GO headless; UNVERIFIED interactive**                                        | Policy on `codex exec` fan-out impossible (5,10,30-moot). Payload->`ActionContext` mapping is shape-ready (1); responder contracts unverified (2 interactive-gated)     |
+| iv  | Interactive Codex frontend under Forge sessions       | **UNVERIFIED -- gated on interactive hook firing**                                | Requires a TTY operator session (50); folded into the build card as its first gating probe                                                                              |
+| v   | App-server transport                                  | **DEFERRED, unevaluated**                                                         | Scope decision 2026-06-09                                                                                                                                               |
+
+**Net:** the bridge CLI is the one clearly-shippable Phase 6 deliverable; everything hook-dependent is gated on a firing
+capability that `codex exec` lacks on 0.138.0 and that interactive Codex has not been verified to provide. The
+interactive-firing probe + hook-payload fixtures move to the build card (you only need them if you build the interactive
+frontend).
+
+### Slice 6.2 - Follow-up card + closeout
+
+- [x] Authored `docs/board/proposed/codex_frontend/card.md`, seeded with the probe facts: bridge CLI (GO, build first),
+  the interactive-firing gating probe, hook adapter/responder + the `ActionContext.runtime -> origin` rename,
+  SessionStart-with-fallback, interactive frontend, installer Codex support, app-server (deferred).
+- [x] Closeout per board-contract: Phase 6 boxes ticked with verification; `change_log.md` Phase 6 entry added; durable
+  lessons proposed via `.forge/memory/shadow_impl_notes.md` (human-promote gate). **Design-doc check: no design-doc
+  change** -- Phase 6 shipped no product behavior; the only `src/` edit is the `registry.py` Codex *note* correction
+  (internal data, not a design contract), and the harness lives under `scripts/experiments/`.
+  - [ ] `git mv docs/board/doing/runtime_abstraction docs/board/done/` -- **deferred to immediately after the final
+    merge to `main`** (board-contract: move only once merged; matches how Phases 2-5 stayed in `doing/` on-branch).
+
+**Phase 6 complete (2026-06-09) -- the card is fully executed (Phases 0-6).** The lane move to `done/` is the only
+remaining step and is gated on the merge to `main`.
 
 ## Open Decisions
 
 Tracks Forge-local execution decisions for this checklist. For broader card questions, see
 [`card.md` Open Questions](./card.md#open-questions).
+
+- [x] Phase 6 scope. **Resolved 2026-06-09: evaluation only.** Four decisions taken together: (1) Phase 6 ships no
+  product features -- a probe harness, fixtures, a go/no-go decision record, and a follow-up build card are the
+  deliverables, and the decision record completes the card; (2) the evaluation covers the **broader hook set**
+  (PreToolUse + PermissionRequest + Stop + UserPromptSubmit), answering the card's "minimum Codex hook coverage" open
+  question at the evaluation layer; (3) **SessionStart transfer delivery with initial-message fallback** is the build
+  direction -- the probe must pin trust/`additionalContext` feasibility so the build card can implement it (or record
+  "fallback stays primary" if trust is opaque); (4) **app-server transport is deferred, unevaluated** -- recorded in the
+  decision record verbatim, not probed. Build work lands in `docs/board/proposed/codex_frontend/`.
 
 - [x] Should Forge MITM the **interactive OAuth/subscription** session for wire observability (inspect /
   effort-override)? **Resolved 2026-06-07: deferred + double-gated, not forbidden.** The cost motivation is gone

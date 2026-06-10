@@ -19,8 +19,10 @@ the slice-5a checklist note). Concretely:
   ``"warning"`` for unrelated reasons (stale rollout DB rows, update checks) while
   auth is perfectly fine.
 * ``doctor`` exposes **no per-hook trust** signal, so 5a can never prove the (not yet
-  built) 5d transfer hook is trusted -- ``hook_seam`` therefore never returns
-  ``"active"``; ``"unknown"`` is the honest normal case.
+  built) 5d transfer hook is trusted -- ``hook_seam`` never returns ``"active"``. And the
+  Phase 6 probe pinned that headless ``codex exec`` does not fire hooks at all (registry
+  ``native_hooks="headless_inert"``), so the normal enabled+version-OK case returns
+  ``"headless_inert"``, not a trust-hedged ``"unknown"`` (which would read as "might work").
 
 Render-free (core, not CLI): every function returns data or plain strings. The
 ``forge runtime preflight codex`` command renders the result; ``CodexPreflight``
@@ -70,8 +72,12 @@ CodexAuthMethod = Literal["api_key", "chatgpt_tokens", "enterprise_token", "none
 
 # Whether Forge's (future, 5d) SessionStart transfer hook can deliver context. 5a never
 # returns ``active`` -- Codex trust is keyed to a specific hook *hash*, unprovable before
-# the hook exists; that verdict belongs to 5d, which checks the real hook.
-HookSeam = Literal["active", "untrusted", "managed_suppressed", "disabled", "unknown"]
+# the hook exists; that verdict belongs to 5d. ``headless_inert`` is the normal headless
+# verdict: hooks are enabled + version-OK, but the Phase 6 probe pinned that they do NOT
+# fire under headless ``codex exec`` (mirrors the registry ``native_hooks="headless_inert"``),
+# so trust-provability is moot -- firing is a known negative. ``unknown`` now only covers
+# the moot cases: not installed, or version unparseable (the floor cannot even be proven).
+HookSeam = Literal["active", "untrusted", "managed_suppressed", "headless_inert", "disabled", "unknown"]
 
 # Whether a Codex run can get the Responses API it requires. Codex emits
 # ``wire_api="responses"`` only; no current Forge proxy serves Responses on its
@@ -98,7 +104,7 @@ class CodexPreflight:
     billing_mode: BillingMode  # 5c writes this onto the ledger event
     ready: bool  # installed AND auth resolved AND not responses-blocked; NEVER doctor overallStatus
     blocking_reason: str | None  # actionable setup guidance; None iff ready
-    hook_seam: HookSeam  # 5d seam; 5a never returns "active"
+    hook_seam: HookSeam  # 5d seam; 5a never returns "active" (normal headless case is "headless_inert")
     proxy_responses: ProxyResponses
     doctor_status: str | None  # codex doctor overallStatus -- informational, never gates ready
 
@@ -388,9 +394,12 @@ def _resolve_hook_seam(
     """Honest hook-delivery posture. 5a never returns ``"active"`` (see module note).
 
     The ``"untrusted"`` verdict is reserved for 5d: Codex keys trust to a specific hook
-    *hash*, and Stage A confirmed ``codex doctor`` (0.137.0) exposes no trust signal, so
-    5a cannot determine it -- the honest normal case is ``"unknown"`` (enabled, not
-    suppressed, trust unprovable here).
+    *hash*, and Stage A confirmed ``codex doctor`` (0.137.0) exposes no trust signal.
+    Post-Phase-6 the normal enabled+version-OK case is ``"headless_inert"``: the probe
+    pinned that headless ``codex exec`` does not fire hooks regardless of trust, so it is a
+    known negative, not a trust-hedged ``"unknown"``. ``"unknown"`` remains only for the
+    moot cases -- not installed, or version unparseable (the floor cannot even be proven,
+    so we cannot assert hooks register).
     """
     if not installed:
         return "unknown"  # moot; ready is already False
@@ -405,7 +414,15 @@ def _resolve_hook_seam(
     if managed_only:
         return "managed_suppressed"  # explicit evidence only; a capability limit, not a ready blocker
 
-    return "unknown"
+    if version is None:
+        # Unparseable version: the hooks floor cannot be proven, so we cannot assert hooks
+        # even register -- the honest verdict stays "unknown".
+        return "unknown"
+
+    # Enabled, version meets the floor, not suppressed: hooks DO register/enable, but the
+    # Phase 6 probe pinned that they do not fire under headless `codex exec` (regardless of
+    # trust). For a headless-readiness check that is a known negative -> headless_inert.
+    return "headless_inert"
 
 
 class _Responses(NamedTuple):

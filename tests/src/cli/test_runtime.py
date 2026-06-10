@@ -28,10 +28,9 @@ def test_list_renders_all_runtimes() -> None:
     assert result.exit_code == 0
     for rid in ("claude_code", "codex", "gemini"):
         assert rid in result.output
-    # The Codex partial-enforcement caveat is surfaced, not hidden.
-    assert "partial" in result.output
-    # Hooks render as the tri-state value (Codex is gated, not a bare "yes").
-    assert "gated" in result.output
+    # Hooks render as the honest multi-state value: Codex hooks register but are
+    # headless_inert (do not fire under `codex exec`), not a bare "yes".
+    assert "headless_inert" in result.output
     # The note's bracketed token survives Rich markup (escape, not eaten as a tag).
     assert "[features]" in result.output
 
@@ -43,9 +42,10 @@ def test_list_json_carries_capability_fields() -> None:
     assert {d["id"] for d in data} == {"claude_code", "codex", "gemini"}
 
     codex = next(d for d in data if d["id"] == "codex")
-    assert codex["pretool_policy"] == "partial"  # limit encoded, not parity
-    # Hooks are gated, and the gate is machine-readable (not buried in the note).
-    assert codex["native_hooks"] == "gated"
+    assert codex["pretool_policy"] == "none"  # PreToolUse does not fire headless -> no verified enforcement
+    # Hooks register but are headless_inert (do not fire under `codex exec`); the floor
+    # stays machine-readable but is not a firing guarantee.
+    assert codex["native_hooks"] == "headless_inert"
     assert codex["hook_min_version"] == "0.131.0"
     assert codex["hook_feature_flag"] is None  # no required hook flag; codex_hooks remains a deprecated alias
     assert codex["installed"] is False  # nothing on PATH (stubbed)
@@ -67,7 +67,7 @@ _READY = CodexPreflight(
     billing_mode="subscription_quota",
     ready=True,
     blocking_reason=None,
-    hook_seam="unknown",
+    hook_seam="headless_inert",
     proxy_responses="native_direct",
     doctor_status="warning",
 )
@@ -81,7 +81,7 @@ _NOT_READY = CodexPreflight(
     billing_mode="subscription_quota",
     ready=False,
     blocking_reason="Responses-unsupported: omit --proxy to run native 'codex exec'.",
-    hook_seam="unknown",
+    hook_seam="headless_inert",
     proxy_responses="proxy_unsupported",
     doctor_status="warning",
 )
