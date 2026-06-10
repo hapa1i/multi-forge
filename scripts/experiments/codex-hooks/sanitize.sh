@@ -30,6 +30,13 @@ mkdir -p "$OUT"
 
 USER_NAME="$(whoami)"
 
+# macOS ships BSD sed/grep, which do not support `\b` word boundaries (CLAUDE.md
+# mandates GNU tools on Darwin). Prefer gsed/ggrep; fall back to sed/grep (already
+# GNU on Linux). Without this the `\b$USER_NAME\b` rule below silently no-ops on BSD
+# sed, leaving the real username in "sanitized" output.
+SED="$(command -v gsed || command -v sed)"
+GREP="$(command -v ggrep || command -v grep)"
+
 find "$CAPTURE_ROOT" -type f \
     -not -path "$OUT/*" \
     -not -path '*/codex-home/*' \
@@ -37,7 +44,7 @@ find "$CAPTURE_ROOT" -type f \
     rel="${f#"$CAPTURE_ROOT"/}"
     dest="$OUT/$rel"
     mkdir -p "$(dirname "$dest")"
-    sed -E \
+    "$SED" -E \
         -e "s|/private/var/folders/[A-Za-z0-9/_.+-]*|<PROBE_ROOT>|g" \
         -e "s|/var/folders/[A-Za-z0-9/_.+-]*|<PROBE_ROOT>|g" \
         -e "s|/tmp/tmp[A-Za-z0-9._-]*|<PROBE_ROOT>|g" \
@@ -53,7 +60,7 @@ scan() { # scan <label> <grep-args...>
     local label="$1"
     shift
     local found
-    found="$(grep -RIl "$@" "$OUT" 2>/dev/null || true)"
+    found="$("$GREP" -RIl "$@" "$OUT" 2>/dev/null || true)"
     if [ -n "$found" ]; then
         echo "SECRET-SCAN HIT [$label]:" >&2
         printf '%s\n' "$found" >&2
@@ -71,4 +78,4 @@ if [ "$HITS" -ne 0 ]; then
     echo "FAIL: sanitization incomplete -- fix the listed files (or the sed rules) and rerun." >&2
     exit 1
 fi
-echo "OK: sanitized captures at $OUT (review before promoting to tests/fixtures/codex/hooks/)"
+echo "OK: sanitized captures at $OUT -- review before the build card promotes any to tests/fixtures/codex/hooks/."

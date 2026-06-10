@@ -107,6 +107,10 @@ if [ -n "$(find "$PROBE_CAPTURE_DIR/payloads" -name '30f-PermissionRequest-*' 2>
 else
     oracle 30f-permreq "PermissionRequest did NOT fire headless (write under read-only sandbox)"
 fi
+# Reserved (unexercised headless): responses/permissionrequest-allow.json is the
+# approval-seam counterpart to the deny template above. PermissionRequest does not
+# fire under headless `codex exec`, so the approve path is exercised only by the
+# interactive build-card probe; the template is kept so that probe has both shapes.
 
 # ---- 30g: Stop block-once (bounded continuation) -----------------------------
 set_hooks "Stop=$(make_hook_cmd 30g-Stop respond-hook.sh "$RESPONSES/stop-block-once.json")"

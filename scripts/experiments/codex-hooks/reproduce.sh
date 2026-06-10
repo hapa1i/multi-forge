@@ -5,7 +5,7 @@
 # verdict vocabulary, and safety/cost notes.
 #
 # Usage:
-#   ./reproduce.sh              # headless set: 00 10 20 30 60 70
+#   ./reproduce.sh              # headless set: 00 05 10 20 30 60 70
 #   ./reproduce.sh all          # + operator-guided 40 50 (needs a TTY)
 #   ./reproduce.sh 00 30        # specific stages, in the given order
 #

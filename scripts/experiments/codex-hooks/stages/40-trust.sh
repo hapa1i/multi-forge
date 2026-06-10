@@ -86,7 +86,10 @@ EOI
         C2_FIRED="$(count_fired 40-ProjHook)"
         note "40c2: project hook fired ${C2_FIRED}x total (delta vs 40b = $((C2_FIRED - B_FIRED)))"
 
-        # 40d: hash-keying -- change the hook script content, re-run headless.
+        # 40d: hash-keying -- change the hook script CONTENT, re-run headless. This
+        # covers the content-hash dimension only; changing the registered command
+        # PATH/string is a separate trust dimension not exercised here (deferred to
+        # the interactive build-card probe -- docs/board/proposed/codex_frontend/card.md).
         echo "# content change to break the hook hash" >>"$PROJ_HOOK"
         run_exec 40d-hash-change read-only 'reply with the single word OK'
         D_FIRED="$(count_fired 40-ProjHook)"

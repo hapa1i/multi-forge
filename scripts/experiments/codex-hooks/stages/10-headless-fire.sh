@@ -9,8 +9,11 @@
 #   proj TOML  $PROJ/.codex/config.toml     -> SessionStart-projToml
 #   proj JSON  $PROJ/.codex/hooks.json      -> SessionStart-projJson
 #
-# Verdicts: [FIRES-HEADLESS] [FIRES-HEADLESS-TRUST-GATED] [INTERACTIVE-ONLY]
-#           [NO-FIRE-UNCATEGORIZED]
+# Verdicts: [FIRES-HEADLESS] [FIRES-HEADLESS-TRUST-GATED] [NO-FIRE-UNCATEGORIZED]
+#           [NO-FIRE-INCONCLUSIVE] (every relied-on turn failed -> 0 firings is not
+#           evidence of no-fire; stage exits nonzero).
+# Whether no-fire means interactive-only vs misregistration is a cross-stage call
+# (needs stage 50's interactive evidence), NOT a stage-10 verdict.
 set -uo pipefail
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)/lib.sh"
 
@@ -33,30 +36,40 @@ cp "$CODEX_HOME/hooks.json" "$PROBE_CAPTURE_DIR/meta/registered-user-hooks.json"
 
 note "-- turn 1: plain exec (no trust bypass) --"
 run_exec t1-plain read-only 'reply with the single word OK'
+RC1=$?
 FIRED_T1="$(fired_labels)"
-note "fired after turn 1: ${FIRED_T1:-<none>}"
+note "fired after turn 1: ${FIRED_T1:-<none>} (exit $RC1)"
 
 FIRED_T2=""
+RC2=0
 if [ -z "$FIRED_T1" ]; then
     note "-- turn 2: retry with --dangerously-bypass-hook-trust --"
     run_exec t2-bypass-trust read-only 'reply with the single word OK' --dangerously-bypass-hook-trust
+    RC2=$?
     FIRED_T2="$(fired_labels)"
-    note "fired after turn 2: ${FIRED_T2:-<none>}"
+    note "fired after turn 2: ${FIRED_T2:-<none>} (exit $RC2)"
 fi
 
 {
-    echo "turn1_fired: ${FIRED_T1:-none}"
-    echo "turn2_bypass_fired: ${FIRED_T2:-none}"
+    echo "turn1_fired: ${FIRED_T1:-none} (exit $RC1)"
+    echo "turn2_bypass_fired: ${FIRED_T2:-none} (exit $RC2)"
 } >"$PROBE_CAPTURE_DIR/results/fired-summary.txt"
 
+EXIT_RC=0
 if [ -n "$FIRED_T1" ]; then
     VERDICT="[FIRES-HEADLESS]"
 elif [ -n "$FIRED_T2" ]; then
     VERDICT="[FIRES-HEADLESS-TRUST-GATED]"
+elif [ "$RC1" -ne 0 ] && [ "$RC2" -ne 0 ]; then
+    # No firings, but EVERY turn we relied on failed (timeout/error). 0 firings from a
+    # turn that never completed is inconclusive, not evidence of no-fire -- fail loudly.
+    VERDICT="[NO-FIRE-INCONCLUSIVE]"
+    EXIT_RC=1
 else
-    # Distinguish interactive-only from misregistration is stage 50's job; record
-    # stderr for classification.
+    # At least one relied-on turn completed (exit 0) and nothing fired. Distinguishing
+    # interactive-only from misregistration is stage 50's job; record stderr for it.
     VERDICT="[NO-FIRE-UNCATEGORIZED]"
 fi
-note "VERDICT [10]: $VERDICT (surfaces fired: t1=${FIRED_T1:-none} t2=${FIRED_T2:-none})"
+note "VERDICT [10]: $VERDICT (fired: t1=${FIRED_T1:-none} t2=${FIRED_T2:-none}; exits t1=$RC1 t2=$RC2)"
 printf '%s\n' "$VERDICT" >"$PROBE_CAPTURE_DIR/results/verdict.txt"
+exit "$EXIT_RC"
