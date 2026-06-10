@@ -783,6 +783,13 @@ def supervisor_cmd(
     default=False,
     help="Force supervisor to use direct Anthropic routing",
 )
+@click.option(
+    "--timeout",
+    "timeout_seconds",
+    type=click.IntRange(min=1),
+    default=None,
+    help="Supervisor check timeout in seconds (default: 45)",
+)
 def supervise_cmd(
     target: str | None,
     off: bool,
@@ -793,6 +800,7 @@ def supervise_cmd(
     session_name: str | None,
     supervisor_proxy: str | None,
     supervisor_direct: bool,
+    timeout_seconds: int | None,
 ) -> None:
     """Configure the semantic supervisor for the current session.
 
@@ -802,6 +810,7 @@ def supervise_cmd(
     \b
     Examples:
         forge policy supervise planner           # Set planner as supervisor
+        forge policy supervise planner --timeout 90  # Set with a longer check timeout
         forge policy supervise --off             # Suspend (preserves config)
         forge policy supervise --on              # Resume
         forge policy supervise --remove          # Remove entirely
@@ -814,6 +823,10 @@ def supervise_cmd(
         sys.exit(1)
     if (supervisor_proxy or supervisor_direct) and not target:
         console.print("[red]Error:[/red] --supervisor-proxy/--no-supervisor-proxy require a target argument")
+        sys.exit(1)
+    # An attribute of the target action, not an action: must not enter the count below.
+    if timeout_seconds is not None and not target:
+        console.print("[red]Error:[/red] --timeout requires a target argument")
         sys.exit(1)
     actions = sum([bool(off), bool(on_flag), bool(remove), bool(reload_auto), bool(reload_path), bool(target)])
     if actions > 1:
@@ -955,6 +968,8 @@ def supervise_cmd(
         current_direct = not bool(manifest.intent.proxy)
 
         sup_config = SupervisorConfig(resume_id=target, forge_root=source_state.forge_root or _policy_fr)
+        if timeout_seconds is not None:
+            sup_config.timeout_seconds = timeout_seconds
         routing_display = apply_supervisor_routing(
             sup_config,
             source_state,
@@ -970,6 +985,8 @@ def supervise_cmd(
         if routing_display:
             label = "auto-seeded" if not supervisor_proxy and not supervisor_direct else "explicit"
             console.print(f"  Routing ({label}): {routing_display}")
+        if timeout_seconds is not None:
+            console.print(f"  Timeout: {timeout_seconds}s")
         return
 
     # No args: show current supervisor config

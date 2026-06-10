@@ -206,7 +206,9 @@ Configured in the session manifest under `policy.supervisor`:
 
 - `resume_id` — Claude session UUID of the planning session
 - `proxy` — proxy for supervisor LLM calls (optional, defaults to session proxy)
-- `timeout_seconds` — max wait for supervisor response (default: 45s)
+- `timeout_seconds` — max wait for supervisor response (default: 45s). Set at configure time with
+  `forge policy supervise <target> --timeout N`, or adjust a live session with
+  `forge session set policy.supervisor.timeout_seconds N`
 - `throttle_seconds` — cache window for repeated checks (default: 30s)
 
 The supervisor only blocks when the verdict is "divergent" with **high confidence (≥0.8) and citations** referencing the
@@ -316,9 +318,13 @@ doesn't know about it (state is session-scoped).
 
 The semantic supervisor has a 45s default timeout. If it exceeds this:
 
-- The action is allowed with a warning (fail-open)
+- The action is allowed with a warning (fail-open) — but the upstream provider may still bill the check, since the
+  request usually completes after Forge stops waiting
 - Check proxy connectivity: is the supervisor's proxy running?
 - Reduce supervisor response time: use a faster model via `proxy`
+- Raise the budget for slow models: `forge policy supervise <target> --timeout 90` at configure time, or
+  `forge session set policy.supervisor.timeout_seconds 90` on a live session. Note the hook that invokes the supervisor
+  has its own 60s budget; timeouts above ~55s won't take effect end-to-end
 
 ---
 

@@ -12,7 +12,7 @@ from pytest import fixture
 from forge.cli.main import main
 from forge.policy.types import PolicyDecision, Violation
 from forge.session import IndexStore, SessionStore, create_session_state
-from forge.session.models import PolicyIntent, StartedWithProxy
+from forge.session.models import PolicyIntent, StartedWithProxy, SupervisorConfig
 
 
 def _seed_duplicate_supervisor_targets(project: Path) -> tuple[Path, Path]:
@@ -624,3 +624,56 @@ class TestSupervisorProxyFlags:
         mock_ensure.assert_called_once_with("litellm-gemini")
         mock_apply.assert_called_once()
         assert mock_apply.call_args.kwargs.get("supervisor_proxy") == "litellm-gemini"
+
+
+class TestSuperviseTimeoutFlag:
+    """--timeout on policy supervise: an attribute of the target action, not a new action."""
+
+    def _set_supervisor(self, project: Path, args: list[str]) -> SupervisorConfig:
+        """Run ``policy supervise planner <args>`` against a real store; return persisted config."""
+        store = SessionStore(str(project), "test-session")
+        state = create_session_state("test-session", worktree_path=str(project))
+        state.forge_root = str(project)
+        store.write(state)
+
+        runner = CliRunner()
+        with (
+            patch.dict("os.environ", {"FORGE_SESSION": "test-session"}),
+            patch(
+                "forge.policy.semantic.supervisor.validate_supervisor_target",
+                side_effect=_validate_supervisor_target,
+            ),
+            patch("forge.policy.semantic.supervisor.apply_supervisor_routing"),
+        ):
+            result = runner.invoke(main, ["policy", "supervise", "planner", *args])
+        assert result.exit_code == 0, f"Expected exit 0, got {result.exit_code}: {result.output}"
+        manifest = store.read()
+        assert manifest.intent.policy is not None and manifest.intent.policy.supervisor is not None
+        return manifest.intent.policy.supervisor
+
+    def test_timeout_persists_into_intent(self, temp_guard_env: Path) -> None:
+        sup = self._set_supervisor(temp_guard_env, ["--timeout", "90"])
+        assert sup.timeout_seconds == 90
+
+    def test_default_unchanged_without_flag(self, temp_guard_env: Path) -> None:
+        sup = self._set_supervisor(temp_guard_env, [])
+        assert sup.timeout_seconds == 45
+
+    def test_timeout_requires_target(self, temp_guard_env: Path) -> None:
+        runner = CliRunner()
+        result = runner.invoke(main, ["policy", "supervise", "--timeout", "90"])
+        assert result.exit_code == 1
+        assert "requires a target" in result.output
+
+    def test_timeout_with_other_action_errors_cleanly(self, temp_guard_env: Path) -> None:
+        # Attribute-not-action: the requires-target error fires, not the action count.
+        runner = CliRunner()
+        result = runner.invoke(main, ["policy", "supervise", "--off", "--timeout", "90"])
+        assert result.exit_code == 1
+        assert "requires a target" in result.output
+        assert "only one action" not in result.output
+
+    def test_timeout_rejects_non_positive(self, temp_guard_env: Path) -> None:
+        runner = CliRunner()
+        result = runner.invoke(main, ["policy", "supervise", "planner", "--timeout", "0"])
+        assert result.exit_code == 2  # Click IntRange(min=1) usage error
