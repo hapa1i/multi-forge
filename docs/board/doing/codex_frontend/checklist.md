@@ -35,14 +35,14 @@ synthetic enrolled fixture.
 **Phase 1 probe COMPLETE 2026-06-10 (codex 0.138.0); all findings in.** Operator ran `./reproduce.sh 80` (ceremony) +
 `81 82 83`, plus a hardened `82` re-run. **All 7 Phase-1 boxes ticked below** with recorded verification; round-3 facts
 in `card.md`. **30e PASSED (Phase 4 viable)**; **PreToolUse deny + `updatedInput` work (Phase 3 + `pretool_policy` can
-rise)**; the `trusted_hash` is not computable -> **posture = guided ceremony**; **worktree trust is PATH-INDEPENDENT**
-(82w2 valid run -> project-scope registration with a path-stable command string survives worktrees). All three Open
-Decisions resolved. Two follow-ups remain, deferred for an explicit decision: (a) the findings-gated
-`codex_preflight.py` `[hooks.state]` slice (plan item 8) -- shaped by "hash-not-computable" (a static
-`active`-via-validation verdict is unachievable, so the seam stays `enrollment_gated`; path-independence adds that even
-a path-keyed `[hooks.state]` read would false-negative in a worktree), and (b) the registry `pretool_policy` rise from
-`"none"` (justified by the confirmed deny+mutation). Both touch `src/` + tests + `design.md` §5.5.5 and are a coherent
-next unit.
+rise)**; the `trusted_hash` is not computable -> **posture = guided ceremony**; **enrollment survives worktrees of the
+enrolled project** (82w2 valid run -> project-scope registration with a path-stable command string survives worktrees;
+broad cross-project trust is untested). The three Phase-0/1 Open Decisions are resolved; the Phase 2 bridge CLI shape
+remains open. Two follow-ups remain, deferred for an explicit decision: (a) the findings-gated `codex_preflight.py`
+`[hooks.state]` slice (plan item 8) -- shaped by "hash-not-computable" (a static `active`-via-validation verdict is
+unachievable, so the seam stays `enrollment_gated`; path-independence adds that even a path-keyed `[hooks.state]` read
+would false-negative in a worktree), and (b) the registry `pretool_policy` rise from `"none"` (justified by the
+confirmed deny+mutation). Both touch `src/` + tests + `design.md` §5.5.5 and are a coherent next unit.
 
 ## Phase 0 - Registry correction (owed from probe round 2)
 
@@ -108,15 +108,18 @@ post-enrollment event coverage / 30e / PreToolUse = `stage 81`; user-vs-project 
     `codex-home/config.toml`, project records by `proj/.codex/config.toml` (`meta/trust-locations.txt`).
 - [x] Worktree/path sensitivity: trust keys on the registering config's **absolute path** -- verify whether enrollment
   survives a `git worktree` checkout of the same project (Forge's main isolation workflow).
-  - **Done 2026-06-10 (82w2, valid run): trust is PATH-INDEPENDENT.** The project hook fired in the worktree checkout
-    (`proj-codexwt`) with proj=1 user=1 and **no folder `trust_level` and no `[hooks.state]` record at the worktree
-    path** -- cross-checked against the captured clean base (`meta/user-config.no-wt-trustlevel.toml`: worktree block
-    stripped, 13 records all at the codex-home/proj paths). With **40b** (folder trust alone does NOT fire hooks), the
-    firing can only be a `trusted_hash` match keyed by the definition (byte-identical `$HOOKBIN/<event>.sh` command
-    string), not the config path. **-> Phase 6: project-scope registration with a path-stable command string survives
-    worktrees** (no per-worktree re-enrollment; resolves the scope Open Decision). *(First 82w2 run was VOID -- leftover
-    worktree `trust_level` in the persistent fixture; stage 82 hardened with a strip-first clean base and an INVALID
-    self-guard, unit-tested, then re-run.)*
+  - **Done 2026-06-10 (82w2, valid run): enrollment survives worktrees of the enrolled project.** The project hook fired
+    in the worktree checkout (`proj-codexwt`) with proj=1 user=1 and **no folder `trust_level` and no `[hooks.state]`
+    record at the worktree path** -- cross-checked against the captured clean base
+    (`meta/user-config.no-wt-trustlevel.toml`: worktree block stripped, 13 records all at the codex-home/proj paths).
+    With **40b** (folder trust alone does NOT fire hooks), the firing can only be a `trusted_hash` match on the
+    registration definition (byte-identical `$HOOKBIN/<event>.sh` command string). **Mechanism not distinguished**
+    (path-independent hash vs Codex canonicalizing the worktree back to the enrolled checkout), and the broad "any
+    project with the same command string is trusted" claim is UNTESTED (needs a fresh-project probe). **-> Phase 6
+    (holds either way): project-scope registration with a path-stable command string survives worktrees** (no
+    per-worktree re-enrollment; resolves the scope Open Decision). *(First 82w2 run was VOID -- leftover worktree
+    `trust_level` in the persistent fixture; stage 82 hardened with a strip-first clean base and an INVALID self-guard,
+    verified ad hoc against the captured configs, then re-run.)*
 - [x] Sanitized payload fixtures to `tests/fixtures/codex/hooks/` with a provenance README (the Phase 6 descoped
   deliverable; capturable headless now).
   - Assertion: `sanitize.sh` passes; `make pre-commit` (gitleaks) clean on the fixture commit; per-file provenance table
@@ -190,13 +193,16 @@ per-hook-trust story from Phase 1.
   installer ships a guided `codex` trust step instead. Re-openable only if a codex-cli source-dive recovers the hash
   algorithm (`hash-preimage.py --emit-state` is ready for that path). Programmatic pre-enrollment is therefore NOT the
   posture, sidestepping the "bypass another tool's review gate" concern for now.
-- [x] Worktree/installer scope (Phase 6): **resolved 2026-06-10 (82w2, valid run) -- trust is path-independent, so
-  project-scope registration is viable.** The project hook fired in a worktree with no folder `trust_level` and no
-  `[hooks.state]` record at the worktree path; chained with 40b, trust is keyed by the definition hash (byte-identical
-  command string), not the config path. **Phase 6 registers Codex hooks at project scope with a path-stable command
-  string** (`.codex/config.toml` travels with git AND keeps trust across worktrees -- no per-worktree re-enrollment).
-  Caveat for the installer: the command string must not embed the worktree/project path, or the hash diverges and trust
-  breaks; one interactive ceremony per `CODEX_HOME` still seeds the first record.
+- [x] Worktree/installer scope (Phase 6): **resolved 2026-06-10 (82w2, valid run) -- enrollment survives worktrees of
+  the enrolled project, so project-scope registration is viable.** The project hook fired in a worktree with no folder
+  `trust_level` and no `[hooks.state]` record at the worktree path; chained with 40b, that can only be a `trusted_hash`
+  match on the definition (byte-identical command string). The mechanism (path-independent hash vs worktree->checkout
+  canonicalization) is not distinguished, but the worktree-survival conclusion holds either way. **Phase 6 registers
+  Codex hooks at project scope with a path-stable command string** (`.codex/config.toml` travels with git AND keeps
+  trust across worktrees -- no per-worktree re-enrollment). Caveats for the installer: the command string must not embed
+  the worktree/project path, or the hash diverges and trust breaks; one interactive ceremony per `CODEX_HOME` still
+  seeds the first record; and **cross-project trust (a different repo reusing the command) is UNTESTED** -- a
+  fresh-project probe is owed before any "one ceremony for all projects" story.
 - [ ] Bridge CLI shape (Phase 2): flag on `forge session start` vs a dedicated verb.
 
 ## Closeout

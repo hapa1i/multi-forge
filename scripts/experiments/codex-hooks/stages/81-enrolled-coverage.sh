@@ -53,7 +53,9 @@ run_exec 81-matrix-write workspace-write \
     'Create a file named probe.txt containing exactly PROBE-WR-1, then reply DONE.'
 {
     echo "# post-enrollment fired/not-fired matrix (codex $CODEX_VERSION, enrolled, no bypass)"
-    echo "# two turns: read-only shell + workspace-write file creation"
+    echo "# fired_count is CUMULATIVE for this stage so far: the 81.0 body-swap revalidate"
+    echo "# turn PLUS the two 81.1 matrix turns (read-only shell + workspace-write). The"
+    echo "# signal is fired>=1 vs 0 per event, not the exact count (payloads are not reset)."
     echo "# wrapper-key          fired_count"
     for k in $FIXTURE_WRAPPER_KEYS; do
         printf '%-20s %s\n' "$k" "$(fired_count "$k")"

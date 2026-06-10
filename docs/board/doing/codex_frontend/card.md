@@ -92,18 +92,20 @@ Gating probe round 3 (2026-06-10, codex-cli **0.138.0**, headless from one enrol
   `"bypassPermissions"` on `codex exec` (vs `"default"` interactively, round 2) -- the execution-mode discriminator.
 - **User-level AND project-level hooks fire headless** when enrolled; trust records key by the registering config's path
   (user record under `codex-home/config.toml`, project records under `proj/.codex/config.toml`).
-- **Worktree trust is PATH-INDEPENDENT (resolved 82w2, valid run).** The project SessionStart hook fired in a
-  `git worktree` checkout (`proj-codexwt`, a sibling path) **with no folder `trust_level` and no `[hooks.state]` record
-  at the worktree config path** (proj=1, user=1). Cross-checked against the captured clean base
+- **Enrollment survives worktrees of the enrolled project (resolved 82w2, valid run).** The project SessionStart hook
+  fired in a `git worktree` checkout (`proj-codexwt`, a sibling path) **with no folder `trust_level` and no
+  `[hooks.state]` record at the worktree config path** (proj=1, user=1). Cross-checked against the captured clean base
   (`meta/user-config.no-wt-trustlevel.toml`): the worktree `[projects."<wt>"]` block was stripped, no `[hooks.state]`
   key exists at the worktree path, and all 13 enrolled records sit at `codex-home/config.toml` /
   `proj/.codex/config.toml`. Chained with **40b** (folder `trust_level` alone does NOT fire hooks), the firing can only
-  be a `trusted_hash` match -- and since no record keys to the worktree path, Codex validates the hash *value* (over the
-  registration definition), not the config path. The byte-identical command string (`$HOOKBIN/<event>.sh`, an absolute
-  path outside both trees) is what makes the hashes match. **Phase 6: project-scope registration with a path-stable
-  command string survives `git worktree` checkouts -- no per-worktree re-enrollment** (a path-varying command string
-  would break this). One interactive ceremony per `CODEX_HOME` is still required to seed the first record; thereafter
-  any config registering the same command string inherits trust within that home. *(First 82w2 run was VOID -- the
+  be a `trusted_hash` match on the registration definition (the command string is byte-identical: `$HOOKBIN/<event>.sh`,
+  an absolute path outside both trees). **Mechanism not distinguished**: trust could be matched by a path-independent
+  hash value, or Codex could canonicalize the worktree back to the enrolled checkout (same git repo). This probe does
+  not separate them, and proves **nothing** about an *unrelated* project reusing the same command string -- that broad
+  "one ceremony trusts the command everywhere" claim is UNTESTED and needs a fresh-project probe before any installer
+  story relies on it. **Phase 6 (holds under either mechanism): project-scope registration with a path-stable command
+  string survives `git worktree` checkouts -- no per-worktree re-enrollment** (a path-varying command string would break
+  it; one interactive ceremony per `CODEX_HOME` still seeds the first record). *(First 82w2 run was VOID -- the
   persistent fixture had retained a worktree `trust_level` block; stage 82 hardened with a strip-first clean base and an
   INVALID self-guard, then re-run.)*
 - **`trusted_hash` preimage is NOT black-box computable**: 15 candidate canonicalizations (command, JSON struct, TOML
@@ -125,28 +127,17 @@ Gating probe round 3 (2026-06-10, codex-cli **0.138.0**, headless from one enrol
    trust-enrolled. Use `codex exec resume <thread_id>` for multi-turn continuation. Also: GC the synthetic
    `<parent>-codex-<suffix>` transfer children the bridge accumulates (recorded debt from Phase 5e).
 
-2. **Gating probe -- ANSWERED 2026-06-10 (firing), reshaped to enrollment mechanics.** The original go/no-go ("do hooks
-   fire at all?") is settled: GO -- interactive fires (50c) AND trust-enrolled headless fires (40c2/40d). The remaining
-   probe work, now about *enrollment*, all of it runnable headless from one enrolled fixture home:
-
-   - **`trusted_hash` preimage**: what exactly does Codex hash -- the TOML entry bytes, the command string, a canonical
-     struct? If Forge can compute it, the installer can pre-enroll its own hooks by writing both the registration and
-     the `[hooks.state]` record (decide the posture deliberately: pre-enrolling programmatically bypasses Codex's review
-     gate -- same trust model as Forge writing Claude's `settings.json`, but make it an explicit decision). If not
-     computable/stable, the product story is a one-time guided `codex` trust ceremony per hook change.
-   - **Event coverage post-enrollment**: only SessionStart has fired. Re-run stages 20/30 (payloads + response
-     contracts, incl. the 30e `additionalContext` magic-token oracle and PreToolUse deny/`updatedInput`) in an enrolled
-     home -- now possible headless. Policy on `codex exec` fan-out workers hangs on PreToolUse here.
-   - **Registration-string trust dimension** (the 40e gap): change the registered `command` string and confirm trust
-     invalidates (40d only proved script-*content* changes survive).
-   - **User-level vs project-level trust**: 50c's user-level hook fired interactively but its home died with the run --
-     where (and whether) its trust record lands is unobserved.
-   - **Harness note**: mktemp-per-run kills enrollment with the run. The follow-up probe needs a *stable* project path
-     and a persistent enrolled `CODEX_HOME` fixture (the existing 40-trust persistent-home pattern, minus the teardown)
-     so one ceremony serves many headless probe turns.
-   - Once enrollment semantics are pinned, encode them in `codex_preflight.py`'s `hook_seam` (today `enrollment_gated`
-     -- a capability statement, not a per-home enrolled-state verdict, per the Phase 0 rename; it can now learn to read
-     `[hooks.state]` and report enrolled-vs-not per hook).
+2. **Gating probe -- COMPLETE 2026-06-10 (Phase 0 + Phase 1).** Firing GO (interactive 50c, enrolled-headless 40c2/40d),
+   and the enrollment mechanics are now pinned -- see "Gating probe round 3" above and the change_log Phase 1 entry; do
+   not re-derive. In brief: one "trust all" ceremony enrolls every entry; the `trusted_hash` covers the registration
+   *definition* (40e) but is NOT black-box computable (0/13) -> posture = guided ceremony; the full event matrix +
+   30a-30h response contracts ran (30e PASS gates Phase 4; PreToolUse deny + `updatedInput` gate Phase 3 and the
+   `pretool_policy` value); user- and project-level hooks both fire; enrollment survives worktrees of the enrolled
+   project. The persistent enrolled-fixture harness (`scripts/experiments/codex-hooks/` stages 80-83) is the reproducer.
+   **Remaining code unit (deferred for a decision):** the `codex_preflight.py` `[hooks.state]` decision (stays
+   `enrollment_gated` -- a path-keyed read would false-negative in a worktree, and the hash is not computable, so
+   preflight cannot report `active`) plus the registry `pretool_policy` rise from `"none"` (justified by the confirmed
+   deny + mutation). See Risks.
 
 3. **Codex hook adapter/responder (gated on probe 2's response-contract leg).** `CodexHookAdapter`/`CodexHookResponder`
    filling the runtime-neutral protocols in `src/forge/cli/hooks/protocols.py` (the Phase 4f seam already makes room).
@@ -155,10 +146,9 @@ Gating probe round 3 (2026-06-10, codex-cli **0.138.0**, headless from one enrol
    target: PreToolUse + PermissionRequest + Stop + UserPromptSubmit. Carry the **`ActionContext.runtime` -> `origin`
    rename** here (the adapter is its first real consumer; direction resolved in the `runtime_abstraction` Open Decisions
    2026-06-09 -- values `{forge_cli, claude_code, codex}`; do NOT add a `subject_runtime` axis). **Registry correction
-   owed (2026-06-10):** `native_hooks="headless_inert"` is now refuted by the binary -- hooks fire headless once
-   trust-enrolled. The honest encoding is enrollment-gated (e.g. a `trust_enrolled` literal or re-scoped `gated`
-   semantics) and `pretool_policy` can rise from `"none"` only when PreToolUse firing + deny are pinned post-enrollment.
-   Land the registry+design.md+tests correction with this card's first code commit.
+   DONE in Phase 0 (2026-06-10):** `native_hooks="headless_inert"` was refuted and renamed to `enrollment_gated` on both
+   the registry `HookSupport` and the preflight `HookSeam`. The `pretool_policy` rise from `"none"` is now justified
+   (Phase 1 pinned PreToolUse deny + `updatedInput`) and is the deferred code unit alongside the preflight decision.
 
 4. **SessionStart curated-transfer delivery with initial-message fallback (gated on probe 2's 30e leg).** Now viable for
    BOTH the interactive frontend AND the headless bridge (enrolled homes fire headless -- the Phase 6 "headless stays
@@ -182,17 +172,24 @@ Gating probe round 3 (2026-06-10, codex-cli **0.138.0**, headless from one enrol
 
 ## Risks / open questions
 
-- **The `trusted_hash` preimage may be uncomputable or version-unstable.** If Forge cannot write valid `[hooks.state]`
-  records, every hook install/change costs the user an interactive trust ceremony -- survivable (one-time) but a real UX
-  tax; the installer story (6) hinges on this.
-- **Pre-enrolling trust programmatically is a posture decision, not just a capability.** Writing another tool's trust
-  store to bypass its review gate needs an explicit, documented decision (precedent: Forge already writes Claude's
-  `settings.json` hooks with user consent) -- and could break if Codex hardens the store.
-- **Trust keys on the registering config's absolute path** (`<path>:<event>:<idx>:<idx>`): moving/recreating a project
-  (worktrees!) likely invalidates enrollment; sidecar/container paths diverge from host paths. Probe before relying on
-  enrollment surviving Forge's worktree workflows.
-- **Only SessionStart has been observed firing.** PreToolUse/Stop/UserPromptSubmit/PermissionRequest post-enrollment
-  behavior is extrapolated, not pinned -- the policy deliverable (3) rests on the unprobed events.
+- **Guided-ceremony UX tax (the resolved-posture residual).** The `trusted_hash` is not black-box computable (0/13), so
+  Forge cannot forge `[hooks.state]` records; the posture is a one-time interactive `codex` trust ceremony per
+  `CODEX_HOME`. Survivable but a real Day-1 setup step; re-openable only if a codex-cli source-dive recovers the hash
+  (`hash-preimage.py --emit-state` is ready for that path).
+- **Path-stable command-string requirement.** Worktree trust survival hinges on the registered `command` being
+  byte-identical across paths (40e: the command string is in the hash). A path-varying command (one embedding the
+  worktree/project dir) would diverge the hash and break trust. The installer must register a stable `forge hook`
+  command, not a path-relative one.
+- **Cross-project trust is UNTESTED.** "One ceremony trusts the command in any project within the home" is unproven --
+  only `git worktree` checkouts of the *enrolled* project were tested, and the mechanism (path-independent hash vs
+  worktree->checkout canonicalization) is undetermined. Do not build a cross-project installer story without a
+  fresh-project probe (a new unrelated repo registering the same command string, no ceremony).
+- **Malformed hook output FAILS OPEN, not closed** (refutes the doc claim). Codex ran the command on a PreToolUse
+  response carrying `allow` + an unknown field + `continue:false`. The adapter/responder must emit strictly valid output
+  and must NOT rely on Codex fail-closing on bad hook output.
+- **PermissionRequest behavior headless is unpinned.** It did NOT fire under the read-only sandbox probe; whether it
+  fires headless under permission-eliciting conditions is unobserved. Deliverable 3's PermissionRequest path rests on an
+  event that has not been seen firing on `codex exec`.
 - **Codex version churn**: 0.137.0 -> 0.138.0 mid-evaluation; re-run the probe on Codex bumps (the harness is the
   standing guard). Trust/enrollment semantics are exactly the kind of behavior a minor release changes.
 - **`allow_managed_hooks_only`** (enterprise `requirements.toml`) can still suppress user/project hooks regardless of

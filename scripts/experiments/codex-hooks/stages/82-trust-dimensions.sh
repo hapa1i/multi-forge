@@ -127,14 +127,18 @@ PY
     cp "$CODEX_HOME/config.toml" "$PROBE_CAPTURE_DIR/meta/user-config.no-wt-trustlevel.toml"
     # Self-protect against the confound class: the base MUST now lack the worktree
     # block, or any 82w2 result is meaningless.
-    if grep -q "projects.\"$WT_REAL\"" "$PROBE_CAPTURE_DIR/meta/user-config.no-wt-trustlevel.toml" 2>/dev/null; then
+    if grep -Fq "projects.\"$WT_REAL\"" "$PROBE_CAPTURE_DIR/meta/user-config.no-wt-trustlevel.toml" 2>/dev/null; then
         oracle 82w-worktree "INVALID: could not strip the worktree trust_level from the persistent config; 82w2 would be confounded. Inspect meta/user-config.no-wt-trustlevel.toml."
     else
         # 82w2 (run FIRST, from the clean base): WITHOUT worktree folder trust_level.
         # The project hook has neither a [hooks.state] record at the worktree path NOR
-        # folder trust. If it STILL fires, trust is keyed by the PATH-INDEPENDENT
-        # definition hash (identical command strings -> already trusted); if it stops,
-        # trust_level was load-bearing. 40b predicts the former.
+        # folder trust. If it STILL fires, enrollment SURVIVES the worktree (40b predicts
+        # this). NOTE the scope limit: this is a `git worktree` of the SAME repo, so a
+        # fire is consistent with EITHER a path-independent definition hash OR Codex
+        # canonicalizing the worktree back to the enrolled checkout -- this probe does
+        # not distinguish them, and proves nothing about an UNRELATED project reusing the
+        # same command string (that needs a fresh-project probe). If it stops,
+        # trust_level was load-bearing.
         fixture_tee SessionStart 82w2-proj
         fixture_tee UserSessionStart 82w2-user
         PROBE_EXEC_CWD="$WT" run_exec 82w2-no-trustlevel read-only 'reply with the single word OK'
@@ -157,7 +161,7 @@ PY
         note "82w (worktree, WITH folder trust_level): proj=$WPROJ user=$WUSER"
 
         if [ "$W2PROJ" -ge 1 ]; then
-            oracle 82w-worktree "fired WITHOUT worktree trust_level (w2=$W2PROJ user_w2=$W2USER; with-trustlevel w=$WPROJ) -> trust is keyed by the PATH-INDEPENDENT definition hash: identical command strings carry trust across config paths; folder trust_level is irrelevant. -> Phase 6: project-scope registration with stable 'forge hook' command strings survives worktrees."
+            oracle 82w-worktree "fired WITHOUT worktree trust_level (w2=$W2PROJ user_w2=$W2USER; with-trustlevel w=$WPROJ) -> enrollment SURVIVES a git worktree of the enrolled project: no [hooks.state] record at the worktree path and no folder trust_level, yet the project hook fired (40b rules out folder trust, so this is a trusted_hash match). Mechanism not distinguished (path-independent definition hash vs worktree->checkout canonicalization); the broad 'any project with the same command string is trusted' claim is UNTESTED (needs a fresh-project probe). -> Phase 6: project-scope registration with a stable 'forge hook' command string survives worktrees (no per-worktree re-enrollment)."
         elif [ "$WPROJ" -ge 1 ]; then
             oracle 82w-worktree "fired ONLY WITH worktree trust_level (w=$WPROJ w2=$W2PROJ) -> folder trust_level is LOAD-BEARING for the worktree project hook. -> Phase 6: each worktree path needs folder trust (or register user-scope, path-stable)."
         else

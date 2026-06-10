@@ -61,8 +61,8 @@ code unit, deferred for an explicit decision (see Findings).
 - **`tests/fixtures/codex/hooks/README.md` + 5 payloads**: `session_start`/`pre_tool_use`/`post_tool_use`/
   `user_prompt_submit`/`stop` `.stdin.json`, sanitized + provenance table filled. Surfaced + fixed a real `sanitize.sh`
   over-match (its `sk-` scan tripped on `task-*` plugin filenames in codex-home tree listings -> word-boundary anchor).
-- **Board**: card.md round-3 facts; checklist 6/7 Phase-1 boxes ticked with verification; pre-enrollment posture Open
-  Decision resolved (guided ceremony).
+- **Board**: card.md round-3 facts; checklist 7/7 Phase-1 boxes ticked with verification; the three Phase-0/1 Open
+  Decisions resolved (HookSupport name, guided-ceremony posture, project-scope worktree survival).
 
 **Findings (codex-cli 0.138.0; captures at `~/.cache/forge-codex-hooks-probe/`)**:
 
@@ -71,17 +71,20 @@ code unit, deferred for an explicit decision (see Findings).
   per-entry `trusted_hash` (moved entry untrusted, primary intact).
 - **Gates**: **30e PASS** (additionalContext token echoed -> Phase 4 SessionStart delivery viable headless); PreToolUse
   **deny** (JSON + exit-2) blocked and **`updatedInput` mutation took effect** (-> Phase 3 + justifies a
-  `pretool_policy` rise); Stop block-once + UserPromptSubmit block work. **PermissionRequest does not fire headless**;
-  **malformed PreToolUse output FAILS OPEN** (refutes the doc fail-closed claim -- Phase 3 caveat). `tool_name` is
+  `pretool_policy` rise); Stop block-once + UserPromptSubmit block work. **PermissionRequest did not fire under the
+  read-only sandbox probe** (its headless behavior under permission-eliciting conditions is unpinned); **malformed
+  PreToolUse output FAILS OPEN** (refutes the doc fail-closed claim -- Phase 3 caveat). `tool_name` is
   `"Bash"`/`"apply_patch"` (not `"shell"`).
 - **`trusted_hash` NOT black-box computable** (0/13 over 15 canonicalizations) -> **posture = guided ceremony**
   (programmatic `[hooks.state]` blocked pending a codex-cli source-dive).
-- **Worktree trust is PATH-INDEPENDENT** (82w2, valid run): the project hook fired in a `git worktree` checkout with no
-  folder `trust_level` and no `[hooks.state]` record at the worktree path (cross-checked against the captured clean
-  base). Chained with 40b (folder trust alone does not fire hooks), trust is keyed by the definition hash
-  (byte-identical command string), not the config path. **-> Phase 6: project-scope registration with a path-stable
-  command string survives worktrees** (resolves the scope Open Decision). The first 82w2 run was VOID (the persistent
-  fixture had retained a worktree `trust_level` block); stage 82 was hardened with a strip-first clean base,
+- **Enrollment survives worktrees of the enrolled project** (82w2, valid run): the project hook fired in a
+  `git worktree` checkout with no folder `trust_level` and no `[hooks.state]` record at the worktree path (cross-checked
+  against the captured clean base). Chained with 40b (folder trust alone does not fire hooks), that can only be a
+  `trusted_hash` match on the definition (byte-identical command string). Mechanism not distinguished (path-independent
+  hash vs worktree->checkout canonicalization), and broad cross-project trust is UNTESTED. **-> Phase 6 (holds either
+  way): project-scope registration with a path-stable command string survives worktrees** (resolves the scope Open
+  Decision; a fresh-project probe is owed before any cross-project trust story). The first 82w2 run was VOID (the
+  persistent fixture had retained a worktree `trust_level` block); stage 82 was hardened with a strip-first clean base,
   `82w2`-before-`82w` ordering, and an INVALID self-guard, then re-run.
 
 **Verification**: `bash -n` + `shellcheck 0.11.0` clean on `lib.sh` + stages 80-83 + `reproduce.sh` + `sanitize.sh`;

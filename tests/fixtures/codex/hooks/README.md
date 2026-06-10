@@ -32,16 +32,19 @@ Sanitized hook-payload JSON (one `*.stdin.json` per Codex lifecycle event observ
 - **Date**: 2026-06-10
 - **Auth**: ChatGPT account, isolated `CODEX_HOME` (never the real `~/.codex`)
 - **Capture**: round-3 enrolled fixture; payloads via the per-label tee wrapper (`tee-hook.sh`), so attribution does not
-  depend on the `hook_event_name` field. Paths sanitized to `<HOME>`; `session_id`/`turn_id`/`tool_use_id` are per-run
-  identifiers kept verbatim (not secrets).
+  depend on the `hook_event_name` field. Stage 81 runs several `codex exec` turns from the one enrolled home, so these
+  five payloads span three of them (distinguishable by `session_id`): the 81.0 body-swap revalidate turn (prompt "reply
+  with the single word OK"), the 81.1 read-only matrix turn (`echo PROBE-RT-1`), and the 81.1 workspace-write matrix
+  turn (`apply_patch` of `probe.txt`). The "Source turn" column records which. Paths sanitized to `<HOME>`;
+  `session_id`/`turn_id`/`tool_use_id` are per-run identifiers kept verbatim (not secrets).
 
-| File                            | Event              | Source stage     | codex version | Notes                                                            |
-| ------------------------------- | ------------------ | ---------------- | ------------- | ---------------------------------------------------------------- |
-| `session_start.stdin.json`      | `SessionStart`     | 81 (matrix turn) | 0.138.0       | carries `source: "startup"`                                      |
-| `pre_tool_use.stdin.json`       | `PreToolUse`       | 81 (matrix turn) | 0.138.0       | `tool_name: "Bash"`, `tool_input.command`, `tool_use_id`         |
-| `post_tool_use.stdin.json`      | `PostToolUse`      | 81 (matrix turn) | 0.138.0       | `tool_name: "apply_patch"` (file write); carries `tool_response` |
-| `user_prompt_submit.stdin.json` | `UserPromptSubmit` | 81 (matrix turn) | 0.138.0       | carries the `prompt` string                                      |
-| `stop.stdin.json`               | `Stop`             | 81 (matrix turn) | 0.138.0       | carries `last_assistant_message`, `stop_hook_active`             |
+| File                            | Event              | Source turn         | codex version | Notes                                                            |
+| ------------------------------- | ------------------ | ------------------- | ------------- | ---------------------------------------------------------------- |
+| `session_start.stdin.json`      | `SessionStart`     | 81.0 revalidate     | 0.138.0       | carries `source: "startup"`                                      |
+| `pre_tool_use.stdin.json`       | `PreToolUse`       | 81.1 matrix (r/o)   | 0.138.0       | `tool_name: "Bash"`, `tool_input.command`, `tool_use_id`         |
+| `post_tool_use.stdin.json`      | `PostToolUse`      | 81.1 matrix (write) | 0.138.0       | `tool_name: "apply_patch"` (file write); carries `tool_response` |
+| `user_prompt_submit.stdin.json` | `UserPromptSubmit` | 81.0 revalidate     | 0.138.0       | carries the `prompt` string                                      |
+| `stop.stdin.json`               | `Stop`             | 81.0 revalidate     | 0.138.0       | carries `last_assistant_message`, `stop_hook_active`             |
 
 ## Confirmed shape (round 3, 0.138.0)
 
