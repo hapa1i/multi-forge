@@ -182,3 +182,116 @@ class TestSupervisorE2E:
         sup_override = exec_manifest.get("overrides", {}).get("policy", {})
         assert sup_override.get("supervisor", {}).get("resume_id") == SUPERVISOR_RESUME_ID
         assert sup_override.get("supervisor", {}).get("timeout_seconds") == 30
+
+
+HOOK_PAYLOAD = json.dumps(
+    {
+        "hook_event_name": "PreToolUse",
+        "tool_name": "Write",
+        "tool_input": {"file_path": "src/demo.py", "content": "def widget(): pass"},
+    }
+)
+
+# Run-identity env vars are REQUIRED for the ledger assertion: emit_direct_llm_usage
+# silently no-ops without an ambient run identity (core/usage/emit.py).
+RUN_ENV = "FORGE_RUN_ID=run_cascadee2e0 FORGE_ROOT_RUN_ID=run_cascadee2e0"
+
+
+def _wire_cascade_session(ws: ContainerLike, name: str = "cascade-exec") -> None:
+    """Create a session with cascade enabled via session-set overrides.
+
+    The tier-1 checker model points at an unreachable backend so the cheap check
+    fails fast and the cascade's degrade-to-frontier guarantee is exercised.
+    """
+    ws.exec(f"cd /workspace && forge session start {name} --no-proxy --no-launch")
+    ws.write_file("/workspace/plan.md", "# Approved Plan\nCreate src/demo.py with greet(name) only.\n")
+    for key, value in (
+        ("policy.enabled", "true"),
+        ("policy.supervisor.resume_id", SUPERVISOR_RESUME_ID),
+        ("policy.supervisor.direct", "true"),
+        ("policy.supervisor.cascade", "true"),
+        ("policy.supervisor.plan_override_path", "/workspace/plan.md"),
+        ("policy.supervisor.checker_model", "gemini/cascade-test-unreachable"),
+    ):
+        result = ws.exec(f"cd /workspace && forge session set --session {name} {key} {value}")
+        assert result.returncode == 0, f"session set {key} failed: {result.stderr}"
+
+
+def _run_hook_check(ws: ContainerLike, *, session: str, mode: str) -> tuple[int, str, str]:
+    result = ws.exec(
+        f"cd /workspace && echo '{HOOK_PAYLOAD}' | "
+        f"FORGE_SESSION={session} FORGE_TEST_SUPERVISOR_MODE={mode} {RUN_ENV} forge hook policy-check"
+    )
+    invocations = ws.read_file("/tmp/claude_invocations.log")
+    return result.returncode, result.stderr, invocations
+
+
+class TestCascadeE2E:
+    """Cascade hook-path coverage: tier-1 error degrades to exactly one frontier check."""
+
+    def test_escalation_resolved_aligned(self, supervisor_workspace: ContainerLike) -> None:
+        ws = supervisor_workspace
+        _wire_cascade_session(ws, "cascade-a")
+
+        exit_code, stderr, invocations = _run_hook_check(ws, session="cascade-a", mode="aligned")
+
+        assert exit_code == 0, stderr
+        # Exactly one frontier (mock-claude --resume) invocation: the resolver ran once.
+        assert invocations.count(f"--resume {SUPERVISOR_RESUME_ID}") == 1
+        # The tier-1 error was resolved to allow: no leaked policy-warning noise.
+        assert "Policy warning" not in stderr
+
+    def test_escalation_resolved_divergent_blocks(self, supervisor_workspace: ContainerLike) -> None:
+        ws = supervisor_workspace
+        _wire_cascade_session(ws, "cascade-b")
+
+        exit_code, stderr, invocations = _run_hook_check(ws, session="cascade-b", mode="divergent")
+
+        assert exit_code == 2
+        assert "Policy violation" in stderr
+        assert invocations.count(f"--resume {SUPERVISOR_RESUME_ID}") == 1
+
+    def test_plan_check_error_event_in_ledger(self, supervisor_workspace: ContainerLike) -> None:
+        ws = supervisor_workspace
+        _wire_cascade_session(ws, "cascade-c")
+
+        exit_code, stderr, _ = _run_hook_check(ws, session="cascade-c", mode="aligned")
+        assert exit_code == 0, stderr
+
+        events = ws.exec("cat $HOME/.forge/usage/events/*.jsonl")
+        plan_check_lines = [
+            json.loads(line) for line in events.stdout.splitlines() if line.strip() and '"plan-check"' in line
+        ]
+        assert plan_check_lines, f"no plan-check ledger event found: {events.stdout!r}"
+        event = plan_check_lines[-1]
+        assert event["status"] == "error"
+        assert event["session"] == "cascade-c"
+        assert event["root_run_id"] == "run_cascadee2e0"
+
+    def test_supervise_cli_cascade_wiring(self, supervisor_workspace: ContainerLike) -> None:
+        """Real CLI chain: supervise target -> reload-from -> --cascade toggles intent."""
+        ws = supervisor_workspace
+        ws.exec("cd /workspace && forge session start cascade-planner --no-proxy --no-launch")
+        ws.exec("cd /workspace && forge session start cascade-d --no-proxy --no-launch")
+        ws.write_file("/workspace/plan.md", "# Approved Plan\n")
+
+        set_target = ws.exec("cd /workspace && forge policy supervise cascade-planner --session cascade-d")
+        assert set_target.returncode == 0, set_target.stderr
+
+        # No approved snapshot anywhere yet: enabling cascade fails loud, pre-mutation.
+        unresolved = ws.exec("cd /workspace && forge policy supervise --cascade --session cascade-d")
+        assert unresolved.returncode == 1
+        assert "No approved plan snapshot" in unresolved.stdout + unresolved.stderr
+
+        reload_result = ws.exec(
+            "cd /workspace && forge policy supervise --reload-from /workspace/plan.md --session cascade-d"
+        )
+        assert reload_result.returncode == 0, reload_result.stderr
+
+        enabled = ws.exec("cd /workspace && forge policy supervise --cascade --session cascade-d")
+        assert enabled.returncode == 0, enabled.stderr
+
+        manifest = ws.read_json("/workspace/.forge/sessions/cascade-d/forge.session.json")
+        sup = manifest["intent"]["policy"]["supervisor"]
+        assert sup["cascade"] is True
+        assert sup["plan_override_path"] == "/workspace/plan.md"
