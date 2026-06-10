@@ -100,7 +100,7 @@ _CLAUDE_MODEL_PIN_ENV_VARS = (
 )
 
 
-def _plan_fingerprint(path: str, forge_root: str | None) -> str:
+def plan_fingerprint(path: str, forge_root: str | None) -> str:
     """Return a cheap fingerprint for cache key differentiation: path:mtime_ns:size."""
     resolved = Path(path)
     if not resolved.is_absolute() and forge_root:
@@ -112,7 +112,7 @@ def _plan_fingerprint(path: str, forge_root: str | None) -> str:
         return f"{path}:missing"
 
 
-def _load_plan_override(config: SupervisorConfig) -> str | None:
+def load_plan_override(config: SupervisorConfig) -> str | None:
     """Read the plan override file from disk. Returns None if not set, missing, or empty."""
     if not config.plan_override_path:
         return None
@@ -188,7 +188,7 @@ class SemanticSupervisorPolicy(DeterministicPolicy):
         )
         if self._config.plan_override_path:
             cache_key = (
-                cache_key + "|plan:" + _plan_fingerprint(self._config.plan_override_path, self._config.forge_root)
+                cache_key + "|plan:" + plan_fingerprint(self._config.plan_override_path, self._config.forge_root)
             )
 
         cached = self._cache.check(cache_key)
@@ -421,7 +421,7 @@ def invoke_supervisor(
         content=(context.raw_diff or context.new_content or "")[:2000],
     )
 
-    plan_content = _load_plan_override(config)
+    plan_content = load_plan_override(config)
     if plan_content:
         prompt = _PLAN_OVERRIDE_PREAMBLE.format(plan_content=plan_content) + "\n\n" + prompt
 
