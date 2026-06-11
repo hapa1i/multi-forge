@@ -1250,9 +1250,12 @@ def codex_policy_check() -> None:
     Wire contract (probe-pinned, codex-cli 0.138.0): a block is a strict
     ``hookSpecificOutput`` deny JSON on stdout with exit 0; an allow emits NO
     stdout. Codex FAILS OPEN on malformed hook output, so stdout carries only
-    ``json.dumps`` wire strings -- every diagnostic goes to stderr. Fail-open on
-    every internal error, matching policy-check. A multi-file patch is evaluated
-    per file with cross-file precedence deny > needs_review > warn/allow.
+    ``json.dumps`` wire strings -- diagnostics go to stderr, but only once a Forge
+    session is resolved (an unresolvable session means Forge is not managing this
+    turn and must stay silent: a user-scope registration fires for every Codex
+    session). Fail-open on every internal error, matching policy-check. A
+    multi-file patch is evaluated per file with cross-file precedence
+    deny > needs_review > warn/allow.
     """
     data, err = _read_stdin_json()
     if data is None:
@@ -1275,7 +1278,9 @@ def codex_policy_check() -> None:
     # index; FORGE_SESSION (probe-verified to reach the hook env) is the path.
     store = resolve_session_store(cwd, session_id=None)
     if store is None:
-        print("[forge] Policy check: no session resolved", file=sys.stderr)
+        # Silent allow: a user-scope registration fires for every Codex session, and
+        # "no session" just means Forge is not managing this turn (debug log only).
+        logger.debug("Codex policy check: no session resolved")
         sys.exit(0)
     try:
         manifest = store.read()

@@ -27,6 +27,21 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-11
 
+### codex_frontend follow-up: codex-policy-check silent on unresolvable sessions
+
+**Goal**: Align the Phase 3 hook with the codex-session-start silence rule -- under a user-scope Codex registration, "no
+resolvable Forge session" means Forge is not managing the turn, and unrelated Codex sessions must see no Forge stderr
+noise.
+
+**Key changes**:
+
+- `codex_policy_check` (cli/hooks/commands.py): the no-session stderr print -> `logger.debug` (hooks debug log via
+  `FORGE_DEBUG=1`). Post-resolution diagnostics (manifest/intent/engine failures, block/check summaries, no-evaluable-
+  operations) keep stderr -- they only fire inside a managed Forge session. hook.md documents the silent-allow bullet.
+
+**Verification**: `test_no_session_passes_through` strengthened (empty stderr + caplog debug pin);
+`test_codex_policy_check.py` + `test_codex_session_start.py` 28/28; mypy clean.
+
 ### codex_frontend Phase 4: SessionStart transfer delivery with initial-message fallback
 
 **Goal**: Ship the post-enrollment upgrade the 30e probe unlocked -- deliver the curated transfer to a Codex session via

@@ -1,14 +1,18 @@
 """Hook-level tests for `forge hook codex-policy-check`.
 
 Wire invariant under test: stdout carries ONLY strict deny JSON (Codex fails OPEN
-on malformed hook output) and every diagnostic rides stderr -- so assertions use
-``result.stdout`` / ``result.stderr`` separately (Click 8.2+ separates streams;
-``result.output`` would blur exactly the invariant these tests pin).
+on malformed hook output) and diagnostics ride stderr -- but only once a Forge
+session is resolved. An unresolvable session is a fully silent allow (a user-scope
+registration fires for every Codex session; "no session" means Forge is not
+managing this turn). Assertions use ``result.stdout`` / ``result.stderr``
+separately (Click 8.2+ separates streams; ``result.output`` would blur exactly
+the invariant these tests pin).
 """
 
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -238,16 +242,24 @@ class TestCodexPolicyCheckFailOpen:
         assert result.exit_code == 0
         assert result.stdout == ""
 
-    def test_no_session_passes_through(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_no_session_passes_through(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Regression: a user-scope registration fires for every Codex session, so an
+        unresolvable session (any non-Forge Codex turn) must emit NO stderr -- the
+        diagnostic rides the debug log only."""
         monkeypatch.chdir(tmp_path)
         monkeypatch.delenv("FORGE_SESSION", raising=False)
         monkeypatch.delenv("FORGE_FORGE_ROOT", raising=False)
+        caplog.set_level(logging.DEBUG, logger="forge.cli.hooks.commands")
         payload = _payload(_patch_cmd("*** Add File: src/x.py", "+1"), cwd=str(tmp_path))
 
         result = _invoke(payload)
 
         assert result.exit_code == 0
         assert result.stdout == ""
+        assert result.stderr == ""
+        assert "no session resolved" in caplog.text
 
     def test_malformed_patch_passes_through(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         _make_session(tmp_path, monkeypatch, bundles=["tdd"])

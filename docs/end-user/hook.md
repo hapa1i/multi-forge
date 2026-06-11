@@ -196,6 +196,7 @@ Purpose: the same policy enforcement for **Codex** sessions (`forge session star
 - evaluates each file operation in a Codex `apply_patch` action against the session's policy bundles and supervisor;
   shell (`Bash`) actions pass through unevaluated
 - a block is delivered as Codex's deny JSON on stdout (not an exit code); an allow produces no output
+- non-Forge Codex sessions (no resolvable Forge session) pass through as a fully silent allow
 - **not auto-installed**: register `forge hook codex-policy-check` as a PreToolUse hook in your Codex config and
   complete Codex's one-time trust ceremony — Codex hooks only fire from trust-enrolled registrations (installer support
   is planned)
