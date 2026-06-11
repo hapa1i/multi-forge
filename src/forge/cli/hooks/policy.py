@@ -163,7 +163,7 @@ def _persist_policy_state(
             engine_state=collected_state,
             existing_state=existing,
             bundles=effective.policy.bundles if effective.policy else [],
-            rules_active=[p.policy_id for p in engine.policies],
+            rules_active=engine.registered_policy_ids,
             context_summary=context_summary,
         )
 

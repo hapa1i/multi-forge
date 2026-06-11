@@ -85,6 +85,19 @@ class TestStatusBasic:
         assert result.exit_code == 0
         assert "tdd" in result.output
 
+    def test_unsupported_checker_provider_display(self, runner: CliRunner, env: Path):
+        policy = PolicyIntent(
+            enabled=True,
+            supervisor=SupervisorConfig(resume_id="planner", cascade=True, checker_provider="anthropic"),
+        )
+        _seed_session(str(env), "test-session", policy=policy)
+
+        result = runner.invoke(main, ["policy", "status"])
+
+        assert result.exit_code == 0, result.output
+        assert "anthropic (unsupported)" in result.output
+        assert "unresolved" in result.output
+
 
 class TestStatusSessionFlag:
     def test_resolves_same_forge_root(self, runner: CliRunner, env: Path):

@@ -31,6 +31,7 @@ from forge.core.usage.vocabulary import ROUTE_CLAUDE_INTERACTIVE, Confidence
 logger = logging.getLogger(__name__)
 
 _SUPERVISOR_POLICY_ID = "semantic.supervisor"
+_PLAN_CHECK_POLICY_ID = "semantic.plan_check"
 _ERROR_STATUSES = {"error", "timeout"}
 _WORKFLOW_COMMANDS = {"panel", "analyze", "debate", "consensus"}
 _MAX_RECENT_WARNINGS = 5
@@ -66,18 +67,35 @@ class CommandUsage:
 
 @dataclass
 class PolicyActivity:
-    """Decision-log-derived supervisor activity (capped at MAX_DECISION_LOG)."""
+    """Decision-log-derived supervisor + plan-check activity (capped at MAX_DECISION_LOG).
+
+    The plan-check counters come from the decision log, not the usage ledger, so
+    cached tier-1 allows ARE counted (a cached allow is logged but emits no ledger
+    event). Short-circuit rate = plan_check_allow vs plan_check_needs_review; the
+    supervisor counters are the resolver runs (a tier-1 needs_review co-occurring
+    with a deterministic deny skips the resolver, so needs_review can exceed
+    supervisor checks).
+    """
 
     supervisor_allow: int = 0
     supervisor_warn: int = 0
     supervisor_deny: int = 0
+    plan_check_allow: int = 0
+    plan_check_needs_review: int = 0
     total_warnings: int = 0
     recent_warnings: list[str] = field(default_factory=list)
     log_capped: bool = False
 
     @property
     def has_content(self) -> bool:
-        return bool(self.supervisor_allow or self.supervisor_warn or self.supervisor_deny or self.total_warnings)
+        return bool(
+            self.supervisor_allow
+            or self.supervisor_warn
+            or self.supervisor_deny
+            or self.plan_check_allow
+            or self.plan_check_needs_review
+            or self.total_warnings
+        )
 
 
 @dataclass
@@ -152,16 +170,21 @@ def render_summary_line(summary: SessionActivitySummary) -> str | None:
     sup_errors = next((c.errors for c in summary.commands if c.command == "supervisor"), 0)
     pol = summary.policy
     if pol and pol.has_content:
+        if pol.plan_check_allow or pol.plan_check_needs_review:
+            parts.append(f"plan-check: {pol.plan_check_allow} allow, {pol.plan_check_needs_review} needs-review")
         # `checks` (allow+warn+deny) is the capped decision-log count; `sup_errors` is the
         # uncapped ledger count -- different planes. A supervisor error fails open to an
         # `allow`, so normally errors <= checks; only decision-log eviction breaks that. So
         # when the log is at capacity render `checks` as a floor ("12+"), otherwise a capped
         # 100 checks beside 120 ledger errors reads as a contradiction instead of eviction.
         checks = pol.supervisor_allow + pol.supervisor_warn + pol.supervisor_deny
-        checks_label = f"{checks}+" if pol.log_capped else str(checks)
-        seg = f"supervisor: {checks_label} checks ({pol.supervisor_warn} warn, {pol.supervisor_deny} block"
-        seg += f", {sup_errors} errors)" if sup_errors else ")"
-        parts.append(seg)
+        if checks or sup_errors:
+            # An all-short-circuit cascade session has plan-check content but zero
+            # supervisor checks -- "supervisor: 0 checks" would be noise, skip it.
+            checks_label = f"{checks}+" if pol.log_capped else str(checks)
+            seg = f"supervisor: {checks_label} checks ({pol.supervisor_warn} warn, {pol.supervisor_deny} block"
+            seg += f", {sup_errors} errors)" if sup_errors else ")"
+            parts.append(seg)
     else:
         sup = next((c for c in summary.commands if c.command == "supervisor"), None)
         if sup is not None:
@@ -421,11 +444,22 @@ def _policy_activity(manifest, since: datetime | None) -> PolicyActivity | None:
         # entry-level `warnings` is the composite across every policy in that PreToolUse
         # evaluation (engine.py accumulates `all_warnings.extend(d.warnings)`), so a
         # deterministic policy (e.g. TDD permissive) warning would otherwise render as
-        # phantom supervisor activity.
+        # phantom supervisor activity. Plan-check (cascade tier-1) sub-decisions are
+        # counted separately: allow = short-circuit, needs_review = tier-1 requested
+        # review (the resolver may still be skipped when a deterministic policy denied).
         for sub in entry.get("decisions") or ():
-            if not isinstance(sub, dict) or sub.get("policy_id") != _SUPERVISOR_POLICY_ID:
+            if not isinstance(sub, dict):
                 continue
+            policy_id = sub.get("policy_id")
             decision = sub.get("decision")
+            if policy_id == _PLAN_CHECK_POLICY_ID:
+                if decision == "allow":
+                    activity.plan_check_allow += 1
+                elif decision == "needs_review":
+                    activity.plan_check_needs_review += 1
+                continue
+            if policy_id != _SUPERVISOR_POLICY_ID:
+                continue
             if decision == "allow":
                 activity.supervisor_allow += 1
             elif decision == "warn":
@@ -438,9 +472,9 @@ def _policy_activity(manifest, since: datetime | None) -> PolicyActivity | None:
 
     activity.total_warnings = len(warnings)
     activity.recent_warnings = warnings[-_MAX_RECENT_WARNINGS:]
-    # PolicyActivity is *supervisor* activity; if the supervisor took part in no in-window
-    # decision there is nothing to show (and a non-supervisor warning must not surface a
-    # phantom "supervisor: 0 checks" section). has_content is supervisor-only now.
+    # PolicyActivity is *semantic-tier* activity (supervisor + plan-check); if neither
+    # took part in an in-window decision there is nothing to show (and a deterministic
+    # policy warning must not surface a phantom "supervisor: 0 checks" section).
     return activity if activity.has_content else None
 
 

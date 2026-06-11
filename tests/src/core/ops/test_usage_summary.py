@@ -44,6 +44,8 @@ def _event(**overrides: object) -> UsageEvent:
 def _decision(
     *,
     supervisor: str | None = None,
+    plan_check: str | None = None,
+    plan_check_cached: bool = False,
     warnings: list[str] | None = None,
     evaluated_at: str = "2026-06-03T12:00:00Z",
 ) -> dict:
@@ -55,6 +57,30 @@ def _decision(
         "evaluated_at": evaluated_at,
         "decisions": [],
     }
+    if plan_check:
+        entry["decisions"].append(
+            {
+                "decision": plan_check,
+                "policy_id": "semantic.plan_check",
+                "violations": (
+                    []
+                    if plan_check == "allow"
+                    else [
+                        {
+                            "rule_id": "semantic.plan_check.uncertain",
+                            "message": "not clearly covered by the plan",
+                            "severity": "low",
+                            "evidence": None,
+                            "suggested_fix": None,
+                            "citations": [],
+                        }
+                    ]
+                ),
+                "warnings": [],
+                "cached": plan_check_cached,
+                "evaluated_at": evaluated_at,
+            }
+        )
     if supervisor:
         entry["decisions"].append(
             {
@@ -173,6 +199,75 @@ class TestPolicyPlane:
         assert summary.policy.supervisor_deny == 1
 
 
+class TestPlanCheckPlane:
+    """Decision-log-derived cascade tier-1 counters (cached allows included)."""
+
+    def test_plan_check_counters(self, tmp_path: Path) -> None:
+        _write_manifest(
+            tmp_path,
+            "planner",
+            decisions=[
+                _decision(plan_check="allow"),
+                _decision(plan_check="allow", plan_check_cached=True),  # cached allow still counts
+                _decision(plan_check="needs_review", supervisor="allow"),  # escalation, resolved
+            ],
+        )
+        summary = build_session_activity_summary("planner", forge_root=str(tmp_path))
+
+        assert summary.policy is not None
+        assert summary.policy.plan_check_allow == 2
+        assert summary.policy.plan_check_needs_review == 1
+        # The resolver's resolution counts as supervisor activity (frontier usage).
+        assert summary.policy.supervisor_allow == 1
+
+    def test_needs_review_with_deterministic_deny_skips_resolver(self, tmp_path: Path) -> None:
+        """A pass-1 deny skips the resolver (engine.py): tier-1 needs_review still counts,
+        supervisor counters stay zero — which is why the counter is named needs_review,
+        not "escalated"."""
+        entry = _decision(plan_check="needs_review")
+        entry["final_decision"] = "deny"
+        entry["decisions"].append(
+            {
+                "decision": "deny",
+                "policy_id": "tdd.tests_first",
+                "violations": [],
+                "warnings": [],
+                "cached": False,
+                "evaluated_at": "2026-06-03T12:00:00Z",
+            }
+        )
+        _write_manifest(tmp_path, "planner", decisions=[entry])
+        summary = build_session_activity_summary("planner", forge_root=str(tmp_path))
+
+        assert summary.policy is not None
+        assert summary.policy.plan_check_needs_review == 1
+        assert summary.policy.supervisor_allow == 0
+        assert summary.policy.supervisor_warn == 0
+        assert summary.policy.supervisor_deny == 0
+
+    def test_plan_check_only_session_has_content(self, tmp_path: Path) -> None:
+        """All-short-circuit sessions still surface policy activity (no phantom None)."""
+        _write_manifest(tmp_path, "planner", decisions=[_decision(plan_check="allow")])
+        summary = build_session_activity_summary("planner", forge_root=str(tmp_path))
+
+        assert summary.policy is not None
+        assert summary.policy.has_content
+        assert summary.policy.plan_check_allow == 1
+        assert summary.policy.supervisor_allow == 0
+
+    def test_plan_check_does_not_pollute_supervisor_warnings(self, tmp_path: Path) -> None:
+        _write_manifest(
+            tmp_path,
+            "planner",
+            decisions=[_decision(plan_check="needs_review", supervisor="allow")],
+        )
+        summary = build_session_activity_summary("planner", forge_root=str(tmp_path))
+
+        assert summary.policy is not None
+        assert summary.policy.total_warnings == 0
+        assert summary.policy.recent_warnings == []
+
+
 class TestBestEffort:
     def test_missing_manifest_does_not_raise(self) -> None:
         log_usage_event(_event(command="supervisor"))
@@ -257,6 +352,27 @@ class TestRenderLine:
         assert line is not None
         assert "supervisor: 3 checks" in line
         assert "3+ checks" not in line
+
+    def test_plan_check_only_skips_supervisor_segment(self) -> None:
+        """All-short-circuit cascade session: plan-check segment, no 'supervisor: 0 checks'."""
+        summary = SessionActivitySummary(
+            session="planner",
+            policy=PolicyActivity(plan_check_allow=3, plan_check_needs_review=0),
+        )
+        line = render_summary_line(summary)
+        assert line is not None
+        assert "plan-check: 3 allow, 0 needs-review" in line
+        assert "supervisor:" not in line
+
+    def test_plan_check_and_supervisor_segments(self) -> None:
+        summary = SessionActivitySummary(
+            session="planner",
+            policy=PolicyActivity(plan_check_allow=8, plan_check_needs_review=2, supervisor_allow=2),
+        )
+        line = render_summary_line(summary)
+        assert line is not None
+        assert "plan-check: 8 allow, 2 needs-review" in line
+        assert "supervisor: 2 checks" in line
 
     def test_measured_zero_cost_renders(self) -> None:
         # total_cost_micro_usd == 0 is measured-zero, not unmeasured: it should print.

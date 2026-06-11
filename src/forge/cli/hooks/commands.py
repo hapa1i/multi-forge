@@ -1146,8 +1146,16 @@ def policy_check() -> None:
     if has_supervisor:
         from forge.policy.semantic.supervisor import SemanticSupervisorPolicy
 
-        supervisor_policy = SemanticSupervisorPolicy(config=effective.policy.supervisor)
-        engine.register(supervisor_policy)
+        sup_cfg = effective.policy.supervisor
+        if sup_cfg and sup_cfg.cascade:
+            # Cascade: the cheap tier-1 plan check runs on every event; the frontier
+            # supervisor becomes the needs_review resolver (invoked only on escalation).
+            from forge.policy.semantic.plan_check import PlanCheckPolicy
+
+            engine.register(PlanCheckPolicy(config=sup_cfg))
+            engine.register_resolver(SemanticSupervisorPolicy(config=sup_cfg))
+        else:
+            engine.register(SemanticSupervisorPolicy(config=sup_cfg))
 
     existing_policy_state = None
     if manifest.confirmed.policy:

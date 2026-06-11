@@ -106,6 +106,87 @@ def test_human_render_shows_subagents(monkeypatch, tmp_path) -> None:
     assert "3" in result.output
 
 
+def test_human_render_shows_plan_check_counters(monkeypatch, tmp_path) -> None:
+    # Cascade tier-1 activity comes from the decision log; an all-short-circuit
+    # session shows the plan-check line and NO "Supervisor: 0 allow" noise.
+    from forge.session.models import PolicyConfirmed, create_session_state
+    from forge.session.store import SessionStore
+
+    state = create_session_state("planner", worktree_path=str(tmp_path))
+    state.confirmed.policy = PolicyConfirmed(
+        decisions=[
+            {
+                "final_decision": "allow",
+                "warnings": [],
+                "evaluated_at": "2026-06-10T12:00:00Z",
+                "decisions": [
+                    {
+                        "decision": "allow",
+                        "policy_id": "semantic.plan_check",
+                        "violations": [],
+                        "warnings": [],
+                        "cached": False,
+                        "evaluated_at": "2026-06-10T12:00:00Z",
+                    }
+                ],
+            }
+        ]
+    )
+    SessionStore(str(tmp_path), "planner").write(state)
+    _patch_resolver(monkeypatch, name="planner", forge_root=str(tmp_path))
+    log_usage_event(_event(command="plan-check"))
+
+    result = CliRunner().invoke(activity_cmd, ["planner", "--all"])
+    assert result.exit_code == 0
+    assert "Plan check (tier-1)" in result.output
+    assert "1 allow" in result.output
+    assert "Supervisor" not in result.output
+
+
+def test_json_includes_plan_check_counters(monkeypatch, tmp_path) -> None:
+    from forge.session.models import PolicyConfirmed, create_session_state
+    from forge.session.store import SessionStore
+
+    state = create_session_state("planner", worktree_path=str(tmp_path))
+    state.confirmed.policy = PolicyConfirmed(
+        decisions=[
+            {
+                "final_decision": "allow",
+                "warnings": [],
+                "evaluated_at": "2026-06-10T12:00:00Z",
+                "decisions": [
+                    {
+                        "decision": "needs_review",
+                        "policy_id": "semantic.plan_check",
+                        "violations": [],
+                        "warnings": [],
+                        "cached": False,
+                        "evaluated_at": "2026-06-10T12:00:00Z",
+                    },
+                    {
+                        "decision": "allow",
+                        "policy_id": "semantic.supervisor",
+                        "violations": [],
+                        "warnings": [],
+                        "cached": False,
+                        "evaluated_at": "2026-06-10T12:00:00Z",
+                    },
+                ],
+            }
+        ]
+    )
+    SessionStore(str(tmp_path), "planner").write(state)
+    _patch_resolver(monkeypatch, name="planner", forge_root=str(tmp_path))
+    log_usage_event(_event(command="plan-check"))
+
+    result = CliRunner().invoke(activity_cmd, ["planner", "--all", "--json"])
+    assert result.exit_code == 0
+    data = json.loads(result.output)
+    assert data["policy"]["plan_check_needs_review"] == 1
+    assert data["policy"]["plan_check_allow"] == 0
+    assert data["policy"]["supervisor_allow"] == 1
+
+
 def test_days_window_excludes_nothing_recent(monkeypatch) -> None:
     _patch_resolver(monkeypatch)
     log_usage_event(_event(command="supervisor"))

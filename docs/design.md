@@ -1109,19 +1109,20 @@ default to the parent cache; `edit`/`diff` resolve a child (inferred when the pa
 
 #### Policy enforcement
 
-| Command                                        | Purpose                                       |
-| ---------------------------------------------- | --------------------------------------------- |
-| `forge policy enable --bundle <name>`          | Enable policy enforcement for current session |
-| `forge policy disable`                         | Disable policy enforcement                    |
-| `forge policy status`                          | Show current policy state (`--json`)          |
-| `forge policy list`                            | List available bundles and rules (`--json`)   |
-| `forge policy check --bundle <name> -f <path>` | Evaluate policies on demand                   |
-| `forge policy supervisor -f <path> -r <id>`    | Evaluate file against approved plan           |
-| `forge policy supervise <target>`              | Set persistent supervisor for session         |
-| `forge policy supervise --off / --on`          | Suspend/resume supervisor (preserves config)  |
-| `forge policy supervise --remove`              | Remove supervisor entirely                    |
-| `forge policy supervise --reload`              | Reload latest relevant approved plan          |
-| `forge policy supervise --reload-from <path>`  | Reload plan from explicit file                |
+| Command                                         | Purpose                                       |
+| ----------------------------------------------- | --------------------------------------------- |
+| `forge policy enable --bundle <name>`           | Enable policy enforcement for current session |
+| `forge policy disable`                          | Disable policy enforcement                    |
+| `forge policy status`                           | Show current policy state (`--json`)          |
+| `forge policy list`                             | List available bundles and rules (`--json`)   |
+| `forge policy check --bundle <name> -f <path>`  | Evaluate policies on demand                   |
+| `forge policy supervisor -f <path> -r <id>`     | Evaluate file against approved plan           |
+| `forge policy supervise <target>`               | Set persistent supervisor for session         |
+| `forge policy supervise --cascade/--no-cascade` | Toggle the tier-1 plan check (cascade)        |
+| `forge policy supervise --off / --on`           | Suspend/resume supervisor (preserves config)  |
+| `forge policy supervise --remove`               | Remove supervisor entirely                    |
+| `forge policy supervise --reload`               | Reload latest relevant approved plan          |
+| `forge policy supervise --reload-from <path>`   | Reload plan from explicit file                |
 
 #### Workflow
 
@@ -1295,6 +1296,26 @@ ambiguities.
 - Auto-reload may succeed even if the supervisor target session has been deleted (the current session or a related fork
   may still hold the plan). Status surfaces show `Target: <name>` when resolvable and omit it otherwise.
 
+**Cascade (tier-1 plan check, opt-in):** `forge policy supervise --cascade` (or `<target> --cascade`) routes checks
+through a cheap tier before the frontier. A stateless `core.llm` call (`PlanCheckPolicy`, `semantic.plan_check`, default
+OpenRouter model `google/gemini-3.5-flash`, configurable per provider via `--checker-provider`/`--checker-model`, with a
+configurable default prompt budget of roughly 32K tokens stored as `policy.supervisor.checker_budget_tokens`) evaluates
+the action against the **approved-plan snapshot text** (`plan_override_path`, auto-resolved at wiring time via the
+`--reload` machinery; enabling fails with an actionable error when no approved snapshot resolves). Long plans and
+actions are packed as head+tail excerpts rather than first-N slices, unified diffs retain file and hunk headers when
+truncated, and prompt metadata explicitly marks whether the plan or action was truncated. Edit actions include the
+matched and replacement fragments when available; Write actions include path and target existence context. Tier-1 emits
+only `allow` (clearly aligned; cached per the throttle window) or `needs_review` — it never warns or denies, and
+**every** tier-1 failure (LLM error, parse failure, unreadable plan) escalates, so the system degrades to
+frontier-always, never to unsupervised. In cascade mode the supervisor is registered as the engine's **resolver** (see
+§4.1.5): it is invoked only when a policy emitted `needs_review` and nothing denied, so clearly-aligned actions never
+pay the frontier call. Tier-1 reasons ride in low-severity violations (persisted to the decision log, never printed on
+resolved allows). Measurement is built in: session-tagged `plan-check` usage events plus decision-log-derived
+`plan_check_allow`/`plan_check_needs_review` counters in `forge activity` expose the short-circuit rate; the supervisor
+counters are the resolver runs (a tier-1 `needs_review` alongside a deterministic deny skips the resolver, so the two
+can differ). Cascade off (the default) is exactly the pre-cascade behavior — the supervisor runs as a regular policy on
+every throttle-missing check.
+
 **Supervisor stuck playbook:** When the supervisor blocks because the plan evolved:
 
 - `%policy supervise off` (suspend, config preserved)
@@ -1462,6 +1483,10 @@ Multiple policies may run for a single action:
 - **Any deny** in enforce mode blocks the action
 - warnings accumulate
 - results can be logged for audit/debug
+- `needs_review` is resolved by a registered **resolver** policy (the semantic supervisor in cascade mode), invoked only
+  on escalation — after the regular pass, when a policy requested review and nothing denied. A supervisor registered as
+  a regular policy (cascade off) resolves it the same way; with no resolution, `needs_review` blocks as unresolved
+  (unchanged contract)
 
 **Deny message format** (three-tier, shown to the model):
 

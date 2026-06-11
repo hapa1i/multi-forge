@@ -221,6 +221,51 @@ the wrong benchmark for this role. For per-family supervisor picks (including th
 cross-route to Gemini for mid-long or multimodal planning sessions, and DeepSeek V4 Pro as a cost-efficient
 alternative), see [model-selection.md](model-selection.md).
 
+### Cascade: a cheap first pass before the supervisor (opt-in)
+
+Every supervisor check replays the planning session's full context — expensive when most checks come back "aligned". The
+cascade adds a fast, cheap tier-1 check that approves clearly-aligned actions and reserves the full supervisor for the
+uncertain ones:
+
+```bash
+# Enable when setting the supervisor, or toggle later
+forge policy supervise planner --cascade
+forge policy supervise --cascade          # enable on existing config
+forge policy supervise --no-cascade       # disable (supervisor checks every action again)
+
+# Optional: pick the tier-1 route
+forge policy supervise --cascade --checker-provider litellm-local
+forge policy supervise --cascade --checker-model google/gemini-3.5-flash
+
+# Advanced: tune the persisted checker prompt budget
+forge session set policy.supervisor.checker_budget_tokens 64000
+```
+
+How it behaves:
+
+- The tier-1 checker evaluates the action against the **approved plan snapshot** text only (no session context). It
+  needs a plan file: enabling cascade auto-resolves the latest approved plan (the same search `--reload` uses) and fails
+  with instructions when none exists.
+- The default checker route is OpenRouter `google/gemini-3.5-flash` with an approximate 32K-token total budget for the
+  tier-1 checker prompt. Use `--checker-provider litellm-local` to use the local LiteLLM default
+  (`gemini/gemini-3.5-flash`) when OpenRouter is unavailable. Local LiteLLM backends generated before that model was
+  added to the default backend config may need their `litellm` backend config recreated or updated; otherwise use
+  `--checker-model gemini/gemini-2.5-flash` until the backend serves the 3.5 model.
+- `checker_budget_tokens` is intentionally a session config setting rather than a `policy supervise` flag; use
+  `forge session set policy.supervisor.checker_budget_tokens <tokens>` when you need to tune it.
+- Long plans and actions are packed with head+tail excerpts. Unified diffs keep hunk/file headers, Edit checks include
+  the old/new fragments, Write checks include target existence metadata, and the prompt explicitly marks whether plan or
+  action text was truncated.
+- Tier-1 can only approve or escalate — it never blocks on its own. Anything uncertain, plus **every** checker failure
+  (model unreachable, unparseable output, missing plan file), escalates to the full supervisor. Worst case the cascade
+  degrades to exactly the non-cascade behavior; supervision is never silently skipped.
+- `%policy supervise cascade on` / `%policy supervise cascade off` toggles it in-session.
+
+Reading the results in `forge activity`: the **Plan check (tier-1)** line shows allow vs needs-review counts (your
+short-circuit rate), the **Supervisor** line shows what the frontier decided when it ran, and the `plan-check` command
+row shows tier-1 call volume, tokens, and errors. The two lines can differ: a needs-review verdict that coincides with a
+deterministic block (for example TDD) never reaches the supervisor.
+
 ### Why supervision matters (beyond TDD)
 
 Deterministic policies like `tdd` enforce **process** — tests before implementation. The semantic supervisor enforces
