@@ -1,10 +1,13 @@
-"""Docker-based tests for PolicyCheck and PreCompact hooks.
+"""Docker-based tests for PolicyCheck, CodexPolicyCheck, and PreCompact hooks.
 
 These tests verify hook behavior with complete filesystem and network isolation.
-PolicyCheck tests TDD enforcement; PreCompact tests transcript capture before compaction.
+PolicyCheck tests TDD enforcement (Claude wire: exit 2 blocks); CodexPolicyCheck
+tests the same enforcement on the Codex wire (stdout deny JSON, always exit 0);
+PreCompact tests transcript capture before compaction.
 
 Tests invoke `forge hook <name>` directly via container.exec() and verify:
-- Exit codes (0 = allow, 2 = block for policy; 0 always for pre-compact)
+- Exit codes (0 = allow, 2 = block for Claude policy; 0 always for Codex + pre-compact)
+- Wire output (Codex deny JSON on stdout)
 - Manifest updates for policy and compaction state
 
 Placement: tests/integration/docker/ per testing-guidelines.md
@@ -60,6 +63,41 @@ def invoke_policy_check(
         f"cd /workspace && export FORGE_SESSION={session_name} && printf '%s' '{payload_json}' | forge hook policy-check"
     )
     return result.returncode, result.stdout, result.stderr
+
+
+def invoke_codex_policy_check(
+    workspace: ContainerLike,
+    patch_command: str,
+    session_name: str = "policy-test",
+    tool_name: str = "apply_patch",
+) -> tuple[int, str, str]:
+    """Invoke forge hook codex-policy-check and return (exit_code, stdout, stderr).
+
+    Payload shape pinned by tests/fixtures/codex/hooks/pre_tool_use.stdin.json
+    (codex-cli 0.138.0, snake_case). Codex deny rides in stdout JSON with exit 0.
+    """
+    payload = {
+        "session_id": "019eb075-fd3f-7381-9008-9ef8df491237",
+        "transcript_path": "/tmp/rollout.jsonl",
+        "cwd": "/workspace",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-5.5",
+        "permission_mode": "bypassPermissions",
+        "turn_id": "019eb075-fd77-7992-b35d-73a30bfe9614",
+        "tool_name": tool_name,
+        "tool_input": {"command": patch_command},
+        "tool_use_id": "call_docker_test",
+    }
+    payload_json = json.dumps(payload)
+    result = workspace.exec(
+        f"cd /workspace && export FORGE_SESSION={session_name}"
+        f" && printf '%s' '{payload_json}' | forge hook codex-policy-check"
+    )
+    return result.returncode, result.stdout, result.stderr
+
+
+def _codex_patch(*sections: str) -> str:
+    return "*** Begin Patch\n" + "\n".join(sections) + "\n*** End Patch"
 
 
 def invoke_precompact(
@@ -226,6 +264,116 @@ class TestPolicyCheckDocker:
         if result.stdout.strip():
             output = json.loads(result.stdout)
             assert output.get("action") == "skip" or output.get("reason") == "no_session"
+
+
+# =============================================================================
+# CodexPolicyCheck Tests
+# =============================================================================
+
+
+class TestCodexPolicyCheckDocker:
+    """TDD enforcement on the Codex wire (codex-policy-check) with Docker isolation.
+
+    Same policy engine as TestPolicyCheckDocker, different wire contract:
+    a block is a strict ``hookSpecificOutput`` deny JSON on stdout with exit 0
+    (Codex fails OPEN on malformed hook output -- exit codes don't carry the deny).
+    """
+
+    def test_blocks_impl_without_tests_via_stdout_deny_json(self, policy_workspace: ContainerLike) -> None:
+        """Add File to src/ without tests -> exit 0 + stdout deny JSON (not exit 2)."""
+        exit_code, stdout, stderr = invoke_codex_policy_check(
+            policy_workspace,
+            _codex_patch("*** Add File: src/foo.py", "+print(1)"),
+        )
+
+        assert exit_code == 0, f"Codex deny must exit 0, got {exit_code}. stderr: {stderr}"
+        wire = json.loads(stdout)
+        assert set(wire.keys()) == {"hookSpecificOutput"}, f"stdout must be strict wire JSON, got: {stdout}"
+        out = wire["hookSpecificOutput"]
+        assert out["permissionDecision"] == "deny"
+        assert "tdd.tests-before-impl" in out["permissionDecisionReason"]
+
+    def test_allows_test_file_add_with_empty_stdout(self, policy_workspace: ContainerLike) -> None:
+        """Add File to tests/ -> exit 0, NO stdout, manifest state updated."""
+        exit_code, stdout, stderr = invoke_codex_policy_check(
+            policy_workspace,
+            _codex_patch("*** Add File: tests/test_foo.py", "+def test_foo(): pass"),
+        )
+
+        assert exit_code == 0, f"Expected allow, got {exit_code}. stderr: {stderr}"
+        assert stdout.strip() == "", f"Allow must emit no stdout, got: {stdout}"
+
+        manifest = read_manifest(policy_workspace)
+        assert manifest["confirmed"]["policy"] is not None
+        assert manifest["confirmed"]["confirmed_by"] == "hook:codex-policy-check"
+        tdd_state = manifest["confirmed"]["policy"].get("policy_states", {}).get("tdd.tests-before-impl", {})
+        assert "tests/test_foo.py" in tdd_state.get("tests_touched", [])
+
+    def test_allows_impl_after_test_add_across_invocations(self, policy_workspace: ContainerLike) -> None:
+        """State persists through the manifest between hook invocations."""
+        exit_code1, _, stderr1 = invoke_codex_policy_check(
+            policy_workspace,
+            _codex_patch("*** Add File: tests/test_bar.py", "+def test_bar(): pass"),
+        )
+        assert exit_code1 == 0, f"Test add should allow, got {exit_code1}. stderr: {stderr1}"
+
+        exit_code2, stdout2, stderr2 = invoke_codex_policy_check(
+            policy_workspace,
+            _codex_patch("*** Add File: src/bar.py", "+print(2)"),
+        )
+        assert exit_code2 == 0, f"Impl after test should allow, got {exit_code2}. stderr: {stderr2}"
+        assert stdout2.strip() == "", f"Allow must emit no stdout, got: {stdout2}"
+
+    def test_decision_log_records_per_file_apply_patch_summaries(self, policy_workspace: ContainerLike) -> None:
+        """A multi-file patch persists one decision-log entry per file op."""
+        exit_code, stdout, _ = invoke_codex_policy_check(
+            policy_workspace,
+            _codex_patch(
+                "*** Add File: tests/test_multi.py",
+                "+def test_multi(): pass",
+                "*** Add File: src/multi.py",
+                "+print(3)",
+            ),
+        )
+        assert exit_code == 0
+        assert stdout.strip() == ""
+
+        manifest = read_manifest(policy_workspace)
+        summaries = [e["context_summary"] for e in manifest["confirmed"]["policy"]["decisions"]]
+        assert "apply_patch:tests/test_multi.py" in summaries
+        assert "apply_patch:src/multi.py" in summaries
+
+    def test_fail_open_on_invalid_json(self, policy_workspace: ContainerLike) -> None:
+        result = policy_workspace.exec("cd /workspace && echo 'not valid json' | forge hook codex-policy-check")
+
+        assert result.returncode == 0, f"Invalid JSON should fail-open (exit 0), got {result.returncode}"
+        assert result.stdout.strip() == "", f"Fail-open should produce no stdout, got: {result.stdout}"
+
+    def test_fail_open_when_no_manifest(self, forge_workspace: ContainerLike) -> None:
+        """No session -> exit 0, empty stdout (stderr-only note)."""
+        payload = json.dumps(
+            {
+                "hook_event_name": "PreToolUse",
+                "tool_name": "apply_patch",
+                "tool_input": {"command": "*** Begin Patch\n*** Add File: src/x.py\n+1\n*** End Patch"},
+                "cwd": "/workspace",
+            }
+        )
+        result = forge_workspace.exec(f"cd /workspace && printf '%s' '{payload}' | forge hook codex-policy-check")
+
+        assert result.returncode == 0, f"No manifest should fail-open (exit 0), got {result.returncode}"
+        assert result.stdout.strip() == "", f"Fail-open should produce no stdout, got: {result.stdout}"
+
+    def test_bash_tool_passes_through(self, policy_workspace: ContainerLike) -> None:
+        """Bash actions are not policy-evaluated (parity with Claude skipping non-Write/Edit)."""
+        exit_code, stdout, _ = invoke_codex_policy_check(
+            policy_workspace,
+            "echo hi",
+            tool_name="Bash",
+        )
+
+        assert exit_code == 0
+        assert stdout.strip() == ""
 
 
 # =============================================================================

@@ -25,6 +25,53 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board-contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-06-11
+
+### codex_frontend Phase 3: Codex hook adapter/responder + `forge hook codex-policy-check`
+
+**Goal**: Fill the runtime-neutral `HookAdapter`/`HookResponder` protocols with the Codex pair so a `codex exec` turn
+can enforce Forge policy on `apply_patch` actions, carrying the resolved `ActionContext.runtime -> origin` rename. Scope
+(user decision): **PreToolUse only** (Stop/UserPromptSubmit/SessionStart land with their Phase 4/5 consumers;
+PermissionRequest stays descoped -- never observed firing headless); **handler-only** -- enforcement needs a manually
+registered + trust-enrolled Codex hook until the Phase 6 installer.
+
+**Key changes**:
+
+- **`origin` rename** (`policy/types.py`): `ActionContext.runtime -> origin`, values `{forge_cli, claude_code, codex}`
+  per the recorded `runtime_abstraction` decision -- the two on-demand CLI leaves (`forge policy check`/`supervisor`)
+  become `forge_cli`; `%policy check` stays `claude_code` (Claude-context); the false "flows into attribution" docstring
+  claim fixed. Zero behavioral surface (no read sites, never serialized); 47 test kwargs across 11 files.
+- **apply_patch parser** (`cli/hooks/codex_patch.py`, new): `parse_apply_patch -> list[PatchFileOp] | None` over the
+  probe-pinned grammar (Add/Update/Move to/Delete, `@@` hunks, End-of-File tolerance, CRLF); `None` = malformed ->
+  caller fails open (converges with Codex's own rejection); `path` is the post-op Move-to target.
+- **Adapter/responder** (`cli/hooks/codex_policy.py`, new): `CodexHookAdapter` normalizes per-file ops to the tool names
+  every policy's `applies_to` gates on (Add->`Write`, Update->`Edit`; deletes skipped; `Bash` -> `[]`), tagging
+  `origin="codex"` with runtime truth in `tool_args`; `CodexHookResponder` emits the probe-pinned deny wire
+  (`hookSpecificOutput.permissionDecision="deny"` + reason, strict `json.dumps` only -- Codex FAILS OPEN on malformed
+  output; `BLOCK_EXIT = 0`). Protocol cardinality became `build_contexts -> list[ActionContext]` (clean break; the
+  Claude adapter returns `[ctx]`/`[]`, wire bytes unchanged); deny reason text shared via extracted
+  `format_deny_text`/`format_needs_review_text` (Claude strings byte-identical).
+- **`forge hook codex-policy-check`** (`cli/hooks/commands.py`): per-file evaluation with tests-first ordering (an
+  atomic test+impl patch passes TDD, the `%policy check` precedent); cross-file precedence deny > needs_review >
+  warn/allow; allow emits NO stdout (allow-feedback delivery unprobed); session resolved via FORGE_SESSION with
+  payload-cwd `forge_root` rooting (Codex `session_id` is a thread UUID, never in the Claude index). Engine assembly
+  extracted as `build_hook_engine` + `register_supervisor_and_restore` (moved-not-changed; cascade resolver wiring now
+  serves both commands); `_persist_policy_decisions` writes one decision-log entry per file op in one lock cycle with an
+  **explicitly aggregated** `engine_state` -- `evaluate()` clears collected state per call, so a one-shot end read would
+  drop earlier files' TDD `tests_touched` (review finding, regression-pinned).
+- **Docs**: design.md §4.1.4 (both shipped pairs, normalization, list cardinality, handler-only caveat) + §4.1.5 (shared
+  reason text, per-runtime wire framing); registry codex note (`pretool_policy` stays `"partial"`); `protocols.py`
+  docstrings; end-user `hook.md` codex-policy-check section; probe README owes "stage 85" (operator-gated enrolled
+  end-to-end).
+
+**Verification**: 57 new unit cases (24 parser, 16 adapter/responder, 17 command incl. the state-aggregation,
+payload-cwd, and wire-strictness regressions and two cascade shared-wiring cases) -- full sweep 6118 unit+regression
+green; mypy/pyright/pre-commit clean. Docker: `test_policy_hooks.py` 17/17 (7 new Codex cases; 10 pre-existing unchanged
+-- extraction moved no Claude bytes) + `test_supervisor_e2e.py` 9/9 (cascade through the extracted registration).
+
+**Deferred**: real-codex enrolled-hook E2E is operator-gated (trust ceremony) -- recorded as probe stage 85; whether
+Codex surfaces exit-0 stderr to the agent is unobserved (warnings are advisory).
+
 ## 2026-06-10
 
 ### Supervisor cascade: tier-1 plan check before the frontier supervisor

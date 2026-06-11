@@ -48,6 +48,11 @@ from ._helpers import (
     _output_result,
     _read_stdin_json,
 )
+from .codex_policy import (
+    CodexHookAdapter,
+    CodexHookResponder,
+    sort_contexts_tests_first,
+)
 from .direct_commands import (
     _handle_cmd_cancel_verification,
     _handle_cmd_clean,
@@ -63,7 +68,10 @@ from .policy import (
     ClaudeHookAdapter,
     ClaudeHookResponder,
     _derive_policy_source_label,
+    _persist_policy_decisions,
     _persist_policy_state,
+    build_hook_engine,
+    register_supervisor_and_restore,
 )
 from .verification import _run_verification_check
 
@@ -1116,12 +1124,12 @@ def policy_check() -> None:
     if not effective.policy or not effective.policy.enabled:
         sys.exit(0)
 
-    context = ClaudeHookAdapter().build_context(data, tool_name, manifest)
-    if context is None:
+    contexts = ClaudeHookAdapter().build_contexts(data, tool_name, manifest)
+    if not contexts:
         print("[forge] Policy check: cannot build action context", file=sys.stderr)
         sys.exit(0)
+    context = contexts[0]  # Claude tools are single-file; the adapter yields at most one
 
-    from forge.policy.engine import build_engine
     from forge.policy.types import FailMode
 
     fail_mode: FailMode = effective.policy.fail_mode or "open"
@@ -1132,35 +1140,13 @@ def policy_check() -> None:
     if not bundles and not has_supervisor:
         sys.exit(0)
 
-    bundle_config: dict[str, dict[str, Any]] = {}
-    if effective.policy and effective.policy.bundle_config:
-        bundle_config = effective.policy.bundle_config
-
     try:
-        engine = build_engine(bundles, fail_mode=fail_mode, bundle_config=bundle_config or None)
+        engine = build_hook_engine(effective)
     except Exception as e:
         print(f"[forge] Policy check: cannot build engine: {e}", file=sys.stderr)
         sys.exit(0)
 
-    # Register semantic supervisor before restore_state so cached state is restored with it.
-    if has_supervisor:
-        from forge.policy.semantic.supervisor import SemanticSupervisorPolicy
-
-        sup_cfg = effective.policy.supervisor
-        if sup_cfg and sup_cfg.cascade:
-            # Cascade: the cheap tier-1 plan check runs on every event; the frontier
-            # supervisor becomes the needs_review resolver (invoked only on escalation).
-            from forge.policy.semantic.plan_check import PlanCheckPolicy
-
-            engine.register(PlanCheckPolicy(config=sup_cfg))
-            engine.register_resolver(SemanticSupervisorPolicy(config=sup_cfg))
-        else:
-            engine.register(SemanticSupervisorPolicy(config=sup_cfg))
-
-    existing_policy_state = None
-    if manifest.confirmed.policy:
-        existing_policy_state = manifest.confirmed.policy.policy_states
-    engine.restore_state(existing_policy_state)
+    register_supervisor_and_restore(engine, effective, manifest)
 
     import time
 
@@ -1253,6 +1239,171 @@ def policy_check() -> None:
                 f"Forge policy: {target_label} checked against {source_label}"
                 f" ({verdict}{cache_label}, {elapsed:.1f}s)"
             )
+        )
+    sys.exit(responder.ALLOW_EXIT)
+
+
+@hooks.command(name="codex-policy-check")
+def codex_policy_check() -> None:
+    """Evaluate policies on a Codex PreToolUse apply_patch action.
+
+    Wire contract (probe-pinned, codex-cli 0.138.0): a block is a strict
+    ``hookSpecificOutput`` deny JSON on stdout with exit 0; an allow emits NO
+    stdout. Codex FAILS OPEN on malformed hook output, so stdout carries only
+    ``json.dumps`` wire strings -- every diagnostic goes to stderr. Fail-open on
+    every internal error, matching policy-check. A multi-file patch is evaluated
+    per file with cross-file precedence deny > needs_review > warn/allow.
+    """
+    data, err = _read_stdin_json()
+    if data is None:
+        sys.exit(0)
+
+    if data.get("hook_event_name") != "PreToolUse":
+        sys.exit(0)
+
+    tool_name = data.get("tool_name", "")
+    if tool_name != "apply_patch":
+        sys.exit(0)  # Bash and other tools pass through unevaluated
+
+    # Codex resolves apply_patch paths against the payload cwd; the hook process's
+    # own CWD is unpinned, so the payload's is authoritative (also for forge_root
+    # derivation in session-store resolution).
+    payload_cwd = data.get("cwd")
+    cwd = Path(payload_cwd).resolve() if isinstance(payload_cwd, str) and payload_cwd else Path.cwd().resolve()
+
+    # Codex's payload session_id is a Codex thread UUID, never in the Claude UUID
+    # index; FORGE_SESSION (probe-verified to reach the hook env) is the path.
+    store = resolve_session_store(cwd, session_id=None)
+    if store is None:
+        print("[forge] Policy check: no session resolved", file=sys.stderr)
+        sys.exit(0)
+    try:
+        manifest = store.read()
+    except Exception as e:
+        print(f"[forge] Policy check: cannot read session manifest: {e}", file=sys.stderr)
+        sys.exit(0)
+
+    try:
+        effective = compute_effective_intent(manifest)
+    except Exception as e:
+        print(f"[forge] Policy check: cannot compute effective intent: {e}", file=sys.stderr)
+        sys.exit(0)
+
+    if not effective.policy or not effective.policy.enabled:
+        sys.exit(0)
+
+    from forge.policy.types import FailMode
+
+    fail_mode: FailMode = effective.policy.fail_mode or "open"
+    bundles = effective.policy.bundles or []
+    sup = effective.policy.supervisor if effective.policy else None
+    has_supervisor = bool(sup and sup.resume_id and not sup.suspended)
+
+    if not bundles and not has_supervisor:
+        sys.exit(0)
+
+    contexts = CodexHookAdapter().build_contexts(data, tool_name, manifest)
+    if not contexts:
+        # Covers malformed patches, delete-only patches, and non-dict tool_input.
+        print("[forge] Policy check: no evaluable file operations in apply_patch", file=sys.stderr)
+        sys.exit(0)
+    contexts = sort_contexts_tests_first(contexts)
+
+    try:
+        engine = build_hook_engine(effective)
+    except Exception as e:
+        print(f"[forge] Policy check: cannot build engine: {e}", file=sys.stderr)
+        sys.exit(0)
+
+    register_supervisor_and_restore(engine, effective, manifest)
+
+    import time
+
+    responder = CodexHookResponder()
+    t0 = time.monotonic()
+    # evaluate() clears the engine's collected state per call, so a multi-file loop
+    # must aggregate it here or earlier files' stateful-policy state (e.g. TDD
+    # tests_touched) is dropped at persist time.
+    aggregated_state: dict[str, dict[str, Any]] = {}
+    file_results: list[tuple[str | None, Any]] = []
+    for context in contexts:
+        try:
+            result = engine.evaluate(context)
+        except Exception as e:
+            if fail_mode == "closed":
+                print(responder.format_error_deny(f"Policy evaluation failed (fail-closed): {e}"))
+                sys.exit(responder.BLOCK_EXIT)
+            continue  # fail-open: skip this file
+        aggregated_state.update(engine.get_collected_state())
+        file_results.append((context.target_path, result))
+    elapsed = time.monotonic() - t0
+
+    if not file_results:
+        sys.exit(0)  # every evaluation failed open
+
+    paths_label = ",".join(path or "?" for path, _ in file_results)
+    target_label = f"apply_patch:{paths_label}"
+
+    try:
+        _persist_policy_decisions(
+            store=store,
+            engine=engine,
+            engine_state=aggregated_state,
+            entries=[(result, f"apply_patch:{path}" if path else "apply_patch") for path, result in file_results],
+            effective=effective,
+            confirmed_by="hook:codex-policy-check",
+        )
+    except Exception as e:
+        print(f"[forge] Policy state persistence failed: {e}", file=sys.stderr)
+
+    from forge.runtime_config import get_runtime_config
+
+    show_summary = get_runtime_config().policy_summary_feedback == "on"
+    source_label = _derive_policy_source_label(file_results[0][1], effective)
+
+    denying = [(path, result) for path, result in file_results if result.final_decision == "deny"]
+    if denying:
+        print(responder.format_deny_multi(denying))
+        if show_summary:
+            print(
+                f"[forge] Policy: checked {target_label} against {source_label}" f" (blocked, {elapsed:.1f}s)",
+                file=sys.stderr,
+            )
+        sys.exit(responder.BLOCK_EXIT)
+
+    reviews = [(path, result) for path, result in file_results if result.final_decision == "needs_review"]
+    if reviews:
+        print(responder.format_needs_review_multi(reviews))
+        if show_summary:
+            print(
+                f"[forge] Policy: checked {target_label} against {source_label}"
+                f" (review required, unresolved, {elapsed:.1f}s)",
+                file=sys.stderr,
+            )
+        sys.exit(responder.BLOCK_EXIT)
+
+    # Allow: NO stdout (PreToolUse allow-feedback delivery is unprobed on Codex).
+    # Surface warnings with path attribution, deduped to avoid spam.
+    seen: set[str] = set()
+    warning_count = 0
+    for path, result in file_results:
+        for warning in result.all_warnings:
+            key = f"{path}:{warning}"
+            if key not in seen:
+                seen.add(key)
+                warning_count += 1
+                print(f"[forge] Policy warning: {path}: {warning}", file=sys.stderr)
+
+    if show_summary:
+        verdict = (
+            "aligned" if warning_count == 0 else f"allowed, {warning_count} warning{'s' if warning_count != 1 else ''}"
+        )
+        is_cached = any(getattr(d, "cached", False) for _, r in file_results for d in r.decisions)
+        cache_label = ", cached" if is_cached else ""
+        print(
+            f"[forge] Policy: checked {target_label} against {source_label}"
+            f" ({verdict}{cache_label}, {elapsed:.1f}s)",
+            file=sys.stderr,
         )
     sys.exit(responder.ALLOW_EXIT)
 

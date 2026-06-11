@@ -1286,8 +1286,11 @@ def _handle_policy_check(argv: list[str]) -> None:
 
     for file_path, diff_chunk in file_diffs:
         added = extract_added_lines(diff_chunk) if diff_chunk else None
+        # origin stays "claude_code": %policy check is dispatched from a Claude
+        # UserPromptSubmit hook, so the invoking actor genuinely is the Claude session
+        # (unlike the forge_cli-tagged terminal leaves in cli/policy.py).
         context = ActionContext(
-            runtime="claude_code",
+            origin="claude_code",
             event="OnDemand.Check",
             tool_name="Edit",
             tool_args={"file_path": file_path, "content": (added or "")[:200]},

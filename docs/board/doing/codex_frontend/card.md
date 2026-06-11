@@ -162,16 +162,20 @@ experiment harness but the E2E supersedes its one-shot run):
    `pretool_policy` rose `"none"` -> `"partial"` (deny + mutation confirmed; partial because enforcement is
    enrollment-gated, malformed output fails open, and PermissionRequest is unpinned). See Risks.
 
-3. **Codex hook adapter/responder (gated on probe 2's response-contract leg).** `CodexHookAdapter`/`CodexHookResponder`
-   filling the runtime-neutral protocols in `src/forge/cli/hooks/protocols.py` (the Phase 4f seam already makes room).
-   Map the snake_case payload -> `ActionContext`; serialize decisions to Codex's response wire (deny/`updatedInput`/
-   PermissionRequest `decision.behavior` -- contracts to pin in probe 2, now headless-runnable). Broader coverage
-   target: PreToolUse + PermissionRequest + Stop + UserPromptSubmit. Carry the **`ActionContext.runtime` -> `origin`
-   rename** here (the adapter is its first real consumer; direction resolved in the `runtime_abstraction` Open Decisions
-   2026-06-09 -- values `{forge_cli, claude_code, codex}`; do NOT add a `subject_runtime` axis). **Registry correction
-   DONE in Phase 0 (2026-06-10):** `native_hooks="headless_inert"` was refuted and renamed to `enrollment_gated` on both
-   the registry `HookSupport` and the preflight `HookSeam`. The `pretool_policy` rise shipped in the Phase 1 closeout
-   unit (2026-06-10): `"none"` -> `"partial"` (see Deliverable 2).
+3. **Codex hook adapter/responder -- SHIPPED 2026-06-11 (Phase 3, PreToolUse scope; see the checklist + change_log
+   entry).** `CodexHookAdapter`/`CodexHookResponder` (`src/forge/cli/hooks/codex_policy.py`) fill the runtime-neutral
+   protocols, consumed by `forge hook codex-policy-check`: the `apply_patch` envelope is parsed (`codex_patch.py`) into
+   per-file contexts (protocol cardinality became `build_contexts -> list`), **normalized** Add->Write / Update->Edit so
+   every policy's `applies_to` gate matches; deny = strict stdout JSON + exit 0 (Codex fails OPEN on malformed output);
+   per-file state aggregated before one persist (one decision-log entry per file,
+   `confirmed_by: hook:codex-policy-check`). The **`ActionContext.runtime` -> `origin` rename** was carried here per the
+   recorded decision (CLI leaves -> `forge_cli`; `%policy check` stays `claude_code`). **Scope (user decision
+   2026-06-10): PreToolUse only** -- Stop/UserPromptSubmit/SessionStart land with their Phase 4/5 consumers;
+   PermissionRequest stays descoped (never observed firing headless). Handler-only: enforcement requires manual
+   registration + trust enrollment until Phase 6 (the probe README owes a "stage 85" enrolled end-to-end on the next
+   operator round). **Registry correction DONE in Phase 0 (2026-06-10):** `native_hooks="headless_inert"` was refuted
+   and renamed to `enrollment_gated` on both the registry `HookSupport` and the preflight `HookSeam`. The
+   `pretool_policy` rise shipped in the Phase 1 closeout unit (2026-06-10): `"none"` -> `"partial"` (see Deliverable 2).
 
 4. **SessionStart curated-transfer delivery with initial-message fallback (gated on probe 2's 30e leg).** Now viable for
    BOTH the interactive frontend AND the headless bridge (enrolled homes fire headless -- the Phase 6 "headless stays

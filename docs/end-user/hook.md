@@ -189,6 +189,17 @@ Purpose: evaluate TDD/policy bundles before file writes.
 
 - enforces policy bundles (TDD, coding standards) when enabled via `forge policy enable`
 
+### codex-policy-check (Codex PreToolUse:apply_patch)
+
+Purpose: the same policy enforcement for **Codex** sessions (`forge session start --runtime codex`).
+
+- evaluates each file operation in a Codex `apply_patch` action against the session's policy bundles and supervisor;
+  shell (`Bash`) actions pass through unevaluated
+- a block is delivered as Codex's deny JSON on stdout (not an exit code); an allow produces no output
+- **not auto-installed**: register `forge hook codex-policy-check` as a PreToolUse hook in your Codex config and
+  complete Codex's one-time trust ceremony — Codex hooks only fire from trust-enrolled registrations (installer support
+  is planned)
+
 ### read-hygiene (PreToolUse:Read)
 
 Purpose: silently fix Read calls to skill instruction files that include extra parameters.
@@ -287,10 +298,11 @@ See [Hook session resolution](#hook-session-resolution) for the four-step resolu
 All hooks are under `forge hook ...` (group name `hook`, not `hooks`):
 
 ```bash
-forge hook session-start   # SessionStart handler
-forge hook stop            # Stop handler
-forge hook policy-check    # PreToolUse:Write/Edit handler
-forge hook enable --local # Install to .claude/settings.local.json
+forge hook session-start       # SessionStart handler
+forge hook stop                # Stop handler
+forge hook policy-check        # PreToolUse:Write/Edit handler (Claude)
+forge hook codex-policy-check  # PreToolUse:apply_patch handler (Codex; manual registration)
+forge hook enable --local      # Install to .claude/settings.local.json
 ```
 
 ### Files to inspect (debugging)

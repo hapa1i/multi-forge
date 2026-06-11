@@ -7,7 +7,7 @@ the OpenRouter content-filter failures this surface was built to reveal -- tags 
 event with ``session=context.session_name``. So the surface only works if
 ``ActionContext.session_name == manifest.name``.
 
-That bridge is a single assignment in ``ClaudeHookAdapter.build_context``
+That bridge is a single assignment in ``ClaudeHookAdapter.build_contexts``
 (``session_name=manifest.name``). Pin it so a future change (e.g. tagging a Claude UUID
 instead of the name) -- which would silently make supervisor activity invisible to
 ``forge usage`` while the policy-decision half kept working -- fails loudly here.
@@ -29,12 +29,11 @@ pytestmark = pytest.mark.regression
 
 def test_action_context_session_name_is_manifest_name() -> None:
     manifest = create_session_state("planner", worktree_path="/tmp/x")
-    ctx = ClaudeHookAdapter().build_context(
+    [ctx] = ClaudeHookAdapter().build_contexts(
         {"tool_input": {"file_path": "a.py", "content": "x"}},
         "Write",
         manifest,
     )
-    assert ctx is not None
     # The bridge: the supervisor emits its ledger event with session=context.session_name,
     # and the read surface filters event.session == manifest.name. If these diverge, the
     # ledger half (incl. supervisor errors) goes silently invisible to `forge usage`.

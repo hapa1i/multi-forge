@@ -1490,20 +1490,25 @@ auditable). Both time limits matter: `max_iterations` catches fast-failing loops
 
 #### 4.1.4 Action context
 
-Policies operate on a normalized, runtime-tagged view of what a runtime is doing (an `ActionContext`), for example:
+Policies operate on a normalized, origin-tagged view of what a runtime is doing (an `ActionContext`), for example:
 
-- `runtime` — which agent runtime produced the action (`claude_code` today; `codex`/`gemini` later)
+- `origin` — which actor produced the action (`claude_code`, `codex`, or `forge_cli` for manual on-demand checks)
 - hook event (`PreToolUse.Write`, `PreToolUse.Edit`, …)
 - tool arguments (target path, content/diff metadata)
 - repository/worktree path
 - effective session config (intent + overrides)
 
-Normalization happens at the **adapter boundary**: a runtime's hook adapter (`ClaudeHookAdapter`,
-`src/forge/cli/hooks/policy.py`) maps that runtime's payload into this shape and tags `runtime`. `PolicyEngine.evaluate`
-is runtime-agnostic — it never branches on `runtime`. The reverse seam, a hook **responder** (`ClaudeHookResponder`),
-serializes the composed decision back into the runtime's wire contract (exit codes, block message, allow output). Both
-match runtime-neutral `HookAdapter`/`HookResponder` protocols (`src/forge/cli/hooks/protocols.py`), so a Codex
-adapter/responder pair (Phase 6) reuses the engine without touching it.
+Normalization happens at the **adapter boundary**: a runtime's hook adapter maps its payload into this shape and tags
+`origin`; a hook **responder** serializes the composed decision back into the runtime's wire contract.
+`PolicyEngine.evaluate` never branches on `origin`. Both halves match runtime-neutral `HookAdapter`/`HookResponder`
+protocols (`src/forge/cli/hooks/protocols.py`); two pairs ship: **Claude** (`cli/hooks/policy.py`,
+`forge hook policy-check`) and **Codex** (`cli/hooks/codex_policy.py`, `forge hook codex-policy-check`). The Codex
+adapter parses an `apply_patch` envelope into **per-file** contexts (the protocol's `build_contexts` list),
+**normalized** to the tool names every policy's `applies_to` gates on (Add File → `Write`, Update File → `Edit`;
+deletions skipped; `Bash` passes through); runtime truth stays in `origin="codex"` + `tool_args`. Files compose deny >
+needs_review > warn/allow, stateful policy state is aggregated across the loop before one persist, and unparseable
+patches fail open. Shipped **handler-only**: enforcement requires a manually registered + trust-enrolled Codex
+PreToolUse hook until the Phase 6 installer.
 
 #### 4.1.5 Policy composition
 
@@ -1532,9 +1537,11 @@ Policy violation(s):
 ```
 
 The `Intent:` line appears once per denying policy (not per violation). The `Note:` uses project-owner framing so models
-treat it as a constraint to respect, not an obstacle to circumvent. The runtime's hook responder owns this serialization
-(`ClaudeHookResponder.format_deny`/`format_needs_review`/`allow_feedback`); the `[forge] Policy: …` summary line is a
-separate telemetry overlay in the hook command, not part of the runtime wire contract.
+treat it as a constraint to respect, not an obstacle to circumvent. The reason text is composed once
+(`format_deny_text`/`format_needs_review_text` in `cli/hooks/policy.py`); each responder owns only the wire framing:
+Claude via stderr + exit 2, Codex via stdout JSON (`hookSpecificOutput.permissionDecisionReason`) + exit 0 (strict JSON
+because Codex **fails open** on malformed output; allow emits no stdout). The `[forge] Policy: …` summary line is stderr
+telemetry in the hook command, not part of either wire contract.
 
 #### 4.1.6 Policy state and ownership
 
@@ -1696,21 +1703,17 @@ half). A frozen `RuntimeSpec` per runtime in a module-level `RUNTIMES` table (mi
 `Credential`/`CREDENTIALS` pattern) answers the card's seven questions without hard-coding Claude Code assumptions:
 installed (`is_installed()` = PATH presence; `detect()` = best-effort `--version`), interactive, headless, hooks, usage
 source, native resume, and install scopes (plus curated-transfer in/out). Limited or planned support is a multi-state
-`Literal`, not a `bool` — Codex `native_hooks="enrollment_gated"` (probes 2026-06-10: hooks fire headless and
-interactively once trust-enrolled; enrollment is a guided one-time interactive TUI ceremony whose trust is keyed by the
-registering config's path — project-scope trust survives a project's `git worktree` checkouts but not an unrelated repo
-(stage 84, codex 0.139.0: a fresh repo's byte-identical project hook stays untrusted), so the Phase 6 installer's scope
-is a trade-off (user scope `$CODEX_HOME/config.toml` is the one-ceremony-covers-all target; project scope travels with
-git but needs per-repo enrollment); the Phase 1 probe found the `trusted_hash` is not black-box computable, so
-programmatic pre-enrollment is off the table), `pretool_policy="partial"` (Phase 1 pinned post-enrollment PreToolUse
-deny + `updatedInput` mutation headless; partial, not full — enforcement exists only in enrolled homes, malformed hook
-output fails open, and PermissionRequest has not been observed firing headless), and `interactive="beta"` (a
-Forge-integration target, not shipped). `hook_min_version` stays machine-readable as the registration/enablement floor a
-preflight checks (not a firing guarantee); `hook_feature_flag` is `None` since Codex hooks are default-on — so a
-consumer reading the field, not just the prose, never mistakes a Codex limit for Claude parity.
-`forge runtime list [--json]` renders the matrix. Claude Code is fully populated; Codex/Gemini declare their limits as
-values. Phase 5's `CodexHeadlessInvoker` and auth/runtime preflight now read this registry (e.g.
-`get_runtime("codex").headless_cmd` builds the `codex exec` argv; the preflight checks the version gate).
+`Literal`, not a `bool` — Codex declares `native_hooks="enrollment_gated"` (hooks fire only after a one-time interactive
+TUI trust ceremony; trust is keyed by the registering config's path, the `trusted_hash` is not black-box computable (no
+programmatic pre-enrollment), and the Phase 6 installer's scope choice is a user-vs-project trade-off — probe details in
+`scripts/experiments/codex-hooks/README.md`), `pretool_policy="partial"` (post-enrollment PreToolUse deny +
+`updatedInput` pinned headless, but enforcement exists only in enrolled homes, malformed hook output fails open, and
+PermissionRequest has not been observed firing), and `interactive="beta"` (a Forge-integration target, not shipped).
+`hook_min_version` is the machine-readable registration floor a preflight checks (not a firing guarantee);
+`hook_feature_flag` is `None` since Codex hooks are default-on — so a field-reading consumer never mistakes a Codex
+limit for Claude parity. `forge runtime list [--json]` renders the matrix. Phase 5's `CodexHeadlessInvoker` and
+auth/runtime preflight read it (e.g. `get_runtime("codex").headless_cmd` builds the `codex exec` argv; the preflight
+checks the version gate).
 
 #### 5.5.6 Relationship to policies (workflow unification)
 

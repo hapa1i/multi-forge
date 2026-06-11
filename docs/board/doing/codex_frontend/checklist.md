@@ -53,8 +53,12 @@ rewritten to the round-3 facts and `design.md` §5.5.5 synced.
 `forge session resume <name> --task "..."` over new `core/ops/codex_session.py`; manifest `runtime` + `confirmed.codex`;
 snapshot keyed by real session name (synthetic-children debt retired structurally); all five acceptance rows green
 including the live real-codex E2E, which also closed the two open probe-61 seams (rollout filename == stream thread_id;
-stdin-prompt + `exec resume` recall). **Next: Phase 3 (hook adapter/responder) or Phase 5 (interactive frontend)** --
-both unblocked; Phase 4 viable per 30e.
+stdin-prompt + `exec resume` recall).
+
+**Phase 3 shipped 2026-06-11** (all six slices ticked below; see change_log): the `origin` rename, the apply_patch
+parser, `CodexHookAdapter`/`CodexHookResponder`, and `forge hook codex-policy-check` -- PreToolUse scope, handler-only
+(manual registration + trust enrollment until Phase 6). **Next: Phase 4 (SessionStart transfer delivery) or Phase 5
+(interactive frontend)** -- both unblocked.
 
 ## Phase 0 - Registry correction (owed from probe round 2)
 
@@ -209,13 +213,63 @@ the acceptance sketch:
 | Transfer-child GC      | real-name snapshot + synthetic file  | synthetic children GC'd; real children + notes untouched           | `tests/src/core/ops/test_gc.py`, `test_codex_session.py`                          |
 | Real-codex E2E (@slow) | real codex, curation mocked          | one run tree: curation + codex events; rollout id; stdin resume    | `tests/integration/core/test_codex_session_start.py` (passed live)                |
 
-## Phase 3 - Codex hook adapter/responder (gated on Phase 1 event coverage)
+## Phase 3 - Codex hook adapter/responder (shipped 2026-06-11)
 
-Stub -- expand when started. `CodexHookAdapter`/`CodexHookResponder` filling `src/forge/cli/hooks/protocols.py`;
-snake_case payload -> `ActionContext`; carry the **`ActionContext.runtime` -> `origin` rename** (first real consumer;
-direction resolved in `runtime_abstraction` Open Decisions 2026-06-09). `pretool_policy` rose to `"partial"` in the
-Phase 1 closeout unit (2026-06-10); the adapter must emit strictly valid output (Codex fails OPEN on malformed hook
-responses) and match Codex tool names (`Bash`, `apply_patch`).
+Plan approved 2026-06-10 (full plan: `~/.claude/plans/effervescent-plotting-pascal.md`). **Scope decisions (user):**
+PreToolUse only (Stop/UserPromptSubmit/SessionStart/PermissionRequest land with their Phase 4/5 consumers); deny =
+strict stdout JSON (`hookSpecificOutput.permissionDecision: "deny"`) + exit 0, NOT Claude's exit-2 contract (Codex fails
+OPEN on malformed hook output); **handler only** -- enforcement needs a manually registered + trust-enrolled Codex
+PreToolUse hook until the Phase 6 installer. Load-bearing: every policy's `applies_to` gates on
+`tool_name in ("Write", "Edit")`, so the adapter normalizes apply_patch ops (Add File -> Write, Update File -> Edit,
+deletions skipped); `origin="codex"` + raw `tool_args` keep runtime truth.
+
+- [x] Slice 1 -- `ActionContext.runtime` -> `origin` rename (mechanical, first; recorded decision: the two CLI leaves
+  `cli/policy.py:577/:752` -> `forge_cli`; `%policy check` stays `claude_code`; fix the "flows into attribution"
+  docstring claim).
+  - Assertion: zero `runtime=` kwargs on `ActionContext` constructions in src+tests; policy/hooks/reactive/regression
+    suites green; mypy clean.
+  - **Done 2026-06-10**: field + docstring rewritten (notes the name deliberately does not invite `get_runtime()`); 47
+    test kwargs across 11 files + the `result.origin` read assertion; 702 targeted unit tests green; mypy clean; the
+    surviving `runtime=` hits are all other domains (UsageEvent/Attribution/LaunchIntent/target_runtime) by design.
+- [x] Slice 2 -- apply_patch parser (`cli/hooks/codex_patch.py`, new): `PatchFileOp` + `parse_apply_patch` (`None` =
+  malformed -> caller fails open; reuses `extract_added_lines`).
+  - Assertion: fixture-literal Add, Update+`@@`, Move to, Delete, multi-file order, empty `[]`, malformed `None` all
+    pass in `tests/src/cli/hooks/test_codex_patch.py`.
+  - **Done 2026-06-10**: 24 parser cases green incl. CRLF, End-of-File tolerance, Delete-with-body malformed, `path` =
+    post-op Move-to target.
+- [x] Slice 3 -- `CodexHookAdapter`/`CodexHookResponder` (`cli/hooks/codex_policy.py`, new) + protocol cardinality
+  `build_context` -> `build_contexts(...) -> list[ActionContext]` (clean break; Claude wire bytes unchanged); deny
+  reason text shared via extracted `format_deny_text`/`format_needs_review_text`.
+  - Assertion: deny JSON round-trips to the probe-pinned key set exactly; protocol-conformance test covers both pairs;
+    `test_policy_feedback.py` untouched and green (byte guard).
+  - **Done 2026-06-10**: 16 adapter/responder cases green; conformance test extended with the Codex pair; one missed
+    `build_context` caller surfaced by the full sweep (`test_bug_usage_session_attribution_contract.py`) and updated.
+- [x] Slice 4 -- `forge hook codex-policy-check` + engine-assembly extraction (`build_hook_engine`,
+  `register_supervisor_and_restore`, `_persist_policy_decisions` with explicit aggregated `engine_state` -- `evaluate()`
+  clears `_collected_state` per call, so the per-file loop MUST accumulate); cross-file precedence deny > needs_review >
+  warn/allow; tests-first ordering.
+  - Assertion: `policy_check` diff confined to two helper call lines; state-aggregation regression (tests-file +
+    docs-file patch persists `tests_touched`) and payload-cwd regression (process CWD outside project, payload cwd
+    inside, unindexed manifest) pass; stdout-strictness regression (non-empty stdout == exactly
+    `{"hookSpecificOutput"}`) passes; stdout/stderr asserted separately (Click 8.4).
+  - **Done 2026-06-11**: 17 command cases green incl. both pinned regressions, deny-beats-needs_review co-occurrence,
+    and the two cascade shared-wiring cases (short-circuit + escalation through the extracted helper); 6118
+    unit+regression sweep green; mypy/pyright/pre-commit clean.
+- [x] Slice 5 -- Docker integration: `TestCodexPolicyCheckDocker` in `tests/integration/docker/test_policy_hooks.py`
+  (deny = exit 0 + stdout JSON; state across invocations; fail-open paths); suite run before AND after the slice-4
+  extraction; probe-harness README gains the operator-gated "stage 85" enrolled E2E follow-up note.
+  - Assertion: `./scripts/test-integration.sh tests/integration/docker/test_policy_hooks.py` green.
+  - **Done 2026-06-11**: 17/17 (`test_policy_hooks.py` -- 7 new Codex cases + 10 pre-existing unchanged, proving the
+    extraction moved no Claude bytes) + 9/9 `test_supervisor_e2e.py` (cascade path through the extracted registration);
+    stage-85 follow-up note added to the probe README.
+- [x] Slice 6 -- docs/board sync: design.md §4.1.4/§4.1.5 (+§5.5.5 mirror check), protocols.py docstrings, registry
+  codex note sentence (`pretool_policy` stays `"partial"`), end-user hook.md, card Deliverable 3 annotation, change_log
+  entry.
+  - Assertion: no stale "Phase 6 adapter" claim on normative surfaces; `make pre-commit` clean.
+  - **Done 2026-06-11**: §4.1.4 documents both shipped pairs + normalization + handler-only caveat; §4.1.5 documents the
+    shared reason text + per-runtime wire framing; §5.5.5 unchanged (its capability claims stay accurate --
+    `pretool_policy` stays `"partial"`); registry note gains the shipped-handler sentence; hook.md gains the
+    codex-policy-check section; change_log entry added.
 
 ## Phase 4 - SessionStart transfer delivery with initial-message fallback (gated on Phase 1 30e)
 

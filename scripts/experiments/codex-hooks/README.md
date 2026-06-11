@@ -178,3 +178,11 @@ ceremony, then headless capture). Phase 1 already promoted five sanitized payloa
 `sanitize.sh` produces review-ready candidates; the build card promotes any with a provenance README (cloning the
 `tests/fixtures/codex/README.md` structure), pinning the future adapter's parsers as `exec_json_success.jsonl` pins
 `parse_codex_jsonl_stream`.
+
+**Owed next operator round — stage 85 (enrolled `forge hook codex-policy-check` end-to-end).** Phase 3 shipped the Codex
+PreToolUse policy hook (`forge hook codex-policy-check`: apply_patch -> per-file policy evaluation -> stdout deny JSON);
+CI covers its stdin-JSON CLI contract (`tests/integration/docker/test_policy_hooks.py`), but the full enrolled-hook loop
+— a real `codex exec` turn whose registered PreToolUse hook runs the forge command and Codex honors the deny — needs the
+trust ceremony, so it is operator-gated. Sketch: register `command = "forge hook codex-policy-check"` (path-stable) as a
+PreToolUse hook in the enrolled fixture, point `FORGE_SESSION` at a policy-enabled session, prompt an apply_patch into
+`src/` with no tests, and assert the patch did NOT apply.
