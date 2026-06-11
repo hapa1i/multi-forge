@@ -48,14 +48,11 @@ def _apply_checker_options(
     *,
     checker_model: str | None,
     checker_provider: str | None,
-    checker_budget_tokens: int | None,
 ) -> None:
     if checker_model:
         sup.checker_model = checker_model
     if checker_provider:
         sup.checker_provider = _normalize_checker_provider_arg(checker_provider)
-    if checker_budget_tokens is not None:
-        sup.checker_budget_tokens = checker_budget_tokens
 
 
 def _checker_display(sup: SupervisorConfig) -> tuple[str, str, int]:
@@ -896,13 +893,6 @@ def _resolve_cascade_plan(sup_config: SupervisorConfig, manifest: SessionState) 
     default=None,
     help="Tier-1 checker provider (default: openrouter)",
 )
-@click.option(
-    "--checker-budget-tokens",
-    "checker_budget_tokens",
-    type=click.IntRange(min=1),
-    default=None,
-    help="Approx token budget for the tier-1 checker prompt (default: 32000)",
-)
 def supervise_cmd(
     target: str | None,
     off: bool,
@@ -917,7 +907,6 @@ def supervise_cmd(
     cascade_flag: bool | None,
     checker_model: str | None,
     checker_provider: str | None,
-    checker_budget_tokens: int | None,
 ) -> None:
     """Configure the semantic supervisor for the current session.
 
@@ -951,7 +940,7 @@ def supervise_cmd(
     if cascade_flag is False and target:
         console.print("[red]Error:[/red] --no-cascade with a target is redundant (cascade defaults to off)")
         sys.exit(1)
-    checker_option_supplied = bool(checker_model or checker_provider or checker_budget_tokens is not None)
+    checker_option_supplied = bool(checker_model or checker_provider)
     if checker_option_supplied and not (target or cascade_flag is True):
         console.print("[red]Error:[/red] Checker options require a target argument or --cascade")
         sys.exit(1)
@@ -1051,7 +1040,6 @@ def supervise_cmd(
                     m.intent.policy.supervisor,
                     checker_model=checker_model,
                     checker_provider=checker_provider,
-                    checker_budget_tokens=checker_budget_tokens,
                 )
                 if not m.intent.policy.supervisor.plan_override_path:
                     m.intent.policy.supervisor.plan_override_path = plan_path
@@ -1064,7 +1052,6 @@ def supervise_cmd(
             preview,
             checker_model=checker_model,
             checker_provider=checker_provider,
-            checker_budget_tokens=checker_budget_tokens,
         )
         route_provider, route_model, route_budget = _checker_display(preview)
         console.print(
@@ -1191,7 +1178,6 @@ def supervise_cmd(
                 sup_config,
                 checker_model=checker_model,
                 checker_provider=checker_provider,
-                checker_budget_tokens=checker_budget_tokens,
             )
             plan_path, cascade_source_desc = _resolve_cascade_plan(sup_config, manifest)
             sup_config.plan_override_path = plan_path
@@ -1200,7 +1186,6 @@ def supervise_cmd(
                 sup_config,
                 checker_model=checker_model,
                 checker_provider=checker_provider,
-                checker_budget_tokens=checker_budget_tokens,
             )
 
         store.update(timeout_s=5.0, mutate=lambda m: apply_supervisor_to_intent(m, sup_config))

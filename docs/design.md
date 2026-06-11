@@ -1299,21 +1299,22 @@ ambiguities.
 **Cascade (tier-1 plan check, opt-in):** `forge policy supervise --cascade` (or `<target> --cascade`) routes checks
 through a cheap tier before the frontier. A stateless `core.llm` call (`PlanCheckPolicy`, `semantic.plan_check`, default
 OpenRouter model `google/gemini-3.5-flash`, configurable per provider via `--checker-provider`/`--checker-model`, with a
-configurable default prompt budget of roughly 32K tokens via `--checker-budget-tokens`) evaluates the action against the
-**approved-plan snapshot text** (`plan_override_path`, auto-resolved at wiring time via the `--reload` machinery;
-enabling fails with an actionable error when no approved snapshot resolves). Long plans and actions are packed as
-head+tail excerpts rather than first-N slices, unified diffs retain file and hunk headers when truncated, and prompt
-metadata explicitly marks whether the plan or action was truncated. Edit actions include the matched and replacement
-fragments when available; Write actions include path and target existence context. Tier-1 emits only `allow` (clearly
-aligned; cached per the throttle window) or `needs_review` — it never warns or denies, and **every** tier-1 failure (LLM
-error, parse failure, unreadable plan) escalates, so the system degrades to frontier-always, never to unsupervised. In
-cascade mode the supervisor is registered as the engine's **resolver** (see §4.1.5): it is invoked only when a policy
-emitted `needs_review` and nothing denied, so clearly-aligned actions never pay the frontier call. Tier-1 reasons ride
-in low-severity violations (persisted to the decision log, never printed on resolved allows). Measurement is built in:
-session-tagged `plan-check` usage events plus decision-log-derived `plan_check_allow`/`plan_check_needs_review` counters
-in `forge activity` expose the short-circuit rate; the supervisor counters are the resolver runs (a tier-1
-`needs_review` alongside a deterministic deny skips the resolver, so the two can differ). Cascade off (the default) is
-exactly the pre-cascade behavior — the supervisor runs as a regular policy on every throttle-missing check.
+configurable default prompt budget of roughly 32K tokens stored as `policy.supervisor.checker_budget_tokens`) evaluates
+the action against the **approved-plan snapshot text** (`plan_override_path`, auto-resolved at wiring time via the
+`--reload` machinery; enabling fails with an actionable error when no approved snapshot resolves). Long plans and
+actions are packed as head+tail excerpts rather than first-N slices, unified diffs retain file and hunk headers when
+truncated, and prompt metadata explicitly marks whether the plan or action was truncated. Edit actions include the
+matched and replacement fragments when available; Write actions include path and target existence context. Tier-1 emits
+only `allow` (clearly aligned; cached per the throttle window) or `needs_review` — it never warns or denies, and
+**every** tier-1 failure (LLM error, parse failure, unreadable plan) escalates, so the system degrades to
+frontier-always, never to unsupervised. In cascade mode the supervisor is registered as the engine's **resolver** (see
+§4.1.5): it is invoked only when a policy emitted `needs_review` and nothing denied, so clearly-aligned actions never
+pay the frontier call. Tier-1 reasons ride in low-severity violations (persisted to the decision log, never printed on
+resolved allows). Measurement is built in: session-tagged `plan-check` usage events plus decision-log-derived
+`plan_check_allow`/`plan_check_needs_review` counters in `forge activity` expose the short-circuit rate; the supervisor
+counters are the resolver runs (a tier-1 `needs_review` alongside a deterministic deny skips the resolver, so the two
+can differ). Cascade off (the default) is exactly the pre-cascade behavior — the supervisor runs as a regular policy on
+every throttle-missing check.
 
 **Supervisor stuck playbook:** When the supervisor blocks because the plan evolved:
 

@@ -814,7 +814,7 @@ class TestSuperviseCascade:
         sup = _read_supervisor(store)
         assert sup.checker_model == "openrouter/some-cheap-model"
 
-    def test_checker_provider_and_budget_stored_with_standalone_cascade(
+    def test_checker_provider_stored_with_standalone_cascade(
         self, runner: CliRunner, temp_guard_env: Path, monkeypatch
     ) -> None:
         store = _make_supervised_project(temp_guard_env, monkeypatch)
@@ -830,16 +830,20 @@ class TestSuperviseCascade:
                 "--cascade",
                 "--checker-provider",
                 "litellm-local",
-                "--checker-budget-tokens",
-                "64000",
             ],
         )
         assert result.exit_code == 0, result.output
 
         sup = _read_supervisor(store)
         assert sup.checker_provider == "litellm_local"
-        assert sup.checker_budget_tokens == 64000
+        assert sup.checker_budget_tokens is None
         assert "gemini/gemini-3.5-flash via litellm_local" in result.output
+
+    def test_checker_budget_is_not_a_supervise_option(self, runner: CliRunner, temp_guard_env: Path) -> None:
+        result = runner.invoke(main, ["policy", "supervise", "--cascade", "--checker-budget-tokens", "64000"])
+        assert result.exit_code == 2
+        assert "No such option" in result.output
+        assert "--checker-budget-tokens" in result.output
 
     def test_cascade_is_standalone_action(self, runner: CliRunner, temp_guard_env: Path, monkeypatch) -> None:
         """Standalone cascade flags participate in the one-action rule."""

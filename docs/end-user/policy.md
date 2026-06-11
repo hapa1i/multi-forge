@@ -233,10 +233,12 @@ forge policy supervise planner --cascade
 forge policy supervise --cascade          # enable on existing config
 forge policy supervise --no-cascade       # disable (supervisor checks every action again)
 
-# Optional: pick the tier-1 route and prompt budget
+# Optional: pick the tier-1 route
 forge policy supervise --cascade --checker-provider litellm-local
 forge policy supervise --cascade --checker-model google/gemini-3.5-flash
-forge policy supervise --cascade --checker-budget-tokens 64000
+
+# Advanced: tune the persisted checker prompt budget
+forge session set policy.supervisor.checker_budget_tokens 64000
 ```
 
 How it behaves:
@@ -249,6 +251,8 @@ How it behaves:
   (`gemini/gemini-3.5-flash`) when OpenRouter is unavailable. Local LiteLLM backends generated before that model was
   added to the default backend config may need their `litellm` backend config recreated or updated; otherwise use
   `--checker-model gemini/gemini-2.5-flash` until the backend serves the 3.5 model.
+- `checker_budget_tokens` is intentionally a session config setting rather than a `policy supervise` flag; use
+  `forge session set policy.supervisor.checker_budget_tokens <tokens>` when you need to tune it.
 - Long plans and actions are packed with head+tail excerpts. Unified diffs keep hunk/file headers, Edit checks include
   the old/new fragments, Write checks include target existence metadata, and the prompt explicitly marks whether plan or
   action text was truncated.
