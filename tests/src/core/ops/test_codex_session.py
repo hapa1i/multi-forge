@@ -385,9 +385,7 @@ class TestStartCodexSessionGC:
         state = SessionManager().get_session("impl", forge_root=str(proj))
         assert state.confirmed.derivation is not None
 
-    def test_worktree_snapshot_owned_by_child_forge_root(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_worktree_snapshot_owned_by_child_forge_root(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         from forge.core.ops.gc import _detect_orphan_transfer_files
 
         # Nested Forge project (forge_root != repo root): the manager remaps the
@@ -403,9 +401,7 @@ class TestStartCodexSessionGC:
         ctx = ExecutionContext(cwd=proj, worktree_root=repo, project_root=repo, forge_root=proj)
 
         with _codex_mocks():
-            result = start_codex_session(
-                ctx=ctx, name="impl", parent="planner", task="Build it", create_worktree=True
-            )
+            result = start_codex_session(ctx=ctx, name="impl", parent="planner", task="Build it", create_worktree=True)
 
         assert result.codex.success
         entry = SessionManager().get_session_entry("impl", forge_root=None)

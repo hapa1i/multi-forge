@@ -20,7 +20,10 @@ from click.testing import CliRunner
 from forge.cli.main import main
 from forge.cli.session_codex import launch_codex_session, resume_codex_session
 from forge.core.invoker.types import HeadlessResult
-from forge.core.ops.codex_session import CodexSessionResumeResult, CodexSessionStartResult
+from forge.core.ops.codex_session import (
+    CodexSessionResumeResult,
+    CodexSessionStartResult,
+)
 from forge.core.ops.session import ForgeOpError
 from forge.session import IndexStore, SessionStore
 from forge.session.models import CodexConfirmed, create_session_state
@@ -100,9 +103,7 @@ class TestStartFlagMatrix:
             (["--image", "img"], "--image"),
         ],
     )
-    def test_claude_flags_rejected_with_codex(
-        self, runner: CliRunner, extra_args: list[str], flag_label: str
-    ) -> None:
+    def test_claude_flags_rejected_with_codex(self, runner: CliRunner, extra_args: list[str], flag_label: str) -> None:
         result = runner.invoke(main, _CODEX_BASE + extra_args)
         assert result.exit_code == 1
         assert f"{flag_label} is not supported with --runtime codex" in result.output

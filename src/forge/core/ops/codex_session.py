@@ -23,7 +23,12 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 
-from forge.core.invoker import Attribution, CodexHeadlessInvoker, HeadlessResult, prepare_codex_request
+from forge.core.invoker import (
+    Attribution,
+    CodexHeadlessInvoker,
+    HeadlessResult,
+    prepare_codex_request,
+)
 from forge.core.invoker.codex import CodexSandbox
 from forge.core.ops.codex_bridge import _temporary_run_env, bridge_session_to_codex
 from forge.core.ops.context import ExecutionContext
@@ -157,9 +162,7 @@ def start_codex_session(
     except Exception:
         # Nothing of ours is on disk yet: remove only the session. A referenced
         # pre-existing snapshot is another session's property -- never delete it.
-        _rollback_created_session(
-            manager, name, forge_root=str(child_forge_root), delete_branch=create_worktree
-        )
+        _rollback_created_session(manager, name, forge_root=str(child_forge_root), delete_branch=create_worktree)
         raise
 
     try:
