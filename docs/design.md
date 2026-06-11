@@ -352,12 +352,13 @@ To avoid writer conflicts:
     start — routing mode, proxy id/base URL, and whether/how an API key was made available to the child)
   - `confirmed.codex` for Codex-runtime sessions — `thread_id`, rollout path/source, auth posture, `last_run_at`,
     `context_delivery` — is CLI-written like `launch`: Codex hooks only fire from trust-enrolled homes
-    (`enrollment_gated`), so the CLI records these from the `codex exec --json` stream and filesystem discovery,
-    refreshed per turn. Even in hook-delivery mode (§3.9), the `codex-session-start` hook's only write is a small
-    receipt file under the session directory — the CLI reconciles it into `confirmed.codex` after the turn, so the
-    manifest stays CLI-owned. `confirmed.launch` stays unset for Codex sessions (it documents the ANTHROPIC key posture
-    of interactive Claude and would misread), and `claude_session_id` stays `None` — which is what makes every
-    Claude-resume predicate refuse Codex sessions.
+    (`enrollment_gated`), so the CLI records these from the `codex exec --json` stream and filesystem discovery.
+    Thread/rollout/auth/`last_run_at` refresh per turn; `context_delivery` is a start-turn delivery fact resume never
+    rewrites. Even in hook-delivery mode (§3.9), the `codex-session-start` hook's only write is a small receipt file
+    under the session directory — the CLI reconciles it into `confirmed.codex` after the turn, so the manifest stays
+    CLI-owned. `confirmed.launch` stays unset for Codex sessions (it documents the ANTHROPIC key posture of interactive
+    Claude and would misread), and `claude_session_id` stays `None` — which is what makes every Claude-resume predicate
+    refuse Codex sessions.
   - Sets `FORGE_SESSION=<session_name>` when launching Claude
   - `claude_session_id` whenever the CLI starts a **new** Claude conversation — `forge session start` and transfer/fresh
     children (`session fork`, `resume --fresh`): the CLI **pre-seeds** it (generates a UUID, writes it at creation,
@@ -609,39 +610,41 @@ The resume command supports two **resume modes** (`--resume-mode`):
 - **`native`**: Uses `--resume --fork-session` to carry full conversation history. Lossless but lost on `/compact`. No
   context file generated. Requires the parent to have a confirmed `claude_session_id`.
 
-The transfer doc carries a `target_runtime` frontmatter field and a `## Runtime Hints` section (Phase 5d). `claude`
-(default) renders byte-identically to pre-5d output; `codex` relabels both (the curated body stays Claude-worded —
-curation-prompt tuning is a follow-up). Delivery is runtime-specific: Claude uses `--append-system-prompt-file`. Codex
-has **no** system-prompt-file flag, so by default the curated context is prepended to the **initial `codex exec`
-message** — the zero-setup path. The opt-in `--context-delivery hook` (Phase 4) instead stages the framed body at
-`<session_dir>/codex/pending-context.md`, sends only the task as the prompt, and lets a trust-enrolled
-`forge hook codex-session-start` emit the staged body as SessionStart `additionalContext` (probe 30e), consuming the
-file and writing `context-receipt.json` — the hook's **only** write. Enrollment is unverifiable pre-turn (`trusted_hash`
-not computable), so the CLI reconciles the receipt **after** the turn into CLI-written
-`confirmed.codex.context_delivery` (`initial_message | session_start_hook | hook_undelivered`); undelivered keeps the
-session, records the honest fact, and exits 1 with ceremony/delete-and-retry guidance. Staging is one-shot: the staged
-file never survives the start turn, and resume turns defensively clear leftovers. Phase 5e composed the parts into the
-cross-runtime hop `bridge_session_to_codex` (`core/ops/codex_bridge.py`): parent session -> ai-curated Codex-targeted
-transfer -> body prepended via `compose_codex_initial_message` (or staged via `compose_codex_handoff_context` in hook
-mode) -> `CodexHeadlessInvoker().run`, all under **one run tree** joining on `root_run_id` (§3.14) — a UI-agnostic
-command-core op.
+The transfer doc carries a `target_runtime` frontmatter field and a `## Runtime Hints` section. `claude` (default)
+renders byte-identically to the original output; `codex` relabels both (the curated body stays Claude-worded). Delivery
+is runtime-specific: Claude uses `--append-system-prompt-file`. Codex has **no** system-prompt-file flag, so by default
+the curated context is prepended to the **initial `codex exec` message** — the zero-setup path. The opt-in
+`--context-delivery hook` instead stages the framed body at `<session_dir>/codex/pending-context.md`, sends only the
+task as the prompt, and lets a trust-enrolled `forge hook codex-session-start` emit the staged body as SessionStart
+`additionalContext` (a probe-pinned wire contract — evidence in `scripts/experiments/codex-hooks/`), consuming the file
+and writing `context-receipt.json` — the hook's **only** write. Enrollment is unverifiable pre-turn (`trusted_hash` not
+computable), so the CLI reconciles the receipt **after** the turn into CLI-written `confirmed.codex.context_delivery`
+(`initial_message | session_start_hook | hook_undelivered`); undelivered keeps the session, records the honest fact, and
+exits 1 with ceremony/delete-and-retry guidance. Staging is one-shot: the staged file never survives the start turn, and
+resume turns defensively clear leftovers. The cross-runtime hop is `bridge_session_to_codex`
+(`core/ops/codex_bridge.py`): parent session -> ai-curated Codex-targeted transfer -> body prepended via
+`compose_codex_initial_message` (or staged via `compose_codex_handoff_context` in hook mode) ->
+`CodexHeadlessInvoker().run`, all under **one run tree** joining on `root_run_id` (§3.14) — a UI-agnostic command-core
+op.
 
-The one-command frontend over it is **`forge session start <name> --runtime codex --resume-from <parent> --task "…"`**
-(`core/ops/codex_session.py`, shipped with the `codex_frontend` card Phase 2): it creates a real Codex-runtime session
-(manifest `intent.launch.runtime="codex"`, immutable — `forge session set launch.runtime` is rejected), keys the
-transfer snapshot by the **real session name** so `Derivation.context_file` GC-protects it (no synthetic per-run
-transfer children), runs the first `codex exec` turn, and records hook-free Codex facts into `confirmed.codex`:
-`thread_id` from the stream's `thread.started` event, the matching `$CODEX_HOME/sessions/…/rollout-*-<thread_id>.jsonl`
-discovered by thread_id (`rollout_source="discovered_by_thread_id"`; in hook-delivery mode the receipt's codex-reported
-`transcript_path` supersedes the glob as `rollout_source="session_start_hook"`, and the receipt can recover a
-`thread_id` the stream missed), the preflight's secret-free auth posture (`auth_method`/`auth_source`/`billing_mode`),
-`last_run_at`, and `context_delivery`. `confirmed.launch` and `claude_session_id` stay unset (§3.5). Continuation is
-`forge session resume <name> --task "…"` -> `codex exec resume <thread_id>`, cross-CWD in the session's recorded
-worktree with the prompt on stdin — rollout-filename identity and stdin+resume recall are pinned live by the standing
-E2E `tests/integration/core/test_codex_session_start.py`. A failed first turn keeps the session (a turn that never
-reached `thread.started` leaves no `thread_id`; resume refuses with delete-and-retry guidance).
+**Codex session lifecycle.** The one-command frontend over it is
+**`forge session start <name> --runtime codex --resume-from <parent> --task "…"`** (`core/ops/codex_session.py`): it
+creates a real Codex-runtime session (manifest `intent.launch.runtime="codex"`, immutable —
+`forge session set launch.runtime` is rejected), keys the transfer snapshot by the **real session name** so
+`Derivation.context_file` GC-protects it (no synthetic per-run transfer children), and runs the first `codex exec` turn.
+A failed first turn keeps the session (a turn that never reached `thread.started` leaves no `thread_id`; resume refuses
+with delete-and-retry guidance). Continuation is `forge session resume <name> --task "…"` ->
+`codex exec resume <thread_id>`, cross-CWD in the session's recorded worktree with the prompt on stdin —
+rollout-filename identity and stdin+resume recall are codex-cli behaviors pinned live by a standing E2E.
 `forge transfer regenerate <parent> --target-runtime {claude|codex}` remains the sessionless surface (re-stamps a cache,
 defaulting the runtime from the existing frontmatter so a regenerate never silently flips it back).
+
+**Recorded Codex facts** (CLI-owned, written to `confirmed.codex`): `thread_id` from the stream's `thread.started`
+event; the matching `$CODEX_HOME/sessions/…/rollout-*-<thread_id>.jsonl` discovered by thread_id
+(`rollout_source="discovered_by_thread_id"`; in hook-delivery mode the receipt's codex-reported `transcript_path`
+supersedes the glob as `rollout_source="session_start_hook"`, and the receipt can recover a `thread_id` the stream
+missed); the preflight's secret-free auth posture (`auth_method`/`auth_source`/`billing_mode`); `last_run_at`; and
+`context_delivery`. `confirmed.launch` and `claude_session_id` stay unset (§3.5).
 
 > **Why not native for worktree forks?** Claude stores sessions at `~/.claude/projects/<encoded-cwd>/`, so a bare
 > `--resume` can't cross the CWD boundary (2.1.90/2.1.158 fail "No conversation found"). **Worktree forks default to
@@ -727,8 +730,9 @@ generates a transfer context file.
 
 ### 3.10 Hook handlers
 
-Hooks write ground truth to the session file. The session manager writes `intent` (and user `overrides`); hooks write
-`confirmed` facts (transcript paths, plan paths, proxy identity, etc.).
+Session-state hooks write ground truth to the session file: the session manager writes `intent` (and user `overrides`);
+hooks write `confirmed` facts (transcript paths, plan paths, proxy identity, etc.). Exception: the Codex
+`codex-session-start` hook writes only a delivery receipt, never the manifest (§3.5).
 
 **Session identification:** Hooks locate the session via `FORGE_SESSION` (set at launch), enabling multiple sessions per
 Forge project. Hooks use `FORGE_SESSION` + UUID lookup only. No CWD-based scan or fallback detection.
@@ -894,21 +898,21 @@ runtime/provider/model and what it consumed, referencing the cost and audit plan
 is the redacted wire record, usage is attribution. Each event also carries metric-evidence provenance — `route` (how the
 work reached the model), `reporter` (source of the metric evidence), and `confidence` (trustworthiness of *that event's
 own* `cost_micro_usd`: `reported` | `gateway_calculated` | `inferred` | `unavailable` | `unknown`). Emission is wired
-(Phase 4c): the workflow verbs (`panel`/`analyze`/`debate`/`consensus`) record one estimated verb-level event each; the
+everywhere: the workflow verbs (`panel`/`analyze`/`debate`/`consensus`) record one estimated verb-level event each; the
 memory writer, semantic supervisor, team supervisor, and shadow curation record one event per `claude -p` run; the
 action tagger records exact provider tokens from its direct `core.llm` call (and, when that call resolves to a
 registered Forge proxy, an exact `source_refs.cost_request_id` join via a forwarded `X-Request-ID`; direct
 `billing_mode` stays `unknown` unless provably direct + credentialed). All emit best-effort, never gate the work they
 measure, and record `latency_ms`. `claude -p` events carry null `source_refs` because Forge is not the HTTP client and
-can't know the proxy `request_id`. Phase 4g instead correlates a proxied `claude -p` run to its **exact** cost through
-the run tree, not a per-request ref: Forge stamps the headless subprocess's outbound requests with validated
+can't know the proxy `request_id`. Run-tree correlation instead ties a proxied `claude -p` run to its **exact** cost
+through the run tree, not a per-request ref: Forge stamps the headless subprocess's outbound requests with validated
 `X-Forge-Run-ID`/`X-Forge-Root-Run-ID` headers (only when the target is a proven Forge proxy), the proxy records
 `forge_run_id`/`forge_root_run_id` on each cost record, and the read surface (`forge activity`, `forge +$Y`) sums cost
 records by `forge_root_run_id` — superseding the concurrency-fragile verb snapshot rather than adding to it.
 `source_refs` stays null by design (one run makes many requests; the single-valued ref is the wrong shape — see
 [§A.13](design_appendix.md#a13-usage-attribution-ledger-schema-314)).
 
-**Headless self-report (Phase 5).** Every `claude -p` run requests `--output-format json` (capability-gated with a
+**Headless self-report.** Every `claude -p` run requests `--output-format json` (capability-gated with a
 retry-once-and-latch backstop, so an older CLI that rejects the flag self-heals), so the runtime can self-report cost
 and usage. Exactly **one** reporter attributes cost per run: a **proxied** run keeps the proxy snapshot
 (`forge_proxy`/`reported`, Claude's Anthropic-priced `total_cost_usd` ignored as wrong-and-duplicate); a **direct** run
@@ -919,16 +923,15 @@ Tokens follow the cost source (no mixed provenance). The opt-in `forge_cost` sta
 (`route=claude_interactive`), reported-or-unavailable and distinct from Claude's native cost
 ([§A.8](design_appendix.md#a8-status-line-guidance-3611)).
 
-**Native Codex usage (Phase 5b/5c).** A `codex exec` run goes **direct to OpenAI** (no Forge proxy), so there is no
-proxy cost record to join: `emit_codex_usage` records `route=codex_exec`/`reporter=codex_jsonl`/`runtime_native` with
-the **exact** tokens from the JSONL `turn.completed.usage`, but `cost_micro_usd=null`/`source_refs=null` and
-`confidence=unavailable` (the ledger's `confidence` is a cost signal, and Codex reports no dollars — honest absence, not
-a fabricated $0). The event carries the resolved `billing_mode` from `CodexPreflight`. Because the Codex child shares
-its parent's run tree (`stamp_run_identity`), a Codex leaf and a Claude leaf join under the same `root_run_id` in
-`forge activity`.
+**Native Codex usage.** A `codex exec` run goes **direct to OpenAI** (no Forge proxy), so there is no proxy cost record
+to join: `emit_codex_usage` records `route=codex_exec`/`reporter=codex_jsonl`/`runtime_native` with the **exact** tokens
+from the JSONL `turn.completed.usage`, but `cost_micro_usd=null`/`source_refs=null` and `confidence=unavailable` (the
+ledger's `confidence` is a cost signal, and Codex reports no dollars — honest absence, not a fabricated $0). The event
+carries the resolved `billing_mode` from `CodexPreflight`. Because the Codex child shares its parent's run tree
+(`stamp_run_identity`), a Codex leaf and a Claude leaf join under the same `root_run_id` in `forge activity`.
 
-**Transfer curation usage (Phase 5e).** The `ai-curated` transfer's curation step makes a `core.llm` call (an Anthropic
-model via OpenRouter) that is now attributed: it emits `route=core_llm`/`reporter=provider`/`runtime=forge_cli`/
+**Transfer curation usage.** The `ai-curated` transfer's curation step makes a `core.llm` call (an Anthropic model via
+OpenRouter) that is now attributed: it emits `route=core_llm`/`reporter=provider`/`runtime=forge_cli`/
 `command=transfer-curate` with the provider's exact tokens (cost `unavailable` — `emit_direct_llm_usage` computes no
 dollar figure for a direct `core.llm` call, so the event records exact tokens but no cost). The emit no-ops without an
 ambient run identity, so a plain `forge session resume --strategy ai-curated` stays silent; the cross-runtime bridge
@@ -1467,12 +1470,10 @@ Normalization happens at the **adapter boundary**: a runtime's hook adapter maps
 `PolicyEngine.evaluate` never branches on `origin`. Both halves match runtime-neutral `HookAdapter`/`HookResponder`
 protocols (`src/forge/cli/hooks/protocols.py`); two pairs ship: **Claude** (`cli/hooks/policy.py`,
 `forge hook policy-check`) and **Codex** (`cli/hooks/codex_policy.py`, `forge hook codex-policy-check`). The Codex
-adapter parses an `apply_patch` envelope into **per-file** contexts (the protocol's `build_contexts` list),
-**normalized** to the tool names every policy's `applies_to` gates on (Add File → `Write`, Update File → `Edit`;
-deletions skipped; `Bash` passes through); runtime truth stays in `origin="codex"` + `tool_args`. Files compose deny >
-needs_review > warn/allow, stateful policy state is aggregated across the loop before one persist, and unparseable
-patches fail open. Shipped **handler-only**: enforcement requires a manually registered + trust-enrolled Codex
-PreToolUse hook until the Phase 6 installer.
+adapter normalizes each `apply_patch` file operation to the tool names every policy's `applies_to` gates on (Add File →
+`Write`, Update File → `Edit`; deletions skipped; `Bash` passes through), keeping runtime truth in `origin="codex"` +
+`tool_args`; files compose deny > needs_review > warn/allow, and unparseable patches fail open. Enforcement is
+**handler-only**: it requires a manually registered + trust-enrolled Codex PreToolUse hook.
 
 #### 4.1.5 Policy composition
 
@@ -1664,20 +1665,22 @@ outputs), and evidence-weighted synthesis.
 
 **Runtime registry (`core/runtime/`).** The capability half of the runtime seam (the invoker above is the lifecycle
 half). A frozen `RuntimeSpec` per runtime in a module-level `RUNTIMES` table (mirrors `core/auth/capabilities.py`'s
-`Credential`/`CREDENTIALS` pattern) answers the card's seven questions without hard-coding Claude Code assumptions:
+`Credential`/`CREDENTIALS` pattern) answers seven capability questions without hard-coding Claude Code assumptions:
 installed (`is_installed()` = PATH presence; `detect()` = best-effort `--version`), interactive, headless, hooks, usage
 source, native resume, and install scopes (plus curated-transfer in/out). Limited or planned support is a multi-state
-`Literal`, not a `bool` — Codex declares `native_hooks="enrollment_gated"` (hooks fire only after a one-time interactive
-TUI trust ceremony; trust is keyed by the registering config's path, the `trusted_hash` is not black-box computable (no
-programmatic pre-enrollment), and the Phase 6 installer's scope choice is a user-vs-project trade-off — probe details in
-`scripts/experiments/codex-hooks/README.md`), `pretool_policy="partial"` (post-enrollment PreToolUse deny +
-`updatedInput` pinned headless, but enforcement exists only in enrolled homes, malformed hook output fails open, and
-PermissionRequest has not been observed firing), and `interactive="beta"` (a Forge-integration target, not shipped).
-`hook_min_version` is the machine-readable registration floor a preflight checks (not a firing guarantee);
-`hook_feature_flag` is `None` since Codex hooks are default-on — so a field-reading consumer never mistakes a Codex
-limit for Claude parity. `forge runtime list [--json]` renders the matrix. Phase 5's `CodexHeadlessInvoker` and
-auth/runtime preflight read it (e.g. `get_runtime("codex").headless_cmd` builds the `codex exec` argv; the preflight
-checks the version gate).
+`Literal`, not a `bool` — a field-reading consumer never mistakes a Codex limit for Claude parity. Codex's load-bearing
+declarations (probe evidence in `scripts/experiments/codex-hooks/README.md`):
+
+| Field               | Codex value        | Meaning                                                                                                                                                                                              |
+| ------------------- | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `native_hooks`      | `enrollment_gated` | Hooks fire only from a one-time interactive TUI trust ceremony. Trust keys on the registering config's path; `trusted_hash` is not black-box computable, so enrollment is never verifiable pre-turn. |
+| `pretool_policy`    | `partial`          | Post-enrollment PreToolUse deny + `updatedInput` pinned headless; enforcement exists only in enrolled homes, malformed hook output fails open, PermissionRequest never observed firing.              |
+| `interactive`       | `beta`             | A Forge-integration target, not shipped.                                                                                                                                                             |
+| `hook_min_version`  | (version floor)    | Machine-readable registration floor a preflight checks — not a firing guarantee.                                                                                                                     |
+| `hook_feature_flag` | `None`             | Codex hooks are default-on.                                                                                                                                                                          |
+
+`forge runtime list [--json]` renders the matrix. `CodexHeadlessInvoker` and the auth/runtime preflight read it (e.g.
+`get_runtime("codex").headless_cmd` builds the `codex exec` argv; the preflight checks the version gate).
 
 #### 5.5.6 Relationship to policies (workflow unification)
 
