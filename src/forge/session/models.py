@@ -150,7 +150,9 @@ class SupervisorConfig:
     suspended: bool = False  # True = supervision paused, config preserved
     plan_override_path: str | None = None  # Absolute path to plan file that supersedes session context
     cascade: bool = False  # Opt-in tier-1 plan check before the frontier supervisor
-    checker_model: str | None = None  # Tier-1 model (prefixed id); None = plan_check.DEFAULT_PLAN_CHECK_MODEL
+    checker_model: str | None = None  # Tier-1 model (prefixed id); None = provider-specific default
+    checker_provider: str | None = None  # Tier-1 provider override (openrouter/litellm_local/litellm_remote)
+    checker_budget_tokens: int | None = None  # Approx total token budget for the tier-1 checker prompt
 
 
 @dataclass

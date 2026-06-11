@@ -741,7 +741,7 @@ user rather than working around the check.
 | TDD mode (off/permissive/strict)                    | Session | Session file `intent.tdd_mode`                      |
 | Policy enabled/disabled                             | Session | Session file `intent.policy_mode`                   |
 | Verification config                                 | Session | Session file `intent.verification`                  |
-| Cascade on/off + tier-1 checker model               | Session | `intent.policy.supervisor.cascade`/`.checker_model` |
+| Cascade on/off + tier-1 checker route/budget        | Session | `intent.policy.supervisor.cascade`/`.checker_provider`/`.checker_model`/`.checker_budget_tokens` |
 
 ### D.4 Policy state ownership (from §4.1.6)
 

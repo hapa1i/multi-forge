@@ -233,8 +233,10 @@ forge policy supervise planner --cascade
 forge policy supervise --cascade          # enable on existing config
 forge policy supervise --no-cascade       # disable (supervisor checks every action again)
 
-# Optional: pick the tier-1 model (prefixed id)
-forge policy supervise --cascade --checker-model gemini/gemini-2.5-flash
+# Optional: pick the tier-1 route and prompt budget
+forge policy supervise --cascade --checker-provider litellm-local
+forge policy supervise --cascade --checker-model google/gemini-3.5-flash
+forge policy supervise --cascade --checker-budget-tokens 64000
 ```
 
 How it behaves:
@@ -242,6 +244,12 @@ How it behaves:
 - The tier-1 checker evaluates the action against the **approved plan snapshot** text only (no session context). It
   needs a plan file: enabling cascade auto-resolves the latest approved plan (the same search `--reload` uses) and fails
   with instructions when none exists.
+- The default checker route is OpenRouter `google/gemini-3.5-flash` with an approximate 32K-token total budget for the
+  tier-1 checker prompt. Use `--checker-provider litellm-local` to use the local LiteLLM default
+  (`gemini/gemini-3.5-flash`) when OpenRouter is unavailable.
+- Long plans and actions are packed with head+tail excerpts. Unified diffs keep hunk/file headers, Edit checks include
+  the old/new fragments, Write checks include target existence metadata, and the prompt explicitly marks whether plan or
+  action text was truncated.
 - Tier-1 can only approve or escalate — it never blocks on its own. Anything uncertain, plus **every** checker failure
   (model unreachable, unparseable output, missing plan file), escalates to the full supervisor. Worst case the cascade
   degrades to exactly the non-cascade behavior; supervision is never silently skipped.

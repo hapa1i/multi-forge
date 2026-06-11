@@ -16,10 +16,13 @@ from unittest.mock import MagicMock, patch
 
 from forge.core.llm import CompletionResponse
 from forge.policy.semantic.plan_check import (
+    DEFAULT_PLAN_CHECK_BUDGET_TOKENS,
+    DEFAULT_PLAN_CHECK_MODEL,
     _MAX_REASON_CHARS,
     PlanCheckPolicy,
     PlanCheckVerdict,
     parse_plan_check_verdict,
+    resolve_plan_check_route,
     run_plan_check,
 )
 from forge.policy.types import ActionContext, PolicyDecision
@@ -128,7 +131,7 @@ class TestRunPlanCheck:
         )
         mock_adapter_cls.return_value = mock_adapter
 
-        verdict = run_plan_check(_make_context(), model="gemini/gemini-2.0-flash", plan_text="# Plan\nStep 1.")
+        verdict = run_plan_check(_make_context(), model="gemini/gemini-3.5-flash", plan_text="# Plan\nStep 1.")
 
         assert verdict == PlanCheckVerdict(aligned=True, reason="covered by step 1")
         prompt = _prompt_of(mock_adapter.complete)
@@ -156,11 +159,15 @@ class TestRunPlanCheck:
 
     @patch("forge.core.llm.get_client")
     @patch("forge.core.llm.SyncAdapter")
-    def test_truncates_plan_and_content(self, mock_adapter_cls: MagicMock, mock_get_client: MagicMock) -> None:
+    def test_truncates_with_head_tail_and_metadata(
+        self, mock_adapter_cls: MagicMock, mock_get_client: MagicMock
+    ) -> None:
         mock_adapter = MagicMock()
         mock_adapter.complete.return_value = CompletionResponse(text='{"aligned": true}')
         mock_adapter_cls.return_value = mock_adapter
 
+        plan = "PLAN_HEAD\n" + ("p" * 8000) + "\nPLAN_TAIL"
+        content = "CONTENT_HEAD\n" + ("x" * 8000) + "\nCONTENT_TAIL"
         ctx = ActionContext(
             runtime="claude_code",
             event="PreToolUse.Write",
@@ -169,15 +176,123 @@ class TestRunPlanCheck:
             repo_root="/workspace",
             session_name="test-session",
             target_path="src/main.py",
-            new_content="x" * 5000,
+            new_content=content,
         )
-        run_plan_check(ctx, model="test/model", plan_text="p" * 50000)
+        run_plan_check(ctx, model="test/model", plan_text=plan, budget_tokens=1_000)
 
         prompt = _prompt_of(mock_adapter.complete)
-        assert "p" * 16000 in prompt
-        assert "p" * 16001 not in prompt
-        assert "x" * 2000 in prompt
-        assert "x" * 2001 not in prompt
+        assert "PLAN_HEAD" in prompt
+        assert "PLAN_TAIL" in prompt
+        assert "CONTENT_HEAD" in prompt
+        assert "CONTENT_TAIL" in prompt
+        assert "- truncated: true" in prompt
+        assert "omitted" in prompt
+        assert len(prompt) <= 1_000 * 4
+
+    @patch("forge.core.llm.get_client")
+    @patch("forge.core.llm.SyncAdapter")
+    def test_diff_hunk_headers_survive_truncation(
+        self, mock_adapter_cls: MagicMock, mock_get_client: MagicMock
+    ) -> None:
+        mock_adapter = MagicMock()
+        mock_adapter.complete.return_value = CompletionResponse(text='{"aligned": true}')
+        mock_adapter_cls.return_value = mock_adapter
+
+        diff = (
+            "diff --git a/src/main.py b/src/main.py\n"
+            "--- a/src/main.py\n"
+            "+++ b/src/main.py\n"
+            "@@ -120,6 +120,9 @@ def important():\n"
+            + ("+ filler\n" * 3000)
+        )
+        ctx = ActionContext(
+            runtime="claude_code",
+            event="PreToolUse.Edit",
+            tool_name="Edit",
+            tool_args={"file_path": "src/main.py", "old_string": "old", "new_string": "new"},
+            repo_root="/workspace",
+            session_name="test-session",
+            target_path="src/main.py",
+            new_content="new",
+            raw_diff=diff,
+        )
+        run_plan_check(ctx, model="test/model", plan_text="plan", budget_tokens=1_000)
+
+        prompt = _prompt_of(mock_adapter.complete)
+        assert "Hunk/file headers preserved" in prompt
+        assert "@@ -120,6 +120,9 @@ def important():" in prompt
+
+    @patch("forge.core.llm.get_client")
+    @patch("forge.core.llm.SyncAdapter")
+    def test_edit_prompt_includes_old_and_new_fragments(
+        self, mock_adapter_cls: MagicMock, mock_get_client: MagicMock
+    ) -> None:
+        mock_adapter = MagicMock()
+        mock_adapter.complete.return_value = CompletionResponse(text='{"aligned": true}')
+        mock_adapter_cls.return_value = mock_adapter
+
+        ctx = ActionContext(
+            runtime="claude_code",
+            event="PreToolUse.Edit",
+            tool_name="Edit",
+            tool_args={"file_path": "src/main.py", "old_string": "old_call()", "new_string": "new_call()"},
+            repo_root="/workspace",
+            session_name="test-session",
+            target_path="src/main.py",
+            new_content="new_call()",
+        )
+        run_plan_check(ctx, model="test/model", plan_text="plan")
+
+        prompt = _prompt_of(mock_adapter.complete)
+        assert "Matched/replaced fragment (old_string)" in prompt
+        assert "old_call()" in prompt
+        assert "Replacement fragment (new_string)" in prompt
+        assert "new_call()" in prompt
+
+    @patch("forge.core.llm.get_client")
+    @patch("forge.core.llm.SyncAdapter")
+    def test_write_prompt_includes_target_existence_context(
+        self, mock_adapter_cls: MagicMock, mock_get_client: MagicMock, tmp_path: Path
+    ) -> None:
+        mock_adapter = MagicMock()
+        mock_adapter.complete.return_value = CompletionResponse(text='{"aligned": true}')
+        mock_adapter_cls.return_value = mock_adapter
+
+        target = tmp_path / "src" / "main.py"
+        target.parent.mkdir()
+        target.write_text("old")
+        ctx = ActionContext(
+            runtime="claude_code",
+            event="PreToolUse.Write",
+            tool_name="Write",
+            tool_args={"file_path": str(target), "content": "new"},
+            repo_root=str(tmp_path),
+            session_name="test-session",
+            target_path=str(target),
+            new_content="new",
+        )
+        run_plan_check(ctx, model="test/model", plan_text="plan")
+
+        prompt = _prompt_of(mock_adapter.complete)
+        assert str(target) in prompt
+        assert "- target_exists: true" in prompt
+        assert "- existing_size_bytes: 3" in prompt
+        assert "- write_mode: overwrite_existing_file" in prompt
+
+    @patch("forge.core.llm.get_client")
+    @patch("forge.core.llm.SyncAdapter")
+    def test_default_route_uses_openrouter_gemini_35(
+        self, mock_adapter_cls: MagicMock, mock_get_client: MagicMock
+    ) -> None:
+        mock_adapter = MagicMock()
+        mock_adapter.complete.return_value = CompletionResponse(text='{"aligned": true}')
+        mock_adapter_cls.return_value = mock_adapter
+
+        policy = PlanCheckPolicy(config=_make_config(plan_override_path=None))
+        route = resolve_plan_check_route(policy._config)
+        assert route.model == DEFAULT_PLAN_CHECK_MODEL
+        assert route.provider == "openrouter"
+        assert DEFAULT_PLAN_CHECK_BUDGET_TOKENS == 32_000
 
     @patch("forge.core.llm.get_client")
     @patch("forge.core.llm.SyncAdapter")
@@ -193,7 +308,7 @@ class TestRunPlanCheck:
         )
         mock_adapter_cls.return_value = mock_adapter
 
-        run_plan_check(_make_context(), model="gemini/gemini-2.0-flash", plan_text="plan")
+        run_plan_check(_make_context(), model="gemini/gemini-3.5-flash", plan_text="plan")
 
         from forge.core.usage.ledger import read_usage_events
 
@@ -258,7 +373,7 @@ class TestRunPlanCheck:
         )
         mock_adapter_cls.return_value = mock_adapter
 
-        run_plan_check(_make_context(), model="gemini/gemini-2.0-flash", plan_text="plan")
+        run_plan_check(_make_context(), model="gemini/gemini-3.5-flash", plan_text="plan")
 
         forwarded = mock_adapter.complete.call_args.kwargs["hyperparams"].extra["openai"]["extra_headers"][
             "X-Request-ID"
@@ -390,6 +505,20 @@ class TestPlanCheckEvaluate:
             decision = policy.evaluate(_make_context())
             assert decision.decision in ("allow", "needs_review")
             assert decision.warnings == []
+
+    @patch("forge.policy.semantic.plan_check.run_plan_check")
+    def test_provider_default_and_budget_passed_to_checker(self, mock_check: MagicMock, tmp_path: Path) -> None:
+        mock_check.return_value = PlanCheckVerdict(aligned=True)
+        policy = PlanCheckPolicy(
+            config=_config_with_plan(tmp_path, checker_provider="litellm_local", checker_budget_tokens=64_000)
+        )
+
+        decision = policy.evaluate(_make_context())
+
+        assert decision.decision == "allow"
+        assert mock_check.call_args.kwargs["model"] == "gemini/gemini-3.5-flash"
+        assert mock_check.call_args.kwargs["provider"] == "litellm_local"
+        assert mock_check.call_args.kwargs["budget_tokens"] == 64_000
 
 
 # --- Cache behavior ---

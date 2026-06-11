@@ -11,8 +11,10 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
+from forge.core.llm.detection import ProviderType, detect_provider
 from forge.core.reactive.structured_output import extract_json_from_response
 from forge.core.reactive.throttle import ThrottleCache, compute_cache_key
 from forge.policy.deterministic.base import StatefulDeterministicPolicy
@@ -22,9 +24,30 @@ from forge.session.models import SupervisorConfig
 
 _log = logging.getLogger(__name__)
 
-# gemini/* routes to the litellm_local provider, so the default must be a model the
-# local LiteLLM backend serves (src/forge/config/defaults/backends/litellm.yaml).
-DEFAULT_PLAN_CHECK_MODEL = "gemini/gemini-2.5-flash"
+DEFAULT_PLAN_CHECK_PROVIDER: ProviderType = "openrouter"
+DEFAULT_PLAN_CHECK_MODELS_BY_PROVIDER: dict[ProviderType, str] = {
+    "openrouter": "google/gemini-3.5-flash",
+    "litellm_local": "gemini/gemini-3.5-flash",
+    "litellm_remote": "gemini/gemini-3.5-flash",
+}
+DEFAULT_PLAN_CHECK_MODEL = DEFAULT_PLAN_CHECK_MODELS_BY_PROVIDER[DEFAULT_PLAN_CHECK_PROVIDER]
+DEFAULT_PLAN_CHECK_BUDGET_TOKENS = 32_000
+
+# Provider-agnostic budgeting: exact tokenizers differ across OpenRouter, Gemini,
+# and LiteLLM-served models, so use a conservative chars/token approximation.
+_APPROX_CHARS_PER_TOKEN = 4
+_PROMPT_OVERHEAD_RESERVE_CHARS = 600
+_PLAN_BUDGET_FRACTION = 0.70
+_MIN_ACTION_CHARS = 4_000
+_OPENROUTER_MODEL_PREFIXES = (
+    "deepseek/",
+    "google/",
+    "minimax/",
+    "moonshotai/",
+    "openrouter/",
+    "qwen/",
+    "z-ai/",
+)
 
 PLAN_CHECK_INTENT = (
     "Fast first-pass alignment check against the approved plan. Clearly aligned "
@@ -32,8 +55,6 @@ PLAN_CHECK_INTENT = (
     "supervisor for a full review."
 )
 
-_MAX_CONTENT_CHARS = 2000  # supervisor/tagger parity
-_MAX_PLAN_CHARS = 16000
 # Reasons persist into the manifest decision log (MAX_DECISION_LOG entries), so an
 # unbounded model response must not bloat confirmed.policy.decisions.
 _MAX_REASON_CHARS = 500
@@ -42,19 +63,24 @@ PLAN_CHECK_PROMPT = """You are a fast plan-alignment pre-checker. A thorough sup
 will review anything you are not sure about, so never guess "aligned".
 
 ## Approved Plan
+Metadata:
+{plan_metadata}
+
 {plan_text}
 
 ## Action Being Evaluated
 Tool: {tool_name}
 Target: {target_path}
-Content/Diff (truncated):
-```
-{content}
-```
+Metadata:
+{action_metadata}
+
+{action_text}
 
 ## Rules
 - "aligned": true ONLY if this action is clearly consistent with the approved plan.
 - If uncertain, only partially covered by the plan, or potentially divergent: "aligned": false.
+- If the plan or action metadata says truncated=true, return "aligned": true only when the visible excerpts are still
+  sufficient to prove alignment. Otherwise return "aligned": false.
 - You cannot block anything; "aligned": false only requests a deeper review.
 
 ## Response Format (strict JSON in a code fence)
@@ -72,6 +98,36 @@ class PlanCheckVerdict:
     reason: str = ""
 
 
+@dataclass(frozen=True)
+class _PlanCheckRoute:
+    """Resolved checker route."""
+
+    model: str
+    provider: ProviderType | None
+
+
+@dataclass(frozen=True)
+class _PackedText:
+    """A prompt section excerpt plus truncation metadata."""
+
+    text: str
+    original_chars: int
+    included_chars: int
+    truncated: bool
+    strategy: str
+
+    @property
+    def metadata(self) -> str:
+        return "\n".join(
+            [
+                f"- original_chars: {self.original_chars}",
+                f"- included_chars: {self.included_chars}",
+                f"- truncated: {str(self.truncated).lower()}",
+                f"- selection_strategy: {self.strategy}",
+            ]
+        )
+
+
 def parse_plan_check_verdict(response: str) -> PlanCheckVerdict | None:
     """Parse the checker's JSON verdict. None on any parse failure (caller escalates)."""
     data = extract_json_from_response(response)
@@ -84,7 +140,223 @@ def parse_plan_check_verdict(response: str) -> PlanCheckVerdict | None:
     return PlanCheckVerdict(aligned=aligned, reason=str(reason) if reason is not None else "")
 
 
-def run_plan_check(context: ActionContext, *, model: str, plan_text: str) -> PlanCheckVerdict | None:
+def _normalize_checker_provider(provider: str | None) -> ProviderType | None:
+    """Normalize user-facing provider strings to core.llm provider names."""
+    if provider is None:
+        return None
+    normalized = provider.replace("-", "_")
+    if normalized not in DEFAULT_PLAN_CHECK_MODELS_BY_PROVIDER:
+        raise ValueError(
+            f"Unsupported checker provider {provider!r}; expected one of "
+            f"{', '.join(sorted(DEFAULT_PLAN_CHECK_MODELS_BY_PROVIDER))}"
+        )
+    return normalized  # type: ignore[return-value]
+
+
+def resolve_plan_check_route(config: SupervisorConfig | None) -> _PlanCheckRoute:
+    """Resolve the effective checker model/provider route."""
+    provider = _normalize_checker_provider(config.checker_provider if config else None)
+    model = config.checker_model if config else None
+
+    if model is None:
+        provider = provider or DEFAULT_PLAN_CHECK_PROVIDER
+        return _PlanCheckRoute(
+            model=DEFAULT_PLAN_CHECK_MODELS_BY_PROVIDER[provider],
+            provider=provider,
+        )
+
+    if provider is not None:
+        return _PlanCheckRoute(model=model, provider=provider)
+
+    try:
+        detect_provider(model)
+    except ValueError:
+        if model.lower().startswith(_OPENROUTER_MODEL_PREFIXES):
+            return _PlanCheckRoute(model=model, provider="openrouter")
+        raise
+
+    return _PlanCheckRoute(model=model, provider=None)
+
+
+def _budget_tokens(config: SupervisorConfig | None) -> int:
+    value = config.checker_budget_tokens if config else None
+    if value is None:
+        return DEFAULT_PLAN_CHECK_BUDGET_TOKENS
+    return max(1, int(value))
+
+
+def _budget_chars(budget_tokens: int) -> int:
+    return max(1, budget_tokens * _APPROX_CHARS_PER_TOKEN)
+
+
+def _prompt_shell_chars(context: ActionContext) -> int:
+    """Approximate non-plan/action prompt overhead for whole-prompt budgeting."""
+    return len(
+        PLAN_CHECK_PROMPT.format(
+            plan_metadata="",
+            plan_text="",
+            tool_name=context.tool_name,
+            target_path=context.target_path or "N/A",
+            action_metadata="",
+            action_text="",
+        )
+    )
+
+
+def _head_tail_excerpt(text: str, budget_chars: int, *, preserve_hunk_headers: bool = False) -> _PackedText:
+    """Return a head+tail excerpt, optionally pinning diff hunk headers."""
+    original_chars = len(text)
+    if original_chars <= budget_chars:
+        return _PackedText(
+            text=text,
+            original_chars=original_chars,
+            included_chars=original_chars,
+            truncated=False,
+            strategy="full",
+        )
+
+    hunk_headers = ""
+    if preserve_hunk_headers:
+        hunk_lines = [
+            line
+            for line in text.splitlines()
+            if line.startswith(("diff --git ", "@@ ", "--- ", "+++ "))
+        ]
+        if hunk_lines:
+            header_budget = max(500, budget_chars // 4)
+            hunk_headers = "\n".join(hunk_lines)
+            if len(hunk_headers) > header_budget:
+                hunk_headers = _head_tail_excerpt(hunk_headers, header_budget).text
+            hunk_headers = "Hunk/file headers preserved from the full diff:\n" + hunk_headers + "\n\n"
+
+    marker_template = "\n\n[... omitted {omitted_chars} chars from the middle ...]\n\n"
+    available = max(1, budget_chars - len(hunk_headers) - len(marker_template.format(omitted_chars=0)))
+    head_chars = max(1, available // 2)
+    tail_chars = max(1, available - head_chars)
+    omitted = max(0, original_chars - head_chars - tail_chars)
+    marker = marker_template.format(omitted_chars=omitted)
+    excerpt = hunk_headers + text[:head_chars] + marker + text[-tail_chars:]
+    return _PackedText(
+        text=excerpt,
+        original_chars=original_chars,
+        included_chars=len(excerpt),
+        truncated=True,
+        strategy="head+tail" + ("+hunk_headers" if hunk_headers else ""),
+    )
+
+
+def _target_metadata(context: ActionContext) -> list[str]:
+    lines = []
+    target = context.target_path or context.tool_args.get("file_path") or context.tool_args.get("path")
+    if not isinstance(target, str) or not target:
+        return ["- target_exists: unknown"]
+
+    path = Path(target)
+    if not path.is_absolute():
+        path = Path(context.repo_root) / path
+
+    try:
+        stat = path.stat()
+    except FileNotFoundError:
+        lines.append("- target_exists: false")
+        if context.tool_name == "Write":
+            lines.append("- write_mode: create_new_file")
+    except OSError as e:
+        lines.append("- target_exists: unknown")
+        lines.append(f"- target_stat_error: {e}")
+    else:
+        lines.append("- target_exists: true")
+        lines.append(f"- existing_size_bytes: {stat.st_size}")
+        if context.tool_name == "Write":
+            lines.append("- write_mode: overwrite_existing_file")
+    return lines
+
+
+def _build_action_source(context: ActionContext) -> tuple[str, bool, str]:
+    """Build the action text before final prompt-budget packing."""
+    target_lines = _target_metadata(context)
+    header = "\n".join(target_lines)
+
+    if context.raw_diff:
+        body = "Unified diff:\n```diff\n" + context.raw_diff + "\n```"
+        return header + "\n\n" + body, True, "raw_diff"
+
+    if context.tool_name == "Edit":
+        old_string = context.tool_args.get("old_string")
+        new_string = context.tool_args.get("new_string", context.new_content)
+        old_text = old_string if isinstance(old_string, str) else ""
+        new_text = new_string if isinstance(new_string, str) else ""
+        body = "\n\n".join(
+            [
+                "Matched/replaced fragment (old_string):\n```\n" + old_text + "\n```",
+                "Replacement fragment (new_string):\n```\n" + new_text + "\n```",
+            ]
+        )
+        return header + "\n\n" + body, False, "edit_fragments"
+
+    content = context.tool_args.get("content")
+    if not isinstance(content, str):
+        content = context.new_content or ""
+    body = "Write content:\n```\n" + content + "\n```"
+    return header + "\n\n" + body, False, "write_content"
+
+
+def _pack_prompt_sections(plan_text: str, context: ActionContext, *, budget_tokens: int) -> tuple[_PackedText, _PackedText]:
+    # Treat checker_budget_tokens as the approximate whole-prompt budget, then
+    # split the remaining room between the approved plan and action context.
+    total_chars = max(1, _budget_chars(budget_tokens) - _prompt_shell_chars(context) - _PROMPT_OVERHEAD_RESERVE_CHARS)
+    plan_budget = int(total_chars * _PLAN_BUDGET_FRACTION)
+    action_budget = max(1, total_chars - plan_budget)
+    if total_chars >= _MIN_ACTION_CHARS * 2 and action_budget < _MIN_ACTION_CHARS:
+        action_budget = _MIN_ACTION_CHARS
+        plan_budget = max(1, total_chars - action_budget)
+
+    packed_plan = _head_tail_excerpt(plan_text, plan_budget)
+    unused_plan = max(0, plan_budget - packed_plan.included_chars)
+    action_source, preserve_hunks, action_strategy = _build_action_source(context)
+    packed_action = _head_tail_excerpt(action_source, action_budget + unused_plan, preserve_hunk_headers=preserve_hunks)
+    if packed_action.strategy == "full":
+        packed_action = _PackedText(
+            text=packed_action.text,
+            original_chars=packed_action.original_chars,
+            included_chars=packed_action.included_chars,
+            truncated=packed_action.truncated,
+            strategy=action_strategy,
+        )
+    else:
+        packed_action = _PackedText(
+            text=packed_action.text,
+            original_chars=packed_action.original_chars,
+            included_chars=packed_action.included_chars,
+            truncated=packed_action.truncated,
+            strategy=f"{action_strategy}+{packed_action.strategy}",
+        )
+    return packed_plan, packed_action
+
+
+def _provider_label(model: str, provider: ProviderType | None) -> str:
+    return provider or (model.split("/", 1)[0] if "/" in model else "unknown")
+
+
+def _client_base_url(model: str, provider: ProviderType | None) -> str | None:
+    if provider is not None:
+        from forge.core.llm.credentials import resolve_provider_base_url
+
+        return resolve_provider_base_url(provider)
+
+    from forge.core.usage import resolve_client_base_url
+
+    return resolve_client_base_url(model)
+
+
+def run_plan_check(
+    context: ActionContext,
+    *,
+    model: str,
+    plan_text: str,
+    provider: ProviderType | None = None,
+    budget_tokens: int = DEFAULT_PLAN_CHECK_BUDGET_TOKENS,
+) -> PlanCheckVerdict | None:
     """One cheap ``core.llm`` call: is this action clearly aligned with the plan?
 
     Mirrors ``tag_action``'s call mechanics (client, X-Request-ID forwarding,
@@ -98,24 +370,26 @@ def run_plan_check(context: ActionContext, *, model: str, plan_text: str) -> Pla
         from forge.core.usage import (
             emit_direct_llm_usage,
             mint_request_id,
-            resolve_client_base_url,
             target_is_forge_proxy,
             with_forge_request_id,
         )
+        packed_plan, packed_action = _pack_prompt_sections(plan_text, context, budget_tokens=budget_tokens)
 
         prompt = PLAN_CHECK_PROMPT.format(
-            plan_text=plan_text[:_MAX_PLAN_CHARS],
+            plan_metadata=packed_plan.metadata,
+            plan_text=packed_plan.text,
             tool_name=context.tool_name,
             target_path=context.target_path or "N/A",
-            content=(context.raw_diff or context.new_content or "")[:_MAX_CONTENT_CHARS],
+            action_metadata=packed_action.metadata,
+            action_text=packed_action.text,
         )
 
-        client = get_client(model)
+        client = get_client(model, provider=provider)
         adapter = SyncAdapter(client)
 
         # Same exact-cost join as the tagger: forward an X-Request-ID only when the
         # client provably targets a Forge proxy (a dangling ref is worse than none).
-        request_id = mint_request_id() if target_is_forge_proxy(resolve_client_base_url(model)) else None
+        request_id = mint_request_id() if target_is_forge_proxy(_client_base_url(model, provider)) else None
         hp = with_forge_request_id(None, request_id) if request_id else None
 
         start = time.monotonic()
@@ -128,7 +402,7 @@ def run_plan_check(context: ActionContext, *, model: str, plan_text: str) -> Pla
         emit_direct_llm_usage(
             command="plan-check",
             model=model,
-            provider=model.split("/", 1)[0] if "/" in model else None,
+            provider=_provider_label(model, provider),
             usage=response.usage,
             status="success" if verdict is not None else "error",
             failure_type=None if verdict is not None else "parse_error",
@@ -146,7 +420,7 @@ def run_plan_check(context: ActionContext, *, model: str, plan_text: str) -> Pla
         emit_direct_llm_usage(
             command="plan-check",
             model=model,
-            provider=model.split("/", 1)[0] if "/" in model else None,
+            provider=_provider_label(model, provider),
             status="error",
             failure_type="exception",
             session=context.session_name,
@@ -220,9 +494,19 @@ class PlanCheckPolicy(StatefulDeterministicPolicy):
                 "Approved plan snapshot unavailable; escalating to supervisor",
             )
 
+        route = resolve_plan_check_route(config)
+        budget_tokens = _budget_tokens(config)
+
         cache_key = compute_cache_key(context.tool_name, context.target_path, context.new_content)
         # plan_override_path is non-None here (load_plan_override returned content)
         cache_key = cache_key + "|plan:" + plan_fingerprint(str(config.plan_override_path), config.forge_root)
+        cache_key = (
+            cache_key
+            + f"|checker:{route.provider or 'auto'}:{route.model}"
+            + f"|budget:{budget_tokens}"
+            + "|target:"
+            + ";".join(_target_metadata(context))
+        )
 
         cached = self._cache.check(cache_key)
         if cached is not None:
@@ -231,8 +515,13 @@ class PlanCheckPolicy(StatefulDeterministicPolicy):
             decision.cached = True
             return decision
 
-        model = config.checker_model or DEFAULT_PLAN_CHECK_MODEL
-        verdict = run_plan_check(context, model=model, plan_text=plan_text)
+        verdict = run_plan_check(
+            context,
+            model=route.model,
+            provider=route.provider,
+            plan_text=plan_text,
+            budget_tokens=budget_tokens,
+        )
 
         if verdict is None:
             return self._needs_review(

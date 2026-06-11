@@ -39,15 +39,17 @@ clearly-aligned Write/Edit actions short-circuit and only uncertain ones pay the
   cleared per `evaluate()`; `rules_active` uses `registered_policy_ids` (includes the resolver). Cascade off is
   bit-identical to the pre-cascade engine.
 - `PlanCheckPolicy` (`semantic.plan_check`, new `policy/semantic/plan_check.py`): one cheap `core.llm` call (tagger
-  mechanics, default `gemini/gemini-2.5-flash` — a model the local LiteLLM backend serves, since `gemini/*` routes to
-  `litellm_local`) judging the action against the approved-plan snapshot. Emits only `allow` (cached via ThrottleCache,
-  plan fingerprint in key) or `needs_review`; every failure path escalates — degrades to frontier-always, never to
-  unsupervised. Reasons ride in low-severity violations (clamped 500 chars), never `decision.warnings`, so resolved
-  escalations stay silent on the allow path.
-- CLI/config: `SupervisorConfig.cascade`/`checker_model`;
-  `forge policy supervise --cascade/--no-cascade --checker-model` (modifiers with target, standalone toggle without);
-  enabling auto-resolves the plan snapshot via the `--reload` machinery and fails loud pre-mutation when none resolves;
-  `%policy supervise cascade on|off`; status/show surfaces.
+  mechanics, default OpenRouter `google/gemini-3.5-flash`, with per-provider defaults and an approximately 32K-token
+  configurable prompt budget) judging the action against the approved-plan snapshot. Prompt packing uses head+tail
+  excerpts, keeps diff file/hunk headers when truncated, includes Edit matched/replacement fragments and Write target
+  existence context, and tells the checker when plan or action fields were truncated. Emits only `allow` (cached via
+  ThrottleCache, plan fingerprint in key) or `needs_review`; every failure path escalates — degrades to frontier-always,
+  never to unsupervised. Reasons ride in low-severity violations (clamped 500 chars), never `decision.warnings`, so
+  resolved escalations stay silent on the allow path.
+- CLI/config: `SupervisorConfig.cascade`/`checker_provider`/`checker_model`/`checker_budget_tokens`;
+  `forge policy supervise --cascade/--no-cascade --checker-provider --checker-model --checker-budget-tokens` (modifiers
+  with target, standalone toggle without); enabling auto-resolves the plan snapshot via the `--reload` machinery and
+  fails loud pre-mutation when none resolves; `%policy supervise cascade on|off`; status/show surfaces.
 - Measurement: decision-log-derived `plan_check_allow`/`plan_check_needs_review` counters (cached allows counted) in
   `forge activity` + summary line; session-tagged `plan-check` ledger events via `emit_direct_llm_usage`. Named
   needs-review (not "escalated") because a tier-1 `needs_review` co-occurring with a deterministic deny skips the

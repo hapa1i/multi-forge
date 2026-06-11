@@ -101,14 +101,13 @@
 | Tier-1 never warns                 | every plan-check failure path                         | `decision.warnings == []` on all tier-1 decisions                    | `tests/src/policy/semantic/test_plan_check.py`    |
 | Checker error degrades to frontier | unreachable checker endpoint, mock-claude supervisor  | one supervisor invocation; hook allows/blocks per supervisor verdict | `tests/integration/docker/test_supervisor_e2e.py` |
 | Cascade-off is today               | supervisor configured, `cascade=False`                | registration + hook output identical to pre-cascade                  | `tests/integration/docker/test_supervisor_e2e.py` |
-| Old manifest loads                 | manifest JSON without `cascade`/`checker_model`       | `SupervisorConfig` loads with defaults                               | `tests/src/session/` round-trip suite             |
+| Old manifest loads                 | manifest JSON without cascade/checker route fields    | `SupervisorConfig` loads with defaults                               | `tests/src/session/` round-trip suite             |
 | Wiring requires a plan             | no approved snapshot anywhere                         | `supervise t --cascade` exits 1 with tip; manifest untouched         | `tests/src/cli/test_policy_supervisor.py`         |
 
 ## Blockers / deferred decisions
 
 - `forge session set policy.supervisor.cascade true` bool coercion verified by code read
   (`session/overrides.py:240-265`: `json.loads` before dacite strict) — e2e helper assumption holds.
-- Default checker model fixed during Slice 5 follow-up: `gemini/gemini-2.0-flash` (workflow-config precedent) is not in
-  the local LiteLLM backend's model list, and `gemini/*` always routes `litellm_local` — default-config cascade would
-  have failed every tier-1 call. Default is now `gemini/gemini-2.5-flash` (served, equally cheap); the short-circuit e2e
-  runs against the real default to keep this honest.
+- Default checker route revised during Slice 5 follow-up: default-config cascade now uses OpenRouter
+  `google/gemini-3.5-flash` with an approximately 32K-token prompt budget. Users without OpenRouter can set
+  `--checker-provider litellm-local`, which defaults to `gemini/gemini-3.5-flash` for local LiteLLM routing.

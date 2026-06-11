@@ -1053,6 +1053,16 @@ def _handle_policy_supervise(argv: list[str]) -> None:
     lines.append(f"  Fork: {'yes' if sup.fork_session else 'no'}")
     lines.append(f"  Timeout: {sup.timeout_seconds}s, Throttle: {sup.throttle_seconds}s")
     lines.append(f"  Cascade: {'on' if sup.cascade else 'off'}")
+    if sup.cascade:
+        from forge.policy.semantic.plan_check import DEFAULT_PLAN_CHECK_BUDGET_TOKENS, resolve_plan_check_route
+
+        route = resolve_plan_check_route(sup)
+        budget = (
+            max(1, int(sup.checker_budget_tokens))
+            if sup.checker_budget_tokens is not None
+            else DEFAULT_PLAN_CHECK_BUDGET_TOKENS
+        )
+        lines.append(f"  Checker: {route.model} via {route.provider or 'auto'} ({budget} tokens)")
     if sup.plan_override_path:
         lines.append(f"  Plan override: {sup.plan_override_path}")
 

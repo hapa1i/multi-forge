@@ -181,6 +181,8 @@ class TestSupervisorConfigCompat:
         sup = data["intent"]["policy"]["supervisor"]
         del sup["cascade"]
         del sup["checker_model"]
+        del sup["checker_provider"]
+        del sup["checker_budget_tokens"]
         store.manifest_path.write_text(json.dumps(data))
 
         loaded = store.read()
@@ -188,6 +190,8 @@ class TestSupervisorConfigCompat:
         assert loaded.intent.policy.supervisor is not None
         assert loaded.intent.policy.supervisor.cascade is False
         assert loaded.intent.policy.supervisor.checker_model is None
+        assert loaded.intent.policy.supervisor.checker_provider is None
+        assert loaded.intent.policy.supervisor.checker_budget_tokens is None
 
     def test_new_fields_round_trip(self, tmp_path: Path) -> None:
         from forge.session.models import PolicyIntent, SupervisorConfig
@@ -199,7 +203,9 @@ class TestSupervisorConfigCompat:
             supervisor=SupervisorConfig(
                 resume_id="planner",
                 cascade=True,
-                checker_model="gemini/gemini-2.0-flash",
+                checker_model="gemini/gemini-3.5-flash",
+                checker_provider="litellm_local",
+                checker_budget_tokens=64000,
             ),
         )
         store.write(state)
@@ -208,7 +214,9 @@ class TestSupervisorConfigCompat:
         assert loaded.intent.policy is not None
         assert loaded.intent.policy.supervisor is not None
         assert loaded.intent.policy.supervisor.cascade is True
-        assert loaded.intent.policy.supervisor.checker_model == "gemini/gemini-2.0-flash"
+        assert loaded.intent.policy.supervisor.checker_model == "gemini/gemini-3.5-flash"
+        assert loaded.intent.policy.supervisor.checker_provider == "litellm_local"
+        assert loaded.intent.policy.supervisor.checker_budget_tokens == 64000
 
 
 class TestSessionStoreUpdate:
