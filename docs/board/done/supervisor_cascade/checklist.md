@@ -1,6 +1,6 @@
 # Supervisor Cascade — Execution Checklist
 
-**Current focus**: Closeout — card moves `doing/ -> done/` after merge to `main`.
+**Current focus**: Done — card moved to `done/` on `main`.
 
 ## Slice 0 — Board card + checklist
 
@@ -89,8 +89,8 @@
 - [x] `design.md` §4.1.2 cascade block + §4.1.5 resolver-hop sentence + CLI table row.
 - [x] `design_appendix.md` §D ownership rows; §A.13 per-emitter table `plan-check` row.
 - [x] `docs/end-user/policy.md` cascade subsection.
-- [x] `change_log.md` entry (Goal / Key changes / Verification). Durable lessons drafted for impl_notes (human gate) and
-  card `doing/ -> done/` remain post-merge steps.
+- [x] `change_log.md` entry (Goal / Key changes / Verification). Durable lessons drafted for impl_notes (human gate).
+- [x] Card moved from `doing/` to `done/` on `main`.
 
 ## Acceptance tests (risky/multi-file changes)
 
