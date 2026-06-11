@@ -12,7 +12,7 @@ from pytest import fixture
 from forge.cli.main import main
 from forge.policy.types import PolicyDecision, Violation
 from forge.session import IndexStore, SessionStore, create_session_state
-from forge.session.models import PolicyIntent, StartedWithProxy
+from forge.session.models import PolicyIntent, StartedWithProxy, SupervisorConfig
 
 
 def _seed_duplicate_supervisor_targets(project: Path) -> tuple[Path, Path]:
@@ -624,3 +624,311 @@ class TestSupervisorProxyFlags:
         mock_ensure.assert_called_once_with("litellm-gemini")
         mock_apply.assert_called_once()
         assert mock_apply.call_args.kwargs.get("supervisor_proxy") == "litellm-gemini"
+
+
+class TestSuperviseTimeoutFlag:
+    """--timeout on policy supervise: an attribute of the target action, not a new action."""
+
+    def _set_supervisor(self, project: Path, args: list[str]) -> SupervisorConfig:
+        """Run ``policy supervise planner <args>`` against a real store; return persisted config."""
+        store = SessionStore(str(project), "test-session")
+        state = create_session_state("test-session", worktree_path=str(project))
+        state.forge_root = str(project)
+        store.write(state)
+
+        runner = CliRunner()
+        with (
+            patch.dict("os.environ", {"FORGE_SESSION": "test-session"}),
+            patch(
+                "forge.policy.semantic.supervisor.validate_supervisor_target",
+                side_effect=_validate_supervisor_target,
+            ),
+            patch("forge.policy.semantic.supervisor.apply_supervisor_routing"),
+        ):
+            result = runner.invoke(main, ["policy", "supervise", "planner", *args])
+        assert result.exit_code == 0, f"Expected exit 0, got {result.exit_code}: {result.output}"
+        manifest = store.read()
+        assert manifest.intent.policy is not None and manifest.intent.policy.supervisor is not None
+        return manifest.intent.policy.supervisor
+
+    def test_timeout_persists_into_intent(self, temp_guard_env: Path) -> None:
+        sup = self._set_supervisor(temp_guard_env, ["--timeout", "90"])
+        assert sup.timeout_seconds == 90
+
+    def test_default_unchanged_without_flag(self, temp_guard_env: Path) -> None:
+        sup = self._set_supervisor(temp_guard_env, [])
+        assert sup.timeout_seconds == 45
+
+    def test_timeout_requires_target(self, temp_guard_env: Path) -> None:
+        runner = CliRunner()
+        result = runner.invoke(main, ["policy", "supervise", "--timeout", "90"])
+        assert result.exit_code == 1
+        assert "requires a target" in result.output
+
+    def test_timeout_with_other_action_errors_cleanly(self, temp_guard_env: Path) -> None:
+        # Attribute-not-action: the requires-target error fires, not the action count.
+        runner = CliRunner()
+        result = runner.invoke(main, ["policy", "supervise", "--off", "--timeout", "90"])
+        assert result.exit_code == 1
+        assert "requires a target" in result.output
+        assert "only one action" not in result.output
+
+    def test_timeout_rejects_non_positive(self, temp_guard_env: Path) -> None:
+        runner = CliRunner()
+        result = runner.invoke(main, ["policy", "supervise", "planner", "--timeout", "0"])
+        assert result.exit_code == 2  # Click IntRange(min=1) usage error
+
+
+# --- Cascade tests for `forge policy supervise --cascade/--no-cascade/--checker-model` ---
+
+
+def _fake_resolved_plan(path: str, source: str = "self", session_name: str = "worker"):
+    from types import SimpleNamespace
+
+    return SimpleNamespace(path=path, source=source, session_name=session_name, captured_at=None)
+
+
+def _set_supervisor_fields(store: SessionStore, **fields) -> None:
+    def _mutate(m) -> None:
+        assert m.intent.policy is not None and m.intent.policy.supervisor is not None
+        for key, value in fields.items():
+            setattr(m.intent.policy.supervisor, key, value)
+
+    store.update(timeout_s=5.0, mutate=_mutate)
+
+
+def _read_supervisor(store: SessionStore):
+    manifest = store.read()
+    assert manifest.intent.policy is not None
+    assert manifest.intent.policy.supervisor is not None
+    return manifest.intent.policy.supervisor
+
+
+class TestSuperviseCascade:
+    """Tests for the cascade flags (modifier with target, standalone toggle without)."""
+
+    def test_standalone_cascade_enables_with_existing_plan(
+        self, runner: CliRunner, temp_guard_env: Path, monkeypatch
+    ) -> None:
+        store = _make_supervised_project(temp_guard_env, monkeypatch)
+        plan = temp_guard_env / "plan.md"
+        plan.write_text("# Plan")
+        _set_supervisor_fields(store, plan_override_path=str(plan))
+
+        result = runner.invoke(main, ["policy", "supervise", "--cascade"])
+        assert result.exit_code == 0, result.output
+        assert "cascade enabled" in result.output.lower()
+
+        sup = _read_supervisor(store)
+        assert sup.cascade is True
+        assert sup.plan_override_path == str(plan)
+
+    def test_standalone_cascade_auto_resolves_plan(self, runner: CliRunner, temp_guard_env: Path, monkeypatch) -> None:
+        store = _make_supervised_project(temp_guard_env, monkeypatch)
+        plan = temp_guard_env / "resolved.md"
+        plan.write_text("# Plan")
+
+        with patch(
+            "forge.policy.semantic.supervisor.resolve_supervisor_reload_plan_path",
+            return_value=_fake_resolved_plan(str(plan)),
+        ):
+            result = runner.invoke(main, ["policy", "supervise", "--cascade"])
+
+        assert result.exit_code == 0, result.output
+        assert "current session" in result.output
+
+        sup = _read_supervisor(store)
+        assert sup.cascade is True
+        assert sup.plan_override_path == str(plan)
+
+    def test_standalone_cascade_unresolvable_exits_1_manifest_untouched(
+        self, runner: CliRunner, temp_guard_env: Path, monkeypatch
+    ) -> None:
+        store = _make_supervised_project(temp_guard_env, monkeypatch)
+
+        with patch(
+            "forge.policy.semantic.supervisor.resolve_supervisor_reload_plan_path",
+            return_value=None,
+        ):
+            result = runner.invoke(main, ["policy", "supervise", "--cascade"])
+
+        assert result.exit_code == 1
+        assert "No approved plan snapshot" in result.output
+        assert "Tip:" in result.output
+
+        sup = _read_supervisor(store)
+        assert sup.cascade is False
+        assert sup.plan_override_path is None
+
+    def test_standalone_no_cascade_disables(self, runner: CliRunner, temp_guard_env: Path, monkeypatch) -> None:
+        store = _make_supervised_project(temp_guard_env, monkeypatch)
+        _set_supervisor_fields(store, cascade=True, plan_override_path="/tmp/plan.md")
+
+        result = runner.invoke(main, ["policy", "supervise", "--no-cascade"])
+        assert result.exit_code == 0, result.output
+        assert "cascade disabled" in result.output.lower()
+
+        sup = _read_supervisor(store)
+        assert sup.cascade is False
+
+    def test_cascade_without_supervisor_reports_not_configured(
+        self, runner: CliRunner, temp_guard_env: Path, monkeypatch
+    ) -> None:
+        monkeypatch.setenv("FORGE_SESSION", "worker")
+        manifest = create_session_state("worker", worktree_path=str(temp_guard_env))
+        manifest.forge_root = str(temp_guard_env)
+        SessionStore(str(temp_guard_env), "worker").write(manifest)
+
+        result = runner.invoke(main, ["policy", "supervise", "--cascade"])
+        assert result.exit_code == 0
+        assert "no supervisor configured" in result.output.lower()
+
+    def test_no_cascade_with_target_rejected(self, runner: CliRunner, temp_guard_env: Path) -> None:
+        result = runner.invoke(main, ["policy", "supervise", "planner", "--no-cascade"])
+        assert result.exit_code == 1
+        assert "redundant" in result.output
+
+    def test_bare_checker_model_rejected(self, runner: CliRunner, temp_guard_env: Path) -> None:
+        result = runner.invoke(main, ["policy", "supervise", "--checker-model", "google/gemini-3.5-flash"])
+        assert result.exit_code == 1
+        assert "Checker options require a target argument or --cascade" in result.output
+
+    def test_checker_model_must_be_prefixed(self, runner: CliRunner, temp_guard_env: Path) -> None:
+        result = runner.invoke(main, ["policy", "supervise", "--cascade", "--checker-model", "flash"])
+        assert result.exit_code == 1
+        assert "prefixed model id" in result.output
+
+    def test_checker_model_stored_with_standalone_cascade(
+        self, runner: CliRunner, temp_guard_env: Path, monkeypatch
+    ) -> None:
+        store = _make_supervised_project(temp_guard_env, monkeypatch)
+        plan = temp_guard_env / "plan.md"
+        plan.write_text("# Plan")
+        _set_supervisor_fields(store, plan_override_path=str(plan))
+
+        result = runner.invoke(
+            main, ["policy", "supervise", "--cascade", "--checker-model", "openrouter/some-cheap-model"]
+        )
+        assert result.exit_code == 0, result.output
+
+        sup = _read_supervisor(store)
+        assert sup.checker_model == "openrouter/some-cheap-model"
+
+    def test_checker_provider_stored_with_standalone_cascade(
+        self, runner: CliRunner, temp_guard_env: Path, monkeypatch
+    ) -> None:
+        store = _make_supervised_project(temp_guard_env, monkeypatch)
+        plan = temp_guard_env / "plan.md"
+        plan.write_text("# Plan")
+        _set_supervisor_fields(store, plan_override_path=str(plan))
+
+        result = runner.invoke(
+            main,
+            [
+                "policy",
+                "supervise",
+                "--cascade",
+                "--checker-provider",
+                "litellm-local",
+            ],
+        )
+        assert result.exit_code == 0, result.output
+
+        sup = _read_supervisor(store)
+        assert sup.checker_provider == "litellm_local"
+        assert sup.checker_budget_tokens is None
+        assert "gemini/gemini-3.5-flash via litellm_local" in result.output
+
+    def test_checker_budget_is_not_a_supervise_option(self, runner: CliRunner, temp_guard_env: Path) -> None:
+        result = runner.invoke(main, ["policy", "supervise", "--cascade", "--checker-budget-tokens", "64000"])
+        assert result.exit_code == 2
+        assert "No such option" in result.output
+        assert "--checker-budget-tokens" in result.output
+
+    def test_cascade_is_standalone_action(self, runner: CliRunner, temp_guard_env: Path, monkeypatch) -> None:
+        """Standalone cascade flags participate in the one-action rule."""
+        _make_supervised_project(temp_guard_env, monkeypatch)
+        result = runner.invoke(main, ["policy", "supervise", "--cascade", "--off"])
+        assert result.exit_code == 1
+        assert "only one action" in result.output.lower()
+
+    @patch("forge.policy.semantic.supervisor.validate_supervisor_target", side_effect=_validate_supervisor_target)
+    @patch("forge.policy.semantic.supervisor.apply_supervisor_routing", return_value=None)
+    def test_target_with_cascade_modifier(
+        self, mock_apply, mock_validate, runner: CliRunner, temp_guard_env: Path, monkeypatch
+    ) -> None:
+        """--cascade with a target is a modifier, not a second action."""
+        monkeypatch.setenv("FORGE_SESSION", "worker")
+        manifest = create_session_state("worker", worktree_path=str(temp_guard_env))
+        manifest.forge_root = str(temp_guard_env)
+        store = SessionStore(str(temp_guard_env), "worker")
+        store.write(manifest)
+        plan = temp_guard_env / "approved.md"
+        plan.write_text("# Plan")
+
+        with patch(
+            "forge.policy.semantic.supervisor.resolve_supervisor_reload_plan_path",
+            return_value=_fake_resolved_plan(str(plan), source="target"),
+        ):
+            result = runner.invoke(main, ["policy", "supervise", "planner", "--cascade"])
+
+        assert result.exit_code == 0, result.output
+        assert "Cascade: on" in result.output
+        assert "supervisor target" in result.output
+
+        sup = _read_supervisor(store)
+        assert (sup.resume_id, sup.cascade, sup.plan_override_path) == ("planner", True, str(plan))
+
+    @patch("forge.policy.semantic.supervisor.validate_supervisor_target", side_effect=_validate_supervisor_target)
+    @patch("forge.policy.semantic.supervisor.apply_supervisor_routing", return_value=None)
+    def test_target_with_cascade_unresolvable_plan_exits_1(
+        self, mock_apply, mock_validate, runner: CliRunner, temp_guard_env: Path, monkeypatch
+    ) -> None:
+        """Wiring-time plan resolution failure exits before any manifest mutation."""
+        monkeypatch.setenv("FORGE_SESSION", "worker")
+        manifest = create_session_state("worker", worktree_path=str(temp_guard_env))
+        manifest.forge_root = str(temp_guard_env)
+        store = SessionStore(str(temp_guard_env), "worker")
+        store.write(manifest)
+
+        with patch(
+            "forge.policy.semantic.supervisor.resolve_supervisor_reload_plan_path",
+            return_value=None,
+        ):
+            result = runner.invoke(main, ["policy", "supervise", "planner", "--cascade"])
+
+        assert result.exit_code == 1
+        assert "No approved plan snapshot" in result.output
+
+        updated = store.read()
+        assert updated.intent.policy is None or updated.intent.policy.supervisor is None
+
+    def test_show_displays_cascade(self, runner: CliRunner, temp_guard_env: Path, monkeypatch) -> None:
+        store = _make_supervised_project(temp_guard_env, monkeypatch)
+        _set_supervisor_fields(store, cascade=True, plan_override_path="/tmp/plan.md")
+
+        result = runner.invoke(main, ["policy", "supervise"])
+        assert result.exit_code == 0
+        assert "Cascade: on" in result.output
+        assert "Checker provider: openrouter" in result.output
+        assert "Checker model: google/gemini-3.5-flash" in result.output
+        assert "Checker budget: 32000 tokens" in result.output
+
+    def test_show_displays_unsupported_checker_provider(
+        self, runner: CliRunner, temp_guard_env: Path, monkeypatch
+    ) -> None:
+        store = _make_supervised_project(temp_guard_env, monkeypatch)
+        _set_supervisor_fields(store, cascade=True, checker_provider="anthropic")
+
+        result = runner.invoke(main, ["policy", "supervise"])
+
+        assert result.exit_code == 0, result.output
+        assert "Checker provider: anthropic (unsupported)" in result.output
+        assert "Checker model: unresolved" in result.output
+
+    def test_show_displays_cascade_off_by_default(self, runner: CliRunner, temp_guard_env: Path, monkeypatch) -> None:
+        _make_supervised_project(temp_guard_env, monkeypatch)
+        result = runner.invoke(main, ["policy", "supervise"])
+        assert result.exit_code == 0
+        assert "Cascade: off" in result.output
+        assert "Checker model" not in result.output

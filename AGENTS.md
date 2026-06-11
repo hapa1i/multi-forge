@@ -56,7 +56,7 @@ connectivity after first setup, credential changes, or proxy auth changes.
 Target Python 3.11 with 4-space indentation and a 120-character line length. Use `snake_case` for modules, functions,
 and variables, `CamelCase` for classes, and `UPPER_CASE` for constants. Follow the repo’s Python conventions: public
 methods before private ones, type hints on public functions, and comments that explain why. Quality checks center on
-Ruff and mypy; pre-commit also runs isort, Black, and gitleaks.
+`make pre-commit`, which runs ruff, black, isort, mypy, pyright, mdformat, and gitleaks.
 
 ## Testing Guidelines
 

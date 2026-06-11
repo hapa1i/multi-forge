@@ -1135,44 +1135,44 @@ class TestSupervisorSuspended:
 
 
 class TestLoadPlanOverride:
-    """Tests for _load_plan_override()."""
+    """Tests for load_plan_override()."""
 
     def test_no_override_returns_none(self) -> None:
-        from forge.policy.semantic.supervisor import _load_plan_override
+        from forge.policy.semantic.supervisor import load_plan_override
 
         config = _make_config(plan_override_path=None)
-        assert _load_plan_override(config) is None
+        assert load_plan_override(config) is None
 
     def test_reads_file_content(self, tmp_path) -> None:
-        from forge.policy.semantic.supervisor import _load_plan_override
+        from forge.policy.semantic.supervisor import load_plan_override
 
         plan = tmp_path / "plan.md"
         plan.write_text("# My Plan\nDo the thing.")
         config = _make_config(plan_override_path=str(plan))
-        assert _load_plan_override(config) == "# My Plan\nDo the thing."
+        assert load_plan_override(config) == "# My Plan\nDo the thing."
 
     def test_missing_file_returns_none(self, tmp_path) -> None:
-        from forge.policy.semantic.supervisor import _load_plan_override
+        from forge.policy.semantic.supervisor import load_plan_override
 
         config = _make_config(plan_override_path=str(tmp_path / "nonexistent.md"))
-        assert _load_plan_override(config) is None
+        assert load_plan_override(config) is None
 
     def test_empty_file_returns_none(self, tmp_path) -> None:
-        from forge.policy.semantic.supervisor import _load_plan_override
+        from forge.policy.semantic.supervisor import load_plan_override
 
         plan = tmp_path / "empty.md"
         plan.write_text("")
         config = _make_config(plan_override_path=str(plan))
-        assert _load_plan_override(config) is None
+        assert load_plan_override(config) is None
 
     def test_relative_path_resolves_from_forge_root(self, tmp_path) -> None:
-        from forge.policy.semantic.supervisor import _load_plan_override
+        from forge.policy.semantic.supervisor import load_plan_override
 
         (tmp_path / "plans").mkdir()
         plan = tmp_path / "plans" / "plan.md"
         plan.write_text("Plan content")
         config = _make_config(plan_override_path="plans/plan.md", forge_root=str(tmp_path))
-        assert _load_plan_override(config) == "Plan content"
+        assert load_plan_override(config) == "Plan content"
 
 
 class TestPlanOverridePrompt:

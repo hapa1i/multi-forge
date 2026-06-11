@@ -17,7 +17,7 @@ help:
 	@echo "  make test-regression    - Run regression tests (fast, no Docker required)"
 	@echo "  make test               - Run both unit and integration tests"
 	@echo ""
-	@echo "  make pre-commit         - Run all pre-commit hooks (ruff, black, isort, mypy, pyright)"
+	@echo "  make pre-commit         - Run all pre-commit hooks (ruff, black, isort, mypy, pyright, mdformat, gitleaks)"
 	@echo "  make pre-commit-md      - Run pre-commit hooks on Markdown files only"
 	@echo ""
 	@echo "  make clean              - Remove caches and build artifacts"

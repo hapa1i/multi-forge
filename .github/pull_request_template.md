@@ -6,9 +6,9 @@
 
 <!-- How did you verify this? -->
 
-- [ ] `make test-unit` passes
-- [ ] `make lint` passes
-- [ ] `make type-check` passes
+- [ ] `make pre-commit` passes (ruff, black, isort, mypy, pyright, mdformat, gitleaks)
+- [ ] Relevant tests pass (`make test-unit`, targeted `make test-integration` / `./scripts/test-integration.sh <path>`,
+  `make test-regression`, or `make test`)
 
 <!-- If this is a bug fix, include a regression test (see docs/developer/testing-guidelines.md) -->
 

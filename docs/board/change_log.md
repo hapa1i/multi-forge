@@ -27,6 +27,49 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-10
 
+### Supervisor cascade: tier-1 plan check before the frontier supervisor
+
+**Goal**: Route semantic-supervisor checks through a cheap stateless tier-1 plan check (opt-in `--cascade`) so
+clearly-aligned Write/Edit actions short-circuit and only uncertain ones pay the frontier `claude -p --resume` call.
+
+**Key changes**:
+
+- `PolicyEngine.register_resolver()`: a resolver policy runs only when pass-1 emitted `needs_review` and nothing denied;
+  `_run_policy()` extraction keeps applies_to/fail-mode/state semantics identical for both passes; `_collected_state`
+  cleared per `evaluate()`; `rules_active` uses `registered_policy_ids` (includes the resolver). Cascade off is
+  bit-identical to the pre-cascade engine.
+- `PlanCheckPolicy` (`semantic.plan_check`, new `policy/semantic/plan_check.py`): one cheap `core.llm` call (tagger
+  mechanics, default OpenRouter `google/gemini-3.5-flash`, with per-provider defaults and an approximately 32K-token
+  configurable prompt budget) judging the action against the approved-plan snapshot. Prompt packing uses head+tail
+  excerpts, keeps diff file/hunk headers when truncated, includes Edit matched/replacement fragments and Write target
+  existence context, and tells the checker when plan or action fields were truncated. Emits only `allow` (cached via
+  ThrottleCache, plan fingerprint in key) or `needs_review`; every failure path escalates — degrades to frontier-always,
+  never to unsupervised. Reasons ride in low-severity violations (clamped 500 chars), never `decision.warnings`, so
+  resolved escalations stay silent on the allow path.
+- CLI/config: `SupervisorConfig.cascade`/`checker_provider`/`checker_model`/`checker_budget_tokens`;
+  `forge policy supervise --cascade/--no-cascade --checker-provider --checker-model` (modifiers with target, standalone
+  toggle without); advanced budget tuning stays in session config via
+  `forge session set policy.supervisor.checker_budget_tokens <tokens>`; enabling auto-resolves the plan snapshot via the
+  `--reload` machinery and fails loud pre-mutation when none resolves; `%policy supervise cascade on|off`; status/show
+  surfaces. Existing local LiteLLM backend configs created before `gemini/gemini-3.5-flash` was added must be
+  recreated/updated or paired with an explicit served checker model such as `gemini/gemini-2.5-flash`.
+- Measurement: decision-log-derived `plan_check_allow`/`plan_check_needs_review` counters (cached allows counted) in
+  `forge activity` + summary line; session-tagged `plan-check` ledger events via `emit_direct_llm_usage`. Named
+  needs-review (not "escalated") because a tier-1 `needs_review` co-occurring with a deterministic deny skips the
+  resolver; actual frontier runs are the supervisor counters.
+- Docs: design.md §4.1.2 cascade block + §4.1.5 resolver bullet + CLI row; design_appendix §D ownership + §A.13 emitter
+  rows; end-user policy.md cascade subsection.
+
+**Verification**: 5950+ unit/regression tests pass (`-m "not integration"`) incl. 80+ new cases (engine resolver,
+plan-check policy, CLI, dispatcher, hook wiring, activity); Docker tier 19/19 (`test_supervisor_e2e.py` +
+`test_policy_hooks.py` — escalation resolves aligned/divergent with exactly one frontier invocation, plan-check error
+ledger event, CLI wiring persistence, cascade-off regression, plus a `slow`-marked real-LLM short-circuit e2e: the
+default checker via the host's port-4001 LiteLLM approves an aligned action with zero frontier invocations);
+`make pre-commit` hooks clean on all touched files.
+
+**Deferred**: allow-verdict rationale is debug-logged only — validating false-aligned rates needs shadow-sampling
+(follow-up idea on the card).
+
 ### codex_frontend Phase 1 follow-up: cross-project trust probe (stage 84) -> SCOPED
 
 **Goal**: Settle the last untested Phase-1 assumption gating the Phase 6 installer story -- does ONE Codex trust

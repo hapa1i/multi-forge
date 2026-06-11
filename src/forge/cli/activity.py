@@ -113,10 +113,16 @@ def _render(summary: SessionActivitySummary, *, days: int | None) -> None:
 
     pol = summary.policy
     if pol and pol.has_content:
-        console.print(
-            f"\n[bold]Supervisor[/bold]: {pol.supervisor_allow} allow · "
-            f"{pol.supervisor_warn} warn · {pol.supervisor_deny} block"
-        )
+        if pol.plan_check_allow or pol.plan_check_needs_review:
+            console.print(
+                f"\n[bold]Plan check (tier-1)[/bold]: {pol.plan_check_allow} allow · "
+                f"{pol.plan_check_needs_review} needs review"
+            )
+        if pol.supervisor_allow or pol.supervisor_warn or pol.supervisor_deny or pol.total_warnings:
+            console.print(
+                f"\n[bold]Supervisor[/bold]: {pol.supervisor_allow} allow · "
+                f"{pol.supervisor_warn} warn · {pol.supervisor_deny} block"
+            )
         for warning in pol.recent_warnings:
             console.print(f"  [yellow]•[/yellow] {warning}")
 
