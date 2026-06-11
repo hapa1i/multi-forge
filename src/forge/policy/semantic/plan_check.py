@@ -217,11 +217,7 @@ def _head_tail_excerpt(text: str, budget_chars: int, *, preserve_hunk_headers: b
 
     hunk_headers = ""
     if preserve_hunk_headers:
-        hunk_lines = [
-            line
-            for line in text.splitlines()
-            if line.startswith(("diff --git ", "@@ ", "--- ", "+++ "))
-        ]
+        hunk_lines = [line for line in text.splitlines() if line.startswith(("diff --git ", "@@ ", "--- ", "+++ "))]
         if hunk_lines:
             header_budget = max(500, budget_chars // 4)
             hunk_headers = "\n".join(hunk_lines)
@@ -301,7 +297,9 @@ def _build_action_source(context: ActionContext) -> tuple[str, bool, str]:
     return header + "\n\n" + body, False, "write_content"
 
 
-def _pack_prompt_sections(plan_text: str, context: ActionContext, *, budget_tokens: int) -> tuple[_PackedText, _PackedText]:
+def _pack_prompt_sections(
+    plan_text: str, context: ActionContext, *, budget_tokens: int
+) -> tuple[_PackedText, _PackedText]:
     # Treat checker_budget_tokens as the approximate whole-prompt budget, then
     # split the remaining room between the approved plan and action context.
     total_chars = max(1, _budget_chars(budget_tokens) - _prompt_shell_chars(context) - _PROMPT_OVERHEAD_RESERVE_CHARS)
@@ -373,6 +371,7 @@ def run_plan_check(
             target_is_forge_proxy,
             with_forge_request_id,
         )
+
         packed_plan, packed_action = _pack_prompt_sections(plan_text, context, budget_tokens=budget_tokens)
 
         prompt = PLAN_CHECK_PROMPT.format(

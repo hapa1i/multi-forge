@@ -16,9 +16,9 @@ from unittest.mock import MagicMock, patch
 
 from forge.core.llm import CompletionResponse
 from forge.policy.semantic.plan_check import (
+    _MAX_REASON_CHARS,
     DEFAULT_PLAN_CHECK_BUDGET_TOKENS,
     DEFAULT_PLAN_CHECK_MODEL,
-    _MAX_REASON_CHARS,
     PlanCheckPolicy,
     PlanCheckVerdict,
     parse_plan_check_verdict,
@@ -202,8 +202,7 @@ class TestRunPlanCheck:
             "diff --git a/src/main.py b/src/main.py\n"
             "--- a/src/main.py\n"
             "+++ b/src/main.py\n"
-            "@@ -120,6 +120,9 @@ def important():\n"
-            + ("+ filler\n" * 3000)
+            "@@ -120,6 +120,9 @@ def important():\n" + ("+ filler\n" * 3000)
         )
         ctx = ActionContext(
             runtime="claude_code",

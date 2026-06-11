@@ -1054,7 +1054,10 @@ def _handle_policy_supervise(argv: list[str]) -> None:
     lines.append(f"  Timeout: {sup.timeout_seconds}s, Throttle: {sup.throttle_seconds}s")
     lines.append(f"  Cascade: {'on' if sup.cascade else 'off'}")
     if sup.cascade:
-        from forge.policy.semantic.plan_check import DEFAULT_PLAN_CHECK_BUDGET_TOKENS, resolve_plan_check_route
+        from forge.policy.semantic.plan_check import (
+            DEFAULT_PLAN_CHECK_BUDGET_TOKENS,
+            resolve_plan_check_route,
+        )
 
         budget = (
             max(1, int(sup.checker_budget_tokens))
@@ -1064,7 +1067,7 @@ def _handle_policy_supervise(argv: list[str]) -> None:
         try:
             route = resolve_plan_check_route(sup)
             checker_model = route.model
-            checker_provider = route.provider or "auto"
+            checker_provider: str = route.provider or "auto"
         except ValueError:
             checker_model = sup.checker_model or "unresolved"
             checker_provider = f"{sup.checker_provider or 'auto'} (unsupported)"

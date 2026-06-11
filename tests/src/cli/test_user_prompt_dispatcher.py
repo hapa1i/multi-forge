@@ -1437,9 +1437,7 @@ class TestGuardSuperviseToggle:
         out = json.loads(result.output)
         assert "Cascade: off" in out["reason"]
 
-    def test_show_includes_unsupported_checker_provider(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_show_includes_unsupported_checker_provider(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         store = _make_supervised_session(tmp_path, monkeypatch)
 
         def _set_bad_provider(m):

@@ -734,13 +734,13 @@ user rather than working around the check.
 
 ### D.3 Policy definition ownership (from §4.1.6)
 
-| Setting                                             | Owner   | Location                                            |
-| --------------------------------------------------- | ------- | --------------------------------------------------- |
-| Supervisor model (which model to use as supervisor) | Proxy   | `~/.forge/proxies/<id>/proxy.yaml`                  |
-| Throttling settings (check frequency)               | Proxy   | `~/.forge/proxies/<id>/proxy.yaml`                  |
-| TDD mode (off/permissive/strict)                    | Session | Session file `intent.tdd_mode`                      |
-| Policy enabled/disabled                             | Session | Session file `intent.policy_mode`                   |
-| Verification config                                 | Session | Session file `intent.verification`                  |
+| Setting                                             | Owner   | Location                                                                                         |
+| --------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------ |
+| Supervisor model (which model to use as supervisor) | Proxy   | `~/.forge/proxies/<id>/proxy.yaml`                                                               |
+| Throttling settings (check frequency)               | Proxy   | `~/.forge/proxies/<id>/proxy.yaml`                                                               |
+| TDD mode (off/permissive/strict)                    | Session | Session file `intent.tdd_mode`                                                                   |
+| Policy enabled/disabled                             | Session | Session file `intent.policy_mode`                                                                |
+| Verification config                                 | Session | Session file `intent.verification`                                                               |
 | Cascade on/off + tier-1 checker route/budget        | Session | `intent.policy.supervisor.cascade`/`.checker_provider`/`.checker_model`/`.checker_budget_tokens` |
 
 ### D.4 Policy state ownership (from §4.1.6)
