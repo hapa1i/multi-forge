@@ -281,12 +281,14 @@ class TestCascadeE2E:
 
     @pytest.mark.slow
     def test_short_circuit_real_checker_skips_frontier(self, supervisor_workspace: ContainerLike) -> None:
-        """Real tier-1 short-circuit: the default checker model, served by the host's
-        test LiteLLM (port 4001, started by test-integration.sh), approves a
-        clearly-aligned action and the frontier supervisor is never invoked.
+        """Real tier-1 short-circuit through the host's test LiteLLM (port 4001,
+        started by test-integration.sh): the checker approves a clearly-aligned
+        action and the frontier supervisor is never invoked.
 
+        The checker is pinned to the litellm_local route (the shipped default is
+        OpenRouter, which would need OPENROUTER_API_KEY inside the container).
         Requires GEMINI_API_KEY on the host; provider keys never enter the
-        container (litellm_local sends them from the proxy side). mode=divergent
+        container (the proxy sends them from the host side). mode=divergent
         makes the test self-proving: had the frontier been consulted it would
         have blocked, so exit 0 + zero --resume invocations is only reachable
         via the tier-1 allow.
@@ -295,7 +297,9 @@ class TestCascadeE2E:
         _wire_cascade_session(
             ws,
             "cascade-sc",
-            checker_model=None,  # real default; must be served by the local backend
+            # gemini/* -> litellm_local. Pinned to 2.5-flash: present in both current
+            # litellm.yaml defaults and backends generated before the 3.5 entry landed.
+            checker_model="gemini/gemini-2.5-flash",
             plan_text="# Approved Plan\nCreate src/demo.py containing exactly: def widget(): pass\n",
         )
 
