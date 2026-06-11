@@ -377,6 +377,114 @@ class TestCodexPolicyCheckDocker:
 
 
 # =============================================================================
+# Codex SessionStart Transfer Delivery Tests
+# =============================================================================
+
+_CODEX_THREAD_ID = "019eb075-ef05-7702-9045-0a8a88b512d2"
+_CODEX_ROLLOUT = f"/root/.codex/sessions/2026/06/10/rollout-2026-06-10T03-36-19-{_CODEX_THREAD_ID}.jsonl"
+_PENDING_PATH = "/workspace/.forge/sessions/policy-test/codex/pending-context.md"
+_RECEIPT_PATH = "/workspace/.forge/sessions/policy-test/codex/context-receipt.json"
+
+
+def invoke_codex_session_start(
+    workspace: ContainerLike,
+    session_name: str = "policy-test",
+) -> tuple[int, str, str]:
+    """Invoke forge hook codex-session-start with a fixture-shaped SessionStart payload.
+
+    Payload shape pinned by tests/fixtures/codex/hooks/session_start.stdin.json
+    (codex-cli 0.138.0, snake_case).
+    """
+    payload = {
+        "session_id": _CODEX_THREAD_ID,
+        "transcript_path": _CODEX_ROLLOUT,
+        "cwd": "/workspace",
+        "hook_event_name": "SessionStart",
+        "model": "gpt-5.5",
+        "permission_mode": "bypassPermissions",
+        "source": "startup",
+    }
+    payload_json = json.dumps(payload)
+    result = workspace.exec(
+        f"cd /workspace && export FORGE_SESSION={session_name}"
+        f" && printf '%s' '{payload_json}' | forge hook codex-session-start"
+    )
+    return result.returncode, result.stdout, result.stderr
+
+
+class TestCodexSessionStartDocker:
+    """SessionStart transfer delivery (codex-session-start) with Docker isolation.
+
+    Delivery: staged file -> strict additionalContext wire JSON on stdout + a receipt
+    the CLI reconciles. Every non-delivery path is a silent no-op (exit 0, no output:
+    a user-scope registration fires for every Codex session, so unrelated sessions
+    must see no Forge stderr noise) -- Codex fails OPEN on malformed hook output.
+    """
+
+    def test_staged_context_delivered_with_receipt(self, policy_workspace: ContainerLike) -> None:
+        body = "# Handoff context (curated transfer from a prior planning session)\n\nCURATED-BODY"
+        policy_workspace.mkdir("/workspace/.forge/sessions/policy-test/codex", parents=True)
+        policy_workspace.write_file(_PENDING_PATH, body)
+        assert policy_workspace.file_exists(_PENDING_PATH), "staging precondition failed"
+
+        exit_code, stdout, stderr = invoke_codex_session_start(policy_workspace)
+
+        assert exit_code == 0, f"Delivery must exit 0, got {exit_code}. stderr: {stderr}"
+        wire = json.loads(stdout)
+        assert set(wire.keys()) == {"hookSpecificOutput"}, f"stdout must be strict wire JSON, got: {stdout}"
+        out = wire["hookSpecificOutput"]
+        assert set(out.keys()) == {"hookEventName", "additionalContext"}
+        assert out["hookEventName"] == "SessionStart"
+        assert out["additionalContext"].strip() == body.strip()
+
+        # Staged file consumed; receipt carries the payload's thread identity.
+        assert not policy_workspace.file_exists(_PENDING_PATH)
+        receipt = policy_workspace.read_json(_RECEIPT_PATH)
+        assert receipt["session_id"] == _CODEX_THREAD_ID
+        assert receipt["transcript_path"] == _CODEX_ROLLOUT
+        assert receipt["source"] == "startup"
+
+    def test_nothing_staged_is_silent(self, policy_workspace: ContainerLike) -> None:
+        """The resume-turn case: no staged file -> exit 0, no stdout, no receipt."""
+        exit_code, stdout, stderr = invoke_codex_session_start(policy_workspace)
+
+        assert exit_code == 0
+        assert stdout.strip() == ""
+        assert "[forge]" not in stderr, f"silent no-op must not emit Forge stderr noise, got: {stderr}"
+        assert not policy_workspace.file_exists(_RECEIPT_PATH)
+
+    def test_non_forge_session_is_silent(self, policy_workspace: ContainerLike) -> None:
+        """Regression: the user-scope case. A Codex session with no FORGE_SESSION in
+        its env (any non-Forge Codex start) must be a silent no-op -- no stdout and
+        no Forge stderr noise."""
+        payload = json.dumps(
+            {
+                "session_id": _CODEX_THREAD_ID,
+                "transcript_path": _CODEX_ROLLOUT,
+                "cwd": "/workspace",
+                "hook_event_name": "SessionStart",
+                "model": "gpt-5.5",
+                "permission_mode": "bypassPermissions",
+                "source": "startup",
+            }
+        )
+        result = policy_workspace.exec(
+            f"cd /workspace && unset FORGE_SESSION FORGE_FORK_NAME"
+            f" && printf '%s' '{payload}' | forge hook codex-session-start"
+        )
+
+        assert result.returncode == 0
+        assert result.stdout.strip() == ""
+        assert "[forge]" not in result.stderr, f"non-Forge session must see no Forge noise, got: {result.stderr}"
+
+    def test_fail_open_on_invalid_json(self, policy_workspace: ContainerLike) -> None:
+        result = policy_workspace.exec("cd /workspace && echo 'not valid json' | forge hook codex-session-start")
+
+        assert result.returncode == 0, f"Invalid JSON should fail-open (exit 0), got {result.returncode}"
+        assert result.stdout.strip() == "", f"Fail-open should produce no stdout, got: {result.stdout}"
+
+
+# =============================================================================
 # PreCompact Tests
 # =============================================================================
 

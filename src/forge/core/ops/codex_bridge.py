@@ -15,8 +15,11 @@ attribute the curation step and the Codex run together.
 
 Two deliberate properties:
 
-- **Delivery is the initial ``codex exec`` message**, not a Codex ``SessionStart`` hook:
-  per-hook trust can't be confirmed (Slice 5a), so hook delivery is deferred to Phase 6.
+- **Initial-message delivery is the zero-setup default**: the transfer is prepended to the
+  first ``codex exec`` prompt. Phase 4 adds the post-enrollment upgrade -- staging the
+  handoff for a trust-enrolled Codex ``SessionStart`` hook (``forge hook
+  codex-session-start``) to inject as ``additionalContext`` -- because enrollment cannot be
+  verified programmatically, hook delivery is opt-in and reconciled post-turn.
 - **Curated transfer is the only context bridge**: cross-runtime reasoning signatures are
   non-portable, so the distilled transfer -- not native resume -- is what crosses.
 """
@@ -49,6 +52,7 @@ from forge.core.runtime.codex_preflight import (
     CodexPreflightError,
     assert_codex_ready,
 )
+from forge.core.state.io import atomic_write_text
 from forge.session import ForgeSessionError, SessionManager, SessionState
 from forge.session.prev_sessions import child_path, compose_child_context
 from forge.session.transfer import (
@@ -61,6 +65,7 @@ from .context import ExecutionContext
 from .session import ForgeOpError
 
 _FORGE_SESSION_VAR = "FORGE_SESSION"
+_FORGE_FORGE_ROOT_VAR = "FORGE_FORGE_ROOT"
 
 
 @dataclass(frozen=True)
@@ -80,13 +85,14 @@ class CodexBridgeResult:
     context_file_rel: str | None = None
 
 
-def compose_codex_initial_message(transfer_body: str, task: str) -> str:
-    """Prepend the curated transfer to the task as one ``codex exec`` initial message.
+def compose_codex_handoff_context(transfer_body: str) -> str:
+    """Frame the curated transfer as handoff context for a Codex run.
 
-    The curated transfer is delivered in-band (no Codex ``SessionStart`` hook; see module
-    docstring). The framing tells Codex the section is curated context from a prior runtime
-    -- reasoning state does not transfer across runtimes, so this distilled context is the
-    authoritative bridge.
+    The framing tells Codex the section is curated context from a prior runtime --
+    reasoning state does not transfer across runtimes, so this distilled context is the
+    authoritative bridge. Shared by both delivery paths: prepended to the initial
+    ``codex exec`` message (default), or staged for the ``codex-session-start`` hook to
+    inject as ``additionalContext`` (opt-in, post-enrollment).
     """
     return (
         "# Handoff context (curated transfer from a prior planning session)\n"
@@ -96,11 +102,16 @@ def compose_codex_initial_message(transfer_body: str, task: str) -> str:
         "state does not transfer across runtimes, so treat this as your authoritative context.\n"
         "\n"
         f"{transfer_body.strip()}\n"
-        "\n"
-        "# Your task\n"
-        "\n"
-        f"{task.strip()}\n"
     )
+
+
+def compose_codex_initial_message(transfer_body: str, task: str) -> str:
+    """Prepend the curated transfer to the task as one ``codex exec`` initial message.
+
+    The zero-setup default delivery (see module docstring); byte-identical to the
+    pre-Phase-4 output (golden-pinned).
+    """
+    return compose_codex_handoff_context(transfer_body) + "\n# Your task\n\n" + f"{task.strip()}\n"
 
 
 # Guards _temporary_run_env: os.environ is process-global, so two concurrent bridge
@@ -110,15 +121,20 @@ _RUN_ENV_LOCK = threading.Lock()
 
 
 @contextmanager
-def _temporary_run_env(identity: RunIdentity, session: str) -> Generator[None, None, None]:
+def _temporary_run_env(
+    identity: RunIdentity, session: str, forge_root: str | None = None
+) -> Generator[None, None, None]:
     """Make ``identity`` + ``session`` the ambient run-tree env for the block.
 
     The Codex request-builder (``prepare_codex_request`` -> ``stamp_run_identity``) and
     ``emit_direct_llm_usage`` both read the run-tree triple (and ``FORGE_SESSION``) from
     ``os.environ``, so setting them here is what places the curation event and the
-    ``codex exec`` run under one root. Saves and restores the prior values -- including
-    absence -- on exit, even on exception, so this core op never leaks run identity into
-    the rest of the process.
+    ``codex exec`` run under one root. ``forge_root`` additionally sets
+    ``FORGE_FORGE_ROOT`` so Codex hook subprocesses (``codex-session-start``,
+    ``codex-policy-check``) resolve the session store under the CHILD's forge_root --
+    a worktree session's manifest is not findable from the payload cwd alone. Saves and
+    restores the prior values -- including absence -- on exit, even on exception, so
+    this core op never leaks run identity into the rest of the process.
 
     **Single-use-at-a-time**: ``os.environ`` is process-global state, so concurrent or
     nested use would attribute one bridge's events to another's run tree. Guarded by a
@@ -131,13 +147,21 @@ def _temporary_run_env(identity: RunIdentity, session: str) -> Generator[None, N
             "_temporary_run_env is already active in this process; "
             "bridge runs cannot overlap (run-tree env is process-global)."
         )
-    keys = (FORGE_RUN_ID_VAR, FORGE_ROOT_RUN_ID_VAR, FORGE_PARENT_RUN_ID_VAR, _FORGE_SESSION_VAR)
+    keys = (
+        FORGE_RUN_ID_VAR,
+        FORGE_ROOT_RUN_ID_VAR,
+        FORGE_PARENT_RUN_ID_VAR,
+        _FORGE_SESSION_VAR,
+        _FORGE_FORGE_ROOT_VAR,
+    )
     saved = {key: os.environ.get(key) for key in keys}
     try:
         os.environ[FORGE_RUN_ID_VAR] = identity.run_id
         os.environ[FORGE_ROOT_RUN_ID_VAR] = identity.root_run_id
         os.environ.pop(FORGE_PARENT_RUN_ID_VAR, None)  # a fresh root has no parent
         os.environ[_FORGE_SESSION_VAR] = session
+        if forge_root is not None:
+            os.environ[_FORGE_FORGE_ROOT_VAR] = forge_root
         yield
     finally:
         try:
@@ -165,13 +189,17 @@ def bridge_session_to_codex(
     child: str | None = None,
     preflight: CodexPreflight | None = None,
     output_root: Path | None = None,
+    staged_context_path: Path | None = None,
 ) -> CodexBridgeResult:
     """Hand ``parent``'s curated transfer to a headless ``codex exec`` run implementing ``task``.
 
     Mints a fresh run tree, assembles a Codex-targeted curated transfer from the parent
     session, prepends it to the task as the ``codex exec`` initial message, and runs Codex
     in ``cwd`` (expected to be a git worktree) -- so the curation ``core.llm`` event and the
-    ``codex_exec`` event share one root.
+    ``codex_exec`` event share one root. ``staged_context_path`` switches to hook delivery:
+    the framed handoff is staged at that path for a trust-enrolled ``codex-session-start``
+    hook to inject as ``additionalContext``, and the prompt carries ONLY the task -- the
+    caller reconciles delivery from the receipt after the run.
 
     ``child`` overrides the per-run synthetic transfer-child key -- the codex session op
     passes the real session name so the snapshot is referenced by that session's
@@ -228,7 +256,10 @@ def bridge_session_to_codex(
         child = f"{parent}-codex-{root.run_id[-6:]}"
     transfer_root = output_root if output_root is not None else forge_root
 
-    with _temporary_run_env(root, sess):
+    # The CHILD's forge_root (transfer_root): codex hook subprocesses resolve the
+    # session store from FORGE_FORGE_ROOT, and a worktree session's manifest lives
+    # under the child root, not the payload cwd's.
+    with _temporary_run_env(root, sess, forge_root=str(transfer_root)):
         transfer = assemble_transfer_context(
             parent_name=parent,
             parent_state=parent_state,
@@ -242,7 +273,11 @@ def bridge_session_to_codex(
         )
         composed = compose_child_context(transfer_root, parent, child)
         frontmatter, body, _ = parse_transfer_frontmatter(composed)
-        full_prompt = compose_codex_initial_message(body, task)
+        if staged_context_path is not None:
+            atomic_write_text(staged_context_path, compose_codex_handoff_context(body))
+            full_prompt = task  # raw, matching the resume-turn prompt contract
+        else:
+            full_prompt = compose_codex_initial_message(body, task)
 
         request = prepare_codex_request(
             prompt=full_prompt,

@@ -66,8 +66,6 @@ from forge.cli.session import (  # noqa: E402
     logger,
 )
 from forge.cli.session_lifecycle import (  # noqa: E402
-    _apply_and_persist_direct_model_override,
-    _apply_direct_model_env_if_supported,
     _launch_claude_for_session,
     _persist_fork_transfer_derivation,
     _print_branch_exists_tip,
@@ -75,8 +73,12 @@ from forge.cli.session_lifecycle import (  # noqa: E402
     _print_session_activity_summary,
     _resolve_manifest_prompt_file,
     _resume_tip_command,
-    _validate_direct_model_pin_for_routing,
     session,
+)
+from forge.cli.session_model_pin import (  # noqa: E402
+    _apply_and_persist_direct_model_override,
+    _apply_direct_model_env_if_supported,
+    _validate_direct_model_pin_for_routing,
 )
 from forge.core.reactive.env import compute_interactive_api_key_decision  # noqa: E402
 

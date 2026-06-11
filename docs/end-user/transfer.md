@@ -86,6 +86,12 @@ forge session show impl     # Runtime, thread id, rollout path, auth posture
 forge activity impl         # transfer-curate + codex turns under one run tree
 ```
 
+By default the curated context rides the first `codex exec` prompt (zero setup). With a trust-enrolled
+`codex-session-start` hook you can opt into SessionStart delivery instead — `--context-delivery hook` — which keeps the
+prompt as your task alone and injects the context as `additionalContext`; see
+[session.md](session.md#derive-a-codex-session-from-a-claude-parent-cross-runtime) and
+[hook.md](hook.md#codex-session-start-codex-sessionstart) for the registration and failure semantics.
+
 **The manual recipe** stays available when you want the handoff without a Forge session:
 
 ```bash

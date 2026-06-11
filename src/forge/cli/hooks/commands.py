@@ -1420,6 +1420,34 @@ def codex_policy_check() -> None:
     sys.exit(responder.ALLOW_EXIT)
 
 
+@hooks.command(name="codex-session-start")
+def codex_session_start() -> None:
+    """Deliver a staged transfer handoff to a Codex turn as additionalContext.
+
+    The hook half of ``forge session start --runtime codex --context-delivery hook``:
+    when the CLI staged a handoff for this session, emit it as the strict SessionStart
+    ``additionalContext`` wire JSON (stdout, exit 0), consuming the staged file and
+    leaving a delivery receipt the CLI reconciles post-turn. Every other invocation
+    (no session, nothing staged, resume turns, malformed stdin) is a silent no-op:
+    exit 0 with NO output. Codex FAILS OPEN on malformed hook output, so stdout
+    carries only the ``json.dumps`` wire string; diagnostics go to the hooks debug
+    log, never stderr -- a user-scope registration fires for every Codex session.
+
+    The command name is trust-durable: Codex enrollment hashes the registered command
+    STRING, so renaming this command breaks every existing trust enrollment.
+    """
+    data, err = _read_stdin_json()
+    if data is None:
+        sys.exit(0)
+
+    from forge.cli.hooks.codex_transfer import run_codex_session_start
+
+    wire = run_codex_session_start(data)
+    if wire is not None:
+        print(wire, file=sys.stdout)
+    sys.exit(0)
+
+
 @hooks.command(name="user-prompt-submit")
 def user_prompt_submit() -> None:
     """Dispatch direct user commands from UserPromptSubmit.

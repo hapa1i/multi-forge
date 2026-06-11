@@ -64,17 +64,17 @@ def test_persist_direct_model_override_warns_on_lock_failure(
     temp_env: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """A failed --model manifest write should be visible instead of silently lost."""
-    from forge.cli import session_lifecycle
+    from forge.cli import session_model_pin
     from forge.core.state import FileLockTimeoutError
 
     state = create_session_state("persist-warning", worktree_path=str(temp_env))
     SessionStore(str(temp_env), "persist-warning").write(state)
 
     with patch(
-        "forge.cli.session_lifecycle.SessionStore.update",
+        "forge.cli.session_model_pin.SessionStore.update",
         side_effect=FileLockTimeoutError(lock_path=temp_env / "forge.session.json.lock", timeout_s=5.0),
     ):
-        session_lifecycle._persist_direct_model_override(
+        session_model_pin._persist_direct_model_override(
             forge_root=temp_env,
             session_name="persist-warning",
             direct_model="claude-opus-4-6",

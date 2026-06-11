@@ -200,6 +200,31 @@ Purpose: the same policy enforcement for **Codex** sessions (`forge session star
   complete Codex's one-time trust ceremony — Codex hooks only fire from trust-enrolled registrations (installer support
   is planned)
 
+### codex-session-start (Codex SessionStart)
+
+Purpose: deliver the transfer handoff to a Codex session as `additionalContext` — the hook half of
+`forge session start --runtime codex --context-delivery hook`.
+
+By default the curated transfer rides the first `codex exec` prompt (zero setup). With `--context-delivery hook`, Forge
+stages the handoff under the session directory and this hook injects it at SessionStart instead; after the turn, Forge
+reconciles the hook's delivery receipt into the session manifest (`confirmed.codex.context_delivery`). If the hook never
+fired (not enrolled), the command exits 1 and tells you so — the first turn ran without the parent context.
+
+- every other invocation (no staged handoff, resume turns, non-Forge Codex sessions) is a silent no-op
+- **not auto-installed**: add the registration below to your Codex `config.toml` and complete the one-time trust
+  ceremony (run `codex` interactively in the project and grant trust):
+
+```toml
+[[hooks.SessionStart]]
+[[hooks.SessionStart.hooks]]
+type = "command"
+command = "forge hook codex-session-start"
+timeout = 60
+```
+
+- **do not rename or alter the registered command string**: Codex trust hashes the registration definition, so any
+  change to the `command` value invalidates the enrollment and the hook silently stops firing
+
 ### read-hygiene (PreToolUse:Read)
 
 Purpose: silently fix Read calls to skill instruction files that include extra parameters.
@@ -302,6 +327,7 @@ forge hook session-start       # SessionStart handler
 forge hook stop                # Stop handler
 forge hook policy-check        # PreToolUse:Write/Edit handler (Claude)
 forge hook codex-policy-check  # PreToolUse:apply_patch handler (Codex; manual registration)
+forge hook codex-session-start # SessionStart transfer delivery (Codex; manual registration)
 forge hook enable --local      # Install to .claude/settings.local.json
 ```
 

@@ -57,8 +57,14 @@ stdin-prompt + `exec resume` recall).
 
 **Phase 3 shipped 2026-06-11** (all six slices ticked below; see change_log): the `origin` rename, the apply_patch
 parser, `CodexHookAdapter`/`CodexHookResponder`, and `forge hook codex-policy-check` -- PreToolUse scope, handler-only
-(manual registration + trust enrollment until Phase 6). **Next: Phase 4 (SessionStart transfer delivery) or Phase 5
-(interactive frontend)** -- both unblocked.
+(manual registration + trust enrollment until Phase 6).
+
+**Phase 4 shipped 2026-06-11** (all six slices ticked below; see change_log):
+`--context-delivery {initial-message, hook}` on `start --runtime codex`, the `forge hook codex-session-start` handler
+(staged file -> strict `additionalContext` wire + delivery receipt), and post-turn receipt reconciliation into
+`confirmed.codex.context_delivery` (incl. thread-id recovery + hook-sourced rollout). Handler-only; stage 86
+(operator-gated enrolled E2E) owed alongside stage 85. **Next: Phase 5 (interactive frontend) or Phase 6 (installer) --
+Phase 5 unblocked; Phase 6 now has both hook handlers shipped.**
 
 ## Phase 0 - Registry correction (owed from probe round 2)
 
@@ -271,10 +277,63 @@ deletions skipped); `origin="codex"` + raw `tool_args` keep runtime truth.
     `pretool_policy` stays `"partial"`); registry note gains the shipped-handler sentence; hook.md gains the
     codex-policy-check section; change_log entry added.
 
-## Phase 4 - SessionStart transfer delivery with initial-message fallback (gated on Phase 1 30e)
+## Phase 4 - SessionStart transfer delivery with initial-message fallback (gated on Phase 1 30e -- PASSED)
 
-Stub -- viable for both the interactive frontend and the enrolled headless bridge; initial-message stays the zero-setup
-default.
+Plan approved 2026-06-11 (full plan: `~/.claude/plans/expressive-zooming-rainbow.md`). **Scope decisions (user):**
+`--context-delivery {initial-message,hook}` on `start --runtime codex` (default initial-message; Click default `None` --
+the reject-list pattern); hook-undelivered = fail loud (keep session,
+`confirmed.codex.context_delivery = "hook_undelivered"`, exit 1 with ceremony/delete-and-retry tips); handler name
+`codex-session-start` is trust-durable (renaming breaks `trusted_hash` enrollment); handler-only like Phase 3 (manual
+registration + ceremony until Phase 6). Load-bearing: enrollment is unverifiable pre-turn, so hook mode = stage
+`compose_codex_handoff_context(body)` to `<session_dir>/codex/pending-context.md`, prompt carries only the task, the
+hook consumes the staged file and writes `context-receipt.json`, and the CLI reconciles post-turn (receipt also recovers
+`thread_id` when the stream missed `thread.started`; receipt `transcript_path` supersedes glob discovery as
+`rollout_source="session_start_hook"`). One-shot invariant: staged file never survives the start turn (consumed or
+cleared); resume defensively clears.
+
+- [x] Slice 1 -- composition split (`compose_codex_handoff_context`, byte-pinned golden FIRST) +
+  `session/codex_handoff.py` staging module (pending/receipt paths, atomic stage/consume/clear/read).
+  - Assertion: golden test pins today's initial-message bytes pre- and post-refactor; handoff module roundtrip/one-shot/
+    malformed-receipt cases green; stale "deferred to Phase 6" bridge docstrings rewritten.
+  - **Done 2026-06-11**: golden ran green against pre-refactor code first, then the split; receipt-write failure
+    deliberately leaves pending unconsumed (nothing delivered the receipt can't vouch for). 29 tests
+    (`test_codex_handoff.py` 16 + `test_codex_bridge.py` 13) green; mypy clean.
+- [x] Slice 2 -- `forge hook codex-session-start` (new `cli/hooks/codex_transfer.py`; strict one-line wire JSON pinned
+  to the probe response fixture; never reads the manifest -- only `store.session_dir`; receipt-before-stdout).
+  - Assertion: happy path stdout byte-equals formatter + staged consumed + receipt fields; all silent no-op paths exit 0
+    with empty stdout; wire-strictness + payload-cwd rooting regressions.
+  - **Done 2026-06-11**: 9 new cases in `test_codex_session_start.py` (delivery + strict-wire key sets + rooting + 6
+    silent no-ops incl. the resume case); full hooks package 146 green; mypy clean. Command docstring records the
+    trust-durable-name constraint.
+- [x] Slice 3 -- bridge staging param + `_temporary_run_env(..., forge_root=)` sets `FORGE_FORGE_ROOT` (worktree
+  rooting; call site passes the CHILD's forge_root).
+  - Assertion: staged file exists at Popen time with framed body; prompt == task exactly; default mode byte-identical
+    (no staging artifacts); env restore cases.
+  - **Done 2026-06-11**: `FORGE_FORGE_ROOT` passed unconditionally (`transfer_root` = the child's forge_root) so BOTH
+    codex hooks resolve worktree sessions; Popen side_effect snapshots staging+env at spawn time. 18 bridge tests + 215
+    ops-package tests green; mypy clean.
+- [x] Slice 4 -- op wiring: `CodexConfirmed.context_delivery`, pre-turn seam guard (disabled/unknown/managed_suppressed/
+  untrusted fail fast; enrollment_gated proceeds), `_reconcile_hook_delivery` (match / thread-id recovery / undelivered
+  \+ clear), resume defensive clear, `--context-delivery` flag (Click default `None` + reject list + exit-1 render).
+  - Assertion: hook-mode happy path, not-fired, mismatched-receipt, thread-id recovery, per-seam guard, default-mode
+    `initial_message`, resume leftover clear, GC/delete pinning, plain-Claude-start regression all green.
+  - **Done 2026-06-11**: receipt also recovers `thread_id` when the stream misses `thread.started` (resumability
+    preserved; receipt `transcript_path` supersedes glob as `rollout_source="session_start_hook"`); the
+    plain-Claude-start None-default regression pins the reject-list interaction. 1270 tests (ops + session + CLI
+    packages) green; mypy clean on all of `src/forge/`.
+- [x] Slice 5 -- Docker integration (`TestCodexSessionStartDocker`, real wheel CLI) + probe README stage-86
+  operator-gated note (enrolled E2E incl. multi-KB additionalContext -- size unprobed; 30e used a short token).
+  - Assertion: `./scripts/test-integration.sh tests/integration/docker/test_policy_hooks.py` green.
+  - **Done 2026-06-11**: 20/20 (3 new SessionStart delivery cases -- staged->wire+receipt, nothing-staged silent,
+    malformed-stdin fail-open; 17 pre-existing unchanged). Stage-86 note records the composed-loop + payload-size
+    verification owed to the operator round.
+- [x] Slice 6 -- docs/board sync: design.md §3.9 (shipped opt-in delivery) + §3.5 (receipt is the hook's only write),
+  end-user hook.md (probe-pinned NESTED registration TOML) + session.md/transfer.md, card Deliverable 4 annotation,
+  change_log entry; narrow grep gate (src/, design.md, end-user/, active card -- excluding done/ + historical change_log
+  entries).
+  - Assertion: no stale "deferred to Phase 6" delivery claim on the normative surfaces; `make pre-commit` clean.
+  - **Done 2026-06-11**: grep gate clean (only this checklist's meta-references remain); `make pre-commit` clean (mypy
+    caught + fixed a `HookSeam` literal annotation in the seam-guard test); full sweep 5773 unit + 399 regression green.
 
 ## Phase 5 - Interactive Codex frontend (unblocked; build after 2/3)
 

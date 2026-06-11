@@ -406,14 +406,18 @@ class CodexConfirmed:
         thread_id: the ``codex exec resume`` id, from the stream's ``thread.started``.
         rollout_path: absolute path to the matching ``$CODEX_HOME/sessions/.../
             rollout-*-<thread_id>.jsonl``, when discovered.
-        rollout_source: how ``rollout_path`` was obtained ("discovered_by_thread_id");
-            None when no rollout was found. A future hook-sourced value gets its own
-            label so the provenance stays honest.
+        rollout_source: how ``rollout_path`` was obtained: "discovered_by_thread_id"
+            (filesystem glob) or "session_start_hook" (the hook payload's
+            transcript_path, reported by codex itself); None when no rollout was found.
         auth_method / auth_source / billing_mode: the secret-free auth posture from
             ``CodexPreflight``. ``confirmed.launch`` stays None for Codex sessions
             (it describes the ANTHROPIC key posture of interactive Claude), so this
             is the manifest's only auth breadcrumb.
         last_run_at: ISO8601 of the most recent ``codex exec`` turn.
+        context_delivery: how the start turn's transfer context reached the model:
+            "initial_message" | "session_start_hook" | "hook_undelivered". Still
+            CLI-written -- the hook's only write is the delivery receipt file, which
+            the CLI reconciles into this field after the turn.
     """
 
     thread_id: str | None = None
@@ -423,6 +427,7 @@ class CodexConfirmed:
     auth_source: str | None = None
     billing_mode: str | None = None
     last_run_at: str | None = None
+    context_delivery: str | None = None
 
 
 @dataclass

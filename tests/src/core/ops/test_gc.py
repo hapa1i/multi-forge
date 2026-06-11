@@ -155,6 +155,30 @@ class TestDetectOrphanSessionDirs:
         assert result.count == 1
         assert str(orphan_dir) in result.items[0]
 
+    def test_codex_handoff_files_in_indexed_session_not_flagged(self, tmp_path: Path) -> None:
+        """Phase 4 staged-handoff files live INSIDE the session dir, so an indexed
+        session carrying codex/pending-context.md + context-receipt.json is never an
+        orphan, and session deletion removes them with the dir."""
+        from forge.session import SessionStore
+        from forge.session.codex_handoff import (
+            pending_context_path,
+            receipt_path,
+            stage_pending_context,
+        )
+
+        fr = _seed_session(tmp_path, "alpha")
+        session_dir = fr / ".forge" / "sessions" / "alpha"
+        stage_pending_context(session_dir, "# Handoff context\n\nbody\n")
+        receipt_path(session_dir).write_text("{}")
+
+        ref_set = {("alpha", str(fr))}
+        result = _detect_orphan_session_dirs(ref_set, {fr})
+        assert result.count == 0
+
+        assert SessionStore(str(fr), "alpha").delete() is True
+        assert not pending_context_path(session_dir).exists()
+        assert not receipt_path(session_dir).exists()
+
 
 # ---------------------------------------------------------------------------
 # _detect_orphan_transfer_files

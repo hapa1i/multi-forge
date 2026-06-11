@@ -121,6 +121,7 @@ class TestStartFlagMatrix:
             (["--strategy", "full"], "--strategy"),
             (["--depth", "2"], "--depth"),
             (["--sandbox", "read-only"], "--sandbox"),
+            (["--context-delivery", "hook"], "--context-delivery"),
         ],
     )
     def test_codex_only_flags_require_codex_runtime(
@@ -129,6 +130,20 @@ class TestStartFlagMatrix:
         result = runner.invoke(main, ["session", "start", "impl"] + extra_args)
         assert result.exit_code == 1
         assert f"{flag_label} requires --runtime codex" in result.output
+
+    def test_plain_claude_start_not_rejected_by_codex_defaults(self, runner: CliRunner, project: Path) -> None:
+        """Regression: every codex-only Click option must default to None -- a real
+        default (e.g. --context-delivery "initial-message") would trip
+        reject_codex_flags_for_claude on every plain Claude `session start`."""
+        with (
+            patch("forge.cli.guards.require_repo_root"),
+            patch("forge.cli.session_lifecycle.launch_new_session", return_value=0) as launch,
+        ):
+            result = runner.invoke(main, ["session", "start", "impl"])
+
+        assert "requires --runtime codex" not in result.output
+        assert result.exit_code == 0
+        launch.assert_called_once()
 
 
 class TestStartCodexDispatch:
@@ -149,6 +164,7 @@ class TestStartCodexDispatch:
             sandbox="workspace-write",
             worktree=False,
             branch=None,
+            context_delivery="initial-message",
         )
 
     def test_explicit_options_pass_through(self, runner: CliRunner, project: Path) -> None:
@@ -160,7 +176,19 @@ class TestStartCodexDispatch:
             result = runner.invoke(
                 main,
                 _CODEX_BASE
-                + ["--worktree", "--branch", "feat", "--strategy", "full", "--depth", "2", "--sandbox", "read-only"],
+                + [
+                    "--worktree",
+                    "--branch",
+                    "feat",
+                    "--strategy",
+                    "full",
+                    "--depth",
+                    "2",
+                    "--sandbox",
+                    "read-only",
+                    "--context-delivery",
+                    "hook",
+                ],
             )
 
         assert result.exit_code == 0
@@ -172,6 +200,7 @@ class TestStartCodexDispatch:
         assert kwargs["sandbox"] == "read-only"
         assert kwargs["worktree"] is True
         assert kwargs["branch"] == "feat"
+        assert kwargs["context_delivery"] == "hook"
 
     def test_exit_code_propagates(self, runner: CliRunner, project: Path) -> None:
         with (
@@ -207,6 +236,38 @@ class TestResumeCodexDispatch:
             result = runner.invoke(main, ["session", "resume", "impl", "--task", "next step"])
 
         assert result.exit_code == 0
+        resume.assert_called_once_with(name="impl", task="next step", sandbox="workspace-write")
+
+    def test_dispatch_with_task_falls_back_to_global_codex_session_from_other_project(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        codex_project = tmp_path / "codex-project"
+        other_project = tmp_path / "other-project"
+        for project_root in (codex_project, other_project):
+            (project_root / ".git").mkdir(parents=True)
+            (project_root / ".forge").mkdir()
+
+        state = create_session_state("impl", worktree_path=str(codex_project), runtime="codex")
+        state.forge_root = str(codex_project)
+        state.confirmed.codex = CodexConfirmed(thread_id=_TID)
+        SessionStore(str(codex_project), "impl").write(state)
+        IndexStore().add_session(
+            name="impl",
+            worktree_path=str(codex_project),
+            project_root=str(codex_project),
+            forge_root=str(codex_project),
+            checkout_root=str(codex_project),
+            relative_path=".",
+            is_incognito=False,
+            is_fork=False,
+            parent_session="planner",
+        )
+
+        monkeypatch.chdir(other_project)
+        with patch("forge.cli.session_codex.resume_codex_session", return_value=0) as resume:
+            result = runner.invoke(main, ["session", "resume", "impl", "--task", "next step"])
+
+        assert result.exit_code == 0, result.output
         resume.assert_called_once_with(name="impl", task="next step", sandbox="workspace-write")
 
     def test_exit_code_propagates(self, runner: CliRunner, tmp_path: Path) -> None:
@@ -333,6 +394,48 @@ class TestCodexCliRendering:
         out = capsys.readouterr().out
         assert "Codex turn failed." in out and "boom" in out
         assert "Tip:" not in out  # no resume tip without a usable thread
+
+    def test_start_hook_undelivered_exits_one_with_tip(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """The handoff is the point of the command: a successful codex turn that ran
+        WITHOUT the parent context still fails loud (session kept, fact recorded)."""
+        result = _start_result(context_delivery="hook_undelivered")
+        with patch("forge.cli.session_codex.start_codex_session", return_value=result):
+            code = launch_codex_session(
+                name="impl",
+                parent="planner",
+                task="t",
+                strategy="ai-curated",
+                depth=1,
+                sandbox="workspace-write",
+                worktree=False,
+                branch=None,
+                context_delivery="hook",
+            )
+
+        assert code == 1
+        out = capsys.readouterr().out
+        assert "did not deliver the transfer context" in out
+        assert "hook_undelivered" in out
+        assert "Tip:" in out and "forge session delete impl" in out
+
+    def test_start_hook_delivered_renders_delivery_line(self, capsys: pytest.CaptureFixture[str]) -> None:
+        result = _start_result(context_delivery="session_start_hook")
+        with patch("forge.cli.session_codex.start_codex_session", return_value=result):
+            code = launch_codex_session(
+                name="impl",
+                parent="planner",
+                task="t",
+                strategy="ai-curated",
+                depth=1,
+                sandbox="workspace-write",
+                worktree=False,
+                branch=None,
+                context_delivery="hook",
+            )
+
+        assert code == 0
+        out = capsys.readouterr().out
+        assert "Context delivery: SessionStart hook" in out
 
     def test_resume_success_render(self, capsys: pytest.CaptureFixture[str]) -> None:
         result = CodexSessionResumeResult(

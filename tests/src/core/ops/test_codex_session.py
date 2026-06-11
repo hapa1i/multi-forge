@@ -10,7 +10,7 @@ test a clean index + usage ledger. The real-codex stack is covered in
 from __future__ import annotations
 
 import json
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
@@ -27,9 +27,15 @@ from forge.core.ops.codex_session import (
 )
 from forge.core.ops.context import ExecutionContext
 from forge.core.ops.session import ForgeOpError
-from forge.core.runtime.codex_preflight import CodexPreflight
+from forge.core.runtime.codex_preflight import CodexPreflight, HookSeam
 from forge.core.usage.ledger import read_usage_events
 from forge.session import IndexStore, SessionManager, SessionNotFoundError, SessionStore
+from forge.session.codex_handoff import (
+    consume_pending_context,
+    pending_context_path,
+    receipt_path,
+    stage_pending_context,
+)
 from forge.session.models import CodexConfirmed, create_session_state
 
 _FIXTURES = Path(__file__).resolve().parents[3] / "fixtures" / "codex"
@@ -152,13 +158,18 @@ class _CodexCapture:
 
 
 @contextmanager
-def _codex_mocks(stdout: str = _SUCCESS_STREAM, returncode: int = 0) -> Generator[_CodexCapture]:
+def _codex_mocks(
+    stdout: str = _SUCCESS_STREAM,
+    returncode: int = 0,
+    on_codex_spawn: Callable[[], None] | None = None,
+) -> Generator[_CodexCapture]:
     """Standard hermetic mocks: preflight, curation LLM, codex subprocess.
 
     The Popen patch is GLOBAL (``_lifecycle.subprocess`` is the shared module), and
     the real SessionManager shells out to git during start_session -- so the mock
     routes by argv: ``codex`` gets the fixture replay, everything else gets the real
-    Popen.
+    Popen. ``on_codex_spawn`` runs when the codex turn starts -- hook-delivery tests
+    use it to play the enrolled SessionStart hook (consume the staged handoff).
     """
     import subprocess as _subprocess
 
@@ -167,6 +178,8 @@ def _codex_mocks(stdout: str = _SUCCESS_STREAM, returncode: int = 0) -> Generato
 
     def _route(argv: Any, *args: Any, **kwargs: Any) -> Any:
         if argv and argv[0] == "codex":
+            if on_codex_spawn is not None:
+                on_codex_spawn()
             return codex_proc
         return real_popen(argv, *args, **kwargs)
 
@@ -329,6 +342,152 @@ class TestStartCodexSession:
         assert state.confirmed.codex is not None
         assert state.confirmed.codex.rollout_path is None
         assert state.confirmed.codex.rollout_source is None
+
+
+# The success stream minus thread.started: the recovery path's fixture.
+_NO_THREAD_STREAM = "\n".join(_SUCCESS_STREAM.splitlines()[1:])
+
+
+def _session_dir(proj: Path, name: str = "impl") -> Path:
+    return SessionStore(str(proj), name).session_dir
+
+
+class TestStartCodexHookDelivery:
+    """--context-delivery hook: staging, receipt reconciliation, and the seam guard."""
+
+    def _enrolled_hook(
+        self,
+        proj: Path,
+        *,
+        session_id: str = _SUCCESS_TID,
+        transcript_path: str | None = None,
+    ) -> Callable[[], None]:
+        """Play the trust-enrolled codex-session-start hook at codex-spawn time."""
+
+        def _consume() -> None:
+            content = consume_pending_context(
+                _session_dir(proj),
+                session_id=session_id,
+                transcript_path=transcript_path,
+                source="startup",
+            )
+            assert content is not None and content.startswith("# Handoff context")
+
+        return _consume
+
+    def test_delivered_records_fact_and_receipt_rollout(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        proj, ctx = _make_project(tmp_path, monkeypatch)
+        rollout = f"/codex-home/sessions/rollout-x-{_SUCCESS_TID}.jsonl"
+
+        with _codex_mocks(on_codex_spawn=self._enrolled_hook(proj, transcript_path=rollout)) as codex:
+            result = start_codex_session(
+                ctx=ctx, name="impl", parent="planner", task="Build it", context_delivery="hook"
+            )
+
+        assert result.context_delivery == "session_start_hook"
+        assert result.rollout_path == rollout
+        assert result.thread_id == _SUCCESS_TID
+        # The prompt carried ONLY the raw task -- the hook delivered the context.
+        assert codex.stdin == "Build it"
+
+        state = SessionManager().get_session("impl", forge_root=str(proj))
+        assert state.confirmed.codex is not None
+        assert state.confirmed.codex.context_delivery == "session_start_hook"
+        assert state.confirmed.codex.rollout_path == rollout
+        assert state.confirmed.codex.rollout_source == "session_start_hook"
+        # One-shot: nothing staged survives the start turn.
+        assert not pending_context_path(_session_dir(proj)).exists()
+
+    def test_not_fired_keeps_session_and_records_undelivered(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        proj, ctx = _make_project(tmp_path, monkeypatch)
+
+        with _codex_mocks() as codex:  # no hook plays: the staged file is never consumed
+            result = start_codex_session(
+                ctx=ctx, name="impl", parent="planner", task="Build it", context_delivery="hook"
+            )
+
+        assert result.context_delivery == "hook_undelivered"
+        assert codex.stdin == "Build it"  # the turn ran context-less
+        state = SessionManager().get_session("impl", forge_root=str(proj))
+        assert state.confirmed.codex is not None
+        assert state.confirmed.codex.context_delivery == "hook_undelivered"
+        # One-shot invariant: reconciliation cleared the undelivered staging.
+        assert not pending_context_path(_session_dir(proj)).exists()
+        assert not receipt_path(_session_dir(proj)).exists()
+
+    def test_mismatched_receipt_is_undelivered_with_warning(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        proj, ctx = _make_project(tmp_path, monkeypatch)
+
+        with _codex_mocks(on_codex_spawn=self._enrolled_hook(proj, session_id="not-this-thread")):
+            result = start_codex_session(
+                ctx=ctx, name="impl", parent="planner", task="Build it", context_delivery="hook"
+            )
+
+        assert result.context_delivery == "hook_undelivered"
+        assert any("does not match" in w for w in result.warnings)
+        state = SessionManager().get_session("impl", forge_root=str(proj))
+        assert state.confirmed.codex is not None
+        assert state.confirmed.codex.context_delivery == "hook_undelivered"
+
+    def test_thread_id_recovered_from_receipt_when_stream_missed_it(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The stream missed thread.started but the hook receipt carries the thread:
+        the session must stay resumable (manifest thread_id recovered)."""
+        proj, ctx = _make_project(tmp_path, monkeypatch)
+        rollout = f"/codex-home/sessions/rollout-x-{_SUCCESS_TID}.jsonl"
+
+        with _codex_mocks(
+            stdout=_NO_THREAD_STREAM,
+            on_codex_spawn=self._enrolled_hook(proj, transcript_path=rollout),
+        ):
+            result = start_codex_session(
+                ctx=ctx, name="impl", parent="planner", task="Build it", context_delivery="hook"
+            )
+
+        assert result.thread_id == _SUCCESS_TID
+        assert result.context_delivery == "session_start_hook"
+        assert any("recovered" in w for w in result.warnings)
+        assert not any("cannot be resumed" in w for w in result.warnings)
+        state = SessionManager().get_session("impl", forge_root=str(proj))
+        assert state.confirmed.codex is not None
+        assert state.confirmed.codex.thread_id == _SUCCESS_TID
+        assert state.confirmed.codex.rollout_path == rollout
+
+    @pytest.mark.parametrize("seam", ["disabled", "unknown", "managed_suppressed", "untrusted"])
+    def test_pre_turn_guard_rejects_hook_incapable_seams(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, seam: HookSeam
+    ) -> None:
+        from dataclasses import replace
+
+        proj, ctx = _make_project(tmp_path, monkeypatch)
+        incapable = replace(_preflight(), hook_seam=seam)
+
+        with patch("forge.core.ops.codex_session.assert_codex_ready", return_value=incapable):
+            with pytest.raises(ForgeOpError, match="hook-capable"):
+                start_codex_session(ctx=ctx, name="impl", parent="planner", task="t", context_delivery="hook")
+
+        assert not SessionStore(str(proj), "impl").exists()
+
+    def test_default_mode_records_initial_message_and_stages_nothing(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        proj, ctx = _make_project(tmp_path, monkeypatch)
+
+        with _codex_mocks() as codex:
+            result = start_codex_session(ctx=ctx, name="impl", parent="planner", task="Build it")
+
+        assert result.context_delivery == "initial_message"
+        assert codex.stdin.startswith("# Handoff context")  # transfer rode the prompt
+        state = SessionManager().get_session("impl", forge_root=str(proj))
+        assert state.confirmed.codex is not None
+        assert state.confirmed.codex.context_delivery == "initial_message"
+        assert not pending_context_path(_session_dir(proj)).exists()
+        assert not receipt_path(_session_dir(proj)).exists()
 
 
 def _init_git_repo(repo: Path) -> None:
@@ -507,6 +666,28 @@ class TestContinueCodexSession:
         assert codex.call.kwargs["cwd"] == str(proj)
         assert codex.stdin == "Keep going"
 
+    def test_resume_falls_back_to_global_lookup_from_other_forge_project(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        proj, _ = _make_project(tmp_path, monkeypatch)
+        _seed_codex_session(proj)
+        other_project = tmp_path / "other-project"
+        (other_project / ".git").mkdir(parents=True)
+        (other_project / ".forge").mkdir()
+        invocation_ctx = ExecutionContext(
+            cwd=other_project,
+            worktree_root=other_project,
+            project_root=other_project,
+            forge_root=other_project,
+        )
+
+        with _codex_mocks() as codex:
+            result = continue_codex_session(ctx=invocation_ctx, name="impl", task="Keep going")
+
+        assert isinstance(result, CodexSessionResumeResult)
+        assert codex.argv[-2:] == ["resume", _SUCCESS_TID]
+        assert codex.call.kwargs["cwd"] == str(proj)
+
     def test_resume_refreshes_confirmed_codex(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         proj, ctx = _make_project(tmp_path, monkeypatch)
         _seed_codex_session(proj)
@@ -546,6 +727,19 @@ class TestContinueCodexSession:
         assert refreshed.auth_method == "api_key"
         assert refreshed.auth_source == "env"
         assert refreshed.billing_mode == "api"
+
+    def test_resume_clears_stale_staged_handoff(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """One-shot defensively: a staged handoff that survived the start turn (crash
+        window) must be cleared BEFORE the resume turn, never late-delivered."""
+        proj, ctx = _make_project(tmp_path, monkeypatch)
+        _seed_codex_session(proj)
+        stage_pending_context(_session_dir(proj), "# Handoff context\n\nstale\n")
+
+        with _codex_mocks():
+            result = continue_codex_session(ctx=ctx, name="impl", task="Keep going")
+
+        assert not pending_context_path(_session_dir(proj)).exists()
+        assert any("stale staged handoff" in w for w in result.warnings)
 
     def test_claude_session_rejected(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         _, ctx = _make_project(tmp_path, monkeypatch)

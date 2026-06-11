@@ -15,12 +15,15 @@ from typing import Any
 
 import click
 
-from forge.cli.output import print_tip
+from forge.cli.output import print_error_with_tip, print_tip
 from forge.cli.session import console
 from forge.core.invoker.codex import CodexSandbox
 from forge.core.ops.codex_session import (
+    CONTEXT_DELIVERY_HOOK,
+    CONTEXT_DELIVERY_UNDELIVERED,
     CodexSessionResumeResult,
     CodexSessionStartResult,
+    ContextDeliveryMode,
     continue_codex_session,
     start_codex_session,
 )
@@ -75,6 +78,19 @@ def codex_start_options(f: Callable[..., Any]) -> Callable[..., Any]:
             type=click.Choice(["read-only", "workspace-write", "danger-full-access"]),
             default=None,
             help="Codex sandbox mode (requires --runtime codex; default: workspace-write)",
+        ),
+        # Click default stays None: reject_codex_flags_for_claude rejects any non-None
+        # codex-only value on the Claude path, so the real default resolves below.
+        click.option(
+            "--context-delivery",
+            "context_delivery",
+            type=click.Choice(["initial-message", "hook"]),
+            default=None,
+            help=(
+                "Transfer delivery for the first Codex turn (requires --runtime codex; "
+                "default: initial-message). 'hook' needs a trust-enrolled "
+                "codex-session-start hook."
+            ),
         ),
     ]
     for option in reversed(options):
@@ -158,6 +174,7 @@ def run_codex_start(ctx: click.Context) -> int:
         sandbox=p["sandbox"] or "workspace-write",
         worktree=p["worktree"],
         branch=p["branch"],
+        context_delivery=p["context_delivery"] or "initial-message",
     )
 
 
@@ -169,6 +186,7 @@ def reject_codex_flags_for_claude(params: dict[str, Any]) -> int | None:
         ("transfer_strategy", "--strategy"),
         ("depth", "--depth"),
         ("sandbox", "--sandbox"),
+        ("context_delivery", "--context-delivery"),
     ]:
         if params[key] is not None:
             console.print(f"[red]Error:[/red] {codex_flag} requires --runtime codex")
@@ -218,6 +236,7 @@ def launch_codex_session(
     sandbox: CodexSandbox,
     worktree: bool,
     branch: str | None,
+    context_delivery: ContextDeliveryMode = "initial-message",
 ) -> int:
     """Run ``forge session start --runtime codex``; returns the process exit code."""
     try:
@@ -231,12 +250,25 @@ def launch_codex_session(
             sandbox=sandbox,
             create_worktree=worktree,
             branch=branch,
+            context_delivery=context_delivery,
         )
     except ForgeOpError as e:
         console.print(f"[red]Error:[/red] {e}")
         return 1
 
     _render_start(result)
+    if result.context_delivery == CONTEXT_DELIVERY_UNDELIVERED:
+        # The turn ran WITHOUT the parent context -- the handoff failed even if the
+        # codex turn itself succeeded. Fail loud (the session is kept).
+        print_error_with_tip(
+            f"The SessionStart hook did not deliver the transfer context; the first turn ran without it "
+            f"(recorded context_delivery=hook_undelivered on '{result.session}').",
+            "Enroll the hook (one-time 'codex' trust ceremony in this project), or delete and retry "
+            "with the default delivery:",
+            commands=[f"forge session delete {result.session}"],
+            console=console,
+        )
+        return 1
     return result.codex.returncode if not result.codex.success else 0
 
 
@@ -263,6 +295,8 @@ def _render_start(result: CodexSessionStartResult) -> None:
     if result.worktree_path:
         console.print(f"[dim]Worktree: {result.worktree_path}[/dim]")
     console.print(f"[dim]Transfer: {result.transfer_path}[/dim]")
+    if result.context_delivery == CONTEXT_DELIVERY_HOOK:
+        console.print("[dim]Context delivery: SessionStart hook (receipt reconciled)[/dim]")
     if result.thread_id:
         console.print(f"[dim]Thread: {result.thread_id}[/dim]")
     _render_codex_outcome(result.codex.stdout, result.codex.success, result.codex.stderr)

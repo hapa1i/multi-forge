@@ -27,6 +27,66 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-11
 
+### codex_frontend Phase 4: SessionStart transfer delivery with initial-message fallback
+
+**Goal**: Ship the post-enrollment upgrade the 30e probe unlocked -- deliver the curated transfer to a Codex session via
+a trust-enrolled SessionStart hook (`additionalContext`) instead of the initial `codex exec` prompt, with
+initial-message staying the zero-setup default. The central constraint shaped the design: enrollment is unverifiable
+pre-turn (the `trusted_hash` is not computable), so hook mode = explicit opt-in + staged file + post-turn receipt
+reconciliation. **Scope (user decisions)**: `--context-delivery {initial-message,hook}` flag shape; hook-undelivered
+fails loud (exit 1, session kept); handler-only like Phase 3 (manual registration + ceremony until the Phase 6
+installer).
+
+**Key changes**:
+
+- **Staging module** (`session/codex_handoff.py`, new): `pending-context.md` + `context-receipt.json` under
+  `<session_dir>/codex/` (GC/delete free via the session dir; pinned anyway). `consume_pending_context` writes the
+  receipt BEFORE unlinking (a delivered-but-unreceipted turn would read `hook_undelivered` dishonestly); a failed
+  receipt write deliberately delivers nothing. `compose_codex_initial_message` split into
+  `compose_codex_handoff_context` + task suffix -- the default path is golden-pinned byte-identical (golden added before
+  the refactor).
+- **Handler** (`forge hook codex-session-start`, new `cli/hooks/codex_transfer.py`): resolves the session via
+  FORGE_SESSION + payload-cwd rooting (the Phase 3 rule), consumes the staged file, emits the probe-pinned strict
+  one-line `{"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": ...}}` (Codex fails OPEN on
+  malformed output). Never reads the manifest -- the receipt is its only write, so `confirmed.codex` stays CLI-owned
+  (design.md §3.5). Every non-delivery path (no session, nothing staged = resume turns, malformed stdin) is a silent
+  exit-0 no-op with NO output -- diagnostics log at debug to the hooks log (review fix: two stderr prints would have
+  made every non-Forge Codex session under a user-scope registration emit Forge noise). The command name is
+  trust-durable (renaming breaks `trusted_hash` enrollment).
+- **Bridge/op wiring**: `bridge_session_to_codex(staged_context_path=)` stages the framed body and sends the raw task as
+  the prompt; `_temporary_run_env` now also scopes `FORGE_FORGE_ROOT` (the CHILD's forge_root -- worktree sessions'
+  manifests aren't findable from payload cwd alone, benefits both codex hooks). `start_codex_session` gained
+  `context_delivery` + a pre-turn guard (knowable-negative seams `disabled|unknown|managed_suppressed|untrusted` fail
+  before any state; `enrollment_gated` proceeds). `_reconcile_hook_delivery` post-turn: receipt matching the stream
+  thread -> `session_start_hook` (receipt `transcript_path` supersedes glob as `rollout_source="session_start_hook"`,
+  cross-checked with a warning); receipt present when the stream missed `thread.started` -> **recovers**
+  `thread_id = receipt.session_id` (otherwise-unresumable session stays resumable); absent/mismatched ->
+  `hook_undelivered` + staged file cleared (one-shot: an enrolled resume can never late-deliver stale context; resume
+  also defensively clears).
+- **CLI**: `--context-delivery` Choice with Click default `None` (a real default would trip
+  `reject_codex_flags_for_claude` on every plain Claude start -- regression-pinned), resolved to initial-message in
+  `run_codex_start`; undelivered render prints `print_error_with_tip` (ceremony / delete-and-retry) and exits 1 even
+  when the codex turn succeeded. `CodexConfirmed.context_delivery` (additive).
+- **Docs**: design.md §3.9 (delivery contract; the stale "hook delivery deferred to Phase 6" claim removed at the code
+  slice that falsified it) + §3.5 (receipt note); end-user hook.md (`codex-session-start` section with the probe-pinned
+  NESTED registration TOML + trust-durable-name warning), session.md + transfer.md (flag, default, failure semantics);
+  probe README "stage 86" operator-gated note (enrolled E2E incl. the unprobed multi-KB additionalContext size).
+- **File-size compliance** (commit-hook limits): `cli/session_model_pin.py` split out of `session_lifecycle.py` (the
+  --model pin validate/apply/persist helpers; same pattern as the original session.py split), design.md §3.9 verbosity
+  trims (content-preserving), and the 2026-06-05 change_log block compacted per the board-contract size policy.
+
+**Verification**: 60+ new unit cases -- `test_codex_handoff.py` (16: roundtrip/one-shot/receipt-failure),
+`test_codex_session_start.py` (10: delivery, strict-wire key sets, payload-cwd rooting, 7 silent no-ops asserting empty
+stdout AND stderr, incl. consume-failure fail-open), `test_codex_bridge.py` (+7: golden, staging-at-Popen-time, env
+restore), `test_codex_session.py` (+8: hook-mode matrix incl. thread-id recovery + per-seam guard),
+`test_session_codex.py` (+5 incl. the plain-Claude-start None-default regression), `test_gc.py` (+1 handoff-files
+pinning); full blast radius 1270 ops/session/CLI tests green; mypy clean on all of `src/forge/`. Docker:
+`test_policy_hooks.py` 21/21 (4 new `TestCodexSessionStartDocker` cases through the real wheel CLI, incl. the
+no-FORGE_SESSION user-scope silence case; 17 pre-existing unchanged).
+
+**Deferred**: the real-codex enrolled-hook E2E is operator-gated (stage 86, with stage 85); additionalContext payload
+size beyond the 30e short token is unprobed until that round.
+
 ### codex_frontend Phase 3 follow-up: blocked actions no longer persist policy state
 
 **Goal**: Fix four Phase 3 review findings, chiefly that both hook commands persisted engine-collected policy state
@@ -910,229 +970,69 @@ tombstone forms smoke-tested; `make pre-commit` clean. Integration: the renamed-
 Docker); `test_audit_plumbing.py` is comment-only (optional re-run before merge). Card stays in `doing/` — awaiting
 merge to `main` for the `doing/ → done/` lane move.
 
-## 2026-06-05
+## 2026-06-05 (compacted)
 
-### Phase 5: Headless runtime reporters (metric-evidence-simplification)
+Condensed per the board-contract size policy (decisions, breaking changes, and verification preserved; full detail in
+git history). The metric-evidence-simplification card shipped here: Forge never invents metric figures -- every dollar
+is reported-or-unavailable with recorded provenance.
 
-**Goal**: Close the cost-honesty gap on the headless `claude -p` path — let the Claude runtime self-report cost/usage
-(closing today's `unavailable` on direct verbs) without ever estimating, while a proxied run keeps the proxy figure
-authoritative; surface Forge's additional headless spend as the opt-in `forge +$Y` status-line segment. Claude-only
-(Codex deferred to `runtime_abstraction`).
+### Phase 5: Headless runtime reporters
 
-**Key changes**:
+- **5a spike decision (GO)**: `claude -p --output-format json` (2.1.165) emits a JSON **array** with cost/usage in the
+  terminal `result` element, not the documented single object. Capability guard = retry-once-and-latch (no version
+  probe).
+- Shared `core/reactive/headless_json.py` envelope unwrap on both runners (`run_claude_session` +
+  `ClaudeHeadlessInvoker`); every text consumer byte-for-byte unchanged.
+- Cost precedence: exactly **one** reporter per run -- proxied -> `forge_proxy` (snapshot tokens; self-cost ignored, no
+  double-count); direct -> `claude_code`/`runtime_native` or tokens-only/`unavailable`.
+- Opt-in `forge +$Y` status segment (`sum_forge_added_cost` excludes `route=claude_interactive`; `forge_cost_ttl`
+  throttle keyed on Forge identity, caches a legit 0).
+- Review follow-ups: proxied token-only snapshots read `verb_snapshot_estimated` not `unattributed`; the JSON-flag retry
+  is a tracked Popen (terminable under cancellation); the team supervisor is instrumented like the semantic one.
+- Verification: 5287 unit; 6 real-Claude Docker tests on 2.1.165 (run -> envelope -> emit -> ledger e2e). Pinned
+  follow-up: `usd_to_micros` vs proxy `round()` diverge at most 1 micro at half-micro fractions (separate planes).
 
-- **5a spike (hard gate)** settled an undocumented contract: `claude -p --output-format json` (2.1.165) emits a JSON
-  **array** with cost/usage in the terminal `result` element, not the documented single object. DECISION: GO (broad,
-  direct). Capability guard = **retry-once-and-latch** (no version probe). Verdicts encoded as named constants.
-- **Envelope unwrap (5b)**: shared `core/reactive/headless_json.py` (latch, `prepare_json_argv`, `usd_to_micros`) +
-  `parse_headless_envelope` (never raises; array/object/stream-json/raw-text). Both runners (`run_claude_session` +
-  `ClaudeHeadlessInvoker`) inject the flag through the shared helper, retry once on rejection, and unwrap `.result` into
-  `.stdout` so every text consumer (supervisor/memory-writer/curation) is byte-for-byte unchanged.
-- **Cost precedence (5c)**: exactly **one** reporter per run — proxied → `forge_proxy`/`verb_snapshot_estimated`
-  (snapshot tokens; Anthropic-priced self-cost ignored, no double-count); direct → `claude_code`/`runtime_native`
-  (self-cost) or `provider_usage_exact`/`unavailable` (tokens-only). Tokens follow the cost source (no mixed
-  provenance). First emission of `claude_code` + `runtime_native`. Same precedence per-worker.
-- **`forge +$Y` (5d)**: opt-in `forge_cost` segment; `sum_forge_added_cost` sums reported cost **excluding
-  `route=claude_interactive`** (the card's no-blend rule); time-only `read_or_compute_session_cost` throttle (keyed on
-  Forge identity not the Claude UUID, caches a legit 0, fail-open uncached); `forge_cost_ttl` config (default 10).
-- **Docs (5f)**: `design.md` §3.14, `design_appendix.md` §A.13 + §A.8, `vocabulary.py`/`ledger.py` comments synced;
-  corrected a stale `inferred`→`reported` left from Phase 2.
-- **Review follow-ups**: (1) proxied token-only snapshots now read `verb_snapshot_estimated`, not `unattributed` (a
-  token-carrying event must not claim "no figure"); (2) the `run_parallel` JSON-flag retry is now a tracked `Popen` (own
-  process group, registered in `children`) so it stays terminable under cancellation; (3) the **team supervisor**
-  (`policy/team/handlers.py`) is now instrumented (mirrors the semantic supervisor; emits before the success gate so
-  failures are attributed); (4) `docs/end-user/config.md` gains `forge_cost`/`forge_cost_ttl`; (5) the spike's
-  `reproduce.sh` detects `timeout`/`gtimeout` (macOS portability); (6) name-scoped ledger aggregation documented as a
-  known limitation.
+### Phase 4: Status-line honesty
 
-**Verification**: 5287 unit tests pass (13 new/extended files: envelope parse, unwrap, token-only, json-flag-compat on
-**both** runners, is_error→status, `usd_to_micros` parity, verb+worker precedence (incl. proxied token-only),
-`sum_forge_added_cost`, statusline + session-cost throttle, team-supervisor attribution). **6 real-Claude Docker tests
-pass on 2.1.165** (98s) — the 5a verdict and the full self-report pipeline (run → envelope → emit → ledger) confirmed
-end-to-end; updated memory/workers assertions (direct verb/worker now `runtime_native`). `make pre-commit` clean
-(ruff/black/isort/mypy/pyright/mdformat/gitleaks). Follow-up (non-blocking): `usd_to_micros` vs the proxy `round()`
-diverge ≤1 micro at half-micro fractions only (separate planes), pinned by test.
+- Billing `auto` renders `ambiguous` -- never infers `api` from `ANTHROPIC_API_KEY` presence (golden `$0.42`->`≈$0.42`).
+- `interactive_anthropic_api_key: inherit|omit` applied LAST in the interactive wrapper so the recorded `source` matches
+  the child; sidecar omit via `FORGE_OMIT_INTERACTIVE_KEY=1` after the in-container proxy captured its credential.
+- Additive `confirmed.launch` (`LaunchConfirmed`) recorded from start/resume/fork/sidecar; opt-in `launch` segment
+  renders `<route>/key:<posture>`.
+- Verification: 2991 unit blast radius; `test_status_line_integration.py` (13) + `test_sidecar_omit.py` (`/proc` proof
+  Claude lacks the key while the proxy keeps it).
 
-### Phase 4: Status-line honesty (metric-evidence-simplification)
+### Phase 2 (+2 follow-ups): Cost source replacement -- Forge is not a cost oracle
 
-**Goal**: Make the status line honest about billing and add the user control the auth/cost audit demands — never infer
-an API payer from key presence, record + show how a session reached the model, and let users keep a key out of
-interactive sessions.
+- Proxy cost is **reported-or-unavailable**: `cost_usd` carriers on `CompletionResponse` + `StreamEvent`; OpenRouter
+  body `usage.cost`; LiteLLM `x-litellm-response-cost` header via `with_raw_response`; unreported -> `cost_micros=None`
+  / `confidence="unavailable"` (tokens still logged). The price catalog is **deleted** (`pricing.py`/`pricing.yaml` +
+  tests) so it cannot re-enter the accounting path.
+- **Breaking (research-preview)**: cost-record `estimated`/`pricing_source` -> `reporter`+`confidence`
+  (`COST_SCHEMA_VERSION` stays 1; legacy records read with defaults). Spend caps fire only for cost-reporting routes
+  (Anthropic-passthrough + LiteLLM-streaming dollar caps become no-ops; tokens still tracked).
+- Follow-ups: verb display gates on `cost_measured` evidence, not a numeric total (no unknown-as-zero); remaining
+  "estimated" dollar-cost doc language aligned to reported-or-unavailable; the panel cost canary failure was a **test
+  bug** (`DEFAULT_MODELS` vs `AVAILABLE_MODELS` monkeypatch) -- cost-visibility matrix 5/5 on real wire.
+- Verification: 5531 unit+regression; real-wire matrix confirmed with the catalog removed, incl. the documented
+  LiteLLM-streaming `unavailable` gap.
 
-**Key changes**:
+### Phase 3: Remove `cap_mode` & strict pre-flight
 
-- **Bug #1 (billing honesty)**: `RenderContext.billing_mode` `auto` returns `ambiguous` instead of inferring `api` from
-  `ANTHROPIC_API_KEY`; `format_billing_cost` already shows quota-if-`rate_limits`-else-`≈$`. Golden `$0.42`→`≈$0.42`;
-  the old divergence test became a key-invariance test. Removed the now-dead `RenderContext.has_api_key`.
-- **G4 (env omit)**: flat `interactive_anthropic_api_key: inherit|omit` on `RuntimeConfig`; one source-aware
-  `apply_interactive_api_key`/`compute_interactive_api_key_decision` (env.py) over new
-  `resolve_env_or_credential_with_source` (template_secrets.py). Applied LAST via the interactive wrapper in `invoke.py`
-  (after extra_vars/unset), so it's authoritative and the recorded `source` matches the child. Headless callers
-  untouched.
-- **Sidecar omit**: `session_lifecycle` sets `FORGE_OMIT_INTERACTIVE_KEY=1`; `docker/entrypoint.sh` unsets the key for
-  Claude *after* the in-container proxy captured its upstream credential (works for anthropic-upstream templates).
-- **G3 (launch metadata)**: additive `LaunchConfirmed` under `confirmed.launch` (models.py); centralized best-effort
-  `record_launch_confirmed` called from start/resume + host fork closures (session_fork.py) + sidecar.
-- **Visible `launch` segment**: opt-in (off by default) `format_launch`/`_produce_launch` renders
-  `<route>·key:<posture>`.
-- **Deferred**: `forge +$Y` Forge-additional-cost segment → Phase 5 (sparse until headless reporters report cost).
-- **Docs**: design_appendix §A.7/§A.8 + end-user config.md/authentication.md (new key, corrected `cost_mode=auto`).
+- `cap_mode` removed and the strict pre-flight estimate deleted (the cap path's cost-oracle pattern); post-event
+  enforcement is the only behavior. Stale `cap_mode:` keys are rejected with an explicit tombstone at config-parse and
+  `forge proxy set`. **Reset**: remove the `cap_mode:` line from `proxy.yaml`.
+- Verification: 924 proxy/config/regression tests + a removed-key regression file; 3/4 cost-visibility e2e (the 4th was
+  the pre-existing canary test bug fixed above).
 
-**Verification**: Focused unit suites + full blast-radius sweep (2991 passed); `make pre-commit` clean
-(ruff/black/isort/mypy/pyright/mdformat/gitleaks); integration `test_status_line_integration.py` (13, incl. real-CLI
-launch-metadata + omit recording) and `test_sidecar_omit.py` (1, `/proc` proof Claude lacks the key while the proxy
-keeps it) green.
+### Phase 1: Metric-evidence schema & vocabulary
 
-### Phase 2 follow-up: Fix panel cost-visibility canary (wrong monkeypatch target)
-
-**Goal**: Make the panel integration test previously filed as a "pre-existing" failure
-(`test_panel_with_subprocess_proxy_records_verb_cost`) pass, so the panel verb-cost path is actually real-wire verified
-rather than left red.
-
-**Key changes**:
-
-- Root cause was a **test bug**, not a product bug. The test registered its canary model via
-  `monkeypatch.setitem(DEFAULT_MODELS, …)`, but `forge workflow panel --models <name>` resolves through
-  `resolve_model_specs`, which validates an explicit `--models` against `AVAILABLE_MODELS` (the full registry).
-  `DEFAULT_MODELS` is only the no-args fallback quorum, so the canary read as `Unknown models`. Patched it into
-  `AVAILABLE_MODELS` — the registry the resolver actually reads.
-
-**Verification**: `test_cost_visibility_e2e.py::test_panel_with_subprocess_proxy_records_verb_cost` passes on real
-OpenRouter (4.2s); cost-visibility matrix now 5/5. Diagnosis confirmed with an isolated `resolve_model_specs` repro
-(DEFAULT_MODELS patch → `Unknown models`; AVAILABLE_MODELS patch → resolves).
-
-### Phase 2 follow-up: Verb cost-evidence in `forge proxy costs` + docs sync (review fixes)
-
-**Goal**: Close two review findings on the shipped Phase 2 work — the verb display ignored the cost-evidence flag
-(reintroducing unknown-as-zero), and several proxy/request dollar-cost references still said "estimated."
-
-**Key changes**:
-
-- **Verb display now reads evidence, not a number.** `_display_by_verb` / `_output_json` gated cost-evidence on a
-  numeric `total_cost_micros` (always int, `0` for a passthrough window), so a `cost_measured=False` verb rendered
-  `reported: true, cost_micros: 0`. Added `_verb_cost_reported` (trusts `cost_measured`; legacy records fall back to
-  `total > 0`); `_scope_verb_records_to_proxy` re-derives `cost_measured` for the scoped subset from per-proxy
-  `reported_request_count`. The request display was already correct via nullable `_reported_micros`.
-- **Docs sync.** Aligned remaining "estimated" proxy/request dollar-cost language to reported-or-unavailable across
-  `auth_cost_metric.md`, the normative `design.md` / `design_appendix.md` (they contradicted the synced authority
-  table), and end-user/{proxy,config,session}.md. Preserved the attribution-snapshot sense (`estimated:true` verb field,
-  `verb_snapshot_estimated` enum, concurrency caveat) as accurate.
-
-**Verification**: `test_proxy_costs.py` +5 (reproduces `cost_measured=False` + total 0 → `reported:false`; reported-$0;
-legacy fallback; scoped recompute); 23 focused tests pass; `make pre-commit` clean (commit `b95500d`).
-
-### Phase 2: Cost source replacement — Forge is not a cost oracle (metric-evidence Slice 2)
-
-**Goal**: Stop inventing dollars from a local price table. Proxy cost is now **reported-or-unavailable**: Forge records
-the cost a route actually reported and says `unavailable` otherwise, then deletes the price catalog so it cannot
-re-enter the accounting path. Landed in three tree-green steps (1: nullable+provenance plumbing → 2: reported-cost
-capture → 3: de-catalog), Step 2 integration-verified before Step 3 removed the catalog safety net.
-
-**Key changes**:
-
-- **Reported-cost capture, full matrix.** Added a `cost_usd` carrier on `CompletionResponse` **and** `StreamEvent`
-  (review-found: streaming had no carrier). OpenRouter cost comes from the response body (`usage.cost`), extracted in
-  the shared `openai_compat` converter (covers both clients, stream + non-stream). LiteLLM-gateway cost comes from the
-  `x-litellm-response-cost` **header**, recovered by switching non-streaming chat **and** the Responses-API branch to
-  `with_raw_response.create().parse()` + `_merge_header_cost`. The proxy threads cost as an internal
-  `_reported_cost_micros` key (non-stream) / usage-chunk field (stream, parked in the SSE converter's `final_usage` like
-  `cached_tokens`), never leaked to the client.
-- **Provenance at the proxy.** `_calc_and_log_cost` stamps `reporter` + `confidence` from
-  `config.proxy.preferred_provider` (openrouter→`reported`, litellm→`gateway_calculated`); unreported →
-  `cost_micros=None` / `confidence="unavailable"`, tokens still logged, `cost_tracker.record` + metrics cost
-  accumulation skipped.
-- **Verb cost-evidence (review-found conflation fix).** `ProxyCostDelta.reported_request_count` +
-  `VerbCostResult.cost_measured` (derived from that delta, not `bool(deltas)`); `emit.py` logs `cost_micro_usd=None` /
-  `confidence="unavailable"` for a passthrough verb that moved tokens but reported no cost — never a fabricated measured
-  $0.
-- **Catalog deleted** (zero surviving callers): `core/models/pricing.py`, `core/data/pricing.yaml`, the `core/models`
-  re-exports, and `test_pricing.py` + `test_bug_pricing_fallback_logs.py`.
-- **Header evidence gate** (Step 1): `X-Request-Cost` omitted when this request's cost is null (fixes a `None/1_000_000`
-  crash); `X-Cumulative-Cost` omitted until a reported-cost event exists
-  (`reported_request_count`/`unavailable_request_count` on `ProxyMetrics`).
-
-**Breaking change / reset**: Plane-1 cost record fields `estimated:true` and `pricing_source` are **removed**, replaced
-by `reporter` + `confidence` (research-preview clean break; `COST_SCHEMA_VERSION` stays `1` — new records omit the old
-keys, legacy records read with defaults). **Spend caps now fire only for routes that report cost**:
-Anthropic-passthrough and LiteLLM-**streaming** dollar caps become no-ops (tokens still tracked). No user action
-required; existing logs read fine.
-
-**Verification**: 5531 unit+regression pass; mypy/pyright clean; `make pre-commit` clean. Real-wire integration
-(`test_cost_visibility_e2e.py`) confirmed the matrix with the catalog removed — OpenRouter `reported`
-(stream+non-stream), LiteLLM `gateway_calculated` (non-stream), LiteLLM **streaming**
-`cost_micros=None`/`confidence="unavailable"` (the documented gap: the header predates the cost and the gateway puts
-none in the final usage chunk). Design docs (§3.14, §A.9, §A.13), `auth_cost_metric.md`, and the QA `7-costs.md`
-fixtures updated to the reported/unavailable model.
-
-### Phase 3: Remove `cap_mode` & strict pre-flight (metric-evidence Slice 3)
-
-**Goal**: Collapse the proxy's two cap behaviors (`post` / `strict`) into one — post-event enforcement — by removing
-`cap_mode` and the strict pre-flight cost estimate. Strict was the cost-oracle pattern in the cap path: it priced an
-unsent request from the local catalog and blocked on that guess.
-
-**Key changes**:
-
-- **`cap_mode` removed entirely** from `CostConfig` (field + `valid_modes` validation + load). The `costs` block is
-  leniently parsed, so a stale `cap_mode:` key is rejected with an explicit tombstone in `_coerce_cost_config` rather
-  than silently ignored — verified at both config-parse and the `forge proxy set` validate-before-write path.
-- **Both strict pre-flight callsites deleted** (`server.py` passthrough + translated). With strict gone the whole
-  estimation apparatus is orphaned and removed: the `_textish_chars` / `_estimate_input_tokens` helpers, the cap-path
-  `calculate_cost` imports, `check_cap`'s `projected_cost_micros` parameter, and the always-False `CapResult.projected`
-  field + "Projected " message prefix. The local price catalog no longer touches cap enforcement (the post-flight
-  logging catalog call is separate — Phase 2). `on_cap_hit` (reject/warn) is unchanged.
-- Tests: deleted the strict-only regression file + strict unit tests; swept the removed `cap_mode=`/`projected`/old
-  `check_cap` signature out of every surviving test (the type-checker, not a hand list, was the change-detector); added
-  `tests/regression/test_bug_cap_mode_removed_key_rejected.py` (config-parse + CLI surfaces).
-- Docs (evidence-neutral — shipped, not aspirational): `design.md` §3.7, `design_appendix.md` §A.9,
-  `auth_cost_metric.md` §6, `end-user/proxy.md` (+ upgrade reset note), QA `7-costs.md`.
-
-**Breaking change + reset**: `costs.cap_mode` is removed. An existing `proxy.yaml` carrying any `cap_mode:` line
-(including the old default `post`) now refuses to load with an actionable message; remove the line. Research-preview
-clean break — no migration. **Standalone decision** (recorded once so a future session doesn't pre-date it): docs say
-caps are "enforced after each completed request, from accumulated recorded spend"; Phase 2 upgrades the wording to
-"reported route cost" and makes cost nullable.
-
-**Verification**: 924 proxy/config/regression unit tests pass + the new removed-key regression (4 cases);
-`make pre-commit` clean. Proxy integration: 3/4 cost-visibility e2e pass (request path intact after the strict removal);
-the 4th (`test_panel_with_subprocess_proxy_records_verb_cost`) is a pre-existing, unrelated failure (confirmed identical
-on clean HEAD `c7402c3` — `monkeypatch.setitem(DEFAULT_MODELS, …)` not reaching the workflow model resolver).
-
-### Phase 1: Metric-evidence schema & vocabulary pass (metric-evidence Slice 1)
-
-**Goal**: Add the card's metric-evidence vocabulary (`route`/`reporter`/`confidence`) to the usage ledger **without
-changing any accounting behavior** — the schema foundation every later phase builds on (Phase 2 reuses `Confidence` for
-cost-log provenance; Phase 4/5 reuse `route`/`reporter`).
-
-**Key changes**:
-
-- New thin `core/usage/vocabulary.py` holds three `Literal` aliases (`Route`, `Reporter`, `Confidence`) with no I/O, so
-  Phase 2's cost plane (`proxy/cost_logger.py`) can import `Confidence` without dragging in the ledger's dacite/lock
-  machinery (`proxy → core` is the clean import direction).
-- `UsageEvent` gains `route`/`reporter`/`confidence` — additive, defaulted (`confidence="unknown"`), re-exported from
-  `core/usage/__init__`. **`USAGE_SCHEMA_VERSION` stays `1` — no bump, by decision**: additive defaulted fields change
-  no meaning, require nothing, remove nothing, so a current reader loads pre- and post-change v1 records identically.
-- The 4 emitters (`emit.py`) stamp **today's** provenance honestly — catalog-derived verb cost → `inferred`;
-  structurally-no-cost routes (tagger via dummy-key LiteLLM, null-cost worker) → `unavailable`; `route` = how work
-  reached the model; `reporter` = source of the *metric* evidence (tokens and/or cost). No dollar/token/`billing_mode`
-  value changed. Phase 2 flips the `inferred` verb cost to `reported`/`gateway_calculated`; `route`/`reporter` are
-  stable across that flip.
-- **`confidence` is scoped to the event's own `cost_micro_usd`** only — orthogonal to `measurement_source` (token
-  provenance). The tagger shape `measurement_source="provider_usage_exact"` + `confidence="unavailable"` is therefore
-  not a contradiction: tokens were reported, dollars were not. A `source_refs`-joined cost record never upgrades
-  event-local `confidence`. `unavailable` (route structurally reports no cost) is distinct from `unknown` (provenance
-  never recorded; the pre-Phase-1 default), pre-declared so Phase 2 adds no enum value.
-- Docs synced for shipped fields only: `design.md` §3.14, `design_appendix.md` §A.13 (Provenance row + 3 `Literal`
-  definitions), `auth_cost_metric.md` §1 plane-3 row.
-
-**Keep-at-1 tradeoff (documented once — do NOT "fix" it with a migration)**: a concurrently-running *pre-Phase-1* reader
-hits `dacite(strict=True)` on the unknown `route` key and **drops** new records as `"malformed"` — it discards keys it
-cannot model, it does not understand them. This is expected for additive fields under strict reads and acceptable
-precisely because the usage ledger is best-effort, PID-sharded, pruned **local telemetry, not durable truth**. No reset,
-no migration path is owed.
-
-**Verification**: 58 targeted tests pass (`tests/src/core/usage/test_ledger.py` + `test_emit.py` + dependent read
-surfaces `test_usage_summary.py`/`test_usage.py` + `test_bug_usage_workflow_double_count.py`); `make pre-commit` clean.
-No integration run — pure host-side dataclass + JSONL round-trip (no Docker/`claude -p`/proxy path; contrast Phase 2/4).
+- New `core/usage/vocabulary.py` `Literal`s (`Route`/`Reporter`/`Confidence`); `UsageEvent` gains the three fields --
+  additive, defaulted; **`USAGE_SCHEMA_VERSION` stays 1 by decision**. `confidence` scopes to the event's own
+  `cost_micro_usd` only (`unavailable` = route structurally reports no cost; `unknown` = pre-Phase-1 default).
+- **Keep-at-1 tradeoff (do NOT "fix" with a migration)**: a concurrent pre-Phase-1 strict reader drops new records as
+  "malformed" -- acceptable because the usage ledger is best-effort local telemetry, not durable truth.
+- Verification: 58 targeted ledger/emit/read-surface tests.
 
 ## 2026-06-04
 

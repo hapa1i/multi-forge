@@ -186,3 +186,17 @@ CI covers its stdin-JSON CLI contract (`tests/integration/docker/test_policy_hoo
 trust ceremony, so it is operator-gated. Sketch: register `command = "forge hook codex-policy-check"` (path-stable) as a
 PreToolUse hook in the enrolled fixture, point `FORGE_SESSION` at a policy-enabled session, prompt an apply_patch into
 `src/` with no tests, and assert the patch did NOT apply.
+
+**Owed next operator round — stage 86 (enrolled SessionStart transfer delivery end-to-end).** Phase 4 shipped the
+delivery loop (`forge session start --runtime codex --context-delivery hook`: staged `pending-context.md` -> registered
+`forge hook codex-session-start` emits `additionalContext` -> receipt -> CLI reconciliation into
+`confirmed.codex.context_delivery`); CI covers the handler's stdin-JSON contract and the staged/receipt lifecycle
+(`tests/integration/docker/test_policy_hooks.py::TestCodexSessionStartDocker`) and 30e proved short-token
+additionalContext lands. The operator round verifies the composed loop on real codex: register
+`command = "forge hook codex-session-start"` (path-stable) as a SessionStart hook in the enrolled fixture, plant a
+`MAGIC-CTX`-style token in a parent session's transfer, run the one-command bridge with `--context-delivery hook`, and
+assert (a) the model echoes the token (delivery reached context), (b)
+`confirmed.codex.context_delivery == "session_start_hook"` with `rollout_source = "session_start_hook"` (receipt
+reconciled), and (c) a **realistic multi-KB transfer body** still lands — payload size is the one unprobed dimension
+(30e used a short token). Also re-confirms the bridge-scoped env loop (`FORGE_SESSION`/`FORGE_FORGE_ROOT` visible in the
+hook env; 40c2/50c pinned ambient passthrough, this pins the bridge-set values specifically).

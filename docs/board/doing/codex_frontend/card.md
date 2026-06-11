@@ -177,10 +177,17 @@ experiment harness but the E2E supersedes its one-shot run):
    and renamed to `enrollment_gated` on both the registry `HookSupport` and the preflight `HookSeam`. The
    `pretool_policy` rise shipped in the Phase 1 closeout unit (2026-06-10): `"none"` -> `"partial"` (see Deliverable 2).
 
-4. **SessionStart curated-transfer delivery with initial-message fallback (gated on probe 2's 30e leg).** Now viable for
-   BOTH the interactive frontend AND the headless bridge (enrolled homes fire headless -- the Phase 6 "headless stays
-   initial-message permanently" is softened to "initial-message is the zero-setup default; hook delivery is the
-   post-enrollment upgrade"). Build once the 30e `additionalContext` magic-token oracle passes in an enrolled home.
+4. **SessionStart curated-transfer delivery with initial-message fallback -- SHIPPED 2026-06-11 (Phase 4; see the
+   checklist + change_log entry).** The 30e gate PASSED, so this built: `--context-delivery {initial-message,hook}` on
+   `start --runtime codex` (initial-message stays the zero-setup default), `forge hook codex-session-start` (the
+   trust-durable handler; staged `pending-context.md` -> strict `additionalContext` wire JSON + a delivery receipt --
+   the hook's only write, so `confirmed.codex` stays CLI-owned), and post-turn receipt reconciliation into
+   `confirmed.codex.context_delivery` (`initial_message | session_start_hook | hook_undelivered`; an undelivered hook
+   handoff keeps the session, exits 1 with ceremony/delete-and-retry tips). The receipt also recovers `thread_id` when
+   the stream misses `thread.started` and supersedes glob rollout discovery (`rollout_source="session_start_hook"`).
+   One-shot staging: the staged file never survives the start turn; resume defensively clears. Handler-only like Phase 3
+   (manual registration + ceremony until Phase 6); the probe README owes "stage 86" (operator-gated enrolled end-to-end
+   incl. the unprobed multi-KB additionalContext size).
 
 5. **Interactive Codex frontend (unblocked 2026-06-10: interactive firing confirmed).** Forge-managed interactive
    `codex` sessions: `install_scopes` for Codex config (today `()` on the RuntimeSpec), flip

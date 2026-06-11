@@ -126,7 +126,8 @@ forge session resume [parent] --fresh \
 # Codex-runtime session (derive from a Claude parent; runs headless `codex exec` turns)
 forge session start [name] --runtime codex --resume-from <parent> --task "<first task>" \
   [--strategy minimal|structured|full|ai-curated] [--depth <n>] \
-  [--sandbox read-only|workspace-write|danger-full-access] [--worktree/-w] [--branch/-b <branch>]
+  [--sandbox read-only|workspace-write|danger-full-access] [--worktree/-w] [--branch/-b <branch>] \
+  [--context-delivery initial-message|hook]
 forge session resume <name> --task "<next task>"   # next turn on the same Codex thread
 
 # Show / list
@@ -401,6 +402,14 @@ directory; the turn always runs in the session's recorded worktree. Codex sessio
 supervision, memory, and other Claude-only flags are rejected. `--task` is required (headless turns need a prompt) and
 only valid for Codex sessions. If the first turn fails before Codex opens a thread, resume refuses with guidance —
 delete the session and start again.
+
+**Context delivery (`--context-delivery`):** `initial-message` (default) prepends the curated transfer to the first
+prompt — zero setup. `hook` delivers it via a trust-enrolled Codex `SessionStart` hook instead (`additionalContext`):
+register `forge hook codex-session-start` in your Codex config and complete the one-time trust ceremony first (see
+[hook.md](hook.md#codex-session-start-codex-sessionstart)). Enrollment can't be verified up front, so Forge checks
+delivery **after** the turn via the hook's receipt and records the outcome in the manifest
+(`confirmed.codex.context_delivery`). If the hook didn't fire, the command exits 1 — the first turn ran without the
+parent context; enroll the hook, or `forge session delete <name>` and retry with the default delivery.
 
 ```bash
 forge session fork auth-refactor --name auth-refactor-alt

@@ -350,11 +350,14 @@ To avoid writer conflicts:
   - `confirmed` bootstrap/runtime fields written by the CLI: `derivation` (resume metadata), `is_sandboxed` (updated at
     launch time to reflect whether Claude is running via sidecar), `launch` (immutable launch facts recorded once at
     start — routing mode, proxy id/base URL, and whether/how an API key was made available to the child)
-  - `confirmed.codex` for Codex-runtime sessions — `thread_id`, rollout path/source, auth posture, `last_run_at` — is
-    CLI-written like `launch`: Codex hooks only fire from trust-enrolled homes (`enrollment_gated`), so the CLI records
-    these from the `codex exec --json` stream and filesystem discovery, refreshed per turn. `confirmed.launch` stays
-    unset for Codex sessions (it documents the ANTHROPIC key posture of interactive Claude and would misread), and
-    `claude_session_id` stays `None` — which is what makes every Claude-resume predicate refuse Codex sessions.
+  - `confirmed.codex` for Codex-runtime sessions — `thread_id`, rollout path/source, auth posture, `last_run_at`,
+    `context_delivery` — is CLI-written like `launch`: Codex hooks only fire from trust-enrolled homes
+    (`enrollment_gated`), so the CLI records these from the `codex exec --json` stream and filesystem discovery,
+    refreshed per turn. Even in hook-delivery mode (§3.9), the `codex-session-start` hook's only write is a small
+    receipt file under the session directory — the CLI reconciles it into `confirmed.codex` after the turn, so the
+    manifest stays CLI-owned. `confirmed.launch` stays unset for Codex sessions (it documents the ANTHROPIC key posture
+    of interactive Claude and would misread), and `claude_session_id` stays `None` — which is what makes every
+    Claude-resume predicate refuse Codex sessions.
   - Sets `FORGE_SESSION=<session_name>` when launching Claude
   - `claude_session_id` whenever the CLI starts a **new** Claude conversation — `forge session start` and transfer/fresh
     children (`session fork`, `resume --fresh`): the CLI **pre-seeds** it (generates a UUID, writes it at creation,
@@ -581,7 +584,8 @@ Notes:
 ### 3.9 Session Resume (context management)
 
 When context nears limits, `forge session resume --fresh` creates a new session with context assembled from the parent.
-It's **two-phase**: raw artifacts stay immutable; context assembly is flexible.
+It's **two-phase**: raw artifacts stay immutable (full history for debugging and audit); context assembly is flexible —
+the same raw data serves different fidelity/size needs.
 
 **Phase 1: Capture (parent session end)**
 
@@ -608,12 +612,19 @@ The resume command supports two **resume modes** (`--resume-mode`):
 The transfer doc carries a `target_runtime` frontmatter field and a `## Runtime Hints` section (Phase 5d). `claude`
 (default) renders byte-identically to pre-5d output; `codex` relabels both (the curated body stays Claude-worded —
 curation-prompt tuning is a follow-up). Delivery is runtime-specific: Claude uses `--append-system-prompt-file`. Codex
-has **no** system-prompt-file flag, so the curated context is delivered as the **initial `codex exec` message**
-(prepended to the prompt), **not** a Codex `SessionStart`/additionalContext hook — 5a's preflight can't confirm per-hook
-trust, so hook delivery is deferred to Phase 6. Phase 5e composes the parts into the cross-runtime hop
-`bridge_session_to_codex` (`core/ops/codex_bridge.py`): a parent session -> an ai-curated Codex-targeted transfer -> the
-body prepended via `compose_codex_initial_message` -> `CodexHeadlessInvoker().run`, all under **one run tree** so the
-curation `core.llm` call and the `codex exec` run join on `root_run_id` (§3.14). It is a UI-agnostic command-core op.
+has **no** system-prompt-file flag, so by default the curated context is prepended to the **initial `codex exec`
+message** — the zero-setup path. The opt-in `--context-delivery hook` (Phase 4) instead stages the framed body at
+`<session_dir>/codex/pending-context.md`, sends only the task as the prompt, and lets a trust-enrolled
+`forge hook codex-session-start` emit the staged body as SessionStart `additionalContext` (probe 30e), consuming the
+file and writing `context-receipt.json` — the hook's **only** write. Enrollment is unverifiable pre-turn (`trusted_hash`
+not computable), so the CLI reconciles the receipt **after** the turn into CLI-written
+`confirmed.codex.context_delivery` (`initial_message | session_start_hook | hook_undelivered`); undelivered keeps the
+session, records the honest fact, and exits 1 with ceremony/delete-and-retry guidance. Staging is one-shot: the staged
+file never survives the start turn, and resume turns defensively clear leftovers. Phase 5e composed the parts into the
+cross-runtime hop `bridge_session_to_codex` (`core/ops/codex_bridge.py`): parent session -> ai-curated Codex-targeted
+transfer -> body prepended via `compose_codex_initial_message` (or staged via `compose_codex_handoff_context` in hook
+mode) -> `CodexHeadlessInvoker().run`, all under **one run tree** joining on `root_run_id` (§3.14) — a UI-agnostic
+command-core op.
 
 The one-command frontend over it is **`forge session start <name> --runtime codex --resume-from <parent> --task "…"`**
 (`core/ops/codex_session.py`, shipped with the `codex_frontend` card Phase 2): it creates a real Codex-runtime session
@@ -621,26 +632,24 @@ The one-command frontend over it is **`forge session start <name> --runtime code
 transfer snapshot by the **real session name** so `Derivation.context_file` GC-protects it (no synthetic per-run
 transfer children), runs the first `codex exec` turn, and records hook-free Codex facts into `confirmed.codex`:
 `thread_id` from the stream's `thread.started` event, the matching `$CODEX_HOME/sessions/…/rollout-*-<thread_id>.jsonl`
-discovered by thread_id (`rollout_source="discovered_by_thread_id"`), the preflight's secret-free auth posture
-(`auth_method`/`auth_source`/`billing_mode`), and `last_run_at`. `confirmed.launch` and `claude_session_id` stay unset
-(§3.5). Continuation is `forge session resume <name> --task "…"` -> `codex exec resume <thread_id>`, cross-CWD in the
-session's recorded worktree with the prompt on stdin — both the rollout-filename identity and stdin+resume recall are
-verified live by the standing E2E `tests/integration/core/test_codex_session_start.py`. A failed first turn keeps the
-session (the outcome is on the result; a turn that never reached `thread.started` leaves no `thread_id` and resume
-refuses with delete-and-retry guidance). `forge transfer regenerate <parent> --target-runtime {claude|codex}` remains
-the sessionless surface (re-stamps a cache, defaulting the runtime from the existing frontmatter so a regenerate never
-silently flips it back).
+discovered by thread_id (`rollout_source="discovered_by_thread_id"`; in hook-delivery mode the receipt's codex-reported
+`transcript_path` supersedes the glob as `rollout_source="session_start_hook"`, and the receipt can recover a
+`thread_id` the stream missed), the preflight's secret-free auth posture (`auth_method`/`auth_source`/`billing_mode`),
+`last_run_at`, and `context_delivery`. `confirmed.launch` and `claude_session_id` stay unset (§3.5). Continuation is
+`forge session resume <name> --task "…"` -> `codex exec resume <thread_id>`, cross-CWD in the session's recorded
+worktree with the prompt on stdin — rollout-filename identity and stdin+resume recall are pinned live by the standing
+E2E `tests/integration/core/test_codex_session_start.py`. A failed first turn keeps the session (a turn that never
+reached `thread.started` leaves no `thread_id`; resume refuses with delete-and-retry guidance).
+`forge transfer regenerate <parent> --target-runtime {claude|codex}` remains the sessionless surface (re-stamps a cache,
+defaulting the runtime from the existing frontmatter so a regenerate never silently flips it back).
 
 > **Why not native for worktree forks?** Claude stores sessions at `~/.claude/projects/<encoded-cwd>/`, so a bare
 > `--resume` can't cross the CWD boundary (2.1.90/2.1.158 fail "No conversation found"). **Worktree forks default to
 > transfer.** The opt-in `fork --resume-mode native-relocate` (host only) relocates the parent JSONL and resumes
 > byte-for-byte; tool paths are not rewritten. See `scripts/experiments/native-resume/`.
 
-**Transfer mode strategies** (`--resume-mode transfer`, default):
-
-```bash
-forge session resume <parent> --fresh --strategy <strategy> [--depth N]
-```
+**Transfer mode strategies** (`--resume-mode transfer`, default; selected via
+`forge session resume <parent> --fresh --strategy <strategy> [--depth N]`):
 
 | Strategy     | What child session sees                                        |
 | ------------ | -------------------------------------------------------------- |
@@ -650,45 +659,21 @@ forge session resume <parent> --fresh --strategy <strategy> [--depth N]
 | `ai-curated` | AI-selected highlights from ancestry chain                     |
 
 **Curated transfer is the primary cross-boundary substrate, not a lossy fallback.** Native resume is byte-faithful but
-works only within the same runtime and CWD, and its carried conversation is opaque — the user cannot inspect or prune
-it. Curated transfer is runtime-neutral and *user-editable*, so it is the only way to carry context across worktrees,
-projects, and (later) runtimes while letting the user shape what propagates. `structured` stays the CLI default;
-`ai-curated` emits the full schema (see [design_appendix.md §M](design_appendix.md#m-transfer-context-schema)) and is
-the substrate for genuine cross-boundary moves.
+same-runtime, same-CWD, and opaque (the user cannot inspect or prune the carried conversation); curated transfer is
+runtime-neutral and *user-editable* — the only way to carry context across worktrees, projects, and runtimes while
+shaping what propagates. `structured` stays the CLI default; `ai-curated` emits the full schema
+([design_appendix.md §M](design_appendix.md#m-transfer-context-schema)) and is the substrate for genuine cross-boundary
+moves.
 
-**Native mode** (`--resume-mode native`):
+**Native mode** (`--resume-mode native`): no context assembly; the full conversation history is carried over via
+Claude's `--fork-session`.
 
-```bash
-forge session resume <parent> --fresh --resume-mode native
-```
+**Context budget enforcement:** Resume knows the target proxy (inherited or via `--proxy`). For `full`, it **fails
+fast** before spawning Claude when the parent transcript exceeds the proxy context window, naming
+`structured`/`ai-curated` as the fix. Bounded strategies (truncation/AI selection) need no pre-flight check.
 
-No context assembly. Full conversation history carried over via Claude's `--fork-session`.
-
-**Context budget enforcement:**
-
-Resume knows the target proxy (inherited or via `--proxy`). For `full`, it **fails fast** if the parent transcript
-exceeds the proxy context window:
-
-```bash
-$ forge session resume parent-session --fresh --strategy full
-Error: Parent transcript (145K tokens) exceeds proxy context limit (128K).
-       Use --strategy structured or --strategy ai-curated instead.
-```
-
-This prevents launching a session that would immediately hit limits. The check happens **before** spawning Claude—no
-wasted tokens or mid-session failure.
-
-For `structured` and `ai-curated`, strategies are bounded (truncation/AI selection), so no pre-flight check.
-
-**Depth control:** Resume can traverse lineage, not just the immediate parent:
-
-```yaml
-depth: 1      # Immediate parent only (default)
-depth: 3      # Parent + grandparent + great-grandparent
-depth: all    # Full ancestry chain
-```
-
-This pulls relevant context from earlier sessions (e.g., a decision from 5 sessions ago).
+**Depth control:** `--depth N|all` traverses lineage beyond the immediate parent (default `1`), pulling context from
+earlier sessions in the ancestry chain.
 
 **Processed context location:**
 
@@ -713,25 +698,23 @@ older manifests.
 # In confirmed section of forge.session.json
 derivation:
   parent_session: feature-auth-v1
-  parent_forge_root: /abs/path/to/parent/forge/root   # Where to find parent artifacts
-  parent_project_root: /abs/path/to/repo               # Must match child's project_root
+  parent_forge_root: /abs/path/to/parent/forge/root
+  parent_project_root: /abs/path/to/repo
   parent_transcript: .forge/artifacts/feature-auth-v1/transcript.jsonl
-  inherited_proxy: litellm-anthropic     # From parent's proxy intent, if inherited
+  inherited_proxy: litellm-anthropic    # From parent's proxy intent, if inherited
   resume_mode: transfer                 # "native" or "transfer" (authoritative)
-  strategy: structured                  # null when resume_mode=native or transfer context not generated yet
+  strategy: structured                  # null when resume_mode=native or not generated yet
   depth: 1
   resumed_at: 2025-01-02T15:30:00Z
-  # Lineage chain (computed from parent pointers)
-  lineage: [feature-auth-v1, feature-auth-v0, initial-planning]
+  lineage: [feature-auth-v1, feature-auth-v0, initial-planning]  # computed from parent pointers
 ```
 
 Same-directory forks use `resume_mode: native`, `strategy: null`, `depth: 1`, and lineage containing the parent.
 Worktree and `--into` forks start with `resume_mode: transfer`; the CLI enriches `strategy` and `context_file` when it
 generates a transfer context file.
 
-**Cross-project resume:** `parent_forge_root` tells the child where the parent's artifacts live (may differ from the
-child's `forge_root` when the parent was in a different checkout). `parent_project_root` must equal the child's
-`project_root` -- cross-repo resume is not supported.
+**Cross-project resume:** `parent_forge_root` locates the parent's artifacts (may differ from the child's `forge_root`);
+`parent_project_root` must equal the child's `project_root` -- cross-repo resume is not supported.
 
 **Context assembly (what child loads at start):**
 
@@ -739,27 +722,8 @@ child's `forge_root` when the parent was in a different checkout). `parent_proje
 2. Processed transfer: `<forge_root>/.forge/prev_sessions/<parent>/children/<child>.md` (strategy-dependent)
 3. Lineage reference: pointer to raw artifacts for deep reads
 
-**Why two phases?**
-
-- Raw artifacts preserve the full history for debugging and audit
-- **Transfer** writes a portable, strategy-dependent view of that history
-- **Resume** assembles context — user controls the fidelity/size trade-off
-- Same raw data can produce different views for different needs
-
-**Proxy inheritance:**
-
-By default, the child inherits the parent's proxy (same routing):
-
-```bash
-# Parent was on litellm-anthropic proxy (opus)
-# Child inherits same proxy by default
-forge session resume feature-auth --fresh
-
-# Override if needed
-forge session resume feature-auth --fresh --proxy litellm-gemini
-```
-
-This keeps routing stable across resumes.
+**Proxy inheritance:** The child inherits the parent's proxy by default, keeping routing stable across resumes;
+`--proxy <name>` overrides.
 
 ### 3.10 Hook handlers
 

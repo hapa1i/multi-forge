@@ -22,6 +22,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 from forge.core.invoker import (
     Attribution,
@@ -42,7 +43,17 @@ from forge.core.runtime.codex_preflight import (
 )
 from forge.core.runtime.codex_rollouts import find_rollout_path
 from forge.core.state import now_iso
-from forge.session import ForgeSessionError, SessionManager, SessionState
+from forge.session import (
+    ForgeSessionError,
+    SessionManager,
+    SessionNotFoundError,
+    SessionState,
+)
+from forge.session.codex_handoff import (
+    clear_pending_context,
+    pending_context_path,
+    read_receipt,
+)
 from forge.session.models import CodexConfirmed, Derivation
 from forge.session.prev_sessions import child_notes_path, child_path
 from forge.session.transfer import ResumeStrategy
@@ -50,8 +61,21 @@ from forge.session.transfer import ResumeStrategy
 logger = logging.getLogger(__name__)
 
 ROLLOUT_SOURCE_DISCOVERED = "discovered_by_thread_id"
+ROLLOUT_SOURCE_SESSION_START = "session_start_hook"
 
 CODEX_RUNTIME = "codex"
+
+# confirmed.codex.context_delivery values (CLI-written at post-turn reconciliation).
+CONTEXT_DELIVERY_INITIAL = "initial_message"
+CONTEXT_DELIVERY_HOOK = "session_start_hook"
+CONTEXT_DELIVERY_UNDELIVERED = "hook_undelivered"
+
+ContextDeliveryMode = Literal["initial-message", "hook"]
+
+# Knowable-negative hook seams: hook delivery cannot work, so fail before any state
+# exists. "enrollment_gated" proceeds -- enrollment itself is unverifiable pre-turn
+# (the trusted_hash is not computable); the receipt reconciliation is the truth.
+_HOOK_INCAPABLE_SEAMS = ("disabled", "unknown", "managed_suppressed", "untrusted")
 
 
 @dataclass(frozen=True)
@@ -67,6 +91,7 @@ class CodexSessionStartResult:
     thread_id: str | None
     rollout_path: str | None
     worktree_path: str | None
+    context_delivery: str = CONTEXT_DELIVERY_INITIAL
     warnings: tuple[str, ...] = ()
 
 
@@ -100,6 +125,7 @@ def start_codex_session(
     create_worktree: bool = False,
     branch: str | None = None,
     timeout_seconds: int = 600,
+    context_delivery: ContextDeliveryMode = "initial-message",
 ) -> CodexSessionStartResult:
     """Create a Codex-runtime session derived from ``parent`` and run its first turn.
 
@@ -121,6 +147,9 @@ def start_codex_session(
     if strategy not in valid_strategies:
         raise ForgeOpError(f"Unknown strategy '{strategy}' (valid: {', '.join(sorted(valid_strategies))}).")
 
+    if context_delivery not in ("initial-message", "hook"):
+        raise ForgeOpError(f"Unknown context delivery '{context_delivery}' (valid: initial-message, hook).")
+
     manager = SessionManager()
     try:
         parent_entry = manager.get_session_entry(parent, forge_root=str(forge_root))
@@ -133,6 +162,13 @@ def start_codex_session(
         preflight = assert_codex_ready()
     except CodexPreflightError as e:
         raise ForgeOpError(f"Codex runtime not ready: {e}") from e
+
+    if context_delivery == "hook" and preflight.hook_seam in _HOOK_INCAPABLE_SEAMS:
+        raise ForgeOpError(
+            f"--context-delivery hook needs a hook-capable Codex install "
+            f"(hook seam: {preflight.hook_seam}). Fix the Codex hook configuration "
+            f"or use the default initial-message delivery."
+        )
 
     try:
         state = manager.start_session(
@@ -183,6 +219,7 @@ def start_codex_session(
             child_forge_root=child_forge_root,
             output_root=output_root,
             warnings=warnings,
+            context_delivery=context_delivery,
         )
     except Exception:
         # Past the guard, any snapshot at this key was written by this run.
@@ -215,8 +252,12 @@ def _run_first_codex_turn(
     child_forge_root: Path,
     output_root: Path | None,
     warnings: list[str],
+    context_delivery: ContextDeliveryMode,
 ) -> CodexSessionStartResult:
     """The post-creation half of ``start_codex_session`` (the caller owns rollback)."""
+    store = manager.get_session_store(name, forge_root=str(child_forge_root))
+    staged_context_path = pending_context_path(store.session_dir) if context_delivery == "hook" else None
+
     cwd = state.worktree.path if state.worktree else str(ctx.cwd)
     bridge = bridge_session_to_codex(
         ctx=ctx,
@@ -231,9 +272,27 @@ def _run_first_codex_turn(
         child=name,
         preflight=preflight,
         output_root=output_root,
+        staged_context_path=staged_context_path,
     )
 
-    rollout = find_rollout_path(bridge.thread_id) if bridge.thread_id else None
+    delivery_fact = CONTEXT_DELIVERY_INITIAL
+    effective_thread_id = bridge.thread_id
+    hook_rollout: str | None = None
+    if context_delivery == "hook":
+        delivery_fact, effective_thread_id, hook_rollout = _reconcile_hook_delivery(
+            session_dir=store.session_dir,
+            thread_id=bridge.thread_id,
+            warnings=warnings,
+        )
+
+    if hook_rollout is not None:
+        rollout_path: str | None = hook_rollout
+        rollout_source: str | None = ROLLOUT_SOURCE_SESSION_START
+    else:
+        rollout = find_rollout_path(effective_thread_id) if effective_thread_id else None
+        rollout_path = str(rollout) if rollout else None
+        rollout_source = ROLLOUT_SOURCE_DISCOVERED if rollout else None
+
     timestamp = now_iso()
     derivation = Derivation(
         parent_session=parent,
@@ -248,13 +307,14 @@ def _run_first_codex_turn(
         parent_project_root=parent_project_root,
     )
     codex_confirmed = CodexConfirmed(
-        thread_id=bridge.thread_id,
-        rollout_path=str(rollout) if rollout else None,
-        rollout_source=ROLLOUT_SOURCE_DISCOVERED if rollout else None,
+        thread_id=effective_thread_id,
+        rollout_path=rollout_path,
+        rollout_source=rollout_source,
         auth_method=preflight.auth_method,
         auth_source=preflight.auth_source,
         billing_mode=preflight.billing_mode,
         last_run_at=timestamp,
+        context_delivery=delivery_fact,
     )
 
     def _mutate(m: SessionState) -> None:
@@ -263,10 +323,9 @@ def _run_first_codex_turn(
         m.confirmed.confirmed_at = timestamp
         m.confirmed.confirmed_by = "cli:codex-start"
 
-    store = manager.get_session_store(name, forge_root=str(child_forge_root))
     store.update(timeout_s=5.0, mutate=_mutate)
 
-    if bridge.thread_id is None:
+    if effective_thread_id is None:
         warnings.append(
             "Codex did not announce a thread_id; this session cannot be resumed. "
             f"Run 'forge session delete {name}' and retry."
@@ -279,11 +338,56 @@ def _run_first_codex_turn(
         root_run_id=bridge.root_run_id,
         codex=bridge.codex,
         curation_ran=bridge.curation_ran,
-        thread_id=bridge.thread_id,
-        rollout_path=str(rollout) if rollout else None,
+        thread_id=effective_thread_id,
+        rollout_path=rollout_path,
         worktree_path=state.worktree.path if state.worktree else None,
+        context_delivery=delivery_fact,
         warnings=tuple(warnings),
     )
+
+
+def _reconcile_hook_delivery(
+    *,
+    session_dir: Path,
+    thread_id: str | None,
+    warnings: list[str],
+) -> tuple[str, str | None, str | None]:
+    """Reconcile the hook-delivery receipt after the first turn.
+
+    Returns ``(context_delivery fact, effective thread_id, hook-sourced rollout path)``.
+    The receipt is trustworthy for THIS turn: it can only be written while the staged
+    file exists (one-shot, staged by this start), and rollback deletes the session dir.
+    An absent or thread-mismatched receipt means the context never reached this thread
+    -- the staged file is cleared so a later enrolled resume can never late-deliver it.
+    """
+    receipt = read_receipt(session_dir)
+    if receipt is None:
+        clear_pending_context(session_dir)
+        return CONTEXT_DELIVERY_UNDELIVERED, thread_id, None
+    if thread_id is None:
+        # The stream missed thread.started but the hook saw the turn's thread: recover
+        # the id so the session stays resumable (rollout discovery included).
+        warnings.append(
+            f"Codex stream announced no thread_id; recovered '{receipt.session_id}' from the delivery receipt."
+        )
+        return CONTEXT_DELIVERY_HOOK, receipt.session_id, receipt.transcript_path
+    if receipt.session_id != thread_id:
+        warnings.append(
+            f"Delivery receipt thread ('{receipt.session_id}') does not match the stream thread "
+            f"('{thread_id}'); treating the transfer context as undelivered."
+        )
+        clear_pending_context(session_dir)
+        return CONTEXT_DELIVERY_UNDELIVERED, thread_id, None
+    # Delivered. The receipt's rollout path comes from codex's own payload, so it
+    # supersedes glob discovery; cross-check and surface a disagreement.
+    if receipt.transcript_path:
+        discovered = find_rollout_path(thread_id)
+        if discovered is not None and str(discovered) != receipt.transcript_path:
+            warnings.append(
+                f"Receipt rollout path ('{receipt.transcript_path}') differs from the discovered one "
+                f"('{discovered}'); keeping the receipt's."
+            )
+    return CONTEXT_DELIVERY_HOOK, thread_id, receipt.transcript_path
 
 
 def continue_codex_session(
@@ -302,9 +406,18 @@ def continue_codex_session(
     """
     forge_root = ctx.forge_root
     manager = SessionManager()
+    lookup_forge_root = str(forge_root) if forge_root else None
     try:
-        entry = manager.get_session_entry(name, forge_root=str(forge_root) if forge_root else None)
-        state = manager.get_session(name, forge_root=str(forge_root) if forge_root else None)
+        entry = manager.get_session_entry(name, forge_root=lookup_forge_root)
+        state = manager.get_session(name, forge_root=lookup_forge_root)
+    except SessionNotFoundError as e:
+        if lookup_forge_root is None:
+            raise ForgeOpError(f"Session '{name}' not found: {e}") from e
+        try:
+            entry = manager.get_session_entry(name, forge_root=None)
+            state = manager.get_session(name, forge_root=None)
+        except ForgeSessionError as fallback:
+            raise ForgeOpError(f"Session '{name}' not found: {fallback}") from fallback
     except ForgeSessionError as e:
         raise ForgeOpError(f"Session '{name}' not found: {e}") from e
 
@@ -323,8 +436,15 @@ def continue_codex_session(
     except CodexPreflightError as e:
         raise ForgeOpError(f"Codex runtime not ready: {e}") from e
 
+    warnings: list[str] = []
+    store = manager.get_session_store(name, forge_root=entry.forge_root)
+    # One-shot invariant, defensively: a staged handoff that survived the start turn
+    # (crash window) must never late-deliver into a resume turn from an enrolled home.
+    if clear_pending_context(store.session_dir):
+        warnings.append("Cleared a stale staged handoff (its start turn never delivered it).")
+
     root = new_root_run_identity()
-    with _temporary_run_env(root, name):
+    with _temporary_run_env(root, name, forge_root=entry.forge_root):
         request = prepare_codex_request(
             prompt=task,
             preflight=preflight,
@@ -337,7 +457,6 @@ def continue_codex_session(
         )
         result = CodexHeadlessInvoker().run(request)
 
-    warnings: list[str] = []
     effective_thread_id = thread_id
     if result.runtime_session_id and result.runtime_session_id != thread_id:
         # Probe 60b pinned id stability across resume; drift means Codex re-bound the
@@ -362,7 +481,6 @@ def continue_codex_session(
         codex.last_run_at = timestamp
         m.confirmed.codex = codex
 
-    store = manager.get_session_store(name, forge_root=entry.forge_root)
     store.update(timeout_s=5.0, mutate=_mutate)
 
     return CodexSessionResumeResult(
