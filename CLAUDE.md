@@ -27,14 +27,14 @@ make test                   # Full suite
 # uv run pytest tests/src -m "not integration" -v
 # uv run pytest tests/integration -v
 
-# Code quality (run `make pre-commit` before every commit)
+# Code quality (run `make pre-commit` before every commit; includes type checks)
 make pre-commit            # All hooks: ruff, black, isort, mypy, pyright, mdformat, gitleaks
 make clean                 # Remove caches
 
 # Direct tool usage (read-only checks; let pre-commit own formatting)
 uv run ruff check src/
 uv run mypy src/
-pre-commit run --all-files
+uv run pre-commit run --all-files
 ```
 
 **Run integration tests when needed.** Docker is expected to be running locally — `make test-integration` is routine,
