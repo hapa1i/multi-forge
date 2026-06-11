@@ -1437,6 +1437,25 @@ class TestGuardSuperviseToggle:
         out = json.loads(result.output)
         assert "Cascade: off" in out["reason"]
 
+    def test_show_includes_unsupported_checker_provider(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        store = _make_supervised_session(tmp_path, monkeypatch)
+
+        def _set_bad_provider(m):
+            m.intent.policy.supervisor.cascade = True
+            m.intent.policy.supervisor.checker_provider = "anthropic"
+
+        store.update(timeout_s=5.0, mutate=_set_bad_provider)
+
+        runner = CliRunner()
+        payload = {"prompt": "%policy supervise", "transcript_path": ""}
+        result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
+
+        assert result.exit_code == 0
+        out = json.loads(result.output)
+        assert "Checker: unresolved via anthropic (unsupported)" in out["reason"]
+
 
 class TestGuardSuperviseCascade:
     """Test %policy supervise cascade on|off."""

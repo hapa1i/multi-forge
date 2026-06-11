@@ -110,4 +110,5 @@
   (`session/overrides.py:240-265`: `json.loads` before dacite strict) — e2e helper assumption holds.
 - Default checker route revised during Slice 5 follow-up: default-config cascade now uses OpenRouter
   `google/gemini-3.5-flash` with an approximately 32K-token prompt budget. Users without OpenRouter can set
-  `--checker-provider litellm-local`, which defaults to `gemini/gemini-3.5-flash` for local LiteLLM routing.
+  `--checker-provider litellm-local`, which defaults to `gemini/gemini-3.5-flash` for local LiteLLM routing. Existing
+  local LiteLLM backend configs may need to be recreated/updated if they were generated before that model entry landed.

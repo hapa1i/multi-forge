@@ -1056,13 +1056,19 @@ def _handle_policy_supervise(argv: list[str]) -> None:
     if sup.cascade:
         from forge.policy.semantic.plan_check import DEFAULT_PLAN_CHECK_BUDGET_TOKENS, resolve_plan_check_route
 
-        route = resolve_plan_check_route(sup)
         budget = (
             max(1, int(sup.checker_budget_tokens))
             if sup.checker_budget_tokens is not None
             else DEFAULT_PLAN_CHECK_BUDGET_TOKENS
         )
-        lines.append(f"  Checker: {route.model} via {route.provider or 'auto'} ({budget} tokens)")
+        try:
+            route = resolve_plan_check_route(sup)
+            checker_model = route.model
+            checker_provider = route.provider or "auto"
+        except ValueError:
+            checker_model = sup.checker_model or "unresolved"
+            checker_provider = f"{sup.checker_provider or 'auto'} (unsupported)"
+        lines.append(f"  Checker: {checker_model} via {checker_provider} ({budget} tokens)")
     if sup.plan_override_path:
         lines.append(f"  Plan override: {sup.plan_override_path}")
 

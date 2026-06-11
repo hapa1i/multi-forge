@@ -246,7 +246,9 @@ How it behaves:
   with instructions when none exists.
 - The default checker route is OpenRouter `google/gemini-3.5-flash` with an approximate 32K-token total budget for the
   tier-1 checker prompt. Use `--checker-provider litellm-local` to use the local LiteLLM default
-  (`gemini/gemini-3.5-flash`) when OpenRouter is unavailable.
+  (`gemini/gemini-3.5-flash`) when OpenRouter is unavailable. Local LiteLLM backends generated before that model was
+  added to the default backend config may need their `litellm` backend config recreated or updated; otherwise use
+  `--checker-model gemini/gemini-2.5-flash` until the backend serves the 3.5 model.
 - Long plans and actions are packed with head+tail excerpts. Unified diffs keep hunk/file headers, Edit checks include
   the old/new fragments, Write checks include target existence metadata, and the prompt explicitly marks whether plan or
   action text was truncated.

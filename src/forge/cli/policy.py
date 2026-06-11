@@ -9,6 +9,7 @@ Commands for managing policy enforcement:
 
 from __future__ import annotations
 
+from dataclasses import replace
 import json
 import os
 import re
@@ -63,12 +64,22 @@ def _checker_display(sup: SupervisorConfig) -> tuple[str, str, int]:
         resolve_plan_check_route,
     )
 
-    route = resolve_plan_check_route(sup)
     budget = (
         max(1, int(sup.checker_budget_tokens))
         if sup.checker_budget_tokens is not None
         else DEFAULT_PLAN_CHECK_BUDGET_TOKENS
     )
+
+    try:
+        route = resolve_plan_check_route(sup)
+    except ValueError:
+        provider = sup.checker_provider or "auto"
+        return (
+            f"{provider} (unsupported)",
+            sup.checker_model or "unresolved",
+            budget,
+        )
+
     return (
         route.provider or "auto",
         route.model,
@@ -1047,7 +1058,7 @@ def supervise_cmd(
 
         store.update(timeout_s=5.0, mutate=_enable_cascade)
 
-        preview = SupervisorConfig(**sup.__dict__)
+        preview = replace(sup)
         preview.cascade = True
         _apply_checker_options(
             preview,

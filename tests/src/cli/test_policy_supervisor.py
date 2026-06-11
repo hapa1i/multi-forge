@@ -910,6 +910,18 @@ class TestSuperviseCascade:
         assert "Checker model: google/gemini-3.5-flash" in result.output
         assert "Checker budget: 32000 tokens" in result.output
 
+    def test_show_displays_unsupported_checker_provider(
+        self, runner: CliRunner, temp_guard_env: Path, monkeypatch
+    ) -> None:
+        store = _make_supervised_project(temp_guard_env, monkeypatch)
+        _set_supervisor_fields(store, cascade=True, checker_provider="anthropic")
+
+        result = runner.invoke(main, ["policy", "supervise"])
+
+        assert result.exit_code == 0, result.output
+        assert "Checker provider: anthropic (unsupported)" in result.output
+        assert "Checker model: unresolved" in result.output
+
     def test_show_displays_cascade_off_by_default(self, runner: CliRunner, temp_guard_env: Path, monkeypatch) -> None:
         _make_supervised_project(temp_guard_env, monkeypatch)
         result = runner.invoke(main, ["policy", "supervise"])

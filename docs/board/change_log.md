@@ -49,7 +49,9 @@ clearly-aligned Write/Edit actions short-circuit and only uncertain ones pay the
 - CLI/config: `SupervisorConfig.cascade`/`checker_provider`/`checker_model`/`checker_budget_tokens`;
   `forge policy supervise --cascade/--no-cascade --checker-provider --checker-model --checker-budget-tokens` (modifiers
   with target, standalone toggle without); enabling auto-resolves the plan snapshot via the `--reload` machinery and
-  fails loud pre-mutation when none resolves; `%policy supervise cascade on|off`; status/show surfaces.
+  fails loud pre-mutation when none resolves; `%policy supervise cascade on|off`; status/show surfaces. Existing local
+  LiteLLM backend configs created before `gemini/gemini-3.5-flash` was added must be recreated/updated or paired with an
+  explicit served checker model such as `gemini/gemini-2.5-flash`.
 - Measurement: decision-log-derived `plan_check_allow`/`plan_check_needs_review` counters (cached allows counted) in
   `forge activity` + summary line; session-tagged `plan-check` ledger events via `emit_direct_llm_usage`. Named
   needs-review (not "escalated") because a tier-1 `needs_review` co-occurring with a deterministic deny skips the
