@@ -54,7 +54,7 @@ Fetched 2026-06-09 from developers.openai.com/codex (hooks, config-reference, no
 
 # Round 3 (enrollment mechanics; explicit-only -- see below):
 ./reproduce.sh 80           # operator trust ceremony; builds the persistent enrolled fixture
-./reproduce.sh 81 82 83     # headless probes against that fixture (refuse to run without it)
+./reproduce.sh 81 82 83 84  # headless probes against that fixture (refuse to run without it)
 ```
 
 Captures land **outside the repo** at `${CODEX_HOOKS_CAPTURE_DIR:-~/.cache/forge-codex-hooks-probe}/<stage>/`
@@ -140,6 +140,7 @@ runs two headless verification turns. Re-running 80 rebuilds the home and needs 
 | 81    | headless+fixture | 40d body-swap re-validation; per-event fired matrix; 30a-30h response contracts (30e gates Phase 4; PreToolUse deny/`updatedInput` gate Phase 3 + `pretool_policy`) |
 | 82    | headless+fixture | 40e command-string mutation; user-vs-project trust location; worktree path-sensitivity (-> Phase 6 installer scope)                                                 |
 | 83    | offline (+1-2)   | `hash-preimage.py` reverse-engineers `trusted_hash`; if computable, forges a `[hooks.state]` record and proves programmatic pre-enrollment end-to-end               |
+| 84    | headless+fixture | cross-project trust: does a fresh UNRELATED repo reusing the enrolled command string fire? H1 definition-match vs H2/H3 path-scoping (-> Phase 6 installer scope)   |
 
 ### Verdict vocabulary (round 3)
 
@@ -150,6 +151,14 @@ runs two headless verification turns. Re-running 80 rebuilds the home and needs 
 - Stage 83: `PREIMAGE-COMPUTABLE` (+ empirical `PROVEN`/`UNCONFIRMED`) | `PREIMAGE-NOT-COMPUTABLE` (posture = guided
   ceremony; not a failure). `hash-preimage.py` reports `PREIMAGE FOUND: '<candidate>'` only when one canonicalization
   reproduces **every** harvested hash.
+- Stage 84 (writes `results/verdict.txt`; **HOLDS/SCOPED exit 0, the others exit nonzero**):
+  `[CROSS-PROJECT-TRUST-HOLDS]` (a fresh UNRELATED repo's project hook fired -- itself proof the turn ran, so HOLDS does
+  NOT need the positive control -> one ceremony per `CODEX_HOME` trusts the command everywhere; a user=0 HOLDS is
+  flagged but stands) | `[CROSS-PROJECT-TRUST-SCOPED]` (the turn ran -- user-level positive control fired -- but the
+  project hook did NOT -> per-project enrollment or user-scope registration) | `[CROSS-PROJECT-SELF-ENROLLED]` (MAJOR --
+  a `[hooks.state]` record appeared headless, refuting "headless cannot self-enroll"; 84a short-circuits before 84b) |
+  `[CROSS-PROJECT-INVALID]` (setup confound -- the fixture was not in the expected clean state; inspect + re-run) |
+  `[CROSS-PROJECT-INCONCLUSIVE]` (not even the positive control fired; the turn did not run -- mirrors stage 10).
 
 ### Safety (round 3 additions)
 
@@ -159,9 +168,13 @@ exit. Trust state (`config.toml`) persists by design; delete the fixture dir whe
 
 ## Relationship to the decision record
 
-Findings land as a dated Stage-A-style block + go/no-go table in `docs/board/doing/runtime_abstraction/checklist.md`
-(Phase 6). Hook fixtures are **descoped to the `codex_frontend` build card**, not promoted in Phase 6 (evaluation only):
-hook payload fixtures need a firing hook, which is headless-unavailable, so they must be captured on the interactive
-path. `sanitize.sh` produces review-ready candidates; the build card promotes any to `tests/fixtures/codex/hooks/` with
-a provenance README (cloning the `tests/fixtures/codex/README.md` structure), pinning the future adapter's parsers as
-`exec_json_success.jsonl` pins `parse_codex_jsonl_stream`.
+Rounds 1-2 fed the `runtime_abstraction` Phase 6 decision record (a dated Stage-A-style block + go/no-go table, now in
+`docs/board/done/runtime_abstraction/checklist.md`, evaluation-only). Round 3+ is this harness's standing role as the
+`codex_frontend` build card's Codex-fact guard — re-run it on Codex version bumps.
+
+Hook payload fixtures are **capturable headless** from the enrolled fixture: rounds 2-3 settled that hooks fire under
+headless `codex exec` once trust-enrolled, so the Phase-6 "fixtures need the interactive path" descope is obsolete (one
+ceremony, then headless capture). Phase 1 already promoted five sanitized payloads to `tests/fixtures/codex/hooks/`.
+`sanitize.sh` produces review-ready candidates; the build card promotes any with a provenance README (cloning the
+`tests/fixtures/codex/README.md` structure), pinning the future adapter's parsers as `exec_json_success.jsonl` pins
+`parse_codex_jsonl_stream`.

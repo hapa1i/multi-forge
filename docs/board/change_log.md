@@ -27,6 +27,37 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-10
 
+### codex_frontend Phase 1 follow-up: cross-project trust probe (stage 84) -> SCOPED
+
+**Goal**: Settle the last untested Phase-1 assumption gating the Phase 6 installer story -- does ONE Codex trust
+ceremony trust a hook command string in an UNRELATED repo, or only the enrolled project + its `git worktree` checkouts
+(82w)?
+
+**Key changes**:
+
+- **New probe** `scripts/experiments/codex-hooks/stages/84-fresh-project.sh` (extends the round-3 fixture harness;
+  headless, consumes the stage-80 enrolled fixture, no new ceremony). A fresh `git init` repo at a never-seen `mktemp`
+  path registers a byte-identical single-entry SessionStart (same stable `$HOOKBIN/SessionStart.sh` command, differing
+  ONLY in the registering config path); the path-stable user-level hook is the positive control. Two legs: 84a (no
+  folder trust) then 84b (folder-trust deconfound -- 40b: folder trust alone does not fire hooks, so a fire there is the
+  definition hash). Canonicalized `FRESH` (macOS /var->/private/var) so the run cwd matches the trust path; single
+  `finish_verdict` exit (restore-from-base + exit-code policy); pre-leg `grep -F` self-guards; rejects
+  `PROBE_USE_REAL_CODEX_HOME=1`. Wired into `reproduce.sh` (`FIXTURE_STAGES`, budget); README stage-map + 5-verdict
+  vocabulary + de-staled "fixtures are headless-unavailable" bottom section.
+- **Finding (real codex 0.139.0): `[CROSS-PROJECT-TRUST-SCOPED]`** -- both legs proj=0 user=1 (turn ran, positive
+  control fired -- a real no-fire, not a dead turn), self_enroll=no. Cross-project trust does NOT hold; the 82w worktree
+  survival was worktree->checkout canonicalization, not portable command-string trust. **Installer reframe:**
+  project-scope = a ceremony per repo; USER-scope (`$CODEX_HOME/config.toml`) = one ceremony covers all projects
+  (path-stable).
+- **Docs synced**: card Risk bullet (UNTESTED -> RESOLVED/SCOPED) + 82w annotation; checklist new ticked Phase-1 item +
+  Worktree/installer-scope Open Decision reframed; design.md §5.5.5 + `registry.py` codex note "per CODEX_HOME" ->
+  path-keyed trust + user-scope guidance.
+
+**Verification**: probe ran live on real codex 0.139.0 (2 turns) -> SCOPED, cross-checked against the
+`meta/user-config.84{a,b}-after.toml` captures (not just oracle text). `bash -n` clean; shellcheck stage 84 = only info
+SC1091 (one fewer finding than the shipped stage 82 -- at parity); `pre-commit` clean on stage/harness/README; the
+registry-note edit carries no test assertion (grep clean), runtime/preflight suites rerun green.
+
 ### codex_frontend Phase 2 follow-up: suppress Claude display vestiges on Codex `session show`
 
 **Goal**: Stop `session show` printing `Agent: claude-code` and `Model Family: anthropic` for Codex sessions.

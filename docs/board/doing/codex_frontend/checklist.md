@@ -132,6 +132,22 @@ post-enrollment event coverage / 30e / PreToolUse = `stage 81`; user-vs-project 
     per-worktree re-enrollment; resolves the scope Open Decision). *(First 82w2 run was VOID -- leftover worktree
     `trust_level` in the persistent fixture; stage 82 hardened with a strip-first clean base and an INVALID self-guard,
     verified ad hoc against the captured configs, then re-run.)*
+- [x] Cross-project trust (the fresh-unrelated-repo probe the worktree item deferred): does ONE ceremony trust the
+  command string in an UNRELATED repo, or only the enrolled project + its worktrees? Stage `84-fresh-project`
+  (`scripts/experiments/codex-hooks/stages/84-fresh-project.sh`): a fresh `git init` repo at a never-seen `mktemp` path,
+  byte-identical single-entry SessionStart, run with the path-stable user-level hook as a positive control; 84a (no
+  folder trust) then 84b (folder-trust deconfound).
+  - Assertion: a fresh repo's project hook fires (HOLDS) or not (SCOPED), gated by the user-level control firing; the
+    verdict and captures are recorded.
+  - **Done 2026-06-10 (codex 0.139.0): `[CROSS-PROJECT-TRUST-SCOPED]`.** Both legs proj=0 user=1 exit=0 self_enroll=no
+    -- the turn ran (positive control fired) but the fresh repo's byte-identical project hook did NOT fire even with
+    folder `trust_level`. Cross-project trust does NOT hold; 82w worktree survival was worktree->checkout
+    canonicalization (a fire with no `[hooks.state]` record at the worktree path must map back to the enrolled
+    checkout), not portable command-string trust. Captures at `~/.cache/forge-codex-hooks-probe/84-fresh-project/`
+    (`results/verdict.txt`, `meta/user-config.84{a,b}-after.toml`). Reframes the installer-scope decision (above) as an
+    open Phase-6 trade-off: project-scope = per-repo ceremony; user-scope = one-ceremony-for-all (path-stable).
+    `bash -n`
+    - shellcheck (parity with stage 82) + `pre-commit` clean on the stage/harness/README.
 - [x] Sanitized payload fixtures to `tests/fixtures/codex/hooks/` with a provenance README (the Phase 6 descoped
   deliverable; capturable headless now).
   - Assertion: `sanitize.sh` passes; `make pre-commit` (gitleaks) clean on the fixture commit; per-file provenance table
@@ -236,12 +252,19 @@ per-hook-trust story from Phase 1.
   the enrolled project, so project-scope registration is viable.** The project hook fired in a worktree with no folder
   `trust_level` and no `[hooks.state]` record at the worktree path; chained with 40b, that can only be a `trusted_hash`
   match on the definition (byte-identical command string). The mechanism (path-independent hash vs worktree->checkout
-  canonicalization) is not distinguished, but the worktree-survival conclusion holds either way. **Phase 6 registers
-  Codex hooks at project scope with a path-stable command string** (`.codex/config.toml` travels with git AND keeps
+  canonicalization) is not distinguished, but the worktree-survival conclusion holds either way. **\[Superseded by stage
+  84 -- see below: the project-vs-user scope choice is reopened as a trade-off.\]** The round-2 read was that Phase 6
+  would register at project scope with a path-stable command string (`.codex/config.toml` travels with git AND keeps
   trust across worktrees -- no per-worktree re-enrollment). Caveats for the installer: the command string must not embed
-  the worktree/project path, or the hash diverges and trust breaks; one interactive ceremony per `CODEX_HOME` still
-  seeds the first record; and **cross-project trust (a different repo reusing the command) is UNTESTED** -- a
-  fresh-project probe is owed before any "one ceremony for all projects" story.
+  the worktree/project path, or the hash diverges and trust breaks; one interactive ceremony seeds the first record.
+  **Cross-project trust is now TESTED (stage 84, codex 0.139.0, 2026-06-10): it does NOT hold** -- a fresh unrelated
+  repo's byte-identical project hook stays untrusted even with folder trust (proj=0, user=1), so the worktree survival
+  (82w) was worktree->checkout canonicalization, not portable command-string trust. **Installer scope is now an open,
+  informed Phase-6 trade-off (not re-resolved here -- decided when Phase 6 builds the installer):** project-scope
+  `.codex/config.toml` travels with git and survives worktrees but costs a ceremony *per repo*; USER-scope
+  `$CODEX_HOME/config.toml` is path-stable so one ceremony covers every project (stage 84's user-level control fired
+  unprompted from the fresh repo) but is not committed with the repo -- **user scope is the leading
+  one-ceremony-covers-all candidate.**
 - [x] Bridge CLI shape (Phase 2): **resolved 2026-06-10 -- flag shape on `forge session start`:**
   `forge session start [name] --runtime codex --resume-from <parent>`. Rationale: this is a session-creation operation
   (new manifest with a `runtime` field, runtime-specific `confirmed` facts, runtime-aware launcher dispatch), so it

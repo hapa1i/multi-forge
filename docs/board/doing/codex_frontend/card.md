@@ -106,11 +106,15 @@ Gating probe round 3 (2026-06-10, codex-cli **0.138.0**, headless from one enrol
   hash value, or Codex could canonicalize the worktree back to the enrolled checkout (same git repo). This probe does
   not separate them, and proves **nothing** about an *unrelated* project reusing the same command string -- that broad
   "one ceremony trusts the command everywhere" claim is UNTESTED and needs a fresh-project probe before any installer
-  story relies on it. **Phase 6 (holds under either mechanism): project-scope registration with a path-stable command
-  string survives `git worktree` checkouts -- no per-worktree re-enrollment** (a path-varying command string would break
-  it; one interactive ceremony per `CODEX_HOME` still seeds the first record). *(First 82w2 run was VOID -- the
-  persistent fixture had retained a worktree `trust_level` block; stage 82 hardened with a strip-first clean base and an
-  INVALID self-guard, then re-run.)*
+  story relies on it. **\[RESOLVED 2026-06-10, stage 84: the broad claim is FALSE -- a fresh unrelated repo's
+  byte-identical project hook did NOT fire even with folder trust, so the worktree survival was worktree->checkout
+  canonicalization (not a path-independent hash) and project-scope trust is per-repo. The path-stable user-level hook
+  fired from the fresh repo, so USER-scope registration is the leading one-ceremony-covers-all candidate.\]** **Phase 6
+  (holds under either mechanism): project-scope registration with a path-stable command string survives `git worktree`
+  checkouts -- no per-worktree re-enrollment** (a path-varying command string would break it; one interactive ceremony
+  per `CODEX_HOME` still seeds the first record). *(First 82w2 run was VOID -- the persistent fixture had retained a
+  worktree `trust_level` block; stage 82 hardened with a strip-first clean base and an INVALID self-guard, then
+  re-run.)*
 - **`trusted_hash` preimage is NOT black-box computable**: 15 candidate canonicalizations (command, JSON struct, TOML
   block, key variants) reproduced **0/13** harvested hashes. The command string is in the hash (40e) but the algorithm
   is not a simple sha256 of obvious inputs -- recovering it needs a source-dive of the codex-cli Rust. The empirical
@@ -199,10 +203,16 @@ experiment harness but the E2E supersedes its one-shot run):
   byte-identical across paths (40e: the command string is in the hash). A path-varying command (one embedding the
   worktree/project dir) would diverge the hash and break trust. The installer must register a stable `forge hook`
   command, not a path-relative one.
-- **Cross-project trust is UNTESTED.** "One ceremony trusts the command in any project within the home" is unproven --
-  only `git worktree` checkouts of the *enrolled* project were tested, and the mechanism (path-independent hash vs
-  worktree->checkout canonicalization) is undetermined. Do not build a cross-project installer story without a
-  fresh-project probe (a new unrelated repo registering the same command string, no ceremony).
+- **Cross-project trust does NOT hold (RESOLVED -- stage 84, codex 0.139.0, 2026-06-10).** A fresh, UNRELATED git repo
+  registering a byte-identical hook command string is untrusted: even with the registration present and folder
+  `trust_level` added (the 40b deconfound), the fresh repo's project SessionStart did NOT fire (proj=0) while the
+  path-stable user-level hook DID (user=1) -- so the turn ran and the apparatus worked, a real no-fire, not a dead turn.
+  Trust is keyed by the registering config's PATH; 82w worktree survival was Codex canonicalizing the worktree back to
+  the enrolled checkout (a fire with no `[hooks.state]` record at the worktree path must map back), not portable
+  command-string trust. **Installer consequence:** project-scope registration needs a ceremony *per repo*; a USER-scope
+  registration (`$CODEX_HOME/config.toml`) is path-stable and one ceremony covers every project (the user-level control
+  fired unprompted from the fresh repo). The path-stable command-string requirement still holds within a project's
+  worktrees. See the Worktree/installer-scope Open Decision (checklist).
 - **Malformed hook output FAILS OPEN, not closed** (refutes the doc claim). Codex ran the command on a PreToolUse
   response carrying `allow` + an unknown field + `continue:false`. The adapter/responder must emit strictly valid output
   and must NOT rely on Codex fail-closing on bad hook output.

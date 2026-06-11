@@ -1672,17 +1672,20 @@ half). A frozen `RuntimeSpec` per runtime in a module-level `RUNTIMES` table (mi
 installed (`is_installed()` = PATH presence; `detect()` = best-effort `--version`), interactive, headless, hooks, usage
 source, native resume, and install scopes (plus curated-transfer in/out). Limited or planned support is a multi-state
 `Literal`, not a `bool` — Codex `native_hooks="enrollment_gated"` (probes 2026-06-10: hooks fire headless and
-interactively once trust-enrolled; enrollment is a guided one-time interactive TUI ceremony per `CODEX_HOME` — the Phase
-1 probe found the `trusted_hash` is not black-box computable, so programmatic pre-enrollment is off the table),
-`pretool_policy="partial"` (Phase 1 pinned post-enrollment PreToolUse deny + `updatedInput` mutation headless; partial,
-not full — enforcement exists only in enrolled homes, malformed hook output fails open, and PermissionRequest has not
-been observed firing headless), and `interactive="beta"` (a Forge-integration target, not shipped). `hook_min_version`
-stays machine-readable as the registration/enablement floor a preflight checks (not a firing guarantee);
-`hook_feature_flag` is `None` since Codex hooks are default-on — so a consumer reading the field, not just the prose,
-never mistakes a Codex limit for Claude parity. `forge runtime list [--json]` renders the matrix. Claude Code is fully
-populated; Codex/Gemini declare their limits as values. Phase 5's `CodexHeadlessInvoker` and auth/runtime preflight now
-read this registry (e.g. `get_runtime("codex").headless_cmd` builds the `codex exec` argv; the preflight checks the
-version gate).
+interactively once trust-enrolled; enrollment is a guided one-time interactive TUI ceremony whose trust is keyed by the
+registering config's path — project-scope trust survives a project's `git worktree` checkouts but not an unrelated repo
+(stage 84, codex 0.139.0: a fresh repo's byte-identical project hook stays untrusted), so the Phase 6 installer's scope
+is a trade-off (user scope `$CODEX_HOME/config.toml` is the one-ceremony-covers-all target; project scope travels with
+git but needs per-repo enrollment); the Phase 1 probe found the `trusted_hash` is not black-box computable, so
+programmatic pre-enrollment is off the table), `pretool_policy="partial"` (Phase 1 pinned post-enrollment PreToolUse
+deny + `updatedInput` mutation headless; partial, not full — enforcement exists only in enrolled homes, malformed hook
+output fails open, and PermissionRequest has not been observed firing headless), and `interactive="beta"` (a
+Forge-integration target, not shipped). `hook_min_version` stays machine-readable as the registration/enablement floor a
+preflight checks (not a firing guarantee); `hook_feature_flag` is `None` since Codex hooks are default-on — so a
+consumer reading the field, not just the prose, never mistakes a Codex limit for Claude parity.
+`forge runtime list [--json]` renders the matrix. Claude Code is fully populated; Codex/Gemini declare their limits as
+values. Phase 5's `CodexHeadlessInvoker` and auth/runtime preflight now read this registry (e.g.
+`get_runtime("codex").headless_cmd` builds the `codex exec` argv; the preflight checks the version gate).
 
 #### 5.5.6 Relationship to policies (workflow unification)
 
