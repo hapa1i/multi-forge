@@ -1,6 +1,6 @@
 # Supervisor Cascade — cheap tier-1 plan check before the frontier supervisor
 
-**Status**: Doing (branch `supervisor-cascade`).
+**Status**: Done.
 
 ## Problem
 
