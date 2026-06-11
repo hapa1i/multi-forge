@@ -115,6 +115,15 @@ Docs are read by humans and AI agents. Be direct and specific.
 4. **Plain language wins.** Use "use" instead of "utilize."
 5. **Structure follows content.** Use bullets for parallel items, prose for arguments, and tables for comparisons.
 
+### Tables
+
+In agent-loaded, design, developer, and board docs, use tables for compact enumerable facts, not prose. Keep cells to
+short labels, values, or phrases. If a cell needs a full sentence, examples, caveats, or multiple clauses, use bold-term
+bullets or prose below the table instead.
+
+End-user docs may keep wider tables when they are easier to scan in rendered form, especially for command, setting,
+credential, and comparison references. Prefer the structure that helps a human answer the question fastest.
+
 ### Vocabulary Hygiene
 
 Avoid AI filler words:

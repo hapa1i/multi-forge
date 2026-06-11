@@ -47,11 +47,17 @@ All append-only JSONL under `~/.forge/` (respects `FORGE_HOME`), PID-sharded so 
 are physically separate by design (design.md §3.14) and never merge; plane 3 references planes 1-2 by a shared proxy
 `request_id`.
 
-| Plane           | Path                                   | Writer (file:symbol)                               | Record                                                                                                                                                                                                    | Role                                               |
-| --------------- | -------------------------------------- | -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| 1. Request cost | `costs/requests/<YYYY-MM>_<pid>.jsonl` | `proxy/cost_logger.py` `log_request_cost`          | proxy_id, model, tier, in/out/cached tokens, `cost_micros` (null when unreported), latency, `failed`, `request_id`, `reporter`, `confidence`                                                              | **Spend source of truth** + cap bootstrap          |
-| 2. Verb cost    | `costs/verbs/<YYYY-MM>_<pid>.jsonl`    | `core/reactive/cost_tracking.py` `track_verb_cost` | verb, cost delta, tokens, request_count, duration, `per_proxy[]`, `estimated:true`, `cost_measured`                                                                                                       | Per-command attribution (ESTIMATED snapshot delta) |
-| 3. Usage ledger | `usage/events/<YYYY-MM>_<pid>.jsonl`   | `core/usage/ledger.py` `log_usage_event`           | `UsageEvent` (run/parent/root, runtime, command, status, provider/model/proxy, `billing_mode`, `measurement_source`, `route`, `reporter`, `confidence`, tokens, latency, `cost_micro_usd`, `source_refs`) | **Attribution** (who/what/which runtime)           |
+- **Plane 1: Request cost** (`costs/requests/<YYYY-MM>_<pid>.jsonl`): written by `proxy/cost_logger.py`
+  `log_request_cost`. Records `proxy_id`, `model`, `tier`, in/out/cached tokens, `cost_micros` (null when unreported),
+  latency, `failed`, `request_id`, `reporter`, and `confidence`. This is the **spend source of truth** and cap
+  bootstrap.
+- **Plane 2: Verb cost** (`costs/verbs/<YYYY-MM>_<pid>.jsonl`): written by `core/reactive/cost_tracking.py`
+  `track_verb_cost`. Records `verb`, cost delta, tokens, `request_count`, duration, `per_proxy[]`, `estimated:true`, and
+  `cost_measured`. This is per-command attribution from an estimated snapshot delta.
+- **Plane 3: Usage ledger** (`usage/events/<YYYY-MM>_<pid>.jsonl`): written by `core/usage/ledger.py` `log_usage_event`.
+  Records `UsageEvent` attribution (run/parent/root, runtime, command, status, provider/model/proxy, `billing_mode`,
+  `measurement_source`, `route`, `reporter`, `confidence`, tokens, latency, `cost_micro_usd`, `source_refs`). This is
+  the **attribution** plane: who, what, and which runtime.
 
 Schema/version notes:
 
@@ -71,11 +77,12 @@ currently exact only on the direct `core.llm` path (the action tagger; see §14)
 
 ### 2. In-memory proxy state (live, never persisted)
 
-| Surface        | file:symbol                                              | Holds                                                                                      | Notes                                                                                                                                         |
-| -------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `CostTracker`  | `proxy/cost_tracker.py`                                  | daily/monthly accumulators                                                                 | Bootstraps from plane 1 at startup (curr+prev month for rolling 24h); `record` per request; `check_cap` enforces; `cap_summary` feeds `GET /` |
-| `ProxyMetrics` | `proxy/metrics.py` (singleton)                           | counts, tokens, `cost_micros`, per-tier/per-model (derives `cache_hit_rate` in `snapshot`) | `record_request`; `snapshot` is the `GET /` payload                                                                                           |
-| Tracker init   | `proxy/server.py` `_initialize_cost_tracker_from_config` | wires config caps -> tracker                                                               | Lazy on first POST and on `GET /` so status readers see fresh state                                                                           |
+- `CostTracker` (`proxy/cost_tracker.py`): daily/monthly accumulators. It bootstraps from plane 1 at startup (current +
+  previous month for rolling 24h), records each request, enforces `check_cap`, and feeds `cap_summary` into `GET /`.
+- `ProxyMetrics` (`proxy/metrics.py`, singleton): counts, tokens, `cost_micros`, and per-tier/per-model totals.
+  `snapshot` derives `cache_hit_rate` and is the `GET /` payload; `record_request` updates it.
+- Tracker init (`proxy/server.py` `_initialize_cost_tracker_from_config`): wires config caps to the tracker lazily on
+  first POST and on `GET /`, so status readers see fresh state.
 
 ### 3. Live runtime endpoint + headers
 
@@ -89,13 +96,19 @@ currently exact only on the direct `core.llm` path (the action tagger; see §14)
 
 ### 4. CLI read surfaces
 
-| Command                       | file:symbol                                                                                      | Reads                                                              | Output                                                                                                                                                                                    |
-| ----------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `forge proxy costs show [id]` | `cli/proxy_costs.py` `show_cmd`                                                                  | planes 1 + 2                                                       | `--period today\|week\|month\|all`, `--by-model`, `--by-verb`, `--json`; computes "Interactive" as residual. **Authoritative spend view.**                                                |
-| `forge proxy costs reset`     | `cli/proxy_costs.py` `reset_cmd`                                                                 | planes 1 + 2 + 3                                                   | deletes all cost + usage shards (`--yes`, `--dry-run`); audit plane untouched; running proxy keeps in-memory caps until restart                                                           |
-| `forge proxy metrics [id]`    | `cli/proxy.py` `metrics_cmd`                                                                     | live `GET /`                                                       | per-tier/per-model, cache-hit, failures; `--json`, `--all`                                                                                                                                |
-| `forge activity [session]`    | `cli/activity.py` `activity_cmd` -> `core/ops/usage_summary.py` `build_session_activity_summary` | plane 3 (session-filtered) + manifest `confirmed.policy.decisions` | per-command run/error/token/cost + conditional Workers column; supervisor allow/warn/deny; `--json/--days/--all`. **Reported-or-estimated; footnote points to `forge proxy costs show`.** |
-| session-end line              | `usage_summary.py` `render_summary_line`                                                         | same builder                                                       | one-liner on exit (host/sidecar/fork launch paths)                                                                                                                                        |
+- `forge proxy costs show [id]` (`cli/proxy_costs.py` `show_cmd`): reads planes 1 + 2. Supports
+  `--period today|week|month|all`, `--by-model`, `--by-verb`, and `--json`; computes "Interactive" as residual. This is
+  the **authoritative spend view**.
+- `forge proxy costs reset` (`cli/proxy_costs.py` `reset_cmd`): reads planes 1 + 2 + 3 and deletes cost + usage shards
+  (`--yes`, `--dry-run`). The audit plane is untouched; running proxies keep in-memory caps until restart.
+- `forge proxy metrics [id]` (`cli/proxy.py` `metrics_cmd`): reads live `GET /`; shows per-tier/per-model, cache-hit,
+  failures, `--json`, and `--all`.
+- `forge activity [session]` (`cli/activity.py` `activity_cmd` -> `core/ops/usage_summary.py`
+  `build_session_activity_summary`): reads plane 3 (session-filtered) plus manifest `confirmed.policy.decisions`. Output
+  includes per-command run/error/token/cost, conditional Workers column, supervisor allow/warn/deny, `--json`, `--days`,
+  and `--all`. It is **reported-or-estimated**; the footnote points to `forge proxy costs show`.
+- Session-end line (`usage_summary.py` `render_summary_line`): uses the same builder and renders a one-liner on host,
+  sidecar, and fork exits.
 
 `forge activity` honesty: joins two sources with different guarantees — the ledger (uncapped) for cost/tokens, and
 `confirmed.policy.decisions` (capped at `MAX_DECISION_LOG=100`) for supervisor verdicts. It re-reads the manifest fresh
@@ -127,11 +140,12 @@ env key (§14–16).
 
 ### 6. Cost config surfaces
 
-| Config           | Location                                                                       | Keys                                                                                                                    |
-| ---------------- | ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
-| Proxy spend caps | `proxy.yaml` `costs.*` (`config/schema.py` `CostConfig`/`CostCaps`)            | `caps.per_day`, `caps.per_month` (USD), `on_cap_hit` (`reject`\|`warn`). `cap_mode` was removed (Phase 3).              |
-| Status-line cost | `~/.forge/config.yaml` `statusline.*` (`runtime_config.py` `StatusLineConfig`) | `cost_mode` (`auto`\|`api`\|`subscription`, default `auto`), `forge_cost_ttl`, `cache_hit`, `cache_hit_ttl`, `segments` |
-| Interactive key  | `~/.forge/config.yaml` (`runtime_config.py`, flat)                             | `interactive_anthropic_api_key` (`inherit`\|`omit`) — `omit` withholds the key from interactive launches only           |
+- **Proxy spend caps**: `proxy.yaml` `costs.*` (`config/schema.py` `CostConfig`/`CostCaps`) owns `caps.per_day`,
+  `caps.per_month` (USD), and `on_cap_hit` (`reject` | `warn`). `cap_mode` was removed in Phase 3.
+- **Status-line cost**: `~/.forge/config.yaml` `statusline.*` (`runtime_config.py` `StatusLineConfig`) owns `cost_mode`
+  (`auto` | `api` | `subscription`, default `auto`), `forge_cost_ttl`, `cache_hit`, `cache_hit_ttl`, and `segments`.
+- **Interactive key**: `~/.forge/config.yaml` (`runtime_config.py`, flat) owns `interactive_anthropic_api_key`
+  (`inherit` | `omit`); `omit` withholds the key from interactive launches only.
 
 Cap enforcement: `check_cap` checks accumulated recorded spend post-event, so a request may cross a cap and complete and
 the next is blocked; `reject` returns HTTP 429 `spend_cap_exceeded`, `warn` forwards + sets `X-Spend-Warning`. Because
@@ -140,11 +154,15 @@ Enforcement is process-local (run one proxy process per id for reliable caps).
 
 ### 7. Authoritative vs reported-or-estimated (units matter)
 
-| Surface                  | Scope                                | Unit                                      | Caveat                                                                                                                                               |
-| ------------------------ | ------------------------------------ | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Status-line `cost`       | the one interactive session rendered | `$` (declared api) / quota / `~$` (proxy) | **Claude's** native signal; never recomputed by Forge. `auto` shows quota-or-`≈$`, never `$` from key presence                                       |
-| `forge activity`         | one Forge session's ledger events    | reported `$` or `unavailable` + tokens    | `cost_partial` / `session_tagging_partial`; passthrough routes report no `$`; the session total is best-effort                                       |
-| `forge proxy costs show` | one proxy's request log              | reported `$` or `unavailable`             | sums **route-reported** cost only (OpenRouter body / LiteLLM header); unreported requests are counted `unavailable`, never priced from a local table |
+- **Status-line `cost`**: scoped to the one interactive session rendered. Unit is `$` (declared api), quota, or `~$`
+  (proxy). This is **Claude's** native signal and is never recomputed by Forge; `auto` shows quota-or-`≈$`, never `$`
+  from key presence.
+- **`forge activity`**: scoped to one Forge session's ledger events. Unit is reported `$` or `unavailable` plus tokens.
+  `cost_partial` / `session_tagging_partial` mark gaps; passthrough routes report no `$`; the session total is
+  best-effort.
+- **`forge proxy costs show`**: scoped to one proxy's request log. Unit is reported `$` or `unavailable`. It sums
+  **route-reported** cost only (OpenRouter body / LiteLLM header); unreported requests are counted `unavailable`, never
+  priced from a local table.
 
 See `design_appendix.md §A.9/§A.13` and `end-user/proxy.md` ("which surface answers which question?") for the
 user-facing version.
@@ -176,23 +194,30 @@ process env  >  .env (loaded override=False)  >  ~/.forge/credentials.yaml (acti
 
 `EnvVar` + `Credential` + `CREDENTIALS` registry. Five atomic credentials:
 
-| Credential       | Env var(s)                                                | Unlocks                                                                                                          |
-| ---------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `openrouter`     | `OPENROUTER_API_KEY` (+ `OPENROUTER_BASE_URL` conn-value) | all `openrouter-*` proxies, OSS workflow workers                                                                 |
-| `anthropic-api`  | `ANTHROPIC_API_KEY`                                       | **Forge subprocesses (claude -p)**, direct Anthropic workers, `litellm-anthropic-local`, `anthropic-passthrough` |
-| `openai-api`     | `OPENAI_API_KEY`                                          | `litellm-openai-local`                                                                                           |
-| `gemini-api`     | `GEMINI_API_KEY`                                          | `litellm-gemini-local`                                                                                           |
-| `litellm-remote` | `LITELLM_API_KEY` (+ `LITELLM_BASE_URL` conn-value)       | all remote `litellm-*`                                                                                           |
+- `openrouter`: `OPENROUTER_API_KEY` plus `OPENROUTER_BASE_URL` connection value; unlocks all `openrouter-*` proxies and
+  OSS workflow workers.
+
+- `anthropic-api`: `ANTHROPIC_API_KEY`; unlocks **Forge subprocesses (`claude -p`)**, direct Anthropic workers,
+  `litellm-anthropic-local`, and `anthropic-passthrough`.
+
+- `openai-api`: `OPENAI_API_KEY`; unlocks `litellm-openai-local`.
+
+- `gemini-api`: `GEMINI_API_KEY`; unlocks `litellm-gemini-local`.
+
+- `litellm-remote`: `LITELLM_API_KEY` plus `LITELLM_BASE_URL` connection value; unlocks all remote `litellm-*`.
 
 - `anthropic-passthrough` is now in `anthropic-api`'s `unlocks_features` (Phase 6, Bug #5) **and** is required via
   `TEMPLATE_ENV_VARS` — `credentials_for_template("anthropic-passthrough")` resolves to `anthropic-api` by reverse
   lookup.
+
 - `connection_value=true` (e.g. `LITELLM_BASE_URL`, `OPENROUTER_BASE_URL`) marks non-secret routing endpoints that
   bootstrap proxy creation; skipped in the credential preflight. Once `proxy.yaml` exists, its `base_url` is
   authoritative.
+
 - `credentials_for_template(template)` bridges `TEMPLATE_ENV_VARS` -> `CREDENTIALS`.
   `format_missing_credential_error(...)` renders the actionable failure (signup URL, `forge auth login`,
   `not_needed_for`, an `env_ignored` diagnostic).
+
 - `RETIRED_NAMES` rejects `anthropic`/`litellm-local` with guidance.
 
 ### 10. Credential store + CLI
@@ -204,12 +229,13 @@ process env  >  .env (loaded override=False)  >  ~/.forge/credentials.yaml (acti
 
 ### 11. The four consumer roles
 
-| Role                      | Auth used                                                               | Mechanism                                                                                                                 |
-| ------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| 1. Interactive session    | Claude Code's own OAuth/keychain OR `ANTHROPIC_API_KEY`                 | `claude` (no `--bare`); proxy mode sets `ANTHROPIC_BASE_URL`; `interactive_anthropic_api_key=omit` withholds the key      |
-| 2. Headless `claude -p`   | `--bare` **requires `ANTHROPIC_API_KEY`**; no key -> OAuth (or a proxy) | `can_use_bare()` adds `--bare` only when a key resolves; no key -> OAuth fallthrough (forced `bare=True` + no key errors) |
-| 3. Forge `core.llm` calls | per-provider via `CredentialManager`                                    | async, TTL-cached                                                                                                         |
-| 4. Proxy upstream         | provider key to the model API                                           | `x-api-key` (passthrough) / `Bearer` (openai-compat)                                                                      |
+- **Interactive session**: uses Claude Code's own OAuth/keychain or `ANTHROPIC_API_KEY`. It runs `claude` without
+  `--bare`; proxy mode sets `ANTHROPIC_BASE_URL`; `interactive_anthropic_api_key=omit` withholds the key.
+- **Headless `claude -p`**: `--bare` **requires `ANTHROPIC_API_KEY`**. `can_use_bare()` adds `--bare` only when a key
+  resolves; no key means OAuth fallthrough or a proxy. Forced `bare=True` with no key errors.
+- **Forge `core.llm` calls**: use per-provider credentials via async, TTL-cached `CredentialManager`.
+- **Proxy upstream**: uses provider keys to the model API (`x-api-key` for passthrough, `Bearer` for OpenAI-compatible
+  routes).
 
 ### 12. Launch-time env building + the interactive-key control
 
@@ -315,25 +341,32 @@ spend, never the main harness.
 
 ## Appendix — File / symbol index
 
-| Area                        | file:symbol                                                                                                                                                 |
-| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Request cost log            | `proxy/cost_logger.py` `log_request_cost`, `read_cost_logs`                                                                                                 |
-| Cost tracker / caps         | `proxy/cost_tracker.py` `CostTracker` (bootstrap, `check_cap`, `cap_summary`)                                                                               |
-| Proxy metrics               | `proxy/metrics.py` `ProxyMetrics` (`snapshot`, singleton)                                                                                                   |
-| Cost calc + GET /           | `proxy/server.py` `_calc_and_log_cost`, `root`, `_attach_cap_summary`, `_with_spend_warning`                                                                |
-| Verb cost                   | `core/reactive/cost_tracking.py` `track_verb_cost`, `VerbCostResult`, `read_verb_logs`                                                                      |
-| Usage ledger                | `core/usage/ledger.py` `UsageEvent`, `log_usage_event`, `read_usage_events`, `BillingMode`, `MeasurementSource`; `core/usage/vocabulary.py`                 |
-| Usage emitters              | `core/usage/emit.py` `emit_*`; `_anthropic_key_present`                                                                                                     |
-| Billing classifier          | `core/usage/billing.py` `infer_billing_mode`                                                                                                                |
-| Per-session read            | `cli/activity.py` `activity_cmd`; `core/ops/usage_summary.py` `build_session_activity_summary`, `render_summary_line`, `sum_forge_added_cost`               |
-| Proxy cost CLI              | `cli/proxy_costs.py` `costs_group` (`show_cmd`, `reset_cmd`); `cli/proxy.py` `metrics_cmd`                                                                  |
-| Status-line cost            | `cli/statusline/registry.py` `_produce_cost`/`_produce_forge_cost`; `cli/status_line.py` `get_session_metrics`, `format_billing_cost`, `format_rate_limits` |
-| Status-line billing mode    | `cli/statusline/context.py` `billing_mode` (declaration: `cost_mode` + `rate_limits`; no key read)                                                          |
-| Credential registry         | `core/auth/capabilities.py` `CREDENTIALS`, `credentials_for_template`, `format_missing_credential_error`                                                    |
-| Credential resolution       | `core/auth/template_secrets.py` `resolve_env_or_credential`, `TEMPLATE_ENV_VARS`, `_auth_ignore_env`, `resolve_env_or_credential_with_source`               |
-| Credential store / CLI      | `core/auth/credentials_file.py`; `cli/auth.py`                                                                                                              |
-| Async credentials           | `core/llm/credentials.py` `CredentialManager`                                                                                                               |
-| Env build + interactive key | `core/reactive/env.py` `build_claude_env`, `_hydrate_credentials`, `apply_interactive_api_key`                                                              |
-| Interactive launch          | `session/claude/invoke.py` `_build_environment`                                                                                                             |
-| Proxy upstream auth         | `proxy/proxy_orchestrator.py` `_ensure_template_credentials`; `proxy/passthrough.py` `build_upstream_headers`                                               |
-| Config                      | `runtime_config.py` `StatusLineConfig` (`cost_mode`), `interactive_anthropic_api_key`, `auth_ignore_env`; `config/schema.py` `CostConfig`/`CostCaps`        |
+- **Request cost log**: `proxy/cost_logger.py` `log_request_cost`, `read_cost_logs`.
+- **Cost tracker / caps**: `proxy/cost_tracker.py` `CostTracker` (bootstrap, `check_cap`, `cap_summary`).
+- **Proxy metrics**: `proxy/metrics.py` `ProxyMetrics` (`snapshot`, singleton).
+- **Cost calc + GET /**: `proxy/server.py` `_calc_and_log_cost`, `root`, `_attach_cap_summary`, `_with_spend_warning`.
+- **Verb cost**: `core/reactive/cost_tracking.py` `track_verb_cost`, `VerbCostResult`, `read_verb_logs`.
+- **Usage ledger**: `core/usage/ledger.py` `UsageEvent`, `log_usage_event`, `read_usage_events`, `BillingMode`,
+  `MeasurementSource`; `core/usage/vocabulary.py`.
+- **Usage emitters**: `core/usage/emit.py` `emit_*`; `_anthropic_key_present`.
+- **Billing classifier**: `core/usage/billing.py` `infer_billing_mode`.
+- **Per-session read**: `cli/activity.py` `activity_cmd`; `core/ops/usage_summary.py` `build_session_activity_summary`,
+  `render_summary_line`, `sum_forge_added_cost`.
+- **Proxy cost CLI**: `cli/proxy_costs.py` `costs_group` (`show_cmd`, `reset_cmd`); `cli/proxy.py` `metrics_cmd`.
+- **Status-line cost**: `cli/statusline/registry.py` `_produce_cost`/`_produce_forge_cost`; `cli/status_line.py`
+  `get_session_metrics`, `format_billing_cost`, `format_rate_limits`.
+- **Status-line billing mode**: `cli/statusline/context.py` `billing_mode` (declaration: `cost_mode` + `rate_limits`; no
+  key read).
+- **Credential registry**: `core/auth/capabilities.py` `CREDENTIALS`, `credentials_for_template`,
+  `format_missing_credential_error`.
+- **Credential resolution**: `core/auth/template_secrets.py` `resolve_env_or_credential`, `TEMPLATE_ENV_VARS`,
+  `_auth_ignore_env`, `resolve_env_or_credential_with_source`.
+- **Credential store / CLI**: `core/auth/credentials_file.py`; `cli/auth.py`.
+- **Async credentials**: `core/llm/credentials.py` `CredentialManager`.
+- **Env build + interactive key**: `core/reactive/env.py` `build_claude_env`, `_hydrate_credentials`,
+  `apply_interactive_api_key`.
+- **Interactive launch**: `session/claude/invoke.py` `_build_environment`.
+- **Proxy upstream auth**: `proxy/proxy_orchestrator.py` `_ensure_template_credentials`; `proxy/passthrough.py`
+  `build_upstream_headers`.
+- **Config**: `runtime_config.py` `StatusLineConfig` (`cost_mode`), `interactive_anthropic_api_key`, `auth_ignore_env`;
+  `config/schema.py` `CostConfig`/`CostCaps`.

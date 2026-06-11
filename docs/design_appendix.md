@@ -444,11 +444,14 @@ only appends). The no-plaintext-secret guarantee is regression-tested
 
 Every record carries `schema_version`, `ts`, `request_id`, `proxy_id`, and a `record_type`:
 
-| `record_type` | Key fields                                                                                                                                                                                                                                                                                                                                                                      |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `request`     | `mode`, `route`, `full_body`, `system_prompt_hash`, `tool_surface_hash`, `thinking`, `cache_markers`, `counts`; full-body adds the redacted `request_headers/body` (every path) and `response_headers/body` (structure only) **only for non-streaming passthrough** — streaming captures response usage metadata only; the translated path is request-body only (both deferred) |
-| `drift`       | `dimension` (`system_prompt`\|`tool_surface`), `previous_hash`, `current_hash`, `route`                                                                                                                                                                                                                                                                                         |
-| `mutation`    | `mode: override`, `blocked`, `system_prompt_hash_before/after`, `mutations[]` (each `{target, action, ...}` with `augment_len` / `cache_invalidation_expected` / `pattern_hash` / `stripped_count` / `effort_floor` / `budget_before/after`) — hashes, lengths, and budgets only                                                                                                |
+- `request`: `mode`, `route`, `full_body`, `system_prompt_hash`, `tool_surface_hash`, `thinking`, `cache_markers`,
+  `counts`. Full-body adds redacted `request_headers/body` on every path and structural-only `response_headers/body`
+  only for non-streaming passthrough. Streaming captures response usage metadata only; the translated path is
+  request-body only. Streaming full-body response capture and translated-path response capture are both deferred.
+- `drift`: `dimension` (`system_prompt` | `tool_surface`), `previous_hash`, `current_hash`, `route`.
+- `mutation`: `mode: override`, `blocked`, `system_prompt_hash_before/after`, and `mutations[]`. Each mutation records
+  `{target, action, ...}` plus hashes, lengths, and budgets only: `augment_len`, `cache_invalidation_expected`,
+  `pattern_hash`, `stripped_count`, `effort_floor`, `budget_before/after`.
 
 Reading skips records written by a newer Forge (`schema_version` > current) with a one-time warning.
 `forge proxy audit show|diff` (§4.0) is the read surface.
@@ -598,13 +601,14 @@ scope rationale remain in design.md.
 
 ### B.1 Scope policy table
 
-| Category              | Allowed via `%`                                                                                                     | Not allowed via `%`                                           |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| Session / plan        | `%session list`, `%plan`                                                                                            | --                                                            |
-| Proxy                 | `%proxy list`, `%proxy show`, `%proxy audit show/diff` (read-only)                                                  | `%proxy create`, `%proxy edit`, `%proxy set`, `%proxy delete` |
-| Policy / verification | `%policy status`, `%policy enable`, `%policy disable`, `%policy check`, `%policy supervise`, `%cancel-verification` | --                                                            |
-| Cleanup               | `%clean [--scope workspace\|project\|all]` (read-only report)                                                       | destructive cleanup (use `forge clean --yes` from terminal)   |
-| Utilities / config    | `%h`, `%help`, `%config`                                                                                            | --                                                            |
+- **Session / plan**: allow `%session list` and `%plan`.
+- **Proxy**: allow read-only `%proxy list`, `%proxy show`, and `%proxy audit show/diff`; disallow `%proxy create`,
+  `%proxy edit`, `%proxy set`, and `%proxy delete`.
+- **Policy / verification**: allow `%policy status`, `%policy enable`, `%policy disable`, `%policy check`,
+  `%policy supervise`, and `%cancel-verification`.
+- **Cleanup**: allow `%clean [--scope workspace|project|all]` as a read-only report. Destructive cleanup stays in the
+  terminal via `forge clean --yes`.
+- **Utilities / config**: allow `%h`, `%help`, and `%config`.
 
 ### B.2 Current shipped commands
 

@@ -166,17 +166,17 @@ for cross-session transfer. Worktrees are used when sessions write concurrently.
 
 ### 3.2 Contract files (authoritative paths)
 
-| Artifact             | Path                                                             | Owned by                 | Purpose                                                                                                   |
-| -------------------- | ---------------------------------------------------------------- | ------------------------ | --------------------------------------------------------------------------------------------------------- |
-| Session file         | `<forge_root>/.forge/sessions/<session_name>/forge.session.json` | Forge Session + Hooks    | Session `intent`, `overrides`, hook-written `confirmed`                                                   |
-| Global session index | `~/.forge/sessions/index.json`                                   | Forge Session            | Session metadata (name, `forge_root`, `project_root`); fast listing + project filtering                   |
-| Active session index | `~/.forge/sessions/active.json`                                  | Forge Session            | Ephemeral live-launch registry for delete warnings + stale pruning                                        |
-| Proxy registry       | `~/.forge/proxies/index.json`                                    | Forge Proxy Orchestrator | Running proxies (template ↔ base_url/port ↔ pid)                                                          |
-| Runtime config       | `~/.forge/config.yaml`                                           | Forge CLI                | Global runtime preferences (proxy mode, timeouts, context limit)                                          |
-| Installed manifest   | `~/.forge/installed.json`                                        | Forge Installer          | Tracks what `forge extension enable` installed for update/uninstall                                       |
-| Work queue           | `~/.forge/pending-work/*.json`                                   | Forge Work Queue (§3.13) | Deferred work markers (stop, index, handoff)                                                              |
-| Usage ledger         | `~/.forge/usage/events/<month>_<pid>.jsonl`                      | Forge Usage Ledger       | Attribution events (run/runtime/model/billing/tokens), joined to cost+audit by `request_id`; schema §A.13 |
-| Optional events      | `~/.forge/events/*.jsonl`                                        | TBD                      | Debugging/analytics; optional                                                                             |
+| Artifact             | Path                                                             | Owned by                 | Purpose                                                                                 |
+| -------------------- | ---------------------------------------------------------------- | ------------------------ | --------------------------------------------------------------------------------------- |
+| Session file         | `<forge_root>/.forge/sessions/<session_name>/forge.session.json` | Forge Session + Hooks    | Session `intent`, `overrides`, hook-written `confirmed`                                 |
+| Global session index | `~/.forge/sessions/index.json`                                   | Forge Session            | Session metadata (name, `forge_root`, `project_root`); fast listing + project filtering |
+| Active session index | `~/.forge/sessions/active.json`                                  | Forge Session            | Ephemeral live-launch registry for delete warnings + stale pruning                      |
+| Proxy registry       | `~/.forge/proxies/index.json`                                    | Forge Proxy Orchestrator | Running proxies (template ↔ base_url/port ↔ pid)                                        |
+| Runtime config       | `~/.forge/config.yaml`                                           | Forge CLI                | Global runtime preferences (proxy mode, timeouts, context limit)                        |
+| Installed manifest   | `~/.forge/installed.json`                                        | Forge Installer          | Tracks what `forge extension enable` installed for update/uninstall                     |
+| Work queue           | `~/.forge/pending-work/*.json`                                   | Forge Work Queue (§3.13) | Deferred work markers (stop, index, handoff)                                            |
+| Usage ledger         | `~/.forge/usage/events/<month>_<pid>.jsonl`                      | Forge Usage Ledger       | Usage attribution events; schema §A.13                                                  |
+| Optional events      | `~/.forge/events/*.jsonl`                                        | TBD                      | Debugging/analytics; optional                                                           |
 
 The active session index is intentionally runtime-only. It is self-healed via launcher PID / sidecar container liveness
 checks and must not be treated as durable session truth like the manifest or global session index.
@@ -391,23 +391,27 @@ To avoid writer conflicts:
 
 #### 3.6.1 Definitions (normative)
 
-| Concept            | Definition                                                                                                                                                                                                                                  |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Proxy**          | base_url/port/template + tier→model + default hyperparams. Canonical routing identity for a proxy.                                                                                                                                          |
-| **Session**        | Forge-project-scoped intent/overrides/artifacts. May reference a proxy, cannot change proxy-owned fields.                                                                                                                                   |
-| **Config**         | In-repo defaults + user credentials/connection values (env vars and/or `~/.forge/credentials.yaml`). Connection values (e.g., `LITELLM_BASE_URL`) bootstrap proxy creation; once `proxy.yaml` exists, proxy-owned routing is authoritative. |
-| **Proxy Template** | Operational profile defining provider/endpoint/tier-mappings. Internal template for proxy creation.                                                                                                                                         |
-| **Model Catalog**  | Authoritative internal data for model capabilities (`model_catalog.yaml`). Not user-editable.                                                                                                                                               |
-| **ModelRoute**     | Derived routing option pairing a model with a provider/credential/template. Generated by `derive_model_routes()`, not hand-authored.                                                                                                        |
-| **RoutingResult**  | Structured outcome of subprocess routing resolution: base_url, proxy_id, resolution source, selected route, warning. Replaces bare `str \| None`.                                                                                           |
+- **Proxy**: base_url/port/template + tier→model + default hyperparams. Canonical routing identity for a proxy.
+- **Session**: Forge-project-scoped intent, overrides, and artifacts. May reference a proxy; cannot change proxy-owned
+  fields.
+- **Config**: in-repo defaults plus user credentials/connection values (env vars and/or `~/.forge/credentials.yaml`).
+  Connection values (for example `LITELLM_BASE_URL`) bootstrap proxy creation; once `proxy.yaml` exists, proxy-owned
+  routing is authoritative.
+- **Proxy Template**: operational profile defining provider, endpoint, and tier mappings for proxy creation.
+- **Model Catalog**: authoritative internal data for model capabilities (`model_catalog.yaml`), not user-editable.
+- **ModelRoute**: derived routing option pairing a model with a provider/credential/template. Generated by
+  `derive_model_routes()`, not hand-authored.
+- **RoutingResult**: structured subprocess routing result: base URL, proxy id, resolution source, selected route, and
+  warning. Replaces bare `str | None`.
 
 #### 3.6.2 Field ownership invariants (normative)
 
-| Owner             | Fields                                                                                                                                                              |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Proxy-owned**   | tier→model mappings, provider/base_url, default hyperparams (reasoning_effort, temperature, verbosity, thinking_budget_tokens)                                      |
-| **Session-owned** | policy/TDD mode, memory/artifacts, `forge_root`, `checkout_root`, `relative_path`, session metadata                                                                 |
-| **Routing chain** | Tier: request explicit tier → proxy default tier. Subprocess: explicit → subprocess proxy → preferred proxy → route scan → session proxy → unresolved (see §3.6.12) |
+- **Proxy-owned**: tier→model mappings, provider/base_url, and default hyperparams (`reasoning_effort`, `temperature`,
+  `verbosity`, `thinking_budget_tokens`).
+- **Session-owned**: policy/TDD mode, memory/artifacts, `forge_root`, `checkout_root`, `relative_path`, and session
+  metadata.
+- **Routing chain**: tier resolution is request explicit tier → proxy default tier. Subprocess resolution is explicit →
+  subprocess proxy → preferred proxy → route scan → session proxy → unresolved (see §3.6.12).
 
 **CLI enforcement:** Enforced in the CLI: `forge proxy` edits proxy settings; `forge session` edits session settings.
 Session commands can't set proxy-owned keys.
@@ -1044,19 +1048,15 @@ default to the parent cache; `edit`/`diff` resolve a child (inferred when the pa
 
 #### Memory management
 
-| Command                        | Purpose                                                                                                               |
-| :----------------------------- | :-------------------------------------------------------------------------------------------------------------------- |
-| `forge memory track <path>`    | Author a project passport on a doc, sessionless (`--strategy`, `--intent`, `--writers`, `--propose`, `--shadow-path`) |
-| `forge memory enable`          | Enable memory auto-update for a session (`--session`, resolves `$FORGE_SESSION`)                                      |
-| `forge memory disable`         | Disable memory auto-update for a session (`--session`, resolves `$FORGE_SESSION`)                                     |
-| `forge memory list`            | List passported memory docs under scan roots (`--json`)                                                               |
-| `forge memory status`          | Show memory activation across sessions (`--scope`, `--json`)                                                          |
-| `forge memory report show`     | Inspect memory writer review reports for a session (`--latest`, `--all`)                                              |
-| `forge memory shadows list`    | List accumulated shadow proposals (`--scope`, `--json`)                                                               |
-| `forge memory shadows show`    | Show shadow proposal content (`--for <doc>`, `--scope`)                                                               |
-| `forge memory shadows review`  | Review/curate shadow proposals (`--for`, `--curate`, `--show-latest`)                                                 |
-| `forge memory passport show`   | Show passport embedded in a memory doc (`--json`)                                                                     |
-| `forge memory passport remove` | Remove the project passport from a memory doc (`--json`)                                                              |
+- `forge memory track <path>`: author a project passport on a doc, sessionless (`--strategy`, `--intent`, `--writers`,
+  `--propose`, `--shadow-path`).
+- `forge memory enable|disable`: toggle session memory auto-update (`--session`, resolves `$FORGE_SESSION`).
+- `forge memory list`: list passported memory docs under scan roots (`--json`).
+- `forge memory status`: show memory activation across sessions (`--scope`, `--json`).
+- `forge memory report show`: inspect memory writer review reports for a session (`--latest`, `--all`).
+- `forge memory shadows list|show|review`: list accumulated shadow proposals, inspect one doc's proposals, or curate
+  them (`--scope`, `--for`, `--curate`, `--show-latest`).
+- `forge memory passport show|remove`: inspect or remove the project passport embedded in a memory doc (`--json`).
 
 #### Proxy management
 
@@ -1671,13 +1671,13 @@ source, native resume, and install scopes (plus curated-transfer in/out). Limite
 `Literal`, not a `bool` — a field-reading consumer never mistakes a Codex limit for Claude parity. Codex's load-bearing
 declarations (probe evidence in `scripts/experiments/codex-hooks/README.md`):
 
-| Field               | Codex value        | Meaning                                                                                                                                                                                              |
-| ------------------- | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `native_hooks`      | `enrollment_gated` | Hooks fire only from a one-time interactive TUI trust ceremony. Trust keys on the registering config's path; `trusted_hash` is not black-box computable, so enrollment is never verifiable pre-turn. |
-| `pretool_policy`    | `partial`          | Post-enrollment PreToolUse deny + `updatedInput` pinned headless; enforcement exists only in enrolled homes, malformed hook output fails open, PermissionRequest never observed firing.              |
-| `interactive`       | `beta`             | A Forge-integration target, not shipped.                                                                                                                                                             |
-| `hook_min_version`  | (version floor)    | Machine-readable registration floor a preflight checks — not a firing guarantee.                                                                                                                     |
-| `hook_feature_flag` | `None`             | Codex hooks are default-on.                                                                                                                                                                          |
+- `native_hooks="enrollment_gated"`: hooks fire only after a one-time interactive TUI trust ceremony. Trust keys on the
+  registering config's path; `trusted_hash` is not black-box computable, so enrollment is never verifiable pre-turn.
+- `pretool_policy="partial"`: post-enrollment PreToolUse deny + `updatedInput` are pinned headless, but enforcement
+  exists only in enrolled homes. Malformed hook output fails open; PermissionRequest has not been observed firing.
+- `interactive="beta"`: a Forge-integration target, not shipped.
+- `hook_min_version`: machine-readable registration floor a preflight checks — not a firing guarantee.
+- `hook_feature_flag=None`: Codex hooks are default-on.
 
 `forge runtime list [--json]` renders the matrix. `CodexHeadlessInvoker` and the auth/runtime preflight read it (e.g.
 `get_runtime("codex").headless_cmd` builds the `codex exec` argv; the preflight checks the version gate).
