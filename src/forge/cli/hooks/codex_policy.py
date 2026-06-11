@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import os
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -163,7 +164,7 @@ class CodexHookResponder:
     @staticmethod
     def _join_sections(
         file_results: list[tuple[str | None, CompositeDecision]],
-        format_text: Any,
+        format_text: Callable[[CompositeDecision], str],
     ) -> str:
         sections = []
         for path, result in file_results:

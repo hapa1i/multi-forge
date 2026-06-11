@@ -144,6 +144,32 @@ class TestCodexPolicyCheckDeny:
         assert "Policy review required" not in out["permissionDecisionReason"]
 
 
+class TestTelemetrySourceLabel:
+    def test_summary_names_denying_policy_not_first_file(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """The stderr summary labels the decisive (denying) result. file_results[0]
+        here is an allowing test file -- deriving from it would route the label
+        helper down the non-deny branch and name tdd.tests-before-impl instead of
+        the actual blocker, tdd.no-skip-tests."""
+        _make_session(tmp_path, monkeypatch, bundles=["tdd"])
+        payload = _payload(
+            _patch_cmd(
+                "*** Add File: tests/test_clean.py",
+                "+def test_clean(): pass",
+                "*** Add File: tests/test_skipped.py",
+                "+import pytest",
+                "+@pytest.mark.skip",
+                "+def test_s(): pass",
+            ),
+            cwd=str(tmp_path),
+        )
+
+        result = _invoke(payload)
+
+        out = _deny_wire(result.stdout)
+        assert out["permissionDecision"] == "deny"
+        assert "against tdd.no-skip-tests (blocked" in result.stderr
+
+
 class TestCodexPolicyCheckAllow:
     def test_test_file_add_allows_with_empty_stdout(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         _make_session(tmp_path, monkeypatch, bundles=["tdd"])

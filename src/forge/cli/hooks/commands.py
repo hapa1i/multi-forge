@@ -1331,7 +1331,9 @@ def codex_policy_check() -> None:
             result = engine.evaluate(context)
         except Exception as e:
             if fail_mode == "closed":
-                print(responder.format_error_deny(f"Policy evaluation failed (fail-closed): {e}"))
+                # Wire JSON goes explicitly to stdout; everything else in this
+                # command rides stderr (Codex fails OPEN on malformed stdout).
+                print(responder.format_error_deny(f"Policy evaluation failed (fail-closed): {e}"), file=sys.stdout)
                 sys.exit(responder.BLOCK_EXIT)
             continue  # fail-open: skip this file
         aggregated_state.update(engine.get_collected_state())
@@ -1344,11 +1346,19 @@ def codex_policy_check() -> None:
     paths_label = ",".join(path or "?" for path, _ in file_results)
     target_label = f"apply_patch:{paths_label}"
 
+    denying = [(path, result) for path, result in file_results if result.final_decision == "deny"]
+    reviews = [(path, result) for path, result in file_results if result.final_decision == "needs_review"]
+
+    # A blocked patch never lands (apply_patch is all-or-nothing), so NO file's
+    # collected state may persist -- a clean test file riding in a denied patch
+    # must not record tests_touched, or a later impl-only patch would wrongly
+    # pass tests-before-impl. Decision-log entries persist either way (audit).
+    blocked = bool(denying or reviews)
     try:
         _persist_policy_decisions(
             store=store,
             engine=engine,
-            engine_state=aggregated_state,
+            engine_state={} if blocked else aggregated_state,
             entries=[(result, f"apply_patch:{path}" if path else "apply_patch") for path, result in file_results],
             effective=effective,
             confirmed_by="hook:codex-policy-check",
@@ -1359,11 +1369,14 @@ def codex_policy_check() -> None:
     from forge.runtime_config import get_runtime_config
 
     show_summary = get_runtime_config().policy_summary_feedback == "on"
-    source_label = _derive_policy_source_label(file_results[0][1], effective)
+    # Label telemetry from the decisive file -- the first denying (or unresolved)
+    # result -- not file_results[0], which may be an allowing file whose result
+    # would route _derive_policy_source_label down the wrong branch.
+    decisive = denying[0][1] if denying else reviews[0][1] if reviews else file_results[0][1]
+    source_label = _derive_policy_source_label(decisive, effective)
 
-    denying = [(path, result) for path, result in file_results if result.final_decision == "deny"]
     if denying:
-        print(responder.format_deny_multi(denying))
+        print(responder.format_deny_multi(denying), file=sys.stdout)
         if show_summary:
             print(
                 f"[forge] Policy: checked {target_label} against {source_label}" f" (blocked, {elapsed:.1f}s)",
@@ -1371,9 +1384,8 @@ def codex_policy_check() -> None:
             )
         sys.exit(responder.BLOCK_EXIT)
 
-    reviews = [(path, result) for path, result in file_results if result.final_decision == "needs_review"]
     if reviews:
-        print(responder.format_needs_review_multi(reviews))
+        print(responder.format_needs_review_multi(reviews), file=sys.stdout)
         if show_summary:
             print(
                 f"[forge] Policy: checked {target_label} against {source_label}"

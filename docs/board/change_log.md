@@ -27,6 +27,26 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-11
 
+### codex_frontend Phase 3 follow-up: blocked actions no longer persist policy state
+
+**Goal**: Fix four Phase 3 review findings, chiefly that both hook commands persisted engine-collected policy state
+before checking whether the composed decision blocks the action.
+
+**Key changes**:
+
+- A blocked action (deny / unresolved needs_review) never lands -- Claude denies the Write/Edit, Codex rejects the whole
+  all-or-nothing `apply_patch` -- so its collected state (e.g. TDD `tests_touched` from a clean test file riding in a
+  denied patch) no longer persists; decision-log entries still persist as the audit trail. Gated in
+  `_persist_policy_state` (Claude) and at the `codex-policy-check` persist call (cross-file aggregate).
+- Codex stderr telemetry now labels the decisive file (first denying / first unresolved result), not `file_results[0]`,
+  which could be an allowing file routing the label helper down the wrong branch.
+- All three Codex wire emissions print with explicit `file=sys.stdout`; `_join_sections` types its formatter as
+  `Callable[[CompositeDecision], str]`.
+
+**Verification**: New `tests/regression/test_bug_blocked_action_persists_policy_state.py` (both runtimes, fail-confirmed
+against the unfixed code) + telemetry-label unit test; 6,123 unit/regression tests green; Docker `test_policy_hooks.py`
+17/17; mypy/pyright clean.
+
 ### codex_frontend Phase 3: Codex hook adapter/responder + `forge hook codex-policy-check`
 
 **Goal**: Fill the runtime-neutral `HookAdapter`/`HookResponder` protocols with the Codex pair so a `codex exec` turn
@@ -1193,56 +1213,29 @@ an output-level ANSI remap -- **break**: the flat `show_rate_limits` key removed
   freezes byte-identical default output (API billing path); each phase shipped `make pre-commit` clean with
   `test_status_line_integration.py` green.
 
-## 2026-06-02
+## 2026-06-02 (compacted)
+
+Condensed per the board-contract size policy (decisions, verification, and deferred items preserved; full detail in git
+history).
 
 ### Phase 4: Review-pass hardening (4a / 4c / 4d)
 
-**Goal**: Fix issues found reviewing the shipped Phase 4 slices before merge -- one concurrency race plus three
-correctness/clarity gaps, each with a test.
-
-**Key changes**:
-
-- **4d cancellation race (spawn/register TOCTOU)**: `ClaudeHeadlessInvoker.run_parallel` could spawn a child between
-  `Popen` returning and registering it in `children`; a `_cleanup` snapshot in that window left the child un-SIGTERMed,
-  so `executor.shutdown(wait=True)` blocked on its `communicate(timeout)` (Ctrl+C hang + transient orphan). Fixed with a
-  lock-guarded `cleanup_started` flag: a worker self-reaps a child registered after cleanup began, skips spawning once
-  cancellation starts, and `shutdown(cancel_futures=True)` drops unstarted workers -- append and flag-read are atomic
-  under `children_lock`, so each child is reaped exactly once.
-- **4d cancelled workers no longer emit usage**: a cancelled job fell through to `_emit_worker` and was logged
-  `status="error"`. Added a typed `HeadlessResult.cancelled` (keeps `error="cancelled"` for the review layer);
-  `_emit_worker` skips cancelled -- one policy point.
-- **4c direct-LLM `cached_tokens`**: `emit_direct_llm_usage` dropped `cached_tokens`; now copied from provider usage.
-- **4a partial-origin marker**: pinned the both-or-neither `origin_run_id`/`origin_root_run_id` contract on
-  `_memory_writer_env` with a comment + test, so the defensive fallback isn't mistaken for a parent/root bug.
-
-**Verification**: `test_claude_invoker.py` + `test_emit.py` 24 passed (incl. new race + cancelled-emit + cached_tokens
-tests) + `test_startup_queue.py` partial-marker test; mypy + pyright + `pre-commit` clean on changed files.
+- **4d spawn/register TOCTOU**: `run_parallel` could spawn a child after a `_cleanup` snapshot, leaving it un-SIGTERMed
+  (Ctrl+C hang + transient orphan). Fixed with a lock-guarded `cleanup_started` flag: self-reap late registrations, skip
+  new spawns once cancellation starts, `shutdown(cancel_futures=True)` -- each child reaped exactly once.
+- **4d cancelled workers**: typed `HeadlessResult.cancelled`; `_emit_worker` skips cancelled (no more `status="error"`
+  usage events for cancelled jobs).
+- **4c**: `emit_direct_llm_usage` now copies `cached_tokens` from provider usage. **4a**: both-or-neither
+  `origin_run_id`/`origin_root_run_id` contract pinned on `_memory_writer_env` with comment + test.
+- Verification: invoker/emit/startup-queue suites passed incl. new race + cancelled-emit + cached_tokens tests;
+  mypy/pyright/pre-commit clean.
 
 ### Phase 4: Deferred integration validation (4a / 4c / 4d / 4f)
 
-**Goal**: Run the CLAUDE.md-mandated Docker / real-`claude -p` integration deferred across the Phase 4 slices, now that
-4a-4f have shipped, so every shipped slice has real-subprocess coverage (not just mocked unit tests).
-
-**Key changes**: None -- validation-only run.
-
-**Verification** (`./scripts/test-integration.sh <file> -v`):
-
-- `test_policy_hooks.py` (4f, deterministic): 10/10 -- real `forge hook policy-check` (adapter->engine->responder, exit
-  codes, manifest).
-- `test_supervisor_e2e.py` (4a/4c/4f, deterministic harness): 4/4 (8.2s) -- `forge policy supervisor`
-  aligned/divergent/infra-error + session-set wiring (covers 4a env stamping, 4c supervisor emission, the 4f
-  `cli/policy.py:692` site).
-- `test_real_claude_memory.py::test_real_handoff_review_only_smoke` (4a/4c, real Claude): PASSED -- real
-  `forge memory-writer run` end-to-end (4a origin-identity marker plumbing + 4c emission).
-- `test_real_claude_workers.py` (4d, real Claude): 2/2 (34.4s) -- real `claude -p --bare` fan-out via
-  `ClaudeHeadlessInvoker.run_parallel` (the process-group spawn/cleanup/ordering the mocked unit tests can't reach).
-
-**Pre-existing finding (NOT runtime-abstraction; surfaced by this run)**:
-`test_real_claude_memory.py::test_real_shadow_curation_smoke` FAILS because it passes `--session` to
-`forge memory track`, which PR #6 (`13f57db`, 2026-05-28, project-scoped memory passports) made invalid ("track ... does
-not take a session"). Stale test from the #6 memory change -- `13f57db` is a pre-branch ancestor and this branch touches
-neither `cli/memory.py` nor the test. Latent because `slow` real-Claude tests are rarely run. Needs a separate test-only
-fix to the post-#6 shadow-curation invocation; tracked for whoever owns #6's surface.
+Validation-only Docker / real-`claude -p` run for the shipped slices: `test_policy_hooks.py` 10/10,
+`test_supervisor_e2e.py` 4/4, `test_real_claude_memory.py` handoff smoke PASSED, `test_real_claude_workers.py` 2/2.
+**Pre-existing finding**: `test_real_shadow_curation_smoke` FAILS -- stale `--session` arg to `forge memory track` from
+PR #6's project-scoped memory change (pre-branch ancestor; test-only fix, tracked for #6's owner).
 
 ## 2026-06-01 (compacted)
 

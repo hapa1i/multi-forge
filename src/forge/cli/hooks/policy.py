@@ -209,6 +209,13 @@ def _persist_policy_decisions(
     the last file's state and drop e.g. TDD ``tests_touched`` from earlier files).
     The state merge is per-entry idempotent (same aggregate each iteration); the
     decision log grows by one entry per pair.
+
+    Caller contract: pass ``engine_state={}`` when the evaluated action was BLOCKED
+    (deny / unresolved needs_review) -- a blocked action never lands, so state
+    collected from it (e.g. ``tests_touched`` from a test file riding in a denied
+    patch) must not persist as if it did. ``build_policy_state_update`` merges
+    per-policy-id, so ``{}`` preserves prior state while the decision-log entries
+    (the audit trail of evaluations) still persist.
     """
     from forge.policy.store import build_policy_state_update
     from forge.session.models import PolicyConfirmed
@@ -260,11 +267,18 @@ def _persist_policy_state(
     effective: Any,
     context_summary: str,
 ) -> None:
-    """Persist policy state updates to session manifest (single-entry wrapper)."""
+    """Persist policy state updates to session manifest (single-entry wrapper).
+
+    A blocked action never lands (the hook denies the Write/Edit), so its collected
+    policy state is dropped: e.g. a test write denied by tdd.no-skip-tests must not
+    record ``tests_touched``, or a later impl-only write would wrongly pass
+    tests-before-impl. The decision-log entry persists either way.
+    """
+    blocked = result.final_decision in ("deny", "needs_review")
     _persist_policy_decisions(
         store=store,
         engine=engine,
-        engine_state=engine.get_collected_state(),
+        engine_state={} if blocked else engine.get_collected_state(),
         entries=[(result, context_summary)],
         effective=effective,
     )
