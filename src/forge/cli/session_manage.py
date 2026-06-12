@@ -1328,6 +1328,8 @@ def _print_session_detail(
             console.print(f"  Rollout:      {display_path(codex.rollout_path)}")
         if codex.auth_method:
             console.print(f"  Auth:         {codex.auth_method} ({codex.auth_source})")
+        if codex.context_delivery:
+            console.print(f"  Delivery:     {codex.context_delivery}")
         if codex.last_run_at:
             console.print(f"  Last Run:     {codex.last_run_at}")
         console.print()

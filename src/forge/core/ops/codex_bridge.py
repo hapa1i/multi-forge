@@ -1,9 +1,9 @@
 """Cross-runtime bridge: hand a Claude session's curated transfer to a headless Codex run.
 
-Command-core op (UI-agnostic; returns structured data, raises ``ForgeOpError``) behind a
-future ``forge ... --runtime codex`` surface (the user-facing command is Phase 6). It
-composes the Phase 5 build-group parts into the "plan in Claude -> implement in Codex" hop
-(Slice 5e):
+Command-core op (UI-agnostic; returns structured data, raises ``ForgeOpError``) behind the
+``forge session start --runtime codex --resume-from <parent> --task`` surface
+(``core/ops/codex_session.py``; the interactive variant reuses the assembly half via
+``assemble_codex_transfer``). It composes the "plan in Claude -> implement in Codex" hop:
 
     parent session
       -> ai-curated transfer (``target_runtime=codex``)
@@ -16,8 +16,8 @@ attribute the curation step and the Codex run together.
 Two deliberate properties:
 
 - **Initial-message delivery is the zero-setup default**: the transfer is prepended to the
-  first ``codex exec`` prompt. Phase 4 adds the post-enrollment upgrade -- staging the
-  handoff for a trust-enrolled Codex ``SessionStart`` hook (``forge hook
+  first ``codex exec`` prompt. The post-enrollment upgrade (``--context-delivery hook``)
+  stages the handoff for a trust-enrolled Codex ``SessionStart`` hook (``forge hook
   codex-session-start``) to inject as ``additionalContext`` -- because enrollment cannot be
   verified programmatically, hook delivery is opt-in and reconciled post-turn.
 - **Curated transfer is the only context bridge**: cross-runtime reasoning signatures are
@@ -112,6 +112,102 @@ def compose_codex_initial_message(transfer_body: str, task: str) -> str:
     pre-Phase-4 output (golden-pinned).
     """
     return compose_codex_handoff_context(transfer_body) + "\n# Your task\n\n" + f"{task.strip()}\n"
+
+
+def compose_codex_interactive_context(transfer_body: str) -> str:
+    """Frame the curated transfer as the TUI's positional initial prompt (Phase 5).
+
+    The positional ``[PROMPT]`` is a real first user message -- Codex acts on it before
+    the human types -- so unlike the passive ``additionalContext`` hook path, this
+    framing must pin the model's first turn: acknowledge and hold, no edits, no tools.
+    Stage 87 (operator-gated) verifies the hold holds on a real TUI.
+    """
+    return (
+        compose_codex_handoff_context(transfer_body)
+        + "\n"
+        + "# Hold for instructions\n"
+        + "\n"
+        + "The section above is context only -- there is no task yet. Acknowledge the\n"
+        + "context in one short sentence and WAIT for the user's instruction. Do not\n"
+        + "edit files, run commands, or use tools until the user asks.\n"
+    )
+
+
+@dataclass(frozen=True)
+class CodexTransferAssembly:
+    """A composed Codex-targeted transfer, ready for either delivery path."""
+
+    transfer_path: Path  # the curated transfer snapshot (children/<child>.md)
+    body: str  # composed transfer body (frontmatter stripped, notes overlay merged)
+    curation_ran: bool  # the transfer produced a full ai-curated body (vs a fallback)
+    lineage: tuple[str, ...]
+    parent_transcript: str | None
+    context_file_rel: str | None
+
+
+def assemble_codex_transfer(
+    *,
+    ctx: ExecutionContext,
+    parent: str,
+    child: str,
+    strategy: str = "ai-curated",
+    depth: int = 1,
+    output_root: Path | None = None,
+) -> CodexTransferAssembly:
+    """Assemble + compose a Codex-targeted curated transfer for ``child``.
+
+    Pure assembly: no run-tree env management (callers own ``_temporary_run_env`` --
+    its lock is non-reentrant) and no Codex invocation. The ai-curated strategy makes
+    a ``core.llm`` call whose usage event lands under the AMBIENT run identity, so
+    call this inside the same env context the eventual Codex run shares.
+
+    Raises ``ForgeOpError`` for an unknown strategy or a missing parent.
+    """
+    forge_root = ctx.forge_root
+    if forge_root is None:
+        raise ForgeOpError("Not inside a Forge project (no .forge/ directory found).")
+    try:
+        resume_strategy = ResumeStrategy(strategy)
+    except ValueError as e:
+        valid = ", ".join(s.value for s in ResumeStrategy)
+        raise ForgeOpError(f"Unknown strategy '{strategy}' (valid: {valid}).") from e
+    manager = SessionManager()
+    try:
+        parent_state = manager.get_session(parent, forge_root=str(forge_root))
+    except ForgeSessionError as e:
+        raise ForgeOpError(f"Parent session '{parent}' not found: {e}") from e
+
+    def _get(name: str) -> SessionState | None:
+        try:
+            return manager.get_session(name, forge_root=str(forge_root))
+        except ForgeSessionError:
+            return None
+
+    transfer_root = output_root if output_root is not None else forge_root
+    transfer = assemble_transfer_context(
+        parent_name=parent,
+        parent_state=parent_state,
+        forge_root=forge_root,
+        output_root=output_root,
+        strategy=resume_strategy,
+        depth=depth,
+        get_session=_get,
+        child_name=child,
+        target_runtime="codex",
+    )
+    composed = compose_child_context(transfer_root, parent, child)
+    frontmatter, body, _ = parse_transfer_frontmatter(composed)
+    # schema=="full" is stamped only for a successful ai-curated body (design appendix
+    # §M.1); any deterministic fallback is "compatibility-fallback".
+    curation_ran = frontmatter is not None and frontmatter.get("schema") == "full"
+    return CodexTransferAssembly(
+        transfer_path=transfer.context_file or child_path(transfer_root, parent, child),
+        body=body,
+        curation_ran=curation_ran,
+        lineage=tuple(transfer.lineage),
+        parent_transcript=transfer.transcript_artifact_path,
+        context_file_rel=transfer.context_file_rel,
+    )
 
 
 # Guards _temporary_run_env: os.environ is process-global, so two concurrent bridge
@@ -220,23 +316,17 @@ def bridge_session_to_codex(
     if forge_root is None:
         raise ForgeOpError("Not inside a Forge project (no .forge/ directory found).")
 
+    # Revalidated inside assemble_codex_transfer; kept here so a bad strategy or
+    # missing parent fails BEFORE the ~20s `codex doctor` preflight below.
     try:
-        resume_strategy = ResumeStrategy(strategy)
+        ResumeStrategy(strategy)
     except ValueError as e:
         valid = ", ".join(s.value for s in ResumeStrategy)
         raise ForgeOpError(f"Unknown strategy '{strategy}' (valid: {valid}).") from e
-
-    manager = SessionManager()
     try:
-        parent_state = manager.get_session(parent, forge_root=str(forge_root))
+        SessionManager().get_session(parent, forge_root=str(forge_root))
     except ForgeSessionError as e:
         raise ForgeOpError(f"Parent session '{parent}' not found: {e}") from e
-
-    def _get(name: str) -> SessionState | None:
-        try:
-            return manager.get_session(name, forge_root=str(forge_root))
-        except ForgeSessionError:
-            return None
 
     # Fail closed if Codex can't run (mirrors validate_proxy_startup); the message names
     # the setup path. Runs `codex doctor` (~20s) once -- the bridge is a real launch --
@@ -260,24 +350,19 @@ def bridge_session_to_codex(
     # session store from FORGE_FORGE_ROOT, and a worktree session's manifest lives
     # under the child root, not the payload cwd's.
     with _temporary_run_env(root, sess, forge_root=str(transfer_root)):
-        transfer = assemble_transfer_context(
-            parent_name=parent,
-            parent_state=parent_state,
-            forge_root=forge_root,
-            output_root=output_root,
-            strategy=resume_strategy,
+        assembly = assemble_codex_transfer(
+            ctx=ctx,
+            parent=parent,
+            child=child,
+            strategy=strategy,
             depth=depth,
-            get_session=_get,
-            child_name=child,
-            target_runtime="codex",
+            output_root=output_root,
         )
-        composed = compose_child_context(transfer_root, parent, child)
-        frontmatter, body, _ = parse_transfer_frontmatter(composed)
         if staged_context_path is not None:
-            atomic_write_text(staged_context_path, compose_codex_handoff_context(body))
+            atomic_write_text(staged_context_path, compose_codex_handoff_context(assembly.body))
             full_prompt = task  # raw, matching the resume-turn prompt contract
         else:
-            full_prompt = compose_codex_initial_message(body, task)
+            full_prompt = compose_codex_initial_message(assembly.body, task)
 
         request = prepare_codex_request(
             prompt=full_prompt,
@@ -291,19 +376,15 @@ def bridge_session_to_codex(
         )
         result = CodexHeadlessInvoker().run(request)
 
-    # schema=="full" is stamped only for a successful ai-curated body (design appendix
-    # §M.1); any deterministic fallback is "compatibility-fallback".
-    curation_ran = frontmatter is not None and frontmatter.get("schema") == "full"
-
     return CodexBridgeResult(
         parent=parent,
         child=child,
-        transfer_path=transfer.context_file or child_path(transfer_root, parent, child),
+        transfer_path=assembly.transfer_path,
         root_run_id=root.root_run_id,
         codex=result,
-        curation_ran=curation_ran,
+        curation_ran=assembly.curation_ran,
         thread_id=result.runtime_session_id,
-        lineage=tuple(transfer.lineage),
-        parent_transcript=transfer.transcript_artifact_path,
-        context_file_rel=transfer.context_file_rel,
+        lineage=assembly.lineage,
+        parent_transcript=assembly.parent_transcript,
+        context_file_rel=assembly.context_file_rel,
     )

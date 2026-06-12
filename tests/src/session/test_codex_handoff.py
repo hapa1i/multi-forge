@@ -10,12 +10,17 @@ import pytest
 from forge.session import codex_handoff
 from forge.session.codex_handoff import (
     DeliveryReceipt,
+    ObservationReceipt,
+    clear_observation_receipt,
     clear_pending_context,
     consume_pending_context,
+    observation_receipt_path,
     pending_context_path,
+    read_observation_receipt,
     read_receipt,
     receipt_path,
     stage_pending_context,
+    write_observation_receipt,
 )
 
 _BODY = "# Handoff context\n\nCURATED-BODY with unicode — and trailing spaces  \n"
@@ -60,9 +65,7 @@ class TestStageAndConsume:
         assert _consume(tmp_path) is None
         assert not receipt_path(tmp_path).exists()
 
-    def test_receipt_write_failure_leaves_pending_intact(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_receipt_write_failure_leaves_pending_intact(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         # Receipt-before-consume: an unreceipted delivery would read as hook_undelivered,
         # so a failed receipt write must deliver nothing and keep the staged file.
         stage_pending_context(tmp_path, _BODY)
@@ -121,3 +124,85 @@ class TestReadReceipt:
         assert receipt is not None
         assert receipt.transcript_path is None
         assert receipt.source is None
+
+
+def _observe(session_dir: Path, *, session_id: str = "thread-uuid-1") -> bool:
+    return write_observation_receipt(
+        session_dir,
+        session_id=session_id,
+        transcript_path="/codex/sessions/rollout-thread-uuid-1.jsonl",
+        source="startup",
+    )
+
+
+class TestObservationReceipt:
+    def test_paths_never_alias(self, tmp_path: Path) -> None:
+        assert observation_receipt_path(tmp_path) != receipt_path(tmp_path)
+        assert observation_receipt_path(tmp_path) != pending_context_path(tmp_path)
+
+    def test_write_read_roundtrip(self, tmp_path: Path) -> None:
+        assert _observe(tmp_path) is True
+        receipt = read_observation_receipt(tmp_path)
+        assert isinstance(receipt, ObservationReceipt)
+        assert receipt.session_id == "thread-uuid-1"
+        assert receipt.transcript_path == "/codex/sessions/rollout-thread-uuid-1.jsonl"
+        assert receipt.source == "startup"
+        assert receipt.observed_at
+
+    def test_write_does_not_touch_delivery_receipt(self, tmp_path: Path) -> None:
+        _observe(tmp_path)
+        assert not receipt_path(tmp_path).exists()
+        assert read_receipt(tmp_path) is None
+
+    def test_last_wins_overwrite(self, tmp_path: Path) -> None:
+        _observe(tmp_path, session_id="first")
+        _observe(tmp_path, session_id="second")
+        receipt = read_observation_receipt(tmp_path)
+        assert receipt is not None
+        assert receipt.session_id == "second"
+
+    def test_write_failure_returns_false_never_raises(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        def _boom(*args: object, **kwargs: object) -> None:
+            raise OSError("disk full")
+
+        monkeypatch.setattr(codex_handoff, "atomic_write_json", _boom)
+        assert _observe(tmp_path) is False
+        assert read_observation_receipt(tmp_path) is None
+
+    def test_missing_returns_none(self, tmp_path: Path) -> None:
+        assert read_observation_receipt(tmp_path) is None
+
+    @pytest.mark.parametrize("raw", ["not json", "[]", "42", '{"transcript_path": "x"}', '{"session_id": ""}'])
+    def test_malformed_returns_none(self, tmp_path: Path, raw: str) -> None:
+        observation_receipt_path(tmp_path).parent.mkdir(parents=True, exist_ok=True)
+        observation_receipt_path(tmp_path).write_text(raw)
+        assert read_observation_receipt(tmp_path) is None
+
+    def test_wrong_typed_optional_fields_degrade_to_none(self, tmp_path: Path) -> None:
+        observation_receipt_path(tmp_path).parent.mkdir(parents=True, exist_ok=True)
+        observation_receipt_path(tmp_path).write_text(
+            json.dumps(
+                {
+                    "session_id": "tid",
+                    "observed_at": "2026-06-11T00:00:00Z",
+                    "transcript_path": 7,
+                    "source": ["startup"],
+                }
+            )
+        )
+        receipt = read_observation_receipt(tmp_path)
+        assert receipt is not None
+        assert receipt.transcript_path is None
+        assert receipt.source is None
+
+    def test_clear_removes_and_is_idempotent(self, tmp_path: Path) -> None:
+        _observe(tmp_path)
+        assert clear_observation_receipt(tmp_path) is True
+        assert not observation_receipt_path(tmp_path).exists()
+        assert clear_observation_receipt(tmp_path) is False
+
+    def test_clear_leaves_delivery_receipt_and_pending(self, tmp_path: Path) -> None:
+        stage_pending_context(tmp_path, _BODY)
+        _observe(tmp_path)
+        clear_observation_receipt(tmp_path)
+        assert pending_context_path(tmp_path).read_text() == _BODY

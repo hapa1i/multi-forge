@@ -54,7 +54,7 @@ from forge.session.codex_handoff import (
     pending_context_path,
     read_receipt,
 )
-from forge.session.models import CodexConfirmed, Derivation
+from forge.session.models import CodexConfirmed, Derivation, SessionIndexEntry
 from forge.session.prev_sessions import child_notes_path, child_path
 from forge.session.transfer import ResumeStrategy
 
@@ -111,6 +111,47 @@ def session_runtime(state: SessionState) -> str:
     """Return the session's runtime registry id (default ``claude_code``)."""
     launch = state.intent.launch
     return launch.runtime if launch is not None else "claude_code"
+
+
+def resolve_codex_session(
+    manager: SessionManager, name: str, *, forge_root: Path | None
+) -> tuple[SessionIndexEntry, SessionState]:
+    """Resolve a Codex session by name: current project first, then unscoped.
+
+    Codex resume is cross-CWD by design (probe stage 60), so a scoped miss falls back
+    to the global index. Raises ``ForgeOpError`` when the session is missing or not a
+    Codex session. Shared by the headless ``continue_codex_session`` and the
+    interactive ``reattach_codex_session`` so their refusal messages cannot drift.
+    """
+    lookup_forge_root = str(forge_root) if forge_root else None
+    try:
+        entry = manager.get_session_entry(name, forge_root=lookup_forge_root)
+        state = manager.get_session(name, forge_root=lookup_forge_root)
+    except SessionNotFoundError as e:
+        if lookup_forge_root is None:
+            raise ForgeOpError(f"Session '{name}' not found: {e}") from e
+        try:
+            entry = manager.get_session_entry(name, forge_root=None)
+            state = manager.get_session(name, forge_root=None)
+        except ForgeSessionError as fallback:
+            raise ForgeOpError(f"Session '{name}' not found: {fallback}") from fallback
+    except ForgeSessionError as e:
+        raise ForgeOpError(f"Session '{name}' not found: {e}") from e
+
+    if session_runtime(state) != CODEX_RUNTIME:
+        raise ForgeOpError(f"Session '{name}' is not a Codex session (runtime={session_runtime(state)!r}).")
+    return entry, state
+
+
+def require_codex_thread_id(state: SessionState, name: str) -> str:
+    """Return the recorded thread_id, or raise with the delete-and-retry guidance."""
+    codex_state = state.confirmed.codex
+    if codex_state is None or not codex_state.thread_id:
+        raise ForgeOpError(
+            f"Session '{name}' has no recorded Codex thread_id (its first turn never started a thread). "
+            f"Run 'forge session delete {name}' and start it again."
+        )
+    return codex_state.thread_id
 
 
 def start_codex_session(
@@ -404,32 +445,9 @@ def continue_codex_session(
     worktree, not the invocation directory. Requires a recorded ``thread_id`` -- a
     session whose first turn failed before ``thread.started`` cannot be resumed.
     """
-    forge_root = ctx.forge_root
     manager = SessionManager()
-    lookup_forge_root = str(forge_root) if forge_root else None
-    try:
-        entry = manager.get_session_entry(name, forge_root=lookup_forge_root)
-        state = manager.get_session(name, forge_root=lookup_forge_root)
-    except SessionNotFoundError as e:
-        if lookup_forge_root is None:
-            raise ForgeOpError(f"Session '{name}' not found: {e}") from e
-        try:
-            entry = manager.get_session_entry(name, forge_root=None)
-            state = manager.get_session(name, forge_root=None)
-        except ForgeSessionError as fallback:
-            raise ForgeOpError(f"Session '{name}' not found: {fallback}") from fallback
-    except ForgeSessionError as e:
-        raise ForgeOpError(f"Session '{name}' not found: {e}") from e
-
-    if session_runtime(state) != CODEX_RUNTIME:
-        raise ForgeOpError(f"Session '{name}' is not a Codex session (runtime={session_runtime(state)!r}).")
-    codex_state = state.confirmed.codex
-    if codex_state is None or not codex_state.thread_id:
-        raise ForgeOpError(
-            f"Session '{name}' has no recorded Codex thread_id (its first turn never started a thread). "
-            f"Run 'forge session delete {name}' and start it again."
-        )
-    thread_id = codex_state.thread_id
+    entry, state = resolve_codex_session(manager, name, forge_root=ctx.forge_root)
+    thread_id = require_codex_thread_id(state, name)
 
     try:
         preflight = assert_codex_ready()

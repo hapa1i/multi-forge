@@ -189,11 +189,19 @@ experiment harness but the E2E supersedes its one-shot run):
    (manual registration + ceremony until Phase 6); the probe README owes "stage 86" (operator-gated enrolled end-to-end
    incl. the unprobed multi-KB additionalContext size).
 
-5. **Interactive Codex frontend (unblocked 2026-06-10: interactive firing confirmed).** Forge-managed interactive
-   `codex` sessions: `install_scopes` for Codex config (today `()` on the RuntimeSpec), flip
-   `interactive="beta" -> ...`, FORGE_SESSION wiring (verified to reach BOTH the model shell and the hook env),
-   positional initial-prompt arg (verified), session-id + rollout-path capture into `confirmed` (both carried in the
-   SessionStart payload).
+5. **Interactive Codex frontend -- SHIPPED 2026-06-11 (Phase 5; see the checklist + change_log entry).** Forge-managed
+   interactive `codex` sessions: bare `forge session start --runtime codex` opens the TUI (omitting `--task` =
+   interactive; `--task` keeps meaning headless and now requires `--resume-from`); the interactive bridge
+   (`--resume-from` without `--task`) delivers the curated transfer via the positional initial prompt wrapped in hold
+   instructions (`compose_codex_interactive_context` -- the positional `[PROMPT]` starts a real model turn) or via
+   `--context-delivery hook`; bare `forge session resume` reattaches with `codex resume <thread_id>` (active-session
+   gate, no `--force`; cross-project by design). Thread identity reconciles post-exit: enrolled-home receipts (the new
+   nothing-staged `observation-receipt.json` -- delivery receipts stay byte-stable) beat filesystem discovery
+   (`find_rollouts_since`, exactly-one-or-refuse, `rollout_source="discovered_post_exit"`). FORGE_SESSION wiring +
+   positional prompt + payload capture all landed (`session/codex_invoke.py`, `core/ops/codex_interactive.py`). Registry
+   flipped `interactive="beta" -> "default"`. **Deferred:** `install_scopes` stays `()` (Phase 6 installer);
+   headless-without-parent stays rejected; `--sandbox` on resume stays hardcoded `workspace-write`; the real-TUI smoke
+   is the operator-gated probe README stage 87.
 
 6. **Installer Codex support (gated on 3/5).** The installer is Claude-shaped: 13 Claude hook names are hardcoded in
    `src/forge/install/preset.py` and it writes only `.claude/`. Installing Forge hooks into Codex needs a Codex preset

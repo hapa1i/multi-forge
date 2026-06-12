@@ -1478,44 +1478,59 @@ def resume(
             sys.exit(0)
 
     _fr = _sess()._cwd_forge_root()
+    # Cross-project resolution happens BEFORE the runtime is knowable (the runtime
+    # lives in the manifest), so a scoped miss always tries the unscoped lookup;
+    # whether a cross-project hit is usable is decided per-runtime below.
+    cross_project = False
     try:
         manifest = manager.get_session(name, forge_root=_fr)
     except SessionNotFoundError:
-        if task is not None and _fr is not None:
-            try:
-                manifest = manager.get_session(name, forge_root=None)
-            except SessionNotFoundError:
-                if not _hint_cross_project_session(name, _fr):
-                    print_error_with_tip(
-                        f"session '{name}' not found",
-                        f"Run 'forge session start {name}' to create it.",
-                        console=console,
-                    )
-                sys.exit(1)
-            except ForgeSessionError as e:
-                handle_session_error(e)
-                return
-        elif not _hint_cross_project_session(name, _fr):
-            print_error_with_tip(
-                f"session '{name}' not found",
-                f"Run 'forge session start {name}' to create it.",
-                console=console,
-            )
+        if _fr is None:
+            # The scoped lookup WAS the global lookup; nothing else to try.
+            if not _hint_cross_project_session(name, _fr):
+                print_error_with_tip(
+                    f"session '{name}' not found",
+                    f"Run 'forge session start {name}' to create it.",
+                    console=console,
+                )
             sys.exit(1)
-        else:
+        try:
+            manifest = manager.get_session(name, forge_root=None)
+            cross_project = True
+        except SessionNotFoundError:
+            if not _hint_cross_project_session(name, _fr):
+                print_error_with_tip(
+                    f"session '{name}' not found",
+                    f"Run 'forge session start {name}' to create it.",
+                    console=console,
+                )
             sys.exit(1)
+        except ForgeSessionError as e:
+            handle_session_error(e)
+            return
     except ForgeSessionError as e:
         handle_session_error(e)
         return
 
     # Runtime dispatch BEFORE any Claude predicate: a Codex session has no Claude
     # conversation to reattach, so the Claude resume machinery below never applies.
+    # Codex resume is cross-CWD by design (the turn runs in the recorded worktree).
     manifest_runtime = manifest.intent.launch.runtime if manifest.intent.launch else "claude_code"
     if manifest_runtime == "codex":
-        sys.exit(run_codex_resume(ctx, name, task))
+        sys.exit(run_codex_resume(ctx, name, task, manifest))
 
     if task is not None:
         console.print("[red]Error:[/red] --task is only supported for Codex sessions")
+        sys.exit(1)
+
+    if cross_project:
+        # Claude resume is genuinely project-scoped: keep the pre-lookup refusal.
+        if not _hint_cross_project_session(name, _fr):
+            print_error_with_tip(
+                f"session '{name}' not found",
+                f"Run 'forge session start {name}' to create it.",
+                console=console,
+            )
         sys.exit(1)
 
     _, validation_base_url, validation_proxy_id = _get_effective_proxy_for_session(manifest)

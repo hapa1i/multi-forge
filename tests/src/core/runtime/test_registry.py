@@ -55,7 +55,7 @@ class TestCodexSpec:
         # in trust-enrolled homes, malformed hook output fails open, and PermissionRequest
         # is unpinned headless.
         assert s.pretool_policy == "partial"
-        assert s.interactive == "beta"  # Forge frontend integration target (codex_frontend Phase 5)
+        assert s.interactive == "default"  # Forge-managed interactive sessions (codex_frontend Phase 5)
         # Probes (2026-06-10): trust-enrolled hooks fire headless AND interactively ->
         # "enrollment_gated", not "gated": the version floor is satisfied yet untrusted hooks
         # do not fire -- the gate is trust enrollment, not the version. The floor stays

@@ -117,8 +117,9 @@ does, but a bare `forge transfer regenerate` from a shell runs the curation with
 > tells Codex how to run.
 
 > **Note:** The one-command flow rejects `--resume-from` without `--runtime codex` — with the default (Claude) runtime
-> it would just be `forge session resume <parent> --fresh`, which already exists. Interactive Codex sessions (a bare
-> `forge session start --runtime codex` with no parent) are a later phase.
+> it would just be `forge session resume <parent> --fresh`, which already exists. Omitting `--task` makes the bridge
+> interactive: the curated context opens a `codex` TUI session instead of a headless turn (see
+> [session.md](session.md#interactive-codex-sessions)).
 
 ## Troubleshooting
 

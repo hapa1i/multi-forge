@@ -35,6 +35,7 @@ from forge.session.codex_handoff import (
     pending_context_path,
     receipt_path,
     stage_pending_context,
+    write_observation_receipt,
 )
 from forge.session.models import CodexConfirmed, create_session_state
 
@@ -416,6 +417,32 @@ class TestStartCodexHookDelivery:
         # One-shot invariant: reconciliation cleared the undelivered staging.
         assert not pending_context_path(_session_dir(proj)).exists()
         assert not receipt_path(_session_dir(proj)).exists()
+
+    def test_observation_receipt_never_read_as_delivery(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Phase 4 contract regression (introduced by Phase 5): the observation receipt
+        is a separate file; delivery reconciliation must never read it as a delivery
+        receipt -- an observation WITHOUT a delivery receipt still reconciles
+        hook_undelivered, and no observation field leaks into the manifest."""
+        proj, ctx = _make_project(tmp_path, monkeypatch)
+
+        def _observe_only() -> None:
+            write_observation_receipt(
+                _session_dir(proj),
+                session_id=_SUCCESS_TID,
+                transcript_path=f"/codex-home/sessions/rollout-x-{_SUCCESS_TID}.jsonl",
+                source="startup",
+            )
+
+        with _codex_mocks(on_codex_spawn=_observe_only):
+            result = start_codex_session(
+                ctx=ctx, name="impl", parent="planner", task="Build it", context_delivery="hook"
+            )
+
+        assert result.context_delivery == "hook_undelivered"
+        state = SessionManager().get_session("impl", forge_root=str(proj))
+        assert state.confirmed.codex is not None
+        assert state.confirmed.codex.context_delivery == "hook_undelivered"
+        assert state.confirmed.codex.rollout_source != "session_start_hook"
 
     def test_mismatched_receipt_is_undelivered_with_warning(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch

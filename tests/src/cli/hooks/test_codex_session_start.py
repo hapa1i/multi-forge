@@ -20,7 +20,9 @@ from forge.cli.hooks.codex_transfer import format_session_start_context
 from forge.cli.hooks.commands import hooks
 from forge.session import SessionStore, create_session_state
 from forge.session.codex_handoff import (
+    observation_receipt_path,
     pending_context_path,
+    read_observation_receipt,
     read_receipt,
     receipt_path,
     stage_pending_context,
@@ -193,8 +195,96 @@ class TestSilentNoOps:
 
     def test_nothing_staged_is_the_resume_case(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """A resume-turn SessionStart finds no staged file (one-shot consumed at start)
-        and must stay silent -- no late delivery, no receipt."""
+        and must stay silent -- no late delivery, no DELIVERY receipt. Since Phase 5 an
+        observation receipt IS written (interactive thread capture), still silently."""
         store = _make_session(tmp_path, monkeypatch)
         result = _invoke(_payload(cwd=str(tmp_path), source="resume"))
         self._assert_silent(result)
         assert not receipt_path(store.session_dir).exists()
+        observation = read_observation_receipt(store.session_dir)
+        assert observation is not None
+        assert observation.source == "resume"
+
+
+class TestObservationReceipt:
+    """Phase 5: nothing-staged turns in a managed session record an observation."""
+
+    def _assert_silent(self, result) -> None:  # type: ignore[no-untyped-def]
+        assert result.exit_code == 0
+        assert result.stdout == ""
+        assert result.stderr == ""
+
+    def test_nothing_staged_writes_observation_from_payload(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        store = _make_session(tmp_path, monkeypatch)
+        result = _invoke(_payload(cwd=str(tmp_path)))
+        self._assert_silent(result)
+        observation = read_observation_receipt(store.session_dir)
+        assert observation is not None
+        assert observation.session_id == _THREAD_ID
+        assert observation.transcript_path == _ROLLOUT
+        assert observation.source == "startup"
+        assert not receipt_path(store.session_dir).exists()
+
+    def test_staged_turn_writes_no_observation(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Per-turn mutual exclusivity: a delivery turn leaves only the delivery receipt."""
+        store = _make_session(tmp_path, monkeypatch)
+        stage_pending_context(store.session_dir, _BODY)
+        result = _invoke(_payload(cwd=str(tmp_path)))
+        assert result.stdout == format_session_start_context(_BODY) + "\n"
+        assert read_receipt(store.session_dir) is not None
+        assert not observation_receipt_path(store.session_dir).exists()
+
+    def test_staged_delivery_receipt_failure_writes_no_observation(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Regression: consume returns None both for "nothing staged" and "staged but
+        the delivery receipt write failed". The failure case is a DELIVERY failure --
+        recording it as a nothing-staged observation would be dishonest."""
+        store = _make_session(tmp_path, monkeypatch)
+        stage_pending_context(store.session_dir, _BODY)
+
+        def _boom(*args: object, **kwargs: object) -> None:
+            raise OSError("disk full")
+
+        monkeypatch.setattr("forge.session.codex_handoff.atomic_write_json", _boom)
+
+        result = _invoke(_payload(cwd=str(tmp_path)))
+
+        self._assert_silent(result)
+        assert pending_context_path(store.session_dir).read_text() == _BODY  # delivery failed, pending kept
+        assert not receipt_path(store.session_dir).exists()
+        assert not observation_receipt_path(store.session_dir).exists()
+
+    def test_pre_resolution_paths_write_nothing(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Wrong event / missing session_id return before resolution: zero writes."""
+        store = _make_session(tmp_path, monkeypatch)
+        self._assert_silent(_invoke(_payload(cwd=str(tmp_path), hook_event_name="PreToolUse")))
+        self._assert_silent(_invoke(_payload(cwd=str(tmp_path), session_id=None)))
+        assert not observation_receipt_path(store.session_dir).exists()
+
+    def test_multi_turn_last_wins(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        store = _make_session(tmp_path, monkeypatch)
+        _invoke(_payload(cwd=str(tmp_path), session_id="11111111-1111-1111-1111-111111111111"))
+        _invoke(_payload(cwd=str(tmp_path), session_id="22222222-2222-2222-2222-222222222222", source="resume"))
+        observation = read_observation_receipt(store.session_dir)
+        assert observation is not None
+        assert observation.session_id == "22222222-2222-2222-2222-222222222222"
+        assert observation.source == "resume"
+
+    def test_observation_write_failure_stays_silent(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        _make_session(tmp_path, monkeypatch)
+
+        def _boom(*args: object, **kwargs: object) -> bool:
+            raise RuntimeError("disk on fire")
+
+        monkeypatch.setattr("forge.cli.hooks.codex_transfer.write_observation_receipt", _boom)
+        caplog.set_level(logging.DEBUG, logger="forge.cli.hooks.codex_transfer")
+
+        result = _invoke(_payload(cwd=str(tmp_path)))
+
+        self._assert_silent(result)
+        assert "observation write failed" in caplog.text

@@ -384,6 +384,7 @@ _CODEX_THREAD_ID = "019eb075-ef05-7702-9045-0a8a88b512d2"
 _CODEX_ROLLOUT = f"/root/.codex/sessions/2026/06/10/rollout-2026-06-10T03-36-19-{_CODEX_THREAD_ID}.jsonl"
 _PENDING_PATH = "/workspace/.forge/sessions/policy-test/codex/pending-context.md"
 _RECEIPT_PATH = "/workspace/.forge/sessions/policy-test/codex/context-receipt.json"
+_OBSERVATION_PATH = "/workspace/.forge/sessions/policy-test/codex/observation-receipt.json"
 
 
 def invoke_codex_session_start(
@@ -437,21 +438,30 @@ class TestCodexSessionStartDocker:
         assert out["hookEventName"] == "SessionStart"
         assert out["additionalContext"].strip() == body.strip()
 
-        # Staged file consumed; receipt carries the payload's thread identity.
+        # Staged file consumed; receipt carries the payload's thread identity. Receipts
+        # are per-turn mutually exclusive: a delivery turn writes no observation.
         assert not policy_workspace.file_exists(_PENDING_PATH)
         receipt = policy_workspace.read_json(_RECEIPT_PATH)
         assert receipt["session_id"] == _CODEX_THREAD_ID
         assert receipt["transcript_path"] == _CODEX_ROLLOUT
         assert receipt["source"] == "startup"
+        assert not policy_workspace.file_exists(_OBSERVATION_PATH)
 
-    def test_nothing_staged_is_silent(self, policy_workspace: ContainerLike) -> None:
-        """The resume-turn case: no staged file -> exit 0, no stdout, no receipt."""
+    def test_nothing_staged_writes_observation_silently(self, policy_workspace: ContainerLike) -> None:
+        """The interactive/resume-turn case: no staged file -> exit 0, no stdout, no
+        delivery receipt -- but a managed session records the observation receipt
+        (Phase 5 interactive thread capture)."""
         exit_code, stdout, stderr = invoke_codex_session_start(policy_workspace)
 
         assert exit_code == 0
         assert stdout.strip() == ""
         assert "[forge]" not in stderr, f"silent no-op must not emit Forge stderr noise, got: {stderr}"
         assert not policy_workspace.file_exists(_RECEIPT_PATH)
+        observation = policy_workspace.read_json(_OBSERVATION_PATH)
+        assert observation["session_id"] == _CODEX_THREAD_ID
+        assert observation["transcript_path"] == _CODEX_ROLLOUT
+        assert observation["source"] == "startup"
+        assert observation["observed_at"]
 
     def test_non_forge_session_is_silent(self, policy_workspace: ContainerLike) -> None:
         """Regression: the user-scope case. A Codex session with no FORGE_SESSION in
@@ -476,6 +486,7 @@ class TestCodexSessionStartDocker:
         assert result.returncode == 0
         assert result.stdout.strip() == ""
         assert "[forge]" not in result.stderr, f"non-Forge session must see no Forge noise, got: {result.stderr}"
+        assert not policy_workspace.file_exists(_OBSERVATION_PATH), "unmanaged session must write nothing"
 
     def test_fail_open_on_invalid_json(self, policy_workspace: ContainerLike) -> None:
         result = policy_workspace.exec("cd /workspace && echo 'not valid json' | forge hook codex-session-start")

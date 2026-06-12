@@ -114,6 +114,39 @@ class CodexHeadlessInvoker(_HeadlessLifecycleBase):
         return "codex CLI not found in PATH"
 
 
+def sanitize_codex_child_env(preflight: CodexPreflight) -> dict[str, str]:
+    """Build a sanitized env for any ``codex`` child (headless exec or interactive TUI).
+
+    Strips inherited Codex/Anthropic/proxy vars so the child cannot contradict the
+    preflight's resolved auth posture, advances the ``FORGE_DEPTH`` recursion guard
+    (Codex can run shell commands that invoke ``forge``, even though it does not run
+    Forge hooks), then re-establishes exactly the preflight-resolved auth:
+    ``CODEX_API_KEY`` for an api-key login the ``codex`` binary can't otherwise see
+    (``env``/``credential_file``), the inherited ``CODEX_ACCESS_TOKEN`` for an
+    enterprise login, or **nothing** for ``codex_store`` (Codex reads its own
+    ``~/.codex`` auth). Other ambient context (including ``FORGE_SESSION``) is kept;
+    run-tree identity is the caller's concern (derive for headless children, an
+    explicit fresh root for interactive launches).
+    """
+    env = os.environ.copy()
+    for var in _CODEX_CHILD_STRIP_VARS:
+        env.pop(var, None)
+    env[FORGE_DEPTH_VAR] = str(get_forge_depth(env) + 1)
+    if preflight.auth_source in ("env", "credential_file"):
+        if preflight.auth_method == "enterprise_token":
+            # auth_source=env via CODEX_ACCESS_TOKEN (no API key): restore the exact token
+            # (codex_api_key_for_subprocess resolves CODEX_API_KEY, which is absent here).
+            token = os.environ.get("CODEX_ACCESS_TOKEN")
+            if token:
+                env["CODEX_ACCESS_TOKEN"] = token
+        else:
+            # api_key from Forge env/credential-file resolution (respects auth_ignore_env).
+            key = codex_api_key_for_subprocess()
+            if key:
+                env["CODEX_API_KEY"] = key
+    return env
+
+
 def prepare_codex_request(
     *,
     prompt: str,
@@ -153,26 +186,7 @@ def prepare_codex_request(
     if resume_thread_id:
         argv += ["resume", resume_thread_id]
 
-    env = os.environ.copy()
-    for var in _CODEX_CHILD_STRIP_VARS:
-        env.pop(var, None)
-    # Keep normal ambient context (including FORGE_SESSION for attribution), but advance
-    # the recursion guard just like a Claude headless child: Codex can run shell commands
-    # that invoke `forge`, even though it does not run Forge hooks.
-    env[FORGE_DEPTH_VAR] = str(get_forge_depth(env) + 1)
-    if preflight.auth_source in ("env", "credential_file"):
-        if preflight.auth_method == "enterprise_token":
-            # auth_source=env via CODEX_ACCESS_TOKEN (no API key): restore the exact token
-            # (codex_api_key_for_subprocess resolves CODEX_API_KEY, which is absent here).
-            token = os.environ.get("CODEX_ACCESS_TOKEN")
-            if token:
-                env["CODEX_ACCESS_TOKEN"] = token
-        else:
-            # api_key from Forge env/credential-file resolution (respects auth_ignore_env).
-            key = codex_api_key_for_subprocess()
-            if key:
-                env["CODEX_API_KEY"] = key
-    # auth_source == "codex_store": inject nothing -- codex reads its own ~/.codex auth.
+    env = sanitize_codex_child_env(preflight)
     stamp_run_identity(env, derive=True)
 
     return HeadlessRequest(

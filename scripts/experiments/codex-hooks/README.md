@@ -200,3 +200,26 @@ assert (a) the model echoes the token (delivery reached context), (b)
 reconciled), and (c) a **realistic multi-KB transfer body** still lands — payload size is the one unprobed dimension
 (30e used a short token). Also re-confirms the bridge-scoped env loop (`FORGE_SESSION`/`FORGE_FORGE_ROOT` visible in the
 hook env; 40c2/50c pinned ambient passthrough, this pins the bridge-set values specifically).
+
+**Owed next operator round — stage 87 (Forge-managed interactive Codex smoke).** Phase 5 shipped Forge-managed
+interactive sessions (`forge session start --runtime codex` launches the TUI; bare `forge session resume` reattaches via
+`codex resume <thread_id>`; thread identity reconciled post-exit from the observation receipt or filesystem discovery).
+The TUI cannot run headless, so this is a manual checklist with captured evidence (`forge session show` output +
+`observation-receipt.json` contents per step):
+
+1. **Bare start**: `forge session start s87a --runtime codex` -> TUI opens with no initial prompt -> exit ->
+   `session show s87a` records `thread_id` with `rollout_source = "discovered_post_exit"` (un-enrolled home) or
+   `"session_start_hook"` (enrolled), and **no** `Delivery:` line (bare starts record `context_delivery = None`).
+2. **Interactive bridge, positional delivery**: `forge session start s87b --runtime codex --resume-from <parent>` with a
+   **multi-KB curated transfer** (size unprobed — 50c used a short token). Verify the hold instructions hold: the first
+   model turn acknowledges the context in a sentence and **waits** — no file edits, no commands, no tool calls before
+   the operator types. This is the load-bearing check: the positional `[PROMPT]` starts a real model turn, and the
+   `compose_codex_interactive_context` framing is what keeps it passive.
+3. **Interactive bridge, hook delivery** (enrolled home): `--context-delivery hook` -> context lands via
+   `additionalContext` with no synthetic first turn; post-exit `context_delivery == "session_start_hook"`.
+4. **Reattach**: `forge session resume s87a` -> `codex resume <thread_id>` reopens the same conversation (prior turns
+   visible); a second resume while one is live is refused (active-session gate).
+5. **TUI `--sandbox` behavior**: `forge session start s87c --runtime codex --sandbox read-only` -> the TUI honors the
+   sandbox mode at runtime. The argv shapes are already pinned (codex 0.139.0 `--help` probes, 2026-06-11: root
+   `codex [OPTIONS] [PROMPT]` and `codex resume [OPTIONS] [SESSION_ID]` both declare `-s/--sandbox`; the launcher passes
+   it inside the `resume` subcommand where it is documented) — this step verifies the *behavior*, not the flag parsing.

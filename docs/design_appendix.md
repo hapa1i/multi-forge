@@ -1434,3 +1434,45 @@ storage, curation) informed this substrate. Forge will **not** take `ctx` as a d
 load-bearing for Forge's session, policy, and usage story, so its contract lives in-tree. The schema is self-contained
 and **no `ctx` interop is planned**. An optional import/export bridge could be built on the existing schema later
 without changing it, but that is explicitly not committed work.
+
+---
+
+## N. Codex Runtime Reference
+
+Extracted from [design.md §3.9](design.md#39-session-resume-context-management) and
+[design.md §5.5.5](design.md#555-workflow-runners). Lifecycle narrative (headless turns, interactive TUI sessions,
+delivery modes, post-exit reconciliation) remains in design.md.
+
+### N.1 Recorded Codex facts (`confirmed.codex`)
+
+All CLI-owned (§3.5):
+
+| Field                                          | Source                                                                                                                     |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `thread_id`                                    | Stream `thread.started` (headless) or post-exit reconciliation (interactive)                                               |
+| `rollout_path` / `rollout_source`              | See provenance table below                                                                                                 |
+| `auth_method` / `auth_source` / `billing_mode` | Preflight's secret-free auth posture (refreshed per turn)                                                                  |
+| `last_run_at`                                  | Per turn                                                                                                                   |
+| `context_delivery`                             | `initial_message \| session_start_hook \| hook_undelivered`; `None` for bare interactive starts (a transfer-delivery fact) |
+
+`rollout_source` provenance (the matching file is `$CODEX_HOME/sessions/…/rollout-*-<thread_id>.jsonl`):
+
+- `discovered_by_thread_id`: glob located by a stream-known thread_id.
+- `session_start_hook`: a receipt's codex-reported `transcript_path` supersedes the glob; a receipt can also recover a
+  `thread_id` the stream missed.
+- `discovered_post_exit`: interactive time+cwd discovery — the rollout **filename** is the thread source (filename
+  timestamps are local time, so discovery filters by mtime).
+
+`confirmed.launch` and `claude_session_id` stay unset (§3.5).
+
+### N.2 Codex `RuntimeSpec` declarations
+
+Load-bearing values (probe evidence in `scripts/experiments/codex-hooks/README.md`):
+
+- `native_hooks="enrollment_gated"`: hooks fire only after a one-time interactive TUI trust ceremony. Trust keys on the
+  registering config's path; `trusted_hash` is not black-box computable, so enrollment is never verifiable pre-turn.
+- `pretool_policy="partial"`: post-enrollment PreToolUse deny + `updatedInput` are pinned headless, but enforcement
+  exists only in enrolled homes. Malformed hook output fails open; PermissionRequest has not been observed firing.
+- `interactive="default"`: Forge-managed interactive sessions (bare TUI start and `codex resume` reattach, §3.9).
+- `hook_min_version`: machine-readable registration floor a preflight checks — not a firing guarantee.
+- `hook_feature_flag=None`: Codex hooks are default-on.

@@ -24,6 +24,7 @@ from forge.core.ops.codex_bridge import (
     bridge_session_to_codex,
     compose_codex_handoff_context,
     compose_codex_initial_message,
+    compose_codex_interactive_context,
 )
 from forge.core.ops.context import ExecutionContext
 from forge.core.ops.session import ForgeOpError
@@ -146,6 +147,21 @@ class TestComposeInitialMessage:
         body, task = "CURATED-BODY", "TASK-TEXT"
         expected = compose_codex_handoff_context(body) + "\n# Your task\n\n" + f"{task.strip()}\n"
         assert compose_codex_initial_message(body, task) == expected
+
+
+class TestComposeInteractiveContext:
+    """Phase 5: the TUI positional prompt starts a model turn, so the framing must hold it."""
+
+    def test_framed_body_with_hold_instructions(self) -> None:
+        msg = compose_codex_interactive_context("CURATED-BODY")
+        assert msg.startswith(compose_codex_handoff_context("CURATED-BODY"))
+        assert "# Hold for instructions" in msg
+        assert "WAIT for the user's instruction" in msg
+        assert "# Your task" not in msg  # no task suffix -- the human types in the TUI
+
+    def test_headless_compose_functions_unchanged(self) -> None:
+        # The interactive variant must not perturb the golden-pinned headless framing.
+        assert compose_codex_initial_message("CURATED-BODY", "TASK-TEXT") == _GOLDEN_INITIAL_MESSAGE
 
 
 # --- _temporary_run_env -----------------------------------------------------------------

@@ -211,7 +211,9 @@ stages the handoff under the session directory and this hook injects it at Sessi
 reconciles the hook's delivery receipt into the session manifest (`confirmed.codex.context_delivery`). If the hook never
 fired (not enrolled), the command exits 1 and tells you so — the first turn ran without the parent context.
 
-- every other invocation (no staged handoff, resume turns, non-Forge Codex sessions) is a silent no-op
+- every other invocation is silent (no stdout/stderr). In a **managed** session with nothing staged (interactive starts,
+  resume turns) the hook still records a small observation receipt under the session directory — that is how enrolled
+  homes capture the thread id of interactive sessions exactly. Non-Forge Codex sessions see zero writes.
 - **not auto-installed**: add the registration below to your Codex `config.toml` and complete the one-time trust
   ceremony (run `codex` interactively in the project and grant trust):
 

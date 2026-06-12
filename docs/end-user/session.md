@@ -123,12 +123,14 @@ forge session resume [parent] --fresh \
   [--resume-mode native|transfer] \
   [--proxy <template>]
 
-# Codex-runtime session (derive from a Claude parent; runs headless `codex exec` turns)
-forge session start [name] --runtime codex --resume-from <parent> --task "<first task>" \
+# Codex-runtime session (interactive TUI by default; --task runs headless `codex exec` turns)
+forge session start [name] --runtime codex \
+  [--resume-from <parent> [--task "<first task>"]] \
   [--strategy minimal|structured|full|ai-curated] [--depth <n>] \
   [--sandbox read-only|workspace-write|danger-full-access] [--worktree/-w] [--branch/-b <branch>] \
   [--context-delivery initial-message|hook]
-forge session resume <name> --task "<next task>"   # next turn on the same Codex thread
+forge session resume <name>                        # reattach the codex TUI to the same thread
+forge session resume <name> --task "<next task>"   # next headless turn on the same Codex thread
 
 # Show / list
 forge session show            # Current session (from $FORGE_SESSION)
@@ -399,9 +401,9 @@ Requires `codex` installed and authenticated (`forge runtime preflight codex` �
 the parent's context (default `--strategy ai-curated`), prepends it to your `--task` as the initial `codex exec`
 message, and records the Codex **thread id** so each `resume --task` continues the same conversation — from any
 directory; the turn always runs in the session's recorded worktree. Codex sessions go direct to OpenAI: proxy,
-supervision, memory, and other Claude-only flags are rejected. `--task` is required (headless turns need a prompt) and
-only valid for Codex sessions. If the first turn fails before Codex opens a thread, resume refuses with guidance —
-delete the session and start again.
+supervision, memory, and other Claude-only flags are rejected. `--task` selects the headless form, requires
+`--resume-from`, and is only valid for Codex sessions; omitting it opens the interactive TUI (next section). If the
+first turn fails before Codex opens a thread, resume refuses with guidance — delete the session and start again.
 
 **Context delivery (`--context-delivery`):** `initial-message` (default) prepends the curated transfer to the first
 prompt — zero setup. `hook` delivers it via a trust-enrolled Codex `SessionStart` hook instead (`additionalContext`):
@@ -410,6 +412,30 @@ register `forge hook codex-session-start` in your Codex config and complete the 
 delivery **after** the turn via the hook's receipt and records the outcome in the manifest
 (`confirmed.codex.context_delivery`). If the hook didn't fire, the command exits 1 — the first turn ran without the
 parent context; enroll the hook, or `forge session delete <name>` and retry with the default delivery.
+
+### Interactive Codex sessions
+
+```bash
+forge session start scratch --runtime codex                  # bare: open the codex TUI as a managed session
+forge session start impl --runtime codex --resume-from planner   # interactive bridge: curated context, then you type
+forge session resume scratch                                 # reattach the TUI to the same thread
+forge session show scratch                                   # thread id, rollout, how the thread was captured
+```
+
+Omitting `--task` launches the foreground `codex` TUI under Forge management: the session is indexed, the thread id and
+rollout are recorded when the TUI exits, and a bare `forge session resume <name>` reattaches the same conversation with
+`codex resume` — from any directory; the TUI opens in the session's recorded worktree. While a launch is active, a
+second resume is refused (exit the running TUI first). With `--resume-from`, the curated parent context arrives as the
+session's first message, framed with hold instructions so Codex acknowledges it and waits for you instead of acting on
+its own; with `--context-delivery hook` (trust-enrolled homes) the context lands invisibly via `additionalContext` and
+the TUI opens with no first message. Transfer-shaping flags (`--strategy`, `--depth`, `--context-delivery`) require
+`--resume-from`.
+
+Thread capture is automatic. In trust-enrolled homes the `codex-session-start` hook reports the thread directly; without
+enrollment Forge discovers the rollout file Codex wrote during the run. Discovery refuses to guess: if several Codex
+sessions were started concurrently in the same directory, the thread may stay unrecorded — the command warns, and
+`forge session delete <name>` plus a fresh start is the recovery. Interactive turns do not appear in the usage ledger
+(Codex reports no attributable usage for TUI turns); a bridge's transfer curation still does.
 
 ```bash
 forge session fork auth-refactor --name auth-refactor-alt

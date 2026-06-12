@@ -63,8 +63,17 @@ parser, `CodexHookAdapter`/`CodexHookResponder`, and `forge hook codex-policy-ch
 `--context-delivery {initial-message, hook}` on `start --runtime codex`, the `forge hook codex-session-start` handler
 (staged file -> strict `additionalContext` wire + delivery receipt), and post-turn receipt reconciliation into
 `confirmed.codex.context_delivery` (incl. thread-id recovery + hook-sourced rollout). Handler-only; stage 86
-(operator-gated enrolled E2E) owed alongside stage 85. **Next: Phase 5 (interactive frontend) or Phase 6 (installer) --
-Phase 5 unblocked; Phase 6 now has both hook handlers shipped.**
+(operator-gated enrolled E2E) owed alongside stage 85.
+
+**Phase 5 shipped 2026-06-11** (all seven slices ticked below; see change_log): Forge-managed interactive `codex`
+sessions -- bare start opens the TUI, the interactive bridge carries the curated transfer (positional hold-instructions
+framing or `--context-delivery hook`), bare resume reattaches via `codex resume <thread_id>`, thread identity reconciled
+post-exit (observation receipt beats `find_rollouts_since` discovery; exactly-one-or-refuse). Registry
+`interactive="beta" -> "default"`. The argv/rollout-head externals were closed by live probes post-ship (codex 0.139.0;
+see the verification paragraph at the end of the Phase 5 section -- the launcher now passes `--sandbox` inside the
+`resume` subcommand). Stage 87 (operator-gated real-TUI **behavioral** smoke: hold instructions, multi-KB positional,
+enrolled hook delivery, live reattach) owed alongside stages 85/86. **Next: Phase 6 (installer)**, with both hook
+handlers shipped.
 
 ## Phase 0 - Registry correction (owed from probe round 2)
 
@@ -335,10 +344,106 @@ cleared); resume defensively clears.
   - **Done 2026-06-11**: grep gate clean (only this checklist's meta-references remain); `make pre-commit` clean (mypy
     caught + fixed a `HookSeam` literal annotation in the seam-guard test); full sweep 5773 unit + 399 regression green.
 
-## Phase 5 - Interactive Codex frontend (unblocked; build after 2/3)
+## Phase 5 - Interactive Codex frontend (in progress 2026-06-11)
 
-Stub -- Forge-managed interactive `codex` sessions: `install_scopes`, `interactive="beta"` flip, FORGE_SESSION wiring
-(verified in hook env + model shell), positional initial prompt (verified), session-id capture into `confirmed`.
+Plan approved 2026-06-11 (full plan: `~/.claude/plans/wise-wiggling-wolf.md`). **Scope decisions (user):** bare =
+interactive (omitting `--task` on `start --runtime codex` / codex `resume` launches/reattaches the TUI; `--task` keeps
+meaning headless, byte-unchanged); interactive composes with `--resume-from` (curated transfer rides the positional
+initial prompt, or `--context-delivery hook`); thread-id capture = post-exit filesystem discovery (zero-setup) + an
+enrolled-home **observation receipt** from `codex-session-start` (separate `observation-receipt.json`; the Phase 4
+delivery-receipt contract stays byte-stable); `install_scopes` stays `()` (Phase 6 installer) -- Phase 5 flips only
+`interactive="beta" -> "default"`. Load-bearing: the positional `[PROMPT]` starts a model turn (not passive context), so
+the interactive framing carries explicit hold instructions; hook delivery is the only truly passive path. The TUI owns
+stdout (no JSONL stream), so interactive turns emit NO usage event and `confirmed.codex` is reconciled post-exit
+(observation receipt beats discovery; ambiguity refuses to guess). Two timestamps: `operation_started_at` (activity
+summary `since`) vs `rollout_discovery_started_at` (tight pre-launch discovery window). `run_identity` is REQUIRED on
+the launcher (the TUI must share the curation event's root). Bare starts record `context_delivery=None` (the field is a
+transfer-delivery fact).
+
+- [x] Slice 1 -- discovery + receipt groundwork: `codex_rollouts.py` `DiscoveredRollout`/`parse_rollout_filename`/
+  `find_rollouts_since` (mtime filter; head-cwd narrowing; ambiguity returned to caller); `codex_handoff.py`
+  `ObservationReceipt` + path/write/read/clear.
+  - Assertion: post-launch rollout found with thread_id from filename; older excluded; same-cwd ambiguity returns both;
+    observation roundtrip/malformed/clear; `receipt_path() != observation_receipt_path()`.
+  - **Done 2026-06-11**: filename parse is strict-timestamp/opaque-id (Phase 2 stance); narrowing only applies when it
+    leaves >= 1 candidate (unknown head shape never eliminates the true rollout); canonical-path compare handles macOS
+    /var -> /private/var. 53 tests green (`test_codex_rollouts.py` + `test_codex_handoff.py`); mypy clean.
+- [x] Slice 2 -- hook observation receipt: `codex_transfer.py` branches on **pending-exists** (not the consume return --
+  a staged receipt-write failure must NOT produce an observation receipt); nothing-staged + managed session writes the
+  observation receipt, stays silent; unmanaged stays zero-write.
+  - Assertion: mutual exclusivity incl. the staged-failure case; Phase 4 regression -- `_reconcile_hook_delivery` never
+    reads the observation file (observation-without-delivery still reconciles `hook_undelivered`).
+  - **Done 2026-06-11**: 6 new hook-level cases (`TestObservationReceipt`) + the resume-case docstring/assertion update
+    - the ops-level Phase 4 regression (`test_observation_receipt_never_read_as_delivery`). Full hooks package 153
+      green; `test_codex_session.py` 49 green; mypy clean.
+- [x] Slice 3 -- bridge assembly extraction + interactive launcher: `assemble_codex_transfer` (golden-pinned
+  byte-identity), `sanitize_codex_child_env` (behavior-neutral), `compose_codex_interactive_context` (hold
+  instructions), new `session/codex_invoke.py` `invoke_codex_interactive` (REQUIRED `run_identity`; foreground
+  `subprocess.run`; argv `codex --sandbox X [resume tid] [prompt]`).
+  - Assertion: bridge golden byte-identical; four auth postures pinned; launcher argv/env exact (FORGE_SESSION/
+    FORGE_FORGE_ROOT/root triple, DEPTH+1, no parent-run var).
+  - **Done 2026-06-11**: bridge keeps its early strategy/parent checks (fail before the ~20s preflight; the helper
+    revalidates); the four auth postures exercise the extracted helper transitively through the unmodified
+    `prepare_codex_request` tests. 86 tests green (bridge incl. golden + invoker + new `test_codex_invoke.py` 13 + ops);
+    mypy clean. The `codex resume --help` argv was verified live post-ship (see the verification paragraph below): the
+    builder was corrected to pass `--sandbox` inside the `resume` subcommand, where it is documented.
+- [x] Slice 4 -- interactive ops (`core/ops/codex_interactive.py`, new): `start_interactive_codex_session` +
+  `reattach_codex_session`; `ROLLOUT_SOURCE_POST_EXIT="discovered_post_exit"`; two timestamps; receipt-beats-discovery;
+  `context_delivery=None` for bare; rollback only before the TUI launches; `run_with_active_session` wrap; no
+  `emit_codex_usage`.
+  - Assertion: bare/bridge/hook matrices; precedence + planted-stale-receipt; ambiguity refusal; two-timestamp pin;
+    run-identity equality pin; reattach guards verbatim-consistent with `continue_codex_session`.
+  - **Done 2026-06-11**: guards shared by extraction (`resolve_codex_session`/`require_codex_thread_id` moved out of
+    `continue_codex_session` -- messages identical by construction); hook-undelivered still records a
+    discovery-recovered thread (delivery and identity are separate facts); a TUI spawn failure keeps the session (the
+    rollback boundary is the launch). 22 new tests (`test_codex_interactive.py`); blast radius 1484
+    (ops+session+invoker+hooks) green; mypy clean on 14 ops/session files.
+- [x] Slice 5 -- CLI matrix + registry flip + session show: `session_codex.py` rework (bare=interactive; exact errors
+  for `--task`-alone and orphan transfer flags); `session_lifecycle.py` cross-project resume restructure (unscoped
+  fallback always runs on scoped miss; codex dispatches, Claude refusal byte-identical); `_post_exit_render` via lazy
+  import (cycle: `session_lifecycle.py:101` already imports `session_codex`); registry `interactive="default"`;
+  `session show` Delivery line.
+  - Assertion: full matrix; headless rows byte-unchanged; plain-Claude None-default regression green; cross-project
+    matrix (bare codex resolves+dispatches, bare Claude keeps today's hint+exit 1); registry flip pinned.
+  - **Done 2026-06-11**: bare resume reuses the Claude reconnect refusal verbatim with NO `--force` escape (`--force`
+    stays in the Codex-rejected flag list -- two TUIs on one thread would interleave a rollout); `run_codex_resume` now
+    takes the resolved manifest (the active gate needs its `forge_root`); the cross-project `cross_project` flag defers
+    the Claude refusal until after runtime dispatch (resolution can't know the runtime). Accepted edge change: bare
+    cross-project AmbiguousSessionError now surfaces via `handle_session_error` instead of the hint (the unscoped lookup
+    runs where it previously didn't). `test_session_codex.py` 70 green (was 36; obsolete `requires --task`/
+    `requires --resume-from` rows replaced per matrix); full `tests/src/cli` 1761 green; runtime package 80 green
+    (registry pin flipped); mypy clean.
+- [x] Slice 6 -- Docker integration + stage 87: `TestCodexSessionStartDocker` observation cases (pre-existing 20
+  unchanged); probe README stage-87 operator-gated checklist (bare/bridge/hook/reattach/--sandbox; multi-KB positional;
+  hold-instructions no-autonomous-action).
+  - Assertion: `./scripts/test-integration.sh tests/integration/docker/test_policy_hooks.py` green.
+  - **Done 2026-06-11**: nothing-staged Docker case renamed to pin the observation receipt (payload identity +
+    `observed_at`) with silent stdout/stderr through the real wheel CLI; staged case pins per-turn mutual exclusivity
+    (no observation); unmanaged case pins zero writes. Stage-87 note added beside 85/86. Docker `test_policy_hooks.py`
+    21 green (run as the script's underlying
+    `uv run pytest -m integration tests/integration/docker/test_policy_hooks.py` -- the wrapper's preamble is duplicated
+    by the `forge_test_image` fixture and this file needs no LiteLLM).
+- [x] Slice 7 -- docs/board sync: design.md §3.9/§3.5/§3.4/§4.0; transfer.md "later phase" note removed; session.md +
+  hook.md; card Deliverable 5 annotation; change_log entry; grep gate (no stale "not yet supported" interactive claim on
+  normative surfaces); `make pre-commit` clean; full unit sweep.
+  - **Done 2026-06-11**: design.md gained the §3.9 "Interactive Codex sessions" paragraph + post-exit capture facts in
+    Recorded-Codex-facts, §3.4/§3.5/§3.10 receipts-plural updates, §4.0 command rows, runtime-matrix bullet
+    (`interactive="default"`); session.md "Interactive Codex sessions" section + command block; transfer.md note now
+    points at it; hook.md observation bullet. Card Deliverable 5 marked SHIPPED with the deferred list. Grep gate found
+    one stale claim outside the planned set -- the `codex_bridge.py` module docstring still called the user-facing
+    command "Phase 6" -- fixed. Full sweep `tests/src tests/regression -m "not integration"` 6265 green; pre-commit
+    clean (second run after isort/black/mdformat fixes).
+
+Impl-time verification CLOSED 2026-06-11 (live probes, codex 0.139.0, after the tooling outage lifted): (a)
+`codex resume --help` pins `codex resume [OPTIONS] [SESSION_ID] [PROMPT]` with SESSION_ID as "UUID or session name,
+UUIDs take precedence" AND its own `-s/--sandbox` -- the builder was corrected from root-level
+`codex --sandbox X resume <tid>` (propagation into the subcommand flow not guaranteed) to the documented
+`codex resume --sandbox X <tid>`; argv pin updated, 13 launcher tests + 20 interactive-ops tests green. (b) Root
+`codex --help` pins `-s/--sandbox` and the positional `[PROMPT]` for the bare/bridge start form. (c) A real
+`~/.codex/sessions` rollout head matches the parser exactly (`type=session_meta`, `payload.cwd`;
+`parse_rollout_filename` + `_rollout_head_cwd` verified against the live file), and the filename timestamp is LOCAL time
+vs the payload's UTC -- confirming the filter-by-mtime decision. Still operator-gated at probe README **stage 87**: the
+behavioral TUI smoke (hold instructions hold, multi-KB positional, enrolled hook delivery, live reattach).
 
 ## Phase 6 - Installer Codex support (gated on Phase 1 posture + Phases 3/5)
 

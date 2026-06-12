@@ -10,6 +10,7 @@ runtime and hands over its Click context.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from typing import Any
 
@@ -18,6 +19,12 @@ import click
 from forge.cli.output import print_error_with_tip, print_tip
 from forge.cli.session import console
 from forge.core.invoker.codex import CodexSandbox
+from forge.core.ops.codex_interactive import (
+    CodexInteractiveLaunch,
+    CodexInteractiveResult,
+    reattach_codex_session,
+    start_interactive_codex_session,
+)
 from forge.core.ops.codex_session import (
     CONTEXT_DELIVERY_HOOK,
     CONTEXT_DELIVERY_UNDELIVERED,
@@ -29,6 +36,9 @@ from forge.core.ops.codex_session import (
 )
 from forge.core.ops.context import ExecutionContext
 from forge.core.ops.session import ForgeOpError
+from forge.session import SessionState
+
+logger = logging.getLogger(__name__)
 
 
 def _sess() -> Any:
@@ -112,18 +122,28 @@ def run_codex_start(ctx: click.Context) -> int:
     """Validate the ``--runtime codex`` flag matrix on ``session start`` and dispatch.
 
     Reads the start command's full parameter dict from ``ctx.params``; returns the
-    process exit code.
+    process exit code. ``--task`` selects the headless ``codex exec`` turn (requires
+    a parent); omitting it launches the interactive ``codex`` TUI (Phase 5), with or
+    without a parent.
     """
     p = ctx.params
-    if not p["resume_from"]:
+    if p["task"] and not p["resume_from"]:
         console.print(
-            "[red]Error:[/red] --runtime codex requires --resume-from <parent> "
-            "(starting Codex without a parent session is not yet supported)"
+            "[red]Error:[/red] --task requires --resume-from <parent> -- headless Codex turns "
+            "derive from a parent session; omit --task for an interactive session"
         )
         return 1
-    if not p["task"]:
-        console.print("[red]Error:[/red] --runtime codex requires --task (the headless Codex turn needs a prompt)")
-        return 1
+    interactive = not p["task"]
+    if interactive and not p["resume_from"]:
+        # Bare interactive start: the transfer-shaping flags have no transfer to shape.
+        for key, flag in [
+            ("transfer_strategy", "--strategy"),
+            ("depth", "--depth"),
+            ("context_delivery", "--context-delivery"),
+        ]:
+            if p[key] is not None:
+                console.print(f"[red]Error:[/red] {flag} requires --resume-from <parent>")
+                return 1
     # Codex runs direct-to-OpenAI with no hooks: Claude routing, sidecar,
     # supervision, memory, and prompt-injection flags have no Codex meaning.
     rejected_for_codex: list[tuple[object, str]] = [
@@ -165,6 +185,17 @@ def run_codex_start(ctx: click.Context) -> int:
         existing = {n for n, _ in _sess().SessionManager().list_sessions(forge_root_filter=_fr)}
         name = _sess().generate_unique_name(existing)
 
+    if interactive:
+        return launch_interactive_codex_session(
+            name=name,
+            parent=p["resume_from"],
+            strategy=p["transfer_strategy"] or "ai-curated",
+            depth=p["depth"] if p["depth"] is not None else 1,
+            sandbox=p["sandbox"] or "workspace-write",
+            worktree=p["worktree"],
+            branch=p["branch"],
+            context_delivery=p["context_delivery"] or "initial-message",
+        )
     return launch_codex_session(
         name=name,
         parent=p["resume_from"],
@@ -194,9 +225,11 @@ def reject_codex_flags_for_claude(params: dict[str, Any]) -> int | None:
     return None
 
 
-def run_codex_resume(ctx: click.Context, name: str, task: str | None) -> int:
+def run_codex_resume(ctx: click.Context, name: str, task: str | None, manifest: SessionState) -> int:
     """Validate and dispatch ``session resume`` for a Codex-runtime session.
 
+    ``--task`` runs the next headless ``codex exec`` turn (Phase 2, unchanged);
+    omitting it reattaches the foreground TUI via ``codex resume <thread_id>``.
     Claude-only flags are rejected on explicit use (defaults pass through):
     silently ignoring them would hide a real user mistake.
     """
@@ -217,13 +250,28 @@ def run_codex_resume(ctx: click.Context, name: str, task: str | None) -> int:
         if ctx.get_parameter_source(param) == click.core.ParameterSource.COMMANDLINE:
             console.print(f"[red]Error:[/red] {flag} is not supported for Codex sessions")
             return 1
-    if not task:
-        console.print(
-            "[red]Error:[/red] resuming a Codex session requires --task (the next headless turn needs a prompt)"
+    if task:
+        return resume_codex_session(name=name, task=task, sandbox="workspace-write")
+
+    # Claude reconnect parity: refuse while a launch is still registered. No --force
+    # escape -- two TUIs on one thread would interleave a single rollout.
+    active_entry = _sess()._get_active_session_entry(name, forge_root=manifest.forge_root)
+    if active_entry is not None:
+        console.print(f"[red]Error:[/red] Cannot reconnect: session [bold]{name}[/bold] appears to still be active.")
+        console.print(f"  Launch mode: {active_entry.launch_mode}")
+        if active_entry.launcher_pid is not None:
+            console.print(f"  Launcher PID: {active_entry.launcher_pid}")
+        if active_entry.container_name:
+            console.print(f"  Container: {active_entry.container_name}")
+        print_tip(
+            "Reconnect is only available after the previous launch has exited. "
+            "Return to that launch if it is still running, or stop it cleanly and retry.",
+            blank_before=False,
+            console=console,
         )
         return 1
 
-    return resume_codex_session(name=name, task=task, sandbox="workspace-write")
+    return reattach_interactive_codex_session(name=name)
 
 
 def launch_codex_session(
@@ -287,6 +335,114 @@ def resume_codex_session(*, name: str, task: str, sandbox: CodexSandbox) -> int:
 
     _render_resume(result)
     return result.codex.returncode if not result.codex.success else 0
+
+
+def launch_interactive_codex_session(
+    *,
+    name: str,
+    parent: str | None,
+    strategy: str,
+    depth: int,
+    sandbox: CodexSandbox,
+    worktree: bool,
+    branch: str | None,
+    context_delivery: ContextDeliveryMode = "initial-message",
+) -> int:
+    """Run the interactive (no ``--task``) form of ``session start --runtime codex``."""
+    try:
+        result = start_interactive_codex_session(
+            ctx=ExecutionContext.from_cwd(),
+            name=name,
+            parent=parent,
+            strategy=strategy,
+            depth=depth,
+            sandbox=sandbox,
+            create_worktree=worktree,
+            branch=branch,
+            context_delivery=context_delivery,
+            announce=_render_interactive_launch,
+        )
+    except ForgeOpError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        return 1
+
+    return _finish_interactive(result)
+
+
+def reattach_interactive_codex_session(*, name: str) -> int:
+    """Reattach a Codex session's thread as a foreground TUI (bare ``session resume``)."""
+    try:
+        result = reattach_codex_session(
+            ctx=ExecutionContext.from_cwd(),
+            name=name,
+            sandbox="workspace-write",
+            announce=_render_interactive_launch,
+        )
+    except ForgeOpError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        return 1
+
+    return _finish_interactive(result)
+
+
+def _render_interactive_launch(launch: CodexInteractiveLaunch) -> None:
+    """Pre-launch announce: the TUI takes the terminal next, so print context now."""
+    if launch.reattach_thread_id:
+        console.print(
+            f"[green]Reattaching Codex session:[/green] {launch.session} (thread {launch.reattach_thread_id})"
+        )
+    elif launch.parent:
+        console.print(f"[green]Created Codex session:[/green] {launch.session} (from '{launch.parent}')")
+    else:
+        console.print(f"[green]Created Codex session:[/green] {launch.session}")
+    console.print("[dim]Routing: direct (OpenAI via codex CLI)[/dim]")
+    if launch.worktree_path:
+        console.print(f"[dim]Worktree: {launch.worktree_path}[/dim]")
+    if launch.transfer_path:
+        console.print(f"[dim]Transfer: {launch.transfer_path}[/dim]")
+    if launch.context_delivery == "hook":
+        console.print("[dim]Context delivery: SessionStart hook (receipt reconciled)[/dim]")
+
+
+def _finish_interactive(result: CodexInteractiveResult) -> int:
+    """Post-exit rendering shared by interactive start and reattach."""
+    for warning in result.warnings:
+        console.print(f"[yellow]Warning:[/yellow] {warning}")
+    if result.thread_id:
+        console.print(f"[dim]Thread: {result.thread_id}[/dim]")
+    _render_interactive_post_exit(result)
+    if result.context_delivery == CONTEXT_DELIVERY_UNDELIVERED:
+        # The TUI ran WITHOUT the parent context. Fail loud (the session is kept).
+        print_error_with_tip(
+            f"The SessionStart hook did not deliver the transfer context; the session ran without it "
+            f"(recorded context_delivery=hook_undelivered on '{result.session}').",
+            "Enroll the hook (one-time 'codex' trust ceremony in this project), or delete and retry "
+            "with the default delivery:",
+            commands=[f"forge session delete {result.session}"],
+            console=console,
+        )
+        return 1
+    return result.exit_code
+
+
+def _render_interactive_post_exit(result: CodexInteractiveResult) -> None:
+    """Activity summary + reconnect tip via the shared post-exit renderer. Best-effort.
+
+    Lazy import: ``session_lifecycle`` top-level-imports this module, so importing
+    ``_post_exit_render`` back at module level would be a cycle.
+    """
+    try:
+        from forge.cli.session_lifecycle import _post_exit_render
+
+        manifest = _sess().SessionManager().get_session(result.session, forge_root=result.forge_root)
+        _post_exit_render(
+            manifest,
+            store_exists=True,
+            exit_code=result.exit_code,
+            since=result.operation_started_at,
+        )
+    except Exception:
+        logger.debug("interactive post-exit render failed", exc_info=True)
 
 
 def _render_start(result: CodexSessionStartResult) -> None:

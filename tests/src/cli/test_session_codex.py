@@ -1,16 +1,19 @@
-"""Tests for the Codex CLI wiring (codex_frontend Phase 2).
+"""Tests for the Codex CLI wiring (codex_frontend Phases 2 and 5).
 
-Covers ``forge session start --runtime codex`` / ``forge session resume --task``
-dispatch and flag-matrix validation, the ``_launch_claude_for_session`` runtime
+Covers ``forge session start --runtime codex`` / ``forge session resume``
+dispatch and flag-matrix validation (``--task`` selects the headless turn;
+omitting it the interactive TUI), the ``_launch_claude_for_session`` runtime
 backstop, the ``session_codex`` rendering layer, and ``session show`` for Codex
 manifests. The ops themselves are covered in
-``tests/src/core/ops/test_codex_session.py``; here the ops are mocked and the
-assertions target Click plumbing (what reaches the op, what exits with which code).
+``tests/src/core/ops/test_codex_session.py`` and ``test_codex_interactive.py``;
+here the ops are mocked and the assertions target Click plumbing (what reaches
+the op, what exits with which code).
 """
 
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
 
@@ -18,14 +21,25 @@ import pytest
 from click.testing import CliRunner
 
 from forge.cli.main import main
-from forge.cli.session_codex import launch_codex_session, resume_codex_session
+from forge.cli.session_codex import (
+    _render_interactive_launch,
+    launch_codex_session,
+    launch_interactive_codex_session,
+    reattach_interactive_codex_session,
+    resume_codex_session,
+)
 from forge.core.invoker.types import HeadlessResult
+from forge.core.ops.codex_interactive import (
+    CodexInteractiveLaunch,
+    CodexInteractiveResult,
+)
 from forge.core.ops.codex_session import (
     CodexSessionResumeResult,
     CodexSessionStartResult,
 )
 from forge.core.ops.session import ForgeOpError
 from forge.session import IndexStore, SessionStore
+from forge.session.active import ActiveSessionEntry
 from forge.session.models import CodexConfirmed, create_session_state
 
 _TID = "019eaa51-6920-7c41-ae34-d4f7f368d55a"
@@ -69,18 +83,45 @@ def _start_result(**overrides: object) -> CodexSessionStartResult:
     return CodexSessionStartResult(**base)
 
 
+def _interactive_result(**overrides: object) -> CodexInteractiveResult:
+    base: dict = {
+        "session": "impl",
+        "forge_root": "/proj",
+        "exit_code": 0,
+        "thread_id": _TID,
+        "rollout_path": f"/codex/sessions/2026/06/11/rollout-x-{_TID}.jsonl",
+        "rollout_source": "discovered_post_exit",
+        "context_delivery": None,
+        "curation_ran": None,
+        "operation_started_at": datetime.now(timezone.utc),
+        "warnings": (),
+    }
+    base.update(overrides)
+    return CodexInteractiveResult(**base)
+
+
 class TestStartFlagMatrix:
     """Validation happens before any session/op machinery -- no mocks needed."""
 
-    def test_codex_requires_resume_from(self, runner: CliRunner) -> None:
+    def test_task_requires_resume_from(self, runner: CliRunner) -> None:
         result = runner.invoke(main, ["session", "start", "impl", "--runtime", "codex", "--task", "t"])
         assert result.exit_code == 1
-        assert "--runtime codex requires --resume-from" in result.output
+        assert "--task requires --resume-from" in result.output
+        assert "omit --task for an interactive session" in result.output
 
-    def test_codex_requires_task(self, runner: CliRunner) -> None:
-        result = runner.invoke(main, ["session", "start", "impl", "--runtime", "codex", "--resume-from", "planner"])
+    @pytest.mark.parametrize(
+        ("extra_args", "flag_label"),
+        [
+            (["--strategy", "full"], "--strategy"),
+            (["--depth", "2"], "--depth"),
+            (["--context-delivery", "hook"], "--context-delivery"),
+        ],
+    )
+    def test_transfer_flags_require_parent(self, runner: CliRunner, extra_args: list[str], flag_label: str) -> None:
+        """Bare interactive start: the transfer-shaping flags have no transfer to shape."""
+        result = runner.invoke(main, ["session", "start", "impl", "--runtime", "codex"] + extra_args)
         assert result.exit_code == 1
-        assert "--runtime codex requires --task" in result.output
+        assert f"{flag_label} requires --resume-from <parent>" in result.output
 
     @pytest.mark.parametrize(
         ("extra_args", "flag_label"),
@@ -223,6 +264,79 @@ class TestStartCodexDispatch:
         assert isinstance(generated, str) and generated
 
 
+class TestStartInteractiveDispatch:
+    """Bare and --resume-from-only starts route to the interactive launcher (Phase 5)."""
+
+    def test_bare_start_dispatches_interactive(self, runner: CliRunner, project: Path) -> None:
+        with (
+            patch("forge.cli.guards.require_repo_root"),
+            patch("forge.cli.session_codex.launch_interactive_codex_session", return_value=0) as launch,
+        ):
+            result = runner.invoke(main, ["session", "start", "impl", "--runtime", "codex"])
+
+        assert result.exit_code == 0
+        launch.assert_called_once_with(
+            name="impl",
+            parent=None,
+            strategy="ai-curated",
+            depth=1,
+            sandbox="workspace-write",
+            worktree=False,
+            branch=None,
+            context_delivery="initial-message",
+        )
+
+    def test_bridge_without_task_dispatches_interactive(self, runner: CliRunner, project: Path) -> None:
+        with (
+            patch("forge.cli.guards.require_repo_root"),
+            patch("forge.cli.session_codex.launch_interactive_codex_session", return_value=0) as launch,
+        ):
+            result = runner.invoke(
+                main,
+                ["session", "start", "impl", "--runtime", "codex", "--resume-from", "planner"]
+                + ["--strategy", "full", "--depth", "2", "--context-delivery", "hook"],
+            )
+
+        assert result.exit_code == 0
+        kwargs = launch.call_args.kwargs
+        assert kwargs["parent"] == "planner"
+        assert kwargs["strategy"] == "full"
+        assert kwargs["depth"] == 2
+        assert kwargs["context_delivery"] == "hook"
+
+    def test_bare_sandbox_passes_through(self, runner: CliRunner, project: Path) -> None:
+        """--sandbox shapes the TUI itself, not the transfer -- valid without a parent."""
+        with (
+            patch("forge.cli.guards.require_repo_root"),
+            patch("forge.cli.session_codex.launch_interactive_codex_session", return_value=0) as launch,
+        ):
+            result = runner.invoke(main, ["session", "start", "impl", "--runtime", "codex", "--sandbox", "read-only"])
+
+        assert result.exit_code == 0
+        assert launch.call_args.kwargs["sandbox"] == "read-only"
+
+    def test_interactive_exit_code_propagates(self, runner: CliRunner, project: Path) -> None:
+        with (
+            patch("forge.cli.guards.require_repo_root"),
+            patch("forge.cli.session_codex.launch_interactive_codex_session", return_value=3),
+        ):
+            result = runner.invoke(main, ["session", "start", "impl", "--runtime", "codex"])
+        assert result.exit_code == 3
+
+    def test_task_still_dispatches_headless(self, runner: CliRunner, project: Path) -> None:
+        """--task keeps the Phase 2 headless path; the interactive launcher is untouched."""
+        with (
+            patch("forge.cli.guards.require_repo_root"),
+            patch("forge.cli.session_codex.launch_codex_session", return_value=0) as headless,
+            patch("forge.cli.session_codex.launch_interactive_codex_session", return_value=0) as interactive,
+        ):
+            result = runner.invoke(main, _CODEX_BASE)
+
+        assert result.exit_code == 0
+        headless.assert_called_once()
+        interactive.assert_not_called()
+
+
 class TestResumeCodexDispatch:
     def _codex_state(self, tmp_path: Path) -> object:
         return create_session_state("impl", worktree_path=str(tmp_path), runtime="codex")
@@ -279,13 +393,119 @@ class TestResumeCodexDispatch:
             result = runner.invoke(main, ["session", "resume", "impl", "--task", "t"])
         assert result.exit_code == 2
 
-    def test_requires_task(self, runner: CliRunner, tmp_path: Path) -> None:
-        with patch("forge.cli.session.SessionManager") as mgr_cls:
+    def test_bare_resume_reattaches(self, runner: CliRunner, tmp_path: Path) -> None:
+        with (
+            patch("forge.cli.session.SessionManager") as mgr_cls,
+            patch("forge.cli.session._get_active_session_entry", return_value=None),
+            patch("forge.cli.session_codex.reattach_interactive_codex_session", return_value=0) as reattach,
+        ):
+            mgr_cls.return_value.get_session.return_value = self._codex_state(tmp_path)
+            result = runner.invoke(main, ["session", "resume", "impl"])
+
+        assert result.exit_code == 0
+        reattach.assert_called_once_with(name="impl")
+
+    def test_bare_resume_refused_while_active(self, runner: CliRunner, tmp_path: Path) -> None:
+        """Claude reconnect parity: no second TUI on a live launch (and no --force escape)."""
+        entry = ActiveSessionEntry(
+            worktree_path=str(tmp_path),
+            started_at="2026-06-11T00:00:00Z",
+            launch_mode="host",
+            launcher_pid=4242,
+        )
+        with (
+            patch("forge.cli.session.SessionManager") as mgr_cls,
+            patch("forge.cli.session._get_active_session_entry", return_value=entry),
+            patch("forge.cli.session_codex.reattach_interactive_codex_session") as reattach,
+        ):
             mgr_cls.return_value.get_session.return_value = self._codex_state(tmp_path)
             result = runner.invoke(main, ["session", "resume", "impl"])
 
         assert result.exit_code == 1
-        assert "resuming a Codex session requires --task" in result.output
+        assert "appears to still be active" in result.output
+        assert "Launch mode: host" in result.output
+        assert "Launcher PID: 4242" in result.output
+        assert "Reconnect is only available after the previous launch has exited" in result.output
+        reattach.assert_not_called()
+
+    def test_force_rejected_for_bare_resume(self, runner: CliRunner, tmp_path: Path) -> None:
+        """--force is Claude-only; it must not become an active-gate escape for codex."""
+        with patch("forge.cli.session.SessionManager") as mgr_cls:
+            mgr_cls.return_value.get_session.return_value = self._codex_state(tmp_path)
+            result = runner.invoke(main, ["session", "resume", "impl", "--force"])
+
+        assert result.exit_code == 1
+        assert "--force is not supported for Codex sessions" in result.output
+
+    def test_bare_resume_falls_back_to_global_codex_session_from_other_project(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Codex reattach is cross-CWD by design: the TUI runs in the recorded worktree."""
+        codex_project = tmp_path / "codex-project"
+        other_project = tmp_path / "other-project"
+        for project_root in (codex_project, other_project):
+            (project_root / ".git").mkdir(parents=True)
+            (project_root / ".forge").mkdir()
+
+        state = create_session_state("impl", worktree_path=str(codex_project), runtime="codex")
+        state.forge_root = str(codex_project)
+        state.confirmed.codex = CodexConfirmed(thread_id=_TID)
+        SessionStore(str(codex_project), "impl").write(state)
+        IndexStore().add_session(
+            name="impl",
+            worktree_path=str(codex_project),
+            project_root=str(codex_project),
+            forge_root=str(codex_project),
+            checkout_root=str(codex_project),
+            relative_path=".",
+            is_incognito=False,
+            is_fork=False,
+            parent_session="planner",
+        )
+
+        monkeypatch.chdir(other_project)
+        with (
+            patch("forge.cli.session._get_active_session_entry", return_value=None),
+            patch("forge.cli.session_codex.reattach_interactive_codex_session", return_value=0) as reattach,
+        ):
+            result = runner.invoke(main, ["session", "resume", "impl"])
+
+        assert result.exit_code == 0, result.output
+        reattach.assert_called_once_with(name="impl")
+
+    def test_bare_claude_resume_cross_project_keeps_refusal(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The unscoped fallback now resolves the manifest for every bare resume, but a
+        Claude hit must keep today's project-scoped refusal (hint + exit 1)."""
+        claude_project = tmp_path / "claude-project"
+        other_project = tmp_path / "other-project"
+        for project_root in (claude_project, other_project):
+            (project_root / ".git").mkdir(parents=True)
+            (project_root / ".forge").mkdir()
+
+        state = create_session_state("impl", worktree_path=str(claude_project))
+        state.forge_root = str(claude_project)
+        SessionStore(str(claude_project), "impl").write(state)
+        IndexStore().add_session(
+            name="impl",
+            worktree_path=str(claude_project),
+            project_root=str(claude_project),
+            forge_root=str(claude_project),
+            checkout_root=str(claude_project),
+            relative_path=".",
+            is_incognito=False,
+            is_fork=False,
+            parent_session=None,
+        )
+
+        monkeypatch.chdir(other_project)
+        result = runner.invoke(main, ["session", "resume", "impl"])
+
+        assert result.exit_code == 1
+        assert "session 'impl' not found in current project" in result.output
+        assert "exists in:" in result.output
+        assert "Run the command from that directory instead." in result.output
 
     @pytest.mark.parametrize(
         ("extra_args", "flag_label"),
@@ -460,8 +680,145 @@ class TestCodexCliRendering:
         assert "Error:" in out and "no recorded Codex thread" in out
 
 
+class TestInteractiveCliRendering:
+    """Direct calls into session_codex with the interactive ops mocked."""
+
+    def test_announce_bare(self, capsys: pytest.CaptureFixture[str]) -> None:
+        _render_interactive_launch(
+            CodexInteractiveLaunch(
+                session="impl", parent=None, worktree_path=None, transfer_path=None, context_delivery=None
+            )
+        )
+        out = capsys.readouterr().out
+        assert "Created Codex session" in out and "impl" in out
+        assert "from '" not in out  # no parent line on a bare start
+        assert "direct (OpenAI via codex CLI)" in out
+
+    def test_announce_bridge_hook(self, capsys: pytest.CaptureFixture[str]) -> None:
+        _render_interactive_launch(
+            CodexInteractiveLaunch(
+                session="impl",
+                parent="planner",
+                worktree_path="/wt/impl",
+                transfer_path=Path("/proj/.forge/prev_sessions/planner/children/impl.md"),
+                context_delivery="hook",
+            )
+        )
+        out = capsys.readouterr().out
+        assert "(from 'planner')" in out
+        assert "Worktree: /wt/impl" in out
+        assert "Transfer:" in out
+        assert "Context delivery: SessionStart hook" in out
+
+    def test_announce_reattach(self, capsys: pytest.CaptureFixture[str]) -> None:
+        _render_interactive_launch(
+            CodexInteractiveLaunch(
+                session="impl",
+                parent=None,
+                worktree_path=None,
+                transfer_path=None,
+                context_delivery=None,
+                reattach_thread_id=_TID,
+            )
+        )
+        out = capsys.readouterr().out
+        assert "Reattaching Codex session" in out and _TID in out
+
+    def test_interactive_start_op_error_exits_one(self, capsys: pytest.CaptureFixture[str]) -> None:
+        with patch(
+            "forge.cli.session_codex.start_interactive_codex_session",
+            side_effect=ForgeOpError("Codex runtime not ready: no codex binary"),
+        ):
+            code = launch_interactive_codex_session(
+                name="impl",
+                parent=None,
+                strategy="ai-curated",
+                depth=1,
+                sandbox="workspace-write",
+                worktree=False,
+                branch=None,
+            )
+
+        assert code == 1
+        out = capsys.readouterr().out
+        assert "Error:" in out and "not ready" in out
+
+    def test_interactive_finish_renders_thread_and_warnings(self, capsys: pytest.CaptureFixture[str]) -> None:
+        result = _interactive_result(warnings=("2 Codex rollouts appeared during this run",))
+        with patch("forge.cli.session_codex.start_interactive_codex_session", return_value=result):
+            code = launch_interactive_codex_session(
+                name="impl",
+                parent=None,
+                strategy="ai-curated",
+                depth=1,
+                sandbox="workspace-write",
+                worktree=False,
+                branch=None,
+            )
+
+        assert code == 0
+        out = capsys.readouterr().out
+        assert f"Thread: {_TID}" in out
+        assert "Warning:" in out and "2 Codex rollouts appeared" in out
+
+    def test_interactive_exit_code_passes_through(self) -> None:
+        result = _interactive_result(exit_code=130, thread_id=None, rollout_path=None, rollout_source=None)
+        with patch("forge.cli.session_codex.start_interactive_codex_session", return_value=result):
+            code = launch_interactive_codex_session(
+                name="impl",
+                parent=None,
+                strategy="ai-curated",
+                depth=1,
+                sandbox="workspace-write",
+                worktree=False,
+                branch=None,
+            )
+
+        assert code == 130
+
+    def test_interactive_hook_undelivered_exits_one_with_tip(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """The TUI ran without the parent context: fail loud even on a clean exit."""
+        result = _interactive_result(context_delivery="hook_undelivered", curation_ran=True)
+        with patch("forge.cli.session_codex.start_interactive_codex_session", return_value=result):
+            code = launch_interactive_codex_session(
+                name="impl",
+                parent="planner",
+                strategy="ai-curated",
+                depth=1,
+                sandbox="workspace-write",
+                worktree=False,
+                branch=None,
+                context_delivery="hook",
+            )
+
+        assert code == 1
+        out = capsys.readouterr().out
+        assert "did not deliver the transfer context" in out
+        assert "hook_undelivered" in out
+        assert "forge session delete impl" in out
+
+    def test_reattach_op_error_exits_one(self, capsys: pytest.CaptureFixture[str]) -> None:
+        with patch(
+            "forge.cli.session_codex.reattach_codex_session",
+            side_effect=ForgeOpError("session 'impl' has no recorded Codex thread"),
+        ):
+            code = reattach_interactive_codex_session(name="impl")
+
+        assert code == 1
+        out = capsys.readouterr().out
+        assert "Error:" in out and "no recorded Codex thread" in out
+
+    def test_reattach_success_passes_through(self) -> None:
+        result = _interactive_result()
+        with patch("forge.cli.session_codex.reattach_codex_session", return_value=result) as op:
+            code = reattach_interactive_codex_session(name="impl")
+
+        assert code == 0
+        assert op.call_args.kwargs["sandbox"] == "workspace-write"
+
+
 class TestShowCodexSession:
-    def _seed(self, proj: Path) -> None:
+    def _seed(self, proj: Path, *, context_delivery: str | None = None) -> None:
         state = create_session_state("impl", worktree_path=str(proj), runtime="codex")
         state.confirmed.codex = CodexConfirmed(
             thread_id=_TID,
@@ -471,6 +828,7 @@ class TestShowCodexSession:
             auth_source="codex_store",
             billing_mode="subscription_quota",
             last_run_at="2026-06-10T00:00:00Z",
+            context_delivery=context_delivery,
         )
         SessionStore(str(proj), "impl").write(state)
         IndexStore().add_session(
@@ -504,6 +862,21 @@ class TestShowCodexSession:
         assert "direct (OpenAI via codex CLI)" in result.output
         assert "Thread:" in result.output and _TID in result.output
         assert "chatgpt_tokens (codex_store)" in result.output
+
+    def test_show_human_renders_delivery_line(self, runner: CliRunner, project: Path) -> None:
+        self._seed(project, context_delivery="initial_message")
+        result = runner.invoke(main, ["session", "show", "impl"])
+
+        assert result.exit_code == 0
+        assert "Delivery:" in result.output and "initial_message" in result.output
+
+    def test_show_human_omits_delivery_when_unset(self, runner: CliRunner, project: Path) -> None:
+        """Bare interactive starts record context_delivery=None -- no line to show."""
+        self._seed(project)
+        result = runner.invoke(main, ["session", "show", "impl"])
+
+        assert result.exit_code == 0
+        assert "Delivery:" not in result.output
 
     def test_show_human_suppresses_claude_vestiges(self, runner: CliRunner, project: Path) -> None:
         """The display-only intent.agent ("claude-code") and the Claude-computed
