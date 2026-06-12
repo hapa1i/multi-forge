@@ -62,8 +62,8 @@ parser, `CodexHookAdapter`/`CodexHookResponder`, and `forge hook codex-policy-ch
 **Phase 4 shipped 2026-06-11** (all six slices ticked below; see change_log):
 `--context-delivery {initial-message, hook}` on `start --runtime codex`, the `forge hook codex-session-start` handler
 (staged file -> strict `additionalContext` wire + delivery receipt), and post-turn receipt reconciliation into
-`confirmed.codex.context_delivery` (incl. thread-id recovery + hook-sourced rollout). Handler-only; stage 86
-(operator-gated enrolled E2E) owed alongside stage 85.
+`confirmed.codex.context_delivery` (incl. thread-id recovery + hook-sourced rollout). Handler-only; stages 85/86 are now
+covered by the probe-debt harness run below.
 
 **Phase 5 shipped 2026-06-11** (all seven slices ticked below; see change_log): Forge-managed interactive `codex`
 sessions -- bare start opens the TUI, the interactive bridge carries the curated transfer (positional hold-instructions
@@ -71,9 +71,19 @@ framing or `--context-delivery hook`), bare resume reattaches via `codex resume 
 post-exit (observation receipt beats `find_rollouts_since` discovery; exactly-one-or-refuse). Registry
 `interactive="beta" -> "default"`. The argv/rollout-head externals were closed by live probes post-ship (codex 0.139.0;
 see the verification paragraph at the end of the Phase 5 section -- the launcher now passes `--sandbox` inside the
-`resume` subcommand). Stage 87 (operator-gated real-TUI **behavioral** smoke: hold instructions, multi-KB positional,
-enrolled hook delivery, live reattach) owed alongside stages 85/86. **Next: Phase 6 (installer)**, with both hook
-handlers shipped.
+`resume` subcommand). Stage 87 is now covered by the probe-debt harness run below. **Next: Phase 6 (installer)**, with
+both hook handlers shipped.
+
+**Probe-debt harness slice 2026-06-12:** stages `85-policy-check-e2e`, `86-sessionstart-delivery-e2e`, and
+`87-interactive-smoke` are now implemented under `scripts/experiments/codex-hooks/stages/` and wired into
+`reproduce.sh all`. They convert the owed Phase 3/4/5 product-hook and real-TUI checks into runnable operator gates with
+verdict files. Same-day operator run on codex-cli 0.139.0: **85 PASS** (product policy hook deny honored), **86 PASS**
+(11,519-byte product SessionStart `additionalContext` delivery + receipt reconciliation), **87 PASS** (bare start, live
+reattach memory, active-gate refusal, positional hold, hook-delivered interactive bridge, and read-only sandbox denial
+all operator-confirmed with matching manifest/capture facts; the sandbox sentinel stayed absent). 87 now also records
+the non-gating CLI UX observation that hook-delivered `SessionStart` `additionalContext` can be visibly rendered in the
+TUI transcript even though delivery was passive, not a positional synthetic prompt; that prompt was codified after the
+passing run, so the current PASS capture predates `results/observations.txt`.
 
 ## Phase 0 - Registry correction (owed from probe round 2)
 
@@ -331,7 +341,8 @@ cleared); resume defensively clears.
     plain-Claude-start None-default regression pins the reject-list interaction. 1270 tests (ops + session + CLI
     packages) green; mypy clean on all of `src/forge/`.
 - [x] Slice 5 -- Docker integration (`TestCodexSessionStartDocker`, real wheel CLI) + probe README stage-86
-  operator-gated note (enrolled E2E incl. multi-KB additionalContext -- size unprobed; 30e used a short token).
+  operator-gated note (enrolled E2E incl. multi-KB additionalContext; **resolved 2026-06-12 by stage 86 PASS** with an
+  11,519-byte transfer).
   - Assertion: `./scripts/test-integration.sh tests/integration/docker/test_policy_hooks.py` green.
   - **Done 2026-06-11**: 20/20 (3 new SessionStart delivery cases -- staged->wire+receipt, nothing-staged silent,
     malformed-stdin fail-open; 17 pre-existing unchanged). Stage-86 note records the composed-loop + payload-size
@@ -442,8 +453,9 @@ UUIDs take precedence" AND its own `-s/--sandbox` -- the builder was corrected f
 `codex --help` pins `-s/--sandbox` and the positional `[PROMPT]` for the bare/bridge start form. (c) A real
 `~/.codex/sessions` rollout head matches the parser exactly (`type=session_meta`, `payload.cwd`;
 `parse_rollout_filename` + `_rollout_head_cwd` verified against the live file), and the filename timestamp is LOCAL time
-vs the payload's UTC -- confirming the filter-by-mtime decision. Still operator-gated at probe README **stage 87**: the
-behavioral TUI smoke (hold instructions hold, multi-KB positional, enrolled hook delivery, live reattach).
+vs the payload's UTC -- confirming the filter-by-mtime decision. **Closed 2026-06-12 by stage 87 PASS:** behavioral TUI
+smoke covered hold instructions, multi-KB positional delivery, enrolled hook delivery, live reattach, active-gate
+refusal, and read-only sandbox denial.
 
 ## Phase 6 - Installer Codex support (gated on Phase 1 posture + Phases 3/5)
 

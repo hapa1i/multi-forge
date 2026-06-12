@@ -172,10 +172,11 @@ experiment harness but the E2E supersedes its one-shot run):
    recorded decision (CLI leaves -> `forge_cli`; `%policy check` stays `claude_code`). **Scope (user decision
    2026-06-10): PreToolUse only** -- Stop/UserPromptSubmit/SessionStart land with their Phase 4/5 consumers;
    PermissionRequest stays descoped (never observed firing headless). Handler-only: enforcement requires manual
-   registration + trust enrollment until Phase 6 (the probe README owes a "stage 85" enrolled end-to-end on the next
-   operator round). **Registry correction DONE in Phase 0 (2026-06-10):** `native_hooks="headless_inert"` was refuted
-   and renamed to `enrollment_gated` on both the registry `HookSupport` and the preflight `HookSeam`. The
-   `pretool_policy` rise shipped in the Phase 1 closeout unit (2026-06-10): `"none"` -> `"partial"` (see Deliverable 2).
+   registration + trust enrollment until Phase 6. **RESOLVED 2026-06-12, stage 85:** the product `codex-policy-check`
+   enrolled E2E denied the impl-only `apply_patch`, and the blocked src file stayed absent. **Registry correction DONE
+   in Phase 0 (2026-06-10):** `native_hooks="headless_inert"` was refuted and renamed to `enrollment_gated` on both the
+   registry `HookSupport` and the preflight `HookSeam`. The `pretool_policy` rise shipped in the Phase 1 closeout unit
+   (2026-06-10): `"none"` -> `"partial"` (see Deliverable 2).
 
 4. **SessionStart curated-transfer delivery with initial-message fallback -- SHIPPED 2026-06-11 (Phase 4; see the
    checklist + change_log entry).** The 30e gate PASSED, so this built: `--context-delivery {initial-message,hook}` on
@@ -186,8 +187,9 @@ experiment harness but the E2E supersedes its one-shot run):
    handoff keeps the session, exits 1 with ceremony/delete-and-retry tips). The receipt also recovers `thread_id` when
    the stream misses `thread.started` and supersedes glob rollout discovery (`rollout_source="session_start_hook"`).
    One-shot staging: the staged file never survives the start turn; resume defensively clears. Handler-only like Phase 3
-   (manual registration + ceremony until Phase 6); the probe README owes "stage 86" (operator-gated enrolled end-to-end
-   incl. the unprobed multi-KB additionalContext size).
+   (manual registration + ceremony until Phase 6). **RESOLVED 2026-06-12, stage 86:** the product `codex-session-start`
+   enrolled E2E delivered an 11,519-byte transfer through `additionalContext`, the model echoed the oracle token, and
+   `confirmed.codex` reconciled `session_start_hook`.
 
 5. **Interactive Codex frontend -- SHIPPED 2026-06-11 (Phase 5; see the checklist + change_log entry).** Forge-managed
    interactive `codex` sessions: bare `forge session start --runtime codex` opens the TUI (omitting `--task` =
@@ -199,9 +201,10 @@ experiment harness but the E2E supersedes its one-shot run):
    nothing-staged `observation-receipt.json` -- delivery receipts stay byte-stable) beat filesystem discovery
    (`find_rollouts_since`, exactly-one-or-refuse, `rollout_source="discovered_post_exit"`). FORGE_SESSION wiring +
    positional prompt + payload capture all landed (`session/codex_invoke.py`, `core/ops/codex_interactive.py`). Registry
-   flipped `interactive="beta" -> "default"`. **Deferred:** `install_scopes` stays `()` (Phase 6 installer);
-   headless-without-parent stays rejected; `--sandbox` on resume stays hardcoded `workspace-write`; the real-TUI smoke
-   is the operator-gated probe README stage 87.
+   flipped `interactive="beta" -> "default"`. **RESOLVED 2026-06-12, stage 87:** the real-TUI smoke passed for bare
+   start, live reattach, active-gate refusal, positional hold behavior, hook-delivered interactive bridge, and read-only
+   sandbox denial. **Deferred:** `install_scopes` stays `()` (Phase 6 installer); headless-without-parent stays
+   rejected; `--sandbox` on resume stays hardcoded `workspace-write`.
 
 6. **Installer Codex support (gated on 3/5).** The installer is Claude-shaped: 13 Claude hook names are hardcoded in
    `src/forge/install/preset.py` and it writes only `.claude/`. Installing Forge hooks into Codex needs a Codex preset

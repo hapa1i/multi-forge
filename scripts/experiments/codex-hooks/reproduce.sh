@@ -6,7 +6,7 @@
 #
 # Usage:
 #   ./reproduce.sh              # headless set: 00 05 10 20 30 60 61 70
-#   ./reproduce.sh all          # + operator-guided 40 50 80 (needs a TTY)
+#   ./reproduce.sh all          # + operator-guided 40 50 80 85 86 87 (needs a TTY)
 #   ./reproduce.sh 00 30        # specific stages, in the given order
 #   ./reproduce.sh 80           # round-3 enrollment ceremony (builds the fixture)
 #   ./reproduce.sh 81 82 83 84  # round-3 headless probes (require the stage-80 fixture)
@@ -18,8 +18,9 @@ set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 
 HEADLESS_STAGES=(00-preflight 05-config-schema 10-headless-fire 20-payloads 30-responses 60-exec-resume 61-rollout-identity 70-bypass)
-# 80 (enroll the round-3 fixture) is guided: it needs a TTY for the trust ceremony.
-GUIDED_STAGES=(40-trust 50-interactive 80-enroll-fixture)
+# 80 enrolls the fixture; 85-87 trust/run product Forge hook commands and/or
+# launch the foreground TUI. All guided stages need a TTY.
+GUIDED_STAGES=(40-trust 50-interactive 80-enroll-fixture 85-policy-check-e2e 86-sessionstart-delivery-e2e 87-interactive-smoke)
 # 81-84 consume the stage-80 enrolled fixture and run headless. EXPLICIT-ONLY:
 # excluded from both './reproduce.sh' and './reproduce.sh all' (running them blind
 # would burn quota against a fixture that may not exist), but resolve_stage must
@@ -45,6 +46,10 @@ Approximate model-turn budget (short, one-word-reply prompts; ChatGPT quota):
   82-trust-dims     4 turns (40e command-string, user-vs-project, worktree x2)
   83-preimage       0-2 turns (offline scan; +empirical only if the hash is computable)
   84-fresh-project  2 turns (cross-project trust: a fresh UNRELATED repo, no ceremony)
+  --- product hook / interactive debt (operator-gated; explicit or all) ---
+  85-policy-check    1 turn + 1 operator-guided product-hook trust ceremony
+  86-sessionstart    1 turn + 1 operator-guided product-hook trust ceremony
+  87-interactive     4 foreground TUI runs + operator confirmations
 EOB
 }
 

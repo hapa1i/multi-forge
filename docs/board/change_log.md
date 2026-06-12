@@ -25,6 +25,46 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board-contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-06-12
+
+### codex_frontend probe debt: operator-gated stages 85-87 harness
+
+**Goal**: Convert the owed Phase 3/4/5 operator-gated Codex checks from README sketches into runnable probe stages:
+product `codex-policy-check`, product `codex-session-start` with multi-KB `additionalContext`, and the real interactive
+TUI behavior smoke.
+
+**Key changes**:
+
+- Added product-probe helpers to `scripts/experiments/codex-hooks/lib.sh`: stage-isolated `FORGE_HOME`, repo-root
+  discovery, product-project setup, `forge` PATH guard for trust-durable product hook commands, and a guided trust
+  ceremony prompt.
+- Added stage `85-policy-check-e2e`: registers the real `forge hook codex-policy-check`, enables TDD on an isolated
+  Forge session, asks Codex to create an impl-only file, and passes only if the manifest records a deny and the file is
+  absent.
+- Added stage `86-sessionstart-delivery-e2e`: registers the real `forge hook codex-session-start`, seeds a large parent
+  transcript, runs the shipped `--context-delivery hook` bridge, and checks echo + `confirmed.codex` receipt facts.
+- Added stage `87-interactive-smoke`: foreground TUI flow for bare start, live reattach, active-gate refusal, positional
+  hold instructions, hook-delivered context, and read-only sandbox behavior, combining operator answers with manifest
+  facts.
+- Wired stages 85-87 into `reproduce.sh all`; post-run hardening keeps foreground TUI stdout/stderr attached to the
+  terminal, aborts early when 87A did not create a thread, uses the absolute `forge` path for the second-terminal active
+  gate command, and gives sandbox failures their own verdict.
+
+**Verification**: `bash -n` on the changed harness scripts; `shellcheck -e SC1091` on the same set (dynamic stage
+`source` parity); focused unit slice passed:
+`uv run pytest tests/src/cli/hooks/test_codex_policy_check.py tests/src/cli/hooks/test_codex_session_start.py tests/src/session/test_codex_handoff.py tests/src/core/ops/test_codex_session.py tests/src/core/ops/test_codex_interactive.py`
+(126 passed); `make pre-commit` clean. A minimal stage-style product project can run
+`forge session start smoke --no-launch --no-proxy` with isolated `FORGE_HOME`, and `uv run --project ... forge --help`
+validates the fallback helper command shape. Live operator run on codex-cli 0.139.0: stage 85 PASS (product
+`codex-policy-check` denied the impl-only `apply_patch`; blocked file absent); stage 86 PASS (11,519-byte transfer
+delivered through product `codex-session-start`, token echoed, `confirmed.codex.context_delivery` and `rollout_source`
+both `session_start_hook`); stage 87 PASS after harness hardening (bare start, reattach memory, second-terminal
+active-gate refusal, positional hold instructions, hook-delivered interactive bridge, and read-only sandbox denial all
+operator-confirmed with matching capture facts; `sandbox_should_not_exist.txt` stayed absent). The operator also
+observed that Codex CLI visibly rendered hook-delivered `SessionStart` `additionalContext` in the TUI transcript even
+though it was delivered passively rather than as a positional synthetic prompt; the non-gating observation prompt was
+codified after that PASS run, so the current capture predates `results/observations.txt`.
+
 ## 2026-06-11
 
 ### codex_frontend Phase 5: Interactive Codex frontend

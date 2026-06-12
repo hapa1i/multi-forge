@@ -50,6 +50,8 @@ probe_init() { # probe_init <stage-name> [--persistent-home]
 
     LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
     export LIB_DIR
+    REPO_ROOT="$(cd "$LIB_DIR/../../.." && pwd -P)"
+    export REPO_ROOT
 
     CAPTURE_ROOT="${CODEX_HOOKS_CAPTURE_DIR:-$HOME/.cache/forge-codex-hooks-probe}"
     export CAPTURE_ROOT
@@ -239,6 +241,8 @@ fixture_init() { # fixture_init <stage-name>  -- shared setup for stages 80-83
 
     LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
     export LIB_DIR
+    REPO_ROOT="$(cd "$LIB_DIR/../../.." && pwd -P)"
+    export REPO_ROOT
 
     CAPTURE_ROOT="${CODEX_HOOKS_CAPTURE_DIR:-$HOME/.cache/forge-codex-hooks-probe}"
     export CAPTURE_ROOT
@@ -262,6 +266,80 @@ fixture_init() { # fixture_init <stage-name>  -- shared setup for stages 80-83
     note "stage=$stage (fixture mode)"
     note "FIXTURE_ROOT=$FIXTURE_ROOT"
     note "CODEX_HOME=$CODEX_HOME captures -> $PROBE_CAPTURE_DIR"
+}
+
+probe_forge_home() {
+    FORGE_HOME="$PROBE_CAPTURE_DIR/forge-home"
+    export FORGE_HOME
+    mkdir -p "$FORGE_HOME"
+    chmod 700 "$FORGE_HOME"
+    note "FORGE_HOME=$FORGE_HOME"
+}
+
+run_forge() {
+    if command -v forge >/dev/null 2>&1; then
+        forge "$@"
+        return $?
+    fi
+    if command -v uv >/dev/null 2>&1 && [ -f "$REPO_ROOT/pyproject.toml" ]; then
+        uv run --project "$REPO_ROOT" forge "$@"
+        return $?
+    fi
+    err "forge is not on PATH and uv run forge is unavailable from $REPO_ROOT."
+}
+
+require_product_forge_hook_command() {
+    command -v forge >/dev/null 2>&1 ||
+        err "product-hook stages register command=\"forge hook ...\" in Codex config, so 'forge' must be on PATH. Run ./scripts/setup.sh --local or otherwise install Forge before this probe."
+}
+
+prepare_product_project() { # prepare_product_project <path> <title>
+    local dir="${1:?project path}" title="${2:-Codex product probe project}"
+    rm -rf "$dir"
+    mkdir -p "$dir"/{.forge,.claude,.codex,src,tests}
+    (
+        cd "$dir" &&
+            git init -q &&
+            git config user.email probe@example.invalid &&
+            git config user.name probe &&
+            printf '# %s\n' "$title" >README.md &&
+            git add README.md &&
+            git commit -qm init
+    ) || err "product project git init failed: $dir"
+}
+
+guided_product_trust() { # guided_product_trust <stage> <project-path> <hook-summary>
+    local stage="${1:?stage}" project="${2:?project}" hook_summary="${3:?hook summary}"
+    if [ ! -t 0 ]; then
+        err "stage $stage needs a TTY for the product-hook trust ceremony."
+    fi
+    local project_real
+    project_real="$(cd "$project" && pwd -P)"
+    cat <<EOI
+
+  ================= OPERATOR STEP ($stage -- product hook trust) =================
+  This stage registered:
+
+    $hook_summary
+
+  In ANOTHER terminal, run EXACTLY:
+
+    cd "$project_real" && CODEX_HOME="$CODEX_HOME" FORGE_HOME="$FORGE_HOME" codex
+
+  In the TUI:
+    1. Accept project/folder trust if shown.
+    2. Accept the hook trust prompt(s) for the product Forge hook command(s).
+    3. /quit
+
+  If no trust prompt appears, the stable project path may already be enrolled; /quit.
+  Then press ENTER here. (Type 's' + ENTER to skip -- the stage will stop.)
+  ===============================================================================
+EOI
+    local reply
+    read -r reply
+    if [ "${reply:-}" = "s" ]; then
+        err "operator skipped the $stage trust ceremony."
+    fi
 }
 
 # fixture_build -- (stage 80 only) (re)create the fixture from scratch: fresh

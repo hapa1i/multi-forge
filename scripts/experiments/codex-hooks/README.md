@@ -48,13 +48,16 @@ Fetched 2026-06-09 from developers.openai.com/codex (hooks, config-reference, no
 
 ```bash
 ./reproduce.sh              # headless set: 00 05 10 20 30 60 70 (~16-18 short turns)
-./reproduce.sh all          # + operator-guided 40 50 80 (needs a TTY)
+./reproduce.sh all          # + operator-guided 40 50 80 85 86 87 (needs a TTY)
 ./reproduce.sh 60           # one stage
 ./sanitize.sh               # raw captures -> sanitized fixture candidates + loud secret scan
 
 # Round 3 (enrollment mechanics; explicit-only -- see below):
 ./reproduce.sh 80           # operator trust ceremony; builds the persistent enrolled fixture
 ./reproduce.sh 81 82 83 84  # headless probes against that fixture (refuse to run without it)
+./reproduce.sh 85           # product codex-policy-check E2E (operator trust + 1 headless turn)
+./reproduce.sh 86           # product codex-session-start E2E (operator trust + 1 headless turn)
+./reproduce.sh 87           # foreground TUI behavioral smoke (operator-guided)
 ```
 
 Captures land **outside the repo** at `${CODEX_HOOKS_CAPTURE_DIR:-~/.cache/forge-codex-hooks-probe}/<stage>/`
@@ -141,6 +144,9 @@ runs two headless verification turns. Re-running 80 rebuilds the home and needs 
 | 82    | headless+fixture | 40e command-string mutation; user-vs-project trust location; worktree path-sensitivity (-> Phase 6 installer scope)                                                 |
 | 83    | offline (+1-2)   | `hash-preimage.py` reverse-engineers `trusted_hash`; if computable, forges a `[hooks.state]` record and proves programmatic pre-enrollment end-to-end               |
 | 84    | headless+fixture | cross-project trust: does a fresh UNRELATED repo reusing the enrolled command string fire? H1 definition-match vs H2/H3 path-scoping (-> Phase 6 installer scope)   |
+| 85    | guided+headless  | product `forge hook codex-policy-check` E2E: trusted PreToolUse hook denies an apply_patch and the blocked file does not land                                       |
+| 86    | guided+headless  | product `forge hook codex-session-start` E2E: hook-delivered multi-KB transfer reaches `additionalContext` and reconciles into `confirmed.codex`                    |
+| 87    | guided TUI       | Forge-managed interactive Codex smoke: bare start, reattach, active gate, positional hold behavior, hook delivery, and read-only sandbox behavior                   |
 
 ### Verdict vocabulary (round 3)
 
@@ -159,12 +165,27 @@ runs two headless verification turns. Re-running 80 rebuilds the home and needs 
   a `[hooks.state]` record appeared headless, refuting "headless cannot self-enroll"; 84a short-circuits before 84b) |
   `[CROSS-PROJECT-INVALID]` (setup confound -- the fixture was not in the expected clean state; inspect + re-run) |
   `[CROSS-PROJECT-INCONCLUSIVE]` (not even the positive control fired; the turn did not run -- mirrors stage 10).
+- Stage 85: `[POLICY-CHECK-E2E-PASS]` when a trusted product `codex-policy-check` hook records a TDD deny and the
+  requested `src/` file is absent; `[POLICY-CHECK-E2E-INCONCLUSIVE]` when no matching decision lands;
+  `[POLICY-CHECK-E2E-FAIL]` when the blocked file exists.
+- Stage 86: `[SESSIONSTART-DELIVERY-E2E-PASS]` when a trusted product `codex-session-start` hook delivers a >=4 KiB
+  transfer, the model echoes the oracle token, and `confirmed.codex` records `context_delivery="session_start_hook"` +
+  `rollout_source="session_start_hook"`; `FAIL` means `hook_undelivered`; `INCONCLUSIVE` means the echo/manifest/size
+  facts did not all line up.
+- Stage 87: `[INTERACTIVE-SMOKE-PASS]` when operator confirmations and manifest facts all pass;
+  `[INTERACTIVE-SMOKE-SANDBOX-FAIL]` when the main interactive facts pass but the read-only sandbox still allows a file
+  write; `[INTERACTIVE-SMOKE-SANDBOX-INCONCLUSIVE]` when the sandbox refusal was not operator-confirmed;
+  `[INTERACTIVE-SMOKE-INCOMPLETE]` records other missing answers/facts in `results/verdict.txt`.
 
 ### Safety (round 3 additions)
 
 The fixture's `codex-home/` is never copied by `sanitize.sh` (the existing `*/codex-home/*` exclusion covers it), and
 its `auth.json` is removed on every stage exit. Stage 83's empirical test runs in a fresh `mktemp` home, removed on
-exit. Trust state (`config.toml`) persists by design; delete the fixture dir when the round-3 record is written.
+exit. Trust state (`config.toml`) persists by design; delete the fixture dir when the round-3 record is written. Stages
+85-87 additionally create isolated Forge state under each stage capture dir (`FORGE_HOME=$CAPTURE/stage/forge-home`) and
+stable product projects under the stage capture dir. They register the **real product command strings**
+(`forge hook codex-policy-check` / `forge hook codex-session-start`), so `forge` must be on PATH for the Codex hook
+subprocess. Use `./scripts/setup.sh --local` or another local install before running those stages.
 
 ## Relationship to the decision record
 
@@ -179,47 +200,20 @@ ceremony, then headless capture). Phase 1 already promoted five sanitized payloa
 `tests/fixtures/codex/README.md` structure), pinning the future adapter's parsers as `exec_json_success.jsonl` pins
 `parse_codex_jsonl_stream`.
 
-**Owed next operator round — stage 85 (enrolled `forge hook codex-policy-check` end-to-end).** Phase 3 shipped the Codex
-PreToolUse policy hook (`forge hook codex-policy-check`: apply_patch -> per-file policy evaluation -> stdout deny JSON);
-CI covers its stdin-JSON CLI contract (`tests/integration/docker/test_policy_hooks.py`), but the full enrolled-hook loop
-— a real `codex exec` turn whose registered PreToolUse hook runs the forge command and Codex honors the deny — needs the
-trust ceremony, so it is operator-gated. Sketch: register `command = "forge hook codex-policy-check"` (path-stable) as a
-PreToolUse hook in the enrolled fixture, point `FORGE_SESSION` at a policy-enabled session, prompt an apply_patch into
-`src/` with no tests, and assert the patch did NOT apply.
+**Operator-gated product stages (85-87).** These are now runnable scripts rather than checklist sketches:
 
-**Owed next operator round — stage 86 (enrolled SessionStart transfer delivery end-to-end).** Phase 4 shipped the
-delivery loop (`forge session start --runtime codex --context-delivery hook`: staged `pending-context.md` -> registered
-`forge hook codex-session-start` emits `additionalContext` -> receipt -> CLI reconciliation into
-`confirmed.codex.context_delivery`); CI covers the handler's stdin-JSON contract and the staged/receipt lifecycle
-(`tests/integration/docker/test_policy_hooks.py::TestCodexSessionStartDocker`) and 30e proved short-token
-additionalContext lands. The operator round verifies the composed loop on real codex: register
-`command = "forge hook codex-session-start"` (path-stable) as a SessionStart hook in the enrolled fixture, plant a
-`MAGIC-CTX`-style token in a parent session's transfer, run the one-command bridge with `--context-delivery hook`, and
-assert (a) the model echoes the token (delivery reached context), (b)
-`confirmed.codex.context_delivery == "session_start_hook"` with `rollout_source = "session_start_hook"` (receipt
-reconciled), and (c) a **realistic multi-KB transfer body** still lands — payload size is the one unprobed dimension
-(30e used a short token). Also re-confirms the bridge-scoped env loop (`FORGE_SESSION`/`FORGE_FORGE_ROOT` visible in the
-hook env; 40c2/50c pinned ambient passthrough, this pins the bridge-set values specifically).
-
-**Owed next operator round — stage 87 (Forge-managed interactive Codex smoke).** Phase 5 shipped Forge-managed
-interactive sessions (`forge session start --runtime codex` launches the TUI; bare `forge session resume` reattaches via
-`codex resume <thread_id>`; thread identity reconciled post-exit from the observation receipt or filesystem discovery).
-The TUI cannot run headless, so this is a manual checklist with captured evidence (`forge session show` output +
-`observation-receipt.json` contents per step):
-
-1. **Bare start**: `forge session start s87a --runtime codex` -> TUI opens with no initial prompt -> exit ->
-   `session show s87a` records `thread_id` with `rollout_source = "discovered_post_exit"` (un-enrolled home) or
-   `"session_start_hook"` (enrolled), and **no** `Delivery:` line (bare starts record `context_delivery = None`).
-2. **Interactive bridge, positional delivery**: `forge session start s87b --runtime codex --resume-from <parent>` with a
-   **multi-KB curated transfer** (size unprobed — 50c used a short token). Verify the hold instructions hold: the first
-   model turn acknowledges the context in a sentence and **waits** — no file edits, no commands, no tool calls before
-   the operator types. This is the load-bearing check: the positional `[PROMPT]` starts a real model turn, and the
-   `compose_codex_interactive_context` framing is what keeps it passive.
-3. **Interactive bridge, hook delivery** (enrolled home): `--context-delivery hook` -> context lands via
-   `additionalContext` with no synthetic first turn; post-exit `context_delivery == "session_start_hook"`.
-4. **Reattach**: `forge session resume s87a` -> `codex resume <thread_id>` reopens the same conversation (prior turns
-   visible); a second resume while one is live is refused (active-session gate).
-5. **TUI `--sandbox` behavior**: `forge session start s87c --runtime codex --sandbox read-only` -> the TUI honors the
-   sandbox mode at runtime. The argv shapes are already pinned (codex 0.139.0 `--help` probes, 2026-06-11: root
-   `codex [OPTIONS] [PROMPT]` and `codex resume [OPTIONS] [SESSION_ID]` both declare `-s/--sandbox`; the launcher passes
-   it inside the `resume` subcommand where it is documented) — this step verifies the *behavior*, not the flag parsing.
+- `./reproduce.sh 85`: registers `forge hook codex-policy-check` as a product PreToolUse hook in a stable stage project,
+  asks the operator to trust it, creates a no-launch Forge session with TDD policy enabled, prompts a real Codex turn to
+  `apply_patch` an implementation file without tests, and passes only if the product hook records a deny and the file
+  does not land.
+- `./reproduce.sh 86`: registers `forge hook codex-session-start`, asks the operator to trust it, creates a parent
+  session with a multi-KB synthetic transcript, runs
+  `forge session start s86-child --runtime codex --resume-from s86-parent --strategy full --context-delivery hook`, and
+  passes only if the model echoes the oracle token and `confirmed.codex` records the hook-sourced delivery/rollout.
+- `./reproduce.sh 87`: launches the foreground TUI paths and records operator confirmations plus manifest facts: bare
+  start, live reattach, active-session refusal from a second terminal, positional bridge hold behavior, hook-delivered
+  interactive bridge, and read-only sandbox behavior. The hook-delivered bridge also records the Codex CLI display
+  observation that `SessionStart` `additionalContext` may be visibly rendered in the transcript even though it was not a
+  positional synthetic prompt. The stage prints the exact second-terminal command for the active-gate check (using the
+  absolute `forge` path from the launching shell), writes answers to `results/operator-answers.txt`, and writes
+  non-gating observations to `results/observations.txt`.
