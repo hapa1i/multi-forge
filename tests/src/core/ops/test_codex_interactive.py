@@ -23,6 +23,8 @@ import pytest
 from forge.core.ops.codex_interactive import (
     ROLLOUT_SOURCE_POST_EXIT,
     CodexInteractiveResult,
+    _remove_lock_only_session_dir,
+    _update_manifest_if_present,
     reattach_codex_session,
     start_interactive_codex_session,
 )
@@ -247,6 +249,45 @@ class TestBareInteractiveStart:
         assert state.confirmed.codex is not None
         assert state.confirmed.codex.thread_id is None
 
+    def test_lone_stray_rollout_with_different_cwd_not_recorded(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        proj, ctx = _make_project(tmp_path, monkeypatch)
+
+        def _stray_rollout(**kw: Any) -> None:
+            _make_rollout(_codex_home(tmp_path), _TID_B, cwd=str(tmp_path / "elsewhere"))
+
+        with _interactive_mocks():
+            result = start_interactive_codex_session(
+                ctx=ctx, name="solo", invoke=_FakeInvoke(side_effect=_stray_rollout)
+            )
+
+        assert result.thread_id is None
+        assert any("No Codex rollout appeared" in w for w in result.warnings)
+        state = SessionManager().get_session("solo", forge_root=str(proj))
+        assert state.confirmed.codex is not None
+        assert state.confirmed.codex.thread_id is None
+
+    def test_deleted_during_tui_does_not_recreate_session_dir(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        proj, ctx = _make_project(tmp_path, monkeypatch)
+
+        def _delete_during_tui(**kw: Any) -> None:
+            _make_rollout(_codex_home(tmp_path), _TID, cwd=kw["cwd"])
+            assert SessionStore(str(proj), "solo").delete() is True
+
+        with _interactive_mocks():
+            result = start_interactive_codex_session(
+                ctx=ctx, name="solo", invoke=_FakeInvoke(side_effect=_delete_during_tui)
+            )
+
+        assert result.thread_id == _TID
+        assert any("deleted while Codex was running" in w for w in result.warnings)
+        store = SessionStore(str(proj), "solo")
+        assert not store.exists()
+        assert not store.session_dir.exists()
+
     def test_ambiguous_rollouts_refuse_to_guess(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         proj, ctx = _make_project(tmp_path, monkeypatch)
 
@@ -255,7 +296,9 @@ class TestBareInteractiveStart:
             _make_rollout(_codex_home(tmp_path), _TID_B, cwd=kw["cwd"], ts="2026-06-11T10-00-01")
 
         with _interactive_mocks():
-            result = start_interactive_codex_session(ctx=ctx, name="solo", invoke=_FakeInvoke(side_effect=_two_rollouts))
+            result = start_interactive_codex_session(
+                ctx=ctx, name="solo", invoke=_FakeInvoke(side_effect=_two_rollouts)
+            )
 
         assert result.thread_id is None
         assert any("refusing to guess" in w for w in result.warnings)
@@ -534,9 +577,7 @@ class TestReattachCodexSession:
         _seed_codex_session(proj)
 
         def _observe_drift(**kw: Any) -> None:
-            write_observation_receipt(
-                _session_dir(proj), session_id=_TID_B, transcript_path=None, source="resume"
-            )
+            write_observation_receipt(_session_dir(proj), session_id=_TID_B, transcript_path=None, source="resume")
 
         with _interactive_mocks():
             result = reattach_codex_session(ctx=ctx, name="impl", invoke=_FakeInvoke(side_effect=_observe_drift))
@@ -577,3 +618,82 @@ class TestReattachCodexSession:
         assert state.confirmed.codex.rollout_path == str(rollout)
         assert state.confirmed.codex.auth_method == "chatgpt_tokens"
         assert state.confirmed.codex.last_run_at is not None
+
+    def test_deleted_during_reattach_does_not_recreate_session_dir(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        proj, ctx = _make_project(tmp_path, monkeypatch)
+        _seed_codex_session(proj)
+
+        def _delete_during_tui(**kw: Any) -> None:
+            assert SessionStore(str(proj), "impl").delete() is True
+
+        with _interactive_mocks():
+            result = reattach_codex_session(ctx=ctx, name="impl", invoke=_FakeInvoke(side_effect=_delete_during_tui))
+
+        assert result.thread_id == _TID
+        assert any("deleted while Codex was running" in w for w in result.warnings)
+        store = SessionStore(str(proj), "impl")
+        assert not store.exists()
+        assert not store.session_dir.exists()
+
+
+class TestUpdateManifestIfPresent:
+    """The exists()->update() race window and the lock-only-shell sweep.
+
+    The ops-level deleted-during-TUI tests land in the exists() preflight branch;
+    these pin the narrower race where the delete lands AFTER the preflight, so
+    update()'s lock acquisition recreates the session dir before read() raises.
+    """
+
+    @staticmethod
+    def _exists_true_once() -> Callable[[SessionStore], bool]:
+        """exists() reporting True once (delete lands after the preflight), then real."""
+        real_exists = SessionStore.exists
+        preflight = [True]
+
+        def _exists(self: SessionStore) -> bool:
+            if preflight:
+                preflight.pop()
+                return True
+            return real_exists(self)
+
+        return _exists
+
+    def test_race_window_removes_lock_only_dir(self, tmp_path: Path) -> None:
+        store = SessionStore(str(tmp_path), "ghost")
+        store.session_dir.mkdir(parents=True)
+        (store.session_dir / "forge.session.json.lock").touch()
+        warnings: list[str] = []
+
+        with patch.object(SessionStore, "exists", self._exists_true_once()):
+            updated = _update_manifest_if_present(store, mutate=lambda m: None, warnings=warnings, session="ghost")
+
+        assert updated is False
+        assert any("deleted while Codex was running" in w for w in warnings)
+        assert not store.session_dir.exists()
+
+    def test_race_window_preserves_non_lock_content(self, tmp_path: Path) -> None:
+        store = SessionStore(str(tmp_path), "ghost")
+        receipt_dir = store.session_dir / "codex"
+        receipt_dir.mkdir(parents=True)
+        (receipt_dir / "observation-receipt.json").write_text("{}", encoding="utf-8")
+        warnings: list[str] = []
+
+        with patch.object(SessionStore, "exists", self._exists_true_once()):
+            updated = _update_manifest_if_present(store, mutate=lambda m: None, warnings=warnings, session="ghost")
+
+        assert updated is False
+        assert any("deleted while Codex was running" in w for w in warnings)
+        # A dir holding more than the lock is not ours to judge; nothing is removed.
+        assert (receipt_dir / "observation-receipt.json").exists()
+
+    def test_sweep_removes_empty_dir_shell(self, tmp_path: Path) -> None:
+        # Another actor already unlinked the lock; the bare shell still goes.
+        empty = tmp_path / "ghost-session"
+        empty.mkdir()
+        _remove_lock_only_session_dir(empty)
+        assert not empty.exists()
+
+    def test_sweep_missing_dir_is_noop(self, tmp_path: Path) -> None:
+        _remove_lock_only_session_dir(tmp_path / "never-existed")

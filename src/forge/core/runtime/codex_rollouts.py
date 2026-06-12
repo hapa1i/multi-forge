@@ -104,11 +104,11 @@ def find_rollouts_since(
     ``thread.started`` stream event. Filtering is by **mtime** with a small skew
     allowance -- the filename timestamp's timezone is unpinned across codex versions.
 
-    When ``cwd`` is given and more than one rollout qualifies, the set is narrowed to
-    candidates whose head-line ``cwd`` matches. Narrowing applies only when it leaves
-    at least one candidate: an unreadable or unknown-shape head must not eliminate the
-    true rollout. Callers treat anything but exactly one result as ambiguous and
-    refuse to guess.
+    When ``cwd`` is given, a rollout with a known, mismatching head-line ``cwd`` is
+    rejected if it is the only candidate. With multiple candidates, matching heads
+    narrow the set; if no head matches, unreadable or unknown-shape heads keep the set
+    ambiguous instead of eliminating the true rollout. Callers treat anything but
+    exactly one result as ambiguous and refuse to guess.
     """
     base = (home if home is not None else codex_home()) / "sessions"
     cutoff = since.timestamp() - _MTIME_SKEW_SECONDS
@@ -130,17 +130,18 @@ def find_rollouts_since(
         qualified.append((mtime, parsed))
     qualified.sort(key=lambda item: item[0], reverse=True)
     results = [rollout for _, rollout in qualified]
-    if cwd is not None and len(results) > 1:
+    if cwd is not None and results:
         target = _canonical_path(cwd)
-        narrowed = [r for r in results if _head_cwd_matches(r.path, target)]
+        heads = [(rollout, _rollout_head_cwd(rollout.path)) for rollout in results]
+        narrowed = [rollout for rollout, head in heads if head is not None and _canonical_path(head) == target]
         if narrowed:
             return narrowed
+        # Rejection is deliberately lone-candidate-only: dropping known strangers from
+        # a multi-candidate set could leave a lone unknown-head candidate that would
+        # then be recorded -- a guess. Ambiguity must stay ambiguous.
+        if len(results) == 1 and heads[0][1] is not None:
+            return []
     return results
-
-
-def _head_cwd_matches(path: Path, target: str) -> bool:
-    head_cwd = _rollout_head_cwd(path)
-    return head_cwd is not None and _canonical_path(head_cwd) == target
 
 
 def _rollout_head_cwd(path: Path) -> str | None:

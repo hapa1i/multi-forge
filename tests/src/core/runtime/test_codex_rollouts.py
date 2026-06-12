@@ -182,11 +182,18 @@ class TestFindRolloutsSince:
         results = find_rollouts_since(_since(5000), cwd=str(tmp_path / "work"), home=tmp_path)
         assert {r.thread_id for r in results} == {_TID, _TID_B}
 
-    def test_single_candidate_skips_head_read(self, tmp_path: Path) -> None:
-        # cwd narrowing only applies to >1 candidates; a lone mismatching head is kept.
+    def test_single_known_mismatching_cwd_is_rejected(self, tmp_path: Path) -> None:
+        # A lone rollout with a different known cwd is a concurrent stranger, not ours.
         path = _make_rollout(
             tmp_path, "2026/06/11", "2026-06-11T10-00-00", _TID, head=json.dumps({"cwd": "/elsewhere"})
         )
+        os.utime(path, (6000, 6000))
+        results = find_rollouts_since(_since(5000), cwd=str(tmp_path / "work"), home=tmp_path)
+        assert results == []
+
+    def test_single_unknown_head_shape_is_kept(self, tmp_path: Path) -> None:
+        # Unknown heads may still be true rollouts from a changed Codex schema.
+        path = _make_rollout(tmp_path, "2026/06/11", "2026-06-11T10-00-00", _TID, head="not json")
         os.utime(path, (6000, 6000))
         results = find_rollouts_since(_since(5000), cwd=str(tmp_path / "work"), home=tmp_path)
         assert [r.thread_id for r in results] == [_TID]
