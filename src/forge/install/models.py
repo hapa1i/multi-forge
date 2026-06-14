@@ -68,6 +68,7 @@ class InstallModule(str, Enum):
     HOOKS = "hooks"
     STATUSLINE = "status-line"
     PERMISSIONS = "permissions"
+    CODEX_HOOKS = "codex-hooks"
 
 
 # Profile -> modules mapping
@@ -80,6 +81,7 @@ PROFILE_MODULES: dict[InstallProfile, set[InstallModule]] = {
         InstallModule.HOOKS,
         InstallModule.PERMISSIONS,
         InstallModule.STATUSLINE,
+        InstallModule.CODEX_HOOKS,
     },
     InstallProfile.FULL: set(InstallModule),
 }
@@ -121,10 +123,12 @@ FILE_MODULES: set[InstallModule] = {
 # Modules that are settings-only (no files to install)
 # HOOKS: All hooks are now `forge hook X` commands - no files to copy
 # STATUSLINE: Now `forge status-line` command - no scripts to copy
+# CODEX_HOOKS: managed block in Codex config.toml - no files to copy
 SETTINGS_ONLY_MODULES: set[InstallModule] = {
     InstallModule.PERMISSIONS,
     InstallModule.HOOKS,
     InstallModule.STATUSLINE,
+    InstallModule.CODEX_HOOKS,
 }
 
 
@@ -186,6 +190,9 @@ class Installation:
         files: List of InstalledFile records.
         settings_entries: List of InstalledSettingsEntry records.
         settings_backup_path: Path to settings backup file (if created).
+        codex_config_path: Codex config.toml carrying the Forge-managed hook
+                          block (None when codex-hooks was skipped/unmanaged).
+        codex_commands: Forge hook commands registered in that block.
         installed_at: ISO8601 timestamp when first installed.
         updated_at: ISO8601 timestamp when last updated.
     """
@@ -198,6 +205,8 @@ class Installation:
     files: list[InstalledFile] = field(default_factory=list)
     settings_entries: list[InstalledSettingsEntry] = field(default_factory=list)
     settings_backup_path: str | None = None
+    codex_config_path: str | None = None
+    codex_commands: list[str] = field(default_factory=list)
     installed_at: str = ""
     updated_at: str = ""
 
@@ -297,6 +306,28 @@ class SettingsPlan:
 
 
 @dataclass
+class CodexPlan:
+    """Plan for the Codex hook registration (codex-hooks module).
+
+    Codex registration is best-effort: an "unavailable" (no codex binary) or
+    "conflict" outcome degrades to a visible skip and never sets
+    InstallPlan.has_conflicts -- the Claude install must not fail because
+    another tool's config could not be merged.
+
+    Attributes:
+        action: "install", "update", "skip", "conflict", or "unavailable".
+        config_path: Target Codex config.toml (None when unavailable).
+        reason: Explanation for skip/conflict/unavailable actions.
+        commands: Hook commands the managed block registers.
+    """
+
+    action: str
+    config_path: str | None = None
+    reason: str | None = None
+    commands: list[str] = field(default_factory=list)
+
+
+@dataclass
 class InstallPlan:
     """Complete installation plan.
 
@@ -307,6 +338,7 @@ class InstallPlan:
         modules: List of modules being installed.
         files: List of file operations.
         settings: List of settings operations.
+        codex: Codex hook registration plan (None when module not selected).
         has_conflicts: True if any conflicts were detected.
         conflicts: Human-readable conflict descriptions.
     """
@@ -317,5 +349,6 @@ class InstallPlan:
     modules: list[str] = field(default_factory=list)
     files: list[FilePlan] = field(default_factory=list)
     settings: list[SettingsPlan] = field(default_factory=list)
+    codex: CodexPlan | None = None
     has_conflicts: bool = False
     conflicts: list[str] = field(default_factory=list)

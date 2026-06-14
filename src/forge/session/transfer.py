@@ -781,7 +781,7 @@ def _citation_is_grounded(citation: str, emitted_turns: set[int]) -> bool:
 def _validate_decision_citations(decisions: Any, emitted_turns: set[int]) -> tuple[Any, list[str]]:
     """Drop fabricated citations from decisions, returning (sanitized, warnings).
 
-    The schema advertises decisions as grounded (design_appendix §M.2), but the
+    The schema advertises decisions as grounded (design_appendix §H.2), but the
     citation is model-supplied free text. Rather than trust it, validate each:
     an ungrounded citation is blanked so ``schema: full`` never overstates
     evidence quality. The decision *text* is kept -- LLM curation is a system

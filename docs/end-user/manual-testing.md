@@ -8,7 +8,7 @@ Three skills verify that Forge is installed and working correctly, with escalati
 | Walkthrough | `/forge:walkthrough` | Install + assert in sandbox, verify real system untouched | `standard`      |
 | Full QA     | `/forge:qa`          | Full checklist in Docker                                  | `full`          |
 
-- Canonical architecture: [`docs/design.md` section 5.8](../design.md#58-interactive-manual-testing)
+- Canonical architecture: [`docs/design_appendix.md` section D](../design_appendix.md#d-interactive-manual-testing)
 - Testing guidelines:
   [`testing-guidelines.md`](../developer/testing-guidelines.md#interactive-manual-testing-forgesmoke-test-forgewalkthrough)
 

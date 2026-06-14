@@ -241,6 +241,24 @@ def _build_transfer_context_reference_set(ref_set: set[tuple[str, str]]) -> set[
     return result
 
 
+def referenced_transfer_context_paths() -> set[str]:
+    """Absolute snapshot paths referenced by ANY indexed session's derivation (global).
+
+    Shared with the codex session op's stale-snapshot guard: ``context_file`` may be
+    recorded absolute, so a same-named session in a different forge_root can reference
+    a snapshot outside its own root -- a path-local existence check is not enough.
+    """
+    from forge.session import SessionManager
+
+    entries = SessionManager().list_sessions(include_incognito=True)
+    ref_set = {
+        (name, entry.forge_root or entry.worktree_path)
+        for name, entry in entries
+        if entry.forge_root or entry.worktree_path
+    }
+    return _build_transfer_context_reference_set(ref_set)
+
+
 # ---------------------------------------------------------------------------
 # Pure detect functions (read-only)
 # ---------------------------------------------------------------------------

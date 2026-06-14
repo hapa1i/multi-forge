@@ -29,6 +29,7 @@ from .config import (
     LAUNCH_MODE_SIDECAR,
 )
 from .exceptions import (
+    CannotForkCodexParentError,
     CannotForkIncognitoError,
     ContextBudgetExceededError,
     DirtyWorktreeError,
@@ -401,6 +402,8 @@ class SessionManager:
         sidecar_image: str | None = None,
         direct_model: str | None = None,
         claude_session_id: str | None = None,
+        runtime: str = "claude_code",
+        parent_session: str | None = None,
     ) -> SessionState:
         """Create and register a new session.
 
@@ -421,6 +424,9 @@ class SessionManager:
             sidecar_mounts: Raw sidecar mount specs to persist for relaunch.
             sidecar_image: Optional sidecar image override to persist for relaunch.
             direct_model: Optional Claude Code env-ready direct model pin.
+            runtime: Runtime registry id for launcher dispatch ("claude_code" | "codex").
+            parent_session: Derivation source recorded on the state (codex start path;
+                Claude resume/fork paths record it via their own child-creation flows).
 
         Returns:
             The created session state with candidate UUID.
@@ -583,6 +589,7 @@ class SessionManager:
             name=name,
             proxy_template=template,
             proxy_base_url=base_url,
+            parent_session=parent_session,
             is_incognito=is_incognito,
             worktree_path=worktree_path,
             worktree_branch=worktree_branch,
@@ -590,6 +597,7 @@ class SessionManager:
             sidecar_mounts=sidecar_mounts,
             sidecar_image=sidecar_image,
             direct_model=direct_model,
+            runtime=runtime,
         )
 
         if claude_session_id:
@@ -1092,6 +1100,7 @@ class SessionManager:
         Raises:
             SessionNotFoundError: If parent doesn't exist.
             CannotForkIncognitoError: If parent is incognito.
+            CannotForkCodexParentError: If parent is a Codex session (fork is Claude-only).
             SessionExistsError: If fork_name already exists (and not force).
             BranchExistsError: If branch already exists (create_worktree only, not force).
             WorktreePathExistsError: If worktree path exists (create_worktree only, not force).
@@ -1104,6 +1113,14 @@ class SessionManager:
 
         if parent.is_incognito:
             raise CannotForkIncognitoError(parent_name)
+
+        # fork is Claude-only: the post-fork resume keys on the parent's claude_session_id,
+        # which a Codex session never has, and _inherited_launch_intent would copy runtime=codex
+        # into the child. Reject here -- before any child manifest/worktree is created -- so no
+        # caller (not just the CLI preflight) can leave orphaned child state. See review finding #1.
+        parent_launch = parent.intent.launch
+        if parent_launch is not None and parent_launch.runtime == "codex":
+            raise CannotForkCodexParentError(parent_name)
 
         if fork_name is None:
             existing = {name for name, _ in self.list_sessions(forge_root_filter=parent_forge_root)}

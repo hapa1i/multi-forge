@@ -4,8 +4,10 @@
 - **Memory writer usage**: [memory.md](end-user/memory.md) (automatic memory docs guide)
 - **Search usage**: [search.md](end-user/search.md) (transcript search guide)
 - **Skills usage**: [skills.md](end-user/skills.md) (review, understand, panel guide)
+- **Workflow design**: [design_workflows.md](design_workflows.md) (policy, skills, workflow runners, memory writer)
+- **CLI reference**: [cli_reference.md](cli_reference.md) (terminal and direct-command inventory)
 - **Visual diagrams**: [diagrams.md](diagrams.md) (architecture diagrams)
-- **Reference details**: [design_appendix.md](design_appendix.md) (schemas, config tables, implementation specifics)
+- **Reference details**: [design_appendix.md](design_appendix.md) (schemas, config tables, runtime specifics)
 
 ## 1. Philosophy: The "Glue" Approach
 
@@ -166,17 +168,17 @@ for cross-session transfer. Worktrees are used when sessions write concurrently.
 
 ### 3.2 Contract files (authoritative paths)
 
-| Artifact             | Path                                                             | Owned by                 | Purpose                                                                                                   |
-| -------------------- | ---------------------------------------------------------------- | ------------------------ | --------------------------------------------------------------------------------------------------------- |
-| Session file         | `<forge_root>/.forge/sessions/<session_name>/forge.session.json` | Forge Session + Hooks    | Session `intent`, `overrides`, hook-written `confirmed`                                                   |
-| Global session index | `~/.forge/sessions/index.json`                                   | Forge Session            | Session metadata (name, `forge_root`, `project_root`); fast listing + project filtering                   |
-| Active session index | `~/.forge/sessions/active.json`                                  | Forge Session            | Ephemeral live-launch registry for delete warnings + stale pruning                                        |
-| Proxy registry       | `~/.forge/proxies/index.json`                                    | Forge Proxy Orchestrator | Running proxies (template ↔ base_url/port ↔ pid)                                                          |
-| Runtime config       | `~/.forge/config.yaml`                                           | Forge CLI                | Global runtime preferences (proxy mode, timeouts, context limit)                                          |
-| Installed manifest   | `~/.forge/installed.json`                                        | Forge Installer          | Tracks what `forge extension enable` installed for update/uninstall                                       |
-| Work queue           | `~/.forge/pending-work/*.json`                                   | Forge Work Queue (§3.13) | Deferred work markers (stop, index, handoff)                                                              |
-| Usage ledger         | `~/.forge/usage/events/<month>_<pid>.jsonl`                      | Forge Usage Ledger       | Attribution events (run/runtime/model/billing/tokens), joined to cost+audit by `request_id`; schema §A.13 |
-| Optional events      | `~/.forge/events/*.jsonl`                                        | TBD                      | Debugging/analytics; optional                                                                             |
+| Artifact             | Path                                                             | Owned by                 | Purpose                                                                                 |
+| -------------------- | ---------------------------------------------------------------- | ------------------------ | --------------------------------------------------------------------------------------- |
+| Session file         | `<forge_root>/.forge/sessions/<session_name>/forge.session.json` | Forge Session + Hooks    | Session `intent`, `overrides`, hook-written `confirmed`                                 |
+| Global session index | `~/.forge/sessions/index.json`                                   | Forge Session            | Session metadata (name, `forge_root`, `project_root`); fast listing + project filtering |
+| Active session index | `~/.forge/sessions/active.json`                                  | Forge Session            | Ephemeral live-launch registry for delete warnings + stale pruning                      |
+| Proxy registry       | `~/.forge/proxies/index.json`                                    | Forge Proxy Orchestrator | Running proxies (template ↔ base_url/port ↔ pid)                                        |
+| Runtime config       | `~/.forge/config.yaml`                                           | Forge CLI                | Global runtime preferences (proxy mode, timeouts, context limit)                        |
+| Installed manifest   | `~/.forge/installed.json`                                        | Forge Installer          | Tracks what `forge extension enable` installed for update/uninstall                     |
+| Work queue           | `~/.forge/pending-work/*.json`                                   | Forge Work Queue (§3.13) | Deferred work markers (stop, index, handoff)                                            |
+| Usage ledger         | `~/.forge/usage/events/<month>_<pid>.jsonl`                      | Forge Usage Ledger       | Usage attribution events; schema §A.13                                                  |
+| Optional events      | `~/.forge/events/*.jsonl`                                        | TBD                      | Debugging/analytics; optional                                                           |
 
 The active session index is intentionally runtime-only. It is self-healed via launcher PID / sidecar container liveness
 checks and must not be treated as durable session truth like the manifest or global session index.
@@ -312,6 +314,13 @@ proxy-owned routing properties. (Proxy requests do not carry a stable session id
 - Validates preconditions (proxy healthy, session file exists)
 - Records `confirmed.proxy` at session start when proxy mode is active
 
+**Codex-runtime sessions** (`forge session start --runtime codex`, see §3.9) use the same session-managed path, but
+every entry point dispatches on `intent.launch.runtime` **before** any Claude machinery: the session runs `codex` turns
+direct to OpenAI (no proxy, no `ANTHROPIC_BASE_URL`) — headless `codex exec` with `--task`, the foreground `codex` TUI
+without it — Claude-only flags are rejected rather than ignored, and `_launch_claude_for_session` refuses codex
+manifests as a backstop. The CLI accepts `--runtime claude|codex` but manifests persist registry ids only
+(`claude_code`/`codex`), mapped at the CLI boundary.
+
 **Bare launch** (`forge claude start`):
 
 - Convenience proxy launcher -- does NOT create session state
@@ -344,6 +353,16 @@ To avoid writer conflicts:
   - `confirmed` bootstrap/runtime fields written by the CLI: `derivation` (resume metadata), `is_sandboxed` (updated at
     launch time to reflect whether Claude is running via sidecar), `launch` (immutable launch facts recorded once at
     start — routing mode, proxy id/base URL, and whether/how an API key was made available to the child)
+  - `confirmed.codex` for Codex-runtime sessions — `thread_id`, rollout path/source, auth posture, `last_run_at`,
+    `context_delivery` — is CLI-written like `launch`: Codex hooks only fire from trust-enrolled homes
+    (`enrollment_gated`), so the CLI records these from the `codex exec --json` stream (headless), receipt files, and
+    filesystem discovery. Thread/rollout/auth/`last_run_at` refresh per turn; `context_delivery` is a start-turn
+    delivery fact resume never rewrites. The `codex-session-start` hook's only writes are small receipt files under the
+    session directory — `context-receipt.json` (staged-handoff delivery, §3.9) or `observation-receipt.json`
+    (nothing-staged turns — interactive thread capture) — and the CLI reconciles them into `confirmed.codex` after the
+    turn, so the manifest stays CLI-owned. `confirmed.launch` stays unset for Codex sessions (it documents the ANTHROPIC
+    key posture of interactive Claude and would misread), and `claude_session_id` stays `None` — which is what makes
+    every Claude-resume predicate refuse Codex sessions.
   - Sets `FORGE_SESSION=<session_name>` when launching Claude
   - `claude_session_id` whenever the CLI starts a **new** Claude conversation — `forge session start` and transfer/fresh
     children (`session fork`, `resume --fresh`): the CLI **pre-seeds** it (generates a UUID, writes it at creation,
@@ -376,23 +395,27 @@ To avoid writer conflicts:
 
 #### 3.6.1 Definitions (normative)
 
-| Concept            | Definition                                                                                                                                                                                                                                  |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Proxy**          | base_url/port/template + tier→model + default hyperparams. Canonical routing identity for a proxy.                                                                                                                                          |
-| **Session**        | Forge-project-scoped intent/overrides/artifacts. May reference a proxy, cannot change proxy-owned fields.                                                                                                                                   |
-| **Config**         | In-repo defaults + user credentials/connection values (env vars and/or `~/.forge/credentials.yaml`). Connection values (e.g., `LITELLM_BASE_URL`) bootstrap proxy creation; once `proxy.yaml` exists, proxy-owned routing is authoritative. |
-| **Proxy Template** | Operational profile defining provider/endpoint/tier-mappings. Internal template for proxy creation.                                                                                                                                         |
-| **Model Catalog**  | Authoritative internal data for model capabilities (`model_catalog.yaml`). Not user-editable.                                                                                                                                               |
-| **ModelRoute**     | Derived routing option pairing a model with a provider/credential/template. Generated by `derive_model_routes()`, not hand-authored.                                                                                                        |
-| **RoutingResult**  | Structured outcome of subprocess routing resolution: base_url, proxy_id, resolution source, selected route, warning. Replaces bare `str \| None`.                                                                                           |
+- **Proxy**: base_url/port/template + tier→model + default hyperparams. Canonical routing identity for a proxy.
+- **Session**: Forge-project-scoped intent, overrides, and artifacts. May reference a proxy; cannot change proxy-owned
+  fields.
+- **Config**: in-repo defaults plus user credentials/connection values (env vars and/or `~/.forge/credentials.yaml`).
+  Connection values (for example `LITELLM_BASE_URL`) bootstrap proxy creation; once `proxy.yaml` exists, proxy-owned
+  routing is authoritative.
+- **Proxy Template**: operational profile defining provider, endpoint, and tier mappings for proxy creation.
+- **Model Catalog**: authoritative internal data for model capabilities (`model_catalog.yaml`), not user-editable.
+- **ModelRoute**: derived routing option pairing a model with a provider/credential/template. Generated by
+  `derive_model_routes()`, not hand-authored.
+- **RoutingResult**: structured subprocess routing result: base URL, proxy id, resolution source, selected route, and
+  warning. Replaces bare `str | None`.
 
 #### 3.6.2 Field ownership invariants (normative)
 
-| Owner             | Fields                                                                                                                                                              |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Proxy-owned**   | tier→model mappings, provider/base_url, default hyperparams (reasoning_effort, temperature, verbosity, thinking_budget_tokens)                                      |
-| **Session-owned** | policy/TDD mode, memory/artifacts, `forge_root`, `checkout_root`, `relative_path`, session metadata                                                                 |
-| **Routing chain** | Tier: request explicit tier → proxy default tier. Subprocess: explicit → subprocess proxy → preferred proxy → route scan → session proxy → unresolved (see §3.6.12) |
+- **Proxy-owned**: tier→model mappings, provider/base_url, and default hyperparams (`reasoning_effort`, `temperature`,
+  `verbosity`, `thinking_budget_tokens`).
+- **Session-owned**: policy/TDD mode, memory/artifacts, `forge_root`, `checkout_root`, `relative_path`, and session
+  metadata.
+- **Routing chain**: tier resolution is request explicit tier → proxy default tier. Subprocess resolution is explicit →
+  subprocess proxy → preferred proxy → route scan → session proxy → unresolved (see §3.6.12).
 
 **CLI enforcement:** Enforced in the CLI: `forge proxy` edits proxy settings; `forge session` edits session settings.
 Session commands can't set proxy-owned keys.
@@ -485,7 +508,7 @@ worker.
 
 > **Routing reference details** — data type schemas (`ModelRoute`, `RoutingResult`, `WorkerRoutingPlan`), function
 > signatures, route derivation ranking, and sidecar constraints are in
-> [design_appendix.md §L](design_appendix.md#l-subprocess-routing-reference).
+> [design_appendix.md §G](design_appendix.md#g-subprocess-routing-reference).
 
 ### 3.7 Proxy runtime truth
 
@@ -570,7 +593,8 @@ Notes:
 ### 3.9 Session Resume (context management)
 
 When context nears limits, `forge session resume --fresh` creates a new session with context assembled from the parent.
-It's **two-phase**: raw artifacts stay immutable; context assembly is flexible.
+It's **two-phase**: raw artifacts stay immutable (full history for debugging and audit); context assembly is flexible —
+the same raw data serves different fidelity/size needs.
 
 **Phase 1: Capture (parent session end)**
 
@@ -594,29 +618,61 @@ The resume command supports two **resume modes** (`--resume-mode`):
 - **`native`**: Uses `--resume --fork-session` to carry full conversation history. Lossless but lost on `/compact`. No
   context file generated. Requires the parent to have a confirmed `claude_session_id`.
 
-The transfer doc carries a `target_runtime` frontmatter field and a `## Runtime Hints` section (Phase 5d). `claude`
-(default) renders byte-identically to pre-5d output; `codex` relabels both (the curated body stays Claude-worded —
-curation-prompt tuning is a follow-up). Delivery is runtime-specific: Claude uses `--append-system-prompt-file`. Codex
-has **no** system-prompt-file flag, so the curated context is delivered as the **initial `codex exec` message**
-(prepended to the prompt), **not** a Codex `SessionStart`/additionalContext hook — 5a's preflight can't confirm per-hook
-trust, so hook delivery is deferred to Phase 6. Phase 5e composes the parts into the cross-runtime hop
-`bridge_session_to_codex` (`core/ops/codex_bridge.py`): a parent session -> an ai-curated Codex-targeted transfer -> the
-body prepended via `compose_codex_initial_message` -> `CodexHeadlessInvoker().run`, all under **one run tree** so the
-curation `core.llm` call and the `codex exec` run join on `root_run_id` (§3.14). It is a UI-agnostic command-core op;
-the one-command `forge … --runtime codex` frontend is Phase 6, so the Phase 5 user surface is
-`forge transfer regenerate <parent> --target-runtime {claude|codex}` (re-stamps a cache, defaulting the runtime from the
-existing frontmatter so a regenerate never silently flips it back) plus a manual `codex exec` handoff.
+The transfer doc carries a `target_runtime` frontmatter field and a `## Runtime Hints` section. `claude` (default)
+renders byte-identically to the original output; `codex` relabels both (the curated body stays Claude-worded). Delivery
+is runtime-specific: Claude uses `--append-system-prompt-file`. Codex has **no** system-prompt-file flag, so by default
+the curated context is prepended to the **initial `codex exec` message** — the zero-setup path. The opt-in
+`--context-delivery hook` instead stages the framed body at `<session_dir>/codex/pending-context.md`, sends only the
+task as the prompt, and lets a trust-enrolled `forge hook codex-session-start` emit the staged body as SessionStart
+`additionalContext` (a probe-pinned wire contract), consuming the file and writing `context-receipt.json` — the hook's
+**only** write. Enrollment is unverifiable pre-turn (`trusted_hash` not computable), so the CLI reconciles the receipt
+**after** the turn into CLI-written `confirmed.codex.context_delivery`
+(`initial_message | session_start_hook | hook_undelivered`); undelivered keeps the session, records the honest fact, and
+exits 1 with ceremony/delete-and-retry guidance. Staging is one-shot: the staged file never survives the start turn, and
+resume turns defensively clear leftovers. The cross-runtime hop is `bridge_session_to_codex`
+(`core/ops/codex_bridge.py`): parent session -> ai-curated Codex-targeted transfer -> body prepended via
+`compose_codex_initial_message` (or staged via `compose_codex_handoff_context` in hook mode) ->
+`CodexHeadlessInvoker().run`, all under **one run tree** joining on `root_run_id` (§3.14) — a UI-agnostic command-core
+op.
+
+**Codex session lifecycle.** The headless frontend over it is
+**`forge session start <name> --runtime codex --resume-from <parent> --task "…"`** (`core/ops/codex_session.py`): it
+creates a real Codex-runtime session (manifest `intent.launch.runtime="codex"`, immutable —
+`forge session set launch.runtime` is rejected), keys the transfer snapshot by the **real session name** so
+`Derivation.context_file` GC-protects it (no synthetic per-run transfer children), and runs the first `codex exec` turn.
+A failed first turn keeps the session (a turn that never reached `thread.started` leaves no `thread_id`; resume refuses
+with delete-and-retry guidance). Headless continuation is `forge session resume <name> --task "…"` ->
+`codex exec resume <thread_id>`, cross-CWD in the session's recorded worktree with the prompt on stdin — both codex-cli
+behaviors pinned live by a standing E2E. `forge transfer regenerate <parent> --target-runtime {claude|codex}` remains
+the sessionless surface (re-stamps a cache, defaulting the runtime from the existing frontmatter so a regenerate never
+silently flips it back).
+
+**Interactive Codex sessions** (`core/ops/codex_interactive.py`): omitting `--task` launches the foreground `codex` TUI
+as a managed session — bare (no parent, no transfer, `context_delivery` stays `None`) or an interactive bridge
+(`--resume-from` without `--task`; `--task` alone is rejected — headless turns need a parent). The bridge default rides
+the **positional initial prompt**: `[PROMPT]` starts a real model turn, so `compose_codex_interactive_context` wraps the
+body in explicit hold instructions (acknowledge and wait — no edits/commands/tools yet); `--context-delivery hook` stays
+the only truly passive path. Bare `forge session resume` reattaches via `codex resume <thread_id>` in the recorded
+worktree — active-session gated with **no** `--force` escape (two TUIs would interleave one rollout), and cross-CWD by
+design (Claude's project-scoped refusal is unchanged). The TUI owns stdout — no JSONL stream — so thread identity
+reconciles **post-exit**, receipts first: a trust-enrolled `codex-session-start` hook's delivery receipt (hook mode) or
+its nothing-staged **observation receipt** (`observation-receipt.json`, cleared pre-launch); otherwise filesystem
+discovery over rollouts created after a tight pre-launch timestamp, cwd-narrowed and requiring **exactly one** candidate
+— ambiguity refuses to guess and leaves the thread unrecorded (delete-and-retry guidance). Interactive turns emit **no
+usage event** (mirrors the reserved `claude_interactive` route); the bridge's transfer curation still emits, under the
+same run root the TUI inherits.
+
+**Recorded Codex facts** are CLI-owned, written to `confirmed.codex`; `confirmed.launch` and `claude_session_id` stay
+unset (§3.5). Field-by-field sources and the `rollout_source` provenance table:
+[design_appendix.md §I.1](design_appendix.md#i1-recorded-codex-facts-confirmedcodex).
 
 > **Why not native for worktree forks?** Claude stores sessions at `~/.claude/projects/<encoded-cwd>/`, so a bare
 > `--resume` can't cross the CWD boundary (2.1.90/2.1.158 fail "No conversation found"). **Worktree forks default to
 > transfer.** The opt-in `fork --resume-mode native-relocate` (host only) relocates the parent JSONL and resumes
 > byte-for-byte; tool paths are not rewritten. See `scripts/experiments/native-resume/`.
 
-**Transfer mode strategies** (`--resume-mode transfer`, default):
-
-```bash
-forge session resume <parent> --fresh --strategy <strategy> [--depth N]
-```
+**Transfer mode strategies** (`--resume-mode transfer`, default; selected via
+`forge session resume <parent> --fresh --strategy <strategy> [--depth N]`):
 
 | Strategy     | What child session sees                                        |
 | ------------ | -------------------------------------------------------------- |
@@ -626,45 +682,21 @@ forge session resume <parent> --fresh --strategy <strategy> [--depth N]
 | `ai-curated` | AI-selected highlights from ancestry chain                     |
 
 **Curated transfer is the primary cross-boundary substrate, not a lossy fallback.** Native resume is byte-faithful but
-works only within the same runtime and CWD, and its carried conversation is opaque — the user cannot inspect or prune
-it. Curated transfer is runtime-neutral and *user-editable*, so it is the only way to carry context across worktrees,
-projects, and (later) runtimes while letting the user shape what propagates. `structured` stays the CLI default;
-`ai-curated` emits the full schema (see [design_appendix.md §M](design_appendix.md#m-transfer-context-schema)) and is
-the substrate for genuine cross-boundary moves.
+same-runtime, same-CWD, and opaque (the user cannot inspect or prune the carried conversation); curated transfer is
+runtime-neutral and *user-editable* — the only way to carry context across worktrees, projects, and runtimes while
+shaping what propagates. `structured` stays the CLI default; `ai-curated` emits the full schema
+([design_appendix.md §H](design_appendix.md#h-transfer-context-schema)) and is the substrate for genuine cross-boundary
+moves.
 
-**Native mode** (`--resume-mode native`):
+**Native mode** (`--resume-mode native`): no context assembly; the full conversation history is carried over via
+Claude's `--fork-session`.
 
-```bash
-forge session resume <parent> --fresh --resume-mode native
-```
+**Context budget enforcement:** Resume knows the target proxy (inherited or via `--proxy`). For `full`, it **fails
+fast** before spawning Claude when the parent transcript exceeds the proxy context window, naming
+`structured`/`ai-curated` as the fix. Bounded strategies (truncation/AI selection) need no pre-flight check.
 
-No context assembly. Full conversation history carried over via Claude's `--fork-session`.
-
-**Context budget enforcement:**
-
-Resume knows the target proxy (inherited or via `--proxy`). For `full`, it **fails fast** if the parent transcript
-exceeds the proxy context window:
-
-```bash
-$ forge session resume parent-session --fresh --strategy full
-Error: Parent transcript (145K tokens) exceeds proxy context limit (128K).
-       Use --strategy structured or --strategy ai-curated instead.
-```
-
-This prevents launching a session that would immediately hit limits. The check happens **before** spawning Claude—no
-wasted tokens or mid-session failure.
-
-For `structured` and `ai-curated`, strategies are bounded (truncation/AI selection), so no pre-flight check.
-
-**Depth control:** Resume can traverse lineage, not just the immediate parent:
-
-```yaml
-depth: 1      # Immediate parent only (default)
-depth: 3      # Parent + grandparent + great-grandparent
-depth: all    # Full ancestry chain
-```
-
-This pulls relevant context from earlier sessions (e.g., a decision from 5 sessions ago).
+**Depth control:** `--depth N|all` traverses lineage beyond the immediate parent (default `1`), pulling context from
+earlier sessions in the ancestry chain.
 
 **Processed context location:**
 
@@ -689,25 +721,23 @@ older manifests.
 # In confirmed section of forge.session.json
 derivation:
   parent_session: feature-auth-v1
-  parent_forge_root: /abs/path/to/parent/forge/root   # Where to find parent artifacts
-  parent_project_root: /abs/path/to/repo               # Must match child's project_root
+  parent_forge_root: /abs/path/to/parent/forge/root
+  parent_project_root: /abs/path/to/repo
   parent_transcript: .forge/artifacts/feature-auth-v1/transcript.jsonl
-  inherited_proxy: litellm-anthropic     # From parent's proxy intent, if inherited
+  inherited_proxy: litellm-anthropic    # From parent's proxy intent, if inherited
   resume_mode: transfer                 # "native" or "transfer" (authoritative)
-  strategy: structured                  # null when resume_mode=native or transfer context not generated yet
+  strategy: structured                  # null when resume_mode=native or not generated yet
   depth: 1
   resumed_at: 2025-01-02T15:30:00Z
-  # Lineage chain (computed from parent pointers)
-  lineage: [feature-auth-v1, feature-auth-v0, initial-planning]
+  lineage: [feature-auth-v1, feature-auth-v0, initial-planning]  # computed from parent pointers
 ```
 
 Same-directory forks use `resume_mode: native`, `strategy: null`, `depth: 1`, and lineage containing the parent.
 Worktree and `--into` forks start with `resume_mode: transfer`; the CLI enriches `strategy` and `context_file` when it
 generates a transfer context file.
 
-**Cross-project resume:** `parent_forge_root` tells the child where the parent's artifacts live (may differ from the
-child's `forge_root` when the parent was in a different checkout). `parent_project_root` must equal the child's
-`project_root` -- cross-repo resume is not supported.
+**Cross-project resume:** `parent_forge_root` locates the parent's artifacts (may differ from the child's `forge_root`);
+`parent_project_root` must equal the child's `project_root` -- cross-repo resume is not supported.
 
 **Context assembly (what child loads at start):**
 
@@ -715,32 +745,14 @@ child's `forge_root` when the parent was in a different checkout). `parent_proje
 2. Processed transfer: `<forge_root>/.forge/prev_sessions/<parent>/children/<child>.md` (strategy-dependent)
 3. Lineage reference: pointer to raw artifacts for deep reads
 
-**Why two phases?**
-
-- Raw artifacts preserve the full history for debugging and audit
-- **Transfer** writes a portable, strategy-dependent view of that history
-- **Resume** assembles context — user controls the fidelity/size trade-off
-- Same raw data can produce different views for different needs
-
-**Proxy inheritance:**
-
-By default, the child inherits the parent's proxy (same routing):
-
-```bash
-# Parent was on litellm-anthropic proxy (opus)
-# Child inherits same proxy by default
-forge session resume feature-auth --fresh
-
-# Override if needed
-forge session resume feature-auth --fresh --proxy litellm-gemini
-```
-
-This keeps routing stable across resumes.
+**Proxy inheritance:** The child inherits the parent's proxy by default, keeping routing stable across resumes;
+`--proxy <name>` overrides.
 
 ### 3.10 Hook handlers
 
-Hooks write ground truth to the session file. The session manager writes `intent` (and user `overrides`); hooks write
-`confirmed` facts (transcript paths, plan paths, proxy identity, etc.).
+Session-state hooks write ground truth to the session file: the session manager writes `intent` (and user `overrides`);
+hooks write `confirmed` facts (transcript paths, plan paths, proxy identity, etc.). Exception: the Codex
+`codex-session-start` hook writes only receipt files (delivery or observation), never the manifest (§3.5).
 
 **Session identification:** Hooks locate the session via `FORGE_SESSION` (set at launch), enabling multiple sessions per
 Forge project. Hooks use `FORGE_SESSION` + UUID lookup only. No CWD-based scan or fallback detection.
@@ -840,7 +852,7 @@ Response contract:
 because proxies are global (modifying a proxy mid-session could affect other sessions using the same proxy). Proxy
 management should be done deliberately from terminal.
 
-> Full command list and scope policy table in [design_appendix.md §B](design_appendix.md#b-direct-command-reference).
+> Full command list and scope policy table in [cli_reference.md §2](cli_reference.md#2-direct-command-reference).
 
 ### 3.12 Command-core ops (shared implementation)
 
@@ -878,7 +890,7 @@ retry tracking (`attempt_count`/`last_error`). Handlers are passed as an explici
 handling deletes the marker; poison markers (5+ attempts) move to `pending-work/failed/`.
 
 > Marker schema, processing contract, and known kinds in
-> [design_appendix.md §C](design_appendix.md#c-work-queue-internals).
+> [design_appendix.md §B](design_appendix.md#b-work-queue-internals).
 
 ### 3.14 Cost tracking and spend caps
 
@@ -906,21 +918,21 @@ runtime/provider/model and what it consumed, referencing the cost and audit plan
 is the redacted wire record, usage is attribution. Each event also carries metric-evidence provenance — `route` (how the
 work reached the model), `reporter` (source of the metric evidence), and `confidence` (trustworthiness of *that event's
 own* `cost_micro_usd`: `reported` | `gateway_calculated` | `inferred` | `unavailable` | `unknown`). Emission is wired
-(Phase 4c): the workflow verbs (`panel`/`analyze`/`debate`/`consensus`) record one estimated verb-level event each; the
+everywhere: the workflow verbs (`panel`/`analyze`/`debate`/`consensus`) record one estimated verb-level event each; the
 memory writer, semantic supervisor, team supervisor, and shadow curation record one event per `claude -p` run; the
 action tagger records exact provider tokens from its direct `core.llm` call (and, when that call resolves to a
 registered Forge proxy, an exact `source_refs.cost_request_id` join via a forwarded `X-Request-ID`; direct
 `billing_mode` stays `unknown` unless provably direct + credentialed). All emit best-effort, never gate the work they
 measure, and record `latency_ms`. `claude -p` events carry null `source_refs` because Forge is not the HTTP client and
-can't know the proxy `request_id`. Phase 4g instead correlates a proxied `claude -p` run to its **exact** cost through
-the run tree, not a per-request ref: Forge stamps the headless subprocess's outbound requests with validated
+can't know the proxy `request_id`. Run-tree correlation instead ties a proxied `claude -p` run to its **exact** cost
+through the run tree, not a per-request ref: Forge stamps the headless subprocess's outbound requests with validated
 `X-Forge-Run-ID`/`X-Forge-Root-Run-ID` headers (only when the target is a proven Forge proxy), the proxy records
 `forge_run_id`/`forge_root_run_id` on each cost record, and the read surface (`forge activity`, `forge +$Y`) sums cost
 records by `forge_root_run_id` — superseding the concurrency-fragile verb snapshot rather than adding to it.
 `source_refs` stays null by design (one run makes many requests; the single-valued ref is the wrong shape — see
 [§A.13](design_appendix.md#a13-usage-attribution-ledger-schema-314)).
 
-**Headless self-report (Phase 5).** Every `claude -p` run requests `--output-format json` (capability-gated with a
+**Headless self-report.** Every `claude -p` run requests `--output-format json` (capability-gated with a
 retry-once-and-latch backstop, so an older CLI that rejects the flag self-heals), so the runtime can self-report cost
 and usage. Exactly **one** reporter attributes cost per run: a **proxied** run keeps the proxy snapshot
 (`forge_proxy`/`reported`, Claude's Anthropic-priced `total_cost_usd` ignored as wrong-and-duplicate); a **direct** run
@@ -931,16 +943,15 @@ Tokens follow the cost source (no mixed provenance). The opt-in `forge_cost` sta
 (`route=claude_interactive`), reported-or-unavailable and distinct from Claude's native cost
 ([§A.8](design_appendix.md#a8-status-line-guidance-3611)).
 
-**Native Codex usage (Phase 5b/5c).** A `codex exec` run goes **direct to OpenAI** (no Forge proxy), so there is no
-proxy cost record to join: `emit_codex_usage` records `route=codex_exec`/`reporter=codex_jsonl`/`runtime_native` with
-the **exact** tokens from the JSONL `turn.completed.usage`, but `cost_micro_usd=null`/`source_refs=null` and
-`confidence=unavailable` (the ledger's `confidence` is a cost signal, and Codex reports no dollars — honest absence, not
-a fabricated $0). The event carries the resolved `billing_mode` from `CodexPreflight`. Because the Codex child shares
-its parent's run tree (`stamp_run_identity`), a Codex leaf and a Claude leaf join under the same `root_run_id` in
-`forge activity`.
+**Native Codex usage.** A `codex exec` run goes **direct to OpenAI** (no Forge proxy), so there is no proxy cost record
+to join: `emit_codex_usage` records `route=codex_exec`/`reporter=codex_jsonl`/`runtime_native` with the **exact** tokens
+from the JSONL `turn.completed.usage`, but `cost_micro_usd=null`/`source_refs=null` and `confidence=unavailable` (the
+ledger's `confidence` is a cost signal, and Codex reports no dollars — honest absence, not a fabricated $0). The event
+carries the resolved `billing_mode` from `CodexPreflight`. Because the Codex child shares its parent's run tree
+(`stamp_run_identity`), a Codex leaf and a Claude leaf join under the same `root_run_id` in `forge activity`.
 
-**Transfer curation usage (Phase 5e).** The `ai-curated` transfer's curation step makes a `core.llm` call (an Anthropic
-model via OpenRouter) that is now attributed: it emits `route=core_llm`/`reporter=provider`/`runtime=forge_cli`/
+**Transfer curation usage.** The `ai-curated` transfer's curation step makes a `core.llm` call (an Anthropic model via
+OpenRouter) that is now attributed: it emits `route=core_llm`/`reporter=provider`/`runtime=forge_cli`/
 `command=transfer-curate` with the provider's exact tokens (cost `unavailable` — `emit_direct_llm_usage` computes no
 dollar figure for a direct `core.llm` call, so the event records exact tokens but no cost). The emit no-ops without an
 ambient run identity, so a plain `forge session resume --strategy ai-curated` stays silent; the cross-runtime bridge
@@ -989,940 +1000,53 @@ not tag a session (e.g. the action tagger) are not attributed to one, so the sum
 See [design_appendix.md §A.13](design_appendix.md#a13-usage-attribution-ledger-schema-314) for the read surface and
 per-emitter coverage.
 
-## 4. Unified CLI (`forge`)
+## 4. CLI and command surfaces
 
-The primary entry point for all Forge operations.
+The `forge` CLI is the user-facing entry point for sessions, proxies, transfer, memory, policy, workflows, search,
+configuration, and internal hook/status commands. Command-core operations live in `src/forge/core/ops/` and keep shared
+business logic UI-agnostic for terminal commands and `%` direct commands.
 
-### 4.0 Command reference
+**Command-shape policy:** Forge uses explicit verbs. Non-leaf groups print help when invoked without a subcommand; leaf
+commands should perform the sensible action when optional arguments are omitted. Removed commands, options, and
+shortcuts are clean breaks: the CLI framework reports unknown commands/options rather than carrying compatibility shims.
 
-**Command aliases:** `authentication` (canonical) has alias `auth`; `extension` (canonical) has alias `ext` and
-`extensions`; `session` (canonical) has alias `sess`. Full names always work; aliases are convenience shortcuts.
+Full command inventories live in [cli_reference.md](cli_reference.md): terminal commands in
+[§1](cli_reference.md#1-terminal-command-reference), `%` direct commands in
+[§2](cli_reference.md#2-direct-command-reference).
 
-**Command-shape policy:** Forge uses explicit verbs for all commands. Non-leaf groups print help when invoked without a
-subcommand; they do not hide work behind bare group invocation. Leaf commands should do the sensible action when
-optional arguments are omitted (for example, `forge proxy metrics` shows all proxies when more than one is registered).
-Removed commands, options, and group-level shortcuts are clean breaks: they are deleted outright and the CLI framework
-reports "no such command/option" — no tombstone shims. List/show commands support `--json` for scripting.
+## 5. Extensions, workflows, and testing
 
-#### Installation
-
-| Command                   | Purpose                                                      |
-| ------------------------- | ------------------------------------------------------------ |
-| `forge extension enable`  | Install Forge extensions (commands, agents, hooks, settings) |
-| `forge extension sync`    | Update existing installation to current version              |
-| `forge extension disable` | Remove Forge installation cleanly                            |
-| `forge extension status`  | Show installation status (`--json`)                          |
-
-#### Session management
-
-| Command                                | Purpose                                                                           |
-| -------------------------------------- | --------------------------------------------------------------------------------- |
-| `forge session start [name]`           | Create and start a new session (auto-named if omitted)                            |
-| `forge session resume [name]`          | Reattach to an existing session (default), or derive a fresh child with `--fresh` |
-| `forge session fork <parent> [--name]` | Fork a session (same dir by default; `--worktree` for isolation)                  |
-| `forge session show [session]`         | Show session details (`--json`, `--field`); accepts name or UUID                  |
-| `forge session list`                   | List sessions (`--scope workspace\|project\|all`; default `workspace`; `--json`)  |
-| `forge session set <key> <value>`      | Set a mid-session override                                                        |
-| `forge session reset [key]`            | Reset overrides to intent                                                         |
-| `forge session delete <name>...`       | Delete one or more sessions (`--all` for bulk deletion)                           |
-| `forge session clean --older-than N`   | Bulk-delete sessions older than N days                                            |
-| `forge session incognito [name]`       | Start an ephemeral session (auto-delete on exit)                                  |
-| `forge session shell [name]`           | Open shell in sidecar container                                                   |
-
-Note: `session context` is a deprecated alias for `session show`. `session resume --fresh --review` opens the per-child
-user-notes overlay (`children/<child>.notes.md`) in `$EDITOR` before launching Claude; the AI snapshot stays read-only.
-`forge session memory` is removed; use `forge memory`.
-
-#### Transfer context
-
-| Command                              | Purpose                                                                    |
-| ------------------------------------ | -------------------------------------------------------------------------- |
-| `forge transfer show <parent>`       | Show the parent AI cache, or a child's composed view (`--child`, `--json`) |
-| `forge transfer regenerate <parent>` | Rebuild the parent cache only (defaults to its current strategy/depth)     |
-| `forge transfer edit <parent>`       | Edit a child's user-notes overlay in `$EDITOR` (`--child`)                 |
-| `forge transfer diff <parent>`       | Show cache-vs-child-snapshot drift (`--child`)                             |
-
-`forge transfer` pairs with `forge memory` as the two halves of the former "handoff": `forge memory` curates project
-docs; `forge transfer` assembles resume/fork context. Every verb takes a parent session argument. `show`/`regenerate`
-default to the parent cache; `edit`/`diff` resolve a child (inferred when the parent has exactly one, else `--child`).
-
-#### Memory management
-
-| Command                        | Purpose                                                                                                               |
-| :----------------------------- | :-------------------------------------------------------------------------------------------------------------------- |
-| `forge memory track <path>`    | Author a project passport on a doc, sessionless (`--strategy`, `--intent`, `--writers`, `--propose`, `--shadow-path`) |
-| `forge memory enable`          | Enable memory auto-update for a session (`--session`, resolves `$FORGE_SESSION`)                                      |
-| `forge memory disable`         | Disable memory auto-update for a session (`--session`, resolves `$FORGE_SESSION`)                                     |
-| `forge memory list`            | List passported memory docs under scan roots (`--json`)                                                               |
-| `forge memory status`          | Show memory activation across sessions (`--scope`, `--json`)                                                          |
-| `forge memory report show`     | Inspect memory writer review reports for a session (`--latest`, `--all`)                                              |
-| `forge memory shadows list`    | List accumulated shadow proposals (`--scope`, `--json`)                                                               |
-| `forge memory shadows show`    | Show shadow proposal content (`--for <doc>`, `--scope`)                                                               |
-| `forge memory shadows review`  | Review/curate shadow proposals (`--for`, `--curate`, `--show-latest`)                                                 |
-| `forge memory passport show`   | Show passport embedded in a memory doc (`--json`)                                                                     |
-| `forge memory passport remove` | Remove the project passport from a memory doc (`--json`)                                                              |
-
-#### Proxy management
-
-| Command                              | Purpose                                                             |
-| ------------------------------------ | ------------------------------------------------------------------- |
-| `forge proxy create <template>`      | Create a proxy from template and start it                           |
-| `forge proxy list`                   | List all proxies (`--json`)                                         |
-| `forge proxy show <id>`              | Show proxy configuration (`--json`, `--raw`)                        |
-| `forge proxy edit <id>`              | Edit proxy overlay in $EDITOR                                       |
-| `forge proxy set <id> <key>=<value>` | Set a proxy configuration value                                     |
-| `forge proxy start <id>`             | Start server for existing proxy                                     |
-| `forge proxy stop <id>`              | Stop server (keeps config)                                          |
-| `forge proxy delete <id>...`         | Delete one or more proxies (`--all` for bulk deletion)              |
-| `forge proxy clean`                  | Remove stale proxies (dead pids)                                    |
-| `forge proxy validate <id>`          | Validate proxy configuration                                        |
-| `forge proxy metrics [id]`           | Show runtime metrics (`--json`, `--all`)                            |
-| `forge proxy costs show [id]`        | Show cost summary (`--period`, `--by-model`, `--by-verb`, `--json`) |
-| `forge proxy costs reset`            | Wipe all cost + usage telemetry to zero (`--yes`, `--dry-run`)      |
-| `forge proxy audit show [id]`        | Show redacted audit records (hashes/counts, no secrets)             |
-| `forge proxy audit diff [id]`        | Show system/tool drift + override mutations over time               |
-| `forge proxy template list`          | List available templates                                            |
-| `forge proxy template show <name>`   | Show template configuration (`--raw`)                               |
-| `forge proxy template edit <name>`   | Customize a template (copy-on-first-edit)                           |
-| `forge proxy template reset <name>`  | Reset template to built-in defaults                                 |
-
-#### Claude Code management
-
-| Command                           | Purpose                                     |
-| --------------------------------- | ------------------------------------------- |
-| `forge claude start --proxy <id>` | Launch Claude configured for a proxy        |
-| `forge claude start --no-proxy`   | Launch Claude without proxy (Anthropic API) |
-| `forge claude preset show`        | Show current settings preset (`--raw`)      |
-| `forge claude preset edit`        | Edit settings preset in $EDITOR             |
-| `forge claude preset reset`       | Reset preset to built-in defaults           |
-
-#### Backend management
-
-| Command                          | Purpose                           |
-| -------------------------------- | --------------------------------- |
-| `forge backend list`             | List backends (`--json`)          |
-| `forge backend show <adapter>`   | Show backend details (`--raw`)    |
-| `forge backend create <adapter>` | Create backend config             |
-| `forge backend start <adapter>`  | Start backend instance            |
-| `forge backend stop <adapter>`   | Stop backend instance             |
-| `forge backend delete <adapter>` | Delete backend instance or config |
-
-#### Policy enforcement
-
-| Command                                         | Purpose                                       |
-| ----------------------------------------------- | --------------------------------------------- |
-| `forge policy enable --bundle <name>`           | Enable policy enforcement for current session |
-| `forge policy disable`                          | Disable policy enforcement                    |
-| `forge policy status`                           | Show current policy state (`--json`)          |
-| `forge policy list`                             | List available bundles and rules (`--json`)   |
-| `forge policy check --bundle <name> -f <path>`  | Evaluate policies on demand                   |
-| `forge policy supervisor -f <path> -r <id>`     | Evaluate file against approved plan           |
-| `forge policy supervise <target>`               | Set persistent supervisor for session         |
-| `forge policy supervise --cascade/--no-cascade` | Toggle the tier-1 plan check (cascade)        |
-| `forge policy supervise --off / --on`           | Suspend/resume supervisor (preserves config)  |
-| `forge policy supervise --remove`               | Remove supervisor entirely                    |
-| `forge policy supervise --reload`               | Reload latest relevant approved plan          |
-| `forge policy supervise --reload-from <path>`   | Reload plan from explicit file                |
-
-#### Workflow
-
-| Command                              | Purpose                                    |
-| ------------------------------------ | ------------------------------------------ |
-| `forge workflow panel [targets]`     | Fan out review to multiple models          |
-| `forge workflow analyze [topic]`     | Deep single-model analysis                 |
-| `forge workflow debate [subject]`    | Adversarial evaluation with stance workers |
-| `forge workflow consensus [subject]` | Two-round multi-model convergence          |
-| `forge workflow list-models`         | Show available model backends              |
-
-Workflow model specs support proxy-backed workers and explicit direct Claude workers. The stable `claude-opus` worker is
-kept on Claude Opus 4.6; newer direct workers such as `claude-opus-4.8` are opt-in and can attach per-worker prompt
-hints through `ModelSpec.prompt`. All workflow execution commands (panel, analyze, debate, consensus) accept
-`--proxy <proxy_id>` to route proxy-backed workers through a specific proxy, overriding preferred_proxy and route scan
-(§3.6.12). Direct workers (e.g., `claude-opus`) remain on Anthropic routing regardless of `--proxy`.
-
-#### Search
-
-| Command                      | Purpose                              |
-| ---------------------------- | ------------------------------------ |
-| `forge search query <query>` | Search transcripts                   |
-| `forge search rebuild-index` | Full index rebuild from artifacts    |
-| `forge search status`        | Show index statistics                |
-| `forge search clean`         | Remove orphaned documents from index |
-
-#### System
-
-| Command                       | Purpose                                                                             |
-| ----------------------------- | ----------------------------------------------------------------------------------- |
-| `forge info`                  | Show global system information (`--json`)                                           |
-| `forge activity [session]`    | Per-session activity: supervisor checks, cost, tokens (`--json`, `--days`, `--all`) |
-| `forge clean`                 | Remove orphaned state (`--scope`, `--yes`)                                          |
-| `forge config`                | Manage global runtime preferences                                                   |
-| `forge authentication login`  | Store credentials for LLM providers                                                 |
-| `forge authentication status` | Show credential status per provider                                                 |
-| `forge logs`                  | Show log file locations and status                                                  |
-
-#### Internal (hidden from `forge --help`)
-
-| Command                   | Purpose                                       |
-| ------------------------- | --------------------------------------------- |
-| `forge hook <name>`       | Hook dispatcher (SessionStart, Stop, etc.)    |
-| `forge status-line`       | Generate status line output                   |
-| `forge memory-writer run` | Run the memory writer for a completed session |
-
-**Design principles:**
-
-- **Narrow global config** -- `forge config` owns runtime preferences only; routing stays per-proxy and workflow state
-  stays per-session
-- **Explicit verbs** -- non-leaf groups print help; leaves perform the action
-- **Launch through Forge** -- `forge session start`, `forge session resume`, or `forge claude start --proxy` sets up env
-  vars correctly
-
-### 4.1 Policy (enforcement)
-
-Forge Policy is an **enforcement system** with three types:
-
-1. **Deterministic Policy**: Static checks, file mapping, dependency rules (Fast/Free).
-2. **Semantic Policy (Supervisor)**: LLM-based alignment checks against plans (Smart/Context-aware).
-3. **Verification Policy**: Outcome-based checks at session boundaries (Feedback loop).
-
-| Policy Type   | Boundary               | Question                         |
-| ------------- | ---------------------- | -------------------------------- |
-| Deterministic | PreToolUse             | "Is this action allowed?"        |
-| Semantic      | PreToolUse (throttled) | "Is this aligned with the plan?" |
-| Verification  | Stop                   | "Did it achieve the goal?"       |
-
-**Definition:** a policy is an **enforcement function** that runs at a well-defined boundary (hook, proxy, commit hook)
-and returns an **action decision** with an explanation.
-
-At minimum:
-
-- **Input**: an *action context* (what is about to happen)
-- **Output**: `allow | warn | deny | needs_review` plus human-readable reasons. `needs_review` is an intermediate
-  decision: the semantic supervisor must resolve it to `allow`, `warn`, or `deny`; if no configured supervisor resolves
-  it, the hook blocks as unresolved.
-- **Intent**: every policy declares *why* it exists — shown to models on deny so they can distinguish good workarounds
-  (satisfy the goal) from bad ones (defeat it)
-
-#### 4.1.1 Deterministic Policy (Forge Policy)
-
-Forge Policy is designed to support **deterministic policies first**.
-
-- **Engine**: policy interfaces, composition, decisions
-- **Adapters**: hook boundary (no-proxy) and proxy boundary (proxy-mode)
-- **Policy bundles**: TDD is expressed as a set of deterministic policies (e.g., "tests must exist before
-  implementation").
-
-**Base class contract** (`DeterministicPolicy`):
-
-| Abstract property | Type  | Purpose                                                              |
-| ----------------- | ----- | -------------------------------------------------------------------- |
-| `policy_id`       | `str` | Unique identifier (e.g., `tdd.tests-before-impl`)                    |
-| `description`     | `str` | Human-readable description                                           |
-| `intent`          | `str` | Why this policy exists — shown on deny so models understand the goal |
-
-All three are **required** (abstract). The `intent` field was added after observing that models (e.g., GPT-5.5) would
-find creative workarounds that pass the check but defeat the goal (Unicode escapes to bypass byte-level emoji
-detection). Showing the intent alongside the violation steers models toward compliant approaches or surfacing conflicts
-to the user.
-
-**Why enforce coding standards via policy?** AI assistants tend to favor gradual migration and backward compatibility
-over clean breaks—even when explicitly instructed otherwise. Patterns like `warn+ignore`, fallback logic, and
-compatibility shims sneak into codebases despite best efforts. Deterministic policies can catch these at commit/hook
-boundaries:
-
-- Reject code containing `# backward compat`, `# legacy`, `# deprecated` comments
-- Flag new `if TYPE_CHECKING:` blocks (circular import workaround)
-- Detect `warn` + `strip`/`ignore` patterns in validation code
-
-This doesn't require a stateful system—detecting backward compat patterns in a diff is a pattern-matching task that
-Haiku handles fine.
-
-**Policy bundles** group related rules:
-
-| Bundle             | Rules                                            | Purpose                 |
-| ------------------ | ------------------------------------------------ | ----------------------- |
-| `tdd`              | tests-before-impl, no-skip-tests                 | Test-driven development |
-| `coding_standards` | no-bsd-sed, no-type-checking, no-backward-compat | Platform/style rules    |
-
-Bundles are enabled per-session:
-
-```yaml
-# In session intent
-policy:
-  bundles: [tdd, coding_standards]
-  tdd_mode: strict  # off | permissive | strict
-```
-
-#### 4.1.2 Semantic Policy (The Supervisor)
-
-This enables **"Active Alignment"** checking using the **Side-Channel Architecture**.
-
-Promotion flow (`--fork-current`) is deferred so the building blocks (supervisor, panel, session forking) can compose
-before we hardcode a default. For now: `forge session set policy.supervisor.resume_id <uuid>`.
-
-**Mechanism: "CLI-Fork Supervision"**
-
-The `policy-check` hook runs the supervisor via `claude -p --resume <supervisor_id>` (plus `--model opus` for proxied
-supervisors):
-
-1. **Configure**: `forge session set policy.supervisor.resume_id <uuid>` (from planning session).
-2. **Check**: Runs at PreToolUse for Write/Edit, throttled via cache (default 30s).
-3. **Enforce**:
-   - **Aligned**: Silent success (cached for throttle window).
-   - **Divergent + high confidence + citations**: Block the tool (exit 2).
-   - **Divergent + low confidence or no citations**: Warn via stderr, allow the tool.
-   - **Unresolved review request**: Block the tool (exit 2) until a supervisor is configured or the user gives a new
-     direction.
-
-**Why this works:** Forking the planning session makes the plan's original context the enforcement authority (no RAG).
-Side-channel architecture: Executor uses a high-IQ coder (Opus); Supervisor uses a high-context checker (Gemini).
-
-**Promotion readiness:** Depends on ground truth quality: explicit acceptance criteria, invariant constraints, resolved
-ambiguities.
-
-**Supervisor lifecycle controls:**
-
-- `--off` / `--on`: Toggle without config loss. `--off` sets `suspended=True` (config preserved, hook skips evaluation
-  entirely — not registered in the policy engine); `--on` resumes. `--remove` is the destructive path. Both CLI and
-  direct command surfaces. All three pre-check that a supervisor is configured before acting.
-- `--reload` / `--reload-from <path>`: Inject an updated plan into supervisor evaluation context. `--reload` searches
-  the supervision graph in order: current supervised session, related forks (sessions in the same `forge_root` whose
-  parent is the supervisor target), supervisor target session. Only approved snapshots are considered (no drafts). The
-  plan content is prepended to each evaluation prompt with explicit supersession framing. `--reload-from` takes an
-  explicit file path (resolved relative to CWD, stored absolute). Cache key includes a `path:mtime_ns:size` fingerprint
-  so in-place edits invalidate cached verdicts.
-- `plan_override_path` on `SupervisorConfig` stores the override. It can be set while the supervisor is suspended
-  (configure plan, then `--on`). Proxy routing is not re-seeded on `--on` — the preserved config is used as-is.
-- Auto-reload may succeed even if the supervisor target session has been deleted (the current session or a related fork
-  may still hold the plan). Status surfaces show `Target: <name>` when resolvable and omit it otherwise.
-
-**Cascade (tier-1 plan check, opt-in):** `forge policy supervise --cascade` (or `<target> --cascade`) routes checks
-through a cheap tier before the frontier. A stateless `core.llm` call (`PlanCheckPolicy`, `semantic.plan_check`, default
-OpenRouter model `google/gemini-3.5-flash`, configurable per provider via `--checker-provider`/`--checker-model`, with a
-configurable default prompt budget of roughly 32K tokens stored as `policy.supervisor.checker_budget_tokens`) evaluates
-the action against the **approved-plan snapshot text** (`plan_override_path`, auto-resolved at wiring time via the
-`--reload` machinery; enabling fails with an actionable error when no approved snapshot resolves). Long plans and
-actions are packed as head+tail excerpts rather than first-N slices, unified diffs retain file and hunk headers when
-truncated, and prompt metadata explicitly marks whether the plan or action was truncated. Edit actions include the
-matched and replacement fragments when available; Write actions include path and target existence context. Tier-1 emits
-only `allow` (clearly aligned; cached per the throttle window) or `needs_review` — it never warns or denies, and
-**every** tier-1 failure (LLM error, parse failure, unreadable plan) escalates, so the system degrades to
-frontier-always, never to unsupervised. In cascade mode the supervisor is registered as the engine's **resolver** (see
-§4.1.5): it is invoked only when a policy emitted `needs_review` and nothing denied, so clearly-aligned actions never
-pay the frontier call. Tier-1 reasons ride in low-severity violations (persisted to the decision log, never printed on
-resolved allows). Measurement is built in: session-tagged `plan-check` usage events plus decision-log-derived
-`plan_check_allow`/`plan_check_needs_review` counters in `forge activity` expose the short-circuit rate; the supervisor
-counters are the resolver runs (a tier-1 `needs_review` alongside a deterministic deny skips the resolver, so the two
-can differ). Cascade off (the default) is exactly the pre-cascade behavior — the supervisor runs as a regular policy on
-every throttle-missing check.
-
-**Supervisor stuck playbook:** When the supervisor blocks because the plan evolved:
-
-- `%policy supervise off` (suspend, config preserved)
-- Make the approved changes
-- `%policy supervise reload` (searches current session, forks, then target) or `%policy supervise reload <path>`
-- `%policy supervise on` (resume with updated plan context)
-
-**The underspecification problem (biggest failure mode):** Supervision catches explicit divergence (plan says X, agent
-did Y, citations are clear). Underspecification is harder: the plan is silent, the model picks a plausible default, and
-neither agent nor supervisor can cite against it — so the verdict may be "aligned." The real divergence is between
-unwritten human expectations and model assumptions. Mitigation: (a) more explicit plans (write down the implicit), (b)
-multi-model review (different defaults expose gaps), (c) the human reformulation loop (make assumptions explicit,
-rerun).
-
-**Operational reliability constraints (normative):**
-
-- **Citations required**: Every **Divergent** finding MUST cite (quote) the specific plan/design section it violates.
-- **Structured verdict**: The Supervisor response SHOULD be parseable (even if implemented as plain text initially):
-  - `verdict`: `aligned | divergent`
-  - `violations[]`: `{ severity, evidence, suggested_fix, citations[] }`
-- **Block only on high-confidence + cited rule**: Default behavior is **warn-only** unless the Supervisor provides a
-  clear cited rule and a high-confidence violation.
-- **Fail open vs fail closed**: Policies MUST define failure behavior per severity (e.g., CLI failure, proxy down,
-  timeout). Default to **fail-open (warn-only)** for most checks. Fail-open for policy evaluations is a system-boundary
-  rule (LLM output is external data), not an exception to coding-standards §5. See coding-standards.md §5 (boundary
-  framework) for the general framework.
-- **Throttling + caching**: Supervisor checks SHOULD be throttled (e.g., every N turns, only on Write/Edit, only for
-  configured path prefixes) and MAY cache the last verdict for identical diffs.
-
-**On-demand invocation (planned):** Every policy — including the supervisor — should be callable manually without
-installing hooks:
-
-```bash
-forge policy check supervisor --file src/forge/session/store.py
-forge policy check tdd --diff HEAD~1
-```
-
-The same evaluation function runs in both modes (hook-triggered and CLI-triggered).
-
-**Primary use case: problem reformulation.** When a policy stops the agent, the cause is flawed problem representation
-(too broad/contradictory/ambiguous), genuine agent failure, or an overzealous policy. On-demand checks are diagnostics:
-citations and evidence show *what* failed. Reformulate, then re-check before resuming. The supervisor's `--resume`
-context keeps the original plan in view.
-
-**Reactive Patterns (Shared Library)**
-
-Several components react to hook events via external processing: semantic supervisor (`policy/semantic/supervisor.py`),
-the memory writer (`session/memory_writer.py`), deterministic policies (`policy/deterministic/`), and the planned
-workflow policy. The shared pattern: take hook context, classify/evaluate, return a decision or side-effect. Three node
-types cover current and planned use cases:
-
-| Node type      | Execution                         | Examples                                  | Cost        |
-| -------------- | --------------------------------- | ----------------------------------------- | ----------- |
-| Code           | Deterministic Python function     | TDD enforcement, path gating, file checks | Free        |
-| LLM call       | Stateless API call via `core.llm` | Tagger (classification), checker          | ~$0.001     |
-| Claude session | `claude -p [--resume]` subprocess | Supervisor, memory writer                 | ~$0.01-0.05 |
-
-**Library, not framework**: Utilities live in a shared Python library (`core/reactive/`). Hook handlers are plain Python
-functions that import what they need. No YAML workflow engine, no declarative config layer — the same developers who
-would write YAML can write Python with less indirection and better debuggability.
-
-The shared library provides utilities extracted from existing implementations: session runner, proxy resolution,
-throttle cache, structured output parsing, tagger, env builder, fan-out runner, and adversarial runner. A developer
-adding a new policy imports these utilities and writes a class.
-
-> Shared library API table and example policy code in [design_appendix.md §D](design_appendix.md#d-policy-internals).
-
-**WorkflowPolicy (tagger → branch → checker → reviewer)**: Plugs into PolicyEngine via existing
-`Policy + StatefulPolicy` protocols (zero changes to the engine). Composes library utilities into a branching pipeline:
-a shared tagger classifies the action, branches match by tags (first match wins), each branch has optional filter →
-checker → reviewer stages. The tagger is called once per event and its tags route to all matching downstream checks —
-avoiding redundant classification.
-
-**Team extension**: The same library works for team hooks (`TeammateIdle`, `TaskCompleted`) by subscribing to different
-events. See [team_design.md](board/proposed/team_orchestration/card.md) §3.
-
-#### 4.1.3 Verification Policy (Feedback Loop)
-
-Verification policies check **outcomes** rather than **actions**. They run at the **Stop boundary** and can block
-session exit until goals are achieved.
-
-**The Ralph-Wiggum Pattern:**
-
-Instead of external bash loops, verification uses the Stop hook to create a self-referential feedback loop:
-
-1. User starts session with a completion promise
-2. Claude works toward the goal
-3. Stop hook checks: "Did Claude output the completion signal?"
-4. If no → block exit, re-inject prompt, continue
-5. If yes → allow exit
-
-The prompt never changes between iterations, but Claude's previous work persists in files. Each iteration sees modified
-files and git history, enabling autonomous improvement.
-
-**Configuration:**
-
-```yaml
-# In session intent
-verification:
-  type: completion_promise    # or: test_suite, custom_command
-  promise: "<done>COMPLETE</done>"
-  max_iterations: 50          # safety limit
-  on_incomplete: re_inject    # or: warn, allow
-  re_inject_prompt: |
-    Continue working. Output <done>COMPLETE</done> when all requirements met.
-```
-
-**Verification types:**
-
-| Type                 | Verification method        | Use case          |
-| -------------------- | -------------------------- | ----------------- |
-| `completion_promise` | Look for text in output    | Goal-driven tasks |
-| `test_suite`         | Run tests, check exit code | Code changes      |
-| `custom_command`     | Run any command            | Domain-specific   |
-
-**Completion promise correctness:**
-
-To avoid false positives (promise appearing in quoted files, code examples, or earlier failed iterations):
-
-1. **Check only the last assistant message** — ignore tool results and conversation history
-2. **Require standalone line** — promise must appear on its own line, not embedded in prose
-
-The re-inject prompt should instruct Claude accordingly:
-
-```yaml
-re_inject_prompt: |
-  Continue working. When ALL requirements are met, output this on a standalone line:
-  <done>COMPLETE</done>
-```
-
-This prevents false matches from `print("<done>COMPLETE</done>")` in code or discussion like "I'll output
-`<done>COMPLETE</done>` when done."
-
-**Escape hatches:** `%cancel-verification` direct command, `max_iterations` auto-bypass, `max_minutes` wall-clock limit,
-or `forge session set verification.bypass true` from another terminal. The bypass is a session parameter (discoverable,
-auditable). Both time limits matter: `max_iterations` catches fast-failing loops; `max_minutes` catches slow token burn.
-
-**Why verification is policy, not a separate concept:**
-
-- All three policy types share the same structure: boundary + check + action
-- Verification just fires at a different boundary (Stop vs PreToolUse)
-- Keeps the design unified under "Policy"
-
-#### 4.1.4 Action context
-
-Policies operate on a normalized, runtime-tagged view of what a runtime is doing (an `ActionContext`), for example:
-
-- `runtime` — which agent runtime produced the action (`claude_code` today; `codex`/`gemini` later)
-- hook event (`PreToolUse.Write`, `PreToolUse.Edit`, …)
-- tool arguments (target path, content/diff metadata)
-- repository/worktree path
-- effective session config (intent + overrides)
-
-Normalization happens at the **adapter boundary**: a runtime's hook adapter (`ClaudeHookAdapter`,
-`src/forge/cli/hooks/policy.py`) maps that runtime's payload into this shape and tags `runtime`. `PolicyEngine.evaluate`
-is runtime-agnostic — it never branches on `runtime`. The reverse seam, a hook **responder** (`ClaudeHookResponder`),
-serializes the composed decision back into the runtime's wire contract (exit codes, block message, allow output). Both
-match runtime-neutral `HookAdapter`/`HookResponder` protocols (`src/forge/cli/hooks/protocols.py`), so a Codex
-adapter/responder pair (Phase 6) reuses the engine without touching it.
-
-#### 4.1.5 Policy composition
-
-Multiple policies may run for a single action:
-
-- **Any deny** in enforce mode blocks the action
-- warnings accumulate
-- results can be logged for audit/debug
-- `needs_review` is resolved by a registered **resolver** policy (the semantic supervisor in cascade mode), invoked only
-  on escalation — after the regular pass, when a policy requested review and nothing denied. A supervisor registered as
-  a regular policy (cascade off) resolves it the same way; with no resolution, `needs_review` blocks as unresolved
-  (unchanged contract)
-
-**Deny message format** (three-tier, shown to the model):
-
-```
-Policy violation(s):
-  [rule_id] violation message
-    Intent: why the policy exists
-    Fix: suggested fix (if available)
-    Note: This policy was configured by the project owner. First try a
-    compliant approach that satisfies the intent above. If the user's
-    request cannot be fulfilled without violating the intent, explain
-    the conflict and ask how to proceed. Do not attempt bypasses that
-    pass the check but defeat the goal.
-```
-
-The `Intent:` line appears once per denying policy (not per violation). The `Note:` uses project-owner framing so models
-treat it as a constraint to respect, not an obstacle to circumvent. The runtime's hook responder owns this serialization
-(`ClaudeHookResponder.format_deny`/`format_needs_review`/`allow_feedback`); the `[forge] Policy: …` summary line is a
-separate telemetry overlay in the hook command, not part of the runtime wire contract.
-
-#### 4.1.6 Policy state and ownership
-
-Policy has two aspects with different ownership: **definition** (configuration — who sets the rules) and **state**
-(runtime — what happened). Supervisor model and throttling are proxy-owned (routing decisions). TDD mode, policy
-enabled/disabled, and verification config are session-owned (workflow decisions). All enforcement results are
-hook-written to `confirmed.policy`.
-
-**Policy provenance:** `confirmed.policy` records `forge_version`, `bundles`, `rules_active`, and `decisions` for
-audit/debugging ("why did this block?").
-
-**Ownership rationale:** Supervisor model = routing decision → proxy. TDD mode = workflow decision → session.
-Enforcement results = observed facts → hook-written `confirmed`. Stateful policies (e.g., "tests touched") write only to
-`confirmed.policy`.
-
-> Full policy definition and state ownership tables in [design_appendix.md §D](design_appendix.md#d-policy-internals).
-
-## 5. Extensions install model
+### 5.1 Extensions install model
 
 Claude Code extensions live in this repo and are installed via `forge extension enable`. Forge follows Claude Code's
 scope model (`--scope user` / `--scope project` / `--scope local`) and provides modular installation via profiles
-(`minimal` / `standard` / `full`). Six installable modules (commands, agents, skills, hooks, status-line, permissions)
-are combined into profiles. Settings merge is additive (hooks append + dedupe, permissions union).
-`~/.forge/installed.json` tracks what was installed for clean update/uninstall. Project/local enablement requires a
-`.claude/` anchor at the target directory (created if missing); user-level install (`--scope user`) goes to `~/.claude/`
-and does not require a project anchor. This establishes the Forge project per the identity model (§3).
+(`minimal` / `standard` / `full`). Seven installable modules (commands, agents, skills, hooks, status-line, permissions,
+codex-hooks) are combined into profiles. Settings merge is additive (hooks append + dedupe, permissions union). The
+`codex-hooks` module registers Forge's Codex hooks (`codex-session-start`, `codex-policy-check`) as a marker-delimited
+managed block in the Codex config the install scope maps to — user scope targets `$CODEX_HOME/config.toml`,
+project/local scope targets `<project>/.codex/config.toml` (Codex has no settings.local analog). It is best-effort:
+skipped with a notice when `codex` is not on PATH, and its conflicts never block the install. Registration alone is
+inert — Codex hooks fire only after the user's one-time interactive trust ceremony (§3.9), which
+`forge extension enable` names in its next steps but cannot perform or verify. Enrollment is unverifiable from a config
+read (the `trusted_hash` is not computable), so `forge runtime preflight codex --verify-enrollment` confirms it
+empirically instead — it runs one trivial managed `codex exec` turn and reports the user-scope hook as enrolled iff the
+`codex-session-start` hook fired (the observation receipt appeared). `~/.forge/installed.json` tracks what was installed
+for clean update/uninstall. Project/local enablement requires a `.claude/` anchor at the target directory (created if
+missing); user-level install (`--scope user`) goes to `~/.claude/` and does not require a project anchor. This
+establishes the Forge project per the identity model (§3).
 
 > Scope model, module inventory, merge rules, and tracking file details in
-> [design_appendix.md §E](design_appendix.md#e-install-model-reference). Multi-scope installation behavior (dual user +
-> project) is documented in [§E.5](design_appendix.md#e5-multi-scope-installation-55----skill-resolution).
+> [design_appendix.md §C](design_appendix.md#c-install-model-reference). Multi-scope installation behavior (dual user +
+> project) is documented in [§C.5](design_appendix.md#c5-multi-scope-installation-55----skill-resolution).
 
-### 5.5 Skills architecture
+### 5.2 Policy, skills, workflows, and memory
 
-Skills are Forge's **scripting layer**: they teach Claude to compose Forge capabilities into workflows. Game engines
-have Lua; editors have VimScript; Forge has skills. The `forge` CLI is the engine (proxy routing, session management,
-`core.llm`). Skills are the instructions; the agent orchestrates.
+Forge's workflow layer is documented in [design_workflows.md](design_workflows.md): policy enforcement and supervisor
+composition, skills as the scripting layer, workflow runners, memory writer/project memory, and their reference tables.
+The main design doc keeps the ownership boundary: workflow settings are session-owned unless explicitly proxy-owned;
+enforcement results are hook-written runtime facts.
 
-Skills don't add tools—Claude already has Read/Write/Bash. Skills add the playbook for composing them with Forge
-(multi-proxy routing, session forking, policy checks).
-
-#### 5.5.1 Reflective architecture
-
-Forge installs skills about itself: `forge extension enable` deploys CLI commands (capabilities) and skills (how to use
-them). The system teaches the agent about itself.
-
-- Coherent upgrades: `forge extension sync` updates CLI + skills atomically
-- No version drift between "what the tool can do" and "what the agent thinks the tool can do"
-- Agents can modify skills (markdown files on disk)
-- Matches hooks/status-line pattern: `forge` is the engine; extensions are instructions
-
-#### 5.5.2 Why skills over MCP
-
-Forge uses skills (not MCP tools) for agent workflows. MCP servers remain useful for external data access (APIs,
-databases, OAuth), but aren't the right abstraction for workflow orchestration.
-
-| Aspect            | Skills                                    | MCP Tools                             |
-| ----------------- | ----------------------------------------- | ------------------------------------- |
-| Token cost        | Typically ~100 tokens metadata at startup | Often 3K-10K+ for tool definitions    |
-| Context pollution | Full instructions load only when invoked  | Tool schemas persist in context       |
-| Architecture      | Reflective — skills reference own install | External — separate server process    |
-| Context passing   | Fork session (full context preserved)     | Summarize and send (information loss) |
-| Determinism       | Agent interprets instructions each time   | Structured JSON-RPC interface         |
-
-**Fork advantage:** Skills can fork the current session (`claude -p --resume <uuid>` on another proxy), giving reviewers
-the **full conversation context** (files, decisions, rationale). MCP tools only see what the agent summarizes into tool
-parameters.
-
-#### 5.5.3 Execution modes
-
-Skills that invoke multi-model workflows support two **context modes**; the caller chooses based on the situation —
-skills present options, not prescriptions.
-
-**Resume context mode:** `claude -p --resume <session-uuid>` on another proxy; inherits full session context. Best when
-conversation history matters. Requires Claude Code >= 2.1.80 for reliable parallel tool result handling (`--resume`
-dropped parallel tool results in earlier versions).
-
-**Blind context mode:** Fresh `claude -p` (no `--resume`); rely on the prompt + filesystem reads. Cheaper and
-independent. Best for isolated reviews and quick checks.
-
-**CLI contract:** Workflow CLIs expose this axis explicitly:
-
-- `--context resume:<session-uuid>` → pass `--resume <id>` to each worker
-- `--context blind` → do not pass `--resume` (workers are independent)
-
-**CLI surface:** `forge workflow <workflow>` (e.g. panel/analyze/debate). Default is human-readable; `--check` produces
-a policy-grade verdict (JSON + exit code).
-
-#### 5.5.4 Skill execution types
-
-Skills vary in what they execute. Four types cover all current and planned cases:
-
-| Type            | Execution                                   | Examples                                    |
-| --------------- | ------------------------------------------- | ------------------------------------------- |
-| Pure Python     | Deterministic function                      | TDD policy, pattern matching, `run_tests()` |
-| Single LLM      | `core.llm` API call                         | Tagger, checker                             |
-| Claude session  | `claude -p [--bare]` subprocess (has tools) | Supervisor, reviewer, memory writer         |
-| Pure text (.md) | Markdown instructions sent to `claude -p`   | Review resources, analyze, debate prompts   |
-
-Claude session subprocesses use `--bare` when `ANTHROPIC_API_KEY` is in the environment (skips hooks, LSP, plugin sync,
-skill walks for faster startup). `--bare` disables OAuth/keychain auth, so it is only safe when an explicit API key is
-available. They are full Claude Code agents (Read/Grep/Bash/Write) but cannot invoke skills that spawn more subprocesses
-(`FORGE_DEPTH` prevents recursion at depth >= 2 as defense-in-depth). Pure text (.md) is a markdown prompt run in that
-environment.
-
-Skills can declare `effort: high|medium|low` in their SKILL.md frontmatter (Claude Code 2.1.80+). This overrides the
-model effort level when the skill is invoked -- useful for deep-analysis skills (`analyze`, `debate`) that benefit from
-maximum reasoning. This is orthogonal to proxy-level `reasoning_effort` hyperparameters, which control the routed
-model's behavior.
-
-This maps to the three node types in §4.1.2 (Code, LLM call, Claude session). "Pure text" is a specialization: no Python
-runtime deps, so the prompt is portable across models/runners (the execution environment still has tools).
-
-#### 5.5.5 Workflow runners
-
-Multiple skills compose smaller skills into orchestrated loops. Forge recognizes a small set of **fundamental workflow
-runners**: reusable Python functions in `core/reactive/` that each implement one loop pattern.
-
-**Three-layer architecture:**
-
-| Layer | What                 | Lives in                  | Examples                                         |
-| ----- | -------------------- | ------------------------- | ------------------------------------------------ |
-| 1     | Abstract runners     | `core/reactive/`          | Fan-out, adversarial, linear, actor/critic       |
-| 2     | Skill resources      | `src/skills/*/resources/` | Review resource .md, analyze prompt, tagger      |
-| 3     | Concrete invocations | `src/skills/*/SKILL.md`   | `/forge:panel`, `/forge:debate`, `/forge:review` |
-
-Layer 3 entry points wire a runner (Layer 1) to specific resources (Layer 2). The same runner/resource can be combined
-differently by different entry points.
-
-**Four fundamental runners (conservative set):**
-
-| Runner         | Loop pattern                                 | Status            | Current implementation                 |
-| -------------- | -------------------------------------------- | ----------------- | -------------------------------------- |
-| Linear         | A → B → C (sequential)                       | Exists            | WorkflowPolicy pipeline, Stop pipeline |
-| Fan-out/Fan-in | N workers parallel → collect → synthesize    | Exists, enhancing | `run_multi_review()`                   |
-| Adversarial    | N workers with stances, blinded → synthesize | Exists            | `run_adversarial()`                    |
-| Actor/Critic   | Generate → critique → iterate                | Pattern exists    | Ralph-wiggum verification loop         |
-
-**Design principles:**
-
-- Python, not YAML — continues the "library, not framework" approach
-- Each runner takes skills, returns structured output
-- Callable from skills (on-demand) and policies (automatic)
-- Conservative set: fundamental patterns only
-
-The **fan-out runner** (`run_multi_review()`) shapes one already-routed `HeadlessRequest` per worker (model/proxy +
-optional per-worker prompt) and delegates the parallel lifecycle -- per-worker process groups, `os.killpg`
-SIGTERM->SIGKILL cleanup, `ThreadPoolExecutor`, and deterministic `result_map[idx]` ordering -- to a headless invoker
-(`core/invoker/`). That lifecycle is now runtime-neutral: it lives in `_HeadlessLifecycleBase` (`_lifecycle.py`), and
-two concrete invokers fill template hooks (`_prepare_argv`/`_build_result`/`_emit`/`_is_recoverable_format_rejection`).
-`ClaudeHeadlessInvoker` (the review caller) requests capability-gated `--output-format json`; `CodexHeadlessInvoker`
-runs `codex exec --json` and reduces its JSONL event stream via `parse_codex_jsonl_stream` (Codex's predicate is always
-`False`, so the JSON-retry branch is dead for it). Both emit one per-worker usage event when a request carries
-attribution (run/model/status/latency; cost null -- the verb aggregate holds the estimated total). The **adversarial
-runner** constrains workers to review/eval skills with stance injection (`{stance_prompt}`), mandatory blinding (no peer
-outputs), and evidence-weighted synthesis.
-
-**Runtime registry (`core/runtime/`).** The capability half of the runtime seam (the invoker above is the lifecycle
-half). A frozen `RuntimeSpec` per runtime in a module-level `RUNTIMES` table (mirrors `core/auth/capabilities.py`'s
-`Credential`/`CREDENTIALS` pattern) answers the card's seven questions without hard-coding Claude Code assumptions:
-installed (`is_installed()` = PATH presence; `detect()` = best-effort `--version`), interactive, headless, hooks, usage
-source, native resume, and install scopes (plus curated-transfer in/out). Limited or planned support is a multi-state
-`Literal`, not a `bool` — Codex `native_hooks="headless_inert"` (Phase 6 probe: hooks register and enable but do not
-fire under headless `codex exec`; interactive unverified), `pretool_policy="none"` (PreToolUse never fires headless, so
-no verified enforcement), and `interactive="beta"` (a Forge-integration target, not shipped). `hook_min_version` stays
-machine-readable as the registration/enablement floor a preflight checks (not a firing guarantee); `hook_feature_flag`
-is `None` since Codex hooks are default-on — so a consumer reading the field, not just the prose, never mistakes a Codex
-limit for Claude parity. `forge runtime list [--json]` renders the matrix. Claude Code is fully populated; Codex/Gemini
-declare their limits as values. Phase 5's `CodexHeadlessInvoker` and auth/runtime preflight now read this registry (e.g.
-`get_runtime("codex").headless_cmd` builds the `codex exec` argv; the preflight checks the version gate).
-
-#### 5.5.6 Relationship to policies (workflow unification)
-
-Skills and policies are the **same building blocks with different triggers**:
-
-|          | Policies                              | Skills                              |
-| -------- | ------------------------------------- | ----------------------------------- |
-| Trigger  | Hook event (automatic, on Write/Edit) | Agent/user invocation (on demand)   |
-| Output   | Allow/deny decision                   | Information for agent to synthesize |
-| Latency  | Adds overhead to every action         | Zero overhead until invoked         |
-| Use case | Continuous enforcement                | Deliberate checks                   |
-
-Both compose from the same primitives: `core/reactive/`, `core.llm`, `run_claude_session()`. Shared code is imported by
-both CLI commands and policy classes—no workflow registry, no declarative config layer. Library, not framework.
-
-**CLI surfaces (normative):** Forge uses two related command surfaces:
-
-1. **Policy** — deterministic/semantic policies evaluated against an action context.
-
-   - Hook surface: `forge hook …` invokes policies automatically.
-   - Manual surface: `forge policy check …` runs policies on demand (after a hook blocks you, or in CI).
-
-   **Stuck playbook (target UX):** When a PreToolUse policy blocks repeatedly, give the human an escape hatch without
-   uninstalling hooks.
-
-   - **Disable enforcement in-session:** `%policy disable` (hook becomes a no-op for this session)
-   - **Fix the issue:** work with the agent or edit manually while enforcement is disabled
-   - **Confirm you're unblocked (optional):**
-     - `%policy check` (planned): defaults to `git diff` (unstaged). Supports `--staged`.
-     - Terminal fallback: `git diff | forge policy check --bundle tdd --bundle coding_standards --diff`
-   - **Re-enable enforcement:**
-     - `%policy enable` (planned): with no bundles, restores the session's configured bundles from intent.
-     - `%policy enable tdd coding_standards`: explicitly sets bundles for the session.
-
-   `forge policy check` (and `%policy check`) are diagnostics; you're unstuck once enforcement is re-enabled and the
-   next Write/Edit passes the hook.
-
-2. **Run** -- multi-step workflow runners (fan-out, debate, etc.).
-
-   - Default: `forge workflow <workflow>` returns a human-readable result.
-   - Gate mode: `forge workflow <workflow> --check` forces a policy-grade verdict contract (structured JSON + exit
-     code).
-
-**No auto-promotion:** A workflow does not automatically appear as a Policy. If a Policy wants to use a workflow, it
-invokes the workflow's `--check` surface explicitly.
-
-**Workflow runners unify skills and policies.** The same runner is usable from:
-
-- Skills (agent/user invoked)
-- Hooks/policies (automatic gate via `--check`)
-- CLI manual runs (human debugging)
-
-#### 5.5.7 Panel (fan-out reference skill)
-
-Panel is the reference invocation of the fan-out runner. It fans out a review task to N models via different proxies and
-collects independent findings for synthesis. Each reviewer is a full Claude Code agent (can read files, investigate,
-find issues with real file:line evidence). The main agent synthesizes all N reviews -- identifying consensus findings,
-unique insights, and conflicts -- with full project context to investigate disputes.
-
-**Dual use:** The panel serves as both a skill (`/forge:panel src/session/ --code`) and a policy (automatic multi-model
-gate before committing). Same `run_multi_review()` function, two callers -- the programmer wires both. `/forge:analyze`
-is a degenerate fan-out (N=1) with an analyze-specific resource.
-
-#### 5.5.8 Debate (adversarial reference skill)
-
-Debate is the reference invocation of the adversarial runner. It assigns stances (for/against/neutral) to workers,
-blinds them from each other (separate `claude -p` processes, no `--resume`), and synthesizes by weighing agreement
-against disagreement. Stances influence the evaluative lens, not honesty -- all stances include ethical guardrails. Only
-review/evaluation skills are adversarial-compatible (runner checks for `{stance_prompt}` marker).
-
-> Detailed runner configs, debate protocol, and operational constraints (recursion guard, JSON output contract, child
-> process lifecycle, script dependency tiers) in
-> [design_appendix.md SF](design_appendix.md#f-workflow-runner-and-skill-details).
-
-### 5.6 Designated memory docs
-
-Cross-session continuity via designated markdown files that sessions keep updated—no knowledge graphs or async
-synthesis.
-
-Forge memory has three layers; this section covers **project memory** -- the designated docs the memory writer curates:
-
-| Layer               | What it holds                                           | Location                  |
-| ------------------- | ------------------------------------------------------- | ------------------------- |
-| **Raw memory**      | Transcripts, plans, artifacts, reports (§3.8)           | `.forge/artifacts/`       |
-| **Project memory**  | Passported docs (changelog, impl notes) -- this section | `docs/`, `.forge/memory/` |
-| **Transfer memory** | Curated context for fork/resume (§3.9)                  | `.forge/prev_sessions/`   |
-
-The **memory writer** curates project memory at Stop time; **transfer** (§3.9) assembles context for a child session.
-
-The simplest memory system is:
-
-1. Designated markdown files with templates
-2. Sessions read them at start (via CLAUDE.md references)
-3. Sessions update them before ending
-4. Next session gets current state
-
-#### 5.6.1 Memory writer (automated doc maintenance)
-
-The memory writer runs at session end to fill gaps automatically:
-
-```
-Stop hook → spawn memory writer → reads transcript + current docs → updates
-```
-
-The memory writer runs `claude -p` (headless prompt mode) on the full session transcript. It operates
-**retrospectively**, selecting what mattered with full-session hindsight (higher signal than incremental capture).
-
-```yaml
-# In session intent (set via forge memory enable or --memory on)
-memory:
-  auto_update:
-    enabled: true
-    mode: augment              # augment (add missing) | review-only (dry run)
-    proxy: litellm-haiku       # cheap model for summarization
-    min_turns: 5               # skip for very short sessions
-```
-
-**Multi-agent workflow:** In parallel runs, each agent spawns its own memory writer. `augment` mode stays additive (no
-overwrites).
-
-#### 5.6.2 Memory doc passports
-
-Each memory doc may include a `forge_memory` YAML frontmatter block -- the doc's **passport**. The passport is the
-authoritative contract for that doc's intent, update strategy, and writer privileges. The memory writer re-reads
-passports at Stop time.
-
-```yaml
----
-forge_memory:
-  version: 1
-  intent: "Compact completed-work record for Forge implementation sessions."
-  captures: [completed work, verification, deferred follow-ups]
-  excludes: [pending task plans, raw session summaries]
-  update:
-    instruction: "Add compact newest-first entries with Goal, Key changes, and Verification."
-    strategy: changelog
-    mode: direct
-    writers: all-sessions
-    compact_when: "approaching documentation size limits"
----
-```
-
-**Ownership split**: passports own doc-level policy (strategy, intent, writers). Session manifests own activation state
-(enabled, mode, min_turns). There are no session-scoped doc lists; all docs are discovered from passports at Stop time.
-Editing a passport between sessions takes effect without re-running `forge memory track`.
-
-**Writer semantics**: `all-sessions` and exact session-name writers are supported. `lineage:` and `role:` prefixes are
-rejected with deferral messages. Writer access is checked at Stop time by the memory writer.
-
-**Passport CLI**: `forge memory track --strategy <strategy>` synthesizes a passport for docs without one.
-`forge memory track` with flags on a doc that already has a passport overwrites the passport (flags win, warnings
-printed). `forge memory passport show <path>` displays passport fields.
-
-#### 5.6.3 Two operating modes
-
-The memory writer has two distinct modes:
-
-**Mode 1: Direct Update** — agent updates the doc in place per strategy. Used for project docs the agent is allowed to
-maintain.
-
-**Mode 2: Shadow/Propose** — the agent is the proposer, the human is the author. `forge memory track --propose` derives
-a shadow path under `.forge/memory/` (encoding the immediate parent directory for disambiguation). The agent reads
-transcript + official doc, proposes additions to the shadow; the human reviews and merges at their own pace.
-
-Shadow curation: `forge memory shadows review --for <doc> --curate` runs an LLM pass that reads the official doc plus
-matching shadows, removes duplicates and already-promoted notes, groups related suggestions, and emits source-cited
-output. Curation reports persist at `.forge/artifacts/<session>/memory/curation-{slug}-{hash}-{ts}.md`. Curation never
-mutates official docs.
-
-#### 5.6.4 Memory activation on fork and fresh resume
-
-Children inherit the parent's memory activation by default. The `--memory` flag overrides:
-
-```bash
-forge session fork parent                    # inherit parent's memory on/off
-forge session fork parent --memory on        # force memory on in child
-forge session fork parent --memory off       # force memory off in child
-
-forge session resume parent --fresh          # inherit parent's memory on/off
-forge session resume parent --fresh --memory off
-```
-
-Inheritance copies only `auto_update` (enabled, mode, min_turns, proxy). Other `MemoryIntent` fields do not propagate.
-`--memory off` writes an explicit `MemoryWriterConfig(enabled=False)` so the child is deliberately off even if later
-defaults change. `--memory on` reuses the parent's non-enabled config (mode, proxy, min_turns) or `MemoryWriterConfig`
-defaults.
-
-Memory docs are not inherited. Passports are git-tracked and discovered live at Stop time in whatever checkout the child
-session runs in. This applies equally to same-checkout forks, `--worktree`, and `--into`.
-
-#### 5.6.5 Strategy registry
-
-Per-doc strategies control how each file is updated. Strategies are defined in `MemoryStrategy` enum in
-`src/forge/session/passport.py` (single source for CLI, passport, and memory-writer prompts).
-
-**No file creation.** Designated docs must already exist; missing files are skipped. Humans choose which docs to
-maintain; the agent maintains them. `forge memory track` enforces this at configuration time; runtime skip handling
-remains for stale manifests.
-
-Direct update strategies: `project-state`, `checklist`, `changelog`, `generic`. Shadow mode (`--propose`) works with any
-strategy.
-
-The memory writer resolves designated doc paths relative to `forge_root`, so git-tracked docs target the correct branch
-in worktrees. Trackedness is controlled by path choice -- the writer doesn't distinguish.
-
-**Relationship to Claude Code auto-memory:** Complementary, not competitive. Auto-memory captures during sessions
-(incremental, free-form); the memory writer synthesizes after sessions (retrospective, per-doc strategies). The memory
-writer deliberately does not read auto-memory — different targets, different information, occasional duplication is
-cheaper than cross-format deduplication.
-
-> Strategy tables, example config, worktree resolution details, and full auto-memory comparison in
-> [design_appendix.md §G](design_appendix.md#g-memory-doc-reference).
-
-#### 5.6.6 Session-scoped activation
-
-Memory activation is session-scoped. Each session decides whether the memory writer runs via
-`intent.memory.auto_update.enabled` (or an override). There is no checkout-level config file.
-
-```bash
-forge memory enable                    # resolves $FORGE_SESSION
-forge memory enable --session planner  # named session
-forge memory disable --session planner
-forge session start planner --memory on
-```
-
-Both gates (Stop-hook enqueue in `src/forge/cli/hooks/commands.py` and the detached runner `forge memory-writer run`)
-check `effective.memory.auto_update.enabled` directly. Incognito sessions never enqueue regardless of activation state.
-
-**Stop-time discovery.** When activation is on, the detached runner scans hardcoded roots (`docs/` plus
-`.forge/memory/`) for `forge_memory` passports the session is authorized to write, materializes shadow files for
-shadow-only passports, and passes the result to `run_memory_writer()`. Capped at 50 docs after filtering. The Stop hook
-only decides whether to enqueue; the scan runs in the background runner.
-
-**Scan roots** are hardcoded: `DEFAULT_SCAN_ROOTS = ("docs/",)` plus always `.forge/memory/`. Configurable roots are
-deferred.
-
-#### 5.6.7 CLI verbs
-
-- **`forge memory track <path>`** authors a **passport** (project-lifetime, git-tracked frontmatter). Sessionless.
-  `--propose` authors a shadow-only passport. A passported doc outside the scan roots is written but warns.
-- **`forge memory passport remove <path>`** removes the passport, preserving unrelated frontmatter.
-- **`forge memory enable`** / **`disable`** sets session activation (`memory.auto_update.enabled`). Resolves
-  `$FORGE_SESSION` when `--session` is omitted; errors outside a session without `--session`.
-- **`forge memory list`** shows passported docs under scan roots (sessionless scan, no writer filtering).
-
-**Shadow discovery** scans passports under the scan roots for shadow-only docs (unfiltered by writer).
-
-### 5.7 Test Infrastructure (Docker-based)
+### 5.3 Test Infrastructure (Docker-based)
 
 **Runtime architecture (host-based)**: Proxy runs on host (`subprocess.Popen`), Claude Code runs on host. End users do
 NOT need Docker.
@@ -1943,41 +1067,12 @@ uv run pytest tests/src -m "not integration"
 make test-integration  # Runs: docker build + docker run pytest
 ```
 
-### 5.8 Interactive Manual Testing
+### 5.4 Interactive manual testing
 
-Automated tests catch logic bugs but miss UX/latency/real-system failures. Previous manual testing found 5 real bugs
-(including a macOS crash) that ~2,400 automated tests missed.
-
-**Why checklist-driven.** Early versions let the agent improvise commands — producing invented CLI commands, interactive
-prompts that hang the Bash tool, and leaked API keys. The fix: pre-written checklists where commands and assertions are
-deterministic and the agent only interprets results. Checklist edits change tests without modifying skill instructions.
-
-**Three skills** with escalating isolation, tied to install profiles:
-
-| Skill                | Profile    | Isolation                                          | Audience          |
-| -------------------- | ---------- | -------------------------------------------------- | ----------------- |
-| `/forge:smoke-test`  | `standard` | Host, read-only probes                             | End users         |
-| `/forge:walkthrough` | `standard` | Host, hermetic test repo (`--sidecar` adds Docker) | End users / demos |
-| `/forge:qa`          | `full`     | Docker container                                   | Maintainers       |
-
-**Shared pattern — checklist + wrapper + annotations.** Each skill reads a checklist, runs commands through a
-mode-specific wrapper, and routes items by annotation. A three-window model (Session A runs the skill, Session B is the
-subject under test, Terminal for raw CLI) enables interactive verification of things the agent can't see. Session A
-prompts the user to open Terminal early. Session B is launched only when the checklist first needs interactive
-verification.
-
-**Key design decisions:**
-
-- Share the pattern/convention, not the prompt — each skill is self-contained (no cross-mode confusion)
-- Checklist is single source of truth — editing it changes tests without SKILL.md modifications
-- Each skill-local `walkthrough-state.py` is the deterministic bookkeeper — agent classifies (pass/fail/skip), and the
-  script counts
-- No per-checklist-item scripts — wrapper + lifecycle scripts are enough
-- `/forge:qa` tied to `full` install profile (Docker dependency)
-
-> Annotation types, wrapper details, and per-skill specifications in
-> [design_appendix.md §I](design_appendix.md#i-interactive-manual-testing). See also
-> [testing-guidelines.md](developer/testing-guidelines.md) for the full testing reference.
+Checklist-driven manual testing covers UX, latency, and real-system failures that unit and integration tests miss. Three
+skills provide escalating isolation (`/forge:smoke-test`, `/forge:walkthrough`, `/forge:qa`); the detailed pattern,
+annotation types, and wrappers live in [design_appendix.md §D](design_appendix.md#d-interactive-manual-testing). The
+end-user guide is [manual-testing.md](end-user/manual-testing.md).
 
 ## 6. Directory structure (monorepo)
 
@@ -1986,7 +1081,7 @@ multi-forge/
 ├── src/
 │   ├── forge/    # Python package
 │   │   ├── core/        # Shared libraries
-│   │   │   ├── llm/     # LLM client abstraction (see design_appendix.md §J)
+│   │   │   ├── llm/     # LLM client abstraction (see design_appendix.md §E)
 │   │   │   ├── auth/    # Auth flows (LiteLLM, credential store)
 │   │   │   ├── models/  # Model catalog (forge.models.yaml)
 │   │   │   └── state/   # File-based state helpers
@@ -1998,7 +1093,7 @@ multi-forge/
 │   │
 │   ├── commands/        # Slash commands (installed to ~/.claude/commands)
 │   ├── agents/          # Agents (installed to ~/.claude/agents)
-│   └── skills/          # Skills (installed to ~/.claude/skills) — scripting layer (§5.5)
+│   └── skills/          # Skills (installed to ~/.claude/skills) — scripting layer (design_workflows.md §3)
 │
 ├── docs/
 └── pyproject.toml

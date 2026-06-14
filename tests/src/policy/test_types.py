@@ -16,7 +16,7 @@ class TestActionContext:
     def test_create_minimal(self) -> None:
         """Test creating ActionContext with minimal required fields."""
         ctx = ActionContext(
-            runtime="claude_code",
+            origin="claude_code",
             event="PreToolUse.Write",
             tool_name="Write",
             tool_args={},
@@ -31,7 +31,7 @@ class TestActionContext:
     def test_create_full(self) -> None:
         """Test creating ActionContext with all fields."""
         ctx = ActionContext(
-            runtime="claude_code",
+            origin="claude_code",
             event="PreToolUse.Write",
             tool_name="Write",
             tool_args={"file_path": "/repo/src/foo.py", "content": "code"},
@@ -46,7 +46,7 @@ class TestActionContext:
     def test_immutable(self) -> None:
         """Test that ActionContext is frozen (immutable)."""
         ctx = ActionContext(
-            runtime="claude_code",
+            origin="claude_code",
             event="PreToolUse.Write",
             tool_name="Write",
             tool_args={},

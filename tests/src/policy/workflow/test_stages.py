@@ -20,7 +20,7 @@ from forge.policy.workflow.stages import (
 
 def _ctx(target_path: str | None = "src/foo.py", new_content: str | None = "x = 1") -> ActionContext:
     return ActionContext(
-        runtime="claude_code",
+        origin="claude_code",
         event="PreToolUse.Write",
         tool_name="Write",
         tool_args={},

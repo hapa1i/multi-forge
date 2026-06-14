@@ -14,6 +14,10 @@ from rich.console import Console
 from rich.markup import escape
 from rich.table import Table
 
+# Light dataclass import (codex_enrollment defers its heavy invoker/ops graph into
+# _run_probe_turn), so the `forge runtime` path stays lean. The verify_codex_enrollment
+# *call* is still imported lazily in preflight_cmd (the CLI tests patch the source module).
+from forge.core.ops.codex_enrollment import CodexEnrollmentVerification
 from forge.core.runtime import (
     CodexPreflight,
     RuntimeSpec,
@@ -121,6 +125,15 @@ def _render_preflight(console: Console, result: CodexPreflight) -> None:
     console.print("[bold]Codex preflight[/bold]")
     console.print(f"  Installed:  {'yes' if result.installed else 'no'}")
     console.print(f"  Version:    {escape(version)} (hook floor met: {floor_met})")
+    if result.version_beyond_validated:
+        # Non-blocking: the binary may be fine. Codex trust/enrollment + apply_patch/argv
+        # facts are pinned empirically, so a version past the probe ceiling means those
+        # facts are unverified here -- point the operator at the standing probe harness.
+        console.print(
+            f"  [yellow]Note:[/yellow] codex {escape(version)} runs ahead of the probe-validated "
+            f"{escape(result.version_validated)}; re-run scripts/experiments/codex-hooks/ to re-pin "
+            "trust/enrollment behavior."
+        )
     console.print(
         f"  Auth:       {escape(result.auth_method)}  "
         f"(source: {escape(result.auth_source)}, billing: {escape(result.billing_mode)})"
@@ -135,6 +148,24 @@ def _render_preflight(console: Console, result: CodexPreflight) -> None:
         console.print(escape(result.blocking_reason))
 
 
+def _render_enrollment(console: Console, result: CodexEnrollmentVerification) -> None:
+    """Render an empirical enrollment-verification result (escapes free text)."""
+    if result.enrolled is True:
+        verdict = "[green]ENROLLED[/green]"
+    elif result.enrolled is False:
+        verdict = "[red]NOT ENROLLED[/red]"
+    else:
+        verdict = "[yellow]UNVERIFIED[/yellow]"
+
+    console.print("[bold]Codex hook enrollment[/bold]")
+    console.print(f"  Config:     {escape(result.config_path)}")
+    console.print(f"  Registered: {'yes' if result.registered else 'no'}")
+    console.print(f"  Probe turn: {'ran' if result.attempted else 'skipped (answer already knowable)'}")
+    console.print(f"  Enrolled:   {verdict}")
+    console.print()
+    console.print(escape(result.reason))
+
+
 @runtime.command("preflight")
 @click.argument("runtime_name", metavar="RUNTIME")
 @click.option(
@@ -144,8 +175,14 @@ def _render_preflight(console: Console, result: CodexPreflight) -> None:
     metavar="PROXY_ID",
     help="Check Responses support against an existing proxy id (reads proxy.yaml; starts nothing).",
 )
+@click.option(
+    "--verify-enrollment",
+    "verify_enrollment",
+    is_flag=True,
+    help="Empirically confirm user-scope Codex hooks are trust-enrolled (runs one cheap 'codex exec' turn).",
+)
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
-def preflight_cmd(runtime_name: str, proxy_id: str | None, as_json: bool) -> None:
+def preflight_cmd(runtime_name: str, proxy_id: str | None, verify_enrollment: bool, as_json: bool) -> None:
     """Preflight a runtime for headless runs: auth, hooks, and Responses readiness.
 
     Runs the dynamic, per-machine checks the static `forge runtime list` matrix cannot:
@@ -153,11 +190,17 @@ def preflight_cmd(runtime_name: str, proxy_id: str | None, as_json: bool) -> Non
     -- with --proxy -- whether that proxy can serve Codex its Responses API. Exits
     non-zero when the runtime is not ready.
 
+    --verify-enrollment goes further: it confirms (by EFFECT) that Forge's user-scope
+    Codex hooks are trust-enrolled, by running one trivial 'codex exec' turn and checking
+    whether the SessionStart hook fired. The trust ceremony is unverifiable from a config
+    read, so this is the only positive confirmation that it took. Costs one cheap turn.
+
     \b
     Examples:
         forge runtime preflight codex
         forge runtime preflight codex --json
         forge runtime preflight codex --proxy my-openai-proxy
+        forge runtime preflight codex --verify-enrollment
     """
     if runtime_name != "codex":
         # Codex is the only runtime with a preflight today; this is the dispatch seam.
@@ -165,6 +208,24 @@ def preflight_cmd(runtime_name: str, proxy_id: str | None, as_json: bool) -> Non
             f"No preflight available for '{runtime_name}' (supported: codex).",
             param_hint="RUNTIME",
         )
+
+    if verify_enrollment:
+        from forge.core.ops.codex_enrollment import verify_codex_enrollment
+
+        enrollment_preflight = preflight_codex(proxy_id=proxy_id) if proxy_id is not None else None
+        enrollment = verify_codex_enrollment(preflight=enrollment_preflight)
+        if as_json:
+            import json
+            from dataclasses import asdict
+
+            click.echo(json.dumps(asdict(enrollment), indent=2))
+        else:
+            _render_enrollment(Console(), enrollment)
+        # Exit non-zero unless enrollment was positively confirmed (False/None both fail:
+        # the operator asked to verify and we could not say yes).
+        if enrollment.enrolled is not True:
+            sys.exit(1)
+        return
 
     result = preflight_codex(proxy_id=proxy_id)
 

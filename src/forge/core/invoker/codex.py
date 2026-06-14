@@ -86,9 +86,11 @@ class CodexHeadlessInvoker(_HeadlessLifecycleBase):
         stream = parse_codex_jsonl_stream(stdout)
         # Codex reports a failed turn in the JSONL stream, usually with EMPTY stderr; surface
         # the provider reason on stderr so a caller inspecting it sees why the turn failed.
+        # Fall back to a generic line when the stream carried no (or an empty) error message,
+        # so a failed turn never renders as a blank "Codex turn failed." with no detail.
         effective_stderr = stderr
-        if not effective_stderr and stream.is_error and stream.error_message:
-            effective_stderr = stream.error_message
+        if not effective_stderr and stream.is_error:
+            effective_stderr = stream.error_message or "Codex turn failed (no provider error message)."
         return HeadlessResult(
             label=request.label,
             stdout=stream.final_text,
@@ -103,6 +105,7 @@ class CodexHeadlessInvoker(_HeadlessLifecycleBase):
             # (is_error) still parsed. An empty/garbage stream -> False, stdout "".
             envelope_parsed=bool(stream.final_text) or stream.input_tokens is not None or stream.is_error,
             runtime_is_error=stream.is_error,
+            runtime_session_id=stream.thread_id,
             **ident,
         )
 
@@ -111,6 +114,39 @@ class CodexHeadlessInvoker(_HeadlessLifecycleBase):
 
     def _missing_binary_error(self) -> str:
         return "codex CLI not found in PATH"
+
+
+def sanitize_codex_child_env(preflight: CodexPreflight) -> dict[str, str]:
+    """Build a sanitized env for any ``codex`` child (headless exec or interactive TUI).
+
+    Strips inherited Codex/Anthropic/proxy vars so the child cannot contradict the
+    preflight's resolved auth posture, advances the ``FORGE_DEPTH`` recursion guard
+    (Codex can run shell commands that invoke ``forge``, even though it does not run
+    Forge hooks), then re-establishes exactly the preflight-resolved auth:
+    ``CODEX_API_KEY`` for an api-key login the ``codex`` binary can't otherwise see
+    (``env``/``credential_file``), the inherited ``CODEX_ACCESS_TOKEN`` for an
+    enterprise login, or **nothing** for ``codex_store`` (Codex reads its own
+    ``~/.codex`` auth). Other ambient context (including ``FORGE_SESSION``) is kept;
+    run-tree identity is the caller's concern (derive for headless children, an
+    explicit fresh root for interactive launches).
+    """
+    env = os.environ.copy()
+    for var in _CODEX_CHILD_STRIP_VARS:
+        env.pop(var, None)
+    env[FORGE_DEPTH_VAR] = str(get_forge_depth(env) + 1)
+    if preflight.auth_source in ("env", "credential_file"):
+        if preflight.auth_method == "enterprise_token":
+            # auth_source=env via CODEX_ACCESS_TOKEN (no API key): restore the exact token
+            # (codex_api_key_for_subprocess resolves CODEX_API_KEY, which is absent here).
+            token = os.environ.get("CODEX_ACCESS_TOKEN")
+            if token:
+                env["CODEX_ACCESS_TOKEN"] = token
+        else:
+            # api_key from Forge env/credential-file resolution (respects auth_ignore_env).
+            key = codex_api_key_for_subprocess()
+            if key:
+                env["CODEX_API_KEY"] = key
+    return env
 
 
 def prepare_codex_request(
@@ -123,11 +159,17 @@ def prepare_codex_request(
     sandbox: CodexSandbox = "workspace-write",
     timeout_seconds: int = 600,
     label: str | None = None,
+    resume_thread_id: str | None = None,
 ) -> HeadlessRequest:
     """Shape one ``codex exec --json`` job into a :class:`HeadlessRequest`.
 
     The caller runs :func:`assert_codex_ready` ONCE and passes the frozen ``preflight``
     in, so the ~20s ``codex doctor`` probe is not repeated per worker in a fan-out.
+
+    ``resume_thread_id`` continues an existing Codex thread via the ``resume``
+    subcommand. Options go BEFORE the subcommand (probe stage 60 form A:
+    ``codex exec --json --sandbox X resume <thread_id>``); the prompt still arrives on
+    stdin (probe stage 61 verified the stdin-prompt + resume combination).
 
     Codex runs DIRECT to OpenAI: no Forge proxy, no ``ANTHROPIC_*`` env, ``base_url`` is
     ``None``. The child env is **sanitized** so it cannot contradict the preflight: all
@@ -143,27 +185,10 @@ def prepare_codex_request(
     argv = [*get_runtime("codex").headless_cmd, "--json", "--sandbox", sandbox]
     if model:
         argv += ["-m", model]
+    if resume_thread_id:
+        argv += ["resume", resume_thread_id]
 
-    env = os.environ.copy()
-    for var in _CODEX_CHILD_STRIP_VARS:
-        env.pop(var, None)
-    # Keep normal ambient context (including FORGE_SESSION for attribution), but advance
-    # the recursion guard just like a Claude headless child: Codex can run shell commands
-    # that invoke `forge`, even though it does not run Forge hooks.
-    env[FORGE_DEPTH_VAR] = str(get_forge_depth(env) + 1)
-    if preflight.auth_source in ("env", "credential_file"):
-        if preflight.auth_method == "enterprise_token":
-            # auth_source=env via CODEX_ACCESS_TOKEN (no API key): restore the exact token
-            # (codex_api_key_for_subprocess resolves CODEX_API_KEY, which is absent here).
-            token = os.environ.get("CODEX_ACCESS_TOKEN")
-            if token:
-                env["CODEX_ACCESS_TOKEN"] = token
-        else:
-            # api_key from Forge env/credential-file resolution (respects auth_ignore_env).
-            key = codex_api_key_for_subprocess()
-            if key:
-                env["CODEX_API_KEY"] = key
-    # auth_source == "codex_store": inject nothing -- codex reads its own ~/.codex auth.
+    env = sanitize_codex_child_env(preflight)
     stamp_run_identity(env, derive=True)
 
     return HeadlessRequest(

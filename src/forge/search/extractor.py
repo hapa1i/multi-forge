@@ -1,7 +1,7 @@
 """Content extraction from JSONL transcripts for search indexing.
 
 Extracts searchable text from Forge transcript artifacts, producing one
-SearchDocument per transcript file. Content extraction rules (design.md §5.5):
+SearchDocument per transcript file. Content extraction rules:
 - User/assistant text messages: fully indexed
 - Tool inputs (file paths, commands): truncated to 100 chars
 - Tool results: truncated to 500 chars

@@ -274,7 +274,7 @@ forge extension disable --scope user     # Remove user-level
 forge extension enable --scope project   # Keep project-level
 ```
 
-See [design_appendix.md §E.5](../design_appendix.md#e5-multi-scope-installation-55----skill-resolution) for details.
+See [design_appendix.md §C.5](../design_appendix.md#c5-multi-scope-installation-55----skill-resolution) for details.
 
 ### Panel fails with "No active proxy found"
 

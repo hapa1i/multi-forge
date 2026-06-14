@@ -22,7 +22,9 @@ from forge.core.ops.codex_bridge import (
     CodexBridgeResult,
     _temporary_run_env,
     bridge_session_to_codex,
+    compose_codex_handoff_context,
     compose_codex_initial_message,
+    compose_codex_interactive_context,
 )
 from forge.core.ops.context import ExecutionContext
 from forge.core.ops.session import ForgeOpError
@@ -108,6 +110,23 @@ def _ctx(tmp_path: Path, *, forge_root: Path | None) -> ExecutionContext:
 # --- compose_codex_initial_message ------------------------------------------------------
 
 
+# The default delivery path's exact bytes: hook-mode staging (Phase 4) reuses the framing
+# half, so this golden pins that the split refactor never changes the initial message.
+_GOLDEN_INITIAL_MESSAGE = (
+    "# Handoff context (curated transfer from a prior planning session)\n"
+    "\n"
+    "The section below is curated context -- decisions, current state, relevant files, and\n"
+    "open questions -- distilled from a planning session in another agent runtime. Reasoning\n"
+    "state does not transfer across runtimes, so treat this as your authoritative context.\n"
+    "\n"
+    "CURATED-BODY\n"
+    "\n"
+    "# Your task\n"
+    "\n"
+    "TASK-TEXT\n"
+)
+
+
 class TestComposeInitialMessage:
     def test_body_precedes_task_with_codex_framing(self) -> None:
         msg = compose_codex_initial_message("CURATED-BODY", "TASK-TEXT")
@@ -120,6 +139,29 @@ class TestComposeInitialMessage:
     def test_strips_surrounding_whitespace(self) -> None:
         msg = compose_codex_initial_message("  body  ", "  task  ")
         assert "body" in msg and "task" in msg
+
+    def test_initial_message_bytes_pinned(self) -> None:
+        assert compose_codex_initial_message("CURATED-BODY", "TASK-TEXT") == _GOLDEN_INITIAL_MESSAGE
+
+    def test_handoff_context_plus_task_equals_initial_message(self) -> None:
+        body, task = "CURATED-BODY", "TASK-TEXT"
+        expected = compose_codex_handoff_context(body) + "\n# Your task\n\n" + f"{task.strip()}\n"
+        assert compose_codex_initial_message(body, task) == expected
+
+
+class TestComposeInteractiveContext:
+    """Phase 5: the TUI positional prompt starts a model turn, so the framing must hold it."""
+
+    def test_framed_body_with_hold_instructions(self) -> None:
+        msg = compose_codex_interactive_context("CURATED-BODY")
+        assert msg.startswith(compose_codex_handoff_context("CURATED-BODY"))
+        assert "# Hold for instructions" in msg
+        assert "WAIT for the user's instruction" in msg
+        assert "# Your task" not in msg  # no task suffix -- the human types in the TUI
+
+    def test_headless_compose_functions_unchanged(self) -> None:
+        # The interactive variant must not perturb the golden-pinned headless framing.
+        assert compose_codex_initial_message("CURATED-BODY", "TASK-TEXT") == _GOLDEN_INITIAL_MESSAGE
 
 
 # --- _temporary_run_env -----------------------------------------------------------------
@@ -158,6 +200,27 @@ class TestTemporaryRunEnv:
         # Nested pre-existing values restored even though the block raised.
         assert os.environ["FORGE_RUN_ID"] == "outer"
         assert os.environ["FORGE_ROOT_RUN_ID"] == "outer_root"
+
+    def test_forge_root_set_and_restored_to_absence(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("FORGE_FORGE_ROOT", raising=False)
+        ident = RunIdentity(run_id="run_x", parent_run_id=None, root_run_id="run_x")
+        with _temporary_run_env(ident, "sess", forge_root="/child/root"):
+            assert os.environ["FORGE_FORGE_ROOT"] == "/child/root"
+        assert "FORGE_FORGE_ROOT" not in os.environ
+
+    def test_forge_root_restores_pre_existing_value(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("FORGE_FORGE_ROOT", "/outer/root")
+        ident = RunIdentity(run_id="run_x", parent_run_id=None, root_run_id="run_x")
+        with _temporary_run_env(ident, "sess", forge_root="/child/root"):
+            assert os.environ["FORGE_FORGE_ROOT"] == "/child/root"
+        assert os.environ["FORGE_FORGE_ROOT"] == "/outer/root"
+
+    def test_forge_root_omitted_leaves_env_untouched(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("FORGE_FORGE_ROOT", "/outer/root")
+        ident = RunIdentity(run_id="run_x", parent_run_id=None, root_run_id="run_x")
+        with _temporary_run_env(ident, "sess"):
+            assert os.environ["FORGE_FORGE_ROOT"] == "/outer/root"
+        assert os.environ["FORGE_FORGE_ROOT"] == "/outer/root"
 
     def test_overlapping_use_raises_and_guard_releases(self) -> None:
         """os.environ is process-global: overlapping bridge runs must fail loudly (never
@@ -264,3 +327,134 @@ class TestBridgeSessionToCodex:
         # The bridge is a transient root: os.environ run identity was restored after.
         assert "FORGE_RUN_ID" not in os.environ
         assert "FORGE_ROOT_RUN_ID" not in os.environ
+
+        # The seed thread_id from the fixture stream surfaces on the result (Phase 2).
+        assert result.thread_id == "019eaa51-6920-7c41-ae34-d4f7f368d55a"
+
+
+def _run_bridge(tmp_path: Path, **bridge_kwargs: Any) -> tuple[CodexBridgeResult, MagicMock]:
+    """Run the bridge with the standard hermetic mocks; return (result, assert_ready mock)."""
+    transcript = tmp_path / "transcript.jsonl"
+    _write_transcript(transcript)
+    state = _planner_state(tmp_path, transcript)
+
+    manager = MagicMock()
+    manager.get_session.return_value = state
+    mock_adapter = MagicMock()
+    mock_adapter.complete.return_value = _fake_completion(json.dumps(_CURATED))
+
+    with (
+        patch("forge.core.ops.codex_bridge.SessionManager", return_value=manager),
+        patch("forge.core.ops.codex_bridge.assert_codex_ready", return_value=_preflight()) as mock_ready,
+        patch("forge.core.llm.SyncAdapter", return_value=mock_adapter),
+        patch("forge.core.llm.get_client"),
+        patch("forge.core.invoker._lifecycle.subprocess.Popen", return_value=_mock_codex_proc()),
+    ):
+        result = bridge_session_to_codex(
+            ctx=_ctx(tmp_path, forge_root=tmp_path),
+            parent="planner",
+            task="Implement the parser",
+            cwd=str(tmp_path),
+            strategy="ai-curated",
+            **bridge_kwargs,
+        )
+    return result, mock_ready
+
+
+class TestBridgeHookDelivery:
+    """Phase 4 staging param: hook mode stages the framed body; default is byte-identical."""
+
+    def _run(self, tmp_path: Path, **bridge_kwargs: Any) -> tuple[CodexBridgeResult, dict[str, Any]]:
+        """Like _run_bridge, but the Popen mock snapshots staging state + env at spawn time."""
+        transcript = tmp_path / "transcript.jsonl"
+        _write_transcript(transcript)
+        state = _planner_state(tmp_path, transcript)
+
+        manager = MagicMock()
+        manager.get_session.return_value = state
+        mock_adapter = MagicMock()
+        mock_adapter.complete.return_value = _fake_completion(json.dumps(_CURATED))
+
+        staged_path = bridge_kwargs.get("staged_context_path")
+        spawn_snapshot: dict[str, Any] = {}
+
+        def _popen(*args: Any, **kwargs: Any) -> MagicMock:
+            # The hook fires DURING the codex turn, so the staged file must exist (with
+            # final content) by the time the child process is spawned.
+            if staged_path is not None:
+                spawn_snapshot["staged_exists"] = staged_path.exists()
+                spawn_snapshot["staged_content"] = staged_path.read_text() if staged_path.exists() else None
+            spawn_snapshot["env"] = dict(kwargs["env"])
+            proc = _mock_codex_proc()
+            spawn_snapshot["proc"] = proc
+            return proc
+
+        with (
+            patch("forge.core.ops.codex_bridge.SessionManager", return_value=manager),
+            patch("forge.core.ops.codex_bridge.assert_codex_ready", return_value=_preflight()),
+            patch("forge.core.llm.SyncAdapter", return_value=mock_adapter),
+            patch("forge.core.llm.get_client"),
+            patch("forge.core.invoker._lifecycle.subprocess.Popen", side_effect=_popen),
+        ):
+            result = bridge_session_to_codex(
+                ctx=_ctx(tmp_path, forge_root=tmp_path),
+                parent="planner",
+                task="Implement the parser",
+                cwd=str(tmp_path),
+                strategy="ai-curated",
+                **bridge_kwargs,
+            )
+        return result, spawn_snapshot
+
+    def test_hook_mode_stages_framed_body_and_sends_raw_task(self, tmp_path: Path) -> None:
+        staged = tmp_path / "sessions" / "impl" / "codex" / "pending-context.md"
+        result, snapshot = self._run(tmp_path, staged_context_path=staged, child="impl")
+
+        assert result.codex.success
+        # Staged at Popen time with the framed transfer body (no task section).
+        assert snapshot["staged_exists"] is True
+        staged_content = snapshot["staged_content"]
+        assert staged_content.startswith("# Handoff context")
+        assert "# Your task" not in staged_content
+        assert "Implement the parser" not in staged_content
+        # The staged content is exactly the framing of the composed child body.
+        composed_body = parse_transfer_frontmatter(result.transfer_path.read_text(encoding="utf-8"))[1]
+        assert staged_content == compose_codex_handoff_context(composed_body)
+        # The prompt carries ONLY the raw task; the hook env can root the session store.
+        assert snapshot["proc"].communicate.call_args.kwargs["input"] == "Implement the parser"
+        assert snapshot["env"]["FORGE_FORGE_ROOT"] == str(tmp_path)
+
+    def test_default_mode_stages_nothing_and_prompt_unchanged(self, tmp_path: Path) -> None:
+        result, snapshot = self._run(tmp_path)
+        assert result.codex.success
+        assert list(tmp_path.glob("**/pending-context.md")) == []
+        # Default prompt is the full composed initial message (golden-pinned shape).
+        codex_input = snapshot["proc"].communicate.call_args.kwargs["input"]
+        assert codex_input.startswith("# Handoff context")
+        assert codex_input.rstrip().endswith("Implement the parser")
+        assert snapshot["env"]["FORGE_FORGE_ROOT"] == str(tmp_path)
+
+
+class TestBridgePhase2Extensions:
+    """Phase 2 bridge params: explicit child key, provided preflight, output_root."""
+
+    def test_explicit_child_key_honored(self, tmp_path: Path) -> None:
+        result, _ = _run_bridge(tmp_path, child="impl")
+        assert result.child == "impl"
+        snapshot = tmp_path / ".forge" / "prev_sessions" / "planner" / "children" / "impl.md"
+        assert snapshot.is_file()
+        assert result.transfer_path == snapshot
+
+    def test_provided_preflight_short_circuits_assert(self, tmp_path: Path) -> None:
+        _, mock_ready = _run_bridge(tmp_path, preflight=_preflight())
+        mock_ready.assert_not_called()
+
+    def test_output_root_places_snapshot_under_child_root(self, tmp_path: Path) -> None:
+        child_root = tmp_path / "wt"
+        child_root.mkdir()
+        result, _ = _run_bridge(tmp_path, child="impl", output_root=child_root)
+        snapshot = child_root / ".forge" / "prev_sessions" / "planner" / "children" / "impl.md"
+        assert snapshot.is_file()
+        assert result.transfer_path == snapshot
+        # Nothing was written under the invocation root.
+        assert not (tmp_path / ".forge" / "prev_sessions" / "planner" / "children" / "impl.md").exists()

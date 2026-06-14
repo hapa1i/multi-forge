@@ -184,11 +184,13 @@ Forge uses files instead of a database:
 
 ## Project Docs
 
-| Document                                    | Purpose                                             |
-| ------------------------------------------- | --------------------------------------------------- |
-| [design.md](../design.md)                   | Canonical architecture and design                   |
-| [design_appendix.md](../design_appendix.md) | Reference details (schemas, tables)                 |
-| [end-user/](../end-user/)                   | End-user guides (sessions, proxies, policies, etc.) |
+| Document                                      | Purpose                                             |
+| --------------------------------------------- | --------------------------------------------------- |
+| [design.md](../design.md)                     | Core architecture and design                        |
+| [design_appendix.md](../design_appendix.md)   | Reference details (schemas, tables)                 |
+| [design_workflows.md](../design_workflows.md) | Policy, skills, workflow runners, and memory design |
+| [cli_reference.md](../cli_reference.md)       | Terminal and direct-command inventory               |
+| [end-user/](../end-user/)                     | End-user guides (sessions, proxies, policies, etc.) |
 
 ## Common Tasks
 

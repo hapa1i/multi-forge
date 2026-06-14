@@ -40,6 +40,10 @@ class TestRecordedSuccessStream:
         assert result.is_error is False
         assert result.error_message is None
 
+    def test_thread_id_extracted_from_thread_started(self) -> None:
+        result = parse_codex_jsonl_stream(_read("exec_json_success.jsonl"))
+        assert result.thread_id == "019eaa51-6920-7c41-ae34-d4f7f368d55a"
+
 
 class TestRecordedErrorStream:
     """The recorded failed run: bogus model -> error + turn.failed, exit 1, no usage."""
@@ -59,6 +63,11 @@ class TestRecordedErrorStream:
         assert result.input_tokens is None
         assert result.output_tokens is None
         assert result.cached_tokens is None
+
+    def test_failed_turn_still_carries_thread_id(self) -> None:
+        # The recorded bogus-model failure still opened a thread before failing.
+        result = parse_codex_jsonl_stream(_read("exec_json_error.jsonl"))
+        assert result.thread_id == "019eaa51-f236-7bc2-be86-6903c9339b46"
 
 
 class TestReducerRobustness:
@@ -123,3 +132,19 @@ class TestReducerRobustness:
         # reasoning is a SUBSET of output (Responses usage is inclusive); never summed.
         stream = '{"type":"turn.completed","usage":{"output_tokens":5,"reasoning_output_tokens":4}}\n'
         assert parse_codex_jsonl_stream(stream).output_tokens == 5
+
+    def test_thread_id_none_when_no_thread_started(self) -> None:
+        stream = '{"type":"item.completed","item":{"id":"a","type":"agent_message","text":"ok"}}\n'
+        assert parse_codex_jsonl_stream(stream).thread_id is None
+
+    def test_first_thread_id_wins(self) -> None:
+        # One stream opens one thread; a resumed stream re-announces the SAME id
+        # (probe 60b). If a hypothetical stream carried two, the first is the binding one.
+        stream = (
+            '{"type":"thread.started","thread_id":"first-id"}\n' '{"type":"thread.started","thread_id":"second-id"}\n'
+        )
+        assert parse_codex_jsonl_stream(stream).thread_id == "first-id"
+
+    def test_non_string_or_empty_thread_id_ignored(self) -> None:
+        stream = '{"type":"thread.started","thread_id":""}\n{"type":"thread.started","thread_id":42}\n'
+        assert parse_codex_jsonl_stream(stream).thread_id is None

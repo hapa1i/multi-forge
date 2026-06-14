@@ -315,7 +315,7 @@ class TestManagedSuppression:
         result = preflight_codex()
 
         assert result.hook_seam != "managed_suppressed"  # absence is not proof of "not suppressed"
-        assert result.hook_seam == "headless_inert"  # enabled + version-OK normal headless case (Phase 6)
+        assert result.hook_seam == "enrollment_gated"  # enabled + version-OK normal case (enrollment unchecked)
 
 
 class TestTomlFlagTrue:
@@ -347,16 +347,18 @@ class TestHookSeamNeverActive:
         _stub_probes(monkeypatch, version=None, features=True, doctor=_doctor(chatgpt="true"))
         assert preflight_codex().hook_seam == "unknown"
 
-    def test_enabled_is_headless_inert_never_active(self, monkeypatch) -> None:
-        # Enabled + version-OK: the normal headless case is "headless_inert" (Phase 6 -- hooks
-        # do not fire under `codex exec`). Even a (fabricated) doctor trust hint never yields
-        # "active" in 5a (trust-provability belongs to 5d).
+    def test_enabled_is_enrollment_gated_never_active(self, monkeypatch) -> None:
+        # Enabled + version-OK: the normal case is "enrollment_gated" -- hooks can fire,
+        # but enrollment state is unchecked BY DECISION (codex_frontend Phase 1: the
+        # trusted_hash is not black-box computable and a path-keyed [hooks.state] read
+        # false-negatives in worktrees, so no per-hook read exists). Even a (fabricated)
+        # doctor trust hint never yields "active" here.
         doctor = _doctor(chatgpt="true", extra_details={"project trusted": "true"})
         _stub_probes(monkeypatch, features=True, doctor=doctor)
 
         seam = preflight_codex().hook_seam
 
-        assert seam == "headless_inert"
+        assert seam == "enrollment_gated"
         assert seam != "active"
 
 
@@ -453,6 +455,38 @@ class TestVersionFlag:
         assert cp._version_meets_floor("0.130", "0.131.0") is False
 
 
+class TestValidatedVersionGuard:
+    """The probe-ceiling re-probe signal (mirrors 4g CLAUDE_VERSION_VALIDATED)."""
+
+    def test_at_validated_ceiling_is_not_beyond(self, monkeypatch) -> None:
+        # Exactly the validated version is proven, not ahead (strict greater-than).
+        _stub_probes(monkeypatch, version=cp.CODEX_VERSION_VALIDATED, doctor=_doctor(chatgpt="true"))
+        result = preflight_codex()
+        assert result.version_beyond_validated is False
+        assert result.version_validated == cp.CODEX_VERSION_VALIDATED
+
+    def test_below_ceiling_is_not_beyond(self, monkeypatch) -> None:
+        _stub_probes(monkeypatch, version="0.138.0", doctor=_doctor(chatgpt="true"))
+        assert preflight_codex().version_beyond_validated is False
+
+    def test_above_ceiling_flags_beyond(self, monkeypatch) -> None:
+        # A newer codex than the harness was last run against -> re-probe notice.
+        _stub_probes(monkeypatch, version="0.200.0", doctor=_doctor(chatgpt="true"))
+        result = preflight_codex()
+        assert result.version_beyond_validated is True
+        # Non-blocking: a version past the ceiling does not by itself fail readiness.
+        assert result.ready is True
+
+    def test_unparseable_version_is_not_beyond(self, monkeypatch) -> None:
+        # Can't claim "ahead" of the ceiling when the version doesn't parse.
+        _stub_probes(monkeypatch, version=None, doctor=_doctor(chatgpt="true"))
+        assert preflight_codex().version_beyond_validated is False
+
+    def test_not_installed_is_not_beyond(self, monkeypatch) -> None:
+        _stub_probes(monkeypatch, installed=False)
+        assert preflight_codex().version_beyond_validated is False
+
+
 class TestHappyPathAndAssert:
     def test_full_ready_result_shape(self, monkeypatch) -> None:
         # Mirrors the live machine: chatgpt auth, hooks enabled, no proxy.
@@ -469,7 +503,7 @@ class TestHappyPathAndAssert:
             billing_mode="subscription_quota",
             ready=True,
             blocking_reason=None,
-            hook_seam="headless_inert",
+            hook_seam="enrollment_gated",
             proxy_responses="native_direct",
             doctor_status="warning",
         )

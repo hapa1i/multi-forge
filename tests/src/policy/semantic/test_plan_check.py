@@ -34,7 +34,7 @@ from forge.session.models import SupervisorConfig
 def _make_context(tool_name: str = "Write", target_path: str = "src/main.py") -> ActionContext:
     """Create a minimal ActionContext for testing."""
     return ActionContext(
-        runtime="claude_code",
+        origin="claude_code",
         event=f"PreToolUse.{tool_name}",
         tool_name=tool_name,
         tool_args={"file_path": target_path, "content": "print('hello')"},
@@ -169,7 +169,7 @@ class TestRunPlanCheck:
         plan = "PLAN_HEAD\n" + ("p" * 8000) + "\nPLAN_TAIL"
         content = "CONTENT_HEAD\n" + ("x" * 8000) + "\nCONTENT_TAIL"
         ctx = ActionContext(
-            runtime="claude_code",
+            origin="claude_code",
             event="PreToolUse.Write",
             tool_name="Write",
             tool_args={},
@@ -205,7 +205,7 @@ class TestRunPlanCheck:
             "@@ -120,6 +120,9 @@ def important():\n" + ("+ filler\n" * 3000)
         )
         ctx = ActionContext(
-            runtime="claude_code",
+            origin="claude_code",
             event="PreToolUse.Edit",
             tool_name="Edit",
             tool_args={"file_path": "src/main.py", "old_string": "old", "new_string": "new"},
@@ -231,7 +231,7 @@ class TestRunPlanCheck:
         mock_adapter_cls.return_value = mock_adapter
 
         ctx = ActionContext(
-            runtime="claude_code",
+            origin="claude_code",
             event="PreToolUse.Edit",
             tool_name="Edit",
             tool_args={"file_path": "src/main.py", "old_string": "old_call()", "new_string": "new_call()"},
@@ -261,7 +261,7 @@ class TestRunPlanCheck:
         target.parent.mkdir()
         target.write_text("old")
         ctx = ActionContext(
-            runtime="claude_code",
+            origin="claude_code",
             event="PreToolUse.Write",
             tool_name="Write",
             tool_args={"file_path": str(target), "content": "new"},

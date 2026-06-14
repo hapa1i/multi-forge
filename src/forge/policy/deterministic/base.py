@@ -10,6 +10,20 @@ from typing import Any
 from forge.policy.types import ActionContext, PolicyDecision, Violation
 
 
+def is_under_directory(path: str | None, directory: str) -> bool:
+    """Return True if ``path`` is under ``directory`` -- top-level OR nested.
+
+    Matches ``tests/x`` (top-level) and ``pkg/tests/x`` (nested); separator-normalized.
+    Module-level + shared so the TDD path-relevance check and any ordering that must
+    mirror it cannot drift (the Codex apply_patch tests-first sort reuses this exact
+    rule -- see ``cli/hooks/codex_policy.py``).
+    """
+    if path is None:
+        return False
+    normalized = path.replace("\\", "/")
+    return normalized.startswith(f"{directory}/") or f"/{directory}/" in normalized
+
+
 class DeterministicPolicy(ABC):
     """Base class for deterministic (non-LLM) policies.
 
@@ -89,14 +103,7 @@ class DeterministicPolicy(ABC):
 
     def _is_under_directory(self, path: str | None, directory: str) -> bool:
         """Check if path is under a directory (e.g., 'tests/' or 'src/')."""
-        if path is None:
-            return False
-
-        # Normalize separators and ensure consistent format
-        normalized = path.replace("\\", "/")
-
-        # Check if path starts with directory or contains /directory/
-        return normalized.startswith(f"{directory}/") or f"/{directory}/" in normalized
+        return is_under_directory(path, directory)
 
     def _matches_any_pattern(self, content: str | None, patterns: list[str]) -> list[str]:
         """Return list of matched patterns from content.
