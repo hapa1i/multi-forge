@@ -1509,3 +1509,20 @@ Load-bearing values (probe evidence in `scripts/experiments/codex-hooks/README.m
 - `interactive="default"`: Forge-managed interactive sessions (bare TUI start and `codex resume` reattach, §3.9).
 - `hook_min_version`: machine-readable registration floor a preflight checks — not a firing guarantee.
 - `hook_feature_flag=None`: Codex hooks are default-on.
+
+### N.3 Codex operational guards (probe-churn + enrollment)
+
+Codex's trust/enrollment and `apply_patch`/argv behavior are pinned **empirically**, not contractually, so two
+operator-facing guards backstop version churn and the unverifiable trust ceremony:
+
+- **Validated-version ceiling.** `CODEX_VERSION_VALIDATED` (`core/runtime/codex_preflight.py`) names the newest
+  codex-cli the probe harness was run against end-to-end. `CodexPreflight.version_beyond_validated` is `True` when the
+  installed binary sorts strictly above it; `forge runtime preflight codex` then prints a non-blocking re-probe notice
+  (a bump never fails readiness — the facts are just unverified for that version). Mirrors the 4g
+  `CLAUDE_VERSION_VALIDATED` guard; bump after a green probe round.
+- **Empirical enrollment check.** `forge runtime preflight codex --verify-enrollment` (`core/ops/codex_enrollment.py`)
+  confirms user-scope hooks are trust-enrolled by *effect*: it runs one trivial managed `codex exec` turn in a throwaway
+  git repo and reports enrolled iff `codex-session-start` fired (the observation receipt appeared). Short-circuits with
+  no turn when the answer is already knowable (not ready / not registered); a turn that fails to complete reports
+  `UNVERIFIED`, not "not enrolled". Tests **user** scope only (path-stable, one-ceremony-covers-all); project-scope
+  hooks need a turn inside the project.

@@ -36,8 +36,7 @@ def test_commands_under_swapped_events_install_not_skip(tmp_path: Path) -> None:
     """The exact failure: both commands present, both under the wrong event."""
     config = tmp_path / "config.toml"
     config.write_text(
-        _entry("SessionStart", "forge hook codex-policy-check")
-        + _entry("Stop", "forge hook codex-session-start")
+        _entry("SessionStart", "forge hook codex-policy-check") + _entry("Stop", "forge hook codex-session-start")
     )
     plan = plan_codex_merge(config, ENTRIES)
     assert plan.action == "install", (
@@ -60,8 +59,7 @@ def test_one_correct_one_wrong_event_conflicts(tmp_path: Path) -> None:
     """A correct-event registration plus a wrong-event one is the partial case."""
     config = tmp_path / "config.toml"
     config.write_text(
-        _entry("SessionStart", "forge hook codex-session-start")
-        + _entry("Stop", "forge hook codex-policy-check")
+        _entry("SessionStart", "forge hook codex-session-start") + _entry("Stop", "forge hook codex-policy-check")
     )
     plan = plan_codex_merge(config, ENTRIES)
     assert plan.action == "conflict"
@@ -73,8 +71,7 @@ def test_correct_event_manual_registration_still_skips(tmp_path: Path) -> None:
     """Guard the intended behavior: correct (event, command) pairs dedupe."""
     config = tmp_path / "config.toml"
     config.write_text(
-        _entry("SessionStart", "forge hook codex-session-start")
-        + _entry("PreToolUse", "forge hook codex-policy-check")
+        _entry("SessionStart", "forge hook codex-session-start") + _entry("PreToolUse", "forge hook codex-policy-check")
     )
     plan = plan_codex_merge(config, ENTRIES)
     assert plan.action == "skip"

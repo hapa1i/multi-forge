@@ -571,10 +571,40 @@ per-project config; the committed-vs-not distinction is the user's gitignore cho
 | Uninstall block removal | enabled then disabled                 | marker block gone, user content + outside-marker entries kept | `tests/src/install/test_installer.py`            |
 | Wheel-CLI e2e           | Docker, codex shim on PATH            | enable writes block, disable removes, skip without shim       | `tests/integration/docker/test_installer.py`     |
 
+## Residual-risk mitigations (2026-06-12, pre-closeout slice)
+
+Actionable hardening for the external-binary risks in `card.md` "Risks / open questions" — Forge controls the *detection
+and confirmation* surface even though the underlying behavior is codex-cli's.
+
+- [x] **Validated-version ceiling (version churn).** `CODEX_VERSION_VALIDATED` in `core/runtime/codex_preflight.py`
+  (`0.139.0`, the last green probe round) + additive `CodexPreflight.version_validated`/`version_beyond_validated`
+  fields; `forge runtime preflight codex` prints a non-blocking re-probe notice when installed runs ahead; the
+  real-codex E2E names the ceiling on failure. Mirrors 4g `CLAUDE_VERSION_VALIDATED`.
+  - Assertion: `version_beyond_validated` True iff installed > ceiling (strict, parseable); a version past the ceiling
+    does not fail readiness; CLI renders the notice only when beyond.
+  - **Done**: `TestValidatedVersionGuard` (5 cases) + CLI within/beyond cases; mypy/pyright clean.
+- [x] **Empirical enrollment check (unverifiable ceremony).** `forge runtime preflight codex --verify-enrollment` over
+  new `core/ops/codex_enrollment.py`: one trivial managed `codex exec` turn in a throwaway git repo, enrolled iff
+  `codex-session-start` fired (observation receipt). Short-circuits with no turn when not ready / not registered; a
+  failed turn reports UNVERIFIED, not "not enrolled". User scope only (path-stable).
+  - Assertion: receipt seen -> enrolled True / exit 0; ran-no-receipt -> False / exit 1 with cause sharpened by
+    `hook_seam`; failed turn -> None / exit 1; not-registered short-circuits (no turn).
+  - **Done**: `test_codex_enrollment.py` (verdict-logic + `_run_probe_turn` mechanism incl. the FORGE_FORGE_ROOT ->
+    receipt simulation + git-init-failure degrade) + `TestVerifyEnrollment` CLI cases; mypy/pyright clean.
+- [x] **Upstream fail-open issue drafted.**
+  `scripts/experiments/codex-hooks/upstream-issues/pretooluse-malformed-fails-open.md` (probe 30h reproduction). **Owed
+  before filing**: the exact codex docs citation + `gh issue create --repo openai/codex` (outward-facing —
+  operator-confirmed).
+- [x] Docs synced: design.md §5 (verify-enrollment), design_appendix §N.3 (both guards), card Risks bullets annotated
+  with the shipped mitigations.
+
 ## Deferred
 
 - App-server transport (`codex app-server` / `--stdio`): unevaluated by scope decision; spike only if multi-turn
   `exec resume` proves clumsy.
+- **File the upstream fail-open issue** (draft ready; needs the doc citation + operator-confirmed `gh issue create`).
+- PermissionRequest headless behavior + the `trusted_hash` source-dive stay documented-not-built (no Forge consumer /
+  deliberate posture); fold a PermissionRequest re-check into the next version-bump probe round.
 
 ## Open Decisions
 

@@ -486,8 +486,11 @@ def _reconcile_interactive_hook_delivery(session_dir: Path) -> tuple[str, str | 
     stale context mid-thread).
     """
     receipt = read_receipt(session_dir)
+    # One-shot: clear the staged handoff unconditionally now the TUI has exited, so a
+    # later reattach or mid-session SessionStart cannot re-deliver it (backstops a hook
+    # consume whose unlink failed).
+    clear_pending_context(session_dir)
     if receipt is None:
-        clear_pending_context(session_dir)
         return CONTEXT_DELIVERY_UNDELIVERED, None, None
     return CONTEXT_DELIVERY_HOOK, receipt.session_id, receipt.transcript_path
 

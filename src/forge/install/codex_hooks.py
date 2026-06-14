@@ -390,8 +390,7 @@ def apply_codex_merge(config_path: Path, entries: tuple[CodexHookEntry, ...]) ->
         merged = tomllib.loads(new_text)
     except tomllib.TOMLDecodeError as e:
         raise ForgeInstallError(
-            f"merging Forge hooks into {config_path} would produce invalid TOML "
-            f"({e}); file left unmodified"
+            f"merging Forge hooks into {config_path} would produce invalid TOML " f"({e}); file left unmodified"
         ) from e
     missing_regs = {(e.event, e.command) for e in entries} - _collect_registrations(merged)
     if missing_regs:
@@ -470,9 +469,7 @@ class CodexRegistrationStatus:
     commands_registered: tuple[str, ...]
 
 
-def read_codex_registration(
-    config_path: Path, entries: tuple[CodexHookEntry, ...]
-) -> CodexRegistrationStatus:
+def read_codex_registration(config_path: Path, entries: tuple[CodexHookEntry, ...]) -> CodexRegistrationStatus:
     """Report whether the managed block / Forge commands are registered."""
     path_str = str(config_path)
     if not config_path.is_file():
@@ -494,3 +491,25 @@ def read_codex_registration(
         block_present=split is not None,
         commands_registered=registered,
     )
+
+
+def codex_registration_pairs(config_path: Path) -> set[tuple[str, str]]:
+    """Return the ``(event, command)`` registration pairs in a Codex config (event-aware).
+
+    The correctness counterpart to ``read_codex_registration``'s event-agnostic
+    ``commands_registered`` reporting set: callers asking "is THIS command registered
+    under THIS event?" (enrollment verification, dedupe) must use this, since a command
+    under the wrong event is not a working registration. Best-effort: a missing,
+    unreadable, or invalid-TOML config yields an empty set (never raises).
+    """
+    if not config_path.is_file():
+        return set()
+    try:
+        text = config_path.read_text(encoding="utf-8")
+    except OSError:
+        return set()
+    try:
+        parsed = tomllib.loads(text)
+    except tomllib.TOMLDecodeError:
+        return set()
+    return _collect_registrations(parsed)

@@ -340,6 +340,30 @@ def fork(
     manager = _sess().SessionManager()
     _fr = _sess()._cwd_forge_root()
 
+    # Reject a Codex parent BEFORE fork_session() creates orphaned child state. `fork`
+    # is Claude-specific: it carries the conversation via --fork-session + the parent's
+    # confirmed.claude_session_id, which a Codex session never has (it would fail later at
+    # the "Parent session has no UUID" check, after a child manifest/worktree was created).
+    # Manifests store the registry id "codex" (CLI maps --runtime); not found/unreadable
+    # falls through so fork_session() raises the right error.
+    try:
+        _parent_runtime_state = manager.get_session(parent, forge_root=_fr)
+    except ForgeSessionError:
+        _parent_runtime_state = None
+    if _parent_runtime_state is not None:
+        _parent_launch = _parent_runtime_state.intent.launch
+        if _parent_launch is not None and _parent_launch.runtime == "codex":
+            print_error_with_tip(
+                f"Session '{parent}' is a Codex session; 'forge session fork' is Claude-only.",
+                "Continue the Codex thread, or branch a new Codex session from it:",
+                commands=[
+                    f"forge session resume {parent} --task <next step>",
+                    f"forge session start <name> --runtime codex --resume-from {parent} --task <task>",
+                ],
+                console=console,
+            )
+            sys.exit(1)
+
     # --into cross-repo preflight: reject before fork_session() to avoid orphaned sessions
     if into_resolved is not None and into_target_common is not None:
         import subprocess as _sp2

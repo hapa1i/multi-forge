@@ -167,6 +167,12 @@ def consume_pending_context(
         pending.unlink()
     except OSError as exc:
         logger.warning("Could not remove consumed codex handoff: %s", exc)
+        # One-shot invariant: if unlink failed, empty the file so a re-fired SessionStart
+        # (a mid-turn /clear or /compact) cannot re-read and re-deliver the same context.
+        try:
+            pending.write_text("", encoding="utf-8")
+        except OSError:
+            logger.warning("Could not empty un-removable codex handoff at %s", pending)
     return content
 
 

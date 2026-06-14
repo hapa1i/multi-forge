@@ -70,6 +70,17 @@ _FEATURES_TIMEOUT_S = 10
 
 _MANAGED_HOOKS_KEY = "allow_managed_hooks_only"
 
+# The newest codex-cli version the codex_frontend probe harness
+# (``scripts/experiments/codex-hooks/``) was run against end-to-end (stages 85-87 PASS
+# on 2026-06-12). Codex's trust/enrollment, hook-firing, and ``apply_patch``/argv
+# behavior are pinned empirically, not contractually -- exactly the surface a minor
+# release can change silently. This is a *ceiling*, surfaced as a re-probe notice when
+# the installed binary runs ahead of it (``version_beyond_validated``): a bump does not
+# block readiness (the binary may be fine), it tells the operator the pinned facts are
+# now unverified for their version. Mirrors the 4g ``CLAUDE_VERSION_VALIDATED`` guard;
+# bump it after a green probe round on a newer codex.
+CODEX_VERSION_VALIDATED = "0.139.0"
+
 # Auth state the preflight has *proven*, named by what is stored -- NOT by the login
 # mechanism. ``chatgpt_tokens`` (a ChatGPT-subscription identity) is distinct from
 # ``enterprise_token`` (an opaque access-token / agent identity); the device-auth flow
@@ -120,6 +131,8 @@ class CodexPreflight:
     )
     proxy_responses: ProxyResponses
     doctor_status: str | None  # codex doctor overallStatus -- informational, never gates ready
+    version_validated: str = CODEX_VERSION_VALIDATED  # newest probe-validated codex (the ceiling)
+    version_beyond_validated: bool = False  # installed runs AHEAD of the probe ceiling -> re-probe notice
 
 
 class CodexPreflightError(Exception):
@@ -153,6 +166,9 @@ def preflight_codex(
     installed = _codex_installed(runtime)
     version = _detect_version(runtime) if installed else None
     version_ok = _version_meets_floor(version, runtime.hook_min_version)
+    # "Beyond the ceiling" only when the version parses AND sorts strictly above the
+    # validated one; an unparseable version stays False (we can't claim it ran ahead).
+    version_beyond_validated = version is not None and _version_lt(CODEX_VERSION_VALIDATED, version)
     doctor = _probe_doctor_json(runtime) if (installed and run_doctor) else None
 
     auth = _resolve_codex_auth(doctor)
@@ -188,6 +204,7 @@ def preflight_codex(
         hook_seam=hook_seam,
         proxy_responses=responses.posture,
         doctor_status=doctor.get("overallStatus") if isinstance(doctor, dict) else None,
+        version_beyond_validated=version_beyond_validated,
     )
 
 

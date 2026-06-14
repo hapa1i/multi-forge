@@ -132,15 +132,17 @@ def _extract_error_message(event: dict[str, object]) -> str | None:
     """Pull the provider error string from an ``error`` or ``turn.failed`` event.
 
     ``error`` carries ``message`` at the top level; ``turn.failed`` nests it under
-    ``error.message``. Both values are the provider's (already stringified) error.
+    ``error.message``. Both values are the provider's (already stringified) error. An
+    empty/whitespace message is treated as absent (returns None) so the caller supplies a
+    generic fallback rather than surfacing a blank error.
     """
     message = event.get("message")
-    if isinstance(message, str):
+    if isinstance(message, str) and message.strip():
         return message
     nested = event.get("error")
     if isinstance(nested, dict):
         nested_message = nested.get("message")
-        if isinstance(nested_message, str):
+        if isinstance(nested_message, str) and nested_message.strip():
             return nested_message
     return None
 

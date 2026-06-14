@@ -210,9 +210,7 @@ class TestApplyMerge:
         backup = apply_codex_merge(config, ENTRIES)
         assert backup is None  # nothing to back up
         parsed = tomllib.loads(config.read_text())
-        commands = {
-            h["command"] for entries in parsed["hooks"].values() for e in entries for h in e["hooks"]
-        }
+        commands = {h["command"] for entries in parsed["hooks"].values() for e in entries for h in e["hooks"]}
         assert commands == {e.command for e in ENTRIES}
 
     def test_install_preserves_user_bytes_and_backs_up(self, tmp_path: Path) -> None:

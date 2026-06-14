@@ -130,13 +130,21 @@ def resolve_codex_session(
     except SessionNotFoundError as e:
         if lookup_forge_root is None:
             raise ForgeOpError(f"Session '{name}' not found: {e}") from e
+        # A scoped miss is cross-CWD-legitimate for Codex (probe stage 60): retry unscoped.
         try:
             entry = manager.get_session_entry(name, forge_root=None)
             state = manager.get_session(name, forge_root=None)
-        except ForgeSessionError as fallback:
+        except SessionNotFoundError as fallback:
             raise ForgeOpError(f"Session '{name}' not found: {fallback}") from fallback
+        except ForgeSessionError as fallback:
+            # A corrupt/invalid manifest is NOT a missing session: surface it as such so
+            # the user repairs or deletes it, rather than seeing a misleading "not found".
+            raise ForgeOpError(
+                f"Session '{name}' could not be read (manifest may be corrupt): {fallback}"
+            ) from fallback
     except ForgeSessionError as e:
-        raise ForgeOpError(f"Session '{name}' not found: {e}") from e
+        # Same distinction on the scoped read: a non-not-found error is corruption, not absence.
+        raise ForgeOpError(f"Session '{name}' could not be read (manifest may be corrupt): {e}") from e
 
     if session_runtime(state) != CODEX_RUNTIME:
         raise ForgeOpError(f"Session '{name}' is not a Codex session (runtime={session_runtime(state)!r}).")
@@ -402,8 +410,12 @@ def _reconcile_hook_delivery(
     -- the staged file is cleared so a later enrolled resume can never late-deliver it.
     """
     receipt = read_receipt(session_dir)
+    # One-shot: the start turn is over, so the staged handoff must not survive it. Clear
+    # it unconditionally (idempotent) -- the hook's consume normally removes it, but this
+    # backstops a consume whose unlink failed, so a later enrolled resume or mid-session
+    # SessionStart can never re-deliver the same context.
+    clear_pending_context(session_dir)
     if receipt is None:
-        clear_pending_context(session_dir)
         return CONTEXT_DELIVERY_UNDELIVERED, thread_id, None
     if thread_id is None:
         # The stream missed thread.started but the hook saw the turn's thread: recover
@@ -417,7 +429,6 @@ def _reconcile_hook_delivery(
             f"Delivery receipt thread ('{receipt.session_id}') does not match the stream thread "
             f"('{thread_id}'); treating the transfer context as undelivered."
         )
-        clear_pending_context(session_dir)
         return CONTEXT_DELIVERY_UNDELIVERED, thread_id, None
     # Delivered. The receipt's rollout path comes from codex's own payload, so it
     # supersedes glob discovery; cross-check and surface a disagreement.

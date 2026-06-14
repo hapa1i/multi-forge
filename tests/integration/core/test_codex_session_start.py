@@ -129,10 +129,13 @@ def test_start_then_resume_codex_session_real_turns(tmp_path: Path, monkeypatch:
             timeout_seconds=180,
         )
 
-    # The real codex run consumed the curated-transfer prompt and completed.
+    # The real codex run consumed the curated-transfer prompt and completed. Name the
+    # codex version + the probe-validated ceiling on failure: if a codex bump broke this
+    # flow, that pairing is the first thing to check (re-run scripts/experiments/codex-hooks/).
+    ver_ctx = f"codex={pf.version} validated<={pf.version_validated} beyond={pf.version_beyond_validated}"
     assert (
         result.codex.success
-    ), f"rc={result.codex.returncode} error={result.codex.error} stderr={result.codex.stderr!r}"
+    ), f"[{ver_ctx}] rc={result.codex.returncode} error={result.codex.error} stderr={result.codex.stderr!r}"
     assert result.curation_ran is True
     assert result.thread_id, "live stream emitted no thread.started id"
 

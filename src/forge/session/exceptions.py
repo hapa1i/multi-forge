@@ -84,6 +84,19 @@ class CannotForkIncognitoError(ForgeSessionError):
         super().__init__(f"cannot fork from incognito session '{name}'")
 
 
+class CannotForkCodexParentError(ForgeSessionError):
+    """Raised when attempting to fork from a Codex session.
+
+    'forge session fork' is Claude-only: the post-fork resume keys on the parent's
+    ``claude_session_id``, which a Codex session never has. The CLI preflights this with a
+    friendlier message; this is the internal-boundary invariant that guards every caller.
+    """
+
+    def __init__(self, name: str) -> None:
+        self.name = name
+        super().__init__(f"cannot fork from Codex session '{name}': 'forge session fork' is Claude-only")
+
+
 class ClaudeInvocationError(ForgeSessionError):
     """Raised when Claude binary invocation fails."""
 

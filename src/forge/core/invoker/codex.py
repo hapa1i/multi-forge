@@ -86,9 +86,11 @@ class CodexHeadlessInvoker(_HeadlessLifecycleBase):
         stream = parse_codex_jsonl_stream(stdout)
         # Codex reports a failed turn in the JSONL stream, usually with EMPTY stderr; surface
         # the provider reason on stderr so a caller inspecting it sees why the turn failed.
+        # Fall back to a generic line when the stream carried no (or an empty) error message,
+        # so a failed turn never renders as a blank "Codex turn failed." with no detail.
         effective_stderr = stderr
-        if not effective_stderr and stream.is_error and stream.error_message:
-            effective_stderr = stream.error_message
+        if not effective_stderr and stream.is_error:
+            effective_stderr = stream.error_message or "Codex turn failed (no provider error message)."
         return HeadlessResult(
             label=request.label,
             stdout=stream.final_text,

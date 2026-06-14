@@ -25,9 +25,104 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board-contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-06-13
+
+### codex_frontend Phase 6 code-review fixes: 12-finding sweep (fork / enrollment / policy / handoff / invoker)
+
+**Goal**: Resolve a branch code review of `codex-frontend` (12 findings, P1->P3). Every confirmed behavioral finding is
+fixed with a regression test; doc/process findings are fixed in place. One finding was a verification artifact
+(uncommitted drift) closed by landing this slice.
+
+**Key changes**:
+
+- **Fork rejects a Codex parent (P1)** — two layers. `cli/session_fork.py` preflights with an actionable message (Codex
+  resume / branch commands), and `SessionManager.fork_session` now raises `CannotForkCodexParentError` at the internal
+  boundary before any child manifest/worktree is created. Codex sessions have no `claude_session_id`, so the old path
+  built child state then failed the UUID check, orphaning it; the manager guard makes the invariant hold for every
+  caller, not just the CLI preflight.
+- **No TYPE_CHECKING workaround (P1)** — `cli/runtime.py` imports `CodexEnrollmentVerification` directly;
+  `core/ops/codex_enrollment.py` moved its heavy probe-turn imports (invoker graph, session store) into
+  `_run_probe_turn` so the CLI-facing module import stays cheap. Re-greens the
+  `test_production_source_has_no_type_checking_workarounds` conformance check.
+- **Event-aware enrollment identity (P2)** — new `codex_registration_pairs()` (`(event, command)`) in
+  `install/codex_hooks.py`; `_read_user_scope_registration` checks `("SessionStart", cmd)`, so a wrong-event Forge
+  registration no longer reads as enrolled and burns a real `codex exec` turn.
+- **Shared path matcher for TDD (P2)** — extracted `is_under_directory()` into `policy/deterministic/base.py`; the Codex
+  tests-first sort (`cli/hooks/codex_policy.py`) and the TDD guard now share one nested-aware matcher (their drift was
+  the bug; a `pkg/tests/...` path was misordered).
+- **Staged-context one-shot backstop (P2)** — `consume_pending_context` empties the staging file when `unlink` fails,
+  and the delivered-reconciliation paths (`core/ops/codex_session.py`, `core/ops/codex_interactive.py`) clear pending
+  unconditionally, so a re-fired SessionStart can't re-deliver stale context.
+- **Runtime error is not success (P2)** — `cli/session_codex.py` adds `_codex_ok()` (returncode-success AND not
+  `runtime_is_error`); launch/resume exit codes, outcome render, and the resume tip all honor it.
+- **Argv exposure documented (P2)** — `session/codex_invoke.py` + `docs/end-user/session.md` note that an interactive
+  `--resume-from` prompt is visible in shared-host process listings, recommending `--context-delivery hook`; confirmed
+  the existing debug log emits only cwd/resume, never the prompt.
+- **Manifest corruption distinct from missing (P3)** — `resolve_codex_session` narrows not-found to
+  `SessionNotFoundError`; other `ForgeSessionError` now surfaces "could not be read (manifest may be corrupt)" rather
+  than a misleading "not found".
+- **No blank provider error (P3)** — `core/invoker/codex_stream.py` returns `None` for empty/whitespace error text and
+  `core/invoker/codex.py` backfills a fallback stderr when the stream is an error.
+- **Enrollment diagnostic never tracebacks (P3)** — `verify_codex_enrollment` wraps the gate sequence and degrades any
+  unexpected error to an UNVERIFIED result.
+- **Change-log heading restored (P3)** — the Phase 6 review-fixes entry regained its missing `###`.
+- **Change-log compaction** — summarized the 2026-05-22 → 2026-06-06 tail in place (board-contract size policy) so the
+  file clears the 30K-token doc limit (38.5K → 28.7K count-tokens); dates, breaking changes, decisions, and design
+  pointers preserved, per-test counts and play-by-play dropped (full detail in git history).
+
+**Verification**: 553 unit+regression tests green across the touched Codex suites — 7 new
+`tests/regression/test_bug_codex_*.py` (fork orphan at the CLI **and** `fork_session` layers, enrollment wrong-event,
+TDD nested layout, staged-context re-read, runtime-error exit-0, manifest corrupt-vs-missing, empty provider error) plus
+a `TestNeverRaises` case in `test_codex_enrollment.py`; the no-`TYPE_CHECKING` conformance test green; mypy clean (259
+files); pyright clean on the 15 changed source files (`manager.py` + `exceptions.py` added for the fork-guard
+invariant); `make pre-commit` clean (with every new file staged — an earlier pass silently skipped untracked files). 24
+Docker integration tests green against an image rebuilt with these changes — `test_policy_hooks.py` 21/21 (Claude +
+Codex `policy-check` wires and codex session-start/staged-context delivery, covering the shared `is_under_directory` and
+the one-shot staging backstop) and `test_installer.py` codex-hooks 3/3. The three real-`codex` API E2Es
+(`test_codex_session_start` / `codex_exec_smoke` / `claude_to_codex_resume`) stay `CODEX_API_KEY`-gated (only
+`OPENAI_API_KEY` is present, which codex rejects) and were not run; they exercise codex subprocess mechanics these fixes
+do not alter.
+
 ## 2026-06-12
 
-### codex_frontend Phase 6 follow-up: review fixes (tracking loss, event-blind dedupe, silent sync)
+### codex_frontend residual-risk mitigations: version-churn guard + empirical enrollment check
+
+**Goal**: Harden the external-binary residual risks from the card's "Risks / open questions" before closeout — Forge
+owns the *detection and confirmation* surface even where the underlying behavior is codex-cli's. Three actionable items
+(the `trusted_hash` source-dive and PermissionRequest pinning stay deliberately documented-not-built).
+
+**Key changes**:
+
+- **Validated-version ceiling (version churn).** `CODEX_VERSION_VALIDATED` (`core/runtime/codex_preflight.py`, `0.139.0`
+  — the last green probe round) + additive `CodexPreflight.version_validated`/`version_beyond_validated` (defaulted, so
+  every existing keyword construction stays valid). `forge runtime preflight codex` prints a **non-blocking** re-probe
+  notice when the installed binary sorts strictly above the ceiling (a bump never fails readiness — the pinned
+  trust/`apply_patch`/argv facts are just unverified for that version), and the real-codex E2E names the ceiling on
+  failure. Mirrors the 4g `CLAUDE_VERSION_VALIDATED` guard.
+- **Empirical enrollment check (the unverifiable ceremony).** `forge runtime preflight codex --verify-enrollment` over
+  new `core/ops/codex_enrollment.py`: the trust ceremony is unverifiable from a config read (`trusted_hash` not
+  computable), so this confirms it by *effect* — one trivial managed `codex exec` turn in a throwaway git repo, enrolled
+  iff `codex-session-start` fired (the Phase 5 observation receipt appeared). Reuses `_temporary_run_env` so the codex
+  child inherits `FORGE_SESSION`/`FORGE_FORGE_ROOT` and the hook resolves the disposable session exactly as in
+  production. Short-circuits with **no turn** when the answer is already knowable (not ready / not registered); a turn
+  that fails to complete reports `UNVERIFIED` (not "not enrolled"); the not-enrolled message is sharpened by `hook_seam`
+  (managed-suppressed / disabled / re-probe hint). Tests **user** scope only (path-stable, one-ceremony-covers-all).
+- **Upstream fail-open issue drafted.**
+  `scripts/experiments/codex-hooks/upstream-issues/pretooluse-malformed-fails-open.md` (probe-30h reproduction: `allow`
+  \+ unknown field + `continue:false` ran the command, refuting the documented fail-closed). **Owed**: the exact codex
+  docs citation + an operator-confirmed `gh issue create --repo openai/codex`.
+- **Docs**: design.md §5 (the verify-enrollment path beside "cannot perform or verify"); design_appendix §N.3 (both
+  guards); card Risks bullets annotated with the shipped mitigations; checklist residual-risk slice + Deferred update.
+
+**Verification**: 226 Codex-touching unit tests green (`tests/src/core/runtime/`, `test_runtime.py`,
+`test_codex_enrollment.py`, the four `core/ops`/`invoker`/`session` codex suites — defaulted preflight fields keep every
+construction valid); new `TestValidatedVersionGuard` (5), `test_codex_enrollment.py` (verdict-logic + `_run_probe_turn`
+mechanism via a FORGE_FORGE_ROOT→receipt simulation + git-init degrade + JSON-safe/secret-free), `TestVerifyEnrollment`
+CLI (4) and the two version-notice CLI cases; mypy + pyright clean on the three changed source files. No real `codex`
+runs in the suite (the turn is mocked). The `--verify-enrollment` real-codex behavior is operator-gated (one quota
+turn).
+
+### codex_frontend Phase 6 review fixes: tracking preservation + (event, command) dedupe + sync ceremony
 
 **Goal**: Fix three Phase 6 review findings — two P1s (a previously tracked Codex block orphaned when codex is
 temporarily off PATH; manual-registration dedupe matching bare command strings regardless of event, so a wrong-event
@@ -911,588 +1006,150 @@ any scripts/aliases.
 session/memory CLI, `%`-dispatcher, shadow curation, cross-project regression). Final grep confirms no `--scope repo` /
 "repo-scoped" / "repo-wide" prose remains outside `done/`. `make pre-commit` clean.
 
-## 2026-06-06
+## 2026-06-06 (compacted)
 
-### Remove CLI rename-migration tombstones (clean break at `0.4.0`)
+metric-evidence card closeout + cleanups (shipped 0.4.0, PR #18).
 
-**Goal**: Strip the hidden, error-only rename/migration tombstone commands, flags, and stale-state guards from the CLI
-so the surface stays pristine. Solo research-preview fork; no external users to shield from the breaks.
-
-**Key changes**:
-
-- **Bucket 2 — command/flag tombstones removed**: `forge usage`, `forge handoff run`, `forge session handoff`,
-  `forge session memory` (two whole modules deleted: `session_handoff.py`, `session_memory.py`); `search -q`/`--limit`/
-  `--scope`; `memory track --as`/`--session`; `--resume-mode handoff`; and the `--force` "deprecated alias for --yes" on
-  `auth`, `backend`, `config`, `claude preset`, `extensions disable`, `proxy delete`, `proxy template reset`. Functional
-  `--force` kept where it does real work (`proxy stop`, `extensions enable/sync`, `session delete`/`resume`,
-  `hooks enable`).
-- **Bucket 3a — stale-state migration guards removed**: `_RENAMED_KEYS`/`_REMOVED_KEYS` + `_prune_renamed_keys`
-  (config), `_REMOVED_STRATEGIES` + `scan_stale_passports` + `memory list` stale-warnings (memory/passport). Both
-  degrade cleanly to the pre-existing generic paths ("Unknown keys (ignored)" warning; `VALID_STRATEGY_NAMES` rejection)
-  — no silent loss.
-- **Bucket 3b — schema_version validators KEPT**: `cost_logger`/`audit_logger` forward-compat checks are not tombstones
-  (they guard newer-than-current data, mandated by the durable-state contract).
-- **`forge session context` excluded**: verified functional (`--field`/`--json` extraction), not an error-only stub.
-- **Policy realigned to the implementation**: `coding-standards.md` §5/§6 and `design.md` §4.0 now say command/option
-  removals are clean breaks (rely on the framework's native "no such command/option"); durable-state rejection with an
-  actionable reset/migration message is preserved separately.
-- **Tests + QA updated**: deleted the tombstone-specific tests; migrated `proxy delete`/`template reset` `--force` →
-  `--yes` (and `--yes --kill-adopted` where the adopted-kill path is asserted); QA `7-costs.md` §7.14 probe removed +
-  reset section renumbered; `11-config.md` and `4-proxy.md` `--force` → `--yes`.
-
-**Verification**: `uv run pytest -m "not integration" tests/src tests/regression` → 5681 passed, 0 failed.
-`make pre-commit` clean. CLI smoke: removed names now return Click "No such command/option"; all command groups still
-load.
-
-### Closeout: metric-evidence card → `done/`, version `0.4.0` (PR #18)
-
-**Goal**: Close out the metric-evidence card and cut the release version for the PR #18 line.
-
-**Key changes**:
-
-- **Version `0.3.0` → `0.4.0`** (`pyproject.toml` + `src/forge/__init__.py`). Minor bump (0.x convention for breaking
-  changes): PR #18 carries breaking CLI changes (`forge proxy costs` → `costs show`, `forge usage` → `forge activity`)
-  plus the cost-honesty overhaul, `costs reset`, and the weekly-quota status line.
-- **Card moved `doing/ → done/`** via `git mv` (history preserved), as a commit on PR #18 so it lands in `done/` on
-  `main` at merge. Until then `main` still shows it under `doing/`.
-- **Durable lessons NOT auto-promoted**: they stay drafted under impl_notes' "Proposed Promotions" subsection awaiting
-  human review (closeout step 3 is a human gate).
-
-**Verification**: `import forge` → `0.4.0`; no test hardcodes the version (consistency tests compare against
-`forge.__version__` at runtime); `make pre-commit` clean.
-
-### Added: weekly quota + heat-mapped rate-limit display in the status line (metric-evidence, PR #18)
-
-**Goal**: Surface the **weekly** quota (the limit that actually bites Max/Pro users) in the status line, which
-previously showed only the 5h window.
-
-**Key changes**:
-
-- **Both windows now shown**: Claude Code already sends `rate_limits` as `{five_hour, seven_day}`, but
-  `_extract_short_window` returned only the 5h window and discarded `seven_day`. Replaced it with `_extract_windows`
-  (clean break) and `format_rate_limits` now renders `5h:N% · 7d:M%`.
-- **Heat-mapped**: each window's % is colored by its own usage on the **shared context gradient** (`CTX_*`, soft green →
-  hot coral) via a new `_heat_color`, so the binding window stands out — same color scheme as the context bar, but with
-  quota-appropriate bands (\<25/25-49/50-74/75-89/90-100), not the context bar's auto-compact-skewed thresholds.
-- **`RL` prefix dropped** (the `5h`/`7d` labels are self-evident) and the **reset countdown binds inline** to the hotter
-  window with a `↻` glyph (`7d:52%↻1d`) so it can't be misread as the trailing session duration.
-  `_format_reset_countdown` gained day formatting (`Nd`) for weekly resets.
-- **Docs/QA synced**: `config.md`, `design_appendix.md`, `auth_cost_metric.md`, QA `8-status-line.md`; `RL:` assertions
-  across `test_statusline_billing.py` + `test_status_line_integration.py` updated to `5h:`.
-
-**Verification**: 164 status-line unit tests pass (incl. `TestHeatColor`, both-window/inline-`↻`/day-countdown cases);
-live render `5h:8% · 7d:52%↻1d` confirmed; `make pre-commit` clean.
-
-### Added: `forge proxy costs reset` + `costs` → `costs show` group split (metric-evidence, PR #18)
-
-**Goal**: Give users a one-command "reset all recorded costs to zero" path (requested while manually testing the
-branch), covering every telemetry plane Forge writes — without touching the separate audit plane.
-
-**Key changes**:
-
-- **New `forge proxy costs reset`**: wipes the three telemetry planes — request cost logs (`~/.forge/costs/requests/`),
-  verb cost logs (`~/.forge/costs/verbs/`), and the usage-attribution ledger (`~/.forge/usage/events/`) — **plus** the
-  derived status-line cost cache (`~/.forge/cache/statusline/fcost-*.json`) so `forge +$Y` recomputes from the empty
-  ledger instead of replaying a cached value within its TTL. Audit (`~/.forge/audit/`) and the unrelated transcript
-  cache-hit entries are deliberately spared. `--dry-run` lists without deleting; `--yes` skips the confirm prompt.
-- **Honest restart caveat**: prints a `Tip:` naming `forge proxy stop/start <id>` because a live proxy holds its cost
-  totals (`ProxyMetrics` — cumulative-cost header, snapshot, `forge proxy costs show`) **and** cap counters in a
-  separate process the CLI cannot reach — file deletion alone does not zero a running proxy's reported cost or caps.
-- **CLI shape (research-preview clean break)**: `costs` had to become a group (Click consumes the first positional as a
-  subcommand, colliding with the optional `proxy_id`). `forge proxy costs [id]` → `forge proxy costs show [id]`; bare
-  `forge proxy costs` now prints group help ("groups orient, leaves act"; precedent `forge config` →
-  `forge config show`).
-- **Docs/QA synced**: design.md/appendix, end-user `proxy.md`/`session.md`/`config.md`, `auth_cost_metric.md`, and
-  source/test comments naming the runnable view all moved to `show`; QA `7-costs.md` invocations → `show` + new §7.15
-  reset section (index test-count 532 → 537). Board change_log/card *history* left intact (not rewritten).
-
-**Verification**: `test_proxy_costs.py` 25 passed (incl. `TestCostsReset`: dry-run-lists, wipe-3-planes,
-clears-fcost-cache/spares-cache-hit, audit-spared, confirm-abort, empty-noop); manual smoke in `/tmp/forge-reset-test`
-(dry-run listed, `--yes` wiped shards + printed the restart tip, post-reset `show` read zero). `make pre-commit` clean.
-
-### Phase 6 follow-up: deferred cleanups folded in before closeout (metric-evidence)
-
-**Goal**: Close the three verified-but-narrow / cleanup follow-ups from the PR #18 review on the branch (rather than
-deferring to separate `todo/` cards), so the `doing/ → done/` move carries no known debt. No behavior change to the
-shipped cost-honesty model — these are a perf bound, a dead-branch removal, and three DRY extractions.
-
-**Key changes**:
-
-- **Bound the `forge_cost` scan**: `sum_forge_added_cost` gained `since: datetime | None`, threaded to
-  `read_usage_events(period_start=…)`; the status producer derives it from the manifest `created_at` (defensive
-  `parse_iso`, unbounded fallback). The opt-in `forge +$Y` poll no longer re-parses the whole uncapped ledger; the bound
-  is loss-free (an event can't predate its session).
-- **Removed the dormant `stream-json` parse branch** (chose remove over thread-through — Forge reads headless output in
-  batch, where `json` is equivalent; streaming stays a proxy concern). Dropped the `output_format` param from
-  `_find_result_object`/`parse_headless_envelope` and left a seam note at both halves so a future streaming mode wires
-  parser **and** request side together. Closes the asymmetry where the request side could emit `stream-json` the parser
-  silently dropped.
-- **DRY extractions**: the `isinstance(record, dict)` JSONL guard now lives once as `core.state.decode_json_object` (5
-  readers routed through it); `proxy_costs.py` verb/model/total aggregation shared via `_aggregate_by_verb` /
-  `_aggregate_by_model` / `_request_cost_totals` (table + JSON can't drift); `emit.py`'s **direct-path** one-reporter
-  precedence shared via `_direct_cost_provenance` — the **proxied** path stays per-caller (verb attributes the snapshot,
-  a worker stays unattributed to avoid double-counting the verb aggregate).
-
-**Verification**: 2608 unit tests pass across the affected packages (`core/{reactive,invoker,usage,state,ops}`, `proxy`,
-`cli`); new tests pin each invariant — `decode_json_object` guard (`test_io.py`), `since` bound
-(`test_usage_summary.py`), NDJSON→raw-text fallback (`test_bug_headless_envelope_parse.py`), and the shared-direct /
-divergent-proxied emitter rule (`test_emit.py::TestDirectCostProvenance` + `TestVerbWorkerPrecedenceInvariant`).
-`make pre-commit` clean (ruff/black/isort/mypy/pyright/mdformat/gitleaks). Internal cleanup — no design-doc change.
-
-### Phase 6 review fixes: PR #18 adversarial review — headless retry/latch + cost-honesty edges
-
-**Goal**: A max-effort adversarial review of PR #18 (9 finder angles, each finding independently verified) surfaced one
-real correctness cluster plus several narrow honesty/robustness edges; fix the merge-gating ones on the branch before
-the `doing/ → done/` lane move.
-
-**Key changes**:
-
-- **Headless `--output-format json` retry/latch (the merge gate)**: tightened `_REJECTION_RE`
-  (`core/reactive/headless_json.py`) — dropped the bare `--output-format` alternative so a transient error echoing the
-  command line (e.g. a 529 printing the argv) no longer misfires the retry, which latched the JSON capability off
-  **process-wide** AND **double-billed** a proxied retry (no `request_id` dedupe on the cost log). `run_parallel`
-  (`core/invoker/claude.py`) retry spawn now mirrors the primary spawn's post-register `cleanup_started` re-check +
-  self-reap, closing a cancellation-hang gap (`shutdown(wait=True)` could otherwise block `timeout_seconds`).
-- **Launch resurrection guard**: `record_launch_confirmed` (`cli/launch_confirmation.py`) gained the `exists()`
-  preflight its sibling `_infer_launch_confirmation` documents — a session deleted mid-launch is no longer resurrected
-  as a lock-only directory.
-- **Negative-delta clamp**: `_compute_delta` (`core/reactive/cost_tracking.py`) clamps every delta `>= 0`, so a proxy
-  restart mid-verb can't log a negative cost that inflates the "Interactive" residual.
-- **`forge +$Y` predicate pinned**: `sum_forge_added_cost` now counts `{reported, gateway_calculated}` (not
-  reported-only) and excludes `inferred`/`unknown`/`unavailable` + the harness route via a typed
-  `ROUTE_CLAUDE_INTERACTIVE` constant (no bare string compare on a load-bearing exclusion).
-- **Legacy verb fallback removed**: `_verb_cost_reported` (`cli/proxy_costs.py`) trusts `cost_measured` only; a pre-PR
-  record (its total was a deleted-catalog estimate) reads as unavailable, never resurrected as reported.
-
-**Verification**: 5294 unit pass; blast-radius 1041 green; the new deterministic retry-cancellation race test 10/10;
-`make pre-commit` clean (mypy/pyright incl. the new `frozenset[Confidence]`); `test_status_line_integration.py` (13)
-green on the real wheel CLI. Fixes committed as `97b2098`.
-
-**Deferred (recorded as checklist debt, non-blocking)**: (1) `sum_forge_added_cost` reads the whole uncapped ledger per
-poll — add a session-start lower bound; (2) dormant `stream-json` parse branch — thread `output_format` through
-`parse_headless_envelope` or remove the advertised support; (3) duplication cleanup (verb/model aggregation in
-`proxy_costs.py`, direct-cost precedence in `emit.py`, the ×4 `isinstance(dict)` JSONL guard).
-
-### Phase 6 follow-up: QA checklist metric-evidence coverage (audit-driven)
-
-**Goal**: After the Phase 6 docs/CLI cleanup, an adversarially-verified audit of `src/skills/qa/` + `docs/end-user/`
-found the end-user docs clean but six QA-checklist gaps (3 confirmed + 3 completeness-critic) where a regression in this
-card's headline cost-honesty behavior would pass the release-validation QA gate. Closed them on the branch.
-
-**Key changes** (all in `src/skills/qa/resources/checklist/`):
-
-- **§3.4 masking misfire (real defect)**: "values are masked (never shown in full)" contradicted the non-secret
-  `OPENROUTER_BASE_URL`/`LITELLM_BASE_URL` (shown in full) — a correct system would have *failed* it. Scoped masking to
-  secret values; added a `(default)` non-secret render assertion.
-- **§7.12 `forge activity` cost honesty**: the fixture already triggers `cost_partial`/`~`/footnotes but asserted none —
-  added `cost_partial=True total_cost_micro_usd=2050` (JSON) + a `~`-marker / footnote human-render check.
-- **§7.13 (new) cost provenance**: isolated `qa-prov` fixture proving a null-cost request lands in
-  `unavailable_requests` and is excluded from the dollar total (never priced from a local table); isolated so the shared
-  `qa-fixture` 3-request invariant (7.5/7.6) is untouched.
-- **§7.14 (new) rename tombstone**: bare + stale-args `forge usage` exits non-zero naming `forge activity` (no "No such
-  option").
-- **§8.5 (new) `forge_cost`/`forge +$Y` segment**: opt-in segment exercised end-to-end — seeded reported events render
-  `forge +$0.25`, a `$9.00 claude_interactive` event is **excluded** (the load-bearing harness exclusion), and a
-  no-reported-cost session renders **no** segment.
-- **§5.21**: session-end one-liner cost names the `~` best-effort shape (no ` est`). Index `test-count` 512 → **532**
-  (recounted actual `- [ ]`, clearing prior drift); version 1.0.21 → 1.0.22.
-
-**Verification**: every new `<!-- auto -->` fixture validated against real code on the host — `sum_forge_added_cost` =
-250000 (harness + unavailable excluded) and `format_forge_cost` → `+$0.25` / `None` (8.5);
-`build_session_activity_summary` → 2050 / `cost_partial=True` (7.12); `forge proxy costs qa-prov` → reported=1,
-unavailable=1, total=2500 (7.13); `forge usage` → exit 1 "has been renamed" (7.14). QA state parser re-parses to exactly
-532 assertions; 206 skills/skill-content unit tests pass; `make pre-commit` clean. `docs/end-user/` needed no change
-(audit confirmed cross-links + per-surface labels already correct).
-
-### Phase 6: Docs & CLI cleanup + rename `forge usage` → `forge activity` (metric-evidence-simplification)
-
-**Goal**: Fold the card's remaining bugs (#5–#8) and make the per-session command's name honest — it reports Forge
-*automation* activity (supervisor, memory writer, workflow verbs + policy decisions), not total interactive usage. Final
-docs/CLI pass before closeout; complete on branch (PR/merge/lane-move owned by the human).
-
-**Key changes**:
-
-- **Bug #7 / G2 (flipped to clean break)**: renamed `forge usage` → `forge activity` (`cli/usage.py` →
-  `cli/activity.py`, `activity_cmd`; registered in `main.py`). Hidden, **flag-tolerant** `usage` tombstone
-  (`ignore_unknown_options` + `UNPROCESSED`, the `memory_writer.py` pattern) so `forge usage <s> --all --json --days 7`
-  reaches the rename message, not Click's "No such option". Help/output state the scope honestly and the blanket
-  "Estimated spend only" label is corrected to "reported-or-estimated, best-effort" (Phase 5 made direct-run cost
-  reported). The "usage" **ledger** plane name is unchanged — only the command moved (it now matches the internal
-  `build_session_activity_summary`).
-- **Bug #8**: verified **clean, not swept** — a scoped grep found every "exact"/"authoritative" hit applied to tokens,
-  `request_id` joins, enum names, or `forge proxy costs` authority; no unsafe dollar prose survived Phases 2–5.
-- **Bug #5**: `OPENROUTER_BASE_URL` (non-secret connection value) added to both credential tables;
-  `anthropic-passthrough` added to `anthropic-api.unlocks_features` (`capabilities.py` + test) and a "which auth?" row.
-- **Bug #6**: `auth_ignore_env` docs reworded — it changes the key **source** (file vs env) for both interactive and
-  headless; the interactive/headless separation is `interactive_anthropic_api_key` (Phase 4). Cross-referenced.
-- **Surface table**: new user-facing "which surface answers which question?" table in `proxy.md` (`forge proxy costs` vs
-  `forge activity` vs status-line `cost` vs `forge +$Y`), cross-linked from `session.md` + `config.md`.
-- **`auth_cost_metric.md` folded** to an internal map: banner + links to design.md §3.14 / appendix §A.8/§A.9/§A.13;
-  durable reference kept (three planes, resolution chain, file index); the Phase-4-falsified findings **rewritten as
-  resolved** (F1/F2, `has_api_key` deletion, billing-mode-as-declaration); superseded operator playbook + proposals
-  (P1/P2 shipped in Phase 4) deleted.
-
-**Breaking change / reset**: `forge usage` is removed — use `forge activity` (same args/flags). The old command is a
-hidden tombstone that exits non-zero naming the replacement; update any scripts/aliases. Research-preview clean break,
-no migration.
-
-**Verification**: 1582 `tests/src/cli` unit tests pass (incl. 9 `test_activity.py` + 2 flag-tolerant tombstone tests) +
-34 `test_capabilities.py` (incl. the `anthropic-passthrough` assertion); guard greps clean (`forge usage` → only the
-tombstone + rename notes; no unsafe dollar "exact"/"authoritative"); `forge activity --help` + both `forge usage`
-tombstone forms smoke-tested; `make pre-commit` clean. Integration: the renamed-command test
-`test_session_commands_integration.py::TestActivityCommand` ran green (`-k Activity` → 1 passed, 5.8s, real wheel CLI in
-Docker); `test_audit_plumbing.py` is comment-only (optional re-run before merge). Card stays in `doing/` — awaiting
-merge to `main` for the `doing/ → done/` lane move.
+- **Version 0.3.0 → 0.4.0**; metric-evidence card `doing/ → done/`. Breaking CLI: `forge proxy costs` → `costs show`
+  (Click consumes the first positional as a subcommand, so bare `costs` prints group help), `forge usage` →
+  `forge activity` (reports Forge *automation* activity — supervisor/memory-writer/verbs/policy — not total usage). Old
+  names are flag-tolerant hidden tombstones that exit non-zero naming the replacement.
+- **Removed CLI rename-migration tombstones (clean break)**: error-only tombstone commands/flags (`forge usage`,
+  `forge handoff run`, `forge session handoff`/`memory`, `search -q`, `memory track --as`, `--resume-mode handoff`, the
+  `--force` "deprecated alias for --yes") and stale-state migration guards (`_RENAMED_KEYS`/`_REMOVED_KEYS`,
+  `_REMOVED_STRATEGIES`/`scan_stale_passports`) deleted — degrade to the generic unknown-key/strategy-rejection paths.
+  `schema_version` validators KEPT (forward-compat). `coding-standards.md` §5/§6 + `design.md` §4.0 realigned:
+  command/option removals are clean breaks.
+- **`forge proxy costs reset`**: wipes the three telemetry planes (`requests/`, `verbs/`, usage `events/`) + the derived
+  status-line cost cache; spares audit + transcript cache-hit. Restart `Tip:` (a live proxy holds cost/cap totals in a
+  separate process the CLI can't reach). `--dry-run`/`--yes`.
+- **Status-line weekly quota**: both windows (`5h:N% · 7d:M%`, `_extract_windows` clean break), heat-mapped on the
+  shared context gradient; reset countdown binds inline to the hotter window (`7d:52%↻1d`).
+- **PR #18 adversarial review fixes**: tightened headless `--output-format json` retry `_REJECTION_RE` (a transient
+  error echoing argv no longer latches JSON off process-wide / double-bills a proxied retry); `run_parallel` retry spawn
+  mirrors the primary's `cleanup_started` re-check; launch-resurrection `exists()` guard; negative-delta clamp;
+  `forge +$Y` counts `{reported, gateway_calculated}` and excludes the typed `ROUTE_CLAUDE_INTERACTIVE` route; legacy
+  verb fallback trusts `cost_measured` only.
+- **Cleanups folded in**: `sum_forge_added_cost` gained a `since` bound (no whole-ledger re-parse per poll); dormant
+  `stream-json` parse branch removed (seam note left); DRY extractions — `core.state.decode_json_object` (one JSONL
+  guard, 5 readers), shared `proxy_costs.py` aggregation, `emit.py` `_direct_cost_provenance` (proxied path stays
+  per-caller to avoid double-counting the verb aggregate).
+- **QA checklist coverage** (`src/skills/qa/`): closed 6 gaps where a cost-honesty regression would pass the release
+  gate (§3.4 masking misfire, §7.12-7.14 cost honesty/provenance/tombstone, §8.5 `forge +$Y` segment).
 
 ## 2026-06-05 (compacted)
 
-Condensed per the board-contract size policy (decisions, breaking changes, and verification preserved; full detail in
-git history). The metric-evidence-simplification card shipped here: Forge never invents metric figures -- every dollar
-is reported-or-unavailable with recorded provenance.
+metric-evidence-simplification card (Phases 1-5): Forge never invents metric figures — every dollar is
+reported-or-unavailable with recorded provenance.
 
-### Phase 5: Headless runtime reporters
-
-- **5a spike decision (GO)**: `claude -p --output-format json` (2.1.165) emits a JSON **array** with cost/usage in the
-  terminal `result` element, not the documented single object. Capability guard = retry-once-and-latch (no version
-  probe).
-- Shared `core/reactive/headless_json.py` envelope unwrap on both runners (`run_claude_session` +
-  `ClaudeHeadlessInvoker`); every text consumer byte-for-byte unchanged.
-- Cost precedence: exactly **one** reporter per run -- proxied -> `forge_proxy` (snapshot tokens; self-cost ignored, no
-  double-count); direct -> `claude_code`/`runtime_native` or tokens-only/`unavailable`.
-- Opt-in `forge +$Y` status segment (`sum_forge_added_cost` excludes `route=claude_interactive`; `forge_cost_ttl`
-  throttle keyed on Forge identity, caches a legit 0).
-- Review follow-ups: proxied token-only snapshots read `verb_snapshot_estimated` not `unattributed`; the JSON-flag retry
-  is a tracked Popen (terminable under cancellation); the team supervisor is instrumented like the semantic one.
-- Verification: 5287 unit; 6 real-Claude Docker tests on 2.1.165 (run -> envelope -> emit -> ledger e2e). Pinned
-  follow-up: `usd_to_micros` vs proxy `round()` diverge at most 1 micro at half-micro fractions (separate planes).
-
-### Phase 4: Status-line honesty
-
-- Billing `auto` renders `ambiguous` -- never infers `api` from `ANTHROPIC_API_KEY` presence (golden `$0.42`->`≈$0.42`).
-- `interactive_anthropic_api_key: inherit|omit` applied LAST in the interactive wrapper so the recorded `source` matches
-  the child; sidecar omit via `FORGE_OMIT_INTERACTIVE_KEY=1` after the in-container proxy captured its credential.
-- Additive `confirmed.launch` (`LaunchConfirmed`) recorded from start/resume/fork/sidecar; opt-in `launch` segment
-  renders `<route>/key:<posture>`.
-- Verification: 2991 unit blast radius; `test_status_line_integration.py` (13) + `test_sidecar_omit.py` (`/proc` proof
-  Claude lacks the key while the proxy keeps it).
-
-### Phase 2 (+2 follow-ups): Cost source replacement -- Forge is not a cost oracle
-
-- Proxy cost is **reported-or-unavailable**: `cost_usd` carriers on `CompletionResponse` + `StreamEvent`; OpenRouter
-  body `usage.cost`; LiteLLM `x-litellm-response-cost` header via `with_raw_response`; unreported -> `cost_micros=None`
-  / `confidence="unavailable"` (tokens still logged). The price catalog is **deleted** (`pricing.py`/`pricing.yaml` +
-  tests) so it cannot re-enter the accounting path.
-- **Breaking (research-preview)**: cost-record `estimated`/`pricing_source` -> `reporter`+`confidence`
-  (`COST_SCHEMA_VERSION` stays 1; legacy records read with defaults). Spend caps fire only for cost-reporting routes
-  (Anthropic-passthrough + LiteLLM-streaming dollar caps become no-ops; tokens still tracked).
-- Follow-ups: verb display gates on `cost_measured` evidence, not a numeric total (no unknown-as-zero); remaining
-  "estimated" dollar-cost doc language aligned to reported-or-unavailable; the panel cost canary failure was a **test
-  bug** (`DEFAULT_MODELS` vs `AVAILABLE_MODELS` monkeypatch) -- cost-visibility matrix 5/5 on real wire.
-- Verification: 5531 unit+regression; real-wire matrix confirmed with the catalog removed, incl. the documented
-  LiteLLM-streaming `unavailable` gap.
-
-### Phase 3: Remove `cap_mode` & strict pre-flight
-
-- `cap_mode` removed and the strict pre-flight estimate deleted (the cap path's cost-oracle pattern); post-event
-  enforcement is the only behavior. Stale `cap_mode:` keys are rejected with an explicit tombstone at config-parse and
-  `forge proxy set`. **Reset**: remove the `cap_mode:` line from `proxy.yaml`.
-- Verification: 924 proxy/config/regression tests + a removed-key regression file; 3/4 cost-visibility e2e (the 4th was
-  the pre-existing canary test bug fixed above).
-
-### Phase 1: Metric-evidence schema & vocabulary
-
-- New `core/usage/vocabulary.py` `Literal`s (`Route`/`Reporter`/`Confidence`); `UsageEvent` gains the three fields --
-  additive, defaulted; **`USAGE_SCHEMA_VERSION` stays 1 by decision**. `confidence` scopes to the event's own
-  `cost_micro_usd` only (`unavailable` = route structurally reports no cost; `unknown` = pre-Phase-1 default).
-- **Keep-at-1 tradeoff (do NOT "fix" with a migration)**: a concurrent pre-Phase-1 strict reader drops new records as
-  "malformed" -- acceptable because the usage ledger is best-effort local telemetry, not durable truth.
-- Verification: 58 targeted ledger/emit/read-surface tests.
+- **Phase 2 (cost not an oracle)**: proxy cost reported-or-unavailable (`cost_usd` carriers; OpenRouter `usage.cost`,
+  LiteLLM `x-litellm-response-cost`); unreported → `cost_micros=None`/`confidence="unavailable"`. Price catalog
+  (`pricing.py`/`pricing.yaml`) **deleted** so it can't re-enter accounting. Breaking (research-preview): cost-record
+  `estimated`/`pricing_source` → `reporter`+`confidence` (`COST_SCHEMA_VERSION` stays 1). Spend caps fire only for
+  cost-reporting routes.
+- **Phase 3**: `cap_mode` + strict pre-flight estimate removed; post-event enforcement only. Stale `cap_mode:` rejected
+  with a tombstone. Reset: remove the `cap_mode:` line from `proxy.yaml`.
+- **Phase 1/5 (schema + reporters)**: `core/usage/vocabulary.py` `Route`/`Reporter`/`Confidence` literals;
+  `USAGE_SCHEMA_VERSION` stays 1 by decision (a pre-Phase-1 strict reader dropping new records is acceptable for
+  best-effort telemetry). Headless cost precedence: one reporter per run (proxied → `forge_proxy`; direct → native or
+  tokens-only/`unavailable`). Shared `core/reactive/headless_json.py` unwraps the `claude -p --output-format json` array
+  envelope (2.1.165 emits an array, not the documented object; retry-once-and-latch).
+- **Phase 4 (status-line honesty)**: billing `auto` renders `ambiguous` (never infers `api` from `ANTHROPIC_API_KEY`);
+  additive `confirmed.launch`. Deferred: `usd_to_micros` vs proxy `round()` diverge ≤1 micro at half-micro fractions.
 
 ## 2026-06-04
 
-### Fix: cost/audit JSONL readers crash on valid-but-non-object lines (metric-evidence Phase 0)
-
-**Goal**: A valid-but-non-object JSONL line (`[]`/`1`/`"x"`/`null`/`true`) must not abort cost/audit-plane log reads —
-the metric-evidence card's self-contained, ship-first slice (Bug #4).
-
-**Key changes**:
-
-- Added the canonical `isinstance(record, dict)` guard (mirrors `core/usage/ledger.py:215-218`) to the four unguarded
-  `.get`-after-`json.loads` readers: `read_cost_logs` (`proxy/cost_logger.py`), `read_verb_logs`
-  (`core/reactive/cost_tracking.py`), `read_audit_logs` (`proxy/audit_logger.py`), and `CostTracker._parse_record`
-  (`proxy/cost_tracker.py`). `read_audit_logs` (audit plane) was folded in by scope decision so no JSONL reader stays
-  unguarded across cost/audit/usage.
-- The three readers were genuine crashers (`AttributeError` is not caught by their `except OSError`, so one bad line
-  aborted the whole read and crashed `forge proxy costs` / `forge proxy audit show`); `_parse_record` was an honesty fix
-  — its caller already broad-excepts, so its test calls it directly.
-
-**Verification**: new `tests/regression/test_bug_cost_log_non_dict_line.py` (3 readers × 5 values) +
-`TestParseRecordGuard` (5) — all 20 verified to fail with the guards stashed, pass with them; 92 targeted tests green;
-`make pre-commit` clean.
-
-### Fix: status-line enhancement post-PR review — 5 findings (PR #16)
-
-**Goal**: A second self-review pass after opening PR #16 surfaced five issues across the proxy GET / path, status-line
-fail-open contract, a duplicated tier scanner, and two documentation claims; each fixed (two with regression tests).
-
-**Key changes**:
-
-- **F1 (proxy)**: `root()` now calls the idempotent `_ensure_runtime_state()` so a freshly-imported proxy GET / reports
-  real config and exposes `metrics.costs.caps` before any POST warms the module (caps were load-order dependent; the
-  `spend_cap` segment showed nothing on a fresh proxy).
-- **F3 (fail-open)**: `render_segments` wraps each producer in `try/except` (one bad segment degrades to absent, never
-  crashes the line); `_produce_cache_hit` guards the proxy metrics shape with `isinstance` like `_produce_spend_cap`.
-- **F4 (parity)**: test asserting `explicit_tier_from_model` agrees with the proxy's `_tier_from_model_name` (its 1:1
-  mirror) over a model corpus; shared-helper extraction deferred to keep `proxy.server` off the status-line hot path.
-- **F2 / F5 (docs)**: qualified the "byte-identical default output" claim to the API billing path (the golden guard pins
-  `ANTHROPIC_API_KEY`) + added a golden-scope test pinning the sole no-key divergence (`$`→`≈$`); generated
-  `statusline.segments` config comment now lists all shipped names (`supervisor`/`policy`/`audit`/`drift`/`spend_cap`).
-
-**Verification**: 5136 unit tests pass (`make test-unit`); 15 proxy metrics-integration (incl. the import-split cap
-test); 2 new regression tests (`test_bug_proxy_root_caps_uninitialized.py`, `test_bug_statusline_producer_failopen.py`);
-`make pre-commit` clean; PR #16 CI green (Tests, Pre-commit, CodeQL).
+- **Cost/audit JSONL readers (metric-evidence Phase 0)**: added the `isinstance(record, dict)` guard to four
+  `.get`-after-`json.loads` readers (`read_cost_logs`, `read_verb_logs`, `read_audit_logs`, `CostTracker._parse_record`)
+  so one non-object line (`[]`/`1`/`null`) no longer aborts `forge proxy costs`/`audit show`. Regression
+  `test_bug_cost_log_non_dict_line.py`.
+- **Status-line PR #16 review (5 findings)**: proxy GET `/` runs idempotent `_ensure_runtime_state()` (caps were
+  load-order dependent); `render_segments` fail-open per producer; tier-scanner parity test; the "byte-identical output"
+  claim qualified to the API billing path. Regressions `test_bug_proxy_root_caps_uninitialized.py`,
+  `test_bug_statusline_producer_failopen.py`.
 
 ## 2026-06-03 (compacted)
 
-Condensed per the board-contract size policy (decisions/breaking changes/deferred preserved; play-by-play dropped).
-
-### runtime_abstraction Phase 4 follow-up: per-session usage visibility + fixes
-
-- **`forge usage [session]` + session-end summary**: `read_usage_events(session=)` filter + pure
-  `build_session_activity_summary` (design §3.12; ledger for run/error/token/cost, `confirmed.policy.decisions` for
-  supervisor allow/warn/deny). Host/sidecar/fork converge on one `_post_exit_render`. Workflow verbs tagged
-  `session=$FORGE_SESSION`; action tagger left untagged (documented). design §3.14/§4.0, appendix §A.13.
-- **Sidecar usage-ledger mount**: `usage/` mounted rw (symmetric with audit/costs, proxy-id gated) so in-container
-  supervisor/verb events survive `--rm`; integration-verified host-side after teardown.
-- **Review fixes**: workflow double-count (an N-worker panel read as N+1 workflows) fixed by splitting worker events
-  into `CommandUsage.workers`; supervisor-warning misattribution fixed (warnings now from the `semantic.supervisor`
-  sub-decision only). Regressions for both.
-- **QA-surfaced proxy bugs**: proxy accepts Claude mid-conversation `{"role":"system"}` messages (was a local 422);
-  passthrough streaming errors surface their real status + malformed/non-object JSON -> 400/422; `smoke_test_proxy`
-  resolves the passthrough client model instead of hardcoding `sonnet`; QA `start-container.sh` refuses a stale-revision
-  running container (exit 3). Regressions + real-wire validated.
-
-### Statusline Enhancement (Phases 1-5)
-
-Config-driven status line shipped in five phases: (1) segment registry + lazy `RenderContext` + earthy palette/glyphs as
-an output-level ANSI remap -- **break**: the flat `show_rate_limits` key removed -> opt-in `rate_limits` segment
-(actionable reset message on load/set/reset); (2) billing-aware cost (`api`->$ / `subscription`->quota /
-`ambiguous`->`≈$`)
-
-- `rate_limits` object-shape fix + a sanity-capped reset countdown; (3) throttled file-backed `cache_hit` (a
-  deduped-by-`requestId` transcript primitive matching the proxy's cache-read formula; hashed session-id key,
-  runtime-only -- never raises); (4) four Forge-unique opt-in segments -- `supervisor`/`policy` over effective session
-  state, `audit`/`drift` over proxy `GET /` truth, real-route drift; (5) spend-cap proximity (`_attach_cap_summary` ->
-  `metrics.costs.caps`; a binding-window `cap:…` segment; sub-cent `_fmt_cap_money` precision). A golden no-op guard
-  freezes byte-identical default output (API billing path); each phase shipped `make pre-commit` clean with
-  `test_status_line_integration.py` green.
+- **runtime_abstraction Phase 4 follow-up**: `forge usage [session]` + session-end summary
+  (`read_usage_events(session=)` filter, pure `build_session_activity_summary`; design §3.12/§3.14, appendix §A.13);
+  sidecar usage-ledger mount (rw, proxy-id gated). Review fixes: workflow double-count (N-worker panel read as N+1)
+  split into `CommandUsage.workers`; supervisor-warning misattribution. QA proxy bugs: accepts mid-conversation
+  `{"role":"system"}`; passthrough streaming errors surface real status; QA refuses a stale-revision container.
+- **Statusline Enhancement (Phases 1-5)**: config-driven status line — segment registry + lazy `RenderContext`;
+  billing-aware cost (`api`→$ / `subscription`→quota / `ambiguous`→`≈$`); throttled file-backed `cache_hit`;
+  Forge-unique opt-in segments (`supervisor`/`policy`/`audit`/`drift`); spend-cap proximity. Break: flat
+  `show_rate_limits` → opt-in `rate_limits` segment. Golden no-op guard freezes default output.
 
 ## 2026-06-02 (compacted)
 
-Condensed per the board-contract size policy (decisions, verification, and deferred items preserved; full detail in git
-history).
-
-### Phase 4: Review-pass hardening (4a / 4c / 4d)
-
-- **4d spawn/register TOCTOU**: `run_parallel` could spawn a child after a `_cleanup` snapshot, leaving it un-SIGTERMed
-  (Ctrl+C hang + transient orphan). Fixed with a lock-guarded `cleanup_started` flag: self-reap late registrations, skip
-  new spawns once cancellation starts, `shutdown(cancel_futures=True)` -- each child reaped exactly once.
-- **4d cancelled workers**: typed `HeadlessResult.cancelled`; `_emit_worker` skips cancelled (no more `status="error"`
-  usage events for cancelled jobs).
-- **4c**: `emit_direct_llm_usage` now copies `cached_tokens` from provider usage. **4a**: both-or-neither
-  `origin_run_id`/`origin_root_run_id` contract pinned on `_memory_writer_env` with comment + test.
-- Verification: invoker/emit/startup-queue suites passed incl. new race + cancelled-emit + cached_tokens tests;
-  mypy/pyright/pre-commit clean.
-
-### Phase 4: Deferred integration validation (4a / 4c / 4d / 4f)
-
-Validation-only Docker / real-`claude -p` run for the shipped slices: `test_policy_hooks.py` 10/10,
-`test_supervisor_e2e.py` 4/4, `test_real_claude_memory.py` handoff smoke PASSED, `test_real_claude_workers.py` 2/2.
-**Pre-existing finding**: `test_real_shadow_curation_smoke` FAILS -- stale `--session` arg to `forge memory track` from
-PR #6's project-scoped memory change (pre-branch ancestor; test-only fix, tracked for #6's owner).
+- **Phase 4 hardening (4a/4c/4d)**: `run_parallel` spawn/register TOCTOU fixed with a lock-guarded `cleanup_started`
+  flag (children reaped exactly once; no Ctrl+C hang/orphan); typed `HeadlessResult.cancelled` (cancelled workers emit
+  no error usage); `emit_direct_llm_usage` copies `cached_tokens`; both-or-neither `origin_run_id`/`origin_root_run_id`
+  contract.
+- **Phase 4 integration validation**: `test_policy_hooks.py` 10/10, `test_supervisor_e2e.py` 4/4, real-claude
+  memory/workers green. Pre-existing: `test_real_shadow_curation_smoke` fails on a stale `--session` arg (PR #6
+  ancestor; test-only, tracked).
 
 ## 2026-06-01 (compacted)
 
-Condensed per the board-contract size policy (dates, decisions, breaking changes, deferred items, and design.md pointers
-preserved; per-file play-by-play dropped -- full detail in git history).
+**runtime_abstraction Phase 4 (Slices 4a-4f)** — runtime-abstraction core:
 
-### runtime_abstraction Phase 4 (Slices 4a-4f): runtime-abstraction core
-
-- **4a run-tree env contract**: `RunIdentity` + `FORGE_RUN_ID`/`FORGE_PARENT_RUN_ID`/`FORGE_ROOT_RUN_ID`, orthogonal to
-  the `FORGE_DEPTH` recursion guard; interactive launches mint a fresh root (centralized in
-  `invoke._build_environment`); the memory writer re-roots under the session's snapshotted origin identity and scrubs
-  the drainer's run-tree/session vars. design_appendix §F.5/§C.1.
-- **4b usage-attribution ledger**: durable versioned `~/.forge/usage/events/` -- the third plane, joined to cost/audit
-  by `request_id`. `UsageEvent` (schema v1, strict typed reads where an unknown field == corruption), PID-sharded
-  shards, a best-effort never-raising writer (modeled on `audit_logger`, not the unversioned `cost_logger`). design
-  §3.14, appendix §A.13.
-- **4c instrument native+direct paths**: `track_verb_cost` yields a cost holder; emitters wired for the 4 workflow verbs
-  \+ memory-writer/supervisor/shadow + the action tagger (`ask`->`complete` to capture exact provider tokens + forward
-  `X-Request-ID`); conservative `billing_mode` (no key-presence inference); `measurement_source=provider_usage_exact`
-  added. Review fixes: the direct-path `request_id` join actually records its ref; `latency_ms` populated on every path.
-- **4d HeadlessInvoker + review fan-out migration**: new `core/invoker/` (`HeadlessRequest`/`Result`/`Attribution` + the
-  `HeadlessInvoker` protocol + `ClaudeHeadlessInvoker`); the review engine's parallel `claude -p` lifecycle moved
-  **verbatim** behind `run_parallel` (the seam is the lifecycle, not the routing); per-worker usage events (worker
-  granularity, cost null -- the verb aggregate holds the estimate). `_cleanup` SIGTERMs children before the blocking
-  join; per-worker events record the actually-routed model/provider/proxy. design §5.5.5, appendix §A.13.
-- **4e runtime registry**: a frozen `RuntimeSpec` per runtime in a module-level `RUNTIMES` table (the capability source
-  Phase 5 reads); tri-state capability literals (Codex `pretool_policy="partial"`/`native_hooks="gated"` with
-  machine-readable version gates -- limits declared as values, never parity-implying omissions); `forge runtime list`.
-  Nothing branches on it yet. design §5.5.5.
-- **4f runtime-tagged ActionContext + named Claude hook adapter/responder**: `ActionContext.runtime` is **required**
-  attribution metadata (the policy engine never branches on it, stays runtime-agnostic); the two Claude-specific halves
-  named behind runtime-neutral `HookAdapter`/`HookResponder` protocols (the Codex adapter/responder is the Phase 6
-  stub). Output bytes + exit codes unchanged (77 hook-command snapshot tests untouched). design §4.1.4/§4.1.5.
-  Integration: `test_policy_hooks.py` 10/10 through the real wheel CLI.
-
-### Phase 3: native-relocate cross-CWD resume (spike PASS + Stage C v1 opt-in)
-
-- **Outcome: PASS on Claude Code 2.1.158.** Relocating a parent session JSONL into the destination CWD's encoded project
-  dir then `--resume --fork-session` completes a signed-thinking tool-use continuation with the parent JSONL unmodified;
-  the control (resume without relocating) still reproduces the 2026-04-02 "No conversation found" discovery failure.
-- **Shipped opt-in** `forge session fork --resume-mode native-relocate` (host mode only; transfer stays default) with
-  pre-`fork_session` preflights (reject sidecar/`--no-launch`/missing transcript), post-create rollback, and dir-scoped
-  cleanup of the relocated copy. Contract test `test_native_relocate_contract.py` PASSED (23.6s).
-- **Bug fixed (surfaced by the spike)**: `encode_project_path` now maps `_`->`-` alongside `/`/`.` (Claude 2.1.158
-  hyphenates underscores; Forge didn't -- broke transcript discovery/cleanup/relocation for any underscore path).
-  Regression `test_bug_encode_project_path_underscore.py`. design §3.9.
-- **Deferred**: `--rewrite-paths`, sidecar native-relocate, `resume --resume-mode native-relocate`, the gated default
-  flip. **Candidate impl_note**: the Claude project-dir encoding maps `/` `.` `_` -> `-` (case/`-`/digits preserved).
-
-### Phase 2: optional audit proxy
-
-Opt-in, user-controlled wire chokepoint that can observe and (optionally) control the Claude\<->provider wire with
-redacted audit logs -- all new config inert by default. Two orthogonal axes kept distinct: `wire_shape`
-(`openai_translated`|`anthropic_passthrough`) and `intercept.mode`. Shipped: a thinking-preserving
-`anthropic_passthrough` wire (preserves `thinking`/`redacted_thinking` byte-for-byte); redact-before-persist audit JSONL
-
-- `forge proxy audit show|diff`; override-mode system-prompt augment/guards + reasoning-effort pin with a
-  mutation-safety fingerprint tripwire (never rewrites history, fails closed); sidecar host-persistent audit/costs
-  mounts + arbitrary-uid support (fixed two latent entrypoint bugs that meant the sidecar proxy could never start).
-  design §7.x/§3.4/§3.7/§4.0, appendix §A.11/§A.12, end-user/proxy.md. **Deferred debt**: real-upstream `@slow`
-  passthrough signature-replay e2e; streamed full-body capture.
-
-**Verification (range)**: every slice shipped tree-green, `make pre-commit` clean; unit suites 4866->5531 passed across
-the slices; integration/real-wire as noted (policy hooks 10/10, native-relocate contract 23.6s, cost-visibility matrix).
+- **4a run-tree env**: `RunIdentity` + `FORGE_RUN_ID`/`PARENT`/`ROOT`, orthogonal to `FORGE_DEPTH`; memory writer
+  re-roots under the session's origin identity. appendix §F.5/§C.1.
+- **4b usage ledger**: durable versioned `~/.forge/usage/events/` (third plane, joined by `request_id`; schema v1 strict
+  reads, never-raising writer). design §3.14, appendix §A.13.
+- **4c instrument paths**: `track_verb_cost` cost holder; emitters for workflow verbs + memory-writer/supervisor/shadow
+  \+ action tagger; conservative `billing_mode` (no key-presence inference).
+- **4d HeadlessInvoker**: new `core/invoker/` (`HeadlessRequest`/`Result`/`Attribution` + protocol +
+  `ClaudeHeadlessInvoker`); review fan-out moved **verbatim** behind `run_parallel` (the seam is the lifecycle, not
+  routing). design §5.5.5.
+- **4e runtime registry**: frozen `RuntimeSpec` per runtime in `RUNTIMES` (the capability source Phase 5 reads);
+  tri-state capability literals with version gates; `forge runtime list`. Nothing branches on it yet.
+- **4f runtime-tagged ActionContext**: `ActionContext.runtime` required attribution (policy engine stays
+  runtime-agnostic); Claude halves named behind `HookAdapter`/`HookResponder` protocols. design §4.1.4/§4.1.5.
+- **Phase 3 native-relocate** (PASS on Claude 2.1.158): opt-in `forge session fork --resume-mode native-relocate` (host
+  only; transfer stays default) with preflights + rollback + dir-scoped cleanup. Bug: `encode_project_path` now maps
+  `_`→`-` (Claude 2.1.158 hyphenates underscores). Regression `test_bug_encode_project_path_underscore.py`. design §3.9.
+  Deferred: `--rewrite-paths`, sidecar native-relocate, gated default flip.
+- **Phase 2 optional audit proxy**: opt-in wire chokepoint (inert by default); orthogonal `wire_shape`
+  (`openai_translated`|`anthropic_passthrough`) × `intercept.mode`; thinking-preserving passthrough;
+  redact-before-persist audit JSONL (`forge proxy audit show|diff`); sidecar host-persistent mounts. design
+  §7.x/§3.4/§3.7. Deferred: real-upstream `@slow` passthrough replay e2e.
 
 ## 2026-05-31
 
-### Phase 1: Schema-backed curated transfer + `forge transfer` CLI (Runtime Abstraction)
+**runtime_abstraction Phase 1** — schema-backed curated transfer + `forge transfer` CLI:
 
-**Goal**: Make curated transfer a schema-backed, user-reviewable substrate and reposition `ai-curated` as the primary
-cross-boundary transfer path, with a top-level `forge transfer` CLI to inspect and reshape it.
-
-**Key changes**:
-
-- **Transfer schema** (`src/forge/session/transfer.py`): `_build_ai_curated_output()` emits canonical sections 1-7
-  (Lineage, Goal/Current Task, Decisions, Current State, Relevant Files, Open Questions, Runtime Hints); section 8 (User
-  Notes) is the overlay merged at launch. `_build_frontmatter()` stamps `schema_version: 1`, reserves `target_runtime`
-  for Phase 5, and marks `schema: "full"` only for a successful ai-curated body (`minimal|structured|full` →
-  `compatibility-fallback`). `_validate_decision_citations()` drops citations outside the turn range the model saw, so
-  `schema: full` never overstates evidence.
-- **Three-file artifact model**: `generated.md` (regeneratable parent cache), `children/<child>.md` (frozen AI
-  snapshot), `children/<child>.notes.md` (user overlay). `ensure_child` never overwrites an existing child; GC ties a
-  notes file's liveness to its snapshot.
-- **CLI** (`cli/transfer.py`, `core/ops/transfer.py`): new top-level `forge transfer show|regenerate|edit|diff`, pairing
-  with `forge memory`. `regenerate` rewrites only the parent cache; `edit` targets the notes overlay; `show`/`diff` take
-  `--child`.
-- **Docs**: design.md §3.9 reframes curated transfer as the primary cross-boundary substrate (not a lossy fallback);
-  appendix §M documents the frontmatter + 8-section contract + overlay; end-user/session.md updated.
-
-**Verification**: 113 transfer tests pass (`test_transfer.py`, `test_transfer_cli.py`, `test_prev_sessions.py`,
-regression `test_bug_transfer_notes_not_gc_orphaned.py`); shipped as commit `2b70c29`.
-
-**Phase 1 closeout (2026-05-31, docs-only)**: `ctx` posture recorded in `design_appendix.md` §M.4 -- the transfer schema
-is Forge-owned and canonical; `ctx` is prior art and inspiration only, never a dependency, and no interop is planned.
-Both default-behavior decisions resolved as keep-current: `--review` stays opt-in (a plain `--fresh` resume never blocks
-on `$EDITOR`) and `structured` stays the CLI default (`ai-curated` opt-in via `--strategy`, keeping the resume hot path
-deterministic and LLM-free). Schema confirmed stable for Phase 5 (`target_runtime` reserved). All Phase 1 boxes ticked;
-card stays in `doing/` for Phases 2-6. No code or tests changed.
+- `transfer.py` `_build_ai_curated_output()` emits canonical sections 1-7 + User Notes overlay; `schema_version: 1`,
+  `target_runtime` reserved for Phase 5; citations outside the seen turn range dropped so `schema: full` never
+  overstates evidence. Three-file artifact model (`generated.md` cache, frozen `children/<child>.md`, `.notes.md`
+  overlay). New `forge transfer show|regenerate|edit|diff`. design §3.9 reframes curated transfer as the primary
+  cross-boundary substrate; appendix §M.
+- Closeout decisions (keep-current): `--review` stays opt-in; `structured` stays the CLI default (`ai-curated` opt-in).
+  `ctx` is prior art/inspiration only, never a dependency (appendix §M.4). Schema stable for Phase 5.
 
 ## 2026-05-28 — 2026-05-29 (compacted)
 
-Older entries condensed per the board-contract size policy. Dates, decisions, and verification highlights preserved;
-per-file play-by-play dropped. Full detail in git history.
-
-### memory_substrate: "handoff" → memory writer + transfer (2026-05-29, PR #8)
-
-**Goal**: Split the overloaded "handoff" term into two concepts: **memory writer** (Stop-time project-doc curation) and
-**transfer** (resume/fork context assembly), across code/CLI/config/durable state/docs/skills.
-
-**Key changes**: `handoff_agent.py → memory_writer.py`, `handoff.py → transfer.py` (`HandoffConfig→MemoryWriterConfig`,
-`process_handoff→assemble_transfer_context`); CLI `forge handoff run → forge memory-writer run`,
-`forge session handoff show → forge memory report show` (old paths tombstoned, error with the replacement). Durable
-state accept-and-tolerate: `--resume-mode handoff → transfer` (legacy read as transfer),
-`handoff_timeout → memory_writer_timeout` (warn-and-ignore). Internal sweep drove residual `handoff` 207 → 39, all
-intentional KEEPs (work-queue `kind="handoff"`, `enqueue_handoff_marker`, the `.forge/artifacts/<session>/handoff/`
-path, the `queued_handoff` Stop field — recorded in `impl_notes.md`).
-
-**Verification**: full unit+regression green (4902); `test_handoff_integration.py` (10) green; `make pre-commit` clean.
-Shipped as PR #8 (gemini-3.5-flash catalog work split to PR #9).
-
-### Add Claude Opus 4.8 (2026-05-28, retain 4.6 + 4.7)
-
-**Goal**: Add Opus 4.8 as the opt-in Anthropic alternative without shrinking the registry.
-
-**Key changes**: added `claude-opus-4-8` (5 aliases; $5/$25/$0.50, 1M context, 128K output, adaptive-only, `xhigh`)
-alongside the retained 4.7 and 4.6 — three distinct registry models (`intelligence_score` 98/99/100). The
-`opus`/`claude-opus` defaults + proxy tier mappings stay on **4.6**; 4.8 is opt-in (`--model claude-opus-4-8`), taking
-over 4.7's *role* in review/templates/docs. Review guide `claude-4.7.md → claude-4.8.md`. (Additive correction
-2026-05-29: an initial pass dropped 4.7 from the registry; re-added so catalog/pricing stay additive.)
-
-**Verification**: catalog/pricing + full unit suite green; built-wheel smoke confirms `opus` still resolves to 4.6.
-
-### Simplify memory strategies 7 → 4 (2026-05-28)
-
-**Goal**: Reduce the strategy enum from 7 to 4, make shadow mode orthogonal, rename `--as → --strategy`.
-
-**Key changes**: removed `debugging`/`patterns` (topic scoping moves to passport `intent`/`captures`) and `suggested`
-(shadow mode is now orthogonal — `--propose` works with any strategy; path prefix `suggested_* → shadow_*`). Renamed
-`--as → --strategy` (`--as` a hidden tombstone). Stale removed-strategy passports rejected with actionable hints.
-
-**Verification**: full unit suite + `make pre-commit` clean.
+- **memory_substrate (PR #8)**: split "handoff" into **memory writer** (Stop-time doc curation) and **transfer**
+  (resume/fork context). `handoff_agent.py→memory_writer.py`, `handoff.py→transfer.py`; CLI
+  `forge handoff run→forge memory-writer run`, `forge session handoff show→forge memory report show` (old paths
+  tombstoned). Durable accept-and-tolerate: `--resume-mode handoff→transfer`, `handoff_timeout→memory_writer_timeout`.
+  Intentional `handoff` KEEPs (work-queue `kind="handoff"`, artifact path, `queued_handoff`) recorded in impl_notes.
+- **Add Claude Opus 4.8** (retain 4.6+4.7): `claude-opus-4-8` opt-in ($5/$25/$0.50, 1M ctx, adaptive-only); `opus`
+  defaults stay on 4.6; 4.8 takes over 4.7's review/template role.
+- **Memory strategies 7→4**: removed `debugging`/`patterns`/`suggested` (shadow mode now orthogonal via `--propose`;
+  `suggested_*→shadow_*`); `--as`→`--strategy` (`--as` a hidden tombstone). Stale removed-strategy passports rejected.
 
 ## 2026-05-22 — 2026-05-26 (compacted)
 
-Older entries condensed per the board-contract size policy. Dates, decisions, and verification highlights preserved;
-per-file play-by-play dropped. Full detail in git history.
-
-### Memory Enhancement project (PR #1, Phases 0-5)
-
-**Goal**: Replace the manifest `designated_docs[]` model with passport-authoritative doc ownership, then reduce the
-memory system to two primitives — passports select docs, session activation decides whether the memory writer runs.
-
-**Key decisions & changes**:
-
-- **Passport model** (`session/passport.py`, 2026-05-22): `MemoryStrategy` enum, YAML-frontmatter parse/serialize,
-  `synthesize_passport`, writer-authorization, flag-vs-passport conflict resolution;
-  `PassportError(field_path, reason, hint)`. Passports are authoritative for doc ownership.
-- **Top-level `forge memory` CLI** (2026-05-23): `enable/track/untrack/list/status` (replacing `forge session memory`,
-  which became a tombstone — since removed). Phase 5 added `forge memory shadows review` (LLM shadow curation,
-  source-cited reports, `shadow_curation.py`).
-- **Two-primitive simplification** (Slices 1-7, 2026-05-24→26): removed `.forge/memory.yaml` checkout activation,
-  `MemoryIntent.designated_docs` (manifest field), the three-tier `memory_activation()` resolver, `ProjectMemoryConfig`,
-  and `--inherit-memory`/extras tombstones. `forge memory enable/disable` are session-scoped; `list` is a sessionless
-  passport scan; Stop hook + writer read `effective.memory.auto_update.enabled` directly. `--memory on|off` added to
-  `fork`/`resume --fresh`/`start`. Strategy enum cut 7→4 (`debugging`/`patterns`/`suggested` removed; shadow mode
-  orthogonal via `--propose`); `--as` renamed `--strategy`.
-- **Design sync**: `design.md §5.6` (passport ownership, frontmatter, shadow, inheritance), `design_appendix.md §G`;
-  memory-enhancement card archived to `docs/board/done/memory_enhancement/`.
-
-**Verification**: unit suites green throughout (4441 → 4645 passed across slices); `make pre-commit` clean.
-
-### CLI hardening (2026-05-24 → 2026-05-26)
-
-- **Command-shape invariant** (documented in `coding-standards.md`/`design.md`): groups orient (print help), leaves act
-  (sensible default). `forge config show` is the explicit leaf; `forge search query <terms>` replaced the `-q` action;
-  `forge proxy metrics` shows all proxies when several are registered.
-- **Shared recovery-tip helpers** (`cli/output.py`): `print_tip`/`print_error`/`print_error_with_tip`/
-  `handle_session_error`; equivalent failures now tip identically; an invariant test allows `[dim]Tip:` only in
-  `output.py`. **Break**: `forge backend create <existing>` now errors + exits 1 (was yellow + exit 0).
-- **Auto-start proxies from templates** (`ensure_proxy`): naming a template with no live proxy starts one instead of
-  erroring; covers all five `--proxy`/`--supervisor-proxy` paths. Liveness-aware (stale-healthy entries marked unhealthy
-  before replacement). Regressions `test_bug_supervisor_proxy_autostart.py`,
-  `test_bug_stale_healthy_proxy_not_restarted.py`.
-- **Protect live sessions from deletion**: `forge session delete` refuses a session with a live launch unless `--force`
-  (`--yes` no longer overrides); `--all` skips live sessions. Launcher tolerates a manifest deleted mid-run (no
-  traceback). Regression `test_bug_delete_live_session.py`.
+- **Memory Enhancement project (PR #1, Phases 0-5)**: passport-authoritative doc ownership replacing manifest
+  `designated_docs[]`; two primitives — passports select docs, session activation decides whether the writer runs.
+  `session/passport.py` (`MemoryStrategy`, YAML frontmatter, `synthesize_passport`, `PassportError`); top-level
+  `forge memory enable/track/untrack/list/status` + `forge memory shadows review`. Removed `.forge/memory.yaml`
+  activation, `MemoryIntent.designated_docs`, the three-tier resolver, `ProjectMemoryConfig`, `--inherit-memory`. design
+  §5.6, appendix §G; card archived to `done/memory_enhancement/`.
+- **CLI hardening**: command-shape invariant (groups orient, leaves act) — `forge config show`,
+  `forge search query <terms>`, `forge proxy metrics` all-proxies. Shared recovery-tip helpers (`cli/output.py`); break:
+  `forge backend create <existing>` errors + exits 1. Auto-start proxies from templates (`ensure_proxy`,
+  liveness-aware). Live-session deletion protection (`forge session delete` refuses a live launch without `--force`).
+  Regressions: supervisor-proxy-autostart, stale-healthy-proxy, delete-live-session.

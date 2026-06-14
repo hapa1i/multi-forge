@@ -18,6 +18,7 @@ import click
 
 from forge.cli.output import print_error_with_tip, print_tip
 from forge.cli.session import console
+from forge.core.invoker import HeadlessResult
 from forge.core.invoker.codex import CodexSandbox
 from forge.core.ops.codex_interactive import (
     CodexInteractiveLaunch,
@@ -39,6 +40,14 @@ from forge.core.ops.session import ForgeOpError
 from forge.session import SessionState
 
 logger = logging.getLogger(__name__)
+
+
+def _codex_ok(codex: HeadlessResult) -> bool:
+    """True iff the Codex turn truly succeeded: the process exited 0 AND the JSONL stream
+    reported no runtime error. ``HeadlessResult.success`` is returncode-only, so a
+    ``turn.failed``/``error`` event riding an exit-0 would otherwise read as success.
+    """
+    return codex.success and not codex.runtime_is_error
 
 
 def _sess() -> Any:
@@ -317,7 +326,7 @@ def launch_codex_session(
             console=console,
         )
         return 1
-    return result.codex.returncode if not result.codex.success else 0
+    return 0 if _codex_ok(result.codex) else (result.codex.returncode or 1)
 
 
 def resume_codex_session(*, name: str, task: str, sandbox: CodexSandbox) -> int:
@@ -334,7 +343,7 @@ def resume_codex_session(*, name: str, task: str, sandbox: CodexSandbox) -> int:
         return 1
 
     _render_resume(result)
-    return result.codex.returncode if not result.codex.success else 0
+    return 0 if _codex_ok(result.codex) else (result.codex.returncode or 1)
 
 
 def launch_interactive_codex_session(
@@ -455,10 +464,10 @@ def _render_start(result: CodexSessionStartResult) -> None:
         console.print("[dim]Context delivery: SessionStart hook (receipt reconciled)[/dim]")
     if result.thread_id:
         console.print(f"[dim]Thread: {result.thread_id}[/dim]")
-    _render_codex_outcome(result.codex.stdout, result.codex.success, result.codex.stderr)
+    _render_codex_outcome(result.codex.stdout, _codex_ok(result.codex), result.codex.stderr)
     for warning in result.warnings:
         console.print(f"[yellow]Warning:[/yellow] {warning}")
-    if result.thread_id and result.codex.success:
+    if result.thread_id and _codex_ok(result.codex):
         print_tip(
             f"Run 'forge session resume {result.session} --task <next step>' to continue this thread.",
             console=console,
@@ -467,14 +476,14 @@ def _render_start(result: CodexSessionStartResult) -> None:
 
 def _render_resume(result: CodexSessionResumeResult) -> None:
     console.print(f"[green]Resumed Codex session:[/green] {result.session} (thread {result.thread_id})")
-    _render_codex_outcome(result.codex.stdout, result.codex.success, result.codex.stderr)
+    _render_codex_outcome(result.codex.stdout, _codex_ok(result.codex), result.codex.stderr)
     for warning in result.warnings:
         console.print(f"[yellow]Warning:[/yellow] {warning}")
 
 
-def _render_codex_outcome(stdout: str, success: bool, stderr: str) -> None:
+def _render_codex_outcome(stdout: str, ok: bool, stderr: str) -> None:
     if stdout:
         console.print()
         console.print(stdout)
-    if not success:
+    if not ok:
         console.print(f"[red]Codex turn failed.[/red] {stderr or ''}".rstrip())

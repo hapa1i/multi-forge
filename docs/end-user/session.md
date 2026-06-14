@@ -431,6 +431,12 @@ its own; with `--context-delivery hook` (trust-enrolled homes) the context lands
 the TUI opens with no first message. Transfer-shaping flags (`--strategy`, `--depth`, `--context-delivery`) require
 `--resume-from`.
 
+**Shared-host note:** with the default `initial-message` delivery the curated context is passed as the `codex` process's
+positional prompt, so it is visible to other users' process listings on the same machine (`ps`, `/proc/<pid>/cmdline`).
+On a multi-user or shared host, prefer `--context-delivery hook` (trust-enrolled homes), which delivers the context out
+of band via `additionalContext` rather than on the command line. (Headless `--task` turns pass the prompt on stdin, so
+they are unaffected.)
+
 Thread capture is automatic. In trust-enrolled homes the `codex-session-start` hook reports the thread directly; without
 enrollment Forge discovers the rollout file Codex wrote during the run. Discovery refuses to guess: if several Codex
 sessions were started concurrently in the same directory, the thread may stay unrecorded — the command warns, and

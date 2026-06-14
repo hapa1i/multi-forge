@@ -220,7 +220,10 @@ experiment harness but the E2E supersedes its one-shot run):
 - **Guided-ceremony UX tax (the resolved-posture residual).** The `trusted_hash` is not black-box computable (0/13), so
   Forge cannot forge `[hooks.state]` records; the posture is a one-time interactive `codex` trust ceremony per
   `CODEX_HOME`. Survivable but a real Day-1 setup step; re-openable only if a codex-cli source-dive recovers the hash
-  (`hash-preimage.py --emit-state` is ready for that path).
+  (`hash-preimage.py --emit-state` is ready for that path). **Mitigation shipped (2026-06-12):** the ceremony is still
+  manual, but `forge runtime preflight codex --verify-enrollment` (`core/ops/codex_enrollment.py`) now *confirms* it
+  took, empirically — one trivial managed `codex exec` turn, enrolled iff `codex-session-start` fired (observation
+  receipt). Tests user scope only (path-stable); project scope needs a turn in the project.
 - **Path-stable command-string requirement.** Worktree trust survival hinges on the registered `command` being
   byte-identical across paths (40e: the command string is in the hash). A path-varying command (one embedding the
   worktree/project dir) would diverge the hash and break trust. The installer must register a stable `forge hook`
@@ -237,12 +240,19 @@ experiment harness but the E2E supersedes its one-shot run):
   worktrees. See the Worktree/installer-scope Open Decision (checklist).
 - **Malformed hook output FAILS OPEN, not closed** (refutes the doc claim). Codex ran the command on a PreToolUse
   response carrying `allow` + an unknown field + `continue:false`. The adapter/responder must emit strictly valid output
-  and must NOT rely on Codex fail-closing on bad hook output.
+  and must NOT rely on Codex fail-closing on bad hook output. **Action shipped (2026-06-12):** upstream issue drafted at
+  `scripts/experiments/codex-hooks/upstream-issues/pretooluse-malformed-fails-open.md` (probe 30h reproduction); needs
+  the exact doc citation + a `gh issue create` to `openai/codex` before filing. Forge's own responder already emits
+  strict output and never relies on fail-closing; probe stage 81 is the standing regression guard.
 - **PermissionRequest behavior headless is unpinned.** It did NOT fire under the read-only sandbox probe; whether it
   fires headless under permission-eliciting conditions is unobserved. Deliverable 3's PermissionRequest path rests on an
   event that has not been seen firing on `codex exec`.
 - **Codex version churn**: 0.137.0 -> 0.138.0 mid-evaluation; re-run the probe on Codex bumps (the harness is the
-  standing guard). Trust/enrollment semantics are exactly the kind of behavior a minor release changes.
+  standing guard). Trust/enrollment semantics are exactly the kind of behavior a minor release changes. **Mitigation
+  shipped (2026-06-12):** `CODEX_VERSION_VALIDATED` (`core/runtime/codex_preflight.py`, currently `0.139.0`) is the
+  probe-validated ceiling; `forge runtime preflight codex` prints a non-blocking re-probe notice when the installed
+  binary runs ahead of it (`CodexPreflight.version_beyond_validated`), and the real-codex E2E names it on failure. Bump
+  the constant after a green probe round on a newer codex.
 - **`allow_managed_hooks_only`** (enterprise `requirements.toml`) can still suppress user/project hooks regardless of
   enrollment.
 - **`fallbackModel`/model drift**: a Codex usage event's `model` must be the actually-routed model (already handled for

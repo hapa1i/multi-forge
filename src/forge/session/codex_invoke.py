@@ -64,6 +64,9 @@ def invoke_codex_interactive(
     else:
         argv += ["--sandbox", sandbox]
         if initial_prompt is not None:
+            # The positional prompt is visible to same-host process listings (ps,
+            # /proc/<pid>/cmdline). For sensitive context on a shared host, prefer
+            # --context-delivery hook (out-of-band additionalContext); see session.md.
             argv.append(initial_prompt)
 
     env = sanitize_codex_child_env(preflight)

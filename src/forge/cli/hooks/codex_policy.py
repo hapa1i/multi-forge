@@ -23,6 +23,7 @@ from typing import Any
 
 from forge.cli.hooks.codex_patch import PatchFileOp, parse_apply_patch
 from forge.cli.hooks.policy import format_deny_text, format_needs_review_text
+from forge.policy.deterministic.base import is_under_directory
 from forge.policy.types import ActionContext, CompositeDecision
 
 _MAX_CONTENT_CHARS = 5000  # same truncation convention as ClaudeHookAdapter
@@ -178,15 +179,18 @@ def sort_contexts_tests_first(contexts: list[ActionContext]) -> list[ActionConte
 
     Optimistic ordering for TDD stateful evaluation: an atomic patch adding test +
     implementation together passes tests-before-impl (the test file populates
-    ``tests_touched`` first). Same key as %policy check's per-file diff loop;
-    ``sorted`` is stable, so patch order is preserved within each bucket.
+    ``tests_touched`` first). Uses ``is_under_directory`` -- the SAME nested-aware rule
+    the TDD policy's ``applies_to`` gates on -- so a nested ``pkg/tests`` / ``pkg/src``
+    layout is reordered too. A top-level-only prefix match would leave both nested files
+    in one bucket and false-deny an impl-first atomic patch. ``sorted`` is stable, so
+    patch order is preserved within each bucket.
     """
 
     def _key(ctx: ActionContext) -> int:
         path = ctx.target_path or ""
-        if path.startswith(("tests/", "tests\\")):
+        if is_under_directory(path, "tests"):
             return 0
-        if path.startswith(("src/", "src\\")):
+        if is_under_directory(path, "src"):
             return 2
         return 1
 

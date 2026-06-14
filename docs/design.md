@@ -1551,10 +1551,13 @@ managed block in the Codex config the install scope maps to — user scope targe
 project/local scope targets `<project>/.codex/config.toml` (Codex has no settings.local analog). It is best-effort:
 skipped with a notice when `codex` is not on PATH, and its conflicts never block the install. Registration alone is
 inert — Codex hooks fire only after the user's one-time interactive trust ceremony (§3.9), which
-`forge extension enable` names in its next steps but cannot perform or verify. `~/.forge/installed.json` tracks what was
-installed for clean update/uninstall. Project/local enablement requires a `.claude/` anchor at the target directory
-(created if missing); user-level install (`--scope user`) goes to `~/.claude/` and does not require a project anchor.
-This establishes the Forge project per the identity model (§3).
+`forge extension enable` names in its next steps but cannot perform or verify. Enrollment is unverifiable from a config
+read (the `trusted_hash` is not computable), so `forge runtime preflight codex --verify-enrollment` confirms it
+empirically instead — it runs one trivial managed `codex exec` turn and reports the user-scope hook as enrolled iff the
+`codex-session-start` hook fired (the observation receipt appeared). `~/.forge/installed.json` tracks what was installed
+for clean update/uninstall. Project/local enablement requires a `.claude/` anchor at the target directory (created if
+missing); user-level install (`--scope user`) goes to `~/.claude/` and does not require a project anchor. This
+establishes the Forge project per the identity model (§3).
 
 > Scope model, module inventory, merge rules, and tracking file details in
 > [design_appendix.md §E](design_appendix.md#e-install-model-reference). Multi-scope installation behavior (dual user +

@@ -455,6 +455,38 @@ class TestVersionFlag:
         assert cp._version_meets_floor("0.130", "0.131.0") is False
 
 
+class TestValidatedVersionGuard:
+    """The probe-ceiling re-probe signal (mirrors 4g CLAUDE_VERSION_VALIDATED)."""
+
+    def test_at_validated_ceiling_is_not_beyond(self, monkeypatch) -> None:
+        # Exactly the validated version is proven, not ahead (strict greater-than).
+        _stub_probes(monkeypatch, version=cp.CODEX_VERSION_VALIDATED, doctor=_doctor(chatgpt="true"))
+        result = preflight_codex()
+        assert result.version_beyond_validated is False
+        assert result.version_validated == cp.CODEX_VERSION_VALIDATED
+
+    def test_below_ceiling_is_not_beyond(self, monkeypatch) -> None:
+        _stub_probes(monkeypatch, version="0.138.0", doctor=_doctor(chatgpt="true"))
+        assert preflight_codex().version_beyond_validated is False
+
+    def test_above_ceiling_flags_beyond(self, monkeypatch) -> None:
+        # A newer codex than the harness was last run against -> re-probe notice.
+        _stub_probes(monkeypatch, version="0.200.0", doctor=_doctor(chatgpt="true"))
+        result = preflight_codex()
+        assert result.version_beyond_validated is True
+        # Non-blocking: a version past the ceiling does not by itself fail readiness.
+        assert result.ready is True
+
+    def test_unparseable_version_is_not_beyond(self, monkeypatch) -> None:
+        # Can't claim "ahead" of the ceiling when the version doesn't parse.
+        _stub_probes(monkeypatch, version=None, doctor=_doctor(chatgpt="true"))
+        assert preflight_codex().version_beyond_validated is False
+
+    def test_not_installed_is_not_beyond(self, monkeypatch) -> None:
+        _stub_probes(monkeypatch, installed=False)
+        assert preflight_codex().version_beyond_validated is False
+
+
 class TestHappyPathAndAssert:
     def test_full_ready_result_shape(self, monkeypatch) -> None:
         # Mirrors the live machine: chatgpt auth, hooks enabled, no proxy.
