@@ -146,6 +146,32 @@ Shipped 2026-06-03 (statusline-enhancement card). Durable rules for `src/forge/c
   keeping `ProxyMetrics` decoupled from `CostTracker`. Cap amounts use `_fmt_cap_money` (four decimals below a cent),
   NOT `_fmt_dollars` (whose `int(usd*100)` collapses sub-cent caps to `0c`).
 
+### Codex runtime (codex_frontend epic, shipped 2026-06-12)
+
+Durable invariants for Forge's first alternate agent runtime. Sources: `src/forge/core/runtime/` (registry, preflight),
+`src/forge/install/codex_hooks.py`, probe harness `scripts/experiments/codex-hooks/`.
+
+- **Runtime seam = capability half + lifecycle half.** `core/runtime/registry.py` holds the capability matrix
+  (`RUNTIMES`/`RuntimeSpec`); the invoker classes (`core/invoker/`) are the lifecycle half over a runtime-neutral
+  `ActionContext`. Non-Claude runtimes encode their **limits as capability values** (`pretool_policy="partial"`,
+  `native_hooks="enrollment_gated"`, `usage_source="jsonl_events"`), never as omissions — a consumer must never mistake
+  a capability gap for parity. Adding a runtime = a new `RUNTIMES` row + an invoker, not scattered `if codex` branches.
+- **Codex hooks are enrollment-gated; the `trusted_hash` is not black-box computable.** Stage 83 matched 0/13 harvested
+  hashes across 15 canonicalizations, so Forge can never programmatically pre-enroll. The Phase 6 installer
+  (`install/codex_hooks.py`) writes a marker-delimited managed TOML block to the Codex config its install scope maps to
+  (`user -> $CODEX_HOME/config.toml`; `project`/`local -> <project>/.codex/config.toml`), but **registration is inert
+  until the user's one-time interactive `codex` trust ceremony**. Trust keys on the registering config's path + the
+  *command-string definition* (not script bytes): it survives `git worktree` checkouts of the enrolled project
+  (canonicalization) but does NOT cross to an unrelated repo (stage 84). Rendered entry bytes are golden-pinned so
+  sync/update never breaks enrollment. **Malformed PreToolUse hook output FAILS OPEN** (probe 30h) — never rely on Codex
+  fail-closing on bad hook output.
+- **Codex routes native-direct to OpenAI's Responses API by default; Forge governs at the seams, not the wire.**
+  `core/runtime/codex_preflight.py`: no `--proxy` -> `native_direct` (preferred); `--proxy` is rejected unless that
+  proxy already serves Responses on its Codex-facing endpoint (Forge adds no `/v1/responses` route). Usage therefore
+  comes from `jsonl_events`, not a proxy transcript, and the proxy/cost-routing features stay Claude-side. **Test
+  isolation:** codex hook/installer tests MUST use the autouse `isolate_codex_home` fixture (`tests/conftest.py`) or
+  they write the real `~/.codex/config.toml` (a real leak caught and fixed in Phase 6 slice 2).
+
 ### Proposed Promotions From Metric Evidence (awaiting human review, 2026-06-06)
 
 Drafted by the `metric_evidence_simplification` Phase 6 closeout. **Not yet promoted** — a human should review and move

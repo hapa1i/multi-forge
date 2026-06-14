@@ -25,6 +25,29 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board-contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-06-14
+
+### codex_frontend closeout: Codex shipped as a first-class alternate runtime (card -> done)
+
+**Goal**: Close out the `codex_frontend` card after PR #26 merged to `main`. Phases 0-6 and the residual-risk
+mitigations each have their own dated entries below; this records the epic closeout and the v0.6.0 release.
+
+**Key changes**:
+
+- Card moved `doing/codex_frontend/ -> done/` (board-contract closeout). All phase and Open-Decision boxes ticked; only
+  the deliberate Deferred items remain (app-server transport, filing the upstream fail-open issue, PermissionRequest
+  source-dive).
+- Durable lessons promoted to `impl_notes.md`: the capability/lifecycle runtime seam (limits-as-capability-values),
+  Codex hook enrollment-gating + non-computable `trusted_hash` + fail-open PreToolUse, and the
+  native-direct-to-Responses topology (governed at the session/hook seams, not the wire; `isolate_codex_home` test
+  isolation).
+- Post-merge doc-sync landed on the branch in #26: `design.md` split into design/appendix/workflows/cli_reference for
+  the 30K doc-size limit; architecture diagrams (1/5/8) and the README updated to show Codex as an alternate runtime.
+
+**Verification**: Full checklist ticked with per-phase verification recorded; `make pre-commit` + `make test-unit` green
+before tagging; PR #26 CI (Docker integration) green at merge. Released as **v0.6.0** (covers #24 supervisor timeout,
+#25 supervisor cascade, #26 Codex runtime) via the `v0.6.0` tag -> `publish.yml` -> PyPI.
+
 ## 2026-06-13
 
 ### codex_frontend Phase 6 code-review fixes: 12-finding sweep (fork / enrollment / policy / handoff / invoker)
