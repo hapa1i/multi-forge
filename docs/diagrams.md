@@ -10,7 +10,8 @@ Visual representations of the Forge unified architecture.
 flowchart TB
     subgraph UserLayer["User Layer"]
         CLI["forge CLI"]
-        CC["Claude Code"]
+        CC["Claude Code<br/>(default runtime)"]
+        CX["Codex CLI<br/>(alternate runtime)"]
     end
 
     subgraph StateLayer["State + Artifacts"]
@@ -39,6 +40,7 @@ flowchart TB
     subgraph External["External Services"]
         Anthropic["Anthropic API"]
         LiteLLM["LiteLLM<br/>(TR/Local)"]
+        OpenAI["OpenAI<br/>(Responses API)"]
     end
 
     CLI --> Session
@@ -48,6 +50,8 @@ flowchart TB
     CLI -->|sidecar mode| Sidecar
     CC -->|ANTHROPIC_BASE_URL| Proxy
     CC -->|hook events| Hooks
+    CX -->|hook events| Hooks
+    CX -->|codex exec, native-direct| OpenAI
 
     Session -->|writes| ASP
     Session -->|writes intent/overrides| SM
@@ -69,6 +73,12 @@ flowchart TB
     Proxy -->|routes to| LiteLLM
     Proxy -->|routes to| Anthropic
 ```
+
+**Runtime asymmetry:** Claude Code routes model traffic through the Forge proxy (`ANTHROPIC_BASE_URL`), so Forge sees
+its usage on the wire. Codex runs `codex exec` native-direct to OpenAI's Responses API by default; Forge governs it at
+the session and hook seams, not the wire (`--proxy` is rejected unless that proxy already serves Responses on its
+Codex-facing endpoint — Forge adds no `/v1/responses` route). Both runtimes share the same hooks, state, and artifact
+paths.
 
 ---
 
@@ -212,12 +222,16 @@ flowchart TB
 flowchart LR
     subgraph Installation["Install Surface"]
         Installer["forge extension enable<br/>or forge hook enable"]
-        Settings["Claude settings file<br/>(settings.json or settings.local.json)"]
+        Settings["Claude settings file<br/>(settings.json / settings.local.json)"]
+        CodexCfg["Codex config.toml managed block<br/>(user: $CODEX_HOME; project/local: &lt;project&gt;/.codex)"]
         Installer -->|writes hook config| Settings
+        Installer -->|appends managed block| CodexCfg
     end
 
-    subgraph Runtime["Claude Code triggers"]
-        Event["Hook Event<br/>(SessionStart, PreToolUse, Stop, etc.)"]
+    subgraph Triggers["Runtime triggers"]
+        ClaudeEvt["Claude Code event<br/>(SessionStart, PreToolUse, Stop, ...)"]
+        CodexEvt["Codex event<br/>(SessionStart, PreToolUse)"]
+        Enroll(["one-time trust ceremony<br/>(registration alone is inert)"])
     end
 
     subgraph Execution["Forge executes"]
@@ -226,11 +240,19 @@ flowchart LR
         Outputs["confirmed.* + artifacts<br/>+ pending-work markers"]
     end
 
-    Settings -->|configures| Event
-    Event -->|invokes| CLI2
+    Settings -->|configures| ClaudeEvt
+    CodexCfg -->|registers| CodexEvt
+    Enroll -.->|enables firing| CodexEvt
+    ClaudeEvt -->|invokes| CLI2
+    CodexEvt -->|"codex-session-start /<br/>codex-policy-check"| CLI2
     CLI2 -->|runs| Handler
     Handler -->|produces| Outputs
 ```
+
+Claude hooks fire as soon as the settings file is written. Codex hooks are **enrollment-gated**: the installer appends a
+marker-delimited block to the Codex `config.toml` its install scope maps to, registering two hooks
+(`codex-session-start`, `codex-policy-check`), but they fire only after the user completes Codex's one-time interactive
+trust ceremony — registration alone is inert. Both runtimes converge on the same `forge hook` handlers.
 
 ---
 
@@ -321,6 +343,7 @@ flowchart LR
         P5["Deferred work<br/>(stop pipeline, queue, search, memory writer)"]
         P6["Workflow runners<br/>(review, panel, analyze, debate)"]
         P7["Status line + runtime config"]
+        P8["Codex runtime<br/>(alternate frontend: seam, enroll, sessions, hooks, transfer)"]
     end
 
     subgraph Dropped["Not consolidated into Forge"]
