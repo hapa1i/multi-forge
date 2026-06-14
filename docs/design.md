@@ -1487,8 +1487,9 @@ protocols (`src/forge/cli/hooks/protocols.py`); two pairs ship: **Claude** (`cli
 `forge hook policy-check`) and **Codex** (`cli/hooks/codex_policy.py`, `forge hook codex-policy-check`). The Codex
 adapter normalizes each `apply_patch` file operation to the tool names every policy's `applies_to` gates on (Add File →
 `Write`, Update File → `Edit`; deletions skipped; `Bash` passes through), keeping runtime truth in `origin="codex"` +
-`tool_args`; files compose deny > needs_review > warn/allow, and unparseable patches fail open. Enforcement is
-**handler-only**: it requires a manually registered + trust-enrolled Codex PreToolUse hook.
+`tool_args`; files compose deny > needs_review > warn/allow, and unparseable patches fail open. Enforcement requires a
+registered + trust-enrolled Codex PreToolUse hook: `forge extension enable` registers it (codex-hooks module, §5);
+enrollment remains the user's one-time interactive trust ceremony, which Forge can neither perform nor verify.
 
 #### 4.1.5 Policy composition
 
@@ -1543,11 +1544,17 @@ Enforcement results = observed facts → hook-written `confirmed`. Stateful poli
 
 Claude Code extensions live in this repo and are installed via `forge extension enable`. Forge follows Claude Code's
 scope model (`--scope user` / `--scope project` / `--scope local`) and provides modular installation via profiles
-(`minimal` / `standard` / `full`). Six installable modules (commands, agents, skills, hooks, status-line, permissions)
-are combined into profiles. Settings merge is additive (hooks append + dedupe, permissions union).
-`~/.forge/installed.json` tracks what was installed for clean update/uninstall. Project/local enablement requires a
-`.claude/` anchor at the target directory (created if missing); user-level install (`--scope user`) goes to `~/.claude/`
-and does not require a project anchor. This establishes the Forge project per the identity model (§3).
+(`minimal` / `standard` / `full`). Seven installable modules (commands, agents, skills, hooks, status-line, permissions,
+codex-hooks) are combined into profiles. Settings merge is additive (hooks append + dedupe, permissions union). The
+`codex-hooks` module registers Forge's Codex hooks (`codex-session-start`, `codex-policy-check`) as a marker-delimited
+managed block in the Codex config the install scope maps to — user scope targets `$CODEX_HOME/config.toml`,
+project/local scope targets `<project>/.codex/config.toml` (Codex has no settings.local analog). It is best-effort:
+skipped with a notice when `codex` is not on PATH, and its conflicts never block the install. Registration alone is
+inert — Codex hooks fire only after the user's one-time interactive trust ceremony (§3.9), which
+`forge extension enable` names in its next steps but cannot perform or verify. `~/.forge/installed.json` tracks what was
+installed for clean update/uninstall. Project/local enablement requires a `.claude/` anchor at the target directory
+(created if missing); user-level install (`--scope user`) goes to `~/.claude/` and does not require a project anchor.
+This establishes the Forge project per the identity model (§3).
 
 > Scope model, module inventory, merge rules, and tracking file details in
 > [design_appendix.md §E](design_appendix.md#e-install-model-reference). Multi-scope installation behavior (dual user +

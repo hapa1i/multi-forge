@@ -17,7 +17,16 @@ from typing import Any
 # Import for CLAUDE_HOME support
 from forge.session.claude.paths import get_claude_home
 
+from .codex_hooks import (
+    apply_codex_merge,
+    get_builtin_codex_entries,
+    get_codex_config_path,
+    plan_codex_merge,
+    read_codex_registration,
+    remove_codex_block,
+)
 from .exceptions import (
+    ForgeInstallError,
     NoClaudeDirectoryError,
     NoForgeInstallationError,
     NotInstalledError,
@@ -29,6 +38,7 @@ from .models import (
     PROFILE_RANK,
     SETTINGS_ONLY_MODULES,
     SKILL_PROFILE_REQUIREMENTS,
+    CodexPlan,
     FilePlan,
     Installation,
     InstalledFile,
@@ -147,6 +157,13 @@ def _get_git_tracked_files(repo_root: Path) -> set[Path] | None:
         return {repo_root / line for line in result.stdout.splitlines() if line}
     except (OSError, subprocess.TimeoutExpired):
         return None
+
+
+def _codex_available() -> bool:
+    """Presence gate for the codex-hooks module (PATH check via the runtime registry)."""
+    from forge.core.runtime import get_runtime
+
+    return get_runtime("codex").is_installed()
 
 
 def get_target_root(scope: InstallScope, project_root: Path | None = None) -> Path:
@@ -514,7 +531,73 @@ class Installer:
         # Sort settings for determinism
         plan.settings.sort(key=lambda s: (s.key_path, str(s.value)))
 
+        # Codex registration is best-effort: its conflicts degrade to a
+        # visible skip and never set plan.has_conflicts (another tool's
+        # config must not fail the Claude install).
+        plan.codex = self._plan_codex(modules)
+
         return plan
+
+    def _plan_codex(self, modules: set[InstallModule]) -> CodexPlan | None:
+        """Plan the Codex hook registration for the scope-mapped config.toml."""
+        if InstallModule.CODEX_HOOKS not in modules:
+            return None
+        entries = get_builtin_codex_entries()
+        commands = [e.command for e in entries]
+        if not _codex_available():
+            # System-boundary degrade: codex is another tool; absence is a
+            # visible skip, not an error.
+            return CodexPlan(
+                action="unavailable",
+                reason="codex binary not found on PATH",
+                commands=commands,
+            )
+        config_path = get_codex_config_path(self._scope, self._project_root)
+        merge_plan = plan_codex_merge(config_path, entries)
+        return CodexPlan(
+            action=merge_plan.action,
+            config_path=merge_plan.config_path,
+            reason=merge_plan.reason,
+            commands=commands,
+        )
+
+    def _execute_codex(self, codex_plan: CodexPlan | None) -> tuple[str | None, list[str]] | None:
+        """Execute the planned Codex merge; return fresh tracking fields.
+
+        Returns (codex_config_path, codex_commands) read back from disk after
+        a resolved outcome -- where (None, []) legitimately means "nothing
+        Forge-owned on disk" (skip due to a manual registration: ownership
+        transferred to the user). Returns None when the merge could NOT act
+        (module not selected, no codex binary, conflict, apply failure):
+        there is no authoritative read, so the caller must keep its previous
+        tracking -- a managed block written by an earlier enable may still be
+        on disk and disable must keep knowing about it. Apply failures
+        degrade to a warning recorded on the plan (best-effort module; never
+        fails the install).
+        """
+        if codex_plan is None or codex_plan.action == "unavailable" or codex_plan.config_path is None:
+            return None
+        if codex_plan.action == "conflict":
+            logger.warning("Codex hook registration skipped: %s", codex_plan.reason)
+            return None
+
+        entries = get_builtin_codex_entries()
+        config_path = Path(codex_plan.config_path)
+        if codex_plan.action in ("install", "update"):
+            try:
+                apply_codex_merge(config_path, entries)
+            except ForgeInstallError as e:
+                # Race between plan and apply (config changed under us).
+                logger.warning("Codex hook registration skipped: %s", e)
+                codex_plan.action = "conflict"
+                codex_plan.reason = str(e)
+                return None
+
+        status = read_codex_registration(config_path, entries)
+        if status.block_present:
+            return (str(config_path), list(status.commands_registered))
+        # skip due to manual registration: user-owned, not tracked
+        return (None, [])
 
     def _plan_file(
         self,
@@ -866,6 +949,19 @@ class Installer:
                 if (existing_entry.key_path, existing_entry.stable_id) not in entry_ids:
                     final_entries.append(existing_entry)
 
+        codex_result = self._execute_codex(plan.codex)
+        if codex_result is not None:
+            codex_path, codex_commands = codex_result
+        elif existing is not None:
+            # No authoritative outcome (module not selected, codex binary
+            # unavailable, conflict, or apply failure): preserve prior
+            # tracking -- the previously written managed block may still be
+            # on disk and disable must keep knowing to remove it.
+            codex_path = existing.codex_config_path
+            codex_commands = list(existing.codex_commands)
+        else:
+            codex_path, codex_commands = None, []
+
         installation = Installation(
             scope=self._scope.value,
             mode=mode.value,
@@ -874,6 +970,8 @@ class Installer:
             files=final_files,
             settings_entries=final_entries,
             settings_backup_path=str(backup_path) if backup_path else None,
+            codex_config_path=codex_path,
+            codex_commands=codex_commands,
             installed_at=existing.installed_at if existing else now,
             updated_at=now,
         )
@@ -1034,4 +1132,32 @@ class Installer:
             validate_path_within_boundary(added_file, base_dir, "delete added file")
             added_file.unlink()
 
+        self._remove_codex_registration(existing)
+
         self._tracking.remove_installation(self._scope.value, self._project_path_str)
+
+    def _remove_codex_registration(self, existing: Installation) -> None:
+        """Remove the Forge-managed Codex hook block recorded in tracking.
+
+        The tracked path must match the current scope mapping (guards against
+        a tampered tracking file, and against a CODEX_HOME that changed since
+        install -- in either case Forge refuses to edit the unexpected file).
+        """
+        if not existing.codex_config_path:
+            return
+        tracked = Path(existing.codex_config_path)
+        expected = get_codex_config_path(self._scope, self._project_root)
+        if tracked.resolve() != expected.resolve():
+            logger.warning(
+                "tracked Codex config %s does not match the scope mapping %s; not modifying it",
+                tracked,
+                expected,
+            )
+            return
+        result = remove_codex_block(tracked, get_builtin_codex_entries())
+        if result.leftover_commands:
+            logger.warning(
+                "Forge hook commands remain outside the managed block in %s: %s",
+                tracked,
+                ", ".join(result.leftover_commands),
+            )

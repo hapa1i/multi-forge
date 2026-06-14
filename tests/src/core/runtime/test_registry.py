@@ -67,7 +67,9 @@ class TestCodexSpec:
         assert s.native_resume is True
         assert s.usage_source == "jsonl_events"
         assert s.headless_cmd == ("codex", "exec")
-        assert s.install_scopes == ()  # Forge does not manage Codex install
+        # Phase 6: the installer registers Codex hooks in the config the Forge
+        # install scope maps to (user -> $CODEX_HOME, project/local -> .codex/).
+        assert s.install_scopes == ("user", "project", "local")
         # Note records the default-on reality + the trust-enrollment finding.
         assert s.note is not None and "default-on" in s.note and "trust-enrolled" in s.note
 

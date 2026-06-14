@@ -176,7 +176,10 @@ RUNTIMES: dict[str, RuntimeSpec] = {
         pretool_policy="partial",  # Phase 1 probe: deny + updatedInput confirmed post-enrollment; partial -- enrollment-gated, malformed output fails open, PermissionRequest unpinned (see PolicyEnforcement)
         usage_source="jsonl_events",
         native_resume=True,  # codex exec resume, by thread_id; works cross-CWD (Phase 6 probe, 0.138.0)
-        install_scopes=(),  # Forge does not manage Codex install scopes yet
+        # Mirrors the Forge install scope (codex_frontend Phase 6): user ->
+        # $CODEX_HOME/config.toml; project/local -> <project>/.codex/config.toml
+        # (Codex has no settings.local analog).
+        install_scopes=("user", "project", "local"),
         curated_transfer_in=True,  # initial user message is the zero-setup default; SessionStart additionalContext delivery is probe-confirmed in enrolled homes (Phase 1 30e PASS; build is codex_frontend Phase 4)
         curated_transfer_out=True,  # via headless invoker
         note=(
@@ -194,16 +197,18 @@ RUNTIMES: dict[str, RuntimeSpec] = {
             "the registering config's PATH: a project-scope registration survives that project's `git "
             "worktree` checkouts (path-stable command) but is NOT trusted in an unrelated repo (stage 84, "
             "codex 0.139.0: a fresh repo's byte-identical project hook did not fire while the path-stable "
-            "user-level hook did). The Phase 6 installer scope is that trade-off -- user scope "
-            "(`$CODEX_HOME/config.toml`) is the one-ceremony-covers-all target; project scope travels "
-            "with git but needs per-repo enrollment. Forge ships the PreToolUse policy hook (Phase 3: "
-            "`forge hook codex-policy-check` over CodexHookAdapter/CodexHookResponder, "
-            "cli/hooks/codex_policy.py) -- handler only; enforcement still requires manual registration + "
-            "trust enrollment until the Phase 6 installer. Caveats: malformed PreToolUse "
+            "user-level hook did). The Phase 6 installer registers Forge's two hooks "
+            "(`codex-session-start`, `codex-policy-check`) as a managed block in the Codex config the "
+            "Forge install scope maps to -- user -> `$CODEX_HOME/config.toml` (one ceremony covers all "
+            "projects), project/local -> `<project>/.codex/config.toml` (per-repo ceremony; trade-off "
+            "accepted by the scope-mirroring decision). Registration alone is inert: enrollment is still "
+            "the user's one-time interactive trust ceremony, which the installer names but cannot perform "
+            "or verify. Caveats: malformed PreToolUse "
             "output FAILS OPEN (never rely on Codex fail-closing "
             "on bad hook output); PermissionRequest has not been observed firing headless; PreToolUse "
             "matchers must use Codex tool names (`Bash`, `apply_patch`). Registration validation is shallow "
-            "-- bogus event names load silently. Enterprise `allow_managed_hooks_only` (requirements.toml) "
+            "-- bogus event names load silently (the installer validates event names itself). Enterprise "
+            "`allow_managed_hooks_only` (requirements.toml) "
             "can suppress user/project hooks regardless of enrollment. Codex emits the Responses API "
             "(custom-provider `wire_api=chat` removed ~Feb 2026); a proxy fronting Codex must serve "
             "Responses on its Codex-facing endpoint (backend may be translated)."

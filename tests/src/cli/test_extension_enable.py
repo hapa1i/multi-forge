@@ -185,6 +185,7 @@ class TestEnableFailureCleanup:
         mock_plan = MagicMock()
         mock_plan.has_conflicts = True
         mock_plan.files = []
+        mock_plan.codex = None
         mock_plan.settings_entries = []
 
         with (
@@ -431,6 +432,7 @@ class TestEnableWithPath:
         mock_plan = MagicMock()
         mock_plan.has_conflicts = False
         mock_plan.files = []
+        mock_plan.codex = None
         mock_plan.settings = []
         mock_plan.settings_entries = []
         mock_plan.modules = []
@@ -470,6 +472,7 @@ class TestEnableWithPath:
         mock_plan = MagicMock()
         mock_plan.has_conflicts = False
         mock_plan.files = []
+        mock_plan.codex = None
         mock_plan.settings = []
         mock_plan.settings_entries = []
         mock_plan.modules = []
@@ -524,6 +527,7 @@ class TestEnableWithPath:
         mock_plan = MagicMock()
         mock_plan.has_conflicts = False
         mock_plan.files = []
+        mock_plan.codex = None
         mock_plan.settings = []
         mock_plan.settings_entries = []
         mock_plan.modules = []
@@ -630,3 +634,136 @@ class TestDisableNoInstallMessage:
         assert result.exit_code != 0
         assert "forge extension enable" in result.output
         assert "forge init" not in result.output
+
+
+class TestEnableCodexHooks:
+    """Tests for the codex-hooks module surfaces on enable/status/disable."""
+
+    @staticmethod
+    def _codex_config() -> Path:
+        import os
+
+        return Path(os.environ["CODEX_HOME"]) / "config.toml"
+
+    def _enable(self, available: bool) -> Any:
+        from unittest.mock import MagicMock, patch
+
+        from click.testing import CliRunner
+
+        from forge.cli.extensions import enable_cmd
+
+        with (
+            patch("forge.install.version.check_minimum_version") as mock_ver,
+            patch("forge.install.installer._codex_available", return_value=available),
+        ):
+            mock_ver.return_value = MagicMock(ok=True)
+            runner = CliRunner()
+            return runner.invoke(
+                enable_cmd,
+                ["--scope", "user", "--profile", "minimal", "--with", "codex-hooks"],
+            )
+
+    def test_enable_registers_and_prints_ceremony_next_steps(self) -> None:
+        result = self._enable(available=True)
+        assert result.exit_code == 0, result.output
+        assert "Next steps (Codex hooks):" in result.output
+        assert "grant trust" in result.output
+        assert "# >>> forge hooks >>>" in self._codex_config().read_text()
+
+    def test_enable_without_codex_binary_skips_visibly(self) -> None:
+        result = self._enable(available=False)
+        assert result.exit_code == 0, result.output
+        assert "Codex hooks skipped: codex binary not found on PATH" in result.output
+        assert "Next steps (Codex hooks):" not in result.output
+        assert not self._codex_config().exists()
+
+    def test_status_shows_codex_registration(self) -> None:
+        from click.testing import CliRunner
+
+        from forge.cli.extensions import status_cmd
+
+        self._enable(available=True)
+        result = CliRunner().invoke(status_cmd, ["--scope", "user"])
+        assert result.exit_code == 0, result.output
+        assert "Codex:" in result.output
+        assert "hooks registered in" in result.output
+
+    def test_status_json_carries_codex_fields(self) -> None:
+        import json
+
+        from click.testing import CliRunner
+
+        from forge.cli.extensions import status_cmd
+
+        self._enable(available=True)
+        result = CliRunner().invoke(status_cmd, ["--scope", "user", "--json"])
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data[0]["codex_config_path"] == str(self._codex_config())
+        assert data[0]["codex_commands"] == [
+            "forge hook codex-policy-check",
+            "forge hook codex-session-start",
+        ]
+
+    def test_disable_previews_and_removes_block(self) -> None:
+        from click.testing import CliRunner
+
+        from forge.cli.extensions import disable_cmd
+
+        self._enable(available=True)
+        assert self._codex_config().is_file()
+        result = CliRunner().invoke(disable_cmd, ["--scope", "user", "--yes"])
+        assert result.exit_code == 0, result.output
+        assert "Codex hooks:" in result.output
+        assert not self._codex_config().exists()
+
+    def _sync(self, available: bool = True) -> Any:
+        from unittest.mock import MagicMock, patch
+
+        from click.testing import CliRunner
+
+        from forge.cli.extensions import sync_cmd
+
+        with (
+            patch("forge.install.version.check_minimum_version") as mock_ver,
+            patch("forge.install.installer._codex_available", return_value=available),
+        ):
+            mock_ver.return_value = MagicMock(ok=True)
+            return CliRunner().invoke(sync_cmd, ["--scope", "user"])
+
+    def test_sync_restores_block_counts_it_and_prints_ceremony(self) -> None:
+        """A codex-only sync change must not render "Already up to date." and
+        must print the trust next-steps (an updated block can carry untrusted
+        new entries -- per-entry trusted_hash)."""
+        self._enable(available=True)
+        self._codex_config().unlink()  # block gone; sync should restore it
+
+        result = self._sync(available=True)
+        assert result.exit_code == 0, result.output
+        assert "Already up to date." not in result.output
+        assert "Codex hooks" in result.output  # counted as an action
+        assert "Next steps (Codex hooks):" in result.output
+        assert "# >>> forge hooks >>>" in self._codex_config().read_text()
+
+    def test_sync_unchanged_block_stays_quiet(self) -> None:
+        """No codex change -> no ceremony nag, counts stay honest."""
+        self._enable(available=True)
+        result = self._sync(available=True)
+        assert result.exit_code == 0, result.output
+        assert "Already up to date." in result.output
+        assert "Next steps (Codex hooks):" not in result.output
+
+    def test_rerun_enable_without_codex_keeps_tracking(self) -> None:
+        """CLI-level pin of the preserve fix: enable -> re-enable codex-less."""
+        import json
+
+        from click.testing import CliRunner
+
+        from forge.cli.extensions import status_cmd
+
+        self._enable(available=True)
+        result = self._enable(available=False)
+        assert result.exit_code == 0, result.output
+        status = CliRunner().invoke(status_cmd, ["--scope", "user", "--json"])
+        data = json.loads(status.output)
+        assert data[0]["codex_config_path"] == str(self._codex_config())

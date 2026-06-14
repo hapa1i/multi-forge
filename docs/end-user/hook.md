@@ -197,9 +197,11 @@ Purpose: the same policy enforcement for **Codex** sessions (`forge session star
   shell (`Bash`) actions pass through unevaluated
 - a block is delivered as Codex's deny JSON on stdout (not an exit code); an allow produces no output
 - non-Forge Codex sessions (no resolvable Forge session) pass through as a fully silent allow
-- **not auto-installed**: register `forge hook codex-policy-check` as a PreToolUse hook in your Codex config and
-  complete Codex's one-time trust ceremony — Codex hooks only fire from trust-enrolled registrations (installer support
-  is planned)
+- **registered by `forge extension enable`** (codex-hooks module, standard profile): the installer writes a managed
+  block into the Codex config matching your install scope — user scope targets `$CODEX_HOME/config.toml`, project/local
+  scope targets `<project>/.codex/config.toml`. Skipped with a notice when `codex` is not installed.
+- registration alone is inert: complete Codex's one-time trust ceremony (run `codex` interactively and grant trust when
+  prompted) — Codex hooks only fire from trust-enrolled registrations
 
 ### codex-session-start (Codex SessionStart)
 
@@ -214,8 +216,9 @@ fired (not enrolled), the command exits 1 and tells you so — the first turn ra
 - every other invocation is silent (no stdout/stderr). In a **managed** session with nothing staged (interactive starts,
   resume turns) the hook still records a small observation receipt under the session directory — that is how enrolled
   homes capture the thread id of interactive sessions exactly. Non-Forge Codex sessions see zero writes.
-- **not auto-installed**: add the registration below to your Codex `config.toml` and complete the one-time trust
-  ceremony (run `codex` interactively in the project and grant trust):
+- **registered by `forge extension enable`** (codex-hooks module, with `codex-policy-check`, as a managed block in the
+  scope-mapped Codex config) — then complete the one-time trust ceremony (run `codex` interactively and grant trust). To
+  register manually instead, add this to your Codex `config.toml`:
 
 ```toml
 [[hooks.SessionStart]]
@@ -224,6 +227,9 @@ type = "command"
 command = "forge hook codex-session-start"
 timeout = 60
 ```
+
+- the installer detects a pre-existing manual registration and leaves it alone (it never double-registers; a *partial*
+  manual registration is reported as a conflict to resolve by hand)
 
 - **do not rename or alter the registered command string**: Codex trust hashes the registration definition, so any
   change to the `command` value invalidates the enrollment and the hook silently stops firing
@@ -329,8 +335,8 @@ All hooks are under `forge hook ...` (group name `hook`, not `hooks`):
 forge hook session-start       # SessionStart handler
 forge hook stop                # Stop handler
 forge hook policy-check        # PreToolUse:Write/Edit handler (Claude)
-forge hook codex-policy-check  # PreToolUse:apply_patch handler (Codex; manual registration)
-forge hook codex-session-start # SessionStart transfer delivery (Codex; manual registration)
+forge hook codex-policy-check  # PreToolUse:apply_patch handler (Codex; installed to Codex config)
+forge hook codex-session-start # SessionStart transfer delivery (Codex; installed to Codex config)
 forge hook enable --local      # Install to .claude/settings.local.json
 ```
 

@@ -63,6 +63,7 @@ class TestProfileModules:
             InstallModule.HOOKS,
             InstallModule.PERMISSIONS,
             InstallModule.STATUSLINE,
+            InstallModule.CODEX_HOOKS,
         }
         assert PROFILE_MODULES[InstallProfile.STANDARD] == expected
 

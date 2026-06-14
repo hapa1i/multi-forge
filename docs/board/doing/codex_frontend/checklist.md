@@ -74,6 +74,19 @@ see the verification paragraph at the end of the Phase 5 section -- the launcher
 `resume` subcommand). Stage 87 is now covered by the probe-debt harness run below. **Next: Phase 6 (installer)**, with
 both hook handlers shipped.
 
+**Phase 6 review fixes shipped 2026-06-12** (see change_log): tracking preserved through unavailable/conflict re-runs
+(`_execute_codex` None = no-authoritative-outcome -> keep prior tracking; manual-skip still authoritative), dedupe
+rekeyed to `(event, command)` registration identity (wrong/bogus-event manual entries no longer satisfy it; matchers
+deliberately ignored), and `sync` now counts codex actions + prints the ceremony next-steps. Two fail-confirmed
+regression files + 3 CLI cases; sweep 6341 green; Docker installer 15/15.
+
+**Phase 6 shipped 2026-06-12** (all six slices ticked below; see change_log): the codex-hooks installer module --
+`forge extension enable` registers both Codex hooks as a managed TOML block in the config the **Forge install scope maps
+to** (the resolved scope Open Decision: user -> `$CODEX_HOME/config.toml`, project/local -> `.codex/config.toml`),
+presence-gated, best-effort (codex conflicts never block the Claude install), with trust-ceremony Next-steps guidance.
+Registry `install_scopes` flipped. The trust ceremony itself stays operator-owned (unverifiable pre-turn); an optional
+live-codex enable smoke could ride a future probe round. **Next: closeout** (all card phases shipped).
+
 **Probe-debt harness slice 2026-06-12:** stages `85-policy-check-e2e`, `86-sessionstart-delivery-e2e`, and
 `87-interactive-smoke` are now implemented under `scripts/experiments/codex-hooks/stages/` and wired into
 `reproduce.sh all`. They convert the owed Phase 3/4/5 product-hook and real-TUI checks into runnable operator gates with
@@ -457,10 +470,106 @@ vs the payload's UTC -- confirming the filter-by-mtime decision. **Closed 2026-0
 smoke covered hold instructions, multi-KB positional delivery, enrolled hook delivery, live reattach, active-gate
 refusal, and read-only sandbox denial.
 
-## Phase 6 - Installer Codex support (gated on Phase 1 posture + Phases 3/5)
+## Phase 6 - Installer Codex support (shipped 2026-06-12)
 
-Stub -- Codex preset + registration target + installer-side event-name validation (the binary won't catch typos) + the
-per-hook-trust story from Phase 1.
+**Scope decision (user, 2026-06-12): Codex hook registration mirrors the Forge install scope** (see Open Decisions).
+Mapping: `user` -> `$CODEX_HOME/config.toml` (default `~/.codex/config.toml`); `project` AND `local` ->
+`<project_root>/.codex/config.toml` (Codex has no settings.local analog -- both Forge project scopes target the one
+per-project config; the committed-vs-not distinction is the user's gitignore choice, documented).
+
+**Design decisions (recorded at plan time):**
+
+- **No `codex.preset.json`** (the card's question-marked sketch is rejected): the Claude preset exists for user-owned
+  permissions/env; hooks always come from the builtin even there. The Codex registration is hooks-only AND the command
+  string is trust-hashed -- a user-editable surface would invite silently breaking enrollment. Builtin-only entries in
+  `install/codex_hooks.py`.
+
+- **Registration mechanism = marker-delimited managed TOML block** appended to `config.toml` (`# >>> forge hooks >>>` /
+  `# <<< forge hooks <<<`): codex-cli owns that file (auth, model config, comments), so Forge never rewrites or
+  normalizes it -- no TOML-writer dependency added. Pre-checks parse with stdlib `tomllib` (unparseable file or
+  non-array `hooks.<event>` -> conflict; our command already present anywhere -> skip); post-merge content is
+  re-validated with `tomllib` before the atomic write; backup mirrors the settings pattern
+  (`.config.toml.forge.backup.<ts>`). Uninstall removes the marker block only; Forge commands found OUTSIDE the markers
+  are warned about and left (user-owned now).
+
+- **Trust-byte stability**: the rendered entry bytes (probe-pinned nested `[[hooks.<event>]]` shape, command strings
+  `forge hook codex-session-start` / `forge hook codex-policy-check`, timeout 60) are golden-pinned -- sync/update
+  replaces the block with identical bytes so existing enrollment survives (82e: the hash covers the definition).
+  `codex-policy-check` registers PreToolUse with NO matcher (probe: `matcher="shell"` never fired; the adapter filters
+  apply_patch vs Bash itself).
+
+- **Module + gating**: new settings-only `InstallModule.CODEX_HOOKS` (`codex-hooks`) in `standard` + `full` profiles,
+  **presence-gated** -- skipped with a visible notice when the `codex` binary is absent (registry `is_installed()`;
+  system-boundary degrade, never silent). `--with codex-hooks` on a codex-less machine still skips with the notice.
+
+- **Enrollment is the user's ceremony**: enable prints a Next-steps block (run `codex` interactively, grant trust; hooks
+  are inert until then). The installer never claims enrollment (unverifiable pre-turn, Phase 1).
+
+- [x] Slice 1 -- `install/codex_hooks.py`: builtin entries, `CODEX_HOOK_EVENTS` (the probe-pinned 10) + event-name
+  validation (the binary loads bogus names silently), block render, target-path mapping, merge/unmerge/detect.
+
+  - Assertion: golden block bytes pinned; merge is idempotent + dedupes against user-moved entries; unparseable config
+    and non-array `hooks.<event>` -> conflict without touching the file; post-validate failure restores the original;
+    unknown event name raises at plan time; `CODEX_HOME` env honored.
+  - **Done 2026-06-12**: 40 tests (`test_codex_hooks.py`) incl. the trust-byte golden, the inline-table
+    (`hooks = { SessionStart = [] }`) post-validation-only failure with no write and no backup, full-vs-partial manual
+    registration (skip vs conflict), and whitespace-only file deletion on remove; mypy clean.
+
+- [x] Slice 2 -- installer wiring: `InstallModule.CODEX_HOOKS`, profile membership, presence gating, `InstallPlan` codex
+  section, additive `Installation` tracking fields, plan/init/uninstall/update integration.
+
+  - Assertion: plan shows codex entries only when module on + binary present; init writes block + backup + tracking;
+    re-run skips (idempotent); uninstall removes block + tracking; update replaces block byte-identically; old tracking
+    manifests (no codex fields) still read.
+  - **Done 2026-06-12**: `TestInstallerCodexHooks` (11 cases) incl. update byte-stability, conflict-never-blocks (the
+    Claude install completes), tampered-tracking-path refusal, and module-dropped tracking preservation; install package
+    286 green. Found + fixed a test-isolation hole: the suite wrote the block into the REAL `~/.codex/config.toml`
+    (restored from the Forge backup); new autouse `isolate_codex_home` in `tests/conftest.py` makes the leak
+    structurally impossible.
+
+- [x] Slice 3 -- CLI: enable completion prints the ceremony Next-steps when codex hooks were installed; status renders
+  the codex registration; disable removes it; plan rendering shows the codex section.
+
+  - Assertion: enable/status/disable CLI tests; no `Tip:` outside output.py (existing invariant test stays green).
+  - **Done 2026-06-12**: `TestEnableCodexHooks` (5 end-to-end CliRunner cases: ceremony next-steps, unavailable notice,
+    status human + `--json` codex fields, disable preview + removal); 4 existing mock plans gained `codex = None`;
+    `test_extension_enable.py` 44 green; Tip-invariant untouched.
+
+- [x] Slice 4 -- registry flip: codex `install_scopes` `()` -> `("user", "project", "local")` + note rewritten to the
+  shipped mapping.
+
+  - Assertion: registry/CLI tests updated; `forge runtime list --json` renders the scopes.
+  - **Done 2026-06-12**: registry + note updated (installer paragraph replaces the open-trade-off sentence); 87
+    runtime/CLI tests green; live `forge runtime list --json` renders `install_scopes: ['user', 'project', 'local']`.
+
+- [x] Slice 5 -- Docker integration: wheel-CLI enable with a codex shim on PATH writes the block; disable removes it;
+  presence-gated skip without the shim.
+
+  - Assertion: `./scripts/test-integration.sh tests/integration/docker/test_installer.py` green.
+  - **Done 2026-06-12**: `TestCodexHooksModule` (3 cases: full enable->status->disable cycle with a codex shim,
+    presence-gated skip, user-content preservation through the cycle); file 15/15 green (12 pre-existing unchanged).
+
+- [x] Slice 6 -- docs/board sync: design.md §5 install model + §4.1.4/§3.9 "manual registration until Phase 6" caveats
+  rewritten to installer-registered (+ceremony); design_appendix §E module table + codex registration subsection;
+  end-user hook.md "not auto-installed" bullets replaced; change_log entry.
+
+  - Assertion: grep gate -- no stale "not auto-installed"/"installer support is planned" claim on normative surfaces;
+    `make pre-commit` clean.
+  - **Done 2026-06-12**: design.md §5 (seven modules + codex-hooks paragraph) + §4.1.4 (handler-only ->
+    installer-registered + ceremony); appendix §E.2 row + new §E.6; hook.md both codex sections reframed (manual TOML
+    kept as reference); QA checklist 2.10/2.11 added (count 535 -> 541); grep gate clean (remaining "manual
+    registration" hits document the dedupe behavior); `make pre-commit` clean; full unit sweep 6329 green; change_log
+    entry added.
+
+| Test                    | Fixture                               | Assertion                                                     | Test File                                        |
+| ----------------------- | ------------------------------------- | ------------------------------------------------------------- | ------------------------------------------------ |
+| Block merge idempotent  | user config.toml with comments + auth | two installs -> one block, user bytes untouched               | `tests/src/install/test_codex_hooks.py`          |
+| Conflict fail-closed    | config.toml with `hooks` as non-array | plan conflict, file unmodified                                | `tests/src/install/test_codex_hooks.py`          |
+| Trust-byte stability    | installed block, then update()        | block bytes identical pre/post sync                           | `tests/src/install/test_codex_hooks.py` (golden) |
+| Scope mapping           | user/project/local installs           | user -> $CODEX_HOME, project+local -> .codex/config.toml      | `tests/src/install/test_codex_hooks.py`          |
+| Presence gating         | no codex on PATH                      | module skipped with visible notice, no file created           | `tests/src/install/test_installer.py`            |
+| Uninstall block removal | enabled then disabled                 | marker block gone, user content + outside-marker entries kept | `tests/src/install/test_installer.py`            |
+| Wheel-CLI e2e           | Docker, codex shim on PATH            | enable writes block, disable removes, skip without shim       | `tests/integration/docker/test_installer.py`     |
 
 ## Deferred
 
@@ -494,7 +603,11 @@ per-hook-trust story from Phase 1.
   `.codex/config.toml` travels with git and survives worktrees but costs a ceremony *per repo*; USER-scope
   `$CODEX_HOME/config.toml` is path-stable so one ceremony covers every project (stage 84's user-level control fired
   unprompted from the fresh repo) but is not committed with the repo -- **user scope is the leading
-  one-ceremony-covers-all candidate.**
+  one-ceremony-covers-all candidate.** **RESOLVED 2026-06-12 (user decision): Codex registration mirrors the Forge
+  install scope** -- `user` -> `$CODEX_HOME/config.toml`, `project`/`local` -> `<project_root>/.codex/config.toml`
+  (Codex has no settings.local analog). Accepted trade-off: project/local installs cost one trust ceremony per repo; the
+  enable Next-steps block names the ceremony explicitly so a registered-but-unenrolled install is never mistaken for
+  active enforcement. See the Phase 6 plan for the mechanism.
 - [x] Bridge CLI shape (Phase 2): **resolved 2026-06-10 -- flag shape on `forge session start`:**
   `forge session start [name] --runtime codex --resume-from <parent>`. Rationale: this is a session-creation operation
   (new manifest with a `runtime` field, runtime-specific `confirmed` facts, runtime-aware launcher dispatch), so it

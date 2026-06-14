@@ -27,6 +27,77 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-12
 
+### codex_frontend Phase 6 follow-up: review fixes (tracking loss, event-blind dedupe, silent sync)
+
+**Goal**: Fix three Phase 6 review findings — two P1s (a previously tracked Codex block orphaned when codex is
+temporarily off PATH; manual-registration dedupe matching bare command strings regardless of event, so a wrong-event
+registration silently skipped enforcement untracked) and one P2 (`extension sync` never printed the trust-ceremony
+next-steps and `_count_actions` ignored codex, rendering a false "Already up to date." on codex-only changes).
+
+**Key changes**:
+
+- `Installer._execute_codex` now returns `None` for "no authoritative outcome" (module not selected, codex binary
+  unavailable, conflict, apply failure) vs `(path, commands)` for a resolved read-back from disk; `init()` preserves
+  prior tracking on `None` — unifying the module-dropped branch — so disable always keeps knowing about a previously
+  written block. The skip-due-to-manual-registration outcome stays authoritative (`(None, [])`): ownership transferred
+  to the user, tracking correctly clears.
+- New `_collect_registrations()` in `codex_hooks.py`: dedupe compares `(event, command)` pairs with `type = "command"`,
+  matching Codex's own registration identity; matchers deliberately ignored (a matcher'd entry still fires on
+  overlapping events — installing alongside would double-fire). Wrong-event and bogus-event registrations now plan
+  `install`; conflict/post-merge-validation messages name `event: command`. The event-agnostic `_collect_commands()`
+  flatten is kept for the reporting surfaces (status, uninstall leftover warning) by design.
+- `_count_actions` returns a third codex component (install/update = 1 action) at both call sites, and `sync_cmd` calls
+  `_print_codex_completion` — a synced block can carry new entries whose per-entry `trusted_hash` is not yet granted, so
+  sync is exactly where the ceremony guidance matters.
+
+**Verification**: Two regression files, fail-confirmed against the unfixed code (6 failing + 3 behavior-guard cases):
+`tests/regression/test_bug_codex_tracking_lost_on_unavailable.py` (unavailable + conflict re-runs preserve tracking and
+disable still cleans up; manual-skip still drops tracking) and `tests/regression/test_bug_codex_dedupe_wrong_event.py`
+(swapped/bogus events install, partial wrong-event conflicts, correct-event + matcher'd dedupe kept, non-command type
+excluded). Three new CLI cases (sync restores block + counts it + prints ceremony; unchanged sync stays quiet;
+codex-less re-enable keeps tracking via `status --json`). Full sweep 6341 unit+regression green; Docker
+`test_installer.py` 15/15; mypy/pyright clean; `make pre-commit` clean.
+
+### codex_frontend Phase 6: codex-hooks installer module (scope-mirroring registration)
+
+**Goal**: `forge extension enable` registers Forge's two Codex hooks (`codex-session-start`, `codex-policy-check`) in
+the Codex config the **Forge install scope maps to** — resolving the stage-84 installer-scope trade-off by user
+decision: mirror the install scope (`user` -> `$CODEX_HOME/config.toml`; `project`/`local` ->
+`<project>/.codex/config.toml`, Codex has no settings.local analog). Accepted trade-off: project/local installs cost one
+trust ceremony per repo; enable names the ceremony explicitly so a registered-but-unenrolled install is never mistaken
+for active enforcement.
+
+**Key changes**:
+
+- **`install/codex_hooks.py`** (new): builtin entries (trust-durable command strings, PreToolUse with NO matcher — the
+  adapter filters), marker-delimited managed block (`# >>> forge hooks >>>`), `tomllib`-validated merge/remove that
+  never rewrites the codex-owned `config.toml` (no TOML-writer dependency; post-merge parse validation before an atomic
+  write; `.config.toml.forge.backup.<ts>`), event-name validation against the probe-pinned 10-event set (Codex loads
+  bogus names silently), and dedupe vs manual registrations (full -> skip untracked; partial -> conflict — installing
+  would double-register and Codex fires duplicates twice per event).
+- **Installer wiring**: settings-only `InstallModule.CODEX_HOOKS` in `standard`+`full`, presence-gated on the codex
+  binary (visible skip, never silent); `InstallPlan.codex` (`CodexPlan`); additive `Installation.codex_config_path`/
+  `codex_commands` tracking; **codex conflicts never set `has_conflicts`** (best-effort: another tool's config must not
+  fail the Claude install); uninstall removes only the managed block, refuses a tracked path that no longer matches the
+  scope mapping, and deletes a whitespace-only (Forge-created) file.
+- **CLI**: plan render gains a "Codex hooks (config.toml)" section; enable prints trust-ceremony Next-steps on
+  install/update; `extension status` shows the registration (human + `--json`); disable previews the block removal.
+- **Registry**: codex `install_scopes` `()` -> `("user", "project", "local")`; note rewritten to the shipped mapping.
+- **Test isolation fix**: the new installer tests exposed that nothing isolated `CODEX_HOME` — the suite wrote the
+  managed block into the real `~/.codex/config.toml` (restored from the Forge backup). New autouse `isolate_codex_home`
+  fixture in `tests/conftest.py` closes the leak class for all tests.
+- **Docs**: design.md §5 (seven modules + codex-hooks paragraph) + §4.1.4 (handler-only -> installer-registered +
+  ceremony); design_appendix §E.2 + new §E.6 (mechanics); end-user hook.md codex sections reframed (manual TOML kept as
+  a reference path); QA checklist §2.10/§2.11 (test-count 535 -> 541).
+
+**Verification**: 59 new unit cases — `test_codex_hooks.py` (40: trust-byte golden, inline-table post-validation-only
+failure with no write, full-vs-partial manual dedupe, whitespace-only deletion), `TestInstallerCodexHooks` (11: update
+byte-stability, conflict-never-blocks, tampered-path refusal, module-dropped tracking preservation),
+`TestEnableCodexHooks` (5 CliRunner end-to-end), registry pins; full unit+regression sweep 6329 green; Docker
+`test_installer.py` 15/15 (3 new `TestCodexHooksModule` cases through the real wheel CLI: enable->status->disable cycle
+with a codex shim, presence-gated skip, user-content preservation); live `forge runtime list --json` renders the flipped
+scopes; `make pre-commit` clean.
+
 ### codex_frontend probe debt: operator-gated stages 85-87 harness
 
 **Goal**: Convert the owed Phase 3/4/5 operator-gated Codex checks from README sketches into runnable probe stages:

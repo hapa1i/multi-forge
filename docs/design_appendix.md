@@ -781,11 +781,12 @@ Extracted from [design.md §5.1-5.4](design.md#5-extensions-install-model). Over
 | `hooks`       | Hook settings entries (invoke `forge hook ...`)    | No hook scripts installed; requires `hooks.*` settings merge |
 | `status-line` | `statusLine` setting (invokes `forge status-line`) | No scripts installed; same pattern as hooks                  |
 | `permissions` | Forge-required permission entries                  | Merged as unions                                             |
+| `codex-hooks` | Managed hook block in Codex `config.toml`          | Scope-mapped target; best-effort (see §E.6)                  |
 
 Profiles:
 
 - `minimal`: `commands`
-- `standard`: `commands`, `agents`, `skills`, `hooks`, `permissions`, `status-line` (default)
+- `standard`: `commands`, `agents`, `skills`, `hooks`, `permissions`, `status-line`, `codex-hooks` (default)
 - `full`: all modules (same as standard; reserved for future heavy modules)
 
 ### E.3 Settings merge rules (§5.3 -- normative)
@@ -831,6 +832,38 @@ scopes.
 forge extension disable --scope user     # Remove user-level
 forge extension enable --scope project   # Keep project-level only
 ```
+
+### E.6 Codex hook registration (codex-hooks module)
+
+`forge extension enable` registers Forge's two Codex hooks by appending a marker-delimited managed block
+(`# >>> forge hooks >>>` … `# <<< forge hooks <<<`) to the Codex config the Forge install scope maps to:
+
+| Forge scope         | Codex config target                                        |
+| ------------------- | ---------------------------------------------------------- |
+| `user`              | `$CODEX_HOME/config.toml` (default `~/.codex/config.toml`) |
+| `project` / `local` | `<project_root>/.codex/config.toml`                        |
+
+Codex has no settings.local analog, so both project scopes target the one per-project config. The scope choice carries a
+trust cost (stage 84): user scope needs **one** trust ceremony ever; project/local scope needs one **per repo**.
+
+Mechanics (`src/forge/install/codex_hooks.py`):
+
+- **Forge never rewrites the user's config.toml** — codex-cli owns it. Merge appends or replaces only the managed block,
+  re-validates the merged content with `tomllib` before an atomic write, and backs up first
+  (`.config.toml.forge.backup.<ts>`). Disable removes only the block (a whitespace-only remainder deletes the file).
+- **Trust-byte stability**: the rendered entry bytes are golden-pinned — Codex's `trusted_hash` covers the registration
+  definition, so changing a command string or entry shape silently invalidates existing enrollment.
+- **Dedupe vs manual registrations**: all Forge commands already registered outside the markers → skip (manual
+  registration kept, untracked); a partial manual registration → conflict (installing would double-register).
+- **Best-effort module**: a missing `codex` binary or a config conflict degrades to a visible skip — it never sets
+  `InstallPlan.has_conflicts` and never blocks the Claude install.
+- **Event-name validation**: registration event names are validated against the probe-pinned 10-event set at plan time
+  (Codex itself loads bogus event names silently).
+- Tracking records `codex_config_path` + `codex_commands` in `~/.forge/installed.json`; `forge extension status` shows
+  the registration; disable refuses a tracked path that no longer matches the scope mapping.
+
+Registration alone is inert: enable prints a Next-steps block naming the one-time interactive trust ceremony (run
+`codex`, grant trust). Enrollment is unverifiable pre-turn (design.md §3.9), so Forge never claims it.
 
 ---
 
