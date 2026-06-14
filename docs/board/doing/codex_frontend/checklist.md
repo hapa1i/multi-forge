@@ -300,7 +300,7 @@ deletions skipped); `origin="codex"` + raw `tool_args` keep runtime truth.
   - **Done 2026-06-11**: 17/17 (`test_policy_hooks.py` -- 7 new Codex cases + 10 pre-existing unchanged, proving the
     extraction moved no Claude bytes) + 9/9 `test_supervisor_e2e.py` (cascade path through the extracted registration);
     stage-85 follow-up note added to the probe README.
-- [x] Slice 6 -- docs/board sync: design.md §4.1.4/§4.1.5 (+§5.5.5 mirror check), protocols.py docstrings, registry
+- [x] Slice 6 -- docs/board sync: design_workflows.md §1.4/§1.5 (+§3.5 mirror check), protocols.py docstrings, registry
   codex note sentence (`pretool_policy` stays `"partial"`), end-user hook.md, card Deliverable 3 annotation, change_log
   entry.
   - Assertion: no stale "Phase 6 adapter" claim on normative surfaces; `make pre-commit` clean.
@@ -664,7 +664,7 @@ and confirmation* surface even though the underlying behavior is codex-cli's.
 1. Tick final checklist items with verification; change_log entry per phase (newest-first, Goal/Key changes/
    Verification).
 2. Durable lessons proposed via `.forge/memory/shadow_impl_notes.md` (human promotes).
-3. Design docs + end-user docs verified against shipped behavior (registry/design.md §5.5.5 in Phase 0; session manifest
-   \+ `transfer.md`/`session.md` in Phase 2; hooks docs in Phase 3+).
+3. Design docs + end-user docs verified against shipped behavior (registry/design_workflows.md §3.5 in Phase 0; session
+   manifest + `transfer.md`/`session.md` in Phase 2; hooks docs in Phase 3+).
 4. `git mv docs/board/doing/codex_frontend docs/board/done/` as the final closeout commit once shipped and verified, so
    `main` lands with the card already in `done/`.

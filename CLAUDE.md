@@ -109,7 +109,7 @@ src/forge/
 ### Shared Libraries (`src/forge/core/`)
 
 - `forge.core.auth` - Credential resolution (env > `~/.forge/credentials.yaml`), template-to-secrets mapping
-- `forge.core.llm` - Async-first LLM client abstraction (see design_appendix.md §J)
+- `forge.core.llm` - Async-first LLM client abstraction (see design_appendix.md §E)
 - `forge.core.models` - Model catalog with templates/tiers
 - `forge.core.state` - State read/write operations
 - `forge.core.workqueue` - File-based async work queue
@@ -178,6 +178,8 @@ regex), `gdate` (`--date` parsing), `greadlink -f` (BSD lacks `-f`).
 
 - `docs/design.md` - Unified design and migration plan (canonical)
 - `docs/design_appendix.md` - Reference details (schemas, config tables)
+- `docs/design_workflows.md` - Policy, skills, workflow runners, and memory architecture
+- `docs/cli_reference.md` - Terminal and direct-command inventory
 - `docs/developer/board-contract.md` - Work-board lane, checklist, and closeout contract
 - `docs/board/README.md` - Board directory guide and dogfood examples
 - `docs/end-user/` - End-user guides (sessions, proxies, hooks, configs)

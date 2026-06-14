@@ -594,52 +594,11 @@ drop audit/costs.
 
 ---
 
-## B. Direct Command Reference
-
-Extracted from [design.md §3.11](design.md#311-direct-commands-userpromptsubmit-dispatcher). Design goal, mechanism, and
-scope rationale remain in design.md.
-
-### B.1 Scope policy table
-
-- **Session / plan**: allow `%session list` and `%plan`.
-- **Proxy**: allow read-only `%proxy list`, `%proxy show`, and `%proxy audit show/diff`; disallow `%proxy create`,
-  `%proxy edit`, `%proxy set`, and `%proxy delete`.
-- **Policy / verification**: allow `%policy status`, `%policy enable`, `%policy disable`, `%policy check`,
-  `%policy supervise`, and `%cancel-verification`.
-- **Cleanup**: allow `%clean [--scope workspace|project|all]` as a read-only report. Destructive cleanup stays in the
-  terminal via `forge clean --yes`.
-- **Utilities / config**: allow `%h`, `%help`, and `%config`.
-
-### B.2 Current shipped commands
-
-%-only utilities:
-
-- `%h` / `%help`: show direct command help
-- `%config`: show effective runtime config (read-only)
-
-Shared commands (mirrors CLI syntax):
-
-- `%session list` (calls the same command-core op as `forge session list`)
-- `%plan` (shows the current session's recorded plan file path)
-- `%proxy list` (read-only: shows available proxies)
-- `%proxy show <id>` (read-only: shows proxy details and tier mappings)
-- `%proxy audit show|diff [id]` (read-only: recent audit metadata / wire changes; metadata only, never secrets)
-- `%policy status` (shows current policy config and state)
-- `%policy enable --bundle tdd [--permissive]` (enables policy enforcement)
-- `%policy disable` (disables all policies for the session)
-- `%policy check [--staged] [--bundle <name>]` (diagnostic policy evaluation against git diff)
-- `%policy supervise <target>` (set supervisor), `off` (suspend), `on` (resume), `remove` (delete)
-- `%policy supervise reload [path]` (reload latest approved plan, or from explicit path)
-- `%cancel-verification` (bypasses the active Stop-hook verification loop)
-- `%clean [--scope workspace|project|all]` (read-only: shows orphaned state report, default scope=project)
-
----
-
-## C. Work Queue Internals
+## B. Work Queue Internals
 
 Extracted from [design.md §3.13](design.md#313-async-work-queue). Design goals and rationale remain in design.md.
 
-### C.1 Marker schema (v2)
+### B.1 Marker schema (v2)
 
 ```json
 {
@@ -665,9 +624,9 @@ Extracted from [design.md §3.13](design.md#313-async-work-queue). Design goals 
 session ID); `payload` = kind-specific data; `attempt_count`/`last_error` = retry tracking. Marker ID validated with
 `^[A-Za-z0-9._-]+$`. The `handoff` marker payload additionally carries `origin_run_id`/`origin_root_run_id` (the
 originating session's run-tree identity, snapshotted at Stop time) so the detached memory writer roots under that
-session rather than the draining CLI (§F.5).
+session rather than the draining CLI ([design_workflows.md §4.5](design_workflows.md#45-operational-constraints)).
 
-### C.2 Processing contract
+### B.2 Processing contract
 
 Handlers are passed explicitly as a `handlers` dict (no global registry -- avoids import-order coupling and test state
 leakage): `process_pending_work(handlers={"stop": handler, "index": handler})`.
@@ -680,7 +639,7 @@ leakage): `process_pending_work(handlers={"stop": handler, "index": handler})`.
 | No handler for kind                 | Skip, log warning (leave in place)                                      |
 | `attempt_count >= MAX_ATTEMPTS` (5) | Move to `pending-work/failed/` (poison marker, preserved for debugging) |
 
-### C.3 Known marker kinds
+### B.3 Known marker kinds
 
 | Kind      | Producer            | Handler                                 |
 | --------- | ------------------- | --------------------------------------- |
@@ -690,80 +649,11 @@ leakage): `process_pending_work(handlers={"stop": handler, "index": handler})`.
 
 ---
 
-## D. Policy Internals
+## C. Install Model Reference
 
-Extracted from [design.md §4.1](design.md#41-policy-enforcement). Policy type definitions, supervisor mechanism,
-verification loop, and action context remain in design.md.
+Reference details for [design.md §5.1](design.md#51-extensions-install-model).
 
-### D.1 Shared library scope (from §4.1.2)
-
-| Utility            | Extracted from                      | API                                                                                   |
-| ------------------ | ----------------------------------- | ------------------------------------------------------------------------------------- |
-| Session runner     | `supervisor.py`, `memory_writer.py` | `run_claude_session(prompt, resume_id?, model?, base_url?, timeout, unset_env_vars?)` |
-| Proxy resolution   | both                                | `resolve_base_url(proxy_id?, explicit_url?, fallbacks)`                               |
-| Throttle cache     | `policy/store.py`                   | `ThrottleCache(ttl).check(key) / .update(key, value)`                                 |
-| Structured output  | `verdict.py`                        | `extract_json_verdict(stdout, schema)`                                                |
-| Tagger             | new                                 | `tag_action(context, model, prompt) -> tags[]`                                        |
-| Env builder        | both                                | `build_claude_env(base_url?) -> dict`                                                 |
-| Fan-out runner     | `src/forge/review/engine.py`        | `run_multi_review(prompt, models, per_worker_prompts?)`                               |
-| Adversarial runner | `src/forge/review/adversarial.py`   | `run_adversarial(proposal, skill_resource, stances, models)`                          |
-
-### D.2 Example: Writing a new policy (from §4.1.2)
-
-A developer adding a policy imports a few utilities and writes a class. Three abstract properties are required:
-`policy_id`, `description`, and `intent` (see §4.1.1).
-
-```python
-# Example: block database migrations without review
-from forge.core.reactive import tag_action, run_claude_session, ThrottleCache
-
-class MigrationReviewPolicy(DeterministicPolicy):
-    policy_id = "custom.migration_review"
-    description = "Require review for database migrations"
-    intent = "Prevent unreviewed schema changes from reaching production"
-
-    def applies_to(self, ctx):
-        return ctx.tool_name == "Write" and "migration" in (ctx.target_path or "")
-
-    def _evaluate(self, ctx):
-        tags = tag_action(ctx, model="haiku", prompt="Is this a schema migration? tags: migration | safe")
-        if "migration" not in tags:
-            return self._allow()
-        verdict = run_claude_session(prompt=REVIEW_PROMPT.format(...), resume_id=config.resume_id)
-        return verdict_to_decision(verdict)
-```
-
-On deny, the message includes the `intent` so models understand why the policy exists and can surface conflicts to the
-user rather than working around the check.
-
-### D.3 Policy definition ownership (from §4.1.6)
-
-| Setting                                             | Owner   | Location                                                                                         |
-| --------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------ |
-| Supervisor model (which model to use as supervisor) | Proxy   | `~/.forge/proxies/<id>/proxy.yaml`                                                               |
-| Throttling settings (check frequency)               | Proxy   | `~/.forge/proxies/<id>/proxy.yaml`                                                               |
-| TDD mode (off/permissive/strict)                    | Session | Session file `intent.tdd_mode`                                                                   |
-| Policy enabled/disabled                             | Session | Session file `intent.policy_mode`                                                                |
-| Verification config                                 | Session | Session file `intent.verification`                                                               |
-| Cascade on/off + tier-1 checker route/budget        | Session | `intent.policy.supervisor.cascade`/`.checker_provider`/`.checker_model`/`.checker_budget_tokens` |
-
-### D.4 Policy state ownership (from §4.1.6)
-
-| State                                     | Owner           | Location                                         |
-| ----------------------------------------- | --------------- | ------------------------------------------------ |
-| Enforcement decisions                     | Session (hooks) | `confirmed.policy` in session file               |
-| Cached verdicts (supervisor + plan-check) | Session (hooks) | `confirmed.policy.policy_states` in session file |
-| "Tests touched" tracking                  | Session (hooks) | `confirmed.policy` in session file               |
-| Verification iteration                    | Session (hooks) | `confirmed.verification.iterations`              |
-| Last verification result                  | Session (hooks) | `confirmed.verification.last_result`             |
-
----
-
-## E. Install Model Reference
-
-Extracted from [design.md §5.1-5.4](design.md#5-extensions-install-model). Overview remains in design.md.
-
-### E.1 Scope model (§5.1 -- mirrors Claude Code)
+### C.1 Scope model
 
 | Scope     | Extensions Path                       | Settings Path                 | Use case                                           |
 | --------- | ------------------------------------- | ----------------------------- | -------------------------------------------------- |
@@ -771,17 +661,17 @@ Extracted from [design.md §5.1-5.4](design.md#5-extensions-install-model). Over
 | `project` | `.claude/{commands,agents,skills}/`   | `.claude/settings.json`       | Team-shared (checked in)                           |
 | `local`   | `.claude/{commands,agents,skills}/`   | `.claude/settings.local.json` | Personal per-project                               |
 
-### E.2 Installable modules + profiles (§5.2)
+### C.2 Installable modules + profiles
 
-| Module        | Installs                                           | Notes                                                        |
-| ------------- | -------------------------------------------------- | ------------------------------------------------------------ |
-| `commands`    | Slash commands markdown                            |                                                              |
-| `agents`      | Subagents markdown                                 |                                                              |
-| `skills`      | Skills (SKILL.md + resources/scripts)              | Scripting layer for Forge workflows (see §5.5)               |
-| `hooks`       | Hook settings entries (invoke `forge hook ...`)    | No hook scripts installed; requires `hooks.*` settings merge |
-| `status-line` | `statusLine` setting (invokes `forge status-line`) | No scripts installed; same pattern as hooks                  |
-| `permissions` | Forge-required permission entries                  | Merged as unions                                             |
-| `codex-hooks` | Managed hook block in Codex `config.toml`          | Scope-mapped target; best-effort (see §E.6)                  |
+| Module        | Installs                                           | Notes                                                            |
+| ------------- | -------------------------------------------------- | ---------------------------------------------------------------- |
+| `commands`    | Slash commands markdown                            |                                                                  |
+| `agents`      | Subagents markdown                                 |                                                                  |
+| `skills`      | Skills (SKILL.md + resources/scripts)              | Scripting layer for Forge workflows (see design_workflows.md §3) |
+| `hooks`       | Hook settings entries (invoke `forge hook ...`)    | No hook scripts installed; requires `hooks.*` settings merge     |
+| `status-line` | `statusLine` setting (invokes `forge status-line`) | No scripts installed; same pattern as hooks                      |
+| `permissions` | Forge-required permission entries                  | Merged as unions                                                 |
+| `codex-hooks` | Managed hook block in Codex `config.toml`          | Scope-mapped target; best-effort (see §C.6)                      |
 
 Profiles:
 
@@ -789,7 +679,7 @@ Profiles:
 - `standard`: `commands`, `agents`, `skills`, `hooks`, `permissions`, `status-line`, `codex-hooks` (default)
 - `full`: all modules (same as standard; reserved for future heavy modules)
 
-### E.3 Settings merge rules (§5.3 -- normative)
+### C.3 Settings merge rules
 
 | Setting             | Merge behavior                                             |
 | ------------------- | ---------------------------------------------------------- |
@@ -801,14 +691,14 @@ Profiles:
 
 All settings modifications must be backed up first (`settings.json.forge-backup`).
 
-### E.4 Tracking file (§5.4 -- `~/.forge/installed.json`)
+### C.4 Tracking file (`~/.forge/installed.json`)
 
 The installer must track what it changed so:
 
 - `forge extension sync` updates only tracked items
 - `forge extension disable` removes only tracked files and reverts only Forge-added settings entries
 
-### E.5 Multi-scope installation (§5.5 -- skill resolution)
+### C.5 Multi-scope installation (skill resolution)
 
 Skills use `${CLAUDE_SKILL_DIR}` (a Claude Code built-in) to reference co-located resources. This variable resolves to
 the directory of the **executing** SKILL.md, so each installation is self-contained -- resources always come from the
@@ -833,7 +723,7 @@ forge extension disable --scope user     # Remove user-level
 forge extension enable --scope project   # Keep project-level only
 ```
 
-### E.6 Codex hook registration (codex-hooks module)
+### C.6 Codex hook registration (codex-hooks module)
 
 `forge extension enable` registers Forge's two Codex hooks by appending a marker-delimited managed block
 (`# >>> forge hooks >>>` … `# <<< forge hooks <<<`) to the Codex config the Forge install scope maps to:
@@ -867,271 +757,41 @@ Registration alone is inert: enable prints a Next-steps block naming the one-tim
 
 ---
 
-## F. Workflow Runner and Skill Details
+## D. Interactive Manual Testing
 
-Extracted from [design.md §5.5.5-5.5.9](design.md#555-workflow-runners). Three-layer architecture, four runner types,
-design principles, skills-vs-policies relationship, and CLI surfaces remain in design.md.
+Automated tests catch logic bugs but miss UX/latency/real-system failures. Previous manual testing found 5 real bugs
+(including a macOS crash) that ~2,400 automated tests missed.
 
-### F.1 Fan-out runner details (from §5.5.5)
+**Why checklist-driven.** Early versions let the agent improvise commands — producing invented CLI commands, interactive
+prompts that hang the Bash tool, and leaked API keys. The fix: pre-written checklists where commands and assertions are
+deterministic and the agent only interprets results. Checklist edits change tests without modifying skill instructions.
 
-`run_multi_review()` in `src/forge/review/engine.py`:
+**Three skills** with escalating isolation, tied to install profiles:
 
-- N workers, each with model/proxy via `ModelSpec`
-- Per-worker prompt via `ModelSpec.prompt`
-- Per-worker context: `--context resume:<id>` or `--context blind`
-- Direct Claude workers use `ANTHROPIC_MODEL` plus `ANTHROPIC_DEFAULT_*_MODEL`, not Claude CLI `--model`
-- Parallel via `ThreadPoolExecutor` + process group cleanup
-- Workers receive pre-resolved `RoutingResult` from a `WorkerRoutingPlan` (see [§L](#l-subprocess-routing-reference))
-- `/forge:analyze`: single-model fan-out with an analyze resource
+| Skill                | Profile    | Isolation                                          | Audience          |
+| -------------------- | ---------- | -------------------------------------------------- | ----------------- |
+| `/forge:smoke-test`  | `standard` | Host, read-only probes                             | End users         |
+| `/forge:walkthrough` | `standard` | Host, hermetic test repo (`--sidecar` adds Docker) | End users / demos |
+| `/forge:qa`          | `full`     | Docker container                                   | Maintainers       |
 
-### F.2 Adversarial runner details (from §5.5.5)
+**Shared pattern — checklist + wrapper + annotations.** Each skill reads a checklist, runs commands through a
+mode-specific wrapper, and routes items by annotation. A three-window model (Session A runs the skill, Session B is the
+subject under test, Terminal for raw CLI) enables interactive verification of things the agent can't see. Session A
+prompts the user to open Terminal early. Session B is launched only when the checklist first needs interactive
+verification.
 
-Adversarial runner:
+**Key design decisions:**
 
-- Constrained to review/eval skills (stance injection)
-- Inject stance via `{stance_prompt}` in resources
-- Mandatory blinding: proposal + files only (no peer outputs)
-- Stances: for/against/neutral with guardrails (lens, not honesty)
-- Synthesize agreement vs disagreement; evidence-weighted recommendation
+- Share the pattern/convention, not the prompt — each skill is self-contained (no cross-mode confusion)
+- Checklist is single source of truth — editing it changes tests without SKILL.md modifications
+- Each skill-local `walkthrough-state.py` is the deterministic bookkeeper — agent classifies (pass/fail/skip), and the
+  script counts
+- No per-checklist-item scripts — wrapper + lifecycle scripts are enough
+- `/forge:qa` tied to `full` install profile (Docker dependency)
 
-Adversarial-compatible skills include `{stance_prompt}` in their resource .md; `/forge:debate` enforces this.
+> See also [testing-guidelines.md](developer/testing-guidelines.md) for the full testing reference.
 
-### F.3 Panel engine details (from SS5.5.7)
-
-Panel is the reference invocation of the fan-out runner. It fans out a review task to N models via different proxies and
-collects independent findings for synthesis.
-
-**Engine:** `forge workflow panel` CLI command.
-
-Spawns N `claude -p` subprocesses, each with a different `ANTHROPIC_BASE_URL`. Routing for all panel workers is resolved
-once at invocation start via `resolve_invocation_routing()` (see [§L](#l-subprocess-routing-reference)). Each reviewer
-is a full Claude Code agent -- it can read files, investigate, and find issues with real file:line evidence.
-
-**Execution:** Fork mode gives each reviewer the main agent's full context. Summary mode sends a focused prompt.
-
-**Target-based review:** Positional `target` argument loads a bundled review framework (docreview.md by default,
-codereview.md with `--code`). Combined with per-worker prompt support (`ModelSpec.prompt`), this enables specialized
-fan-out patterns -- code review, document review, security audit -- all using the same runner.
-
-**Synthesis:** The main agent reads all N reviews and synthesizes -- identifying consensus findings (2+ models agree),
-unique insights, and conflicts. Because the main agent has full project context, it can **investigate conflicts** by
-reading the disputed code -- something external synthesis (which merges text without context) cannot do.
-
-**`/forge:analyze` as degenerate fan-out:** Single-model fan-out with an analyze-specific resource. Same panel engine
-with N=1. The resource instructs the model to act as a senior engineering collaborator with deep analysis guidelines.
-
-**Dual use:** The panel serves as both a skill (`/forge:panel src/session/ --code`) and a policy (automatic multi-model
-gate before committing). Same `run_multi_review()` function, two callers -- the programmer wires both.
-
-### F.4 Debate / adversarial reference skill (from SS5.5.8)
-
-Debate is the reference invocation of the adversarial runner. It assigns stances to workers, blinds them from each
-other, and synthesizes by weighing agreement against disagreement.
-
-**Stances:** Each worker receives a stance directive (for/against/neutral) injected via `{stance_prompt}` in the
-evaluation template. Stances influence the evaluative lens, not honesty -- all stances include ethical guardrails that
-override positional framing (a "for" evaluator must still flag genuine critical issues).
-
-**Blinding:** Each worker sees only the original proposal + files + stance prompt. Workers never see other workers'
-output. Achieved by spawning separate `claude -p` processes without `--resume` (no shared session context).
-
-**Skill constraint:** Only review/evaluation skills are adversarial-compatible. The runner checks for a
-`{stance_prompt}` marker in the evaluation resource and rejects resources without it. This prevents misuse (adversarial
-code generation makes no sense).
-
-**Templates:** Two debate evaluation frameworks (embedded in CLI): a proposal evaluation template (7-point: feasibility,
-correctness, trade-offs, risks, completeness, alternatives, recommendation) and a code evaluation template (5-point:
-quality, security, performance, architecture, risks). `--code` selects the code template. Both produce structured
-verdict output (Verdict/Confidence/Key Findings).
-
-**Execution flow:** Parse subject -> select template (proposal or code via `--code`) -> fill template with subject ->
-write to temp file -> N x adversarial runner with stance injection -> collect results -> synthesize (agreement areas,
-disagreement areas, evidence-weighted recommendation). Temp file cleaned up via try/finally.
-
-### F.5 Operational constraints (from §5.5.9)
-
-**Recursion guard:** Skills invoke `forge` commands. `forge` commands spawn `claude -p` subprocesses. Those subprocesses
-trigger hooks. If a hook spawns another subprocess, you get recursion. `build_claude_env()` sets `FORGE_DEPTH` (starting
-at 0, incremented per subprocess layer). Hooks that spawn subprocesses (supervisor, memory writer) skip at depth >= 2.
-
-**Run-tree identity (attribution, orthogonal to the recursion guard):** alongside `FORGE_DEPTH`, `build_claude_env()`
-stamps `FORGE_RUN_ID` (this process), `FORGE_PARENT_RUN_ID` (the spawner), and `FORGE_ROOT_RUN_ID` (the tree root). A
-child inherits the root and sets its parent to the spawner's run_id; an interactive launch (session start/resume/fork,
-bare `forge claude start`) and the sidecar instead mint a fresh root (`invoke._build_environment` / `container.py`, via
-`derive_run_identity=False`). Depth guards recursion; identity records who-spawned-whom for the usage ledger — the two
-are independent and `FORGE_DEPTH` is never reinterpreted. The queue-decoupled memory writer is the one spawn where env
-inheritance breaks: the Stop hook snapshots the originating session's run id into the handoff marker (§C.1) and the
-drain handler re-roots the detached process under it, not under the unrelated draining CLI.
-
-**JSON output contract:** `forge` commands invoked by skills must support `--json` for structured output. Skills should
-never parse human-readable CLI text -- it drifts. JSON schemas are the API contract between skills and CLI.
-
-**Child process lifecycle:** Parallel fan-out (panel runner) spawns N `claude -p` processes. If the parent is killed
-(Ctrl+C), children must be terminated via process group signal (`os.killpg`). All child processes must have timeouts
-(the `timeout_seconds` parameter in `run_claude_session()`).
-
-**Skill script dependency tiers:** Skills are installed by file copy (`forge extension enable`), not as Python packages.
-Scripts in `skills/*/scripts/` have no access to `forge.*` imports or third-party deps. Three tiers handle this:
-
-| Tier               | When                                                | How                                                    | Example                                |
-| ------------------ | --------------------------------------------------- | ------------------------------------------------------ | -------------------------------------- |
-| Pure stdlib        | Script needs only Python builtins                   | `python3 script.py`                                    | `walkthrough-state.py`                 |
-| Forge CLI command  | Script needs `forge.*` or third-party deps          | `forge <group> <cmd>`                                  | `forge hook stop`, `forge status-line` |
-| `uv run` + PEP 723 | Script needs 1-2 external deps, not worth a CLI cmd | `uv run script.py` with inline `# /// script` metadata | --                                     |
-
-**Graduation rule:** When a pure-stdlib script needs deps, promote it to a Forge CLI command (one step, no intermediate
-stages). This follows the hooks pattern: `forge hook <name>` runs as a CLI command with full package deps, not as an
-installed script. The same principle applies to skill scripts.
-
----
-
-## G. Memory Doc Reference
-
-Extracted from [design.md §5.6](design.md#56-designated-memory-docs). Passport model, operating modes, and the memory
-writer concept remain in design.md.
-
-### G.1 Strategy registry (from §5.6.5)
-
-Strategies are defined in `MemoryStrategy` enum (`src/forge/session/passport.py`).
-
-**Direct update strategies:**
-
-| Strategy        | Behavior                                         |
-| --------------- | ------------------------------------------------ |
-| `project-state` | Update focus, active work, decisions, next steps |
-| `checklist`     | Mark `[x]` completed, add discovered tasks       |
-| `changelog`     | Add accomplishments, follow existing format      |
-| `generic`       | Add any new information (default fallback)       |
-
-Shadow mode (`--propose`) is orthogonal to strategy: any strategy works with `--propose`.
-
-### G.2 Passport example (from §5.6.2)
-
-Memory doc passports are `forge_memory` YAML frontmatter blocks. The passport is the doc-level source of truth for
-strategy, writers, and update mode.
-
-```yaml
----
-forge_memory:
-  version: 1
-  intent: "Human-approved durable implementation memory for future Forge sessions."
-  captures: [stable decisions, non-obvious invariants, recurring bug causes]
-  excludes: [raw session summaries, pending tasks, unverified hunches]
-  update:
-    strategy: generic
-    mode: shadow-only
-    writers: all-sessions
-    approval: human-promoted
-    shadow_path: .forge/memory/shadow_impl_notes.md
----
-```
-
-**CLI setup** (equivalent to the passport above):
-
-```bash
-# Passports are project-lifetime and sessionless:
-forge memory track docs/board/change_log.md --strategy changelog
-forge memory track docs/board/impl_notes.md \
-  --propose --shadow-path .forge/memory/shadow_impl_notes.md
-
-# Enable memory for a session:
-forge memory enable --session planner
-
-# Verify:
-forge memory passport show docs/board/change_log.md
-forge memory list
-```
-
-`forge memory track` is idempotent and sessionless: re-running with different flags updates the passport in place; with
-no flags on an already-passported doc it is a no-op. `forge memory passport remove <path>` removes the passport and
-turns the file back into a normal doc, preserving unrelated frontmatter. One-off doc updates that don't need a passport
-are ordinary agent instructions. All docs are processed in one `claude -p` call with per-doc strategy instructions.
-
-### G.3 Worktree resolution (extends §5.6.5)
-
-Managed sessions always launch from `forge_root`. The memory writer resolves designated doc paths relative to
-`forge_root`, so git-tracked docs (for example, a card checklist under `docs/board/doing/<slug>/checklist.md`) target
-the correct branch when working in a worktree.
-
-Trackedness is controlled by path choice; the agent doesn't distinguish:
-
-- `docs/board/doing/<slug>/checklist.md` -> git-tracked, branch-specific (moves with the branch)
-- `.forge/memory/debugging.md` -> untracked, per-Forge-project (`.forge/` is in `.gitignore`)
-- `docs/suggested/coding_standards.md` -> git-tracked shadow doc (visible in PRs if desired)
-
-Shadow docs also resolve relative to `forge_root`, so the agent reads the branch-correct official doc.
-
-**Transcript path handling:** Transcripts live under `<forge_root>/.forge/artifacts/`. Because `cwd` is `forge_root`,
-transcript paths in the prompt must be **absolute**; designated doc paths remain relative (resolved against `cwd`).
-
-> **Note:** Artifacts (transcripts/plans) consolidate at `forge_root` for per-project visibility. Designated docs are
-> working documents and belong with branch content.
-
-### G.4 Comparison with Claude Code auto-memory (from §5.6.5)
-
-Claude Code (Feb 2026) ships **auto-memory**: Claude writes free-form notes to `~/.claude/projects/<project>/memory/`
-during sessions. `MEMORY.md` (first 200 lines) loads at startup; topic files load on demand.
-
-Forge's memory writer is complementary, not competitive:
-
-| Aspect          | Auto-Memory                  | Memory Writer                              |
-| --------------- | ---------------------------- | ------------------------------------------ |
-| Timing          | During session (incremental) | After session (retrospective)              |
-| Signal quality  | In-the-moment judgment       | Full-session hindsight                     |
-| Structure       | Free-form, model-organized   | Per-doc strategies with constraints        |
-| Target files    | User-local memory dir        | Project docs (repo-tracked, shareable)     |
-| Curation        | None -- entries accumulate   | Shadow pattern provides human review gate  |
-| Graduation path | None                         | Shadow doc -> human review -> official doc |
-
-**Key design rationale:** Free-form capture relies on model judgment and tends to accumulate noise over time. The memory
-writer reduces this via (a) retrospective synthesis, (b) per-doc topic constraints, and (c) the shadow pattern (human
-curation gate).
-
-Auto-memory is better for long-lived preferences; the memory writer is better for structured project docs and proposed
-standards evolution.
-
-**Deliberate non-integration:** The memory writer does not read auto-memory (`~/.claude/projects/<project>/memory/`) as
-input. It's outside the project root (containment guard), is free-form (hard to dedupe against structured strategies),
-and targets different information (preferences/patterns vs project state/standards). Occasional duplication is cheaper
-than cross-format deduplication. If overlap becomes painful, a small prompt tweak can address it.
-
-### G.5 Session activation (from §5.6.6)
-
-Memory activation is session-scoped. The effective `memory.auto_update.enabled` (intent + overrides via
-`compute_effective_intent()`) is the sole gate. No checkout-level config file.
-
-| Field                   | Type        | Default   | Meaning                                    |
-| ----------------------- | ----------- | --------- | ------------------------------------------ |
-| `auto_update.enabled`   | bool        | `false`   | Whether the memory writer runs at Stop     |
-| `auto_update.mode`      | str         | `augment` | `augment` (edit) or `review-only` (report) |
-| `auto_update.min_turns` | int         | `5`       | Skip sessions shorter than this            |
-| `auto_update.proxy`     | str \| null | `null`    | Optional `proxy_id` for the memory writer  |
-
-Scan roots are hardcoded: `DEFAULT_SCAN_ROOTS = ("docs/",)` plus always `.forge/memory/`. Configurable roots deferred.
-
-**Stale `.forge/memory.yaml`**: existing checkouts may have this file from a previous version. It is no longer read.
-Safe to delete.
-
-**Stale `designated_docs` in manifests**: old session manifests may contain `designated_docs` entries. These are
-stripped on read with a one-time `logger.warning()` per coding-standards §5. The field no longer exists on
-`MemoryIntent`.
-
----
-
-## H. (Removed)
-
-CLI patching was removed for the OSS release. Forge now uses the native `CLAUDE_CODE_AUTO_COMPACT_WINDOW` env var to
-control compaction timing in proxy mode.
-
----
-
-## I. Interactive Manual Testing
-
-Extracted from [design.md §5.8](design.md#58-interactive-manual-testing). Rationale, three-skill table, three-window
-model, and key design decisions remain in design.md. See also [testing-guidelines.md](developer/testing-guidelines.md)
-for the full testing reference.
-
-### I.1 Annotation types
+### D.1 Annotation types
 
 | Annotation               | Session A does                                 | User does                              |
 | ------------------------ | ---------------------------------------------- | -------------------------------------- |
@@ -1141,7 +801,7 @@ for the full testing reference.
 | `<!-- requires: X -->`   | Checks infra probe                             | Skip if unavailable                    |
 | `<!-- destructive -->`   | Runs command (safe in sandbox)                 | Nothing                                |
 
-### I.2 Wrapper abstraction
+### D.2 Wrapper abstraction
 
 | Skill                | Wrapper                        | Isolation                        |
 | -------------------- | ------------------------------ | -------------------------------- |
@@ -1151,7 +811,7 @@ for the full testing reference.
 **Three-window model:** Session A prompts the user to open Terminal early. Session B is launched only when the checklist
 first needs interactive verification.
 
-### I.3 Per-skill details
+### D.3 Per-skill details
 
 **Smoke test** (`smoke-test.sh`): Read-only probes with mtime snapshot assertions. Not checklist-driven.
 
@@ -1170,20 +830,20 @@ display-only). State file uses SHA-256 hash for drift detection. 58 unit tests.
 
 ---
 
-## J. Shared LLM Client (`src/forge/core/llm/`)
+## E. Shared LLM Client (`src/forge/core/llm/`)
 
 `AnthropicClient` deferred; currently uses `OpenAIClient` for all providers via LiteLLM.
 
 **Purpose:** Unified async-first LLM client abstraction for Proxy, Policy, and Skills components.
 
-### J.1 Design principles
+### E.1 Design principles
 
 1. **Async-first**: All clients async; sync usage via `SyncAdapter` wrapper
 2. **Canonical types**: `Message`, `CompletionResponse`, `StreamEvent` -- no raw dicts
 3. **Injectable credentials**: `CredentialManager` with TTL caching, testable
 4. **Separation**: LLM calls only; tier orchestration stays in Proxy
 
-### J.2 Module structure
+### E.2 Module structure
 
 ```text
 src/forge/core/llm/
@@ -1194,7 +854,7 @@ src/forge/core/llm/
 └── clients/        # LiteLLMClient
 ```
 
-### J.3 Core types (signatures)
+### E.3 Core types (signatures)
 
 ```python
 class ModelHyperparameters(BaseModel):
@@ -1209,7 +869,7 @@ class CompletionResponse(BaseModel): text: str; tool_calls: list[ToolCall] | Non
 class StreamEvent(BaseModel): type: Literal["text_delta", "tool_call_delta", "response_end", ...]
 ```
 
-### J.4 Client protocol
+### E.4 Client protocol
 
 ```python
 class LLMClient(Protocol):
@@ -1220,7 +880,7 @@ class LLMClient(Protocol):
     async def count_tokens(self, messages, tools=None) -> int: ...
 ```
 
-### J.5 Factory and provider detection
+### E.5 Factory and provider detection
 
 ```python
 def get_client(model: str, *, provider: ProviderType | None = None) -> LLMClient:
@@ -1229,7 +889,7 @@ def get_client(model: str, *, provider: ProviderType | None = None) -> LLMClient
     # gemini/ -> litellm_local
 ```
 
-### J.6 Sync adapter
+### E.6 Sync adapter
 
 ```python
 class SyncAdapter:
@@ -1240,14 +900,14 @@ class SyncAdapter:
 > **Trap:** Policy uses `SyncAdapter`; Proxy is async. Don't import sync Policy logic into Proxy -- `asyncio.run()`
 > crashes in running loop. Use async-first at boundaries.
 
-### J.7 Unsupported parameter policy
+### E.7 Unsupported parameter policy
 
 | Mode                     | Behavior                         |
 | ------------------------ | -------------------------------- |
 | `strict=False` (default) | Warn + ignore unsupported params |
 | `strict=True`            | Raise `UnsupportedParamError`    |
 
-### J.8 Relationship to Proxy
+### E.8 Relationship to Proxy
 
 | Concern                        | Owner              |
 | ------------------------------ | ------------------ |
@@ -1257,10 +917,10 @@ class SyncAdapter:
 
 ---
 
-## K. WorkflowPolicy Cost Model
+## F. WorkflowPolicy Cost Model
 
-Migrated from the former archived Appendix C. Contextualizes why the tagger->checker->reviewer pipeline (design.md
-§4.1.2) uses a branching architecture.
+Migrated from the former archived Appendix C. Contextualizes why the tagger->checker->reviewer pipeline
+(design_workflows.md §1.2) uses a branching architecture.
 
 Cost model for a divergence-from-mean workflow: tagger ($0.001/call) filters 80% of changes as non-architectural. Of the
 20% that reach a checker ($0.001), ~80% short-circuit as aligned. Only ~4% reach the reviewer ($0.05). Total: ~$0.32/100
@@ -1268,12 +928,12 @@ changes vs $5.00 reviewing everything.
 
 ---
 
-## L. Subprocess Routing Reference
+## G. Subprocess Routing Reference
 
 Extracted from [design.md §3.6.12](design.md#3612-subprocess-routing-resolution-normative). Resolution chain concept,
 fail-open/fail-closed semantics, and per-invocation routing plan remain in design.md.
 
-### L.1 Core types (from `core.reactive.routing`)
+### G.1 Core types (from `core.reactive.routing`)
 
 ```python
 RoutingSource = Literal[
@@ -1312,7 +972,7 @@ shared resolver as its terminal step). `route` is present when model compatibili
 or opaque/non-model-specific routing (e.g., explicit base URL with no routes supplied). `source` and `base_url`
 distinguish them.
 
-### L.2 Workflow types (from `review.routing`)
+### G.2 Workflow types (from `review.routing`)
 
 ```python
 @dataclass(frozen=True)
@@ -1322,7 +982,7 @@ class WorkerRoutingPlan:
     via_override: str | None           # --proxy value, if set (for logging)
 ```
 
-### L.3 Key function signatures
+### G.3 Key function signatures
 
 ```python
 def resolve_subprocess_routing(
@@ -1364,7 +1024,7 @@ def resolve_model_flag(route: ModelRoute) -> str | None:
     """
 ```
 
-### L.4 Route derivation ranking
+### G.4 Route derivation ranking
 
 `derive_model_routes()` produces routes in deterministic order:
 
@@ -1378,7 +1038,7 @@ Registry scan then ranks matched proxies:
 1. Route preference order (from `derive_model_routes()` ranking above)
 2. Alphabetical proxy_id as tiebreaker
 
-### L.5 Sidecar constraints
+### G.5 Sidecar constraints
 
 In sidecar mode (`~/.forge` not mounted), registry-dependent steps are unavailable:
 
@@ -1397,12 +1057,12 @@ running the workflow on the host.
 
 ---
 
-## M. Transfer Context Schema
+## H. Transfer Context Schema
 
 Extracted from [design.md §3.9](design.md#39-session-resume-context-management). The transfer document is a stable,
 frontmatter-backed Markdown contract produced by `assemble_transfer_context` (`src/forge/session/transfer.py`).
 
-### M.1 Frontmatter (child-agnostic)
+### H.1 Frontmatter (child-agnostic)
 
 Every strategy prepends one YAML block. It carries **no `child` field** — child identity is path-derived, so
 `generated.md` and the `children/<child>.md` copy stay byte-identical (the `ensure_child` copy and the auto-name retry
@@ -1427,7 +1087,7 @@ forge_transfer:
 Reads are **best-effort** (`parse_transfer_frontmatter`): the doc is an LLM-consumed artifact with a user-editable
 overlay (a system boundary), so missing/malformed frontmatter warns and still returns the body — it never hard-fails.
 
-### M.2 Sections
+### H.2 Sections
 
 `ai-curated` emits the full 8-section contract; code owns the skeleton and the model fills section bodies (it returns
 structured JSON, parsed with `extract_json_from_response`). Decisions cite a transcript turn (`[turn N]`) or file;
@@ -1446,7 +1106,7 @@ snapshot; section 8 is the separate notes overlay (so the snapshot has 7 headers
 
 `minimal | structured | full` keep their existing bodies and set `schema: compatibility-fallback`.
 
-### M.3 File layout and overlay
+### H.3 File layout and overlay
 
 ```
 <forge_root>/.forge/prev_sessions/<parent>/generated.md               # parent AI cache (regenerate rewrites)
@@ -1459,9 +1119,9 @@ via `_combine_prompt_files`. `forge transfer regenerate` rewrites only `generate
 overwritten. GC pairs a notes file's liveness to its snapshot — it is never orphaned independently
 (`_detect_orphan_transfer_files`).
 
-### M.4 Relationship to `ctx` (prior art)
+### H.4 Relationship to `ctx` (prior art)
 
-The transfer schema (§M.1–M.3) is **Forge-owned and canonical**. [`ctx`](https://github.com/dchu917/ctx) is **prior art
+The transfer schema (§H.1–M.3) is **Forge-owned and canonical**. [`ctx`](https://github.com/dchu917/ctx) is **prior art
 and inspiration only** — its concepts (workstreams, exact transcript binding, branching, indexed retrieval, local
 storage, curation) informed this substrate. Forge will **not** take `ctx` as a dependency: curated transfer is
 load-bearing for Forge's session, policy, and usage story, so its contract lives in-tree. The schema is self-contained
@@ -1470,13 +1130,13 @@ without changing it, but that is explicitly not committed work.
 
 ---
 
-## N. Codex Runtime Reference
+## I. Codex Runtime Reference
 
 Extracted from [design.md §3.9](design.md#39-session-resume-context-management) and
-[design.md §5.5.5](design.md#555-workflow-runners). Lifecycle narrative (headless turns, interactive TUI sessions,
-delivery modes, post-exit reconciliation) remains in design.md.
+[design_workflows.md §3.5](design_workflows.md#35-workflow-runners). Lifecycle narrative (headless turns, interactive
+TUI sessions, delivery modes, post-exit reconciliation) remains in design.md.
 
-### N.1 Recorded Codex facts (`confirmed.codex`)
+### I.1 Recorded Codex facts (`confirmed.codex`)
 
 All CLI-owned (§3.5):
 
@@ -1498,7 +1158,7 @@ All CLI-owned (§3.5):
 
 `confirmed.launch` and `claude_session_id` stay unset (§3.5).
 
-### N.2 Codex `RuntimeSpec` declarations
+### I.2 Codex `RuntimeSpec` declarations
 
 Load-bearing values (probe evidence in `scripts/experiments/codex-hooks/README.md`):
 
@@ -1510,7 +1170,7 @@ Load-bearing values (probe evidence in `scripts/experiments/codex-hooks/README.m
 - `hook_min_version`: machine-readable registration floor a preflight checks — not a firing guarantee.
 - `hook_feature_flag=None`: Codex hooks are default-on.
 
-### N.3 Codex operational guards (probe-churn + enrollment)
+### I.3 Codex operational guards (probe-churn + enrollment)
 
 Codex's trust/enrollment and `apply_patch`/argv behavior are pinned **empirically**, not contractually, so two
 operator-facing guards backstop version churn and the unverifiable trust ceremony:

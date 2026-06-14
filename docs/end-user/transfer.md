@@ -5,7 +5,7 @@
 manual `regenerate → show → codex exec` recipe below remains for sessionless handoffs.
 
 - Canonical architecture: [`docs/design.md`](../design.md) §3.9 (transfer) · schema:
-  [`design_appendix.md`](../design_appendix.md) §M
+  [`design_appendix.md`](../design_appendix.md) §H
 - Sessions (resume/fork): [`session.md`](session.md)
 - Authentication (Codex, OpenRouter): [`authentication.md`](authentication.md)
 

@@ -182,12 +182,14 @@ Run `forge <command> --help` for details on any command.
 
 ## Documentation
 
-| Audience         | Location                           | Contents                                             |
-| ---------------- | ---------------------------------- | ---------------------------------------------------- |
-| **Users**        | [docs/end-user/](docs/end-user/)   | Tour, guides for sessions, proxies, policies, ...    |
-| **Developers**   | [docs/developer/](docs/developer/) | Setup, coding standards, testing guidelines          |
-| **Architecture** | [docs/design.md](docs/design.md)   | System narrative, data flow, invariants              |
-| **Work Board**   | [docs/board/](docs/board/)         | Cards, checklists, change log, implementation memory |
+| Audience            | Location                                             | Contents                                              |
+| ------------------- | ---------------------------------------------------- | ----------------------------------------------------- |
+| **Users**           | [docs/end-user/](docs/end-user/)                     | Tour, guides for sessions, proxies, policies, ...     |
+| **Developers**      | [docs/developer/](docs/developer/)                   | Setup, coding standards, testing guidelines           |
+| **Architecture**    | [docs/design.md](docs/design.md)                     | Core system narrative, data flow, invariants          |
+| **Workflow design** | [docs/design_workflows.md](docs/design_workflows.md) | Policy, skills, workflow runners, memory architecture |
+| **CLI reference**   | [docs/cli_reference.md](docs/cli_reference.md)       | Terminal and direct-command inventory                 |
+| **Work Board**      | [docs/board/](docs/board/)                           | Cards, checklists, change log, implementation memory  |
 
 ## Contributing
 
