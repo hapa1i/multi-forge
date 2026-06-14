@@ -185,4 +185,47 @@ forge extension sync
 
 - [ ] Update completes (or reports already up to date)
 
+### 2.10 Codex Hook Registration (codex-hooks module)
+
+<!-- auto -->
+
+```bash
+# Enable with a fake codex binary on PATH + isolated CODEX_HOME
+export CODEX_HOME=$(mktemp -d)
+FAKE_BIN=$(mktemp -d) && printf '#!/bin/sh\nexit 0\n' > "$FAKE_BIN/codex" && chmod +x "$FAKE_BIN/codex"
+PATH="$FAKE_BIN:$PATH" forge extension enable --scope user --force
+
+cat "$CODEX_HOME/config.toml"
+forge extension status --scope user
+
+# Disable removes the managed block (file deleted when Forge created it)
+PATH="$FAKE_BIN:$PATH" forge extension disable --scope user --yes
+test ! -f "$CODEX_HOME/config.toml" && echo "BLOCK-REMOVED"
+```
+
+- [ ] Enable output shows a "Codex hooks (config.toml)" plan section and "Next steps (Codex hooks):" trust-ceremony
+  guidance
+- [ ] `$CODEX_HOME/config.toml` contains the `# >>> forge hooks >>>` block with `forge hook codex-session-start` and
+  `forge hook codex-policy-check`
+- [ ] `forge extension status` shows a `Codex:` line with the config path
+- [ ] After disable, `BLOCK-REMOVED` is printed (Forge-created file removed)
+
+### 2.11 Codex Hooks Skipped Without Binary
+
+<!-- auto -->
+
+```bash
+# Re-enable with codex absent from PATH (minimal PATH without codex)
+export CODEX_HOME=$(mktemp -d)
+PATH="/usr/bin:/bin" $HOME/.local/bin/forge extension enable --scope user --force
+test ! -f "$CODEX_HOME/config.toml" && echo "NO-CONFIG-WRITTEN"
+
+# Restore: re-enable normally and clear the env override
+forge extension enable --scope user --force
+unset CODEX_HOME
+```
+
+- [ ] Enable prints "Codex hooks skipped: codex binary not found on PATH"
+- [ ] `NO-CONFIG-WRITTEN` is printed (no Codex config created)
+
 ---

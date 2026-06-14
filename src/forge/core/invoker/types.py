@@ -97,6 +97,11 @@ class HeadlessResult:
     cached_tokens: int | None = None
     envelope_parsed: bool = False
     runtime_is_error: bool = False
+    # Runtime-native resume/session id, when the runtime announces one in-band:
+    # Codex fills it from the stream's `thread.started.thread_id` (the
+    # `codex exec resume` id); Claude leaves it None (its session id is Forge-owned
+    # via --session-id, not read back from output).
+    runtime_session_id: str | None = None
 
     @property
     def success(self) -> bool:

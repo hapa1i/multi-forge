@@ -15,14 +15,17 @@
 **Multi-runtime agent toolkit: proxy routing, cost control, session management, and policy enforcement for coding
 agents.**
 
-Forge sits between you and your coding agent (Claude Code today, Codex and Gemini next), adding persistent sessions,
-multi-provider model routing, cost visibility with spend caps, and autonomous verification. You run
-`forge session start` instead of `claude`, and Forge handles the rest -- routing to your chosen model provider, tracking
-state across sessions, and enforcing policies.
+Forge sits between you and your coding agent (Claude Code by default, with Codex as an alternate runtime and Gemini
+next), adding persistent sessions, multi-provider model routing, cost visibility with spend caps, and autonomous
+verification. You run `forge session start` instead of `claude`, and Forge handles the rest -- routing to your chosen
+model provider, tracking state across sessions, and enforcing policies.
 
 ```bash
 # Use Claude with session tracking (no proxy needed)
 forge session start
+
+# Or run a different runtime entirely -- Codex as an alternate frontend
+forge session start --runtime codex    # interactive TUI; hooks/policy need a one-time Codex trust enrollment
 
 # Or route through different model providers (after creating proxies -- see Quick Start)
 forge session start planner --proxy openrouter-openai    # GPT for planning
@@ -182,12 +185,14 @@ Run `forge <command> --help` for details on any command.
 
 ## Documentation
 
-| Audience         | Location                           | Contents                                             |
-| ---------------- | ---------------------------------- | ---------------------------------------------------- |
-| **Users**        | [docs/end-user/](docs/end-user/)   | Tour, guides for sessions, proxies, policies, ...    |
-| **Developers**   | [docs/developer/](docs/developer/) | Setup, coding standards, testing guidelines          |
-| **Architecture** | [docs/design.md](docs/design.md)   | System narrative, data flow, invariants              |
-| **Work Board**   | [docs/board/](docs/board/)         | Cards, checklists, change log, implementation memory |
+| Audience            | Location                                             | Contents                                              |
+| ------------------- | ---------------------------------------------------- | ----------------------------------------------------- |
+| **Users**           | [docs/end-user/](docs/end-user/)                     | Tour, guides for sessions, proxies, policies, ...     |
+| **Developers**      | [docs/developer/](docs/developer/)                   | Setup, coding standards, testing guidelines           |
+| **Architecture**    | [docs/design.md](docs/design.md)                     | Core system narrative, data flow, invariants          |
+| **Workflow design** | [docs/design_workflows.md](docs/design_workflows.md) | Policy, skills, workflow runners, memory architecture |
+| **CLI reference**   | [docs/cli_reference.md](docs/cli_reference.md)       | Terminal and direct-command inventory                 |
+| **Work Board**      | [docs/board/](docs/board/)                           | Cards, checklists, change log, implementation memory  |
 
 ## Contributing
 

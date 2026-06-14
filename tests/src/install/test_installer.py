@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Generator
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -813,3 +814,157 @@ class TestValidatePathWithinBoundary:
             validate_path_within_boundary(target, boundary, "remove backup file")
 
         assert "remove backup file" in str(exc_info.value)
+
+
+class TestInstallerCodexHooks:
+    """Tests for the codex-hooks module wiring (plan/init/uninstall/update)."""
+
+    @pytest.fixture
+    def setup_installer(self, tmp_path: Path) -> Generator[tuple[Installer, Path, Path, Path], None, None]:
+        """Installer with temp dirs; codex config lands in the isolated CODEX_HOME."""
+        forge_home = tmp_path / ".forge"
+        forge_home.mkdir()
+        # Must match the autouse isolate_claude_home target: uninstall's
+        # path-boundary check validates settings paths against this root.
+        claude_home = tmp_path / "claude_home"
+
+        src = tmp_path / "src"
+        src.mkdir()
+        commands = src / "commands"
+        commands.mkdir()
+        (commands / "test.md").write_text("# Test Command\n")
+        (src / "skills").mkdir()
+        (src / "forge").mkdir()  # _is_repo_checkout requires src/forge + extension dir
+
+        tracking = TrackingStore(tracking_path=forge_home / "installed.json")
+        installer = Installer(scope=InstallScope.USER, tracking_store=tracking)
+        yield installer, forge_home, claude_home, src
+
+    def _run(
+        self,
+        installer: Installer,
+        src: Path,
+        claude_home: Path,
+        method: str = "init",
+        available: bool = True,
+        **kwargs: Any,
+    ) -> Any:
+        with patch("forge.install.installer.get_forge_source_root", return_value=src.parent):
+            with patch("forge.install.installer.get_target_root", return_value=claude_home):
+                with patch("forge.install.installer._codex_available", return_value=available):
+                    return getattr(installer, method)(**kwargs)
+
+    @staticmethod
+    def _codex_config(monkeypatch_free_env: None = None) -> Path:
+        import os
+
+        return Path(os.environ["CODEX_HOME"]) / "config.toml"
+
+    def test_plan_standard_includes_codex_install(self, setup_installer: tuple[Installer, Path, Path, Path]) -> None:
+        installer, _, claude_home, src = setup_installer
+        plan = self._run(installer, src, claude_home, method="plan")
+        assert plan.codex is not None
+        assert plan.codex.action == "install"
+        assert plan.codex.config_path == str(self._codex_config())
+        assert plan.codex.commands == [
+            "forge hook codex-session-start",
+            "forge hook codex-policy-check",
+        ]
+
+    def test_plan_minimal_has_no_codex(self, setup_installer: tuple[Installer, Path, Path, Path]) -> None:
+        installer, _, claude_home, src = setup_installer
+        plan = self._run(installer, src, claude_home, method="plan", profile=InstallProfile.MINIMAL)
+        assert plan.codex is None
+
+    def test_plan_without_codex_binary_is_unavailable(
+        self, setup_installer: tuple[Installer, Path, Path, Path]
+    ) -> None:
+        installer, _, claude_home, src = setup_installer
+        plan = self._run(installer, src, claude_home, method="plan", available=False)
+        assert plan.codex.action == "unavailable"
+        assert "not found on PATH" in plan.codex.reason
+        assert not plan.has_conflicts
+
+    def test_codex_conflict_never_blocks_the_install(self, setup_installer: tuple[Installer, Path, Path, Path]) -> None:
+        installer, forge_home, claude_home, src = setup_installer
+        config = self._codex_config()
+        config.write_text("not = valid = toml\n")
+        plan = self._run(installer, src, claude_home)
+        assert plan.codex.action == "conflict"
+        assert not plan.has_conflicts
+        # The Claude install completed despite the codex conflict.
+        assert (claude_home / "commands" / "test.md").exists()
+        assert config.read_text() == "not = valid = toml\n"
+        installation = installer._tracking.get_installation("user", None)
+        assert installation is not None and installation.codex_config_path is None
+
+    def test_init_writes_block_and_tracks(self, setup_installer: tuple[Installer, Path, Path, Path]) -> None:
+        installer, forge_home, claude_home, src = setup_installer
+        self._run(installer, src, claude_home)
+        config = self._codex_config()
+        text = config.read_text()
+        assert "# >>> forge hooks >>>" in text
+        installation = installer._tracking.get_installation("user", None)
+        assert installation is not None
+        assert installation.codex_config_path == str(config)
+        assert installation.codex_commands == [
+            "forge hook codex-policy-check",
+            "forge hook codex-session-start",
+        ]
+
+    def test_init_is_idempotent(self, setup_installer: tuple[Installer, Path, Path, Path]) -> None:
+        installer, _, claude_home, src = setup_installer
+        self._run(installer, src, claude_home)
+        before = self._codex_config().read_text()
+        self._run(installer, src, claude_home)
+        assert self._codex_config().read_text() == before
+        assert before.count("# >>> forge hooks >>>") == 1
+
+    def test_update_preserves_block_bytes(self, setup_installer: tuple[Installer, Path, Path, Path]) -> None:
+        """Trust stability: sync must not change the registered definitions."""
+        installer, _, claude_home, src = setup_installer
+        self._run(installer, src, claude_home)
+        before = self._codex_config().read_text()
+        self._run(installer, src, claude_home, method="update")
+        assert self._codex_config().read_text() == before
+
+    def test_uninstall_removes_block_and_forge_created_file(
+        self, setup_installer: tuple[Installer, Path, Path, Path]
+    ) -> None:
+        installer, _, claude_home, src = setup_installer
+        self._run(installer, src, claude_home)
+        assert self._codex_config().is_file()
+        self._run(installer, src, claude_home, method="uninstall")
+        assert not self._codex_config().exists()
+
+    def test_uninstall_preserves_user_content(self, setup_installer: tuple[Installer, Path, Path, Path]) -> None:
+        installer, _, claude_home, src = setup_installer
+        config = self._codex_config()
+        config.write_text('model = "gpt-5.5-codex"\n')
+        self._run(installer, src, claude_home)
+        self._run(installer, src, claude_home, method="uninstall")
+        assert config.read_text() == 'model = "gpt-5.5-codex"\n'
+
+    def test_uninstall_refuses_mismatched_tracked_path(
+        self, setup_installer: tuple[Installer, Path, Path, Path], tmp_path: Path
+    ) -> None:
+        """A tampered tracking path (or changed CODEX_HOME) is never edited."""
+        installer, _, claude_home, src = setup_installer
+        self._run(installer, src, claude_home)
+        victim = tmp_path / "victim.toml"
+        victim.write_text("# >>> forge hooks >>>\n# <<< forge hooks <<<\n")
+        installation = installer._tracking.get_installation("user", None)
+        assert installation is not None
+        installation.codex_config_path = str(victim)
+        installer._tracking.set_installation("user", installation, None)
+        self._run(installer, src, claude_home, method="uninstall")
+        assert victim.read_text() == "# >>> forge hooks >>>\n# <<< forge hooks <<<\n"
+
+    def test_module_dropped_preserves_tracking(self, setup_installer: tuple[Installer, Path, Path, Path]) -> None:
+        """Re-enabling without codex-hooks keeps tracking so disable still cleans up."""
+        installer, _, claude_home, src = setup_installer
+        self._run(installer, src, claude_home)
+        self._run(installer, src, claude_home, profile=InstallProfile.MINIMAL)
+        installation = installer._tracking.get_installation("user", None)
+        assert installation is not None
+        assert installation.codex_config_path == str(self._codex_config())

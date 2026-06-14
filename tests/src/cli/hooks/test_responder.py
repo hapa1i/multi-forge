@@ -3,13 +3,15 @@
 ``ClaudeHookResponder`` owns Claude Code's PreToolUse wire contract: the block
 message (deny / needs_review), the allow ``hookSpecificOutput`` JSON, and the
 exit codes. These lock that contract directly (the ``policy_check`` command tests
-cover the end-to-end integration). ``ClaudeHookAdapter``/``ClaudeHookResponder``
-must also structurally satisfy the runtime-neutral ``HookAdapter``/``HookResponder``
-protocols so a Codex equivalent (Phase 6) can sit beside them.
+cover the end-to-end integration). Both runtime pairs --
+``ClaudeHookAdapter``/``ClaudeHookResponder`` and the Codex pair in
+``cli/hooks/codex_policy.py`` -- must structurally satisfy the runtime-neutral
+``HookAdapter``/``HookResponder`` protocols.
 """
 
 from __future__ import annotations
 
+from forge.cli.hooks.codex_policy import CodexHookAdapter, CodexHookResponder
 from forge.cli.hooks.policy import ClaudeHookAdapter, ClaudeHookResponder
 from forge.cli.hooks.protocols import HookAdapter, HookResponder
 from forge.policy.types import CompositeDecision, PolicyDecision, Violation
@@ -110,4 +112,11 @@ def test_claude_impls_satisfy_protocols() -> None:
     """Static + runtime check that the Claude impls match the runtime-neutral seam."""
     adapter: HookAdapter = ClaudeHookAdapter()  # type-checked structural conformance
     responder: HookResponder = ClaudeHookResponder()
+    assert adapter is not None and responder is not None
+
+
+def test_codex_impls_satisfy_protocols() -> None:
+    """Static + runtime check that the Codex impls match the runtime-neutral seam."""
+    adapter: HookAdapter = CodexHookAdapter()  # type-checked structural conformance
+    responder: HookResponder = CodexHookResponder()
     assert adapter is not None and responder is not None

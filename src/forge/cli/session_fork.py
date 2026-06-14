@@ -66,8 +66,6 @@ from forge.cli.session import (  # noqa: E402
     logger,
 )
 from forge.cli.session_lifecycle import (  # noqa: E402
-    _apply_and_persist_direct_model_override,
-    _apply_direct_model_env_if_supported,
     _launch_claude_for_session,
     _persist_fork_transfer_derivation,
     _print_branch_exists_tip,
@@ -75,8 +73,12 @@ from forge.cli.session_lifecycle import (  # noqa: E402
     _print_session_activity_summary,
     _resolve_manifest_prompt_file,
     _resume_tip_command,
-    _validate_direct_model_pin_for_routing,
     session,
+)
+from forge.cli.session_model_pin import (  # noqa: E402
+    _apply_and_persist_direct_model_override,
+    _apply_direct_model_env_if_supported,
+    _validate_direct_model_pin_for_routing,
 )
 from forge.core.reactive.env import compute_interactive_api_key_decision  # noqa: E402
 
@@ -337,6 +339,30 @@ def fork(
 
     manager = _sess().SessionManager()
     _fr = _sess()._cwd_forge_root()
+
+    # Reject a Codex parent BEFORE fork_session() creates orphaned child state. `fork`
+    # is Claude-specific: it carries the conversation via --fork-session + the parent's
+    # confirmed.claude_session_id, which a Codex session never has (it would fail later at
+    # the "Parent session has no UUID" check, after a child manifest/worktree was created).
+    # Manifests store the registry id "codex" (CLI maps --runtime); not found/unreadable
+    # falls through so fork_session() raises the right error.
+    try:
+        _parent_runtime_state = manager.get_session(parent, forge_root=_fr)
+    except ForgeSessionError:
+        _parent_runtime_state = None
+    if _parent_runtime_state is not None:
+        _parent_launch = _parent_runtime_state.intent.launch
+        if _parent_launch is not None and _parent_launch.runtime == "codex":
+            print_error_with_tip(
+                f"Session '{parent}' is a Codex session; 'forge session fork' is Claude-only.",
+                "Continue the Codex thread, or branch a new Codex session from it:",
+                commands=[
+                    f"forge session resume {parent} --task <next step>",
+                    f"forge session start <name> --runtime codex --resume-from {parent} --task <task>",
+                ],
+                console=console,
+            )
+            sys.exit(1)
 
     # --into cross-repo preflight: reject before fork_session() to avoid orphaned sessions
     if into_resolved is not None and into_target_common is not None:

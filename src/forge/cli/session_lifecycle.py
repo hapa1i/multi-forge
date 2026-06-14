@@ -21,13 +21,17 @@ from forge.cli.launch_confirmation import (
     _routing_mode_for,
     record_launch_confirmed,
 )
-from forge.config.schema import ProxyInstanceConfig
+from forge.cli.session_model_pin import (
+    _apply_and_persist_direct_model_override,
+    _apply_direct_model_env_if_supported,
+    _validate_direct_model_pin_for_routing,
+    _validate_proxy_model_pin,
+)
 from forge.core.paths import display_path
 from forge.core.reactive.env import (
     InteractiveApiKeyDecision,
     compute_interactive_api_key_decision,
 )
-from forge.core.state import FileLockTimeoutError
 from forge.session import (
     LAUNCH_MODE_HOST,
     LAUNCH_MODE_SIDECAR,
@@ -48,10 +52,6 @@ from forge.session.direct_model import (
 from forge.session.exceptions import (
     BranchExistsError,
     InvalidBranchNameError,
-    InvalidSessionNameError,
-    ManifestCorruptedError,
-    ManifestValidationError,
-    SessionFileNotFoundError,
     SessionNotFoundError,
     WorktreePathExistsError,
 )
@@ -97,6 +97,13 @@ session = cast(click.Group, _session_untyped)  # type: ignore[has-type]  # circu
 from forge.cli.session_addendum import (  # noqa: E402
     resolve_addendum_content_for_proxy,
     write_managed_addendum,
+)
+from forge.cli.session_codex import (  # noqa: E402
+    codex_resume_options,
+    codex_start_options,
+    reject_codex_flags_for_claude,
+    run_codex_resume,
+    run_codex_start,
 )
 
 # Functions below are accessed through _sess() because tests patch them
@@ -346,6 +353,17 @@ def _launch_claude_for_session(
     proxy_id: str | None = None,
 ) -> int:
     """Launch Claude for a session, handling sidecar/host split."""
+    # Dispatch backstop: every entry point routes Codex sessions to session_codex
+    # before reaching this launcher; a manifest arriving here anyway is a bug, and
+    # launching Claude against it would corrupt the session's runtime facts.
+    _runtime = manifest.intent.launch.runtime if manifest.intent.launch else "claude_code"
+    if _runtime != "claude_code":
+        console.print(
+            f"[red]Error:[/red] session '{manifest.name}' has runtime '{_runtime}' "
+            "and cannot be launched with Claude. Use the matching runtime command."
+        )
+        return 1
+
     worktree_path = Path(manifest.worktree.path) if manifest.worktree else Path.cwd()
     # State lives under forge_root (may differ from worktree_path in nested projects)
     forge_root = Path(manifest.forge_root) if manifest.forge_root else worktree_path
@@ -760,172 +778,6 @@ def _resume_token_estimate_multiplier(
         return 1.0
 
 
-def _proxy_supports_model_pin(proxy_cfg: ProxyInstanceConfig, pin: DirectModelPin) -> bool:
-    """Whether a proxy can honor a Claude model pin via tier default or alternatives."""
-    alt_models = proxy_cfg.model_alternatives.get(pin.tier, {})
-    if pin.canonical_model in alt_models:
-        return True
-
-    tier_model = proxy_cfg.tiers.get(pin.tier)
-    if not tier_model:
-        return False
-
-    from forge.core.models.catalog import ModelCatalogError, resolve_model_id
-
-    try:
-        default_model = resolve_model_id(str(tier_model)).removesuffix("-1m")
-    except ModelCatalogError:
-        return False
-    return default_model == pin.canonical_model
-
-
-def _apply_direct_model_env_if_supported(
-    env_vars: dict[str, str],
-    proxy_id: str,
-    direct_model: str,
-) -> str | None:
-    """Apply --model env vars when the proxy can honor the pin.
-
-    No-op (returns None) when the proxy is missing or cannot honor the pin.
-    Returns an error message only when env application itself fails.
-    """
-    from forge.config.loader import load_proxy_instance_config
-
-    proxy_cfg = load_proxy_instance_config(proxy_id)
-    if proxy_cfg is None:
-        return None
-    if not _proxy_supports_model_pin(proxy_cfg, resolve_direct_model_pin(direct_model)):
-        return None
-    return apply_direct_model_env(env_vars, direct_model)
-
-
-def _validate_proxy_model_pin(proxy_id: str, pin: DirectModelPin) -> str | None:
-    """Return a user-facing error if a proxy cannot honor a Claude model pin."""
-    from forge.config.loader import load_proxy_instance_config
-
-    try:
-        proxy_cfg = load_proxy_instance_config(proxy_id)
-    except (FileNotFoundError, TypeError, ValueError) as e:
-        return f"Could not load proxy config for '{proxy_id}': {e}"
-
-    if proxy_cfg is None:
-        return f"Could not load proxy config for '{proxy_id}'"
-
-    if _proxy_supports_model_pin(proxy_cfg, pin):
-        return None
-
-    alt_models = proxy_cfg.model_alternatives.get(pin.tier, {})
-    available = ", ".join(sorted(alt_models.keys())) if alt_models else "(none configured)"
-    return (
-        f"Proxy '{proxy_id}' does not configure model alternative or tier default "
-        f"for '{pin.canonical_model}' in tier '{pin.tier}'. Available alternatives: {available}"
-    )
-
-
-def _validate_direct_model_pin_for_routing(
-    *,
-    pin: DirectModelPin | None,
-    proxy_id: str | None,
-    base_url: str | None,
-    surface: str,
-) -> str | None:
-    """Validate a --model pin against explicit or inherited routing."""
-    if pin is None:
-        return None
-    if proxy_id:
-        return _validate_proxy_model_pin(proxy_id, pin)
-    if base_url is not None:
-        return (
-            f"--model with inherited proxy routing requires an active proxy id for {surface}. "
-            "Pass --proxy <proxy_id> to select the proxy explicitly."
-        )
-    return None
-
-
-def _apply_direct_model_override_to_state(state: SessionState, direct_model: str | None) -> None:
-    """Apply a normalized --model override to an in-memory session state."""
-    if direct_model is None:
-        return
-    if state.intent.launch is None:
-        from forge.session.models import LaunchIntent
-
-        state.intent.launch = LaunchIntent()
-    state.intent.launch.direct_model = direct_model
-
-
-def _persist_direct_model_override(
-    *,
-    forge_root: Path,
-    session_name: str,
-    direct_model: str | None,
-) -> None:
-    """Persist a --model override into the session manifest."""
-    if direct_model is None:
-        return
-
-    store = SessionStore(str(forge_root), session_name)
-
-    def _mutate(m: SessionState) -> None:
-        _apply_direct_model_override_to_state(m, direct_model)
-
-    try:
-        store.update(timeout_s=5.0, mutate=_mutate)
-    except FileLockTimeoutError as e:
-        logger.warning("Failed to persist direct model override to manifest", exc_info=True)
-        console.print(
-            f"[yellow]Warning:[/yellow] Could not persist --model override for session "
-            f"[green]{session_name}[/green]: {e}"
-        )
-        print_tip(
-            "If this command launches Claude, it will use the requested model for this run, "
-            "but future resumes may use the previous stored model. Retry after current Forge state updates finish.",
-            blank_before=False,
-            console=console,
-        )
-    except (
-        InvalidSessionNameError,
-        ManifestCorruptedError,
-        ManifestValidationError,
-        OSError,
-        SessionFileNotFoundError,
-        ValueError,
-    ) as e:
-        logger.warning("Failed to persist direct model override to manifest", exc_info=True)
-        console.print(
-            f"[yellow]Warning:[/yellow] Could not persist --model override for session "
-            f"[green]{session_name}[/green]: {e}"
-        )
-        print_tip(
-            "If this command launches Claude, it will use the requested model for this run, "
-            "but future resumes may use the previous stored model. Check the session manifest before relying on this pin.",
-            blank_before=False,
-            console=console,
-        )
-
-
-def _apply_and_persist_direct_model_override(
-    *,
-    state: SessionState,
-    direct_model: str | None,
-    forge_root: Path,
-    use_sidecar: bool,
-    surface: str,
-) -> None:
-    """Apply a --model override to a launch state and persist it when requested."""
-    if direct_model is None:
-        return
-    if use_sidecar:
-        console.print(f"[red]Error:[/red] --model cannot be combined with sidecar {surface}")
-        sys.exit(1)
-
-    _apply_direct_model_override_to_state(state, direct_model)
-    _persist_direct_model_override(
-        forge_root=forge_root,
-        session_name=state.name,
-        direct_model=direct_model,
-    )
-
-
 # --- Shared session creation + launch ---
 
 
@@ -1324,6 +1176,7 @@ def launch_new_session(
     default=None,
     help="Enable/disable memory auto-update for this session (default: off).",
 )
+@codex_start_options
 def start(
     name: str | None,
     proxy_name: str | None,
@@ -1345,6 +1198,13 @@ def start(
     supervisor_direct: bool,
     subprocess_proxy: str | None,
     memory_flag: str | None,
+    runtime: str,
+    resume_from: str | None,
+    task: str | None,
+    transfer_strategy: str | None,
+    depth: int | None,
+    sandbox: str | None,
+    context_delivery: str | None,
 ) -> None:
     """Create and start a new session.
 
@@ -1368,7 +1228,16 @@ def start(
         forge session start my-feature --subprocess-proxy openrouter-anthropic # Direct + proxied subprocesses
         forge session start my-feature --worktree                              # Isolated worktree
         forge session start my-feature --supervise planner                     # With plan supervision
+        forge session start impl --runtime codex --resume-from planner --task "Build it"
     """
+    if runtime == "codex":
+        sys.exit(run_codex_start(click.get_current_context()))
+
+    # Codex-only flags are meaningless on the Claude path: reject, don't ignore.
+    codex_rc = reject_codex_flags_for_claude(click.get_current_context().params)
+    if codex_rc is not None:
+        sys.exit(codex_rc)
+
     if direct and proxy_name:
         console.print("[red]Error:[/red] --no-proxy and --proxy are mutually exclusive")
         sys.exit(1)
@@ -1512,6 +1381,7 @@ def start(
     default=None,
     help="Override child memory activation (default: inherit parent).",
 )
+@codex_resume_options
 @click.pass_context
 def resume(
     ctx: click.Context,
@@ -1527,6 +1397,7 @@ def resume(
     review: bool,
     force: bool,
     memory_flag: str | None,
+    task: str | None,
 ) -> None:
     """Resume a session.
 
@@ -1607,9 +1478,53 @@ def resume(
             sys.exit(0)
 
     _fr = _sess()._cwd_forge_root()
+    # Cross-project resolution happens BEFORE the runtime is knowable (the runtime
+    # lives in the manifest), so a scoped miss always tries the unscoped lookup;
+    # whether a cross-project hit is usable is decided per-runtime below.
+    cross_project = False
     try:
         manifest = manager.get_session(name, forge_root=_fr)
     except SessionNotFoundError:
+        if _fr is None:
+            # The scoped lookup WAS the global lookup; nothing else to try.
+            if not _hint_cross_project_session(name, _fr):
+                print_error_with_tip(
+                    f"session '{name}' not found",
+                    f"Run 'forge session start {name}' to create it.",
+                    console=console,
+                )
+            sys.exit(1)
+        try:
+            manifest = manager.get_session(name, forge_root=None)
+            cross_project = True
+        except SessionNotFoundError:
+            if not _hint_cross_project_session(name, _fr):
+                print_error_with_tip(
+                    f"session '{name}' not found",
+                    f"Run 'forge session start {name}' to create it.",
+                    console=console,
+                )
+            sys.exit(1)
+        except ForgeSessionError as e:
+            handle_session_error(e)
+            return
+    except ForgeSessionError as e:
+        handle_session_error(e)
+        return
+
+    # Runtime dispatch BEFORE any Claude predicate: a Codex session has no Claude
+    # conversation to reattach, so the Claude resume machinery below never applies.
+    # Codex resume is cross-CWD by design (the turn runs in the recorded worktree).
+    manifest_runtime = manifest.intent.launch.runtime if manifest.intent.launch else "claude_code"
+    if manifest_runtime == "codex":
+        sys.exit(run_codex_resume(ctx, name, task, manifest))
+
+    if task is not None:
+        console.print("[red]Error:[/red] --task is only supported for Codex sessions")
+        sys.exit(1)
+
+    if cross_project:
+        # Claude resume is genuinely project-scoped: keep the pre-lookup refusal.
         if not _hint_cross_project_session(name, _fr):
             print_error_with_tip(
                 f"session '{name}' not found",
@@ -1617,9 +1532,6 @@ def resume(
                 console=console,
             )
         sys.exit(1)
-    except ForgeSessionError as e:
-        handle_session_error(e)
-        return
 
     _, validation_base_url, validation_proxy_id = _get_effective_proxy_for_session(manifest)
     if routing:

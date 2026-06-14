@@ -19,10 +19,15 @@ the slice-5a checklist note). Concretely:
   ``"warning"`` for unrelated reasons (stale rollout DB rows, update checks) while
   auth is perfectly fine.
 * ``doctor`` exposes **no per-hook trust** signal, so 5a can never prove the (not yet
-  built) 5d transfer hook is trusted -- ``hook_seam`` never returns ``"active"``. And the
-  Phase 6 probe pinned that headless ``codex exec`` does not fire hooks at all (registry
-  ``native_hooks="headless_inert"``), so the normal enabled+version-OK case returns
-  ``"headless_inert"``, not a trust-hedged ``"unknown"`` (which would read as "might work").
+  built) transfer hook is trusted -- ``hook_seam`` never returns ``"active"``. The
+  codex_frontend probes (2026-06-10) pinned that hooks DO fire under headless
+  ``codex exec`` once trust-enrolled (registry ``native_hooks="enrollment_gated"``),
+  so the normal enabled+version-OK case returns ``"enrollment_gated"``: hooks can
+  fire, but enrollment state is unchecked. A direct ``[hooks.state]`` read was
+  considered and **rejected by decision** (Phase 1): the ``trusted_hash`` preimage is
+  not black-box computable (a record cannot be validated), and enrollment survives
+  worktrees that have NO ``[hooks.state]`` record at their own config path, so a
+  path-keyed read would false-negative in Forge's main isolation workflow.
 
 Render-free (core, not CLI): every function returns data or plain strings. The
 ``forge runtime preflight codex`` command renders the result; ``CodexPreflight``
@@ -49,6 +54,7 @@ from forge.core.auth.template_secrets import (
     resolve_env_or_credential,
     resolve_env_or_credential_with_source,
 )
+from forge.core.runtime.codex_rollouts import codex_home
 from forge.core.runtime.registry import RuntimeSpec, get_runtime
 from forge.core.usage.ledger import BillingMode
 
@@ -64,20 +70,36 @@ _FEATURES_TIMEOUT_S = 10
 
 _MANAGED_HOOKS_KEY = "allow_managed_hooks_only"
 
+# The newest codex-cli version the codex_frontend probe harness
+# (``scripts/experiments/codex-hooks/``) was run against end-to-end (stages 85-87 PASS
+# on 2026-06-12). Codex's trust/enrollment, hook-firing, and ``apply_patch``/argv
+# behavior are pinned empirically, not contractually -- exactly the surface a minor
+# release can change silently. This is a *ceiling*, surfaced as a re-probe notice when
+# the installed binary runs ahead of it (``version_beyond_validated``): a bump does not
+# block readiness (the binary may be fine), it tells the operator the pinned facts are
+# now unverified for their version. Mirrors the 4g ``CLAUDE_VERSION_VALIDATED`` guard;
+# bump it after a green probe round on a newer codex.
+CODEX_VERSION_VALIDATED = "0.139.0"
+
 # Auth state the preflight has *proven*, named by what is stored -- NOT by the login
 # mechanism. ``chatgpt_tokens`` (a ChatGPT-subscription identity) is distinct from
 # ``enterprise_token`` (an opaque access-token / agent identity); the device-auth flow
 # is just one way to obtain the former.
 CodexAuthMethod = Literal["api_key", "chatgpt_tokens", "enterprise_token", "none"]
 
-# Whether Forge's (future, 5d) SessionStart transfer hook can deliver context. 5a never
-# returns ``active`` -- Codex trust is keyed to a specific hook *hash*, unprovable before
-# the hook exists; that verdict belongs to 5d. ``headless_inert`` is the normal headless
-# verdict: hooks are enabled + version-OK, but the Phase 6 probe pinned that they do NOT
-# fire under headless ``codex exec`` (mirrors the registry ``native_hooks="headless_inert"``),
-# so trust-provability is moot -- firing is a known negative. ``unknown`` now only covers
-# the moot cases: not installed, or version unparseable (the floor cannot even be proven).
-HookSeam = Literal["active", "untrusted", "managed_suppressed", "headless_inert", "disabled", "unknown"]
+# Whether Forge's (future) SessionStart transfer hook can deliver context. This
+# preflight never returns ``active`` -- Codex trust is keyed to a specific hook entry,
+# unprovable before the hook exists. ``enrollment_gated`` is the normal
+# enabled+version-OK verdict and is NOT a per-home enrolled-state claim: it means
+# "hooks can fire (probe-confirmed: enrolled hooks fire headless AND interactively),
+# but enrollment state is unchecked" -- never treat it as ``active``. Reading
+# ``[hooks.state]`` to report enrolled-vs-not per hook was rejected by decision
+# (codex_frontend Phase 1, 2026-06-10): the ``trusted_hash`` is not black-box
+# computable and a path-keyed read false-negatives in worktrees. ``untrusted`` stays
+# reserved -- reachable only if a codex-cli source-dive makes the hash computable.
+# ``unknown`` covers only the moot cases: not installed, or version unparseable (the
+# floor cannot even be proven).
+HookSeam = Literal["active", "untrusted", "managed_suppressed", "enrollment_gated", "disabled", "unknown"]
 
 # Whether a Codex run can get the Responses API it requires. Codex emits
 # ``wire_api="responses"`` only; no current Forge proxy serves Responses on its
@@ -104,9 +126,13 @@ class CodexPreflight:
     billing_mode: BillingMode  # 5c writes this onto the ledger event
     ready: bool  # installed AND auth resolved AND not responses-blocked; NEVER doctor overallStatus
     blocking_reason: str | None  # actionable setup guidance; None iff ready
-    hook_seam: HookSeam  # 5d seam; 5a never returns "active" (normal headless case is "headless_inert")
+    hook_seam: (
+        HookSeam  # never "active" here (normal enabled case is "enrollment_gated": can fire, enrollment unchecked)
+    )
     proxy_responses: ProxyResponses
     doctor_status: str | None  # codex doctor overallStatus -- informational, never gates ready
+    version_validated: str = CODEX_VERSION_VALIDATED  # newest probe-validated codex (the ceiling)
+    version_beyond_validated: bool = False  # installed runs AHEAD of the probe ceiling -> re-probe notice
 
 
 class CodexPreflightError(Exception):
@@ -140,6 +166,9 @@ def preflight_codex(
     installed = _codex_installed(runtime)
     version = _detect_version(runtime) if installed else None
     version_ok = _version_meets_floor(version, runtime.hook_min_version)
+    # "Beyond the ceiling" only when the version parses AND sorts strictly above the
+    # validated one; an unparseable version stays False (we can't claim it ran ahead).
+    version_beyond_validated = version is not None and _version_lt(CODEX_VERSION_VALIDATED, version)
     doctor = _probe_doctor_json(runtime) if (installed and run_doctor) else None
 
     auth = _resolve_codex_auth(doctor)
@@ -175,6 +204,7 @@ def preflight_codex(
         hook_seam=hook_seam,
         proxy_responses=responses.posture,
         doctor_status=doctor.get("overallStatus") if isinstance(doctor, dict) else None,
+        version_beyond_validated=version_beyond_validated,
     )
 
 
@@ -301,9 +331,7 @@ def _read_managed_only() -> bool:
 
 
 def _managed_requirements_paths() -> list[Path]:
-    codex_home = os.environ.get("CODEX_HOME")
-    user_dir = Path(codex_home) if codex_home else Path.home() / ".codex"
-    return [user_dir / "requirements.toml", Path("/etc/codex/requirements.toml")]
+    return [codex_home() / "requirements.toml", Path("/etc/codex/requirements.toml")]
 
 
 def _read_toml(path: Path) -> dict[str, Any] | None:
@@ -391,15 +419,18 @@ def _resolve_hook_seam(
     features_hooks_enabled: bool | None,
     managed_only: bool,
 ) -> HookSeam:
-    """Honest hook-delivery posture. 5a never returns ``"active"`` (see module note).
+    """Honest hook-delivery posture. This preflight never returns ``"active"`` (see module note).
 
-    The ``"untrusted"`` verdict is reserved for 5d: Codex keys trust to a specific hook
-    *hash*, and Stage A confirmed ``codex doctor`` (0.137.0) exposes no trust signal.
-    Post-Phase-6 the normal enabled+version-OK case is ``"headless_inert"``: the probe
-    pinned that headless ``codex exec`` does not fire hooks regardless of trust, so it is a
-    known negative, not a trust-hedged ``"unknown"``. ``"unknown"`` remains only for the
-    moot cases -- not installed, or version unparseable (the floor cannot even be proven,
-    so we cannot assert hooks register).
+    The ``"untrusted"`` verdict stays reserved: the codex_frontend Phase 1 probe
+    (2026-06-10) found the ``[hooks.state]`` ``trusted_hash`` is not black-box
+    computable and that enrollment survives worktrees with no record at the worktree's
+    config path, so a per-hook enrollment read cannot produce a trustworthy verdict
+    and is deliberately not implemented (``codex doctor`` exposes no trust signal
+    either, Stage A). The normal enabled+version-OK case is ``"enrollment_gated"`` --
+    a capability statement, NOT a per-home enrolled-state verdict: hooks can fire, but
+    enrollment state is unchecked. ``"unknown"`` remains only for the moot cases --
+    not installed, or version unparseable (the floor cannot even be proven, so we
+    cannot assert hooks register).
     """
     if not installed:
         return "unknown"  # moot; ready is already False
@@ -419,10 +450,11 @@ def _resolve_hook_seam(
         # even register -- the honest verdict stays "unknown".
         return "unknown"
 
-    # Enabled, version meets the floor, not suppressed: hooks DO register/enable, but the
-    # Phase 6 probe pinned that they do not fire under headless `codex exec` (regardless of
-    # trust). For a headless-readiness check that is a known negative -> headless_inert.
-    return "headless_inert"
+    # Enabled, version meets the floor, not suppressed: hooks register/enable AND fire
+    # once trust-enrolled, but enrollment state is unchecked by decision (Phase 1: the
+    # trusted_hash cannot be validated, and a path-keyed [hooks.state] read would
+    # false-negative in worktrees). Not a per-home enrolled claim.
+    return "enrollment_gated"
 
 
 class _Responses(NamedTuple):

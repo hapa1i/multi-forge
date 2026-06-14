@@ -937,6 +937,7 @@ def _build_show_json(
         data["last_accessed_at"] = state.last_accessed_at
         data["intent"] = {
             "agent": state.intent.agent,
+            "runtime": (state.intent.launch.runtime if state.intent.launch else "claude_code"),
             "proxy": (
                 {
                     "template": state.intent.proxy.template,
@@ -954,6 +955,7 @@ def _build_show_json(
             "latest_plan_path": state.confirmed.latest_plan_path,
             "artifacts": dict(state.confirmed.artifacts),
             "derivation": (dataclasses.asdict(state.confirmed.derivation) if state.confirmed.derivation else None),
+            "codex": (dataclasses.asdict(state.confirmed.codex) if state.confirmed.codex else None),
             "is_sandboxed": state.confirmed.is_sandboxed,
             "claude_project_root": state.confirmed.claude_project_root,
             "policy": (dataclasses.asdict(state.confirmed.policy) if state.confirmed.policy else None),
@@ -1301,14 +1303,36 @@ def _print_session_detail(
     console.print()
 
     console.print("[bold]Configuration (Intent)[/bold]")
-    console.print(f"  Agent:        {state.intent.agent}")
-    if state.intent.proxy:
+    session_runtime = state.intent.launch.runtime if state.intent.launch else "claude_code"
+    if session_runtime == "claude_code":
+        # intent.agent is a display-only vestige superseded by Runtime: it always
+        # says "claude-code", which would misread on non-Claude runtimes.
+        console.print(f"  Agent:        {state.intent.agent}")
+    console.print(f"  Runtime:      {session_runtime}")
+    if session_runtime == "codex":
+        console.print("  Routing:      direct (OpenAI via codex CLI)")
+    elif state.intent.proxy:
         console.print(f"  Routing:      {_template_display_label(state.intent.proxy.template)}")
         console.print(f"  Base URL:     {state.intent.proxy.base_url}")
     else:
         console.print("  Routing:      direct")
         console.print("  Base URL:     default Anthropic")
     console.print()
+
+    if state.confirmed.codex:
+        codex = state.confirmed.codex
+        console.print("[bold]Codex[/bold]")
+        if codex.thread_id:
+            console.print(f"  Thread:       {codex.thread_id}")
+        if codex.rollout_path:
+            console.print(f"  Rollout:      {display_path(codex.rollout_path)}")
+        if codex.auth_method:
+            console.print(f"  Auth:         {codex.auth_method} ({codex.auth_source})")
+        if codex.context_delivery:
+            console.print(f"  Delivery:     {codex.context_delivery}")
+        if codex.last_run_at:
+            console.print(f"  Last Run:     {codex.last_run_at}")
+        console.print()
 
     if state.worktree:
         console.print("[bold]Worktree[/bold]")
@@ -1362,7 +1386,10 @@ def _print_session_detail(
         for key, value in _flatten_overrides(state.overrides):
             console.print(f"  {key}: {_format_value(value)}")
 
-    if ctx:
+    # Computed Context is Claude routing/tier/policy state; on other runtimes the
+    # model family and tier mapping don't apply (a Codex session would render the
+    # direct-mode "anthropic" default while actually running OpenAI models).
+    if ctx and session_runtime == "claude_code":
         console.print()
         console.print("[bold]Computed Context[/bold]")
         console.print(f"  Model Family: [cyan]{ctx.model_family}[/cyan]")

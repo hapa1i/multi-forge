@@ -1,5 +1,7 @@
 .env
 .claude/settings.json
 .claude/settings.local.json
+.claude/commands
+.agents/skills
 .mcp.json
 .envrc

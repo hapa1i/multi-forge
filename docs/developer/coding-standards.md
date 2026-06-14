@@ -136,7 +136,7 @@ External data: user-edited config, LLM responses, subprocess output, Claude Code
 
 - **Critical path**: Fail with a clear error message.
 - **Best-effort (non-critical path)**: Warn and degrade to a safe default. Example: unknown key in user config YAML →
-  warn, ignore. Example: supervisor parse failure → "aligned" (design.md §4.1.2 mandates fail-open for policy
+  warn, ignore. Example: supervisor parse failure → "aligned" (design_workflows.md §1.2 mandates fail-open for policy
   evaluations).
 
 Best-effort patterns MUST:

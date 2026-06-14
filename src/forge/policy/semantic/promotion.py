@@ -1,6 +1,6 @@
 """Supervisor promotion flow (deferred).
 
-The full "CLI-Fork Supervision" pattern from design.md §4.1.2 involves:
+The full "CLI-Fork Supervision" pattern from design_workflows.md §1.2 involves:
 1. Forking the planning session via SessionManager
 2. Establishing supervisor session UUID via claude --fork-session
 3. Recording supervisor configuration in the executor session

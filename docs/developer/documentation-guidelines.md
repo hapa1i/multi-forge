@@ -11,15 +11,15 @@ This file explains how to write and maintain docs. The board workflow itself is 
 
 Use one authoritative source per domain:
 
-| Domain                                        | Authority                                   |
-| --------------------------------------------- | ------------------------------------------- |
-| Repository overview                           | `README.md`                                 |
-| Shipped architecture and ownership            | `docs/design.md`, `docs/design_appendix.md` |
-| Documentation writing and maintenance         | This file                                   |
-| Work-board lanes, cards, checklists, closeout | `docs/developer/board-contract.md`          |
-| Coding style and durable-state rules          | `docs/developer/coding-standards.md`        |
-| Test policy                                   | `docs/developer/testing-guidelines.md`      |
-| User-facing behavior                          | `docs/end-user/*`                           |
+| Domain                                        | Authority                                                                                        |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Repository overview                           | `README.md`                                                                                      |
+| Shipped architecture and ownership            | `docs/design.md`, `docs/design_appendix.md`, `docs/design_workflows.md`, `docs/cli_reference.md` |
+| Documentation writing and maintenance         | This file                                                                                        |
+| Work-board lanes, cards, checklists, closeout | `docs/developer/board-contract.md`                                                               |
+| Coding style and durable-state rules          | `docs/developer/coding-standards.md`                                                             |
+| Test policy                                   | `docs/developer/testing-guidelines.md`                                                           |
+| User-facing behavior                          | `docs/end-user/*`                                                                                |
 
 `docs/board/README.md` is a directory guide with examples. It is not the normative board contract.
 
@@ -70,17 +70,17 @@ Cards may contain aspirational target architecture. Design docs should not.
 
 ## Where To Document What
 
-| What                          | Where                                       | When to update                             |
-| ----------------------------- | ------------------------------------------- | ------------------------------------------ |
-| Aspirational proposal         | `docs/board/proposed/<slug>/card.md`        | When drafting or revising a proposal       |
-| Accepted/scheduled work       | `docs/board/todo/<slug>/card.md`            | When work is accepted but not active       |
-| Active execution plan         | `docs/board/doing/<slug>/checklist.md`      | During active card work                    |
-| Paused in-progress work       | `docs/board/paused/<slug>/card.md`          | When partially-done work goes on hold      |
-| Completed work                | `docs/board/change_log.md`                  | At phase/card closeout                     |
-| Durable implementation memory | `docs/board/impl_notes.md`                  | After human review                         |
-| Normative architecture        | `docs/design.md`, `docs/design_appendix.md` | As code ships                              |
-| End-user behavior             | `docs/end-user/*`                           | When user-facing setup or behavior changes |
-| Setup/development workflow    | `docs/developer/*`                          | When maintainer workflow changes           |
+| What                          | Where                                                                                            | When to update                             |
+| ----------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------ |
+| Aspirational proposal         | `docs/board/proposed/<slug>/card.md`                                                             | When drafting or revising a proposal       |
+| Accepted/scheduled work       | `docs/board/todo/<slug>/card.md`                                                                 | When work is accepted but not active       |
+| Active execution plan         | `docs/board/doing/<slug>/checklist.md`                                                           | During active card work                    |
+| Paused in-progress work       | `docs/board/paused/<slug>/card.md`                                                               | When partially-done work goes on hold      |
+| Completed work                | `docs/board/change_log.md`                                                                       | At phase/card closeout                     |
+| Durable implementation memory | `docs/board/impl_notes.md`                                                                       | After human review                         |
+| Normative architecture        | `docs/design.md`, `docs/design_appendix.md`, `docs/design_workflows.md`, `docs/cli_reference.md` | As code ships                              |
+| End-user behavior             | `docs/end-user/*`                                                                                | When user-facing setup or behavior changes |
+| Setup/development workflow    | `docs/developer/*`                                                                               | When maintainer workflow changes           |
 
 The board-specific rules for these files live in [`board-contract.md`](board-contract.md).
 
@@ -114,6 +114,15 @@ Docs are read by humans and AI agents. Be direct and specific.
 3. **Earn every sentence.** If it does not add new information, merge or cut it.
 4. **Plain language wins.** Use "use" instead of "utilize."
 5. **Structure follows content.** Use bullets for parallel items, prose for arguments, and tables for comparisons.
+
+### Tables
+
+In agent-loaded, design, developer, and board docs, use tables for compact enumerable facts, not prose. Keep cells to
+short labels, values, or phrases. If a cell needs a full sentence, examples, caveats, or multiple clauses, use bold-term
+bullets or prose below the table instead.
+
+End-user docs may keep wider tables when they are easier to scan in rendered form, especially for command, setting,
+credential, and comparison references. Prefer the structure that helps a human answer the question fastest.
 
 ### Vocabulary Hygiene
 

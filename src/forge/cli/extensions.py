@@ -99,15 +99,18 @@ def _parse_modules(modules_str: str | None) -> set[InstallModule] | None:
     return {InstallModule(m.strip()) for m in modules_str.split(",")}
 
 
-def _count_actions(plan: InstallPlan) -> tuple[int, int]:
+def _count_actions(plan: InstallPlan) -> tuple[int, int, int]:
     """Count non-skip actions in a plan.
 
     Returns:
-        Tuple of (file_actions, settings_actions) that are not skips.
+        Tuple of (file_actions, settings_actions, codex_actions) that
+        actually change something. A codex install/update counts as an
+        action so a codex-only change never renders "Already up to date.".
     """
     file_actions = sum(1 for f in plan.files if f.action != "skip")
     settings_actions = sum(1 for s in plan.settings if s.action != "skip")
-    return file_actions, settings_actions
+    codex_actions = 1 if plan.codex is not None and plan.codex.action in ("install", "update") else 0
+    return file_actions, settings_actions, codex_actions
 
 
 # Modules that are intentionally empty in the source tree (only .gitkeep).
@@ -165,8 +168,8 @@ def _print_completion_message(
     tracking: TrackingStore,
 ) -> None:
     """Print appropriate completion message based on what was done."""
-    file_actions, settings_actions = _count_actions(plan)
-    total_actions = file_actions + settings_actions
+    file_actions, settings_actions, codex_actions = _count_actions(plan)
+    total_actions = file_actions + settings_actions + codex_actions
 
     _warn_if_modules_have_no_files(plan, scope, project_root, tracking)
 
@@ -178,6 +181,8 @@ def _print_completion_message(
             parts.append(f"{file_actions} file{'s' if file_actions != 1 else ''}")
         if settings_actions > 0:
             parts.append(f"{settings_actions} setting{'s' if settings_actions != 1 else ''}")
+        if codex_actions > 0:
+            parts.append("Codex hooks")
         console.print(f"\n[green]Extensions enabled.[/green] ({', '.join(parts)} updated)")
 
     print_tip(
@@ -199,6 +204,30 @@ def _print_completion_message(
         skill_list = ", ".join(f"/forge:{name}" for name, _ in gated)
         required = gated[0][1].value
         print_tip(f"Additional skills available with --profile {required}: {skill_list}", console=console)
+
+    _print_codex_completion(plan, scope)
+
+
+def _print_codex_completion(plan: InstallPlan, scope: InstallScope) -> None:
+    """Print the trust-ceremony guidance (or skip notice) for the codex plan.
+
+    Registration alone is inert: Codex hooks fire only after the user's
+    one-time interactive trust ceremony, which Forge can neither perform nor
+    verify -- so a fresh registration always names the ceremony explicitly.
+    """
+    codex = plan.codex
+    if codex is None:
+        return
+    if codex.action in ("install", "update"):
+        where = "in any project" if scope == InstallScope.USER else "in this project"
+        config = display_path(codex.config_path) if codex.config_path else "config.toml"
+        console.print("\n[dim]Next steps (Codex hooks):[/dim]")
+        console.print(f"  - Forge hooks are registered in {config} but stay inert until trusted.")
+        console.print(f"  - Run 'codex' interactively {where} and grant trust when prompted (one-time).")
+    elif codex.action == "conflict":
+        console.print(f"\n[yellow]Warning:[/yellow] Codex hook registration skipped: {codex.reason}")
+    elif codex.action == "unavailable":
+        console.print(f"\n[dim]Codex hooks skipped: {codex.reason}.[/dim]")
 
 
 def _validate_anchor(anchor: Path) -> None:
@@ -322,6 +351,23 @@ def _print_plan(plan: InstallPlan, dry_run: bool = False) -> None:
                 value_str = f"current={s.current_value!r}, forge={s.value!r}"
             table.add_row(s.action, s.key_path, value_str, style=style)
 
+        console.print(table)
+
+    if plan.codex is not None:
+        console.print(f"\n{prefix}[bold]Codex hooks (config.toml):[/bold]")
+        table = Table(show_header=True, header_style="bold", box=None)
+        table.add_column("ACTION", style="dim")
+        table.add_column("TARGET")
+        table.add_column("REASON", style="dim")
+        style = {
+            "install": "green",
+            "update": "yellow",
+            "skip": "dim",
+            "conflict": "yellow",  # best-effort: degrades to skip, never blocks
+            "unavailable": "dim",
+        }.get(plan.codex.action, "")
+        target = display_path(plan.codex.config_path) if plan.codex.config_path else ""
+        table.add_row(plan.codex.action, target, plan.codex.reason or "", style=style)
         console.print(table)
 
     if plan.has_conflicts:
@@ -467,7 +513,7 @@ def extensions() -> None:
     "--with",
     "-w",
     "with_modules",
-    help="Add modules (comma-separated: commands,agents,skills,hooks,status-line,permissions)",
+    help="Add modules (comma-separated: commands,agents,skills,hooks,status-line,permissions,codex-hooks)",
 )
 @click.option(
     "--without",
@@ -672,8 +718,8 @@ def sync_cmd(scope: str | None, force: bool) -> None:
             console.print("\n[red]Sync failed due to conflicts.[/red]")
             sys.exit(1)
         else:
-            file_actions, settings_actions = _count_actions(plan)
-            total_actions = file_actions + settings_actions
+            file_actions, settings_actions, codex_actions = _count_actions(plan)
+            total_actions = file_actions + settings_actions + codex_actions
             if total_actions == 0:
                 console.print("\n[dim]Already up to date.[/dim]")
             else:
@@ -682,7 +728,14 @@ def sync_cmd(scope: str | None, force: bool) -> None:
                     parts.append(f"{file_actions} file{'s' if file_actions != 1 else ''}")
                 if settings_actions > 0:
                     parts.append(f"{settings_actions} setting{'s' if settings_actions != 1 else ''}")
+                if codex_actions > 0:
+                    parts.append("Codex hooks")
                 console.print(f"\n[green]Sync complete.[/green] ({', '.join(parts)} updated)")
+
+            # A synced block can carry NEW entries whose trust is not yet
+            # granted (per-entry trusted_hash) -- the ceremony guidance
+            # matters most exactly here.
+            _print_codex_completion(plan, install_scope)
 
     except NoForgeInstallationError as e:
         console.print(f"[red]Error:[/red] {e}")
@@ -787,6 +840,10 @@ def disable_cmd(scope: str | None, uninstall_all: bool, yes: bool) -> None:
                 table.add_row("unmerge", entry.key_path)
             console.print("[bold]Settings:[/bold]")
             console.print(table)
+
+        if existing.codex_config_path:
+            console.print("\n[bold]Codex hooks:[/bold]")
+            console.print(f"  [red]remove[/red] managed block in {display_path(existing.codex_config_path)}")
 
         if not yes:
             if not click.confirm("\nProceed with disable?"):
@@ -926,6 +983,8 @@ def status_cmd(scope: str | None, path: str | None, show_all: bool, as_json: boo
                     "modules": list(inst.modules_enabled),
                     "files_count": len(inst.files),
                     "settings_count": len(inst.settings_entries),
+                    "codex_config_path": inst.codex_config_path,
+                    "codex_commands": list(inst.codex_commands),
                     "installed_at": inst.installed_at,
                     "updated_at": inst.updated_at,
                 }
@@ -966,6 +1025,8 @@ def status_cmd(scope: str | None, path: str | None, show_all: bool, as_json: boo
         console.print(f"  Modules:   {', '.join(installation.modules_enabled)}")
         console.print(f"  Files:     {len(installation.files)}")
         console.print(f"  Settings:  {len(installation.settings_entries)} entries")
+        if installation.codex_config_path:
+            console.print(f"  Codex:     hooks registered in {display_path(installation.codex_config_path)}")
         console.print(f"  Installed: {installation.installed_at}")
         console.print(f"  Updated:   {installation.updated_at}")
 

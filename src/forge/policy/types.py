@@ -35,12 +35,15 @@ class ActionContext:
 
     This is the input to all policy evaluations. A runtime's hook adapter (e.g.
     ``ClaudeHookAdapter``) normalizes that runtime's hook payload into this shape;
-    ``PolicyEngine.evaluate`` is runtime-agnostic and does not branch on ``runtime``.
+    ``PolicyEngine.evaluate`` is runtime-agnostic and does not branch on ``origin``.
 
     Attributes:
-        runtime: Which agent runtime produced this action ("claude_code" today;
-            "codex"/"gemini" later). Required so the origin runtime is explicit at
-            the adapter boundary, never silently assumed; flows into attribution.
+        origin: Which actor produced this action ("claude_code", "codex", or
+            "forge_cli" for manual on-demand checks). Required so the origin is
+            explicit at the adapter boundary, never silently assumed. Deliberately
+            named ``origin``, not ``runtime``: the value set is wider than the
+            runtime registry, so the name must not invite a ``get_runtime()``
+            lookup (which raises for non-registry values like "forge_cli").
         event: Hook event type (e.g., "PreToolUse.Write")
         tool_name: Tool being invoked (e.g., "Write", "Edit")
         tool_args: Raw tool input arguments from the runtime's hook payload
@@ -54,7 +57,7 @@ class ActionContext:
             context for LLM-based policies. None for hook-triggered evaluations.
     """
 
-    runtime: str
+    origin: str
     event: str
     tool_name: str
     tool_args: dict[str, Any]

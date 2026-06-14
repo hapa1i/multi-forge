@@ -189,6 +189,51 @@ Purpose: evaluate TDD/policy bundles before file writes.
 
 - enforces policy bundles (TDD, coding standards) when enabled via `forge policy enable`
 
+### codex-policy-check (Codex PreToolUse:apply_patch)
+
+Purpose: the same policy enforcement for **Codex** sessions (`forge session start --runtime codex`).
+
+- evaluates each file operation in a Codex `apply_patch` action against the session's policy bundles and supervisor;
+  shell (`Bash`) actions pass through unevaluated
+- a block is delivered as Codex's deny JSON on stdout (not an exit code); an allow produces no output
+- non-Forge Codex sessions (no resolvable Forge session) pass through as a fully silent allow
+- **registered by `forge extension enable`** (codex-hooks module, standard profile): the installer writes a managed
+  block into the Codex config matching your install scope — user scope targets `$CODEX_HOME/config.toml`, project/local
+  scope targets `<project>/.codex/config.toml`. Skipped with a notice when `codex` is not installed.
+- registration alone is inert: complete Codex's one-time trust ceremony (run `codex` interactively and grant trust when
+  prompted) — Codex hooks only fire from trust-enrolled registrations
+
+### codex-session-start (Codex SessionStart)
+
+Purpose: deliver the transfer handoff to a Codex session as `additionalContext` — the hook half of
+`forge session start --runtime codex --context-delivery hook`.
+
+By default the curated transfer rides the first `codex exec` prompt (zero setup). With `--context-delivery hook`, Forge
+stages the handoff under the session directory and this hook injects it at SessionStart instead; after the turn, Forge
+reconciles the hook's delivery receipt into the session manifest (`confirmed.codex.context_delivery`). If the hook never
+fired (not enrolled), the command exits 1 and tells you so — the first turn ran without the parent context.
+
+- every other invocation is silent (no stdout/stderr). In a **managed** session with nothing staged (interactive starts,
+  resume turns) the hook still records a small observation receipt under the session directory — that is how enrolled
+  homes capture the thread id of interactive sessions exactly. Non-Forge Codex sessions see zero writes.
+- **registered by `forge extension enable`** (codex-hooks module, with `codex-policy-check`, as a managed block in the
+  scope-mapped Codex config) — then complete the one-time trust ceremony (run `codex` interactively and grant trust). To
+  register manually instead, add this to your Codex `config.toml`:
+
+```toml
+[[hooks.SessionStart]]
+[[hooks.SessionStart.hooks]]
+type = "command"
+command = "forge hook codex-session-start"
+timeout = 60
+```
+
+- the installer detects a pre-existing manual registration and leaves it alone (it never double-registers; a *partial*
+  manual registration is reported as a conflict to resolve by hand)
+
+- **do not rename or alter the registered command string**: Codex trust hashes the registration definition, so any
+  change to the `command` value invalidates the enrollment and the hook silently stops firing
+
 ### read-hygiene (PreToolUse:Read)
 
 Purpose: silently fix Read calls to skill instruction files that include extra parameters.
@@ -287,10 +332,12 @@ See [Hook session resolution](#hook-session-resolution) for the four-step resolu
 All hooks are under `forge hook ...` (group name `hook`, not `hooks`):
 
 ```bash
-forge hook session-start   # SessionStart handler
-forge hook stop            # Stop handler
-forge hook policy-check    # PreToolUse:Write/Edit handler
-forge hook enable --local # Install to .claude/settings.local.json
+forge hook session-start       # SessionStart handler
+forge hook stop                # Stop handler
+forge hook policy-check        # PreToolUse:Write/Edit handler (Claude)
+forge hook codex-policy-check  # PreToolUse:apply_patch handler (Codex; installed to Codex config)
+forge hook codex-session-start # SessionStart transfer delivery (Codex; installed to Codex config)
+forge hook enable --local      # Install to .claude/settings.local.json
 ```
 
 ### Files to inspect (debugging)

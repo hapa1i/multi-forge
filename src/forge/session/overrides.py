@@ -198,6 +198,15 @@ def validate_key(key: str) -> list[str]:
     if first_part == "custom":
         raise InvalidOverrideKeyError(key, "custom.* is not supported")
 
+    if key == "launch.runtime":
+        # Launcher dispatch trusts raw intent (never effective state), so an override
+        # here would be recorded but ignored -- worse than rejection.
+        raise InvalidOverrideKeyError(
+            key,
+            "runtime is immutable launch identity",
+            hint="start a new session with --runtime instead",
+        )
+
     if "*" in key:
         # Wildcards are handled separately by expand_wildcard
         # validate_key should not receive wildcard keys directly

@@ -266,3 +266,78 @@ print('symlinks verified')
         """)
         assert check.returncode == 0, f"Symlink check failed: {check.stderr}"
         assert "symlinks verified" in check.stdout
+
+
+class TestCodexHooksModule:
+    """codex-hooks module: scope-mapped managed block in Codex config.toml."""
+
+    def test_enable_registers_block_and_disable_removes_it(self, synced_container: ContainerLike) -> None:
+        """Full cycle with a codex shim on PATH: enable writes the block, disable removes it."""
+        synced_container.exec("rm -rf ~/.claude ~/.forge /tmp/codex-home /tmp/fake-bin")
+        synced_container.exec(
+            "mkdir -p /tmp/fake-bin /tmp/codex-home"
+            " && printf '#!/bin/sh\\nexit 0\\n' > /tmp/fake-bin/codex"
+            " && chmod +x /tmp/fake-bin/codex"
+        )
+
+        result = synced_container.exec(
+            "cd /forge && CODEX_HOME=/tmp/codex-home PATH=/tmp/fake-bin:$PATH"
+            " uv run forge extensions enable --scope user --profile standard"
+        )
+        assert result.returncode == 0, f"Enable failed: {result.stderr}"
+        assert "Next steps (Codex hooks):" in result.stdout
+
+        config = synced_container.read_file("/tmp/codex-home/config.toml")
+        assert "# >>> forge hooks >>>" in config
+        assert "forge hook codex-session-start" in config
+        assert "forge hook codex-policy-check" in config
+
+        status = synced_container.exec(
+            "cd /forge && CODEX_HOME=/tmp/codex-home uv run forge extensions status --scope user"
+        )
+        assert "Codex:" in status.stdout
+
+        result = synced_container.exec(
+            "cd /forge && CODEX_HOME=/tmp/codex-home uv run forge extensions disable --scope user --yes"
+        )
+        assert result.returncode == 0, f"Disable failed: {result.stderr}"
+        # Forge created the file, so removing the block deletes it entirely.
+        assert not synced_container.file_exists("/tmp/codex-home/config.toml")
+
+    def test_enable_without_codex_binary_skips_visibly(self, synced_container: ContainerLike) -> None:
+        """No codex on PATH: presence gate skips with a notice; no config written."""
+        synced_container.exec("rm -rf ~/.claude ~/.forge /tmp/codex-home")
+        synced_container.exec("mkdir -p /tmp/codex-home")
+
+        result = synced_container.exec(
+            "cd /forge && CODEX_HOME=/tmp/codex-home" " uv run forge extensions enable --scope user --profile standard"
+        )
+        assert result.returncode == 0, f"Enable failed: {result.stderr}"
+        assert "Codex hooks skipped: codex binary not found on PATH" in result.stdout
+        assert not synced_container.file_exists("/tmp/codex-home/config.toml")
+
+    def test_user_content_preserved_through_cycle(self, synced_container: ContainerLike) -> None:
+        """A pre-existing codex config keeps its user content through enable + disable."""
+        synced_container.exec("rm -rf ~/.claude ~/.forge /tmp/codex-home /tmp/fake-bin")
+        synced_container.exec(
+            "mkdir -p /tmp/fake-bin /tmp/codex-home"
+            " && printf '#!/bin/sh\\nexit 0\\n' > /tmp/fake-bin/codex"
+            " && chmod +x /tmp/fake-bin/codex"
+        )
+        synced_container.write_file("/tmp/codex-home/config.toml", 'model = "gpt-5.5-codex"\n')
+
+        enable = (
+            "cd /forge && CODEX_HOME=/tmp/codex-home PATH=/tmp/fake-bin:$PATH"
+            " uv run forge extensions enable --scope user --profile standard"
+        )
+        assert synced_container.exec(enable).returncode == 0
+
+        config = synced_container.read_file("/tmp/codex-home/config.toml")
+        assert config.startswith('model = "gpt-5.5-codex"\n')
+        assert "# >>> forge hooks >>>" in config
+
+        result = synced_container.exec(
+            "cd /forge && CODEX_HOME=/tmp/codex-home uv run forge extensions disable --scope user --yes"
+        )
+        assert result.returncode == 0
+        assert synced_container.read_file("/tmp/codex-home/config.toml") == 'model = "gpt-5.5-codex"\n'

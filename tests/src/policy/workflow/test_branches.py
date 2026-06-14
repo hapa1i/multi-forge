@@ -16,7 +16,7 @@ from forge.policy.workflow.config import (
 
 def _ctx(target_path: str = "src/foo.py") -> ActionContext:
     return ActionContext(
-        runtime="claude_code",
+        origin="claude_code",
         event="PreToolUse.Write",
         tool_name="Write",
         tool_args={},

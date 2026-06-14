@@ -20,7 +20,7 @@ class TestNoTypeCheckingPolicy:
     def test_applies_to_python_files(self, policy: NoTypeCheckingPolicy) -> None:
         """Policy applies to Python files with content."""
         ctx = ActionContext(
-            runtime="claude_code",
+            origin="claude_code",
             event="PreToolUse.Write",
             tool_name="Write",
             tool_args={},
@@ -34,7 +34,7 @@ class TestNoTypeCheckingPolicy:
     def test_not_applies_to_non_python(self, policy: NoTypeCheckingPolicy) -> None:
         """Policy does not apply to non-Python files."""
         ctx = ActionContext(
-            runtime="claude_code",
+            origin="claude_code",
             event="PreToolUse.Write",
             tool_name="Write",
             tool_args={},
@@ -48,7 +48,7 @@ class TestNoTypeCheckingPolicy:
     def test_allows_normal_imports(self, policy: NoTypeCheckingPolicy) -> None:
         """Allows normal import statements."""
         ctx = ActionContext(
-            runtime="claude_code",
+            origin="claude_code",
             event="PreToolUse.Write",
             tool_name="Write",
             tool_args={},
@@ -63,7 +63,7 @@ class TestNoTypeCheckingPolicy:
     def test_denies_type_checking_block(self, policy: NoTypeCheckingPolicy) -> None:
         """Denies TYPE_CHECKING conditional blocks."""
         ctx = ActionContext(
-            runtime="claude_code",
+            origin="claude_code",
             event="PreToolUse.Write",
             tool_name="Write",
             tool_args={},
@@ -79,7 +79,7 @@ class TestNoTypeCheckingPolicy:
     def test_denies_type_checking_import(self, policy: NoTypeCheckingPolicy) -> None:
         """Denies importing TYPE_CHECKING."""
         ctx = ActionContext(
-            runtime="claude_code",
+            origin="claude_code",
             event="PreToolUse.Write",
             tool_name="Write",
             tool_args={},
@@ -102,7 +102,7 @@ class TestNoBackwardCompatPolicy:
     def test_allows_normal_code(self, policy: NoBackwardCompatPolicy) -> None:
         """Allows normal code without backward-compat patterns."""
         ctx = ActionContext(
-            runtime="claude_code",
+            origin="claude_code",
             event="PreToolUse.Write",
             tool_name="Write",
             tool_args={},
@@ -117,7 +117,7 @@ class TestNoBackwardCompatPolicy:
     def test_denies_backward_compat_comment(self, policy: NoBackwardCompatPolicy) -> None:
         """Denies backward compatibility comments."""
         ctx = ActionContext(
-            runtime="claude_code",
+            origin="claude_code",
             event="PreToolUse.Write",
             tool_name="Write",
             tool_args={},
@@ -132,7 +132,7 @@ class TestNoBackwardCompatPolicy:
     def test_denies_legacy_comment(self, policy: NoBackwardCompatPolicy) -> None:
         """Denies legacy comments."""
         ctx = ActionContext(
-            runtime="claude_code",
+            origin="claude_code",
             event="PreToolUse.Write",
             tool_name="Write",
             tool_args={},
@@ -147,7 +147,7 @@ class TestNoBackwardCompatPolicy:
     def test_denies_deprecated_comment(self, policy: NoBackwardCompatPolicy) -> None:
         """Denies deprecated comments."""
         ctx = ActionContext(
-            runtime="claude_code",
+            origin="claude_code",
             event="PreToolUse.Write",
             tool_name="Write",
             tool_args={},
@@ -162,7 +162,7 @@ class TestNoBackwardCompatPolicy:
     def test_denies_todo_remove_later(self, policy: NoBackwardCompatPolicy) -> None:
         """Denies TODO remove later comments."""
         ctx = ActionContext(
-            runtime="claude_code",
+            origin="claude_code",
             event="PreToolUse.Write",
             tool_name="Write",
             tool_args={},
@@ -184,7 +184,7 @@ class TestNoEmojiPolicy:
 
     def test_applies_to_python(self, policy: NoEmojiPolicy) -> None:
         ctx = ActionContext(
-            runtime="claude_code",
+            origin="claude_code",
             event="PreToolUse.Write",
             tool_name="Write",
             tool_args={},
@@ -197,7 +197,7 @@ class TestNoEmojiPolicy:
 
     def test_applies_to_javascript(self, policy: NoEmojiPolicy) -> None:
         ctx = ActionContext(
-            runtime="claude_code",
+            origin="claude_code",
             event="PreToolUse.Write",
             tool_name="Write",
             tool_args={},
@@ -210,7 +210,7 @@ class TestNoEmojiPolicy:
 
     def test_not_applies_to_markdown(self, policy: NoEmojiPolicy) -> None:
         ctx = ActionContext(
-            runtime="claude_code",
+            origin="claude_code",
             event="PreToolUse.Write",
             tool_name="Write",
             tool_args={},
@@ -223,7 +223,7 @@ class TestNoEmojiPolicy:
 
     def test_not_applies_to_json(self, policy: NoEmojiPolicy) -> None:
         ctx = ActionContext(
-            runtime="claude_code",
+            origin="claude_code",
             event="PreToolUse.Write",
             tool_name="Write",
             tool_args={},
@@ -236,7 +236,7 @@ class TestNoEmojiPolicy:
 
     def test_allows_clean_code(self, policy: NoEmojiPolicy) -> None:
         ctx = ActionContext(
-            runtime="claude_code",
+            origin="claude_code",
             event="PreToolUse.Write",
             tool_name="Write",
             tool_args={},
@@ -251,7 +251,7 @@ class TestNoEmojiPolicy:
     def test_allows_text_safe_symbols(self, policy: NoEmojiPolicy) -> None:
         """Text-safe dingbats (checkmark, cross, warning, arrows) are allowed."""
         ctx = ActionContext(
-            runtime="claude_code",
+            origin="claude_code",
             event="PreToolUse.Write",
             tool_name="Write",
             tool_args={},
@@ -265,7 +265,7 @@ class TestNoEmojiPolicy:
 
     def test_denies_face_emoji(self, policy: NoEmojiPolicy) -> None:
         ctx = ActionContext(
-            runtime="claude_code",
+            origin="claude_code",
             event="PreToolUse.Write",
             tool_name="Write",
             tool_args={},
@@ -281,7 +281,7 @@ class TestNoEmojiPolicy:
 
     def test_denies_rocket_emoji(self, policy: NoEmojiPolicy) -> None:
         ctx = ActionContext(
-            runtime="claude_code",
+            origin="claude_code",
             event="PreToolUse.Write",
             tool_name="Write",
             tool_args={},
@@ -295,7 +295,7 @@ class TestNoEmojiPolicy:
 
     def test_denies_fire_emoji_in_edit(self, policy: NoEmojiPolicy) -> None:
         ctx = ActionContext(
-            runtime="claude_code",
+            origin="claude_code",
             event="PreToolUse.Edit",
             tool_name="Edit",
             tool_args={},
@@ -309,7 +309,7 @@ class TestNoEmojiPolicy:
 
     def test_evidence_shows_unique_emoji(self, policy: NoEmojiPolicy) -> None:
         ctx = ActionContext(
-            runtime="claude_code",
+            origin="claude_code",
             event="PreToolUse.Write",
             tool_name="Write",
             tool_args={},

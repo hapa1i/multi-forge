@@ -1,0 +1,15 @@
+{
+  "session_id": "019eb076-1d43-7580-8c20-9e506a9fc052",
+  "turn_id": "019eb076-1d8a-7ce2-b12b-139e6e39258a",
+  "transcript_path": "<HOME>/.cache/forge-codex-hooks-probe/fixture/codex-home/sessions/2026/06/10/rollout-2026-06-10T03-36-31-019eb076-1d43-7580-8c20-9e506a9fc052.jsonl",
+  "cwd": "<HOME>/.cache/forge-codex-hooks-probe/fixture/proj",
+  "hook_event_name": "PostToolUse",
+  "model": "gpt-5.5",
+  "permission_mode": "bypassPermissions",
+  "tool_name": "apply_patch",
+  "tool_input": {
+    "command": "*** Begin Patch\n*** Add File: probe.txt\n+PROBE-WR-1\n*** End Patch\n"
+  },
+  "tool_response": "Exit code: 0\nWall time: 0.1 seconds\nOutput:\nSuccess. Updated the following files:\nA probe.txt\n",
+  "tool_use_id": "call_VOXNWefYUXbT5uCcG0Xga4aj"
+}
