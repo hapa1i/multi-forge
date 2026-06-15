@@ -229,6 +229,20 @@ default (no transfer flags, no `--resume-mode transfer`) is untouched.
   guidelines `Tip:` is reserved for recovery suggestions; an action Forge took is informational. Tip-location
   enforcement test (`test_output.py`) and the auto-switch assertion (substring "switched to transfer mode") both pass.
 
+### Closeout audit outcome (2026-06-15 — 16-agent workflow)
+
+Swept all 9 `proposed/` cards, the 6 `docs/end-user/` docs that mention fork/transfer, and the QA checklist, verifying
+each claim against the diff/code:
+
+- **Proposed cards: no change.** All 9 are unrelated subsystems; none had a subset delivered or made stale.
+  `supervisor_launch_controls` verified — the split held (the diff touches no supervisor cascade/checker/effort code).
+- **`docs/end-user/`: no change.** The only stale claim lived in `session.md` (already fixed in this PR); a grep
+  confirmed no sibling doc repeats it. `transfer.md`/`README.md`/`model-selection.md`/`memory.md`/`config.md` clean.
+- **QA checklist: one real gap closed.** Section 5 exercised `--strategy`/`--inline-plan` only on `--worktree` forks.
+  Added auto case **5.22** (same-dir explicit `--resume-mode transfer`, the `--strategy` auto-switch, and the native
+  default control), grounded in the shipped integration test; index metadata bumped (test-count 541→548, last-updated
+  2026-06-15).
+
 ## Acceptance Test Table
 
 | Test                                                      | Fixture                                                                                                                                                                                | Assertion                                                                                                                                                                      | Test File                                                    |
