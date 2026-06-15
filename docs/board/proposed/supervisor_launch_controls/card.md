@@ -15,12 +15,12 @@ fully express the supervision posture a user may already know they want at launc
 
 There are two distinct gaps:
 
-1. **Launch-time parity for existing cascade knobs**: persistent `forge policy supervise` already supports
-   `--cascade`, `--checker-model`, and `--checker-provider`, and `SupervisorConfig` already has matching fields. Fork
-   and start should be able to persist those values before the child begins.
+1. **Launch-time parity for existing cascade knobs**: persistent `forge policy supervise` already supports `--cascade`,
+   `--checker-model`, and `--checker-provider`, and `SupervisorConfig` already has matching fields. Fork and start
+   should be able to persist those values before the child begins.
 2. **New effort controls**: `checker_effort` does not exist on `SupervisorConfig` today, and the tier-1 plan checker
-   currently uses `checker_budget_tokens` for prompt packing rather than passing `reasoning_effort` into the
-   `core.llm` call. Effort is new plumbing, not a simple CLI passthrough.
+   currently uses `checker_budget_tokens` for prompt packing rather than passing `reasoning_effort` into the `core.llm`
+   call. Effort is new plumbing, not a simple CLI passthrough.
 
 Bundling these with same-directory transfer would make ready UX cleanup wait on model-effort design. Keep this as its
 own card.
