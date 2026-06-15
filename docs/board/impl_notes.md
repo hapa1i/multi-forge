@@ -183,10 +183,10 @@ frontier would have blocked); shadow sampling replays the frontier on a sampled 
   (`<hash>.plan.md`) + a routing snapshot — never tier-1's packed prompt text (it is local to `run_plan_check` and gone
   at the seam). Reconstruction fidelity is the locking test: rebuild → identical `SUPERVISOR_PROMPT`.
 - **Work-queue reliability boundary is at spawn, not completion**: a handler "succeeds" the instant it `Popen`s and the
-  marker is deleted, so the queue's poison cap never sees a detached worker's outcome. Idempotency for detached work must
-  be **per-item** (atomic `os.rename` claim → `.processing`), not via the marker. A deterministic post-claim failure must
-  **finalize** to a terminal state (`.done` `status="error"`), not stay `.processing` — otherwise it is phantom-`pending`
-  forever and leaks a cap slot. Only a hard crash mid-write may orphan.
+  marker is deleted, so the queue's poison cap never sees a detached worker's outcome. Idempotency for detached work
+  must be **per-item** (atomic `os.rename` claim → `.processing`), not via the marker. A deterministic post-claim
+  failure must **finalize** to a terminal state (`.done` `status="error"`), not stay `.processing` — otherwise it is
+  phantom-`pending` forever and leaks a cap slot. Only a hard crash mid-write may orphan.
 - **A detached worker outlives its spawner's invariants — re-establish them locally**: it must reset `FORGE_DEPTH=0` (a
   fresh top-level tree; inheriting depth ≥ 2 makes the depth guard skip its frontier call → false errors), and any path
   it replays must resolve the **same** way the consumer resolves it (a relative `plan_override_path` anchors at

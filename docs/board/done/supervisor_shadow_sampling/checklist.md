@@ -2,8 +2,8 @@
 
 Branch: `supervisor_shadow_sampling` · Plan: approved (capture → Stop-batch drain → read surface, shipped as one PR).
 
-**Current focus:** Closed out — card moved to `done/`. Slices 1 + 2 + 3 shipped + verified (capture / Stop-batch
-drain / read surface); durable lessons promoted to `impl_notes.md`.
+**Current focus:** Closed out — card moved to `done/`. Slices 1 + 2 + 3 shipped + verified (capture / Stop-batch drain /
+read surface); durable lessons promoted to `impl_notes.md`.
 
 Decisions locked during planning (corrections to the card):
 
