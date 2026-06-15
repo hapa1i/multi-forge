@@ -425,14 +425,15 @@ user rather than working around the check.
 
 ### 2.3 Policy definition ownership (from §1.6)
 
-| Setting                                             | Owner   | Location                                                                                         |
-| --------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------ |
-| Supervisor model (which model to use as supervisor) | Proxy   | `~/.forge/proxies/<id>/proxy.yaml`                                                               |
-| Throttling settings (check frequency)               | Proxy   | `~/.forge/proxies/<id>/proxy.yaml`                                                               |
-| TDD mode (off/permissive/strict)                    | Session | Session file `intent.tdd_mode`                                                                   |
-| Policy enabled/disabled                             | Session | Session file `intent.policy_mode`                                                                |
-| Verification config                                 | Session | Session file `intent.verification`                                                               |
-| Cascade on/off + tier-1 checker route/budget        | Session | `intent.policy.supervisor.cascade`/`.checker_provider`/`.checker_model`/`.checker_budget_tokens` |
+| Setting                                             | Owner   | Location                                                                                                                                                   |
+| --------------------------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Supervisor model (which model to use as supervisor) | Proxy   | `~/.forge/proxies/<id>/proxy.yaml`                                                                                                                         |
+| Throttling settings (check frequency)               | Proxy   | `~/.forge/proxies/<id>/proxy.yaml`                                                                                                                         |
+| TDD mode (off/permissive/strict)                    | Session | Session file `intent.tdd_mode`                                                                                                                             |
+| Policy enabled/disabled                             | Session | Session file `intent.policy_mode`                                                                                                                          |
+| Verification config                                 | Session | Session file `intent.verification`                                                                                                                         |
+| Cascade on/off + tier-1 checker route/budget        | Session | `intent.policy.supervisor.cascade`/`.checker_provider`/`.checker_model`/`.checker_budget_tokens`                                                           |
+| Checker + frontier reasoning effort                 | Session | `intent.policy.supervisor.checker_effort` (core.llm: `none/low/medium/high/xhigh`) / `.supervisor_effort` (`claude --effort`: `low/medium/high/xhigh/max`) |
 
 ### 2.4 Policy state ownership (from §1.6)
 
@@ -523,6 +524,16 @@ Skills can declare `effort: high|medium|low` in their SKILL.md frontmatter (Clau
 model effort level when the skill is invoked -- useful for deep-analysis skills (`analyze`, `debate`) that benefit from
 maximum reasoning. This is orthogonal to proxy-level `reasoning_effort` hyperparameters, which control the routed
 model's behavior.
+
+Forge injects `claude --effort` per-caller on its automated `claude -p` subprocesses (never the user's interactive
+session). Each consumer carries its own optional effort field and, where a CLI exists, an `--effort` flag: the
+supervisor frontier (`supervisor_effort`), memory writer (`MemoryWriterConfig.effort`), shadow curation (pass-through),
+team supervisor (`TeamSupervisorConfig.effort`), and the workflow fan-out (`run_multi_review(reasoning_effort=...)`).
+The central builder is `run_claude_session` (`core/reactive/session_runner.py`); the review fan-out builds its argv in
+`review/engine.py:_prepare_worker`. These use the `claude --effort` vocabulary (`low/medium/high/xhigh/max`), distinct
+from the tier-1 checker's `core.llm` `reasoning_effort` (`none/low/medium/high/xhigh`) — the checker is an API call, not
+a `-p` subprocess. An older `claude` that rejects `--effort` fails loud (no silent rerun at default), unlike the
+`--output-format` telemetry retry. There is no global default effort knob; effort is per-caller by design.
 
 This maps to the three node types in §4.1.2 (Code, LLM call, Claude session). "Pure text" is a specialization: no Python
 runtime deps, so the prompt is portable across models/runners (the execution environment still has tools).

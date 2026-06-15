@@ -231,10 +231,10 @@ shipped code before promotion.
   `_validate_resume_mode` callback accepting `{"native", "transfer"}`. Both default to `None`; resume's `None` resolves
   to `transfer` behaviorally. `native-relocate` is fork/worktree-only; `native` is resume-only.
 - **Auto-switch is one pre-fork assignment, not scattered special-casing.** Explicit `--strategy`/`--inline-plan` on a
-  same-dir fork is detected via `ParameterSource.COMMANDLINE` (never truthiness — so the `structured` default never trips
-  it) and resolves `resume_mode = "transfer"` exactly once, gated on `not is_cross_dir and resume_mode is None` (so an
-  explicit `--resume-mode native-relocate` never auto-switches). Because it is set before `manager.fork_session`, every
-  downstream site (the `--strategy full` budget gate, the manager call, the `same_dir_transfer` launch flag, the
+  same-dir fork is detected via `ParameterSource.COMMANDLINE` (never truthiness — so the `structured` default never
+  trips it) and resolves `resume_mode = "transfer"` exactly once, gated on `not is_cross_dir and resume_mode is None`
+  (so an explicit `--resume-mode native-relocate` never auto-switches). Because it is set before `manager.fork_session`,
+  every downstream site (the `--strategy full` budget gate, the manager call, the `same_dir_transfer` launch flag, the
   no-launch resume tip) keys uniformly on `resume_mode == "transfer"`. When extending this path, branch on
   `resume_mode == "transfer"`, never on re-reading the flags.
 

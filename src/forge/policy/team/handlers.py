@@ -203,6 +203,7 @@ def _run_supervisor(
             resume_id=config.resume_id,
             base_url=base_url,
             timeout_seconds=config.timeout_seconds,
+            reasoning_effort=config.effort,
         )
     # Emit before the success gate so failures/timeouts are attributed too (the emit
     # helper maps status itself and is best-effort -- it never raises).

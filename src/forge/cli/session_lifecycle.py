@@ -27,10 +27,17 @@ from forge.cli.session_model_pin import (
     _validate_direct_model_pin_for_routing,
     _validate_proxy_model_pin,
 )
+from forge.core.effort import CLAUDE_EFFORT_LEVELS
+from forge.core.llm.types import REASONING_EFFORT_LEVELS
 from forge.core.paths import display_path
 from forge.core.reactive.env import (
     InteractiveApiKeyDecision,
     compute_interactive_api_key_decision,
+)
+from forge.policy.semantic.supervisor import (
+    CHECKER_PROVIDER_CHOICES,
+    apply_checker_options,
+    validate_checker_model,
 )
 from forge.session import (
     LAUNCH_MODE_HOST,
@@ -812,6 +819,11 @@ def launch_new_session(
     supervise_target: str | None = None,
     supervisor_proxy: str | None = None,
     supervisor_direct: bool = False,
+    cascade_flag: bool = False,
+    checker_model: str | None = None,
+    checker_provider: str | None = None,
+    checker_effort: str | None = None,
+    supervisor_effort: str | None = None,
     subprocess_proxy: str | None = None,
     direct_model: str | None = None,
     memory_flag: bool | None = None,
@@ -1001,6 +1013,19 @@ def launch_new_session(
             current_template=template,
             current_direct=direct,
         )
+        # Launch-time --cascade only flips the flag; the runtime hook escalates to
+        # the frontier when no plan exists (unlike `policy supervise --cascade`,
+        # which resolves the plan eagerly). See plan_check._needs_review.
+        if cascade_flag:
+            sup_config.cascade = True
+        apply_checker_options(
+            sup_config,
+            checker_model=checker_model,
+            checker_provider=checker_provider,
+            checker_effort=checker_effort,
+        )
+        if supervisor_effort is not None:
+            sup_config.supervisor_effort = supervisor_effort
 
         forge_root = _sup_forge_root
         store = SessionStore(forge_root, manifest.name)
@@ -1170,6 +1195,40 @@ def launch_new_session(
     help="Force supervisor to use direct Anthropic routing (requires --supervise)",
 )
 @click.option(
+    "--cascade",
+    "cascade_flag",
+    is_flag=True,
+    default=False,
+    help="Enable the tier-1 plan check before the frontier supervisor (requires --supervise)",
+)
+@click.option(
+    "--checker-model",
+    "checker_model",
+    default=None,
+    help="Tier-1 checker model (prefixed id; requires --supervise)",
+)
+@click.option(
+    "--checker-provider",
+    "checker_provider",
+    type=click.Choice(list(CHECKER_PROVIDER_CHOICES)),
+    default=None,
+    help="Tier-1 checker provider (requires --supervise)",
+)
+@click.option(
+    "--checker-effort",
+    "checker_effort",
+    type=click.Choice(list(REASONING_EFFORT_LEVELS)),
+    default=None,
+    help="Tier-1 checker reasoning effort (none/low/medium/high/xhigh; requires --supervise)",
+)
+@click.option(
+    "--supervisor-effort",
+    "supervisor_effort",
+    type=click.Choice(list(CLAUDE_EFFORT_LEVELS)),
+    default=None,
+    help="Frontier supervisor effort (claude --effort: low/medium/high/xhigh/max; requires --supervise)",
+)
+@click.option(
     "--subprocess-proxy",
     "subprocess_proxy",
     type=str,
@@ -1203,6 +1262,11 @@ def start(
     supervise_target: str | None,
     supervisor_proxy: str | None,
     supervisor_direct: bool,
+    cascade_flag: bool,
+    checker_model: str | None,
+    checker_provider: str | None,
+    checker_effort: str | None,
+    supervisor_effort: str | None,
     subprocess_proxy: str | None,
     memory_flag: str | None,
     runtime: str,
@@ -1253,6 +1317,16 @@ def start(
         sys.exit(1)
     if (supervisor_proxy or supervisor_direct) and not supervise_target:
         console.print("[red]Error:[/red] --supervisor-proxy/--no-supervisor-proxy require --supervise")
+        sys.exit(1)
+    if (
+        cascade_flag or checker_model or checker_provider or checker_effort or supervisor_effort
+    ) and not supervise_target:
+        console.print("[red]Error:[/red] --cascade/--checker-*/--supervisor-effort require --supervise")
+        sys.exit(1)
+    try:
+        validate_checker_model(checker_model)
+    except ValueError as e:
+        console.print(f"[red]Error:[/red] {e}")
         sys.exit(1)
     if subprocess_proxy and proxy_name:
         console.print(
@@ -1306,6 +1380,11 @@ def start(
             supervise_target=supervise_target,
             supervisor_proxy=supervisor_proxy,
             supervisor_direct=supervisor_direct,
+            cascade_flag=cascade_flag,
+            checker_model=checker_model,
+            checker_provider=checker_provider,
+            checker_effort=checker_effort,
+            supervisor_effort=supervisor_effort,
             subprocess_proxy=subprocess_proxy,
             direct_model=direct_model,
             memory_flag={"on": True, "off": False}.get(memory_flag) if memory_flag else None,

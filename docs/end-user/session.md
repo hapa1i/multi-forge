@@ -144,7 +144,7 @@ forge activity [name]         # Per-session Forge automation activity: superviso
 forge activity [name] --json --days N --all
 
 # Fork (conversation branching)
-forge session fork <parent> [--name <name>] [--model <claude-model>] [--incognito] [--branch <branch>] [--worktree] [--into <path>] [--supervise] [--supervisor-proxy <id>] [--no-supervisor-proxy] [--no-launch]
+forge session fork <parent> [--name <name>] [--model <claude-model>] [--incognito] [--branch <branch>] [--worktree] [--into <path>] [--supervise] [--supervisor-proxy <id>] [--no-supervisor-proxy] [--cascade] [--checker-model <id>] [--checker-provider <p>] [--checker-effort <level>] [--supervisor-effort <level>] [--no-launch]
 
 # Delete
 forge session delete <name> [--keep-worktree] [--delete-branch] [--force] [--keep-transcripts]
@@ -549,6 +549,33 @@ forge session start executor --supervise planner --supervisor-proxy openrouter-g
 
 # Or change supervisor routing on an existing session
 forge policy supervise planner --supervisor-proxy openrouter-gemini
+```
+
+**Launch-time cascade and checker controls:** `fork` and `start` accept the same tier-1 cascade knobs as
+`forge policy supervise`, so you can wire the cheap pre-check at launch instead of in a second command. All require
+`--supervise`:
+
+```bash
+# Fork with the tier-1 plan check (cascade) and a specific checker model/provider
+forge session fork planner --worktree --supervise \
+  --cascade --checker-model google/gemini-3.5-flash --checker-provider openrouter
+
+# Same knobs on session start
+forge session start executor --supervise planner --cascade --checker-model google/gemini-3.5-flash
+```
+
+Launch-time `--cascade` only sets the flag; it does **not** resolve a plan eagerly. The runtime hook escalates to the
+frontier supervisor when no plan exists yet. This differs from `forge policy supervise --cascade`, which resolves the
+plan at the time you run it.
+
+**Reasoning effort:** `--supervisor-effort` sets the frontier supervisor's `claude --effort`
+(`low/medium/high/xhigh/max`; `max` is Claude-only). `--checker-effort` sets the tier-1 checker's reasoning effort
+(`none/low/medium/high/xhigh`; `none` is checker-only — the checker is an API call, not a `claude -p` subprocess). The
+two vocabularies are distinct: `max` is invalid for the checker and `none` is invalid for the supervisor.
+
+```bash
+forge session fork planner --worktree --supervise --cascade \
+  --checker-effort low --supervisor-effort medium
 ```
 
 **Supervisor lifecycle controls:**

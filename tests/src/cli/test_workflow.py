@@ -341,6 +341,65 @@ class TestRunPanel:
         assert "--proxy" in result.output
 
 
+class TestEffortFlag:
+    """--effort forwards as reasoning_effort into the fan-out runners."""
+
+    def test_panel_help_shows_effort(self):
+        runner = CliRunner()
+        result = runner.invoke(main, ["workflow", "panel", "--help"])
+        assert "--effort" in result.output
+
+    @patch("forge.review.engine.run_multi_review")
+    def test_panel_forwards_effort_to_run_multi_review(self, mock_run):
+        mock_run.return_value = _mock_output()
+        runner = CliRunner()
+        result = runner.invoke(main, ["workflow", "panel", "-p", "Review this", "--effort", "high"])
+        assert result.exit_code == 0
+        assert mock_run.call_args[1]["reasoning_effort"] == "high"
+
+    @patch("forge.review.engine.run_multi_review")
+    def test_panel_without_effort_passes_none(self, mock_run):
+        mock_run.return_value = _mock_output()
+        runner = CliRunner()
+        result = runner.invoke(main, ["workflow", "panel", "-p", "Review this"])
+        assert result.exit_code == 0
+        assert mock_run.call_args[1]["reasoning_effort"] is None
+
+    def test_panel_rejects_invalid_effort(self):
+        runner = CliRunner()
+        result = runner.invoke(main, ["workflow", "panel", "-p", "Review", "--effort", "bogus"])
+        assert result.exit_code == 2
+
+    @patch("forge.review.engine.run_multi_review")
+    def test_analyze_forwards_effort(self, mock_run):
+        mock_run.return_value = _mock_output()
+        runner = CliRunner()
+        result = runner.invoke(main, ["workflow", "analyze", "topic", "--effort", "max"])
+        assert result.exit_code == 0
+        assert mock_run.call_args[1]["reasoning_effort"] == "max"
+
+    @patch("forge.review.routing.resolve_invocation_routing", side_effect=_auto_routing_plan)
+    @patch("forge.review.adversarial.run_multi_review")
+    def test_debate_forwards_effort(self, mock_run, _mock_routing):
+        """--effort threads through run_adversarial into its fan-out."""
+        mock_run.return_value = _mock_output()
+        runner = CliRunner()
+        result = runner.invoke(main, ["workflow", "debate", "proposal", "--effort", "low", "--json"])
+        assert result.exit_code == 0
+        assert mock_run.call_args[1]["reasoning_effort"] == "low"
+
+    @patch("forge.review.routing.resolve_invocation_routing", side_effect=_auto_routing_plan)
+    @patch("forge.review.consensus.run_multi_review")
+    def test_consensus_forwards_effort(self, mock_run, _mock_routing):
+        """--effort threads through run_consensus into both rounds' fan-out."""
+        mock_run.return_value = _mock_output()
+        runner = CliRunner()
+        result = runner.invoke(main, ["workflow", "consensus", "subject", "--effort", "xhigh"])
+        assert result.exit_code == 0
+        for call in mock_run.call_args_list:
+            assert call.kwargs["reasoning_effort"] == "xhigh"
+
+
 class TestProxyFlag:
     """Tests for --proxy flag across all workflow commands."""
 

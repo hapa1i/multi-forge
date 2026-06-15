@@ -1272,3 +1272,104 @@ class TestPlanOverrideCache:
 
         policy.evaluate(_make_context())
         assert mock_invoke.call_count == 2
+
+
+# --- Reasoning effort (launch controls) ---
+
+
+class TestSupervisorEffort:
+    """Tests for supervisor reasoning-effort plumbing (checker + frontier)."""
+
+    def test_validate_checker_model_rejects_unprefixed(self) -> None:
+        from forge.policy.semantic.supervisor import validate_checker_model
+
+        with pytest.raises(ValueError, match=r"--checker-model must be a prefixed model id \(got 'flash'\)"):
+            validate_checker_model("flash")
+
+    def test_validate_checker_model_allows_prefixed_and_none(self) -> None:
+        from forge.policy.semantic.supervisor import validate_checker_model
+
+        # Neither should raise.
+        validate_checker_model(None)
+        validate_checker_model("openrouter/google/gemini-3.5-flash")
+
+    def test_apply_checker_options_sets_truthy_fields(self) -> None:
+        from forge.policy.semantic.supervisor import apply_checker_options
+
+        sup = SupervisorConfig()
+        apply_checker_options(
+            sup,
+            checker_model="gemini/gemini-3.5-flash",
+            checker_provider="litellm-local",
+            checker_effort="high",
+        )
+        assert sup.checker_model == "gemini/gemini-3.5-flash"
+        # Provider arg is normalized dash -> underscore.
+        assert sup.checker_provider == "litellm_local"
+        assert sup.checker_effort == "high"
+
+    def test_apply_checker_options_leaves_unset_fields_untouched(self) -> None:
+        from forge.policy.semantic.supervisor import apply_checker_options
+
+        sup = SupervisorConfig(
+            checker_model="existing/model",
+            checker_provider="openrouter",
+            checker_effort="low",
+        )
+        apply_checker_options(sup, checker_model=None, checker_provider=None, checker_effort=None)
+        assert sup.checker_model == "existing/model"
+        assert sup.checker_provider == "openrouter"
+        assert sup.checker_effort == "low"
+
+    def test_apply_checker_options_effort_defaults_to_none(self) -> None:
+        """checker_effort is keyword-optional and defaults to leaving the field alone."""
+        from forge.policy.semantic.supervisor import apply_checker_options
+
+        sup = SupervisorConfig(checker_effort="medium")
+        apply_checker_options(sup, checker_model=None, checker_provider=None)
+        assert sup.checker_effort == "medium"
+
+    def test_normalize_checker_provider_arg(self) -> None:
+        from forge.policy.semantic.supervisor import normalize_checker_provider_arg
+
+        assert normalize_checker_provider_arg("litellm-local") == "litellm_local"
+        assert normalize_checker_provider_arg("openrouter") == "openrouter"
+        assert normalize_checker_provider_arg(None) is None
+
+    @patch("forge.policy.semantic.supervisor.run_claude_session")
+    def test_supervisor_effort_forwarded_to_run_claude_session(self, mock_run: MagicMock) -> None:
+        """run_supervisor_check forwards config.supervisor_effort to run_claude_session."""
+        from forge.core.reactive.session_runner import SessionResult
+        from forge.policy.semantic.supervisor import run_supervisor_check
+
+        mock_run.return_value = SessionResult(
+            stdout='```json\n{"verdict": "aligned", "confidence": 0.9, "violations": []}\n```',
+            stderr="",
+            returncode=0,
+        )
+
+        raw_uuid = "12345678-1234-1234-1234-123456789abc"
+        config = _make_config(resume_id=raw_uuid, supervisor_effort="medium", direct=True)
+        run_supervisor_check(config, _make_context())
+
+        mock_run.assert_called_once()
+        assert mock_run.call_args.kwargs["reasoning_effort"] == "medium"
+
+    @patch("forge.policy.semantic.supervisor.run_claude_session")
+    def test_supervisor_effort_none_forwards_none(self, mock_run: MagicMock) -> None:
+        """An unset supervisor_effort forwards None (model/tier default)."""
+        from forge.core.reactive.session_runner import SessionResult
+        from forge.policy.semantic.supervisor import run_supervisor_check
+
+        mock_run.return_value = SessionResult(
+            stdout='```json\n{"verdict": "aligned", "confidence": 0.9, "violations": []}\n```',
+            stderr="",
+            returncode=0,
+        )
+
+        raw_uuid = "12345678-1234-1234-1234-123456789abc"
+        config = _make_config(resume_id=raw_uuid, direct=True)
+        run_supervisor_check(config, _make_context())
+
+        mock_run.assert_called_once()
+        assert mock_run.call_args.kwargs["reasoning_effort"] is None

@@ -16,6 +16,7 @@ import click
 
 from forge.cli.output import print_tip
 from forge.cli.session import console
+from forge.core.effort import CLAUDE_EFFORT_LEVELS, validate_claude_effort
 from forge.core.ops.context import ExecutionContext
 from forge.core.ops.session import (
     ForgeOpError,
@@ -97,11 +98,19 @@ def memory() -> None:
 @memory.command("enable")
 @click.option("--session", "-s", "session_name", default=None, help="Target session (default: ambient $FORGE_SESSION).")
 @click.option("--review-only", is_flag=True, default=False, help="Enable in review-only mode (no edits).")
-def enable_cmd(session_name: str | None, review_only: bool) -> None:
+@click.option(
+    "--effort",
+    "effort",
+    type=click.Choice(list(CLAUDE_EFFORT_LEVELS)),
+    default=None,
+    help="Memory-writer reasoning effort (claude --effort: low/medium/high/xhigh/max). Updates effort even if already enabled.",
+)
+def enable_cmd(session_name: str | None, review_only: bool, effort: str | None) -> None:
     """Enable memory auto-update for a session.
 
-    Sets ``memory.auto_update.enabled`` on the session manifest.
-    Resolves ``$FORGE_SESSION`` when ``--session`` is omitted.
+    Sets ``memory.auto_update.enabled`` on the session manifest. ``--effort``
+    sets ``memory.auto_update.effort`` and applies even when memory is already
+    enabled in the same mode. Resolves ``$FORGE_SESSION`` when ``--session`` is omitted.
     """
     target_mode = "review-only" if review_only else "augment"
     resolved_name = session_name or os.environ.get("FORGE_SESSION")
@@ -111,7 +120,7 @@ def enable_cmd(session_name: str | None, review_only: bool) -> None:
             "Use --session <name> or run inside a Forge session ($FORGE_SESSION)."
         )
         sys.exit(1)
-    _set_memory_activation(resolved_name, enabled=True, mode=target_mode)
+    _set_memory_activation(resolved_name, enabled=True, mode=target_mode, effort=effort)
 
 
 @memory.command("disable")
@@ -132,9 +141,15 @@ def disable_cmd(session_name: str | None) -> None:
     _set_memory_activation(resolved_name, enabled=False)
 
 
-def _set_memory_activation(session_name: str, *, enabled: bool, mode: str | None = None) -> None:
+def _set_memory_activation(
+    session_name: str, *, enabled: bool, mode: str | None = None, effort: str | None = None
+) -> None:
     """Write memory activation state to a session manifest override."""
     import json
+
+    # Defense-in-depth: callers pass click.Choice-constrained values, but the
+    # function is also reachable from other code paths.
+    validate_claude_effort(effort)
 
     try:
         ctx = ExecutionContext.from_cwd()
@@ -149,16 +164,20 @@ def _set_memory_activation(session_name: str, *, enabled: bool, mode: str | None
     effective = compute_effective_intent(state)
     display_name = session_name or state.name
 
-    current_enabled = (
-        effective.memory is not None
-        and effective.memory.auto_update is not None
-        and effective.memory.auto_update.enabled
-    )
+    auto_update = effective.memory.auto_update if effective.memory else None
+    current_enabled = auto_update is not None and auto_update.enabled
+    current_mode = auto_update.mode if auto_update else None
+    current_effort = auto_update.effort if auto_update else None
 
-    if enabled and current_enabled and mode:
-        current_mode = effective.memory.auto_update.mode if effective.memory and effective.memory.auto_update else None
-        if current_mode == mode:
-            console.print(f"[dim]Memory auto-update already enabled for session {display_name} (mode: {mode}).[/dim]")
+    # Short-circuit only when nothing is pending. An effort-only change must
+    # still persist even when memory is already enabled in the same mode.
+    if enabled and current_enabled:
+        mode_pending = mode is not None and mode != current_mode
+        effort_pending = effort is not None and effort != current_effort
+        if not mode_pending and not effort_pending:
+            console.print(
+                f"[dim]Memory auto-update already enabled for session {display_name} (mode: {current_mode}).[/dim]"
+            )
             return
     elif not enabled and not current_enabled:
         console.print(f"[dim]Memory auto-update already disabled for session {display_name}.[/dim]")
@@ -178,12 +197,20 @@ def _set_memory_activation(session_name: str, *, enabled: bool, mode: str | None
                 key="memory.auto_update.mode",
                 value_str=json.dumps(mode),
             )
+        if effort and enabled:
+            set_session_override(
+                ctx=ctx,
+                session_name=session_name,
+                key="memory.auto_update.effort",
+                value_str=json.dumps(effort),
+            )
     except ForgeOpError as e:
         console.print(f"[red]Error:[/red] {e}")
         sys.exit(1)
 
     if enabled:
-        console.print(f"Memory auto-update enabled for session {display_name} (mode: {mode}).")
+        effort_note = f", effort: {effort}" if effort else ""
+        console.print(f"Memory auto-update enabled for session {display_name} (mode: {mode}{effort_note}).")
     else:
         console.print(f"Memory auto-update disabled for session {display_name}.")
 
@@ -826,6 +853,13 @@ def shadows_show_cmd(for_doc: str, scope: str) -> None:
     help="Scope for shadow discovery.",
 )
 @click.option("--json", "as_json", is_flag=True, default=False, help="Emit JSON.")
+@click.option(
+    "--effort",
+    "effort",
+    type=click.Choice(list(CLAUDE_EFFORT_LEVELS)),
+    default=None,
+    help="Curation reasoning effort (claude --effort: low/medium/high/xhigh/max). Used with --curate.",
+)
 def shadows_review_cmd(
     for_doc: str,
     curate: bool,
@@ -833,17 +867,20 @@ def shadows_review_cmd(
     session_name: str | None,
     scope: str,
     as_json: bool,
+    effort: str | None,
 ) -> None:
     """Review shadow proposals for an official doc."""
     if curate and show_latest:
         raise click.ClickException("--curate and --show-latest are mutually exclusive.")
+    if effort and not curate:
+        raise click.ClickException("--effort applies only to --curate.")
 
     if show_latest:
         _review_show_latest(for_doc, session_name, scope, as_json)
         return
 
     if curate:
-        _review_curate(for_doc, session_name, scope, as_json)
+        _review_curate(for_doc, session_name, scope, as_json, effort=effort)
         return
 
     # Bare review: show raw content + hint
@@ -912,6 +949,7 @@ def _review_curate(
     session_name: str | None,
     scope: str,
     as_json: bool,
+    effort: str | None = None,
 ) -> None:
     """Handle ``--curate``: run LLM curation."""
     import os
@@ -1029,6 +1067,10 @@ def _review_curate(
     if not as_json:
         console.print(f"[dim]Curating {len(shadow_entries)} shadow source(s) for {for_doc}...[/dim]")
 
+    # --effort overrides; otherwise inherit the memory writer's configured effort
+    # (curation already inherits proxy/direct routing from the same config).
+    effective_effort = effort or (config.effort if config else None)
+
     result = run_shadow_curation(
         session_name=resolved.store.session_name,
         forge_root=forge_root,
@@ -1038,6 +1080,7 @@ def _review_curate(
         base_url=base_url,
         direct=direct,
         scope=scope,
+        reasoning_effort=effective_effort,
     )
 
     if as_json:

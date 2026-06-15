@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from forge.core.effort import validate_claude_effort
 from forge.core.state import now_iso
 from forge.policy.team.config import TeamSupervisorConfig
 from forge.policy.types import FailMode
@@ -19,6 +20,11 @@ from .config import LAUNCH_MODE_HOST, LAUNCH_MODE_SIDECAR
 # Schema version for session state files.
 SCHEMA_VERSION = 1
 INDEX_VERSION = 1
+
+# Mirror of forge.core.llm.types.ReasoningEffort. Kept inline so this foundational
+# module's import chain stays free of the heavy core.llm package (litellm clients);
+# tests/src/core/test_effort.py is the drift guard that asserts equality.
+_CHECKER_EFFORT_LEVELS = ("none", "low", "medium", "high", "xhigh")
 
 
 # --- Worktree metadata (embedded in SessionState) ---
@@ -101,6 +107,10 @@ class MemoryWriterConfig:
     proxy: str | None = None
     direct: bool = False
     min_turns: int = 5
+    effort: str | None = None  # `claude --effort` level for the writer's claude -p run; None = tier default
+
+    def __post_init__(self) -> None:
+        validate_claude_effort(self.effort)
 
 
 @dataclass
@@ -157,6 +167,12 @@ class SupervisorConfig:
     checker_model: str | None = None  # Tier-1 model (prefixed id); None = provider-specific default
     checker_provider: str | None = None  # Tier-1 provider override (openrouter/litellm_local/litellm_remote)
     checker_budget_tokens: int | None = None  # Approx total token budget for the tier-1 checker prompt
+    checker_effort: str | None = (
+        None  # Tier-1 checker reasoning effort (core.llm: none/low/medium/high/xhigh); None=model default
+    )
+    supervisor_effort: str | None = (
+        None  # Frontier `claude --effort` level (low/medium/high/xhigh/max); None=tier default
+    )
     # Shadow sampling (audit the cascade's false-aligned rate): run the frontier supervisor on a random sample of
     # tier-1 allows post-hoc, verdict recorded but never enforced. 0.0 = off (default).
     shadow_sample_rate: float = 0.0  # [0,1] probability of shadowing an uncached tier-1 allow
@@ -171,6 +187,12 @@ class SupervisorConfig:
             raise ValueError(f"shadow_sample_rate must be in [0.0, 1.0], got {self.shadow_sample_rate}")
         if self.shadow_max_per_session < 1:
             raise ValueError(f"shadow_max_per_session must be >= 1, got {self.shadow_max_per_session}")
+        # Frontier supervisor runs via `claude -p --effort`; tier-1 checker is a core.llm call.
+        validate_claude_effort(self.supervisor_effort)
+        if self.checker_effort is not None and self.checker_effort not in _CHECKER_EFFORT_LEVELS:
+            raise ValueError(
+                f"checker_effort must be one of {', '.join(_CHECKER_EFFORT_LEVELS)}, got {self.checker_effort!r}"
+            )
 
 
 @dataclass

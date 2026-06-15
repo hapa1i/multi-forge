@@ -386,3 +386,23 @@ class TestHookInstallConfig:
         assert "TaskCompleted" in FORGE_HOOK_CONFIG["hooks"]
         hooks = FORGE_HOOK_CONFIG["hooks"]["TaskCompleted"]
         assert any("forge hook task-completed" in h.get("command", "") for group in hooks for h in group["hooks"])
+
+
+# --- per-caller reasoning effort ---
+
+
+class TestRunSupervisorEffort:
+    """config.effort is forwarded to run_claude_session as reasoning_effort."""
+
+    @patch("forge.policy.team.handlers.run_claude_session")
+    def test_effort_forwarded(self, mock_session):
+        mock_session.return_value = SessionResult(
+            stdout='{"verdict": "aligned"}',
+            stderr="",
+            returncode=0,
+        )
+        _run_supervisor(_config(effort="high"), "alice", "team", "idle", "")
+
+        mock_session.assert_called_once()
+        _, kwargs = mock_session.call_args
+        assert kwargs["reasoning_effort"] == "high"

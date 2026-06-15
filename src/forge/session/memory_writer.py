@@ -473,6 +473,7 @@ def run_memory_writer(
             direct=config.direct,
             timeout_seconds=effective_timeout,
             cwd=str(forge_root),
+            reasoning_effort=config.effort,
         )
 
     # Attribute before the failure branch so failed runs are recorded too.

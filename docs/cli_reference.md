@@ -45,6 +45,12 @@ Note: `session context` is a deprecated alias for `session show`. `session resum
 user-notes overlay (`children/<child>.notes.md`) in `$EDITOR` before launching Claude; the AI snapshot stays read-only.
 `forge session memory` is removed; use `forge memory`.
 
+`fork` and `start` accept the tier-1 launch controls alongside `--supervise`: `--cascade`, `--checker-model`,
+`--checker-provider`, `--checker-effort` (`none/low/medium/high/xhigh`), and `--supervisor-effort`
+(`low/medium/high/xhigh/max`). Launch-time `--cascade` sets the flag only; the runtime hook escalates to the frontier
+when no plan exists yet (unlike `forge policy supervise --cascade`, which resolves the plan eagerly). See
+[session.md](end-user/session.md).
+
 Codex runtime ([design.md §3.9](design.md#39-session-resume-context-management)):
 `forge session start <name> --runtime codex` launches the interactive `codex` TUI (bare, or an interactive bridge with
 `--resume-from <parent>`); adding `--task "…"` instead runs a headless first turn and requires `--resume-from`
@@ -69,12 +75,13 @@ default to the parent cache; `edit`/`diff` resolve a child (inferred when the pa
 
 - `forge memory track <path>`: author a project passport on a doc, sessionless (`--strategy`, `--intent`, `--writers`,
   `--propose`, `--shadow-path`).
-- `forge memory enable|disable`: toggle session memory auto-update (`--session`, resolves `$FORGE_SESSION`).
+- `forge memory enable|disable`: toggle session memory auto-update (`--session`, resolves `$FORGE_SESSION`). `enable`
+  takes `--effort` (`claude --effort` for the writer; updates effort even when already enabled in the same mode).
 - `forge memory list`: list passported memory docs under scan roots (`--json`).
 - `forge memory status`: show memory activation across sessions (`--scope`, `--json`).
 - `forge memory report show`: inspect memory writer review reports for a session (`--latest`, `--all`).
 - `forge memory shadows list|show|review`: list accumulated shadow proposals, inspect one doc's proposals, or curate
-  them (`--scope`, `--for`, `--curate`, `--show-latest`).
+  them (`--scope`, `--for`, `--curate`, `--show-latest`, `--effort` with `--curate`).
 - `forge memory passport show|remove`: inspect or remove the project passport embedded in a memory doc (`--json`).
 
 ### Proxy management
@@ -124,21 +131,23 @@ default to the parent cache; `edit`/`diff` resolve a child (inferred when the pa
 
 ### Policy enforcement
 
-| Command                                         | Purpose                                            |
-| ----------------------------------------------- | -------------------------------------------------- |
-| `forge policy enable --bundle <name>`           | Enable policy enforcement for current session      |
-| `forge policy disable`                          | Disable policy enforcement                         |
-| `forge policy status`                           | Show current policy state (`--json`)               |
-| `forge policy list`                             | List available bundles and rules (`--json`)        |
-| `forge policy check --bundle <name> -f <path>`  | Evaluate policies on demand                        |
-| `forge policy supervisor -f <path> -r <id>`     | Evaluate file against approved plan                |
-| `forge policy supervise <target>`               | Set persistent supervisor for session              |
-| `forge policy supervise --cascade/--no-cascade` | Toggle the tier-1 plan check (cascade)             |
-| `forge policy supervise --off / --on`           | Suspend/resume supervisor (preserves config)       |
-| `forge policy supervise --remove`               | Remove supervisor entirely                         |
-| `forge policy supervise --reload`               | Reload latest relevant approved plan               |
-| `forge policy supervise --reload-from <path>`   | Reload plan from explicit file                     |
-| `forge policy shadow show [session]`            | Show shadow-audit disagreements (`--all`/`--json`) |
+| Command                                          | Purpose                                              |
+| ------------------------------------------------ | ---------------------------------------------------- |
+| `forge policy enable --bundle <name>`            | Enable policy enforcement for current session        |
+| `forge policy disable`                           | Disable policy enforcement                           |
+| `forge policy status`                            | Show current policy state (`--json`)                 |
+| `forge policy list`                              | List available bundles and rules (`--json`)          |
+| `forge policy check --bundle <name> -f <path>`   | Evaluate policies on demand                          |
+| `forge policy supervisor -f <path> -r <id>`      | Evaluate file against approved plan                  |
+| `forge policy supervise <target>`                | Set persistent supervisor for session                |
+| `forge policy supervise --cascade/--no-cascade`  | Toggle the tier-1 plan check (cascade)               |
+| `forge policy supervise --checker-effort <lvl>`  | Tier-1 checker effort (`none/low/medium/high/xhigh`) |
+| `forge policy supervise --supervisor-effort <l>` | Frontier effort (`low/medium/high/xhigh/max`)        |
+| `forge policy supervise --off / --on`            | Suspend/resume supervisor (preserves config)         |
+| `forge policy supervise --remove`                | Remove supervisor entirely                           |
+| `forge policy supervise --reload`                | Reload latest relevant approved plan                 |
+| `forge policy supervise --reload-from <path>`    | Reload plan from explicit file                       |
+| `forge policy shadow show [session]`             | Show shadow-audit disagreements (`--all`/`--json`)   |
 
 ### Workflow
 
@@ -154,8 +163,9 @@ Workflow model specs support proxy-backed workers and explicit direct Claude wor
 kept on Claude Opus 4.6; newer direct workers such as `claude-opus-4.8` are opt-in and can attach per-worker prompt
 hints through `ModelSpec.prompt`. All workflow execution commands (panel, analyze, debate, consensus) accept
 `--proxy <proxy_id>` to route proxy-backed workers through a specific proxy, overriding preferred_proxy and route scan
-([design.md §3.6.12](design.md#3612-subprocess-routing-resolution-normative)). Direct workers (e.g., `claude-opus`)
-remain on Anthropic routing regardless of `--proxy`.
+([design.md §3.6.12](design.md#3612-subprocess-routing-resolution-normative)). All four execution commands also accept
+`--effort <level>` (`claude --effort`: `low/medium/high/xhigh/max`), applied to every worker's `claude -p` argv. Direct
+workers (e.g., `claude-opus`) remain on Anthropic routing regardless of `--proxy`.
 
 ### Search
 

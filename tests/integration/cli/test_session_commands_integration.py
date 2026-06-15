@@ -837,3 +837,42 @@ class TestActivityCommand:
         supervisor = next(c for c in data["commands"] if c["command"] == "supervisor")
         assert supervisor["calls"] == 3
         assert supervisor["errors"] == 1
+
+
+class TestSupervisedLaunchControls:
+    """Launch-time cascade + effort persist onto the child manifest (no plan resolution)."""
+
+    def _confirm_parent(self, workspace: ContainerLike, name: str, uuid: str) -> None:
+        """Mark a started parent as hook-confirmed so --supervise validation passes."""
+        _run_container_python(
+            workspace,
+            f"""
+            import json
+            from pathlib import Path
+
+            path = Path("/workspace/.forge/sessions/{name}/forge.session.json")
+            data = json.loads(path.read_text())
+            data["confirmed"]["claude_session_id"] = "{uuid}"
+            data["confirmed"]["confirmed_by"] = "hook:SessionStart:startup"
+            data["confirmed"]["transcript_path"] = "/tmp/{name}-transcript.jsonl"
+            path.write_text(json.dumps(data))
+            Path("/tmp/{name}-transcript.jsonl").write_text("{{}}")
+            """,
+        )
+
+    def test_fork_supervise_cascade_effort_persists(self, mock_claude_workspace: ContainerLike) -> None:
+        mock_claude_workspace.exec("cd /workspace && forge session start launch-sup-parent --no-launch")
+        self._confirm_parent(mock_claude_workspace, "launch-sup-parent", "launch-sup-uuid")
+
+        result = mock_claude_workspace.exec(
+            "cd /workspace && forge session fork launch-sup-parent --name launch-sup-child "
+            "--supervise --cascade --supervisor-effort medium --no-launch"
+        )
+        assert result.returncode == 0, result.stderr
+
+        child = mock_claude_workspace.read_json("/workspace/.forge/sessions/launch-sup-child/forge.session.json")
+        supervisor = child["intent"]["policy"]["supervisor"]
+        assert supervisor["cascade"] is True
+        assert supervisor["supervisor_effort"] == "medium"
+        # Launch-time --cascade sets the flag only; no plan is resolved eagerly.
+        assert supervisor.get("plan_override_path") is None

@@ -99,6 +99,65 @@ class TestStatusBasic:
         assert "unresolved" in result.output
 
 
+class TestStatusEffortDisplay:
+    """supervisor_effort and checker_effort surface in the status table + JSON."""
+
+    def test_effort_fields_in_human_table(self, runner: CliRunner, env: Path):
+        policy = PolicyIntent(
+            enabled=True,
+            supervisor=SupervisorConfig(
+                resume_id="planner", cascade=True, supervisor_effort="high", checker_effort="low"
+            ),
+        )
+        _seed_session(str(env), "test-session", policy=policy)
+
+        result = runner.invoke(main, ["policy", "status"])
+
+        assert result.exit_code == 0, result.output
+        assert "Supervisor effort" in result.output and "high" in result.output
+        assert "Checker effort" in result.output and "low" in result.output
+
+    def test_checker_effort_hidden_when_cascade_off(self, runner: CliRunner, env: Path):
+        # checker_effort only governs the tier-1 checker, which runs only under cascade.
+        policy = PolicyIntent(
+            enabled=True,
+            supervisor=SupervisorConfig(resume_id="planner", cascade=False, checker_effort="low"),
+        )
+        _seed_session(str(env), "test-session", policy=policy)
+
+        result = runner.invoke(main, ["policy", "status"])
+
+        assert result.exit_code == 0, result.output
+        assert "Checker effort" not in result.output
+
+    def test_effort_fields_in_json(self, runner: CliRunner, env: Path):
+        policy = PolicyIntent(
+            enabled=True,
+            supervisor=SupervisorConfig(resume_id="planner", supervisor_effort="medium", checker_effort="xhigh"),
+        )
+        _seed_session(str(env), "target", policy=policy)
+
+        result = runner.invoke(main, ["policy", "status", "--session", "target", "--json"])
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        sup = data["policy"]["supervisor"]
+        assert sup["supervisor_effort"] == "medium"
+        assert sup["checker_effort"] == "xhigh"
+
+    def test_json_effort_keys_present_when_unset(self, runner: CliRunner, env: Path):
+        # Scripts rely on a stable schema: keys present (None) even when not configured.
+        policy = PolicyIntent(enabled=True, supervisor=SupervisorConfig(resume_id="planner"))
+        _seed_session(str(env), "target", policy=policy)
+
+        result = runner.invoke(main, ["policy", "status", "--session", "target", "--json"])
+
+        assert result.exit_code == 0, result.output
+        sup = json.loads(result.output)["policy"]["supervisor"]
+        assert sup["supervisor_effort"] is None
+        assert sup["checker_effort"] is None
+
+
 class TestStatusSessionFlag:
     def test_resolves_same_forge_root(self, runner: CliRunner, env: Path):
         policy = PolicyIntent(enabled=True, bundles=["tdd"])

@@ -271,11 +271,13 @@ def run_shadow_curation(
     direct: bool = False,
     timeout_seconds: int = 120,
     scope: str = "project",
+    reasoning_effort: str | None = None,
 ) -> CurationResult:
     """Build prompt, call LLM, persist report.
 
     The caller (CLI) resolves routing via ``resolve_writer_base_url()``
-    and passes ``base_url`` + ``direct``.
+    and passes ``base_url`` + ``direct``. ``reasoning_effort`` is the
+    ``claude --effort`` level for the curation ``claude -p`` run.
     """
     from forge.core.reactive.cost_tracking import track_verb_cost
     from forge.core.reactive.session_runner import run_claude_session
@@ -296,6 +298,7 @@ def run_shadow_curation(
             direct=direct,
             timeout_seconds=timeout_seconds,
             cwd=str(forge_root),
+            reasoning_effort=reasoning_effort,
         )
 
     # Attribute before the failure branch so failed runs are recorded too.

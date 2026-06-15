@@ -21,6 +21,7 @@ import click
 from rich.console import Console
 
 from forge.cli.output import print_tip
+from forge.core.effort import CLAUDE_EFFORT_LEVELS
 from forge.proxy.proxies import ProxyResolutionError
 from forge.review.models import (
     NAMED_ROLES,
@@ -364,6 +365,13 @@ def _print_grouped_models(availabilities: list) -> None:
 )
 @click.option("--proxy", "via", type=str, default=None, help="Route proxy-backed workers through this proxy")
 @click.option("--cwd", type=click.Path(exists=True), default=None, help="Working directory")
+@click.option(
+    "--effort",
+    "effort",
+    type=click.Choice(list(CLAUDE_EFFORT_LEVELS)),
+    default=None,
+    help="Per-worker reasoning effort (claude --effort: low/medium/high/xhigh/max)",
+)
 @click.pass_context
 def panel(
     ctx: click.Context,
@@ -380,6 +388,7 @@ def panel(
     severity: str | None,
     via: str | None,
     cwd: str | None,
+    effort: str | None,
 ) -> None:
     """Fan out a review to multiple models.
 
@@ -472,6 +481,7 @@ def panel(
             cwd=cwd or str(Path.cwd()),
             resume_id=resume_id,
             attribution=Attribution(command="panel", session=os.environ.get("FORGE_SESSION")),
+            reasoning_effort=effort,
         )
 
     # Verb-level aggregate (estimated, across workers) attributed to the ambient run.
@@ -785,6 +795,13 @@ def _handle_review_output(
 )
 @click.option("--proxy", "via", type=str, default=None, help="Route proxy-backed workers through this proxy")
 @click.option("--cwd", type=click.Path(exists=True), default=None, help="Working directory")
+@click.option(
+    "--effort",
+    "effort",
+    type=click.Choice(list(CLAUDE_EFFORT_LEVELS)),
+    default=None,
+    help="Per-worker reasoning effort (claude --effort: low/medium/high/xhigh/max)",
+)
 @click.pass_context
 def analyze(
     ctx: click.Context,
@@ -796,6 +813,7 @@ def analyze(
     check_mode: bool,
     via: str | None,
     cwd: str | None,
+    effort: str | None,
 ) -> None:
     """Deep structured analysis on a topic (single-model).
 
@@ -846,6 +864,7 @@ def analyze(
             timeout_seconds=timeout,
             cwd=cwd or str(Path.cwd()),
             attribution=Attribution(command="analyze", session=os.environ.get("FORGE_SESSION")),
+            reasoning_effort=effort,
         )
 
     # Verb-level aggregate (estimated, across workers) attributed to the ambient run.
@@ -1177,6 +1196,13 @@ def _resolve_debate_prompt(
 )
 @click.option("--proxy", "via", type=str, default=None, help="Route proxy-backed workers through this proxy")
 @click.option("--cwd", type=click.Path(exists=True), default=None, help="Working directory")
+@click.option(
+    "--effort",
+    "effort",
+    type=click.Choice(list(CLAUDE_EFFORT_LEVELS)),
+    default=None,
+    help="Per-worker reasoning effort (claude --effort: low/medium/high/xhigh/max)",
+)
 @click.pass_context
 def debate(
     ctx: click.Context,
@@ -1190,6 +1216,7 @@ def debate(
     workers: tuple[str, ...],
     via: str | None,
     cwd: str | None,
+    effort: str | None,
 ) -> None:
     """Adversarial evaluation with stance-injected workers.
 
@@ -1277,6 +1304,7 @@ def debate(
                 cwd=cwd or str(Path.cwd()),
                 routing_plan=routing_plan,
                 attribution=Attribution(command="debate", session=os.environ.get("FORGE_SESSION")),
+                reasoning_effort=effort,
             )
     finally:
         if tmp_file is not None:
@@ -1868,6 +1896,13 @@ def _print_consensus_text(output: ConsensusOutput, resolved_models: dict[str, di
 )
 @click.option("--proxy", "via", type=str, default=None, help="Route proxy-backed workers through this proxy")
 @click.option("--cwd", type=click.Path(exists=True), default=None, help="Working directory")
+@click.option(
+    "--effort",
+    "effort",
+    type=click.Choice(list(CLAUDE_EFFORT_LEVELS)),
+    default=None,
+    help="Per-worker reasoning effort (claude --effort: low/medium/high/xhigh/max)",
+)
 @click.pass_context
 def consensus(
     ctx: click.Context,
@@ -1881,6 +1916,7 @@ def consensus(
     workers: tuple[str, ...],
     via: str | None,
     cwd: str | None,
+    effort: str | None,
 ) -> None:
     """Two-round consensus building with role-assigned workers.
 
@@ -1973,6 +2009,7 @@ def consensus(
                 original_subject=raw_subject or "",
                 routing_plan=routing_plan,
                 attribution=Attribution(command="consensus", session=os.environ.get("FORGE_SESSION")),
+                reasoning_effort=effort,
             )
     finally:
         if tmp_file is not None:

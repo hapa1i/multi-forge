@@ -18,7 +18,14 @@ from forge.cli.session_addendum import (
     resolve_addendum_content_for_proxy,
     write_managed_addendum,
 )
+from forge.core.effort import CLAUDE_EFFORT_LEVELS
+from forge.core.llm.types import REASONING_EFFORT_LEVELS
 from forge.core.paths import display_path
+from forge.policy.semantic.supervisor import (
+    CHECKER_PROVIDER_CHOICES,
+    apply_checker_options,
+    validate_checker_model,
+)
 from forge.session import (
     LAUNCH_MODE_HOST,
     LAUNCH_MODE_SIDECAR,
@@ -172,6 +179,40 @@ __all__ = ["fork"]
     help="Force supervisor to use direct Anthropic routing (requires --supervise)",
 )
 @click.option(
+    "--cascade",
+    "cascade_flag",
+    is_flag=True,
+    default=False,
+    help="Enable the tier-1 plan check before the frontier supervisor (requires --supervise)",
+)
+@click.option(
+    "--checker-model",
+    "checker_model",
+    default=None,
+    help="Tier-1 checker model (prefixed id; requires --supervise)",
+)
+@click.option(
+    "--checker-provider",
+    "checker_provider",
+    type=click.Choice(list(CHECKER_PROVIDER_CHOICES)),
+    default=None,
+    help="Tier-1 checker provider (requires --supervise)",
+)
+@click.option(
+    "--checker-effort",
+    "checker_effort",
+    type=click.Choice(list(REASONING_EFFORT_LEVELS)),
+    default=None,
+    help="Tier-1 checker reasoning effort (none/low/medium/high/xhigh; requires --supervise)",
+)
+@click.option(
+    "--supervisor-effort",
+    "supervisor_effort",
+    type=click.Choice(list(CLAUDE_EFFORT_LEVELS)),
+    default=None,
+    help="Frontier supervisor effort (claude --effort: low/medium/high/xhigh/max; requires --supervise)",
+)
+@click.option(
     "--force",
     "-f",
     is_flag=True,
@@ -204,6 +245,11 @@ def fork(
     supervise_target: bool,
     supervisor_proxy: str | None,
     supervisor_direct: bool,
+    cascade_flag: bool,
+    checker_model: str | None,
+    checker_provider: str | None,
+    checker_effort: str | None,
+    supervisor_effort: str | None,
     force: bool,
     memory_flag: str | None,
 ) -> None:
@@ -237,6 +283,16 @@ def fork(
         sys.exit(1)
     if (supervisor_proxy or supervisor_direct) and not supervise_target:
         console.print("[red]Error:[/red] --supervisor-proxy/--no-supervisor-proxy require --supervise")
+        sys.exit(1)
+    if (
+        cascade_flag or checker_model or checker_provider or checker_effort or supervisor_effort
+    ) and not supervise_target:
+        console.print("[red]Error:[/red] --cascade/--checker-*/--supervisor-effort require --supervise")
+        sys.exit(1)
+    try:
+        validate_checker_model(checker_model)
+    except ValueError as e:
+        console.print(f"[red]Error:[/red] {e}")
         sys.exit(1)
 
     normalized_direct_model: str | None = None
@@ -656,6 +712,19 @@ def fork(
             current_template=_preflight_routing.template if _preflight_routing else None,
             current_direct=direct,
         )
+        # Cascade-at-launch sets the flag only; the runtime hook resolves the plan at
+        # eval time (a fresh child has no approved snapshot yet -- it safely escalates
+        # to the frontier supervisor until a plan is approved).
+        if cascade_flag:
+            sup_config.cascade = True
+        apply_checker_options(
+            sup_config,
+            checker_model=checker_model,
+            checker_provider=checker_provider,
+            checker_effort=checker_effort,
+        )
+        if supervisor_effort is not None:
+            sup_config.supervisor_effort = supervisor_effort
         fork_store = SessionStore(fork_forge_root, fork_manifest.name)
         fork_store.update(timeout_s=5.0, mutate=lambda m: apply_supervisor_to_intent(m, sup_config))
         fork_manifest = fork_store.read()
