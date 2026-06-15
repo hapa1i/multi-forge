@@ -352,6 +352,8 @@ def status(as_json: bool, session_name: str | None) -> None:
                     "checker_model": sup.checker_model,
                     "checker_provider": sup.checker_provider,
                     "checker_budget_tokens": sup.checker_budget_tokens,
+                    "checker_effort": sup.checker_effort,
+                    "supervisor_effort": sup.supervisor_effort,
                     "resolved_uuid": None,
                     "source_model": None,
                 }
@@ -427,6 +429,8 @@ def status(as_json: bool, session_name: str | None) -> None:
             table.add_row("  Fork session", "Yes" if sup.fork_session else "No")
             table.add_row("  Timeout", f"{sup.timeout_seconds}s")
             table.add_row("  Throttle", f"{sup.throttle_seconds}s")
+            if sup.supervisor_effort:
+                table.add_row("  Supervisor effort", sup.supervisor_effort)
             table.add_row("  Cascade", "On" if sup.cascade else "Off")
             if sup.cascade:
                 checker_provider, checker_model, checker_budget = _checker_display(sup)
@@ -434,6 +438,8 @@ def status(as_json: bool, session_name: str | None) -> None:
                 table.add_row("  Checker provider", checker_provider)
                 table.add_row("  Checker model", checker_model)
                 table.add_row("  Checker budget", f"{checker_budget} tokens")
+                if sup.checker_effort:
+                    table.add_row("  Checker effort", sup.checker_effort)
             if sup.plan_override_path:
                 table.add_row("  Plan override", sup.plan_override_path)
         else:
@@ -1268,6 +1274,8 @@ def supervise_cmd(
     console.print(f"  Fork session: {'yes' if sup.fork_session else 'no'}")
     console.print(f"  Timeout: {sup.timeout_seconds}s")
     console.print(f"  Throttle: {sup.throttle_seconds}s")
+    if sup.supervisor_effort:
+        console.print(f"  Supervisor effort: {sup.supervisor_effort}")
     console.print(f"  Cascade: {'on' if sup.cascade else 'off'}")
     if sup.cascade:
         checker_provider, checker_model, checker_budget = _checker_display(sup)
@@ -1275,6 +1283,8 @@ def supervise_cmd(
         console.print(f"  Checker provider: {checker_provider}")
         console.print(f"  Checker model: {checker_model}")
         console.print(f"  Checker budget: {checker_budget} tokens")
+        if sup.checker_effort:
+            console.print(f"  Checker effort: {sup.checker_effort}")
     if sup.plan_override_path:
         console.print(f"  Plan override: {sup.plan_override_path}")
 

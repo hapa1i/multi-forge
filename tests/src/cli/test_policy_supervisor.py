@@ -914,6 +914,29 @@ class TestSuperviseCascade:
         assert "Checker model: google/gemini-3.5-flash" in result.output
         assert "Checker budget: 32000 tokens" in result.output
 
+    def test_show_displays_effort_fields(self, runner: CliRunner, temp_guard_env: Path, monkeypatch) -> None:
+        store = _make_supervised_project(temp_guard_env, monkeypatch)
+        _set_supervisor_fields(store, cascade=True, supervisor_effort="high", checker_effort="low")
+
+        result = runner.invoke(main, ["policy", "supervise"])
+
+        assert result.exit_code == 0, result.output
+        assert "Supervisor effort: high" in result.output
+        assert "Checker effort: low" in result.output
+
+    def test_show_hides_checker_effort_when_cascade_off(
+        self, runner: CliRunner, temp_guard_env: Path, monkeypatch
+    ) -> None:
+        store = _make_supervised_project(temp_guard_env, monkeypatch)
+        _set_supervisor_fields(store, cascade=False, supervisor_effort="high", checker_effort="low")
+
+        result = runner.invoke(main, ["policy", "supervise"])
+
+        assert result.exit_code == 0, result.output
+        # supervisor_effort governs the always-on frontier; checker_effort is cascade-only.
+        assert "Supervisor effort: high" in result.output
+        assert "Checker effort" not in result.output
+
     def test_show_displays_unsupported_checker_provider(
         self, runner: CliRunner, temp_guard_env: Path, monkeypatch
     ) -> None:
