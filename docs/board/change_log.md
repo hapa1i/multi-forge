@@ -27,6 +27,30 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-15
 
+### openrouter_observability Phase 1: Forge-owned session ids + X-Forge-Session/Command headers
+
+**Goal**: Mint opaque, path-free provider grouping ids and propagate the hashed session name + command role from
+headless spawns to the proxy via two new sanitized, leak-gated headers — the identity foundation later phases join on.
+
+**Key changes**:
+
+- `core/run_id.py`: added `derive_provider_session_id(label, root_run_id, role)` (SHA-256 12-hex; explicit
+  `forge_run_<hash(root_run_id)>` fallback when no session label), one `sanitize_label` that canonicalizes all separator
+  runs to `_` (so the id suffix and `X-Forge-Command` can't drift), and `is_valid_label`/`is_valid_provider_session_id`
+  validators distinct from `RUN_ID_RE`. Header/env-var name constants added.
+- `core/reactive/env.py`: `_apply_correlation_headers` stamps `X-Forge-Session` (always emittable via the fallback) +
+  `X-Forge-Command` (role only), both added to the Forge-owned strip-set, gated to a proven Forge proxy.
+- Headless spawns tag their role + session: `supervisor` (`supervisor.py`), `memory_writer` (`memory_writer.py`),
+  `review` (`engine.py`, command-only). Used the existing `run_claude_session(extra_env=...)` pass-through — no
+  signature change (the plan's "plumbing gap" was a misread).
+- `proxy/server.py`: middleware reads + validates both headers (spoof/over-long → `None`), stores on `request.state`
+  before both wire branches; getter `_forge_session_command` added for the Phase 3 trace writer. Headers are never
+  forwarded upstream (passthrough allowlist already excludes them — asserted, not re-stripped).
+- `design_appendix.md` §A.13: documented the two headers as internal-only correlation, distinct from Phase 5 `user`.
+
+**Verification**: New `test_server_forge_headers.py` (10) + additions to `test_run_id.py`, `test_env.py`,
+`test_supervisor.py`, `test_memory_writer.py`; full `make test-unit` 6094 passed; `make pre-commit` clean.
+
 ### openrouter_observability Phase 0: live-probe the OpenRouter externals
 
 **Goal**: Pin the live OpenRouter behaviors the card's later phases assume, before any provider-id field is populated.

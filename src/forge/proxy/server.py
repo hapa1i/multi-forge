@@ -42,8 +42,12 @@ from forge.core.logging import (
     get_effective_log_level,
 )
 from forge.core.run_id import (
+    FORGE_COMMAND_HEADER,
     FORGE_ROOT_RUN_ID_HEADER,
     FORGE_RUN_ID_HEADER,
+    FORGE_SESSION_HEADER,
+    is_valid_label,
+    is_valid_provider_session_id,
     is_valid_run_id,
 )
 from forge.core.usage.vocabulary import Confidence, Reporter
@@ -197,10 +201,26 @@ def _valid_run_header(value: str | None) -> str | None:
     return value if is_valid_run_id(value) else None
 
 
+def _valid_session_header(value: str | None) -> str | None:
+    """Return a validated provider grouping id from ``X-Forge-Session``, else None (Phase 1)."""
+    return value if is_valid_provider_session_id(value) else None
+
+
+def _valid_command_header(value: str | None) -> str | None:
+    """Return a validated command role from ``X-Forge-Command``, else None (Phase 1)."""
+    return value if is_valid_label(value) else None
+
+
 def _forge_run_ids(request: Request) -> tuple[str | None, str | None]:
     """The validated ``(forge_run_id, forge_root_run_id)`` the middleware stored."""
     state = request.state
     return getattr(state, "forge_run_id", None), getattr(state, "forge_root_run_id", None)
+
+
+def _forge_session_command(request: Request) -> tuple[str | None, str | None]:
+    """The validated ``(forge_session, forge_command)`` the middleware stored (Phase 1)."""
+    state = request.state
+    return getattr(state, "forge_session", None), getattr(state, "forge_command", None)
 
 
 def _calc_and_log_cost(
@@ -1715,6 +1735,11 @@ async def log_requests_middleware(request: Request, call_next):
     # wire shapes see them on request.state.
     request.state.forge_run_id = _valid_run_header(request.headers.get(FORGE_RUN_ID_HEADER))
     request.state.forge_root_run_id = _valid_run_header(request.headers.get(FORGE_ROOT_RUN_ID_HEADER))
+    # Phase 1: provider-trace correlation. The opaque session grouping id + command role
+    # the subprocess stamped, validated the same way (spoofed/over-long -> None). These are
+    # internal Forge<->proxy headers; the proxy consumes them and never forwards upstream.
+    request.state.forge_session = _valid_session_header(request.headers.get(FORGE_SESSION_HEADER))
+    request.state.forge_command = _valid_command_header(request.headers.get(FORGE_COMMAND_HEADER))
 
     # Transparent Anthropic passthrough is intercepted HERE, before the route's
     # MessagesRequest binding runs — FastAPI validates the body against a closed

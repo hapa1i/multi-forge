@@ -349,10 +349,16 @@ Request records contain timestamp, proxy ID, model/tier, token counts, `cost_mic
 cost), request ID, latency, metric-evidence provenance (`reporter` + `confidence`), and the **run-tree correlation**
 `forge_run_id`/`forge_root_run_id` (§3.14 / §A.13: null for the interactive harness and any non-Forge-originated
 traffic; set when a Forge-routed `claude -p` subprocess forwarded the validated `X-Forge-Run-ID`/`X-Forge-Root-Run-ID`
-headers). There is no local price catalog, so cost is reported-or-unavailable, never inferred from tokens. Both fields
-are additive at `schema_version: 1` (old readers `.get` them as `None`). Verb records contain timestamp, verb name,
-proxy URL/ID when known, before/after snapshots, total cost delta, request count delta, `estimated=true`, and
-`cost_measured` (false when the window moved tokens but reported no cost, so a passthrough verb is not read as $0).
+headers). Two companion headers ride the same proven-proxy path for provider-trace correlation: `X-Forge-Session` (an
+opaque `forge_sess_<hash>` / `forge_run_<hash>` grouping id derived by hashing the session name + role — the raw name is
+never sent) and `X-Forge-Command` (the sanitized command role). Like the run-id headers they are validated on read,
+stored on `request.state`, and are **internal Forge↔proxy correlation only — never forwarded upstream** (the passthrough
+allowlist drops them). They are distinct from provider-bound metadata such as the OpenRouter `user` field, which is
+deliberately sent upstream. There is no local price catalog, so cost is reported-or-unavailable, never inferred from
+tokens. Both fields are additive at `schema_version: 1` (old readers `.get` them as `None`). Verb records contain
+timestamp, verb name, proxy URL/ID when known, before/after snapshots, total cost delta, request count delta,
+`estimated=true`, and `cost_measured` (false when the window moved tokens but reported no cost, so a passthrough verb is
+not read as $0).
 
 The proxy `GET /` endpoint reports in-memory metrics and cost totals for live status. The JSONL request logs remain the
 bootstrap source for cap enforcement after restart.

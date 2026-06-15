@@ -16,9 +16,13 @@ from dataclasses import dataclass
 
 from forge.core.run_id import (
     ANTHROPIC_CUSTOM_HEADERS_VAR,
+    FORGE_COMMAND_HEADER,
     FORGE_ROOT_RUN_ID_HEADER,
     FORGE_RUN_ID_HEADER,
+    FORGE_SESSION_HEADER,
+    derive_provider_session_id,
     mint_run_id,
+    sanitize_label,
 )
 
 logger = logging.getLogger(__name__)
@@ -35,6 +39,15 @@ FORGE_MAX_DEPTH = 2
 FORGE_RUN_ID_VAR = "FORGE_RUN_ID"
 FORGE_PARENT_RUN_ID_VAR = "FORGE_PARENT_RUN_ID"
 FORGE_ROOT_RUN_ID_VAR = "FORGE_ROOT_RUN_ID"
+
+# Provider session/command correlation (openrouter_observability Phase 1). FORGE_SESSION
+# (the human session name, already set by the session-start path) and FORGE_COMMAND (the
+# spawn's role) are hashed/sanitized into the X-Forge-Session / X-Forge-Command headers by
+# _apply_correlation_headers. Local Forge<->proxy correlation only; dropped before the
+# upstream call. session_start.py / codex_invoke.py keep their own "FORGE_SESSION" literal
+# to stay import-light (leaf/hook discipline); the value is shared by convention.
+FORGE_SESSION_VAR = "FORGE_SESSION"
+FORGE_COMMAND_VAR = "FORGE_COMMAND"
 
 FORGE_SUBPROCESS_PROXY_VAR = "FORGE_SUBPROCESS_PROXY"
 FORGE_SUBPROCESS_BASE_URL_VAR = "FORGE_SUBPROCESS_BASE_URL"
@@ -324,19 +337,34 @@ def _target_is_proven_forge_proxy(env: Mapping[str, str]) -> bool:
 
 
 def _apply_correlation_headers(env: dict[str, str]) -> None:
-    """Stamp X-Forge-Run-ID/-Root-Run-ID into ANTHROPIC_CUSTOM_HEADERS (Slice 4g).
+    """Stamp the Forge correlation headers into ANTHROPIC_CUSTOM_HEADERS (Slice 4g + Phase 1).
 
-    No-ops unless the subprocess is proxy-routed to a *proven* Forge proxy, so the
-    opaque run id never reaches a non-Forge gateway. The two headers are
-    Forge-owned: strip any inherited ``X-Forge-*`` line (the env starts from
-    ``os.environ.copy()``, so a nested subprocess inherits the parent's value), then
-    append the current child's ids; all other (user) header lines are preserved.
+    No-ops unless the subprocess is proxy-routed to a *proven* Forge proxy, so the opaque
+    ids never reach a non-Forge gateway. Up to four Forge-owned headers are stamped: the
+    run-tree ids (``X-Forge-Run-ID``/``-Root-Run-ID``) and the provider grouping ids
+    (``X-Forge-Session`` -- an opaque hash of the session name + role, always emittable via
+    the ``forge_run_<hash>`` fallback; ``X-Forge-Command`` -- the sanitized role, only when
+    a role is set). Inherited ``X-Forge-*`` lines are stripped first (the env starts from
+    ``os.environ.copy()``, so a nested child inherits the parent's values), then the current
+    child's values are appended; all other (user) header lines are preserved. These headers
+    are consumed by the proxy and never forwarded upstream (the passthrough allowlist drops
+    them).
     """
     run_id = env.get(FORGE_RUN_ID_VAR)
     if not run_id or not _target_is_proven_forge_proxy(env):
         return
 
-    forge_owned = {FORGE_RUN_ID_HEADER.lower(), FORGE_ROOT_RUN_ID_HEADER.lower()}
+    root_run_id = env.get(FORGE_ROOT_RUN_ID_VAR) or run_id
+    role = env.get(FORGE_COMMAND_VAR)
+    session_id = derive_provider_session_id(env.get(FORGE_SESSION_VAR), root_run_id, role)
+    command = sanitize_label(role)
+
+    forge_owned = {
+        FORGE_RUN_ID_HEADER.lower(),
+        FORGE_ROOT_RUN_ID_HEADER.lower(),
+        FORGE_SESSION_HEADER.lower(),
+        FORGE_COMMAND_HEADER.lower(),
+    }
     kept: list[str] = []
     for raw in env.get(ANTHROPIC_CUSTOM_HEADERS_VAR, "").split("\n"):
         line = raw.strip()
@@ -347,7 +375,10 @@ def _apply_correlation_headers(env: dict[str, str]) -> None:
             continue  # drop inherited Forge-owned line; re-added fresh below
         kept.append(line)
     kept.append(f"{FORGE_RUN_ID_HEADER}: {run_id}")
-    kept.append(f"{FORGE_ROOT_RUN_ID_HEADER}: {env.get(FORGE_ROOT_RUN_ID_VAR) or run_id}")
+    kept.append(f"{FORGE_ROOT_RUN_ID_HEADER}: {root_run_id}")
+    kept.append(f"{FORGE_SESSION_HEADER}: {session_id}")  # opaque grouping id, always present
+    if command:
+        kept.append(f"{FORGE_COMMAND_HEADER}: {command}")
     env[ANTHROPIC_CUSTOM_HEADERS_VAR] = "\n".join(kept)
 
 

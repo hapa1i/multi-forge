@@ -7,14 +7,16 @@ planning; see **Card corrections** for claims the code refuted.
 
 ## Current focus
 
-**Phase 0 is complete** -- all four probes settled 2026-06-15 (probes 1-3 re-run after harness fixes; see
-`phase0-results.md`). **Phase 1** (identity) is buildable now, offline. **Phase 2** is **unblocked** to populate
-`provider_generation_id` from the streaming `chunk.id` / non-streaming `body.id` (probe 1; streaming is **not**
-structurally `None`). **Phases 3-4** (trace plane + read surface) build against fixtures (e.g. a simulated cancelled
-stream) once the Phase 2 shape lands; probe 2 confirms a cancelled stream is **not remotely retrievable**
-(`[REMOTE-ABSENT]`), so the local-only `unavailable` justification holds. **Phase 5** (injection) gets a **channel
-correction**: OpenRouter **recognizes `user`** (records it) but **ignores `session_id`** -> inject under `user`; routing
-is neutral (both arms), so the flag stays default OFF (opt-in for observability, not performance).
+**Phases 0 + 1 are complete.** Phase 0 -- all four probes settled 2026-06-15 (probes 1-3 re-run after harness fixes; see
+`phase0-results.md`). **Phase 1 (identity headers) shipped** offline: the `X-Forge-Session`/`X-Forge-Command` minter +
+sanitizer + validators, client-side stamping, headless-spawn population, and proxy read/validate, all unit-tested
+(`make test-unit` 6094 green, `make pre-commit` clean). **Phase 2** (additive `ProviderTraceMeta`) is next and is
+**unblocked** to populate `provider_generation_id` from the streaming `chunk.id` / non-streaming `body.id` (probe 1;
+streaming is **not** structurally `None`). **Phases 3-4** (trace plane + read surface) build against fixtures (e.g. a
+simulated cancelled stream) once the Phase 2 shape lands; probe 2 confirms a cancelled stream is **not remotely
+retrievable** (`[REMOTE-ABSENT]`), so the local-only `unavailable` justification holds. **Phase 5** (injection) gets a
+**channel correction**: OpenRouter **recognizes `user`** (records it) but **ignores `session_id`** -> inject under
+`user`; routing is neutral (both arms), so the flag stays default OFF (opt-in for observability, not performance).
 
 ## Decisions locked (this card)
 
@@ -81,27 +83,30 @@ results under `docs/board/doing/openrouter_observability/` (probe notes) and/or 
 **Goal**: Mint opaque, path-free provider session ids and propagate the human session name + command role to the proxy
 via new sanitized, leak-gated headers. Identity foundation every later phase joins on.
 
-- [ ] **Minter + sanitizer** (`src/forge/core/run_id.py`): add `FORGE_SESSION_HEADER="X-Forge-Session"`,
-  `FORGE_COMMAND_HEADER="X-Forge-Command"` (pick ONE command-name; do **not** also add `X-Forge-Provider-Role`), a
-  session/role sanitizer (own charset + length cap), and
-  `derive_provider_session_id(root_run_id|forge_session,     role) -> "forge_sess_<short_hash>[_<role>]"`. -
-  *Assertion*: mint hashes the human label (no raw path/name passes through); role round-trips the sanitizer;
-  `RUN_ID_RE` (`^run_[0-9a-f]{12}$`, `run_id.py:18`) is **not** reused for these headers (it would reject names).
-- [ ] **Client-side stamping** (`src/forge/core/reactive/env.py`): stamp the two headers into `ANTHROPIC_CUSTOM_HEADERS`
-  in `_apply_correlation_headers` (`:326`), extending the strip-set so inherited values drop then re-append. Reuse the
-  `_target_is_proven_forge_proxy` gate (`:301`) + `derive_run_identity=True` restriction (`:262-267`). - *Assertion*:
-  proven-proxy + vars set -> fresh `X-Forge-Session`/`X-Forge-Command` after the run-id lines, stale duplicates
-  stripped; non-proven target -> neither header emitted.
-- [ ] **Populate at headless spawns** (`session_lifecycle.py`, `policy/semantic/supervisor.py`, `review/engine.py`,
-  memory writer): set `FORGE_SESSION_VAR` (manifest name, already available) + `FORGE_COMMAND_VAR` (role). -
-  *Assertion*: a supervised fork spawn sets `FORGE_COMMAND_VAR="supervisor"` and `FORGE_SESSION_VAR=<name>`.
-- [ ] **Proxy read + validate** (`src/forge/proxy/server.py`): read/sanitize both headers in `log_requests_middleware`
-  (`:1697`) with the **new** sanitizers (not `is_valid_run_id`), store on `request.state`, add a getter beside
-  `_forge_run_ids` (`:200`). Set before both the passthrough branch and `call_next`. - *Assertion*: valid headers store
-  sanitized values; a spoofed/over-long value -> `None`; assert neither header is forwarded upstream (stripping is
-  already structural on both wire shapes -- assert, don't add new stripping).
-- [ ] Design-doc sync: note the two new Forge headers beside the `X-Forge-Run-ID` description (design_appendix §A.9/A.13
-  region).
+- [x] **Minter + sanitizer** (`src/forge/core/run_id.py`): added `FORGE_SESSION_HEADER`/`FORGE_COMMAND_HEADER`,
+  `sanitize_label` (canonicalizes **all** separator runs to `_`, so `memory writer`/`memory-writer` collapse — one
+  charset for the id suffix and the command header), `derive_provider_session_id(label, root_run_id, role)` (SHA-256
+  12-hex short hash; explicit `forge_run_<hash(root_run_id)>` fallback when no label), and `is_valid_label` /
+  `is_valid_provider_session_id` validators (reject spoof, distinct from `RUN_ID_RE`). 58 tests in `test_run_id.py`. -
+  *Verified*: label hashed (no raw name leaks); no-label → `forge_run_<hash>`; injection/over-long rejected.
+- [x] **Client-side stamping** (`src/forge/core/reactive/env.py`): `_apply_correlation_headers` now stamps
+  `X-Forge-Session` (always emittable via the fallback) + `X-Forge-Command` (only when a role is set) after the run-id
+  lines, with both header names added to the `forge_owned` strip-set; `FORGE_SESSION_VAR`/`FORGE_COMMAND_VAR` added
+  beside the run-id var family (the `session_start.py`/`codex_invoke.py` `FORGE_SESSION` literals stay separate by
+  leaf/hook discipline). - *Verified*: proven-proxy → one fresh of each, stale stripped, opaque value; non-proven →
+  neither (6 new tests in `test_env.py`).
+- [x] **Populate at headless spawns**: `supervisor.py` (role `supervisor` + `context.session_name`), `memory_writer.py`
+  (role `memory_writer` + `session_name`), `review/engine.py` (role `review` only; no session in scope →
+  `forge_run_<hash>` fallback). **Correction:** `run_claude_session` already had an `extra_env` pass-through — no
+  signature change needed (the plan's "plumbing gap" was wrong; the Explore agent missed `extra_env`). - *Verified*:
+  supervised fork sets both vars; writer sets both (focused tests in `test_supervisor.py` + `test_memory_writer.py`).
+- [x] **Proxy read + validate** (`src/forge/proxy/server.py`): `log_requests_middleware` reads + validates both headers
+  via `_valid_session_header`/`_valid_command_header` (new validators, **not** `is_valid_run_id`), stores on
+  `request.state` before both branches; added getter `_forge_session_command` beside `_forge_run_ids` (consumed by the
+  Phase 3 trace writer). - *Verified*: valid → stored; spoofed/over-long → `None`; build_upstream_headers drops all
+  `X-Forge-*` (allowlist already excludes — asserted, not re-stripped). New `test_server_forge_headers.py` (10 tests).
+- [x] Design-doc sync: `design_appendix.md` §A.13 region now documents the two headers as internal Forge↔proxy
+  correlation only (dropped upstream), distinct from the Phase 5 `user` field.
 
 | Test                                                        | Fixture                                                           | Assertion                                                                        | Test File                                      |
 | ----------------------------------------------------------- | ----------------------------------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------- |
