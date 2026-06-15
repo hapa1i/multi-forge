@@ -23,10 +23,17 @@ from rich.table import Table
 from rich.text import Text
 
 from forge.cli.output import print_error_with_tip, print_tip
+from forge.core.effort import CLAUDE_EFFORT_LEVELS
+from forge.core.llm.types import REASONING_EFFORT_LEVELS
 from forge.core.paths import display_path
 from forge.policy.queries import (
     find_sessions_supervised_by,
     read_scoped_supervisor_target,
+)
+from forge.policy.semantic.supervisor import (
+    CHECKER_PROVIDER_CHOICES,
+    apply_checker_options,
+    validate_checker_model,
 )
 from forge.session import SessionStore
 from forge.session.effective import compute_effective_intent
@@ -37,23 +44,12 @@ from forge.session.store import HOOK_LOCK_TIMEOUT_S, MANIFEST_FILENAME, get_sess
 
 console = Console()
 
-_CHECKER_PROVIDER_CHOICES = click.Choice(["openrouter", "litellm-local", "litellm-remote"])
-
-
-def _normalize_checker_provider_arg(provider: str | None) -> str | None:
-    return provider.replace("-", "_") if provider else None
-
-
-def _apply_checker_options(
-    sup: SupervisorConfig,
-    *,
-    checker_model: str | None,
-    checker_provider: str | None,
-) -> None:
-    if checker_model:
-        sup.checker_model = checker_model
-    if checker_provider:
-        sup.checker_provider = _normalize_checker_provider_arg(checker_provider)
+# Click wrappers over the shared (Click-free) vocabularies. Checker effort uses the
+# core.llm ReasoningEffort set (the tier-1 checker is a core.llm call); supervisor effort
+# uses the claude --effort set (the frontier is a claude -p subprocess).
+_CHECKER_PROVIDER_CHOICES = click.Choice(list(CHECKER_PROVIDER_CHOICES))
+_CHECKER_EFFORT_CHOICES = click.Choice(list(REASONING_EFFORT_LEVELS))
+_SUPERVISOR_EFFORT_CHOICES = click.Choice(list(CLAUDE_EFFORT_LEVELS))
 
 
 def _checker_display(sup: SupervisorConfig) -> tuple[str, str, int]:
@@ -692,6 +688,13 @@ _INFRA_FAILURE_PREFIXES = ("Supervisor error:", "Supervisor skipped")
     help="Supervisor timeout in seconds (default: 45)",
 )
 @click.option(
+    "--supervisor-effort",
+    "supervisor_effort",
+    type=_SUPERVISOR_EFFORT_CHOICES,
+    default=None,
+    help="Supervisor reasoning effort (claude --effort: low/medium/high/xhigh/max)",
+)
+@click.option(
     "--json",
     "json_output",
     is_flag=True,
@@ -703,6 +706,7 @@ def supervisor_cmd(
     proxy_name: str | None,
     direct: bool,
     timeout: int,
+    supervisor_effort: str | None,
     json_output: bool,
 ) -> None:
     """Evaluate a single file against a supervisor plan (one-shot).
@@ -747,6 +751,7 @@ def supervisor_cmd(
         proxy=proxy_name,
         direct=direct,
         timeout_seconds=timeout,
+        supervisor_effort=supervisor_effort,
         fork_session=True,
     )
 
@@ -894,6 +899,20 @@ def _resolve_cascade_plan(sup_config: SupervisorConfig, manifest: SessionState) 
     default=None,
     help="Tier-1 checker provider (default: openrouter)",
 )
+@click.option(
+    "--checker-effort",
+    "checker_effort",
+    type=_CHECKER_EFFORT_CHOICES,
+    default=None,
+    help="Tier-1 checker reasoning effort (none/low/medium/high/xhigh)",
+)
+@click.option(
+    "--supervisor-effort",
+    "supervisor_effort",
+    type=_SUPERVISOR_EFFORT_CHOICES,
+    default=None,
+    help="Frontier supervisor effort (claude --effort: low/medium/high/xhigh/max)",
+)
 def supervise_cmd(
     target: str | None,
     off: bool,
@@ -908,6 +927,8 @@ def supervise_cmd(
     cascade_flag: bool | None,
     checker_model: str | None,
     checker_provider: str | None,
+    checker_effort: str | None,
+    supervisor_effort: str | None,
 ) -> None:
     """Configure the semantic supervisor for the current session.
 
@@ -938,15 +959,20 @@ def supervise_cmd(
     if timeout_seconds is not None and not target:
         console.print("[red]Error:[/red] --timeout requires a target argument")
         sys.exit(1)
+    if supervisor_effort is not None and not target:
+        console.print("[red]Error:[/red] --supervisor-effort requires a target argument")
+        sys.exit(1)
     if cascade_flag is False and target:
         console.print("[red]Error:[/red] --no-cascade with a target is redundant (cascade defaults to off)")
         sys.exit(1)
-    checker_option_supplied = bool(checker_model or checker_provider)
+    checker_option_supplied = bool(checker_model or checker_provider or checker_effort)
     if checker_option_supplied and not (target or cascade_flag is True):
         console.print("[red]Error:[/red] Checker options require a target argument or --cascade")
         sys.exit(1)
-    if checker_model and "/" not in checker_model:
-        console.print(f"[red]Error:[/red] --checker-model must be a prefixed model id (got '{checker_model}')")
+    try:
+        validate_checker_model(checker_model)
+    except ValueError as e:
+        console.print(f"[red]Error:[/red] {e}")
         print_tip("Example: google/gemini-3.5-flash", blank_before=False, console=console)
         sys.exit(1)
     # Cascade flags are modifiers when a target is present; standalone they are a
@@ -1037,10 +1063,11 @@ def supervise_cmd(
         def _enable_cascade(m: SessionState) -> None:
             if m.intent.policy and m.intent.policy.supervisor:
                 m.intent.policy.supervisor.cascade = True
-                _apply_checker_options(
+                apply_checker_options(
                     m.intent.policy.supervisor,
                     checker_model=checker_model,
                     checker_provider=checker_provider,
+                    checker_effort=checker_effort,
                 )
                 if not m.intent.policy.supervisor.plan_override_path:
                     m.intent.policy.supervisor.plan_override_path = plan_path
@@ -1049,10 +1076,11 @@ def supervise_cmd(
 
         preview = replace(sup)
         preview.cascade = True
-        _apply_checker_options(
+        apply_checker_options(
             preview,
             checker_model=checker_model,
             checker_provider=checker_provider,
+            checker_effort=checker_effort,
         )
         route_provider, route_model, route_budget = _checker_display(preview)
         console.print(
@@ -1160,6 +1188,8 @@ def supervise_cmd(
         sup_config = SupervisorConfig(resume_id=target, forge_root=source_state.forge_root or _policy_fr)
         if timeout_seconds is not None:
             sup_config.timeout_seconds = timeout_seconds
+        if supervisor_effort is not None:
+            sup_config.supervisor_effort = supervisor_effort
         routing_display = apply_supervisor_routing(
             sup_config,
             source_state,
@@ -1175,18 +1205,20 @@ def supervise_cmd(
             # The tier-1 checker needs plan snapshot text. Resolve it (exits 1 with a
             # tip when unresolvable) before any manifest mutation.
             sup_config.cascade = True
-            _apply_checker_options(
+            apply_checker_options(
                 sup_config,
                 checker_model=checker_model,
                 checker_provider=checker_provider,
+                checker_effort=checker_effort,
             )
             plan_path, cascade_source_desc = _resolve_cascade_plan(sup_config, manifest)
             sup_config.plan_override_path = plan_path
         elif checker_option_supplied:
-            _apply_checker_options(
+            apply_checker_options(
                 sup_config,
                 checker_model=checker_model,
                 checker_provider=checker_provider,
+                checker_effort=checker_effort,
             )
 
         store.update(timeout_s=5.0, mutate=lambda m: apply_supervisor_to_intent(m, sup_config))

@@ -6,8 +6,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from forge.core.invoker import HeadlessRequest
 from forge.core.reactive.routing import ModelRoute, RoutingResult, RoutingSource
-from forge.review.engine import preflight_check, run_multi_review
+from forge.review.engine import _prepare_worker, preflight_check, run_multi_review
 from forge.review.models import ModelAvailability, ModelSpec, PromptMode
 from forge.review.routing import WorkerRoutingPlan
 
@@ -474,3 +475,58 @@ class TestCredentialInjection:
 
         cmd = mock_popen_cls.call_args[0][0]
         assert "--bare" in cmd
+
+
+class TestReasoningEffort:
+    """reasoning_effort threads into the worker argv as `--effort <level>` after `--model`."""
+
+    def _prepare(self, reasoning_effort):
+        prepared = _prepare_worker(
+            _spec(),
+            _routing_result(),
+            prompt="review this",
+            cwd=None,
+            resume_id=None,
+            timeout_seconds=600,
+            attribution=None,
+            reasoning_effort=reasoning_effort,
+        )
+        assert isinstance(prepared, HeadlessRequest)
+        return prepared.argv
+
+    def test_prepare_worker_appends_effort_flag(self):
+        argv = self._prepare("high")
+        assert "--effort" in argv
+        idx = argv.index("--effort")
+        assert argv[idx + 1] == "high"
+
+    def test_prepare_worker_effort_after_model_flag(self):
+        argv = self._prepare("high")
+        assert "--model" in argv
+        assert "--effort" in argv
+        assert argv.index("--effort") > argv.index("--model")
+
+    def test_prepare_worker_no_effort_omits_flag(self):
+        argv = self._prepare(None)
+        assert "--effort" not in argv
+
+    @patch("forge.core.invoker._lifecycle.subprocess.Popen")
+    def test_run_multi_review_forwards_effort_to_each_worker(self, mock_popen_cls):
+        mock_popen_cls.return_value = _mock_popen("output")
+        specs = [_spec(f"model-{i}") for i in range(3)]
+        plan = _plan(*[_routing_result() for _ in range(3)])
+        run_multi_review("review", models=specs, routing_plan=plan, reasoning_effort="max")
+        assert mock_popen_cls.call_count == 3
+        for call in mock_popen_cls.call_args_list:
+            cmd = call[0][0]
+            assert "--effort" in cmd
+            assert cmd[cmd.index("--effort") + 1] == "max"
+            assert cmd.index("--effort") > cmd.index("--model")
+
+    @patch("forge.core.invoker._lifecycle.subprocess.Popen")
+    def test_run_multi_review_without_effort_omits_flag(self, mock_popen_cls):
+        mock_popen_cls.return_value = _mock_popen("output")
+        plan = _plan(_routing_result())
+        run_multi_review("review", models=[_spec()], routing_plan=plan)
+        cmd = mock_popen_cls.call_args[0][0]
+        assert "--effort" not in cmd

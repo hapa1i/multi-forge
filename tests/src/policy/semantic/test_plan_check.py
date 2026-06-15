@@ -21,10 +21,13 @@ from forge.policy.semantic.plan_check import (
     DEFAULT_PLAN_CHECK_MODEL,
     PlanCheckPolicy,
     PlanCheckVerdict,
+    _budget_tokens,
+    _target_metadata,
     parse_plan_check_verdict,
     resolve_plan_check_route,
     run_plan_check,
 )
+from forge.policy.semantic.supervisor import plan_fingerprint
 from forge.policy.types import ActionContext, PolicyDecision
 from forge.session.models import SupervisorConfig
 
@@ -385,6 +388,56 @@ class TestRunPlanCheck:
         assert e.source_refs is not None
         assert e.source_refs.cost_request_id == forwarded
 
+    @patch("forge.core.llm.get_client")
+    @patch("forge.core.llm.SyncAdapter")
+    def test_reasoning_effort_forwarded_in_hyperparams(
+        self, mock_adapter_cls: MagicMock, mock_get_client: MagicMock
+    ) -> None:
+        """reasoning_effort='high' rides on the adapter.complete hyperparams kwarg."""
+        mock_adapter = MagicMock()
+        mock_adapter.complete.return_value = CompletionResponse(text='{"aligned": true}')
+        mock_adapter_cls.return_value = mock_adapter
+
+        run_plan_check(_make_context(), model="test/model", plan_text="plan", reasoning_effort="high")
+
+        hp = mock_adapter.complete.call_args.kwargs["hyperparams"]
+        assert hp is not None
+        assert hp.reasoning_effort == "high"
+
+    @patch("forge.core.llm.get_client")
+    @patch("forge.core.llm.SyncAdapter")
+    def test_no_reasoning_effort_leaves_hyperparams_none(
+        self, mock_adapter_cls: MagicMock, mock_get_client: MagicMock
+    ) -> None:
+        """reasoning_effort=None with no proxy request id sends no hyperparams (prior behavior)."""
+        mock_adapter = MagicMock()
+        mock_adapter.complete.return_value = CompletionResponse(text='{"aligned": true}')
+        mock_adapter_cls.return_value = mock_adapter
+
+        run_plan_check(_make_context(), model="test/model", plan_text="plan")
+
+        assert mock_adapter.complete.call_args.kwargs["hyperparams"] is None
+
+    @patch("forge.core.usage.target_is_forge_proxy", lambda _u: True)
+    @patch("forge.core.usage.resolve_client_base_url", lambda _m: "http://localhost:8084")
+    @patch("forge.core.llm.get_client")
+    @patch("forge.core.llm.SyncAdapter")
+    def test_reasoning_effort_merges_with_request_id_hyperparams(
+        self, mock_adapter_cls: MagicMock, mock_get_client: MagicMock
+    ) -> None:
+        """Effort and the X-Request-ID join coexist on the same merged hyperparams object."""
+        mock_adapter = MagicMock()
+        mock_adapter.complete.return_value = CompletionResponse(text='{"aligned": true}')
+        mock_adapter_cls.return_value = mock_adapter
+
+        run_plan_check(_make_context(), model="gemini/gemini-3.5-flash", plan_text="plan", reasoning_effort="low")
+
+        hp = mock_adapter.complete.call_args.kwargs["hyperparams"]
+        assert hp is not None
+        assert hp.reasoning_effort == "low"
+        # The request-id join survives the merge (disjoint fields).
+        assert hp.extra["openai"]["extra_headers"]["X-Request-ID"].startswith("req_")
+
 
 # --- applies_to ---
 
@@ -584,6 +637,84 @@ class TestPlanCheckCache:
         restored.set_state({"cache": {"key2": {"aligned": True, "checked_at": now_iso()}}})
         assert restored._cache.check("key1") is None
         assert restored._cache.check("key2") is not None
+
+
+# --- Reasoning effort (launch controls) ---
+
+
+class TestPlanCheckEffort:
+    """Tests for tier-1 checker_effort plumbing and cache differentiation."""
+
+    @patch("forge.policy.semantic.plan_check.run_plan_check")
+    def test_checker_effort_forwarded_to_run_plan_check(self, mock_check: MagicMock, tmp_path: Path) -> None:
+        """PlanCheckPolicy forwards config.checker_effort into run_plan_check."""
+        mock_check.return_value = PlanCheckVerdict(aligned=True)
+        policy = PlanCheckPolicy(config=_config_with_plan(tmp_path, checker_effort="high"))
+
+        decision = policy.evaluate(_make_context())
+
+        assert decision.decision == "allow"
+        assert mock_check.call_args.kwargs["reasoning_effort"] == "high"
+
+    @patch("forge.policy.semantic.plan_check.run_plan_check")
+    def test_checker_effort_unset_forwards_none(self, mock_check: MagicMock, tmp_path: Path) -> None:
+        mock_check.return_value = PlanCheckVerdict(aligned=True)
+        policy = PlanCheckPolicy(config=_config_with_plan(tmp_path))
+
+        policy.evaluate(_make_context())
+
+        assert mock_check.call_args.kwargs["reasoning_effort"] is None
+
+    @patch("forge.policy.semantic.plan_check.run_plan_check")
+    def test_effort_varies_cache_key_produces_miss(self, mock_check: MagicMock, tmp_path: Path) -> None:
+        """Two configs differing only in checker_effort have independent caches (both MISS)."""
+        mock_check.return_value = PlanCheckVerdict(aligned=True)
+
+        # Same plan file so the plan fingerprint is identical across both configs.
+        plan = tmp_path / "plan.md"
+        plan.write_text("# Plan\nDo the thing.")
+
+        policy_low = PlanCheckPolicy(
+            config=_make_config(plan_override_path=str(plan), throttle_seconds=60, checker_effort="low")
+        )
+        policy_high = PlanCheckPolicy(
+            config=_make_config(plan_override_path=str(plan), throttle_seconds=60, checker_effort="high")
+        )
+
+        ctx = _make_context()
+        low = policy_low._check(ctx)
+        high = policy_high._check(ctx)
+
+        assert (low.decision, high.decision) == ("allow", "allow")
+        # Each fresh allow ran the checker: the differing effort segment prevents a shared hit.
+        assert mock_check.call_count == 2
+
+    def test_effort_changes_cache_key_string(self, tmp_path: Path) -> None:
+        """The computed cache key embeds the effort segment, so differing effort -> differing key."""
+        from forge.core.reactive.throttle import compute_cache_key
+
+        plan = tmp_path / "plan.md"
+        plan.write_text("# Plan\nDo the thing.")
+
+        ctx = _make_context()
+
+        def cache_key_for(effort: str | None) -> str:
+            config = _make_config(plan_override_path=str(plan), checker_effort=effort)
+            route = resolve_plan_check_route(config)
+            key = compute_cache_key(ctx.tool_name, ctx.target_path, ctx.new_content)
+            key = key + "|plan:" + plan_fingerprint(str(config.plan_override_path), config.forge_root)
+            return (
+                key
+                + f"|checker:{route.provider or 'auto'}:{route.model}"
+                + f"|budget:{_budget_tokens(config)}"
+                + f"|effort:{config.checker_effort or 'default'}"
+                + "|target:"
+                + ";".join(_target_metadata(ctx))
+            )
+
+        assert cache_key_for("low") != cache_key_for("high")
+        assert "|effort:low" in cache_key_for("low")
+        assert "|effort:default" in cache_key_for(None)
 
 
 # --- Shadow sampling capture seam (Slice 1) ---

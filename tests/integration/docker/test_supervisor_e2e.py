@@ -169,6 +169,18 @@ class TestSupervisorE2E:
         assert any(str(w).startswith("Supervisor error:") for w in output["warnings"])
         assert f"--resume {SUPERVISOR_RESUME_ID}" in invocations
 
+    def test_supervisor_effort_reaches_claude_argv(self, supervisor_workspace: ContainerLike) -> None:
+        """One-shot --supervisor-effort threads `--effort` into the frontier claude -p argv."""
+        ws = supervisor_workspace
+        result = ws.exec(
+            f"cd /workspace && FORGE_TEST_SUPERVISOR_MODE=aligned "
+            f"forge policy supervisor -f src/demo.py -r {SUPERVISOR_RESUME_ID} --supervisor-effort medium --json"
+        )
+        assert result.returncode == 0, result.stderr
+        invocations = ws.read_file("/tmp/claude_invocations.log")
+        assert f"--resume {SUPERVISOR_RESUME_ID}" in invocations
+        assert "--effort medium" in invocations
+
     def test_session_set_wires_supervisor_config(self, supervisor_workspace: ContainerLike) -> None:
         """``forge session set policy.supervisor.*`` should populate the manifest."""
         ws = supervisor_workspace

@@ -118,6 +118,37 @@ class TestMemoryEnable:
         assert effective.memory.auto_update is not None
         assert effective.memory.auto_update.enabled is True
 
+    def test_effort_only_change_persists_when_already_enabled(
+        self, runner: CliRunner, seeded_session: tuple[Path, str]
+    ) -> None:
+        """Regression: an effort-only change must persist even when memory is
+        already enabled in the same mode.
+
+        The old early-return short-circuited on "already enabled AND same mode",
+        silently dropping the --effort override. The fix only short-circuits when
+        nothing (enabled/mode/effort) is pending.
+        """
+        forge_root, _ = seeded_session
+
+        # First enable in the default (augment) mode, no effort set.
+        first = runner.invoke(main, ["memory", "enable", "--session", "s1"])
+        assert first.exit_code == 0, first.output
+
+        # Same mode (augment), but now request an effort change.
+        result = runner.invoke(main, ["memory", "enable", "--session", "s1", "--effort", "high"])
+        assert result.exit_code == 0, result.output
+        # Must NOT have taken the "already enabled" no-op path.
+        assert "already enabled" not in result.output
+
+        from forge.session.effective import compute_effective_intent
+        from forge.session.store import SessionStore
+
+        state = SessionStore(str(forge_root), "s1").read()
+        effective = compute_effective_intent(state)
+        assert effective.memory is not None
+        assert effective.memory.auto_update is not None
+        assert effective.memory.auto_update.effort == "high"
+
     def test_disable_session_scoped(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
         runner.invoke(main, ["memory", "enable", "--session", "s1"])
         result = runner.invoke(main, ["memory", "disable", "--session", "s1"])

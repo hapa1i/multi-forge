@@ -4138,6 +4138,164 @@ class TestSupervisorProxyFlags:
         assert not any("fork-badproxy-parent" in n for n in fork_names)
 
 
+class TestSupervisorLaunchControls:
+    """Tests for --cascade / --checker-* / --supervisor-effort on start and fork.
+
+    These options all require --supervise. They land on the child/session
+    manifest's supervisor block (SupervisorConfig). For persistence cases we
+    seed a real parent and let apply_supervisor_to_intent write the real
+    fields, patching only apply_supervisor_routing (no proxy I/O), mirroring
+    test_fork_proxy_no_launch_persists_intent.
+    """
+
+    def _seed_supervise_parent(self, runner: CliRunner, temp_env: Path, name: str) -> SessionStore:
+        """Start a real parent session and confirm its Claude UUID."""
+        with patch("forge.cli.session.invoke_claude", return_value=0):
+            runner.invoke(main, ["session", "start", name, "--no-proxy"])
+        store = SessionStore(str(temp_env), name)
+        store.update(timeout_s=5.0, mutate=lambda m: setattr(m.confirmed, "claude_session_id", "parent-uuid-x"))
+        return store
+
+    # --- validation: launch-control flags require --supervise (no manifest needed) ---
+
+    def test_fork_cascade_without_supervise_errors(self, runner: CliRunner, temp_env: Path) -> None:
+        self._seed_supervise_parent(runner, temp_env, "sup-parent")
+        result = runner.invoke(main, ["session", "fork", "sup-parent", "--name", "child", "--cascade", "--no-launch"])
+        assert result.exit_code != 0
+        assert "require --supervise" in result.output
+
+    def test_start_cascade_without_supervise_errors(self, runner: CliRunner, temp_env: Path) -> None:
+        result = runner.invoke(main, ["session", "start", "child-start", "--cascade", "--no-launch"])
+        assert result.exit_code != 0
+        assert "require --supervise" in result.output
+
+    # --- persistence: --supervise --cascade --no-launch ---
+
+    def test_fork_supervise_cascade_persists_flag_without_plan(self, runner: CliRunner, temp_env: Path) -> None:
+        """--cascade at fork sets supervisor.cascade=True and leaves plan_override_path None.
+
+        Launch-time cascade only flips the flag; the runtime hook resolves the plan at
+        eval time (a fresh child has no approved snapshot yet).
+        """
+        self._seed_supervise_parent(runner, temp_env, "sup-parent")
+
+        with patch("forge.policy.semantic.supervisor.apply_supervisor_routing", return_value=None):
+            result = runner.invoke(
+                main,
+                ["session", "fork", "sup-parent", "--name", "cascade-child", "--supervise", "--cascade", "--no-launch"],
+            )
+
+        assert result.exit_code == 0, result.output
+        policy = SessionStore(str(temp_env), "cascade-child").read().intent.policy
+        assert policy is not None
+        sup = policy.supervisor
+        assert sup is not None
+        assert sup.cascade is True
+        assert sup.plan_override_path is None
+
+    def test_start_supervise_cascade_persists_flag_without_plan(self, runner: CliRunner, temp_env: Path) -> None:
+        from unittest.mock import MagicMock
+
+        mock_source = MagicMock()
+        mock_source.confirmed.started_with_proxy = None
+        mock_source.forge_root = str(temp_env)
+
+        with (
+            patch("forge.policy.semantic.supervisor.validate_supervisor_target", return_value=mock_source),
+            patch("forge.policy.semantic.supervisor.apply_supervisor_routing", return_value=None),
+        ):
+            result = runner.invoke(
+                main,
+                ["session", "start", "cascade-start", "--supervise", "planner", "--cascade", "--no-launch"],
+            )
+
+        assert result.exit_code == 0, result.output
+        policy = SessionStore(str(temp_env), "cascade-start").read().intent.policy
+        assert policy is not None
+        sup = policy.supervisor
+        assert sup is not None
+        assert sup.cascade is True
+        assert sup.plan_override_path is None
+
+    # --- persistence: checker-* + supervisor-effort (provider normalized dash->underscore) ---
+
+    def test_fork_supervise_checker_options_persist_normalized(self, runner: CliRunner, temp_env: Path) -> None:
+        self._seed_supervise_parent(runner, temp_env, "sup-parent")
+
+        with patch("forge.policy.semantic.supervisor.apply_supervisor_routing", return_value=None):
+            result = runner.invoke(
+                main,
+                [
+                    "session",
+                    "fork",
+                    "sup-parent",
+                    "--name",
+                    "checker-child",
+                    "--supervise",
+                    "--checker-model",
+                    "google/gemini-3.5-flash",
+                    "--checker-provider",
+                    "litellm-local",
+                    "--checker-effort",
+                    "low",
+                    "--supervisor-effort",
+                    "medium",
+                    "--no-launch",
+                ],
+            )
+
+        assert result.exit_code == 0, result.output
+        policy = SessionStore(str(temp_env), "checker-child").read().intent.policy
+        assert policy is not None
+        sup = policy.supervisor
+        assert sup is not None
+        assert sup.checker_model == "google/gemini-3.5-flash"
+        assert sup.checker_provider == "litellm_local"  # normalized dash->underscore
+        assert sup.checker_effort == "low"
+        assert sup.supervisor_effort == "medium"
+
+    def test_start_supervise_checker_options_persist_normalized(self, runner: CliRunner, temp_env: Path) -> None:
+        from unittest.mock import MagicMock
+
+        mock_source = MagicMock()
+        mock_source.confirmed.started_with_proxy = None
+        mock_source.forge_root = str(temp_env)
+
+        with (
+            patch("forge.policy.semantic.supervisor.validate_supervisor_target", return_value=mock_source),
+            patch("forge.policy.semantic.supervisor.apply_supervisor_routing", return_value=None),
+        ):
+            result = runner.invoke(
+                main,
+                [
+                    "session",
+                    "start",
+                    "checker-start",
+                    "--supervise",
+                    "planner",
+                    "--checker-model",
+                    "google/gemini-3.5-flash",
+                    "--checker-provider",
+                    "litellm-local",
+                    "--checker-effort",
+                    "low",
+                    "--supervisor-effort",
+                    "medium",
+                    "--no-launch",
+                ],
+            )
+
+        assert result.exit_code == 0, result.output
+        policy = SessionStore(str(temp_env), "checker-start").read().intent.policy
+        assert policy is not None
+        sup = policy.supervisor
+        assert sup is not None
+        assert sup.checker_model == "google/gemini-3.5-flash"
+        assert sup.checker_provider == "litellm_local"  # normalized dash->underscore
+        assert sup.checker_effort == "low"
+        assert sup.supervisor_effort == "medium"
+
+
 class TestMainGroup:
     """Tests for main CLI group."""
 

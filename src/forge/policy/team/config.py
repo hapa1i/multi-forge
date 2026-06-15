@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from forge.core.effort import validate_claude_effort
+
 
 @dataclass
 class TeamSupervisorConfig:
@@ -22,3 +24,7 @@ class TeamSupervisorConfig:
     timeout_seconds: int = 45
     throttle_seconds: int = 60
     max_blocks_per_task: int = 3
+    effort: str | None = None  # `claude --effort` level for the team supervisor's claude -p run; None = tier default
+
+    def __post_init__(self) -> None:
+        validate_claude_effort(self.effort)

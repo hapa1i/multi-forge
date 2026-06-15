@@ -27,6 +27,43 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-15
 
+### supervisor_launch_controls: launch-time cascade parity + reasoning effort across all `claude -p` subprocesses
+
+**Goal**: Give `forge session fork/start --supervise` the tier-1 cascade knobs `forge policy supervise` already had, and
+add a per-caller reasoning-effort lever to every Forge-spawned `claude -p` subprocess (no global default).
+
+**Key changes**:
+
+- **Cascade parity**: `fork` and `start` gained `--cascade`/`--checker-model`/`--checker-provider` (all require
+  `--supervise`). Launch-time `--cascade` sets the flag only; the runtime hook escalates to the frontier when no plan
+  exists yet (asymmetric with `policy supervise --cascade`, which resolves the plan eagerly).
+- **Shared checker helpers**: extracted `CHECKER_PROVIDER_CHOICES`, `normalize_checker_provider_arg`,
+  `validate_checker_model`, and `apply_checker_options` into `policy/semantic/supervisor.py` (Click-free); consolidated
+  the duplicate provider normalizer in `plan_check.py` to one source.
+- **Two effort vocabularies** (kept distinct): `claude --effort` = `low/medium/high/xhigh/max` (`max` Claude-only),
+  validated by new top-level leaf `core/effort.py`; core.llm `ReasoningEffort` = `none/low/medium/high/xhigh` (`none`
+  checker-only), validated in `core/llm/types.py`. `session/models.py` keeps a drift-guarded inline mirror to stay
+  import-light.
+- **Two argv builders learn `--effort`**: `run_claude_session` (central `-p` builder) appends `--effort` after `--model`
+  and **fails loud** if an older `claude` rejects it (no silent rerun-at-default, unlike the `--output-format` retry);
+  `review/engine.py:_prepare_worker` appends it to the fan-out argv.
+- **Per-caller wiring**: `SupervisorConfig.supervisor_effort`/`.checker_effort`, `MemoryWriterConfig.effort`,
+  `TeamSupervisorConfig.effort`; threaded into the supervisor frontier, tier-1 checker (`ModelHyperparameters` + effort
+  in the plan-check cache key), memory writer, shadow curation, team supervisor, and the workflow fan-out. CLI flags:
+  `--supervisor-effort`/`--checker-effort` on fork/start/`policy supervise`, `--supervisor-effort` on the one-shot
+  `policy supervisor`, `--effort` on `memory enable`, `memory shadows review --curate`, and
+  `workflow {panel,analyze,debate,consensus}`.
+- **Memory enable early-return fix**: `_set_memory_activation` now short-circuits only when enabled/mode/effort are all
+  unchanged, so `forge memory enable --effort high` persists on an already-enabled same-mode session.
+- Additive optional fields only — no `SCHEMA_VERSION` bump. No global `RuntimeConfig` default-effort knob (per-caller by
+  decision). Docs updated: `end-user/session.md`, `end-user/memory.md`, `cli_reference.md`, `design_workflows.md`.
+
+**Verification**: 906 unit tests pass across new + touched files (incl. new `tests/src/core/test_effort.py`
+vocab/drift-guard, `run_claude_session` fail-loud, fork/start persistence, per-consumer forwarding, vocab matrix, memory
+early-return regression); `make pre-commit` clean (ruff/black/isort/mypy/pyright/mdformat/gitleaks); integration green:
+`test_session_commands_integration.py::test_fork_supervise_cascade_effort_persists` and
+`test_supervisor_e2e.py::test_supervisor_effort_reaches_claude_argv` (`--effort medium` in the logged claude argv).
+
 ### same_dir_transfer_forks: decouple transfer mode from worktree isolation in `forge session fork`
 
 **Goal**: Let a same-directory fork run a curated *transfer* launch (fresh child Claude session + assembled parent

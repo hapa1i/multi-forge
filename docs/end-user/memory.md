@@ -78,6 +78,10 @@ forge memory track docs/developer/coding-standards.md \
 forge memory enable --session planner
 forge session start planner --memory on     # equivalent at start time
 
+# Set the writer's reasoning effort (claude --effort: low/medium/high/xhigh/max).
+# --effort updates effort even when memory is already enabled in the same mode.
+forge memory enable --session planner --effort high
+
 # Verify passported docs:
 forge memory list
 ```
@@ -244,9 +248,14 @@ The memory writer inherits the session's proxy by default (same model routing). 
 auto_update:
   enabled: true
   proxy: openrouter-gemini-flash   # Use a cheaper proxy for summarization
+  effort: high                     # claude --effort for the writer's claude -p run (optional)
 ```
 
 Priority chain: `proxy` -> `confirmed.started_with_proxy` -> `ANTHROPIC_BASE_URL` env -> Anthropic direct.
+
+`effort` (optional) sets the writer's `claude --effort` level (`low/medium/high/xhigh/max`). Set it with
+`forge memory enable --effort <level>`. Shadow curation (`forge memory shadows review --curate`) inherits this effort
+unless overridden with its own `--effort`.
 
 ---
 

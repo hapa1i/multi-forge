@@ -104,6 +104,32 @@ class TestRunClaudeSession:
         assert cmd == ["claude", "-p", "--resume", "abc-123", "--model", "opus"]
 
     @patch("forge.core.reactive.session_runner.subprocess.run")
+    def test_reasoning_effort_adds_flag_after_model(self, mock_run):
+        mock_run.return_value = MagicMock(stdout="", stderr="", returncode=0)
+        run_claude_session("prompt", model="opus", reasoning_effort="high", output_format=None)
+
+        cmd = mock_run.call_args[0][0]
+        # --effort follows --model so it survives the --output-format json retry path.
+        assert cmd == ["claude", "-p", "--model", "opus", "--effort", "high"]
+
+    @patch("forge.core.reactive.session_runner.subprocess.run")
+    def test_reasoning_effort_fails_loud_when_unsupported(self, mock_run):
+        """An older claude that rejects --effort must surface an actionable error,
+        never a silent rerun at default effort (effort changes behavior)."""
+        mock_run.return_value = MagicMock(
+            stdout="",
+            stderr="error: unknown option '--effort'",
+            returncode=2,
+        )
+        result = run_claude_session("prompt", reasoning_effort="max", output_format=None)
+
+        assert result.success is False
+        assert result.error is not None
+        assert "--effort" in result.error and "Upgrade Claude" in result.error
+        # No silent retry-at-default: the runner invoked claude exactly once.
+        assert mock_run.call_count == 1
+
+    @patch("forge.core.reactive.session_runner.subprocess.run")
     def test_base_url_set_in_env(self, mock_run):
         mock_run.return_value = MagicMock(stdout="", stderr="", returncode=0)
         run_claude_session("prompt", base_url="http://localhost:8085")

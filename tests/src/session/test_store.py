@@ -219,6 +219,58 @@ class TestSupervisorConfigCompat:
         assert loaded.intent.policy.supervisor.checker_budget_tokens == 64000
 
 
+class TestEffortVocabularyValidation:
+    """Effort fields validate against their respective vocabularies in __post_init__.
+
+    Two distinct vocabularies (see forge.core.effort):
+    - claude --effort: low/medium/high/xhigh/max (max-only, no 'none')
+    - core.llm ReasoningEffort: none/low/medium/high/xhigh ('none'-only, no 'max')
+    """
+
+    def test_memory_writer_max_is_valid(self) -> None:
+        from forge.session.models import MemoryWriterConfig
+
+        assert MemoryWriterConfig(effort="max").effort == "max"
+
+    def test_memory_writer_none_rejected(self) -> None:
+        from forge.session.models import MemoryWriterConfig
+
+        # claude --effort has no "none" level.
+        with pytest.raises(ValueError):
+            MemoryWriterConfig(effort="none")
+
+    def test_memory_writer_bogus_rejected(self) -> None:
+        from forge.session.models import MemoryWriterConfig
+
+        with pytest.raises(ValueError):
+            MemoryWriterConfig(effort="bogus")
+
+    def test_supervisor_checker_effort_none_is_valid(self) -> None:
+        from forge.session.models import SupervisorConfig
+
+        # checker_effort is a core.llm call; "none" is valid there.
+        assert SupervisorConfig(checker_effort="none").checker_effort == "none"
+
+    def test_supervisor_checker_effort_max_rejected(self) -> None:
+        from forge.session.models import SupervisorConfig
+
+        # core.llm vocabulary excludes "max".
+        with pytest.raises(ValueError):
+            SupervisorConfig(checker_effort="max")
+
+    def test_supervisor_effort_max_is_valid(self) -> None:
+        from forge.session.models import SupervisorConfig
+
+        # Frontier supervisor runs via claude --effort; "max" is valid there.
+        assert SupervisorConfig(supervisor_effort="max").supervisor_effort == "max"
+
+    def test_supervisor_effort_bogus_rejected(self) -> None:
+        from forge.session.models import SupervisorConfig
+
+        with pytest.raises(ValueError):
+            SupervisorConfig(supervisor_effort="bogus")
+
+
 class TestSessionStoreUpdate:
     def test_update_merges_concurrent_writes(self, temp_worktree: Path, sample_manifest: SessionState) -> None:
         """update() should prevent lost updates when multiple processes write."""

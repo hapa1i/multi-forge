@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import dacite
+import pytest
 
 from forge.policy.team.config import TeamSupervisorConfig
 from forge.session.models import PolicyIntent
@@ -55,3 +56,19 @@ class TestPolicyIntentTeamSupervisor:
         data = {"enabled": True, "bundles": ["tdd"]}
         intent = dacite.from_dict(PolicyIntent, data)
         assert intent.team_supervisor is None
+
+
+class TestTeamSupervisorEffortValidation:
+    """effort uses the claude --effort vocabulary (low/medium/high/xhigh/max)."""
+
+    def test_max_is_valid(self):
+        assert TeamSupervisorConfig(effort="max").effort == "max"
+
+    def test_none_rejected(self):
+        # "none" is a core.llm value, not a claude --effort level.
+        with pytest.raises(ValueError):
+            TeamSupervisorConfig(effort="none")
+
+    def test_bogus_rejected(self):
+        with pytest.raises(ValueError):
+            TeamSupervisorConfig(effort="bogus")
