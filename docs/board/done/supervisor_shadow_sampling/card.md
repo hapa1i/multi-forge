@@ -1,7 +1,8 @@
 # Supervisor Shadow Sampling — measure the cascade's false-aligned rate
 
-**Status**: In progress (`doing/`) — implemented, pending closeout. Follow-up to `supervisor_cascade`; gates any
-default-on cascade decision.
+**Status**: Done (`done/`) — shipped to `main` via PR #27. Follow-up to `supervisor_cascade`; provides the audit
+instrument that gates any future default-on cascade decision (the rate-bounding data is now collectible, not yet
+collected).
 
 > **Shipped design (supersedes the sketch below).** Two parts of the original sketch changed during implementation; the
 > normative description is [`design_workflows.md` §1.2](../../../design_workflows.md) and the [checklist](checklist.md):

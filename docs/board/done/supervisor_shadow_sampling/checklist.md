@@ -2,7 +2,8 @@
 
 Branch: `supervisor_shadow_sampling` · Plan: approved (capture → Stop-batch drain → read surface, shipped as one PR).
 
-**Current focus:** Docs + closeout. Slices 1 + 2 + 3 shipped + verified (capture / Stop-batch drain / read surface).
+**Current focus:** Closed out — card moved to `done/`. Slices 1 + 2 + 3 shipped + verified (capture / Stop-batch
+drain / read surface); durable lessons promoted to `impl_notes.md`.
 
 Decisions locked during planning (corrections to the card):
 
@@ -18,20 +19,20 @@ Decisions locked during planning (corrections to the card):
 
 ## Slice 1 — Capture (inert)
 
-- [ ] **Config**: add `shadow_sample_rate: float = 0.0`, `shadow_max_per_session: int = 10`,
+- [x] **Config**: add `shadow_sample_rate: float = 0.0`, `shadow_max_per_session: int = 10`,
   `shadow_seed: str | None = None` to `SupervisorConfig` (`session/models.py:138`). Old manifests read fine (additive +
   defaulted).
-- [ ] **Validation**: `SupervisorConfig.__post_init__` rejects `rate ∉ [0,1]` / `max < 1` with a clear `ValueError`
+- [x] **Validation**: `SupervisorConfig.__post_init__` rejects `rate ∉ [0,1]` / `max < 1` with a clear `ValueError`
   (auto-wrapped to `InvalidOverrideValueError` on the `session set` path via `effective.py:99`). Covers set, start,
   fork/resume, manifest read.
-- [ ] **Artifact dir**: add `shadow_abs`/`shadow_rel` to `ArtifactPaths` + `get_artifact_paths`
+- [x] **Artifact dir**: add `shadow_abs`/`shadow_rel` to `ArtifactPaths` + `get_artifact_paths`
   (`session/artifacts.py`). **Not** added to `ensure_dirs` (would break rate=0 inertness); created lazily in
   `capture_candidate`.
-- [ ] **New module** `policy/semantic/shadow.py`: `should_sample` (deterministic hash, rate 0/1 short-circuits),
+- [x] **New module** `policy/semantic/shadow.py`: `should_sample` (deterministic hash, rate 0/1 short-circuits),
   `ShadowCandidate` (raw action + frozen plan + routing snapshot + dims + `status`), `count_existing_candidates`
   (distinct `<hash>` stems across `.json`/`.processing`/`.done`, excludes `.plan.md` sidecar), `capture_candidate`
   (dedup across all states, cap, lazy mkdir, copy plan to `<hash>.plan.md`, write `<hash>.json` pending).
-- [ ] **Seam** (`plan_check.py:534`, fresh-allow branch only): gated on `shadow_sample_rate > 0.0`; best-effort
+- [x] **Seam** (`plan_check.py:534`, fresh-allow branch only): gated on `shadow_sample_rate > 0.0`; best-effort
   try/except; passes `route.model`/`route.provider`/`budget_tokens`/`CHECKER_PROMPT_VERSION` + `verdict.reason`. Add
   `CHECKER_PROMPT_VERSION = 1` constant.
 
@@ -119,9 +120,9 @@ Decisions locked during planning (corrections to the card):
 
 - [x] `design_workflows.md` §1.2 shadow-sampling paragraph; `design_appendix.md` §A.13 `supervisor-shadow` emitter row.
 - [x] `change_log.md` entry; notes additive `SupervisorConfig` schema break (old Forge can't read new manifests).
-- [ ] `impl_notes.md` durable lessons — drafted below; promote after human review (capture/check split; queue
-  reliability boundary at spawn → per-candidate atomic claim; count lifecycle states for cap/dedup; single ledger
-  emitter via `usage_command`; parse-status flag separates `error` from `inconclusive`).
+- [x] `impl_notes.md` durable lessons — promoted (capture/check split; queue reliability boundary at spawn →
+  per-candidate atomic claim; count lifecycle states for cap/dedup; single ledger emitter via `usage_command`;
+  parse-status flag separates `error` from `inconclusive`; re-root detached spend under the origin session).
 - [x] `make pre-commit` clean (ruff/black/isort/mypy/pyright/mdformat/gitleaks); full unit suite 6022 green.
 - [x] Stop→queue→handler integration covered host-side (`test_artifact_hooks.py` enqueue, `test_startup_queue.py`
   detached-worker routing + env re-root). **Deferred (optional):** a real-Claude shadow E2E — the frontier replay reuses

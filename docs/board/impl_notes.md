@@ -172,6 +172,37 @@ Durable invariants for Forge's first alternate agent runtime. Sources: `src/forg
   isolation:** codex hook/installer tests MUST use the autouse `isolate_codex_home` fixture (`tests/conftest.py`) or
   they write the real `~/.codex/config.toml` (a real leak caught and fixed in Phase 6 slice 2).
 
+### Supervisor shadow sampling: deferred-audit + detached-worker reliability (shipped 2026-06-14)
+
+Durable invariants for `src/forge/policy/semantic/shadow.py`, `shadow_runner.py`, `policy/semantic/plan_check.py`, and
+the `_shadow_handler` in `cli/main.py`. The cascade's blind spot is the **false-aligned** case (a tier-1 `allow` the
+frontier would have blocked); shadow sampling replays the frontier on a sampled subset without ever enforcing.
+
+- **Capture/check split**: the frontier supervisor builds its OWN prompt from raw inputs (`raw_diff or new_content`) and
+  reloads the plan at run time, so a deferred audit must freeze the **raw** `ActionContext` + a **copied** plan
+  (`<hash>.plan.md`) + a routing snapshot — never tier-1's packed prompt text (it is local to `run_plan_check` and gone
+  at the seam). Reconstruction fidelity is the locking test: rebuild → identical `SUPERVISOR_PROMPT`.
+- **Work-queue reliability boundary is at spawn, not completion**: a handler "succeeds" the instant it `Popen`s and the
+  marker is deleted, so the queue's poison cap never sees a detached worker's outcome. Idempotency for detached work must
+  be **per-item** (atomic `os.rename` claim → `.processing`), not via the marker. A deterministic post-claim failure must
+  **finalize** to a terminal state (`.done` `status="error"`), not stay `.processing` — otherwise it is phantom-`pending`
+  forever and leaks a cap slot. Only a hard crash mid-write may orphan.
+- **A detached worker outlives its spawner's invariants — re-establish them locally**: it must reset `FORGE_DEPTH=0` (a
+  fresh top-level tree; inheriting depth ≥ 2 makes the depth guard skip its frontier call → false errors), and any path
+  it replays must resolve the **same** way the consumer resolves it (a relative `plan_override_path` anchors at
+  `forge_root`, not CWD — mirror `load_plan_override`, or the plan copy is silently skipped).
+- **Count all lifecycle states for cap/dedup**: a content-addressed candidate exists as `.json`/`.processing`/`.done`;
+  counting only `*.json` undercounts mid-drain and lets identical content re-capture (over-cap + double billing).
+- **Single ledger emitter via `usage_command`**: `run_supervisor_check` is the sole cost/usage emitter; the shadow path
+  parameterizes the label (`supervisor-shadow`) instead of re-emitting, so a run is never double-counted.
+- **Parse-status flag separates `error` from `inconclusive`**: `parse_supervisor_verdict` collapses empty/unparseable →
+  divergent+0.0 (a warn that looks like a real low-confidence verdict). The audit needs
+  `parse_supervisor_verdict_with_status`'s `parsed` flag to classify a failed run as `error`, distinct from a genuine
+  low-confidence `inconclusive`.
+- **Re-root detached spend under the origin session**: snapshot `origin_run_id`/`origin_root_run_id` into the marker at
+  enqueue (the Stop hook runs in the session env) and re-root via `_memory_writer_env` at drain; otherwise spend
+  attributes to whoever drained the queue. Scrub `FORGE_SESSION` (don't re-inject) to avoid a self-spawning hook loop.
+
 ### Proposed Promotions From Metric Evidence (awaiting human review, 2026-06-06)
 
 Drafted by the `metric_evidence_simplification` Phase 6 closeout. **Not yet promoted** — a human should review and move
