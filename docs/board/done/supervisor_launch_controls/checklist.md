@@ -90,7 +90,8 @@ in: all three knobs in scope; per-caller config; two effort vocabularies; fail-l
 - [x] Scoped integration green: `test_session_commands_integration.py::test_fork_supervise_cascade_effort_persists`,
   `test_supervisor_e2e.py::test_supervisor_effort_reaches_claude_argv`.
 - [x] `docs/board/change_log.md` entry added; durable invariants flagged for `impl_notes.md` (after human review).
-- [ ] Move card `doing/ -> done/` after merge to `main`.
+- [x] Move card `doing/ -> done/` after merge to `main`. Done 2026-06-15 (durable invariants promoted to
+  `impl_notes.md`; docs verified against shipped code via a 5-dimension adversarial sweep).
 
 ## Deferred follow-ups (recorded on card)
 
