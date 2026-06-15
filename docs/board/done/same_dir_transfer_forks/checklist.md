@@ -203,13 +203,18 @@ default (no transfer flags, no `--resume-mode transfer`) is untouched.
   clean.
 - [x] Add a newest-first `docs/board/change_log.md` entry (Goal / Key changes / Verification) for decoupling transfer
   mode from worktree isolation in fork.
-- [ ] After human review, promote durable invariants to `docs/board/impl_notes.md`: (1) fork derivation is written twice
-  (manager baseline + CLI `_persist_fork_transfer_derivation` override); (2) `_get_deferred_same_dir_fork_resume_id`
-  must be `derivation.resume_mode`-aware or it re-natives deferred same-dir transfer forks; (3) fork `--resume-mode`
-  Choice is {transfer, native-relocate} vs resume's {native, transfer} — do not conflate; (4) auto-switch is encoded by
-  resolving `resume_mode = "transfer"` pre-fork on an explicit transfer flag (same-dir, `resume_mode is None`), so every
-  downstream branch keys uniformly on `resume_mode == "transfer"` with no auto-switch special-casing.
-- [ ] Move `docs/board/doing/same_dir_transfer_forks/` to `docs/board/done/` after final merge to `main`.
+- [x] Promoted durable invariants to `docs/board/impl_notes.md` (new section "Same-directory transfer forks: decouple
+  transfer mode from worktree isolation", 2026-06-15): (1) fork derivation is written twice; (2)
+  `_get_deferred_same_dir_fork_resume_id` must be `derivation.resume_mode`-aware or it re-natives deferred same-dir
+  transfer forks; (3) fork vs resume `--resume-mode` value sets differ; (4) auto-switch is encoded by resolving
+  `resume_mode = "transfer"` pre-fork. **Verification:** all 4 invariants adversarially re-checked against the shipped
+  code (4-agent workflow) before promotion. I2/I4 confirmed as written; two refinements folded into the promoted text:
+  (I1) the CLI `_persist_fork_transfer_derivation` step is a best-effort, transfer-gated *refinement* writing the only
+  real fork `strategy` (the manager baseline is `strategy=None`), not a blind override of a prior real value; (I3)
+  resume's `--resume-mode` is `default=None` + a `_validate_resume_mode` callback accepting `{native, transfer}`, NOT a
+  `click.Choice` (only fork's is a Choice).
+- [x] Move `docs/board/doing/same_dir_transfer_forks/` to `docs/board/done/` (#28 merged to `main`; relocated via
+  `git mv` in the closeout commit).
 
 ### Deferred / debt (from pre-PR adversarial review, 2026-06-15 — both non-blocking)
 
