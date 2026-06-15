@@ -1,6 +1,7 @@
 # Same-Directory Transfer Forks -- make curated context explicit
 
-**Status**: Proposed. Spun out of the `supervisor_shadow_sampling` investigation on 2026-06-14, after
+**Status**: In progress (`doing/`) — execution branch `same_dir_transfer_forks`; see [checklist.md](checklist.md). Spun
+out of the `supervisor_shadow_sampling` investigation on 2026-06-14, after
 `forge session fork ... --strategy ai-curated --inline-plan` silently used native same-directory resume instead of an
 AI-curated transfer.
 
@@ -81,6 +82,10 @@ In that mode Forge would:
 Worktree forks would keep their current default: transfer unless `--resume-mode native-relocate` is requested.
 Same-directory forks would keep their current default: native resume unless transfer is requested explicitly.
 
+> **Resolved (2026-06-15, see [checklist.md](checklist.md)):** the opt-in token is the existing `--resume-mode transfer`
+> — the `--fresh-transfer` alternative above was **not** adopted. Additionally, explicit `--strategy`/`--inline-plan` on
+> a same-dir fork **auto-switch** to transfer with a non-silent info line (no extra flag required).
+
 ## Design sketch
 
 ### 1. Make ignored flags a hard error or an explicit mode switch
@@ -94,6 +99,11 @@ of:
 Hard error is safer because it preserves native same-directory semantics and turns accidental flag dropping into a clear
 preflight failure. Auto-switch is friendlier but changes behavior for users who expected native resume and did not
 understand that `--strategy` requested a transfer.
+
+> **Resolved (2026-06-15, see [checklist.md](checklist.md) Phase 1):** **auto-switch** was chosen, not hard error. It is
+> encoded by resolving `resume_mode = "transfer"` early (only when `resume_mode is None`, so explicit
+> `--resume-mode native-relocate` never auto-switches), after which every downstream branch keys uniformly on
+> `resume_mode == "transfer"`.
 
 ### 2. Add same-directory transfer launch
 
@@ -146,14 +156,21 @@ Docs should say plainly: `ai-curated` is a transfer strategy, not a native-resum
 
 ## Open questions
 
+**All resolved 2026-06-15 — see [checklist.md](checklist.md). Kept here as the framing that produced the decisions; do
+not re-open without revising the checklist.**
+
 - Should explicit `--strategy` on same-directory fork imply transfer mode, or should the user also pass
-  `--resume-mode transfer` / `--fresh-transfer`?
-- Should `--inline-plan` alone imply transfer mode? It only has meaning in a generated context document.
+  `--resume-mode transfer` / `--fresh-transfer`? **→ Resolved: explicit `--strategy`/`--inline-plan` AUTO-SWITCH to
+  transfer (with an info line); the opt-in token is the existing `--resume-mode transfer`; no `--fresh-transfer` flag.**
+- Should `--inline-plan` alone imply transfer mode? It only has meaning in a generated context document. **→ Resolved:
+  yes — `--inline-plan` is a transfer flag and auto-switches a same-dir fork, same as `--strategy`.**
 - Should same-directory transfer use `system_prompt_file`, an initial message, or the same composition path as worktree
-  forks?
-- Should `--resume-mode transfer` be accepted for all forks, while `native-relocate` remains worktree-only?
+  forks? **→ Resolved: the same composition path — `system_prompt_file` via `--append-system-prompt-file` (OQ3).**
+- Should `--resume-mode transfer` be accepted for all forks, while `native-relocate` remains worktree-only? **→
+  Resolved: yes — `transfer` is same-dir-legal; `native-relocate` stays worktree/`--into`-only.**
 - How should this interact with sidecar launches, where the current sidecar branch passes `system_prompt_file` only for
-  worktree forks?
+  worktree forks? **→ Resolved: a `uses_fresh_transfer` predicate replaces the `is_worktree_fork` sidecar gate;
+  `container.py` is unchanged (OQ5, Phase 2).**
 
 ## Risks
 

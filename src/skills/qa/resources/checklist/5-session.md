@@ -656,4 +656,61 @@ forge session delete test-session-end --yes --force 2>/dev/null || true
 - [ ] `forge activity test-session-end` reports the same session's activity (or `No Forge activity` if the session was
   idle)
 
+### 5.22 Same-Directory Transfer Fork (`--resume-mode transfer` + auto-switch)
+
+<!-- prereq: 5.1 -->
+
+<!-- auto -->
+
+Transfer mode is decoupled from worktree isolation: a **same-directory** fork can run a curated transfer launch (fresh
+child session + assembled parent context), not just native `--resume --fork-session`. Explicit `--resume-mode transfer`
+opts in; bare `--strategy`/`--inline-plan` on a same-dir fork **auto-switch** it to transfer (the old path silently
+dropped those flags). No `--worktree` is created -- the child shares the parent's checkout.
+
+```bash
+cd $FORGE_TEST_REPO
+
+# Clean up from previous runs
+forge session delete sd-xfer-parent sd-xfer-explicit sd-xfer-auto sd-xfer-native --yes --force 2>/dev/null || true
+
+forge session start sd-xfer-parent --no-launch
+
+# Seed a parent transcript so transfer has content to assemble (same dir = project root).
+PJSON=".forge/sessions/sd-xfer-parent/forge.session.json"
+TP=$(python3 -c "from forge.session.claude.paths import get_transcript_path; print(get_transcript_path('$FORGE_TEST_REPO','fixture-sd-xfer'))")
+mkdir -p "$(dirname "$TP")"
+printf '%s\n' '{"requestId":"r1","timestamp":"2026-01-01T00:00:00Z","message":{"role":"user","content":[{"type":"text","text":"hello from sd parent"}]}}' > "$TP"
+jq --arg tp "$TP" '.confirmed.transcript_path = $tp | .confirmed.claude_session_id = "fixture-sd-xfer"' \
+  "$PJSON" > /tmp/sdx.json && mv /tmp/sdx.json "$PJSON"
+
+# (A) Explicit same-dir transfer -- no --worktree
+forge session fork sd-xfer-parent --name sd-xfer-explicit --resume-mode transfer --no-launch 2>&1 | tee /tmp/sd-explicit.out
+grep -c "Worktree:" /tmp/sd-explicit.out                                          # expect 0 (no worktree created)
+CTX_E=".forge/prev_sessions/sd-xfer-parent/children/sd-xfer-explicit.md"
+test -f "$CTX_E" && echo "EXPLICIT_CTX=true" || echo "EXPLICIT_CTX=false"
+jq -r '.confirmed.derivation.resume_mode' ".forge/sessions/sd-xfer-explicit/forge.session.json"   # expect: transfer
+
+# (B) Auto-switch: bare --strategy on a same-dir fork flips to transfer (status notice, flag not dropped)
+forge session fork sd-xfer-parent --name sd-xfer-auto --strategy structured --no-launch 2>&1 | tee /tmp/sd-auto.out
+grep -c "switched to transfer mode" /tmp/sd-auto.out                              # expect 1 (auto-switch notice)
+jq -r '.confirmed.derivation.resume_mode' ".forge/sessions/sd-xfer-auto/forge.session.json"        # expect: transfer
+
+# (C) Control: a plain same-dir fork stays native (no transfer file, no notice)
+forge session fork sd-xfer-parent --name sd-xfer-native --no-launch 2>&1 | tee /tmp/sd-native.out
+jq -r '.confirmed.derivation.resume_mode' ".forge/sessions/sd-xfer-native/forge.session.json"      # expect: native
+test -f ".forge/prev_sessions/sd-xfer-parent/children/sd-xfer-native.md" && echo "NATIVE_CTX=true" || echo "NATIVE_CTX=false"
+
+# Clean up
+forge session delete sd-xfer-parent sd-xfer-explicit sd-xfer-auto sd-xfer-native --yes --force 2>/dev/null || true
+```
+
+- [ ] Explicit `--resume-mode transfer` same-dir fork prints no `Worktree:` line (`grep -c` = 0)
+- [ ] Explicit transfer fork generates the context file at
+  `.forge/prev_sessions/sd-xfer-parent/children/sd-xfer-explicit.md` (`EXPLICIT_CTX=true`)
+- [ ] Explicit transfer fork manifest records `derivation.resume_mode == "transfer"`
+- [ ] Bare `--strategy` on a same-dir fork prints the auto-switch notice (`switched to transfer mode`, `grep -c` = 1)
+- [ ] Auto-switched fork manifest records `derivation.resume_mode == "transfer"`
+- [ ] Plain same-dir fork (no flags) manifest records `derivation.resume_mode == "native"`
+- [ ] Plain same-dir fork generates no transfer context file (`NATIVE_CTX=false`)
+
 ---

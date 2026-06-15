@@ -2282,7 +2282,11 @@ class TestSessionFork:
         mock_manager.fork_session.assert_not_called()
 
     def test_resume_mode_on_same_directory_fork_warns(self, runner: CliRunner, temp_env: Path) -> None:
-        """--resume-mode on a same-directory fork is inapplicable: tip + ignored."""
+        """--resume-mode native-relocate on a same-directory fork is inapplicable: tip + ignored.
+
+        (transfer is now same-dir-legal; only native-relocate is cross-CWD-only, so the tip is
+        scoped to native-relocate and points at native resume or --resume-mode transfer.)
+        """
         parent, _ = self._nr_parent_and_fork(temp_env)
         samedir_fork = create_session_state(
             "fork-child", parent_session="fork-parent", is_fork=True, worktree_path=str(temp_env)
@@ -2300,8 +2304,229 @@ class TestSessionFork:
                 main, ["session", "fork", "fork-parent", "-n", "fork-child", "--resume-mode", "native-relocate"]
             )
 
-        assert "--resume-mode only applies to --worktree/--into forks" in result.output
+        assert "--resume-mode native-relocate only applies to --worktree/--into forks" in result.output
         mock_manager.fork_session.assert_called_once()
+
+    # ---- same-directory transfer forks (decoupled transfer mode) -------------
+
+    def _samedir_parent_and_fork(self, temp_env: Path, *, fork_launch_mode: str = LAUNCH_MODE_HOST):
+        """Build (parent, same-directory fork) states.
+
+        A same-directory fork carries a non-None Worktree with is_worktree=False -- the shape
+        manager.fork_session produces when no worktree is created (the path is the shared parent
+        checkout). Downstream code gates on is_worktree, never truthiness.
+        """
+        parent = create_session_state("fork-parent", worktree_path=str(temp_env), worktree_branch="main")
+        parent.confirmed.claude_session_id = "parent-uuid"
+        fork_state = create_session_state(
+            "fork-child",
+            parent_session="fork-parent",
+            is_fork=True,
+            worktree_path=str(temp_env),
+            launch_mode=fork_launch_mode,
+        )
+        assert fork_state.worktree is not None
+        fork_state.worktree.is_worktree = False
+        return parent, fork_state
+
+    def _seed_context_file(self, temp_env: Path, text: str = "# Parent transfer context\n") -> Path:
+        ctx = temp_env / ".forge" / "ctx.md"
+        ctx.parent.mkdir(parents=True, exist_ok=True)
+        ctx.write_text(text)
+        return ctx
+
+    def test_samedir_strategy_autoswitches_to_transfer(self, runner: CliRunner, temp_env: Path) -> None:
+        """Explicit --strategy on a same-dir fork auto-switches it to transfer: the manager is told
+        resume_mode='transfer', an info line prints, and Claude launches with a fresh session_id
+        (no parent --resume/--fork-session)."""
+        parent, fork_state = self._samedir_parent_and_fork(temp_env)
+        ctx = self._seed_context_file(temp_env)
+        with (
+            patch("forge.cli.session.SessionManager") as mock_manager_cls,
+            patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
+            patch("forge.cli.session._generate_parent_transfer_context", return_value=(ctx, [])),
+        ):
+            mock_manager = mock_manager_cls.return_value
+            mock_manager.get_session.return_value = parent
+            mock_manager.fork_session.return_value = (parent, fork_state)
+            result = runner.invoke(
+                main, ["session", "fork", "fork-parent", "-n", "fork-child", "--strategy", "structured"]
+            )
+
+        assert result.exit_code == 0, result.output
+        assert "switched to transfer mode" in result.output
+        assert mock_manager.fork_session.call_args.kwargs.get("resume_mode") == "transfer"
+        kwargs = mock_invoke.call_args.kwargs
+        assert kwargs.get("session_id") is not None
+        assert len(kwargs["session_id"]) == 36  # UUID format
+        assert kwargs.get("resume_id") is None
+        assert kwargs.get("fork_session") is None
+
+    def test_samedir_transfer_uses_fresh_session_id(self, runner: CliRunner, temp_env: Path) -> None:
+        """Same-dir transfer launches a fresh child session with the assembled context as the
+        append-system-prompt file, never a native parent resume."""
+        parent, fork_state = self._samedir_parent_and_fork(temp_env)
+        ctx = self._seed_context_file(temp_env, "# Parent transfer context\nSENTINEL-CTX\n")
+        with (
+            patch("forge.cli.session.SessionManager") as mock_manager_cls,
+            patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
+            patch("forge.cli.session._generate_parent_transfer_context", return_value=(ctx, [])),
+        ):
+            mock_manager = mock_manager_cls.return_value
+            mock_manager.get_session.return_value = parent
+            mock_manager.fork_session.return_value = (parent, fork_state)
+            result = runner.invoke(
+                main, ["session", "fork", "fork-parent", "-n", "fork-child", "--resume-mode", "transfer"]
+            )
+
+        assert result.exit_code == 0, result.output
+        kwargs = mock_invoke.call_args.kwargs
+        assert kwargs.get("session_id") is not None
+        assert kwargs.get("resume_id") is None
+        assert kwargs.get("fork_session") is None
+        prompt_file = kwargs.get("system_prompt_file")
+        assert prompt_file is not None
+        assert "SENTINEL-CTX" in Path(prompt_file).read_text()
+
+    def test_samedir_native_default_unchanged(self, runner: CliRunner, temp_env: Path) -> None:
+        """A plain same-dir fork (no transfer flags) still resumes the parent natively and does NOT
+        auto-switch to transfer -- the unset --strategy default must not trigger the switch."""
+        parent, fork_state = self._samedir_parent_and_fork(temp_env)
+        with (
+            patch("forge.cli.session.SessionManager") as mock_manager_cls,
+            patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
+        ):
+            mock_manager = mock_manager_cls.return_value
+            mock_manager.get_session.return_value = parent
+            mock_manager.fork_session.return_value = (parent, fork_state)
+            result = runner.invoke(main, ["session", "fork", "fork-parent", "-n", "fork-child"])
+
+        assert result.exit_code == 0, result.output
+        assert "switched to transfer mode" not in result.output
+        kwargs = mock_invoke.call_args.kwargs
+        assert kwargs.get("resume_id") == "parent-uuid"
+        assert kwargs.get("fork_session") is True
+        assert kwargs.get("session_id") is None
+        assert mock_manager.fork_session.call_args.kwargs.get("resume_mode") is None
+
+    def test_samedir_transfer_sidecar_registers_fork(self, runner: CliRunner, temp_env: Path) -> None:
+        """Sidecar same-dir transfer: _launch_claude_for_session gets a fresh session_id,
+        fork_session=False, register_fork=True (the only thing setting FORGE_FORK_NAME when
+        fork_session is False), and a non-None system_prompt_file."""
+        parent, fork_state = self._samedir_parent_and_fork(temp_env, fork_launch_mode=LAUNCH_MODE_SIDECAR)
+        ctx = self._seed_context_file(temp_env)
+        with (
+            patch("forge.cli.session.SessionManager") as mock_manager_cls,
+            patch("forge.cli.session._generate_parent_transfer_context", return_value=(ctx, [])),
+            patch("forge.cli.session_fork._launch_claude_for_session", return_value=0) as mock_launch,
+        ):
+            mock_manager = mock_manager_cls.return_value
+            mock_manager.get_session.return_value = parent
+            mock_manager.fork_session.return_value = (parent, fork_state)
+            result = runner.invoke(
+                main, ["session", "fork", "fork-parent", "-n", "fork-child", "--resume-mode", "transfer"]
+            )
+
+        assert result.exit_code == 0, result.output
+        assert mock_launch.called
+        kwargs = mock_launch.call_args.kwargs
+        assert kwargs.get("session_id") is not None
+        assert len(kwargs["session_id"]) == 36
+        assert kwargs.get("resume_id") is None
+        assert kwargs.get("fork_session") is False
+        assert kwargs.get("register_fork") is True
+        assert kwargs.get("system_prompt_file") is not None
+
+    def test_samedir_transfer_over_budget_blocks(self, runner: CliRunner, temp_env: Path) -> None:
+        """A same-dir --strategy full fork (auto-switched to transfer) preflights the context budget
+        and blocks an over-limit parent transcript without --force, before fork_session()."""
+        artifacts = temp_env / ".forge" / "artifacts" / "fork-parent" / "transcripts"
+        artifacts.mkdir(parents=True)
+        (artifacts / "large.jsonl").write_text("x" * 4096)
+
+        parent = create_session_state(
+            "fork-parent",
+            proxy_template="litellm-openai",
+            proxy_base_url="http://localhost:8085",
+            worktree_path=str(temp_env),
+            worktree_branch="main",
+        )
+        parent.confirmed.claude_session_id = "parent-uuid"
+        parent.forge_root = str(temp_env)
+        parent.confirmed.artifacts["transcripts"] = [
+            {"copied_path": ".forge/artifacts/fork-parent/transcripts/large.jsonl"}
+        ]
+
+        with (
+            patch("forge.cli.session.SessionManager") as mock_manager_cls,
+            patch("forge.cli.session._resolve_context_limit", return_value=100),
+            patch("forge.cli.session.invoke_claude") as mock_invoke,
+        ):
+            mock_manager = mock_manager_cls.return_value
+            mock_manager.get_session.return_value = parent
+            result = runner.invoke(main, ["session", "fork", "fork-parent", "-n", "fork-child", "--strategy", "full"])
+
+        assert result.exit_code == 1
+        assert "exceeds context limit" in result.output
+        mock_manager.fork_session.assert_not_called()
+        mock_invoke.assert_not_called()
+
+    def test_samedir_explicit_resume_mode_transfer(self, runner: CliRunner, temp_env: Path) -> None:
+        """Explicit --resume-mode transfer on a same-dir fork takes the transfer launch shape and
+        does NOT print the native-relocate 'only applies' tip or the auto-switch info line (nothing
+        was switched -- it was requested)."""
+        parent, fork_state = self._samedir_parent_and_fork(temp_env)
+        ctx = self._seed_context_file(temp_env)
+        with (
+            patch("forge.cli.session.SessionManager") as mock_manager_cls,
+            patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
+            patch("forge.cli.session._generate_parent_transfer_context", return_value=(ctx, [])),
+        ):
+            mock_manager = mock_manager_cls.return_value
+            mock_manager.get_session.return_value = parent
+            mock_manager.fork_session.return_value = (parent, fork_state)
+            result = runner.invoke(
+                main, ["session", "fork", "fork-parent", "-n", "fork-child", "--resume-mode", "transfer"]
+            )
+
+        assert result.exit_code == 0, result.output
+        assert "only applies to --worktree/--into" not in result.output
+        assert "switched to transfer mode" not in result.output
+        kwargs = mock_invoke.call_args.kwargs
+        assert kwargs.get("session_id") is not None
+        assert kwargs.get("resume_id") is None
+
+    def test_samedir_transfer_inline_plan_embeds_text(self, runner: CliRunner, temp_env: Path) -> None:
+        """--inline-plan on a same-dir fork auto-switches to transfer AND passes inline_plan=True plus
+        the strategy into the shared assembly; the assembled context flows into the launch
+        system_prompt_file. (Plan-text resolution itself is covered by test_transfer.py.)"""
+        parent, fork_state = self._samedir_parent_and_fork(temp_env)
+        ctx = self._seed_context_file(temp_env, "# Context\nAPPROVED-PLAN-SENTINEL\n")
+        captured: dict[str, object] = {}
+
+        def _spy(*, manager, manifest, parent_state=None, strategy="structured", inline_plan=False):
+            captured["strategy"] = strategy
+            captured["inline_plan"] = inline_plan
+            return ctx, []
+
+        with (
+            patch("forge.cli.session.SessionManager") as mock_manager_cls,
+            patch("forge.cli.session.invoke_claude", return_value=0) as mock_invoke,
+            patch("forge.cli.session._generate_parent_transfer_context", side_effect=_spy),
+        ):
+            mock_manager = mock_manager_cls.return_value
+            mock_manager.get_session.return_value = parent
+            mock_manager.fork_session.return_value = (parent, fork_state)
+            result = runner.invoke(
+                main,
+                ["session", "fork", "fork-parent", "-n", "fork-child", "--inline-plan", "--strategy", "full"],
+            )
+
+        assert result.exit_code == 0, result.output
+        assert captured == {"strategy": "full", "inline_plan": True}
+        prompt_file = mock_invoke.call_args.kwargs.get("system_prompt_file")
+        assert prompt_file is not None
+        assert "APPROVED-PLAN-SENTINEL" in Path(prompt_file).read_text()
 
     def test_native_relocate_warns_strategy_ignored(self, runner: CliRunner, temp_env: Path) -> None:
         parent, fork_state = self._nr_parent_and_fork(temp_env)

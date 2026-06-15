@@ -27,19 +27,19 @@ reports "no such command/option" — no tombstone shims. List/show commands supp
 
 ### Session management
 
-| Command                                | Purpose                                                                           |
-| -------------------------------------- | --------------------------------------------------------------------------------- |
-| `forge session start [name]`           | Create and start a new session (auto-named if omitted)                            |
-| `forge session resume [name]`          | Reattach to an existing session (default), or derive a fresh child with `--fresh` |
-| `forge session fork <parent> [--name]` | Fork a session (same dir by default; `--worktree` for isolation)                  |
-| `forge session show [session]`         | Show session details (`--json`, `--field`); accepts name or UUID                  |
-| `forge session list`                   | List sessions (`--scope workspace\|project\|all`; default `workspace`; `--json`)  |
-| `forge session set <key> <value>`      | Set a mid-session override                                                        |
-| `forge session reset [key]`            | Reset overrides to intent                                                         |
-| `forge session delete <name>...`       | Delete one or more sessions (`--all` for bulk deletion)                           |
-| `forge session clean --older-than N`   | Bulk-delete sessions older than N days                                            |
-| `forge session incognito [name]`       | Start an ephemeral session (auto-delete on exit)                                  |
-| `forge session shell [name]`           | Open shell in sidecar container                                                   |
+| Command                                | Purpose                                                                                                                     |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `forge session start [name]`           | Create and start a new session (auto-named if omitted)                                                                      |
+| `forge session resume [name]`          | Reattach to an existing session (default), or derive a fresh child with `--fresh`                                           |
+| `forge session fork <parent> [--name]` | Fork a session (same dir + native resume by default; `--worktree` to isolate, `--resume-mode transfer` for curated context) |
+| `forge session show [session]`         | Show session details (`--json`, `--field`); accepts name or UUID                                                            |
+| `forge session list`                   | List sessions (`--scope workspace\|project\|all`; default `workspace`; `--json`)                                            |
+| `forge session set <key> <value>`      | Set a mid-session override                                                                                                  |
+| `forge session reset [key]`            | Reset overrides to intent                                                                                                   |
+| `forge session delete <name>...`       | Delete one or more sessions (`--all` for bulk deletion)                                                                     |
+| `forge session clean --older-than N`   | Bulk-delete sessions older than N days                                                                                      |
+| `forge session incognito [name]`       | Start an ephemeral session (auto-delete on exit)                                                                            |
+| `forge session shell [name]`           | Open shell in sidecar container                                                                                             |
 
 Note: `session context` is a deprecated alias for `session show`. `session resume --fresh --review` opens the per-child
 user-notes overlay (`children/<child>.notes.md`) in `$EDITOR` before launching Claude; the AI snapshot stays read-only.

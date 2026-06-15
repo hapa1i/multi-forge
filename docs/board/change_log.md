@@ -25,6 +25,39 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board-contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-06-15
+
+### same_dir_transfer_forks: decouple transfer mode from worktree isolation in `forge session fork`
+
+**Goal**: Let a same-directory fork run a curated *transfer* launch (fresh child Claude session + assembled parent
+context) instead of always native `--resume --fork-session`, and stop silently dropping `--strategy`/`--inline-plan` on
+same-dir forks (the bug from the supervisor investigation).
+
+**Key changes** (`src/forge/cli/session_fork.py`, `manager.py`, `session_lifecycle.py`):
+
+- **Auto-switch**: explicit `--strategy`/`--inline-plan` on a same-dir fork resolves `resume_mode = "transfer"` pre-fork
+  (gated on `resume_mode is None`, so `--resume-mode native-relocate` never auto-switches) and prints a non-silent info
+  line. The existing `--resume-mode transfer` is the explicit same-dir-legal opt-in; `native-relocate` stays
+  worktree/`--into`-only. No `--fresh-transfer` flag.
+- **Branch widened, not duplicated**: the worktree-transfer branch predicate becomes
+  `uses_fresh_transfer = (is_worktree_fork and not native_relocate) or same_dir_transfer`, resolving `worktree_path` per
+  case. Six launch refs (sidecar `session_id`/`resume_id`/`fork_session`/**`register_fork`**/`system_prompt_file`; host
+  `active_claude_session_id`) now key on it. `register_fork` is load-bearing: with `fork_session=False` it is the only
+  thing setting `FORGE_FORK_NAME`. Budget preflight widened to `is_cross_dir or resume_mode == "transfer"`.
+- **Derivation correct under partial failure**: `manager.fork_session` writes the `"transfer"` baseline (+ pre-recorded
+  `context_file`) for same-dir transfer, so a best-effort CLI `_persist_fork_transfer_derivation` refinement failure
+  can't leave a requested transfer fork recorded as `"native"`.
+- **Deferred-resume guard**: `_get_deferred_same_dir_fork_resume_id` returns `None` when
+  `derivation.resume_mode == "transfer"`, before the confirmed-state guard — a failed UUID pre-seed can no longer
+  silently native-resume a `--no-launch` transfer fork.
+- **Docs**: `design.md`, `end-user/session.md`, `cli_reference.md` updated; help strings dropped "worktree-only"
+  framing.
+
+**Verification**: 41 unit tests green (7 new same-dir CLI tests, 3 regression incl. a direct guard test, new manager
+derivation test); 4 integration tests green (new same-dir transfer argv has `--session-id` +
+`--append-system-prompt-file` and lacks `--resume`/`--fork-session`; 3 adjacent fork-launch regressions unchanged);
+`make pre-commit` clean.
+
 ## 2026-06-14
 
 ### supervisor_shadow_sampling: measure the cascade's false-aligned rate (3 slices, one PR)

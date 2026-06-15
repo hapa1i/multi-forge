@@ -206,6 +206,13 @@ def _get_deferred_same_dir_fork_resume_id(
     if manifest.worktree and manifest.worktree.is_worktree:
         return None
 
+    # A same-directory TRANSFER fork must never deferred-resume as a native parent fork, even if the
+    # best-effort UUID pre-seed failed (leaving claude_session_id unset). Recorded transfer intent is
+    # authoritative, so it falls through to the transfer-context path in _launch_in_place.
+    derivation = manifest.confirmed.derivation
+    if derivation is not None and derivation.resume_mode == "transfer":
+        return None
+
     confirmed = manifest.confirmed
     if (
         confirmed.claude_session_id is not None

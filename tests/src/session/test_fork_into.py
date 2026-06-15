@@ -300,6 +300,35 @@ class TestForkNativeRelocate:
         assert fork.confirmed.derivation.resume_mode == "native"
         assert fork.confirmed.derivation.relocated_parent_session_id is None
 
+    def test_fork_session_samedir_transfer_derivation(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A same-directory fork with resume_mode='transfer' records the transfer baseline.
+
+        The CLI's _persist_fork_transfer_derivation refinement is best-effort, so the manager
+        must write the authoritative 'transfer' baseline (with a pre-recorded context_file for GC)
+        even if that later refinement fails. resume_mode=None stays plain native.
+        """
+        monkeypatch.setenv("HOME", str(tmp_path / "home"))
+        (tmp_path / "home").mkdir()
+        parent_repo = tmp_path / "repo"
+        _init_git_repo(parent_repo)
+        _enable_forge(parent_repo)
+
+        manager = SessionManager()
+        self._parent_with_uuid(manager, parent_repo, "parent-uuid-abc")
+
+        _, transfer_fork = manager.fork_session("parent", "child-t", resume_mode="transfer")
+        assert transfer_fork.confirmed.derivation is not None
+        assert transfer_fork.confirmed.derivation.resume_mode == "transfer"
+        # Per-child context file is pre-recorded so GC knows it belongs to this fork.
+        assert transfer_fork.confirmed.derivation.context_file is not None
+        # Transfer is not a transcript relocation.
+        assert transfer_fork.confirmed.derivation.relocated_parent_session_id is None
+
+        _, native_fork = manager.fork_session("parent", "child-n")
+        assert native_fork.confirmed.derivation is not None
+        assert native_fork.confirmed.derivation.resume_mode == "native"
+        assert native_fork.confirmed.derivation.context_file is None
+
     def test_delete_removes_relocated_copy_without_child_uuid(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
