@@ -25,6 +25,40 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board-contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-06-15
+
+### openrouter_observability Phase 0: live-probe the OpenRouter externals
+
+**Goal**: Pin the live OpenRouter behaviors the card's later phases assume, before any provider-id field is populated.
+
+**Key changes**:
+
+- **Probe harness** (`scripts/experiments/openrouter/`): operator-gated, staged `reproduce.sh` + `lib.sh` +
+  scan-and-fail `sanitize.sh` + async/typed `helpers/or_probe.py` + 5 stages + README. Reuses Forge credential
+  resolution read-only; metadata-only records (no keys; no raw bodies without `--debug-raw`).
+- **Findings** (`phase0-results.md`): the `gen-` id is in `body.id`, the `x-generation-id` header, **and** every
+  streaming `chunk.id` (stable) -> streaming `provider_generation_id` is **not** structurally `None` (corrects the card
+  hedge); Forge's canonical types drop it today. A stream cancelled after the first chunk is `[REMOTE-ABSENT]` (not
+  retrievable via `/generation` or `/activity`), so a local-only trace is justified. On the direct path OpenRouter
+  **records the OpenAI-standard `user`** (`[CHANNEL-USER-RECOGNIZED]`) but **ignores a custom `session_id`** -> Phase 5
+  channel correction: inject under `user`, not `session_id`. Sticky routing `[STICKY-NEUTRAL]` across both arms
+  (recognition is not routing impact) -> no enable recommendation; flag stays opt-in for observability.
+- **Bug caught + fixed**: probe 2's first `[REMOTE-PRESENT-GENERATION]` was a false positive -- `_http_get` counted a
+  404 JSON error body as "present". Fixed with an HTTP-200 gate (`_generation_present`), an eventual-consistency poll
+  (`~23s`; an immediate `/generation` lookup 404s even for completed calls, which index in ~3s), and a completed-call
+  baseline control that only allows `[REMOTE-ABSENT]` when the control indexes while the aborted id does not.
+- **Review fixes** (post-run): `sanitize.sh` now **requires** GNU sed/grep (BSD silently no-ops `\b`, risking a
+  false-clean secret scan); probe 3 recognition now polls the indexed `/generation` record (`_poll_generation_body`) --
+  the polled re-run **flipped** `[CHANNEL-UNVERIFIABLE]` to `[CHANNEL-USER-RECOGNIZED]` (the un-polled lookup had masked
+  a real recognition); `_routing_verdict` now spans **both** sticky arms so a `user` divergence can't hide behind a
+  neutral `session_id`.
+
+**Verification**: Adversarial workflow (3 independent agents) confirmed the false positive and audited every probe for
+the bug class. Helper offline-tested (status gate + interleaved poll + both-arm routing verdict). Operator re-ran probes
+1-3: probe 1 `[GENID-IN-STREAM-CHUNK]`, probe 2 `[REMOTE-ABSENT]`, probe 3 `[CHANNEL-USER-RECOGNIZED]`. Pre-commit clean
+on all changed files (ruff/black/isort/mypy/pyright/mdformat/gitleaks); `sanitize.sh` OK. All four probes settled; Phase
+0 ships no `src/` change.
+
 ## 2026-06-14
 
 ### supervisor_shadow_sampling: measure the cascade's false-aligned rate (3 slices, one PR)

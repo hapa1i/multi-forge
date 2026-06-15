@@ -7,11 +7,14 @@ planning; see **Card corrections** for claims the code refuted.
 
 ## Current focus
 
-Phase 0 probes are operator-gated (need a live `OPENROUTER_API_KEY`). **Phase 1** (identity) is buildable now, offline.
-**Phase 2** (the `ProviderTraceMeta` shape + plumbing) is buildable now, but do not populate `provider_generation_id`
-until probe 1 records where it lives. **Phases 3-4** (trace plane + read surface) build against fixtures (e.g. a
-simulated cancelled stream) once the Phase 2 shape lands -- probe 2 only confirms the remote-visibility expectation that
-justifies local-only semantics. **Phase 5** (injection) waits for probes 3-4 (transport + routing impact).
+**Phase 0 is complete** -- all four probes settled 2026-06-15 (probes 1-3 re-run after harness fixes; see
+`phase0-results.md`). **Phase 1** (identity) is buildable now, offline. **Phase 2** is **unblocked** to populate
+`provider_generation_id` from the streaming `chunk.id` / non-streaming `body.id` (probe 1; streaming is **not**
+structurally `None`). **Phases 3-4** (trace plane + read surface) build against fixtures (e.g. a simulated cancelled
+stream) once the Phase 2 shape lands; probe 2 confirms a cancelled stream is **not remotely retrievable**
+(`[REMOTE-ABSENT]`), so the local-only `unavailable` justification holds. **Phase 5** (injection) gets a **channel
+correction**: OpenRouter **recognizes `user`** (records it) but **ignores `session_id`** -> inject under `user`; routing
+is neutral (both arms), so the flag stays default OFF (opt-in for observability, not performance).
 
 ## Decisions locked (this card)
 
@@ -45,13 +48,31 @@ results under `docs/board/doing/openrouter_observability/` (probe notes) and/or 
 | 3   | `session_id` transport: inject via `extra_body` on the direct client; separately check the LiteLLM-gateway route.                                                                                                      | Whether `session_id` reaches OpenRouter on (a) direct and (b) LiteLLM paths; exact body key; whether LiteLLM strips it        | Phase 5 channel correctness                                                                                     |
 | 4   | `session_id` routing impact: repeated large supervisor-style prompts with/without sticky `session_id`.                                                                                                                 | First-token + total latency, cache indicators, provider selection, failure rate; watch the adverse pin-to-worse-provider case | Whether the opt-in flag is safe to recommend enabling; the 45s-timeout hypothesis                               |
 
-- [ ] Probe 1 recorded (generation-id source)
-- [ ] Probe 2 recorded (cancelled-stream remote visibility)
-- [ ] Probe 3 recorded (`session_id` transport, direct + LiteLLM)
-- [ ] Probe 4 recorded (`session_id` routing impact)
+- [x] **Harness authored** (`scripts/experiments/openrouter/`): `reproduce.sh` + `lib.sh` + `sanitize.sh` +
+  `helpers/or_probe.py` (async, typed) + 5 stages (`00`-`40`) + `README.md`; results at
+  `docs/board/doing/openrouter_observability/phase0-results.md`. Lint/type-checked (`bash -n`, `shellcheck`,
+  `ruff`/`black`/`mypy`/`pyright`).
+- [x] Probe 1 recorded (generation-id source) -- `[GENID-IN-STREAM-CHUNK]`: `gen-` id in `body.id`, `x-generation-id`
+  header, **and** every stream `chunk.id` (stable across 12 chunks); Forge drops it
+  (`forge_canonical_type_preserved_provider_id=false`). **Streaming `provider_generation_id` is NOT structurally
+  `None`** -- corrects the hedge at line 43 / the Phase 2 streaming task.
+- [x] Probe 2 recorded (cancelled-stream remote visibility) -- `[REMOTE-ABSENT]` **confirmed on re-run** after the
+  false-positive fix. Aborted id: `/generation` 404 across all 6 poll attempts (~23s) **and** absent from `/activity`
+  (200); the completed-call **baseline indexed to 200**, so the window was long enough and the absence is real. (The
+  first run's `[REMOTE-PRESENT-GENERATION]` was a harness bug: a 404 error body counted as "present" via bare
+  `bool(body)`; fixed with an HTTP-200 gate + eventual-consistency poll + baseline control.)
+- [x] Probe 3 recorded (`session_id` transport, direct arm) -- `[CHANNEL-USER-RECOGNIZED]` (polled re-run). OpenRouter
+  **records the OpenAI-standard `user`** (recognized -- the sent value appears in the indexed `/generation` record) but
+  **ignores a custom `session_id`** (transported, unverifiable). **Channel correction APPLIES: Phase 5 should inject
+  under `user`, not `session_id`** (see Card corrections + Phase 5 note). Recognition is **not** routing impact (probe 4
+  neutral). Direct path only; gateway arm opt-in (LiteLLM transport code-settled, `transformation.py:165-169`). The
+  first run's un-polled `[CHANNEL-UNVERIFIABLE]` was an indexing artifact (fixed via `_poll_generation_body`).
+- [x] Probe 4 recorded (`session_id` routing impact) -- `[STICKY-NEUTRAL]`: sticky vs baseline within noise, no cache
+  hits, single provider (`Azure`), 0% failure -> **no reason to recommend enabling** the flag (stays OFF regardless).
 
 > If cancelled streams are absent remotely (probe 2), that is an **expected** result, not a failure -- it is the reason
-> the local trace must self-describe disconnect/timeout.
+> the local trace must self-describe disconnect/timeout. (Probe 2 must assert this via the 200-gated poll + baseline
+> control, not a bare `bool(body)` lookup -- see the false-positive note above.)
 
 ---
 
@@ -213,9 +234,16 @@ only** -- no remote lookup (that is the reconciliation card). Depends on Phase 3
 
 ## Phase 5: `session_id` injection (opt-in, default OFF)
 
-**Goal**: Carry the Forge-derived (or caller-preserved) `session_id` into the OpenRouter body via `extra_body`, gated to
+**Goal**: Carry the Forge-derived (or caller-preserved) session id into the OpenRouter body via `extra_body`, gated to
 OpenRouter traffic **and** behind the opt-in flag. Last phase by design (routing-affecting; user chose opt-in). Depends
 on Phase 1 + probes 3-4.
+
+> **Channel correction (probe 3, polled re-run).** OpenRouter **records the OpenAI-standard `user` field** but **ignores
+> a custom `session_id`** (`[CHANNEL-USER-RECOGNIZED]`). At implementation, inject the Forge id under **`user`** (the
+> recognized channel -- makes a fork findable in OpenRouter's dashboard, addressing the incident), not the
+> `extra_body["session_id"]` key the tasks below were drafted against. Update each body-key reference accordingly.
+> Recognition is **not** a routing win (probe 4 `[STICKY-NEUTRAL]`), so the flag stays opt-in/off for *observability*,
+> not performance. A recognized `user` value is retained by OpenRouter -> keep the "hash, never raw name" rule.
 
 - [ ] **Flag** (home per the open question above): default OFF; the proxied path and direct callers both consult it. -
   *Assertion*: with the flag off (default), no `session_id` is injected on any path -- behavior is byte-identical to
@@ -251,6 +279,11 @@ on Phase 1 + probes 3-4.
 
 ## Card corrections (verified against code 2026-06-15)
 
+- **The `session_id` injection channel is wrong; use `user`** (probe 3, polled re-run, `phase0-results.md`). OpenRouter
+  records the OpenAI-standard `user` field (`[TRANSPORTED+RECOGNIZED]`) but ignores a custom `session_id`
+  (`[TRANSPORTED+UNVERIFIABLE]`). Phase 5 should inject the Forge id under `user`; a custom `session_id` is
+  Forge-local-correlation only and invisible upstream. Recognition is not routing impact (probe 4 neutral). Direct path
+  measured; recognition expected path-independent (LiteLLM forwards `extra_body` verbatim).
 - **`~/.forge/logs/requests/` is real** (`proxy/utils.py:493`, debug-gated, body-redacted) -- the card's References line
   is correct. It is owned by the `proxy_log_hygiene` card, **not** a join target for provider trace.
 - **Synthetic `chatcmpl-<epoch-seconds>` ids are minted in `CoreLLMClientAdapter`** (`client_adapter.py:204` non-stream,
