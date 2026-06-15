@@ -505,8 +505,11 @@ Key differences from `--worktree`:
 | `--strategy <s>` | Context assembly strategy (`minimal`/`structured`/`full`/`ai-curated`)      | `structured` |
 | `--inline-plan`  | Embed the approved plan content in the transfer (not just a path reference) | off          |
 
-These flags apply to `--worktree` and `--into` forks (file-based transfer). Same-directory forks use native
-`--resume --fork-session` and ignore these flags.
+A plain same-directory fork uses native `--resume --fork-session` (full Claude continuity, no transfer file). On a
+same-directory fork these transfer flags **switch it into transfer mode**: passing `--strategy` or `--inline-plan`
+auto-switches the fork (with an info line), and `--resume-mode transfer` opts in explicitly. A same-directory transfer
+fork generates the transfer file and starts a *fresh* child Claude session — the same file-based transfer that
+`--worktree` and `--into` forks always use. `--resume-mode native-relocate` remains worktree/`--into`-only.
 
 `ai-curated` uses OpenRouter directly and requires `OPENROUTER_API_KEY`. If OpenRouter auth is unavailable, Forge warns
 and falls back to the deterministic `structured` strategy.

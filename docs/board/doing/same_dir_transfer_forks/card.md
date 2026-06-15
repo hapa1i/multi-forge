@@ -1,7 +1,7 @@
 # Same-Directory Transfer Forks -- make curated context explicit
 
-**Status**: In progress (`doing/`) — execution branch `same_dir_transfer_forks`; see [checklist.md](checklist.md).
-Spun out of the `supervisor_shadow_sampling` investigation on 2026-06-14, after
+**Status**: In progress (`doing/`) — execution branch `same_dir_transfer_forks`; see [checklist.md](checklist.md). Spun
+out of the `supervisor_shadow_sampling` investigation on 2026-06-14, after
 `forge session fork ... --strategy ai-curated --inline-plan` silently used native same-directory resume instead of an
 AI-curated transfer.
 
