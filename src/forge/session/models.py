@@ -157,6 +157,20 @@ class SupervisorConfig:
     checker_model: str | None = None  # Tier-1 model (prefixed id); None = provider-specific default
     checker_provider: str | None = None  # Tier-1 provider override (openrouter/litellm_local/litellm_remote)
     checker_budget_tokens: int | None = None  # Approx total token budget for the tier-1 checker prompt
+    # Shadow sampling (audit the cascade's false-aligned rate): run the frontier supervisor on a random sample of
+    # tier-1 allows post-hoc, verdict recorded but never enforced. 0.0 = off (default).
+    shadow_sample_rate: float = 0.0  # [0,1] probability of shadowing an uncached tier-1 allow
+    shadow_max_per_session: int = 10  # Hard cap on shadow candidates persisted per session (bounds frontier spend)
+    shadow_seed: str | None = None  # Optional salt for deterministic sampling (tests); session_name supplies entropy
+
+    def __post_init__(self) -> None:
+        # Range validation lives here (the broadest shared construction path) rather than on the CLI surface: dacite
+        # runs __post_init__ on every manifest read / session set / start / fork, and compute_effective_intent's
+        # strict branch auto-wraps this ValueError into the typed InvalidOverrideValueError.
+        if not 0.0 <= self.shadow_sample_rate <= 1.0:
+            raise ValueError(f"shadow_sample_rate must be in [0.0, 1.0], got {self.shadow_sample_rate}")
+        if self.shadow_max_per_session < 1:
+            raise ValueError(f"shadow_max_per_session must be >= 1, got {self.shadow_max_per_session}")
 
 
 @dataclass

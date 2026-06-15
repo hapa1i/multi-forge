@@ -27,6 +27,39 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-14
 
+### supervisor_shadow_sampling: measure the cascade's false-aligned rate (3 slices, one PR)
+
+**Goal**: Audit how often the cascade's tier-1 `allow` short-circuits a frontier check the frontier would have blocked,
+without slowing the PreToolUse hook.
+
+**Key changes**:
+
+- **Slice 1 (capture, inert)**: `SupervisorConfig` gains `shadow_sample_rate`/`shadow_max_per_session`/`shadow_seed`
+  (range-validated in `__post_init__`, so a bad `session set` override surfaces as `InvalidOverrideValueError`). New
+  `policy/semantic/shadow.py`: deterministic stable-hash sampler (no RNG; rate 0/1 short-circuit), `capture_candidate`
+  freezes a *fresh* tier-1 allow's raw inputs + copied plan (`<hash>.plan.md`) + routing snapshot to
+  `.forge/artifacts/<session>/shadow/`. Cap/dedup count distinct stems across `.json`/`.processing`/`.done`. Seam in
+  `plan_check.py` (fresh-allow branch, gated on rate > 0, best-effort). Fully inert at rate 0 (dir never created).
+- **Slice 2 (Stop-batch drain)**: `run_supervisor_check` extracted as the single emitter (`usage_command` param +
+  `SupervisorRun{decision,verdict,run_ok,parsed}`); `parse_supervisor_verdict_with_status` distinguishes a parse failure
+  from a real low-confidence verdict. `enqueue_shadow_marker` + Stop-hook gate (`has_pending_candidates`) +
+  `_shadow_handler` (detached `Popen`, run-tree re-root via `_memory_writer_env`). New `shadow_runner.py`: atomic claim
+  (`rename` → `.processing`, at-most-once), reconstruct full context/config (plan → frozen sidecar), classify
+  agree/disagree/inconclusive/error with the supervisor's own block bar; never enforces.
+- **Slice 3 (read surface)**: `ShadowActivity` in `build_session_activity_summary` (counts from `.done` status, spend
+  from the `supervisor-shadow` ledger row); `forge activity` Shadow line + `render_summary_line` audited/queued segment;
+  `forge policy shadow` group (hidden `run` worker + `show` lists disagreement artifacts with citations).
+- Docs: design_workflows.md §1.2 shadow paragraph, design_appendix.md §A.13 `supervisor-shadow` emitter row.
+- Post-review hardening: relative `plan_override_path` now resolves against `forge_root` at capture (mirrors
+  `load_plan_override`); deterministic post-claim failures finalize as `.done` `status="error"` (no orphaned
+  `.processing` phantom-pending); detached shadow worker resets `FORGE_DEPTH=0` so the frontier replay spawns; renderer
+  shows only cited (blocking) violations for a disagreement.
+
+**Verification**: 42 drain tests (`test_shadow_runner.py`) + 73 capture tests (Slice 1) + 9 `test_usage_summary.py` + 2
+`test_activity.py` + 6 `test_policy_shadow.py`; 2500 policy/workqueue/cli/core-ops tests green; mypy + pyright clean on
+all 10 changed source files. Schema note: additive `SupervisorConfig` fields — old Forge cannot read new manifests
+(research-preview clean break).
+
 ### codex_frontend closeout: Codex shipped as a first-class alternate runtime (card -> done)
 
 **Goal**: Close out the `codex_frontend` card after PR #26 merged to `main`. Phases 0-6 and the residual-risk

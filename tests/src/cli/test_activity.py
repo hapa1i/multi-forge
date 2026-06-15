@@ -234,3 +234,52 @@ def test_exact_proxied_cost_renders_without_tilde(monkeypatch) -> None:
     assert "$0.12" in result.output
     assert "~$0.12" not in result.output  # exact -> no estimate marker
     assert "no snapshot estimates mixed in" in result.output
+
+
+def _write_shadow_done(forge_root, cand_hash: str, *, status: str, session: str = "planner", **extra) -> None:
+    import json as _json
+    from pathlib import Path as _Path
+
+    d = _Path(forge_root) / ".forge" / "artifacts" / session / "shadow"
+    d.mkdir(parents=True, exist_ok=True)
+    record = {
+        "schema_version": 1,
+        "captured_at": "2026-06-10T12:00:00Z",
+        "checked_at": "2026-06-10T12:05:00Z",
+        "tool_name": "Write",
+        "target_path": "src/foo.py",
+        "status": status,
+    }
+    record.update(extra)
+    (d / f"{cand_hash}.done").write_text(_json.dumps(record))
+
+
+def test_human_render_shows_shadow_section(monkeypatch, tmp_path) -> None:
+    from forge.session.models import create_session_state
+    from forge.session.store import SessionStore
+
+    SessionStore(str(tmp_path), "planner").write(create_session_state("planner", worktree_path=str(tmp_path)))
+    _write_shadow_done(tmp_path, "a1", status="agree")
+    _write_shadow_done(tmp_path, "d1", status="disagree", frontier_verdict="divergent", frontier_confidence=0.9)
+    _patch_resolver(monkeypatch, name="planner", forge_root=str(tmp_path))
+
+    result = CliRunner().invoke(activity_cmd, ["planner", "--all"])
+    assert result.exit_code == 0
+    assert "Shadow (audit)" in result.output
+    assert "2 checked" in result.output
+    assert "1 disagree" in result.output
+
+
+def test_json_includes_shadow(monkeypatch, tmp_path) -> None:
+    from forge.session.models import create_session_state
+    from forge.session.store import SessionStore
+
+    SessionStore(str(tmp_path), "planner").write(create_session_state("planner", worktree_path=str(tmp_path)))
+    _write_shadow_done(tmp_path, "d1", status="disagree")
+    _patch_resolver(monkeypatch, name="planner", forge_root=str(tmp_path))
+
+    result = CliRunner().invoke(activity_cmd, ["planner", "--all", "--json"])
+    assert result.exit_code == 0
+    data = json.loads(result.output)
+    assert data["shadow"]["checked"] == 1
+    assert data["shadow"]["disagree"] == 1

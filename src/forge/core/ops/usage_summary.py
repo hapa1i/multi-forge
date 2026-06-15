@@ -21,9 +21,11 @@ launcher's in-memory copy was taken.
 
 from __future__ import annotations
 
+import json
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from pathlib import Path
 
 from forge.core.usage.ledger import UsageEvent, read_usage_events
 from forge.core.usage.vocabulary import ROUTE_CLAUDE_INTERACTIVE, Confidence
@@ -99,6 +101,29 @@ class PolicyActivity:
 
 
 @dataclass
+class ShadowActivity:
+    """Supervisor shadow-sampling audit results, read from the session's shadow dir.
+
+    Counts come from the candidate *records* (not the ledger): a ``.done`` record
+    carries a terminal ``status``; ``*.json``/``.processing`` records are captured but
+    not yet drained. ``disagree`` is the headline -- a fresh tier-1 allow the frontier
+    would have *blocked* (the cascade's measured false-aligned rate). Per-check spend
+    is the separate ``supervisor-shadow`` ledger row (in ``commands``), not here.
+    """
+
+    checked: int = 0  # terminal (.done) records
+    agree: int = 0
+    disagree: int = 0
+    inconclusive: int = 0
+    error: int = 0
+    pending: int = 0  # captured but not yet drained (*.json + .processing)
+
+    @property
+    def has_content(self) -> bool:
+        return bool(self.checked or self.pending)
+
+
+@dataclass
 class SessionActivitySummary:
     """What a Forge session did: per-command usage + supervisor/policy activity."""
 
@@ -110,6 +135,7 @@ class SessionActivitySummary:
     total_output_tokens: int = 0
     total_events: int = 0
     policy: PolicyActivity | None = None
+    shadow: ShadowActivity | None = None
     subagents: int = 0
     # Explicit coverage flags (JSON-friendly) so a sparse summary reads honestly.
     cost_partial: bool = False  # some in-scope events lacked a measured cost
@@ -127,7 +153,12 @@ class SessionActivitySummary:
 
     @property
     def is_empty(self) -> bool:
-        return not self.commands and (self.policy is None or not self.policy.has_content) and self.subagents == 0
+        return (
+            not self.commands
+            and (self.policy is None or not self.policy.has_content)
+            and (self.shadow is None or not self.shadow.has_content)
+            and self.subagents == 0
+        )
 
 
 def build_session_activity_summary(
@@ -152,6 +183,8 @@ def build_session_activity_summary(
         subagents = manifest.confirmed.subagents
         if subagents is not None:
             summary.subagents = int(subagents.total_count)
+
+    summary.shadow = _shadow_activity(forge_root, session_name, since)
 
     # Untagged emitters (e.g. the action tagger) never tag a session, so a per-session
     # view can undercount -- but only flag that once the session has activity to
@@ -192,6 +225,18 @@ def render_summary_line(summary: SessionActivitySummary) -> str | None:
             if sup.errors:
                 seg += f" ({sup.errors} errors)"
             parts.append(seg)
+
+    sh = summary.shadow
+    if sh is not None and sh.has_content:
+        # At session end the candidates were just enqueued (drain runs on a LATER CLI
+        # invocation), so `pending` is the usual case; a later `forge activity` shows
+        # `audited`. Lead with the disagree headline once any are checked.
+        if sh.checked:
+            seg = f"shadow: {sh.checked} audited ({sh.disagree} disagree"
+            seg += f", {sh.error} error)" if sh.error else ")"
+            parts.append(seg)
+        elif sh.pending:
+            parts.append(f"shadow: {sh.pending} queued")
 
     if summary.total_cost_micro_usd is not None:
         # `~` flags the figure as approximate (the aggregate mixes route-reported cost with
@@ -475,6 +520,64 @@ def _policy_activity(manifest, since: datetime | None) -> PolicyActivity | None:
     # PolicyActivity is *semantic-tier* activity (supervisor + plan-check); if neither
     # took part in an in-window decision there is nothing to show (and a deterministic
     # policy warning must not surface a phantom "supervisor: 0 checks" section).
+    return activity if activity.has_content else None
+
+
+def _shadow_activity(forge_root: str | None, session_name: str, since: datetime | None) -> ShadowActivity | None:
+    """Count shadow candidates from the session's shadow dir (best-effort).
+
+    Reads ``.done`` terminal status and pending (``*.json``/``.processing``) records,
+    windowing on each record's ``captured_at``. Best-effort: an unreadable record is
+    skipped, a missing dir yields None (shadow sampling off or nothing captured).
+    The cap bounds the dir to ``shadow_max_per_session`` records, so the per-call
+    parse cost is negligible.
+    """
+    if not forge_root:
+        return None
+    try:
+        from forge.session.artifacts import get_artifact_paths
+
+        directory = get_artifact_paths(Path(forge_root), session_name).shadow_abs
+    except Exception:
+        return None
+    if not directory.is_dir():
+        return None
+
+    from forge.policy.semantic.shadow_runner import (
+        STATUS_AGREE,
+        STATUS_DISAGREE,
+        STATUS_INCONCLUSIVE,
+    )
+
+    activity = ShadowActivity()
+    for entry in directory.iterdir():
+        name = entry.name
+        if name.endswith(".plan.md"):
+            continue  # frozen-plan sidecar, not a record
+        is_done = name.endswith(".done")
+        is_pending = name.endswith(".json") or name.endswith(".processing")
+        if not (is_done or is_pending):
+            continue
+        try:
+            data = json.loads(entry.read_text())
+        except Exception:
+            continue
+        if since is not None and not _entry_in_window(data.get("captured_at"), since):
+            continue
+        if not is_done:
+            activity.pending += 1
+            continue
+        activity.checked += 1
+        status = data.get("status")
+        if status == STATUS_AGREE:
+            activity.agree += 1
+        elif status == STATUS_DISAGREE:
+            activity.disagree += 1
+        elif status == STATUS_INCONCLUSIVE:
+            activity.inconclusive += 1
+        else:  # STATUS_ERROR or any unrecognized terminal status
+            activity.error += 1
+
     return activity if activity.has_content else None
 
 

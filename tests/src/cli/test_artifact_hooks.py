@@ -231,6 +231,43 @@ class TestStopHook:
         assert output["queued"] is True
         assert output["queued_handoff"] is False
 
+    def _write_shadow_candidate(self, store: SessionStore, session_name: str = "test-session") -> None:
+        # Use the store's own forge_root so the candidate lands exactly where the hook's
+        # `has_pending_candidates(effective_forge_root, ...)` gate will look for it.
+        from forge.session.artifacts import get_artifact_paths
+
+        d = get_artifact_paths(Path(str(store.forge_root)), session_name).shadow_abs
+        d.mkdir(parents=True, exist_ok=True)
+        (d / "cand1.json").write_text(json.dumps({"schema_version": 1, "status": "pending"}))
+
+    def test_stop_enqueues_shadow_when_candidate_pending(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        from forge.core.workqueue import pending_work_dir
+
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("FORGE_HOME", str(tmp_path / ".forge-test"))
+        store = _write_manifest(tmp_path, monkeypatch)
+        self._stop_with_transcript(store, tmp_path, "uuid-sh1")
+        self._write_shadow_candidate(store)
+
+        result = CliRunner().invoke(hooks, ["stop"], input=json.dumps({"hook_event_name": "Stop"}))
+
+        assert result.exit_code == 0
+        output = json.loads(result.output)
+        assert output["queued_shadow"] is True
+        assert (pending_work_dir() / "shadow-uuid-sh1.json").is_file()
+
+    def test_stop_skips_shadow_when_no_candidates(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("FORGE_HOME", str(tmp_path / ".forge-test"))
+        store = _write_manifest(tmp_path, monkeypatch)
+        self._stop_with_transcript(store, tmp_path, "uuid-sh2")  # no shadow candidate written
+
+        result = CliRunner().invoke(hooks, ["stop"], input=json.dumps({"hook_event_name": "Stop"}))
+
+        assert result.exit_code == 0
+        output = json.loads(result.output)
+        assert output["queued_shadow"] is False
+
     def test_reconciles_child_uuid_when_fork_session_start_kept_parent_uuid(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:

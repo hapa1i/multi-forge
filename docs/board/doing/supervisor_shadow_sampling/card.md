@@ -1,6 +1,18 @@
 # Supervisor Shadow Sampling — measure the cascade's false-aligned rate
 
-**Status**: Proposed. Follow-up to `supervisor_cascade`; gates any default-on cascade decision.
+**Status**: In progress (`doing/`) — implemented, pending closeout. Follow-up to `supervisor_cascade`; gates any
+default-on cascade decision.
+
+> **Shipped design (supersedes the sketch below).** Two parts of the original sketch changed during implementation; the
+> normative description is [`design_workflows.md` §1.2](../../../design_workflows.md) and the [checklist](checklist.md):
+>
+> - **Recording is an artifact directory, not a decision-log entry.** Shadow records live in
+>   `.forge/artifacts/<session>/shadow/<hash>.{json,processing,done}` (with a `<hash>.plan.md` sidecar), keeping the
+>   audit plane fully separate from the enforcement decision log (which is capped at `MAX_DECISION_LOG`).
+> - **Capture freezes a candidate; the drain is a Stop-batch.** The hook freezes the *raw* action + a copied plan +
+>   routing snapshot (it does not pack content into the queue payload); a Stop-hook marker spawns a detached
+>   `forge policy shadow run` worker that replays the frontier and finalizes each candidate. Counts surface as
+>   `checked`/`disagree`/`pending` in `forge activity`; disagreement artifacts via `forge policy shadow show`.
 
 ## Problem
 

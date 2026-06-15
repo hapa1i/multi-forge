@@ -169,8 +169,8 @@ Docs should say plainly: `ai-curated` is a transfer strategy, not a native-resum
 - **Same-dir transfer requested**: `fork` without `--worktree`, with `--resume-mode transfer` and
   `--strategy ai-curated`, generates transfer context and launches a fresh child without parent
   `--resume --fork-session`.
-- **Same-dir native default preserved**: a fork without transfer flags uses parent `resume_id` and
-  `fork_session=True`, with no generated transfer context.
+- **Same-dir native default preserved**: a fork without transfer flags uses parent `resume_id` and `fork_session=True`,
+  with no generated transfer context.
 - **Ignored flags eliminated**: same-dir fork with `--strategy ai-curated` but no transfer mode either errors before
   creating a child or clearly switches to transfer per the chosen policy.
 - **Inline plan works same-dir**: same-dir transfer with `--inline-plan` embeds approved plan text in the generated

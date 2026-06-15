@@ -33,6 +33,10 @@ DEFAULT_PLAN_CHECK_MODELS_BY_PROVIDER: dict[ProviderType, str] = {
 DEFAULT_PLAN_CHECK_MODEL = DEFAULT_PLAN_CHECK_MODELS_BY_PROVIDER[DEFAULT_PLAN_CHECK_PROVIDER]
 DEFAULT_PLAN_CHECK_BUDGET_TOKENS = 32_000
 
+# Bumped whenever PLAN_CHECK_PROMPT changes. Shadow-sampling records carry this so a prompt edit does not silently
+# blend pre- and post-change verdicts into one false-aligned estimate.
+CHECKER_PROMPT_VERSION = 1
+
 # Provider-agnostic budgeting: exact tokenizers differ across OpenRouter, Gemini,
 # and LiteLLM-served models, so use a conservative chars/token approximation.
 _APPROX_CHARS_PER_TOKEN = 4
@@ -531,6 +535,25 @@ class PlanCheckPolicy(StatefulDeterministicPolicy):
         if verdict.aligned:
             _log.debug("Plan check aligned: %s", verdict.reason)
             self._cache.update(cache_key, aligned=True)
+            # Shadow-sample this FRESH allow (the cache-hit branch above is deliberately never sampled). Best-effort and
+            # gated on rate > 0 so a default session does literal zero I/O here; capture never runs the frontier.
+            if config.shadow_sample_rate > 0.0:
+                try:
+                    from forge.policy.semantic import shadow
+
+                    if shadow.should_sample(config, context, cache_key):
+                        shadow.capture_candidate(
+                            config,
+                            context,
+                            cache_key=cache_key,
+                            tier1_reason=verdict.reason,
+                            checker_model=route.model,
+                            checker_provider=route.provider,
+                            checker_budget_tokens=budget_tokens,
+                            checker_prompt_version=CHECKER_PROMPT_VERSION,
+                        )
+                except Exception:  # best-effort audit: never block the hook
+                    _log.debug("shadow capture failed", exc_info=True)
             return self._allow()
 
         return self._needs_review(

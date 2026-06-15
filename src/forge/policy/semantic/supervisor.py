@@ -19,7 +19,7 @@ from forge.core.reactive.throttle import ThrottleCache, compute_cache_key
 from forge.policy.deterministic.base import DeterministicPolicy
 from forge.policy.semantic.verdict import (
     SupervisorVerdict,
-    parse_supervisor_verdict,
+    parse_supervisor_verdict_with_status,
     verdict_to_decision,
 )
 from forge.policy.types import ActionContext, PolicyDecision
@@ -371,46 +371,67 @@ def _resolve_resume_target(resume_target: str, forge_root: str | None = None) ->
     return _ResolvedTarget(resume_id=session_uuid, source_cwd=source_cwd)
 
 
-def invoke_supervisor(
+@dataclass
+class SupervisorRun:
+    """Result of one frontier-supervisor run.
+
+    Carries the composed ``decision`` (the enforcement path needs only this) plus
+    the raw ``verdict`` and ``run_ok``/``parsed`` flags the shadow auditor needs to
+    classify: ``run_ok`` is whether ``claude -p`` completed, ``parsed`` whether its
+    output was a real JSON verdict (vs the fallback warn). An early/failed exit
+    leaves ``verdict=None``, ``run_ok=False``.
+    """
+
+    decision: PolicyDecision
+    verdict: SupervisorVerdict | None = None
+    run_ok: bool = False
+    parsed: bool = False
+
+
+def run_supervisor_check(
     config: SupervisorConfig,
     context: ActionContext,
     *,
     intent: str | None = None,
-) -> PolicyDecision:
-    """Invoke the semantic supervisor via claude -p --resume.
+    usage_command: str = "supervisor",
+) -> SupervisorRun:
+    """Run the frontier supervisor once; return decision + raw verdict + run/parse status.
 
-    Args:
-        config: Supervisor configuration
-        context: Action being evaluated
-        intent: Policy intent to attach to deny decisions.
-
-    Returns:
-        PolicyDecision based on supervisor verdict (fail-open on errors)
+    Shared core for both enforcement (``invoke_supervisor``) and the shadow
+    auditor. ``usage_command`` labels the single cost/ledger emission (the caller
+    must NOT emit again -- this is the sole emitter), so the shadow path records
+    ``supervisor-shadow`` rather than double-counting as ``supervisor``.
     """
     from forge.core.reactive.env import should_spawn_subprocesses
 
     if not should_spawn_subprocesses():
         _log.debug("Skipping supervisor at FORGE_DEPTH >= %d", 2)
-        return PolicyDecision(
-            decision="allow",
-            policy_id="semantic.supervisor",
-            warnings=["Supervisor skipped (FORGE_DEPTH limit reached)"],
+        return SupervisorRun(
+            PolicyDecision(
+                decision="allow",
+                policy_id="semantic.supervisor",
+                warnings=["Supervisor skipped (FORGE_DEPTH limit reached)"],
+            )
         )
 
     if not config.resume_id:
-        return PolicyDecision(
-            decision="allow",
-            policy_id="semantic.supervisor",
-            warnings=["Supervisor not configured (no resume_id)"],
+        return SupervisorRun(
+            PolicyDecision(
+                decision="allow",
+                policy_id="semantic.supervisor",
+                warnings=["Supervisor not configured (no resume_id)"],
+            )
         )
 
     resolved = _resolve_resume_target(config.resume_id, forge_root=config.forge_root)
     if resolved.warning:
         _log.warning(resolved.warning)
-        return PolicyDecision(
-            decision="allow",
-            policy_id="semantic.supervisor",
-            warnings=[resolved.warning],
+        return SupervisorRun(
+            PolicyDecision(
+                decision="allow",
+                policy_id="semantic.supervisor",
+                warnings=[resolved.warning],
+            )
         )
 
     assert resolved.resume_id is not None
@@ -439,10 +460,12 @@ def invoke_supervisor(
             base_url = routing_result.base_url
         except Exception as e:
             _log.warning("Supervisor proxy '%s' not found: %s", config.proxy, e)
-            return PolicyDecision(
-                decision="warn",
-                policy_id="semantic.supervisor",
-                warnings=[f"Supervisor proxy '{config.proxy}' not found: {e}"],
+            return SupervisorRun(
+                PolicyDecision(
+                    decision="warn",
+                    policy_id="semantic.supervisor",
+                    warnings=[f"Supervisor proxy '{config.proxy}' not found: {e}"],
+                )
             )
         # Keep executor model pins from leaking into the read-only supervisor.
         # With a proxy URL, `--model opus` routes through the proxy's opus tier,
@@ -455,7 +478,7 @@ def invoke_supervisor(
 
     tracking_url = base_url
 
-    with track_verb_cost("supervisor", [tracking_url] if tracking_url else []) as cost:
+    with track_verb_cost(usage_command, [tracking_url] if tracking_url else []) as cost:
         result = run_claude_session(
             prompt,
             resume_id=resolved.resume_id,
@@ -468,10 +491,10 @@ def invoke_supervisor(
             unset_env_vars=unset_env_vars,
         )
 
-    # Attribute before the failure branch so failed runs are recorded too.
+    # Attribute before the failure branch so failed runs are recorded too. This is the SOLE emitter for the run.
     emit_usage_for_session_result(
         result,
-        command="supervisor",
+        command=usage_command,
         cost=cost,
         session=context.session_name,
         model=model,
@@ -484,14 +507,31 @@ def invoke_supervisor(
             "Supervisor invocation failed: %s",
             result.error or f"exit {result.returncode}",
         )
-        return PolicyDecision(
-            decision="allow",
-            policy_id="semantic.supervisor",
-            warnings=[f"Supervisor error: {result.error or f'exit {result.returncode}'}, failing open"],
+        return SupervisorRun(
+            PolicyDecision(
+                decision="allow",
+                policy_id="semantic.supervisor",
+                warnings=[f"Supervisor error: {result.error or f'exit {result.returncode}'}, failing open"],
+            )
         )
 
-    verdict = parse_supervisor_verdict(result.stdout)
-    return verdict_to_decision(verdict, intent=intent)
+    verdict, parsed = parse_supervisor_verdict_with_status(result.stdout)
+    decision = verdict_to_decision(verdict, intent=intent)
+    return SupervisorRun(decision=decision, verdict=verdict, run_ok=True, parsed=parsed)
+
+
+def invoke_supervisor(
+    config: SupervisorConfig,
+    context: ActionContext,
+    *,
+    intent: str | None = None,
+) -> PolicyDecision:
+    """Invoke the semantic supervisor via claude -p --resume (enforcement path).
+
+    Thin wrapper over ``run_supervisor_check`` returning just the composed
+    ``PolicyDecision`` (fail-open on errors).
+    """
+    return run_supervisor_check(config, context, intent=intent).decision
 
 
 # --- Setup-time helpers (used by CLI, direct commands, and --supervise flags) ---

@@ -285,6 +285,57 @@ def enqueue_handoff_marker(
     )
 
 
+def enqueue_shadow_marker(
+    *,
+    session_id: str,
+    session_name: str,
+    worktree_path: Path,
+    forge_root: str | None = None,
+) -> Path | None:
+    """Enqueue a Shadow marker so a later CLI startup drains the session's shadow candidates.
+
+    Convenience wrapper around enqueue() for the Stop hook. Uses
+    marker_id="shadow-<session_id>" to avoid collision with the stop/index/handoff
+    markers. The drain worker reconstructs everything from the shadow dir, so the
+    payload only needs to locate it (session_name + forge_root) and carry the
+    originating session's run identity for cost attribution.
+
+    Args:
+        session_id: The Claude session ID.
+        session_name: Forge session name (locates the shadow dir).
+        worktree_path: Absolute path to the worktree.
+        forge_root: Explicit Forge project root (for nested projects).
+
+    Returns:
+        Path to created marker, or None if enqueue failed.
+    """
+    payload: dict[str, Any] = {
+        "session_id": session_id,
+        "session_name": session_name,
+        "worktree_path": str(worktree_path),
+    }
+    if forge_root:
+        payload["forge_root"] = forge_root
+
+    # Snapshot the originating session's run identity (the Stop hook runs inside the
+    # session's env). The shadow worker is drained and spawned LATER by an unrelated
+    # CLI process, so env inheritance would otherwise root its supervisor-shadow spend
+    # under the drainer; the handler re-roots it under this session. Mirrors the
+    # handoff marker -- additive payload fields, no marker-envelope version bump.
+    from forge.core.reactive.env import get_run_identity
+
+    origin = get_run_identity()
+    if origin:
+        payload["origin_run_id"] = origin.run_id
+        payload["origin_root_run_id"] = origin.root_run_id
+
+    return enqueue(
+        kind="shadow",
+        marker_id=f"shadow-{session_id}",
+        payload=payload,
+    )
+
+
 def process_pending_work(
     *,
     max_items: int = 25,
