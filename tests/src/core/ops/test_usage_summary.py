@@ -8,6 +8,7 @@ capped). The autouse ``isolate_forge_home`` fixture gives each test a fresh
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -771,3 +772,124 @@ class TestRootJoin4g:
         assert sup.cost_estimated is True
         mw = next(c for c in summary.commands if c.command == "memory-writer")
         assert mw.cost_estimated is False  # the exact half stays clean per-command
+
+
+# --- Shadow sampling (Slice 3 read surface) ---------------------------------
+
+
+def _shadow_dir(forge_root: Path, session: str = "planner") -> Path:
+    return forge_root / ".forge" / "artifacts" / session / "shadow"
+
+
+def _write_shadow(
+    forge_root: Path,
+    cand_hash: str,
+    *,
+    session: str = "planner",
+    suffix: str = ".done",
+    status: str | None = None,
+    captured_at: str = "2026-06-03T12:00:00Z",
+    frontier_verdict: str | None = None,
+    frontier_confidence: float | None = None,
+    target_path: str = "src/foo.py",
+) -> Path:
+    d = _shadow_dir(forge_root, session)
+    d.mkdir(parents=True, exist_ok=True)
+    record: dict = {
+        "schema_version": 1,
+        "captured_at": captured_at,
+        "tool_name": "Write",
+        "target_path": target_path,
+    }
+    if status is not None:
+        record["status"] = status
+        record["checked_at"] = "2026-06-03T12:05:00Z"
+    if frontier_verdict is not None:
+        record["frontier_verdict"] = frontier_verdict
+    if frontier_confidence is not None:
+        record["frontier_confidence"] = frontier_confidence
+    path = d / f"{cand_hash}{suffix}"
+    path.write_text(json.dumps(record))
+    return path
+
+
+class TestShadowActivity:
+    def test_no_dir_yields_none(self, tmp_path: Path) -> None:
+        _write_manifest(tmp_path, "planner", decisions=[])
+        summary = build_session_activity_summary("planner", forge_root=str(tmp_path))
+        assert summary.shadow is None
+
+    def test_counts_done_status_breakdown(self, tmp_path: Path) -> None:
+        _write_manifest(tmp_path, "planner", decisions=[])
+        _write_shadow(tmp_path, "a1", status="agree")
+        _write_shadow(tmp_path, "a2", status="agree")
+        _write_shadow(tmp_path, "d1", status="disagree", frontier_verdict="divergent")
+        _write_shadow(tmp_path, "i1", status="inconclusive")
+        _write_shadow(tmp_path, "e1", status="error")
+        summary = build_session_activity_summary("planner", forge_root=str(tmp_path))
+        sh = summary.shadow
+        assert sh is not None
+        assert sh.checked == 5
+        assert (sh.agree, sh.disagree, sh.inconclusive, sh.error) == (2, 1, 1, 1)
+        assert sh.pending == 0
+
+    def test_pending_counts_json_and_processing(self, tmp_path: Path) -> None:
+        _write_manifest(tmp_path, "planner", decisions=[])
+        _write_shadow(tmp_path, "p1", suffix=".json")
+        _write_shadow(tmp_path, "p2", suffix=".processing")
+        _write_shadow(tmp_path, "done1", status="agree")
+        summary = build_session_activity_summary("planner", forge_root=str(tmp_path))
+        sh = summary.shadow
+        assert sh is not None
+        assert sh.pending == 2
+        assert sh.checked == 1
+
+    def test_plan_md_sidecar_ignored(self, tmp_path: Path) -> None:
+        _write_manifest(tmp_path, "planner", decisions=[])
+        _write_shadow(tmp_path, "x1", status="agree")
+        (_shadow_dir(tmp_path) / "x1.plan.md").write_text("# plan")
+        summary = build_session_activity_summary("planner", forge_root=str(tmp_path))
+        assert summary.shadow is not None
+        assert summary.shadow.checked == 1  # sidecar not counted
+
+    def test_since_window_filters_by_captured_at(self, tmp_path: Path) -> None:
+        _write_manifest(tmp_path, "planner", decisions=[])
+        _write_shadow(tmp_path, "old", status="disagree", captured_at="2026-06-01T00:00:00Z")
+        _write_shadow(tmp_path, "new", status="agree", captured_at="2026-06-10T00:00:00Z")
+        since = datetime(2026, 6, 5, tzinfo=timezone.utc)
+        summary = build_session_activity_summary("planner", forge_root=str(tmp_path), since=since)
+        sh = summary.shadow
+        assert sh is not None
+        assert sh.checked == 1 and sh.agree == 1 and sh.disagree == 0
+
+    def test_unknown_status_counts_as_error(self, tmp_path: Path) -> None:
+        _write_manifest(tmp_path, "planner", decisions=[])
+        _write_shadow(tmp_path, "weird", status="bogus")
+        summary = build_session_activity_summary("planner", forge_root=str(tmp_path))
+        assert summary.shadow is not None
+        assert summary.shadow.error == 1
+
+    def test_shadow_only_session_not_empty(self, tmp_path: Path) -> None:
+        # No ledger, no decisions, no subagents -- only a pending shadow candidate.
+        _write_manifest(tmp_path, "planner", decisions=[])
+        _write_shadow(tmp_path, "p1", suffix=".json")
+        summary = build_session_activity_summary("planner", forge_root=str(tmp_path))
+        assert summary.is_empty is False
+
+    def test_render_summary_line_audited_segment(self) -> None:
+        from forge.core.ops.usage_summary import ShadowActivity
+
+        summary = SessionActivitySummary(session="planner")
+        summary.shadow = ShadowActivity(checked=8, agree=5, disagree=2, inconclusive=1, error=0)
+        line = render_summary_line(summary)
+        assert line is not None
+        assert "shadow: 8 audited (2 disagree)" in line
+
+    def test_render_summary_line_queued_segment(self) -> None:
+        from forge.core.ops.usage_summary import ShadowActivity
+
+        summary = SessionActivitySummary(session="planner")
+        summary.shadow = ShadowActivity(pending=4)
+        line = render_summary_line(summary)
+        assert line is not None
+        assert "shadow: 4 queued" in line

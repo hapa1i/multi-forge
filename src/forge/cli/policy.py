@@ -15,6 +15,7 @@ import re
 import sys
 from dataclasses import replace
 from pathlib import Path
+from typing import Any
 
 import click
 from rich.console import Console
@@ -1244,3 +1245,120 @@ def supervise_cmd(
         console.print(f"  Checker budget: {checker_budget} tokens")
     if sup.plan_override_path:
         console.print(f"  Plan override: {sup.plan_override_path}")
+
+
+@policy.group(name="shadow")
+def shadow_group() -> None:
+    """Inspect supervisor shadow-sampling audit results.
+
+    Shadow sampling replays the frontier supervisor post-hoc on a sample of tier-1
+    allows to measure how often the cascade wrongly short-circuited a divergent
+    action. Enable it on a supervised session with
+    'forge session set policy.supervisor.shadow_sample_rate <0..1>'.
+
+    \b
+    Examples:
+        forge policy shadow show              # disagreements for the current session
+        forge policy shadow show --all        # every audited candidate
+    """
+
+
+@shadow_group.command(name="run", hidden=True)
+@click.option("--session-name", required=True, help="Forge session whose shadow candidates to drain")
+@click.option("--root", "forge_root", default=None, help="Forge project root (defaults to cwd resolution)")
+def shadow_run_cmd(session_name: str, forge_root: str | None) -> None:
+    """Drain a session's pending shadow candidates (detached worker; not user-facing).
+
+    Spawned fire-and-forget by the Stop-hook's shadow marker. Replays the frontier
+    supervisor on each captured tier-1 allow, records the verdict, and never
+    enforces. Per-candidate atomic claims bound frontier billing to at-most-once,
+    so a re-spawn after a crash is safe.
+    """
+    from forge.policy.semantic.shadow_runner import run_shadow_for_session
+
+    if not forge_root:
+        from forge.session.artifacts import resolve_forge_root
+
+        forge_root = str(resolve_forge_root(Path.cwd()))
+
+    counts = run_shadow_for_session(session_name, forge_root)
+    click.echo(json.dumps({"session": session_name, "drained": counts}))
+
+
+@shadow_group.command(name="show")
+@click.argument("session", required=False)
+@click.option("--all", "show_all", is_flag=True, help="Show every audited candidate, not just disagreements")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def shadow_show_cmd(session: str | None, show_all: bool, as_json: bool) -> None:
+    """Show shadow-audit disagreements for a session (the cascade's false-aligned cases).
+
+    A disagreement is a fresh tier-1 allow the frontier supervisor would have
+    *blocked* (high-confidence, cited divergence). Use --all to also list agree /
+    inconclusive / error audits.
+
+    \b
+    Examples:
+        forge policy shadow show              # current session ($FORGE_SESSION)
+        forge policy shadow show planner      # a named session
+        forge policy shadow show --all --json
+    """
+    from forge.core.ops.session_context import (
+        SessionContextError,
+        resolve_session_identifier,
+    )
+    from forge.policy.semantic.shadow import read_done_records
+    from forge.policy.semantic.shadow_runner import STATUS_DISAGREE
+
+    try:
+        session_name, forge_root = resolve_session_identifier(session)
+    except SessionContextError as e:
+        if as_json:
+            click.echo(json.dumps({"error": str(e)}))
+        else:
+            print_error_with_tip(str(e), "Run 'forge session list' to see sessions.", console=console)
+        sys.exit(1)
+
+    records = read_done_records(forge_root, session_name)
+    if not show_all:
+        records = [r for r in records if r.get("status") == STATUS_DISAGREE]
+
+    if as_json:
+        click.echo(json.dumps({"session": session_name, "records": records}, indent=2))
+        return
+
+    if not records:
+        scope = "audited candidates" if show_all else "disagreements"
+        console.print(f"[dim]No shadow {scope} for session '{session_name}'.[/dim]")
+        return
+
+    console.print(f"\n[bold]Shadow audit — {session_name}[/bold] [dim]({len(records)} shown)[/dim]")
+    for r in records:
+        _render_shadow_record(r)
+
+
+def _render_shadow_record(record: dict[str, Any]) -> None:
+    """Render one finalized shadow record: the action, the verdict, and any citations."""
+    status = record.get("status", "?")
+    color = {"disagree": "yellow", "error": "red"}.get(status, "dim")
+    target = record.get("target_path") or "N/A"
+    console.print(f"\n  [{color}]{status}[/{color}] · {record.get('tool_name', '?')} {target}")
+
+    confidence = record.get("frontier_confidence")
+    if record.get("frontier_verdict"):
+        conf = f" (confidence {confidence:.0%})" if isinstance(confidence, (int, float)) else ""
+        console.print(f"    frontier: {record['frontier_verdict']}{conf}")
+
+    violations = [v for v in (record.get("frontier_violations") or ()) if isinstance(v, dict)]
+    # For a disagreement, only the *cited* violations met the block bar (confidence >= 0.8
+    # + citations) and drove the would-be block -- the uncited ones are review noise. For
+    # other statuses (shown via --all) keep all: an inconclusive's uncited violations are
+    # exactly why it did NOT block.
+    if status == "disagree":
+        violations = [v for v in violations if v.get("citations")]
+
+    for v in violations:
+        evidence = v.get("evidence")
+        if evidence:
+            console.print(f"    [dim]•[/dim] {evidence}")
+        for citation in v.get("citations") or ():
+            console.print(f"      [dim]↳ {citation}[/dim]")

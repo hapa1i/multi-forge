@@ -580,6 +580,7 @@ Per-emitter session coverage (a per-session summary is honest about what it can 
 | Emitter                                                        | Tags `session`? | Notes                                                                                    |
 | -------------------------------------------------------------- | --------------- | ---------------------------------------------------------------------------------------- |
 | Semantic supervisor (`emit_usage_for_session_result`)          | Yes             | `session=context.session_name` (= manifest name)                                         |
+| Supervisor shadow (`emit_usage_for_session_result`)            | Yes             | `command=supervisor-shadow`; detached drain worker; re-rooted under the origin session   |
 | Memory writer (`emit_usage_for_session_result`)                | Yes             | `session=session_name`                                                                   |
 | Workflow verbs panel/analyze/debate/consensus                  | Yes             | threaded `session=$FORGE_SESSION` (verb aggregate + per-worker)                          |
 | Transfer curation (`emit_direct_llm_usage`, `transfer-curate`) | Yes             | `session=$FORGE_SESSION`; ai-curated strategy only; `route=core_llm`/`runtime=forge_cli` |

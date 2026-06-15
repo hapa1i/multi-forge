@@ -297,3 +297,69 @@ class TestMemoryWriterRunIdentity:
         payload = json.loads(marker_path.read_text())["payload"]
         assert payload["origin_run_id"] == "run_C"
         assert payload["origin_root_run_id"] == "run_R"
+
+
+class TestShadowQueueRouting:
+    """The Stop->queue->handler chain for supervisor shadow sampling (no real frontier)."""
+
+    def test_enqueue_shadow_marker_captures_origin_identity(self, tmp_path: Path) -> None:
+        import json
+        from unittest.mock import patch
+
+        from forge.core.workqueue.queue import enqueue_shadow_marker
+
+        with patch.dict("os.environ", {"FORGE_RUN_ID": "run_C", "FORGE_ROOT_RUN_ID": "run_R"}):
+            marker_path = enqueue_shadow_marker(
+                session_id="sid",
+                session_name="exec",
+                worktree_path=tmp_path,
+                forge_root=str(tmp_path),
+            )
+        assert marker_path is not None
+        payload = json.loads(marker_path.read_text())["payload"]
+        assert payload["origin_run_id"] == "run_C"
+        assert payload["origin_root_run_id"] == "run_R"
+        assert payload["session_name"] == "exec"
+        assert payload["forge_root"] == str(tmp_path)
+
+    def test_shadow_marker_spawns_detached_worker_with_rerooted_env(self, tmp_path: Path) -> None:
+        """Draining a shadow marker Popens `forge policy shadow run` with the session's
+        run-tree re-rooted and the drainer's SESSION scrubbed, then deletes the marker."""
+        from unittest.mock import patch
+
+        from forge.cli.main import _process_pending_work_best_effort
+        from forge.core.workqueue.queue import enqueue_shadow_marker
+
+        # FORGE_DEPTH=3 simulates a drainer running deep in a subprocess chain; the
+        # detached worker is a fresh top-level tree and must reset it to 0, else
+        # run_supervisor_check would skip the frontier (depth >= 2) and record false errors.
+        with patch.dict(
+            "os.environ",
+            {
+                "FORGE_RUN_ID": "run_C",
+                "FORGE_ROOT_RUN_ID": "run_R",
+                "FORGE_SESSION": "drainer",
+                "FORGE_DEPTH": "3",
+            },
+        ):
+            marker_path = enqueue_shadow_marker(
+                session_id="sid",
+                session_name="exec",
+                worktree_path=tmp_path,
+                forge_root=str(tmp_path),
+            )
+            assert marker_path is not None
+            with patch("subprocess.Popen") as popen:
+                _process_pending_work_best_effort()
+
+        popen.assert_called_once()
+        cmd = popen.call_args.args[0] if popen.call_args.args else popen.call_args.kwargs["args"]
+        assert cmd[:4] == ["forge", "policy", "shadow", "run"]
+        assert cmd[cmd.index("--session-name") + 1] == "exec"
+        assert cmd[cmd.index("--root") + 1] == str(tmp_path)
+        env = popen.call_args.kwargs["env"]
+        assert env["FORGE_ROOT_RUN_ID"] == "run_R"  # re-rooted under the originating session
+        assert env["FORGE_PARENT_RUN_ID"] == "run_C"
+        assert "FORGE_SESSION" not in env  # drainer identity scrubbed
+        assert env["FORGE_DEPTH"] == "0"  # depth reset so the frontier replay actually spawns
+        assert not marker_path.is_file()  # handler Popen'd -> marker consumed

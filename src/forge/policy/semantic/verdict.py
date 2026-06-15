@@ -50,36 +50,42 @@ def _warn_verdict(evidence: str, suggested_fix: str) -> SupervisorVerdict:
     )
 
 
-def parse_supervisor_verdict(response: str) -> SupervisorVerdict:
-    """Extract JSON verdict from supervisor response.
+def parse_supervisor_verdict_with_status(response: str) -> tuple[SupervisorVerdict, bool]:
+    """Parse a supervisor response, returning ``(verdict, parsed)``.
 
-    Uses ``extract_json_from_response`` for code-fence/raw JSON extraction,
-    then validates the verdict structure. Unparseable responses return a
-    divergent verdict with 0.0 confidence (maps to "warn", not deny or
-    silent allow).
-
-    Args:
-        response: Raw text response from the supervisor
-
-    Returns:
-        Parsed SupervisorVerdict
+    ``parsed`` is False when the response was empty or unparseable -- the returned
+    verdict is then the divergent-0.0 fallback warn. Callers that *audit* the
+    supervisor (shadow sampling) need this flag to distinguish a real
+    low-confidence divergence (``parsed=True``) from a failed/unparseable run
+    (``parsed=False``), which the bare verdict cannot.
     """
     if not response:
         _log.warning("Empty supervisor response, failing open with warning")
-        return _warn_verdict(
-            "Supervisor response was empty — check supervisor session health",
-            "Verify supervisor resume_id and proxy connectivity",
+        return (
+            _warn_verdict(
+                "Supervisor response was empty — check supervisor session health",
+                "Verify supervisor resume_id and proxy connectivity",
+            ),
+            False,
         )
 
     data = extract_json_from_response(response)
     if data is None:
         _log.warning("Could not parse supervisor verdict, failing open with warning")
-        return _warn_verdict(
-            "Supervisor verdict could not be parsed — check supervisor response format",
-            "Verify supervisor session responds with valid JSON verdict",
+        return (
+            _warn_verdict(
+                "Supervisor verdict could not be parsed — check supervisor response format",
+                "Verify supervisor session responds with valid JSON verdict",
+            ),
+            False,
         )
 
-    return _parse_verdict_data(data)
+    return _parse_verdict_data(data), True
+
+
+def parse_supervisor_verdict(response: str) -> SupervisorVerdict:
+    """Extract a JSON verdict from a supervisor response (fallback warn on failure)."""
+    return parse_supervisor_verdict_with_status(response)[0]
 
 
 def _parse_verdict_data(data: dict[str, Any]) -> SupervisorVerdict:

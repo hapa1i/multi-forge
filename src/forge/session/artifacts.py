@@ -37,6 +37,9 @@ class ArtifactPaths:
     transcripts_abs: Path
     transcripts_rel: Path
 
+    shadow_abs: Path
+    shadow_rel: Path
+
 
 def resolve_forge_root(cwd: Path) -> Path:
     """Resolve the Forge project root for artifact storage.
@@ -92,6 +95,9 @@ def get_artifact_paths(forge_root: Path, session_name: str) -> ArtifactPaths:
     transcripts_rel = artifacts_root_rel / "transcripts"
     transcripts_abs = forge_root / transcripts_rel
 
+    shadow_rel = artifacts_root_rel / "shadow"
+    shadow_abs = forge_root / shadow_rel
+
     return ArtifactPaths(
         forge_root=forge_root,
         artifacts_root_abs=artifacts_root_abs,
@@ -100,6 +106,8 @@ def get_artifact_paths(forge_root: Path, session_name: str) -> ArtifactPaths:
         plans_rel=plans_rel,
         transcripts_abs=transcripts_abs,
         transcripts_rel=transcripts_rel,
+        shadow_abs=shadow_abs,
+        shadow_rel=shadow_rel,
     )
 
 

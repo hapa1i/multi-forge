@@ -23,6 +23,7 @@ from forge.core.state import FileLockTimeoutError, now_iso
 from forge.core.workqueue import (
     enqueue_handoff_marker,
     enqueue_index_marker,
+    enqueue_shadow_marker,
     enqueue_stop_marker,
 )
 from forge.session.artifacts import (
@@ -544,6 +545,26 @@ def stop() -> None:
     except Exception:
         logger.debug("Memory handoff enqueue failed for session %s", manifest.name, exc_info=True)
 
+    # Enqueue a shadow-drain marker only when this session captured pending shadow
+    # candidates (best-effort). The cheap directory glob keeps the Stop hook inert
+    # for the common case where shadow sampling is off (rate 0 never writes the dir).
+    queued_shadow = False
+    try:
+        from forge.policy.semantic.shadow import has_pending_candidates
+
+        if has_pending_candidates(effective_forge_root, manifest.name):
+            queued_shadow = (
+                enqueue_shadow_marker(
+                    session_id=session_id,
+                    session_name=manifest.name,
+                    worktree_path=cwd,
+                    forge_root=effective_forge_root,
+                )
+                is not None
+            )
+    except Exception:
+        logger.debug("Shadow drain enqueue failed for session %s", manifest.name, exc_info=True)
+
     if not manifest_updated:
         # Manifest failed but we still tried to enqueue
         _output_json(
@@ -557,6 +578,7 @@ def stop() -> None:
                 "queued": queued_stop,
                 "queued_index": queued_index,
                 "queued_handoff": queued_handoff,
+                "queued_shadow": queued_shadow,
             }
         )
     else:
@@ -569,6 +591,7 @@ def stop() -> None:
                 "queued": queued_stop,
                 "queued_index": queued_index,
                 "queued_handoff": queued_handoff,
+                "queued_shadow": queued_shadow,
             }
         )
 

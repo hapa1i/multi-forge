@@ -124,20 +124,21 @@ default to the parent cache; `edit`/`diff` resolve a child (inferred when the pa
 
 ### Policy enforcement
 
-| Command                                         | Purpose                                       |
-| ----------------------------------------------- | --------------------------------------------- |
-| `forge policy enable --bundle <name>`           | Enable policy enforcement for current session |
-| `forge policy disable`                          | Disable policy enforcement                    |
-| `forge policy status`                           | Show current policy state (`--json`)          |
-| `forge policy list`                             | List available bundles and rules (`--json`)   |
-| `forge policy check --bundle <name> -f <path>`  | Evaluate policies on demand                   |
-| `forge policy supervisor -f <path> -r <id>`     | Evaluate file against approved plan           |
-| `forge policy supervise <target>`               | Set persistent supervisor for session         |
-| `forge policy supervise --cascade/--no-cascade` | Toggle the tier-1 plan check (cascade)        |
-| `forge policy supervise --off / --on`           | Suspend/resume supervisor (preserves config)  |
-| `forge policy supervise --remove`               | Remove supervisor entirely                    |
-| `forge policy supervise --reload`               | Reload latest relevant approved plan          |
-| `forge policy supervise --reload-from <path>`   | Reload plan from explicit file                |
+| Command                                         | Purpose                                            |
+| ----------------------------------------------- | -------------------------------------------------- |
+| `forge policy enable --bundle <name>`           | Enable policy enforcement for current session      |
+| `forge policy disable`                          | Disable policy enforcement                         |
+| `forge policy status`                           | Show current policy state (`--json`)               |
+| `forge policy list`                             | List available bundles and rules (`--json`)        |
+| `forge policy check --bundle <name> -f <path>`  | Evaluate policies on demand                        |
+| `forge policy supervisor -f <path> -r <id>`     | Evaluate file against approved plan                |
+| `forge policy supervise <target>`               | Set persistent supervisor for session              |
+| `forge policy supervise --cascade/--no-cascade` | Toggle the tier-1 plan check (cascade)             |
+| `forge policy supervise --off / --on`           | Suspend/resume supervisor (preserves config)       |
+| `forge policy supervise --remove`               | Remove supervisor entirely                         |
+| `forge policy supervise --reload`               | Reload latest relevant approved plan               |
+| `forge policy supervise --reload-from <path>`   | Reload plan from explicit file                     |
+| `forge policy shadow show [session]`            | Show shadow-audit disagreements (`--all`/`--json`) |
 
 ### Workflow
 

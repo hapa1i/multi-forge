@@ -584,3 +584,53 @@ class TestPlanCheckCache:
         restored.set_state({"cache": {"key2": {"aligned": True, "checked_at": now_iso()}}})
         assert restored._cache.check("key1") is None
         assert restored._cache.check("key2") is not None
+
+
+# --- Shadow sampling capture seam (Slice 1) ---
+
+
+class TestShadowCapture:
+    """Capture is wired only at the FRESH (uncached) allow seam, gated on rate > 0, best-effort."""
+
+    @patch("forge.policy.semantic.plan_check.run_plan_check")
+    def test_rate_zero_is_inert(self, mock_run: MagicMock, tmp_path: Path) -> None:
+        mock_run.return_value = PlanCheckVerdict(aligned=True, reason="ok")
+        cfg = _config_with_plan(tmp_path, forge_root=str(tmp_path), shadow_sample_rate=0.0)
+        policy = PlanCheckPolicy(config=cfg)
+        with patch("forge.policy.semantic.shadow.should_sample") as spy:
+            decision = policy._check(_make_context())
+        assert decision.decision == "allow"
+        spy.assert_not_called()  # gated out before importing/calling shadow
+        shadow_dir = tmp_path / ".forge" / "artifacts" / "test-session" / "shadow"
+        assert not shadow_dir.exists()  # zero I/O at rate 0
+
+    @patch("forge.policy.semantic.plan_check.run_plan_check")
+    def test_fresh_allow_captures(self, mock_run: MagicMock, tmp_path: Path) -> None:
+        mock_run.return_value = PlanCheckVerdict(aligned=True, reason="aligned")
+        cfg = _config_with_plan(tmp_path, forge_root=str(tmp_path), shadow_sample_rate=1.0)
+        policy = PlanCheckPolicy(config=cfg)
+        decision = policy._check(_make_context())
+        assert decision.decision == "allow"
+        shadow_dir = tmp_path / ".forge" / "artifacts" / "test-session" / "shadow"
+        assert list(shadow_dir.glob("*.json"))  # a pending candidate was frozen
+
+    @patch("forge.policy.semantic.plan_check.run_plan_check")
+    def test_cache_hit_not_sampled(self, mock_run: MagicMock, tmp_path: Path) -> None:
+        mock_run.return_value = PlanCheckVerdict(aligned=True, reason="aligned")
+        cfg = _config_with_plan(tmp_path, forge_root=str(tmp_path), shadow_sample_rate=1.0)
+        policy = PlanCheckPolicy(config=cfg)
+        ctx = _make_context()
+        with patch("forge.policy.semantic.shadow.capture_candidate") as cap:
+            policy._check(ctx)  # fresh -> captures
+            policy._check(ctx)  # cached -> must NOT capture
+        assert cap.call_count == 1
+        assert mock_run.call_count == 1  # second call short-circuited by the throttle cache
+
+    @patch("forge.policy.semantic.plan_check.run_plan_check")
+    def test_capture_failure_is_swallowed(self, mock_run: MagicMock, tmp_path: Path) -> None:
+        mock_run.return_value = PlanCheckVerdict(aligned=True, reason="aligned")
+        cfg = _config_with_plan(tmp_path, forge_root=str(tmp_path), shadow_sample_rate=1.0)
+        policy = PlanCheckPolicy(config=cfg)
+        with patch("forge.policy.semantic.shadow.capture_candidate", side_effect=RuntimeError("boom")):
+            decision = policy._check(_make_context())
+        assert decision.decision == "allow"  # audit failure never blocks the hook

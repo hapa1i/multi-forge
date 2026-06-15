@@ -255,12 +255,57 @@ def _process_pending_work_best_effort() -> None:
                 stdin=subprocess.DEVNULL,
             )
 
+        def _shadow_handler(marker: Marker) -> None:
+            """Spawn a detached background process to drain shadow candidates.
+
+            Same fire-and-forget shape as the memory writer: the handler returns
+            as soon as the worker is launched (the marker is then deleted), and the
+            actual frontier replays happen in the background. Per-candidate atomic
+            claims (not the work queue) bound at-most-once frontier billing, so a
+            crashed worker is recoverable on the next drain. Reuses
+            ``_memory_writer_env`` to re-root the worker's supervisor-shadow spend
+            under the originating session.
+            """
+            import subprocess
+
+            from forge.core.reactive.env import FORGE_DEPTH_VAR
+
+            payload = marker.payload
+            cmd = [
+                "forge",
+                "policy",
+                "shadow",
+                "run",
+                "--session-name",
+                payload["session_name"],
+            ]
+            marker_forge_root = payload.get("forge_root")
+            if marker_forge_root:
+                cmd.extend(["--root", marker_forge_root])
+
+            env = _memory_writer_env(payload)
+            # This is a fresh top-level process tree (start_new_session=True). Reset the
+            # recursion depth so the frontier replay actually spawns -- the inherited
+            # drainer's FORGE_DEPTH would otherwise leak in, and run_supervisor_check
+            # skips at FORGE_DEPTH >= 2, turning every audit into a false `error`.
+            env[FORGE_DEPTH_VAR] = "0"
+
+            subprocess.Popen(
+                cmd,
+                env=env,
+                start_new_session=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                stdin=subprocess.DEVNULL,
+            )
+
         handlers: dict[str, WorkHandler] = {
             "stop": _noop_stop_handler,
             "index": _index_handler,
             # Marker kind stays "handoff" (work-queue routing key, ephemeral); only
             # the handler/command surface is renamed to memory-writer.
             "handoff": _memory_writer_handler,
+            "shadow": _shadow_handler,
         }
 
         # Limit to 5 items per startup to avoid blocking CLI when many

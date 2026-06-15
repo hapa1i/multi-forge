@@ -126,6 +126,17 @@ def _render(summary: SessionActivitySummary, *, days: int | None) -> None:
         for warning in pol.recent_warnings:
             console.print(f"  [yellow]•[/yellow] {warning}")
 
+    sh = summary.shadow
+    if sh is not None and sh.has_content:
+        line = f"\n[bold]Shadow (audit)[/bold]: {sh.checked} checked"
+        if sh.checked:
+            line += f" · {sh.agree} agree · [yellow]{sh.disagree} disagree[/yellow] · {sh.inconclusive} inconclusive"
+            if sh.error:
+                line += f" · [red]{sh.error} error[/red]"
+        if sh.pending:
+            line += f" · {sh.pending} pending"
+        console.print(line)
+
     if summary.subagents:
         console.print(f"\n[bold]Subagents[/bold]: {summary.subagents}")
 
