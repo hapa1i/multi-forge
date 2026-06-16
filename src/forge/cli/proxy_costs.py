@@ -393,16 +393,18 @@ def _output_json(
 
 
 # Reset wipes the on-disk planes Forge records spend/usage into, plus the derived
-# status-line cost cache that would otherwise replay a stale `forge +$Y` within its TTL.
-# Each target carries its own glob (planes shard as `*.jsonl`; the cache as `fcost-*.json`).
-# Audit records (audit/) are a separate redacted-wire plane and are intentionally NOT
-# touched. In-memory proxy state (ProxyMetrics totals, cap counters) lives in a separate
-# process the CLI cannot reach -- the printed tip points at a restart for those.
+# status-line caches that would otherwise replay a stale `forge +$Y` / supervisor-health
+# marker within their TTL. Each target carries its own glob (planes shard as `*.jsonl`;
+# the derived caches as `fcost-*.json` / `fhealth-*.json`). Audit records (audit/) are a
+# separate redacted-wire plane and are intentionally NOT touched. In-memory proxy state
+# (ProxyMetrics totals, cap counters) lives in a separate process the CLI cannot reach --
+# the printed tip points at a restart for those.
 _RESET_TARGETS: tuple[tuple[str, tuple[str, ...], str], ...] = (
     ("request cost logs", ("costs", "requests"), "*.jsonl"),
     ("verb cost logs", ("costs", "verbs"), "*.jsonl"),
     ("usage ledger", ("usage", "events"), "*.jsonl"),
     ("status-line cost cache", ("cache", "statusline"), "fcost-*.json"),
+    ("status-line supervisor-health cache", ("cache", "statusline"), "fhealth-*.json"),
 )
 
 
@@ -413,8 +415,8 @@ def reset_cmd(yes: bool, dry_run: bool) -> None:
     """Reset all recorded cost and usage telemetry to zero.
 
     Deletes the request cost logs, verb cost logs, the usage-attribution ledger, and the
-    derived status-line cost cache (`forge +$Y`) under FORGE_HOME. Audit records are left
-    untouched. This is irreversible.
+    derived status-line caches (`forge +$Y` cost + supervisor-health) under FORGE_HOME.
+    Audit records are left untouched. This is irreversible.
 
     A running proxy keeps its cost totals AND cap counters in memory until restarted, so a
     live proxy's cumulative-cost header, snapshot, and `forge proxy costs show` figures do

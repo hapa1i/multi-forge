@@ -1195,19 +1195,39 @@ _BUNDLE_LABELS = {"tdd": "TDD", "coding_standards": "STD"}
 _AUDIT_MODE_LABELS = {"passthrough": "pass", "inspect": "inspect", "override": "override"}
 
 
-def format_supervisor(suspended: bool, enabled: bool = True) -> str:
-    """Supervisor posture: ``SUP`` active, ``SUP(susp)`` suspended, ``SUP(off)`` when
-    policy is disabled.
+def format_supervisor(
+    suspended: bool,
+    enabled: bool = True,
+    *,
+    recent_failures: int = 0,
+    last_kind: str | None = None,
+) -> str:
+    """Supervisor posture, optionally suffixed with recent fail-open health.
 
-    ``policy.enabled=False`` makes the whole policy subsystem inert (the hook
-    exits before running), so a disabled supervisor is not actually watching —
+    Posture: ``SUP`` active, ``SUP(susp)`` suspended, ``SUP(off)`` when policy is
+    disabled. ``policy.enabled=False`` makes the whole policy subsystem inert (the
+    hook exits before running), so a disabled supervisor is not actually watching —
     distinct from suspended. Both non-active states use the warning color.
+
+    When ``recent_failures > 0`` a posture-independent ``!N <kind>`` suffix is
+    appended (``SUP!3 timeout``) — the newest-first contiguous run of frontier
+    supervisor runs the usage ledger recorded as a non-``success`` status, tiered
+    like :func:`format_spend_cap` (yellow 1-2, red >= 3). ``recent_failures == 0``
+    (the default, and the no-session / fail-open case) renders the bare posture,
+    byte-identical to a supervisor with no health data. ``last_kind`` is the display
+    kind (``"timeout"`` | ``"error"``) of the newest failure.
     """
     if not enabled:
-        return f"{YELLOW}SUP(off){RESET}"
-    if suspended:
-        return f"{YELLOW}SUP(susp){RESET}"
-    return f"{METRICS_COLOR}SUP{RESET}"
+        token = f"{YELLOW}SUP(off){RESET}"
+    elif suspended:
+        token = f"{YELLOW}SUP(susp){RESET}"
+    else:
+        token = f"{METRICS_COLOR}SUP{RESET}"
+    if recent_failures <= 0:
+        return token  # byte-identical to today: no failures -> bare posture
+    color = RED if recent_failures >= 3 else YELLOW
+    kind = last_kind or "error"  # reader guarantees a kind when count>0; defend the str|None type
+    return f"{token}{color}!{recent_failures} {kind}{RESET}"
 
 
 def format_policy(bundles: list[str], enabled: bool = True) -> str | None:

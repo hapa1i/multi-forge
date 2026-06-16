@@ -39,6 +39,8 @@ from forge.cli.status_line import (
 from forge.cli.statusline.context import RenderContext
 from forge.cli.statusline.names import DEFAULT_ORDER, SEGMENT_NAMES
 from forge.cli.statusline.registry import render_segments
+from forge.core.ops.usage_summary import SupervisorHealth
+from forge.core.usage.ledger import UsageEvent, log_usage_event
 from forge.runtime_config import RuntimeConfig, StatusLineConfig
 
 # --- Builders -------------------------------------------------------------
@@ -73,6 +75,20 @@ def _stream(ctx, segments):
     return [_plain(s) for s in stream]
 
 
+def _seed_supervisor(**kw: object) -> None:
+    """Append one usage event for the ``planner`` session (defaults: a supervisor success)."""
+    base: dict[str, object] = {
+        "run_id": "r",
+        "root_run_id": "r",
+        "runtime": "claude_code",
+        "command": "supervisor",
+        "status": "success",
+        "session": "planner",
+    }
+    base.update(kw)
+    log_usage_event(UsageEvent(**base))  # type: ignore[arg-type]
+
+
 # --- Pure format helpers --------------------------------------------------
 
 
@@ -81,6 +97,32 @@ class TestFormatHelpers:
         assert "SUP" in format_supervisor(suspended=False)
         assert "susp" not in format_supervisor(suspended=False)
         assert "SUP(susp)" in format_supervisor(suspended=True)
+
+    def test_supervisor_health_none_is_byte_identical(self):
+        # The optional health params must not perturb the bare posture: zero failures
+        # (the default, the fail-open None, and an empty streak) render today's token.
+        for suspended, enabled in [(False, True), (True, True), (False, False)]:
+            bare = format_supervisor(suspended=suspended, enabled=enabled)
+            assert format_supervisor(suspended=suspended, enabled=enabled, recent_failures=0) == bare
+            assert format_supervisor(suspended=suspended, enabled=enabled, recent_failures=0, last_kind=None) == bare
+
+    def test_supervisor_health_suffix_and_tiers(self):
+        # >0 failures append `!N <kind>`, tiered like format_spend_cap (yellow 1-2, red >=3).
+        # Asserted on the active posture (METRICS_COLOR) so the tier color can only be the suffix.
+        red3 = format_supervisor(suspended=False, recent_failures=3, last_kind="timeout")
+        assert _plain(red3) == "SUP!3 timeout" and RED in red3
+        yellow2 = format_supervisor(suspended=False, recent_failures=2, last_kind="timeout")
+        assert _plain(yellow2) == "SUP!2 timeout" and YELLOW in yellow2
+        err = format_supervisor(suspended=False, recent_failures=4, last_kind="error")
+        assert _plain(err) == "SUP!4 error" and RED in err
+
+    def test_supervisor_health_suffix_is_posture_independent(self):
+        # The suffix attaches to whatever posture renders -- suspended/off keep their
+        # prior fail-open history (they emit no new events to reset it).
+        susp = format_supervisor(suspended=True, recent_failures=2, last_kind="timeout")
+        assert _plain(susp) == "SUP(susp)!2 timeout"
+        off = format_supervisor(suspended=False, enabled=False, recent_failures=4, last_kind="error")
+        assert _plain(off) == "SUP(off)!4 error"
 
     def test_policy_known_bundles_abbreviated(self):
         assert "pol:TDD" in _plain(format_policy(["tdd"]) or "")
@@ -191,6 +233,64 @@ class TestSupervisorProducer:
         assert any("SUP(susp)" in s for s in stream)
         # Intent dict is untouched (apply_overrides deepcopies).
         assert intent["policy"]["supervisor"]["suspended"] is False
+
+    def test_health_suffix_from_ledger(self):
+        # Acceptance: 3 supervisor timeouts in the ledger -> `SUP!3 timeout` end-to-end.
+        for i in (1, 2, 3):
+            _seed_supervisor(status="timeout", failure_type="timeout", ts=f"2026-06-16T12:00:0{i}Z")
+        manifest = {
+            "name": "planner",
+            "created_at": "2026-06-16T00:00:00Z",
+            "intent": {"policy": {"enabled": True, "supervisor": {"suspended": False}}},
+        }
+        out = _stream(_ctx(manifest=manifest), ["supervisor"])
+        assert any("SUP!3 timeout" in s for s in out)
+
+    def test_health_suffix_on_disabled_posture(self):
+        # Posture-independent: a disabled supervisor still shows accrued fail-open history.
+        manifest = {
+            "name": "planner",
+            "created_at": "2026-06-16T00:00:00Z",
+            "intent": {"policy": {"enabled": False, "supervisor": {"suspended": False}}},
+        }
+        with patch(
+            "forge.core.ops.usage_summary.read_supervisor_health",
+            return_value=SupervisorHealth(4, "error", "ts"),
+        ):
+            out = _stream(_ctx(manifest=manifest), ["supervisor"])
+        assert any("SUP(off)!4 error" in s for s in out)
+
+    def test_health_suffix_on_suspended_posture(self):
+        intent = {"policy": {"enabled": True, "supervisor": {"suspended": False}}}
+        manifest = {
+            "name": "planner",
+            "created_at": "2026-06-16T00:00:00Z",
+            "intent": intent,
+            "overrides": {"policy": {"supervisor": {"suspended": True}}},
+        }
+        with patch(
+            "forge.core.ops.usage_summary.read_supervisor_health",
+            return_value=SupervisorHealth(2, "timeout", "ts"),
+        ):
+            out = _stream(_ctx(manifest=manifest), ["supervisor"])
+        assert any("SUP(susp)!2 timeout" in s for s in out)
+
+    def test_raising_reader_degrades_to_posture_only(self):
+        # Fail-open differs from forge_cost: the throttle swallows the read error ->
+        # supervisor_health is None -> the POSTURE still renders, just without a suffix
+        # (the posture is manifest-derived, not ledger-derived).
+        manifest = {
+            "name": "planner",
+            "created_at": "2026-06-16T00:00:00Z",
+            "intent": {"policy": {"enabled": True, "supervisor": {"suspended": False}}},
+        }
+        with patch(
+            "forge.core.ops.usage_summary.read_supervisor_health",
+            side_effect=RuntimeError("ledger boom"),
+        ):
+            out = _stream(_ctx(manifest=manifest), ["supervisor"])
+        assert any("SUP" in s for s in out)  # posture survives the read error
+        assert not any("!" in s for s in out)  # but no health suffix
 
 
 class TestPolicyProducer:
@@ -505,3 +605,59 @@ class TestEndToEndRender:
         # Configured but no session/proxy -> baseline path+model only, no crash.
         visible = self._render(dict(_DATA), segments=["path", "model", "supervisor", "policy", "audit", "drift"])
         assert "SUP" not in visible and "pol:" not in visible and "aud:" not in visible and "drift:" not in visible
+
+    def test_supervisor_segment_exits_zero_on_corrupt_ledger(self):
+        # Acceptance row "Status-line fail-open": a malformed usage shard must yield empty
+        # health, the bar must still exit 0, and the posture renders with NO '!' suffix.
+        # Drives a REAL corrupt shard through the full status_line() CLI with the supervisor
+        # segment ACTIVELY reading the ledger -- the other e2e cases never trigger a ledger
+        # read (their manifests carry no "name", so supervisor_health is gated out early).
+        from forge.core.paths import get_forge_home
+
+        events_dir = get_forge_home() / "usage" / "events"
+        events_dir.mkdir(parents=True, exist_ok=True)
+        (events_dir / "2026-06_bad.jsonl").write_text("{ not valid json\n", encoding="utf-8")
+        manifest = (
+            {
+                "name": "planner",
+                "created_at": "2026-06-16T00:00:00Z",
+                "intent": {"policy": {"enabled": True, "supervisor": {"suspended": False}}},
+            },
+            True,
+        )
+        # _render asserts exit_code == 0 internally.
+        visible = self._render(dict(_DATA), segments=["path", "model", "supervisor"], session=manifest)
+        assert "SUP" in visible  # posture renders through the full CLI
+        assert "SUP!" not in visible  # corrupt ledger -> empty health -> no suffix
+
+
+class TestSupervisorHealthContext:
+    """`RenderContext.supervisor_health` -- manifest-gated, lazy, throttled.
+
+    Exercises the accessor directly; the `SUP!N` render that consumes it is covered by
+    `TestFormatHelpers` (the format) and `TestSupervisorProducer` (the producer wiring).
+    """
+
+    def test_none_without_session_name(self):
+        assert _ctx(manifest=None).supervisor_health is None
+        assert _ctx(manifest={"intent": {}}).supervisor_health is None  # no "name"
+
+    def test_reads_ledger_streak(self):
+        for i in (1, 2, 3):
+            _seed_supervisor(status="timeout", failure_type="timeout", ts=f"2026-06-16T12:00:0{i}Z")
+        health = _ctx(manifest={"name": "planner", "created_at": "2026-06-16T00:00:00Z"}).supervisor_health
+        assert health is not None
+        assert health.recent_failures == 3
+        assert health.last_kind == "timeout"
+
+    def test_is_lazy_and_cached(self):
+        with patch(
+            "forge.core.ops.usage_summary.read_supervisor_health",
+            return_value=SupervisorHealth(2, "timeout", "ts"),
+        ) as reader:
+            ctx = _ctx(manifest={"name": "planner", "created_at": "2026-06-16T00:00:00Z"})
+            reader.assert_not_called()  # cached_property is lazy: construction reads nothing
+            first = ctx.supervisor_health
+            second = ctx.supervisor_health
+        assert first == second == SupervisorHealth(2, "timeout", "ts")
+        assert reader.call_count == 1  # cached_property collapses repeat access to one read

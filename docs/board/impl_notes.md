@@ -241,28 +241,30 @@ shipped code before promotion.
 ### Supervisor launch controls + per-caller reasoning effort (shipped 2026-06-15)
 
 Durable invariants for `supervisor_launch_controls` (#29): launch-time cascade parity for
-`forge session fork/start --supervise`, plus a per-caller `--effort` lever on every Forge `claude -p` subprocess. Sources:
-`src/forge/core/effort.py`, `core/llm/types.py`, `core/reactive/session_runner.py`, `policy/semantic/supervisor.py`,
-`policy/semantic/plan_check.py`, `session/models.py`, `cli/{session_fork,session_lifecycle,policy,memory}.py`. Each
-invariant was adversarially verified against the shipped code (file:line) before promotion.
+`forge session fork/start --supervise`, plus a per-caller `--effort` lever on every Forge `claude -p` subprocess.
+Sources: `src/forge/core/effort.py`, `core/llm/types.py`, `core/reactive/session_runner.py`,
+`policy/semantic/supervisor.py`, `policy/semantic/plan_check.py`, `session/models.py`,
+`cli/{session_fork,session_lifecycle,policy,memory}.py`. Each invariant was adversarially verified against the shipped
+code (file:line) before promotion.
 
-- **Two effort vocabularies, two validator homes — do not merge them.** Claude `--effort` = `{low,medium,high,xhigh,max}`
-  (`validate_claude_effort`, `core/effort.py`); core.llm `ReasoningEffort` = `{none,low,medium,high,xhigh}`
-  (`validate_reasoning_effort`, `core/llm/types.py`). `max` is Claude-only; `none` is checker-only; a drift-guard test
-  asserts they stay unequal. The Claude validator lives in the dependency-light leaf `core/effort.py`, **not**
-  `core/reactive/effort.py`, because `core/reactive/__init__.py` eagerly imports the heavy session runner — importing it
-  from the foundational `session/models.py` would re-create an import cycle. So `session/models.py` keeps an inline
-  `_CHECKER_EFFORT_LEVELS` mirror (drift-guarded by `test_effort.py`) instead of importing the core.llm vocab.
+- **Two effort vocabularies, two validator homes — do not merge them.** Claude `--effort` =
+  `{low,medium,high,xhigh,max}` (`validate_claude_effort`, `core/effort.py`); core.llm `ReasoningEffort` =
+  `{none,low,medium,high,xhigh}` (`validate_reasoning_effort`, `core/llm/types.py`). `max` is Claude-only; `none` is
+  checker-only; a drift-guard test asserts they stay unequal. The Claude validator lives in the dependency-light leaf
+  `core/effort.py`, **not** `core/reactive/effort.py`, because `core/reactive/__init__.py` eagerly imports the heavy
+  session runner — importing it from the foundational `session/models.py` would re-create an import cycle. So
+  `session/models.py` keeps an inline `_CHECKER_EFFORT_LEVELS` mirror (drift-guarded by `test_effort.py`) instead of
+  importing the core.llm vocab.
 - **`run_claude_session` `--effort` is fail-loud, NOT retry-latch.** It appends `--effort` after `--model`; if an older
   `claude` rejects the flag (`_is_effort_flag_rejection`) the run fails loud with `call_count == 1` — no silent
   rerun-at-default. This is deliberately the opposite of the `--output-format json` telemetry path, which
-  retries-once-and-latches (`headless_json.mark_json_output_unsupported`). Rationale: effort changes model behavior, so a
-  silent default-rerun would misreport what actually ran.
-- **Cascade-at-launch is flag-only — the asymmetry with `policy supervise --cascade` is intentional.** `fork`/`start
-  --supervise --cascade` set `cascade=True` only; the runtime hook escalates to the frontier when no approved plan exists
-  yet. `forge policy supervise --cascade` instead resolves the approved-plan snapshot eagerly (via the `--reload`
-  machinery) and exits 1 if none resolves. Do not "fix" the divergence: launch time legitimately has no plan snapshot
-  yet.
+  retries-once-and-latches (`headless_json.mark_json_output_unsupported`). Rationale: effort changes model behavior, so
+  a silent default-rerun would misreport what actually ran.
+- **Cascade-at-launch is flag-only — the asymmetry with `policy supervise --cascade` is intentional.**
+  `fork`/`start --supervise --cascade` set `cascade=True` only; the runtime hook escalates to the frontier when no
+  approved plan exists yet. `forge policy supervise --cascade` instead resolves the approved-plan snapshot eagerly (via
+  the `--reload` machinery) and exits 1 if none resolves. Do not "fix" the divergence: launch time legitimately has no
+  plan snapshot yet.
 - **One Click-free checker-helper source prevents launch/policy drift.** `CHECKER_PROVIDER_CHOICES`,
   `normalize_checker_provider_arg`, `validate_checker_model` (raises `ValueError` containing "prefixed model id"), and
   `apply_checker_options` live in `policy/semantic/supervisor.py` (no Click). `cli/policy.py` and `plan_check.py` import
@@ -278,6 +280,44 @@ invariant was adversarially verified against the shipped code (file:line) before
   alone, silently dropping `forge memory enable --effort high` on an already-enabled, same-mode session. Regression in
   `test_memory.py`. When adding a new persisted activation field, add it to the no-op comparison or it joins this class
   of silent drop.
+
+### Supervisor status-line health: surface fail-open from the usage ledger (shipped 2026-06-16)
+
+Durable invariants for `supervisor_statusline_health` (#30): make a silently fail-open supervisor visible on the
+always-on status line (`SUP!N <kind>`) and in `forge activity` (`failing open: N timeout, N error`), reading the outcome
+the usage ledger already records. Sources: `src/forge/core/ops/usage_summary.py`, `src/forge/cli/status_line.py`,
+`src/forge/cli/statusline/{throttle,context,registry}.py`, `src/forge/cli/activity.py`.
+
+- **Read the ledger, not the decision log — the on-model source.** The supervisor's timeout/subprocess fail-open is
+  already in the usage ledger as a non-`success` `UsageEvent.status`/`failure_type` (`emit_usage_for_session_result`).
+  Surfacing it needed **no** new durable field. The rejected alternative — a structured `failure_kind` on
+  `PolicyDecision` — patches the *accidental* outcome record (the decision log) instead of the real one; it is deferred
+  to `upstream_downstream_ledgers` along with the kinds the ledger can't yet see (parse fail-opens logged `success`,
+  auth fail-opens that emit no event, and exact cached-allow reset).
+- **Two read shapes off one ledger, one kind vocabulary.** `read_supervisor_health` returns the **newest-first
+  contiguous fail-open streak** (resets on the first `success`) for the status-line `SUP!N`; `_aggregate_ledger` returns
+  the **window total** per kind (`CommandUsage.error_kinds`) for `forge activity`. They are deliberately different
+  numbers and the docs say so. Both map `failure_type` through the single `_failure_kind` helper (`timeout` exact,
+  everything incl. `None`/subprocess/exit/runtime → `error`) — keep that the only source of the kind mapping or the two
+  surfaces drift.
+- **Generic data, supervisor-only interpretation.** `CommandUsage.error_kinds` is a generic per-kind split of the
+  existing generic `errors` count, populated uniformly for every command in `_aggregate_ledger` (no
+  `command == "supervisor"` branch). "Failing open" is applied **only** by the supervisor formatter
+  (`format_failing_open`); a memory-writer/panel error is an error, not a fail-open. Non-supervisor rows still carry
+  `error_kinds` in `--json` as an honest generic breakdown.
+- **`format_failing_open` is gated on `error_kinds`, not `errors` — with an explicit caller fallback.** Real ledger rows
+  co-populate both (`_failure_kind(None) == "error"`), so `errors>0 / error_kinds={}` is exclusively a hand-built /
+  internal summary. The helper returns `None` there; `render_summary_line` falls back **locally** to the legacy
+  `"{errors} errors"` so the count is never silently dropped (regression: `test_errors_only_falls_back_to_count`; the
+  three pre-existing hand-built `TestRenderLine` tests stay green unchanged). `forge activity` needs no fallback — its
+  commands table already shows the lumped count, so the Supervisor line carries pure breakdown detail.
+- **Status-line health stays fail-open + posture-preserving.** The throttled read (`read_or_compute_session_health`,
+  same `forge_cost_ttl` window, distinct `fhealth-` cache) degrades a read error to **posture-only** (no suffix), never
+  hiding the posture — unlike `forge_cost`, whose whole value is ledger-derived. `SUP!N` attaches to any posture
+  (`SUP`/`SUP(susp)`/`SUP(off)`) so suspended/off keeps prior fail-open history visible. `recent_failures==0` is
+  byte-identical to today (golden-safe; `supervisor` stays out of `DEFAULT_ORDER`). Frontier-only:
+  `command="supervisor"` excludes `supervisor-shadow`/`plan-check`. `forge proxy costs reset` clears `fhealth-*.json`
+  alongside `fcost-*.json` so a wiped ledger can't replay cached health.
 
 ### Proposed Promotions From Metric Evidence (awaiting human review, 2026-06-06)
 

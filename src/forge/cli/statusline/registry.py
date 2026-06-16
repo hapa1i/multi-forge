@@ -178,9 +178,13 @@ def _produce_supervisor(ctx: RenderContext) -> Optional[str]:
     supervisor = policy.get("supervisor")
     if not isinstance(supervisor, dict):
         return None
+    # Append recent fail-open health (ledger-derived, throttled, lazy); None -> no suffix.
+    health = ctx.supervisor_health
     return sl.format_supervisor(
         suspended=bool(supervisor.get("suspended", False)),
         enabled=bool(policy.get("enabled", False)),
+        recent_failures=health.recent_failures if health else 0,
+        last_kind=health.last_kind if health else None,
     )
 
 
