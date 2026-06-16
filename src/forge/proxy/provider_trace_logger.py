@@ -52,6 +52,9 @@ def _pid_suffix() -> str:
 
 
 def _traces_dir() -> Path:
+    # Forward-ref: this hardcoded "openrouter" segment (and the record_provider_trace gate below) is the
+    # model-source identity the `unified_backend` board proposal migrates to a backend id -- a deliberate
+    # clean break, so it stays a literal, not a seam. (`rg unified_backend` finds the card; lane-stable slug.)
     return get_forge_home() / "providers" / "openrouter" / "traces"
 
 
@@ -215,6 +218,11 @@ def record_provider_trace(
 
     Direct-OpenRouter-only by design: gateway-routed OpenRouter (LiteLLM -> OpenRouter)
     is out of scope for this card, so a ``litellm``/``unknown`` route writes nothing.
+
+    Forward-ref: the ``unified_backend`` board proposal (find it with ``rg unified_backend``) migrates
+    this provider-literal gate (and the ``_traces_dir`` path) to a backend-id check, broadening beyond
+    OpenRouter via ``selected_provider``. A deliberate clean break -- kept a hardcoded literal, not a
+    premature seam, until that proposal runs. (Slug, not a board path -- cards move lanes.)
     """
     if provider_name != "openrouter":
         return
