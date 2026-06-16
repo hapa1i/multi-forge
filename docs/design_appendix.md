@@ -583,12 +583,14 @@ aggregates it with the manifest's `confirmed.policy.decisions` into a `SessionAc
 `CommandUsage` run/error/token/cost rows; decisions -> `PolicyActivity` supervisor allow/warn/deny + warnings, with
 `log_capped` when the decision log hit `MAX_DECISION_LOG`). The builder re-reads the manifest fresh from disk because
 hooks mutate `confirmed.*` during the run. `forge activity [session]` renders a table (`--json`/`--days`/`--all`); the
-launcher prints a one-line `render_summary_line(...)` on exit (host, sidecar, fork). The Supervisor render and the
-session-end line append a `failing open: N timeout, N error` clause from the window's supervisor `failure_type` split
-(generic `CommandUsage.error_kinds`, surfaced in `--json`; `format_failing_open` falls back to the plain `errors` count
-for hand-built rows). This is the window aggregate behind the status line's consecutive `SUP!N` streak (§A.8) — no
-durable-schema change. Cost is reported-or-estimated (best-effort; the verb-snapshot aggregate contributes estimates)
-and may be partial (`cost_partial`); `forge proxy costs show` is authoritative.
+launcher prints a one-line `render_summary_line(...)` on exit (host, sidecar, fork). The `forge activity` Supervisor
+render and the session-end line append a `failing open: N timeout, N error` clause from the window's supervisor
+`failure_type` split (generic `CommandUsage.error_kinds`, surfaced in `--json`). `format_failing_open` returns `None`
+for an empty/all-zero `error_kinds`; the session-end line (`render_summary_line`) then falls back locally to the plain
+`errors` count for hand-built rows, while the `forge activity` render shows the clause only when kinds are populated
+(its commands table already carries the lumped count). This is the window aggregate behind the status line's consecutive
+`SUP!N` streak (§A.8) — no durable-schema change. Cost is reported-or-estimated (best-effort; the verb-snapshot
+aggregate contributes estimates) and may be partial (`cost_partial`); `forge proxy costs show` is authoritative.
 
 Per-emitter session coverage (a per-session summary is honest about what it can attribute):
 

@@ -149,6 +149,25 @@ def test_health_reuses_within_ttl() -> None:
     assert calls["n"] == 1, "second poll within TTL reuses the cache"
 
 
+def test_health_recomputes_after_ttl() -> None:
+    compute, calls = _health_counter(SupervisorHealth(2, "timeout", "ts"))
+    read_or_compute_session_health("kh", ttl=10, compute_fn=compute, now=1000.0)
+    read_or_compute_session_health("kh", ttl=10, compute_fn=compute, now=1011.0)
+    assert calls["n"] == 2, "past the TTL window the health is recomputed"
+
+
+def test_health_distinct_keys_do_not_share_cache() -> None:
+    compute_a, calls_a = _health_counter(SupervisorHealth(1, "timeout", "ts"))
+    compute_b, calls_b = _health_counter(SupervisorHealth(2, "error", "ts"))
+    assert read_or_compute_session_health("kha", ttl=100, compute_fn=compute_a, now=1000.0) == SupervisorHealth(
+        1, "timeout", "ts"
+    )
+    assert read_or_compute_session_health("khb", ttl=100, compute_fn=compute_b, now=1000.0) == SupervisorHealth(
+        2, "error", "ts"
+    )
+    assert calls_a["n"] == 1 and calls_b["n"] == 1, "distinct keys derive distinct fhealth- files"
+
+
 def test_health_caches_empty_result() -> None:
     # An empty (healthy) result is a real, cacheable value -- a healthy supervisor must
     # not re-scan the PID-sharded ledger on every poll.

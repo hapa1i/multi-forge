@@ -283,7 +283,7 @@ code (file:line) before promotion.
 
 ### Supervisor status-line health: surface fail-open from the usage ledger (shipped 2026-06-16)
 
-Durable invariants for `supervisor_statusline_health` (#?): make a silently fail-open supervisor visible on the
+Durable invariants for `supervisor_statusline_health` (#30): make a silently fail-open supervisor visible on the
 always-on status line (`SUP!N <kind>`) and in `forge activity` (`failing open: N timeout, N error`), reading the outcome
 the usage ledger already records. Sources: `src/forge/core/ops/usage_summary.py`, `src/forge/cli/status_line.py`,
 `src/forge/cli/statusline/{throttle,context,registry}.py`, `src/forge/cli/activity.py`.

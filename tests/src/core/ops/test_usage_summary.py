@@ -332,6 +332,10 @@ class TestFailureKind:
         assert format_failing_open(CommandUsage(command="supervisor", errors=2, error_kinds={"error": 2})) == (
             "failing open: 2 error"
         )
+        # A non-empty but all-zero error_kinds yields None, not a content-less "failing
+        # open: " -- the value count, not the dict's presence, decides (guards both render
+        # surfaces; unreachable from ledger data, which only ever increments).
+        assert format_failing_open(CommandUsage(command="supervisor", errors=0, error_kinds={"timeout": 0})) is None
 
 
 class TestRenderLine:
@@ -1003,6 +1007,16 @@ class TestReadSupervisorHealth:
                 )
             )
         # Frontier-only: command="supervisor" exact-match excludes supervisor-shadow.
+        assert read_supervisor_health("planner") == SupervisorHealth()
+
+    def test_excludes_plan_check_command(self) -> None:
+        for i in (1, 2):
+            log_usage_event(
+                _event(command="plan-check", status="timeout", failure_type="timeout", ts=f"2026-06-16T12:00:0{i}Z")
+            )
+        # Frontier-only: the checklist invariant excludes the tier-1 cascade checker too,
+        # not only supervisor-shadow. Guards the second MUST-NOT clause against a future
+        # filter that loosens read_usage_events's exact command match.
         assert read_supervisor_health("planner") == SupervisorHealth()
 
     def test_no_events_is_empty(self) -> None:

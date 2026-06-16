@@ -606,6 +606,30 @@ class TestEndToEndRender:
         visible = self._render(dict(_DATA), segments=["path", "model", "supervisor", "policy", "audit", "drift"])
         assert "SUP" not in visible and "pol:" not in visible and "aud:" not in visible and "drift:" not in visible
 
+    def test_supervisor_segment_exits_zero_on_corrupt_ledger(self):
+        # Acceptance row "Status-line fail-open": a malformed usage shard must yield empty
+        # health, the bar must still exit 0, and the posture renders with NO '!' suffix.
+        # Drives a REAL corrupt shard through the full status_line() CLI with the supervisor
+        # segment ACTIVELY reading the ledger -- the other e2e cases never trigger a ledger
+        # read (their manifests carry no "name", so supervisor_health is gated out early).
+        from forge.core.paths import get_forge_home
+
+        events_dir = get_forge_home() / "usage" / "events"
+        events_dir.mkdir(parents=True, exist_ok=True)
+        (events_dir / "2026-06_bad.jsonl").write_text("{ not valid json\n", encoding="utf-8")
+        manifest = (
+            {
+                "name": "planner",
+                "created_at": "2026-06-16T00:00:00Z",
+                "intent": {"policy": {"enabled": True, "supervisor": {"suspended": False}}},
+            },
+            True,
+        )
+        # _render asserts exit_code == 0 internally.
+        visible = self._render(dict(_DATA), segments=["path", "model", "supervisor"], session=manifest)
+        assert "SUP" in visible  # posture renders through the full CLI
+        assert "SUP!" not in visible  # corrupt ledger -> empty health -> no suffix
+
 
 class TestSupervisorHealthContext:
     """`RenderContext.supervisor_health` -- manifest-gated, lazy, throttled.

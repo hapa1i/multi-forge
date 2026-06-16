@@ -205,8 +205,12 @@ def format_failing_open(cmd: CommandUsage | None) -> str | None:
     so an ``errors > 0`` row with empty ``error_kinds`` is a hand-built/internal summary
     -- callers fall back to the plain ``errors`` count rather than fabricate kinds. The
     "failing open" framing is supervisor-specific; only the supervisor render calls this.
+
+    An empty *or* all-zero ``error_kinds`` (e.g. a hand-built ``{"timeout": 0}``) yields
+    ``None``, never a content-less ``"failing open: "`` -- the value count, not just the
+    dict's presence, decides whether there is a clause to render.
     """
-    if cmd is None or not cmd.error_kinds:
+    if cmd is None or not any(cmd.error_kinds.values()):
         return None
     order = ("timeout", "error")
     parts = [f"{cmd.error_kinds[k]} {k}" for k in order if cmd.error_kinds.get(k)]
@@ -362,12 +366,21 @@ def read_supervisor_health(session: str, *, since: datetime | None = None) -> Su
     unexpected read error propagates (the throttle decides whether to cache or skip); the
     common corruption -- malformed lines and per-shard ``OSError`` -- is swallowed by
     ``read_usage_events``, so a readable-but-corrupt ledger yields empty health.
+
+    Ordering invariant at the success/failure boundary: ``read_usage_events`` *stable*-sorts
+    by ``ts``, and ``ts`` is seconds-granularity, so same-second events are NOT disambiguated
+    by ``ts`` -- their order is the stable sort preserving each shard's chronological append
+    order. The frontier supervisor is a single sequential hook in one Claude Code process
+    (one PID shard), so its same-second events stay correctly ordered. A future multi-process
+    supervisor emitting same-second events across shards could mis-order a success/failure
+    boundary and miscount the streak by one; sub-second ``ts`` resolution would remove the
+    dependency.
     """
     events = read_usage_events(session=session, command="supervisor", period_start=since)
     count = 0
     last_kind: str | None = None
     last_seen_at: str | None = None
-    for event in reversed(events):  # ledger is ascending by ts; reverse for newest-first
+    for event in reversed(events):  # newest-first (read_usage_events sorts ascending by ts)
         if event.status not in _ERROR_STATUSES:
             break  # the first non-failure (a success) ends the recent fail-open run
         if count == 0:  # the newest failure defines the displayed kind + timestamp
