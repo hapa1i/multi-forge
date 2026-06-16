@@ -27,6 +27,27 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-15
 
+### openrouter_observability Phase 2 review fixes (R1–R3): no metadata lost on the incident path
+
+**Goal**: Close three gaps a review found in the shipped Phase 2 carry-through, all on paths the card exists to trace.
+
+**Key changes**:
+
+- **R1 (high) — cancelled streams keep the gen id**: `openrouter.py` stream now **emits `provider_meta` on the first
+  content/tool event** (not only terminal usage/`response_end`), and `client_adapter.py` carries it as a **dedicated
+  metadata-only chunk** (`choices=[]`) the instant it first appears. A stream aborted before its final usage chunk — the
+  incident — now still delivers `provider_generation_id` to the Phase 3 seam.
+- **R2 (medium) — LiteLLM Responses streaming fallback keeps meta**: the synthetic events (text_delta, tool_call_delta,
+  usage, response_end) now pass `provider_meta=response.provider_meta` instead of dropping it.
+- **R3 (low/med) — direct OpenRouter non-streaming populates headers**: `_make_completion_request` switches to
+  `with_raw_response.create()` (`raw.parse()` + `raw.headers`) so the direct path gets allowlisted
+  `provider_meta.headers` like the LiteLLM path. The header allowlist (`provider_trace_headers` +
+  `merge_provider_headers`) moved to `openai_compat.py` so both paths share one source; the prior "deferred" scope note
+  is removed.
+
+**Verification**: +6 unit tests (incident carrier chunk, end-before-usage, Responses fallback meta, direct-path headers,
+shared-allowlist merge); full `make test-unit` 6125 passed; mypy + pyright clean; scoped `pre-commit` clean.
+
 ### openrouter_observability Phase 2: provider metadata through core.llm (additive ProviderTraceMeta)
 
 **Goal**: Lift the provider/generation id, selected upstream, and allowlisted correlation headers out of raw provider

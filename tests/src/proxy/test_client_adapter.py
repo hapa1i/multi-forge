@@ -339,35 +339,71 @@ class TestProviderMetaThreading:
         assert out["id"] != out["_provider_meta"]["provider_generation_id"]
 
     @pytest.mark.asyncio
-    async def test_streaming_usage_chunk_carries_provider_meta(self) -> None:
+    async def test_streaming_emits_provider_meta_carrier_chunk(self) -> None:
+        """provider_meta rides its own carrier chunk (choices=[]) the instant it first appears,
+        not nested in the usage chunk -- so the Phase 3 seam stashes it before any cancellation."""
         adapter = _make_adapter_with_mock_client()
 
         async def _fake_stream(*args, **kwargs):  # type: ignore[no-untyped-def]
-            yield StreamEvent(type="text_delta", text="Hi")
+            yield StreamEvent(
+                type="text_delta",
+                text="Hi",
+                provider_meta=ProviderTraceMeta(provider="openrouter", provider_generation_id="gen-stream"),
+            )
             yield StreamEvent(
                 type="usage",
                 usage={"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
-                provider_meta=ProviderTraceMeta(provider="openrouter", provider_generation_id="gen-stream"),
             )
             yield StreamEvent(type="response_end")
 
         adapter._client = MagicMock(stream=_fake_stream)  # type: ignore[assignment]
 
-        usage_chunks = [
+        chunks = [
             c
             async for c in adapter.create_streaming_completion(
                 {"messages": [{"role": "user", "content": "hi"}], "max_tokens": 100},
                 request_id="req-stream-meta",
             )
-            if c.get("usage")
         ]
-        assert usage_chunks
-        assert usage_chunks[0]["usage"]["provider_meta"] == {
+        carrier = [c for c in chunks if "_provider_meta" in c]
+        assert len(carrier) == 1  # emitted at most once
+        assert carrier[0]["_provider_meta"] == {
             "provider": "openrouter",
             "provider_generation_id": "gen-stream",
         }
-        # The synthetic stream id is never the gen id.
-        assert usage_chunks[0]["id"].startswith("chatcmpl-")
+        assert carrier[0]["choices"] == []  # metadata-only carrier, no content
+        assert carrier[0]["id"].startswith("chatcmpl-")  # synthetic id, never the gen id
+        # provider_meta no longer nested in the usage chunk's usage dict.
+        usage_chunks = [c for c in chunks if c.get("usage")]
+        assert usage_chunks
+        assert "provider_meta" not in usage_chunks[0]["usage"]
+
+    @pytest.mark.asyncio
+    async def test_streaming_provider_meta_survives_end_before_usage(self) -> None:
+        """The incident path: a stream that ends before the final usage chunk still delivers
+        provider_meta, because the carrier chunk fires on the first content event (R1)."""
+        adapter = _make_adapter_with_mock_client()
+
+        async def _fake_stream(*args, **kwargs):  # type: ignore[no-untyped-def]
+            yield StreamEvent(
+                type="text_delta",
+                text="partial",
+                provider_meta=ProviderTraceMeta(provider="openrouter", provider_generation_id="gen-cut"),
+            )
+            # No usage / response_end -- mirrors a cancellation before final accounting.
+
+        adapter._client = MagicMock(stream=_fake_stream)  # type: ignore[assignment]
+
+        chunks = [
+            c
+            async for c in adapter.create_streaming_completion(
+                {"messages": [{"role": "user", "content": "hi"}], "max_tokens": 100},
+                request_id="req-cancel",
+            )
+        ]
+        carrier = [c for c in chunks if "_provider_meta" in c]
+        assert len(carrier) == 1
+        assert carrier[0]["_provider_meta"]["provider_generation_id"] == "gen-cut"
 
 
 # ---------------------------------------------------------------------------

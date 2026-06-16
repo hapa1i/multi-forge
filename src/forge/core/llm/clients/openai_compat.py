@@ -164,6 +164,54 @@ def provider_trace_meta(response: Any, provider: str) -> ProviderTraceMeta:
     )
 
 
+# A deliberately tiny allowlist of correlation header names lifted into
+# ProviderTraceMeta.headers (Phase 2). Header *values* are retained and can themselves be
+# identifiers, so anything not listed here is dropped -- never "everything except auth".
+# Auth/cookie/set-cookie headers are excluded by omission, not by a denylist.
+_PROVIDER_TRACE_HEADER_ALLOWLIST = frozenset(
+    {
+        "x-request-id",  # generic request correlation id
+        "x-generation-id",  # OpenRouter gen-... id header carrier
+        "x-litellm-call-id",  # LiteLLM per-call id
+        "x-litellm-model-id",  # LiteLLM resolved model id
+    }
+)
+
+
+def provider_trace_headers(headers: Any) -> dict[str, str] | None:
+    """Return only the allowlisted correlation headers (lowercased name -> value), or None.
+
+    A fixed name-allowlist (:data:`_PROVIDER_TRACE_HEADER_ALLOWLIST`): non-string names/values
+    and anything not on the list are dropped, so a response's auth/cookie headers never enter
+    the trace plane. Returns None when nothing allowlisted is present (keeps the field unset).
+    """
+    if headers is None:
+        return None
+    try:
+        pairs = list(headers.items())  # httpx.Headers and dict both expose .items()
+    except (AttributeError, TypeError):
+        return None
+    out: dict[str, str] = {}
+    for name, value in pairs:
+        if isinstance(name, str) and isinstance(value, str) and name.lower() in _PROVIDER_TRACE_HEADER_ALLOWLIST:
+            out[name.lower()] = value
+    return out or None
+
+
+def merge_provider_headers(completion: CompletionResponse, headers: Any, provider: str) -> CompletionResponse:
+    """Attach allowlisted correlation headers to ``completion.provider_meta`` (Phase 2).
+
+    Used by the non-streaming/Responses paths that hold a raw-response handle (direct
+    OpenRouter + LiteLLM); streaming has no headers, so its ``provider_meta.headers`` stays
+    None. Creates a ``provider_meta`` when the completion has none yet.
+    """
+    trace_headers = provider_trace_headers(headers)
+    if not trace_headers:
+        return completion
+    meta = completion.provider_meta or ProviderTraceMeta(provider=provider)
+    return completion.model_copy(update={"provider_meta": meta.model_copy(update={"headers": trace_headers})})
+
+
 def openai_response_to_completion(response: Any, provider: str) -> CompletionResponse:
     """Convert OpenAI ChatCompletion response to canonical CompletionResponse."""
     if hasattr(response, "error") and response.error:

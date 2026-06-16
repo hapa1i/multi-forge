@@ -12,7 +12,6 @@ from forge.core.llm.clients.litellm import (
     LITELLM_COST_HEADER,
     LiteLLMClient,
     cost_from_response_headers,
-    provider_trace_headers,
 )
 from forge.core.llm.types import (
     CompletionResponse,
@@ -71,37 +70,6 @@ class TestMergeHeaderCost:
     def test_no_header_no_body_stays_none(self):
         merged = _client()._merge_header_cost(CompletionResponse(text="hi", cost_usd=None), {})
         assert merged.cost_usd is None
-
-
-class TestProviderTraceHeaders:
-    """Only a tiny allowlist of correlation headers enters the trace plane (Phase 2)."""
-
-    def test_keeps_allowlisted_names_and_values(self):
-        headers = httpx.Headers({"x-request-id": "req-1", "x-generation-id": "gen-9"})
-        assert provider_trace_headers(headers) == {"x-request-id": "req-1", "x-generation-id": "gen-9"}
-
-    def test_drops_non_allowlisted_auth_and_cookies(self):
-        headers = httpx.Headers(
-            {
-                "x-request-id": "req-1",
-                "authorization": "Bearer secret",
-                "set-cookie": "session=abc",
-                "x-random-thing": "nope",
-            }
-        )
-        assert provider_trace_headers(headers) == {"x-request-id": "req-1"}
-
-    def test_none_when_nothing_allowlisted(self):
-        assert provider_trace_headers(httpx.Headers({"content-type": "application/json"})) is None
-
-    def test_none_headers(self):
-        assert provider_trace_headers(None) is None
-
-    def test_plain_dict_lowercased(self):
-        assert provider_trace_headers({"X-LiteLLM-Call-Id": "call-1"}) == {"x-litellm-call-id": "call-1"}
-
-    def test_non_dict_like_is_none(self):
-        assert provider_trace_headers(42) is None
 
 
 class TestMergeResponseMetadata:

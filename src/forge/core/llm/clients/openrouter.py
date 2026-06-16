@@ -30,6 +30,7 @@ from .openai_compat import (
     extract_cached_tokens,
     extract_reported_cost_usd,
     is_retryable_error,
+    merge_provider_headers,
     message_to_openai,
     openai_response_to_completion,
 )
@@ -110,8 +111,12 @@ class OpenRouterClient:
     ) -> CompletionResponse:
         kwargs = build_chat_completion_kwargs(self._model, messages, tools, merged_params)
         kwargs = self._translate_params(kwargs)
-        response = await client.chat.completions.create(**kwargs)
-        return openai_response_to_completion(response, self._provider)
+        # with_raw_response keeps the HTTP headers (probe-confirmed x-request-id / gen-id carriers)
+        # alongside the parsed body so the direct path populates provider_meta.headers, matching the
+        # LiteLLM path. Plain .create() discards headers, which is the gap review #R3 flagged.
+        raw = await client.chat.completions.with_raw_response.create(**kwargs)
+        completion = openai_response_to_completion(raw.parse(), self._provider)
+        return merge_provider_headers(completion, raw.headers, self._provider)
 
     async def complete(
         self,
@@ -162,11 +167,14 @@ class OpenRouterClient:
         accumulator = ToolCallAccumulator()
         usage_data: dict[str, int] | None = None
         cost_usd: float | None = None
-        # First-seen provider generation id. OpenRouter puts the gen-... id on every stream
-        # chunk (probe 1); capturing it from the FIRST chunk means a stream cancelled before
-        # the final usage chunk (the incident case) still surfaces its id (Phase 2 / used by
-        # the Phase 3 trace plane).
+        # First-seen provider generation id, captured from the first chunk and EMITTED on the
+        # first content/tool event -- not just the terminal usage/response_end. OpenRouter puts
+        # the gen-... id on every stream chunk (probe 1); emitting early means a stream cancelled
+        # before the final usage chunk (the incident) still delivers the id to the proxy trace
+        # seam. (Phase 2; consumed by the Phase 3 trace plane.)
         generation_id: str | None = None
+        provider_meta: ProviderTraceMeta | None = None
+        provider_meta_pending = False  # built once, not yet emitted on an event
 
         try:
             kwargs = build_chat_completion_kwargs(self._model, messages, tools, merged_params)
@@ -181,6 +189,12 @@ class OpenRouterClient:
                     chunk_id = getattr(chunk, "id", None)
                     if isinstance(chunk_id, str) and chunk_id:  # set-once / first-seen
                         generation_id = chunk_id
+                        provider_meta = ProviderTraceMeta(
+                            provider=self._provider,
+                            provider_response_id=generation_id,
+                            provider_generation_id=generation_id,
+                        )
+                        provider_meta_pending = True
 
                 if chunk.usage:
                     usage_data = {
@@ -203,7 +217,12 @@ class OpenRouterClient:
                 delta = choice.delta
 
                 if delta.content:
-                    yield StreamEvent(type="text_delta", text=delta.content)
+                    yield StreamEvent(
+                        type="text_delta",
+                        text=delta.content,
+                        provider_meta=provider_meta if provider_meta_pending else None,
+                    )
+                    provider_meta_pending = False
 
                 if delta.tool_calls:
                     for tc_delta in delta.tool_calls:
@@ -217,18 +236,15 @@ class OpenRouterClient:
                             arguments_json=(tc_delta.function.arguments or "") if tc_delta.function else "",
                         )
                         accumulator.add_delta(tool_delta)
-                        yield StreamEvent(type="tool_call_delta", tool_call_delta=tool_delta)
+                        yield StreamEvent(
+                            type="tool_call_delta",
+                            tool_call_delta=tool_delta,
+                            provider_meta=provider_meta if provider_meta_pending else None,
+                        )
+                        provider_meta_pending = False
 
-            provider_meta = (
-                ProviderTraceMeta(
-                    provider=self._provider,
-                    provider_response_id=generation_id,
-                    provider_generation_id=generation_id,
-                )
-                if generation_id
-                else None
-            )
-
+            # Terminal events still carry the meta -- covers a clean stream and the rare
+            # no-content case (where no first content/tool event fired to emit it).
             if usage_data:
                 yield StreamEvent(type="usage", usage=usage_data, cost_usd=cost_usd, provider_meta=provider_meta)
 

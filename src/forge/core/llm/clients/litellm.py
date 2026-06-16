@@ -35,7 +35,6 @@ from ..types import (
     CompletionResponse,
     Message,
     ModelHyperparameters,
-    ProviderTraceMeta,
     StreamEvent,
     ToolCall,
     ToolCallDelta,
@@ -47,6 +46,7 @@ from .openai_compat import (
     extract_cached_tokens,
     extract_reported_cost_usd,
     is_retryable_error,
+    merge_provider_headers,
     message_to_openai,
     openai_response_to_completion,
 )
@@ -56,39 +56,6 @@ logger = logging.getLogger(__name__)
 # LiteLLM proxy reports the computed spend for a request in this response header.
 # Direct providers (and surfaces that drop raw headers) don't set it → cost unavailable.
 LITELLM_COST_HEADER = "x-litellm-response-cost"
-
-# A deliberately tiny allowlist of correlation header names lifted into
-# ProviderTraceMeta.headers (Phase 2). Header *values* are retained and can themselves be
-# identifiers, so anything not listed here is dropped — never "everything except auth".
-# Auth/cookie/set-cookie headers are excluded by omission, not by a denylist.
-_PROVIDER_TRACE_HEADER_ALLOWLIST = frozenset(
-    {
-        "x-request-id",  # generic request correlation id
-        "x-generation-id",  # OpenRouter gen-... id header carrier
-        "x-litellm-call-id",  # LiteLLM per-call id
-        "x-litellm-model-id",  # LiteLLM resolved model id
-    }
-)
-
-
-def provider_trace_headers(headers: Any) -> dict[str, str] | None:
-    """Return only the allowlisted correlation headers (lowercased name -> value), or None.
-
-    A fixed name-allowlist (`_PROVIDER_TRACE_HEADER_ALLOWLIST`): non-string names/values and
-    anything not on the list are dropped, so a response's auth/cookie headers never enter the
-    trace plane. Returns None when nothing allowlisted is present (keeps the field unset).
-    """
-    if headers is None:
-        return None
-    try:
-        pairs = list(headers.items())  # httpx.Headers and dict both expose .items()
-    except (AttributeError, TypeError):
-        return None
-    out: dict[str, str] = {}
-    for name, value in pairs:
-        if isinstance(name, str) and isinstance(value, str) and name.lower() in _PROVIDER_TRACE_HEADER_ALLOWLIST:
-            out[name.lower()] = value
-    return out or None
 
 
 def cost_from_response_headers(headers: Any) -> float | None:
@@ -385,14 +352,11 @@ class LiteLLMClient:
         """Attach gateway header cost AND allowlisted provider-trace headers (Phase 2).
 
         Only the non-streaming/Responses paths reach this (they hold a raw-response handle);
-        streaming has no headers, so its ``provider_meta.headers`` stays None.
+        streaming has no headers, so its ``provider_meta.headers`` stays None. The header
+        allowlist lives in ``openai_compat`` so the direct-OpenRouter path shares one source.
         """
         completion = self._merge_header_cost(completion, headers)
-        trace_headers = provider_trace_headers(headers)
-        if not trace_headers:
-            return completion
-        meta = completion.provider_meta or ProviderTraceMeta(provider=self._provider)
-        return completion.model_copy(update={"provider_meta": meta.model_copy(update={"headers": trace_headers})})
+        return merge_provider_headers(completion, headers, self._provider)
 
     def _build_request_kwargs(
         self,
@@ -584,8 +548,10 @@ class LiteLLMClient:
                 )
                 response = await self._complete_with_responses_api(client, messages, merged_params, tools=tools)
 
+                # Carry the provider_meta computed by _complete_with_responses_api onto the
+                # synthetic events (it was previously dropped on this fallback path).
                 if response.text:
-                    yield StreamEvent(type="text_delta", text=response.text)
+                    yield StreamEvent(type="text_delta", text=response.text, provider_meta=response.provider_meta)
 
                 # Emit tool call deltas so callers can accumulate them
                 if response.tool_calls:
@@ -598,16 +564,23 @@ class LiteLLMClient:
                                 name=tc.name,
                                 arguments_json=json.dumps(tc.arguments),
                             ),
+                            provider_meta=response.provider_meta,
                         )
 
                 if response.usage:
-                    yield StreamEvent(type="usage", usage=response.usage, cost_usd=response.cost_usd)
+                    yield StreamEvent(
+                        type="usage",
+                        usage=response.usage,
+                        cost_usd=response.cost_usd,
+                        provider_meta=response.provider_meta,
+                    )
 
                 yield StreamEvent(
                     type="response_end",
                     tool_calls=response.tool_calls,
                     usage=response.usage,
                     cost_usd=response.cost_usd,
+                    provider_meta=response.provider_meta,
                 )
                 return
 

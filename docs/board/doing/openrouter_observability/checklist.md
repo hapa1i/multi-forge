@@ -7,13 +7,17 @@ planning; see **Card corrections** for claims the code refuted.
 
 ## Current focus
 
-**Phases 0 + 1 + 2 are complete** (the offline slice). Phase 0 -- all four probes settled 2026-06-15. **Phase 1
-(identity headers)** and **Phase 2 (additive `ProviderTraceMeta`)** shipped offline: the provider/generation id +
-selected upstream + allowlisted headers now flow from the OpenRouter/LiteLLM clients to the proxy boundary via a typed
-internal carrier, kept separate from the synthetic `chatcmpl-<ts>` id (`make test-unit` 6119 green, `make pre-commit`
-clean). **Phase 3 (trace plane + SSE seam) is next** and should be **re-planned** against the concrete carrier shape:
-the converters/`server.py` seam reads the `_provider_meta` / usage-chunk carrier, reconstructs `ProviderTraceMeta`, and
-writes the metadata-only trace record; probe 2 (`[REMOTE-ABSENT]`) justifies the local-only `unavailable` status.
+**Phases 0 + 1 + 2 are complete** (the offline slice; Phase 2 incl. R1–R3 review fixes). Phase 0 -- all four probes
+settled 2026-06-15. **Phase 1 (identity headers)** and **Phase 2 (additive `ProviderTraceMeta`)** shipped offline: the
+provider/generation id + selected upstream + allowlisted headers now flow from the OpenRouter/LiteLLM clients to the
+proxy boundary via a typed internal carrier, kept separate from the synthetic `chatcmpl-<ts>` id. The review fixes
+ensure nothing is lost on the incident path: streaming emits `provider_meta` on the **first** content/tool event via a
+**dedicated `_provider_meta` carrier chunk** (so a cancelled stream keeps the gen id), the LiteLLM Responses fallback
+carries it too, and the direct OpenRouter non-streaming path now captures headers via `with_raw_response`
+(`make test-unit` 6125 green, mypy/pyright/scoped-`pre-commit` clean). **Phase 3 (trace plane + SSE seam) is next** and
+should be **re-planned** against the concrete carrier shape: the converters/`server.py` seam reads the
+**`_provider_meta` carrier chunk** (streaming) / `_provider_meta` key (non-streaming), reconstructs `ProviderTraceMeta`,
+and writes the metadata-only trace record; probe 2 (`[REMOTE-ABSENT]`) justifies the local-only `unavailable` status.
 **Phase 5** (injection) keeps the **channel correction**: inject under `user` (recognized), not `session_id` (ignored);
 routing neutral, so the flag stays default OFF.
 
@@ -131,23 +135,35 @@ flow to the proxy boundary instead of dying in raw dicts. Depends on Phase 0 pro
   `openai_response_to_completion`. - *Verified*: OpenRouter completion carries `provider="openrouter"` + gen id; LiteLLM
   carries `provider="litellm"`, no generation id.
 - [x] **Streaming populate** (`openrouter.py`): captures the **first-seen** non-null `chunk.id` (set-once) into a local
-  and attaches it to the usage + `response_end` events' `provider_meta`. First-seen (not last) is what lets a
-  *cancelled* stream still surface its id — the incident case (cross-phase note for P3). An `isinstance(str)` guard
-  means a bare-mock chunk id yields no meta (and keeps existing MagicMock streaming tests green). - *Verified*: stream
-  sets meta from the first id, a later id does not overwrite, non-string id → `provider_meta=None`.
-- [x] **Header allowlist** (`litellm.py`): `provider_trace_headers()` (tiny exact-name allowlist: `x-request-id`,
-  `x-generation-id`, `x-litellm-call-id`, `x-litellm-model-id`) beside `cost_from_response_headers`; new
-  `_merge_response_metadata` populates `provider_meta.headers` on the non-streaming/Responses raw-response paths.
-  **Scope note:** the **direct** `openrouter.py` path is unchanged — it uses plain `chat.completions.create()` (no
-  `with_raw_response`), and `body.id`/`chunk.id` already deliver the gen id there, so header capture on the direct path
-  is deferred (it would mean switching the response flow to `with_raw_response`). - *Verified*: only allowlisted
-  names+values kept; auth/cookies dropped; streaming `headers=None`.
+  and **emits `provider_meta` on the first content/tool event** (not only the terminal usage/`response_end`). Emitting
+  early is what lets a stream *cancelled before the final usage chunk* — the incident case — still surface its id; the
+  terminal events still carry it for the clean / no-content path. An `isinstance(str)` guard means a bare-mock chunk id
+  yields no meta (and keeps existing MagicMock streaming tests green). - *Verified*: stream emits meta on the first
+  `text_delta`/`tool_call_delta`, a later id does not overwrite, non-string id → `provider_meta=None`
+  (`test_openrouter.py`).
+- [x] **Responses streaming fallback carries meta** (`litellm.py`): GPT-5 has no real streaming, so `stream()` falls
+  back to one non-streaming Responses call and re-emits synthetic events; those events now pass
+  `provider_meta=response.provider_meta` (text_delta, tool_call_delta, usage, response_end) instead of dropping it (R2).
+  \- *Verified*: all four synthetic events carry the completion's `provider_meta`
+  (`test_litellm_gpt5.py::TestResponsesStreamingFallbackProviderMeta`).
+- [x] **Header allowlist** (`openai_compat.py`, shared): `provider_trace_headers()` (tiny exact-name allowlist:
+  `x-request-id`, `x-generation-id`, `x-litellm-call-id`, `x-litellm-model-id`) and `merge_provider_headers()` live in
+  `openai_compat` so the LiteLLM and **direct OpenRouter** paths share one allowlist source. `litellm.py`
+  `_merge_response_metadata` delegates to it; the **direct `openrouter.py` non-streaming path now switches to
+  `with_raw_response.create()`** (`raw.parse()` + `raw.headers`) so it populates `provider_meta.headers` too — the prior
+  "deferred" gap (R3) is closed. Streaming has no raw-response handle → `headers=None`. - *Verified*: only allowlisted
+  names+values kept; auth/cookies dropped; direct non-streaming OpenRouter carries `headers`; streaming `headers=None`
+  (`test_openai_compat.py`, `test_openrouter.py`, `test_litellm_cost.py`).
 - [x] **Adapter carry-through** (`proxy/client_adapter.py`): widened `AdapterProviderType` to include `"openrouter"`,
   which made the `get_client(provider=...)` `# type: ignore` provably redundant — **removed** it (mypy + pyright clean).
-  `provider_meta` rides as a typed carrier (`ProviderTraceMeta.model_dump(exclude_none=True)`) under `_provider_meta`
-  (non-streaming) and the usage chunk's `provider_meta` (streaming), mirroring `reported_cost_micros`. - *Verified*:
-  synthetic `chatcmpl-<ts>` id stays `!=` `provider_generation_id`; carrier present on both paths; full unit suite
-  green. (Reconstruction into `ProviderTraceMeta` + the converters read happen at the Phase 3 trace seam.)
+  `provider_meta` rides as a typed carrier (`ProviderTraceMeta.model_dump(exclude_none=True)`) under `_provider_meta`:
+  the non-streaming dict, and on the streaming path a **dedicated metadata-only carrier chunk** (`choices=[]`) emitted
+  once the instant the first event carrying `provider_meta` arrives — *not* nested in the terminal usage chunk. The
+  dedicated chunk is what guarantees a cancelled stream's gen id reaches the Phase 3 seam before any abort (R1). The
+  synthetic `chatcmpl-<ts>` id stays separate from `provider_generation_id`. - *Verified*: carrier chunk present and
+  emitted at most once; a stream ending before its usage chunk still delivers the carrier; synthetic id stays `!=`
+  `provider_generation_id`; full unit suite green (`test_client_adapter.py`). (Reconstruction into `ProviderTraceMeta` +
+  the converters read happen at the Phase 3 trace seam.)
 
 | Test                          | Fixture                                                               | Assertion                                                               | Test File                                  |
 | ----------------------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------ |

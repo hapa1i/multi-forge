@@ -1,10 +1,18 @@
 """Tests for GPT-5 Responses API support in LiteLLM client."""
 
+from unittest.mock import AsyncMock, patch
+
 import pytest
 
 from forge.core.llm.clients.litellm import LiteLLMClient
 from forge.core.llm.clients.openai_compat import extract_cached_tokens
-from forge.core.llm.types import Message, ModelHyperparameters, ToolCall
+from forge.core.llm.types import (
+    CompletionResponse,
+    Message,
+    ModelHyperparameters,
+    ProviderTraceMeta,
+    ToolCall,
+)
 
 
 class TestGPT5ModelDetection:
@@ -583,3 +591,42 @@ class TestExtractCachedTokens:
         """Return 0 when prompt_tokens_details is empty dict."""
         usage: dict[str, object] = {"prompt_tokens_details": {}}
         assert extract_cached_tokens(usage) == 0
+
+
+class TestResponsesStreamingFallbackProviderMeta:
+    """The Responses-API streaming fallback carries provider_meta onto its synthetic events (R2).
+
+    GPT-5 has no real streaming, so stream() falls back to a single non-streaming Responses call
+    and re-emits its result as synthetic events. That fallback previously dropped the provider_meta
+    the completion already held.
+    """
+
+    @pytest.mark.asyncio
+    async def test_synthetic_events_carry_provider_meta(self) -> None:
+        client = LiteLLMClient(model="openai/gpt-5.5", provider="litellm_remote")
+        meta = ProviderTraceMeta(provider="litellm_remote", provider_response_id="resp-77")
+        completion = CompletionResponse(
+            text="hello",
+            tool_calls=[ToolCall(id="call-1", name="lookup", arguments={"q": "x"})],
+            usage={"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
+            cost_usd=0.002,
+            provider_meta=meta,
+        )
+
+        with (
+            patch.object(client, "_get_client", AsyncMock(return_value=AsyncMock())),
+            patch.object(client, "_complete_with_responses_api", AsyncMock(return_value=completion)),
+        ):
+            events = [
+                event
+                async for event in client.stream(
+                    messages=[Message(role="user", content="hi")],
+                    hyperparams=ModelHyperparameters(verbosity="medium"),
+                )
+            ]
+
+        # Every synthetic event (text_delta, tool_call_delta, usage, response_end) carries the meta.
+        by_type = {e.type for e in events}
+        assert by_type == {"text_delta", "tool_call_delta", "usage", "response_end"}
+        for event in events:
+            assert event.provider_meta is meta, f"{event.type} dropped provider_meta"

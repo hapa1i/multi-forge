@@ -74,18 +74,29 @@ class TestOpenRouterClientInit:
 class TestOpenRouterClientComplete:
     """Tests for non-streaming completion."""
 
+    @staticmethod
+    def _raw_response(headers: dict[str, str] | None = None) -> MagicMock:
+        """A with_raw_response handle: .parse() -> body, .headers -> raw headers."""
+        body = MagicMock()
+        body.id = "gen-abc123"
+        body.provider = None
+        body.choices = [MagicMock(message=MagicMock(content="Hello", tool_calls=None))]
+        body.usage = MagicMock(prompt_tokens=10, completion_tokens=5, total_tokens=15)
+        body.usage.prompt_tokens_details = None
+        body.error = None
+        body.model_extra = None
+        body.model_dump = MagicMock(return_value={})
+
+        raw = MagicMock()
+        raw.parse = MagicMock(return_value=body)
+        raw.headers = headers if headers is not None else {}
+        return raw
+
     @pytest.mark.asyncio
     async def test_calls_chat_completions(self, client):
-        """Verify OpenRouter uses chat.completions, not responses API."""
-        mock_response = MagicMock()
-        mock_response.choices = [MagicMock(message=MagicMock(content="Hello", tool_calls=None))]
-        mock_response.usage = MagicMock(prompt_tokens=10, completion_tokens=5, total_tokens=15)
-        mock_response.usage.prompt_tokens_details = None
-        mock_response.error = None
-        mock_response.model_dump = MagicMock(return_value={})
-
+        """Verify OpenRouter uses chat.completions (with_raw_response), not responses API."""
         mock_client = AsyncMock()
-        mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+        mock_client.chat.completions.with_raw_response.create = AsyncMock(return_value=self._raw_response())
 
         mock_creds = {
             "api_key": "sk-or-test",
@@ -100,12 +111,40 @@ class TestOpenRouterClientComplete:
                 messages=[Message(role="user", content="Hello")],
             )
 
-        mock_client.chat.completions.create.assert_called_once()
-        call_kwargs = mock_client.chat.completions.create.call_args[1]
+        mock_client.chat.completions.with_raw_response.create.assert_called_once()
+        call_kwargs = mock_client.chat.completions.with_raw_response.create.call_args[1]
         assert call_kwargs["model"] == "anthropic/claude-sonnet-4.6"
         assert "reasoning_effort" not in call_kwargs
         assert isinstance(result, CompletionResponse)
         assert result.text == "Hello"
+
+    @pytest.mark.asyncio
+    async def test_non_streaming_populates_allowlisted_headers(self, client):
+        """Direct non-streaming path lifts allowlisted response headers into provider_meta (R3).
+
+        Plain .create() dropped headers; with_raw_response keeps them so the direct path
+        matches the LiteLLM path. Auth/cookie headers are excluded by the allowlist.
+        """
+        raw = self._raw_response(
+            headers={
+                "x-request-id": "req-direct-1",
+                "authorization": "Bearer sk-or-secret",
+                "set-cookie": "session=abc",
+            }
+        )
+        mock_client = AsyncMock()
+        mock_client.chat.completions.with_raw_response.create = AsyncMock(return_value=raw)
+
+        with patch.object(client, "_credentials") as mock_cm:
+            mock_cm.get_credentials = AsyncMock(
+                return_value={"api_key": "sk-or-test", "base_url": "https://openrouter.ai/api/v1"}
+            )
+            client._client = mock_client
+
+            result = await client.complete(messages=[Message(role="user", content="Hello")])
+
+        assert result.provider_meta is not None
+        assert result.provider_meta.headers == {"x-request-id": "req-direct-1"}  # only allowlisted name+value
 
     @pytest.mark.asyncio
     async def test_headers_set_on_client_creation(self, client):
