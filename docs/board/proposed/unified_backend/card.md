@@ -133,15 +133,24 @@ but never an instance row (the §1 lifecycle point). The real work is reconcilin
 instead of carrying an inline base_url. If "remote backend" is bolted on without absorbing those, the result is a fifth
 overlapping concept and *more* surface, not less.
 
-### 5. Telemetry spine: backend id as the canonical key
+### 5. Telemetry spine: backend id as the canonical *source* key
 
-Once backends are first-class, the four planes key on backend id:
+Once backends are first-class, the **downstream** telemetry plane keys on `backend_id` as its canonical
+**source identity**. This card owns that *key*; it does **not** decide how many planes exist -- the plane
+**structure** (whether cost / audit / usage / provider-trace collapse, plus a new upstream outcome plane) is owned by
+`upstream_downstream_ledgers` under the `telemetry_architecture` epic. Here we only make `backend_id` the source key
+downstream records attribute to.
 
 - **provider-trace** is the first migration target: replace `provider_name == "openrouter"` and the
   `~/.forge/providers/openrouter/traces/` path with a backend-id gate/layout. The generalization the observability card
   deferred (`selected_provider`-based broadening) becomes "this backend, and gateway backends expose their selected
   upstream" -- a clean axis rather than a hardcoded string.
-- **cost / usage** attribution gains a stable source identity beyond `proxy_id`.
+- **downstream cost/metrics** attribution gains a stable source identity beyond `proxy_id`. The *upstream* outcome plane
+  is session-keyed, not backend-keyed (one operation spans many backends), so `backend_id` is a downstream key, not a
+  universal one.
+- **Defer plane count to `upstream_downstream_ledgers`.** That card collapses cost + audit + provider-trace into one
+  *downstream* plane (keyed on `backend_id`) and adds a first-class *upstream* outcome plane. This card supplies the key;
+  it must **not** assert the four planes persist. See the `telemetry_architecture` epic for the shared contract.
 
 ## Relationship to other cards
 
@@ -153,6 +162,11 @@ Once backends are first-class, the four planes key on backend id:
   one. Phase 4's read CLI stays provider-neutral (`forge provider trace ...`), so naming needs no migration.
 - **`proxy_log_hygiene`**, **`openrouter_remote_reconciliation`**: both also key on provider/source identity and would
   consume a canonical backend id.
+- **`upstream_downstream_ledgers`** + the **`telemetry_architecture`** epic (on the `supervisor_statusline_health`
+  branch): the orthogonal **plane-structure** axis to this card's **source-identity** axis. Composable (collapse-to-two
+  *and* key downstream on `backend_id`) and both edit `core/usage/emit.py`, so §5 owns only the `backend_id` key and
+  defers plane count to that card. The epic holds the shared contract (canonical there; cross-branch until both merge to
+  `main`; referenced by slug, not a relative link, since the epic is not in this branch's board).
 
 ## Open questions
 
