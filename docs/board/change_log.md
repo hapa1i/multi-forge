@@ -123,6 +123,40 @@ the clean stream surfaces a real `gen-` id via the carrier and the **cancelled s
 incident, end to end). Regression: metadata-only (no body/prompt/completion field; header-bypass re-filtered) + run-tree
 join. `make pre-commit` clean (mypy/pyright/ruff/black/isort/mdformat/gitleaks).
 
+### supervisor_statusline_health: surface frontier-supervisor fail-open (status line + `forge activity`)
+
+**Goal**: Make a silently-failing supervisor visible. In the motivating incident a session's supervisor timed out 24/24
+times and failed open to `allow` while the always-on status line still rendered a healthy `SUP`. Surface the fail-open
+outcome the usage ledger already records — no new durable-state field.
+
+**Key changes** (whole card, Phases 1–3):
+
+- **Phase 1 (read, throttled)**: `read_supervisor_health(session, since) -> SupervisorHealth` over the usage ledger
+  (`command="supervisor"`, newest-first contiguous `status in {error,timeout}` streak, reset on first `success`),
+  surfaced via the `forge_cost` throttle (`read_or_compute_session_health`, distinct `fhealth-` cache) and exposed as a
+  lazy `RenderContext.supervisor_health`. `forge proxy costs reset` also clears `fhealth-*.json`.
+- **Phase 2 (status-line suffix)**: `format_supervisor` appends a posture-preserving ASCII `SUP!N <kind>` suffix
+  (`SUP!3 timeout`, `SUP(susp)!2 timeout`, `SUP(off)!4 error`); YELLOW 1–2, RED `>=3` (mirrors `format_spend_cap`).
+  `recent_failures==0` is byte-identical to today; a raising reader degrades to posture-only.
+- **Phase 3 (`forge activity` detail + closeout)**: generic `CommandUsage.error_kinds` (per-display-kind split of
+  `errors`, populated uniformly in `_aggregate_ledger`); shared `_failure_kind` maps `failure_type` to `timeout`/`error`
+  (single source with `read_supervisor_health`). `format_failing_open` renders `failing open: N timeout, N error`; the
+  `forge activity` Supervisor render appends it (ledger-driven, independent of the decision log) and `--json` carries
+  `error_kinds`. `render_summary_line` shows the same breakdown with an explicit `error_kinds`-gated fallback to the
+  legacy `"{errors} errors"` so hand-built summaries never drop the count.
+- **Scope boundary**: "failing open" is the supervisor formatter's interpretation only — `error_kinds` is generic ledger
+  data; a memory-writer/panel error is not relabeled. v1 covers timeout/subprocess fail-opens (the ledger's `status`);
+  parse fail-opens (logged `success`), auth fail-opens (no event), and exact cached-allow reset are deferred to
+  `upstream_downstream_ledgers`. Docs note the streak-vs-window distinction (`SUP!N` consecutive vs `forge activity`
+  window total).
+
+**Verification**: 191 (Phase 1) + 112 (Phase 2) + new Phase 3 cases green — `test_usage_summary.py` (error_kinds
+aggregation, `_failure_kind`/`format_failing_open` units, render both policy-present/absent branches, the three
+pre-existing hand-built `errors`-only tests stay green via the fallback) and `test_activity.py` (human
+`failing open: 2 timeout, 1 error` + `--json` `error_kinds`); status-line suites unchanged. `make pre-commit` clean
+(ruff/black/isort/mypy/pyright/mdformat/gitleaks). No integration tier — `forge activity` is a read-only render over the
+ledger + manifest. Additive optional fields only; no durable-schema change.
+
 ## 2026-06-15
 
 ### openrouter_observability Phase 2 review fixes (R1–R3): no metadata lost on the incident path

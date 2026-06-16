@@ -754,11 +754,12 @@ tip. This is the one session-end channel Claude Code does not suppress — non-b
 **warnings**) is hidden from you mid-session, so without this line a `warn` verdict is invisible:
 
 ```text
-Forge this session — supervisor: 12 checks (2 warn, 0 block, 3 errors) · ~$0.04 · 21k tok · 2 workflows
+Forge this session — supervisor: 12 checks (2 warn, 0 block, failing open: 2 timeout, 1 error) · ~$0.04 · 21k tok · 2 workflows
 ```
 
-The `errors` count surfaces failed supervisor LLM calls directly — for example an OpenRouter content-filter rejection.
-The line is best-effort and prints only when the session had activity; incognito sessions are skipped.
+The `failing open` clause surfaces supervisor LLM calls that errored or timed out and **failed open** (the action
+proceeded without frontier review), broken down by kind — for example a 45s timeout or an OpenRouter content-filter
+rejection. The line is best-effort and prints only when the session had activity; incognito sessions are skipped.
 
 **`forge activity [session]` (on demand).** Inspect any session's Forge automation activity anytime:
 
@@ -773,6 +774,12 @@ forge activity my-feature --json    # machine-readable
 It reports per-command calls/errors/tokens/reported-cost (or *unavailable*) plus the supervisor allow/warn/deny
 breakdown with recent warning text. A workflow fan-out (panel/debate/...) counts as **one** call with its worker count
 tracked in a separate column, so a 4-worker panel reads as one workflow, not five.
+
+The Supervisor line appends `failing open: N timeout, N error` when recent frontier checks failed open — this is the
+always-visible status line's `SUP!N <kind>` marker in detail (recent supervisor checks erroring/timing out means actions
+may be proceeding without frontier review). The two are scoped differently, so the counts can differ: `SUP!N` is the
+**current consecutive** fail-open streak (it resets on the supervisor's next successful check), while `forge activity`
+totals fail-opens across the selected window (`--days`/`--all`).
 
 > **Sidecar:** both surfaces work in sidecar mode when the session launched with a proxy id (the in-container usage
 > ledger is mounted back to the host). A template-only sidecar shows only the policy-decision half.

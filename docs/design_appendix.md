@@ -301,6 +301,17 @@ no transcript-mtime shortcut, because headless cost accrues via ledger writes th
 would otherwise freeze the value all session). A legitimate `0` is cached; a ledger read error fails open (no segment,
 never cached). Window: `forge_cost_ttl` (default 10s).
 
+**Supervisor health (`supervisor` suffix, v1).** When the opt-in `supervisor` segment is active, a fail-open suffix
+`!N <kind>` appends to the posture token (`SUP!3 timeout`, `SUP(susp)!2 timeout`, `SUP(off)!4 error`): N is the
+newest-first contiguous run of frontier-supervisor `claude -p` runs the usage ledger recorded as a non-`success`
+`status` (reset by the first `success`), `<kind>` is `timeout` or `error`. Posture-independent — suspended/off emit no
+events, so prior fail-open history stays visible. ASCII `!` (no unicode glyph; survives `normalize-text`). Tiered like
+`format_spend_cap`: YELLOW 1-2, RED `>=3`; the suffix never shows at 0, so a healthy `SUP` is byte-identical to today.
+Read throttled + fail-open by `read_or_compute_session_health` (same `forge_cost_ttl` window, distinct `fhealth-`
+cache); a read error degrades to **posture-only** (no suffix), never hiding the posture (unlike `forge_cost`, whose
+whole value is ledger-derived). Source is the existing `UsageEvent.status`/`failure_type` — no durable-schema change. v1
+misses parse fail-opens (logged `success`) and auth fail-opens (no event), deferred to `upstream_downstream_ledgers`.
+
 **Rendering.** The `where` bucket (`path`, `branch`) leads concatenated; all other segments are separator-joined in the
 configured order. `RenderContext` derivations are lazy `cached_property` — a segment not in the active set does zero I/O
 (no transcript scan, git subprocess, or proxy-field access it would otherwise trigger). Forge-unique segments read
@@ -369,11 +380,12 @@ proxy ID.
 
 Cost logs accumulate indefinitely. `forge proxy costs reset` wipes both cost-log planes (`costs/requests/` +
 `costs/verbs/`) **and** the usage-attribution ledger (`usage/events/`) to zero in one step, and clears the derived
-status-line cost cache (`cache/statusline/fcost-*.json`) so `forge +$Y` does not replay a cached value (audit records
-are a separate plane and are left untouched); it prompts for confirmation unless `--yes`, and `--dry-run` previews. You
-can also delete individual JSONL files under `~/.forge/costs/` by hand. Either way, a running proxy keeps its cost
-totals and cap counters in memory until restarted — it re-bootstraps from the remaining logs at next startup, so restart
-any active proxy to also zero its live cumulative cost and cap enforcement.
+status-line caches (`cache/statusline/fcost-*.json` for `forge +$Y`, `fhealth-*.json` for supervisor health) so a wiped
+ledger cannot replay a cached value (audit records are a separate plane and are left untouched); it prompts for
+confirmation unless `--yes`, and `--dry-run` previews. You can also delete individual JSONL files under
+`~/.forge/costs/` by hand. Either way, a running proxy keeps its cost totals and cap counters in memory until restarted
+— it re-bootstraps from the remaining logs at next startup, so restart any active proxy to also zero its live cumulative
+cost and cap enforcement.
 
 ---
 
@@ -577,9 +589,14 @@ aggregates it with the manifest's `confirmed.policy.decisions` into a `SessionAc
 `CommandUsage` run/error/token/cost rows; decisions -> `PolicyActivity` supervisor allow/warn/deny + warnings, with
 `log_capped` when the decision log hit `MAX_DECISION_LOG`). The builder re-reads the manifest fresh from disk because
 hooks mutate `confirmed.*` during the run. `forge activity [session]` renders a table (`--json`/`--days`/`--all`); the
-launcher prints a one-line `render_summary_line(...)` on exit (host, sidecar, fork). Cost is reported-or-estimated
-(best-effort; the verb-snapshot aggregate contributes estimates) and may be partial (`cost_partial`);
-`forge proxy costs show` is authoritative.
+launcher prints a one-line `render_summary_line(...)` on exit (host, sidecar, fork). The `forge activity` Supervisor
+render and the session-end line append a `failing open: N timeout, N error` clause from the window's supervisor
+`failure_type` split (generic `CommandUsage.error_kinds`, surfaced in `--json`). `format_failing_open` returns `None`
+for an empty/all-zero `error_kinds`; the session-end line (`render_summary_line`) then falls back locally to the plain
+`errors` count for hand-built rows, while the `forge activity` render shows the clause only when kinds are populated
+(its commands table already carries the lumped count). This is the window aggregate behind the status line's consecutive
+`SUP!N` streak (§A.8) — no durable-schema change. Cost is reported-or-estimated (best-effort; the verb-snapshot
+aggregate contributes estimates) and may be partial (`cost_partial`); `forge proxy costs show` is authoritative.
 
 Per-emitter session coverage (a per-session summary is honest about what it can attribute):
 

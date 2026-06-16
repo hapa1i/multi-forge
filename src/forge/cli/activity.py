@@ -26,6 +26,7 @@ from forge.core.ops.session_context import (
 from forge.core.ops.usage_summary import (
     SessionActivitySummary,
     build_session_activity_summary,
+    format_failing_open,
 )
 
 console = Console()
@@ -112,19 +113,31 @@ def _render(summary: SessionActivitySummary, *, days: int | None) -> None:
         console.print(table)
 
     pol = summary.policy
-    if pol and pol.has_content:
-        if pol.plan_check_allow or pol.plan_check_needs_review:
-            console.print(
-                f"\n[bold]Plan check (tier-1)[/bold]: {pol.plan_check_allow} allow · "
-                f"{pol.plan_check_needs_review} needs review"
-            )
-        if pol.supervisor_allow or pol.supervisor_warn or pol.supervisor_deny or pol.total_warnings:
-            console.print(
-                f"\n[bold]Supervisor[/bold]: {pol.supervisor_allow} allow · "
-                f"{pol.supervisor_warn} warn · {pol.supervisor_deny} block"
-            )
-        for warning in pol.recent_warnings:
-            console.print(f"  [yellow]•[/yellow] {warning}")
+    # Fail-open breakdown is ledger-derived (the supervisor CommandUsage), so the
+    # Supervisor line must render even when there is no decision log (pol is None) --
+    # the acceptance case is a session whose every supervisor run timed out.
+    sup_cmd = next((c for c in summary.commands if c.command == "supervisor"), None)
+    failing = format_failing_open(sup_cmd)
+
+    if pol and (pol.plan_check_allow or pol.plan_check_needs_review):
+        console.print(
+            f"\n[bold]Plan check (tier-1)[/bold]: {pol.plan_check_allow} allow · "
+            f"{pol.plan_check_needs_review} needs review"
+        )
+
+    sup_has_pol = bool(
+        pol and (pol.supervisor_allow or pol.supervisor_warn or pol.supervisor_deny or pol.total_warnings)
+    )
+    if sup_has_pol or failing:
+        bits: list[str] = []
+        if sup_has_pol and pol is not None:
+            bits.append(f"{pol.supervisor_allow} allow · {pol.supervisor_warn} warn · {pol.supervisor_deny} block")
+        if failing:
+            bits.append(f"[red]{failing}[/red]")
+        console.print("\n[bold]Supervisor[/bold]: " + " · ".join(bits))
+
+    for warning in pol.recent_warnings if pol else ():
+        console.print(f"  [yellow]•[/yellow] {warning}")
 
     sh = summary.shadow
     if sh is not None and sh.has_content:

@@ -16,10 +16,13 @@ from forge.core.ops.usage_summary import (
     CommandUsage,
     PolicyActivity,
     SessionActivitySummary,
+    SupervisorHealth,
     build_session_activity_summary,
+    read_supervisor_health,
     render_summary_line,
     sum_forge_added_cost,
 )
+from forge.core.paths import get_forge_home
 from forge.core.usage.ledger import UsageEvent, log_usage_event
 from forge.session.models import (
     PolicyConfirmed,
@@ -122,6 +125,16 @@ class TestLedgerPlane:
         assert by_cmd["panel"].calls == 1
         # commands sorted by calls desc -> supervisor first
         assert summary.commands[0].command == "supervisor"
+
+    def test_error_kinds_breakdown(self) -> None:
+        # `errors` is split per display kind; `errors == sum(error_kinds.values())`.
+        log_usage_event(_event(status="timeout", failure_type="timeout"))
+        log_usage_event(_event(status="timeout", failure_type="timeout"))
+        log_usage_event(_event(status="error", failure_type="subprocess_error"))
+        summary = build_session_activity_summary("planner", forge_root=None)
+        sup = {c.command: c for c in summary.commands}["supervisor"]
+        assert sup.errors == 3
+        assert sup.error_kinds == {"timeout": 2, "error": 1}
 
     def test_only_this_session(self) -> None:
         log_usage_event(_event(session="planner", command="supervisor"))
@@ -299,6 +312,32 @@ class TestBestEffort:
         assert summary.cost_partial is False
 
 
+class TestFailureKind:
+    def test_failure_kind_mapping(self) -> None:
+        from forge.core.ops.usage_summary import _failure_kind
+
+        assert _failure_kind("timeout") == "timeout"
+        for ft in ("subprocess_error", "exit_1", "runtime_reported_error", None):
+            assert _failure_kind(ft) == "error"
+
+    def test_format_failing_open(self) -> None:
+        from forge.core.ops.usage_summary import format_failing_open
+
+        assert format_failing_open(None) is None
+        # errors but no kinds (hand-built) -> None, so callers fall back to the count.
+        assert format_failing_open(CommandUsage(command="supervisor", errors=3)) is None
+        cu = CommandUsage(command="supervisor", errors=3, error_kinds={"timeout": 2, "error": 1})
+        assert format_failing_open(cu) == "failing open: 2 timeout, 1 error"
+        # timeout-first ordering, only non-zero kinds.
+        assert format_failing_open(CommandUsage(command="supervisor", errors=2, error_kinds={"error": 2})) == (
+            "failing open: 2 error"
+        )
+        # A non-empty but all-zero error_kinds yields None, not a content-less "failing
+        # open: " -- the value count, not the dict's presence, decides (guards both render
+        # surfaces; unreachable from ledger data, which only ever increments).
+        assert format_failing_open(CommandUsage(command="supervisor", errors=0, error_kinds={"timeout": 0})) is None
+
+
 class TestRenderLine:
     def test_full_line(self) -> None:
         summary = SessionActivitySummary(
@@ -330,6 +369,40 @@ class TestRenderLine:
         line = render_summary_line(summary)
         assert line is not None
         assert "supervisor: 4 runs (4 errors)" in line
+
+    def test_failing_open_breakdown_with_policy(self) -> None:
+        # Real (kind-bearing) data renders the per-kind fail-open clause inside the
+        # decision-log checks segment.
+        summary = SessionActivitySummary(
+            session="planner",
+            commands=[CommandUsage(command="supervisor", calls=24, errors=24, error_kinds={"timeout": 24})],
+            policy=PolicyActivity(supervisor_allow=24),
+        )
+        line = render_summary_line(summary)
+        assert line is not None
+        assert "supervisor: 24 checks (0 warn, 0 block, failing open: 24 timeout)" in line
+
+    def test_failing_open_breakdown_without_policy(self) -> None:
+        summary = SessionActivitySummary(
+            session="planner",
+            commands=[CommandUsage(command="supervisor", calls=3, errors=3, error_kinds={"timeout": 2, "error": 1})],
+        )
+        line = render_summary_line(summary)
+        assert line is not None
+        assert "supervisor: 3 runs (failing open: 2 timeout, 1 error)" in line
+
+    def test_errors_only_falls_back_to_count(self) -> None:
+        # error_kinds empty (hand-built/legacy summary) -> plain "N errors" is preserved,
+        # never silently dropped, and no fabricated "failing open" clause.
+        summary = SessionActivitySummary(
+            session="planner",
+            commands=[CommandUsage(command="supervisor", calls=5, errors=5)],
+            policy=PolicyActivity(supervisor_allow=5),
+        )
+        line = render_summary_line(summary)
+        assert line is not None
+        assert "5 errors" in line
+        assert "failing open" not in line
 
     def test_capped_log_marks_checks_as_floor(self) -> None:
         # Capped decision log (checks) vs uncapped ledger (errors): the "+" keeps
@@ -893,3 +966,71 @@ class TestShadowActivity:
         line = render_summary_line(summary)
         assert line is not None
         assert "shadow: 4 queued" in line
+
+
+class TestReadSupervisorHealth:
+    """`read_supervisor_health` reads the newest-first contiguous fail-open run from the
+    usage ledger (`command="supervisor"` only)."""
+
+    def test_consecutive_timeouts_counted(self) -> None:
+        for i in (1, 2, 3):
+            log_usage_event(_event(status="timeout", failure_type="timeout", ts=f"2026-06-16T12:00:0{i}Z"))
+        health = read_supervisor_health("planner")
+        assert health.recent_failures == 3
+        assert health.last_kind == "timeout"
+        assert health.last_seen_at == "2026-06-16T12:00:03Z"  # newest failure's ts
+
+    def test_success_resets_streak(self) -> None:
+        for i in (1, 2, 3):
+            log_usage_event(_event(status="timeout", failure_type="timeout", ts=f"2026-06-16T12:00:0{i}Z"))
+        log_usage_event(_event(status="success", ts="2026-06-16T12:00:04Z"))  # newest
+        assert read_supervisor_health("planner") == SupervisorHealth()
+
+    def test_only_newest_contiguous_failures_count(self) -> None:
+        log_usage_event(_event(status="success", ts="2026-06-16T12:00:01Z"))  # older success
+        log_usage_event(_event(status="timeout", failure_type="timeout", ts="2026-06-16T12:00:02Z"))
+        log_usage_event(_event(status="timeout", failure_type="timeout", ts="2026-06-16T12:00:03Z"))
+        # Streak starts at the newest event and breaks at the older success.
+        assert read_supervisor_health("planner").recent_failures == 2
+
+    def test_subprocess_error_maps_to_error_kind(self) -> None:
+        log_usage_event(_event(status="error", failure_type="subprocess_error", ts="2026-06-16T12:00:01Z"))
+        health = read_supervisor_health("planner")
+        assert health.recent_failures == 1
+        assert health.last_kind == "error"  # everything that is not failure_type="timeout"
+
+    def test_excludes_shadow_command(self) -> None:
+        for i in (1, 2):
+            log_usage_event(
+                _event(
+                    command="supervisor-shadow", status="timeout", failure_type="timeout", ts=f"2026-06-16T12:00:0{i}Z"
+                )
+            )
+        # Frontier-only: command="supervisor" exact-match excludes supervisor-shadow.
+        assert read_supervisor_health("planner") == SupervisorHealth()
+
+    def test_excludes_plan_check_command(self) -> None:
+        for i in (1, 2):
+            log_usage_event(
+                _event(command="plan-check", status="timeout", failure_type="timeout", ts=f"2026-06-16T12:00:0{i}Z")
+            )
+        # Frontier-only: the checklist invariant excludes the tier-1 cascade checker too,
+        # not only supervisor-shadow. Guards the second MUST-NOT clause against a future
+        # filter that loosens read_usage_events's exact command match.
+        assert read_supervisor_health("planner") == SupervisorHealth()
+
+    def test_no_events_is_empty(self) -> None:
+        assert read_supervisor_health("planner") == SupervisorHealth()
+
+    def test_since_bound_excludes_older_events(self) -> None:
+        log_usage_event(_event(status="timeout", failure_type="timeout", ts="2026-06-15T00:00:00Z"))
+        since = datetime(2026, 6, 16, tzinfo=timezone.utc)
+        assert read_supervisor_health("planner", since=since) == SupervisorHealth()
+
+    def test_malformed_ledger_yields_empty_health_without_raising(self) -> None:
+        # read_usage_events skips malformed lines -> empty health, NEVER raises. This is
+        # distinct from the throttle's compute-raises -> None fail-open path.
+        events_dir = get_forge_home() / "usage" / "events"
+        events_dir.mkdir(parents=True, exist_ok=True)
+        (events_dir / "2026-06_bad.jsonl").write_text("{ not valid json\n")
+        assert read_supervisor_health("planner") == SupervisorHealth()

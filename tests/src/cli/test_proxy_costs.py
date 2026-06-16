@@ -427,3 +427,29 @@ class TestCostsReset:
         assert result.exit_code == 0, result.output
         assert not fcost.exists()  # stale derived cost segment cleared
         assert cache_hit.exists()  # transcript cache-hit rate is not cost telemetry
+
+    def test_clears_fhealth_cache_but_not_cache_hit_entries(self) -> None:
+        # The derived supervisor-health cache (fhealth-*.json) would otherwise replay a
+        # stale SUP!N marker within its TTL after the ledger is wiped, so reset clears it.
+        # The unrelated transcript cache-hit entry ({digest}.json) is not telemetry state.
+        cache = get_forge_home() / "cache" / "statusline"
+        cache.mkdir(parents=True, exist_ok=True)
+        fhealth = cache / "fhealth-deadbeef.json"
+        cache_hit = cache / "deadbeef.json"
+        fhealth.write_text(
+            '{"version": 1, "computed_at": 0, "recent_failures": 3, "last_kind": "timeout", "last_seen_at": "ts"}\n'
+        )
+        cache_hit.write_text('{"version": 1, "cache_hit_rate": 0.5}\n')
+        result = CliRunner().invoke(costs_group, ["reset", "--yes"])
+        assert result.exit_code == 0, result.output
+        assert not fhealth.exists()  # stale derived health marker cleared
+        assert cache_hit.exists()  # transcript cache-hit rate is not telemetry
+
+    def test_dry_run_lists_supervisor_health_cache(self) -> None:
+        cache = get_forge_home() / "cache" / "statusline"
+        cache.mkdir(parents=True, exist_ok=True)
+        (cache / "fhealth-deadbeef.json").write_text("{}\n")
+        result = CliRunner().invoke(costs_group, ["reset", "--dry-run"])
+        assert result.exit_code == 0, result.output
+        assert "supervisor-health" in result.output  # previewed as its own target
+        assert (cache / "fhealth-deadbeef.json").exists()  # dry-run deletes nothing

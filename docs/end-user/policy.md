@@ -264,7 +264,9 @@ How it behaves:
 Reading the results in `forge activity`: the **Plan check (tier-1)** line shows allow vs needs-review counts (your
 short-circuit rate), the **Supervisor** line shows what the frontier decided when it ran, and the `plan-check` command
 row shows tier-1 call volume, tokens, and errors. The two lines can differ: a needs-review verdict that coincides with a
-deterministic block (for example TDD) never reaches the supervisor.
+deterministic block (for example TDD) never reaches the supervisor. When recent frontier checks fail open, the
+**Supervisor** line also appends `failing open: N timeout, N error` — a window aggregate, distinct from the status
+line's `SUP!N` consecutive streak.
 
 ### Why supervision matters (beyond TDD)
 

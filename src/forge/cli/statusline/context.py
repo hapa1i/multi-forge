@@ -25,6 +25,7 @@ from forge.cli.statusline.palette import (
     resolve_glyphs,
     resolve_palette,
 )
+from forge.core.ops.usage_summary import SupervisorHealth
 from forge.runtime_config import RuntimeConfig
 
 
@@ -142,3 +143,38 @@ class RenderContext:
         from forge.session.effective import apply_overrides
 
         return apply_overrides(intent, overrides)
+
+    @cached_property
+    def supervisor_health(self) -> SupervisorHealth | None:
+        """Recent frontier-supervisor fail-open health for the bar (throttled, fail-open).
+
+        ``None`` when there is no Forge session to attribute to, or when the throttled
+        ledger read fails open. Manifest-gated and root-scoped exactly like the
+        ``forge_cost`` segment; the throttle is time-only (supervisor fail-opens accrue via
+        ledger writes that never touch the transcript). Lazy `cached_property`: the ledger
+        read happens only if the (opt-in) supervisor producer reads this.
+        """
+        name = (self.manifest or {}).get("name")
+        if not isinstance(name, str) or not name:  # manifest-gated, like _produce_forge_cost
+            return None
+
+        from forge.cli.statusline.throttle import read_or_compute_session_health
+        from forge.core.ops.usage_summary import read_supervisor_health
+        from forge.core.state import parse_iso
+
+        # Bound the scan to events at/after session creation (an event cannot predate it);
+        # a malformed/absent created_at falls back to an unbounded scan.
+        since = None
+        created_raw = (self.manifest or {}).get("created_at")
+        if isinstance(created_raw, str):
+            try:
+                since = parse_iso(created_raw)
+            except ValueError:
+                since = None
+
+        cache_key = f"{self.forge_root or ''}\x00{name}"
+        return read_or_compute_session_health(
+            cache_key,
+            self.config.statusline.forge_cost_ttl,
+            lambda: read_supervisor_health(name, since=since),
+        )
