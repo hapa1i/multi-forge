@@ -63,7 +63,8 @@ async def test_bug_openrouter_client_reset_on_auth_failure_complete() -> None:
     """OpenRouterClient.complete() auth path (openrouter.py line ~131)."""
     client = _make_openrouter_client()
     mock_openai = _inject_mock_client(client)
-    mock_openai.chat.completions.create = AsyncMock(side_effect=Exception("unauthorized"))
+    # Non-streaming OpenRouter reads response headers via with_raw_response (provider-trace).
+    mock_openai.chat.completions.with_raw_response.create = AsyncMock(side_effect=Exception("unauthorized"))
 
     with pytest.raises(Exception, match="unauthorized"):
         await client.complete([Message(role="user", content="test")])
@@ -161,7 +162,8 @@ async def test_bug_openrouter_client_not_reset_on_non_auth_error() -> None:
     """Non-auth errors must not clear the client."""
     client = _make_openrouter_client()
     mock_openai = _inject_mock_client(client)
-    mock_openai.chat.completions.create = AsyncMock(side_effect=Exception("rate limit exceeded"))
+    # Non-streaming OpenRouter reads response headers via with_raw_response (provider-trace).
+    mock_openai.chat.completions.with_raw_response.create = AsyncMock(side_effect=Exception("rate limit exceeded"))
 
     with pytest.raises(Exception, match="rate limit"):
         await client.complete([Message(role="user", content="test")])
