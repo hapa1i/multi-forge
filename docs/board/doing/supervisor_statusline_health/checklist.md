@@ -130,17 +130,32 @@ posture preservation, ASCII `!`, yellow/red tiers, and the ledger source.
 
 ### Phase 3: `forge activity` failing-open line + end-user doc + closeout
 
-- [ ] `forge activity` Supervisor render appends `failing open: N timeout, N error` from the existing ledger
-  `failure_type` (no new field); `--json` includes the per-kind counts. *Verify*:
-  `test_activity.py::test_human_render_shows_supervisor` (failing-open line) + JSON test. *Files*:
-  `src/forge/cli/activity.py`, `src/forge/core/ops/usage_summary.py`.
-- [ ] `docs/end-user/session.md`: a short note after the supervisor activity example -- `SUP!N timeout` means recent
-  frontier checks are failing open (actions may proceed without frontier review), pointing to
-  `forge activity <session>`. *Files*: `docs/end-user/session.md`.
-- [ ] `make pre-commit` clean; `change_log.md` feature-completion entry; durable lessons staged for `impl_notes.md`
-  after review; card moved `doing/ -> done/`. The deferred kinds (parse/auth), exact reset, and the
-  decision-log/upstream path are recorded in `upstream_downstream_ledgers` -- not lost. *Files*:
-  `docs/board/change_log.md`.
+**Status (2026-06-16): Phase 3 complete.** `make pre-commit` clean (mdformat auto-fixed doc prose, second pass clean);
+79 `test_usage_summary.py`/`test_activity.py` + 112 status-line tests green. **Deviations from the approved plan, both
+from the branch review:** (1) the breakdown field is the generic neutral `error_kinds` (sibling to `errors`), populated
+uniformly in `_aggregate_ledger` with no `command == "supervisor"` branch -- "failing open" is the supervisor
+formatter's interpretation only, so memory-writer/panel rows carry a generic breakdown in `--json` but are never
+mislabeled; (2) `format_failing_open` is gated on `error_kinds`, and `render_summary_line` keeps an explicit local
+fallback to the legacy `"{errors} errors"`, which means the three pre-existing hand-built `TestRenderLine` tests stay
+green **unchanged** (no churn, the opposite of the draft's "update existing tests"). Docs also call out the
+streak-vs-window semantic gap (review point 3).
+
+- [x] `forge activity` Supervisor render appends `failing open: N timeout, N error` from the existing ledger
+  `failure_type` (no new field); `--json` includes the per-kind counts as generic `commands[*].error_kinds`. *Verify*:
+  `test_activity.py::test_human_render_shows_failing_open` + `test_json_includes_error_kinds`;
+  `test_usage_summary.py::TestLedgerPlane::test_error_kinds_breakdown`, `TestFailureKind`, and `TestRenderLine`
+  failing-open + fallback cases. *Files*: `src/forge/cli/activity.py`, `src/forge/core/ops/usage_summary.py`.
+- [x] `docs/end-user/session.md`: note after the `forge activity` description -- `SUP!N timeout` means recent frontier
+  checks are failing open, pointing to `forge activity <session>`, explicit that `SUP!N` is the consecutive streak vs
+  the window aggregate; session-end example updated. Plus `policy.md` cross-reference and `design_appendix.md §A.13`.
+  *Files*: `docs/end-user/session.md`, `docs/end-user/policy.md`, `docs/design_appendix.md`.
+- [x] `make pre-commit` clean; `change_log.md` feature-completion entry; durable lessons promoted to `impl_notes.md`.
+  The deferred kinds (parse/auth), exact reset, and the decision-log/upstream path are recorded in
+  `upstream_downstream_ledgers` -- not lost. *Files*: `docs/board/change_log.md`, `docs/board/impl_notes.md`.
+- [ ] **Lane move `doing/ -> done/` pending merge to `main`** (repo convention: the move is gated on the final merge,
+  per the `codex_frontend` closeout). Perform
+  `git mv docs/board/doing/supervisor_statusline_health docs/board/done/supervisor_statusline_health` immediately after
+  this branch lands on `main`.
 
 ## Acceptance test table
 

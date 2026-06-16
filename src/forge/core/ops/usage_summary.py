@@ -55,6 +55,11 @@ class CommandUsage:
     # panel as 5 calls/workflows, so worker events are split into `workers` below.
     calls: int = 0
     errors: int = 0  # status in {error, timeout}, among `calls` (worker errors are not counted here)
+    # Per-display-kind split of `errors` (generic, keyed by the `_failure_kind` vocab:
+    # "timeout"/"error"). `errors == sum(error_kinds.values())` for ledger-derived rows.
+    # This is generic error data -- NOT "fail-open": the supervisor formatter is the only
+    # caller that interprets it as failing open (a memory-writer/panel error is not one).
+    error_kinds: dict[str, int] = field(default_factory=dict)
     workers: int = 0  # per-worker fan-out leaf events (claude -p); not part of `calls`
     input_tokens: int = 0
     output_tokens: int = 0
@@ -193,6 +198,23 @@ def build_session_activity_summary(
     return summary
 
 
+def format_failing_open(cmd: CommandUsage | None) -> str | None:
+    """Return a supervisor fail-open clause from a command's ``error_kinds``, or ``None``.
+
+    Gated on ``error_kinds`` (not ``errors``): real ledger rows always co-populate both,
+    so an ``errors > 0`` row with empty ``error_kinds`` is a hand-built/internal summary
+    -- callers fall back to the plain ``errors`` count rather than fabricate kinds. The
+    "failing open" framing is supervisor-specific; only the supervisor render calls this.
+    """
+    if cmd is None or not cmd.error_kinds:
+        return None
+    order = ("timeout", "error")
+    parts = [f"{cmd.error_kinds[k]} {k}" for k in order if cmd.error_kinds.get(k)]
+    # Defensive: surface any unexpected kind outside the canonical timeout/error vocab.
+    parts += [f"{n} {k}" for k, n in cmd.error_kinds.items() if k not in order and n]
+    return "failing open: " + ", ".join(parts)
+
+
 def render_summary_line(summary: SessionActivitySummary) -> str | None:
     """Return a one-line session-end summary, or None when there is nothing to show.
 
@@ -200,7 +222,12 @@ def render_summary_line(summary: SessionActivitySummary) -> str | None:
     """
     parts: list[str] = []
 
-    sup_errors = next((c.errors for c in summary.commands if c.command == "supervisor"), 0)
+    sup_cmd = next((c for c in summary.commands if c.command == "supervisor"), None)
+    sup_errors = sup_cmd.errors if sup_cmd else 0
+    # The error clause: the per-kind fail-open breakdown when the ledger recorded kinds
+    # (real data), else the plain count for a hand-built summary (error_kinds empty). The
+    # `or` fallback is load-bearing -- it must never silently drop a known error count.
+    failing = format_failing_open(sup_cmd) or (f"{sup_errors} errors" if sup_errors else None)
     pol = summary.policy
     if pol and pol.has_content:
         if pol.plan_check_allow or pol.plan_check_needs_review:
@@ -216,15 +243,13 @@ def render_summary_line(summary: SessionActivitySummary) -> str | None:
             # supervisor checks -- "supervisor: 0 checks" would be noise, skip it.
             checks_label = f"{checks}+" if pol.log_capped else str(checks)
             seg = f"supervisor: {checks_label} checks ({pol.supervisor_warn} warn, {pol.supervisor_deny} block"
-            seg += f", {sup_errors} errors)" if sup_errors else ")"
+            seg += f", {failing})" if failing else ")"
             parts.append(seg)
-    else:
-        sup = next((c for c in summary.commands if c.command == "supervisor"), None)
-        if sup is not None:
-            seg = f"supervisor: {sup.calls} runs"
-            if sup.errors:
-                seg += f" ({sup.errors} errors)"
-            parts.append(seg)
+    elif sup_cmd is not None:
+        seg = f"supervisor: {sup_cmd.calls} runs"
+        if failing:
+            seg += f" ({failing})"
+        parts.append(seg)
 
     sh = summary.shadow
     if sh is not None and sh.has_content:
@@ -313,6 +338,16 @@ class SupervisorHealth:
     last_seen_at: str | None = None
 
 
+def _failure_kind(failure_type: str | None) -> str:
+    """Map a ledger ``failure_type`` to a display kind: ``timeout`` (exact) or ``error``.
+
+    The single source of the kind vocabulary, shared by :func:`read_supervisor_health`
+    (the status-line consecutive streak) and :func:`_aggregate_ledger` (the activity
+    window count). ``None``/subprocess/exit/runtime failures all map to ``error``.
+    """
+    return "timeout" if failure_type == "timeout" else "error"
+
+
 def read_supervisor_health(session: str, *, since: datetime | None = None) -> SupervisorHealth:
     """Return the recent consecutive frontier-supervisor fail-open run for ``session``.
 
@@ -336,7 +371,7 @@ def read_supervisor_health(session: str, *, since: datetime | None = None) -> Su
         if event.status not in _ERROR_STATUSES:
             break  # the first non-failure (a success) ends the recent fail-open run
         if count == 0:  # the newest failure defines the displayed kind + timestamp
-            last_kind = "timeout" if event.failure_type == "timeout" else "error"
+            last_kind = _failure_kind(event.failure_type)
             last_seen_at = event.ts
         count += 1
     if count == 0:
@@ -480,6 +515,11 @@ def _aggregate_ledger(summary: SessionActivitySummary, session_name: str, since:
             cu.calls += 1
             if event.status in _ERROR_STATUSES:
                 cu.errors += 1
+                # Generic per-kind split (uniform over all commands; only the supervisor
+                # render interprets it as "failing open"). Real error events always carry
+                # a kind, so `errors == sum(error_kinds.values())` for ledger-derived rows.
+                kind = _failure_kind(event.failure_type)
+                cu.error_kinds[kind] = cu.error_kinds.get(kind, 0) + 1
         if event.input_tokens:
             cu.input_tokens += event.input_tokens
             summary.total_input_tokens += event.input_tokens

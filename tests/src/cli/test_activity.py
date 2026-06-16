@@ -82,6 +82,30 @@ def test_json_shape(monkeypatch) -> None:
     assert cmds["supervisor"]["errors"] == 1
 
 
+def test_human_render_shows_failing_open(monkeypatch) -> None:
+    # Acceptance: a supervisor failing open is visible with a per-kind breakdown, even
+    # with no decision log (pol is None here -- the resolver returns no forge_root).
+    _patch_resolver(monkeypatch)
+    log_usage_event(_event(status="timeout", failure_type="timeout"))
+    log_usage_event(_event(status="timeout", failure_type="timeout"))
+    log_usage_event(_event(status="error", failure_type="subprocess_error"))
+    result = CliRunner().invoke(activity_cmd, ["planner", "--all"])
+    assert result.exit_code == 0
+    assert "failing open: 2 timeout, 1 error" in result.output
+
+
+def test_json_includes_error_kinds(monkeypatch) -> None:
+    _patch_resolver(monkeypatch)
+    log_usage_event(_event(status="timeout", failure_type="timeout"))
+    log_usage_event(_event(status="timeout", failure_type="timeout"))
+    log_usage_event(_event(status="error", failure_type="subprocess_error"))
+    result = CliRunner().invoke(activity_cmd, ["planner", "--all", "--json"])
+    assert result.exit_code == 0
+    cmds = {c["command"]: c for c in json.loads(result.output)["commands"]}
+    assert cmds["supervisor"]["error_kinds"] == {"timeout": 2, "error": 1}
+    assert cmds["supervisor"]["errors"] == 3
+
+
 def test_empty_session_message(monkeypatch) -> None:
     _patch_resolver(monkeypatch, name="quiet")
     result = CliRunner().invoke(activity_cmd, ["quiet"])

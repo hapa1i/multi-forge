@@ -281,6 +281,44 @@ code (file:line) before promotion.
   `test_memory.py`. When adding a new persisted activation field, add it to the no-op comparison or it joins this class
   of silent drop.
 
+### Supervisor status-line health: surface fail-open from the usage ledger (shipped 2026-06-16)
+
+Durable invariants for `supervisor_statusline_health` (#?): make a silently fail-open supervisor visible on the
+always-on status line (`SUP!N <kind>`) and in `forge activity` (`failing open: N timeout, N error`), reading the outcome
+the usage ledger already records. Sources: `src/forge/core/ops/usage_summary.py`, `src/forge/cli/status_line.py`,
+`src/forge/cli/statusline/{throttle,context,registry}.py`, `src/forge/cli/activity.py`.
+
+- **Read the ledger, not the decision log — the on-model source.** The supervisor's timeout/subprocess fail-open is
+  already in the usage ledger as a non-`success` `UsageEvent.status`/`failure_type` (`emit_usage_for_session_result`).
+  Surfacing it needed **no** new durable field. The rejected alternative — a structured `failure_kind` on
+  `PolicyDecision` — patches the *accidental* outcome record (the decision log) instead of the real one; it is deferred
+  to `upstream_downstream_ledgers` along with the kinds the ledger can't yet see (parse fail-opens logged `success`,
+  auth fail-opens that emit no event, and exact cached-allow reset).
+- **Two read shapes off one ledger, one kind vocabulary.** `read_supervisor_health` returns the **newest-first
+  contiguous fail-open streak** (resets on the first `success`) for the status-line `SUP!N`; `_aggregate_ledger` returns
+  the **window total** per kind (`CommandUsage.error_kinds`) for `forge activity`. They are deliberately different
+  numbers and the docs say so. Both map `failure_type` through the single `_failure_kind` helper (`timeout` exact,
+  everything incl. `None`/subprocess/exit/runtime → `error`) — keep that the only source of the kind mapping or the two
+  surfaces drift.
+- **Generic data, supervisor-only interpretation.** `CommandUsage.error_kinds` is a generic per-kind split of the
+  existing generic `errors` count, populated uniformly for every command in `_aggregate_ledger` (no
+  `command == "supervisor"` branch). "Failing open" is applied **only** by the supervisor formatter
+  (`format_failing_open`); a memory-writer/panel error is an error, not a fail-open. Non-supervisor rows still carry
+  `error_kinds` in `--json` as an honest generic breakdown.
+- **`format_failing_open` is gated on `error_kinds`, not `errors` — with an explicit caller fallback.** Real ledger rows
+  co-populate both (`_failure_kind(None) == "error"`), so `errors>0 / error_kinds={}` is exclusively a hand-built /
+  internal summary. The helper returns `None` there; `render_summary_line` falls back **locally** to the legacy
+  `"{errors} errors"` so the count is never silently dropped (regression: `test_errors_only_falls_back_to_count`; the
+  three pre-existing hand-built `TestRenderLine` tests stay green unchanged). `forge activity` needs no fallback — its
+  commands table already shows the lumped count, so the Supervisor line carries pure breakdown detail.
+- **Status-line health stays fail-open + posture-preserving.** The throttled read (`read_or_compute_session_health`,
+  same `forge_cost_ttl` window, distinct `fhealth-` cache) degrades a read error to **posture-only** (no suffix), never
+  hiding the posture — unlike `forge_cost`, whose whole value is ledger-derived. `SUP!N` attaches to any posture
+  (`SUP`/`SUP(susp)`/`SUP(off)`) so suspended/off keeps prior fail-open history visible. `recent_failures==0` is
+  byte-identical to today (golden-safe; `supervisor` stays out of `DEFAULT_ORDER`). Frontier-only:
+  `command="supervisor"` excludes `supervisor-shadow`/`plan-check`. `forge proxy costs reset` clears `fhealth-*.json`
+  alongside `fcost-*.json` so a wiped ledger can't replay cached health.
+
 ### Proposed Promotions From Metric Evidence (awaiting human review, 2026-06-06)
 
 Drafted by the `metric_evidence_simplification` Phase 6 closeout. **Not yet promoted** — a human should review and move
