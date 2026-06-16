@@ -52,9 +52,10 @@ record for account-side lookup (probe 3: `user` is retained, a custom `session_i
 - **Docs**: `proxy.md` (flag + `/generation` framing), `design.md §3.14` config block + sentence,
   `design_appendix §A.14` injection bullet. No CLI/`%` surface change, so `cli_reference.md` is untouched.
 
-**Verification**: 14 new unit tests (3 config + 4 adapter + 5 server-helper + 2 channel-proof, incl. an end-to-end proof
-that `extra["openai"]["user"]` survives the hyperparam merge to a top-level `user` kwarg); `make test-unit` + scoped
-proxy integration; `make pre-commit` clean. Last shipped phase of the card.
+**Verification**: 16 new unit tests (3 config + 4 adapter + 5 server-helper + 2 channel-proof + 2 create_message
+wiring), incl. an end-to-end proof that `extra["openai"]["user"]` survives the hyperparam merge to a top-level `user`
+kwarg, and a `create_message`-level test that config-ON inserts `_forge_user` before the adapter handoff;
+`make test-unit` + scoped proxy integration; `make pre-commit` clean. Last shipped phase of the card.
 
 ### openrouter_observability Phase 4: `forge provider trace` read surfaces
 

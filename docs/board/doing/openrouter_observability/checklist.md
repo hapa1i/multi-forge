@@ -342,6 +342,7 @@ record for account-side lookup**. Last phase by design. Depends on Phase 1 + pro
 | Server gate + fallback               | provider/flag/session/run-id matrix            | openrouter+flag+session -> session id; flag-off / non-openrouter / no-identity -> None; no session + root run -> `forge_run_<hash>_<role>` | `tests/src/proxy/test_server_forge_headers.py` |
 | Adapter forwards `_forge_user`       | request with `_forge_user` (+/- `_user_agent`) | `extra["openai"]["user"]` set on stream + non-stream; coexists with `extra_headers`; absent -> no `user` key                               | `tests/src/proxy/test_client_adapter.py`       |
 | Channel proof (`user` is top-level)  | hyperparams `extra["openai"]["user"]`          | reaches `chat.completions.create(user=...)`, survives `_translate_params`, never in `extra_body`                                           | `tests/src/core/llm/test_openrouter.py`        |
+| create_message wiring (config ON)    | OpenRouter route, flag on/off, X-Forge-Session | flag-on -> `_forge_user` on the dict handed to the adapter; flag-off -> absent                                                             | `tests/src/proxy/test_routing_invariants.py`   |
 
 ---
 
