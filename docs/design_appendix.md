@@ -301,6 +301,17 @@ no transcript-mtime shortcut, because headless cost accrues via ledger writes th
 would otherwise freeze the value all session). A legitimate `0` is cached; a ledger read error fails open (no segment,
 never cached). Window: `forge_cost_ttl` (default 10s).
 
+**Supervisor health (`supervisor` suffix, v1).** When the opt-in `supervisor` segment is active, a fail-open suffix
+`!N <kind>` appends to the posture token (`SUP!3 timeout`, `SUP(susp)!2 timeout`, `SUP(off)!4 error`): N is the
+newest-first contiguous run of frontier-supervisor `claude -p` runs the usage ledger recorded as a non-`success`
+`status` (reset by the first `success`), `<kind>` is `timeout` or `error`. Posture-independent — suspended/off emit no
+events, so prior fail-open history stays visible. ASCII `!` (no unicode glyph; survives `normalize-text`). Tiered like
+`format_spend_cap`: YELLOW 1-2, RED `>=3`; the suffix never shows at 0, so a healthy `SUP` is byte-identical to today.
+Read throttled + fail-open by `read_or_compute_session_health` (same `forge_cost_ttl` window, distinct `fhealth-`
+cache); a read error degrades to **posture-only** (no suffix), never hiding the posture (unlike `forge_cost`, whose
+whole value is ledger-derived). Source is the existing `UsageEvent.status`/`failure_type` — no durable-schema change. v1
+misses parse fail-opens (logged `success`) and auth fail-opens (no event), deferred to `upstream_downstream_ledgers`.
+
 **Rendering.** The `where` bucket (`path`, `branch`) leads concatenated; all other segments are separator-joined in the
 configured order. `RenderContext` derivations are lazy `cached_property` — a segment not in the active set does zero I/O
 (no transcript scan, git subprocess, or proxy-field access it would otherwise trigger). Forge-unique segments read

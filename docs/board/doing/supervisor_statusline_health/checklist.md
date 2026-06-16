@@ -54,8 +54,8 @@ beside `sum_forge_added_cost`, then surfaced throttled, mirroring `read_or_compu
   suspended/off write no new events, so prior fail-open history stays visible.
 - **Allowlist == producers.** The suffix lives inside the existing `supervisor` segment; no new segment name;
   `SEGMENT_NAMES == {seg.name for seg in SEGMENTS}` holds.
-- **Golden default bar unchanged.** `supervisor` stays out of `DEFAULT_ORDER`; `format_supervisor(health=None)` is
-  byte-identical to today.
+- **Golden default bar unchanged.** `supervisor` stays out of `DEFAULT_ORDER`; `format_supervisor` with no failures
+  (`recent_failures==0`) is byte-identical to today.
 - **Zero I/O when inactive.** The throttled read happens only when the `supervisor` segment is active.
 
 ## Phases
@@ -99,18 +99,31 @@ context box below anticipated. Issue #1 (reset clears `fhealth-*.json`) and the 
 **Goal**: Append a colored ASCII health suffix to `format_supervisor` after the posture token, default-off, without
 touching golden bars.
 
-- [ ] `format_supervisor` gains optional `health=None`; when `recent_failures>0`, append `!N <kind>` to the rendered
-  posture token regardless of posture (`SUP!3 timeout`, `SUP(susp)!2 timeout`, `SUP(off)!4 error`). YELLOW 1-2, RED
-  `>=3` (mirror `format_spend_cap`). `health=None` byte-identical to today. *Verify*:
-  `test_statusline_forge_segments.py` -- suffix on all three postures; `None` equals current output. *Files*:
-  `src/forge/cli/status_line.py`.
-- [ ] `_produce_supervisor` passes `ctx.supervisor_health` (atomic signature change, no shim); all posture branches
-  preserved. *Verify*: producer test -- `policy.enabled` + 3 ledger timeouts -> `SUP` + `!3 timeout`; disabled ->
-  `SUP(off)` + suffix; suspended -> `SUP(susp)` + suffix. *Files*: `src/forge/cli/statusline/registry.py`.
-- [ ] Golden default bar unchanged + render fail-open: golden snapshots pass; a raising `supervisor_health` degrades to
-  no suffix, `status_line()` exits 0. *Verify*: `test_statusline_registry.py::TestGoldenNoOpGuard` +
-  `test_allowlist_equals_producers` unchanged; inject a raising reader -> exit 0, segment omitted. *Files*:
-  `tests/src/cli/test_statusline_registry.py`.
+**Status (2026-06-16): Phase 2 complete.** `make pre-commit` clean (first pass, no auto-fix); 112 passed across
+`test_statusline_forge_segments.py` (format + producer health cases), `test_statusline_registry.py` (golden
+byte-identity + `test_allowlist_equals_producers`, both unchanged), and `test_statusline_session_cost_throttle.py`.
+**Deviation from the approved plan**: `format_supervisor` takes the two primitives it renders (`recent_failures`,
+`last_kind`) rather than a `SupervisorHealth` param. `status_line.py` has a deliberate zero-top-level-forge-import
+convention (all 8+ forge imports are lazy/in-function), and the renderer needs only count + kind (not `last_seen_at`);
+the producer unpacks `ctx.supervisor_health`, keeping the dataclass coupling on the forge-aware side. No new import;
+render is byte-identical to the planned shape. The §A.8 supervisor-health paragraph was added.
+
+- [x] `format_supervisor` gains optional `recent_failures`/`last_kind` (the two fields it renders, not a
+  `SupervisorHealth` param -- preserves `status_line.py`'s zero-top-level-forge-import convention); when
+  `recent_failures>0`, append `!N <kind>` regardless of posture (`SUP!3 timeout`, `SUP(susp)!2 timeout`,
+  `SUP(off)!4 error`). YELLOW 1-2, RED `>=3` (mirror `format_spend_cap`). `recent_failures==0` byte-identical to today.
+  *Verify*: `test_statusline_forge_segments.py` -- suffix + tiers on all three postures; zero failures equals current
+  output. *Files*: `src/forge/cli/status_line.py`.
+- [x] `_produce_supervisor` unpacks `ctx.supervisor_health` into the two render fields (no shim); all posture branches
+  preserved. *Verify*: producer test -- `policy.enabled` + 3 ledger timeouts -> `SUP!3 timeout` (seeded end-to-end);
+  disabled -> `SUP(off)` + suffix; suspended-via-override -> `SUP(susp)` + suffix. *Files*:
+  `src/forge/cli/statusline/registry.py`.
+- [x] Golden default bar unchanged + render fail-open: golden snapshots pass; a raising reader degrades to
+  **posture-only** (no suffix), NOT a dropped segment -- the posture is manifest-derived, only the suffix is
+  ledger-derived (corrects the plan's "segment omitted"; that is `forge_cost`'s behavior, whose whole value is
+  ledger-derived). *Verify*: `test_statusline_registry.py::TestGoldenNoOpGuard` + `test_allowlist_equals_producers`
+  unchanged; `test_raising_reader_degrades_to_posture_only` -- posture present, no `!`. *Files*:
+  `tests/src/cli/test_statusline_forge_segments.py`, `tests/src/cli/test_statusline_registry.py`.
 
 **Design-doc updates**: status-line segment reference (`design_appendix.md §A.8`) -- describe the `SUP!N <kind>` suffix,
 posture preservation, ASCII `!`, yellow/red tiers, and the ledger source.
@@ -138,8 +151,8 @@ posture preservation, ASCII `!`, yellow/red tiers, and the ledger source.
 | Success resets streak      | 3 failures then a newest `status="success"` supervisor event         | `recent_failures==0`                                            | `tests/src/cli/test_statusline_forge_segments.py` |
 | Posture preserved + suffix | `policy.enabled=False` / `suspended=True` + ledger failures          | `SUP(off)`/`SUP(susp)` renders WITH the suffix                  | `tests/src/cli/test_statusline_forge_segments.py` |
 | Shadow excluded            | only `command="supervisor-shadow"` events                            | no suffix (frontier-only)                                       | `tests/src/cli/test_statusline_forge_segments.py` |
-| Status-line fail-open      | malformed ledger shard                                               | empty health, `status_line()` exits 0, segment omitted          | `tests/src/cli/test_statusline_registry.py`       |
-| Golden default unchanged   | default segments (`health=None`)                                     | `supervisor` absent from `DEFAULT_ORDER`; golden byte-identical | `tests/src/cli/test_statusline_registry.py`       |
+| Status-line fail-open      | malformed ledger shard                                               | empty health, `status_line()` exits 0, no suffix                | `tests/src/cli/test_statusline_registry.py`       |
+| Golden default unchanged   | default segments (no failures)                                       | `supervisor` absent from `DEFAULT_ORDER`; golden byte-identical | `tests/src/cli/test_statusline_registry.py`       |
 | Activity failing-open line | session ledger w/ 2 timeout + 1 subprocess_error supervisor events   | `forge activity` shows `failing open: 2 timeout, 1 error`       | `tests/src/cli/test_activity.py`                  |
 
 ## Deferred to `upstream_downstream_ledgers` (proposed)
