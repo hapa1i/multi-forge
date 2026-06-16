@@ -7,30 +7,40 @@ planning; see **Card corrections** for claims the code refuted.
 
 ## Current focus
 
-**Phases 0 + 1 + 2 are complete** (the offline slice; Phase 2 incl. R1–R3 review fixes). Phase 0 -- all four probes
-settled 2026-06-15. **Phase 1 (identity headers)** and **Phase 2 (additive `ProviderTraceMeta`)** shipped offline: the
-provider/generation id + selected upstream + allowlisted headers now flow from the OpenRouter/LiteLLM clients to the
-proxy boundary via a typed internal carrier, kept separate from the synthetic `chatcmpl-<ts>` id. The review fixes
-ensure nothing is lost on the incident path: streaming emits `provider_meta` on the **first** content/tool event via a
-**dedicated `_provider_meta` carrier chunk** (so a cancelled stream keeps the gen id), the LiteLLM Responses fallback
-carries it too, and the direct OpenRouter non-streaming path now captures headers via `with_raw_response`
-(`make test-unit` 6125 green, mypy/pyright/scoped-`pre-commit` clean). **Phase 3 (trace plane + SSE seam) is next** and
-should be **re-planned** against the concrete carrier shape: the converters/`server.py` seam reads the
-**`_provider_meta` carrier chunk** (streaming) / `_provider_meta` key (non-streaming), reconstructs `ProviderTraceMeta`,
-and writes the metadata-only trace record; probe 2 (`[REMOTE-ABSENT]`) justifies the local-only `unavailable` status.
+**Phases 0 + 1 + 2 + 3 are implemented** (Phase 3 pending its Docker-integration commit gate). Phase 0 — all four probes
+settled 2026-06-15. **Phase 1 (identity headers)** + **Phase 2 (additive `ProviderTraceMeta`)** shipped offline:
+provider/generation id + selected upstream + allowlisted headers flow from the OpenRouter/LiteLLM clients to the proxy
+boundary via a typed internal carrier, separate from the synthetic `chatcmpl-<ts>` id; the carrier rides as a dedicated
+`_provider_meta` chunk (streaming) so a cancelled stream keeps the gen id.
+
+**Phase 3 (trace plane + SSE seam) is implemented.** The converters seam intercepts the `_provider_meta` carrier, tracks
+the four lifecycle flags (with `GeneratorExit` + `CancelledError` disconnect detection), and packs everything under one
+reserved `final_usage["_provider_trace"]` key (carrier mechanism = widen-the-dict). `server.py` writes a metadata-only
+record at both the streaming and non-streaming `on_complete` sites via the shared `record_provider_trace` helper in the
+neutral-leaf `provider_trace_logger.py` (gated direct-OpenRouter-only). The plane mirrors the audit log (versioned,
+owner-only 0600/0700, strict-dacite read, retention prune) and re-applies the Phase 2 header allowlist at the writer.
+The passthrough relay is instrumented identically but **latent** (the gate suppresses its write — it never carries
+OpenRouter). probe 2 (`[REMOTE-ABSENT]`) justifies the local-only `unavailable` status. 186 Phase 3 unit + 4 regression
+tests green; 2 live-OpenRouter integration tests pass (clean stream + the cancelled-stream incident path). **Remaining:
+the Docker-integration commit gate** (`make test-integration` + `make pre-commit` + change-log entry + commit).
+
 **Phase 5** (injection) keeps the **channel correction**: inject under `user` (recognized), not `session_id` (ignored);
 routing neutral, so the flag stays default OFF.
 
 ## Decisions locked (this card)
 
-| Decision                       | Choice                                                                        | Consequence                                                                                                                                                                                            |
-| ------------------------------ | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `session_id` injection default | **Opt-in config flag, default OFF**                                           | Injection (Phase 5) is gated; the trace plane works without it. Decouples observability from the routing-behavior change.                                                                              |
-| `session_id` granularity       | **`forge_sess_<hash>_<role>`**, fallback `forge_run_<hash>`                   | `root_run_id` is the only id all direct callers share -> right fallback. Human name is hashed, never sent raw.                                                                                         |
-| Trace retention / reset        | **Match audit (14d / 512 MB); NOT in `forge proxy costs reset`**              | Traces are metadata-only diagnostics, not spend truth. One mental model with the audit plane. Chosen once, shared with `proxy_log_hygiene`.                                                            |
-| Action tagger scope            | **Out of scope (documented gap)**                                             | `tagger.py` defaults to `gemini -> litellm_local`, no `provider=` arg; reaching OpenRouter is a separate routing change.                                                                               |
-| Provider metadata shape        | **Nested optional `ProviderTraceMeta`** on `CompletionResponse`/`StreamEvent` | Lower churn than ~6 flat fields x2 models; keeps synthetic-id namespace separate. (`types.py` has no `extra='forbid'`; `cost_usd` was added the same additive way.)                                    |
-| Trace-write home               | **One shared helper invoked from the proxy `on_complete` seam**               | Only existing shared stream-lifecycle point with `request_id` + run-tree headers in hand. Direct `core.llm` callers populate `provider_meta` but join via the usage ledger, not the proxy trace plane. |
+| Decision                       | Choice                                                                        | Consequence                                                                                                                                                                                                                                                              |
+| ------------------------------ | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `session_id` injection default | **Opt-in config flag, default OFF**                                           | Injection (Phase 5) is gated; the trace plane works without it. Decouples observability from the routing-behavior change.                                                                                                                                                |
+| `session_id` granularity       | **`forge_sess_<hash>_<role>`**, fallback `forge_run_<hash>`                   | `root_run_id` is the only id all direct callers share -> right fallback. Human name is hashed, never sent raw.                                                                                                                                                           |
+| Trace retention / reset        | **Match audit (14d / 512 MB); NOT in `forge proxy costs reset`**              | Traces are metadata-only diagnostics, not spend truth. One mental model with the audit plane. Chosen once, shared with `proxy_log_hygiene`.                                                                                                                              |
+| Action tagger scope            | **Out of scope (documented gap)**                                             | `tagger.py` defaults to `gemini -> litellm_local`, no `provider=` arg; reaching OpenRouter is a separate routing change.                                                                                                                                                 |
+| Provider metadata shape        | **Nested optional `ProviderTraceMeta`** on `CompletionResponse`/`StreamEvent` | Lower churn than ~6 flat fields x2 models; keeps synthetic-id namespace separate. (`types.py` has no `extra='forbid'`; `cost_usd` was added the same additive way.)                                                                                                      |
+| Trace-write home               | **One shared helper invoked from the proxy `on_complete` seam**               | Only existing shared stream-lifecycle point with `request_id` + run-tree headers in hand. Direct `core.llm` callers populate `provider_meta` but join via the usage ledger, not the proxy trace plane.                                                                   |
+| Carrier mechanism (P3)         | **Widen the dict, one reserved key**                                          | `final_usage`/`_OnCompleteCallback` arg widen `Dict[str,int]`→`Dict[str,Any]`; all trace payload quarantined under `final_usage["_provider_trace"]`. Mirrors `reported_cost_micros`; callback arity stable; one call site (`server.py`).                                 |
+| Shared-helper home (P3)        | **`record_provider_trace` in the neutral-leaf `provider_trace_logger.py`**    | `server.py` lazily imports `passthrough`; a helper in `server.py` imported by `passthrough.py` would invert that and risk a cycle. The leaf is imported by both — no cycle. Gate + `local_usage_status` derivation live there.                                           |
+| Passthrough mirror (P3)        | **Forward-wired, latent today**                                               | Instrumented with the same four flags + the one shared helper, but the OpenRouter gate suppresses its write (passthrough never carries OpenRouter). Tested both ways (flags computed; gate suppresses). Avoids a second writer for a future passthrough-routed provider. |
+| Plane scope (P3)               | **Direct-OpenRouter-only (`provider_name == "openrouter"`)**                  | Covers the direct `openrouter-openai` incident path the probes exercised. Gateway-routed OpenRouter (LiteLLM→OpenRouter) is **out of scope** — documented, not silently excluded. Broadening later keys off `provider_meta.selected_provider`, not `provider_name`.      |
 
 ## Open implementation question (settle in Phase 5, not blocking)
 
@@ -179,44 +189,68 @@ flow to the proxy boundary instead of dying in raw dicts. Depends on Phase 0 pro
 metadata-only owner-only records to `~/.forge/providers/openrouter/traces/<YYYY-MM>_<pid>.jsonl`. Depends on Phases 1-2
 and probe 2.
 
-- [ ] **Lifecycle flags at the one seam** (`src/forge/proxy/converters.py`): in `convert_openai_to_anthropic_sse` track
-  `stream_started` (message_start), `first_chunk_seen` (first upstream chunk), `final_usage_seen` (usage chunk parsed
-  `:887-920`). Detect disconnect with a **new** `asyncio.CancelledError` catch around the `async for`, set
-  `client_disconnected`, then **re-raise** (CancelledError is `BaseException`, not caught by `except Exception`). Carry
-  flags additively -- prefer the `final_usage` dict carrier (precedent: `reported_cost_micros` at `:918`) so the
-  `_OnCompleteCallback` signature (`:40`, fired in `finally` at `:1209`) stays stable. - *Assertion*: `on_complete`
-  receives the flags; aborted stream -> `client_disconnected=True`, `final_usage_seen=False`, `finally` still fires
-  once; clean stream -> `final_usage_seen=True`, `client_disconnected=False`.
-- [ ] **Mirror in passthrough** (`src/forge/proxy/passthrough.py`): same flags in `_stream_opened_upstream`
-  (CancelledError on the relay; `final_usage_seen` when `_UsageAccumulator` sees the final `message_delta`), funneled
-  into the **same** trace helper. (Passthrough cost is structurally always unavailable.) - *Assertion*: passthrough
-  stream sets the same flags; both wire shapes call one shared helper, not two writers.
-- [ ] **Trace plane writer/reader** (`src/forge/proxy/provider_trace_logger.py`, new -- model on `audit_logger.py` /
-  `ledger.py`, **not** `cost_logger.py`): `PROVIDER_TRACE_SCHEMA_VERSION=1`;
-  `_traces_dir()=get_forge_home()/"providers"/"openrouter"/"traces"`; shard `{YYYY-MM}_{pid}.jsonl`;
-  `log_provider_trace` via `open_secure_append` under a dedicated non-reentrant `_lock`; **chmod all three dir levels
-  0700**; best-effort try/except that never raises. `read_provider_traces`: glob + `decode_json_object` +
-  skip-newer-schema-warn-once (own latch) + strict `dacite` (`strict=True`). Fields per card §4 (no bodies). -
-  *Assertion*: 0600 files under 0700 three-level dirs; newer-schema skipped with one warning; unknown field =
-  corruption; non-object line skipped; forced `OSError` swallowed; no prompt/completion/body field exists.
-- [ ] **Write from the proxy** (`src/forge/proxy/server.py`): in `_on_stream_complete` and the non-streaming block,
-  **after** cost logging, call the writer gated to the resolved OpenRouter provider, joining by `request_id` +
-  `forge_run_id`/`forge_root_run_id` + `X-Forge-Session`/`Command`. Derive `local_usage_status` (`available` when
-  reported cost/final usage present, else `unavailable`). Set `client_disconnected` from the SSE flag; **leave
-  `timeout_seen=False`** -- the proxy never observes the parent's `subprocess.run` timeout (it only sees a disconnect);
-  `timeout_seen` is for later run-tree correlation. Document this limit. - *Assertion*: OpenRouter stream that
-  disconnects before final usage -> trace `stream_started=True`, `first_chunk_seen=True`, `final_usage_seen=False`,
-  `client_disconnected=True`, `local_usage_status="unavailable"`; clean -> `final_usage_seen=True`,
-  `local_usage_status="available"`; a litellm route writes no OpenRouter trace.
-- [ ] **Config + prune** (`src/forge/config/schema.py`, `provider_trace_logger.py`, `server.py`): `ProviderTraceConfig`
-  (`retention_days=14`, `max_total_mb=512`; bool-rejecting validation + `_reject_unknown_keys`) wired into
-  `ProxyConfig`. `prune_provider_traces` cloned from `prune_audit_logs` (`audit_logger.py:428`) **and wired** into a
-  `_maybe_prune_provider_traces()` called from `_ensure_runtime_state` (`server.py:168`) beside
-  `_maybe_prune_audit_logs` (`:176`). Do **not** repeat the dead `prune_usage_events` (`ledger.py:274`, never invoked).
-  \- *Assertion*: config rejects unknown keys + non-bounded values; prune deletes over `retention_days` and oldest-first
-  over `max_total_mb` preserving 0600/0700; prune is invoked once per process.
-- [ ] Design-doc sync: design.md §3.14 (three planes -> **four**; provider trace is lifecycle/correlation, joined by
-  `request_id` + run-tree ids, **not** wiped by `forge proxy costs reset`), design_appendix new schema subsection.
+- [x] **Lifecycle flags at the one seam** (`src/forge/proxy/converters.py`): `convert_openai_to_anthropic_sse` now
+  tracks `_stream_started` (after `message_start`), `_first_chunk_seen` (first **user-visible** text/tool
+  `content_block_start` — the `_provider_meta` carrier is excluded), `_final_usage_seen` (usage-parse block), and
+  intercepts the `_provider_meta` carrier chunk (stashes into `_provider_trace_meta`, `continue`s — never yielded, and
+  the prior spurious empty-`choices` WARNING is gone). Disconnect caught with
+  `except (asyncio.CancelledError, GeneratorExit):` (both are `BaseException`, so `except Exception` misses them) → sets
+  `_client_disconnected=True`, re-raises; the `finally` packs
+  `final_usage["_provider_trace"] = {"provider_meta", "lifecycle"}` and fires `on_complete` exactly once.
+  `_OnCompleteCallback` first arg + `final_usage` widened `Dict[str, int]`→`Dict[str, Any]` (mirrors the
+  `reported_cost_micros` precedent; arity unchanged). - *Verified*: carrier emits nothing and leaves
+  `first_chunk_seen=False`; `CancelledError` **and** `GeneratorExit` both set `client_disconnected`, propagate, fire
+  `finally` once; clean stream → `first_chunk_seen/final_usage_seen=True`, `client_disconnected=False`; **carrier-only
+  then disconnect** (the incident path) → `provider_generation_id` present, `first_chunk_seen=False`,
+  `final_usage_seen=False`, `client_disconnected=True` (`tests/src/proxy/test_converters_lifecycle.py`, 5 tests).
+- [x] **Mirror in passthrough** (`src/forge/proxy/passthrough.py`): `_stream_opened_upstream` now tracks
+  `stream_started`/`client_disconnected` (via `except (asyncio.CancelledError, GeneratorExit):` on the relay) and reads
+  `saw_content`/`saw_final_usage` off the `_UsageAccumulator` (`_merge` sets them), funneling into the **same**
+  `record_provider_trace(...)` from the neutral-leaf `provider_trace_logger.py` — **not** a second writer, and **not**
+  imported from `server.py` (no cycle). `forward()` threads a `provider_trace_ctx`. - *Verified*: passthrough computes
+  the four flags and calls the one shared helper; with `provider_name != "openrouter"` the gate suppresses the write
+  (forward-wiring is **latent** today — passthrough never carries OpenRouter); no `from forge.proxy.server import` in
+  `passthrough.py` (4 mirror tests in `tests/src/proxy/test_passthrough.py`).
+- [x] **Trace plane writer/reader** (`src/forge/proxy/provider_trace_logger.py`, new — modeled on `audit_logger.py` /
+  `ledger.py`, **not** `cost_logger.py`): `PROVIDER_TRACE_SCHEMA_VERSION=1`; own `_lock` + `_warned_newer_schema` latch;
+  `_traces_dir()=get_forge_home()/"providers"/"openrouter"/"traces"` (three levels); shard `{YYYY-MM}_{pid}.jsonl`.
+  `ProviderTraceRecord` adds `proxy_id`/`mapped_model` (card §4) and `request_mode` ∈ `{streaming,non_streaming}` beside
+  the Phase 2 `ProviderTraceMeta`-derived fields; metadata-only (no body/prompt/completion). `write_provider_trace`
+  **re-applies** the Phase 2 allowlist (`provider_trace_headers` lazily imported from `openai_compat` — verified
+  acyclic) as defense-in-depth, `open_secure_append` under `_lock`, chmods all three dir levels 0700, best-effort.
+  `record_provider_trace` (the **shared** helper both `server.py` and `passthrough.py` call) gates
+  `provider_name != "openrouter"`, derives `local_usage_status`. `read_provider_traces` strict-dacite +
+  skip-newer-schema-warn-once; `prune_provider_traces` cloned from `prune_audit_logs`. - *Verified*: 0600 files under
+  0700 three-level dirs; newer-schema skipped with exactly one warning; unknown field rejected (strict); non-object line
+  skipped; forced `OSError` swallowed; **header-bypass guard** — a `provider_meta` carrying `authorization`/`x-api-key`/
+  `cookie` persists only allowlisted names (`tests/src/proxy/test_provider_trace_logger.py`, 18 tests).
+- [x] **Write from the proxy** (`src/forge/proxy/server.py`): `create_message` captures
+  `forge_session, forge_command = _forge_session_command(raw_request)` beside `_forge_run_ids`. `_on_stream_complete`
+  unpacks `usage["_provider_trace"]` and, **after** `_calc_and_log_cost`, calls
+  `record_provider_trace(request_mode="streaming", proxy_id=PROXY_ID, mapped_model=actual_model_id, ...)`; the
+  non-streaming block calls it with `request_mode="non_streaming"`, lifecycle trivially complete,
+  `provider_meta=openai_response.get("_provider_meta")`. `timeout_seen=False` always — the proxy sees only its own peer
+  disconnect, never the parent's `subprocess.run` timeout (documented inline). - *Verified*: OpenRouter stream
+  disconnecting before final usage →
+  `stream_started/first_chunk_seen=True, final_usage_seen=False, client_disconnected=True, local_usage_status="unavailable"`;
+  clean → `final_usage_seen=True, status="available"`; the cost record schema is unchanged; a litellm/gateway route
+  writes **no** trace — `test_litellm_gateway_route_writes_no_trace_by_design` asserts the suppression is deliberate
+  scope, not an accidental miss (`tests/src/proxy/test_server_provider_trace.py`, 3 tests).
+- [x] **Config + prune** (`src/forge/config/schema.py`, `provider_trace_logger.py`, `server.py`): `ProviderTraceConfig`
+  (`retention_days=14`, `max_total_mb=512`; bool-rejecting int validation + `_coerce_provider_trace_config` with
+  `_reject_unknown_keys`) nested into **both** `ProxyConfig` **and** `ProxyInstanceConfig` (the two ProxyConfig-shaped
+  dataclasses — parity with `audit`; each `__post_init__` coerces its own field). `prune_provider_traces` cloned from
+  `prune_audit_logs`, wired into `_maybe_prune_provider_traces()` (with a `_provider_traces_pruned` latch) called from
+  `_ensure_runtime_state` beside `_maybe_prune_audit_logs`. - *Verified*: config rejects unknown keys + non-bounded/bool
+  values, defaults 14/512; prune deletes over `retention_days` and oldest-first over `max_total_mb` preserving
+  0600/0700; prune invoked once per process (`tests/src/config/test_schema.py`, 6 provider_trace tests).
+- [x] Design-doc sync: `design.md §3.14` now names the **fourth** provider-trace plane (lifecycle/correlation under
+  `providers/openrouter/traces/<month>_<pid>.jsonl`, written at the proxy `on_complete` seam, joined by `request_id` +
+  run-tree ids, **not** wiped by `forge proxy costs reset`, direct-OpenRouter-only) + a `provider_trace:` yaml block;
+  `design_appendix.md` gains `### A.14 Provider-trace plane schema` (cloned the §A.13 ledger-schema style — path/owner
+  table, field-groups table, metadata-only/direct-only/`timeout_seen`/`first_chunk_seen` semantics, run-tree join note).
+  **`docs/end-user/proxy.md` is deferred to Phase 4** — it lands with the `forge provider trace` read CLI (no
+  user-facing surface exists yet to document).
 
 | Test                                            | Fixture                                                                       | Assertion                                                                                                   | Test File                                                      |
 | ----------------------------------------------- | ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |

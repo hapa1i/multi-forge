@@ -25,6 +25,40 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board-contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-06-16
+
+### openrouter_observability Phase 3: provider-trace plane + shared SSE lifecycle seam
+
+**Goal**: Persist metadata-only, owner-only provider-trace records at the one shared stream seam so Forge can answer
+"what happened to this OpenRouter request?" after a timeout — the incident this card exists for.
+
+**Key changes**:
+
+- **New plane** `src/forge/proxy/provider_trace_logger.py`: versioned (`PROVIDER_TRACE_SCHEMA_VERSION=1`),
+  owner-only `0600` shards under `0700` three-level dirs (`~/.forge/providers/openrouter/traces/<YYYY-MM>_<pid>.jsonl`),
+  strict-dacite read, retention prune — modeled on the audit log, not the unversioned cost log. The shared
+  `record_provider_trace` helper lives here (the neutral leaf) so `server.py` and `passthrough.py` both call it without
+  an import cycle; it gates **direct-OpenRouter-only** and derives `local_usage_status` (probe 2 `[REMOTE-ABSENT]` →
+  local evidence only). `write_provider_trace` **re-applies** the Phase 2 header allowlist as defense-in-depth.
+- **Converter seam** (`converters.py`): intercepts the `_provider_meta` carrier chunk (consumed, never yielded — kills a
+  spurious WARNING), tracks four lifecycle flags, catches `(asyncio.CancelledError, GeneratorExit)` to record
+  `client_disconnected` and re-raise, and packs all of it under one reserved `final_usage["_provider_trace"]` key
+  (carrier = widen `Dict[str,int]`→`Dict[str,Any]`, mirroring `reported_cost_micros`; callback arity unchanged).
+- **Proxy write sites** (`server.py`): both streaming and non-streaming `on_complete` paths write after cost logging,
+  carrying `proxy_id`/`mapped_model`/`request_mode` + run-tree/session/command join keys; `timeout_seen=False` always
+  (the proxy sees its own disconnect, never the parent `subprocess.run` timeout).
+- **Passthrough mirror** (`passthrough.py`): same four flags + the one shared helper, **latent today** (the gate
+  suppresses the write — passthrough never carries OpenRouter); forward-wiring for a future provider.
+- **Config** (`schema.py`): `ProviderTraceConfig` (`retention_days=14`, `max_total_mb=512`, bool-rejecting) nested into
+  both `ProxyConfig` and `ProxyInstanceConfig`; prune wired into `_ensure_runtime_state` (once per process).
+- **Docs**: design.md §3.14 now names the **fourth** plane; design_appendix §A.14 adds the `ProviderTraceRecord` schema.
+
+**Verification**: full `make test-unit` 6161 passed; `make test-integration` 393 passed; 2 live-OpenRouter E2E pass —
+the clean stream surfaces a real `gen-` id via the carrier and the **cancelled stream** records
+`client_disconnected=True, final_usage_seen=False, local_usage_status="unavailable"` with the gen id intact (the
+incident, end to end). Regression: metadata-only (no body/prompt/completion field; header-bypass re-filtered) +
+run-tree join. `make pre-commit` clean (mypy/pyright/ruff/black/isort/mdformat/gitleaks).
+
 ## 2026-06-15
 
 ### openrouter_observability Phase 2 review fixes (R1–R3): no metadata lost on the incident path

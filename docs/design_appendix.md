@@ -599,6 +599,52 @@ session-end summary + `forge activity` show the full ledger half, not just the p
 sidecars (no proxy id) mount none of these, so their ledger events stay ephemeral — consistent with how they already
 drop audit/costs.
 
+### A.14 Provider-trace plane schema (§3.14)
+
+The fourth telemetry plane: **provider lifecycle / correlation evidence** for a single OpenRouter request — "did it
+leave Forge, which route/generation, did the stream start, finish, or lose its final usage chunk?" Metadata-only;
+modeled on the audit log (versioned write/prune, owner-only shards, strict typed read). Born from an incident where a
+supervised fork's checks timed out before the final streaming usage chunk and left no trace locally or remotely.
+
+| Path                                                         | Owner                               | Notes                                                                 |
+| ------------------------------------------------------------ | ----------------------------------- | --------------------------------------------------------------------- |
+| `~/.forge/providers/openrouter/traces/<YYYY-MM>_<pid>.jsonl` | `forge.proxy.provider_trace_logger` | Owner-only 0600 under 0700 (three dir levels); `ProviderTraceRecord`s |
+
+`ProviderTraceRecord` carries `schema_version` (= 1) and an auto-stamped `ts`:
+
+| Group       | Fields                                                                                                                                |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Correlation | `request_id`, `proxy_id`, `mapped_model`, `forge_run_id`, `forge_root_run_id`, `provider_session_id`, `provider_command`              |
+| Provider    | `provider`, `selected_provider`, `provider_response_id`, `provider_generation_id`, `provider_request_id`, `headers`                   |
+| Lifecycle   | `request_mode`, `stream_started`, `first_chunk_seen`, `final_usage_seen`, `client_disconnected`, `local_usage_status`, `timeout_seen` |
+| Cost echo   | `reported_cost_micros`, `latency_ms` (diagnostic copies; the cost plane stays the spend source of truth)                              |
+
+Semantics and invariants:
+
+- **Metadata-only.** There is deliberately no prompt/completion/tool/body field. `headers` is the Phase 2 correlation
+  allowlist (`x-request-id` / `x-generation-id` / `x-litellm-call-id` / `x-litellm-model-id`), re-applied at the writer
+  so a future caller that bypasses the upstream allowlist still cannot persist auth/cookie headers.
+- **Direct-OpenRouter-only.** Written only when the resolved provider is the direct `openrouter` route (the incident the
+  probes exercised); gateway-routed OpenRouter (LiteLLM → OpenRouter) is out of scope and writes nothing. The
+  passthrough relay is instrumented with the same lifecycle (forward-wiring) but is latent — it never carries
+  OpenRouter.
+- **`first_chunk_seen`** = first user-visible content chunk; the internal `_provider_meta` carrier (which delivers the
+  `gen-…` id, captured on the **first** stream event) does not count, so a stream cancelled before any content still
+  records the generation id with `first_chunk_seen=false`.
+- **`local_usage_status`** = `available` when the proxy locally saw a final usage chunk or a reported cost, else
+  `unavailable`. Probe 2 (`[REMOTE-ABSENT]`) confirmed an aborted stream is not remotely retrievable, so the status is
+  answered from local evidence only — no remote `/generation` lookup.
+- **`timeout_seen` is always `false`.** The proxy observes only its own client disconnect (`client_disconnected`), never
+  the parent's `subprocess.run` timeout; the field is a join target for later run-tree correlation, not proxy-populated.
+- **Joins** the cost/usage planes by shared `request_id` + run-tree ids; one `claude -p` run produces many requests, so
+  the run-tree join (`forge_root_run_id`) is the right shape
+  (`tests/regression/test_bug_provider_trace_run_tree_join.py`). **Not** wiped by `forge proxy costs reset` — it is
+  diagnostics, not spend truth.
+- Reading skips, with a one-time warning, records written by a newer Forge (`schema_version` > current), and (strict on
+  shape) records with unknown fields or bad `Literal` values. `read_provider_traces()` is the typed read surface.
+  Retention is bounded by `provider_trace.{retention_days=14, max_total_mb=512}` (`ProviderTraceConfig`), pruned once
+  per process from `_ensure_runtime_state` — a shared mental model with the audit plane.
+
 ---
 
 ## B. Work Queue Internals

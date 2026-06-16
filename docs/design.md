@@ -914,22 +914,23 @@ mark `cost_measured` so a token-only passthrough verb is not read as a measured 
 A third plane, the **usage-attribution ledger** (`~/.forge/usage/events/`, schema in
 [§A.13](design_appendix.md#a13-usage-attribution-ledger-schema-314)), records *which run/workflow/session* invoked which
 runtime/provider/model and what it consumed, referencing the cost and audit planes via a shared proxy `request_id`
-(nullable `source_refs`). The three planes stay physically separate by design — cost is the spend source of truth, audit
-is the redacted wire record, usage is attribution. Each event also carries metric-evidence provenance — `route` (how the
-work reached the model), `reporter` (source of the metric evidence), and `confidence` (trustworthiness of *that event's
-own* `cost_micro_usd`: `reported` | `gateway_calculated` | `inferred` | `unavailable` | `unknown`). Emission is wired
-everywhere: the workflow verbs (`panel`/`analyze`/`debate`/`consensus`) record one estimated verb-level event each; the
-memory writer, semantic supervisor, team supervisor, and shadow curation record one event per `claude -p` run; the
-action tagger records exact provider tokens from its direct `core.llm` call (and, when that call resolves to a
-registered Forge proxy, an exact `source_refs.cost_request_id` join via a forwarded `X-Request-ID`; direct
-`billing_mode` stays `unknown` unless provably direct + credentialed). All emit best-effort, never gate the work they
-measure, and record `latency_ms`. `claude -p` events carry null `source_refs` because Forge is not the HTTP client and
-can't know the proxy `request_id`. Run-tree correlation instead ties a proxied `claude -p` run to its **exact** cost
-through the run tree, not a per-request ref: Forge stamps the headless subprocess's outbound requests with validated
-`X-Forge-Run-ID`/`X-Forge-Root-Run-ID` headers (only when the target is a proven Forge proxy), the proxy records
-`forge_run_id`/`forge_root_run_id` on each cost record, and the read surface (`forge activity`, `forge +$Y`) sums cost
-records by `forge_root_run_id` — superseding the concurrency-fragile verb snapshot rather than adding to it.
-`source_refs` stays null by design (one run makes many requests; the single-valued ref is the wrong shape — see
+(nullable `source_refs`). The planes stay physically separate by design — cost is the spend source of truth, audit is
+the redacted wire record, usage is attribution, and the **provider-trace** plane (below) is provider lifecycle /
+correlation evidence. Each event also carries metric-evidence provenance — `route` (how the work reached the model),
+`reporter` (source of the metric evidence), and `confidence` (trustworthiness of *that event's own* `cost_micro_usd`:
+`reported` | `gateway_calculated` | `inferred` | `unavailable` | `unknown`). Emission is wired everywhere: the workflow
+verbs (`panel`/`analyze`/`debate`/`consensus`) record one estimated verb-level event each; the memory writer, semantic
+supervisor, team supervisor, and shadow curation record one event per `claude -p` run; the action tagger records exact
+provider tokens from its direct `core.llm` call (and, when that call resolves to a registered Forge proxy, an exact
+`source_refs.cost_request_id` join via a forwarded `X-Request-ID`; direct `billing_mode` stays `unknown` unless provably
+direct + credentialed). All emit best-effort, never gate the work they measure, and record `latency_ms`. `claude -p`
+events carry null `source_refs` because Forge is not the HTTP client and can't know the proxy `request_id`. Run-tree
+correlation instead ties a proxied `claude -p` run to its **exact** cost through the run tree, not a per-request ref:
+Forge stamps the headless subprocess's outbound requests with validated `X-Forge-Run-ID`/`X-Forge-Root-Run-ID` headers
+(only when the target is a proven Forge proxy), the proxy records `forge_run_id`/`forge_root_run_id` on each cost
+record, and the read surface (`forge activity`, `forge +$Y`) sums cost records by `forge_root_run_id` — superseding the
+concurrency-fragile verb snapshot rather than adding to it. `source_refs` stays null by design (one run makes many
+requests; the single-valued ref is the wrong shape — see
 [§A.13](design_appendix.md#a13-usage-attribution-ledger-schema-314)).
 
 **Headless self-report.** Every `claude -p` run requests `--output-format json` (capability-gated with a
@@ -958,6 +959,23 @@ ambient run identity, so a plain `forge session resume --strategy ai-curated` st
 mints a run-tree root, so there the curation event and the `codex exec` run share one `root_run_id` and `forge activity`
 shows both sides of the hop.
 
+**Provider-trace plane (fourth plane).** A local, metadata-only plane answers "what happened to this provider request?"
+after a timeout — born from an incident where a supervised fork's checks routed through an OpenRouter proxy, timed out
+before the final streaming usage chunk, and left no trace locally or in OpenRouter's UI. The proxy `on_complete` seam
+writes one record per request to `~/.forge/providers/openrouter/traces/<month>_<pid>.jsonl`
+([§A.14](design_appendix.md#a14-provider-trace-plane-schema-314), owner-only 0600, versioned, retention 14d/512 MB —
+shared mental model with the audit plane, **not** wiped by `forge proxy costs reset`). It is **direct-OpenRouter-only**
+by design (the incident path the probes exercised); gateway-routed OpenRouter (LiteLLM → OpenRouter) is out of scope.
+The record carries the provider/generation id (probe 1: OpenRouter's `gen-…` id rides every stream `chunk.id`), the
+selected upstream, allowlisted correlation headers (never auth/cookie), stream lifecycle flags
+(`stream_started`/`first_chunk_seen`/`final_usage_seen`/`client_disconnected`), and a local `local_usage_status`
+(`available` when the proxy saw a final usage/cost figure, else `unavailable`). The generation id is captured on the
+**first** stream event, so a stream **cancelled before the final usage chunk** — the incident — still surfaces its id.
+`timeout_seen` is always `false` at the proxy boundary: the proxy observes only its own client disconnect, never the
+parent's `subprocess.run` timeout (that is a later run-tree-correlation join target). Traces join the cost/usage planes
+by shared `request_id` + run-tree ids; probe 2 (`[REMOTE-ABSENT]`) confirmed an aborted stream is not remotely
+retrievable, which is why the plane answers from local evidence only (no remote `/generation` lookup).
+
 Each proxy may define:
 
 ```yaml
@@ -966,6 +984,9 @@ costs:
     per_day: 20.00
     per_month: 100.00
   on_cap_hit: reject  # reject | warn
+provider_trace:
+  retention_days: 14   # diagnostics, not spend truth; matches the audit plane
+  max_total_mb: 512
 ```
 
 Caps are enforced after each completed request, from accumulated recorded spend: a request may cross a cap and complete,

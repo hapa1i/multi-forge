@@ -413,6 +413,39 @@ def _coerce_audit_config(value: Any) -> AuditConfig:
 
 
 @dataclass
+class ProviderTraceConfig:
+    """Retention bounds for the provider-trace plane (openrouter_observability Phase 3).
+
+    Diagnostics, not spend truth — matches the audit plane's defaults (14d / 512 MB) so the
+    two on-disk telemetry surfaces share one mental model.
+    """
+
+    retention_days: int = 14
+    max_total_mb: int = 512
+
+    def __post_init__(self) -> None:
+        # bool is an int subclass; reject it so provider_trace.retention_days=true fails loudly.
+        if isinstance(self.retention_days, bool) or not isinstance(self.retention_days, int) or self.retention_days < 0:
+            raise ValueError("provider_trace.retention_days must be a non-negative int")
+        if isinstance(self.max_total_mb, bool) or not isinstance(self.max_total_mb, int) or self.max_total_mb <= 0:
+            raise ValueError("provider_trace.max_total_mb must be a positive int")
+
+
+def _coerce_provider_trace_config(value: Any) -> ProviderTraceConfig:
+    if value is None:
+        return ProviderTraceConfig()
+    if isinstance(value, ProviderTraceConfig):
+        return value
+    if not isinstance(value, dict):
+        raise ValueError("Invalid provider_trace: must be a mapping")
+    _reject_unknown_keys(value, {"retention_days", "max_total_mb"}, "provider_trace")
+    return ProviderTraceConfig(
+        retention_days=value.get("retention_days", 14),
+        max_total_mb=value.get("max_total_mb", 512),
+    )
+
+
+@dataclass
 class BackendDependency:
     """Backend dependency declaration (proxy runtime requirement).
 
@@ -477,13 +510,15 @@ class ProxyConfig:
     wire_shape: str = "openai_translated"
     intercept: InterceptConfig = field(default_factory=InterceptConfig)
     audit: AuditConfig = field(default_factory=AuditConfig)
+    provider_trace: ProviderTraceConfig = field(default_factory=ProviderTraceConfig)
 
     def __post_init__(self) -> None:
-        # Templates carry wire_shape/intercept/audit/costs/default_tier/tier_overrides too; coerce +
-        # validate here so an invalid combo is rejected at 'forge proxy template edit', not late at
-        # 'forge proxy create' (parity with ProxyInstanceConfig).
+        # Templates carry wire_shape/intercept/audit/provider_trace/costs/default_tier/tier_overrides
+        # too; coerce + validate here so an invalid combo is rejected at 'forge proxy template edit',
+        # not late at 'forge proxy create' (parity with ProxyInstanceConfig).
         self.intercept = _coerce_intercept_config(self.intercept)
         self.audit = _coerce_audit_config(self.audit)
+        self.provider_trace = _coerce_provider_trace_config(self.provider_trace)
         self.costs = _coerce_cost_config(self.costs)
         if self.wire_shape not in _VALID_WIRE_SHAPES:
             raise ValueError(
@@ -561,6 +596,7 @@ class ProxyInstanceConfig:
     wire_shape: str = "openai_translated"
     intercept: InterceptConfig = field(default_factory=InterceptConfig)
     audit: AuditConfig = field(default_factory=AuditConfig)
+    provider_trace: ProviderTraceConfig = field(default_factory=ProviderTraceConfig)
 
     created_at: str | None = None
     updated_at: str | None = None
@@ -597,6 +633,7 @@ class ProxyInstanceConfig:
             )
         self.intercept = _coerce_intercept_config(self.intercept)
         self.audit = _coerce_audit_config(self.audit)
+        self.provider_trace = _coerce_provider_trace_config(self.provider_trace)
         _validate_wire_shape_intercept(self.wire_shape, self.intercept)
 
         _validate_static_tier_override_constraints(self.tiers, self.tier_overrides)

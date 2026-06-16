@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -869,3 +871,131 @@ async def test_override_full_body_record_is_self_consistent(monkeypatch, tmp_pat
     # The record's hash matches the MUTATED (augmented) system, not the pre-mutation one.
     assert fb[0]["system_prompt_hash"] == audit_logger.hash_system_prompt(sent["system"])
     assert fb[0]["system_prompt_hash"] != audit_logger.hash_system_prompt([{"type": "text", "text": "base"}])
+
+
+# ---------------------------------------------------------------------------
+# Provider-trace mirror (openrouter_observability Phase 3, forward-wiring)
+# ---------------------------------------------------------------------------
+
+_SSE_CONTENT_CHUNKS = (
+    b'event: message_start\ndata: {"type":"message_start","message":'
+    b'{"usage":{"input_tokens":10,"output_tokens":1}}}\n\n',
+    b'event: content_block_start\ndata: {"type":"content_block_start","index":0,'
+    b'"content_block":{"type":"text","text":""}}\n\n',
+    b'event: content_block_delta\ndata: {"type":"content_block_delta","index":0,'
+    b'"delta":{"type":"text_delta","text":"hi"}}\n\n',
+    b'event: message_delta\ndata: {"type":"message_delta","usage":{"output_tokens":5}}\n\n',
+    b'event: message_stop\ndata: {"type":"message_stop"}\n\n',
+)
+
+_PT_CTX = {
+    "provider_name": "litellm",  # passthrough is never OpenRouter -> latent (no write)
+    "proxy_id": "crimson-apricot",
+    "mapped_model": "claude-opus-4-6",
+    "request_id": "req_pt",
+    "forge_run_id": "run_abc",
+    "forge_root_run_id": "run_root",
+    "provider_session_id": "forge_sess_abc",
+    "provider_command": "supervisor",
+}
+
+
+class _SSEContentClient(_FakeAsyncClient):
+    def stream(self, method, url, headers=None, json=None):
+        return _FakeStream(chunks=_SSE_CONTENT_CHUNKS)
+
+
+@pytest.mark.asyncio
+async def test_passthrough_mirror_records_lifecycle_flags(monkeypatch):
+    """The relay computes the four lifecycle flags and calls the one shared helper."""
+    monkeypatch.setattr(passthrough.httpx, "AsyncClient", _SSEContentClient)
+    captured: list[dict] = []
+    monkeypatch.setattr(passthrough, "record_provider_trace", lambda **kw: captured.append(kw))
+
+    resp = await passthrough.forward(
+        raw_body={"model": "m", "stream": True, "messages": []},
+        inbound_headers={},
+        base_url="https://api.anthropic.com",
+        api_key="K",
+        request_id="req_pt",
+        provider_trace_ctx=_PT_CTX,
+    )
+    _ = [chunk async for chunk in resp.body_iterator]  # drain -> fires the mirror in finally
+
+    assert len(captured) == 1
+    call = captured[0]
+    assert call["request_mode"] == "streaming"
+    assert call["provider_meta"] is None  # no provider_meta on the Anthropic-native wire
+    assert call["stream_started"] is True
+    assert call["first_chunk_seen"] is True  # content_block_start was seen
+    assert call["final_usage_seen"] is True  # message_delta carried output_tokens
+    assert call["client_disconnected"] is False
+    assert call["reported_cost_micros"] is None  # passthrough cost is structurally unavailable
+    # Context threaded from the server is carried through verbatim.
+    assert call["provider_name"] == "litellm"
+    assert call["provider_session_id"] == "forge_sess_abc"
+
+
+@pytest.mark.asyncio
+async def test_passthrough_mirror_is_latent_for_litellm(monkeypatch, tmp_path):
+    """End-to-end through the REAL helper: a non-OpenRouter route persists nothing."""
+    monkeypatch.setenv("FORGE_HOME", str(tmp_path))
+    monkeypatch.setattr(passthrough.httpx, "AsyncClient", _SSEContentClient)
+
+    resp = await passthrough.forward(
+        raw_body={"model": "m", "stream": True, "messages": []},
+        inbound_headers={},
+        base_url="https://api.anthropic.com",
+        api_key="K",
+        request_id="req_pt",
+        provider_trace_ctx=_PT_CTX,  # provider_name="litellm"
+    )
+    _ = [chunk async for chunk in resp.body_iterator]
+
+    from forge.proxy import provider_trace_logger as ptl
+
+    assert ptl.read_provider_traces() == []  # gate suppressed the write
+
+
+class _CancelStream(_FakeStream):
+    async def aiter_bytes(self):
+        yield (
+            b'event: content_block_start\ndata: {"type":"content_block_start","index":0,'
+            b'"content_block":{"type":"text","text":""}}\n\n'
+        )
+        raise asyncio.CancelledError()
+
+
+@pytest.mark.asyncio
+async def test_passthrough_mirror_records_disconnect(monkeypatch):
+    """A cancelled relay records client_disconnected and re-raises (not swallowed)."""
+    captured: list[dict] = []
+    monkeypatch.setattr(passthrough, "record_provider_trace", lambda **kw: captured.append(kw))
+
+    client_cm = SimpleNamespace(__aexit__=_noop_aexit)
+    stream_cm = SimpleNamespace(__aexit__=_noop_aexit)
+
+    async def _drain():
+        agen = passthrough._stream_opened_upstream(
+            client_cm, stream_cm, _CancelStream(), "req_x", provider_trace_ctx=_PT_CTX
+        )
+        async for _chunk in agen:
+            pass
+
+    with pytest.raises(asyncio.CancelledError):
+        await _drain()
+
+    assert len(captured) == 1
+    assert captured[0]["client_disconnected"] is True
+    assert captured[0]["first_chunk_seen"] is True  # content_block_start arrived before the cancel
+
+
+async def _noop_aexit(*exc):
+    return False
+
+
+def test_passthrough_does_not_import_server():
+    """The shared helper lives in the neutral leaf -> passthrough never imports server."""
+    src = Path(passthrough.__file__).read_text()
+    assert "from forge.proxy.server import" not in src
+    assert "import forge.proxy.server" not in src

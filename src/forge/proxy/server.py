@@ -68,6 +68,7 @@ from forge.proxy.data_models import (
 )
 from forge.proxy.error_hints import enrich_error_content
 from forge.proxy.metrics import proxy_metrics
+from forge.proxy.provider_trace_logger import record_provider_trace
 from forge.proxy.utils import (
     log_request_beautifully,
     log_request_response,
@@ -150,6 +151,7 @@ def _attach_cap_summary(metrics: dict[str, Any], tracker: CostTracker | None) ->
 
 
 _audit_pruned = False
+_provider_traces_pruned = False
 
 
 def _maybe_prune_audit_logs() -> None:
@@ -169,6 +171,23 @@ def _maybe_prune_audit_logs() -> None:
         logger.debug("audit prune skipped: %s", e)
 
 
+def _maybe_prune_provider_traces() -> None:
+    """Enforce provider-trace retention once per process (best-effort) once config is loaded."""
+    global _provider_traces_pruned
+    if _provider_traces_pruned:
+        return
+    _provider_traces_pruned = True
+    pt = getattr(config.proxy, "provider_trace", None)
+    if pt is None:
+        return
+    try:
+        from forge.proxy.provider_trace_logger import prune_provider_traces
+
+        prune_provider_traces(retention_days=pt.retention_days, max_total_mb=pt.max_total_mb)
+    except Exception as e:
+        logger.debug("provider trace prune skipped: %s", e)
+
+
 def _ensure_runtime_state() -> None:
     """Ensure the imported app module has proxy config and runtime trackers."""
     if PROXY_ID is None:
@@ -178,6 +197,7 @@ def _ensure_runtime_state() -> None:
 
     _initialize_cost_tracker_from_config()
     _maybe_prune_audit_logs()
+    _maybe_prune_provider_traces()
 
 
 def _reported_cost_provenance() -> tuple[Reporter | None, Confidence]:
@@ -658,6 +678,7 @@ async def _handle_anthropic_passthrough(raw_request: Request, request_id: str, *
 
     start_time = time.time()
     forge_run_id, forge_root_run_id = _forge_run_ids(raw_request)  # Slice 4g run-tree correlation
+    forge_session, forge_command = _forge_session_command(raw_request)  # Phase 3 provider-trace join keys
 
     base_url = config.proxy.get_provider().base_url
     if not base_url:
@@ -820,6 +841,21 @@ async def _handle_anthropic_passthrough(raw_request: Request, request_id: str, *
         spend_warning,
     )
 
+    # Provider-trace forward-wiring (Phase 3): the passthrough relay mirrors stream
+    # lifecycle into the same record_provider_trace helper. Latent today -- the helper
+    # gates on direct OpenRouter, which never rides the passthrough (Anthropic-native) wire.
+    passthrough_provider = getattr(config.proxy, "provider", None) or getattr(config.proxy, "preferred_provider", None)
+    provider_trace_ctx = {
+        "provider_name": passthrough_provider or "unknown",
+        "proxy_id": PROXY_ID or "unknown",
+        "mapped_model": model,
+        "request_id": request_id,
+        "forge_run_id": forge_run_id,
+        "forge_root_run_id": forge_root_run_id,
+        "provider_session_id": forge_session,
+        "provider_command": forge_command,
+    }
+
     return await forward(
         raw_body=raw_body,
         inbound_headers=raw_request.headers,
@@ -829,6 +865,7 @@ async def _handle_anthropic_passthrough(raw_request: Request, request_id: str, *
         path=path,
         on_complete=_on_complete,
         extra_headers=extra_headers,
+        provider_trace_ctx=provider_trace_ctx,
     )
 
 
@@ -842,6 +879,7 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
     """
     request_id = raw_request.state.request_id
     forge_run_id, forge_root_run_id = _forge_run_ids(raw_request)  # Slice 4g run-tree correlation
+    forge_session, forge_command = _forge_session_command(raw_request)  # Phase 3 provider-trace join keys
     start_time = time.time()
 
     _ensure_runtime_state()
@@ -1107,7 +1145,7 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                 status_code=200,
             )
 
-            def _on_stream_complete(usage: dict[str, int], failed: bool, error_type: str | None) -> None:
+            def _on_stream_complete(usage: dict[str, Any], failed: bool, error_type: str | None) -> None:
                 elapsed = (time.time() - start_time) * 1000
                 in_tok = usage.get("input_tokens", 0)
                 out_tok = usage.get("output_tokens", 0)
@@ -1137,6 +1175,29 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                     failed=failed,
                     error_type=error_type,
                     cost_micros=cost,
+                )
+                # Provider-trace plane (Phase 3): gated to direct OpenRouter inside the helper.
+                # The converter parked provider_meta + stream lifecycle under usage["_provider_trace"];
+                # a stream cancelled before the final usage chunk still carries the generation id here.
+                _trace = usage.get("_provider_trace") or {}
+                _lc = _trace.get("lifecycle", {})
+                record_provider_trace(
+                    provider_name=provider_name,
+                    request_mode="streaming",
+                    proxy_id=PROXY_ID or "unknown",
+                    mapped_model=actual_model_id,
+                    request_id=request_id,
+                    forge_run_id=forge_run_id,
+                    forge_root_run_id=forge_root_run_id,
+                    provider_session_id=forge_session,
+                    provider_command=forge_command,
+                    provider_meta=_trace.get("provider_meta"),
+                    stream_started=_lc.get("stream_started", False),
+                    first_chunk_seen=_lc.get("first_chunk_seen", False),
+                    final_usage_seen=_lc.get("final_usage_seen", False),
+                    client_disconnected=_lc.get("client_disconnected", False),
+                    reported_cost_micros=usage.get("reported_cost_micros"),
+                    latency_ms=elapsed,
                 )
 
             return StreamingResponse(
@@ -1196,6 +1257,26 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                     failed=False,
                     error_type=None,
                     cost_micros=_cost,
+                )
+                # Provider-trace plane (Phase 3): non-streaming lifecycle is trivially complete
+                # (the full body arrived); provider_meta rides the top-level carrier key.
+                record_provider_trace(
+                    provider_name=provider_name,
+                    request_mode="non_streaming",
+                    proxy_id=PROXY_ID or "unknown",
+                    mapped_model=actual_model_id,
+                    request_id=request_id,
+                    forge_run_id=forge_run_id,
+                    forge_root_run_id=forge_root_run_id,
+                    provider_session_id=forge_session,
+                    provider_command=forge_command,
+                    provider_meta=openai_response.get("_provider_meta"),
+                    stream_started=True,
+                    first_chunk_seen=True,
+                    final_usage_seen=True,
+                    client_disconnected=False,
+                    reported_cost_micros=openai_response.get("_reported_cost_micros"),
+                    latency_ms=duration_ms,
                 )
 
                 asyncio.create_task(
