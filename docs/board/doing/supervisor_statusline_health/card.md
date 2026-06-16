@@ -1,13 +1,16 @@
 # Supervisor Status-Line Health -- surface fail-open timeouts
 
-**Status**: In progress (`doing/`; branch `supervisor_statusline_health`). The open questions below are resolved in
-[`checklist.md`](checklist.md) ("Resolved design decisions") and retained here as the original framing. Spun out of the
-`supervisor_shadow_sampling` investigation on 2026-06-14, after a supervised executor accumulated repeated supervisor
-timeouts while the status line still showed only the normal active `SUP` posture.
+**Status**: In progress (`doing/`; branch `supervisor_statusline_health`). **Re-cut 2026-06-16** to a minimal scope: v1
+reads the outcome the **usage ledger already records** and renders a marker -- no new durable-state field. The original
+structured-`failure_kind`-on-`PolicyDecision` design, and the clean two-ledger model it implied, are deferred to the
+[`upstream_downstream_ledgers`](../../proposed/upstream_downstream_ledgers/card.md) proposed card (see "Relationship"
+below). Spun out of the `supervisor_shadow_sampling` investigation on 2026-06-14, after a supervised executor
+accumulated repeated supervisor timeouts while the status line still showed only the normal active `SUP` posture.
 
 **References**: `src/forge/cli/status_line.py::format_supervisor`,
-`src/forge/cli/statusline/registry.py::_produce_supervisor`, `src/forge/core/ops/usage_summary.py::_policy_activity`,
-and `docs/end-user/session.md` activity-summary examples.
+`src/forge/cli/statusline/registry.py::_produce_supervisor` (+ the `forge_cost` throttle precedent:
+`read_or_compute_session_cost`, `sum_forge_added_cost`), `src/forge/core/ops/usage_summary.py`,
+`docs/end-user/session.md`.
 
 ## Problem
 
@@ -21,15 +24,20 @@ out after 45 seconds and failed open:
 Supervisor error: Timed out after 45s, failing open
 ```
 
-The policy decision log and usage ledger contained the evidence, and `forge activity` could summarize it after the fact.
-But the always-visible status line still rendered a healthy-looking `SUP`. That creates the wrong operator intuition:
-the session appears watched, while in practice the watcher is repeatedly failing open.
+The policy decision log and usage ledger contained the evidence, and `forge activity` could summarize it after the fact
+(`supervisor 24/24 errors`). But the always-visible status line still rendered a healthy-looking `SUP`. That creates the
+wrong operator intuition: the session appears watched, while in practice the watcher is repeatedly failing open.
 
-## Proposal
+## Proposal (v1 -- minimal, on-model)
 
-Extend the supervisor status-line segment from a pure posture indicator to a compact health indicator. The primary
-signal should be a structured failure kind recorded when the supervisor decision is written, not a status-line parser
-that re-interprets human warning text later.
+The supervisor already records each `claude -p` run's outcome -- including the observed timeout/subprocess fail-opens --
+in the usage ledger: a timeout emits `status="timeout"` / `failure_type="timeout"` (`emit_usage_for_session_result`,
+`supervisor.py:496`), which is why `forge activity` already shows the 24/24. And the status line already reads the
+ledger, throttled, for the `forge_cost` segment. So v1 is a **read + render**, not a schema change:
+
+- a throttled, fail-open `supervisor_health` reader over the ledger (`command="supervisor"`, newest-first consecutive
+  `status in {error, timeout}`, reset on the first `status="success"`);
+- a posture-preserving `SUP!N <kind>` suffix.
 
 Examples:
 
@@ -41,154 +49,48 @@ SUP(susp)!2 timeout  # suspended now, but recent timeout history still visible
 SUP(off)!4 error     # policy disabled now, but recent fail-open history still visible
 ```
 
-Exact glyph/color choices can follow the existing statusline palette:
+Colors: YELLOW for 1-2 consecutive, RED for `>=3` (mirrors `format_spend_cap`). Literal ASCII `!` (no unicode glyph).
+Detailed diagnosis stays in `forge activity` and hook/proxy logs.
 
-- active/healthy: metrics color, current `SUP`
-- warning/failure: yellow for recoverable fail-open warnings
-- severe/stale: red only if the evidence indicates repeated recent fail-open infrastructure failures
+**Deliberately NOT in v1:** a `failure_kind` field on `PolicyDecision`. That would patch the policy decision log -- the
+*accidental* outcome record -- instead of the real one. v1 reuses the ledger's existing `status`/`failure_type`; the
+principled fix is the ledger refactor below.
 
-The signal should be small and glanceable; detailed diagnosis remains in `forge activity` and hook/proxy logs. Scope the
-first version to frontier supervisor fail-open events. Cascade tier-1 plan-check failures escalate to the frontier
-instead of allowing the action, so they are not the "action proceeded without frontier review" case this segment is
-trying to catch.
+## What v1 covers and defers
 
-## Design sketch
+| Fail-open kind             | v1 (ledger read)             | Deferred to `upstream_downstream_ledgers` |
+| -------------------------- | ---------------------------- | ----------------------------------------- |
+| timeout / subprocess error | yes (ledger `status`)        | --                                        |
+| parse fail-open            | no (ledger logs a *success*) | yes (needs upstream-at-verb-entry emit)   |
+| auth / proxy-not-found     | no (emits no ledger event)   | yes                                       |
+| reset precision            | next successful **call**     | exact (needs no-call outcome records)     |
 
-### 1. Record structured failure kind at write-time
+The observed incident was 24/24 **timeouts** -- fully covered by v1. parse/auth fail-opens are unobserved; v1 ships the
+on-model marker now and lets the refactor generalize later.
 
-The supervisor already knows the failure shape when it fails open. Persist that fact in Forge-owned durable state while
-writing the policy decision:
+## Relationship to `upstream_downstream_ledgers`
 
-```python
-PolicyDecision(
-    decision="allow",
-    policy_id="semantic.supervisor",
-    warnings=["Supervisor error: Timed out after 45s, failing open"],
-    failure_kind="timeout",  # timeout | auth | parse | error
-)
-```
-
-Add `failure_kind: Literal["timeout", "auth", "parse", "error"] | None` to `PolicyDecision`, or an equivalent optional
-field on the serialized decision dict if the implementation wants to keep the dataclass narrower. It must be additive:
-older decisions without the field still load and render normally.
-
-Write `failure_kind` at the supervisor failure sites:
-
-- subprocess timeout -> `timeout`
-- credential/authentication/proxy-auth failure -> `auth`
-- supervisor output could not be parsed into a verdict -> `parse`
-- other subprocess, provider, routing, or unexpected failure -> `error`
-
-Human warning strings can stay useful for `forge activity`, but they should not be the status line's classification API.
-
-### 2. Source status-line health from local structured evidence
-
-Do not call providers or scan large logs in the status line hot path.
-
-Preferred source:
-
-- `manifest.confirmed.policy.decisions`, already capped by the policy store
-- specifically the `semantic.supervisor` sub-decisions
-- `failure_kind` on fail-open supervisor decisions
-
-Optional secondary source:
-
-- the usage ledger's `command="supervisor"` events, via a throttled/file-backed summary if decision-log evidence proves
-  insufficient
-
-Avoid reading hook logs directly; they are diagnostic files, not a stable status-line API.
-
-### 3. Summarize supervisor health
-
-Introduce a small status-line helper that returns a compact health record:
-
-```python
-SupervisorHealth(
-    recent_failures=3,
-    last_kind="timeout",  # timeout | auth | parse | error
-    last_seen_at="2026-06-14T22:54:16Z",
-)
-```
-
-For legacy decisions written before `failure_kind` existed, keep a small best-effort fallback classifier isolated in the
-reader. That fallback may inspect warning text or usage `failure_type`, but it is compatibility glue, not the v1 design.
-
-### 4. Define the recency window
-
-Status line should not permanently shame a session for one old outage.
-
-Possible policy:
-
-- count only the last N policy decisions, or decisions in the last M minutes
-- clear the warning after a successful supervisor decision newer than the last failure
-- keep a small count if failures are consecutive
-
-The motivating case was consecutive timeouts, so consecutive-failure count is likely the highest-signal first version.
-Tier-1 plan-check parse/provider failures should not increment this count unless the escalated frontier supervisor also
-fails open.
-
-### 5. Render without hiding posture
-
-Keep the current posture semantics:
-
-- no supervisor configured -> omit the segment
-- policy disabled -> `SUP(off)`
-- supervisor suspended -> `SUP(susp)`
-- active supervisor -> `SUP`
-
-Add health as a suffix, not a replacement, so the line can express both "configured posture" and "recent reliability."
-
-### 6. Link the detailed view
-
-When the status line shows a failure indicator, the matching detailed command should explain it:
-
-```bash
-forge activity <session>
-```
-
-Consider adding a short note to `docs/end-user/session.md` explaining that `SUP!N timeout` means supervisor checks are
-failing open and actions may be proceeding without frontier review.
-
-## Open questions
-
-> Resolved in [`checklist.md`](checklist.md) under "Resolved design decisions"; retained here as the original framing.
-
-- Should the status line show all recent warnings, or only infrastructure failures that caused fail-open behavior?
-- Should a later successful supervisor check clear the indicator immediately, or should the last-failure count remain
-  visible for a short window?
-- Should repeated fail-open supervisor errors ever trigger policy escalation outside the status line?
-- How should unicode vs ASCII glyph modes render the warning marker?
+This card is the forcing function that surfaced a deeper issue: the usage ledger records **both** a call's cost/tokens
+(downstream evidence) and its `status`/`failure_type` (upstream outcome) on one record, wrapped at the subprocess call
+-- so it cannot cleanly answer "did this verb succeed?" for no-call operations, which is why supervisor health drifted
+toward the policy decision log. The clean model splits them into a **downstream** model-interaction ledger (today's cost
+\+ audit unified) and a first-class **upstream** outcome ledger wrapped at each operation boundary, with **asymmetric
+correlation**: upstream records carry `session` + `run`/`root` id; downstream records carry `request`/`run`/`root` ids
+and are session-blind; readers select upstream by `session` and join downstream through the run tree. Captured in
+[`upstream_downstream_ledgers`](../../proposed/upstream_downstream_ledgers/card.md). v1 here is the minimal on-model
+step; that card is the principled completion.
 
 ## Risks
 
-- Over-warning can train users to ignore the status line. Keep the first version focused on fail-open supervisor errors,
-  especially timeouts/auth/provider failures.
-- Tier-1 checker health is still important, but it belongs to cascade quality/shadow-sampling surfaces. Mixing it into
-  `SUP!N` would blur "cheap checker failed" with "frontier supervisor failed open."
-- Decision-log evidence is capped; an old failure may disappear. That is acceptable for a recent-health signal, but not
-  for audit history.
-- Adding a field to persisted policy decisions is an additive schema change. Readers must tolerate old decisions without
-  `failure_kind` and unknown newer fields according to the existing decision-log compatibility rules.
-- Legacy string classification is still brittle. Keep it small, tested, and only for decisions written before the
-  structured field existed.
-- Status-line render must always exit 0. Health parsing must be fail-open and cheap.
+- Over-warning trains users to ignore the bar. v1 is scoped to supervisor fail-opens (the observed timeouts).
+- A ledger read on the status-line hot path -- mitigated by reusing the `forge_cost` throttle (time-bounded, fail-open;
+  `status_line()` must always exit 0).
+- Reset is coarse (next successful call, not next cached allow) until the ledger refactor. Acceptable for a
+  recent-health marker.
+- The read window is a recent-health signal, not an audit trail; `forge activity` remains the full record.
 
-## Acceptance sketch
+## Open questions
 
-- **Structured timeout recorded**: a supervisor subprocess timeout writes a `semantic.supervisor` decision with
-  `failure_kind == "timeout"`.
-- **Structured parse failure recorded**: an unparseable supervisor response writes `failure_kind == "parse"` while
-  preserving the human warning.
-- **Healthy supervisor unchanged**: an enabled supervisor with no recent structured failures renders the current `SUP`.
-- **Timeout visible**: a recent `semantic.supervisor` decision with `failure_kind == "timeout"` renders a warning suffix
-  with `timeout` and count.
-- **Consecutive failures counted**: three newest supervisor decisions with structured timeout failures render count `3`.
-- **Tier-1 failures excluded**: plan-check parse/provider failures that escalate successfully to the frontier do not
-  increment `SUP!N`.
-- **Success clears or ages warning**: a timeout followed by a successful supervisor decision clears or ages the warning
-  per the chosen recency policy.
-- **Disabled posture preserved**: policy disabled plus recent timeout history still shows `SUP(off)` with a health
-  suffix.
-- **Legacy warning fallback**: an old decision without `failure_kind` but with a timeout warning can still render
-  `timeout` through the compatibility classifier.
-- **Status line fail-open**: malformed decision-log entries render without traceback and omit bad health data.
+- RED-vs-YELLOW threshold (proposed `>=3` / 1-2) -- confirm in Phase 2.
+- Whether to surface non-supervisor verb health (memory-writer, panel) now or wait for the upstream ledger -- lean
+  **wait** (the refactor makes it uniform; doing it per-feature now is the trap this card just stepped out of).
