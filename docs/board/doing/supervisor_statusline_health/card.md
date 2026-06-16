@@ -1,8 +1,9 @@
 # Supervisor Status-Line Health -- surface fail-open timeouts
 
-**Status**: Proposed. Spun out of the `supervisor_shadow_sampling` investigation on 2026-06-14, after a supervised
-executor accumulated repeated supervisor timeouts while the status line still showed only the normal active `SUP`
-posture.
+**Status**: In progress (`doing/`; branch `supervisor_statusline_health`). The open questions below are resolved in
+[`checklist.md`](checklist.md) ("Resolved design decisions") and retained here as the original framing. Spun out of the
+`supervisor_shadow_sampling` investigation on 2026-06-14, after a supervised executor accumulated repeated supervisor
+timeouts while the status line still showed only the normal active `SUP` posture.
 
 **References**: `src/forge/cli/status_line.py::format_supervisor`,
 `src/forge/cli/statusline/registry.py::_produce_supervisor`, `src/forge/core/ops/usage_summary.py::_policy_activity`,
@@ -149,6 +150,8 @@ Consider adding a short note to `docs/end-user/session.md` explaining that `SUP!
 failing open and actions may be proceeding without frontier review.
 
 ## Open questions
+
+> Resolved in [`checklist.md`](checklist.md) under "Resolved design decisions"; retained here as the original framing.
 
 - Should the status line show all recent warnings, or only infrastructure failures that caused fail-open behavior?
 - Should a later successful supervisor check clear the indicator immediately, or should the last-failure count remain
