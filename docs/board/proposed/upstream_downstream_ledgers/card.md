@@ -1,20 +1,31 @@
-# Upstream / Downstream Ledgers -- collapse three telemetry planes into two
+# Upstream / Downstream Ledgers -- collapse four telemetry planes into two
 
 **Status**: Proposed. Spun out of the `supervisor_statusline_health` investigation (2026-06-16) -- a first-principles
 dialogue on why surfacing a supervisor timeout on the status line kept colliding with telemetry complexity. The
 conclusion: the messiness is a symptom of Forge's **telemetry planes being split along the wrong axis** -- consumption,
-redacted wire capture, and outcome scattered across three planes, with the usage plane conflating two of them.
+redacted wire capture, per-call provider lifecycle, and outcome scattered across **four** planes, with the usage plane
+conflating two of them.
+
+**Updated 2026-06-16 (cross-branch).** The parallel `openrouter-observability` branch **shipped a fourth plane** --
+provider-trace (`~/.forge/providers/<source>/traces/`, `src/forge/proxy/provider_trace_logger.py`) -- and added a
+proposed `unified_backend` card that introduces a canonical model-source id (`backend_id`) the telemetry planes should
+key on. Provider-trace is **downstream by this card's taxonomy** (per-call, session-blind, metadata-only
+model-interaction evidence), so the target is **four planes -> two**, not three. This card owns plane **structure**;
+`unified_backend` owns the source-identity **key**. The shared contract and member list live in the
+[`telemetry_architecture`](../telemetry_architecture/card.md) epic.
 
 **References**: `src/forge/core/usage/emit.py` (the proxied/direct provenance branch, inline in two emitters),
-`src/forge/core/usage/ledger.py` (`UsageEvent`), `src/forge/proxy/cost_logger.py` + `src/forge/proxy/audit_logger.py`
-(the cost + audit planes), `src/forge/core/ops/usage_summary.py` (joins the tangle today), `src/forge/policy/store.py`
-(`confirmed.policy.decisions` -- the accidental fourth outcome record), [design.md §3.14](../../../design.md),
-[design_appendix §A.12-A.13](../../../design_appendix.md).
+`src/forge/core/usage/ledger.py` (`UsageEvent`), `src/forge/proxy/cost_logger.py` + `src/forge/proxy/audit_logger.py` +
+`src/forge/proxy/provider_trace_logger.py` (the cost + audit + provider-trace planes -- the three per-call/downstream
+planes), `src/forge/core/ops/usage_summary.py` (joins the tangle today), `src/forge/policy/store.py`
+(`confirmed.policy.decisions` -- the accidental outcome side-channel), [design.md §3.14](../../../design.md),
+[design_appendix §A.12-A.14](../../../design_appendix.md).
 
 ## Problem
 
-Forge has **three** durable telemetry planes today -- cost (`~/.forge/costs/requests/`), audit (`~/.forge/audit/`), and
-usage (`~/.forge/usage/events/`) -- split along the **wrong axis**. The natural axis is two:
+Forge has **four** durable telemetry planes today -- cost (`~/.forge/costs/requests/`), audit (`~/.forge/audit/`), usage
+(`~/.forge/usage/events/`), and provider-trace (`~/.forge/providers/<source>/traces/`, shipped on the
+`openrouter-observability` branch) -- split along the **wrong axis**. The natural axis is two:
 
 - **Downstream** -- model-interaction evidence: tokens, cost, provenance, and optional redacted request/response
   capture. Per call.
@@ -22,7 +33,9 @@ usage (`~/.forge/usage/events/`) -- split along the **wrong axis**. The natural 
 
 On that axis the current planes are mis-cut:
 
-- **cost and audit are both downstream** (per-call metrics + redacted wire capture) but live as two separate planes;
+- **cost, audit, and provider-trace are all downstream** (per-call metrics, redacted wire capture, and per-call provider
+  lifecycle/correlation) but live as **three** separate planes -- provider-trace landing as a standalone fourth plane is
+  itself the per-feature-plane proliferation this card argues against;
 - the **usage ledger straddles both** -- `cost_micro_usd`/tokens (downstream) and `status`/`failure_type` (upstream) on
   one record, emitted at the **subprocess-call** layer (`emit_usage_for_session_result`, fired only when a `claude -p`
   actually runs);
@@ -36,7 +49,7 @@ The conflation surfaces as -- each observed during the supervisor investigation:
   nothing answers "did this verb succeed?" for them.
 - **Conflates call-success with operation-success.** A parse fail-open is a *successful subprocess* (`status="success"`)
   whose *verb* failed -- the wrong outcome is recorded.
-- **Forces an accidental fourth outcome record.** Because the usage ledger cannot answer outcome for no-call ops,
+- **Forces an accidental outcome side-channel.** Because the usage ledger cannot answer outcome for no-call ops,
   `confirmed.policy.decisions` became the de-facto outcome log for the supervisor -- a policy-only side-channel that
   overlaps and disagrees with the usage ledger's `status`.
 - **Scatters provenance.** The proxied-vs-direct cost/token source resolution lives inline in **two** emitters
@@ -58,8 +71,10 @@ Two planes, one correlation:
 | **Downstream** | one model call | tokens, cost, provenance, optional redacted req/resp | the call (proxy/self-report) | **session-blind** -- request/run/root ids only |
 | **Upstream**   | one operation  | success/failure + reason, latency                    | operation boundary           | session + run/root ids                         |
 
-- **Downstream absorbs today's cost + audit.** Metrics always; the optional redacted request/response capture is exactly
-  today's `audit.audit_full_body`. They are one plane: per-call evidence about the model interaction.
+- **Downstream absorbs today's cost + audit + provider-trace.** Metrics always; the optional redacted request/response
+  capture is exactly today's `audit.audit_full_body`; provider-trace's per-call lifecycle/correlation (generation id,
+  stream-lifecycle flags, `local_usage_status`) is the same per-call evidence under a different name. They are one
+  plane: per-call evidence about the model interaction.
 - **Upstream is new and first-class.** It records operation outcome for *every* operation, including no-call ops (TDD,
   auth fail-open, cached allow), retiring the supervisor's reliance on `confirmed.policy.decisions`.
 - **Correlation flows session -> run-tree -> downstream.** **Upstream** records carry `session` + `run`/`root` id;
@@ -91,11 +106,11 @@ memory-writer health, TDD outcomes, panel-worker failures -- from one place, wit
 
 ## Design sketch
 
-- **Collapse three planes into two -- do NOT merely split `UsageEvent`.** The trap for the implementer: splitting the
-  usage ledger while leaving cost and audit as separate planes leaves the old architecture intact. The target is **two**
-  planes -- **downstream** = today's cost + audit unified (per-call metrics + optional redacted req/resp), and
-  **upstream** = a new operation-outcome plane. The usage ledger's two halves migrate to those homes; attribution
-  becomes run-tree metadata on each, not a plane.
+- **Collapse four planes into two -- do NOT merely split `UsageEvent`.** The trap for the implementer: splitting the
+  usage ledger while leaving cost, audit, and provider-trace as separate planes leaves the old architecture intact. The
+  target is **two** planes -- **downstream** = today's cost + audit + provider-trace unified (per-call metrics +
+  optional redacted req/resp + provider lifecycle/correlation), and **upstream** = a new operation-outcome plane. The
+  usage ledger's two halves migrate to those homes; attribution becomes run-tree metadata on each, not a plane.
 - **Emit outcome at each operation boundary**, not just CLI command-core ops: CLI ops (`core/ops/`), **hook policy
   evaluations** (`cli/hooks/` + `policy/` -- where TDD and supervisor checks fire, at finer granularity than the
   enclosing `forge hook` command), **async workers** (memory writer, shadow drain), and **workflow invocations**
@@ -105,6 +120,13 @@ memory-writer health, TDD outcomes, panel-worker failures -- from one place, wit
   `resolve_measurement(proxied, cost, envelope, caller) -> Measurement`, ideally returned by the invoker
   (`core/invoker/`), so the downstream write becomes `record(measurement, attribution)`. The resolver must **preserve**
   the divergence (a per-worker call stays unattributed) or it reintroduces the double-count it was meant to remove.
+- **Downstream keys on `backend_id` (owned by `unified_backend`).** Today downstream attribution is `proxy_id` + ad-hoc
+  provider strings (provider-trace literally hardcodes `provider_name == "openrouter"`). The canonical model-source id
+  is the `unified_backend` card's deliverable; this refactor **consumes** it as the downstream attribution key rather
+  than minting its own. Plane **structure** is owned here; the source-identity **key** is owned there. If
+  `unified_backend` lands first, downstream is keyed correctly from day one; if this card lands first, downstream keys
+  on `proxy_id` and re-keys on adoption -- the [`telemetry_architecture`](../telemetry_architecture/card.md) epic
+  records the sequencing.
 - **Consumers read the right plane -- and `forge activity` becomes the honest join.** Upstream answers health/outcome
   (select by session), downstream answers spend (join by run tree). `forge activity` is then a **two-pane outer join,
   not one conflated row**: an upstream pane (outcomes grouped by verb/session, including the no-call ops downstream
@@ -142,11 +164,11 @@ them.
 
 ## Risks / open questions
 
-- **Durable-schema change across three planes.** All three are versioned durable JSONL, but read with different
-  strictness: `UsageEvent` is strict-read (dacite, unknown fields rejected); `read_cost_logs`/`read_audit_logs` are
-  shape-tolerant dict readers that skip records from a newer `schema_version` (§A.12-A.13). Re-cutting them into two is
-  a research-preview clean break (bump/reset + changelog + reset instructions per coding-standards §5); the merged
-  downstream reader must pick one strictness contract, not inherit both.
+- **Durable-schema change across four planes.** All four are versioned durable JSONL, but read with **three different**
+  strictness contracts: `UsageEvent` and provider-trace are strict-read (dacite, unknown fields rejected);
+  `read_cost_logs`/`read_audit_logs` are shape-tolerant dict readers that skip records from a newer `schema_version`
+  (§A.12-A.14). Re-cutting them into two is a research-preview clean break (bump/reset + changelog + reset instructions
+  per coding-standards §5); the merged downstream reader must pick one strictness contract, not inherit three.
 - **Upstream scope = event volume.** What counts as a recorded operation? Every TDD check (one per Write/Edit) and every
   cached allow could flood the upstream ledger. Draw the boundary deliberately (likely: enforced verbs + fail-opens, not
   every deterministic pass). **Open question.**
@@ -162,3 +184,22 @@ function that revealed this. It ships the **minimal on-model step**: read the ou
 records (`command="supervisor"` `status`) for the timeout marker -- *not* the off-model `PolicyDecision.failure_kind`.
 This card is the principled completion: make upstream/downstream first-class so the next health surface needs no new
 field.
+
+## Relationship to `unified_backend` (source identity)
+
+`unified_backend` (proposed on the `openrouter-observability` branch) and this card are the **two orthogonal axes** of
+the telemetry rethink, not duplicates:
+
+- **This card** re-cuts the planes by **direction** -- per-call *downstream* vs per-operation *upstream*. It owns plane
+  **structure** and the `resolve_measurement` provenance resolver.
+- **`unified_backend`** promotes "model source" to a first-class noun and makes `backend_id` the **canonical source
+  key**. Its telemetry section (§5) owns the **key**, not the plane count -- it should defer "how many planes" to this
+  card.
+
+They are **composable** (collapse-to-two *and* key downstream on `backend_id` is the intended end state) and both edit
+the same `emit.py` provenance branch, so they must not run as independent, mutually blind refactors. They are
+**deliberately not merged** into one card: the bulk of `unified_backend` (backend lifecycle, `forge backend list`, auth
+provenance, the model-source catalog) is config/CLI/auth work with its own large blast radius and "spike first" posture,
+and chaining this telemetry refactor to it would break independent shippability. The shared contract -- *downstream keys
+on `backend_id`; structure owned here, key owned there* -- and the sequencing live in the
+[`telemetry_architecture`](../telemetry_architecture/card.md) epic.
