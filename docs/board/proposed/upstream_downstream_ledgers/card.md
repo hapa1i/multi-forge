@@ -120,6 +120,15 @@ memory-writer health, TDD outcomes, panel-worker failures -- from one place, wit
   `resolve_measurement(proxied, cost, envelope, caller) -> Measurement`, ideally returned by the invoker
   (`core/invoker/`), so the downstream write becomes `record(measurement, attribution)`. The resolver must **preserve**
   the divergence (a per-worker call stays unattributed) or it reintroduces the double-count it was meant to remove.
+  - **The same proxied/direct asymmetry is also a *persistence* gap, not only a cost-source choice.** Provider-trace is
+    persisted **only on the proxied path today** -- the proxy's `on_complete` writes it (`server.py` ->
+    `provider_trace_logger.py`), gated on `provider_name == "openrouter"`. The direct `core.llm` clients already
+    **build** the same per-call evidence onto the response object (`CompletionResponse.provider_meta` /
+    `StreamEvent.provider_meta`, `ProviderTraceMeta` at `core/llm/types.py:155`), but `emit.py` never reads it -- so a
+    direct call (action tagger, tier-1 plan-check, transfer curation) constructs `provider_meta` and **drops it**,
+    persisting no provider correlation even though cost/tokens are kept. The unified downstream writer must consume
+    `provider_meta` on the direct path too -- a `Measurement` that carries provider metadata (not just cost/tokens)
+    closes this in one place. (Cross-branch: these symbols live on `openrouter-observability`, not this branch.)
 - **Downstream keys on `backend_id` (owned by `unified_backend`).** Today downstream attribution is `proxy_id` + ad-hoc
   provider strings (provider-trace literally hardcodes `provider_name == "openrouter"`). The canonical model-source id
   is the `unified_backend` card's deliverable; this refactor **consumes** it as the downstream attribution key rather
