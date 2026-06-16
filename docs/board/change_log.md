@@ -34,8 +34,8 @@ wc -l docs/board/change_log.md
 
 **Key changes**:
 
-- **New plane** `src/forge/proxy/provider_trace_logger.py`: versioned (`PROVIDER_TRACE_SCHEMA_VERSION=1`),
-  owner-only `0600` shards under `0700` three-level dirs (`~/.forge/providers/openrouter/traces/<YYYY-MM>_<pid>.jsonl`),
+- **New plane** `src/forge/proxy/provider_trace_logger.py`: versioned (`PROVIDER_TRACE_SCHEMA_VERSION=1`), owner-only
+  `0600` shards under `0700` three-level dirs (`~/.forge/providers/openrouter/traces/<YYYY-MM>_<pid>.jsonl`),
   strict-dacite read, retention prune — modeled on the audit log, not the unversioned cost log. The shared
   `record_provider_trace` helper lives here (the neutral leaf) so `server.py` and `passthrough.py` both call it without
   an import cycle; it gates **direct-OpenRouter-only** and derives `local_usage_status` (probe 2 `[REMOTE-ABSENT]` →
@@ -44,6 +44,9 @@ wc -l docs/board/change_log.md
   spurious WARNING), tracks four lifecycle flags, catches `(asyncio.CancelledError, GeneratorExit)` to record
   `client_disconnected` and re-raise, and packs all of it under one reserved `final_usage["_provider_trace"]` key
   (carrier = widen `Dict[str,int]`→`Dict[str,Any]`, mirroring `reported_cost_micros`; callback arity unchanged).
+  `first_chunk_seen` flips at the first user-visible text **or** tool `content_block_start` — including the delayed
+  id-then-name tool path (a provider that streams the tool id before its name); the id-only buffer chunk emits nothing,
+  so it correctly leaves the flag unset.
 - **Proxy write sites** (`server.py`): both streaming and non-streaming `on_complete` paths write after cost logging,
   carrying `proxy_id`/`mapped_model`/`request_mode` + run-tree/session/command join keys; `timeout_seen=False` always
   (the proxy sees its own disconnect, never the parent `subprocess.run` timeout).
@@ -56,8 +59,8 @@ wc -l docs/board/change_log.md
 **Verification**: full `make test-unit` 6161 passed; `make test-integration` 393 passed; 2 live-OpenRouter E2E pass —
 the clean stream surfaces a real `gen-` id via the carrier and the **cancelled stream** records
 `client_disconnected=True, final_usage_seen=False, local_usage_status="unavailable"` with the gen id intact (the
-incident, end to end). Regression: metadata-only (no body/prompt/completion field; header-bypass re-filtered) +
-run-tree join. `make pre-commit` clean (mypy/pyright/ruff/black/isort/mdformat/gitleaks).
+incident, end to end). Regression: metadata-only (no body/prompt/completion field; header-bypass re-filtered) + run-tree
+join. `make pre-commit` clean (mypy/pyright/ruff/black/isort/mdformat/gitleaks).
 
 ## 2026-06-15
 

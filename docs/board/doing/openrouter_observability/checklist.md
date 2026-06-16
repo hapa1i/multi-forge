@@ -202,7 +202,10 @@ and probe 2.
   `first_chunk_seen=False`; `CancelledError` **and** `GeneratorExit` both set `client_disconnected`, propagate, fire
   `finally` once; clean stream → `first_chunk_seen/final_usage_seen=True`, `client_disconnected=False`; **carrier-only
   then disconnect** (the incident path) → `provider_generation_id` present, `first_chunk_seen=False`,
-  `final_usage_seen=False`, `client_disconnected=True` (`tests/src/proxy/test_converters_lifecycle.py`, 5 tests).
+  `final_usage_seen=False`, `client_disconnected=True`; the **delayed id-then-name tool path** also flips
+  `first_chunk_seen` (a provider that streams the tool id before its name still emits a visible `content_block_start`),
+  while the id-only buffer chunk emits nothing and leaves it unset
+  (`tests/src/proxy/test_converters_lifecycle.py`, 7 tests).
 - [x] **Mirror in passthrough** (`src/forge/proxy/passthrough.py`): `_stream_opened_upstream` now tracks
   `stream_started`/`client_disconnected` (via `except (asyncio.CancelledError, GeneratorExit):` on the relay) and reads
   `saw_content`/`saw_final_usage` off the `_UsageAccumulator` (`_merge` sets them), funneling into the **same**

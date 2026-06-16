@@ -109,6 +109,68 @@ class TestCarrierSemantics:
         assert trace["lifecycle"]["final_usage_seen"] is True
 
 
+def _tool_delta(
+    *, index: int = 0, tc_id: str | None = None, name: str | None = None, args: str | None = None
+) -> dict[str, Any]:
+    func: dict[str, Any] = {}
+    if name is not None:
+        func["name"] = name
+    if args is not None:
+        func["arguments"] = args
+    tc: dict[str, Any] = {"index": index, "function": func}
+    if tc_id is not None:
+        tc["id"] = tc_id
+    return {"choices": [{"delta": {"tool_calls": [tc]}, "finish_reason": None}]}
+
+
+class TestToolStreamLifecycle:
+    @pytest.mark.asyncio
+    async def test_id_then_name_tool_delta_sets_first_chunk_seen(self) -> None:
+        """A provider that streams the tool id before the name still emits visible tool
+        content on the delayed-name path -> first_chunk_seen must be True (the id-only buffer
+        chunk emits nothing, so it alone must NOT flip the flag)."""
+        captured: list = []
+        chunks: list[dict[str, Any]] = [
+            CARRIER,
+            _tool_delta(tc_id="call_abc", name=None),  # id only -> buffered, nothing emitted
+            _tool_delta(tc_id="call_abc", name="get_weather"),  # name arrives -> visible block_start
+            {
+                "choices": [
+                    {
+                        "delta": {"tool_calls": [{"index": 0, "function": {"arguments": "{}"}}]},
+                        "finish_reason": "tool_calls",
+                    }
+                ],
+                "usage": {"prompt_tokens": 5, "completion_tokens": 3},
+            },
+        ]
+        events = await _drain(_gen(chunks), lambda u, f, e: captured.append((u, f, e)))
+
+        # A user-visible tool_use block was emitted (the delayed-name path).
+        starts = [e for e in events if e["event"] == "content_block_start"]
+        assert any(e["data"]["content_block"].get("type") == "tool_use" for e in starts)
+
+        trace = _trace(captured)
+        assert trace["lifecycle"]["first_chunk_seen"] is True  # visible tool content was emitted
+        assert trace["lifecycle"]["final_usage_seen"] is True
+
+    @pytest.mark.asyncio
+    async def test_id_only_then_disconnect_leaves_first_chunk_unseen(self) -> None:
+        """The boundary: a tool id is buffered but the stream drops before the name. Nothing
+        user-visible was emitted, so first_chunk_seen stays False while the disconnect is
+        recorded -- the flag tracks emitted content, not a pending buffer."""
+        captured: list = []
+        chunks: list[dict[str, Any]] = [CARRIER, _tool_delta(tc_id="call_abc", name=None)]
+
+        with pytest.raises(GeneratorExit):
+            await _drain(_gen_then_raise(chunks, GeneratorExit()), lambda u, f, e: captured.append((u, f, e)))
+
+        trace = _trace(captured)
+        assert trace["provider_meta"]["provider_generation_id"] == "gen-incident"
+        assert trace["lifecycle"]["first_chunk_seen"] is False  # id buffered, nothing emitted yet
+        assert trace["lifecycle"]["client_disconnected"] is True
+
+
 class TestDisconnect:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("exc_type", [__import__("asyncio").CancelledError, GeneratorExit])

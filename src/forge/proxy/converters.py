@@ -1100,6 +1100,9 @@ async def convert_openai_to_anthropic_sse(
                     ):
                         tool_info = tool_calls_buffer[tc_openai_index]
                         if tool_info["id"] == tc_id:  # Ensure ID matches if provided again
+                            # Delayed-name path: the id was buffered earlier with nothing emitted;
+                            # this is the first user-visible tool content for the block (lifecycle).
+                            _first_chunk_seen = True
                             content_block_index += 1
                             current_block_type = "tool_use"
                             tool_info["name"] = func_name
