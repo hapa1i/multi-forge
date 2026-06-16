@@ -680,25 +680,27 @@ async def cmd_session_transport(args: argparse.Namespace) -> int:
     label = args.label
     model = args.model
     creds = await resolve_openrouter_creds()
-    base_url, key = creds["base_url"], creds["api_key"]
+    base_url = creds["base_url"]
+    key = creds["api_key"]
     extra_headers = creds.get("extra_headers", {})
     write_run_manifest(capture_dir, label, model, base_url)
 
     gateway = os.environ.get("OPENROUTER_PROBE_GATEWAY_BASE_URL")
-    routes: list[tuple[str, str, str]] = [("direct", base_url, key)]
+    # Keep the secret keys OUT of `routes` -- that list feeds the written cells/record below.
+    # Bundling the api_key alongside the non-secret route name/url taints the whole collection,
+    # so CodeQL reports its serialized siblings as clear-text secret storage (py/clear-text-storage
+    # false positive). Look the key up by route name instead; it only ever reaches the Bearer header.
+    routes: list[tuple[str, str]] = [("direct", base_url)]
+    route_keys: dict[str, str] = {"direct": key}
     if gateway:
-        routes.append(
-            (
-                "gateway",
-                gateway.rstrip("/"),
-                os.environ.get("OPENROUTER_PROBE_GATEWAY_KEY") or key,
-            )
-        )
+        routes.append(("gateway", gateway.rstrip("/")))
+        route_keys["gateway"] = os.environ.get("OPENROUTER_PROBE_GATEWAY_KEY") or key
 
     fields = (("session_id", "forge_sess_probe0"), ("user", "forge_user_probe0"))
     cells: list[dict[str, Any]] = []
 
-    for route_name, route_url, route_key in routes:
+    for route_name, route_url in routes:
+        route_key = route_keys[route_name]
         for field, value in fields:
             cell: dict[str, Any] = {
                 "route": route_name,
