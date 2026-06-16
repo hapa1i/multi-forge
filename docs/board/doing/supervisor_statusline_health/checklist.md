@@ -65,19 +65,34 @@ beside `sum_forge_added_cost`, then surfaced throttled, mirroring `read_or_compu
 **Goal**: A pure reader returning the recent consecutive supervisor fail-open run from the ledger, surfaced under the
 `forge_cost` throttle, never raising.
 
-- [ ] `SupervisorHealth(recent_failures: int, last_kind: str | None, last_seen_at: str | None)` +
+**Status (2026-06-16): Phase 1 complete.** `make pre-commit` clean (mypy/pyright/ruff/black/isort/mdformat/gitleaks).
+191 passed across the five files run for Phase 1: `test_usage_summary.py`, `test_statusline_session_cost_throttle.py`,
+`test_statusline_forge_segments.py`, and `test_proxy_costs.py` (the four carrying the new reader/throttle/context/reset
+tests), plus `test_statusline_registry.py` (no new tests there; run to confirm the golden bar and lazy-context behavior
+did not regress -- the context box below mirrors its `TestLazyContext`). The lazy-access test for the new
+`supervisor_health` accessor landed in `test_statusline_forge_segments.py`, not `test_statusline_registry.py` as the
+context box below anticipated. Issue #1 (reset clears `fhealth-*.json`) and the semantic cache validator
+(`_valid_health_fields`, Issue #2) shipped; no durable-schema change. No visible status-line change yet -- the
+`SUP!N <kind>` render is Phase 2.
+
+- [x] `SupervisorHealth(recent_failures: int, last_kind: str | None, last_seen_at: str | None)` +
   `read_supervisor_health(session, *, since) -> SupervisorHealth`: read `command="supervisor"` events newest-first,
   count the contiguous `status in {error, timeout}` run, break at the first `status="success"`; `last_kind` from the
   newest failure's mapped `failure_type`, `last_seen_at` its `ts`. *Verify*: unit -- 3 timeout events ->
   `recent_failures==3, last_kind=="timeout"`; append a newest `status="success"` -> `0`; a `subprocess_error` ->
   `last_kind=="error"`. *Files*: `src/forge/core/ops/usage_summary.py` (beside `sum_forge_added_cost`).
-- [ ] Surfaced throttled + fail-open: a thin wrapper mirroring `read_or_compute_session_cost`
+- [x] Surfaced throttled + fail-open: a thin wrapper mirroring `read_or_compute_session_cost`
   (`statusline/throttle.py`), keyed on `(forge_root, session)`; a malformed/empty ledger returns empty health, no raise.
   *Verify*: unit -- malformed shard -> empty health, no exception; cached within the TTL window. *Files*:
   `src/forge/cli/statusline/throttle.py`.
-- [ ] Exposed as `RenderContext.supervisor_health` (`@cached_property`, zero I/O unless the supervisor segment is
+- [x] Exposed as `RenderContext.supervisor_health` (`@cached_property`, zero I/O unless the supervisor segment is
   active). *Verify*: mirror `test_statusline_registry.py::TestLazyContext` -- not accessed when supervisor inactive.
   *Files*: `src/forge/cli/statusline/context.py`.
+- [x] `forge proxy costs reset` also clears the derived `fhealth-*.json` cache (Issue #1) so a wiped ledger cannot
+  replay stale health until TTL: added to the table-driven `_RESET_TARGETS` (drives both the `--dry-run` preview and the
+  delete loop); `design_appendix.md §A.9` now names both `fcost-`/`fhealth-` caches. *Verify*: unit -- reset removes
+  `fhealth-deadbeef.json` but preserves the bare `deadbeef.json` cache-hit entry; `--dry-run` lists the
+  supervisor-health cache. *Files*: `src/forge/cli/proxy_costs.py`, `docs/design_appendix.md`.
 
 ### Phase 2: render `SUP!N <kind>` (posture-preserving, golden-safe)
 

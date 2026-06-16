@@ -39,6 +39,8 @@ from forge.cli.status_line import (
 from forge.cli.statusline.context import RenderContext
 from forge.cli.statusline.names import DEFAULT_ORDER, SEGMENT_NAMES
 from forge.cli.statusline.registry import render_segments
+from forge.core.ops.usage_summary import SupervisorHealth
+from forge.core.usage.ledger import UsageEvent, log_usage_event
 from forge.runtime_config import RuntimeConfig, StatusLineConfig
 
 # --- Builders -------------------------------------------------------------
@@ -505,3 +507,48 @@ class TestEndToEndRender:
         # Configured but no session/proxy -> baseline path+model only, no crash.
         visible = self._render(dict(_DATA), segments=["path", "model", "supervisor", "policy", "audit", "drift"])
         assert "SUP" not in visible and "pol:" not in visible and "aud:" not in visible and "drift:" not in visible
+
+
+class TestSupervisorHealthContext:
+    """`RenderContext.supervisor_health` -- manifest-gated, lazy, throttled (Phase 1).
+
+    Phase 1 wires only the data path; the `SUP!N` render lands in Phase 2, so the accessor
+    is tested directly rather than through `_produce_supervisor`.
+    """
+
+    @staticmethod
+    def _seed(**kw: object) -> None:
+        base: dict[str, object] = {
+            "run_id": "r",
+            "root_run_id": "r",
+            "runtime": "claude_code",
+            "command": "supervisor",
+            "status": "success",
+            "session": "planner",
+        }
+        base.update(kw)
+        log_usage_event(UsageEvent(**base))  # type: ignore[arg-type]
+
+    def test_none_without_session_name(self):
+        assert _ctx(manifest=None).supervisor_health is None
+        assert _ctx(manifest={"intent": {}}).supervisor_health is None  # no "name"
+
+    def test_reads_ledger_streak(self):
+        for i in (1, 2, 3):
+            self._seed(status="timeout", failure_type="timeout", ts=f"2026-06-16T12:00:0{i}Z")
+        health = _ctx(manifest={"name": "planner", "created_at": "2026-06-16T00:00:00Z"}).supervisor_health
+        assert health is not None
+        assert health.recent_failures == 3
+        assert health.last_kind == "timeout"
+
+    def test_is_lazy_and_cached(self):
+        with patch(
+            "forge.core.ops.usage_summary.read_supervisor_health",
+            return_value=SupervisorHealth(2, "timeout", "ts"),
+        ) as reader:
+            ctx = _ctx(manifest={"name": "planner", "created_at": "2026-06-16T00:00:00Z"})
+            reader.assert_not_called()  # cached_property is lazy: construction reads nothing
+            first = ctx.supervisor_health
+            second = ctx.supervisor_health
+        assert first == second == SupervisorHealth(2, "timeout", "ts")
+        assert reader.call_count == 1  # cached_property collapses repeat access to one read

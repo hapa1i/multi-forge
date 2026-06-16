@@ -363,11 +363,12 @@ proxy ID.
 
 Cost logs accumulate indefinitely. `forge proxy costs reset` wipes both cost-log planes (`costs/requests/` +
 `costs/verbs/`) **and** the usage-attribution ledger (`usage/events/`) to zero in one step, and clears the derived
-status-line cost cache (`cache/statusline/fcost-*.json`) so `forge +$Y` does not replay a cached value (audit records
-are a separate plane and are left untouched); it prompts for confirmation unless `--yes`, and `--dry-run` previews. You
-can also delete individual JSONL files under `~/.forge/costs/` by hand. Either way, a running proxy keeps its cost
-totals and cap counters in memory until restarted — it re-bootstraps from the remaining logs at next startup, so restart
-any active proxy to also zero its live cumulative cost and cap enforcement.
+status-line caches (`cache/statusline/fcost-*.json` for `forge +$Y`, `fhealth-*.json` for supervisor health) so a wiped
+ledger cannot replay a cached value (audit records are a separate plane and are left untouched); it prompts for
+confirmation unless `--yes`, and `--dry-run` previews. You can also delete individual JSONL files under
+`~/.forge/costs/` by hand. Either way, a running proxy keeps its cost totals and cap counters in memory until restarted
+— it re-bootstraps from the remaining logs at next startup, so restart any active proxy to also zero its live cumulative
+cost and cap enforcement.
 
 ---
 

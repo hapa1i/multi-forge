@@ -293,6 +293,57 @@ def sum_forge_added_cost(session: str, *, since: datetime | None = None) -> int 
     return _join_session_cost(events, since, exclude_interactive=True, trusted_only=True).total
 
 
+@dataclass
+class SupervisorHealth:
+    """Recent fail-open health of the frontier supervisor, read from the usage ledger.
+
+    ``recent_failures`` is the newest-first contiguous run of ``error``/``timeout``
+    supervisor events (reset by the first ``success``); ``last_kind`` is the display
+    kind of the newest failure (``"timeout"`` | ``"error"``) and ``last_seen_at`` its
+    ``ts``. Empty (``0``/``None``/``None``) means the most recent supervisor run
+    succeeded -- or none ran.
+
+    v1 covers only the timeout/subprocess fail-opens the ledger records as a
+    non-``success`` ``status``; parse fail-opens (logged ``success``) and auth/proxy
+    fail-opens (no event) are out of scope (deferred to ``upstream_downstream_ledgers``).
+    """
+
+    recent_failures: int = 0
+    last_kind: str | None = None
+    last_seen_at: str | None = None
+
+
+def read_supervisor_health(session: str, *, since: datetime | None = None) -> SupervisorHealth:
+    """Return the recent consecutive frontier-supervisor fail-open run for ``session``.
+
+    Reads ``command="supervisor"`` events newest-first (the ledger sorts ascending by
+    ``ts``) and counts the contiguous ``status in {"error","timeout"}`` prefix, breaking
+    at the first non-failure. ``last_kind`` maps the newest failure's ``failure_type`` to
+    ``"timeout"`` (exact) or ``"error"`` (everything else: subprocess/exit/runtime).
+
+    Frontier-only: ``command="supervisor"`` excludes ``"supervisor-shadow"`` and
+    ``"plan-check"`` by exact match. ``since`` bounds the scan to events at/after session
+    creation (an event cannot predate it), mirroring :func:`sum_forge_added_cost`. An
+    unexpected read error propagates (the throttle decides whether to cache or skip); the
+    common corruption -- malformed lines and per-shard ``OSError`` -- is swallowed by
+    ``read_usage_events``, so a readable-but-corrupt ledger yields empty health.
+    """
+    events = read_usage_events(session=session, command="supervisor", period_start=since)
+    count = 0
+    last_kind: str | None = None
+    last_seen_at: str | None = None
+    for event in reversed(events):  # ledger is ascending by ts; reverse for newest-first
+        if event.status not in _ERROR_STATUSES:
+            break  # the first non-failure (a success) ends the recent fail-open run
+        if count == 0:  # the newest failure defines the displayed kind + timestamp
+            last_kind = "timeout" if event.failure_type == "timeout" else "error"
+            last_seen_at = event.ts
+        count += 1
+    if count == 0:
+        return SupervisorHealth()
+    return SupervisorHealth(recent_failures=count, last_kind=last_kind, last_seen_at=last_seen_at)
+
+
 # --- internals ---------------------------------------------------------------
 
 

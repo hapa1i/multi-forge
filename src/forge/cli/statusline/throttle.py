@@ -19,8 +19,9 @@ import os
 import tempfile
 import time
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, cast
 
+from forge.core.ops.usage_summary import SupervisorHealth
 from forge.core.paths import get_forge_home
 
 CACHE_VERSION = 1
@@ -170,3 +171,84 @@ def read_or_compute_session_cost(
         return None
     _write(path, {"version": CACHE_VERSION, "computed_at": now, "cost_micro_usd": value})
     return value
+
+
+def _session_health_cache_path(forge_session_key: str) -> Path:
+    # Distinct `fhealth-` namespace from the `fcost-` cost entries and the bare
+    # cache-hit entries. Same FORGE session identity (forge_root + manifest name) as the
+    # cost cache, so the two derived caches share a key but never a file (different
+    # prefix). usedforsecurity=False: filename derivation only.
+    digest = hashlib.sha256(forge_session_key.encode("utf-8"), usedforsecurity=False).hexdigest()
+    return get_forge_home() / "cache" / "statusline" / f"fhealth-{digest}.json"
+
+
+def _valid_health_fields(recent_failures: Any, last_kind: Any, last_seen_at: Any) -> bool:
+    """Whether a cached health triple matches the reader's own invariant.
+
+    Semantic (not just type) validation: a hand-corrupted runtime cache must not feed
+    arbitrary ``last_kind`` text or a dangling ``last_seen_at`` to the renderer. The
+    reader only ever produces ``(0, None, None)`` or ``(n>0, "timeout"|"error", <ts>)``,
+    so the three fields are validated together, not independently.
+    """
+    # bool is an int subclass; a corrupt `true` must not read as a count of 1.
+    if not isinstance(recent_failures, int) or isinstance(recent_failures, bool) or recent_failures < 0:
+        return False
+    if recent_failures == 0:
+        return last_kind is None and last_seen_at is None
+    return last_kind in ("timeout", "error") and isinstance(last_seen_at, str)
+
+
+def read_or_compute_session_health(
+    forge_session_key: str,
+    ttl: int,
+    compute_fn: Callable[[], SupervisorHealth],
+    *,
+    now: float | None = None,
+) -> SupervisorHealth | None:
+    """Return a cached supervisor-health triple or recompute + persist it.
+
+    **Time-only** throttle, like :func:`read_or_compute_session_cost`: supervisor
+    fail-opens accrue via usage-ledger writes that never touch the transcript, so a
+    transcript-mtime shortcut would freeze the marker for the whole session. Caches
+    **any successful result, including empty health** (a healthy supervisor must not
+    re-scan the PID-sharded ledger every poll). A compute *failure* (``compute_fn``
+    raises) is left uncached and returns ``None`` (fail-open: a transient ledger read
+    error means "no health this poll", never a crash, never a frozen stale marker).
+
+    A cached entry is reused only when fresh AND it passes :func:`_valid_health_fields`
+    (semantic validation against the reader's invariant); otherwise it is recomputed.
+    """
+    if now is None:
+        now = time.time()
+
+    path = _session_health_cache_path(forge_session_key)
+    cached = _read(path)
+    if cached is not None and cached.get("version") == CACHE_VERSION:
+        computed_at = cached.get("computed_at")
+        fresh = isinstance(computed_at, (int, float)) and (now - computed_at) < ttl
+        recent_failures = cached.get("recent_failures")
+        last_kind = cached.get("last_kind")
+        last_seen_at = cached.get("last_seen_at")
+        if fresh and _valid_health_fields(recent_failures, last_kind, last_seen_at):
+            # _valid_health_fields guarantees the int; cast past dict.get's Any | None.
+            return SupervisorHealth(
+                recent_failures=cast(int, recent_failures), last_kind=last_kind, last_seen_at=last_seen_at
+            )
+
+    try:
+        health = compute_fn()
+    except Exception:
+        # Fail-open: do NOT cache (retry next poll). Caching a failure would freeze the
+        # segment until the TTL elapsed even after the ledger recovered.
+        return None
+    _write(
+        path,
+        {
+            "version": CACHE_VERSION,
+            "computed_at": now,
+            "recent_failures": health.recent_failures,
+            "last_kind": health.last_kind,
+            "last_seen_at": health.last_seen_at,
+        },
+    )
+    return health

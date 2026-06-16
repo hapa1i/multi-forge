@@ -16,10 +16,13 @@ from forge.core.ops.usage_summary import (
     CommandUsage,
     PolicyActivity,
     SessionActivitySummary,
+    SupervisorHealth,
     build_session_activity_summary,
+    read_supervisor_health,
     render_summary_line,
     sum_forge_added_cost,
 )
+from forge.core.paths import get_forge_home
 from forge.core.usage.ledger import UsageEvent, log_usage_event
 from forge.session.models import (
     PolicyConfirmed,
@@ -893,3 +896,61 @@ class TestShadowActivity:
         line = render_summary_line(summary)
         assert line is not None
         assert "shadow: 4 queued" in line
+
+
+class TestReadSupervisorHealth:
+    """`read_supervisor_health` reads the newest-first contiguous fail-open run from the
+    usage ledger (`command="supervisor"` only)."""
+
+    def test_consecutive_timeouts_counted(self) -> None:
+        for i in (1, 2, 3):
+            log_usage_event(_event(status="timeout", failure_type="timeout", ts=f"2026-06-16T12:00:0{i}Z"))
+        health = read_supervisor_health("planner")
+        assert health.recent_failures == 3
+        assert health.last_kind == "timeout"
+        assert health.last_seen_at == "2026-06-16T12:00:03Z"  # newest failure's ts
+
+    def test_success_resets_streak(self) -> None:
+        for i in (1, 2, 3):
+            log_usage_event(_event(status="timeout", failure_type="timeout", ts=f"2026-06-16T12:00:0{i}Z"))
+        log_usage_event(_event(status="success", ts="2026-06-16T12:00:04Z"))  # newest
+        assert read_supervisor_health("planner") == SupervisorHealth()
+
+    def test_only_newest_contiguous_failures_count(self) -> None:
+        log_usage_event(_event(status="success", ts="2026-06-16T12:00:01Z"))  # older success
+        log_usage_event(_event(status="timeout", failure_type="timeout", ts="2026-06-16T12:00:02Z"))
+        log_usage_event(_event(status="timeout", failure_type="timeout", ts="2026-06-16T12:00:03Z"))
+        # Streak starts at the newest event and breaks at the older success.
+        assert read_supervisor_health("planner").recent_failures == 2
+
+    def test_subprocess_error_maps_to_error_kind(self) -> None:
+        log_usage_event(_event(status="error", failure_type="subprocess_error", ts="2026-06-16T12:00:01Z"))
+        health = read_supervisor_health("planner")
+        assert health.recent_failures == 1
+        assert health.last_kind == "error"  # everything that is not failure_type="timeout"
+
+    def test_excludes_shadow_command(self) -> None:
+        for i in (1, 2):
+            log_usage_event(
+                _event(
+                    command="supervisor-shadow", status="timeout", failure_type="timeout", ts=f"2026-06-16T12:00:0{i}Z"
+                )
+            )
+        # Frontier-only: command="supervisor" exact-match excludes supervisor-shadow.
+        assert read_supervisor_health("planner") == SupervisorHealth()
+
+    def test_no_events_is_empty(self) -> None:
+        assert read_supervisor_health("planner") == SupervisorHealth()
+
+    def test_since_bound_excludes_older_events(self) -> None:
+        log_usage_event(_event(status="timeout", failure_type="timeout", ts="2026-06-15T00:00:00Z"))
+        since = datetime(2026, 6, 16, tzinfo=timezone.utc)
+        assert read_supervisor_health("planner", since=since) == SupervisorHealth()
+
+    def test_malformed_ledger_yields_empty_health_without_raising(self) -> None:
+        # read_usage_events skips malformed lines -> empty health, NEVER raises. This is
+        # distinct from the throttle's compute-raises -> None fail-open path.
+        events_dir = get_forge_home() / "usage" / "events"
+        events_dir.mkdir(parents=True, exist_ok=True)
+        (events_dir / "2026-06_bad.jsonl").write_text("{ not valid json\n")
+        assert read_supervisor_health("planner") == SupervisorHealth()
