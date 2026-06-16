@@ -35,6 +35,7 @@ from ..types import (
     CompletionResponse,
     Message,
     ModelHyperparameters,
+    ProviderTraceMeta,
     StreamEvent,
     ToolCall,
     ToolCallDelta,
@@ -55,6 +56,39 @@ logger = logging.getLogger(__name__)
 # LiteLLM proxy reports the computed spend for a request in this response header.
 # Direct providers (and surfaces that drop raw headers) don't set it → cost unavailable.
 LITELLM_COST_HEADER = "x-litellm-response-cost"
+
+# A deliberately tiny allowlist of correlation header names lifted into
+# ProviderTraceMeta.headers (Phase 2). Header *values* are retained and can themselves be
+# identifiers, so anything not listed here is dropped — never "everything except auth".
+# Auth/cookie/set-cookie headers are excluded by omission, not by a denylist.
+_PROVIDER_TRACE_HEADER_ALLOWLIST = frozenset(
+    {
+        "x-request-id",  # generic request correlation id
+        "x-generation-id",  # OpenRouter gen-... id header carrier
+        "x-litellm-call-id",  # LiteLLM per-call id
+        "x-litellm-model-id",  # LiteLLM resolved model id
+    }
+)
+
+
+def provider_trace_headers(headers: Any) -> dict[str, str] | None:
+    """Return only the allowlisted correlation headers (lowercased name -> value), or None.
+
+    A fixed name-allowlist (`_PROVIDER_TRACE_HEADER_ALLOWLIST`): non-string names/values and
+    anything not on the list are dropped, so a response's auth/cookie headers never enter the
+    trace plane. Returns None when nothing allowlisted is present (keeps the field unset).
+    """
+    if headers is None:
+        return None
+    try:
+        pairs = list(headers.items())  # httpx.Headers and dict both expose .items()
+    except (AttributeError, TypeError):
+        return None
+    out: dict[str, str] = {}
+    for name, value in pairs:
+        if isinstance(name, str) and isinstance(value, str) and name.lower() in _PROVIDER_TRACE_HEADER_ALLOWLIST:
+            out[name.lower()] = value
+    return out or None
 
 
 def cost_from_response_headers(headers: Any) -> float | None:
@@ -347,6 +381,19 @@ class LiteLLMClient:
             return completion
         return completion.model_copy(update={"cost_usd": header_cost})
 
+    def _merge_response_metadata(self, completion: CompletionResponse, headers: Any) -> CompletionResponse:
+        """Attach gateway header cost AND allowlisted provider-trace headers (Phase 2).
+
+        Only the non-streaming/Responses paths reach this (they hold a raw-response handle);
+        streaming has no headers, so its ``provider_meta.headers`` stays None.
+        """
+        completion = self._merge_header_cost(completion, headers)
+        trace_headers = provider_trace_headers(headers)
+        if not trace_headers:
+            return completion
+        meta = completion.provider_meta or ProviderTraceMeta(provider=self._provider)
+        return completion.model_copy(update={"provider_meta": meta.model_copy(update={"headers": trace_headers})})
+
     def _build_request_kwargs(
         self,
         messages: list[Message],
@@ -416,7 +463,7 @@ class LiteLLMClient:
 
         raw = await client.responses.with_raw_response.create(**request_params)
         completion = self._parse_responses_output(raw.parse(), self._model)
-        return self._merge_header_cost(completion, raw.headers)
+        return self._merge_response_metadata(completion, raw.headers)
 
     @retry(
         retry=retry_if_exception(lambda e: isinstance(e, Exception) and LiteLLMClient._is_retryable_error(e)),
@@ -445,7 +492,7 @@ class LiteLLMClient:
         # .create() drops; .parse() returns the same ChatCompletion model.
         raw = await client.chat.completions.with_raw_response.create(**kwargs)
         completion = self._openai_to_completion(raw.parse())
-        return self._merge_header_cost(completion, raw.headers)
+        return self._merge_response_metadata(completion, raw.headers)
 
     async def complete(
         self,

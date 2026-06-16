@@ -9,6 +9,7 @@ from forge.core.llm.types import (
     Message,
     ModelHyperparameters,
     PromptCachingConfig,
+    ProviderTraceMeta,
     StreamEvent,
     ThinkingConfig,
     ToolCall,
@@ -292,6 +293,40 @@ class TestCompletionResponse:
         resp = CompletionResponse(text="hi", cost_usd=0.00234)
         assert resp.cost_usd == 0.00234
 
+    def test_provider_meta_defaults_none(self):
+        """provider_meta is additive: a response built without it still constructs."""
+        resp = CompletionResponse(text="hi")
+        assert resp.provider_meta is None
+
+    def test_provider_meta_carried(self):
+        meta = ProviderTraceMeta(provider="openrouter", provider_generation_id="gen-abc")
+        resp = CompletionResponse(text="hi", provider_meta=meta)
+        assert resp.provider_meta is not None
+        assert resp.provider_meta.provider == "openrouter"
+        assert resp.provider_meta.provider_generation_id == "gen-abc"
+
+
+class TestProviderTraceMeta:
+    """Tests for the provider-trace metadata type (openrouter_observability Phase 2)."""
+
+    def test_all_fields_optional(self):
+        """Every field defaults to None so old providers/fakes stay valid."""
+        meta = ProviderTraceMeta()
+        assert meta.provider is None
+        assert meta.provider_generation_id is None
+        assert meta.headers is None
+
+    def test_partial_population(self):
+        meta = ProviderTraceMeta(
+            provider="openrouter",
+            provider_response_id="gen-body",
+            selected_provider="Azure",
+            headers={"x-request-id": "req-1"},
+        )
+        assert meta.provider == "openrouter"
+        assert meta.headers == {"x-request-id": "req-1"}
+        assert meta.provider_request_id is None  # untouched fields stay None
+
 
 class TestStreamEvent:
     """Tests for StreamEvent type."""
@@ -329,6 +364,16 @@ class TestStreamEvent:
     def test_cost_usd_carried_on_final_event(self):
         event = StreamEvent(type="response_end", cost_usd=0.0019)
         assert event.cost_usd == 0.0019
+
+    def test_provider_meta_defaults_none(self):
+        event = StreamEvent(type="usage", usage={"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2})
+        assert event.provider_meta is None
+
+    def test_provider_meta_carried_on_final_event(self):
+        meta = ProviderTraceMeta(provider="openrouter", provider_generation_id="gen-stream")
+        event = StreamEvent(type="response_end", provider_meta=meta)
+        assert event.provider_meta is not None
+        assert event.provider_meta.provider_generation_id == "gen-stream"
 
     def test_invalid_type_rejected(self):
         with pytest.raises(ValidationError):

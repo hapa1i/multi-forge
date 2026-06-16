@@ -83,3 +83,51 @@ class TestOpenAIResponseToCompletion:
         result = openai_response_to_completion(self._response(None), "litellm")
         assert result.cost_usd is None
         assert result.usage is None
+
+    # --- provider_meta population (openrouter_observability Phase 2) ---
+
+    def test_provider_meta_openrouter_lifts_gen_id_and_upstream(self):
+        # OpenRouter's body.id is the gen-... generation id (probe 1); `provider` names
+        # the selected upstream.
+        resp = SimpleNamespace(
+            id="gen-abc123",
+            provider="Azure",
+            choices=[SimpleNamespace(message=SimpleNamespace(content="hi", tool_calls=None))],
+            usage=None,
+            error=None,
+            model_dump=lambda: {},
+        )
+        meta = openai_response_to_completion(resp, "openrouter").provider_meta
+        assert meta is not None
+        assert meta.provider == "openrouter"
+        assert meta.provider_response_id == "gen-abc123"
+        assert meta.provider_generation_id == "gen-abc123"
+        assert meta.selected_provider == "Azure"
+
+    def test_provider_meta_non_gen_id_has_no_generation_id(self):
+        resp = SimpleNamespace(
+            id="chatcmpl-1",
+            choices=[SimpleNamespace(message=SimpleNamespace(content="hi", tool_calls=None))],
+            usage=None,
+            error=None,
+            model_dump=lambda: {},
+        )
+        meta = openai_response_to_completion(resp, "litellm").provider_meta
+        assert meta is not None
+        assert meta.provider == "litellm"
+        assert meta.provider_response_id == "chatcmpl-1"
+        assert meta.provider_generation_id is None  # body.id is not a gen- id
+        assert meta.selected_provider is None
+
+    def test_provider_meta_selected_provider_from_model_extra(self):
+        resp = SimpleNamespace(
+            id="gen-x",
+            model_extra={"provider": "Fireworks"},
+            choices=[SimpleNamespace(message=SimpleNamespace(content="hi", tool_calls=None))],
+            usage=None,
+            error=None,
+            model_dump=lambda: {},
+        )
+        meta = openai_response_to_completion(resp, "openrouter").provider_meta
+        assert meta is not None
+        assert meta.selected_provider == "Fireworks"

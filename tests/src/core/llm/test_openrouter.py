@@ -209,3 +209,58 @@ class TestOpenRouterClientStream:
 
         cost_carriers = [e.cost_usd for e in events if e.cost_usd is not None]
         assert cost_carriers == [0.0021, 0.0021]  # usage + response_end events
+
+    @pytest.mark.asyncio
+    async def test_stream_provider_meta_from_first_chunk_id(self, client):
+        """The gen-... id on the FIRST chunk rides on the usage/response_end events (Phase 2)."""
+        chunk1 = MagicMock()
+        chunk1.id = "gen-stream-abc"
+        chunk1.usage = None
+        chunk1.choices = [MagicMock(delta=MagicMock(content="Hi", tool_calls=None))]
+
+        chunk2 = MagicMock()
+        chunk2.id = "gen-stream-LATER"  # must NOT overwrite the first-seen id
+        chunk2.usage = SimpleNamespace(
+            prompt_tokens=10, completion_tokens=2, total_tokens=12, prompt_tokens_details=None
+        )
+        chunk2.choices = []
+
+        async def mock_stream():
+            yield chunk1
+            yield chunk2
+
+        mock_client = AsyncMock()
+        mock_client.chat.completions.create = AsyncMock(return_value=mock_stream())
+        mock_creds = {"api_key": "sk-or-test", "base_url": "https://openrouter.ai/api/v1", "extra_headers": {}}
+        with patch.object(client, "_credentials") as mock_cm:
+            mock_cm.get_credentials = AsyncMock(return_value=mock_creds)
+            client._client = mock_client
+            events = [e async for e in client.stream(messages=[Message(role="user", content="Hello")])]
+
+        metas = [e.provider_meta for e in events if e.provider_meta is not None]
+        assert metas  # carried on usage + response_end
+        for meta in metas:
+            assert meta.provider == "openrouter"
+            assert meta.provider_generation_id == "gen-stream-abc"  # first-seen, not overwritten
+            assert meta.provider_response_id == "gen-stream-abc"
+
+    @pytest.mark.asyncio
+    async def test_stream_non_string_id_leaves_provider_meta_none(self, client):
+        """A chunk with no usable string id yields no provider_meta (guards against mock ids)."""
+        chunk = MagicMock(spec=["usage", "choices"])  # no .id attribute at all
+        chunk.usage = SimpleNamespace(prompt_tokens=1, completion_tokens=1, total_tokens=2, prompt_tokens_details=None)
+        chunk.choices = []
+
+        async def mock_stream():
+            yield chunk
+
+        mock_client = AsyncMock()
+        mock_client.chat.completions.create = AsyncMock(return_value=mock_stream())
+        mock_creds = {"api_key": "sk-or-test", "base_url": "https://openrouter.ai/api/v1", "extra_headers": {}}
+        with patch.object(client, "_credentials") as mock_cm:
+            mock_cm.get_credentials = AsyncMock(return_value=mock_creds)
+            client._client = mock_client
+            events = [e async for e in client.stream(messages=[Message(role="user", content="Hello")])]
+
+        response_end = [e for e in events if e.type == "response_end"]
+        assert response_end and response_end[0].provider_meta is None

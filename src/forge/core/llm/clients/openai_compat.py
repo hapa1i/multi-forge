@@ -15,6 +15,7 @@ from ..types import (
     CompletionResponse,
     Message,
     ModelHyperparameters,
+    ProviderTraceMeta,
     ToolCall,
     ToolCallDelta,
 )
@@ -137,6 +138,32 @@ def build_chat_completion_kwargs(
     return kwargs
 
 
+def provider_trace_meta(response: Any, provider: str) -> ProviderTraceMeta:
+    """Build provider-trace metadata from a non-streaming OpenAI-shaped response (Phase 2).
+
+    ``body.id`` carries the provider response id; for OpenRouter that id is the ``gen-…``
+    generation id (probe 1), surfaced as ``provider_generation_id``. ``selected_provider``
+    is the upstream OpenRouter routed to, reported in the body's ``provider`` field (read
+    from ``model_extra`` when the typed SDK stashed it there).
+    """
+    response_id = getattr(response, "id", None)
+    response_id = response_id if isinstance(response_id, str) else None
+    generation_id = response_id if response_id and response_id.startswith("gen-") else None
+
+    selected = getattr(response, "provider", None)
+    if selected is None:
+        extra = getattr(response, "model_extra", None)
+        if isinstance(extra, dict):
+            selected = extra.get("provider")
+
+    return ProviderTraceMeta(
+        provider=provider,
+        provider_response_id=response_id,
+        provider_generation_id=generation_id,
+        selected_provider=selected if isinstance(selected, str) else None,
+    )
+
+
 def openai_response_to_completion(response: Any, provider: str) -> CompletionResponse:
     """Convert OpenAI ChatCompletion response to canonical CompletionResponse."""
     if hasattr(response, "error") and response.error:
@@ -192,6 +219,7 @@ def openai_response_to_completion(response: Any, provider: str) -> CompletionRes
         tool_calls=tool_calls,
         usage=usage,
         cost_usd=cost_usd,
+        provider_meta=provider_trace_meta(response, provider),
         raw=response.model_dump(),
     )
 

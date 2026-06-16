@@ -27,6 +27,31 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-15
 
+### openrouter_observability Phase 2: provider metadata through core.llm (additive ProviderTraceMeta)
+
+**Goal**: Lift the provider/generation id, selected upstream, and allowlisted correlation headers out of raw provider
+dicts and carry them to the proxy boundary on an additive, nested `ProviderTraceMeta`, kept separate from Forge's
+synthetic `chatcmpl-<ts>` id.
+
+**Key changes**:
+
+- `core/llm/types.py` + `__init__.py`: new `ProviderTraceMeta(BaseModel)` (7 optional fields); `provider_meta` added to
+  `CompletionResponse` and `StreamEvent`; exported. Additive — fakes/old providers keep working.
+- `openai_compat.py`: `provider_trace_meta()` sets `provider_response_id` from `body.id`, `provider_generation_id` only
+  when the id is a `gen-…` (so `chatcmpl-` ids don't masquerade), `selected_provider` from the body `provider` field.
+- `openrouter.py` stream: captures the **first-seen** `chunk.id` (set-once, `isinstance(str)` guarded) and attaches it
+  to the usage/`response_end` events — first-seen is what survives a cancelled stream (the incident).
+- `litellm.py`: tiny exact-name header allowlist (`provider_trace_headers`) + `_merge_response_metadata` populating
+  `provider_meta.headers` on the raw-response paths (never auth/cookies). Direct `openrouter.py` header capture deferred
+  (it has no `with_raw_response`; body/chunk id already carries the gen id).
+- `proxy/client_adapter.py`: widened `AdapterProviderType` to include `"openrouter"` (removed the now-redundant
+  `type: ignore`); `provider_meta` carried as a typed `model_dump` under `_provider_meta` (non-streaming) and the usage
+  chunk (streaming), mirroring `reported_cost_micros` and kept distinct from the synthetic id.
+
+**Verification**: +25 unit tests across `test_types`, `test_openai_compat`, `test_openrouter`, `test_litellm_cost`,
+`test_client_adapter`; full `make test-unit` 6119 passed; mypy + pyright + `make pre-commit` clean. (Reconstruction +
+the converters read land at the Phase 3 trace seam.)
+
 ### openrouter_observability Phase 1: Forge-owned session ids + X-Forge-Session/Command headers
 
 **Goal**: Mint opaque, path-free provider grouping ids and propagate the hashed session name + command role from

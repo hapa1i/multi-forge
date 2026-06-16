@@ -26,7 +26,7 @@ from forge.proxy.base_client import ProxyStreamError
 
 logger = logging.getLogger(__name__)
 
-AdapterProviderType = Literal["litellm_remote", "litellm_local"]
+AdapterProviderType = Literal["litellm_remote", "litellm_local", "openrouter"]
 
 
 def _extract_cache_info(usage: dict[str, int] | None) -> dict[str, Any]:
@@ -96,7 +96,7 @@ class CoreLLMClientAdapter:
         # Model includes vendor prefix (e.g., "openai/gpt-5.5")
         self._client = get_client(
             model,
-            provider=provider,  # type: ignore  # AdapterProviderType is subset of ProviderType
+            provider=provider,
             default_hyperparams=default_hyperparams,
         )
 
@@ -227,6 +227,11 @@ class CoreLLMClientAdapter:
         # the route-reported cost in micros, read by the proxy's _calc_and_log_cost.
         if response.cost_usd is not None:
             result["_reported_cost_micros"] = round(response.cost_usd * 1_000_000)
+        # Internal-only carrier (Phase 2): the provider-trace metadata as a plain dict, kept
+        # strictly separate from the synthetic ``chatcmpl-<ts>`` id above and dropped at the
+        # Anthropic translation. Reconstructed to ProviderTraceMeta by the Phase 3 trace seam.
+        if response.provider_meta is not None:
+            result["_provider_meta"] = response.provider_meta.model_dump(exclude_none=True)
         return result
 
     async def create_completion(self, openai_request: Dict[str, Any], request_id: str) -> Dict[str, Any]:
@@ -408,6 +413,10 @@ class CoreLLMClientAdapter:
                 # cost in micros, read by the SSE converter → _on_stream_complete.
                 if event.cost_usd is not None:
                     usage_chunk["reported_cost_micros"] = round(event.cost_usd * 1_000_000)
+                # Same pattern (Phase 2): provider-trace metadata as a plain dict, separate from
+                # the synthetic chatcmpl id; consumed by the Phase 3 trace seam, never the client.
+                if event.provider_meta is not None:
+                    usage_chunk["provider_meta"] = event.provider_meta.model_dump(exclude_none=True)
                 yield {
                     "id": response_id,
                     "object": "chat.completion.chunk",

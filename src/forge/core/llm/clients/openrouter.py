@@ -19,6 +19,7 @@ from ..types import (
     CompletionResponse,
     Message,
     ModelHyperparameters,
+    ProviderTraceMeta,
     StreamEvent,
     ToolCallDelta,
 )
@@ -161,6 +162,11 @@ class OpenRouterClient:
         accumulator = ToolCallAccumulator()
         usage_data: dict[str, int] | None = None
         cost_usd: float | None = None
+        # First-seen provider generation id. OpenRouter puts the gen-... id on every stream
+        # chunk (probe 1); capturing it from the FIRST chunk means a stream cancelled before
+        # the final usage chunk (the incident case) still surfaces its id (Phase 2 / used by
+        # the Phase 3 trace plane).
+        generation_id: str | None = None
 
         try:
             kwargs = build_chat_completion_kwargs(self._model, messages, tools, merged_params)
@@ -171,6 +177,11 @@ class OpenRouterClient:
             stream_resp = await client.chat.completions.create(**kwargs)
 
             async for chunk in stream_resp:
+                if generation_id is None:
+                    chunk_id = getattr(chunk, "id", None)
+                    if isinstance(chunk_id, str) and chunk_id:  # set-once / first-seen
+                        generation_id = chunk_id
+
                 if chunk.usage:
                     usage_data = {
                         "prompt_tokens": chunk.usage.prompt_tokens,
@@ -208,8 +219,18 @@ class OpenRouterClient:
                         accumulator.add_delta(tool_delta)
                         yield StreamEvent(type="tool_call_delta", tool_call_delta=tool_delta)
 
+            provider_meta = (
+                ProviderTraceMeta(
+                    provider=self._provider,
+                    provider_response_id=generation_id,
+                    provider_generation_id=generation_id,
+                )
+                if generation_id
+                else None
+            )
+
             if usage_data:
-                yield StreamEvent(type="usage", usage=usage_data, cost_usd=cost_usd)
+                yield StreamEvent(type="usage", usage=usage_data, cost_usd=cost_usd, provider_meta=provider_meta)
 
             final_tool_calls = accumulator.finalize() if accumulator.has_pending() else None
             yield StreamEvent(
@@ -217,6 +238,7 @@ class OpenRouterClient:
                 tool_calls=final_tool_calls,
                 usage=usage_data,
                 cost_usd=cost_usd,
+                provider_meta=provider_meta,
             )
 
         except Exception as e:

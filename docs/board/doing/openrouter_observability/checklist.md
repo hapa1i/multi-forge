@@ -7,16 +7,15 @@ planning; see **Card corrections** for claims the code refuted.
 
 ## Current focus
 
-**Phases 0 + 1 are complete.** Phase 0 -- all four probes settled 2026-06-15 (probes 1-3 re-run after harness fixes; see
-`phase0-results.md`). **Phase 1 (identity headers) shipped** offline: the `X-Forge-Session`/`X-Forge-Command` minter +
-sanitizer + validators, client-side stamping, headless-spawn population, and proxy read/validate, all unit-tested
-(`make test-unit` 6094 green, `make pre-commit` clean). **Phase 2** (additive `ProviderTraceMeta`) is next and is
-**unblocked** to populate `provider_generation_id` from the streaming `chunk.id` / non-streaming `body.id` (probe 1;
-streaming is **not** structurally `None`). **Phases 3-4** (trace plane + read surface) build against fixtures (e.g. a
-simulated cancelled stream) once the Phase 2 shape lands; probe 2 confirms a cancelled stream is **not remotely
-retrievable** (`[REMOTE-ABSENT]`), so the local-only `unavailable` justification holds. **Phase 5** (injection) gets a
-**channel correction**: OpenRouter **recognizes `user`** (records it) but **ignores `session_id`** -> inject under
-`user`; routing is neutral (both arms), so the flag stays default OFF (opt-in for observability, not performance).
+**Phases 0 + 1 + 2 are complete** (the offline slice). Phase 0 -- all four probes settled 2026-06-15. **Phase 1
+(identity headers)** and **Phase 2 (additive `ProviderTraceMeta`)** shipped offline: the provider/generation id +
+selected upstream + allowlisted headers now flow from the OpenRouter/LiteLLM clients to the proxy boundary via a typed
+internal carrier, kept separate from the synthetic `chatcmpl-<ts>` id (`make test-unit` 6119 green, `make pre-commit`
+clean). **Phase 3 (trace plane + SSE seam) is next** and should be **re-planned** against the concrete carrier shape:
+the converters/`server.py` seam reads the `_provider_meta` / usage-chunk carrier, reconstructs `ProviderTraceMeta`, and
+writes the metadata-only trace record; probe 2 (`[REMOTE-ABSENT]`) justifies the local-only `unavailable` status.
+**Phase 5** (injection) keeps the **channel correction**: inject under `user` (recognized), not `session_id` (ignored);
+routing neutral, so the flag stays default OFF.
 
 ## Decisions locked (this card)
 
@@ -122,30 +121,33 @@ via new sanitized, leak-gated headers. Identity foundation every later phase joi
 OpenRouter/LiteLLM clients, so provider id / generation id / selected upstream / allowlisted headers / sent `session_id`
 flow to the proxy boundary instead of dying in raw dicts. Depends on Phase 0 probe 1 for *which field* to lift.
 
-- [ ] **Type** (`src/forge/core/llm/types.py`, `__init__.py`): `ProviderTraceMeta(BaseModel)` all-optional/defaulted
-  (`provider`, `provider_response_id`, `provider_generation_id`, `provider_request_id`, `selected_provider`, `headers`,
-  `provider_session_id`); add `provider_meta: ProviderTraceMeta | None = None` to both models; export. - *Assertion*:
-  `CompletionResponse(text=...)` / `StreamEvent(type=...)` with no `provider_meta` still construct; all-`None`
-  `ProviderTraceMeta` valid; existing fake-client tests stay green.
-- [ ] **Non-streaming populate** (`src/forge/core/llm/clients/openai_compat.py`): set `provider_meta` in
-  `openai_response_to_completion` from `response.id` / `response.model_extra` (the hook already used by
-  `extract_reported_cost_usd`), keyed by probe 1's finding; pass provider name through. - *Assertion*: a non-streaming
-  OpenRouter completion carries `provider="openrouter"` + the probe-confirmed id; a LiteLLM completion carries
-  `provider="litellm"`.
-- [ ] **Streaming populate** (`src/forge/core/llm/clients/openrouter.py`): read `chunk.id` in `.stream` (currently
-  dropped) onto the usage/`response_end` event; if probe 1 says the gen-id is header-only, leave
-  `provider_generation_id=None` and record the structural gap (the incident must still produce a useful trace). -
-  *Assertion*: streamed OpenRouter response sets `provider_meta` from `chunk.id` when present; header-only case leaves
-  `provider_generation_id=None` and still records lifecycle facts.
-- [ ] **Header allowlist** (`litellm.py`, `openrouter.py`): allowlist helper beside `cost_from_response_headers`;
-  populate `provider_meta.headers` from `with_raw_response` on non-streaming/Responses paths only. - *Assertion*:
-  `headers` contains only allowlisted correlation headers (never `Authorization`/keys); streaming leaves `headers=None`.
-- [ ] **Adapter carry-through** (`proxy/client_adapter.py`, `client_factory.py`): widen `AdapterProviderType` to include
-  `"openrouter"` (factory already passes it at runtime); carry `provider_meta` via an internal-only carrier key on the
-  usage chunk (same pattern as `reported_cost_micros` at `converters.py:918`), keeping the synthetic `chatcmpl-<epoch>`
-  id (`client_adapter.py:204/:329`) strictly separate from `provider_generation_id`. - *Assertion*: mypy passes with
-  `provider="openrouter"`; the synthetic id stays `chatcmpl-<ts>` and is `!=` `provider_meta.provider_generation_id`;
-  the provider id is dropped by the Anthropic translation (never reaches the client).
+- [x] **Type** (`src/forge/core/llm/types.py`, `__init__.py`): added `ProviderTraceMeta(BaseModel)`, all 7 fields
+  optional/defaulted; `provider_meta: ProviderTraceMeta | None = None` on both `CompletionResponse` and `StreamEvent`;
+  exported (import + `__all__`). - *Verified*: both models construct without it; all-`None` meta valid; full unit suite
+  (6119) stays green (`test_types.py` additions).
+- [x] **Non-streaming populate** (`openai_compat.py`): added `provider_trace_meta(response, provider)` — body `id` →
+  `provider_response_id`; `provider_generation_id` only when the id is a `gen-…` (probe 1, so plain `chatcmpl-` ids
+  don't masquerade as generation ids); `selected_provider` from the body `provider` field / `model_extra`. Wired into
+  `openai_response_to_completion`. - *Verified*: OpenRouter completion carries `provider="openrouter"` + gen id; LiteLLM
+  carries `provider="litellm"`, no generation id.
+- [x] **Streaming populate** (`openrouter.py`): captures the **first-seen** non-null `chunk.id` (set-once) into a local
+  and attaches it to the usage + `response_end` events' `provider_meta`. First-seen (not last) is what lets a
+  *cancelled* stream still surface its id — the incident case (cross-phase note for P3). An `isinstance(str)` guard
+  means a bare-mock chunk id yields no meta (and keeps existing MagicMock streaming tests green). - *Verified*: stream
+  sets meta from the first id, a later id does not overwrite, non-string id → `provider_meta=None`.
+- [x] **Header allowlist** (`litellm.py`): `provider_trace_headers()` (tiny exact-name allowlist: `x-request-id`,
+  `x-generation-id`, `x-litellm-call-id`, `x-litellm-model-id`) beside `cost_from_response_headers`; new
+  `_merge_response_metadata` populates `provider_meta.headers` on the non-streaming/Responses raw-response paths.
+  **Scope note:** the **direct** `openrouter.py` path is unchanged — it uses plain `chat.completions.create()` (no
+  `with_raw_response`), and `body.id`/`chunk.id` already deliver the gen id there, so header capture on the direct path
+  is deferred (it would mean switching the response flow to `with_raw_response`). - *Verified*: only allowlisted
+  names+values kept; auth/cookies dropped; streaming `headers=None`.
+- [x] **Adapter carry-through** (`proxy/client_adapter.py`): widened `AdapterProviderType` to include `"openrouter"`,
+  which made the `get_client(provider=...)` `# type: ignore` provably redundant — **removed** it (mypy + pyright clean).
+  `provider_meta` rides as a typed carrier (`ProviderTraceMeta.model_dump(exclude_none=True)`) under `_provider_meta`
+  (non-streaming) and the usage chunk's `provider_meta` (streaming), mirroring `reported_cost_micros`. - *Verified*:
+  synthetic `chatcmpl-<ts>` id stays `!=` `provider_generation_id`; carrier present on both paths; full unit suite
+  green. (Reconstruction into `ProviderTraceMeta` + the converters read happen at the Phase 3 trace seam.)
 
 | Test                          | Fixture                                                               | Assertion                                                               | Test File                                  |
 | ----------------------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------ |

@@ -13,7 +13,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from forge.config import init_config
-from forge.core.llm.types import CompletionResponse, StreamEvent
+from forge.core.llm.types import CompletionResponse, ProviderTraceMeta, StreamEvent
 from forge.proxy.client_adapter import (
     CoreLLMClientAdapter,
     _extract_cache_info,
@@ -307,6 +307,67 @@ class TestReportedCostThreading:
         ]
         assert usage_chunks
         assert "reported_cost_micros" not in usage_chunks[0]["usage"]
+
+
+class TestProviderMetaThreading:
+    """provider_meta rides into the OpenAI dict as an internal carrier, separate from the
+    synthetic chatcmpl id (openrouter_observability Phase 2)."""
+
+    def test_core_response_carries_provider_meta(self) -> None:
+        adapter = _make_adapter_with_mock_client()
+        resp = CompletionResponse(
+            text="hi",
+            provider_meta=ProviderTraceMeta(provider="openrouter", provider_generation_id="gen-abc"),
+        )
+        out = adapter._core_response_to_openai(resp, "openrouter/gpt-5.2")
+        assert out["_provider_meta"] == {"provider": "openrouter", "provider_generation_id": "gen-abc"}
+
+    def test_core_response_omits_provider_meta_when_none(self) -> None:
+        adapter = _make_adapter_with_mock_client()
+        out = adapter._core_response_to_openai(CompletionResponse(text="hi"), "openrouter/gpt-5.2")
+        assert "_provider_meta" not in out
+
+    def test_synthetic_id_distinct_from_generation_id(self) -> None:
+        """The minted chatcmpl-<ts> id must never equal the provider generation id."""
+        adapter = _make_adapter_with_mock_client()
+        resp = CompletionResponse(
+            text="hi",
+            provider_meta=ProviderTraceMeta(provider="openrouter", provider_generation_id="gen-abc"),
+        )
+        out = adapter._core_response_to_openai(resp, "openrouter/gpt-5.2")
+        assert out["id"].startswith("chatcmpl-")
+        assert out["id"] != out["_provider_meta"]["provider_generation_id"]
+
+    @pytest.mark.asyncio
+    async def test_streaming_usage_chunk_carries_provider_meta(self) -> None:
+        adapter = _make_adapter_with_mock_client()
+
+        async def _fake_stream(*args, **kwargs):  # type: ignore[no-untyped-def]
+            yield StreamEvent(type="text_delta", text="Hi")
+            yield StreamEvent(
+                type="usage",
+                usage={"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
+                provider_meta=ProviderTraceMeta(provider="openrouter", provider_generation_id="gen-stream"),
+            )
+            yield StreamEvent(type="response_end")
+
+        adapter._client = MagicMock(stream=_fake_stream)  # type: ignore[assignment]
+
+        usage_chunks = [
+            c
+            async for c in adapter.create_streaming_completion(
+                {"messages": [{"role": "user", "content": "hi"}], "max_tokens": 100},
+                request_id="req-stream-meta",
+            )
+            if c.get("usage")
+        ]
+        assert usage_chunks
+        assert usage_chunks[0]["usage"]["provider_meta"] == {
+            "provider": "openrouter",
+            "provider_generation_id": "gen-stream",
+        }
+        # The synthetic stream id is never the gen id.
+        assert usage_chunks[0]["id"].startswith("chatcmpl-")
 
 
 # ---------------------------------------------------------------------------
