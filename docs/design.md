@@ -732,9 +732,12 @@ derivation:
   lineage: [feature-auth-v1, feature-auth-v0, initial-planning]  # computed from parent pointers
 ```
 
-Same-directory forks use `resume_mode: native`, `strategy: null`, `depth: 1`, and lineage containing the parent.
-Worktree and `--into` forks start with `resume_mode: transfer`; the CLI enriches `strategy` and `context_file` when it
-generates a transfer context file.
+Same-directory forks default to `resume_mode: native`, `strategy: null`, `depth: 1`, and lineage containing the parent.
+Passing `--resume-mode transfer` -- or any transfer flag (`--strategy`/`--inline-plan`), which auto-switches a
+same-directory fork to transfer with an info line -- instead yields a same-directory *transfer* fork:
+`resume_mode: transfer`, a fresh child Claude session (no parent `--resume --fork-session`), and a generated
+`context_file`. Worktree and `--into` forks start with `resume_mode: transfer`; the CLI enriches `strategy` and
+`context_file` when it generates a transfer context file. `--resume-mode native-relocate` stays worktree/`--into`-only.
 
 **Cross-project resume:** `parent_forge_root` locates the parent's artifacts (may differ from the child's `forge_root`);
 `parent_project_root` must equal the child's `project_root` -- cross-repo resume is not supported.

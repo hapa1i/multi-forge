@@ -476,6 +476,7 @@ def run_memory_writer(
             cwd=str(forge_root),
             # Group the writer's proxied requests under this session + role (Phase 1).
             extra_env={FORGE_SESSION_VAR: session_name, FORGE_COMMAND_VAR: "memory_writer"},
+            reasoning_effort=config.effort,
         )
 
     # Attribute before the failure branch so failed runs are recorded too.

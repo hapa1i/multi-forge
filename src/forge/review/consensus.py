@@ -132,6 +132,7 @@ def run_consensus(
     via: str | None = None,
     routing_plan: WorkerRoutingPlan | None = None,
     attribution: Attribution | None = None,
+    reasoning_effort: str | None = None,
 ) -> ConsensusOutput:
     """Run two-round consensus workflow with role-assigned workers.
 
@@ -195,6 +196,7 @@ def run_consensus(
         cwd=cwd,
         resume_id=None,
         attribution=attribution,
+        reasoning_effort=reasoning_effort,
     )
 
     # --- Build reconciliation brief ---
@@ -228,6 +230,7 @@ def run_consensus(
         cwd=cwd,
         resume_id=None,
         attribution=attribution,
+        reasoning_effort=reasoning_effort,
     )
 
     return ConsensusOutput(

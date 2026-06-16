@@ -227,6 +227,74 @@ the bug class. Helper offline-tested (status gate + interleaved poll + both-arm 
 on all changed files (ruff/black/isort/mypy/pyright/mdformat/gitleaks); `sanitize.sh` OK. All four probes settled; Phase
 0 ships no `src/` change.
 
+### supervisor_launch_controls: launch-time cascade parity + reasoning effort across all `claude -p` subprocesses
+
+**Goal**: Give `forge session fork/start --supervise` the tier-1 cascade knobs `forge policy supervise` already had, and
+add a per-caller reasoning-effort lever to every Forge-spawned `claude -p` subprocess (no global default).
+
+**Key changes**:
+
+- **Cascade parity**: `fork` and `start` gained `--cascade`/`--checker-model`/`--checker-provider` (all require
+  `--supervise`). Launch-time `--cascade` sets the flag only; the runtime hook escalates to the frontier when no plan
+  exists yet (asymmetric with `policy supervise --cascade`, which resolves the plan eagerly).
+- **Shared checker helpers**: extracted `CHECKER_PROVIDER_CHOICES`, `normalize_checker_provider_arg`,
+  `validate_checker_model`, and `apply_checker_options` into `policy/semantic/supervisor.py` (Click-free); consolidated
+  the duplicate provider normalizer in `plan_check.py` to one source.
+- **Two effort vocabularies** (kept distinct): `claude --effort` = `low/medium/high/xhigh/max` (`max` Claude-only),
+  validated by new top-level leaf `core/effort.py`; core.llm `ReasoningEffort` = `none/low/medium/high/xhigh` (`none`
+  checker-only), validated in `core/llm/types.py`. `session/models.py` keeps a drift-guarded inline mirror to stay
+  import-light.
+- **Two argv builders learn `--effort`**: `run_claude_session` (central `-p` builder) appends `--effort` after `--model`
+  and **fails loud** if an older `claude` rejects it (no silent rerun-at-default, unlike the `--output-format` retry);
+  `review/engine.py:_prepare_worker` appends it to the fan-out argv.
+- **Per-caller wiring**: `SupervisorConfig.supervisor_effort`/`.checker_effort`, `MemoryWriterConfig.effort`,
+  `TeamSupervisorConfig.effort`; threaded into the supervisor frontier, tier-1 checker (`ModelHyperparameters` + effort
+  in the plan-check cache key), memory writer, shadow curation, team supervisor, and the workflow fan-out. CLI flags:
+  `--supervisor-effort`/`--checker-effort` on fork/start/`policy supervise`, `--supervisor-effort` on the one-shot
+  `policy supervisor`, `--effort` on `memory enable`, `memory shadows review --curate`, and
+  `workflow {panel,analyze,debate,consensus}`.
+- **Memory enable early-return fix**: `_set_memory_activation` now short-circuits only when enabled/mode/effort are all
+  unchanged, so `forge memory enable --effort high` persists on an already-enabled same-mode session.
+- Additive optional fields only — no `SCHEMA_VERSION` bump. No global `RuntimeConfig` default-effort knob (per-caller by
+  decision). Docs updated: `end-user/session.md`, `end-user/memory.md`, `cli_reference.md`, `design_workflows.md`.
+
+**Verification**: 906 unit tests pass across new + touched files (incl. new `tests/src/core/test_effort.py`
+vocab/drift-guard, `run_claude_session` fail-loud, fork/start persistence, per-consumer forwarding, vocab matrix, memory
+early-return regression); `make pre-commit` clean (ruff/black/isort/mypy/pyright/mdformat/gitleaks); integration green:
+`test_session_commands_integration.py::test_fork_supervise_cascade_effort_persists` and
+`test_supervisor_e2e.py::test_supervisor_effort_reaches_claude_argv` (`--effort medium` in the logged claude argv).
+
+### same_dir_transfer_forks: decouple transfer mode from worktree isolation in `forge session fork`
+
+**Goal**: Let a same-directory fork run a curated *transfer* launch (fresh child Claude session + assembled parent
+context) instead of always native `--resume --fork-session`, and stop silently dropping `--strategy`/`--inline-plan` on
+same-dir forks (the bug from the supervisor investigation).
+
+**Key changes** (`src/forge/cli/session_fork.py`, `manager.py`, `session_lifecycle.py`):
+
+- **Auto-switch**: explicit `--strategy`/`--inline-plan` on a same-dir fork resolves `resume_mode = "transfer"` pre-fork
+  (gated on `resume_mode is None`, so `--resume-mode native-relocate` never auto-switches) and prints a non-silent info
+  line. The existing `--resume-mode transfer` is the explicit same-dir-legal opt-in; `native-relocate` stays
+  worktree/`--into`-only. No `--fresh-transfer` flag.
+- **Branch widened, not duplicated**: the worktree-transfer branch predicate becomes
+  `uses_fresh_transfer = (is_worktree_fork and not native_relocate) or same_dir_transfer`, resolving `worktree_path` per
+  case. Six launch refs (sidecar `session_id`/`resume_id`/`fork_session`/**`register_fork`**/`system_prompt_file`; host
+  `active_claude_session_id`) now key on it. `register_fork` is load-bearing: with `fork_session=False` it is the only
+  thing setting `FORGE_FORK_NAME`. Budget preflight widened to `is_cross_dir or resume_mode == "transfer"`.
+- **Derivation correct under partial failure**: `manager.fork_session` writes the `"transfer"` baseline (+ pre-recorded
+  `context_file`) for same-dir transfer, so a best-effort CLI `_persist_fork_transfer_derivation` refinement failure
+  can't leave a requested transfer fork recorded as `"native"`.
+- **Deferred-resume guard**: `_get_deferred_same_dir_fork_resume_id` returns `None` when
+  `derivation.resume_mode == "transfer"`, before the confirmed-state guard — a failed UUID pre-seed can no longer
+  silently native-resume a `--no-launch` transfer fork.
+- **Docs**: `design.md`, `end-user/session.md`, `cli_reference.md` updated; help strings dropped "worktree-only"
+  framing.
+
+**Verification**: 41 unit tests green (7 new same-dir CLI tests, 3 regression incl. a direct guard test, new manager
+derivation test); 4 integration tests green (new same-dir transfer argv has `--session-id` +
+`--append-system-prompt-file` and lacks `--resume`/`--fork-session`; 3 adjacent fork-launch regressions unchanged);
+`make pre-commit` clean.
+
 ## 2026-06-14
 
 ### supervisor_shadow_sampling: measure the cascade's false-aligned rate (3 slices, one PR)
@@ -1034,156 +1102,25 @@ mocked so codex auth is the only hard dep); 5b real-codex smoke regression green
 preflight + invoker) + the end-user cross-runtime workflow doc. No CLI command and no `SessionStart`-hook delivery (both
 Phase 6).
 
-## 2026-06-08
+## 2026-06-08 (compacted)
 
-### Phase 5b-5d: Codex headless runtime (invoker + usage + transfer relabel)
-
-**Goal**: Ship the Codex build group -- a `CodexHeadlessInvoker` reusing the hardened lifecycle, a native usage emitter,
-and a `target_runtime`-aware transfer relabel -- so the Phase 5e plan-in-Claude/implement-in-Codex bridge has its parts.
-
-**Key changes**:
-
-- **Probe-first (B0)**: captured a real `codex exec --json` run (codex-cli 0.137.0) verbatim into
-  `tests/fixtures/codex/` (success + error streams + `-o` oracle + provenance README). The fixture is authoritative over
-  docs; it confirmed the doc-sourced token field names (`input_tokens`/`cached_input_tokens`/`output_tokens`).
-- **Parser (B1)**: `core/invoker/codex_stream.py` reduces the JSONL event stream -> `(final_text, tokens, is_error)`; a
-  failed turn (`error`+`turn.failed`) maps to `runtime_is_error`.
-- **Shared lifecycle (B2)**: extracted the hardened `run`/`run_parallel` lifecycle into `_HeadlessLifecycleBase`
-  (`core/invoker/_lifecycle.py`) with six template hooks; `ClaudeHeadlessInvoker` subclasses it ("moved, not changed").
-  Migrated ~30 test patch-strings `claude.<sym>` -> `_lifecycle.<sym>` across the invoker test + 3 review drivers + the
-  json-flag regression; both retry-race canaries stayed green.
-- **Invoker + builder (B3/B4)**: `core/invoker/codex.py` -- `CodexHeadlessInvoker` (format-retry predicate always
-  `False`) + `prepare_codex_request` (argv `codex exec --json --sandbox`, key injected only for env/credential_file
-  auth, no proxy, run-tree triple stamped via the neutral `stamp_run_identity` factored out of `build_claude_env`).
-- **Usage (5c)**: `emit_codex_usage` -- `route=codex_exec`/`reporter=codex_jsonl`/`runtime_native`,
-  `confidence=unavailable` + `cost=None`/`source_refs=None` (direct to OpenAI; honest cost absence), `billing_mode` from
-  `CodexPreflight` via a new optional `Attribution.billing_mode`.
-- **Transfer (5d)**: `target_runtime` threads through `assemble_transfer_context` (default `claude`, byte-identical to
-  pre-5d) -> frontmatter + `## Runtime Hints`; `forge transfer regenerate --target-runtime {claude|codex}` defaults from
-  the cache (no silent flip). Delivery is initial-message (no SessionStart hook -> Phase 6).
-- **Design sync**: `design.md` §5.5.5 (shared `_lifecycle` base + two invokers), §3.14 (native Codex emitter), §3.9
-  (`target_runtime` + initial-message delivery).
-
-**Decisions**: 5c `confidence=unavailable` (ledger confidence is cost-only; Codex reports no $); 5d minimal relabel
-(body stays Claude-worded; curation tuning deferred); SessionStart-hook delivery deferred to Phase 6 (`hook_seam` can't
-confirm per-hook trust).
-
-**Verification**: 430 hermetic unit tests (invoker/usage/transfer/CLI + migrated review/regression); real-codex `@slow`
-smoke green (8s, full stack: builder -> invoker -> real `codex exec` -> parser -> emitter); `mypy` clean (15 files);
-`make pre-commit` clean.
-
-### Phase 5a: Codex auth/runtime preflight (probe-first)
-
-**Goal**: Ship a read-only native-Codex preflight -- run before any `codex exec` -- that resolves a non-interactive
-credential, fails closed with setup guidance, and exposes a stable `CodexPreflight` contract for slices 5b/5c/5d, after
-a live probe of the installed `codex` binary to correct doc-implied assumptions.
-
-**Key changes**:
-
-- **Stage-A probe (codex-cli 0.137.0, binary-authoritative)**: `codex doctor --json` is `schemaVersion: 1` with
-  **string-boolean** auth details (`stored API key`/`stored ChatGPT tokens`/`stored agent identity` =
-  `"true"`/`"false"`), parses a valid report **even on non-zero exit**, and reports `overallStatus="warning"` while auth
-  is fine (so it must NOT gate readiness). It exposes **no per-hook trust** check -- so 5a never claims a trusted hook.
-  Sanitized note in the 5a checklist.
-- **`src/forge/core/runtime/codex_preflight.py`** (render-free core): frozen `CodexPreflight` + `preflight_codex` /
-  `assert_codex_ready` (typed `CodexPreflightError`, mirroring `validate_proxy_startup`). Auth resolution is
-  binary-authoritative: Forge `CODEX_API_KEY` (env/file) -> `CODEX_ACCESS_TOKEN` (env) -> `codex doctor` stored auth ->
-  fail closed. `ready = installed AND auth resolved AND not responses-blocked` -- never `overallStatus`. `hook_seam`
-  never returns `active` (trust is a 5d per-hook-hash check); managed suppression is claimed only on explicit
-  `requirements.toml` evidence. The resolved key value is **never** a result field (would leak via `asdict()`/`--json`);
-  5b reads it via the non-rendered `codex_api_key_for_subprocess()`.
-- **Responses as a report, not a route**: `--proxy <id>` reads an existing proxy's `wire_shape` via
-  `config.loader.load_proxy_instance_config` (lazy import; no `forge.proxy` dependency, no `/v1/responses` route);
-  neither wire shape serves Codex Responses, so a proxied route is `proxy_unsupported` and direct `codex exec` is
-  preferred.
-- **`codex-api` (`CODEX_API_KEY`) credential** added to `CREDENTIALS`; note clarifies it is not OPENAI_API_KEY and not
-  the ChatGPT login (Codex owns its own store).
-- **CLI** `forge runtime preflight codex [--proxy] [--json]`: Rich report; `--json` dumps the secret-free dataclass;
-  exit 1 when not ready.
-- **Review hardening (2026-06-08)**: `_resolve_responses_posture` catches the config loader's `ValueError`/`TypeError`
-  (invalid id / corrupt `proxy.yaml`) -> `proxy_unsupported`, not a traceback (preserves the never-raise contract);
-  version comparison pads components (`0.131` meets the `0.131.0` floor); stored-auth resolution documented as
-  PRESENCE-based (a non-"ok" `auth.credentials.status` does not fail-close -- validity is proven at 5b). Stale
-  credential docs updated (`authentication.md` + `design_appendix.md`: six credentials, `codex-api` row,
-  `not_needed_for` note); managed-suppression tests made fully hermetic + the nested-TOML parser branch covered.
-
-**Verification**: 85 focused tests (`test_codex_preflight.py`, `test_runtime.py` preflight, `test_capabilities.py`
-codex-api) + 244 broader (auth/runtime/CLI) green; mypy + pyright 0/0/0 on changed src. Live
-`forge runtime preflight codex` on 0.137.0: `chatgpt_tokens`/`subscription_quota`, `hook_seam=unknown`,
-`doctor=warning`, **Ready YES**, exit 0 (unknown `--proxy` -> exit 1; non-codex runtime -> exit 2). No
-Docker/integration tier (5a spawns nothing). 5b-5f remain provisional pending a re-plan from the Stage-A findings.
-
-### Phase 5 planning + Slice 5.0: Codex/Claude runtime-fact corrections
-
-**Goal**: Scope Phase 5 (cross-runtime resume) and, before planning, re-verify the `runtime_abstraction` card's
-external-tool assumptions against current Claude Code + Codex CLI — the card pinned Codex 0.124.0, now 0.137.0 stable
-(~13 minors stale).
-
-**Key changes**:
-
-- **Research**: three adversarially-verified web sweeps (every claim grounded in fetched official docs or the installed
-  `codex` binary) produced a per-assumption diff. Corrected stale Codex facts: hooks are **default-on**
-  (`[features] hooks`; `codex_hooks` is a **deprecated alias**, not "required" and not "removed"); **10** lifecycle
-  events (was 5); `SessionStart` additionalContext is the transfer-injection seam but **conditional** on hook
-  enablement+trust (keep an initial-message fallback); `PreToolUse` can mutate via `updatedInput`; first-party
-  non-interactive auth (`CODEX_API_KEY` / `codex login --device-auth` / enterprise tokens) + `codex doctor`; Codex emits
-  `wire_api="responses"` only, so a proxy must serve Responses on its **Codex-facing** surface (a translated
-  chat-completions backend does not block); `codex app-server --stdio` is a real alias for `--listen stdio://` (verified
-  against the 0.137.0 binary — the rendered docs table omitted it).
-- **Slice 5.0 (registry, shipped)**: `core/runtime/registry.py` Codex `RuntimeSpec` → `hook_feature_flag=None`,
-  `hook_min_version="0.131.0"`, default-on note (10 events, `updatedInput`, `allow_managed_hooks_only`, Responses,
-  SessionStart-trust caveat); `HookSupport` comment generalized to version-gated. `card.md` hooks paragraph + capability
-  matrix + posture bullets + Phase 5/6 notes and `design.md` §5.5.5 corrected.
-- **Plan**: `checklist.md` Phase 5 expanded from a 4-task stub to slices 5.0 (done) → 5a auth/runtime preflight → 5b
-  `CodexHeadlessInvoker` (one-shot `codex exec`) → 5c usage attribution → 5d target-runtime curator (SessionStart +
-  fallback) → 5e Claude→Codex demo → 5f doc sync, with fixture-grounded acceptance tables, a research verdict, and an
-  Open Risks list. Transport decision recorded: one-shot `codex exec` (app-server a deferred follow-up).
-
-**Verification**: `tests/src/core/runtime/test_registry.py` + `tests/src/cli/test_runtime.py` → 17 passed; mypy clean on
-changed src. Otherwise docs/planning (no runtime behavior change beyond registry data). `make pre-commit` clean.
-
-### Phase 4g: Exact cost attribution for proxied `claude -p` (run-tree correlation)
-
-**Goal**: Replace the concurrency-fragile before/after proxy snapshot delta for proxied `claude -p` cost
-(`verb_snapshot_estimated`, polluted when a session shares the proxy) with an **exact** join that correlates each cost
-record to the Forge run that incurred it. ToS-clean: Forge's own headless subprocesses through Forge's own proxy, opaque
-non-secret run ids; no credential extraction; the interactive OAuth session is untouched. Resolves the last Phase 4 open
-decision.
-
-**Key changes**:
-
-- **Join key is the run tree, not `source_refs`.** One `claude -p` run makes many requests, so the single-valued
-  `source_refs.cost_request_id` is the wrong shape — `source_refs` stays null on `claude -p`
-  (`test_bug_usage_claude_p_null_source_refs.py` holds, no `UsageEvent` schema change). Cost records gain additive
-  `forge_run_id`/`forge_root_run_id` (`schema_version` 1, no bump; reader uses `.get()`).
-- **Env injection (gated, Forge-owned).** `build_claude_env` stamps `X-Forge-Run-ID`/`X-Forge-Root-Run-ID` via
-  `ANTHROPIC_CUSTOM_HEADERS` only for a headless child (`derive_run_identity`) targeting a **proven Forge proxy**
-  (`target_is_forge_proxy` OR marker present **and** `base_url == FORGE_SUBPROCESS_BASE_URL`) — an opaque/third-party
-  base_url, including an inherited marker + explicit opaque override, never leaks the header. Strips inherited
-  `X-Forge-*` lines, preserves user lines.
-- **Proxy validate + stamp.** Middleware validates each inbound id (`^run_[0-9a-f]{12}$`, shared with `mint_run_id` via
-  the new dependency-free `forge.core.run_id` leaf) and stores `None` on a spoof/malformed value; threads the ids
-  through `_calc_and_log_cost` -> `log_request_cost`. One site covers both wire shapes.
-- **Read-time root join + suppression.** `sum_reported_cost_by_root` returns `has_records`/`runs_with_records`
-  (presence, incl. dollar-less records) and `has_cost`/`per_run` (dollars) separately;
-  `usage_summary._join_session_cost` sums by `forge_root_run_id` and suppresses a `verb_snapshot_estimated` event
-  **per-run-subtree** — only when its OWN run produced records, or it is a verb whose DIRECT children did (fan-out, via
-  worker `parent_run_id`). Whole-root suppression was wrong: it dropped a correctly-unstamped sibling's snapshot
-  whenever any run under the shared session root was stamped (silent undercount). A no-dollars route renders
-  **unavailable**, never `$0`; root-summing still captures orphan cancelled leaves. The event stays
-  `verb_snapshot_estimated`; the read surface recomputes the exact figure (`proxy_request_exact`) and renders it
-  **without the `~` estimate marker** (`cost_estimated=False` on the summary/command DTOs drives `forge activity` and
-  the session-end line).
-
-**Verification**: Unit + regression suites green — `test_run_id.py`, `test_cost_logger.py::TestForgeRunCorrelation`
-(+`runs_with_records` presence), `test_env.py::TestCorrelationHeaders`, `test_usage_summary.py::TestRootJoin4g`
-(+exactness flags), `test_activity.py` (exact renders without `~`), and
-`tests/regression/test_bug_4g_mixed_stamped_unstamped_undercount.py` (the shared-root undercount guard); mypy clean.
-Docs synced (design.md §3.14, design_appendix.md §A.9/§A.13, card + checklist). **4g.0 feasibility canary PASSED**
-(`tests/integration/proxy/test_forge_run_id_correlation.py`, all 6 cases, 28.6s) against a live OpenRouter-backed Forge
-proxy on **Claude Code 2.1.168** — proving the load-bearing external dependency on the real wire: plain `claude -p`,
-`claude -p --bare`, and a multi-request tool loop where the tool loop forced >= 2 requests and **every** record carried
-the run ids. The standing version-regression guard records the validated version (`CLAUDE_VERSION_VALIDATED`).
+- **Phase 5b-5d: Codex headless runtime.** Probe-first codex-cli 0.137.0 fixtures; `codex_stream.py` parser; extracted
+  `_HeadlessLifecycleBase` (six hooks) shared by Claude + Codex invokers; `CodexHeadlessInvoker`
+  (`codex exec --json --sandbox`); `emit_codex_usage` (`confidence=unavailable`, honest `cost=None`); `target_runtime`
+  threads transfer (default `claude`, byte-identical). Decisions: cost-only ledger confidence; SessionStart-hook
+  delivery deferred to Phase 6. 430 unit + real-codex `@slow` smoke green.
+- **Phase 5a: Codex preflight.** Render-free `CodexPreflight` (`codex_preflight.py`); binary-authoritative auth
+  (`CODEX_API_KEY` -> `CODEX_ACCESS_TOKEN` -> `codex doctor` -> fail closed); `ready` never keys off `overallStatus`;
+  the resolved key is never a result field (no `--json` leak). `codex-api` credential + `forge runtime preflight codex`.
+  85 + 244 tests; live Ready YES on 0.137.0.
+- **Phase 5 planning + Slice 5.0.** Adversarial web sweeps corrected stale Codex facts (hooks default-on; 10 lifecycle
+  events; Responses-only wire). Shipped Codex `RuntimeSpec`; expanded the Phase 5 checklist (5.0-5f); one-shot
+  `codex exec` transport (app-server deferred).
+- **Phase 4g: Exact cost for proxied `claude -p`.** A run-tree join replaces the concurrency-fragile snapshot delta:
+  additive `forge_run_id`/`forge_root_run_id` on cost records (no schema bump); env stamps `X-Forge-Run-ID/-Root-Run-ID`
+  only for a headless child hitting a **proven** Forge proxy; read-time suppression is **per-run-subtree** (whole-root
+  was a silent undercount -- regression guard). No-dollars route renders **unavailable**, never `$0`. Live 4g.0 canary
+  passed (6 cases, Claude Code 2.1.168).
 
 ## 2026-06-07 (compacted)
 

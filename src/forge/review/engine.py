@@ -128,6 +128,7 @@ def run_multi_review(
     cwd: str | None = None,
     resume_id: str | None = None,
     attribution: Attribution | None = None,
+    reasoning_effort: str | None = None,
 ) -> MultiReviewOutput:
     """Fan out a review prompt to multiple models in parallel.
 
@@ -147,6 +148,8 @@ def run_multi_review(
         resume_id: If set, adds ``--resume <id>`` to each subprocess.
         attribution: Verb context (command/workflow/session) for per-worker usage
             events. None (default) skips per-worker emission.
+        reasoning_effort: ``claude --effort`` level applied to every worker's
+            ``claude -p`` argv. None (default) omits the flag (tier default).
 
     Returns:
         MultiReviewOutput with per-model results in input order.
@@ -194,6 +197,7 @@ def run_multi_review(
             resume_id=resume_id,
             timeout_seconds=timeout_seconds,
             attribution=attribution,
+            reasoning_effort=reasoning_effort,
         )
         for idx, spec in enumerate(specs)
     ]
@@ -225,6 +229,7 @@ def _prepare_worker(
     resume_id: str | None,
     timeout_seconds: int,
     attribution: Attribution | None,
+    reasoning_effort: str | None = None,
 ) -> ReviewResult | HeadlessRequest:
     """Shape one worker into a HeadlessRequest, or a failed ReviewResult.
 
@@ -283,6 +288,8 @@ def _prepare_worker(
     model_flag = resolve_model_flag(route)
     if model_flag:
         cmd.extend(["--model", model_flag])
+    if reasoning_effort:
+        cmd.extend(["--effort", reasoning_effort])
 
     return HeadlessRequest(
         argv=cmd,

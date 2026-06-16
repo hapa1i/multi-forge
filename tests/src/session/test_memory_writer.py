@@ -1679,3 +1679,60 @@ class TestDedupeSpecs:
         a = resolve_doc_spec(DesignatedDoc(path="docs/a.md", strategy="generic"), None)
         b = resolve_doc_spec(DesignatedDoc(path="docs/b.md", strategy="generic"), None)
         assert len(_dedupe_specs([a, b])) == 2
+
+
+# ---------------------------------------------------------------------------
+# Per-caller reasoning effort
+# ---------------------------------------------------------------------------
+
+
+class TestMemoryWriterEffort:
+    """config.effort is forwarded to run_claude_session as reasoning_effort."""
+
+    @pytest.fixture
+    def workspace(self, tmp_path: Path) -> Path:
+        """Workspace with a real git repo, transcript, and a designated doc."""
+        import subprocess as sp
+
+        sp.run(["git", "init", str(tmp_path)], capture_output=True, check=True)
+        sp.run(
+            ["git", "config", "user.email", "test@test.com"],
+            capture_output=True,
+            check=True,
+            cwd=str(tmp_path),
+        )
+        sp.run(
+            ["git", "config", "user.name", "Test"],
+            capture_output=True,
+            check=True,
+            cwd=str(tmp_path),
+        )
+        transcript_rel = ".forge/artifacts/test/transcripts/uuid-123.jsonl"
+        entries = [_make_newer_entry(f"req-{i}", "user") for i in range(10)] + [
+            _make_newer_entry(f"req-{i}", "assistant") for i in range(10)
+        ]
+        _write_transcript(tmp_path / transcript_rel, entries)
+        (tmp_path / "docs").mkdir(parents=True, exist_ok=True)
+        (tmp_path / "docs" / "state.md").write_text("# State\n")
+        return tmp_path
+
+    def test_effort_forwarded_to_run_claude_session(self, workspace: Path) -> None:
+        """A config built with effort='high' passes reasoning_effort='high'."""
+        config = MemoryWriterConfig(enabled=True, min_turns=1, effort="high")
+        with (
+            patch("forge.session.memory_writer.is_claude_available", return_value=True),
+            patch("forge.session.memory_writer.run_claude_session") as mock_run,
+        ):
+            mock_run.return_value = SessionResult(stdout="", stderr="", returncode=0)
+            result = run_memory_writer(
+                session_name="test",
+                forge_root=workspace,
+                transcript_snapshot_rel=".forge/artifacts/test/transcripts/uuid-123.jsonl",
+                config=config,
+                designated_docs=[DesignatedDoc(path="docs/state.md", strategy="project-state")],
+            )
+
+        assert result is True
+        mock_run.assert_called_once()
+        _, kwargs = mock_run.call_args
+        assert kwargs["reasoning_effort"] == "high"

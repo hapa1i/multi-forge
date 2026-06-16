@@ -208,7 +208,10 @@ async def _capture_openrouter_request(monkeypatch, *, inject_flag: bool, forge_s
     monkeypatch.setattr(server, "log_request_beautifully", lambda *a, **k: None)
     monkeypatch.setattr(server, "log_tool_event", lambda *a, **k: None)
 
-    resp = await server.create_message(_openrouter_request_data(), _ForgeRequest("req_test", forge_session))
+    # _ForgeRequest is a minimal Starlette-Request double exposing only .state/.headers (what
+    # create_message reads); mypy checks this helper's body because it has a typed signature.
+    raw_request = _ForgeRequest("req_test", forge_session)
+    resp = await server.create_message(_openrouter_request_data(), raw_request)  # type: ignore[arg-type]
     assert resp.status_code == 200
     return captured["openai_request"]
 

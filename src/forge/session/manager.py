@@ -1355,12 +1355,17 @@ class SessionManager:
             memory_flag=memory_flag,
         )
 
-        # Opt-in native-relocate (worktree/--into only) overrides the transfer default;
-        # everything else keeps the auto-decision (same-dir native, cross-CWD transfer).
+        # Opt-in native-relocate (worktree/--into only) overrides the transfer default. Cross-CWD
+        # forks default to transfer; same-directory forks default to native UNLESS the caller asks
+        # for transfer (resume_mode == "transfer", auto-switched or explicit), which opts them into
+        # a same-directory transfer fork. Recording the baseline here keeps derivation correct even
+        # if the CLI's best-effort _persist_fork_transfer_derivation refinement later fails.
         if resume_mode == "native-relocate" and (create_worktree or is_into):
             fork_resume_mode = "native-relocate"
+        elif create_worktree or is_into or resume_mode == "transfer":
+            fork_resume_mode = "transfer"
         else:
-            fork_resume_mode = "transfer" if (create_worktree or is_into) else "native"
+            fork_resume_mode = "native"
         # For transfer-mode forks the per-child file is created lazily at launch
         # (see _generate_parent_transfer_context). We pre-record the reference
         # here so GC knows the fork's child file belongs to this session, even

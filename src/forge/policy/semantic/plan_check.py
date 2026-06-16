@@ -12,13 +12,17 @@ import logging
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from forge.core.llm.detection import ProviderType, detect_provider
 from forge.core.reactive.structured_output import extract_json_from_response
 from forge.core.reactive.throttle import ThrottleCache, compute_cache_key
 from forge.policy.deterministic.base import StatefulDeterministicPolicy
-from forge.policy.semantic.supervisor import load_plan_override, plan_fingerprint
+from forge.policy.semantic.supervisor import (
+    load_plan_override,
+    normalize_checker_provider_arg,
+    plan_fingerprint,
+)
 from forge.policy.types import ActionContext, PolicyDecision, Violation
 from forge.session.models import SupervisorConfig
 
@@ -145,10 +149,14 @@ def parse_plan_check_verdict(response: str) -> PlanCheckVerdict | None:
 
 
 def _normalize_checker_provider(provider: str | None) -> ProviderType | None:
-    """Normalize user-facing provider strings to core.llm provider names."""
-    if provider is None:
+    """Normalize user-facing provider strings to core.llm provider names.
+
+    Shares the dash->underscore transform with the launch/policy write path
+    (``normalize_checker_provider_arg``); adds membership validation here.
+    """
+    normalized = normalize_checker_provider_arg(provider)
+    if normalized is None:
         return None
-    normalized = provider.replace("-", "_")
     if normalized not in DEFAULT_PLAN_CHECK_MODELS_BY_PROVIDER:
         raise ValueError(
             f"Unsupported checker provider {provider!r}; expected one of "
@@ -358,6 +366,7 @@ def run_plan_check(
     plan_text: str,
     provider: ProviderType | None = None,
     budget_tokens: int = DEFAULT_PLAN_CHECK_BUDGET_TOKENS,
+    reasoning_effort: str | None = None,
 ) -> PlanCheckVerdict | None:
     """One cheap ``core.llm`` call: is this action clearly aligned with the plan?
 
@@ -368,7 +377,14 @@ def run_plan_check(
     Must NOT be called from inside an event loop (SyncAdapter constraint).
     """
     try:
-        from forge.core.llm import Message, SyncAdapter, get_client
+        from forge.core.llm import (
+            Message,
+            ModelHyperparameters,
+            SyncAdapter,
+            get_client,
+        )
+        from forge.core.llm.clients.base import merge_hyperparams
+        from forge.core.llm.types import ReasoningEffort
         from forge.core.usage import (
             emit_direct_llm_usage,
             mint_request_id,
@@ -393,7 +409,15 @@ def run_plan_check(
         # Same exact-cost join as the tagger: forward an X-Request-ID only when the
         # client provably targets a Forge proxy (a dangling ref is worse than none).
         request_id = mint_request_id() if target_is_forge_proxy(_client_base_url(model, provider)) else None
-        hp = with_forge_request_id(None, request_id) if request_id else None
+        # Layer reasoning effort onto the request-id wrapper without clobbering either
+        # (disjoint fields; exclude_unset merge). None when nothing to send, preserving
+        # the prior "no hyperparams" behavior.
+        rid_hp = with_forge_request_id(None, request_id) if request_id else None
+        # reasoning_effort is validated upstream (CLI Choice + SupervisorConfig.__post_init__).
+        effort_hp = (
+            ModelHyperparameters(reasoning_effort=cast(ReasoningEffort, reasoning_effort)) if reasoning_effort else None
+        )
+        hp = merge_hyperparams(effort_hp, rid_hp) if (effort_hp or rid_hp) else None
 
         start = time.monotonic()
         response = adapter.complete([Message(role="user", content=prompt)], hyperparams=hp)
@@ -507,6 +531,7 @@ class PlanCheckPolicy(StatefulDeterministicPolicy):
             cache_key
             + f"|checker:{route.provider or 'auto'}:{route.model}"
             + f"|budget:{budget_tokens}"
+            + f"|effort:{config.checker_effort or 'default'}"
             + "|target:"
             + ";".join(_target_metadata(context))
         )
@@ -524,6 +549,7 @@ class PlanCheckPolicy(StatefulDeterministicPolicy):
             provider=route.provider,
             plan_text=plan_text,
             budget_tokens=budget_tokens,
+            reasoning_effort=config.checker_effort,
         )
 
         if verdict is None:

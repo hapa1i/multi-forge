@@ -492,6 +492,7 @@ def run_supervisor_check(
             resume_id=resolved.resume_id,
             fork_session=config.fork_session,
             model=model,
+            reasoning_effort=config.supervisor_effort,
             base_url=base_url,
             direct=config.direct,
             timeout_seconds=config.timeout_seconds,
@@ -544,6 +545,41 @@ def invoke_supervisor(
 
 
 # --- Setup-time helpers (used by CLI, direct commands, and --supervise flags) ---
+
+# Tier-1 checker provider choices in CLI (dash) form. Single source so fork/start/policy
+# all build identical click.Choice options; Click stays out of this semantic module.
+CHECKER_PROVIDER_CHOICES = ("openrouter", "litellm-local", "litellm-remote")
+
+
+def normalize_checker_provider_arg(provider: str | None) -> str | None:
+    """Normalize a CLI checker-provider value (dash form) to stored underscore form."""
+    return provider.replace("-", "_") if provider else None
+
+
+def validate_checker_model(checker_model: str | None) -> None:
+    """Raise ValueError if a checker model id is set but not provider-prefixed."""
+    if checker_model and "/" not in checker_model:
+        raise ValueError(f"--checker-model must be a prefixed model id (got '{checker_model}')")
+
+
+def apply_checker_options(
+    sup: SupervisorConfig,
+    *,
+    checker_model: str | None,
+    checker_provider: str | None,
+    checker_effort: str | None = None,
+) -> None:
+    """Apply tier-1 checker options onto a SupervisorConfig (in place).
+
+    Shared by ``forge policy supervise`` and the launch-time fork/start paths so
+    checker validation and field mutation never drift across surfaces.
+    """
+    if checker_model:
+        sup.checker_model = checker_model
+    if checker_provider:
+        sup.checker_provider = normalize_checker_provider_arg(checker_provider)
+    if checker_effort:
+        sup.checker_effort = checker_effort
 
 
 def validate_supervisor_target(target: str, forge_root: str | None = None) -> SessionState:

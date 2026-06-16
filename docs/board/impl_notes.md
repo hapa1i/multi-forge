@@ -203,6 +203,84 @@ frontier would have blocked); shadow sampling replays the frontier on a sampled 
   enqueue (the Stop hook runs in the session env) and re-root via `_memory_writer_env` at drain; otherwise spend
   attributes to whoever drained the queue. Scrub `FORGE_SESSION` (don't re-inject) to avoid a self-spawning hook loop.
 
+### Same-directory transfer forks: decouple transfer mode from worktree isolation (shipped 2026-06-15)
+
+Durable invariants for `forge session fork` after `same_dir_transfer_forks` (#28). A same-dir fork is native by default;
+an explicit `--resume-mode transfer` (or explicit `--strategy`/`--inline-plan` that auto-switch it) routes the existing
+worktree-transfer machinery into the same checkout. Sources: `src/forge/cli/session_fork.py`,
+`src/forge/cli/session_lifecycle.py`, `src/forge/session/manager.py`. Invariants adversarially verified against the
+shipped code before promotion.
+
+- **Fork derivation is written twice — baseline + best-effort refinement, not a clobber.** `manager.fork_session`
+  pre-records a baseline `Derivation` (`resume_mode` + `context_file` set, `strategy=None`); the CLI
+  `_persist_fork_transfer_derivation` then refines it per-field (a `SessionStore.update` `_mutate`), overriding
+  `resume_mode`/`context_file` and being the ONLY writer of a real `strategy` for a fork. That CLI step is gated to
+  transfer forks (`elif uses_fresh_transfer`) and best-effort (try/except swallows failures), so a refinement failure
+  degrades to the correct `strategy=None` baseline instead of losing transfer intent — which is exactly why the manager
+  pre-records at all. Scope caveat: "only writer of `strategy`" is fork-specific; `resume_session` records `strategy` on
+  its own non-fork resume/transfer path.
+- **`_get_deferred_same_dir_fork_resume_id` must stay `derivation.resume_mode`-aware, or it re-natives deferred transfer
+  forks.** Fork creation never pre-seeds `claude_session_id` (launch-owned), so a `--no-launch` same-dir transfer fork
+  has no UUID to short-circuit on. The resolver returns `None` when `confirmed.derivation.resume_mode == "transfer"`;
+  without that guard it falls through to `return parent.confirmed.claude_session_id` and relaunches the child as
+  `--resume --fork-session` of the parent, silently discarding the recorded transfer. Correctness depends on
+  `resume_mode` being persisted at fork-creation (the manager baseline). For a same-dir fork the value is only ever
+  `native` or `transfer` — `native-relocate` requires a worktree and is filtered earlier.
+- **fork and resume `--resume-mode` are different value sets — do not conflate.** fork's `--resume-mode` is a
+  `click.Choice(["transfer", "native-relocate"])`; resume's is NOT a Choice — it is `default=None` plus a
+  `_validate_resume_mode` callback accepting `{"native", "transfer"}`. Both default to `None`; resume's `None` resolves
+  to `transfer` behaviorally. `native-relocate` is fork/worktree-only; `native` is resume-only.
+- **Auto-switch is one pre-fork assignment, not scattered special-casing.** Explicit `--strategy`/`--inline-plan` on a
+  same-dir fork is detected via `ParameterSource.COMMANDLINE` (never truthiness — so the `structured` default never
+  trips it) and resolves `resume_mode = "transfer"` exactly once, gated on `not is_cross_dir and resume_mode is None`
+  (so an explicit `--resume-mode native-relocate` never auto-switches). Because it is set before `manager.fork_session`,
+  every downstream site (the `--strategy full` budget gate, the manager call, the `same_dir_transfer` launch flag, the
+  no-launch resume tip) keys uniformly on `resume_mode == "transfer"`. When extending this path, branch on
+  `resume_mode == "transfer"`, never on re-reading the flags.
+
+### Supervisor launch controls + per-caller reasoning effort (shipped 2026-06-15)
+
+Durable invariants for `supervisor_launch_controls` (#29): launch-time cascade parity for
+`forge session fork/start --supervise`, plus a per-caller `--effort` lever on every Forge `claude -p` subprocess.
+Sources: `src/forge/core/effort.py`, `core/llm/types.py`, `core/reactive/session_runner.py`,
+`policy/semantic/supervisor.py`, `policy/semantic/plan_check.py`, `session/models.py`,
+`cli/{session_fork,session_lifecycle,policy,memory}.py`. Each invariant was adversarially verified against the shipped
+code (file:line) before promotion.
+
+- **Two effort vocabularies, two validator homes — do not merge them.** Claude `--effort` =
+  `{low,medium,high,xhigh,max}` (`validate_claude_effort`, `core/effort.py`); core.llm `ReasoningEffort` =
+  `{none,low,medium,high,xhigh}` (`validate_reasoning_effort`, `core/llm/types.py`). `max` is Claude-only; `none` is
+  checker-only; a drift-guard test asserts they stay unequal. The Claude validator lives in the dependency-light leaf
+  `core/effort.py`, **not** `core/reactive/effort.py`, because `core/reactive/__init__.py` eagerly imports the heavy
+  session runner — importing it from the foundational `session/models.py` would re-create an import cycle. So
+  `session/models.py` keeps an inline `_CHECKER_EFFORT_LEVELS` mirror (drift-guarded by `test_effort.py`) instead of
+  importing the core.llm vocab.
+- **`run_claude_session` `--effort` is fail-loud, NOT retry-latch.** It appends `--effort` after `--model`; if an older
+  `claude` rejects the flag (`_is_effort_flag_rejection`) the run fails loud with `call_count == 1` — no silent
+  rerun-at-default. This is deliberately the opposite of the `--output-format json` telemetry path, which
+  retries-once-and-latches (`headless_json.mark_json_output_unsupported`). Rationale: effort changes model behavior, so
+  a silent default-rerun would misreport what actually ran.
+- **Cascade-at-launch is flag-only — the asymmetry with `policy supervise --cascade` is intentional.**
+  `fork`/`start --supervise --cascade` set `cascade=True` only; the runtime hook escalates to the frontier when no
+  approved plan exists yet. `forge policy supervise --cascade` instead resolves the approved-plan snapshot eagerly (via
+  the `--reload` machinery) and exits 1 if none resolves. Do not "fix" the divergence: launch time legitimately has no
+  plan snapshot yet.
+- **One Click-free checker-helper source prevents launch/policy drift.** `CHECKER_PROVIDER_CHOICES`,
+  `normalize_checker_provider_arg`, `validate_checker_model` (raises `ValueError` containing "prefixed model id"), and
+  `apply_checker_options` live in `policy/semantic/supervisor.py` (no Click). `cli/policy.py` and `plan_check.py` import
+  them, so launch commands, persistent `policy supervise`, and the tier-1 checker share one validation/normalization
+  source. Add new checker controls there, not at each CLI surface.
+- **Effort is per-caller by design — no global knob.** Wired per consumer: `SupervisorConfig.supervisor_effort` /
+  `.checker_effort`, `MemoryWriterConfig.effort`, `TeamSupervisorConfig.effort`, `run_multi_review(reasoning_effort=)`.
+  `checker_effort` feeds `ModelHyperparameters` via `merge_hyperparams` **and** is part of the plan-check throttle cache
+  key (a different effort must not reuse a cached verdict). All additive optional `str | None` fields — no
+  `SCHEMA_VERSION` bump.
+- **Memory-enable early-return must compare effort too (recurring silent-drop shape).** `_set_memory_activation`
+  short-circuits only when enabled AND mode AND effort are all unchanged. The bug was short-circuiting on enabled+mode
+  alone, silently dropping `forge memory enable --effort high` on an already-enabled, same-mode session. Regression in
+  `test_memory.py`. When adding a new persisted activation field, add it to the no-op comparison or it joins this class
+  of silent drop.
+
 ### Proposed Promotions From Metric Evidence (awaiting human review, 2026-06-06)
 
 Drafted by the `metric_evidence_simplification` Phase 6 closeout. **Not yet promoted** — a human should review and move

@@ -914,6 +914,29 @@ class TestSuperviseCascade:
         assert "Checker model: google/gemini-3.5-flash" in result.output
         assert "Checker budget: 32000 tokens" in result.output
 
+    def test_show_displays_effort_fields(self, runner: CliRunner, temp_guard_env: Path, monkeypatch) -> None:
+        store = _make_supervised_project(temp_guard_env, monkeypatch)
+        _set_supervisor_fields(store, cascade=True, supervisor_effort="high", checker_effort="low")
+
+        result = runner.invoke(main, ["policy", "supervise"])
+
+        assert result.exit_code == 0, result.output
+        assert "Supervisor effort: high" in result.output
+        assert "Checker effort: low" in result.output
+
+    def test_show_hides_checker_effort_when_cascade_off(
+        self, runner: CliRunner, temp_guard_env: Path, monkeypatch
+    ) -> None:
+        store = _make_supervised_project(temp_guard_env, monkeypatch)
+        _set_supervisor_fields(store, cascade=False, supervisor_effort="high", checker_effort="low")
+
+        result = runner.invoke(main, ["policy", "supervise"])
+
+        assert result.exit_code == 0, result.output
+        # supervisor_effort governs the always-on frontier; checker_effort is cascade-only.
+        assert "Supervisor effort: high" in result.output
+        assert "Checker effort" not in result.output
+
     def test_show_displays_unsupported_checker_provider(
         self, runner: CliRunner, temp_guard_env: Path, monkeypatch
     ) -> None:
@@ -932,3 +955,33 @@ class TestSuperviseCascade:
         assert result.exit_code == 0
         assert "Cascade: off" in result.output
         assert "Checker model" not in result.output
+
+
+class TestSupervisorOneShotEffort:
+    """Effort controls for the one-shot `forge policy supervisor` command."""
+
+    @patch("forge.policy.semantic.supervisor.invoke_supervisor")
+    def test_supervisor_effort_passed_to_config(self, mock_invoke, tmp_path):
+        """--supervisor-effort lands on the ephemeral SupervisorConfig given to the invoker."""
+        f = tmp_path / "src.py"
+        f.write_text("x = 1")
+        mock_invoke.return_value = _allow_decision()
+
+        runner = CliRunner()
+        result = runner.invoke(
+            main,
+            ["policy", "supervisor", "-f", str(f), "-r", "abc-123", "--supervisor-effort", "high"],
+        )
+        assert result.exit_code == 0, result.output
+        config = mock_invoke.call_args[0][0]
+        assert config.supervisor_effort == "high"
+
+    def test_checker_effort_is_not_a_supervisor_option(self):
+        """The one-shot command intentionally has no --checker-effort; Click rejects it."""
+        runner = CliRunner()
+        result = runner.invoke(
+            main,
+            ["policy", "supervisor", "-f", "ignored.py", "-r", "abc-123", "--checker-effort", "low"],
+        )
+        assert result.exit_code == 2
+        assert "no such option" in result.output.lower()

@@ -48,6 +48,7 @@ def run_adversarial(
     via: str | None = None,
     routing_plan: WorkerRoutingPlan | None = None,
     attribution: Attribution | None = None,
+    reasoning_effort: str | None = None,
 ) -> AdversarialOutput:
     """Run adversarial evaluation with stance-injected workers.
 
@@ -103,6 +104,7 @@ def run_adversarial(
         cwd=cwd,
         resume_id=None,
         attribution=attribution,
+        reasoning_effort=reasoning_effort,
     )
 
     stance_map = {spec.effective_worker_id: s.effective_label for spec, s in zip(specs, stances)}

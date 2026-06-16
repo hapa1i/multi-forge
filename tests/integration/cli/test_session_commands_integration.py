@@ -567,6 +567,57 @@ class TestSessionResumeScenarios:
         assert manifest.returncode == 0
         assert '"is_fork": true' in manifest.stdout
 
+    def test_fork_same_directory_transfer_uses_fresh_session(self, mock_claude_workspace: ContainerLike) -> None:
+        """A same-directory --resume-mode transfer fork launches a FRESH child session with assembled
+        parent context (--session-id + --append-system-prompt-file), not a native --resume --fork-session."""
+        mock_claude_workspace.exec("cd /workspace && forge session start sd-transfer-parent --no-launch")
+        # Seed a parent UUID + transcript so the transfer context has content to assemble.
+        _run_container_python(
+            mock_claude_workspace,
+            """
+            import json
+            from pathlib import Path
+
+            from forge.session.claude.paths import get_transcript_path
+
+            parent_path = Path("/workspace/.forge/sessions/sd-transfer-parent/forge.session.json")
+            parent = json.loads(parent_path.read_text())
+            parent["confirmed"]["claude_session_id"] = "sd-parent-uuid"
+            transcript = get_transcript_path("/workspace", "sd-parent-uuid")
+            transcript.parent.mkdir(parents=True, exist_ok=True)
+            transcript.write_text(
+                '{"requestId":"r1","timestamp":"2025-01-15T10:00:00Z","message":{"role":"user","content":[{"type":"text","text":"hello from sd parent"}]}}\\n',
+                encoding="utf-8",
+            )
+            parent["confirmed"]["transcript_path"] = str(transcript)
+            parent_path.write_text(json.dumps(parent))
+            """,
+        )
+        mock_claude_workspace.exec("> /tmp/claude_invocations.log")
+
+        result = mock_claude_workspace.exec(
+            "cd /workspace && forge session fork sd-transfer-parent --name sd-transfer-child --resume-mode transfer"
+        )
+
+        assert result.returncode == 0, result.stdout
+        assert "Worktree:" not in result.stdout  # same directory, no worktree created
+
+        invocations = mock_claude_workspace.exec("cat /tmp/claude_invocations.log")
+        assert "--session-id" in invocations.stdout
+        assert "--append-system-prompt-file" in invocations.stdout
+        assert "--resume" not in invocations.stdout
+        assert "--fork-session" not in invocations.stdout
+
+        # Manifest records transfer derivation; context file lives under the shared /workspace forge root.
+        manifest = mock_claude_workspace.exec("cat /workspace/.forge/sessions/sd-transfer-child/forge.session.json")
+        assert manifest.returncode == 0
+        assert '"resume_mode": "transfer"' in manifest.stdout
+
+        context_file = mock_claude_workspace.exec(
+            "cat /workspace/.forge/prev_sessions/sd-transfer-parent/children/sd-transfer-child.md"
+        )
+        assert "hello from sd parent" in context_file.stdout
+
     def test_resume_deferred_same_dir_fork_uses_fork_session(self, mock_claude_workspace: ContainerLike) -> None:
         """Resuming a deferred same-dir fork should still use --resume --fork-session."""
         mock_claude_workspace.exec("cd /workspace && forge session start fork-parent-later --no-launch")
@@ -786,3 +837,42 @@ class TestActivityCommand:
         supervisor = next(c for c in data["commands"] if c["command"] == "supervisor")
         assert supervisor["calls"] == 3
         assert supervisor["errors"] == 1
+
+
+class TestSupervisedLaunchControls:
+    """Launch-time cascade + effort persist onto the child manifest (no plan resolution)."""
+
+    def _confirm_parent(self, workspace: ContainerLike, name: str, uuid: str) -> None:
+        """Mark a started parent as hook-confirmed so --supervise validation passes."""
+        _run_container_python(
+            workspace,
+            f"""
+            import json
+            from pathlib import Path
+
+            path = Path("/workspace/.forge/sessions/{name}/forge.session.json")
+            data = json.loads(path.read_text())
+            data["confirmed"]["claude_session_id"] = "{uuid}"
+            data["confirmed"]["confirmed_by"] = "hook:SessionStart:startup"
+            data["confirmed"]["transcript_path"] = "/tmp/{name}-transcript.jsonl"
+            path.write_text(json.dumps(data))
+            Path("/tmp/{name}-transcript.jsonl").write_text("{{}}")
+            """,
+        )
+
+    def test_fork_supervise_cascade_effort_persists(self, mock_claude_workspace: ContainerLike) -> None:
+        mock_claude_workspace.exec("cd /workspace && forge session start launch-sup-parent --no-launch")
+        self._confirm_parent(mock_claude_workspace, "launch-sup-parent", "launch-sup-uuid")
+
+        result = mock_claude_workspace.exec(
+            "cd /workspace && forge session fork launch-sup-parent --name launch-sup-child "
+            "--supervise --cascade --supervisor-effort medium --no-launch"
+        )
+        assert result.returncode == 0, result.stderr
+
+        child = mock_claude_workspace.read_json("/workspace/.forge/sessions/launch-sup-child/forge.session.json")
+        supervisor = child["intent"]["policy"]["supervisor"]
+        assert supervisor["cascade"] is True
+        assert supervisor["supervisor_effort"] == "medium"
+        # Launch-time --cascade sets the flag only; no plan is resolved eagerly.
+        assert supervisor.get("plan_override_path") is None

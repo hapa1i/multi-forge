@@ -495,3 +495,38 @@ class TestImportLayering:
         cli_modules_after = {k for k in sys.modules if k.startswith("forge.cli")}
         new_cli_imports = cli_modules_after - cli_modules_before
         assert not new_cli_imports, f"shadow_curation imported CLI modules: {new_cli_imports}"
+
+
+# ---------------------------------------------------------------------------
+# run_shadow_curation reasoning effort
+# ---------------------------------------------------------------------------
+
+
+class TestRunShadowCurationEffort:
+    def _mock_result(self) -> MagicMock:
+        result = MagicMock()
+        result.success = True
+        result.returncode = 0
+        result.timed_out = False
+        result.error = None
+        result.stdout = "## Promote\n- Item"
+        result.stderr = ""
+        return result
+
+    @patch("forge.core.reactive.session_runner.run_claude_session")
+    @patch("forge.core.reactive.cost_tracking.track_verb_cost")
+    def test_reasoning_effort_forwarded(self, mock_cost: MagicMock, mock_run: MagicMock, tmp_path: Path) -> None:
+        """reasoning_effort='medium' is forwarded to run_claude_session."""
+        mock_run.return_value = self._mock_result()
+
+        run_shadow_curation(
+            session_name="s1",
+            forge_root=tmp_path,
+            official_path="docs/n.md",
+            official_content="# Notes",
+            shadow_entries=[],
+            reasoning_effort="medium",
+        )
+
+        call_kwargs = mock_run.call_args
+        assert call_kwargs.kwargs.get("reasoning_effort") == "medium"

@@ -4,7 +4,7 @@ These types provide a provider-agnostic interface for LLM interactions.
 All client implementations convert to/from these canonical types.
 """
 
-from typing import Any, Literal, Self
+from typing import Any, Literal, Self, get_args
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -15,6 +15,19 @@ StreamEventType = Literal["text_delta", "tool_call_delta", "response_end", "usag
 # Client-side prompt caching policy (NOT provider mechanism)
 # Provider mechanisms (auto, explicit, context_cache_api) are in model_catalog.yaml
 PromptCachingPolicy = Literal["passthrough", "auto_inject"]
+
+REASONING_EFFORT_LEVELS: tuple[str, ...] = get_args(ReasoningEffort)
+
+
+def validate_reasoning_effort(value: str | None) -> None:
+    """Raise ValueError if ``value`` is not a valid core.llm ``ReasoningEffort``.
+
+    ``None`` is allowed (means "send no reasoning_effort; use the model default").
+    This is the tier-1 plan-checker vocabulary; the ``claude --effort`` CLI
+    vocabulary (which adds ``max``, drops ``none``) lives in ``forge.core.effort``.
+    """
+    if value is not None and value not in REASONING_EFFORT_LEVELS:
+        raise ValueError(f"reasoning_effort must be one of {', '.join(REASONING_EFFORT_LEVELS)}, got {value!r}")
 
 
 class ThinkingConfig(BaseModel):

@@ -18,7 +18,14 @@ from forge.cli.session_addendum import (
     resolve_addendum_content_for_proxy,
     write_managed_addendum,
 )
+from forge.core.effort import CLAUDE_EFFORT_LEVELS
+from forge.core.llm.types import REASONING_EFFORT_LEVELS
 from forge.core.paths import display_path
+from forge.policy.semantic.supervisor import (
+    CHECKER_PROVIDER_CHOICES,
+    apply_checker_options,
+    validate_checker_model,
+)
 from forge.session import (
     LAUNCH_MODE_HOST,
     LAUNCH_MODE_SIDECAR,
@@ -126,13 +133,15 @@ __all__ = ["fork"]
     "--strategy",
     type=click.Choice(["minimal", "structured", "full", "ai-curated"]),
     default="structured",
-    help="Context assembly strategy for worktree forks (default: structured)",
+    help="Context assembly strategy for transfer forks (worktree, --into, or same-directory transfer). "
+    "On a same-directory fork, setting it switches the fork to transfer mode. Default: structured",
 )
 @click.option(
     "--inline-plan",
     is_flag=True,
     default=False,
-    help="For worktree/--into forks, embed approved plan text in the transfer; default is a parent plan-path reference",
+    help="Embed approved plan text in the transfer (any transfer fork; switches a same-directory fork to "
+    "transfer mode); default is a parent plan-path reference",
 )
 @click.option(
     "--into",
@@ -146,8 +155,8 @@ __all__ = ["fork"]
     "resume_mode",
     type=click.Choice(["transfer", "native-relocate"]),
     default=None,
-    help="Cross-CWD (worktree/--into) resume: transfer (assembled context, default) or "
-    "native-relocate (byte-faithful Claude resume; relocates the parent JSONL).",
+    help="Resume mode: transfer (assembled context; legal for same-directory forks too) or "
+    "native-relocate (byte-faithful Claude resume; relocates the parent JSONL; worktree/--into only).",
 )
 @click.option(
     "--supervise",
@@ -168,6 +177,40 @@ __all__ = ["fork"]
     is_flag=True,
     default=False,
     help="Force supervisor to use direct Anthropic routing (requires --supervise)",
+)
+@click.option(
+    "--cascade",
+    "cascade_flag",
+    is_flag=True,
+    default=False,
+    help="Enable the tier-1 plan check before the frontier supervisor (requires --supervise)",
+)
+@click.option(
+    "--checker-model",
+    "checker_model",
+    default=None,
+    help="Tier-1 checker model (prefixed id; requires --supervise)",
+)
+@click.option(
+    "--checker-provider",
+    "checker_provider",
+    type=click.Choice(list(CHECKER_PROVIDER_CHOICES)),
+    default=None,
+    help="Tier-1 checker provider (requires --supervise)",
+)
+@click.option(
+    "--checker-effort",
+    "checker_effort",
+    type=click.Choice(list(REASONING_EFFORT_LEVELS)),
+    default=None,
+    help="Tier-1 checker reasoning effort (none/low/medium/high/xhigh; requires --supervise)",
+)
+@click.option(
+    "--supervisor-effort",
+    "supervisor_effort",
+    type=click.Choice(list(CLAUDE_EFFORT_LEVELS)),
+    default=None,
+    help="Frontier supervisor effort (claude --effort: low/medium/high/xhigh/max; requires --supervise)",
 )
 @click.option(
     "--force",
@@ -202,6 +245,11 @@ def fork(
     supervise_target: bool,
     supervisor_proxy: str | None,
     supervisor_direct: bool,
+    cascade_flag: bool,
+    checker_model: str | None,
+    checker_provider: str | None,
+    checker_effort: str | None,
+    supervisor_effort: str | None,
     force: bool,
     memory_flag: str | None,
 ) -> None:
@@ -235,6 +283,16 @@ def fork(
         sys.exit(1)
     if (supervisor_proxy or supervisor_direct) and not supervise_target:
         console.print("[red]Error:[/red] --supervisor-proxy/--no-supervisor-proxy require --supervise")
+        sys.exit(1)
+    if (
+        cascade_flag or checker_model or checker_provider or checker_effort or supervisor_effort
+    ) and not supervise_target:
+        console.print("[red]Error:[/red] --cascade/--checker-*/--supervisor-effort require --supervise")
+        sys.exit(1)
+    try:
+        validate_checker_model(checker_model)
+    except ValueError as e:
+        console.print(f"[red]Error:[/red] {e}")
         sys.exit(1)
 
     normalized_direct_model: str | None = None
@@ -393,6 +451,20 @@ def fork(
     # Use the child's effective routing: --no-proxy means no proxy, --proxy overrides parent
     is_cross_dir = worktree or into_resolved is not None
 
+    # Auto-switch a same-directory fork into transfer mode when the user explicitly set a
+    # transfer-only flag (--strategy/--inline-plan) without an explicit --resume-mode. Resolving
+    # resume_mode here keeps every downstream site (notice, budget gate, manager call, launch,
+    # derivation) keyed uniformly on "transfer". Gated on `resume_mode is None`, so an explicit
+    # --resume-mode native-relocate never auto-switches.
+    if not is_cross_dir and resume_mode is None and (_strategy_explicit or _inline_plan_explicit):
+        resume_mode = "transfer"
+        # Status notice (an action Forge took), not a recovery Tip -- per CLAUDE.md UX guidelines,
+        # informational output is an unprefixed dim line; 'Tip:' is reserved for recovery suggestions.
+        console.print(
+            "[dim]Same-directory fork switched to transfer mode "
+            "(--strategy/--inline-plan implies a transfer fork).[/dim]"
+        )
+
     # Native-relocate (opt-in) preflights -- reject before fork_session() to avoid orphaned state.
     if resume_mode == "native-relocate" and is_cross_dir:
         if no_launch:
@@ -455,9 +527,10 @@ def fork(
                 blank_before=False,
                 console=console,
             )
-    elif resume_mode is not None and not is_cross_dir:
+    elif resume_mode == "native-relocate" and not is_cross_dir:
         print_tip(
-            "--resume-mode only applies to --worktree/--into forks; same-directory forks already use native resume.",
+            "--resume-mode native-relocate only applies to --worktree/--into forks; "
+            "same-directory forks use native resume or --resume-mode transfer.",
             blank_before=False,
             console=console,
         )
@@ -498,7 +571,7 @@ def fork(
                 console.print(f"[red]Error:[/red] {error}")
                 sys.exit(1)
 
-    if is_cross_dir and strategy == "full" and not direct:
+    if (is_cross_dir or resume_mode == "transfer") and strategy == "full" and not direct:
         try:
             from forge.session.artifacts import resolve_artifact_path
 
@@ -639,6 +712,19 @@ def fork(
             current_template=_preflight_routing.template if _preflight_routing else None,
             current_direct=direct,
         )
+        # Cascade-at-launch sets the flag only; the runtime hook resolves the plan at
+        # eval time (a fresh child has no approved snapshot yet -- it safely escalates
+        # to the frontier supervisor until a plan is approved).
+        if cascade_flag:
+            sup_config.cascade = True
+        apply_checker_options(
+            sup_config,
+            checker_model=checker_model,
+            checker_provider=checker_provider,
+            checker_effort=checker_effort,
+        )
+        if supervisor_effort is not None:
+            sup_config.supervisor_effort = supervisor_effort
         fork_store = SessionStore(fork_forge_root, fork_manifest.name)
         fork_store.update(timeout_s=5.0, mutate=lambda m: apply_supervisor_to_intent(m, sup_config))
         fork_manifest = fork_store.read()
@@ -699,6 +785,11 @@ def fork(
     fork_name = fork_manifest.name  # Capture for cleanup
     is_worktree_fork = bool(fork_manifest.worktree and fork_manifest.worktree.is_worktree)
     native_relocate = is_worktree_fork and resume_mode == "native-relocate"
+    same_dir_transfer = not is_worktree_fork and resume_mode == "transfer"
+    # Forks that pre-seed a fresh child UUID and carry a generated transfer doc: worktree transfer
+    # OR same-directory transfer. native-relocate is a byte-faithful native resume (not a fresh
+    # transfer), so it is excluded even though is_worktree_fork is True for it.
+    uses_fresh_transfer = (is_worktree_fork and not native_relocate) or same_dir_transfer
     if effective_url is None:
         from forge.runtime_config import get_default_direct_model
 
@@ -716,16 +807,9 @@ def fork(
             console.print(f"[red]Error:[/red] {error}")
             sys.exit(1)
 
-    # Warn about --strategy/--inline-plan on same-directory forks (only if user explicitly set them)
-    if not is_worktree_fork and (_strategy_explicit or _inline_plan_explicit):
-        print_tip(
-            "--strategy/--inline-plan only apply to worktree forks (ignored for same-directory forks).",
-            blank_before=False,
-            console=console,
-        )
-
-    # Assigned only in the worktree-fork branch; pre-declared so the same-directory
-    # path leaves them bound (consumed under `if is_worktree_fork` guards below).
+    # Assigned only in the fresh-transfer branch (worktree transfer or same-dir transfer);
+    # pre-declared so the same-directory native path leaves them bound (consumed under
+    # `uses_fresh_transfer` guards below).
     _fork_uuid: str | None = None
     prompt_file: str | None = None
 
@@ -829,9 +913,16 @@ def fork(
                 cwd=_fork_cwd,
             )
 
-    elif is_worktree_fork:
-        worktree_path = Path(fork_manifest.worktree.path)  # type: ignore[union-attr]
-        if resume_mode is None:
+    elif uses_fresh_transfer:
+        # Shared transfer-launch path: worktree transfer AND same-directory transfer. The only
+        # difference is the base dir for the combined prompt -- a worktree fork writes under its
+        # checkout; a same-directory fork writes under forge_root (same CWD as the parent). Gate on
+        # is_worktree (a same-dir fork carries a non-None Worktree with is_worktree=False).
+        if is_worktree_fork:
+            worktree_path = Path(fork_manifest.worktree.path)  # type: ignore[union-attr]
+        else:
+            worktree_path = Path(fork_manifest.forge_root) if fork_manifest.forge_root else Path.cwd()
+        if is_worktree_fork and resume_mode is None:
             print_tip(
                 "Worktree fork uses transfer context by default.",
                 "Use --resume-mode native-relocate for byte-faithful Claude resume.",
@@ -985,7 +1076,7 @@ def fork(
 
     if no_launch:
         console.print("[dim]Fork created (--no-launch: Claude not started)[/dim]")
-        if is_worktree_fork:
+        if is_worktree_fork or same_dir_transfer:
             print_tip("Resume this fork with:", commands=[_resume_tip_command(fork_manifest)], console=console)
         sys.exit(0)
 
@@ -996,17 +1087,17 @@ def fork(
         try:
             exit_code = _launch_claude_for_session(
                 manifest=fork_manifest,
-                session_id=_fork_uuid if is_worktree_fork else None,
-                resume_id=None if is_worktree_fork else parent_session_id,
+                session_id=_fork_uuid if uses_fresh_transfer else None,
+                resume_id=None if uses_fresh_transfer else parent_session_id,
                 effective_template=effective_template,
                 runtime_base_url=runtime_base_url,
                 context_limit=context_limit,
                 use_sidecar=True,
                 mounts=mounts,
                 image=image,
-                fork_session=not is_worktree_fork,
-                register_fork=is_worktree_fork,
-                system_prompt_file=prompt_file if is_worktree_fork else None,
+                fork_session=not uses_fresh_transfer,
+                register_fork=uses_fresh_transfer,
+                system_prompt_file=prompt_file if uses_fresh_transfer else None,
                 name=fork_manifest.name,
                 proxy_id=effective_proxy_id,
             )
@@ -1043,7 +1134,7 @@ def fork(
         decision=compute_interactive_api_key_decision(interactive=True),
     )
 
-    active_claude_session_id = _fork_uuid if is_worktree_fork else None
+    active_claude_session_id = _fork_uuid if uses_fresh_transfer else None
 
     # Scope the post-exit summary to this run (hooks write during the session).
     launch_started_at = datetime.now(timezone.utc)

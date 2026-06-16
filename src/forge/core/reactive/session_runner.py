@@ -72,12 +72,28 @@ class SessionResult:
         return self.returncode == 0 and not self.timed_out and self.error is None
 
 
+def _is_effort_flag_rejection(returncode: int, stderr: str) -> bool:
+    """True when ``claude`` rejected ``--effort`` (e.g. an older CLI without the flag).
+
+    Unlike ``--output-format`` (telemetry, safe to retry-without), effort changes
+    behavior, so callers surface an actionable error instead of rerunning.
+    """
+    if returncode == 0 or not stderr:
+        return False
+    low = stderr.lower()
+    return "--effort" in low and any(
+        s in low
+        for s in ("unknown option", "unknown argument", "no such option", "unexpected argument", "invalid option")
+    )
+
+
 def run_claude_session(
     prompt: str,
     *,
     resume_id: str | None = None,
     fork_session: bool = False,
     model: str | None = None,
+    reasoning_effort: str | None = None,
     bare: bool | None = None,
     base_url: str | None = None,
     direct: bool = False,
@@ -100,6 +116,10 @@ def run_claude_session(
             to create an ephemeral fork instead of appending to the
             original conversation.
         model: Optional Claude model/tier passed via ``--model``.
+        reasoning_effort: Optional ``claude --effort`` level (low/medium/high/xhigh/max).
+            Unlike ``--output-format`` (telemetry, retried-without on rejection), effort
+            changes behavior: if the installed ``claude`` rejects ``--effort`` the run
+            fails loud with an actionable error rather than rerunning at the default.
         bare: If True, adds ``--bare`` to skip hooks/LSP/plugins.
             None (default) auto-detects: uses ``--bare`` only when
             ANTHROPIC_API_KEY is present (``--bare`` disables OAuth).
@@ -170,6 +190,9 @@ def run_claude_session(
             cmd.append("--fork-session")
     if model:
         cmd.extend(["--model", model])
+    # In `cmd` (not the json-prepared argv) so it survives the --output-format retry below.
+    if reasoning_effort:
+        cmd.extend(["--effort", reasoning_effort])
 
     # Guard: fail if subprocess proxy was configured but didn't resolve.
     # Prevents silent fallback to direct mode (which would burn subscription quota).
@@ -247,6 +270,19 @@ def run_claude_session(
                 env=env,
             )
             json_requested = False
+
+        # Fail loud on an unsupported --effort: effort changes behavior, so (unlike the
+        # --output-format retry above) we surface an actionable error rather than silently
+        # rerunning at the model's default effort.
+        if reasoning_effort and _is_effort_flag_rejection(result.returncode, result.stderr):
+            return _session_result(
+                stderr=result.stderr,
+                returncode=result.returncode,
+                error=(
+                    f"claude rejected --effort {reasoning_effort!r}; this Claude version may not "
+                    "support it. Upgrade Claude, or unset the effort setting."
+                ),
+            )
 
         if result.returncode != 0:
             _log.warning("claude -p returned non-zero exit code: %d", result.returncode)

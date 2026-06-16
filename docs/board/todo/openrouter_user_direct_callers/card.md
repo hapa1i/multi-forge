@@ -1,7 +1,7 @@
 # OpenRouter `user` injection for direct `core.llm` callers
 
-**Status**: Todo. Spun out of `openrouter_observability` Phase 5 (2026-06-16), which shipped `user`-field injection on the
-**proxied** path only. This card extends the same observability to Forge's **direct** OpenRouter callers.
+**Status**: Todo. Spun out of `openrouter_observability` Phase 5 (2026-06-16), which shipped `user`-field injection on
+the **proxied** path only. This card extends the same observability to Forge's **direct** OpenRouter callers.
 
 ## Problem
 
@@ -19,9 +19,10 @@ OpenRouter (changing that is a routing change, not a header change).
 ## Scope
 
 - **In**: a `with_openrouter_user(hyperparams, user_id)` helper (`core/usage/correlation.py`) mirroring
-  `with_forge_request_id` — deep-copy, **no-clobber** (preserve an explicit caller `user`), writes `extra["openai"]["user"]`
-  (the verified top-level-`user` channel, proven in Phase 5's `test_openrouter.py`). Wire it into plan-check + curation:
-  derive `user_id = derive_provider_session_id(os.environ.get("FORGE_SESSION"), <root_run_id>, role)` (same env keys
+  `with_forge_request_id` — deep-copy, **no-clobber** (preserve an explicit caller `user`), writes
+  `extra["openai"]["user"]` (the verified top-level-`user` channel, proven in Phase 5's `test_openrouter.py`). Wire it
+  into plan-check + curation: derive
+  `user_id = derive_provider_session_id(os.environ.get("FORGE_SESSION"), <root_run_id>, role)` (same env keys
   `core/reactive/env.py` reads), gate on the existing `provider == "openrouter"`, behind the opt-in.
 - **Out**: the proxied path (shipped); the tagger (routing limitation); remote reconciliation.
 
@@ -46,5 +47,7 @@ govern both paths or whether proxied and direct keep separate (documented) homes
 
 - Phase 5 shipped code: `proxy/server.py` (`_openrouter_user_value`), `proxy/client_adapter.py`
   (`extra["openai"]["user"]` forward), `config/schema.py` (`ProviderTraceConfig.inject_openrouter_user`).
-- Channel proof: `tests/src/core/llm/test_openrouter.py::TestOpenRouterClientComplete::test_user_from_extra_openai_reaches_create_kwargs`.
-- Minter: `core/run_id.py::derive_provider_session_id`; header precedent: `core/reactive/env.py::_apply_correlation_headers`.
+- Channel proof:
+  `tests/src/core/llm/test_openrouter.py::TestOpenRouterClientComplete::test_user_from_extra_openai_reaches_create_kwargs`.
+- Minter: `core/run_id.py::derive_provider_session_id`; header precedent:
+  `core/reactive/env.py::_apply_correlation_headers`.
