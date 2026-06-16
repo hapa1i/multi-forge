@@ -1,8 +1,8 @@
 # OpenRouter Provider Trace -- session IDs and local lifecycle evidence
 
-**Status**: Proposed. Spun out of the `supervisor_shadow_sampling` investigation on 2026-06-14, after a supervised fork
-sent requests through the OpenRouter proxy but the user could not find them in OpenRouter's UI or Forge activity/cost
-surfaces.
+**Status**: Accepted -- in `doing/` (branch `openrouter-observability`, 2026-06-15). Spun out of the
+`supervisor_shadow_sampling` investigation on 2026-06-14, after a supervised fork sent requests through the OpenRouter
+proxy but the user could not find them in OpenRouter's UI or Forge activity/cost surfaces.
 
 **Split from**: the original broad OpenRouter observability sketch. Log-volume work now lives in
 `docs/board/proposed/proxy_log_hygiene/card.md`; remote OpenRouter reconciliation now lives in
@@ -12,6 +12,30 @@ surfaces.
 (`~/.forge/logs/requests/`), run-tree headers (`X-Forge-Run-ID`, `X-Forge-Root-Run-ID`), the `core.llm`
 `CompletionResponse` / `StreamEvent` abstraction, and the usage ledger cross-plane refs in `docs/design_appendix.md`
 §A.13.
+
+## Investigation findings & locked decisions (2026-06-15)
+
+A codebase investigation grounded this card before implementation, and several current-behavior assumptions in the
+sections below were corrected. The full correction list lives in `checklist.md` ("Card corrections") to keep one
+authority; the short version: `timeout_seen` is **not** proxy-derivable (the proxy sees only a client disconnect; the
+45s timeout is the parent killing `claude -p`), synthetic `chatcmpl-<epoch>` ids are minted in `CoreLLMClientAdapter`
+(not `converters.py`), the "LiteLLM drops params" risk is moot for the **direct** OpenRouter client (a direct OpenAI-SDK
+wrapper -- `extra_body` is the channel), and a client-sent `session_id` cannot survive the proxied path (dropped at
+request binding + adapter extraction), so it is derived server-side.
+
+Locked design decisions (see `checklist.md` for phase mapping and acceptance tests):
+
+- **`session_id` injection**: opt-in config flag, **default OFF** -- decouples the observability foundation from the
+  routing-behavior change.
+- **`session_id` granularity**: `forge_sess_<hash>_<role>`, falling back to `forge_run_<hash>` (the only id all direct
+  callers share). The human name is hashed, never sent raw.
+- **Provider metadata shape**: a nested, optional `ProviderTraceMeta` on `CompletionResponse` / `StreamEvent`
+  (additive).
+- **Trace-write home**: one shared helper invoked at the proxy `on_complete` SSE seam; direct `core.llm` callers
+  populate `provider_meta` but join via the usage ledger, not the proxy trace plane.
+- **Retention**: match audit (14 days / 512 MB); **not** wiped by `forge proxy costs reset`. Shared default with the
+  `proxy_log_hygiene` card.
+- **Action tagger**: out of scope -- it cannot reach OpenRouter today (`gemini -> litellm_local`, no `provider=` arg).
 
 ## Problem
 
@@ -48,7 +72,9 @@ Before implementation, pin the OpenRouter externals with tiny, reproducible prob
    its own.
 3. **`session_id` transport**: confirm the field actually reaches OpenRouter through Forge's path, including `core.llm`
    -> LiteLLM/OpenAI-compatible clients -> OpenRouter. If LiteLLM drops unknown params, the implementation needs the
-   right `extra_body` / allowed-params path before routing measurements mean anything.
+   right `extra_body` / allowed-params path before routing measurements mean anything. (**Correction 2026-06-15:** the
+   drop-params risk applies only to the openrouter-**via-LiteLLM-gateway** route; the **direct** OpenRouter client is a
+   direct OpenAI-SDK wrapper where `extra_body` is forwarded verbatim, so this probe is mainly about the gateway path.)
 4. **`session_id` routing impact**: compare repeated large supervisor-style prompts with and without sticky
    `session_id`, measuring first-token latency, total latency, cache indicators when exposed, provider selection, and
    failure rate.
@@ -100,11 +126,15 @@ so traffic is still grouped without leaking workspace paths.
 
 For OpenRouter-bound OpenAI-compatible requests:
 
-- Preserve an explicit caller-provided `session_id`.
+- Preserve an explicit caller-provided `session_id`. (**Correction 2026-06-15:** honorable only on **direct** `core.llm`
+  calls -- on the proxied path a client-sent `session_id` is dropped at request binding + adapter extraction, so the
+  proxy derives it server-side.)
 - Otherwise inject Forge's derived `session_id`.
 - Keep human-readable labels out of upstream metadata unless a user opts in.
-- Make the same capability available to direct `core.llm` OpenRouter calls through provider-specific extras so curation,
-  taggers, and plan checks can share the grouping behavior.
+- Make the same capability available to direct `core.llm` OpenRouter calls through provider-specific extras so curation
+  and plan checks can share the grouping behavior. (**Correction 2026-06-15:** the **action tagger** is out of scope --
+  it routes to `litellm_local` and cannot reach OpenRouter today; sharing for it is a routing change, not a header
+  change.)
 
 The upside is not only observability. The motivating supervisor loop re-sent a very large repeated context on every
 check. If OpenRouter's sticky `session_id` improves provider affinity or prompt-cache hits, it may reduce the latency
@@ -161,6 +191,10 @@ format:
   "local_usage_status": "unavailable"
 }
 ```
+
+> **Correction (2026-06-15):** the proxy cannot set `timeout_seen` from its own signals -- it observes only a client
+> disconnect (`CancelledError`); the timeout is the parent's `subprocess.run` killing `claude -p`. The proxy-side trace
+> sets `client_disconnected`; `timeout_seen` is left for run-tree correlation (see `checklist.md` Phase 3).
 
 Trace joins should respect the existing three-plane design:
 
@@ -220,14 +254,23 @@ Remote OpenRouter lookups belong to the reconciliation card, not this foundation
 
 ## Open questions
 
-- Exact `session_id` granularity: Forge session, root run, role, or a composite?
+Resolutions from the 2026-06-15 investigation are marked inline; the one remaining open item is flagged.
+
+- Exact `session_id` granularity: Forge session, root run, role, or a composite? -- **RESOLVED**:
+  `forge_sess_<hash>_<role>`, fallback `forge_run_<hash>`.
 - Should provider metadata live directly on `CompletionResponse` / `StreamEvent`, or in a nested `ProviderTraceMeta`
-  object reused by both?
+  object reused by both? -- **RESOLVED**: nested, optional `ProviderTraceMeta` reused by both (`types.py` has no
+  `extra='forbid'`; `cost_usd` was added the same additive way).
 - Should trace writing happen in the proxy adapter, the proxy server streaming loop, the direct `core.llm` clients, or a
-  small shared helper used by all of them and by proxy log-hygiene summaries?
-- How much provider header data is useful after sanitization, and which headers should be allowlisted?
+  small shared helper used by all of them and by proxy log-hygiene summaries? -- **RESOLVED**: one shared helper invoked
+  at the proxy `on_complete` SSE seam (the only point with `request_id` + run-tree headers in hand); direct `core.llm`
+  callers populate `provider_meta` and join via the usage ledger.
+- How much provider header data is useful after sanitization, and which headers should be allowlisted? -- **OPEN**:
+  settled by Phase 0 probe 1 (where the gen-id lives) + the Phase 2 allowlist (correlation headers only, never auth).
 - Should provider trace pruning reuse the request-diagnostics retention machinery from the proxy log-hygiene card, and
-  what defaults should it use relative to cost, audit, usage, and request logs?
+  what defaults should it use relative to cost, audit, usage, and request logs? -- **RESOLVED**: that machinery does not
+  exist yet (proxy_log_hygiene is unshipped); clone `prune_audit_logs` and wire it. Defaults: 14 days / 512 MB (match
+  audit), **not** wiped by `forge proxy costs reset`.
 
 ## Risks
 

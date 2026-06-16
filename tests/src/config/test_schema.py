@@ -702,6 +702,57 @@ class TestInterceptAuditConfig:
         with pytest.raises(ValueError, match="audit.retention_days"):
             self._make(audit={"retention_days": -1})
 
+    # --- provider_trace plane retention (openrouter_observability Phase 3) ---
+
+    def test_provider_trace_defaults_are_inert(self):
+        from forge.config.schema import ProviderTraceConfig
+
+        config = self._make()
+        assert isinstance(config.provider_trace, ProviderTraceConfig)
+        assert config.provider_trace.retention_days == 14
+        assert config.provider_trace.max_total_mb == 512
+
+    def test_provider_trace_coerced_from_dict(self):
+        from forge.config.schema import ProviderTraceConfig
+
+        config = self._make(provider_trace={"retention_days": 7, "max_total_mb": 128})
+        assert isinstance(config.provider_trace, ProviderTraceConfig)
+        assert config.provider_trace.retention_days == 7
+        assert config.provider_trace.max_total_mb == 128
+
+    def test_provider_trace_unknown_key_rejected(self):
+        with pytest.raises(ValueError, match="Unknown provider_trace key.*days"):
+            self._make(provider_trace={"days": 7})
+
+    def test_provider_trace_retention_days_rejects_bool(self):
+        with pytest.raises(ValueError, match="provider_trace.retention_days"):
+            self._make(provider_trace={"retention_days": True})
+
+    def test_provider_trace_max_total_mb_rejects_zero(self):
+        with pytest.raises(ValueError, match="provider_trace.max_total_mb"):
+            self._make(provider_trace={"max_total_mb": 0})
+
+    def test_provider_trace_nested_in_proxyconfig_template(self):
+        """The template-shaped ProxyConfig also nests provider_trace (parity with audit)."""
+        from forge.config.schema import ProviderTraceConfig, ProxyConfig
+
+        cfg = ProxyConfig(provider_trace={"retention_days": 3})  # type: ignore[arg-type]  # coerced in __post_init__
+        assert isinstance(cfg.provider_trace, ProviderTraceConfig)
+        assert cfg.provider_trace.retention_days == 3
+
+    def test_provider_trace_inject_openrouter_user_defaults_false(self):
+        """Phase 5 opt-in is off unless explicitly enabled."""
+        config = self._make()
+        assert config.provider_trace.inject_openrouter_user is False
+
+    def test_provider_trace_inject_openrouter_user_coerced_from_dict(self):
+        config = self._make(provider_trace={"inject_openrouter_user": True})
+        assert config.provider_trace.inject_openrouter_user is True
+
+    def test_provider_trace_inject_openrouter_user_rejects_non_bool(self):
+        with pytest.raises(ValueError, match="provider_trace.inject_openrouter_user"):
+            self._make(provider_trace={"inject_openrouter_user": "yes"})
+
     def test_system_prompt_guard_requires_pattern(self):
         with pytest.raises(ValueError, match="needs a 'pattern' key"):
             self._make(intercept={"mode": "override", "override": {"system_prompt_guards": [{"action": "warn"}]}})

@@ -13,7 +13,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from forge.config import init_config
-from forge.core.llm.types import CompletionResponse, StreamEvent
+from forge.core.llm.types import CompletionResponse, ProviderTraceMeta, StreamEvent
 from forge.proxy.client_adapter import (
     CoreLLMClientAdapter,
     _extract_cache_info,
@@ -309,6 +309,103 @@ class TestReportedCostThreading:
         assert "reported_cost_micros" not in usage_chunks[0]["usage"]
 
 
+class TestProviderMetaThreading:
+    """provider_meta rides into the OpenAI dict as an internal carrier, separate from the
+    synthetic chatcmpl id (openrouter_observability Phase 2)."""
+
+    def test_core_response_carries_provider_meta(self) -> None:
+        adapter = _make_adapter_with_mock_client()
+        resp = CompletionResponse(
+            text="hi",
+            provider_meta=ProviderTraceMeta(provider="openrouter", provider_generation_id="gen-abc"),
+        )
+        out = adapter._core_response_to_openai(resp, "openrouter/gpt-5.2")
+        assert out["_provider_meta"] == {"provider": "openrouter", "provider_generation_id": "gen-abc"}
+
+    def test_core_response_omits_provider_meta_when_none(self) -> None:
+        adapter = _make_adapter_with_mock_client()
+        out = adapter._core_response_to_openai(CompletionResponse(text="hi"), "openrouter/gpt-5.2")
+        assert "_provider_meta" not in out
+
+    def test_synthetic_id_distinct_from_generation_id(self) -> None:
+        """The minted chatcmpl-<ts> id must never equal the provider generation id."""
+        adapter = _make_adapter_with_mock_client()
+        resp = CompletionResponse(
+            text="hi",
+            provider_meta=ProviderTraceMeta(provider="openrouter", provider_generation_id="gen-abc"),
+        )
+        out = adapter._core_response_to_openai(resp, "openrouter/gpt-5.2")
+        assert out["id"].startswith("chatcmpl-")
+        assert out["id"] != out["_provider_meta"]["provider_generation_id"]
+
+    @pytest.mark.asyncio
+    async def test_streaming_emits_provider_meta_carrier_chunk(self) -> None:
+        """provider_meta rides its own carrier chunk (choices=[]) the instant it first appears,
+        not nested in the usage chunk -- so the Phase 3 seam stashes it before any cancellation."""
+        adapter = _make_adapter_with_mock_client()
+
+        async def _fake_stream(*args, **kwargs):  # type: ignore[no-untyped-def]
+            yield StreamEvent(
+                type="text_delta",
+                text="Hi",
+                provider_meta=ProviderTraceMeta(provider="openrouter", provider_generation_id="gen-stream"),
+            )
+            yield StreamEvent(
+                type="usage",
+                usage={"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
+            )
+            yield StreamEvent(type="response_end")
+
+        adapter._client = MagicMock(stream=_fake_stream)  # type: ignore[assignment]
+
+        chunks = [
+            c
+            async for c in adapter.create_streaming_completion(
+                {"messages": [{"role": "user", "content": "hi"}], "max_tokens": 100},
+                request_id="req-stream-meta",
+            )
+        ]
+        carrier = [c for c in chunks if "_provider_meta" in c]
+        assert len(carrier) == 1  # emitted at most once
+        assert carrier[0]["_provider_meta"] == {
+            "provider": "openrouter",
+            "provider_generation_id": "gen-stream",
+        }
+        assert carrier[0]["choices"] == []  # metadata-only carrier, no content
+        assert carrier[0]["id"].startswith("chatcmpl-")  # synthetic id, never the gen id
+        # provider_meta no longer nested in the usage chunk's usage dict.
+        usage_chunks = [c for c in chunks if c.get("usage")]
+        assert usage_chunks
+        assert "provider_meta" not in usage_chunks[0]["usage"]
+
+    @pytest.mark.asyncio
+    async def test_streaming_provider_meta_survives_end_before_usage(self) -> None:
+        """The incident path: a stream that ends before the final usage chunk still delivers
+        provider_meta, because the carrier chunk fires on the first content event (R1)."""
+        adapter = _make_adapter_with_mock_client()
+
+        async def _fake_stream(*args, **kwargs):  # type: ignore[no-untyped-def]
+            yield StreamEvent(
+                type="text_delta",
+                text="partial",
+                provider_meta=ProviderTraceMeta(provider="openrouter", provider_generation_id="gen-cut"),
+            )
+            # No usage / response_end -- mirrors a cancellation before final accounting.
+
+        adapter._client = MagicMock(stream=_fake_stream)  # type: ignore[assignment]
+
+        chunks = [
+            c
+            async for c in adapter.create_streaming_completion(
+                {"messages": [{"role": "user", "content": "hi"}], "max_tokens": 100},
+                request_id="req-cancel",
+            )
+        ]
+        carrier = [c for c in chunks if "_provider_meta" in c]
+        assert len(carrier) == 1
+        assert carrier[0]["_provider_meta"]["provider_generation_id"] == "gen-cut"
+
+
 # ---------------------------------------------------------------------------
 # User-Agent forwarding tests
 # ---------------------------------------------------------------------------
@@ -422,6 +519,112 @@ async def test_streaming_completion_forwards_user_agent() -> None:
     assert len(captured_hyperparams) == 1
     hp = captured_hyperparams[0]
     assert hp.extra["openai"]["extra_headers"] == {"User-Agent": "claude-code/2.1.0"}
+
+
+# ---------------------------------------------------------------------------
+# Phase 5: _forge_user -> extra["openai"]["user"] forwarding
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_create_completion_forwards_forge_user() -> None:
+    """`_forge_user` from the server flows to extra["openai"]["user"] (Phase 5)."""
+    adapter = _make_adapter_with_mock_client()
+    mock_complete = AsyncMock(
+        return_value=CompletionResponse(
+            text="ok", usage={"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}
+        )
+    )
+    adapter._client = MagicMock(complete=mock_complete)  # type: ignore[assignment]
+
+    await adapter.create_completion(
+        {
+            "messages": [{"role": "user", "content": "hi"}],
+            "max_tokens": 100,
+            "_forge_user": "forge_sess_7e81a1bb765d_supervisor",
+        },
+        request_id="req-fu",
+    )
+
+    call_kwargs = mock_complete.call_args
+    hp = call_kwargs.kwargs.get("hyperparams") or call_kwargs[1].get("hyperparams")
+    assert hp is not None
+    assert hp.extra["openai"]["user"] == "forge_sess_7e81a1bb765d_supervisor"
+
+
+@pytest.mark.asyncio
+async def test_streaming_completion_forwards_forge_user() -> None:
+    """`_forge_user` forwarding also works on the streaming path (Phase 5)."""
+    adapter = _make_adapter_with_mock_client()
+    captured_hyperparams = []
+
+    async def _fake_stream(*args, **kwargs):  # type: ignore[no-untyped-def]
+        captured_hyperparams.append(kwargs.get("hyperparams"))
+        yield StreamEvent(type="text_delta", text="Hi")
+        yield StreamEvent(type="response_end")
+
+    adapter._client = MagicMock(stream=_fake_stream)  # type: ignore[assignment]
+
+    async for _chunk in adapter.create_streaming_completion(
+        {
+            "messages": [{"role": "user", "content": "hi"}],
+            "max_tokens": 100,
+            "_forge_user": "forge_run_7e81a1bb765d",
+        },
+        request_id="req-stream-fu",
+    ):
+        pass
+
+    assert len(captured_hyperparams) == 1
+    assert captured_hyperparams[0].extra["openai"]["user"] == "forge_run_7e81a1bb765d"
+
+
+@pytest.mark.asyncio
+async def test_create_completion_forge_user_coexists_with_user_agent() -> None:
+    """`_forge_user` and `_user_agent` share the extra["openai"] dict without clobbering."""
+    adapter = _make_adapter_with_mock_client()
+    mock_complete = AsyncMock(
+        return_value=CompletionResponse(
+            text="ok", usage={"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}
+        )
+    )
+    adapter._client = MagicMock(complete=mock_complete)  # type: ignore[assignment]
+
+    await adapter.create_completion(
+        {
+            "messages": [{"role": "user", "content": "hi"}],
+            "max_tokens": 100,
+            "_user_agent": "claude-code/2.1.0",
+            "_forge_user": "forge_sess_7e81a1bb765d_supervisor",
+        },
+        request_id="req-both",
+    )
+
+    call_kwargs = mock_complete.call_args
+    hp = call_kwargs.kwargs.get("hyperparams") or call_kwargs[1].get("hyperparams")
+    assert hp.extra["openai"]["extra_headers"] == {"User-Agent": "claude-code/2.1.0"}
+    assert hp.extra["openai"]["user"] == "forge_sess_7e81a1bb765d_supervisor"
+
+
+@pytest.mark.asyncio
+async def test_create_completion_no_forge_user_no_user_key() -> None:
+    """Without `_forge_user`, no `user` key is injected (flag-off path is byte-identical)."""
+    adapter = _make_adapter_with_mock_client()
+    mock_complete = AsyncMock(
+        return_value=CompletionResponse(
+            text="ok", usage={"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}
+        )
+    )
+    adapter._client = MagicMock(complete=mock_complete)  # type: ignore[assignment]
+
+    await adapter.create_completion(
+        {"messages": [{"role": "user", "content": "hi"}], "max_tokens": 100, "_user_agent": "claude-code/2.1.0"},
+        request_id="req-no-fu",
+    )
+
+    call_kwargs = mock_complete.call_args
+    hp = call_kwargs.kwargs.get("hyperparams") or call_kwargs[1].get("hyperparams")
+    assert "user" not in hp.extra["openai"]
 
 
 # ---------------------------------------------------------------------------

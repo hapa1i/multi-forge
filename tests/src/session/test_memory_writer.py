@@ -685,6 +685,19 @@ class TestRunHandoffAgent:
             assert kwargs["cwd"] == str(workspace)
             assert kwargs["timeout_seconds"] == 120
 
+    def test_stamps_provider_trace_identity_env(self, workspace: Path) -> None:
+        """Phase 1: the writer tags its spawn with the session name + memory_writer role."""
+        from forge.core.reactive.env import FORGE_COMMAND_VAR, FORGE_SESSION_VAR
+
+        with patch("forge.session.memory_writer.run_claude_session") as mock_run:
+            mock_run.return_value = SessionResult(stdout="", stderr="", returncode=0)
+
+            self._run_with_mock_claude(workspace, mock_run, session_name="my-session")
+
+            _, kwargs = mock_run.call_args
+            assert kwargs["extra_env"][FORGE_SESSION_VAR] == "my-session"
+            assert kwargs["extra_env"][FORGE_COMMAND_VAR] == "memory_writer"
+
     def test_sets_base_url_when_provided(self, workspace: Path) -> None:
         """Passes base_url to run_claude_session when provided."""
         with patch("forge.session.memory_writer.run_claude_session") as mock_run:

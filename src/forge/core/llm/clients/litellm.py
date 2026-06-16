@@ -46,6 +46,7 @@ from .openai_compat import (
     extract_cached_tokens,
     extract_reported_cost_usd,
     is_retryable_error,
+    merge_provider_headers,
     message_to_openai,
     openai_response_to_completion,
 )
@@ -347,6 +348,16 @@ class LiteLLMClient:
             return completion
         return completion.model_copy(update={"cost_usd": header_cost})
 
+    def _merge_response_metadata(self, completion: CompletionResponse, headers: Any) -> CompletionResponse:
+        """Attach gateway header cost AND allowlisted provider-trace headers (Phase 2).
+
+        Only the non-streaming/Responses paths reach this (they hold a raw-response handle);
+        streaming has no headers, so its ``provider_meta.headers`` stays None. The header
+        allowlist lives in ``openai_compat`` so the direct-OpenRouter path shares one source.
+        """
+        completion = self._merge_header_cost(completion, headers)
+        return merge_provider_headers(completion, headers, self._provider)
+
     def _build_request_kwargs(
         self,
         messages: list[Message],
@@ -416,7 +427,7 @@ class LiteLLMClient:
 
         raw = await client.responses.with_raw_response.create(**request_params)
         completion = self._parse_responses_output(raw.parse(), self._model)
-        return self._merge_header_cost(completion, raw.headers)
+        return self._merge_response_metadata(completion, raw.headers)
 
     @retry(
         retry=retry_if_exception(lambda e: isinstance(e, Exception) and LiteLLMClient._is_retryable_error(e)),
@@ -445,7 +456,7 @@ class LiteLLMClient:
         # .create() drops; .parse() returns the same ChatCompletion model.
         raw = await client.chat.completions.with_raw_response.create(**kwargs)
         completion = self._openai_to_completion(raw.parse())
-        return self._merge_header_cost(completion, raw.headers)
+        return self._merge_response_metadata(completion, raw.headers)
 
     async def complete(
         self,
@@ -537,8 +548,10 @@ class LiteLLMClient:
                 )
                 response = await self._complete_with_responses_api(client, messages, merged_params, tools=tools)
 
+                # Carry the provider_meta computed by _complete_with_responses_api onto the
+                # synthetic events (it was previously dropped on this fallback path).
                 if response.text:
-                    yield StreamEvent(type="text_delta", text=response.text)
+                    yield StreamEvent(type="text_delta", text=response.text, provider_meta=response.provider_meta)
 
                 # Emit tool call deltas so callers can accumulate them
                 if response.tool_calls:
@@ -551,16 +564,23 @@ class LiteLLMClient:
                                 name=tc.name,
                                 arguments_json=json.dumps(tc.arguments),
                             ),
+                            provider_meta=response.provider_meta,
                         )
 
                 if response.usage:
-                    yield StreamEvent(type="usage", usage=response.usage, cost_usd=response.cost_usd)
+                    yield StreamEvent(
+                        type="usage",
+                        usage=response.usage,
+                        cost_usd=response.cost_usd,
+                        provider_meta=response.provider_meta,
+                    )
 
                 yield StreamEvent(
                     type="response_end",
                     tool_calls=response.tool_calls,
                     usage=response.usage,
                     cost_usd=response.cost_usd,
+                    provider_meta=response.provider_meta,
                 )
                 return
 

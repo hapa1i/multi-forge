@@ -25,6 +25,7 @@ import logging
 import re
 from pathlib import Path
 
+from forge.core.reactive.env import FORGE_COMMAND_VAR, FORGE_SESSION_VAR
 from forge.core.reactive.routing import resolve_subprocess_routing
 from forge.core.reactive.session_runner import run_claude_session
 from forge.core.transcript import parse_jsonl_transcript
@@ -473,6 +474,8 @@ def run_memory_writer(
             direct=config.direct,
             timeout_seconds=effective_timeout,
             cwd=str(forge_root),
+            # Group the writer's proxied requests under this session + role (Phase 1).
+            extra_env={FORGE_SESSION_VAR: session_name, FORGE_COMMAND_VAR: "memory_writer"},
             reasoning_effort=config.effort,
         )
 

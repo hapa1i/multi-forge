@@ -13,7 +13,12 @@ from forge.core.llm.clients.litellm import (
     LiteLLMClient,
     cost_from_response_headers,
 )
-from forge.core.llm.types import CompletionResponse, Message, ModelHyperparameters
+from forge.core.llm.types import (
+    CompletionResponse,
+    Message,
+    ModelHyperparameters,
+    ProviderTraceMeta,
+)
 
 
 def _client() -> LiteLLMClient:
@@ -65,6 +70,46 @@ class TestMergeHeaderCost:
     def test_no_header_no_body_stays_none(self):
         merged = _client()._merge_header_cost(CompletionResponse(text="hi", cost_usd=None), {})
         assert merged.cost_usd is None
+
+
+class TestMergeResponseMetadata:
+    """_merge_response_metadata adds gateway cost AND allowlisted trace headers."""
+
+    def test_populates_provider_meta_headers(self):
+        completion = CompletionResponse(text="hi", provider_meta=ProviderTraceMeta(provider="litellm"))
+        merged = _client()._merge_response_metadata(
+            completion,
+            httpx.Headers({"x-request-id": "req-7", "authorization": "Bearer s"}),
+        )
+        assert merged.provider_meta is not None
+        assert merged.provider_meta.headers == {"x-request-id": "req-7"}
+
+    def test_creates_provider_meta_when_absent(self):
+        merged = _client()._merge_response_metadata(
+            CompletionResponse(text="hi"),  # provider_meta None
+            httpx.Headers({"x-generation-id": "gen-1"}),
+        )
+        assert merged.provider_meta is not None
+        assert merged.provider_meta.headers == {"x-generation-id": "gen-1"}
+
+    def test_no_allowlisted_headers_leaves_meta_unchanged(self):
+        meta = ProviderTraceMeta(provider="litellm", provider_generation_id="gen-x")
+        merged = _client()._merge_response_metadata(
+            CompletionResponse(text="hi", provider_meta=meta),
+            httpx.Headers({"content-type": "application/json"}),
+        )
+        assert merged.provider_meta is not None
+        assert merged.provider_meta.headers is None
+        assert merged.provider_meta.provider_generation_id == "gen-x"  # preserved
+
+    def test_still_merges_cost_alongside_headers(self):
+        merged = _client()._merge_response_metadata(
+            CompletionResponse(text="hi", cost_usd=None),
+            httpx.Headers({LITELLM_COST_HEADER: "0.003", "x-request-id": "req-1"}),
+        )
+        assert merged.cost_usd == 0.003
+        assert merged.provider_meta is not None
+        assert merged.provider_meta.headers == {"x-request-id": "req-1"}
 
 
 class TestCompleteReadsHeaderCost:

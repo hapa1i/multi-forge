@@ -27,6 +27,102 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-16
 
+### openrouter_observability Phase 5: OpenRouter `user`-field injection (opt-in, proxied-only)
+
+**Goal**: Close the incident loop upstream — when enabled, proxied direct-OpenRouter requests carry the Forge session
+grouping id in the OpenAI-standard `user` field, so a session/fork is recorded in OpenRouter's indexed `/generation`
+record for account-side lookup (probe 3: `user` is retained, a custom `session_id` is ignored).
+
+**Key changes**:
+
+- **Config flag** (`config/schema.py`): `ProviderTraceConfig.inject_openrouter_user: bool = False` — field +
+  `__post_init__` bool-reject + `_coerce_provider_trace_config` allowlist/constructor (all three durable-state touch
+  points, so an existing proxy.yaml carrying the key is not rejected as corruption).
+- **Proxied path** (`proxy/server.py`, `proxy/client_adapter.py`): a pure, testable `_openrouter_user_value` helper
+  gates on `provider == "openrouter"` + the flag, prefers the already-validated `X-Forge-Session` id, and falls back to
+  `forge_run_<hash>` (via `derive_provider_session_id`) when only run identity exists. It sets a `_forge_user` carrier
+  (mirroring `_user_agent`); the adapter forwards it into `extra["openai"]["user"]` on both stream + non-stream, which
+  `build_chat_completion_kwargs` merges to a **top-level** `user` kwarg — the verified channel, not `extra_body`.
+- **Tagger gap** (`core/reactive/tagger.py`): documented (not silently no-op'd) — it routes via local LiteLLM and cannot
+  reach OpenRouter, so injection is N/A.
+- **Scope decision**: proxied-only. The flag is per-proxy because upstream proxy behavior belongs in per-proxy config
+  (`runtime_config`/`~/.forge/config.yaml` owns runtime prefs, not this). The direct-client helper + direct callers
+  (plan-check, curation) are deferred to a new `todo/openrouter_user_direct_callers/` card to avoid a second opt-in
+  source; no direct-call behavior changes this release.
+- **Docs**: `proxy.md` (flag + `/generation` framing), `design.md §3.14` config block + sentence,
+  `design_appendix §A.14` injection bullet. No CLI/`%` surface change, so `cli_reference.md` is untouched.
+
+**Verification**: 16 new unit tests (3 config + 4 adapter + 5 server-helper + 2 channel-proof + 2 create_message
+wiring), incl. an end-to-end proof that `extra["openai"]["user"]` survives the hyperparam merge to a top-level `user`
+kwarg, and a `create_message`-level test that config-ON inserts `_forge_user` before the adapter handoff;
+`make test-unit` + scoped proxy integration; `make pre-commit` clean. Last shipped phase of the card.
+
+### openrouter_observability Phase 4: `forge provider trace` read surfaces
+
+**Goal**: Give the metadata-only provider-trace plane (shipped Phase 3) a user-facing read surface so an operator can
+run `forge provider trace explain <req>` after a timeout and get a local provenance narrative instead of grepping
+shards.
+
+**Key changes**:
+
+- **Command-core op** (`core/ops/provider_trace.py`): UI-agnostic `list`/`show`/`explain` returning frozen DTOs, raising
+  `ForgeOpError`, taking `ExecutionContext` — no Click/print, no remote call. `explain` builds
+  `ProviderTraceExplanation` from local trace records and answers the incident's five questions (left Forge? route?
+  generation/session id? stream lifecycle? cost). Cost provenance is a **bounded** `read_cost_logs(trace_ts ±5m)` lookup
+  keyed by `request_id` for the cost record's `confidence` — additive only; the trace already carries
+  `reported_cost_micros`. The pure `render_explanation_lines` plain-text contract is shared verbatim by the terminal and
+  `%` surfaces (no drift).
+- **Terminal CLI** (`cli/provider.py`, `cli/main.py`): `provider` group orients; `trace list|show|explain` leaves;
+  `--json` shapes are bare-array / single-dict / `asdict(exp)` via `dataclasses.asdict()`; errors via
+  `print_error_with_tip`. `list` filters: `--session` (session-*label*, documented as imprecise), `--root-run-id`
+  (exact), `--period today|week|month|all`, `--limit` (50).
+- **Direct commands** (`cli/hooks/{direct_commands,commands}.py`): `%provider trace list|show|explain` mirror
+  `%proxy audit` — read-only, `list` capped at 10, reusing the same ops + renderer.
+- **Decision (card Q1 unanswered)**: `explain` is **route-only / trace-derived** — no credential-source resolution. The
+  "never print a key" guardrail holds trivially (no credential field is read). Credential provenance remains an additive
+  extension via `proxy_id → template → TEMPLATE_ENV_VARS → resolve_env_or_credential_with_source`.
+- **Docs**: `cli_reference.md` (Provider-trace table + `%` scope/commands), `end-user/proxy.md` (new "Provider trace"
+  section, board-contract Day-1 rule), `design.md §3.14` + `design_appendix.md §A.14` read-surface note.
+
+**Verification**: 28 new unit tests (11 op + 11 CLI + 6 direct-command), incl. a no-secret-printed assertion and
+identical terminal/`%` narratives; full `make test-unit` 6191 passed; `make pre-commit` clean (ruff/black/isort/mypy/
+pyright/mdformat/gitleaks). Read-only over existing shards — no new Docker path, so unit coverage is the gate.
+
+### openrouter_observability Phase 3: provider-trace plane + shared SSE lifecycle seam
+
+**Goal**: Persist metadata-only, owner-only provider-trace records at the one shared stream seam so Forge can answer
+"what happened to this OpenRouter request?" after a timeout — the incident this card exists for.
+
+**Key changes**:
+
+- **New plane** `src/forge/proxy/provider_trace_logger.py`: versioned (`PROVIDER_TRACE_SCHEMA_VERSION=1`), owner-only
+  `0600` shards under `0700` three-level dirs (`~/.forge/providers/openrouter/traces/<YYYY-MM>_<pid>.jsonl`),
+  strict-dacite read, retention prune — modeled on the audit log, not the unversioned cost log. The shared
+  `record_provider_trace` helper lives here (the neutral leaf) so `server.py` and `passthrough.py` both call it without
+  an import cycle; it gates **direct-OpenRouter-only** and derives `local_usage_status` (probe 2 `[REMOTE-ABSENT]` →
+  local evidence only). `write_provider_trace` **re-applies** the Phase 2 header allowlist as defense-in-depth.
+- **Converter seam** (`converters.py`): intercepts the `_provider_meta` carrier chunk (consumed, never yielded — kills a
+  spurious WARNING), tracks four lifecycle flags, catches `(asyncio.CancelledError, GeneratorExit)` to record
+  `client_disconnected` and re-raise, and packs all of it under one reserved `final_usage["_provider_trace"]` key
+  (carrier = widen `Dict[str,int]`→`Dict[str,Any]`, mirroring `reported_cost_micros`; callback arity unchanged).
+  `first_chunk_seen` flips at the first user-visible text **or** tool `content_block_start` — including the delayed
+  id-then-name tool path (a provider that streams the tool id before its name); the id-only buffer chunk emits nothing,
+  so it correctly leaves the flag unset.
+- **Proxy write sites** (`server.py`): both streaming and non-streaming `on_complete` paths write after cost logging,
+  carrying `proxy_id`/`mapped_model`/`request_mode` + run-tree/session/command join keys; `timeout_seen=False` always
+  (the proxy sees its own disconnect, never the parent `subprocess.run` timeout).
+- **Passthrough mirror** (`passthrough.py`): same four flags + the one shared helper, **latent today** (the gate
+  suppresses the write — passthrough never carries OpenRouter); forward-wiring for a future provider.
+- **Config** (`schema.py`): `ProviderTraceConfig` (`retention_days=14`, `max_total_mb=512`, bool-rejecting) nested into
+  both `ProxyConfig` and `ProxyInstanceConfig`; prune wired into `_ensure_runtime_state` (once per process).
+- **Docs**: design.md §3.14 now names the **fourth** plane; design_appendix §A.14 adds the `ProviderTraceRecord` schema.
+
+**Verification**: full `make test-unit` 6161 passed; `make test-integration` 393 passed; 2 live-OpenRouter E2E pass —
+the clean stream surfaces a real `gen-` id via the carrier and the **cancelled stream** records
+`client_disconnected=True, final_usage_seen=False, local_usage_status="unavailable"` with the gen id intact (the
+incident, end to end). Regression: metadata-only (no body/prompt/completion field; header-bypass re-filtered) + run-tree
+join. `make pre-commit` clean (mypy/pyright/ruff/black/isort/mdformat/gitleaks).
+
 ### supervisor_statusline_health: surface frontier-supervisor fail-open (status line + `forge activity`)
 
 **Goal**: Make a silently-failing supervisor visible. In the motivating incident a session's supervisor timed out 24/24
@@ -62,6 +158,108 @@ pre-existing hand-built `errors`-only tests stay green via the fallback) and `te
 ledger + manifest. Additive optional fields only; no durable-schema change.
 
 ## 2026-06-15
+
+### openrouter_observability Phase 2 review fixes (R1–R3): no metadata lost on the incident path
+
+**Goal**: Close three gaps a review found in the shipped Phase 2 carry-through, all on paths the card exists to trace.
+
+**Key changes**:
+
+- **R1 (high) — cancelled streams keep the gen id**: `openrouter.py` stream now **emits `provider_meta` on the first
+  content/tool event** (not only terminal usage/`response_end`), and `client_adapter.py` carries it as a **dedicated
+  metadata-only chunk** (`choices=[]`) the instant it first appears. A stream aborted before its final usage chunk — the
+  incident — now still delivers `provider_generation_id` to the Phase 3 seam.
+- **R2 (medium) — LiteLLM Responses streaming fallback keeps meta**: the synthetic events (text_delta, tool_call_delta,
+  usage, response_end) now pass `provider_meta=response.provider_meta` instead of dropping it.
+- **R3 (low/med) — direct OpenRouter non-streaming populates headers**: `_make_completion_request` switches to
+  `with_raw_response.create()` (`raw.parse()` + `raw.headers`) so the direct path gets allowlisted
+  `provider_meta.headers` like the LiteLLM path. The header allowlist (`provider_trace_headers` +
+  `merge_provider_headers`) moved to `openai_compat.py` so both paths share one source; the prior "deferred" scope note
+  is removed.
+
+**Verification**: +6 unit tests (incident carrier chunk, end-before-usage, Responses fallback meta, direct-path headers,
+shared-allowlist merge); full `make test-unit` 6125 passed; mypy + pyright clean; scoped `pre-commit` clean.
+
+### openrouter_observability Phase 2: provider metadata through core.llm (additive ProviderTraceMeta)
+
+**Goal**: Lift the provider/generation id, selected upstream, and allowlisted correlation headers out of raw provider
+dicts and carry them to the proxy boundary on an additive, nested `ProviderTraceMeta`, kept separate from Forge's
+synthetic `chatcmpl-<ts>` id.
+
+**Key changes**:
+
+- `core/llm/types.py` + `__init__.py`: new `ProviderTraceMeta(BaseModel)` (7 optional fields); `provider_meta` added to
+  `CompletionResponse` and `StreamEvent`; exported. Additive — fakes/old providers keep working.
+- `openai_compat.py`: `provider_trace_meta()` sets `provider_response_id` from `body.id`, `provider_generation_id` only
+  when the id is a `gen-…` (so `chatcmpl-` ids don't masquerade), `selected_provider` from the body `provider` field.
+- `openrouter.py` stream: captures the **first-seen** `chunk.id` (set-once, `isinstance(str)` guarded) and attaches it
+  to the usage/`response_end` events — first-seen is what survives a cancelled stream (the incident).
+- `litellm.py`: tiny exact-name header allowlist (`provider_trace_headers`) + `_merge_response_metadata` populating
+  `provider_meta.headers` on the raw-response paths (never auth/cookies). Direct `openrouter.py` header capture deferred
+  (it has no `with_raw_response`; body/chunk id already carries the gen id).
+- `proxy/client_adapter.py`: widened `AdapterProviderType` to include `"openrouter"` (removed the now-redundant
+  `type: ignore`); `provider_meta` carried as a typed `model_dump` under `_provider_meta` (non-streaming) and the usage
+  chunk (streaming), mirroring `reported_cost_micros` and kept distinct from the synthetic id.
+
+**Verification**: +25 unit tests across `test_types`, `test_openai_compat`, `test_openrouter`, `test_litellm_cost`,
+`test_client_adapter`; full `make test-unit` 6119 passed; mypy + pyright + `make pre-commit` clean. (Reconstruction +
+the converters read land at the Phase 3 trace seam.)
+
+### openrouter_observability Phase 1: Forge-owned session ids + X-Forge-Session/Command headers
+
+**Goal**: Mint opaque, path-free provider grouping ids and propagate the hashed session name + command role from
+headless spawns to the proxy via two new sanitized, leak-gated headers — the identity foundation later phases join on.
+
+**Key changes**:
+
+- `core/run_id.py`: added `derive_provider_session_id(label, root_run_id, role)` (SHA-256 12-hex; explicit
+  `forge_run_<hash(root_run_id)>` fallback when no session label), one `sanitize_label` that canonicalizes all separator
+  runs to `_` (so the id suffix and `X-Forge-Command` can't drift), and `is_valid_label`/`is_valid_provider_session_id`
+  validators distinct from `RUN_ID_RE`. Header/env-var name constants added.
+- `core/reactive/env.py`: `_apply_correlation_headers` stamps `X-Forge-Session` (always emittable via the fallback) +
+  `X-Forge-Command` (role only), both added to the Forge-owned strip-set, gated to a proven Forge proxy.
+- Headless spawns tag their role + session: `supervisor` (`supervisor.py`), `memory_writer` (`memory_writer.py`),
+  `review` (`engine.py`, command-only). Used the existing `run_claude_session(extra_env=...)` pass-through — no
+  signature change (the plan's "plumbing gap" was a misread).
+- `proxy/server.py`: middleware reads + validates both headers (spoof/over-long → `None`), stores on `request.state`
+  before both wire branches; getter `_forge_session_command` added for the Phase 3 trace writer. Headers are never
+  forwarded upstream (passthrough allowlist already excludes them — asserted, not re-stripped).
+- `design_appendix.md` §A.13: documented the two headers as internal-only correlation, distinct from Phase 5 `user`.
+
+**Verification**: New `test_server_forge_headers.py` (10) + additions to `test_run_id.py`, `test_env.py`,
+`test_supervisor.py`, `test_memory_writer.py`; full `make test-unit` 6094 passed; `make pre-commit` clean.
+
+### openrouter_observability Phase 0: live-probe the OpenRouter externals
+
+**Goal**: Pin the live OpenRouter behaviors the card's later phases assume, before any provider-id field is populated.
+
+**Key changes**:
+
+- **Probe harness** (`scripts/experiments/openrouter/`): operator-gated, staged `reproduce.sh` + `lib.sh` +
+  scan-and-fail `sanitize.sh` + async/typed `helpers/or_probe.py` + 5 stages + README. Reuses Forge credential
+  resolution read-only; metadata-only records (no keys; no raw bodies without `--debug-raw`).
+- **Findings** (`phase0-results.md`): the `gen-` id is in `body.id`, the `x-generation-id` header, **and** every
+  streaming `chunk.id` (stable) -> streaming `provider_generation_id` is **not** structurally `None` (corrects the card
+  hedge); Forge's canonical types drop it today. A stream cancelled after the first chunk is `[REMOTE-ABSENT]` (not
+  retrievable via `/generation` or `/activity`), so a local-only trace is justified. On the direct path OpenRouter
+  **records the OpenAI-standard `user`** (`[CHANNEL-USER-RECOGNIZED]`) but **ignores a custom `session_id`** -> Phase 5
+  channel correction: inject under `user`, not `session_id`. Sticky routing `[STICKY-NEUTRAL]` across both arms
+  (recognition is not routing impact) -> no enable recommendation; flag stays opt-in for observability.
+- **Bug caught + fixed**: probe 2's first `[REMOTE-PRESENT-GENERATION]` was a false positive -- `_http_get` counted a
+  404 JSON error body as "present". Fixed with an HTTP-200 gate (`_generation_present`), an eventual-consistency poll
+  (`~23s`; an immediate `/generation` lookup 404s even for completed calls, which index in ~3s), and a completed-call
+  baseline control that only allows `[REMOTE-ABSENT]` when the control indexes while the aborted id does not.
+- **Review fixes** (post-run): `sanitize.sh` now **requires** GNU sed/grep (BSD silently no-ops `\b`, risking a
+  false-clean secret scan); probe 3 recognition now polls the indexed `/generation` record (`_poll_generation_body`) --
+  the polled re-run **flipped** `[CHANNEL-UNVERIFIABLE]` to `[CHANNEL-USER-RECOGNIZED]` (the un-polled lookup had masked
+  a real recognition); `_routing_verdict` now spans **both** sticky arms so a `user` divergence can't hide behind a
+  neutral `session_id`.
+
+**Verification**: Adversarial workflow (3 independent agents) confirmed the false positive and audited every probe for
+the bug class. Helper offline-tested (status gate + interleaved poll + both-arm routing verdict). Operator re-ran probes
+1-3: probe 1 `[GENID-IN-STREAM-CHUNK]`, probe 2 `[REMOTE-ABSENT]`, probe 3 `[CHANNEL-USER-RECOGNIZED]`. Pre-commit clean
+on all changed files (ruff/black/isort/mypy/pyright/mdformat/gitleaks); `sanitize.sh` OK. All four probes settled; Phase
+0 ships no `src/` change.
 
 ### supervisor_launch_controls: launch-time cascade parity + reasoning effort across all `claude -p` subprocesses
 
@@ -938,235 +1136,44 @@ mocked so codex auth is the only hard dep); 5b real-codex smoke regression green
 preflight + invoker) + the end-user cross-runtime workflow doc. No CLI command and no `SessionStart`-hook delivery (both
 Phase 6).
 
-## 2026-06-08
+## 2026-06-08 (compacted)
 
-### Phase 5b-5d: Codex headless runtime (invoker + usage + transfer relabel)
+- **Phase 5b-5d: Codex headless runtime.** Probe-first codex-cli 0.137.0 fixtures; `codex_stream.py` parser; extracted
+  `_HeadlessLifecycleBase` (six hooks) shared by Claude + Codex invokers; `CodexHeadlessInvoker`
+  (`codex exec --json --sandbox`); `emit_codex_usage` (`confidence=unavailable`, honest `cost=None`); `target_runtime`
+  threads transfer (default `claude`, byte-identical). Decisions: cost-only ledger confidence; SessionStart-hook
+  delivery deferred to Phase 6. 430 unit + real-codex `@slow` smoke green.
+- **Phase 5a: Codex preflight.** Render-free `CodexPreflight` (`codex_preflight.py`); binary-authoritative auth
+  (`CODEX_API_KEY` -> `CODEX_ACCESS_TOKEN` -> `codex doctor` -> fail closed); `ready` never keys off `overallStatus`;
+  the resolved key is never a result field (no `--json` leak). `codex-api` credential + `forge runtime preflight codex`.
+  85 + 244 tests; live Ready YES on 0.137.0.
+- **Phase 5 planning + Slice 5.0.** Adversarial web sweeps corrected stale Codex facts (hooks default-on; 10 lifecycle
+  events; Responses-only wire). Shipped Codex `RuntimeSpec`; expanded the Phase 5 checklist (5.0-5f); one-shot
+  `codex exec` transport (app-server deferred).
+- **Phase 4g: Exact cost for proxied `claude -p`.** A run-tree join replaces the concurrency-fragile snapshot delta:
+  additive `forge_run_id`/`forge_root_run_id` on cost records (no schema bump); env stamps `X-Forge-Run-ID/-Root-Run-ID`
+  only for a headless child hitting a **proven** Forge proxy; read-time suppression is **per-run-subtree** (whole-root
+  was a silent undercount -- regression guard). No-dollars route renders **unavailable**, never `$0`. Live 4g.0 canary
+  passed (6 cases, Claude Code 2.1.168).
 
-**Goal**: Ship the Codex build group -- a `CodexHeadlessInvoker` reusing the hardened lifecycle, a native usage emitter,
-and a `target_runtime`-aware transfer relabel -- so the Phase 5e plan-in-Claude/implement-in-Codex bridge has its parts.
+## 2026-06-07 (compacted)
 
-**Key changes**:
-
-- **Probe-first (B0)**: captured a real `codex exec --json` run (codex-cli 0.137.0) verbatim into
-  `tests/fixtures/codex/` (success + error streams + `-o` oracle + provenance README). The fixture is authoritative over
-  docs; it confirmed the doc-sourced token field names (`input_tokens`/`cached_input_tokens`/`output_tokens`).
-- **Parser (B1)**: `core/invoker/codex_stream.py` reduces the JSONL event stream -> `(final_text, tokens, is_error)`; a
-  failed turn (`error`+`turn.failed`) maps to `runtime_is_error`.
-- **Shared lifecycle (B2)**: extracted the hardened `run`/`run_parallel` lifecycle into `_HeadlessLifecycleBase`
-  (`core/invoker/_lifecycle.py`) with six template hooks; `ClaudeHeadlessInvoker` subclasses it ("moved, not changed").
-  Migrated ~30 test patch-strings `claude.<sym>` -> `_lifecycle.<sym>` across the invoker test + 3 review drivers + the
-  json-flag regression; both retry-race canaries stayed green.
-- **Invoker + builder (B3/B4)**: `core/invoker/codex.py` -- `CodexHeadlessInvoker` (format-retry predicate always
-  `False`) + `prepare_codex_request` (argv `codex exec --json --sandbox`, key injected only for env/credential_file
-  auth, no proxy, run-tree triple stamped via the neutral `stamp_run_identity` factored out of `build_claude_env`).
-- **Usage (5c)**: `emit_codex_usage` -- `route=codex_exec`/`reporter=codex_jsonl`/`runtime_native`,
-  `confidence=unavailable` + `cost=None`/`source_refs=None` (direct to OpenAI; honest cost absence), `billing_mode` from
-  `CodexPreflight` via a new optional `Attribution.billing_mode`.
-- **Transfer (5d)**: `target_runtime` threads through `assemble_transfer_context` (default `claude`, byte-identical to
-  pre-5d) -> frontmatter + `## Runtime Hints`; `forge transfer regenerate --target-runtime {claude|codex}` defaults from
-  the cache (no silent flip). Delivery is initial-message (no SessionStart hook -> Phase 6).
-- **Design sync**: `design.md` §5.5.5 (shared `_lifecycle` base + two invokers), §3.14 (native Codex emitter), §3.9
-  (`target_runtime` + initial-message delivery).
-
-**Decisions**: 5c `confidence=unavailable` (ledger confidence is cost-only; Codex reports no $); 5d minimal relabel
-(body stays Claude-worded; curation tuning deferred); SessionStart-hook delivery deferred to Phase 6 (`hook_seam` can't
-confirm per-hook trust).
-
-**Verification**: 430 hermetic unit tests (invoker/usage/transfer/CLI + migrated review/regression); real-codex `@slow`
-smoke green (8s, full stack: builder -> invoker -> real `codex exec` -> parser -> emitter); `mypy` clean (15 files);
-`make pre-commit` clean.
-
-### Phase 5a: Codex auth/runtime preflight (probe-first)
-
-**Goal**: Ship a read-only native-Codex preflight -- run before any `codex exec` -- that resolves a non-interactive
-credential, fails closed with setup guidance, and exposes a stable `CodexPreflight` contract for slices 5b/5c/5d, after
-a live probe of the installed `codex` binary to correct doc-implied assumptions.
-
-**Key changes**:
-
-- **Stage-A probe (codex-cli 0.137.0, binary-authoritative)**: `codex doctor --json` is `schemaVersion: 1` with
-  **string-boolean** auth details (`stored API key`/`stored ChatGPT tokens`/`stored agent identity` =
-  `"true"`/`"false"`), parses a valid report **even on non-zero exit**, and reports `overallStatus="warning"` while auth
-  is fine (so it must NOT gate readiness). It exposes **no per-hook trust** check -- so 5a never claims a trusted hook.
-  Sanitized note in the 5a checklist.
-- **`src/forge/core/runtime/codex_preflight.py`** (render-free core): frozen `CodexPreflight` + `preflight_codex` /
-  `assert_codex_ready` (typed `CodexPreflightError`, mirroring `validate_proxy_startup`). Auth resolution is
-  binary-authoritative: Forge `CODEX_API_KEY` (env/file) -> `CODEX_ACCESS_TOKEN` (env) -> `codex doctor` stored auth ->
-  fail closed. `ready = installed AND auth resolved AND not responses-blocked` -- never `overallStatus`. `hook_seam`
-  never returns `active` (trust is a 5d per-hook-hash check); managed suppression is claimed only on explicit
-  `requirements.toml` evidence. The resolved key value is **never** a result field (would leak via `asdict()`/`--json`);
-  5b reads it via the non-rendered `codex_api_key_for_subprocess()`.
-- **Responses as a report, not a route**: `--proxy <id>` reads an existing proxy's `wire_shape` via
-  `config.loader.load_proxy_instance_config` (lazy import; no `forge.proxy` dependency, no `/v1/responses` route);
-  neither wire shape serves Codex Responses, so a proxied route is `proxy_unsupported` and direct `codex exec` is
-  preferred.
-- **`codex-api` (`CODEX_API_KEY`) credential** added to `CREDENTIALS`; note clarifies it is not OPENAI_API_KEY and not
-  the ChatGPT login (Codex owns its own store).
-- **CLI** `forge runtime preflight codex [--proxy] [--json]`: Rich report; `--json` dumps the secret-free dataclass;
-  exit 1 when not ready.
-- **Review hardening (2026-06-08)**: `_resolve_responses_posture` catches the config loader's `ValueError`/`TypeError`
-  (invalid id / corrupt `proxy.yaml`) -> `proxy_unsupported`, not a traceback (preserves the never-raise contract);
-  version comparison pads components (`0.131` meets the `0.131.0` floor); stored-auth resolution documented as
-  PRESENCE-based (a non-"ok" `auth.credentials.status` does not fail-close -- validity is proven at 5b). Stale
-  credential docs updated (`authentication.md` + `design_appendix.md`: six credentials, `codex-api` row,
-  `not_needed_for` note); managed-suppression tests made fully hermetic + the nested-TOML parser branch covered.
-
-**Verification**: 85 focused tests (`test_codex_preflight.py`, `test_runtime.py` preflight, `test_capabilities.py`
-codex-api) + 244 broader (auth/runtime/CLI) green; mypy + pyright 0/0/0 on changed src. Live
-`forge runtime preflight codex` on 0.137.0: `chatgpt_tokens`/`subscription_quota`, `hook_seam=unknown`,
-`doctor=warning`, **Ready YES**, exit 0 (unknown `--proxy` -> exit 1; non-codex runtime -> exit 2). No
-Docker/integration tier (5a spawns nothing). 5b-5f remain provisional pending a re-plan from the Stage-A findings.
-
-### Phase 5 planning + Slice 5.0: Codex/Claude runtime-fact corrections
-
-**Goal**: Scope Phase 5 (cross-runtime resume) and, before planning, re-verify the `runtime_abstraction` card's
-external-tool assumptions against current Claude Code + Codex CLI — the card pinned Codex 0.124.0, now 0.137.0 stable
-(~13 minors stale).
-
-**Key changes**:
-
-- **Research**: three adversarially-verified web sweeps (every claim grounded in fetched official docs or the installed
-  `codex` binary) produced a per-assumption diff. Corrected stale Codex facts: hooks are **default-on**
-  (`[features] hooks`; `codex_hooks` is a **deprecated alias**, not "required" and not "removed"); **10** lifecycle
-  events (was 5); `SessionStart` additionalContext is the transfer-injection seam but **conditional** on hook
-  enablement+trust (keep an initial-message fallback); `PreToolUse` can mutate via `updatedInput`; first-party
-  non-interactive auth (`CODEX_API_KEY` / `codex login --device-auth` / enterprise tokens) + `codex doctor`; Codex emits
-  `wire_api="responses"` only, so a proxy must serve Responses on its **Codex-facing** surface (a translated
-  chat-completions backend does not block); `codex app-server --stdio` is a real alias for `--listen stdio://` (verified
-  against the 0.137.0 binary — the rendered docs table omitted it).
-- **Slice 5.0 (registry, shipped)**: `core/runtime/registry.py` Codex `RuntimeSpec` → `hook_feature_flag=None`,
-  `hook_min_version="0.131.0"`, default-on note (10 events, `updatedInput`, `allow_managed_hooks_only`, Responses,
-  SessionStart-trust caveat); `HookSupport` comment generalized to version-gated. `card.md` hooks paragraph + capability
-  matrix + posture bullets + Phase 5/6 notes and `design.md` §5.5.5 corrected.
-- **Plan**: `checklist.md` Phase 5 expanded from a 4-task stub to slices 5.0 (done) → 5a auth/runtime preflight → 5b
-  `CodexHeadlessInvoker` (one-shot `codex exec`) → 5c usage attribution → 5d target-runtime curator (SessionStart +
-  fallback) → 5e Claude→Codex demo → 5f doc sync, with fixture-grounded acceptance tables, a research verdict, and an
-  Open Risks list. Transport decision recorded: one-shot `codex exec` (app-server a deferred follow-up).
-
-**Verification**: `tests/src/core/runtime/test_registry.py` + `tests/src/cli/test_runtime.py` → 17 passed; mypy clean on
-changed src. Otherwise docs/planning (no runtime behavior change beyond registry data). `make pre-commit` clean.
-
-### Phase 4g: Exact cost attribution for proxied `claude -p` (run-tree correlation)
-
-**Goal**: Replace the concurrency-fragile before/after proxy snapshot delta for proxied `claude -p` cost
-(`verb_snapshot_estimated`, polluted when a session shares the proxy) with an **exact** join that correlates each cost
-record to the Forge run that incurred it. ToS-clean: Forge's own headless subprocesses through Forge's own proxy, opaque
-non-secret run ids; no credential extraction; the interactive OAuth session is untouched. Resolves the last Phase 4 open
-decision.
-
-**Key changes**:
-
-- **Join key is the run tree, not `source_refs`.** One `claude -p` run makes many requests, so the single-valued
-  `source_refs.cost_request_id` is the wrong shape — `source_refs` stays null on `claude -p`
-  (`test_bug_usage_claude_p_null_source_refs.py` holds, no `UsageEvent` schema change). Cost records gain additive
-  `forge_run_id`/`forge_root_run_id` (`schema_version` 1, no bump; reader uses `.get()`).
-- **Env injection (gated, Forge-owned).** `build_claude_env` stamps `X-Forge-Run-ID`/`X-Forge-Root-Run-ID` via
-  `ANTHROPIC_CUSTOM_HEADERS` only for a headless child (`derive_run_identity`) targeting a **proven Forge proxy**
-  (`target_is_forge_proxy` OR marker present **and** `base_url == FORGE_SUBPROCESS_BASE_URL`) — an opaque/third-party
-  base_url, including an inherited marker + explicit opaque override, never leaks the header. Strips inherited
-  `X-Forge-*` lines, preserves user lines.
-- **Proxy validate + stamp.** Middleware validates each inbound id (`^run_[0-9a-f]{12}$`, shared with `mint_run_id` via
-  the new dependency-free `forge.core.run_id` leaf) and stores `None` on a spoof/malformed value; threads the ids
-  through `_calc_and_log_cost` -> `log_request_cost`. One site covers both wire shapes.
-- **Read-time root join + suppression.** `sum_reported_cost_by_root` returns `has_records`/`runs_with_records`
-  (presence, incl. dollar-less records) and `has_cost`/`per_run` (dollars) separately;
-  `usage_summary._join_session_cost` sums by `forge_root_run_id` and suppresses a `verb_snapshot_estimated` event
-  **per-run-subtree** — only when its OWN run produced records, or it is a verb whose DIRECT children did (fan-out, via
-  worker `parent_run_id`). Whole-root suppression was wrong: it dropped a correctly-unstamped sibling's snapshot
-  whenever any run under the shared session root was stamped (silent undercount). A no-dollars route renders
-  **unavailable**, never `$0`; root-summing still captures orphan cancelled leaves. The event stays
-  `verb_snapshot_estimated`; the read surface recomputes the exact figure (`proxy_request_exact`) and renders it
-  **without the `~` estimate marker** (`cost_estimated=False` on the summary/command DTOs drives `forge activity` and
-  the session-end line).
-
-**Verification**: Unit + regression suites green — `test_run_id.py`, `test_cost_logger.py::TestForgeRunCorrelation`
-(+`runs_with_records` presence), `test_env.py::TestCorrelationHeaders`, `test_usage_summary.py::TestRootJoin4g`
-(+exactness flags), `test_activity.py` (exact renders without `~`), and
-`tests/regression/test_bug_4g_mixed_stamped_unstamped_undercount.py` (the shared-root undercount guard); mypy clean.
-Docs synced (design.md §3.14, design_appendix.md §A.9/§A.13, card + checklist). **4g.0 feasibility canary PASSED**
-(`tests/integration/proxy/test_forge_run_id_correlation.py`, all 6 cases, 28.6s) against a live OpenRouter-backed Forge
-proxy on **Claude Code 2.1.168** — proving the load-bearing external dependency on the real wire: plain `claude -p`,
-`claude -p --bare`, and a multi-request tool loop where the tool loop forced >= 2 requests and **every** record carried
-the run ids. The standing version-regression guard records the validated version (`CLAUDE_VERSION_VALIDATED`).
-
-## 2026-06-07
-
-### Docs: correct the `claude_session_id` pre-seed lifecycle (design.md §3.3/§3.5 + session.md)
-
-**Goal**: design.md §3.3/§3.5 and the end-user session guide said `claude_session_id` is "not pre-seeded by the CLI" /
-"`None` until Claude starts" / "a non-null value means it has been used" — true only for the native `--fork-session`
-path. The `forge session start` path (and transfer/fresh children) actually **pre-seed** it (the CLI generates the UUID,
-writes it at creation, imposes it via `--session-id`) and the SessionStart hook **validates** it. Align the normative
-and user docs to the shipped code (documentation-guidelines Rule 2: design docs describe shipped behavior).
-
-**Key changes**:
-
-- **design.md §3.3** (1:1 invariant): every launch that starts a **new** Claude conversation pre-seeds —
-  `forge session start` and transfer/fresh children (`fork`, `resume --fresh`) generate a UUID and impose it via
-  `--session-id`, which the hook validates; only **native** `--fork-session` forks do not pre-seed (Claude mints, hook
-  records; `native-relocate` reuses the parent UUID). A non-null UUID alone is **not** "used" (a `--no-launch` start
-  session already carries a pre-seeded UUID) — "used"/resumable requires hook confirmation or transcript-backed
-  evidence, matching `_is_resumable_session` ("Pre-seeded UUIDs without other evidence are still rejected").
-- **design.md §3.5**: the CLI-writes note now states the CLI pre-seeds for start + transfer/fresh children; the
-  Hooks-write note says SessionStart validates (those paths) or records (native `--fork-session`).
-- **end-user/session.md**: same corrections, and fixed a self-contradictory resume section — the stale "never-launched →
-  launch in-place / previously-used → fork" bullets now describe reattach-by-default vs `--fresh`-derives-a-child,
-  matching the adjacent intro/Gates text and `_reconnect_in_place` (`--resume`, no `--fork-session`).
-
-**Verification**: Docs-only — no code change (the code was already self-consistent: `models.py:400` comment, the
-start/fork launch paths, and `_is_resumable_session` all agree). Grep confirms no stale "not pre-seeded" / "None until
-Claude starts" / "non-null means used" claims remain outside `done/`. `make pre-commit` clean.
-
-### Fix: `project_root` consistently git-common-dir-derived (workspace_scope Slice 1)
-
-**Goal**: Sessions started in a **manually**-created linked worktree (`git worktree add`, then `forge session start` —
-not `--worktree`) did not group under `--scope workspace`, defeating the core motivation of the `workspace_scope`
-proposal. Fix the latent `project_root` derivation bug rather than layer a new scope concept over it.
-
-**Key changes**:
-
-- `SessionManager.start_session` and the same-directory `fork` path derived `project_root` via
-  `find_project_root(worktree_path)`, which returns the *worktree's own* root for a linked worktree (its `.git` is a
-  file). Both now route through the existing canonical `resolve_project_root()` (`get_main_repo_root` + graceful non-git
-  fallback), so `project_root` is the shared git-common-dir root for every worktree of a repo — aligning the code with
-  design.md §3, which already names `get_main_repo_root()` as the `project_root` identity source. Removed the now-unused
-  `find_project_root` import.
-- Minor improvement: a `.forge/`-enabled non-git directory no longer raises mid-`start_session`; `project_root` degrades
-  to the directory itself, consistent with how `checkout_root` already falls back.
-
-**Verification**: New regression `tests/regression/test_bug_workspace_scope_manual_worktree.py` (confirmed failing on
-the old derivation — `wt-sess` missing from `--scope workspace` — and passing after the fix). 1031 session+ops unit
-tests pass; `make pre-commit` clean. No design-doc change (the fix makes code match the existing §3 contract).
-
-### Rename `--scope repo` → `--scope workspace` (workspace_scope precursor, clean break)
-
-**Goal**: Resolve concern #1 from the `workspace_scope` proposal review — the proposed `--scope workspace` would have
-been a synonym of the existing `--scope repo` (the logical-repo / worktree-family grouping). Rename the flag value
-instead of adding a second name, so the CLI keeps one scope vocabulary.
-
-**Key changes**:
-
-- **Flag value renamed across all four command families** that share the `repo|project|all` scope: `forge session list`,
-  `forge clean`, `forge memory status|shadows *`, and the `%session list` / `%clean` direct commands. `VALID_SCOPES`
-  (`core/ops/session.py`, `core/ops/gc.py`), Click `Choice`/`default`/help, error messages, and the `%`-dispatcher
-  defaults all use `workspace`. `session list` + `%session list` defaults flip `repo` → `workspace` (identical
-  filtering, new name); `clean`/`memory`/`%clean` keep their existing `project` defaults.
-- **Clean break (research-preview)**: `--scope repo` now fails with Click's native "invalid choice" — no alias or
-  tombstone (coding-standards §5). This is a pure CLI-surface + `--json` `"scope"` output rename; the durable session
-  index is untouched (the `project_root` field is kept — workspace membership is still derived from it, not stored).
-- **Vocabulary swept** in prose/docstrings: "repo-scoped"/"repo-wide" → "workspace-scoped"/"workspace-wide" across
-  design.md §3/§3.2/§4.0, design_appendix §B, end-user `session.md`, `diagrams.md`, and internal resolution docstrings.
-  **Preserved deliberately** (workspace_scope card Open Q1, deferred): the `resolve_session_repo_wide` function symbol,
-  the `project_root` field name, and the git-identity term "logical repo". `done/` board cards left as historical
-  snapshots (board contract).
-
-**Breaking change / reset**: `forge session list --scope repo`, `forge clean --scope repo`,
-`forge memory ... --scope repo`, and `%clean --scope repo` are removed — use `--scope workspace` (same behavior). Update
-any scripts/aliases.
-
-**Verification**: 438 unit+regression tests pass across the affected suites (session ops, gc, resolution, clean CLI,
-session/memory CLI, `%`-dispatcher, shadow curation, cross-project regression). Final grep confirms no `--scope repo` /
-"repo-scoped" / "repo-wide" prose remains outside `done/`. `make pre-commit` clean.
+- **Docs: `claude_session_id` pre-seed lifecycle** (design.md §3.3/§3.5 + session.md). Aligned normative + user docs to
+  shipped code: every launch starting a **new** Claude conversation pre-seeds the UUID (`forge session start` +
+  transfer/fresh children impose `--session-id`; the hook validates) — only native `--fork-session` doesn't pre-seed. A
+  non-null UUID alone is **not** "used"; resumable requires hook/transcript evidence (`_is_resumable_session`).
+  Docs-only; `make pre-commit` clean.
+- **Fix: `project_root` git-common-dir-derived** (workspace_scope Slice 1). `start_session` + same-dir `fork` now route
+  through `resolve_project_root()` (not `find_project_root(worktree_path)`), so every worktree of a repo shares the
+  git-common-dir root — manual linked worktrees now group under `--scope workspace`; non-git `.forge/` dirs degrade
+  gracefully. Regression `test_bug_workspace_scope_manual_worktree.py`; 1031 tests pass; matches the existing §3
+  contract.
+- **Rename `--scope repo` → `--scope workspace`** (workspace_scope precursor, clean break). Renamed the flag value
+  across `session list`, `clean`, `memory status|shadows`, `%session list`/`%clean` (`VALID_SCOPES`, Click choices,
+  `--json` `"scope"`). Clean break — `--scope repo` fails with Click's native "invalid choice", no alias
+  (coding-standards §5); durable session index untouched (`project_root` kept). **Preserved deliberately** (Open Q1):
+  the `resolve_session_repo_wide` symbol, `project_root` field, "logical repo" term. 438 tests pass; `make pre-commit`
+  clean.
 
 ## 2026-06-06 (compacted)
 

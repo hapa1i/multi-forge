@@ -26,7 +26,7 @@ from forge.proxy.base_client import ProxyStreamError
 
 logger = logging.getLogger(__name__)
 
-AdapterProviderType = Literal["litellm_remote", "litellm_local"]
+AdapterProviderType = Literal["litellm_remote", "litellm_local", "openrouter"]
 
 
 def _extract_cache_info(usage: dict[str, int] | None) -> dict[str, Any]:
@@ -96,7 +96,7 @@ class CoreLLMClientAdapter:
         # Model includes vendor prefix (e.g., "openai/gpt-5.5")
         self._client = get_client(
             model,
-            provider=provider,  # type: ignore  # AdapterProviderType is subset of ProviderType
+            provider=provider,
             default_hyperparams=default_hyperparams,
         )
 
@@ -227,6 +227,11 @@ class CoreLLMClientAdapter:
         # the route-reported cost in micros, read by the proxy's _calc_and_log_cost.
         if response.cost_usd is not None:
             result["_reported_cost_micros"] = round(response.cost_usd * 1_000_000)
+        # Internal-only carrier (Phase 2): the provider-trace metadata as a plain dict, kept
+        # strictly separate from the synthetic ``chatcmpl-<ts>`` id above and dropped at the
+        # Anthropic translation. Reconstructed to ProviderTraceMeta by the Phase 3 trace seam.
+        if response.provider_meta is not None:
+            result["_provider_meta"] = response.provider_meta.model_dump(exclude_none=True)
         return result
 
     async def create_completion(self, openai_request: Dict[str, Any], request_id: str) -> Dict[str, Any]:
@@ -263,6 +268,14 @@ class CoreLLMClientAdapter:
         if isinstance(user_agent, str) and user_agent:
             openai_extra = hyperparams_data.setdefault("extra", {}).setdefault("openai", {})
             openai_extra["extra_headers"] = {"User-Agent": _sanitize_header_value(user_agent)}
+
+        # Forward the Forge session grouping id into OpenRouter's top-level `user` field when the
+        # server opted in (openrouter_observability Phase 5). Shares the extra["openai"] dict with
+        # the User-Agent header; build_chat_completion_kwargs merges it to a top-level `user` kwarg.
+        forge_user = openai_request.get("_forge_user")
+        if isinstance(forge_user, str) and forge_user:
+            openai_extra = hyperparams_data.setdefault("extra", {}).setdefault("openai", {})
+            openai_extra["user"] = forge_user
 
         hyperparams = ModelHyperparameters(**hyperparams_data)
 
@@ -322,14 +335,38 @@ class CoreLLMClientAdapter:
             openai_extra = hyperparams_data.setdefault("extra", {}).setdefault("openai", {})
             openai_extra["extra_headers"] = {"User-Agent": _sanitize_header_value(user_agent)}
 
+        # Forward the Forge session grouping id into OpenRouter's top-level `user` field when the
+        # server opted in (openrouter_observability Phase 5). Shares the extra["openai"] dict with
+        # the User-Agent header; build_chat_completion_kwargs merges it to a top-level `user` kwarg.
+        forge_user = openai_request.get("_forge_user")
+        if isinstance(forge_user, str) and forge_user:
+            openai_extra = hyperparams_data.setdefault("extra", {}).setdefault("openai", {})
+            openai_extra["user"] = forge_user
+
         hyperparams = ModelHyperparameters(**hyperparams_data)
 
         # Track accumulated tool calls by OpenAI index (not id — id only in first chunk)
         accumulated_tool_calls: Dict[int, Dict[str, Any]] = {}
         response_id = f"chatcmpl-{int(time.time())}"
         final_usage: dict[str, int] = {}
+        provider_meta_carried = False  # emit the trace-meta carrier chunk at most once
 
         async for event in self._client.stream(messages, tools=tools, hyperparams=hyperparams):
+            # Emit the provider-trace metadata as its own internal-only chunk the instant it
+            # first appears (Phase 2). The core client publishes it on the FIRST content/tool
+            # event, so the Phase 3 SSE seam stashes the generation id BEFORE any cancellation --
+            # even on a stream aborted before the final usage chunk (the incident path).
+            if not provider_meta_carried and event.provider_meta is not None:
+                provider_meta_carried = True
+                yield {
+                    "id": response_id,
+                    "object": "chat.completion.chunk",
+                    "created": int(time.time()),
+                    "model": self.model_name,
+                    "choices": [],
+                    "_provider_meta": event.provider_meta.model_dump(exclude_none=True),
+                }
+
             if event.type == "text_delta":
                 yield {
                     "id": response_id,
@@ -405,7 +442,8 @@ class CoreLLMClientAdapter:
                     "cached_tokens": event.usage.get("cached_tokens", 0) if event.usage else 0,
                 }
                 # Internal-only carrier (dropped by the Anthropic translation): route-reported
-                # cost in micros, read by the SSE converter → _on_stream_complete.
+                # cost in micros, read by the SSE converter → _on_stream_complete. (provider_meta
+                # rides its own earlier carrier chunk above, so a cancelled stream still has it.)
                 if event.cost_usd is not None:
                     usage_chunk["reported_cost_micros"] = round(event.cost_usd * 1_000_000)
                 yield {

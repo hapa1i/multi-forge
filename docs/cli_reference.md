@@ -108,6 +108,18 @@ default to the parent cache; `edit`/`diff` resolve a child (inferred when the pa
 | `forge proxy template edit <name>`   | Customize a template (copy-on-first-edit)                           |
 | `forge proxy template reset <name>`  | Reset template to built-in defaults                                 |
 
+### Provider trace
+
+| Command                                     | Purpose                                                                                       |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `forge provider trace list`                 | List recent OpenRouter traces (`--session`, `--root-run-id`, `--period`, `--limit`, `--json`) |
+| `forge provider trace show <request_id>`    | Show one trace record (`--json`)                                                              |
+| `forge provider trace explain <request_id>` | Local-only provenance narrative for a request (`--json`)                                      |
+
+Metadata-only, owner-only diagnostics over `~/.forge/providers/openrouter/traces/` (the fourth telemetry plane).
+`explain` answers "what happened to this request?" from local records only -- no remote lookup. `--session` matches the
+hashed session *label*; use `--root-run-id` for an exact match.
+
 ### Claude Code management
 
 | Command                           | Purpose                                     |
@@ -216,6 +228,8 @@ scope rationale remain in design.md.
 - **Session / plan**: allow `%session list` and `%plan`.
 - **Proxy**: allow read-only `%proxy list`, `%proxy show`, and `%proxy audit show/diff`; disallow `%proxy create`,
   `%proxy edit`, `%proxy set`, and `%proxy delete`.
+- **Provider trace**: allow read-only `%provider trace list`, `%provider trace show`, and `%provider trace explain`
+  (metadata only, never secrets).
 - **Policy / verification**: allow `%policy status`, `%policy enable`, `%policy disable`, `%policy check`,
   `%policy supervise`, and `%cancel-verification`.
 - **Cleanup**: allow `%clean [--scope workspace|project|all]` as a read-only report. Destructive cleanup stays in the
@@ -236,6 +250,7 @@ Shared commands (mirrors CLI syntax):
 - `%proxy list` (read-only: shows available proxies)
 - `%proxy show <id>` (read-only: shows proxy details and tier mappings)
 - `%proxy audit show|diff [id]` (read-only: recent audit metadata / wire changes; metadata only, never secrets)
+- `%provider trace list|show|explain` (read-only: recent provider traces / one record / local provenance narrative)
 - `%policy status` (shows current policy config and state)
 - `%policy enable --bundle tdd [--permissive]` (enables policy enforcement)
 - `%policy disable` (disables all policies for the session)

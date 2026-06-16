@@ -16,6 +16,7 @@ module only extracts usage and forwards bytes).
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from collections.abc import AsyncIterator, Callable, Mapping
@@ -23,6 +24,8 @@ from typing import Any
 
 import httpx
 from fastapi.responses import Response, StreamingResponse
+
+from forge.proxy.provider_trace_logger import record_provider_trace
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +97,9 @@ class _UsageAccumulator:
     def __init__(self) -> None:
         self.usage: dict[str, int] = {}
         self._buf = ""
+        # Lifecycle side-signals for the Phase 3 provider-trace mirror.
+        self.saw_content = False  # first user-visible content_block_start/delta seen
+        self.saw_final_usage = False  # final message_delta carried output_tokens
 
     def feed(self, chunk: bytes) -> None:
         try:
@@ -127,6 +133,9 @@ class _UsageAccumulator:
             parsed = _normalize_usage(event.get("usage"))
             if "output_tokens" in parsed:  # cumulative; last wins
                 self.usage["output_tokens"] = parsed["output_tokens"]
+                self.saw_final_usage = True
+        elif etype in ("content_block_start", "content_block_delta"):
+            self.saw_content = True
 
 
 # --- Forwarding ---------------------------------------------------------------
@@ -142,6 +151,7 @@ async def forward(
     path: str = "/v1/messages",
     on_complete: OnComplete | None = None,
     extra_headers: Mapping[str, str] | None = None,
+    provider_trace_ctx: Mapping[str, Any] | None = None,
 ) -> Response:
     """Forward a raw Anthropic request to ``{base_url}{path}`` and return the response.
 
@@ -198,6 +208,7 @@ async def forward(
                 resp,
                 request_id,
                 on_complete=on_complete,
+                provider_trace_ctx=provider_trace_ctx,
             ),
             media_type="text/event-stream",
             headers=stream_headers,
@@ -243,26 +254,78 @@ async def _stream_opened_upstream(
     resp: httpx.Response,
     request_id: str,
     on_complete: OnComplete | None = None,
+    provider_trace_ctx: Mapping[str, Any] | None = None,
 ) -> AsyncIterator[bytes]:
     """Stream raw SSE bytes from upstream back to the client unchanged.
 
     Usage is side-tapped from a copy of each chunk; ``on_complete`` fires once at
-    stream end (even on early client disconnect, via ``finally``).
+    stream end (even on early client disconnect, via ``finally``). The same lifecycle
+    is mirrored into the provider-trace plane (Phase 3) when ``provider_trace_ctx`` is
+    supplied -- latent today (the trace helper gates on direct OpenRouter, which never
+    rides the passthrough wire), but ready for a future passthrough-routed provider.
     """
     accumulator = _UsageAccumulator()
     failed = False
+    stream_started = False
+    client_disconnected = False
     try:
         async for chunk in resp.aiter_bytes():
+            stream_started = True
             yield chunk  # byte-faithful, unchanged
             accumulator.feed(chunk)  # tolerant side-tap (copy); never alters bytes
     except httpx.HTTPError as e:
         failed = True
         logger.warning("[%s] passthrough upstream stream failed: %s", request_id, e)
         yield b'{"type":"error","error":{"type":"upstream_error","message":"passthrough upstream stream failed"}}'
+    except (asyncio.CancelledError, GeneratorExit):
+        # Client dropped the relay. Both are BaseException (the httpx.HTTPError handler
+        # never sees them); record the disconnect, then re-raise for clean teardown.
+        client_disconnected = True
+        raise
     finally:
         await stream_cm.__aexit__(None, None, None)
         await client_cm.__aexit__(None, None, None)
         _safe_on_complete(on_complete, accumulator.usage, None, failed, request_id)
+        _record_passthrough_trace(
+            provider_trace_ctx,
+            stream_started=stream_started,
+            first_chunk_seen=accumulator.saw_content,
+            final_usage_seen=accumulator.saw_final_usage,
+            client_disconnected=client_disconnected,
+        )
+
+
+def _record_passthrough_trace(
+    provider_trace_ctx: Mapping[str, Any] | None,
+    *,
+    stream_started: bool,
+    first_chunk_seen: bool,
+    final_usage_seen: bool,
+    client_disconnected: bool,
+) -> None:
+    """Mirror the passthrough relay's lifecycle into the provider-trace plane (Phase 3).
+
+    Forward-wiring: ``record_provider_trace`` gates on ``provider_name == "openrouter"``
+    and passthrough never carries OpenRouter, so this writes nothing today -- the call
+    exists so the plane lights up with no seam change once a passthrough-routed provider
+    populates ``provider_meta``. Best-effort; never raises into the relay teardown.
+    """
+    if provider_trace_ctx is None:
+        return
+    try:
+        record_provider_trace(
+            **provider_trace_ctx,
+            request_mode="streaming",
+            provider_meta=None,  # no provider_meta carrier on the Anthropic-native wire
+            stream_started=stream_started,
+            first_chunk_seen=first_chunk_seen,
+            final_usage_seen=final_usage_seen,
+            client_disconnected=client_disconnected,
+            reported_cost_micros=None,  # passthrough cost is structurally unavailable
+            latency_ms=None,
+        )
+    except Exception as e:
+        logger.debug("passthrough provider trace skipped: %s", e)
 
 
 def _safe_on_complete(

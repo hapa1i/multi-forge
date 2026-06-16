@@ -25,6 +25,7 @@ from forge.core.invoker import (
     HeadlessResult,
 )
 from forge.core.reactive.env import (
+    FORGE_COMMAND_VAR,
     build_claude_env,
     can_use_bare,
     should_spawn_subprocesses,
@@ -244,7 +245,9 @@ def _prepare_worker(
     else:
         worker_prompt = spec.prompt
 
-    extra_env: dict[str, str] = {}
+    # Review fan-out is per-prompt with no session name in scope, so X-Forge-Session
+    # falls back to forge_run_<hash>; only the command role is stamped here.
+    extra_env: dict[str, str] = {FORGE_COMMAND_VAR: "review"}
     if not os.environ.get("ANTHROPIC_API_KEY"):
         ak = resolve_env_or_credential("ANTHROPIC_API_KEY")
         if ak:

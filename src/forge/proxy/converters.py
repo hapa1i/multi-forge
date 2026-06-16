@@ -36,8 +36,11 @@ from forge.proxy.utils import (
 
 logger = logging.getLogger(__name__)
 
-# on_complete(usage, failed, error_type) -- called when SSE stream finishes
-_OnCompleteCallback = Callable[[Dict[str, int], bool, Optional[str]], None]
+# on_complete(usage, failed, error_type) -- called when SSE stream finishes. `usage`
+# carries token ints PLUS reserved non-token keys the client never sees:
+# "reported_cost_micros" (int) and "_provider_trace" (Phase 3 lifecycle + provider_meta).
+# Hence Dict[str, Any].
+_OnCompleteCallback = Callable[[Dict[str, Any], bool, Optional[str]], None]
 
 
 # Tool parameters that non-Claude models compulsively fill with empty values.
@@ -800,10 +803,18 @@ async def convert_openai_to_anthropic_sse(
     tool_calls_buffer: Dict[int, Dict[str, Any]] = (
         {}
     )  # {openai_tc_index: {id: str, name: str, args: str, block_idx: int}}
-    final_usage: Dict[str, int] = {"input_tokens": 0, "output_tokens": 0, "cached_tokens": 0}
+    final_usage: Dict[str, Any] = {"input_tokens": 0, "output_tokens": 0, "cached_tokens": 0}
     _stream_failed = False
     _stream_error_type: Optional[str] = None
     final_stop_reason: Optional[str] = None
+
+    # --- Provider-trace lifecycle (openrouter_observability Phase 3) ---
+    # Observed at the seam, packed into final_usage["_provider_trace"] for _on_stream_complete.
+    _stream_started = True  # message_start (:790) is yielded before this point is reached
+    _first_chunk_seen = False  # first USER-VISIBLE content/tool chunk (the _provider_meta carrier does NOT count)
+    _final_usage_seen = False
+    _client_disconnected = False
+    _provider_trace_meta: Optional[Dict[str, Any]] = None  # stashed from the R1 carrier chunk
 
     def _build_sanitized_args_delta(tool_info: Dict[str, Any]) -> dict[str, Any] | None:
         block_idx = tool_info.get("block_idx")
@@ -866,6 +877,18 @@ async def convert_openai_to_anthropic_sse(
                 logger.warning(f"[{request_id}] Skipping invalid chunk format: {type(chunk)}")
                 continue
 
+            # Provider-trace carrier chunk (Phase 3): client_adapter emits a dedicated
+            # {"choices": [], "_provider_meta": {...}} chunk the instant provider_meta first
+            # appears, BEFORE any visible content -- so a cancelled stream still surfaces the
+            # generation id. Stash it and drop the chunk (internal-only; never reaches the
+            # client). Intercept here, before the choices/usage logic, so it does not trip the
+            # empty-choices warning below.
+            provider_meta = chunk.get("_provider_meta")
+            if provider_meta is not None:
+                if isinstance(provider_meta, dict):
+                    _provider_trace_meta = provider_meta
+                continue
+
             # Handle error chunks from stream generator.
             # stream_generator() catches ToolCallError/ProxyStreamError and yields
             # error dicts instead of raising — so no exception reaches the except
@@ -887,6 +910,7 @@ async def convert_openai_to_anthropic_sse(
             # --- Check for usage-only chunk (LiteLLM sends usage in chunk with empty choices) ---
             chunk_usage = chunk.get("usage")
             if chunk_usage and isinstance(chunk_usage, dict):
+                _final_usage_seen = True  # the proxy saw the final accounting chunk (lifecycle)
                 prompt_tokens = chunk_usage.get("prompt_tokens", 0)
                 completion_tokens = chunk_usage.get("completion_tokens", 0)
 
@@ -965,6 +989,7 @@ async def convert_openai_to_anthropic_sse(
                     current_block_type = None
 
                 if not text_started:
+                    _first_chunk_seen = True  # first user-visible content (lifecycle)
                     content_block_index += 1
                     current_block_type = "text"
                     text_started = True
@@ -1010,6 +1035,7 @@ async def convert_openai_to_anthropic_sse(
                     # --- Start a new tool_use block if necessary ---
                     if tc_openai_index not in tool_calls_buffer:
                         if tc_id and func_name:
+                            _first_chunk_seen = True  # first user-visible tool content (lifecycle)
                             content_block_index += 1
                             current_block_type = "tool_use"
                             tool_calls_buffer[tc_openai_index] = {
@@ -1074,6 +1100,9 @@ async def convert_openai_to_anthropic_sse(
                     ):
                         tool_info = tool_calls_buffer[tc_openai_index]
                         if tool_info["id"] == tc_id:  # Ensure ID matches if provided again
+                            # Delayed-name path: the id was buffered earlier with nothing emitted;
+                            # this is the first user-visible tool content for the block (lifecycle).
+                            _first_chunk_seen = True
                             content_block_index += 1
                             current_block_type = "tool_use"
                             tool_info["name"] = func_name
@@ -1183,6 +1212,14 @@ async def convert_openai_to_anthropic_sse(
         yield f"event: message_stop\ndata: {json.dumps(stop_event_data)}\n\n"
         logger.debug(f"[{request_id}] Sent message_stop")
 
+    except (asyncio.CancelledError, GeneratorExit):
+        # Client/peer dropped the StreamingResponse before it finished. Both shapes are
+        # BaseException (so the `except Exception` below never sees them) and both let the
+        # `finally` fire on_complete exactly once. Record the disconnect, then re-raise so
+        # the event loop / generator teardown completes cleanly -- swallowing it is the bug.
+        # This is the incident path: a stream cancelled before the final usage chunk.
+        _client_disconnected = True
+        raise
     except Exception as e:
         _stream_failed = True
         _stream_error_type = "internal_error"
@@ -1207,6 +1244,17 @@ async def convert_openai_to_anthropic_sse(
     finally:
         logger.info(f"[{request_id}] Anthropic SSE stream conversion finished.")
         if on_complete is not None:
+            # Quarantine all provider-trace payload under one reserved key (Phase 3); the
+            # client never sees it (only token usage is emitted in message_delta).
+            final_usage["_provider_trace"] = {
+                "provider_meta": _provider_trace_meta,
+                "lifecycle": {
+                    "stream_started": _stream_started,
+                    "first_chunk_seen": _first_chunk_seen,
+                    "final_usage_seen": _final_usage_seen,
+                    "client_disconnected": _client_disconnected,
+                },
+            }
             try:
                 on_complete(final_usage, _stream_failed, _stream_error_type)
             except Exception:

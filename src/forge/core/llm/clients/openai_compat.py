@@ -15,6 +15,7 @@ from ..types import (
     CompletionResponse,
     Message,
     ModelHyperparameters,
+    ProviderTraceMeta,
     ToolCall,
     ToolCallDelta,
 )
@@ -137,6 +138,80 @@ def build_chat_completion_kwargs(
     return kwargs
 
 
+def provider_trace_meta(response: Any, provider: str) -> ProviderTraceMeta:
+    """Build provider-trace metadata from a non-streaming OpenAI-shaped response (Phase 2).
+
+    ``body.id`` carries the provider response id; for OpenRouter that id is the ``gen-…``
+    generation id (probe 1), surfaced as ``provider_generation_id``. ``selected_provider``
+    is the upstream OpenRouter routed to, reported in the body's ``provider`` field (read
+    from ``model_extra`` when the typed SDK stashed it there).
+    """
+    response_id = getattr(response, "id", None)
+    response_id = response_id if isinstance(response_id, str) else None
+    generation_id = response_id if response_id and response_id.startswith("gen-") else None
+
+    selected = getattr(response, "provider", None)
+    if selected is None:
+        extra = getattr(response, "model_extra", None)
+        if isinstance(extra, dict):
+            selected = extra.get("provider")
+
+    return ProviderTraceMeta(
+        provider=provider,
+        provider_response_id=response_id,
+        provider_generation_id=generation_id,
+        selected_provider=selected if isinstance(selected, str) else None,
+    )
+
+
+# A deliberately tiny allowlist of correlation header names lifted into
+# ProviderTraceMeta.headers (Phase 2). Header *values* are retained and can themselves be
+# identifiers, so anything not listed here is dropped -- never "everything except auth".
+# Auth/cookie/set-cookie headers are excluded by omission, not by a denylist.
+_PROVIDER_TRACE_HEADER_ALLOWLIST = frozenset(
+    {
+        "x-request-id",  # generic request correlation id
+        "x-generation-id",  # OpenRouter gen-... id header carrier
+        "x-litellm-call-id",  # LiteLLM per-call id
+        "x-litellm-model-id",  # LiteLLM resolved model id
+    }
+)
+
+
+def provider_trace_headers(headers: Any) -> dict[str, str] | None:
+    """Return only the allowlisted correlation headers (lowercased name -> value), or None.
+
+    A fixed name-allowlist (:data:`_PROVIDER_TRACE_HEADER_ALLOWLIST`): non-string names/values
+    and anything not on the list are dropped, so a response's auth/cookie headers never enter
+    the trace plane. Returns None when nothing allowlisted is present (keeps the field unset).
+    """
+    if headers is None:
+        return None
+    try:
+        pairs = list(headers.items())  # httpx.Headers and dict both expose .items()
+    except (AttributeError, TypeError):
+        return None
+    out: dict[str, str] = {}
+    for name, value in pairs:
+        if isinstance(name, str) and isinstance(value, str) and name.lower() in _PROVIDER_TRACE_HEADER_ALLOWLIST:
+            out[name.lower()] = value
+    return out or None
+
+
+def merge_provider_headers(completion: CompletionResponse, headers: Any, provider: str) -> CompletionResponse:
+    """Attach allowlisted correlation headers to ``completion.provider_meta`` (Phase 2).
+
+    Used by the non-streaming/Responses paths that hold a raw-response handle (direct
+    OpenRouter + LiteLLM); streaming has no headers, so its ``provider_meta.headers`` stays
+    None. Creates a ``provider_meta`` when the completion has none yet.
+    """
+    trace_headers = provider_trace_headers(headers)
+    if not trace_headers:
+        return completion
+    meta = completion.provider_meta or ProviderTraceMeta(provider=provider)
+    return completion.model_copy(update={"provider_meta": meta.model_copy(update={"headers": trace_headers})})
+
+
 def openai_response_to_completion(response: Any, provider: str) -> CompletionResponse:
     """Convert OpenAI ChatCompletion response to canonical CompletionResponse."""
     if hasattr(response, "error") and response.error:
@@ -192,6 +267,7 @@ def openai_response_to_completion(response: Any, provider: str) -> CompletionRes
         tool_calls=tool_calls,
         usage=usage,
         cost_usd=cost_usd,
+        provider_meta=provider_trace_meta(response, provider),
         raw=response.model_dump(),
     )
 

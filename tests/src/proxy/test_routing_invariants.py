@@ -120,6 +120,120 @@ async def test_create_message_request_explicit_tier_wins(monkeypatch):
     assert resp.status_code == 200
 
 
+# --- Phase 5: create_message wires inject_openrouter_user -> _forge_user (config ON -> adapter handoff) ---
+
+
+class _ForgeRequestState:
+    def __init__(self, request_id: str, forge_session: str | None) -> None:
+        self.request_id = request_id
+        self.forge_session = forge_session
+        self.forge_command = None
+        self.forge_run_id = None
+        self.forge_root_run_id = None
+
+
+class _ForgeRequest:
+    def __init__(self, request_id: str, forge_session: str | None) -> None:
+        self.state = _ForgeRequestState(request_id, forge_session)
+        self.headers: dict[str, str] = {}
+
+
+def _openrouter_request_data():
+    return type(
+        "Req",
+        (),
+        {
+            "has_explicit_tier": True,
+            "tier": "opus",
+            "stream": False,
+            "messages": [],
+            "tools": None,
+            "system": None,
+            "temperature": None,
+            "max_tokens": 1,
+            "top_p": None,
+            "stop_sequences": None,
+            "original_model_name": "openai/gpt-5.5",
+            "model": "openai/gpt-5.5",
+            "model_dump": lambda self=None: {},
+        },
+    )()
+
+
+async def _capture_openrouter_request(monkeypatch, *, inject_flag: bool, forge_session: str | None) -> dict:
+    """Drive create_message down the OpenRouter route; return the dict handed to the client adapter."""
+    import forge.proxy.server as server
+
+    monkeypatch.setattr(server, "reload", lambda: None)
+
+    captured: dict = {}
+
+    async def _fake_get_client(*args, **kwargs):
+        client = AsyncMock()
+
+        async def _capture_create_completion(openai_request, request_id):
+            captured["openai_request"] = openai_request
+            return {"choices": [{"message": {"content": "ok"}}]}
+
+        client.create_completion = _capture_create_completion
+        client.create_streaming_completion = AsyncMock()
+        return client
+
+    monkeypatch.setattr(server.client_factory, "get_client", _fake_get_client)
+
+    class ProxyCfg:
+        default_tier = "haiku"
+        preferred_provider = "openrouter"
+        provider_trace = type("PT", (), {"inject_openrouter_user": inject_flag})()
+
+        @staticmethod
+        def get_model_for_tier(_tier: str) -> str:
+            return "openai/gpt-5.5"
+
+    class SessionCfg:
+        default_tier = "opus"
+
+    monkeypatch.setattr(server.config, "proxy", ProxyCfg())
+    monkeypatch.setattr(server.config, "session", SessionCfg())
+    monkeypatch.setattr(server, "map_model_name", lambda v: v)
+    monkeypatch.setattr(server, "convert_anthropic_to_openai", lambda *a, **k: {"messages": []})
+    monkeypatch.setattr(server, "convert_openai_to_anthropic", lambda *a, **k: DummyAnthropicResponse())
+    monkeypatch.setattr(server, "_check_client_tool_failures", AsyncMock())
+    monkeypatch.setattr(
+        server.client_factory,
+        "detect_provider_for_model",
+        lambda *_: type("E", (), {"value": "openrouter"})(),
+    )
+    monkeypatch.setattr(server, "log_request_response", AsyncMock())
+    monkeypatch.setattr(server, "log_request_beautifully", lambda *a, **k: None)
+    monkeypatch.setattr(server, "log_tool_event", lambda *a, **k: None)
+
+    # _ForgeRequest is a minimal Starlette-Request double exposing only .state/.headers (what
+    # create_message reads); mypy checks this helper's body because it has a typed signature.
+    raw_request = _ForgeRequest("req_test", forge_session)
+    resp = await server.create_message(_openrouter_request_data(), raw_request)  # type: ignore[arg-type]
+    assert resp.status_code == 200
+    return captured["openai_request"]
+
+
+@pytest.mark.asyncio
+async def test_create_message_injects_forge_user_when_openrouter_flag_on(monkeypatch):
+    """Flag ON + OpenRouter route: the handler sets _forge_user from X-Forge-Session before the adapter handoff."""
+    openai_request = await _capture_openrouter_request(
+        monkeypatch, inject_flag=True, forge_session="forge_sess_7e81a1bb765d_supervisor"
+    )
+    assert openai_request["_forge_user"] == "forge_sess_7e81a1bb765d_supervisor"
+
+
+@pytest.mark.asyncio
+async def test_create_message_no_forge_user_when_flag_off(monkeypatch):
+    """Flag OFF: no _forge_user reaches the client even with a valid session id (byte-identical default path)."""
+    openai_request = await _capture_openrouter_request(
+        monkeypatch, inject_flag=False, forge_session="forge_sess_7e81a1bb765d_supervisor"
+    )
+    assert "_forge_user" not in openai_request
+
+
 @pytest.mark.asyncio
 async def test_count_tokens_uses_proxy_default_tier(monkeypatch):
     import forge.proxy.server as server

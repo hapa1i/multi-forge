@@ -165,6 +165,25 @@ class Message(BaseModel):
     tool_calls: list[ToolCall] | None = None  # For role="assistant" with tool use
 
 
+class ProviderTraceMeta(BaseModel):
+    """Provider-side trace metadata, lifted from the upstream response (Phase 2).
+
+    Carries the *provider's own* identifiers and routing facts so the proxy boundary can
+    populate a provider-trace plane -- kept strictly separate from Forge's synthetic
+    ``chatcmpl-<ts>`` response id. Every field is optional/defaulted: old providers and
+    test fakes that build ``CompletionResponse(text=...)`` must keep working, and any
+    single surface (e.g. a header-only id) may be absent without breaking the rest.
+    """
+
+    provider: str | None = None  # "openrouter" / "litellm" / ...
+    provider_response_id: str | None = None  # body.id (non-streaming)
+    provider_generation_id: str | None = None  # OpenRouter gen-... (chunk.id / body.id)
+    provider_request_id: str | None = None  # upstream request-id header, when present
+    selected_provider: str | None = None  # the upstream OpenRouter routed to
+    headers: dict[str, str] | None = None  # allowlisted correlation headers only (never auth)
+    provider_session_id: str | None = None  # the session/user value Forge sent, if recognized
+
+
 class CompletionResponse(BaseModel):
     """Canonical completion response."""
 
@@ -174,6 +193,10 @@ class CompletionResponse(BaseModel):
     # Route-reported cost in USD (OpenRouter body usage.cost / LiteLLM response-cost header).
     # None = the route reported no cost. Reporter/confidence are derived at the proxy.
     cost_usd: float | None = None
+    # Provider-side trace metadata (provider/generation ids, selected upstream, allowlisted
+    # headers). None for providers/fakes that don't populate it; dropped at the Anthropic
+    # translation boundary, so it never reaches the client.
+    provider_meta: ProviderTraceMeta | None = None
     raw: dict[str, Any] | None = None  # Original provider response (debugging only)
 
 
@@ -192,4 +215,6 @@ class StreamEvent(BaseModel):
     # Route-reported cost in USD, carried on the final usage/response_end event.
     # None = no cost reported on this stream. Reporter/confidence derived at the proxy.
     cost_usd: float | None = None
+    # Provider-side trace metadata, carried on the final usage/response_end event (Phase 2).
+    provider_meta: ProviderTraceMeta | None = None
     error: str | None = None

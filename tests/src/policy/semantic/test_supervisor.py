@@ -312,6 +312,26 @@ class TestSupervisorDepthGuard:
         assert result.decision == "allow"
         mock_run.assert_called_once()
 
+    @patch("forge.policy.semantic.supervisor.run_claude_session")
+    def test_stamps_provider_trace_identity_env(self, mock_run: MagicMock) -> None:
+        """Phase 1: the fork spawn is tagged with the session name + supervisor role."""
+        from forge.core.reactive.env import FORGE_COMMAND_VAR, FORGE_SESSION_VAR
+        from forge.core.reactive.session_runner import SessionResult
+        from forge.policy.semantic.supervisor import invoke_supervisor
+
+        mock_run.return_value = SessionResult(
+            stdout='```json\n{"verdict": "aligned", "confidence": 0.9, "violations": []}\n```',
+            stderr="",
+            returncode=0,
+        )
+
+        with patch.dict("os.environ", {"FORGE_DEPTH": "1"}):
+            invoke_supervisor(_make_config(), _make_context())
+
+        extra_env = mock_run.call_args.kwargs["extra_env"]
+        assert extra_env[FORGE_COMMAND_VAR] == "supervisor"
+        assert extra_env[FORGE_SESSION_VAR] == "test-session"
+
 
 class TestSupervisorResumeTargetResolution:
     """Tests for resolving supervisor resume targets."""

@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, cast
 
+from forge.core.reactive.env import FORGE_COMMAND_VAR, FORGE_SESSION_VAR
 from forge.core.reactive.routing import resolve_subprocess_routing
 from forge.core.reactive.session_runner import run_claude_session
 from forge.core.reactive.throttle import ThrottleCache, compute_cache_key
@@ -478,6 +479,13 @@ def run_supervisor_check(
 
     tracking_url = base_url
 
+    # Stamp provider-trace identity so the fork's proxied requests group under this
+    # session + the supervisor role in OpenRouter (Phase 1). No session name -> the
+    # header derivation falls back to forge_run_<hash>.
+    spawn_env = {FORGE_COMMAND_VAR: "supervisor"}
+    if context.session_name:
+        spawn_env[FORGE_SESSION_VAR] = context.session_name
+
     with track_verb_cost(usage_command, [tracking_url] if tracking_url else []) as cost:
         result = run_claude_session(
             prompt,
@@ -489,6 +497,7 @@ def run_supervisor_check(
             direct=config.direct,
             timeout_seconds=config.timeout_seconds,
             cwd=resolved.source_cwd,
+            extra_env=spawn_env,
             unset_env_vars=unset_env_vars,
         )
 

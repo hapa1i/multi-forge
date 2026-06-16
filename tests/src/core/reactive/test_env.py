@@ -5,11 +5,13 @@ from __future__ import annotations
 from unittest.mock import patch
 
 from forge.core.reactive.env import (
+    FORGE_COMMAND_VAR,
     FORGE_DEPTH_VAR,
     FORGE_MAX_DEPTH,
     FORGE_PARENT_RUN_ID_VAR,
     FORGE_ROOT_RUN_ID_VAR,
     FORGE_RUN_ID_VAR,
+    FORGE_SESSION_VAR,
     InteractiveApiKeyDecision,
     RunIdentity,
     apply_interactive_api_key,
@@ -508,8 +510,10 @@ class TestCorrelationHeaders:
     proxy, treating the two headers as Forge-owned (replace, never duplicate)."""
 
     from forge.core.run_id import ANTHROPIC_CUSTOM_HEADERS_VAR as _H
+    from forge.core.run_id import FORGE_COMMAND_HEADER as _CMD_H
     from forge.core.run_id import FORGE_ROOT_RUN_ID_HEADER as _ROOT_H
     from forge.core.run_id import FORGE_RUN_ID_HEADER as _RUN_H
+    from forge.core.run_id import FORGE_SESSION_HEADER as _SESS_H
 
     BASE = "http://localhost:8085"
 
@@ -553,3 +557,61 @@ class TestCorrelationHeaders:
         env = build_claude_env(extra_vars=self._marker_vars(), base_url=self.BASE)
         run_id = env[FORGE_RUN_ID_VAR]
         assert f"{self._RUN_H}: {run_id}" in env[self._H]
+
+    # --- Provider session/command headers (openrouter_observability Phase 1) ---
+
+    def test_session_header_falls_back_to_run_id_without_session_name(self) -> None:
+        # No FORGE_SESSION/FORGE_COMMAND -> X-Forge-Session is still emitted via the
+        # forge_run_<hash> fallback, and no X-Forge-Command line appears.
+        env = build_claude_env(extra_vars=self._marker_vars(), base_url=self.BASE)
+        lines = env[self._H].split("\n")
+        sess = [ln for ln in lines if ln.startswith(f"{self._SESS_H}: ")]
+        assert len(sess) == 1
+        assert sess[0].startswith(f"{self._SESS_H}: forge_run_")
+        assert not any(ln.startswith(f"{self._CMD_H}: ") for ln in lines)
+
+    def test_stamps_session_and_command_with_session_and_role(self) -> None:
+        vars_ = self._marker_vars()
+        vars_[FORGE_SESSION_VAR] = "my-feature-session"
+        vars_[FORGE_COMMAND_VAR] = "supervisor"
+        env = build_claude_env(extra_vars=vars_, base_url=self.BASE)
+        headers = env[self._H]
+        assert f"{self._SESS_H}: forge_sess_" in headers
+        assert headers.find("_supervisor\n") != -1 or headers.rstrip().endswith("_supervisor")
+        assert f"{self._CMD_H}: supervisor" in headers
+
+    def test_session_header_is_opaque(self) -> None:
+        # The raw human session name must never appear in the header value.
+        vars_ = self._marker_vars()
+        vars_[FORGE_SESSION_VAR] = "secret-project-name"
+        env = build_claude_env(extra_vars=vars_, base_url=self.BASE)
+        assert "secret-project-name" not in env[self._H]
+        assert "secret" not in env[self._H].lower().replace(self._SESS_H.lower(), "")
+
+    def test_command_header_is_sanitized(self) -> None:
+        vars_ = self._marker_vars()
+        vars_[FORGE_COMMAND_VAR] = "memory writer"  # space -> canonical underscore
+        env = build_claude_env(extra_vars=vars_, base_url=self.BASE)
+        assert f"{self._CMD_H}: memory_writer" in env[self._H]
+
+    def test_forge_owned_strip_includes_session_and_command(self) -> None:
+        vars_ = self._marker_vars()
+        vars_[FORGE_SESSION_VAR] = "s"
+        vars_[FORGE_COMMAND_VAR] = "review"
+        # Inherited stale Forge-owned session/command lines must be replaced, not duplicated.
+        vars_[self._H] = f"X-User: keep\n{self._SESS_H}: forge_sess_staleaaaaaaaa\n{self._CMD_H}: stalerole"
+        env = build_claude_env(extra_vars=vars_, base_url=self.BASE)
+        lines = env[self._H].split("\n")
+        assert "X-User: keep" in lines
+        assert len([ln for ln in lines if ln.startswith(f"{self._SESS_H}: ")]) == 1
+        assert len([ln for ln in lines if ln.startswith(f"{self._CMD_H}: ")]) == 1
+        assert "forge_sess_staleaaaaaaaa" not in env[self._H]
+        assert "stalerole" not in env[self._H]
+        assert f"{self._CMD_H}: review" in env[self._H]
+
+    def test_no_session_header_for_non_proven_target(self) -> None:
+        # The whole correlation block no-ops for an unproven target -> no session header.
+        vars_ = self._marker_vars()
+        vars_[FORGE_SESSION_VAR] = "s"
+        env = build_claude_env(extra_vars=vars_, base_url="http://evil.example:9999")
+        assert self._H not in env
