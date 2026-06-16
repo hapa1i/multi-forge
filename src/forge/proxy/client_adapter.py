@@ -269,6 +269,14 @@ class CoreLLMClientAdapter:
             openai_extra = hyperparams_data.setdefault("extra", {}).setdefault("openai", {})
             openai_extra["extra_headers"] = {"User-Agent": _sanitize_header_value(user_agent)}
 
+        # Forward the Forge session grouping id into OpenRouter's top-level `user` field when the
+        # server opted in (openrouter_observability Phase 5). Shares the extra["openai"] dict with
+        # the User-Agent header; build_chat_completion_kwargs merges it to a top-level `user` kwarg.
+        forge_user = openai_request.get("_forge_user")
+        if isinstance(forge_user, str) and forge_user:
+            openai_extra = hyperparams_data.setdefault("extra", {}).setdefault("openai", {})
+            openai_extra["user"] = forge_user
+
         hyperparams = ModelHyperparameters(**hyperparams_data)
 
         response = await self._client.complete(messages, tools=tools, hyperparams=hyperparams)
@@ -326,6 +334,14 @@ class CoreLLMClientAdapter:
         if isinstance(user_agent, str) and user_agent:
             openai_extra = hyperparams_data.setdefault("extra", {}).setdefault("openai", {})
             openai_extra["extra_headers"] = {"User-Agent": _sanitize_header_value(user_agent)}
+
+        # Forward the Forge session grouping id into OpenRouter's top-level `user` field when the
+        # server opted in (openrouter_observability Phase 5). Shares the extra["openai"] dict with
+        # the User-Agent header; build_chat_completion_kwargs merges it to a top-level `user` kwarg.
+        forge_user = openai_request.get("_forge_user")
+        if isinstance(forge_user, str) and forge_user:
+            openai_extra = hyperparams_data.setdefault("extra", {}).setdefault("openai", {})
+            openai_extra["user"] = forge_user
 
         hyperparams = ModelHyperparameters(**hyperparams_data)
 

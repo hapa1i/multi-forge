@@ -422,6 +422,7 @@ class ProviderTraceConfig:
 
     retention_days: int = 14
     max_total_mb: int = 512
+    inject_openrouter_user: bool = False
 
     def __post_init__(self) -> None:
         # bool is an int subclass; reject it so provider_trace.retention_days=true fails loudly.
@@ -429,6 +430,10 @@ class ProviderTraceConfig:
             raise ValueError("provider_trace.retention_days must be a non-negative int")
         if isinstance(self.max_total_mb, bool) or not isinstance(self.max_total_mb, int) or self.max_total_mb <= 0:
             raise ValueError("provider_trace.max_total_mb must be a positive int")
+        # Opt-in (default off): forward the Forge session grouping id into OpenRouter's `user`
+        # field on the proxied direct-OpenRouter path (openrouter_observability Phase 5).
+        if not isinstance(self.inject_openrouter_user, bool):
+            raise ValueError("provider_trace.inject_openrouter_user must be a bool")
 
 
 def _coerce_provider_trace_config(value: Any) -> ProviderTraceConfig:
@@ -438,10 +443,11 @@ def _coerce_provider_trace_config(value: Any) -> ProviderTraceConfig:
         return value
     if not isinstance(value, dict):
         raise ValueError("Invalid provider_trace: must be a mapping")
-    _reject_unknown_keys(value, {"retention_days", "max_total_mb"}, "provider_trace")
+    _reject_unknown_keys(value, {"retention_days", "max_total_mb", "inject_openrouter_user"}, "provider_trace")
     return ProviderTraceConfig(
         retention_days=value.get("retention_days", 14),
         max_total_mb=value.get("max_total_mb", 512),
+        inject_openrouter_user=value.get("inject_openrouter_user", False),
     )
 
 

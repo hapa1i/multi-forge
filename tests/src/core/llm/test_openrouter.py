@@ -70,6 +70,13 @@ class TestOpenRouterClientInit:
         assert result["extra_body"]["reasoning"] == {"effort": "medium"}
         assert result["extra_body"]["transforms"] == ["middle-out"]
 
+    def test_translate_params_keeps_user_top_level(self):
+        """Phase 5 channel: a top-level `user` survives translation and is NOT moved to extra_body."""
+        kwargs = {"model": "test", "messages": [], "user": "forge_sess_abc123", "reasoning_effort": "high"}
+        result = OpenRouterClient._translate_params(kwargs)
+        assert result["user"] == "forge_sess_abc123"
+        assert "user" not in result.get("extra_body", {})
+
 
 class TestOpenRouterClientComplete:
     """Tests for non-streaming completion."""
@@ -171,6 +178,29 @@ class TestOpenRouterClientComplete:
             assert call_kwargs["base_url"] == "https://openrouter.ai/api/v1"
             assert call_kwargs["api_key"] == "sk-or-test"
             assert "X-OpenRouter-Title" in call_kwargs["default_headers"]
+
+    @pytest.mark.asyncio
+    async def test_user_from_extra_openai_reaches_create_kwargs(self, client):
+        """Phase 5 channel proof (end-to-end): a `user` under hyperparams.extra["openai"] -- exactly
+        what the proxy adapter writes -- reaches chat.completions.create as a TOP-LEVEL `user`
+        kwarg, surviving the client's hyperparam merge, and is never nested in extra_body."""
+        mock_client = AsyncMock()
+        mock_client.chat.completions.with_raw_response.create = AsyncMock(return_value=self._raw_response())
+
+        with patch.object(client, "_credentials") as mock_cm:
+            mock_cm.get_credentials = AsyncMock(
+                return_value={"api_key": "sk-or-test", "base_url": "https://openrouter.ai/api/v1"}
+            )
+            client._client = mock_client
+
+            await client.complete(
+                messages=[Message(role="user", content="Hello")],
+                hyperparams=ModelHyperparameters(max_tokens=100, extra={"openai": {"user": "forge_sess_abc123"}}),
+            )
+
+        call_kwargs = mock_client.chat.completions.with_raw_response.create.call_args[1]
+        assert call_kwargs["user"] == "forge_sess_abc123"
+        assert "user" not in call_kwargs.get("extra_body", {})
 
 
 class TestOpenRouterClientStream:

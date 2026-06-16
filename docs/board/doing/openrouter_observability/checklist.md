@@ -298,48 +298,50 @@ only** -- no remote lookup (that is the reconciliation card). Depends on Phase 3
 
 ---
 
-## Phase 5: `session_id` injection (opt-in, default OFF)
+## Phase 5: OpenRouter `user`-field injection (opt-in, default OFF) -- SHIPPED (proxied-only)
 
-**Goal**: Carry the Forge-derived (or caller-preserved) session id into the OpenRouter body via `extra_body`, gated to
-OpenRouter traffic **and** behind the opt-in flag. Last phase by design (routing-affecting; user chose opt-in). Depends
-on Phase 1 + probes 3-4.
+**Goal**: Carry the Forge session grouping id into OpenRouter's OpenAI-standard **`user`** field on the proxied
+direct-OpenRouter path, behind a per-proxy opt-in flag, so a session/fork is **recorded in OpenRouter's `/generation`
+record for account-side lookup**. Last phase by design. Depends on Phase 1 + probes 3-4.
+
+> **Scope (shipped)**: proxied path only. The flag lives in per-proxy `provider_trace` config (Forge has no durable
+> direct-call OpenRouter config owner; `~/.forge/config.yaml`/`runtime_config` owns runtime prefs, not upstream proxy
+> behavior). The direct-client helper + direct callers (plan-check, curation) are **deferred** to
+> `todo/openrouter_user_direct_callers/` to avoid a second opt-in source.
 
 > **Channel correction (probe 3, polled re-run).** OpenRouter **records the OpenAI-standard `user` field** but **ignores
 > a custom `session_id`** (`[CHANNEL-USER-RECOGNIZED]`). At implementation, inject the Forge id under **`user`** (the
-> recognized channel -- makes a fork findable in OpenRouter's dashboard, addressing the incident), not the
-> `extra_body["session_id"]` key the tasks below were drafted against. Update each body-key reference accordingly.
-> Recognition is **not** a routing win (probe 4 `[STICKY-NEUTRAL]`), so the flag stays opt-in/off for *observability*,
-> not performance. A recognized `user` value is retained by OpenRouter -> keep the "hash, never raw name" rule.
+> recognized channel -- the sent value appears in the indexed `/generation` record for account-side lookup, addressing
+> the incident; dashboard grouping is expected but unproven), not the `extra_body["session_id"]` key the tasks below
+> were drafted against. The shipped code injects under the top-level `user` field accordingly. Recognition is **not** a
+> routing win (probe 4 `[STICKY-NEUTRAL]`), so the flag stays opt-in/off for *observability*, not performance. A
+> recognized `user` value is retained by OpenRouter -> keep the "hash, never raw name" rule.
 
-- [ ] **Flag** (home per the open question above): default OFF; the proxied path and direct callers both consult it. -
-  *Assertion*: with the flag off (default), no `session_id` is injected on any path -- behavior is byte-identical to
-  pre-card.
-- [ ] **Direct client** (`src/forge/core/llm/clients/openrouter.py`): in `_translate_params` (`:77`) inject `session_id`
-  into `extra_body` when absent, **preserving** an explicit caller `extra_body["session_id"]`. - *Assertion*: no-session
-  call gets the Forge value; explicit caller value unchanged (mirrors `test_preserves_existing_extra_body`).
-- [ ] **Direct callers** (`core/usage/correlation.py`, `policy/semantic/plan_check.py`, `session/transfer.py`): add
-  `with_openrouter_session_id(hyperparams, session_id)` (deep-copy/no-clobber like `with_forge_request_id`, targeting
-  `extra["openai"]["extra_body"]["session_id"]`); wire into plan-check + curation (both already
-  `provider="openrouter"`); source `session_id` from `session_name`/`FORGE_SESSION` + role via the Phase 1 minter; gate
-  on `provider==openrouter`. - *Assertion*: plan-check + curation OpenRouter calls carry the id; non-OpenRouter
-  unchanged; fail-open contracts (plan-check->`needs_review`, curation->structured fallback) not altered by any new
-  raise.
-- [ ] **Proxied path** (`proxy/client_adapter.py`, `server.py`): thread `session_id` from validated
-  `X-Forge-Session`/run-tree headers into `hyperparams_data["extra"]["openai"]["extra_body"]["session_id"]` in
-  `create_completion`/`create_streaming_completion` (beside `_user_agent`) **when the bound provider is openrouter**;
-  fall back to `forge_run_<hash>` when `X-Forge-Session` absent. Derive server-side -- a client top-level `session_id`
-  is dropped twice (MessagesRequest `extra='ignore'` + the adapter's fixed-key extraction). - *Assertion*: OpenRouter
-  proxy request w/o client `session_id` reaches the client with a Forge-derived `extra_body["session_id"]`;
-  non-OpenRouter route untouched; absent `X-Forge-Session` -> `forge_run_<hash>` id.
-- [ ] **Tagger gap** (`core/reactive/tagger.py`): document (do not silently no-op) that the tagger cannot reach
-  OpenRouter today; out of scope for this card.
+- [x] **Flag** `provider_trace.inject_openrouter_user: bool = False` (`config/schema.py`): field + `__post_init__`
+  bool-reject + `_coerce_provider_trace_config` allowlist/constructor (all three durable-state touch points). -
+  *Verified*: defaults off; `"yes"` rejected; unknown key rejected (`tests/src/config/test_schema.py`).
+- [x] **Proxied path** (`proxy/server.py`, `proxy/client_adapter.py`): server gate `_openrouter_user_value` (pure helper
+  -- provider==openrouter + flag; prefers the validated `X-Forge-Session`, falls back to `forge_run_<hash>` via
+  `derive_provider_session_id`, else None) sets the `_forge_user` carrier; the adapter forwards it into
+  `extra["openai"]["user"]` on stream + non-stream, which `build_chat_completion_kwargs` merges to a **top-level**
+  `user` kwarg (not `extra_body`). - *Verified*: gate matrix + fallback (`test_server_forge_headers.py`), adapter
+  forward both paths (`test_client_adapter.py`), end-to-end channel proof (`test_openrouter.py`).
+- [x] **Tagger gap** (`core/reactive/tagger.py`): one-line note that it routes via local LiteLLM (no provider arg) and
+  structurally cannot reach OpenRouter, so `user` injection is N/A.
+- [ ] **Deferred -- direct-client helper** `with_openrouter_user` (`core/usage/correlation.py`): no-clobber, writes
+  `extra["openai"]["user"]`. Moved to `todo/openrouter_user_direct_callers/` (an unwired helper this phase would be
+  unused production code).
+- [ ] **Deferred -- direct callers** (`policy/semantic/plan_check.py`, `session/transfer.py`): wire the helper, derive
+  the id from the env keys `env.py` reads, gate on their existing `provider="openrouter"`. Moved to the follow-up card;
+  its open question is the flag home (lean `~/.forge/config.yaml`/`runtime_config`, in-process readable, not an env
+  var).
 
-| Test                                          | Fixture                                                                           | Assertion                                                                | Test File                                      |
-| --------------------------------------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------ | ---------------------------------------------- |
-| Flag off = no injection                       | flag default                                                                      | no `session_id` on direct or proxied OpenRouter calls                    | `tests/src/core/llm/test_openrouter.py`        |
-| Injected when absent, preserved when explicit | recorded outbound body; one no-session, one `extra_body["session_id"]="caller_x"` | first = derived value; second = `caller_x`                               | `tests/src/core/llm/test_openrouter.py`        |
-| Proxied OpenRouter gets derived id            | openrouter-openai proxy, `X-Forge-Session` set, no client session                 | upstream body has derived `extra_body["session_id"]`; litellm route none | `tests/src/proxy/test_client_adapter.py`       |
-| Id is private (no path leak)                  | session in nested path, plan-check -> OpenRouter                                  | id is `forge_sess_<hash>[_role]`, no filesystem path                     | `tests/src/policy/semantic/test_plan_check.py` |
+| Test                                 | Fixture                                        | Assertion                                                                                                                                  | Test File                                      |
+| ------------------------------------ | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------- |
+| Flag defaults off + rejects non-bool | `ProviderTraceConfig` via proxy.yaml dict      | `inject_openrouter_user` is False; `"yes"` -> ValueError; unknown key rejected                                                             | `tests/src/config/test_schema.py`              |
+| Server gate + fallback               | provider/flag/session/run-id matrix            | openrouter+flag+session -> session id; flag-off / non-openrouter / no-identity -> None; no session + root run -> `forge_run_<hash>_<role>` | `tests/src/proxy/test_server_forge_headers.py` |
+| Adapter forwards `_forge_user`       | request with `_forge_user` (+/- `_user_agent`) | `extra["openai"]["user"]` set on stream + non-stream; coexists with `extra_headers`; absent -> no `user` key                               | `tests/src/proxy/test_client_adapter.py`       |
+| Channel proof (`user` is top-level)  | hyperparams `extra["openai"]["user"]`          | reaches `chat.completions.create(user=...)`, survives `_translate_params`, never in `extra_body`                                           | `tests/src/core/llm/test_openrouter.py`        |
 
 ---
 
@@ -389,12 +391,13 @@ on Phase 1 + probes 3-4.
 
 ## Closeout
 
-- [ ] All phase acceptance tables green (`make test-unit`); relevant integration tests for proxy/streaming changes
-  (`./scripts/test-integration.sh tests/integration/proxy/...`).
-- [ ] `make pre-commit` clean (ruff, black, isort, mypy, pyright, mdformat, gitleaks).
-- [ ] Design + end-user docs synced: design.md §3.14 (four planes), design_appendix (provider-trace schema + §A.13 join
-  note), cli_reference (`forge provider trace`), and `docs/end-user/proxy.md` (provider-trace section -- Day-1 rule).
-- [ ] Change-log entry (`docs/board/change_log.md`): goal, key changes, verification.
+- [x] All phase acceptance tables green: `make test-unit` 6205 passed; scoped proxy integration 8 passed
+  (`test_forge_run_id_correlation.py` + `test_provider_trace_e2e.py`).
+- [x] `make pre-commit` clean (ruff, black, isort, mypy, pyright, mdformat, gitleaks).
+- [x] Design + end-user docs synced: design.md §3.14 (four planes + Phase 5 injection), design_appendix §A.14 (read
+  surface + injection bullet), cli_reference (`forge provider trace`), `docs/end-user/proxy.md` (provider-trace section
+  \+ `inject_openrouter_user`).
+- [x] Change-log entry (`docs/board/change_log.md`): Phases 3-5 recorded (goal, key changes, verification).
 - [ ] Promote durable lessons to `impl_notes.md` after human review (the fourth-plane idiom; the shared SSE seam; the
   synthetic-vs-provider id separation).
 - [ ] Move card `doing/openrouter_observability/ -> done/` after merge to `main`.

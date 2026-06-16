@@ -17,6 +17,7 @@ from forge.core.run_id import FORGE_COMMAND_HEADER, FORGE_SESSION_HEADER
 from forge.proxy import passthrough
 from forge.proxy.server import (
     _forge_session_command,
+    _openrouter_user_value,
     _valid_command_header,
     _valid_session_header,
 )
@@ -133,3 +134,73 @@ def test_forge_headers_not_forwarded_upstream() -> None:
     assert "x-forge-command" not in {k.lower() for k in headers}
     assert "x-forge-run-id" not in {k.lower() for k in headers}
     assert headers["anthropic-version"] == "2023-06-01"  # allowlisted header still forwarded
+
+
+# --- Phase 5: the OpenRouter `user`-field injection value (gate + fallback) ---
+
+
+def test_openrouter_user_value_uses_session_when_present() -> None:
+    assert (
+        _openrouter_user_value(
+            provider_name="openrouter",
+            inject=True,
+            forge_session=VALID_SESSION,
+            forge_root_run_id="run_7e81a1bb765d",
+            forge_command="supervisor",
+        )
+        == VALID_SESSION
+    )
+
+
+def test_openrouter_user_value_falls_back_to_run_hash() -> None:
+    """No session label -> derive forge_run_<hash> from the root run id, with the role suffix."""
+    value = _openrouter_user_value(
+        provider_name="openrouter",
+        inject=True,
+        forge_session=None,
+        forge_root_run_id="root_run_xyz",
+        forge_command="review",
+    )
+    assert value is not None
+    assert value.startswith("forge_run_")
+    assert value.endswith("_review")
+
+
+def test_openrouter_user_value_none_when_flag_off() -> None:
+    assert (
+        _openrouter_user_value(
+            provider_name="openrouter",
+            inject=False,
+            forge_session=VALID_SESSION,
+            forge_root_run_id="root_run_xyz",
+            forge_command=None,
+        )
+        is None
+    )
+
+
+def test_openrouter_user_value_none_for_non_openrouter() -> None:
+    assert (
+        _openrouter_user_value(
+            provider_name="litellm",
+            inject=True,
+            forge_session=VALID_SESSION,
+            forge_root_run_id="root_run_xyz",
+            forge_command=None,
+        )
+        is None
+    )
+
+
+def test_openrouter_user_value_none_when_no_identity() -> None:
+    """Flag on + openrouter but neither session nor run id -> nothing to group by."""
+    assert (
+        _openrouter_user_value(
+            provider_name="openrouter",
+            inject=True,
+            forge_session=None,
+            forge_root_run_id=None,
+            forge_command=None,
+        )
+        is None
+    )

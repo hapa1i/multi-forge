@@ -46,6 +46,7 @@ from forge.core.run_id import (
     FORGE_ROOT_RUN_ID_HEADER,
     FORGE_RUN_ID_HEADER,
     FORGE_SESSION_HEADER,
+    derive_provider_session_id,
     is_valid_label,
     is_valid_provider_session_id,
     is_valid_run_id,
@@ -241,6 +242,29 @@ def _forge_session_command(request: Request) -> tuple[str | None, str | None]:
     """The validated ``(forge_session, forge_command)`` the middleware stored (Phase 1)."""
     state = request.state
     return getattr(state, "forge_session", None), getattr(state, "forge_command", None)
+
+
+def _openrouter_user_value(
+    *,
+    provider_name: str,
+    inject: bool,
+    forge_session: str | None,
+    forge_root_run_id: str | None,
+    forge_command: str | None,
+) -> str | None:
+    """The OpenRouter ``user`` grouping id to inject, or None (openrouter_observability Phase 5).
+
+    Opt-in and direct-OpenRouter only. Prefers the already-derived, validated ``X-Forge-Session``
+    id; falls back to ``forge_run_<hash>`` when only run identity exists; returns None when there
+    is nothing to group by (or the flag/route does not apply).
+    """
+    if provider_name != "openrouter" or not inject:
+        return None
+    if forge_session:
+        return forge_session
+    if forge_root_run_id:
+        return derive_provider_session_id(None, forge_root_run_id, forge_command)
+    return None
 
 
 def _calc_and_log_cost(
@@ -1020,6 +1044,20 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
             if incoming_user_agent:
                 openai_request_dict["_user_agent"] = incoming_user_agent
                 logger.debug(f"[{request_id}] Forwarding User-Agent: {incoming_user_agent[:120]!r}")
+
+        # Opt-in (default off): record the Forge session grouping id in OpenRouter's `user` field
+        # so a session/fork is retrievable from OpenRouter's /generation record
+        # (openrouter_observability Phase 5). Direct-OpenRouter only; metadata-only, already hashed.
+        forge_user = _openrouter_user_value(
+            provider_name=provider_name,
+            # Read the flag lazily: only OpenRouter routes consult provider_trace config.
+            inject=provider_name == "openrouter" and config.proxy.provider_trace.inject_openrouter_user,
+            forge_session=forge_session,
+            forge_root_run_id=forge_root_run_id,
+            forge_command=forge_command,
+        )
+        if forge_user:
+            openai_request_dict["_forge_user"] = forge_user
 
         # Priority: request explicit > tier_override > model default (in catalog)
         tier_override = _get_tier_override(resolved_tier)

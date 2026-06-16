@@ -159,7 +159,13 @@ class TestExplain:
         old_ts = (datetime.now(timezone.utc) - timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%SZ")
         costs_dir = Path(tmp_path) / "costs" / "requests"
         costs_dir.mkdir(parents=True, exist_ok=True)
-        stale = {"schema_version": 1, "ts": old_ts, "request_id": "req-old", "confidence": "reported", "cost_micros": 1500}
+        stale = {
+            "schema_version": 1,
+            "ts": old_ts,
+            "request_id": "req-old",
+            "confidence": "reported",
+            "cost_micros": 1500,
+        }
         (costs_dir / "2000-01_stale.jsonl").write_text(json.dumps(stale) + "\n")
         exp = explain_provider_trace(ctx=_ctx(), request_id="req-old")
         assert exp.cost_confidence is None

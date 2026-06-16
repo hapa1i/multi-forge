@@ -113,7 +113,9 @@ def trace_list(session: str | None, root_run_id: str | None, period: str, limit:
             limit=limit,
         )
     except ForgeOpError as e:
-        print_error_with_tip(str(e), "Provider traces live at '~/.forge/providers/openrouter/traces/'.", console=console)
+        print_error_with_tip(
+            str(e), "Provider traces live at '~/.forge/providers/openrouter/traces/'.", console=console
+        )
         sys.exit(1)
 
     if as_json:

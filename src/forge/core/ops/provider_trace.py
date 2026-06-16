@@ -180,7 +180,9 @@ def render_explanation_lines(exp: ProviderTraceExplanation) -> list[str]:
 
     lines: list[str] = []
     if exp.left_forge:
-        lines.append(f"{exp.request_id} left Forge via proxy {exp.proxy_id} -> {provider_label} {exp.mapped_model}{upstream}.")
+        lines.append(
+            f"{exp.request_id} left Forge via proxy {exp.proxy_id} -> {provider_label} {exp.mapped_model}{upstream}."
+        )
     else:
         lines.append(
             f"{exp.request_id} was handled by proxy {exp.proxy_id} -> {provider_label} {exp.mapped_model}{upstream}, "

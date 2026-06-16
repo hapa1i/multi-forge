@@ -740,6 +740,19 @@ class TestInterceptAuditConfig:
         assert isinstance(cfg.provider_trace, ProviderTraceConfig)
         assert cfg.provider_trace.retention_days == 3
 
+    def test_provider_trace_inject_openrouter_user_defaults_false(self):
+        """Phase 5 opt-in is off unless explicitly enabled."""
+        config = self._make()
+        assert config.provider_trace.inject_openrouter_user is False
+
+    def test_provider_trace_inject_openrouter_user_coerced_from_dict(self):
+        config = self._make(provider_trace={"inject_openrouter_user": True})
+        assert config.provider_trace.inject_openrouter_user is True
+
+    def test_provider_trace_inject_openrouter_user_rejects_non_bool(self):
+        with pytest.raises(ValueError, match="provider_trace.inject_openrouter_user"):
+            self._make(provider_trace={"inject_openrouter_user": "yes"})
+
     def test_system_prompt_guard_requires_pattern(self):
         with pytest.raises(ValueError, match="needs a 'pattern' key"):
             self._make(intercept={"mode": "override", "override": {"system_prompt_guards": [{"action": "warn"}]}})

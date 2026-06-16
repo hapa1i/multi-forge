@@ -522,6 +522,112 @@ async def test_streaming_completion_forwards_user_agent() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Phase 5: _forge_user -> extra["openai"]["user"] forwarding
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_create_completion_forwards_forge_user() -> None:
+    """`_forge_user` from the server flows to extra["openai"]["user"] (Phase 5)."""
+    adapter = _make_adapter_with_mock_client()
+    mock_complete = AsyncMock(
+        return_value=CompletionResponse(
+            text="ok", usage={"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}
+        )
+    )
+    adapter._client = MagicMock(complete=mock_complete)  # type: ignore[assignment]
+
+    await adapter.create_completion(
+        {
+            "messages": [{"role": "user", "content": "hi"}],
+            "max_tokens": 100,
+            "_forge_user": "forge_sess_7e81a1bb765d_supervisor",
+        },
+        request_id="req-fu",
+    )
+
+    call_kwargs = mock_complete.call_args
+    hp = call_kwargs.kwargs.get("hyperparams") or call_kwargs[1].get("hyperparams")
+    assert hp is not None
+    assert hp.extra["openai"]["user"] == "forge_sess_7e81a1bb765d_supervisor"
+
+
+@pytest.mark.asyncio
+async def test_streaming_completion_forwards_forge_user() -> None:
+    """`_forge_user` forwarding also works on the streaming path (Phase 5)."""
+    adapter = _make_adapter_with_mock_client()
+    captured_hyperparams = []
+
+    async def _fake_stream(*args, **kwargs):  # type: ignore[no-untyped-def]
+        captured_hyperparams.append(kwargs.get("hyperparams"))
+        yield StreamEvent(type="text_delta", text="Hi")
+        yield StreamEvent(type="response_end")
+
+    adapter._client = MagicMock(stream=_fake_stream)  # type: ignore[assignment]
+
+    async for _chunk in adapter.create_streaming_completion(
+        {
+            "messages": [{"role": "user", "content": "hi"}],
+            "max_tokens": 100,
+            "_forge_user": "forge_run_7e81a1bb765d",
+        },
+        request_id="req-stream-fu",
+    ):
+        pass
+
+    assert len(captured_hyperparams) == 1
+    assert captured_hyperparams[0].extra["openai"]["user"] == "forge_run_7e81a1bb765d"
+
+
+@pytest.mark.asyncio
+async def test_create_completion_forge_user_coexists_with_user_agent() -> None:
+    """`_forge_user` and `_user_agent` share the extra["openai"] dict without clobbering."""
+    adapter = _make_adapter_with_mock_client()
+    mock_complete = AsyncMock(
+        return_value=CompletionResponse(
+            text="ok", usage={"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}
+        )
+    )
+    adapter._client = MagicMock(complete=mock_complete)  # type: ignore[assignment]
+
+    await adapter.create_completion(
+        {
+            "messages": [{"role": "user", "content": "hi"}],
+            "max_tokens": 100,
+            "_user_agent": "claude-code/2.1.0",
+            "_forge_user": "forge_sess_7e81a1bb765d_supervisor",
+        },
+        request_id="req-both",
+    )
+
+    call_kwargs = mock_complete.call_args
+    hp = call_kwargs.kwargs.get("hyperparams") or call_kwargs[1].get("hyperparams")
+    assert hp.extra["openai"]["extra_headers"] == {"User-Agent": "claude-code/2.1.0"}
+    assert hp.extra["openai"]["user"] == "forge_sess_7e81a1bb765d_supervisor"
+
+
+@pytest.mark.asyncio
+async def test_create_completion_no_forge_user_no_user_key() -> None:
+    """Without `_forge_user`, no `user` key is injected (flag-off path is byte-identical)."""
+    adapter = _make_adapter_with_mock_client()
+    mock_complete = AsyncMock(
+        return_value=CompletionResponse(
+            text="ok", usage={"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}
+        )
+    )
+    adapter._client = MagicMock(complete=mock_complete)  # type: ignore[assignment]
+
+    await adapter.create_completion(
+        {"messages": [{"role": "user", "content": "hi"}], "max_tokens": 100, "_user_agent": "claude-code/2.1.0"},
+        request_id="req-no-fu",
+    )
+
+    call_kwargs = mock_complete.call_args
+    hp = call_kwargs.kwargs.get("hyperparams") or call_kwargs[1].get("hyperparams")
+    assert "user" not in hp.extra["openai"]
+
+
+# ---------------------------------------------------------------------------
 # cached_tokens propagation tests
 # ---------------------------------------------------------------------------
 

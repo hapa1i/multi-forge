@@ -648,6 +648,12 @@ Semantics and invariants:
   `%provider trace` mirrors it via the shared `render_explanation_lines` text contract). `list` filters by session
   *label* (re-derived `forge_sess_<hash>` prefix) / `forge_root_run_id` / `--period`; `explain` joins the cost plane by
   `request_id` within ±5m for the cost record's `confidence`. Local-only — no remote `/generation` lookup.
+- **Session-id injection (Phase 5, opt-in).** `provider_trace.inject_openrouter_user` (default off) forwards the
+  validated `X-Forge-Session` id (or a `forge_run_<hash>` fallback) into OpenRouter's top-level `user` field on the
+  proxied direct-OpenRouter path — probe 3 found `user` is retained in the indexed `/generation` record for account-side
+  lookup, while a custom `session_id` is ignored. Server-gated (`_openrouter_user_value`) and adapter-forwarded via
+  `extra["openai"]["user"]`; metadata-only, hashed, never the raw session name. Direct `core.llm` callers (plan-check,
+  curation) are a documented follow-up, not wired here.
 
 ---
 
