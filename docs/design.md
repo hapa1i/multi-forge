@@ -974,7 +974,10 @@ selected upstream, allowlisted correlation headers (never auth/cookie), stream l
 `timeout_seen` is always `false` at the proxy boundary: the proxy observes only its own client disconnect, never the
 parent's `subprocess.run` timeout (that is a later run-tree-correlation join target). Traces join the cost/usage planes
 by shared `request_id` + run-tree ids; probe 2 (`[REMOTE-ABSENT]`) confirmed an aborted stream is not remotely
-retrievable, which is why the plane answers from local evidence only (no remote `/generation` lookup).
+retrievable, which is why the plane answers from local evidence only (no remote `/generation` lookup). The read surface
+is `forge provider trace list|show|explain` (op-backed `core/ops/provider_trace.py`; `%provider trace` mirrors it
+in-session); `explain` answers the incident's five questions from the trace plus a bounded (±5m) cost-plane join for
+confidence, never a remote lookup.
 
 Each proxy may define:
 

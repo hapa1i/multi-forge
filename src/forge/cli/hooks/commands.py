@@ -61,6 +61,7 @@ from .direct_commands import (
     _handle_cmd_help,
     _handle_cmd_plan,
     _handle_cmd_policy,
+    _handle_cmd_provider,
     _handle_cmd_proxy,
     _handle_cmd_session,
     _parse_direct_command,
@@ -1517,6 +1518,10 @@ def user_prompt_submit() -> None:
 
     if cmd == "proxy":
         _handle_cmd_proxy(data, args)
+        return
+
+    if cmd == "provider":
+        _handle_cmd_provider(data, args)
         return
 
     if cmd == "plan":

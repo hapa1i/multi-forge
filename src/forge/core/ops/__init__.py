@@ -17,6 +17,15 @@ from .gc import (
     collect_clean_report,
     run_clean,
 )
+from .provider_trace import (
+    ListProviderTracesResult,
+    ProviderTraceExplanation,
+    ShowProviderTraceResult,
+    explain_provider_trace,
+    list_provider_traces,
+    render_explanation_lines,
+    show_provider_trace,
+)
 from .proxy import (
     ListProxiesItem,
     ListProxiesResult,
@@ -70,4 +79,12 @@ __all__ = [
     "ShowProxyResult",
     "list_proxies",
     "show_proxy",
+    # Provider-trace ops
+    "ListProviderTracesResult",
+    "ShowProviderTraceResult",
+    "ProviderTraceExplanation",
+    "list_provider_traces",
+    "show_provider_trace",
+    "explain_provider_trace",
+    "render_explanation_lines",
 ]

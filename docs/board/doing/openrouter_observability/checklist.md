@@ -204,8 +204,8 @@ and probe 2.
   then disconnect** (the incident path) → `provider_generation_id` present, `first_chunk_seen=False`,
   `final_usage_seen=False`, `client_disconnected=True`; the **delayed id-then-name tool path** also flips
   `first_chunk_seen` (a provider that streams the tool id before its name still emits a visible `content_block_start`),
-  while the id-only buffer chunk emits nothing and leaves it unset
-  (`tests/src/proxy/test_converters_lifecycle.py`, 7 tests).
+  while the id-only buffer chunk emits nothing and leaves it unset (`tests/src/proxy/test_converters_lifecycle.py`, 7
+  tests).
 - [x] **Mirror in passthrough** (`src/forge/proxy/passthrough.py`): `_stream_opened_upstream` now tracks
   `stream_started`/`client_disconnected` (via `except (asyncio.CancelledError, GeneratorExit):` on the relay) and reads
   `saw_content`/`saw_final_usage` off the `_UsageAccumulator` (`_merge` sets them), funneling into the **same**
@@ -269,21 +269,27 @@ and probe 2.
 **Goal**: An op-backed CLI group that reads the plane and answers the incident's five questions from **local facts
 only** -- no remote lookup (that is the reconciliation card). Depends on Phase 3.
 
-- [ ] **Command-core op** (`src/forge/core/ops/provider_trace.py`, `__init__.py`): `list_provider_traces` /
-  `show_provider_trace` / `explain_provider_trace` returning frozen dataclasses, raising `ForgeOpError`, taking
-  `ExecutionContext` (shape of `core/ops/proxy.py`). `explain` builds a provenance DTO (left-Forge, route, provider
-  session/generation id, stream lifecycle, cost-unavailable-vs-zero) from local records only. - *Assertion*: ops are
-  Click/print-free; `explain_provider_trace` derives only from local trace+cost records, never calls a remote endpoint.
-- [ ] **CLI group** (`src/forge/cli/provider.py`, `cli/main.py`): `provider` group orients (help only); nested `trace`
-  group; `list`/`show`/`explain` leaves act with sensible defaults; `--json` from the same op DTO (table/JSON cannot
-  drift); `forge.cli.output.print_error_with_tip` with the call site's local console; credential provenance prints only
-  `env` / `credentials.yaml` / `management key unavailable` (never a key). - *Assertion*: bare `forge provider` prints
-  help; `forge provider trace list` defaults to all sessions/today; `explain req_...` renders local-only provenance;
-  `--json` emits the DTO; no key value ever printed.
-- [ ] Docs sync (ship with the change): `docs/cli_reference.md` lists the three leaves; design notes the fourth plane's
-  join keys + retention ownership; **`docs/end-user/proxy.md`** gains a provider-trace section -- board-contract Day-1
-  rule, since `forge provider trace` is a new user-facing surface (split into a dedicated guide later if it grows with
-  the reconciliation card).
+- [x] **Command-core op** (`src/forge/core/ops/provider_trace.py`, `__init__.py`): `list_provider_traces` /
+  `show_provider_trace` / `explain_provider_trace` return frozen DTOs, raise `ForgeOpError`, take `ExecutionContext`
+  (shape of `core/ops/proxy.py`). `explain` builds a `ProviderTraceExplanation` DTO (left-Forge, route, provider
+  session/generation id, stream lifecycle, cost-unavailable-vs-zero) from local records only; the pure
+  `render_explanation_lines` plain-text contract is shared by the terminal + `%` surfaces. Cost enrichment is a bounded
+  `read_cost_logs(trace_ts ±5m)` lookup by `request_id` for the cost record's `confidence`. - *Verified*: ops are
+  Click/print-free; never call a remote endpoint; 11 tests in `tests/src/core/ops/test_provider_trace.py`.
+- [x] **CLI group** (`src/forge/cli/provider.py`, `cli/main.py`): `provider` group orients; nested `trace` group;
+  `list`/`show`/`explain` leaves; `--json` shapes are bare-array (list) / single-dict (show) / `asdict(exp)` (explain)
+  via `dataclasses.asdict()`; errors via `print_error_with_tip` + exit 1. `list` filters: `--session` (label),
+  `--root-run-id` (exact), `--period today|week|month|all` (default today), `--limit` (50). **Decision (Q1 unanswered):
+  `explain` is route-only / trace-derived — no credential-source lookup; the "never print a key" guardrail holds
+  trivially (the record has no credential field). Credential-source bucket remains an easy additive extension.** -
+  *Verified*: bare groups print usage (exit 2, matching `forge proxy`); `--json` parity; no key value printed; 11 tests
+  in `tests/src/cli/test_provider_trace.py`.
+- [x] **Direct commands `%provider trace list|show|explain`** (scope addition — user chose to include now): mirrors
+  `%proxy audit`, read-only, `list` capped at 10; reuses the same ops + `render_explanation_lines` (byte-identical to
+  the terminal narrative). Wired in `cli/hooks/{direct_commands,commands}.py` + help; scope policy in
+  `cli_reference §2`. - *Verified*: 6 tests in `tests/src/cli/hooks/test_direct_commands_provider.py`.
+- [x] Docs sync: `docs/cli_reference.md` Provider-trace table + `%` scope/commands; `docs/end-user/proxy.md` new
+  "Provider trace" section (Day-1 rule); `design.md §3.14` + `design_appendix.md §A.14` read-surface note.
 
 | Test                                          | Fixture                                                   | Assertion                                                                                                                                                    | Test File                              |
 | --------------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------- |

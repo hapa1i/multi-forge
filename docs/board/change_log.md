@@ -27,6 +27,37 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-16
 
+### openrouter_observability Phase 4: `forge provider trace` read surfaces
+
+**Goal**: Give the metadata-only provider-trace plane (shipped Phase 3) a user-facing read surface so an operator can
+run `forge provider trace explain <req>` after a timeout and get a local provenance narrative instead of grepping
+shards.
+
+**Key changes**:
+
+- **Command-core op** (`core/ops/provider_trace.py`): UI-agnostic `list`/`show`/`explain` returning frozen DTOs, raising
+  `ForgeOpError`, taking `ExecutionContext` — no Click/print, no remote call. `explain` builds
+  `ProviderTraceExplanation` from local trace records and answers the incident's five questions (left Forge? route?
+  generation/session id? stream lifecycle? cost). Cost provenance is a **bounded** `read_cost_logs(trace_ts ±5m)` lookup
+  keyed by `request_id` for the cost record's `confidence` — additive only; the trace already carries
+  `reported_cost_micros`. The pure `render_explanation_lines` plain-text contract is shared verbatim by the terminal and
+  `%` surfaces (no drift).
+- **Terminal CLI** (`cli/provider.py`, `cli/main.py`): `provider` group orients; `trace list|show|explain` leaves;
+  `--json` shapes are bare-array / single-dict / `asdict(exp)` via `dataclasses.asdict()`; errors via
+  `print_error_with_tip`. `list` filters: `--session` (session-*label*, documented as imprecise), `--root-run-id`
+  (exact), `--period today|week|month|all`, `--limit` (50).
+- **Direct commands** (`cli/hooks/{direct_commands,commands}.py`): `%provider trace list|show|explain` mirror
+  `%proxy audit` — read-only, `list` capped at 10, reusing the same ops + renderer.
+- **Decision (card Q1 unanswered)**: `explain` is **route-only / trace-derived** — no credential-source resolution. The
+  "never print a key" guardrail holds trivially (no credential field is read). Credential provenance remains an additive
+  extension via `proxy_id → template → TEMPLATE_ENV_VARS → resolve_env_or_credential_with_source`.
+- **Docs**: `cli_reference.md` (Provider-trace table + `%` scope/commands), `end-user/proxy.md` (new "Provider trace"
+  section, board-contract Day-1 rule), `design.md §3.14` + `design_appendix.md §A.14` read-surface note.
+
+**Verification**: 28 new unit tests (11 op + 11 CLI + 6 direct-command), incl. a no-secret-printed assertion and
+identical terminal/`%` narratives; full `make test-unit` 6191 passed; `make pre-commit` clean (ruff/black/isort/mypy/
+pyright/mdformat/gitleaks). Read-only over existing shards — no new Docker path, so unit coverage is the gate.
+
 ### openrouter_observability Phase 3: provider-trace plane + shared SSE lifecycle seam
 
 **Goal**: Persist metadata-only, owner-only provider-trace records at the one shared stream seam so Forge can answer

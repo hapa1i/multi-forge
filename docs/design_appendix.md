@@ -644,6 +644,10 @@ Semantics and invariants:
   shape) records with unknown fields or bad `Literal` values. `read_provider_traces()` is the typed read surface.
   Retention is bounded by `provider_trace.{retention_days=14, max_total_mb=512}` (`ProviderTraceConfig`), pruned once
   per process from `_ensure_runtime_state` — a shared mental model with the audit plane.
+- **Read surface (Phase 4).** `forge provider trace list|show|explain` (op-backed `core/ops/provider_trace.py`;
+  `%provider trace` mirrors it via the shared `render_explanation_lines` text contract). `list` filters by session
+  *label* (re-derived `forge_sess_<hash>` prefix) / `forge_root_run_id` / `--period`; `explain` joins the cost plane by
+  `request_id` within ±5m for the cost record's `confidence`. Local-only — no remote `/generation` lookup.
 
 ---
 

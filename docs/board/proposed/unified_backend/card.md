@@ -1,7 +1,7 @@
 # Unified Backend Concept -- local and remote model sources as one first-class axis
 
-**Status**: Proposed. Spun out of the `openrouter_observability` investigation (2026-06-16) while reasoning about whether
-the provider-trace plane generalizes beyond OpenRouter. The local provider-trace card
+**Status**: Proposed. Spun out of the `openrouter_observability` investigation (2026-06-16) while reasoning about
+whether the provider-trace plane generalizes beyond OpenRouter. The local provider-trace card
 (`docs/board/doing/openrouter_observability/card.md`) is the **first intended consumer**: its hardcoded
 `provider_name == "openrouter"` gate is exactly the model-source identity this card would canonicalize.
 
@@ -28,12 +28,12 @@ Concretely, a "backend" today is a lifecycle-managed local process: `BackendAdap
 The "model source" concept is therefore **real but scattered across four sites**, and only the local half is a named,
 listable thing:
 
-| Identity site                                    | Local (LiteLLM)                                  | Remote (OpenRouter / remote LiteLLM)            |
-| ------------------------------------------------ | ------------------------------------------------ | ----------------------------------------------- |
-| Lifecycle                                        | `BackendDependency` -> `BackendManager`/`Adapter` | none (no process to manage)                     |
-| Identity / listing                               | `forge backend`, id `litellm-<port>`             | inferred from `preferred_provider` + a template |
-| Wire client                                      | `ProviderType.litellm_local`                     | `ProviderType.openrouter` / `litellm_remote`    |
-| Auth link                                        | `TEMPLATE_ENV_VARS` -> `GEMINI_API_KEY` etc.     | `TEMPLATE_ENV_VARS` -> `OPENROUTER_API_KEY`     |
+| Identity site      | Local (LiteLLM)                                   | Remote (OpenRouter / remote LiteLLM)            |
+| ------------------ | ------------------------------------------------- | ----------------------------------------------- |
+| Lifecycle          | `BackendDependency` -> `BackendManager`/`Adapter` | none (no process to manage)                     |
+| Identity / listing | `forge backend`, id `litellm-<port>`              | inferred from `preferred_provider` + a template |
+| Wire client        | `ProviderType.litellm_local`                      | `ProviderType.openrouter` / `litellm_remote`    |
+| Auth link          | `TEMPLATE_ENV_VARS` -> `GEMINI_API_KEY` etc.      | `TEMPLATE_ENV_VARS` -> `OPENROUTER_API_KEY`     |
 
 > **Auth-link note.** The machine-readable contract is `TEMPLATE_ENV_VARS` (template -> env var names, in
 > `template_secrets.py`) reverse-mapped to credentials by `credentials_for_template()`, plus connection values like
@@ -60,11 +60,11 @@ on.
 
 This card does **not** merge backend, proxy, and provider. They are deliberately separate and stay separate:
 
-| Axis         | What it is                                       | Keyed by                       |
-| ------------ | ------------------------------------------------ | ------------------------------ |
-| **Proxy**    | Forge's routing endpoint Claude hits (`ANTHROPIC_BASE_URL`) | template + base_url + port |
-| **Provider** | Per-request wire client inside the proxy         | `ProviderType` enum            |
-| **Backend**  | The upstream **model source** the proxy reaches  | *this card: local \| remote*   |
+| Axis         | What it is                                                  | Keyed by                     |
+| ------------ | ----------------------------------------------------------- | ---------------------------- |
+| **Proxy**    | Forge's routing endpoint Claude hits (`ANTHROPIC_BASE_URL`) | template + base_url + port   |
+| **Provider** | Per-request wire client inside the proxy                    | `ProviderType` enum          |
+| **Backend**  | The upstream **model source** the proxy reaches             | *this card: local \| remote* |
 
 Proxies route *through* backends; credentials *authenticate* backends; the telemetry planes *attribute to* backends. The
 backend axis is the missing **spine** that the other three already lean on informally.
@@ -96,11 +96,11 @@ It is an *is-a vs has-a* split: a remote backend *has* an endpoint and auth but 
 `forge backend list` shows both kinds in one view. The symmetry is at the **noun**, not every **verb** -- a deliberate,
 acknowledged partial symmetry (cf. `git remote` vs local branches):
 
-| Verb              | Local backend | Remote backend |
-| ----------------- | ------------- | -------------- |
-| `list` / `show`   | yes           | yes            |
-| `start` / `stop`  | yes           | n/a            |
-| `test-auth`       | yes           | yes            |
+| Verb             | Local backend | Remote backend |
+| ---------------- | ------------- | -------------- |
+| `list` / `show`  | yes           | yes            |
+| `start` / `stop` | yes           | n/a            |
+| `test-auth`      | yes           | yes            |
 
 ```text
 $ forge backend list
@@ -135,9 +135,9 @@ overlapping concept and *more* surface, not less.
 
 ### 5. Telemetry spine: backend id as the canonical *source* key
 
-Once backends are first-class, the **downstream** telemetry plane keys on `backend_id` as its canonical
-**source identity**. This card owns that *key*; it does **not** decide how many planes exist -- the plane
-**structure** (whether cost / audit / usage / provider-trace collapse, plus a new upstream outcome plane) is owned by
+Once backends are first-class, the **downstream** telemetry plane keys on `backend_id` as its canonical **source
+identity**. This card owns that *key*; it does **not** decide how many planes exist -- the plane **structure** (whether
+cost / audit / usage / provider-trace collapse, plus a new upstream outcome plane) is owned by
 `upstream_downstream_ledgers` under the `telemetry_architecture` epic. Here we only make `backend_id` the source key
 downstream records attribute to.
 
@@ -149,8 +149,8 @@ downstream records attribute to.
   is session-keyed, not backend-keyed (one operation spans many backends), so `backend_id` is a downstream key, not a
   universal one.
 - **Defer plane count to `upstream_downstream_ledgers`.** That card collapses cost + audit + provider-trace into one
-  *downstream* plane (keyed on `backend_id`) and adds a first-class *upstream* outcome plane. This card supplies the key;
-  it must **not** assert the four planes persist. See the `telemetry_architecture` epic for the shared contract.
+  *downstream* plane (keyed on `backend_id`) and adds a first-class *upstream* outcome plane. This card supplies the
+  key; it must **not** assert the four planes persist. See the `telemetry_architecture` epic for the shared contract.
 
 ## Relationship to other cards
 
@@ -179,7 +179,8 @@ downstream records attribute to.
 - **Direct Anthropic.** `ProviderType` has `anthropic` (passthrough). Does direct Anthropic become a remote backend too,
   or stay a proxy wire-shape detail?
 - **Proxy -> backend reference.** How do templates reference backends -- migrate the six `*-local` `backend_dependency`
-  blocks and the `openrouter-*` inline `base_url` to a `source: <backend-id>` reference? What is the one source of truth?
+  blocks and the `openrouter-*` inline `base_url` to a `source: <backend-id>` reference? What is the one source of
+  truth?
 - **Remote health semantics.** Reachable vs authed vs rate-limited -- how much to probe, and at what cost/latency, given
   status surfaces poll frequently?
 - **`ProviderType` fate.** Does the enum collapse into `backend.kind` + the wire-client detail, or stay as the
@@ -195,8 +196,8 @@ downstream records attribute to.
 - **Catalog vs instance conflation.** The static model-source catalog must stay separate from the runtime
   `BackendRegistry` (`~/.forge/backends/index.json`, PID/port/status). A remote backend has a catalog definition but no
   instance row; mixing static remote definitions into the PID-keyed registry would break its pruning/health semantics.
-- **Lifecycle confusion.** Users may expect `forge backend start openrouter` to do something; the unified-noun/divergent-verbs
-  model must be obvious in help and errors.
+- **Lifecycle confusion.** Users may expect `forge backend start openrouter` to do something; the
+  unified-noun/divergent-verbs model must be obvious in help and errors.
 - **Over-promising auth.** The auth-resolution complexity is intrinsic. Frame this as transparency, not simplification.
 - **Sequencing collision.** Doing this while `openrouter_observability` is in flight (it keys on `provider_name`) risks
   churn; the observability card should ship first.
@@ -205,8 +206,8 @@ downstream records attribute to.
 
 - **Unified listing**: `forge backend list` shows local LiteLLM instances and remote sources (OpenRouter, remote
   LiteLLM) in one view with `kind`, endpoint, credential, and status.
-- **No remote lifecycle**: a remote backend exposes `show`/`test-auth` but not `start`/`stop`; the LSP split lives in the
-  type system (no remote adapter implements process start/stop).
+- **No remote lifecycle**: a remote backend exposes `show`/`test-auth` but not `start`/`stop`; the LSP split lives in
+  the type system (no remote adapter implements process start/stop).
 - **Single source of truth**: templates reference a backend by id; the six `*-local` `backend_dependency` blocks and the
   `openrouter-*` templates resolve to **model-source catalog** entries (the static definition layer, distinct from the
   runtime `BackendRegistry` instance store), not inline base_urls.

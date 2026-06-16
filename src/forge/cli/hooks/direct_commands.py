@@ -68,6 +68,7 @@ def _handle_cmd_help() -> None:
                 "reason": "Direct commands:\n"
                 "- %session show [name] | list\n"
                 "- %proxy list | show <id> | audit show|diff [id]\n"
+                "- %provider trace list | show <id> | explain <id>\n"
                 "- %clean [--scope workspace|project|all]\n"
                 "- %plan\n"
                 "- %config (show runtime config)\n"
@@ -350,6 +351,125 @@ def _handle_proxy_show(proxy_id: str) -> None:
                     lines.append(f"    {tier}: {model}")
 
     click.echo(json.dumps({"decision": "block", "reason": "\n".join(lines)}))
+
+
+def _handle_cmd_provider(data: dict[str, Any], argv: list[str]) -> None:
+    """Handle `%provider ...` commands (mirrors CLI syntax, read-only).
+
+    Supported:
+
+    - `%provider trace list [--session NAME]`: recent provider traces (last 10)
+    - `%provider trace show <request_id>`: one trace record
+    - `%provider trace explain <request_id>`: local-only provenance narrative
+
+    Always emits `{decision:block}` when handled. Metadata only; no secrets, no remote
+    lookups. The `list` cap is deliberately small (10) so it never floods the prompt.
+    """
+    usage = "Usage: %provider trace list [--session NAME] | show <request_id> | explain <request_id>"
+    if not argv or argv[0].lower() != "trace":
+        click.echo(json.dumps({"decision": "block", "reason": usage}))
+        return
+
+    sub = argv[1].lower() if len(argv) > 1 else ""
+    rest = argv[2:]
+
+    if sub == "list":
+        _handle_provider_trace_list(rest)
+        return
+    if sub in ("show", "explain"):
+        if not rest:
+            click.echo(json.dumps({"decision": "block", "reason": f"Usage: %provider trace {sub} <request_id>"}))
+            return
+        if sub == "show":
+            _handle_provider_trace_show(rest[0])
+        else:
+            _handle_provider_trace_explain(rest[0])
+        return
+
+    click.echo(json.dumps({"decision": "block", "reason": usage}))
+
+
+def _provider_trace_status(rec: object) -> str:
+    """Compact lifecycle/usage label shared by the %provider list + show renderers."""
+    final_usage_seen = getattr(rec, "final_usage_seen", False)
+    client_disconnected = getattr(rec, "client_disconnected", False)
+    local_usage_status = getattr(rec, "local_usage_status", "-")
+    lifecycle = "ok" if final_usage_seen else ("disconnect" if client_disconnected else "no-usage")
+    return f"{lifecycle}/{local_usage_status}"
+
+
+def _handle_provider_trace_list(argv: list[str]) -> None:
+    """List recent provider traces (last 10), optionally filtered by session label."""
+    from forge.core.ops import list_provider_traces
+    from forge.core.ops.context import ExecutionContext
+    from forge.core.ops.session import ForgeOpError
+
+    session: str | None = None
+    for i, arg in enumerate(argv):
+        if arg.startswith("--session="):
+            session = arg.split("=", 1)[1]
+            break
+        if arg == "--session" and i + 1 < len(argv):
+            session = argv[i + 1]
+            break
+
+    try:
+        result = list_provider_traces(ctx=ExecutionContext.from_cwd(), session=session, limit=10)
+    except ForgeOpError as e:
+        click.echo(json.dumps({"decision": "block", "reason": f"Error: {e}"}))
+        return
+
+    if not result.traces:
+        scope = f" (session {session})" if session else ""
+        click.echo(json.dumps({"decision": "block", "reason": f"No provider traces{scope}."}))
+        return
+
+    lines = ["Provider traces (last 10):"]
+    for r in result.traces:
+        lines.append(f"  {r.ts} {r.request_id} {r.mapped_model} {_provider_trace_status(r)}")
+    click.echo(json.dumps({"decision": "block", "reason": "\n".join(lines)}))
+
+
+def _handle_provider_trace_show(request_id: str) -> None:
+    """Show one provider-trace record (metadata only)."""
+    from forge.core.ops import show_provider_trace
+    from forge.core.ops.context import ExecutionContext
+    from forge.core.ops.session import ForgeOpError
+
+    try:
+        result = show_provider_trace(ctx=ExecutionContext.from_cwd(), request_id=request_id)
+    except ForgeOpError as e:
+        click.echo(json.dumps({"decision": "block", "reason": f"Error: {e}"}))
+        return
+
+    rec = result.record
+    lines = [f"Provider trace: {rec.request_id}"]
+    for label, value in (
+        ("Proxy", rec.proxy_id),
+        ("Model", rec.mapped_model),
+        ("Upstream", rec.selected_provider),
+        ("Generation id", rec.provider_generation_id),
+        ("Session", rec.provider_session_id),
+        ("Role", rec.provider_command),
+        ("Status", _provider_trace_status(rec)),
+    ):
+        if value is not None:
+            lines.append(f"  {label}: {value}")
+    click.echo(json.dumps({"decision": "block", "reason": "\n".join(lines)}))
+
+
+def _handle_provider_trace_explain(request_id: str) -> None:
+    """Explain a request from local records only (same narrative as the terminal CLI)."""
+    from forge.core.ops import explain_provider_trace, render_explanation_lines
+    from forge.core.ops.context import ExecutionContext
+    from forge.core.ops.session import ForgeOpError
+
+    try:
+        explanation = explain_provider_trace(ctx=ExecutionContext.from_cwd(), request_id=request_id)
+    except ForgeOpError as e:
+        click.echo(json.dumps({"decision": "block", "reason": f"Error: {e}"}))
+        return
+    click.echo(json.dumps({"decision": "block", "reason": "\n".join(render_explanation_lines(explanation))}))
 
 
 def _handle_cmd_plan(argv: list[str]) -> None:

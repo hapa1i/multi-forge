@@ -569,6 +569,51 @@ forge proxy audit show audit-test        # records written inside the container 
 
 ---
 
+## Provider trace (request lifecycle diagnostics)
+
+A fourth, local, **metadata-only** telemetry plane (alongside cost, audit, and usage) answers one question after a
+timeout: *what happened to this OpenRouter request?* It was born from an incident -- a supervised fork's checks timed
+out before the final streaming usage chunk and left no trace locally or in OpenRouter's dashboard.
+
+Records live owner-only under `~/.forge/providers/openrouter/traces/` and carry **no** prompt, completion, tool output,
+or request body -- only lifecycle/correlation evidence (request id, proxy, model, provider generation id, stream flags,
+disconnect, and whether local cost was seen). Direct-OpenRouter only; not wiped by `forge proxy costs reset`
+(diagnostics, not spend truth); retained 14 days / 512 MB.
+
+```bash
+# Recent traces (today by default; --period today|week|month|all)
+forge provider trace list
+forge provider trace list --session my-session      # by session label
+forge provider trace list --root-run-id run_abc...   # exact run tree
+forge provider trace list --period week --json
+
+# One record / a plain-language explanation
+forge provider trace show <request_id>
+forge provider trace explain <request_id>
+```
+
+`explain` answers five questions from **local records only** (no remote lookup):
+
+```text
+req_... left Forge via proxy crimson-apricot -> OpenRouter openai/gpt-5.5 (upstream: Azure).
+Stream started and emitted chunks; final usage was not observed; client disconnected.
+Provider generation id: gen-... (session forge_sess_..._supervisor).
+Local cost is unavailable, not zero.
+No remote lookup was performed.
+```
+
+The same three commands are available in-session as `%provider trace list|show|explain` (read-only).
+
+**Notes:**
+
+- `--session` matches the hashed session **label** only -- two same-named sessions in one `FORGE_HOME` share it. Use
+  `--root-run-id` when you need an exact match.
+- "Local cost is unavailable, not zero" is the point: a stream cancelled before its final usage chunk has no local cost,
+  which is different from a genuine `$0`.
+- Remote OpenRouter reconciliation is intentionally out of scope here -- this surface is local-only by design.
+
+---
+
 ## Prerequisites
 
 - **Claude Code >= 2.1.81** -- required for `--bare` (used by workflow subprocesses for faster startup). Older versions

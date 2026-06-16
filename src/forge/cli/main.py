@@ -26,6 +26,7 @@ from .hooks import hooks  # noqa: E402
 from .memory import memory as memory_cmd  # noqa: E402
 from .memory_writer import memory_writer  # noqa: E402
 from .policy import policy  # noqa: E402
+from .provider import provider  # noqa: E402
 from .proxy import proxy  # noqa: E402
 from .runtime import runtime  # noqa: E402
 from .search import search_cmd  # noqa: E402
@@ -379,6 +380,7 @@ main.add_command(auth, name="authentication")
 main.add_command(backend)
 main.add_command(session)
 main.add_command(proxy)
+main.add_command(provider)
 main.add_command(policy)
 main.add_command(memory_writer)
 main.add_command(claude)
