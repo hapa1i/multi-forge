@@ -138,7 +138,27 @@ def test_proxy_launch_no_session_state(tmp_path, monkeypatch):
 
 def test_proxy_launch_sets_base_url_and_context_limit(tmp_path, monkeypatch):
     """Proxy mode sets ANTHROPIC_BASE_URL, CLAUDE_CODE_AUTO_COMPACT_WINDOW, ACTIVE_TEMPLATE."""
-    _setup_proxy_env(tmp_path, monkeypatch)
+    from forge.config.loader import write_proxy_instance_config
+    from forge.config.schema import ProxyInstanceConfig, TierModels
+
+    _setup_proxy_env(tmp_path, monkeypatch, template="openrouter-gemini")
+    proxy_config = ProxyInstanceConfig(
+        proxy_format=1,
+        template="openrouter-gemini",
+        template_digest="sha256:test",
+        provider="openrouter",
+        proxy_endpoint="http://localhost:8085",
+        port=8085,
+        upstream_base_url="https://openrouter.ai/api/v1",
+        tiers=TierModels(
+            haiku="google/gemini-3.5-flash",
+            sonnet="google/gemini-3.1-pro-preview",
+            opus="google/gemini-3.1-pro-preview",
+        ),
+        family="gemini",
+        default_tier="sonnet",
+    )
+    write_proxy_instance_config("proxy_1", proxy_config)
 
     captured = {}
 
@@ -152,8 +172,11 @@ def test_proxy_launch_sets_base_url_and_context_limit(tmp_path, monkeypatch):
 
     assert result.exit_code == 0, result.output
     assert captured["env_vars"]["ANTHROPIC_BASE_URL"] == "http://localhost:8085"
-    assert "CLAUDE_CODE_AUTO_COMPACT_WINDOW" in captured["env_vars"]
-    assert captured["env_vars"]["ACTIVE_TEMPLATE"] == "litellm-openai"
+    assert captured["env_vars"]["CLAUDE_CODE_AUTO_COMPACT_WINDOW"] == "1048576"
+    assert captured["env_vars"]["ANTHROPIC_DEFAULT_OPUS_MODEL"] == "claude-opus-4-6[1m]"
+    assert captured["env_vars"]["ANTHROPIC_DEFAULT_SONNET_MODEL"] == "claude-sonnet-4-6[1m]"
+    assert "ANTHROPIC_MODEL" not in captured["env_vars"]
+    assert captured["env_vars"]["ACTIVE_TEMPLATE"] == "openrouter-gemini"
 
 
 def test_direct_launch_scrubs_proxy_vars(tmp_path, monkeypatch):

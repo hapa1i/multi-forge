@@ -6,6 +6,7 @@ import pytest
 
 from forge.session.direct_model import (
     apply_direct_model_env,
+    apply_proxy_context_model_defaults,
     direct_model_env,
     resolve_direct_model_pin,
 )
@@ -92,3 +93,30 @@ def test_apply_direct_model_env_returns_error() -> None:
     assert error is not None
     assert "only supports Claude" in error
     assert env_vars == {}
+
+
+def test_proxy_context_model_defaults_only_for_large_context() -> None:
+    env_vars: dict[str, str] = {}
+
+    apply_proxy_context_model_defaults(env_vars, 200000)
+    assert env_vars == {}
+
+    apply_proxy_context_model_defaults(env_vars, 1000000)
+    assert env_vars == {
+        "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-4-6[1m]",
+        "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-sonnet-4-6[1m]",
+    }
+
+
+def test_proxy_context_model_defaults_do_not_force_tier_or_override_explicit_defaults() -> None:
+    env_vars = {
+        "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-4-8",
+    }
+
+    apply_proxy_context_model_defaults(env_vars, 1000000)
+
+    assert env_vars == {
+        "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-4-8",
+        "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-sonnet-4-6[1m]",
+    }
+    assert "ANTHROPIC_MODEL" not in env_vars

@@ -73,8 +73,8 @@ class TestAutoCompactWindowContract:
         assert _LEGACY_ENV_VAR not in env_vars
         assert _LEGACY_ENV_VAR not in unset
 
-    def test_resolver_derives_context_from_proxy_model(self, tmp_path, monkeypatch):
-        """_resolve_context_limit returns catalog-derived window, not the fallback."""
+    def test_resolver_derives_context_from_largest_proxy_model(self, tmp_path, monkeypatch):
+        """_resolve_context_limit returns the largest catalog-derived tier window."""
         from forge.cli.session import _resolve_context_limit
         from forge.config.loader import write_proxy_instance_config
         from forge.config.schema import ProxyInstanceConfig, TierModels
@@ -93,7 +93,7 @@ class TestAutoCompactWindowContract:
             proxy_endpoint="http://localhost:9999",
             port=9999,
             upstream_base_url="http://litellm.example.com",
-            tiers=TierModels(sonnet="gpt-4o"),
+            tiers=TierModels(haiku="gpt-4o-mini", sonnet="claude-opus-4-6", opus="gemini-3.1-pro-preview"),
             default_tier="sonnet",
         )
         write_proxy_instance_config("test-proxy", proxy_config)
@@ -112,10 +112,60 @@ class TestAutoCompactWindowContract:
         store = ProxyRegistryStore()
         store.write(registry)
 
-        expected = get_context_window_tokens("gpt-4o")
+        expected = get_context_window_tokens("gemini-3.1-pro-preview")
         result = _resolve_context_limit("test-proxy")
         assert result == expected
         assert result != 200000
+
+    def test_proxy_context_limit_handles_openrouter_dot_slug(self, tmp_path, monkeypatch):
+        """OpenRouter Claude dot slugs use the 1M catalog metadata."""
+        from forge.cli.claude import _get_context_limit_for_proxy
+        from forge.config.loader import write_proxy_instance_config
+        from forge.config.schema import ProxyInstanceConfig, TierModels
+        from forge.runtime_config import reset_runtime_config
+
+        monkeypatch.setenv("FORGE_HOME", str(tmp_path))
+        reset_runtime_config()
+
+        proxy_config = ProxyInstanceConfig(
+            proxy_format=1,
+            template="openrouter-anthropic",
+            template_digest="sha256:test",
+            provider="openrouter",
+            proxy_endpoint="http://localhost:9999",
+            port=9999,
+            upstream_base_url="https://openrouter.ai/api/v1",
+            tiers=TierModels(sonnet="claude-opus-4-6", opus="anthropic/claude-opus-4.6"),
+            default_tier="sonnet",
+        )
+        write_proxy_instance_config("openrouter-proxy", proxy_config)
+
+        assert _get_context_limit_for_proxy("openrouter-proxy") == 1000000
+
+    def test_proxy_context_limit_honors_claude_code_1m_suffix(self, tmp_path, monkeypatch):
+        """Proxy tier models with Claude Code's [1m] suffix are counted as 1M variants."""
+        from forge.cli.claude import _get_context_limit_for_proxy
+        from forge.config.loader import write_proxy_instance_config
+        from forge.config.schema import ProxyInstanceConfig, TierModels
+        from forge.runtime_config import reset_runtime_config
+
+        monkeypatch.setenv("FORGE_HOME", str(tmp_path))
+        reset_runtime_config()
+
+        proxy_config = ProxyInstanceConfig(
+            proxy_format=1,
+            template="litellm-anthropic",
+            template_digest="sha256:test",
+            provider="litellm",
+            proxy_endpoint="http://localhost:9999",
+            port=9999,
+            upstream_base_url="http://litellm.example.com",
+            tiers=TierModels(sonnet="claude-opus-4-6", opus="claude-sonnet-4-6[1m]"),
+            default_tier="sonnet",
+        )
+        write_proxy_instance_config("suffix-proxy", proxy_config)
+
+        assert _get_context_limit_for_proxy("suffix-proxy") == 1000000
 
 
 class TestStaleManifestGuard:

@@ -12,6 +12,11 @@ from forge.core.models.catalog import (
 )
 
 ONE_M_SUFFIX = "[1m]"
+PROXY_CONTEXT_MODEL_DEFAULT_MIN_TOKENS = 200_000
+PROXY_CONTEXT_MODEL_DEFAULTS = {
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": f"claude-opus-4-6{ONE_M_SUFFIX}",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": f"claude-sonnet-4-6{ONE_M_SUFFIX}",
+}
 
 
 @dataclass(frozen=True)
@@ -87,6 +92,22 @@ def apply_direct_model_env(env_vars: MutableMapping[str, str], value: str | None
     except ValueError as e:
         return str(e)
     return None
+
+
+def apply_proxy_context_model_defaults(
+    env_vars: MutableMapping[str, str],
+    context_limit: int | None,
+) -> None:
+    """Give Claude Code 1M Claude defaults when a proxy exposes a larger context.
+
+    Proxy routing still decides the backend tier/model. These defaults only keep
+    Claude Code's local context estimator aligned with large-context proxies.
+    """
+    if context_limit is None or context_limit <= PROXY_CONTEXT_MODEL_DEFAULT_MIN_TOKENS:
+        return
+
+    for key, value in PROXY_CONTEXT_MODEL_DEFAULTS.items():
+        env_vars.setdefault(key, value)
 
 
 def token_estimate_multiplier_for_direct_model(value: str | None) -> float:

@@ -153,6 +153,8 @@ class TestOpenRouterSlugAliases:
     """OpenRouter provider slugs can differ from Forge canonical IDs."""
 
     def test_dot_slugs_resolve_to_canonical_ids(self):
+        assert resolve_model_id("anthropic/claude-opus-4.6") == "claude-opus-4-6-1m"
+        assert resolve_model_id("anthropic/claude-sonnet-4.6") == "claude-sonnet-4-6-1m"
         assert resolve_model_id("anthropic/claude-opus-4.8") == "claude-opus-4-8"
         assert resolve_model_id("qwen/qwen3.6-flash") == "qwen3.6-flash"
         assert resolve_model_id("qwen/qwen3.6-plus") == "qwen3.6-plus"
@@ -163,6 +165,8 @@ class TestOpenRouterSlugAliases:
         assert resolve_model_id("z-ai/glm-5.1") == "glm-5.1"
 
     def test_metadata_lookups_accept_openrouter_slugs(self):
+        assert get_context_window_tokens("anthropic/claude-opus-4.6") == 1000000
+        assert get_context_window_tokens("anthropic/claude-sonnet-4.6") == 1000000
         assert get_context_window_tokens("anthropic/claude-opus-4.8") == 1000000
         assert get_context_window_tokens("qwen/qwen3.6-flash") == 1000000
         assert get_context_window_tokens("qwen/qwen3.6-plus") == 1000000
