@@ -152,7 +152,7 @@ streak-vs-window semantic gap (review point 3).
 - [x] `make pre-commit` clean; `change_log.md` feature-completion entry; durable lessons promoted to `impl_notes.md`.
   The deferred kinds (parse/auth), exact reset, and the decision-log/upstream path are recorded in
   `upstream_downstream_ledgers` -- not lost. *Files*: `docs/board/change_log.md`, `docs/board/impl_notes.md`.
-- [ ] **Lane move `doing/ -> done/` pending merge to `main`** (repo convention: the move is gated on the final merge,
+- [x] **Lane move `doing/ -> done/` pending merge to `main`** (repo convention: the move is gated on the final merge,
   per the `codex_frontend` closeout). Perform
   `git mv docs/board/doing/supervisor_statusline_health docs/board/done/supervisor_statusline_health` immediately after
   this branch lands on `main`.

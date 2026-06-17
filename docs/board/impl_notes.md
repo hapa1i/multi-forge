@@ -319,6 +319,28 @@ the usage ledger already records. Sources: `src/forge/core/ops/usage_summary.py`
   `command="supervisor"` excludes `supervisor-shadow`/`plan-check`. `forge proxy costs reset` clears `fhealth-*.json`
   alongside `fcost-*.json` so a wiped ledger can't replay cached health.
 
+### OpenRouter provider trace: local lifecycle evidence for aborted streams (shipped 2026-06-16)
+
+Durable invariants for `openrouter_observability`: Forge can explain a timed-out OpenRouter request from local metadata
+even when OpenRouter never indexes the cancelled stream.
+
+- **Provider trace is a fourth plane, not a cost-log embellishment.** Cost remains spend truth, audit remains redacted
+  body/control evidence, usage remains run/session attribution, and provider trace records provider lifecycle +
+  correlation evidence under `~/.forge/providers/openrouter/traces/`. The plane is metadata-only, owner-only, bounded
+  like audit, and is intentionally **not** wiped by `forge proxy costs reset`.
+- **The shared SSE seam owns lifecycle flags.** The provider metadata carrier is consumed at the converter seam, which
+  records stream-start, first user-visible chunk, final usage, and client-disconnect state exactly once through the
+  existing `on_complete` path. `CancelledError`/`GeneratorExit` must be caught to mark disconnect and then re-raised;
+  the writer remains best-effort so diagnostics never break a successful or already-cancelling request.
+- **Synthetic response ids and provider ids are separate namespaces.** Forge may mint OpenAI-compatible `chatcmpl-...`
+  ids for downstream clients, but OpenRouter's `gen-...` id lives in optional `ProviderTraceMeta`. Streaming emits
+  metadata as soon as the first provider id is seen so a stream killed before final usage still keeps the provider
+  generation id.
+- **OpenRouter grouping uses `user`, not a custom `session_id`.** Probe evidence showed OpenRouter retains the
+  OpenAI-standard `user` field and ignores custom `session_id`. Proxied injection is therefore opt-in per proxy via
+  `provider_trace.inject_openrouter_user`, sends only hashed Forge ids, and defaults off. Direct `core.llm` callers are
+  a separate card because they need an in-process opt-in owner, not a proxy-owned setting.
+
 ### Proposed Promotions From Metric Evidence (awaiting human review, 2026-06-06)
 
 Drafted by the `metric_evidence_simplification` Phase 6 closeout. **Not yet promoted** — a human should review and move

@@ -1,8 +1,8 @@
 # OpenRouter Provider Trace -- session IDs and local lifecycle evidence
 
-**Status**: Accepted -- in `doing/` (branch `openrouter-observability`, 2026-06-15). Spun out of the
-`supervisor_shadow_sampling` investigation on 2026-06-14, after a supervised fork sent requests through the OpenRouter
-proxy but the user could not find them in OpenRouter's UI or Forge activity/cost surfaces.
+**Status**: Done (`done/`) -- shipped to `main` (2026-06-16). Spun out of the `supervisor_shadow_sampling` investigation
+on 2026-06-14, after a supervised fork sent requests through the OpenRouter proxy but the user could not find them in
+OpenRouter's UI or Forge activity/cost surfaces.
 
 **Split from**: the original broad OpenRouter observability sketch. Log-volume work now lives in
 `docs/board/proposed/proxy_log_hygiene/card.md`; remote OpenRouter reconciliation now lives in

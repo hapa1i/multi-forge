@@ -399,8 +399,9 @@ record for account-side lookup**. Last phase by design. Depends on Phase 1 + pro
   surface + injection bullet), cli_reference (`forge provider trace`), `docs/end-user/proxy.md` (provider-trace section
   \+ `inject_openrouter_user`).
 - [x] Change-log entry (`docs/board/change_log.md`): Phases 3-5 recorded (goal, key changes, verification).
-- [ ] Promote durable lessons to `impl_notes.md` after human review (the fourth-plane idiom; the shared SSE seam; the
+- [x] Promote durable lessons to `impl_notes.md` after human review (the fourth-plane idiom; the shared SSE seam; the
   synthetic-vs-provider id separation).
-- [ ] Move card `doing/openrouter_observability/ -> done/` after merge to `main`.
-- [ ] Hand the shared stream-lifecycle seam to `proxy_log_hygiene` (it consumes the same flags for compact in-log
-  summaries -- the two cards must not double-instrument the loop).
+- [x] Move card `doing/openrouter_observability/ -> done/` after merge to `main`.
+- [x] Hand the shared stream-lifecycle seam to `proxy_log_hygiene`: the proposed card already names compact lifecycle
+  summaries as its logging responsibility and says it must consume the same shared instrumentation, so the two cards do
+  not double-instrument the loop.

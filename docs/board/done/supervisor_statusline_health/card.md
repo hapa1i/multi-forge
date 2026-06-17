@@ -1,7 +1,7 @@
 # Supervisor Status-Line Health -- surface fail-open timeouts
 
-**Status**: In progress (`doing/`; branch `supervisor_statusline_health`). **Re-cut 2026-06-16** to a minimal scope: v1
-reads the outcome the **usage ledger already records** and renders a marker -- no new durable-state field. The original
+**Status**: Done (`done/`) -- shipped to `main` (2026-06-16). **Re-cut 2026-06-16** to a minimal scope: v1 reads the
+outcome the **usage ledger already records** and renders a marker -- no new durable-state field. The original
 structured-`failure_kind`-on-`PolicyDecision` design, and the clean two-ledger model it implied, are deferred to the
 [`upstream_downstream_ledgers`](../../proposed/upstream_downstream_ledgers/card.md) proposed card (see "Relationship"
 below). Spun out of the `supervisor_shadow_sampling` investigation on 2026-06-14, after a supervised executor
