@@ -11,6 +11,10 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from forge.core.reactive.env import (
+    CLAUDE_CODE_ATTRIBUTION_HEADER_VAR,
+    FORGE_PROXY_WIRE_SHAPE_VAR,
+)
 from forge.sidecar.container import (
     ContainerExistsError,
     container_exists,
@@ -201,6 +205,8 @@ class TestRunSidecarSession:
             assert "/home/user/code:/workspace" in " ".join(cmd)
             assert "FORGE_TEMPLATE=litellm-openai" in " ".join(cmd)
             assert "CLAUDE_CODE_AUTO_COMPACT_WINDOW=300000" in " ".join(cmd)
+            assert f"{FORGE_PROXY_WIRE_SHAPE_VAR}=openai_translated" in " ".join(cmd)
+            assert f"{CLAUDE_CODE_ATTRIBUTION_HEADER_VAR}=0" in " ".join(cmd)
             assert "FORGE_SESSION=test-session" in " ".join(cmd)
             assert "FORGE_SIDECAR=1" in " ".join(cmd)
             assert "FORGE_LAUNCH_MODE=sidecar" in " ".join(cmd)
@@ -231,6 +237,23 @@ class TestRunSidecarSession:
             assert run_id is not None and run_id.startswith("run_")
             assert run_id == root_id
             assert not any(isinstance(p, str) and p.startswith("FORGE_PARENT_RUN_ID=") for p in cmd)
+
+    def test_run_sidecar_session_omits_attribution_header_for_anthropic_passthrough(self) -> None:
+        """Anthropic passthrough sidecars keep the classifier-sensitive attribution block."""
+        with (
+            patch("forge.sidecar.container.container_exists", return_value=False),
+            patch("forge.sidecar.container.subprocess.run") as mock_run,
+        ):
+            mock_run.return_value = MagicMock(returncode=0)
+            run_sidecar_session(
+                image="forge-sidecar:latest",
+                template="anthropic-passthrough",
+                session_name="test-session",
+                project_dir=Path("/home/user/code"),
+            )
+            cmd_str = " ".join(mock_run.call_args[0][0])
+            assert f"{FORGE_PROXY_WIRE_SHAPE_VAR}=anthropic_passthrough" in cmd_str
+            assert CLAUDE_CODE_ATTRIBUTION_HEADER_VAR not in cmd_str
 
     def test_run_sidecar_session_with_extra_mounts(self) -> None:
         """Verify extra mounts are added."""

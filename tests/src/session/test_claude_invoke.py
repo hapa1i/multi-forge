@@ -11,6 +11,7 @@ from unittest.mock import Mock
 import pytest
 
 from forge.core.reactive.env import (
+    CLAUDE_CODE_ATTRIBUTION_HEADER_VAR,
     FORGE_PARENT_RUN_ID_VAR,
     FORGE_ROOT_RUN_ID_VAR,
     FORGE_RUN_ID_VAR,
@@ -121,6 +122,25 @@ class TestBuildEnvironment:
 
         assert "ANTHROPIC_BASE_URL" not in env
         assert "ACTIVE_TEMPLATE" not in env
+
+    def test_direct_unset_vars_scrub_inherited_attribution_header(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Interactive direct launches must not inherit the proxy cache workaround."""
+        monkeypatch.setenv("ANTHROPIC_BASE_URL", "http://localhost:8085")
+        monkeypatch.setenv(CLAUDE_CODE_ATTRIBUTION_HEADER_VAR, "0")
+
+        env = _build_environment(None, ["ANTHROPIC_BASE_URL", "ACTIVE_TEMPLATE"])
+
+        assert "ANTHROPIC_BASE_URL" not in env
+        assert CLAUDE_CODE_ATTRIBUTION_HEADER_VAR not in env
+
+    def test_proxy_extra_vars_force_attribution_header_off(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Interactive proxy launches explicitly carry the cache workaround."""
+        monkeypatch.setenv(CLAUDE_CODE_ATTRIBUTION_HEADER_VAR, "1")
+
+        env = _build_environment({"ANTHROPIC_BASE_URL": "http://localhost:8085"})
+
+        assert env["ANTHROPIC_BASE_URL"] == "http://localhost:8085"
+        assert env[CLAUDE_CODE_ATTRIBUTION_HEADER_VAR] == "0"
 
     def test_mints_fresh_root_identity(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """An interactive launch is a run-tree root: FORGE_RUN_ID == FORGE_ROOT_RUN_ID, no parent."""

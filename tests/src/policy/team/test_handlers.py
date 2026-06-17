@@ -176,6 +176,20 @@ class TestRunSupervisor:
         exit_code, _ = _run_supervisor(_config(), "alice", "team", "idle", "")
         assert exit_code == 0
 
+    @patch("forge.policy.team.handlers.run_claude_session")
+    def test_direct_config_forwarded_to_session_runner(self, mock_session):
+        mock_session.return_value = SessionResult(
+            stdout='{"verdict": "aligned"}',
+            stderr="",
+            returncode=0,
+        )
+        exit_code, _ = _run_supervisor(_config(direct=True), "alice", "team", "idle", "")
+
+        assert exit_code == 0
+        mock_session.assert_called_once()
+        assert mock_session.call_args.kwargs["base_url"] is None
+        assert mock_session.call_args.kwargs["direct"] is True
+
 
 # --- usage attribution (Phase 5: the team supervisor is now instrumented) ---
 

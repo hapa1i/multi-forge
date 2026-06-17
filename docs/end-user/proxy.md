@@ -261,6 +261,8 @@ What this does:
 - Resolves `<proxy_id>` in `~/.forge/proxies/index.json`
 - Healthchecks the proxy (`GET /`) and verifies proxy identity
 - Launches `claude` with `ANTHROPIC_BASE_URL=<proxy.base_url>`
+- Sets `CLAUDE_CODE_ATTRIBUTION_HEADER=0` only for translated/third-party proxy routes, preserving prompt caching
+  without leaking the setting into direct Anthropic or `anthropic_passthrough` launches
 - Sets `CLAUDE_CODE_AUTO_COMPACT_WINDOW` based on proxy's model context window
 
 ### Delete a proxy

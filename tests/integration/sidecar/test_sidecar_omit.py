@@ -21,6 +21,7 @@ from pathlib import Path
 
 import pytest
 
+from forge.core.reactive.env import FORGE_PROXY_WIRE_SHAPE_VAR
 from forge.sidecar.docker import is_docker_available
 
 pytestmark = [pytest.mark.integration, pytest.mark.docker_host]
@@ -78,6 +79,8 @@ def test_sidecar_omit_withholds_key_from_claude_but_proxy_keeps_it(sidecar_image
         "FORGE_TEMPLATE=anthropic-passthrough",
         "-e",
         "FORGE_SIDECAR=1",
+        "-e",
+        f"{FORGE_PROXY_WIRE_SHAPE_VAR}=anthropic_passthrough",
         "-e",
         "HOME=/root",
         "-e",

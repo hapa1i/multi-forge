@@ -1715,10 +1715,12 @@ class TestSessionIncognito:
         kwargs = mock_invoke.call_args.kwargs
         assert "ANTHROPIC_BASE_URL" not in kwargs["env_vars"]
         assert "ACTIVE_TEMPLATE" not in kwargs["env_vars"]
+        assert "FORGE_PROXY_WIRE_SHAPE" not in kwargs["env_vars"]
         assert "CLAUDE_CODE_AUTO_COMPACT_WINDOW" not in kwargs["env_vars"]
         assert sorted(kwargs["unset_env_vars"]) == [
             "ACTIVE_TEMPLATE",
             "ANTHROPIC_BASE_URL",
+            "FORGE_PROXY_WIRE_SHAPE",
         ]
 
 
@@ -1989,10 +1991,12 @@ class TestSessionFork:
         kwargs = mock_invoke.call_args.kwargs
         assert "ANTHROPIC_BASE_URL" not in kwargs["env_vars"]
         assert "ACTIVE_TEMPLATE" not in kwargs["env_vars"]
+        assert "FORGE_PROXY_WIRE_SHAPE" not in kwargs["env_vars"]
         assert "CLAUDE_CODE_AUTO_COMPACT_WINDOW" not in kwargs["env_vars"]
         assert sorted(kwargs["unset_env_vars"]) == [
             "ACTIVE_TEMPLATE",
             "ANTHROPIC_BASE_URL",
+            "FORGE_PROXY_WIRE_SHAPE",
         ]
         assert kwargs["model"] is None
 
@@ -3526,10 +3530,12 @@ class TestSessionResume:
         kwargs = mock_invoke.call_args.kwargs
         assert "ANTHROPIC_BASE_URL" not in kwargs["env_vars"]
         assert "ACTIVE_TEMPLATE" not in kwargs["env_vars"]
+        assert "FORGE_PROXY_WIRE_SHAPE" not in kwargs["env_vars"]
         assert "CLAUDE_CODE_AUTO_COMPACT_WINDOW" not in kwargs["env_vars"]
         assert sorted(kwargs["unset_env_vars"]) == [
             "ACTIVE_TEMPLATE",
             "ANTHROPIC_BASE_URL",
+            "FORGE_PROXY_WIRE_SHAPE",
         ]
         assert kwargs["model"] is None
 

@@ -406,6 +406,7 @@ def _launch_claude_for_session(
         context_limit=context_limit,
         template=effective_template,
         base_url=runtime_base_url,
+        proxy_id=proxy_id,
         fork_name=fork_name,
         parent_session=parent_session,
         forge_root=manifest.forge_root,

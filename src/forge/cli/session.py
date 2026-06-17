@@ -31,10 +31,12 @@ from forge.cli.output import handle_session_error as handle_session_error
 from forge.cli.output import print_tip
 from forge.core.paths import display_path
 from forge.core.reactive.env import (
+    FORGE_PROXY_WIRE_SHAPE_VAR,
     FORGE_SUBPROCESS_BASE_URL_VAR,
     FORGE_SUBPROCESS_PROXY_ID_VAR,
     FORGE_SUBPROCESS_PROXY_VAR,
     FORGE_SUBPROCESS_TEMPLATE_VAR,
+    resolve_proxy_wire_shape,
 )
 from forge.core.state import parse_iso
 from forge.session import (
@@ -366,6 +368,7 @@ def _build_session_env(
     context_limit: int,
     template: str | None,
     base_url: str | None,
+    proxy_id: str | None = None,
     fork_name: str | None = None,
     parent_session: str | None = None,
     forge_root: str | None = None,
@@ -385,10 +388,13 @@ def _build_session_env(
         # native CC env var the user may have set. Only scrub Forge-managed vars.
         unset_env_vars.append("ANTHROPIC_BASE_URL")
         unset_env_vars.append("ACTIVE_TEMPLATE")
+        unset_env_vars.append(FORGE_PROXY_WIRE_SHAPE_VAR)
     else:
         # Proxy mode: set compaction window to match the routed model's context.
         env_vars["CLAUDE_CODE_AUTO_COMPACT_WINDOW"] = str(context_limit)
         env_vars["ANTHROPIC_BASE_URL"] = base_url
+        if wire_shape := resolve_proxy_wire_shape(proxy_id=proxy_id, template=template):
+            env_vars[FORGE_PROXY_WIRE_SHAPE_VAR] = wire_shape
         if template is None:
             unset_env_vars.append("ACTIVE_TEMPLATE")
         else:
@@ -417,11 +423,14 @@ def _resolve_subprocess_proxy_launch_metadata(proxy_id: str, *, sidecar: bool = 
             return {}
 
         base_url = _container_reachable_url(entry.base_url) if sidecar else entry.base_url
-        return {
+        metadata = {
             FORGE_SUBPROCESS_BASE_URL_VAR: base_url,
             FORGE_SUBPROCESS_PROXY_ID_VAR: entry.proxy_id,
             FORGE_SUBPROCESS_TEMPLATE_VAR: entry.template,
         }
+        if wire_shape := resolve_proxy_wire_shape(proxy_id=entry.proxy_id, template=entry.template):
+            metadata[FORGE_PROXY_WIRE_SHAPE_VAR] = wire_shape
+        return metadata
     except Exception as e:
         logger.debug("Could not resolve subprocess proxy metadata for %s: %s", proxy_id, e)
         return {}

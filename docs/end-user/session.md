@@ -618,8 +618,8 @@ Sessions can record which proxy they started with, but they do **not** control r
 forge claude start --proxy <proxy_id>
 ```
 
-This resolves the proxy, healthchecks it, sets `ANTHROPIC_BASE_URL` and `CLAUDE_CODE_AUTO_COMPACT_WINDOW`, and launches
-Claude.
+This resolves the proxy, healthchecks it, sets `ANTHROPIC_BASE_URL`, applies `CLAUDE_CODE_ATTRIBUTION_HEADER=0` only for
+translated/third-party proxy routes, sets `CLAUDE_CODE_AUTO_COMPACT_WINDOW`, and launches Claude.
 
 ### Start a session with a proxy
 

@@ -182,6 +182,7 @@ def _build_environment(
     """
     from forge.core.reactive.env import (
         FORGE_PARENT_RUN_ID_VAR,
+        apply_attribution_header_policy,
         apply_interactive_api_key,
         build_claude_env,
         new_root_run_identity,
@@ -193,6 +194,7 @@ def _build_environment(
     env.pop(FORGE_PARENT_RUN_ID_VAR, None)  # a root has no parent; scrub any inherited
     for key in unset_vars or ():
         env.pop(key, None)
+    apply_attribution_header_policy(env)
     # Finalize ANTHROPIC_API_KEY LAST -- after extra_vars and unset_vars -- so the
     # interactive_anthropic_api_key policy wins over anything merged above.
     apply_interactive_api_key(env, interactive=True)

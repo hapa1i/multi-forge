@@ -202,6 +202,7 @@ def _run_supervisor(
             prompt,
             resume_id=config.resume_id,
             base_url=base_url,
+            direct=config.direct,
             timeout_seconds=config.timeout_seconds,
             reasoning_effort=config.effort,
         )
