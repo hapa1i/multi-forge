@@ -428,37 +428,6 @@ def read_audit_logs(
 def prune_audit_logs(*, retention_days: int, max_total_mb: int) -> None:
     """Delete audit shards older than retention_days, then prune oldest-first over
     max_total_mb. Best-effort: errors are ignored (telemetry, not critical path)."""
-    audit_dir = _audit_dir()
-    if not audit_dir.is_dir():
-        return
-    try:
-        shards = sorted(audit_dir.glob("*.jsonl"), key=lambda p: p.stat().st_mtime)
-    except OSError:
-        return
+    from forge.proxy.retention import prune_jsonl_shards
 
-    now = datetime.now(timezone.utc).timestamp()
-    if retention_days > 0:
-        cutoff = now - retention_days * 86400
-        for shard in list(shards):
-            try:
-                if shard.stat().st_mtime < cutoff:
-                    shard.unlink()
-                    shards.remove(shard)
-            except OSError:
-                pass
-
-    if max_total_mb > 0:
-        limit = max_total_mb * 1024 * 1024
-        try:
-            total = sum(p.stat().st_size for p in shards)
-        except OSError:
-            return
-        for shard in shards:  # oldest first
-            if total <= limit:
-                break
-            try:
-                size = shard.stat().st_size
-                shard.unlink()
-                total -= size
-            except OSError:
-                pass
+    prune_jsonl_shards(_audit_dir(), retention_days=retention_days, max_total_mb=max_total_mb)

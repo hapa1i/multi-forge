@@ -26,6 +26,7 @@ import httpx
 from fastapi.responses import Response, StreamingResponse
 
 from forge.proxy.provider_trace_logger import record_provider_trace
+from forge.proxy.utils import format_stream_lifecycle_summary
 
 logger = logging.getLogger(__name__)
 
@@ -268,9 +269,11 @@ async def _stream_opened_upstream(
     failed = False
     stream_started = False
     client_disconnected = False
+    chunk_count = 0
     try:
         async for chunk in resp.aiter_bytes():
             stream_started = True
+            chunk_count += 1
             yield chunk  # byte-faithful, unchanged
             accumulator.feed(chunk)  # tolerant side-tap (copy); never alters bytes
     except httpx.HTTPError as e:
@@ -293,6 +296,21 @@ async def _stream_opened_upstream(
             final_usage_seen=accumulator.saw_final_usage,
             client_disconnected=client_disconnected,
         )
+        # Shared compact lifecycle line (proxy_log_hygiene). DEBUG normally; INFO on a
+        # client disconnect, which the relay otherwise logs nowhere (the incident class).
+        _summary = format_stream_lifecycle_summary(
+            request_id,
+            first_chunk_seen=accumulator.saw_content,
+            final_usage_seen=accumulator.saw_final_usage,
+            client_disconnected=client_disconnected,
+            failed=failed,
+            error_type="upstream_error" if failed else None,
+            chunk_count=chunk_count,
+        )
+        if client_disconnected:
+            logger.info(_summary)
+        else:
+            logger.debug(_summary)
 
 
 def _record_passthrough_trace(

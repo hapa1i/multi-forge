@@ -27,7 +27,7 @@ _LOG_DIR_DESCRIPTIONS: dict[str, str] = {
     "cli": "CLI command logs",
     "tool_failures": "Tool failure telemetry (proxy, opt-in)",
     "tool_events": "Tool event recordings (proxy, debug-only)",
-    "requests": "Raw request/response logs (proxy, debug-only)",
+    "requests": "Request/response diagnostics (per-proxy logging.requests; redacted, debug-gated by default)",
 }
 
 
@@ -296,6 +296,13 @@ def _show_logs(logs_root: Path) -> None:
             console.print("[bold]Retention:[/bold]      unlimited")
     except Exception:
         pass
+
+    # Request diagnostics are configured per-proxy (the global retention above is a coarse
+    # floor over all of logs/). Surface the capture model without printing any secret values.
+    console.print(
+        "[dim]Request diagnostics:  per-proxy logging.requests (auto=debug-gated · on=always · off=disabled); "
+        "bodies redacted, no plaintext. Inspect with 'forge proxy show <id>'.[/dim]"
+    )
 
     console.print()
 

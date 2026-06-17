@@ -27,6 +27,63 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-16
 
+### proxy_log_hygiene: reviewer follow-ups (no-plaintext leaks + CLI/create completeness)
+
+**Goal**: Close five defects a reviewer found against the shipped card, all verified against code before fixing.
+
+**Key changes**:
+
+- **No caller content in stream logs** (`proxy/converters.py`): 8 log sites that emitted completion text, tool args,
+  file paths (buffered `Read` close-event `partial_json`), or dumped whole malformed chunks/deltas now log metadata only
+  (lengths / key-names / indices). Full content stays behind the `stream_chunks` opt-in dump.
+- **stop_sequences plaintext leak** (`proxy/utils.py`): `_redact_body_for_log` listed `stop_sequences` (arbitrary caller
+  text) in `_SAFE_KEYS` and copied it verbatim -> now `{"redacted": True, "count": N}`. Fixes BOTH the
+  request-diagnostics and the shared audit plane.
+- **CLI int coercion** (`cli/proxy.py`): `forge proxy set` now int-casts `logging.requests.max_file_mb` and
+  `stream_chunk_max_bytes` (previously stayed strings and failed schema validation).
+- **Third construction site** (`proxy/proxy_orchestrator.py`): `create_proxy_file` now copies template-defined
+  `provider_trace` + `logging` onto the new `ProxyInstanceConfig` (was the same drop-the-block bug as Slice 0, latent
+  since no shipped template carries them).
+
+**Verification**: 4 new/extended regression tests (converter content-free logs incl. buffered-tool close event;
+stop_sequences canary on redactor + on-disk shard; CLI int round-trip; template-block survival at create). Full unit +
+regression green; `make pre-commit` clean. Two adversarial review rounds (verify-each-finding): round 1 found the four
+above; round 2 found the 8th converter leak site; a third exhaustive enumeration of every converter log call confirmed
+no remaining caller-content interpolation.
+
+### proxy_log_hygiene: quiet defaults + bounded redacted request diagnostics (slices 0-5)
+
+**Goal**: Cut low-value proxy log volume (poll spam, per-chunk dumps) while adding bounded, redacted request diagnostics
+aligned with the audit no-plaintext policy — and fix a folded-in loader bug that silently dropped `provider_trace`.
+
+**Key changes**:
+
+- **Slice 0 (folded loader bug)** — `config/loader.py`: both proxy-config hops (`load_proxy_instance_config_from_dict`,
+  `_proxy_instance_to_forge_config`) silently dropped the `provider_trace` block (and would have dropped the new
+  `logging` block). Now wired through both. Regression: `test_bug_provider_trace_loader_dropped.py`.
+- **Slice 1 (quiet polls)** — `proxy/server.py`: successful completions log at DEBUG; INFO reserved for `status >= 400`
+  or slow polls (`elapsed > _SLOW_POLL_LOG_S = 1.0s`). Slow-poll visibility is new behavior (none existed).
+- **Slices 2-3 (stream logging)** — `proxy/converters.py` + `proxy/passthrough.py`: per-chunk dumps now require opt-in
+  AND DEBUG (off even at `log_level=debug`), truncated via `smart_format_str`. Shared `format_stream_lifecycle_summary`
+  (metadata-only: outcome + chunk count + flags) replaces the per-stream INFO bookends — clean stream = one DEBUG line +
+  zero converter INFO; error/disconnect = one INFO. Passthrough now surfaces client disconnects (previously logged
+  nowhere).
+- **Slice 4 (config)** — `config/schema.py`: per-proxy `logging.requests` (`RequestLogConfig` under `LoggingConfig`),
+  strict `__post_init__` + coercers (`body_capture=full` rejected with audit pointer; bool-vs-int; unknown-key reject).
+  `proxy/utils.log_request_response` gains a `request_log` param: `metadata` omits bodies, `redacted` reuses the audit
+  body redactor (no second sanitizer, no plaintext). `server.py` reads it via a tolerant `_request_log_config()` helper
+  (best-effort telemetry; degrades to defaults on a partial config).
+- **Slice 5 (retention)** — new `proxy/retention.py::prune_jsonl_shards` (age-then-size, 0 = disable) now backs audit,
+  provider-trace, AND request planes (one shared pruner; two byte-identical copies removed). `_active_request_log_shard`
+  rotates at `max_file_mb`; per-process startup prune wired into `_ensure_runtime_state`. `cli/logs.py` notes capture
+  mode.
+
+**Verification**: 6401 unit + 438 regression green; `make pre-commit` clean. Integration:
+`test_proxy_local_litellm_e2e.py` (3, incl. streaming SSE) + `test_provider_trace_e2e.py` (2, incl. cancelled-stream
+disconnect) pass on the live-proxy path. Adversarial review (9 agents, 7 dimensions + refute-by-default verify): 0
+production defects; 1 confirmed nit (missing direct 0600 assertion) fixed via `test_written_shard_is_owner_only_0600`.
+Docs: design.md §7.x, appendix §A.11, end-user `proxy.md`, `cli_reference.md`.
+
 ### openrouter_observability Phase 5: OpenRouter `user`-field injection (opt-in, proxied-only)
 
 **Goal**: Close the incident loop upstream — when enabled, proxied direct-OpenRouter requests carry the Forge session

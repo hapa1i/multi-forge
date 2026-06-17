@@ -13,6 +13,7 @@ import logging
 import os
 import sys
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Literal
 
 from rich.pretty import pretty_repr
@@ -123,6 +124,34 @@ def log_request_beautifully(
 def smart_format_str(obj: object, max_string: int = 500, max_length: int = 100, indent: int = 2) -> str:
     """Format an object to a string with rich formatting."""
     return pretty_repr(obj, max_string=max_string, max_length=max_length, indent_size=indent)
+
+
+def format_stream_lifecycle_summary(
+    request_id: str,
+    *,
+    first_chunk_seen: bool,
+    final_usage_seen: bool,
+    client_disconnected: bool,
+    failed: bool,
+    error_type: str | None,
+    chunk_count: int,
+) -> str:
+    """Render one compact line summarizing a stream's lifecycle (proxy_log_hygiene).
+
+    Replaces per-chunk debug dumps and the bare per-stream "finished" line with a single
+    bounded summary. Metadata only (counts/flags) -- never chunk bodies. Shared by the
+    translated converter path and the Anthropic passthrough relay so the two do not drift.
+    """
+    outcome = "disconnected" if client_disconnected else ("error" if failed else "ok")
+    parts = [
+        f"[{request_id}] stream {outcome}",
+        f"chunks={chunk_count}",
+        f"first_chunk={'y' if first_chunk_seen else 'n'}",
+        f"final_usage={'y' if final_usage_seen else 'n'}",
+    ]
+    if error_type:
+        parts.append(f"error_type={error_type}")
+    return " ".join(parts)
 
 
 def smart_format_proto_str(obj: object, max_string: int = 500, max_length: int = 100, indent: int = 2) -> str:
@@ -375,7 +404,6 @@ def _redact_body_for_log(body: dict[str, object] | None) -> dict[str, object] | 
         "max_tokens",
         "top_p",
         "stream",
-        "stop_sequences",
         "reasoning_effort",
         "verbosity",
         "usage",
@@ -386,6 +414,10 @@ def _redact_body_for_log(body: dict[str, object] | None) -> dict[str, object] | 
     }
 
     redacted: dict[str, object] = {k: v for k, v in body.items() if k in _SAFE_KEYS}
+
+    # stop_sequences is caller-supplied text (can embed proprietary delimiters) -- structure only, never verbatim.
+    if "stop_sequences" in body and isinstance(body["stop_sequences"], list):
+        redacted["stop_sequences"] = {"redacted": True, "count": len(body["stop_sequences"])}
 
     if "messages" in body and isinstance(body["messages"], list):
         redacted["messages"] = [
@@ -447,6 +479,58 @@ def redact_headers(headers: dict[str, str] | None, redact: set[str] | None = Non
     return out
 
 
+def _active_request_log_shard(logs_dir: Path, datestamp: str, pid: str, max_file_mb: int) -> Path:
+    """Pick the request-log shard to append to, rolling to a numbered shard once the active one
+    reaches ``max_file_mb`` (0 = unbounded, single shard). seq 0 keeps the historical name."""
+
+    def _shard(seq: int) -> Path:
+        suffix = "" if seq == 0 else f".{seq}"
+        return logs_dir / f"{datestamp}_requests.{pid}{suffix}.jsonl"
+
+    if max_file_mb <= 0:
+        return _shard(0)
+    cap = max_file_mb * 1024 * 1024
+    seq = 0
+    while True:
+        shard = _shard(seq)
+        try:
+            if not shard.exists() or shard.stat().st_size < cap:
+                return shard
+        except OSError:
+            return shard
+        seq += 1
+
+
+def prune_request_logs(*, retention_days: int, max_total_mb: int) -> None:
+    """Bound the request-diagnostics shards under ``~/.forge/logs/requests/`` (proxy_log_hygiene).
+
+    Per-proxy budget enforced at proxy startup; the global ``log_retention_days`` sweep remains a
+    coarse floor over all of ``logs/``. Best-effort (shared pruner swallows errors)."""
+    from forge.proxy.retention import prune_jsonl_shards
+
+    prune_jsonl_shards(
+        get_forge_home() / "logs" / "requests",
+        retention_days=retention_days,
+        max_total_mb=max_total_mb,
+        pattern="*_requests.*.jsonl",
+    )
+
+
+def request_logging_enabled(request_log: object | None) -> bool:
+    """Whether request JSONL diagnostics should be written (proxy_log_hygiene).
+
+    Duck-typed on the per-proxy ``RequestLogConfig`` so callers need not import it:
+    ``auto`` (default) preserves the historical coupling to ``log_level=debug``; ``on`` writes
+    regardless of log level; ``off`` disables. A ``None`` config is treated as ``auto``.
+    """
+    enabled = getattr(request_log, "enabled", "auto")
+    if enabled == "off":
+        return False
+    if enabled == "on":
+        return True
+    return _should_write_structured_logs()  # "auto"
+
+
 async def log_request_response(
     request_id: str,
     original_model: str,
@@ -463,17 +547,20 @@ async def log_request_response(
     temperature: float | None = None,
     max_tokens: int | None = None,
     streaming: bool = False,
+    request_log: object | None = None,
 ) -> None:
     """Log sanitized request/response metadata to JSONL for debugging.
 
-    Logs at INFO level on failure (status >= 400) and DEBUG level always.
-    Bodies are redacted before writing; these logs are not replay fixtures.
+    Gated by the per-proxy ``RequestLogConfig`` (``request_log``): ``enabled`` decides whether
+    to write, and ``body_capture``/``response_capture`` choose metadata-only vs redacted-structure
+    bodies. There is no plaintext mode -- bodies are always redacted (audit policy). On failure
+    (status >= 400) a summary is also logged at INFO; these logs are not replay fixtures.
 
     Args:
         request_id: Unique request identifier
         original_model: Original model name requested
         mapped_model: Actual model used after mapping
-        request_body: Request payload (redacted before write)
+        request_body: Request payload (redacted before write; omitted in metadata mode)
         response_body: Response payload (redacted before write; None for streaming)
         status_code: HTTP status code
         duration_ms: Request duration in milliseconds
@@ -485,16 +572,21 @@ async def log_request_response(
         temperature: Temperature parameter
         max_tokens: Max tokens parameter
         streaming: Whether request is streaming
+        request_log: Per-proxy RequestLogConfig (None -> historical auto behavior)
     """
-    if not _should_write_structured_logs():
+    if not request_logging_enabled(request_log):
         return
+
+    body_capture = getattr(request_log, "body_capture", "metadata")
+    response_capture = getattr(request_log, "response_capture", "metadata")
+    max_file_mb = getattr(request_log, "max_file_mb", 0)
 
     try:
         logs_dir = get_forge_home() / "logs" / "requests"
         logs_dir.mkdir(exist_ok=True, parents=True)
 
         datestamp = datetime.now(timezone.utc).strftime("%Y%m%d")
-        jsonl_path = logs_dir / f"{datestamp}_requests.{_pid_suffix()}.jsonl"
+        jsonl_path = _active_request_log_shard(logs_dir, datestamp, _pid_suffix(), max_file_mb)
 
         event: dict[str, Any] = {
             "timestamp": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
@@ -515,8 +607,12 @@ async def log_request_response(
 
         is_failure = status_code >= 400
 
-        event["request_body"] = _redact_body_for_log(request_body)
-        event["response_body"] = _redact_body_for_log(response_body)
+        # metadata mode (default) omits bodies entirely; redacted mode includes the
+        # sanitized structure (never plaintext -- audit redacted-body policy).
+        if body_capture == "redacted":
+            event["request_body"] = _redact_body_for_log(request_body)
+        if response_capture == "redacted":
+            event["response_body"] = _redact_body_for_log(response_body)
 
         from forge.core.state import open_secure_append
 

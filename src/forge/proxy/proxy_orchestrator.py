@@ -209,6 +209,8 @@ def create_proxy_file(
         wire_shape=cfg.proxy.wire_shape,
         intercept=cfg.proxy.intercept,
         audit=cfg.proxy.audit,
+        provider_trace=cfg.proxy.provider_trace,
+        logging=cfg.proxy.logging,
         created_at=now_iso(),
     )
 

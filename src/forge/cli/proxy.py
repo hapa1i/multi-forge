@@ -912,7 +912,15 @@ def set_cmd(proxy_id: str, key_value: str) -> None:
     try:
         if value.lower() in ("none", "null"):
             coerced_value = None
-        elif final_key in ("port", "proxy_format", "thinking_budget_tokens", "retention_days", "max_total_mb"):
+        elif final_key in (
+            "port",
+            "proxy_format",
+            "thinking_budget_tokens",
+            "retention_days",
+            "max_total_mb",
+            "max_file_mb",
+            "stream_chunk_max_bytes",
+        ):
             coerced_value = int(value)
         elif final_key in ("temperature",) or key in ("costs.caps.per_day", "costs.caps.per_month"):
             coerced_value = float(value)

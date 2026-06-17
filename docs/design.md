@@ -1214,5 +1214,15 @@ posture (lifecycle-coupled, port-isolated), with the narrow mounts of §7 making
 timeline) render redacted records; `%proxy audit show|diff` is the in-session equivalent. Redaction happens **before**
 persistence — the typed builders redact, then call the writer — so no raw body reaches disk.
 
-See [design_appendix.md §A.11](design_appendix.md#a11-intercept-and-audit-configuration-7x) (config schema) and
-[§A.12](design_appendix.md#a12-audit-log-schema-7x) (audit record schema + log paths).
+See [design_appendix.md §A.11](design_appendix.md#a11-intercept-audit-and-request-logging-configuration-7x) (config
+schema) and [§A.12](design_appendix.md#a12-audit-log-schema-7x) (audit record schema + log paths).
+
+**Request-log hygiene (separate plane).** Normal proxy logging stays quiet by default so the durable answer to "what
+happened to my request?" comes from the structured cost/audit/usage/provider-trace planes, not log volume. Successful
+`GET /` runtime-truth polls log at DEBUG; INFO is reserved for `status >= 400` or slow polls (`elapsed > 1.0s`).
+Streaming no longer dumps per-chunk bodies — a clean stream emits one DEBUG lifecycle summary (request id, chunk count,
+first-chunk/final-usage flags), and INFO only on error or client disconnect (the passthrough relay surfaces disconnects
+that were previously logged nowhere). The optional `logging.requests` block (per-proxy, strict, bounded, redacted —
+[§A.11](design_appendix.md#a11-intercept-audit-and-request-logging-configuration-7x)) governs the debug
+`~/.forge/logs/requests/` plane; `body_capture=full` is rejected (audit no-plaintext policy), and one shared
+`prune_jsonl_shards` helper bounds the audit, provider-trace, and request planes alike.

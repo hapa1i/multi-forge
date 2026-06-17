@@ -30,6 +30,7 @@ from forge.proxy.data_models import (
     Usage,
 )
 from forge.proxy.utils import (
+    format_stream_lifecycle_summary,
     log_tool_event,
     smart_format_str,
 )
@@ -751,6 +752,9 @@ async def convert_openai_to_anthropic_sse(
     request: MessagesRequest,
     request_id: str,
     on_complete: Optional["_OnCompleteCallback"] = None,
+    *,
+    stream_chunks: bool = False,
+    stream_chunk_max_bytes: int = 0,
 ):
     """Convert OpenAI streaming format to Anthropic Server-Sent Events (SSE) format.
 
@@ -772,7 +776,10 @@ async def convert_openai_to_anthropic_sse(
     """
     message_id = f"msg_{uuid.uuid4().hex[:24]}"
     response_model_name = request.original_model_name or request.model  # fallback to mapped ID if original is missing
-    logger.info(
+    # Per-stream bookend; demoted to DEBUG -- the request is already logged by the
+    # middleware + metrics, and the compact end-of-stream summary covers the outcome
+    # (proxy_log_hygiene). INFO is reserved for failures/disconnects.
+    logger.debug(
         f"[{request_id}] Starting Anthropic SSE stream conversion (message {message_id}, model: {response_model_name})"
     )
 
@@ -807,6 +814,7 @@ async def convert_openai_to_anthropic_sse(
     _stream_failed = False
     _stream_error_type: Optional[str] = None
     final_stop_reason: Optional[str] = None
+    chunk_count = 0  # bounded lifecycle summary (proxy_log_hygiene), replaces per-chunk INFO
 
     # --- Provider-trace lifecycle (openrouter_observability Phase 3) ---
     # Observed at the seam, packed into final_usage["_provider_trace"] for _on_stream_complete.
@@ -871,7 +879,15 @@ async def convert_openai_to_anthropic_sse(
 
     try:
         async for chunk in response_generator:
-            logger.debug(f"[{request_id}] Processing adapted OpenAI Chunk: {chunk}")
+            chunk_count += 1
+            # Per-chunk dumps are an explicit opt-in (logging.requests.stream_chunks) AND require
+            # DEBUG -- off even at log_level=debug by default (proxy_log_hygiene). The guard also
+            # avoids paying the format cost on this hot loop when suppressed; output is truncated.
+            if stream_chunks and logger.isEnabledFor(logging.DEBUG):
+                logger.debug(
+                    f"[{request_id}] Processing adapted OpenAI Chunk: "
+                    f"{smart_format_str(chunk, max_string=stream_chunk_max_bytes or 500)}"
+                )
 
             if not isinstance(chunk, dict):
                 logger.warning(f"[{request_id}] Skipping invalid chunk format: {type(chunk)}")
@@ -947,7 +963,10 @@ async def convert_openai_to_anthropic_sse(
             if not choices or not isinstance(choices, list):
                 # Skip chunk if no choices AND no usage (truly empty chunk)
                 if not chunk_usage:
-                    logger.warning(f"[{request_id}] Skipping chunk with missing or invalid 'choices': {chunk}")
+                    # Key names only -- a malformed chunk can carry delta content/tool args; never dump the body.
+                    logger.warning(
+                        f"[{request_id}] Skipping chunk with missing or invalid 'choices' (keys={sorted(chunk.keys())})"
+                    )
                 continue
 
             if len(choices) == 0:
@@ -956,14 +975,16 @@ async def convert_openai_to_anthropic_sse(
                     logger.debug(f"[{request_id}] Processed usage-only chunk (empty choices)")
                     continue
                 else:
-                    logger.warning(f"[{request_id}] Skipping chunk with empty 'choices' list: {chunk}")
+                    logger.warning(
+                        f"[{request_id}] Skipping chunk with empty 'choices' list (keys={sorted(chunk.keys())})"
+                    )
                     continue
 
             choice = choices[0]
 
             if not isinstance(choice, dict):
                 logger.warning(
-                    f"[{request_id}] Skipping chunk with invalid choice format (type={type(choice)}): {choice}"
+                    f"[{request_id}] Skipping chunk with invalid choice format (type={type(choice).__name__})"
                 )
                 continue
 
@@ -1010,10 +1031,15 @@ async def convert_openai_to_anthropic_sse(
                     "delta": {"type": "text_delta", "text": text_delta},
                 }
                 yield f"event: content_block_delta\ndata: {json.dumps(delta_event)}\n\n"
-                logger.debug(f"[{request_id}] Sent text delta: '{text_delta[:50]}...'")
+                # Metadata only -- completion text is content; the opt-in stream_chunks dump carries it.
+                logger.debug(f"[{request_id}] Sent text delta: {len(text_delta)} chars")
 
             if tool_calls_delta and isinstance(tool_calls_delta, list):
-                logger.debug(f"[{request_id}] Received tool_calls_delta: {tool_calls_delta}")
+                if stream_chunks and logger.isEnabledFor(logging.DEBUG):
+                    logger.debug(
+                        f"[{request_id}] Received tool_calls_delta: "
+                        f"{smart_format_str(tool_calls_delta, max_string=stream_chunk_max_bytes or 500)}"
+                    )
                 if current_block_type == "text" and text_started:
                     yield f"event: content_block_stop\ndata: {json.dumps({'type': 'content_block_stop', 'index': content_block_index})}\n\n"
                     logger.debug(f"[{request_id}] Stopped text block {content_block_index} due to incoming tool call.")
@@ -1088,7 +1114,8 @@ async def convert_openai_to_anthropic_sse(
                             )
                         else:
                             logger.warning(
-                                f"[{request_id}] Cannot start tool block for index {tc_openai_index} without ID and/or Name. Delta: {tc_delta}"
+                                f"[{request_id}] Cannot start tool block for index {tc_openai_index} without ID and/or Name "
+                                f"(delta keys={sorted(tc_delta.keys())})"
                             )
                             continue  # Cannot start block yet
 
@@ -1136,8 +1163,9 @@ async def convert_openai_to_anthropic_sse(
                         tool_info = tool_calls_buffer[tc_openai_index]
                         tool_info["args"] += args_delta
                         if tool_info.get("buffer_args"):
+                            # Metadata only -- tool args are content; the opt-in stream_chunks dump carries them.
                             logger.debug(
-                                f"[{request_id}] Buffered tool args delta for block {tool_info['block_idx']}: '{args_delta[:50]}...'"
+                                f"[{request_id}] Buffered tool args delta for block {tool_info['block_idx']}: {len(args_delta)} chars"
                             )
                         else:
                             delta_event = {
@@ -1150,13 +1178,14 @@ async def convert_openai_to_anthropic_sse(
                             }
                             yield f"event: content_block_delta\ndata: {json.dumps(delta_event)}\n\n"
                             logger.debug(
-                                f"[{request_id}] Sent tool args delta for block {tool_info['block_idx']}: '{args_delta[:50]}...'"
+                                f"[{request_id}] Sent tool args delta for block {tool_info['block_idx']}: {len(args_delta)} chars"
                             )
 
             # --- Process Finish Reason ---
             if finish_reason:
                 final_stop_reason = stop_reason_map.get(finish_reason, "end_turn")
-                logger.info(
+                # Internal mapping detail -> DEBUG; the compact summary carries the outcome.
+                logger.debug(
                     f"[{request_id}] Received final finish_reason: '{finish_reason}' -> Mapped to stop_reason: '{final_stop_reason}'"
                 )
                 break
@@ -1168,7 +1197,8 @@ async def convert_openai_to_anthropic_sse(
         elif current_block_type == "tool_use":
             if tool_calls_buffer:
                 for event_name, event_data in _build_tool_block_close_events():
-                    logger.debug(f"[{request_id}] Yielding {event_name} for tool_use: {json.dumps(event_data)}")
+                    # Metadata only -- a buffered tool's close delta carries partial_json (tool args / file paths).
+                    logger.debug(f"[{request_id}] Yielding {event_name} for tool_use (index={event_data.get('index')})")
                     yield f"event: {event_name}\ndata: {json.dumps(event_data)}\n\n"
                 logger.debug(f"[{request_id}] Stopped final tool_use block(s)")
             else:
@@ -1242,7 +1272,22 @@ async def convert_openai_to_anthropic_sse(
         except Exception as e2:
             logger.error(f"[{request_id}] Failed to send error event to client: {e2}")
     finally:
-        logger.info(f"[{request_id}] Anthropic SSE stream conversion finished.")
+        # One compact lifecycle line replaces the per-chunk dumps and the old bare
+        # "conversion finished" INFO (proxy_log_hygiene). INFO only for the cases worth
+        # surfacing without debug logging (error/disconnect); a clean stream is DEBUG.
+        _summary = format_stream_lifecycle_summary(
+            request_id,
+            first_chunk_seen=_first_chunk_seen,
+            final_usage_seen=_final_usage_seen,
+            client_disconnected=_client_disconnected,
+            failed=_stream_failed,
+            error_type=_stream_error_type,
+            chunk_count=chunk_count,
+        )
+        if _stream_failed or _client_disconnected:
+            logger.info(_summary)
+        else:
+            logger.debug(_summary)
         if on_complete is not None:
             # Quarantine all provider-trace payload under one reserved key (Phase 3); the
             # client never sees it (only token usage is emitted in message_delta).

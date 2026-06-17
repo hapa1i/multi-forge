@@ -341,6 +341,44 @@ even when OpenRouter never indexes the cancelled stream.
   `provider_trace.inject_openrouter_user`, sends only hashed Forge ids, and defaults off. Direct `core.llm` callers are
   a separate card because they need an in-process opt-in owner, not a proxy-owned setting.
 
+### Per-proxy config blocks must be wired through BOTH loader hops (proxy_log_hygiene, shipped 2026-06-16)
+
+A `proxy.yaml` block reaches the running proxy through two independent constructors:
+`load_proxy_instance_config_from_dict` (dict -> `ProxyInstanceConfig`) and `_proxy_instance_to_forge_config`
+(`ProxyInstanceConfig` -> `ProxyConfig`, which `config.proxy` exposes). Both in `config/loader.py`.
+
+- **Recurring silent-drop bug.** A new block added to the dataclasses but to neither hop loads fine in unit tests of the
+  schema yet is silently dropped at runtime — the live proxy sees the default. `provider_trace` shipped with exactly
+  this gap (the running proxy never saw a configured block); `logging.requests` would have repeated it. When you add a
+  per-proxy config block, grep both hops and pass it through both, or it never reaches `config.proxy`.
+- **Regression must cover the live-read path, not just coercion.** Assert the value survives BOTH hops AND is read where
+  the server consumes it (e.g. `config.proxy.provider_trace.*`). A schema-only test passes while the runtime drops it.
+- **Best-effort telemetry reads tolerate a partial `config.proxy`.** Hot-path and startup reads of telemetry blocks use
+  `getattr(config.proxy, "<block>", None)` / a tolerant accessor (`_request_log_config`, `_maybe_prune_*`) and degrade
+  to defaults — request logging and prune must never raise into a response path. This is deliberate best-effort
+  degradation, distinct from the strict durable-state coercion that rejects malformed blocks at load time.
+- **One pruner for all JSONL planes.** `proxy/retention.py::prune_jsonl_shards` (age-then-size, `0` = disable a bound)
+  backs the audit, provider-trace, and request planes. New JSONL telemetry planes should delegate to it, not re-copy the
+  delete-by-age/oldest-first loop.
+
+### No caller content in proxy logs; redactor excludes caller free-text (proxy_log_hygiene review, 2026-06-16)
+
+The "redacted = sanitized structure, never plaintext" contract binds two surfaces: the redacted JSONL diagnostics/audit
+files AND the proxy module logger. Both leaked.
+
+- **The shared `_redact_body_for_log` must never verbatim-copy a caller free-text key.** `stop_sequences` sat in
+  `_SAFE_KEYS` (verbatim copy) and leaked arbitrary caller strings onto BOTH the audit and request-diagnostics planes.
+  Safe keys are scalars/enums/ids/token-counts only; any field a caller fills with free text (stop_sequences, and watch
+  future additions) must go through a structural branch (`{"redacted": True, "count": N}`), never `_SAFE_KEYS`.
+- **The SSE converter logger leaked content at DEBUG in ~8 spots.** Per-delta text/tool-args, whole-chunk/`tc_delta`
+  WARNING dumps, and the buffered-tool close-event `json.dumps(event_data)` (carried `partial_json` = `Read`'s
+  `file_path`). The opt-in `stream_chunks` dump is the ONLY sanctioned raw-content path; every other stream log must be
+  metadata (lengths, key-names, indices, token counts, enums, tool names/ids).
+- **Hunt log leaks by data provenance, not variable name.** A name-based grep (`{chunk}`, `{args_delta}`) missed
+  `json.dumps(event_data)` because the caller content was one indirection away (built event dict -> `partial_json`).
+  When auditing a logging surface, trace whether each interpolated value *derives* from caller input, and grep
+  `logger.*json.dumps` plus `%s`-style calls, not just known leaky names.
+
 ### Proposed Promotions From Metric Evidence (awaiting human review, 2026-06-06)
 
 Drafted by the `metric_evidence_simplification` Phase 6 closeout. **Not yet promoted** — a human should review and move
