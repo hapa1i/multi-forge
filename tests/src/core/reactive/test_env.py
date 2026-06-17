@@ -10,6 +10,7 @@ from forge.core.reactive.env import (
     FORGE_DEPTH_VAR,
     FORGE_MAX_DEPTH,
     FORGE_PARENT_RUN_ID_VAR,
+    FORGE_PROXY_WIRE_SHAPE_VAR,
     FORGE_ROOT_RUN_ID_VAR,
     FORGE_RUN_ID_VAR,
     FORGE_SESSION_VAR,
@@ -112,6 +113,25 @@ class TestBuildClaudeEnv:
         assert env["ANTHROPIC_BASE_URL"] == "http://localhost:8085"
         assert env[CLAUDE_CODE_ATTRIBUTION_HEADER_VAR] == "0"
 
+    def test_openai_translated_proxy_route_forces_attribution_header_off(self):
+        """Translated proxy routes get the cache-preserving attribution workaround."""
+        env = build_claude_env(
+            base_url="http://localhost:8085",
+            extra_vars={FORGE_PROXY_WIRE_SHAPE_VAR: "openai_translated"},
+        )
+        assert env[CLAUDE_CODE_ATTRIBUTION_HEADER_VAR] == "0"
+
+    def test_anthropic_passthrough_proxy_route_scrubs_attribution_header(self):
+        """Anthropic passthrough must not reproduce Claude Code #64585 via a proxy."""
+        with patch.dict("os.environ", {CLAUDE_CODE_ATTRIBUTION_HEADER_VAR: "0"}, clear=True):
+            env = build_claude_env(
+                base_url="http://localhost:8085",
+                extra_vars={FORGE_PROXY_WIRE_SHAPE_VAR: "anthropic_passthrough"},
+            )
+        assert env["ANTHROPIC_BASE_URL"] == "http://localhost:8085"
+        assert env[FORGE_PROXY_WIRE_SHAPE_VAR] == "anthropic_passthrough"
+        assert CLAUDE_CODE_ATTRIBUTION_HEADER_VAR not in env
+
     def test_direct_route_scrubs_inherited_attribution_header(self):
         """Global CLAUDE_CODE_ATTRIBUTION_HEADER=0 must not break direct auto mode."""
         with patch.dict("os.environ", {CLAUDE_CODE_ATTRIBUTION_HEADER_VAR: "0"}, clear=True):
@@ -126,10 +146,12 @@ class TestBuildClaudeEnv:
                 direct=True,
                 extra_vars={
                     "ANTHROPIC_BASE_URL": "http://from-extra:9000",
+                    FORGE_PROXY_WIRE_SHAPE_VAR: "openai_translated",
                     CLAUDE_CODE_ATTRIBUTION_HEADER_VAR: "0",
                 },
             )
         assert "ANTHROPIC_BASE_URL" not in env
+        assert FORGE_PROXY_WIRE_SHAPE_VAR not in env
         assert CLAUDE_CODE_ATTRIBUTION_HEADER_VAR not in env
 
     def test_inherited_proxy_route_forces_attribution_header_off(self):

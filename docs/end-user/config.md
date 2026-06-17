@@ -67,8 +67,9 @@ Environment overrides:
 
 - `FORGE_DEBUG` overrides `log_level`. Accepted values: `1/true/yes` -> `debug`, `0/false/no/off` -> `off`, or explicit
   `debug/info/warning`
-- Do not export `CLAUDE_CODE_ATTRIBUTION_HEADER=0` globally. Forge sets it only for proxy-routed Claude processes and
-  scrubs it from direct Anthropic launches, because global inheritance can break Claude Code auto-mode classification.
+- Do not export `CLAUDE_CODE_ATTRIBUTION_HEADER=0` globally. Forge sets it only for translated/third-party proxy routes
+  that need the prompt-cache workaround, and scrubs it from direct Anthropic and `anthropic_passthrough` launches
+  because global inheritance can break Claude Code auto-mode classification.
 
 **Note on running processes:** Runtime config is cached per-process. Changes via `forge config set` take effect for new
 CLI invocations and new sessions, but **already-running proxies do not pick up changes until restart**. To toggle

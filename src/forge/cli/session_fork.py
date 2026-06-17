@@ -781,6 +781,7 @@ def fork(
         context_limit=context_limit,
         template=effective_template,
         base_url=effective_url,
+        proxy_id=effective_proxy_id,
         fork_name=fork_manifest.name,
         parent_session=parent,
         forge_root=fork_manifest.forge_root,

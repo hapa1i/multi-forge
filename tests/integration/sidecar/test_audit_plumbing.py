@@ -31,7 +31,7 @@ from pathlib import Path
 
 import pytest
 
-from forge.core.reactive.env import CLAUDE_CODE_ATTRIBUTION_HEADER_VAR
+from forge.core.reactive.env import FORGE_PROXY_WIRE_SHAPE_VAR
 from forge.sidecar.docker import is_docker_available
 
 pytestmark = [pytest.mark.integration, pytest.mark.docker_host]
@@ -108,7 +108,7 @@ def test_sidecar_proxy_id_overlay_and_host_visible_audit_and_usage(tmp_path: Pat
         "-e",
         "FORGE_SIDECAR=1",
         "-e",
-        f"{CLAUDE_CODE_ATTRIBUTION_HEADER_VAR}=0",
+        f"{FORGE_PROXY_WIRE_SHAPE_VAR}=anthropic_passthrough",
         "-e",
         "FORGE_HOME=/root/.forge",
         "-e",

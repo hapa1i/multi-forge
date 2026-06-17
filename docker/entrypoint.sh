@@ -78,9 +78,10 @@ fi
 
 # Set env for Claude
 export ANTHROPIC_BASE_URL=http://localhost:8085
-# CLAUDE_CODE_ATTRIBUTION_HEADER is passed by the host launcher after applying
-# forge.core.reactive.env.apply_attribution_header_policy(), keeping the
-# classifier/cache workaround in one Python decision point.
+# CLAUDE_CODE_ATTRIBUTION_HEADER is passed only when the host launcher decides
+# this proxy route needs the cache workaround. The decision is made by
+# forge.core.reactive.env.apply_attribution_header_policy() so shell and Python
+# cannot drift on classifier-sensitive routes.
 export CLAUDE_CODE_AUTO_COMPACT_WINDOW="${CLAUDE_CODE_AUTO_COMPACT_WINDOW:-200000}"
 
 # interactive_anthropic_api_key=omit: drop ANTHROPIC_API_KEY for Claude only. The

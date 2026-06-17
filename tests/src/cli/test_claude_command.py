@@ -177,6 +177,7 @@ def test_proxy_launch_sets_base_url_and_context_limit(tmp_path, monkeypatch):
     assert captured["env_vars"]["ANTHROPIC_DEFAULT_SONNET_MODEL"] == "claude-sonnet-4-6[1m]"
     assert "ANTHROPIC_MODEL" not in captured["env_vars"]
     assert captured["env_vars"]["ACTIVE_TEMPLATE"] == "openrouter-gemini"
+    assert captured["env_vars"]["FORGE_PROXY_WIRE_SHAPE"] == "openai_translated"
 
 
 def test_direct_launch_scrubs_proxy_vars(tmp_path, monkeypatch):
@@ -200,8 +201,10 @@ def test_direct_launch_scrubs_proxy_vars(tmp_path, monkeypatch):
     assert "ANTHROPIC_BASE_URL" not in captured["env_vars"]
     assert "CLAUDE_CODE_AUTO_COMPACT_WINDOW" not in captured["env_vars"]
     assert "ACTIVE_TEMPLATE" not in captured["env_vars"]
+    assert "FORGE_PROXY_WIRE_SHAPE" not in captured["env_vars"]
     assert "ANTHROPIC_BASE_URL" in captured["unset_env_vars"]
     assert "ACTIVE_TEMPLATE" in captured["unset_env_vars"]
+    assert "FORGE_PROXY_WIRE_SHAPE" in captured["unset_env_vars"]
     # CLAUDE_CODE_AUTO_COMPACT_WINDOW is a native CC env var -- Forge doesn't unset it
     assert "CLAUDE_CODE_AUTO_COMPACT_WINDOW" not in captured["unset_env_vars"]
 
@@ -486,9 +489,28 @@ class TestBuildBareLaunchEnv:
         assert env["ANTHROPIC_BASE_URL"] == "http://localhost:8085"
         assert env["CLAUDE_CODE_AUTO_COMPACT_WINDOW"] == "200000"
         assert env["ACTIVE_TEMPLATE"] == "litellm-openai"
+        assert env["FORGE_PROXY_WIRE_SHAPE"] == "openai_translated"
         assert "FORGE_SESSION" in unset
         assert "FORGE_FORK_NAME" in unset
         assert "FORGE_PARENT_SESSION" in unset
+
+    def test_proxy_id_wire_shape_wins_over_template_default(self):
+        from types import SimpleNamespace
+
+        from forge.cli.claude import _build_bare_launch_env
+
+        with patch(
+            "forge.config.loader.load_proxy_instance_config",
+            return_value=SimpleNamespace(wire_shape="anthropic_passthrough"),
+        ):
+            env, _ = _build_bare_launch_env(
+                base_url="http://localhost:8085",
+                template="litellm-openai",
+                proxy_id="edited-proxy",
+                context_limit=200000,
+            )
+
+        assert env["FORGE_PROXY_WIRE_SHAPE"] == "anthropic_passthrough"
 
     def test_direct_mode(self):
         from forge.cli.claude import _build_bare_launch_env
@@ -504,6 +526,7 @@ class TestBuildBareLaunchEnv:
         assert "FORGE_PARENT_SESSION" in unset
         assert "ANTHROPIC_BASE_URL" in unset
         assert "ACTIVE_TEMPLATE" in unset
+        assert "FORGE_PROXY_WIRE_SHAPE" in unset
         # CLAUDE_CODE_AUTO_COMPACT_WINDOW is native CC env var -- Forge doesn't unset it
         assert "CLAUDE_CODE_AUTO_COMPACT_WINDOW" not in unset
 

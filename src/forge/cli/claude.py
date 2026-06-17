@@ -19,6 +19,7 @@ import httpx
 from rich.console import Console
 
 from forge.core.paths import display_path
+from forge.core.reactive.env import FORGE_PROXY_WIRE_SHAPE_VAR, resolve_proxy_wire_shape
 from forge.proxy.proxies import (
     ProxyNotFoundError,
     ProxyRegistryCorruptedError,
@@ -160,6 +161,7 @@ def _build_bare_launch_env(
     base_url: str | None,
     template: str | None,
     context_limit: int | None,
+    proxy_id: str | None = None,
 ) -> tuple[dict[str, str], list[str]]:
     """Build environment for bare Claude launch (no session state).
 
@@ -173,12 +175,14 @@ def _build_bare_launch_env(
     if base_url is None:
         # Direct mode: don't touch CLAUDE_CODE_AUTO_COMPACT_WINDOW — it's a
         # native CC env var the user may have set. Only scrub Forge-managed vars.
-        unset_vars.extend(["ANTHROPIC_BASE_URL", "ACTIVE_TEMPLATE"])
+        unset_vars.extend(["ANTHROPIC_BASE_URL", "ACTIVE_TEMPLATE", FORGE_PROXY_WIRE_SHAPE_VAR])
     else:
         env_vars["ANTHROPIC_BASE_URL"] = base_url
         if context_limit is not None:
             env_vars["CLAUDE_CODE_AUTO_COMPACT_WINDOW"] = str(context_limit)
         apply_proxy_context_model_defaults(env_vars, context_limit)
+        if wire_shape := resolve_proxy_wire_shape(proxy_id=proxy_id, template=template):
+            env_vars[FORGE_PROXY_WIRE_SHAPE_VAR] = wire_shape
         if template:
             env_vars["ACTIVE_TEMPLATE"] = template
         else:
@@ -272,6 +276,7 @@ def start_cmd(
         base_url=base_url,
         template=template,
         context_limit=context_limit,
+        proxy_id=proxy_display,
     )
 
     if direct:

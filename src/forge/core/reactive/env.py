@@ -54,8 +54,13 @@ FORGE_SUBPROCESS_PROXY_VAR = "FORGE_SUBPROCESS_PROXY"
 FORGE_SUBPROCESS_BASE_URL_VAR = "FORGE_SUBPROCESS_BASE_URL"
 FORGE_SUBPROCESS_PROXY_ID_VAR = "FORGE_SUBPROCESS_PROXY_ID"
 FORGE_SUBPROCESS_TEMPLATE_VAR = "FORGE_SUBPROCESS_TEMPLATE"
+FORGE_PROXY_WIRE_SHAPE_VAR = "FORGE_PROXY_WIRE_SHAPE"
 FORGE_SIDECAR_VAR = "FORGE_SIDECAR"
 FORGE_LAUNCH_MODE_VAR = "FORGE_LAUNCH_MODE"
+FORGE_TEMPLATE_VAR = "FORGE_TEMPLATE"
+
+ANTHROPIC_PASSTHROUGH_WIRE_SHAPE = "anthropic_passthrough"
+OPENAI_TRANSLATED_WIRE_SHAPE = "openai_translated"
 
 # --bare (Claude Code >= 2.1.81) disables OAuth/keychain auth, requiring
 # ANTHROPIC_API_KEY in the environment. Only safe when the key is present.
@@ -250,6 +255,7 @@ def build_claude_env(
         env.pop(FORGE_SUBPROCESS_BASE_URL_VAR, None)
         env.pop(FORGE_SUBPROCESS_PROXY_ID_VAR, None)
         env.pop(FORGE_SUBPROCESS_TEMPLATE_VAR, None)
+        env.pop(FORGE_PROXY_WIRE_SHAPE_VAR, None)
     else:
         # No explicit base_url and not forced direct: check subprocess proxy fallback.
         # FORGE_SUBPROCESS_PROXY is set by `forge session start --subprocess-proxy`
@@ -286,20 +292,104 @@ def build_claude_env(
 
 
 def apply_attribution_header_policy(env: dict[str, str]) -> None:
-    """Scope Claude Code's attribution-header suppression to proxy-routed calls.
+    """Scope Claude Code's attribution-header suppression to translated proxies.
 
     ``CLAUDE_CODE_ATTRIBUTION_HEADER=0`` removes a volatile Claude Code billing
     system block that defeats third-party prompt caching, but upstream reports
     show it also breaks Claude Code auto-mode's safety classifier when inherited
     into direct Anthropic launches (Claude Code #64585). Forge therefore owns
-    this variable for child Claude processes: proxy-routed calls get the
-    cache-preserving workaround; direct calls scrub any inherited/global value so
-    auto mode can classify.
+    this variable for child Claude processes: translated/third-party proxy calls
+    get the cache-preserving workaround; direct and Anthropic-passthrough calls
+    scrub any inherited/global value so auto mode can classify when Anthropic's
+    classifier is available through the route.
     """
-    if env.get("ANTHROPIC_BASE_URL"):
-        env[CLAUDE_CODE_ATTRIBUTION_HEADER_VAR] = "0"
-    else:
+    if not env.get("ANTHROPIC_BASE_URL") or _proxy_wire_shape_for_env(env) == ANTHROPIC_PASSTHROUGH_WIRE_SHAPE:
         env.pop(CLAUDE_CODE_ATTRIBUTION_HEADER_VAR, None)
+        return
+
+    env[CLAUDE_CODE_ATTRIBUTION_HEADER_VAR] = "0"
+
+
+def resolve_proxy_wire_shape(*, proxy_id: str | None = None, template: str | None = None) -> str | None:
+    """Best-effort wire-shape lookup for attribution-header policy.
+
+    Proxy instance config wins over template defaults because users can edit
+    ``proxy.yaml``. Missing/invalid metadata returns ``None`` so unknown proxy
+    routes keep the conservative translated-proxy suppression behavior.
+    """
+    if proxy_id:
+        try:
+            from forge.config.loader import load_proxy_instance_config
+
+            proxy_config = load_proxy_instance_config(proxy_id)
+            if proxy_config and proxy_config.wire_shape:
+                return proxy_config.wire_shape
+        except Exception as e:
+            logger.debug("Could not resolve proxy wire_shape for proxy_id=%s: %s", proxy_id, e)
+
+    if template:
+        return _template_wire_shape(template)
+
+    return None
+
+
+def _template_wire_shape(template: str) -> str | None:
+    try:
+        import yaml
+
+        from forge.config.loader import read_template
+
+        data = yaml.safe_load(read_template(template))
+        if not isinstance(data, dict):
+            return None
+        proxy = data.get("proxy")
+        if not isinstance(proxy, dict):
+            return None
+        wire_shape = proxy.get("wire_shape", OPENAI_TRANSLATED_WIRE_SHAPE)
+        return str(wire_shape) if wire_shape else OPENAI_TRANSLATED_WIRE_SHAPE
+    except Exception as e:
+        logger.debug("Could not resolve template wire_shape for template=%s: %s", template, e)
+        return None
+
+
+def _proxy_wire_shape_for_env(env: Mapping[str, str]) -> str | None:
+    explicit = env.get(FORGE_PROXY_WIRE_SHAPE_VAR)
+    if explicit:
+        return explicit
+
+    base_url = env.get("ANTHROPIC_BASE_URL")
+    subprocess_base_url = env.get(FORGE_SUBPROCESS_BASE_URL_VAR)
+    if base_url and subprocess_base_url == base_url:
+        wire_shape = resolve_proxy_wire_shape(
+            proxy_id=env.get(FORGE_SUBPROCESS_PROXY_ID_VAR),
+            template=env.get(FORGE_SUBPROCESS_TEMPLATE_VAR),
+        )
+        if wire_shape:
+            return wire_shape
+
+    if base_url:
+        wire_shape = _wire_shape_from_registry_base_url(base_url)
+        if wire_shape:
+            return wire_shape
+
+    # Template-only sidecars have no host proxy id but do carry FORGE_TEMPLATE.
+    if template := env.get(FORGE_TEMPLATE_VAR):
+        return resolve_proxy_wire_shape(template=template)
+
+    return None
+
+
+def _wire_shape_from_registry_base_url(base_url: str) -> str | None:
+    try:
+        from forge.proxy.proxies import ProxyRegistryStore, lookup_proxy_by_base_url
+
+        entry = lookup_proxy_by_base_url(ProxyRegistryStore().read(), base_url)
+        if entry is None:
+            return None
+        return resolve_proxy_wire_shape(proxy_id=entry.proxy_id, template=entry.template)
+    except Exception as e:
+        logger.debug("Could not resolve proxy wire_shape for base_url=%s: %s", base_url, e)
+        return None
 
 
 def _hydrate_credentials(env: dict[str, str]) -> None:
