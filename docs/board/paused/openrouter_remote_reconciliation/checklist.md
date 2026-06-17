@@ -1,11 +1,22 @@
 # OpenRouter Remote Reconciliation -- Execution Checklist
 
-Branch: `openrouter_remote_reconciliation`. Card: [card.md](card.md).
+Branch: `openrouter_remote_reconciliation`. Card: [card.md](card.md). Epic:
+[`epic_telemetry_architecture`](../../doing/epic_telemetry_architecture/card.md).
 
 ## Current Focus
 
-Phase 0 recon and decision lock -> Phase 1 REST client -> Phase 2 credential/key provenance -> Phase 3 command-core
-reconciliation -> Phase 4 CLI surface -> Phase 5 optional view integrations -> docs, review, closeout.
+Paused after Phase 0 while `epic_telemetry_architecture` reviews sibling foundation cards. Resume by moving this card
+back to `doing/` only after the epic sequencing decision.
+
+Original flow: Phase 0 recon and decision lock -> Phase 1 REST client -> Phase 2 credential/key provenance -> Phase 3
+command-core reconciliation -> Phase 4 CLI surface -> Phase 5 optional view integrations -> docs, review, closeout.
+
+## Pause Note (2026-06-17)
+
+- [x] Phase 0 recon, OpenRouter endpoint verification, and decision lock are complete.
+- [x] Card moved to `paused/` before Phase 1 implementation.
+- [ ] Resume only after the telemetry epic decides whether `unified_backend`, `upstream_downstream_ledgers`, or this
+  card should execute next.
 
 ## Decisions To Lock
 
@@ -192,5 +203,5 @@ reconciliation -> Phase 4 CLI surface -> Phase 5 optional view integrations -> d
 - [ ] Record completed work in `docs/board/change_log.md`.
 - [ ] Promote durable lessons to `docs/board/impl_notes.md` after human review.
 - [ ] Verify design docs and end-user docs match shipped behavior.
-- [ ] Move `docs/board/doing/openrouter_remote_reconciliation` to `docs/board/done/openrouter_remote_reconciliation`
-  after merge.
+- [ ] When resumed and shipped, move `docs/board/doing/openrouter_remote_reconciliation` to
+  `docs/board/done/openrouter_remote_reconciliation` after merge.

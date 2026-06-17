@@ -1,7 +1,10 @@
 # OpenRouter Remote Reconciliation -- generation API joins and account-side views
 
-**Status**: Doing. Depends on the shipped local provider-trace foundation in
-`docs/board/done/openrouter_observability/card.md` and the Phase 0 OpenRouter probes recorded there.
+**Status**: Paused after Phase 0. Depends on the shipped local provider-trace foundation in
+`docs/board/done/openrouter_observability/card.md` and the Phase 0 OpenRouter probes recorded there. Paused so the
+active telemetry epic can decide whether `unified_backend` or `upstream_downstream_ledgers` should lay foundation first.
+
+**Epic**: [`epic_telemetry_architecture`](../../doing/epic_telemetry_architecture/card.md).
 
 **References**: OpenRouter `/api/v1/generation`, `/api/v1/activity`, `/api/v1/analytics/query`, management-key
 requirements, Forge provider trace records, cost logs, usage ledger, and run-tree headers.

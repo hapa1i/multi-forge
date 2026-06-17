@@ -4,9 +4,11 @@
 on 2026-06-14, after a supervised fork sent requests through the OpenRouter proxy but the user could not find them in
 OpenRouter's UI or Forge activity/cost surfaces.
 
+**Epic**: [`epic_telemetry_architecture`](../../doing/epic_telemetry_architecture/card.md).
+
 **Split from**: the original broad OpenRouter observability sketch. Log-volume work now lives in
-`docs/board/proposed/proxy_log_hygiene/card.md`; remote OpenRouter reconciliation now lives in
-`docs/board/proposed/openrouter_remote_reconciliation/card.md`.
+`docs/board/done/proxy_log_hygiene/card.md`; remote OpenRouter reconciliation now lives in
+`docs/board/paused/openrouter_remote_reconciliation/card.md`.
 
 **References**: OpenRouter `session_id` request field; Forge proxy cost logs (`~/.forge/costs/requests/`), request logs
 (`~/.forge/logs/requests/`), run-tree headers (`X-Forge-Run-ID`, `X-Forge-Root-Run-ID`), the `core.llm`

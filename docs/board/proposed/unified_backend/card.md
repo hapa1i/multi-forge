@@ -2,8 +2,10 @@
 
 **Status**: Proposed. Spun out of the `openrouter_observability` investigation (2026-06-16) while reasoning about
 whether the provider-trace plane generalizes beyond OpenRouter. The local provider-trace card
-(`docs/board/doing/openrouter_observability/card.md`) is the **first intended consumer**: its hardcoded
+(`docs/board/done/openrouter_observability/card.md`) is the **first intended consumer**: its hardcoded
 `provider_name == "openrouter"` gate is exactly the model-source identity this card would canonicalize.
+
+**Epic**: [`epic_telemetry_architecture`](../../doing/epic_telemetry_architecture/card.md).
 
 **References**: `src/forge/backend/` (`BackendAdapter`, `BackendManager`, the runtime-instance `BackendInstance`/
 `BackendRegistry` in `registry.py`), `BackendDependency` (`src/forge/config/schema.py`), the `ProviderType` enum, the
@@ -138,8 +140,8 @@ overlapping concept and *more* surface, not less.
 Once backends are first-class, the **downstream** telemetry plane keys on `backend_id` as its canonical **source
 identity**. This card owns that *key*; it does **not** decide how many planes exist -- the plane **structure** (whether
 cost / audit / usage / provider-trace collapse, plus a new upstream outcome plane) is owned by
-`upstream_downstream_ledgers` under the `telemetry_architecture` epic. Here we only make `backend_id` the source key
-downstream records attribute to.
+`upstream_downstream_ledgers` under [`epic_telemetry_architecture`](../../doing/epic_telemetry_architecture/card.md).
+Here we only make `backend_id` the source key downstream records attribute to.
 
 - **provider-trace** is the first migration target: replace `provider_name == "openrouter"` and the
   `~/.forge/providers/openrouter/traces/` path with a backend-id gate/layout. The generalization the observability card
@@ -150,11 +152,12 @@ downstream records attribute to.
   universal one.
 - **Defer plane count to `upstream_downstream_ledgers`.** That card collapses cost + audit + provider-trace into one
   *downstream* plane (keyed on `backend_id`) and adds a first-class *upstream* outcome plane. This card supplies the
-  key; it must **not** assert the four planes persist. See the `telemetry_architecture` epic for the shared contract.
+  key; it must **not** assert the four planes persist. See
+  [`epic_telemetry_architecture`](../../doing/epic_telemetry_architecture/card.md) for the shared contract.
 
 ## Relationship to other cards
 
-- **`openrouter_observability`** (in `doing/`): provider-trace is the first consumer. Sequence this card **after** it.
+- **`openrouter_observability`** (in `done/`): provider-trace is the first consumer. Sequence this card **after** it.
   **Reorientation decided 2026-06-16: signpost-only.** The observability card ships its Phases 4-5 as scoped; the two
   hardcoded model-source identity sites (`provider_trace_logger.py` -- the `provider_name == "openrouter"` gate and the
   `_traces_dir()` path) carry forward-reference comments naming this card as the migration owner. No code was
@@ -162,11 +165,11 @@ downstream records attribute to.
   one. Phase 4's read CLI stays provider-neutral (`forge provider trace ...`), so naming needs no migration.
 - **`proxy_log_hygiene`**, **`openrouter_remote_reconciliation`**: both also key on provider/source identity and would
   consume a canonical backend id.
-- **`upstream_downstream_ledgers`** + the **`telemetry_architecture`** epic (on the `supervisor_statusline_health`
-  branch): the orthogonal **plane-structure** axis to this card's **source-identity** axis. Composable (collapse-to-two
-  *and* key downstream on `backend_id`) and both edit `core/usage/emit.py`, so §5 owns only the `backend_id` key and
-  defers plane count to that card. The epic holds the shared contract (canonical there; cross-branch until both merge to
-  `main`; referenced by slug, not a relative link, since the epic is not in this branch's board).
+- **`upstream_downstream_ledgers`** + the
+  **[`epic_telemetry_architecture`](../../doing/epic_telemetry_architecture/card.md)**: the orthogonal
+  **plane-structure** axis to this card's **source-identity** axis. Composable (collapse-to-two *and* key downstream on
+  `backend_id`) and both edit `core/usage/emit.py`, so §5 owns only the `backend_id` key and defers plane count to that
+  card. The epic holds the shared contract and active sequencing decision.
 
 ## Open questions
 

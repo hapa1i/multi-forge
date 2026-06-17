@@ -6,13 +6,15 @@ conclusion: the messiness is a symptom of Forge's **telemetry planes being split
 redacted wire capture, per-call provider lifecycle, and outcome scattered across **four** planes, with the usage plane
 conflating two of them.
 
-**Updated 2026-06-16 (cross-branch).** The parallel `openrouter-observability` branch **shipped a fourth plane** --
-provider-trace (`~/.forge/providers/<source>/traces/`, `src/forge/proxy/provider_trace_logger.py`) -- and added a
-proposed `unified_backend` card that introduces a canonical model-source id (`backend_id`) the telemetry planes should
-key on. Provider-trace is **downstream by this card's taxonomy** (per-call, session-blind, metadata-only
-model-interaction evidence), so the target is **four planes -> two**, not three. This card owns plane **structure**;
-`unified_backend` owns the source-identity **key**. The shared contract and member list live in the
-[`telemetry_architecture`](../telemetry_architecture/card.md) epic.
+**Updated 2026-06-17.** The now-done `openrouter_observability` card shipped a fourth plane -- provider-trace
+(`~/.forge/providers/<source>/traces/`, `src/forge/proxy/provider_trace_logger.py`) -- and the sibling `unified_backend`
+card proposes a canonical model-source id (`backend_id`) the telemetry planes should key on. Provider-trace is
+**downstream by this card's taxonomy** (per-call, session-blind, metadata-only model-interaction evidence), so the
+target is **four planes -> two**, not three. This card owns plane **structure**; `unified_backend` owns the
+source-identity **key**. The shared contract and member list live in the
+[`epic_telemetry_architecture`](../../doing/epic_telemetry_architecture/card.md).
+
+**Epic**: [`epic_telemetry_architecture`](../../doing/epic_telemetry_architecture/card.md).
 
 **References**: `src/forge/core/usage/emit.py` (the proxied/direct provenance branch, inline in two emitters),
 `src/forge/core/usage/ledger.py` (`UsageEvent`), `src/forge/proxy/cost_logger.py` + `src/forge/proxy/audit_logger.py` +
@@ -134,8 +136,8 @@ memory-writer health, TDD outcomes, panel-worker failures -- from one place, wit
   is the `unified_backend` card's deliverable; this refactor **consumes** it as the downstream attribution key rather
   than minting its own. Plane **structure** is owned here; the source-identity **key** is owned there. If
   `unified_backend` lands first, downstream is keyed correctly from day one; if this card lands first, downstream keys
-  on `proxy_id` and re-keys on adoption -- the [`telemetry_architecture`](../telemetry_architecture/card.md) epic
-  records the sequencing.
+  on `proxy_id` and re-keys on adoption -- the
+  [`epic_telemetry_architecture`](../../doing/epic_telemetry_architecture/card.md) records the sequencing.
 - **Consumers read the right plane -- and `forge activity` becomes the honest join.** Upstream answers health/outcome
   (select by session), downstream answers spend (join by run tree). `forge activity` is then a **two-pane outer join,
   not one conflated row**: an upstream pane (outcomes grouped by verb/session, including the no-call ops downstream
@@ -188,16 +190,15 @@ them.
 
 ## Relationship to `supervisor_statusline_health`
 
-That card ([`doing/supervisor_statusline_health`](../../doing/supervisor_statusline_health/card.md)) is the forcing
-function that revealed this. It ships the **minimal on-model step**: read the outcome data the usage ledger already
+That card ([`done/supervisor_statusline_health`](../../done/supervisor_statusline_health/card.md)) is the forcing
+function that revealed this. It shipped the **minimal on-model step**: read the outcome data the usage ledger already
 records (`command="supervisor"` `status`) for the timeout marker -- *not* the off-model `PolicyDecision.failure_kind`.
 This card is the principled completion: make upstream/downstream first-class so the next health surface needs no new
 field.
 
 ## Relationship to `unified_backend` (source identity)
 
-`unified_backend` (proposed on the `openrouter-observability` branch) and this card are the **two orthogonal axes** of
-the telemetry rethink, not duplicates:
+`unified_backend` and this card are the **two orthogonal axes** of the telemetry rethink, not duplicates:
 
 - **This card** re-cuts the planes by **direction** -- per-call *downstream* vs per-operation *upstream*. It owns plane
   **structure** and the `resolve_measurement` provenance resolver.
@@ -210,5 +211,5 @@ the same `emit.py` provenance branch, so they must not run as independent, mutua
 **deliberately not merged** into one card: the bulk of `unified_backend` (backend lifecycle, `forge backend list`, auth
 provenance, the model-source catalog) is config/CLI/auth work with its own large blast radius and "spike first" posture,
 and chaining this telemetry refactor to it would break independent shippability. The shared contract -- *downstream keys
-on `backend_id`; structure owned here, key owned there* -- and the sequencing live in the
-[`telemetry_architecture`](../telemetry_architecture/card.md) epic.
+on `backend_id`; structure owned here, key owned there* -- and the sequencing live in
+[`epic_telemetry_architecture`](../../doing/epic_telemetry_architecture/card.md).

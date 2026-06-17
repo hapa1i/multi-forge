@@ -5,6 +5,8 @@
 Shipped behavior is normative in the design docs; the Proposal below is the original framing. Recon corrections and the
 resolved open questions are recorded in [Resolution](#resolution-2026-06-16).
 
+**Epic**: [`epic_telemetry_architecture`](../../doing/epic_telemetry_architecture/card.md).
+
 **References**: proxy runtime truth `GET /`, request logs under `~/.forge/logs/requests/`, proxy logs under
 `~/.forge/logs/proxy/`, audit/intercept design in `docs/design.md` §7.x and `docs/design_appendix.md` §A.11-A.12.
 

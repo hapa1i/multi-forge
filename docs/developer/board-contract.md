@@ -12,6 +12,7 @@ The work board is Forge's lightweight implementation-memory system for multi-ses
 - proposed ideas
 - accepted but parked work
 - active execution
+- active epic coordination and sequencing
 - paused partially-done work
 - completed snapshots
 - project lifetime memory
@@ -20,13 +21,13 @@ Cards may be aspirational. Design docs are normative and describe shipped code.
 
 ## Lanes
 
-| Path                                 | Meaning                                               | Required action                                   |
-| ------------------------------------ | ----------------------------------------------------- | ------------------------------------------------- |
-| `docs/board/proposed/<slug>/card.md` | Idea or design sketch not yet accepted for execution  | Move to `todo/` when accepted or scheduled        |
-| `docs/board/todo/<slug>/card.md`     | Accepted work parked until an execution branch exists | Move to `doing/` when execution starts            |
-| `docs/board/doing/<slug>/card.md`    | Work currently in flight                              | Keep `checklist.md` current during implementation |
-| `docs/board/paused/<slug>/card.md`   | Partially-done work on hold                           | Move back to `doing/` when work resumes           |
-| `docs/board/done/<slug>/card.md`     | Completed work snapshot                               | Keep paired `checklist.md` when one existed       |
+| Path                                 | Meaning                                                             | Required action                                              |
+| ------------------------------------ | ------------------------------------------------------------------- | ------------------------------------------------------------ |
+| `docs/board/proposed/<slug>/card.md` | Idea, design sketch, or epic not yet accepted for execution         | Move to `todo/` when accepted or scheduled                   |
+| `docs/board/todo/<slug>/card.md`     | Accepted work or epic parked until an execution/coordination branch | Move to `doing/` when active work starts                     |
+| `docs/board/doing/<slug>/card.md`    | Work currently in flight, or an active coordinating epic            | Keep `checklist.md` current during execution or coordination |
+| `docs/board/paused/<slug>/card.md`   | Partially-done work on hold                                         | Move back to `doing/` when work resumes                      |
+| `docs/board/done/<slug>/card.md`     | Completed work snapshot                                             | Keep paired `checklist.md` when one existed                  |
 
 `todo/` is not the active cursor. It means the work is accepted, but no execution branch is active for it.
 
@@ -51,6 +52,31 @@ Every work item is a card directory.
 
 Move cards between lanes instead of copying proposal/checklist snapshots. A completed `done/<slug>/` card is historical
 context; after completion, design docs and code are normative.
+
+## Epics
+
+An epic is a coordinating card for several independently shippable member cards. It owns the shared contract,
+sequencing, and drift control between the members; the member cards remain the implementation units.
+
+Create an epic when two or more independently shippable cards share a contract, sequencing decision, or code seam that
+would otherwise drift through plain cross-links.
+
+Epic directory slugs must start with `epic_`, for example `docs/board/doing/epic_telemetry_architecture/`. The top of
+the epic card should identify it as an epic, and each member card must link its epic near the top of `card.md` using the
+epic's current board path.
+
+Epic lane semantics mirror ordinary card lanes with one addition: an epic moves to `doing/` when its coordination is the
+active cursor, or when a member card is active/paused specifically because the epic is deciding sequencing. Active epics
+must carry a lightweight `checklist.md` for coordination tasks such as member review, dependency decisions, link
+updates, and sequencing outcomes. They do not replace member checklists.
+
+If implementation on a member card stops so the team can revisit the epic or sibling cards, move that member card to
+`paused/` and record the pause reason in its checklist. When the epic chooses the next member to execute, move that
+member to `doing/` and update both sides of the link.
+
+An epic closes to `done/` when every live member card is `done/`, or when the shared contract is no longer load-bearing
+because the work was cancelled, superseded, or folded into normative design docs. Until then, keep the epic in `doing/`
+as the living coordinator.
 
 ## Checklist Contract
 
