@@ -9,38 +9,69 @@ reconciliation -> Phase 4 CLI surface -> Phase 5 optional view integrations -> d
 
 ## Decisions To Lock
 
-- [ ] **Remote query mode**: start with on-demand remote queries only. If caching remote records is needed, record the
-  cache path, schema, retention, and reset semantics before implementation.
-- [ ] **Credential home**: decide the management-key credential name and storage shape. Leading candidate:
-  `openrouter-management` with `OPENROUTER_MANAGEMENT_KEY`, separate from the normal `openrouter` API key.
-- [ ] **Generation endpoint key class**: verify whether `/api/v1/generation` works with a normal OpenRouter API key for
-  generations created by that key, or requires management access.
-- [ ] **Time-window flags**: use `--period today|week|month|all` for parity with `forge provider trace list`; add
+- [x] **Remote query mode**: start with on-demand remote queries only. No remote cache/schema is part of the first
+  implementation.
+- [x] **Credential home**: use `openrouter-management` with `OPENROUTER_MANAGEMENT_KEY`, separate from the normal
+  `openrouter` / `OPENROUTER_API_KEY` credential used for generation lookup.
+- [x] **Generation endpoint key class**: use the normal `openrouter` key for `/api/v1/generation`; the official
+  generation metadata docs require bearer auth but do not mark the endpoint as management-key-gated. Keep a later live
+  smoke for ordinary-key behavior useful but non-blocking.
+- [x] **Time-window flags**: use `--period today|week|month|all` for parity with `forge provider trace list`; add
   explicit `--from`/`--to` UTC bounds for activity/analytics if OpenRouter requires concrete date ranges. Treat older
   card sketches using `--since` or `--date` as illustrative only.
-- [ ] **CLI namespace**: implement remote surfaces under `forge provider openrouter ...`; keep local-only trace commands
+- [x] **CLI namespace**: implement remote surfaces under `forge provider openrouter ...`; keep local-only trace commands
   under `forge provider trace ...`.
-- [ ] **Direct command scope**: decide whether `%provider openrouter ...` is out of scope for the first implementation.
-  Default posture: terminal-only until remote credential UX and latency are proven.
-- [ ] **Identifier vocabulary**: normalize observed OpenRouter ids (`gen-...`, `gen_...`, or endpoint-specific ids)
-  without rewriting local provider-trace ids or synthetic Forge/OpenAI-compatible ids.
-- [ ] **Privacy boundary**: no prompt/completion/content fetching in this card. Metadata only unless a later card adds a
+- [x] **Direct command scope**: `%provider openrouter ...` is out of scope for the first implementation. Ship
+  terminal-only until remote credential UX and latency are proven.
+- [x] **Identifier vocabulary**: treat `gen-...` as the canonical documented OpenRouter generation id; accept observed
+  `gen_...` or endpoint-specific ids defensively without rewriting local provider-trace ids or synthetic
+  Forge/OpenAI-compatible ids.
+- [x] **Privacy boundary**: no prompt/completion/content fetching in this card. Metadata only unless a later card adds a
   separate privacy-reviewed flag.
 
 ## Phase 0 -- Recon And Card Correction
 
-- [ ] Re-read the shipped provider-trace implementation and docs: `src/forge/proxy/provider_trace_logger.py`,
+- [x] Re-read the shipped provider-trace implementation and docs: `src/forge/proxy/provider_trace_logger.py`,
   `src/forge/core/ops/provider_trace.py`, `src/forge/cli/provider.py`, `docs/design.md` §3.14, and
   `docs/design_appendix.md` §A.14.
-- [ ] Correct remaining stale card language before coding: proxied OpenRouter grouping uses the standard `user` field,
+- [x] Correct remaining stale card language before coding: proxied OpenRouter grouping uses the standard `user` field,
   not a custom `session_id`; direct `core.llm` `user` injection remains the separate
   `docs/board/todo/openrouter_user_direct_callers/` card.
-- [ ] Verify the OpenRouter endpoint/key facts needed for implementation and record them in this checklist or the card:
+- [x] Verify the OpenRouter endpoint/key facts needed for implementation and record them in this checklist or the card:
   generation lookup key class, activity/analytics management-key requirements, id format, and any retention/window
   limits.
-- [ ] Decide whether a live OpenRouter probe is required before code. If yes, add an operator-gated script under
-  `scripts/experiments/openrouter/` and a sanitized results note.
-- [ ] Update the acceptance table below with final source/test file names once the module layout is chosen.
+- [x] Decide whether a live OpenRouter probe is required before code: no blocking live probe before implementation. Add
+  optional `@pytest.mark.slow` live smoke tests later if credentials are present, especially for ordinary-key
+  `/generation` behavior and management-key activity/analytics access.
+- [x] Update the acceptance table below with final source/test file names once the module layout is chosen.
+
+### Phase 0 Findings (2026-06-17)
+
+- Local provider trace is already metadata-only and joins to local cost/usage evidence by `request_id` and
+  `forge_root_run_id`. `provider_generation_id` belongs to `ProviderTraceRecord`; cost records do not carry it.
+- The existing op/CLI shape to mirror is `src/forge/core/ops/provider_trace.py` plus `src/forge/cli/provider.py`: frozen
+  DTOs, `ExecutionContext`, `ForgeOpError`, `render_*_lines`, and `--period today|week|month|all`.
+- Official docs used: [generation metadata](https://openrouter.ai/docs/api/api-reference/generations/get-generation),
+  [generation content](https://openrouter.ai/docs/api/api-reference/generations/list-generation-content),
+  [activity](https://openrouter.ai/docs/api/api-reference/analytics/get-user-activity),
+  [analytics meta](https://openrouter.ai/docs/api/api-reference/beta-analytics/get-analytics-meta),
+  [analytics query](https://openrouter.ai/docs/api/api-reference/beta-analytics/query-analytics),
+  [current key](https://openrouter.ai/docs/api/api-reference/api-keys/get-current-key), and
+  [key list](https://openrouter.ai/docs/api/api-reference/api-keys/list).
+- Official OpenRouter docs confirm `GET /api/v1/generation` is the request/usage metadata endpoint, takes `id=gen-...`,
+  returns fields such as `id`, `external_user`, `cancelled`, tokens, `total_cost`, provider, and `request_id`, and is
+  documented as bearer-token auth without a management-key note.
+- `GET /api/v1/generation/content` is a separate content-bearing endpoint returning stored prompt/completion fields.
+  This card must not call it.
+- `GET /api/v1/activity` returns user activity grouped by endpoint for the last 30 completed UTC days, accepts `date`,
+  `api_key_hash`, and `user_id` filters, and is management-key required.
+- `GET /api/v1/analytics/meta` and `POST /api/v1/analytics/query` are management-key required; analytics queries use
+  explicit UTC `time_range.start` / `time_range.end`.
+- `GET /api/v1/key` exposes `is_management_key`, and `GET /api/v1/keys` returns API-key hashes for filtering activity
+  but is itself management-key required.
+- Module layout: start with a single UI-agnostic op/client module, `src/forge/core/ops/openrouter_reconciliation.py`,
+  plus `tests/src/core/ops/test_openrouter_reconciliation.py` and `tests/src/cli/test_provider_openrouter.py`. Split a
+  dedicated provider client package only if reuse or module size demands it.
 
 ## Phase 1 -- Small OpenRouter REST Client
 
