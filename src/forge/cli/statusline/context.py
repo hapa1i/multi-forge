@@ -28,6 +28,8 @@ from forge.cli.statusline.palette import (
 from forge.core.ops.usage_summary import SupervisorHealth
 from forge.runtime_config import RuntimeConfig
 
+_COST_MICROS_PER_USD = 1_000_000
+
 
 @dataclass
 class RenderContext:
@@ -72,6 +74,58 @@ class RenderContext:
     @property
     def cost_data(self) -> dict[str, Any]:
         return self.data.get("cost") or {}
+
+    @property
+    def proxy_cost_baseline_micros(self) -> int | None:
+        """Launch-time proxy cost baseline from ``confirmed.launch``."""
+        confirmed = (self.manifest or {}).get("confirmed")
+        launch = confirmed.get("launch") if isinstance(confirmed, dict) else None
+        baseline = launch.get("proxy_cost_baseline_micros") if isinstance(launch, dict) else None
+        if isinstance(baseline, bool) or not isinstance(baseline, int):
+            return None
+        return max(0, baseline)
+
+    @property
+    def proxy_cost_baseline_started_at(self) -> str | None:
+        """Proxy metrics process timestamp captured with the launch baseline."""
+        confirmed = (self.manifest or {}).get("confirmed")
+        launch = confirmed.get("launch") if isinstance(confirmed, dict) else None
+        started_at = launch.get("proxy_cost_baseline_started_at") if isinstance(launch, dict) else None
+        return started_at if isinstance(started_at, str) and started_at else None
+
+    @property
+    def proxy_runtime_started_at(self) -> str | None:
+        """Current proxy metrics process timestamp."""
+        metrics = self.runtime.raw.get("metrics") if self.runtime else None
+        started_at = metrics.get("started_at") if isinstance(metrics, dict) else None
+        return started_at if isinstance(started_at, str) and started_at else None
+
+    @property
+    def scoped_proxy_cost_usd(self) -> float:
+        """Proxy-reported cost scoped to this launch when a baseline exists."""
+        if not self.runtime:
+            return 0.0
+        current = self.runtime.proxy_cost_usd
+        if isinstance(current, bool) or not isinstance(current, (int, float)) or current <= 0:
+            return 0.0
+
+        baseline = self.proxy_cost_baseline_micros
+        if baseline is None:
+            return float(current)
+
+        baseline_started_at = self.proxy_cost_baseline_started_at
+        runtime_started_at = self.proxy_runtime_started_at
+        if baseline_started_at and runtime_started_at and baseline_started_at != runtime_started_at:
+            return float(current)
+
+        current_micros = int(round(float(current) * _COST_MICROS_PER_USD))
+        if current_micros >= baseline:
+            return (current_micros - baseline) / _COST_MICROS_PER_USD
+
+        # The proxy likely restarted after launch and reset its cumulative
+        # metrics. Do not subtract an old-process baseline from a new-process
+        # total; the current proxy total is the best available scoped value.
+        return float(current)
 
     @property
     def palette(self) -> Palette:

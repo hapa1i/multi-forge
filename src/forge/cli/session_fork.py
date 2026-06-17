@@ -10,6 +10,7 @@ import sys
 import uuid as _uuid
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import cast
 
 import click
 
@@ -55,6 +56,7 @@ def _sess():  # type: ignore[return]
 
 from forge.cli.launch_confirmation import (  # noqa: E402
     _routing_mode_for,
+    read_proxy_cost_baseline,
     record_launch_confirmed,
 )
 from forge.cli.session import (  # noqa: E402
@@ -81,14 +83,16 @@ from forge.cli.session_lifecycle import (  # noqa: E402
     _print_session_activity_summary,
     _resolve_manifest_prompt_file,
     _resume_tip_command,
-    session,
 )
+from forge.cli.session_lifecycle import session as _session_untyped  # noqa: E402
 from forge.cli.session_model_pin import (  # noqa: E402
     _apply_and_persist_direct_model_override,
     _apply_direct_model_env_if_supported,
     _validate_direct_model_pin_for_routing,
 )
 from forge.core.reactive.env import compute_interactive_api_key_decision  # noqa: E402
+
+session = cast(click.Group, _session_untyped)  # type: ignore[has-type]  # circular re-export
 
 __all__ = ["fork"]
 
@@ -1129,12 +1133,15 @@ def fork(
     # so record launch facts here. compute mirrors the interactive finalizer's resolution.
     from forge.session.store import SessionStore as _LaunchStore
 
+    _proxy_cost_baseline = read_proxy_cost_baseline(runtime_base_url)
     record_launch_confirmed(
         _LaunchStore(str(_fork_forge_root), fork_manifest.name),
         routing_mode=_routing_mode_for(runtime_base_url, effective_proxy_id),
         proxy_id=effective_proxy_id,
         base_url=runtime_base_url,
         decision=compute_interactive_api_key_decision(interactive=True),
+        proxy_cost_baseline_micros=_proxy_cost_baseline.cost_micros if _proxy_cost_baseline else None,
+        proxy_cost_baseline_started_at=_proxy_cost_baseline.started_at if _proxy_cost_baseline else None,
     )
 
     active_claude_session_id = _fork_uuid if uses_fresh_transfer else None

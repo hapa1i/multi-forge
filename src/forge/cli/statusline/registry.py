@@ -92,8 +92,7 @@ def _produce_model(ctx: RenderContext) -> Optional[str]:
 
 def _produce_cost(ctx: RenderContext) -> Optional[str]:
     if ctx.is_proxy:
-        proxy_cost = ctx.runtime.proxy_cost_usd if ctx.runtime else 0.0
-        return sl.get_session_metrics(ctx.cost_data, True, proxy_cost_usd=proxy_cost)
+        return sl.get_session_metrics(ctx.cost_data, True, proxy_cost_usd=ctx.scoped_proxy_cost_usd)
     # Direct session: dollars are real only under API billing.
     if ctx.billing_mode == "api":
         return sl.get_session_metrics(ctx.cost_data, False)
