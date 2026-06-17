@@ -78,6 +78,7 @@ fi
 
 # Set env for Claude
 export ANTHROPIC_BASE_URL=http://localhost:8085
+export CLAUDE_CODE_ATTRIBUTION_HEADER=0
 export CLAUDE_CODE_AUTO_COMPACT_WINDOW="${CLAUDE_CODE_AUTO_COMPACT_WINDOW:-200000}"
 
 # interactive_anthropic_api_key=omit: drop ANTHROPIC_API_KEY for Claude only. The

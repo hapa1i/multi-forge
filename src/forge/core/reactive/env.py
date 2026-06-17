@@ -49,6 +49,7 @@ FORGE_ROOT_RUN_ID_VAR = "FORGE_ROOT_RUN_ID"
 FORGE_SESSION_VAR = "FORGE_SESSION"
 FORGE_COMMAND_VAR = "FORGE_COMMAND"
 
+CLAUDE_CODE_ATTRIBUTION_HEADER_VAR = "CLAUDE_CODE_ATTRIBUTION_HEADER"
 FORGE_SUBPROCESS_PROXY_VAR = "FORGE_SUBPROCESS_PROXY"
 FORGE_SUBPROCESS_BASE_URL_VAR = "FORGE_SUBPROCESS_BASE_URL"
 FORGE_SUBPROCESS_PROXY_ID_VAR = "FORGE_SUBPROCESS_PROXY_ID"
@@ -263,6 +264,8 @@ def build_claude_env(
             else:
                 env.pop("ANTHROPIC_BASE_URL", None)
 
+    apply_attribution_header_policy(env)
+
     # Increment FORGE_DEPTH so child subprocesses know their nesting level
     current_depth = get_forge_depth(env)
     env[FORGE_DEPTH_VAR] = str(current_depth + 1)
@@ -280,6 +283,22 @@ def build_claude_env(
         _apply_correlation_headers(env)
 
     return env
+
+
+def apply_attribution_header_policy(env: dict[str, str]) -> None:
+    """Scope Claude Code's attribution-header suppression to proxy-routed calls.
+
+    ``CLAUDE_CODE_ATTRIBUTION_HEADER=0`` removes a volatile Claude Code billing
+    system block that defeats third-party prompt caching, but upstream reports
+    show it also breaks Claude Code auto-mode's safety classifier when inherited
+    into direct Anthropic launches. Forge therefore owns this variable for child
+    Claude processes: proxy-routed calls get the cache-preserving workaround;
+    direct calls scrub any inherited/global value so auto mode can classify.
+    """
+    if env.get("ANTHROPIC_BASE_URL"):
+        env[CLAUDE_CODE_ATTRIBUTION_HEADER_VAR] = "0"
+    else:
+        env.pop(CLAUDE_CODE_ATTRIBUTION_HEADER_VAR, None)
 
 
 def _hydrate_credentials(env: dict[str, str]) -> None:

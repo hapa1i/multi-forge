@@ -5,6 +5,7 @@ from __future__ import annotations
 from unittest.mock import patch
 
 from forge.core.reactive.env import (
+    CLAUDE_CODE_ATTRIBUTION_HEADER_VAR,
     FORGE_COMMAND_VAR,
     FORGE_DEPTH_VAR,
     FORGE_MAX_DEPTH,
@@ -103,6 +104,47 @@ class TestBuildClaudeEnv:
         with patch.dict("os.environ", {"ANTHROPIC_BASE_URL": "http://old:8085"}):
             env = build_claude_env(base_url="http://new:8086", direct=True)
         assert env["ANTHROPIC_BASE_URL"] == "http://new:8086"
+
+    def test_proxy_route_forces_attribution_header_off(self):
+        """Proxy-routed calls suppress Claude's volatile attribution system block."""
+        with patch.dict("os.environ", {CLAUDE_CODE_ATTRIBUTION_HEADER_VAR: "1"}, clear=True):
+            env = build_claude_env(base_url="http://localhost:8085")
+        assert env["ANTHROPIC_BASE_URL"] == "http://localhost:8085"
+        assert env[CLAUDE_CODE_ATTRIBUTION_HEADER_VAR] == "0"
+
+    def test_direct_route_scrubs_inherited_attribution_header(self):
+        """Global CLAUDE_CODE_ATTRIBUTION_HEADER=0 must not break direct auto mode."""
+        with patch.dict("os.environ", {CLAUDE_CODE_ATTRIBUTION_HEADER_VAR: "0"}, clear=True):
+            env = build_claude_env()
+        assert "ANTHROPIC_BASE_URL" not in env
+        assert CLAUDE_CODE_ATTRIBUTION_HEADER_VAR not in env
+
+    def test_direct_true_scrubs_attribution_header_even_with_extra_vars(self):
+        """direct=True owns the attribution-header policy after caller extras."""
+        with patch.dict("os.environ", {CLAUDE_CODE_ATTRIBUTION_HEADER_VAR: "0"}, clear=True):
+            env = build_claude_env(
+                direct=True,
+                extra_vars={
+                    "ANTHROPIC_BASE_URL": "http://from-extra:9000",
+                    CLAUDE_CODE_ATTRIBUTION_HEADER_VAR: "0",
+                },
+            )
+        assert "ANTHROPIC_BASE_URL" not in env
+        assert CLAUDE_CODE_ATTRIBUTION_HEADER_VAR not in env
+
+    def test_inherited_proxy_route_forces_attribution_header_off(self):
+        """Ambient proxy routing is still proxy-routed even without explicit base_url."""
+        with patch.dict(
+            "os.environ",
+            {
+                "ANTHROPIC_BASE_URL": "http://inherited-proxy:8085",
+                CLAUDE_CODE_ATTRIBUTION_HEADER_VAR: "1",
+            },
+            clear=True,
+        ):
+            env = build_claude_env()
+        assert env["ANTHROPIC_BASE_URL"] == "http://inherited-proxy:8085"
+        assert env[CLAUDE_CODE_ATTRIBUTION_HEADER_VAR] == "0"
 
 
 class TestGetForgeDepth:
