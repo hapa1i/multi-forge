@@ -1,7 +1,7 @@
 # OpenRouter Remote Reconciliation -- generation API joins and account-side views
 
-**Status**: Proposed. Depends on the local provider-trace foundation in
-`docs/board/proposed/openrouter_observability/card.md` and the Phase 0 OpenRouter probes recorded there.
+**Status**: Doing. Depends on the shipped local provider-trace foundation in
+`docs/board/done/openrouter_observability/card.md` and the Phase 0 OpenRouter probes recorded there.
 
 **References**: OpenRouter `/api/v1/generation`, `/api/v1/activity`, `/api/v1/analytics/query`, management-key
 requirements, Forge provider trace records, cost logs, usage ledger, and run-tree headers.
@@ -25,7 +25,8 @@ Do not start implementation until the provider-trace card has recorded Phase 0 a
 - where OpenRouter exposes generation ids for Forge's streaming and non-streaming paths
 - whether cancelled-before-final-usage streams appear in `/generation`, `/activity`, dashboard logs, or analytics
 - which endpoints require a normal API key vs a management key
-- whether sticky `session_id` changes latency/cache/provider behavior enough to affect the operator story
+- whether OpenRouter's retained `user` grouping changes latency/cache/provider behavior enough to affect the operator
+  story
 
 ## Proposal
 
@@ -48,17 +49,21 @@ Prefer a provider namespace so provider-neutral trace concepts can generalize la
 
 ```bash
 forge provider openrouter generation gen_...
-forge provider openrouter reconcile --session neat-bloodhound-executor --since today
-forge provider openrouter activity --date 2026-06-14
-forge provider openrouter analytics --session neat-bloodhound-executor --since today
+forge provider openrouter reconcile --session neat-bloodhound-executor --period today
+forge provider openrouter activity --period today
+forge provider openrouter analytics --session neat-bloodhound-executor --period today
+# activity/analytics may also accept explicit --from/--to UTC bounds when OpenRouter requires exact ranges
 ```
 
 Provider-neutral local trace commands remain separate:
 
 ```bash
-forge provider trace list --session neat-bloodhound-executor --since today
+forge provider trace list --session neat-bloodhound-executor --period today
 forge provider trace explain req_...
 ```
+
+The examples intentionally mirror the shipped local trace surface (`--period today|week|month|all`). Explicit
+`--from`/`--to` UTC bounds are the planned escape hatch for activity/analytics endpoints that require concrete ranges.
 
 ### 3. Reconciliation taxonomy
 
