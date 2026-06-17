@@ -19,6 +19,7 @@ import click
 from forge.cli.launch_confirmation import (
     _infer_launch_confirmation,
     _routing_mode_for,
+    read_proxy_cost_baseline,
     record_launch_confirmed,
 )
 from forge.cli.session_model_pin import (
@@ -548,8 +549,17 @@ def _launch_claude_for_session(
             _sidecar_key = InteractiveApiKeyDecision(
                 available=_has_container_key, source="env" if _has_container_key else "none"
             )
+        # Sidecar's in-container proxy has not started yet, so this usually
+        # returns None; that is fine because a fresh sidecar proxy starts at $0.
+        _sidecar_cost_baseline = read_proxy_cost_baseline(runtime_base_url)
         record_launch_confirmed(
-            store, routing_mode="proxy", proxy_id=proxy_id, base_url=runtime_base_url, decision=_sidecar_key
+            store,
+            routing_mode="proxy",
+            proxy_id=proxy_id,
+            base_url=runtime_base_url,
+            decision=_sidecar_key,
+            proxy_cost_baseline_micros=_sidecar_cost_baseline.cost_micros if _sidecar_cost_baseline else None,
+            proxy_cost_baseline_started_at=_sidecar_cost_baseline.started_at if _sidecar_cost_baseline else None,
         )
 
         sidecar_image = image or _runtime_config.sidecar_image
@@ -626,12 +636,15 @@ def _launch_claude_for_session(
     # Record launch facts for the status line: route + the api-key posture the child
     # will end up with. compute mirrors what build_claude_env's interactive finalizer
     # applies (both resolve from os.environ/config), so this matches the child env.
+    _proxy_cost_baseline = read_proxy_cost_baseline(runtime_base_url)
     record_launch_confirmed(
         store,
         routing_mode=_routing_mode_for(runtime_base_url, proxy_id),
         proxy_id=proxy_id,
         base_url=runtime_base_url,
         decision=compute_interactive_api_key_decision(interactive=True),
+        proxy_cost_baseline_micros=_proxy_cost_baseline.cost_micros if _proxy_cost_baseline else None,
+        proxy_cost_baseline_started_at=_proxy_cost_baseline.started_at if _proxy_cost_baseline else None,
     )
 
     if runtime_base_url is None:

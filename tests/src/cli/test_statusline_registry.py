@@ -128,6 +128,60 @@ PROXY_RUNTIME = (
     True,
 )
 
+
+def _proxy_runtime_with_cost(
+    total_usd: float,
+    *,
+    started_at: str = "2026-06-17T19:00:00Z",
+) -> tuple[bool, ProxyRuntimeTruth, bool]:
+    return (
+        True,
+        ProxyRuntimeTruth(
+            {
+                "is_proxy": True,
+                "proxy": {
+                    "proxy_id": "p1",
+                    "template": "openrouter-gemini",
+                    "port": 8097,
+                    "base_url": "http://localhost:8097",
+                },
+                "runtime": {
+                    "tier_mappings": {
+                        "opus": "gemini-3.1-pro",
+                        "sonnet": "gemini-3.1-pro",
+                        "haiku": "gemini-3.5-flash",
+                    },
+                    "context_windows": {"haiku": 1_000_000, "sonnet": 1_000_000, "opus": 1_000_000},
+                    "active_tier": "opus",
+                    "active_context_window": 1_000_000,
+                },
+                "tiers": {},
+                "metrics": {"started_at": started_at, "costs": {"total_usd": total_usd}},
+            }
+        ),
+        True,
+    )
+
+
+def _manifest_with_proxy_cost_baseline(
+    baseline_micros: int,
+    *,
+    started_at: str = "2026-06-17T19:00:00Z",
+) -> tuple[dict, bool]:
+    return (
+        {
+            "name": "cobalt-porcupine",
+            "confirmed": {
+                "launch": {
+                    "proxy_cost_baseline_micros": baseline_micros,
+                    "proxy_cost_baseline_started_at": started_at,
+                }
+            },
+        },
+        True,
+    )
+
+
 # --- Golden snapshots (layout frozen; cost segment is the Phase 4 auto-hedge) ---
 
 GOLDEN_MINIMAL = "\x1b[0m\x1b[32;1m/tmp/demo\x1b[0m\xa0\x1b[90m|\x1b[0m\xa0\x1b[38;5;75m[Opus\xa04.6]\x1b[0m\xa0\x1b[38;5;115m--------\xa012%/\x1b[1m200K\x1b[0m\x1b[0m\xa0\xa0\xa0\n"
@@ -162,6 +216,41 @@ class TestGoldenNoOpGuard:
 
     def test_proxy_template_and_tier_display(self):
         assert _render(FIXTURE_PROXY, proxy=PROXY_RUNTIME) == GOLDEN_PROXY
+
+    def test_proxy_cost_is_scoped_by_launch_baseline(self):
+        fixture = {**FIXTURE_PROXY, "cost": {"total_duration_ms": 360_000}}
+        out = _render(
+            fixture,
+            proxy=_proxy_runtime_with_cost(2.050285),
+            session=_manifest_with_proxy_cost_baseline(769_651),
+        )
+
+        visible = sl._ANSI_RE.sub("", out)
+        assert "~$1.28" in visible
+        assert "~$2.05" not in visible
+
+    def test_proxy_cost_uses_current_total_after_proxy_counter_reset(self):
+        fixture = {**FIXTURE_PROXY, "cost": {"total_duration_ms": 360_000}}
+        out = _render(
+            fixture,
+            proxy=_proxy_runtime_with_cost(0.50),
+            session=_manifest_with_proxy_cost_baseline(769_651),
+        )
+
+        visible = sl._ANSI_RE.sub("", out)
+        assert "~$0.50" in visible
+
+    def test_proxy_cost_uses_current_total_after_proxy_restart_even_above_baseline(self):
+        fixture = {**FIXTURE_PROXY, "cost": {"total_duration_ms": 360_000}}
+        out = _render(
+            fixture,
+            proxy=_proxy_runtime_with_cost(6.00, started_at="2026-06-17T20:00:00Z"),
+            session=_manifest_with_proxy_cost_baseline(5_000_000, started_at="2026-06-17T19:00:00Z"),
+        )
+
+        visible = sl._ANSI_RE.sub("", out)
+        assert "~$6.00" in visible
+        assert "~$1.00" not in visible
 
 
 def _ctx(fixture):

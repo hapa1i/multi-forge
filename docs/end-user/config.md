@@ -173,11 +173,14 @@ binding window stands out. A reset countdown binds inline to the hotter window w
 the weekly quota resets in ~1 day), so it never reads as the session duration. On a Max/Pro plan the weekly window is
 usually the one that matters.
 
-Under a proxy the cost field shows the proxy's *reported* `~$`; the `~` flags that it can undercount, since
-cost-unavailable routes are excluded rather than priced from a local table.
+Under a proxy the cost field shows the proxy's *reported* `~$` scoped to the managed launch: Forge snapshots the live
+proxy's cumulative reported-cost total at session start and subtracts that baseline from the current proxy total. The
+`~` flags that the number is still best-effort: cost-unavailable routes are excluded rather than priced from a local
+table, and concurrent sessions sharing one proxy can still overlap.
 
-The status-line `cost` is **Claude's** native signal, not Forge's spend. For when to use it vs `forge proxy costs show`
-(authoritative spend), `forge activity` (Forge automation activity), and the `forge_cost` segment, see
+The status-line `cost` is the **interactive harness** signal, not Forge's automation spend: Claude's native cost/quota
+in direct mode, or proxy-reported `~$` under a proxy. For when to use it vs `forge proxy costs show` (authoritative
+spend), `forge activity` (Forge automation activity), and the `forge_cost` segment, see
 [which surface answers which question?](proxy.md#which-surface-answers-which-question).
 
 **Removed:** the old flat `show_rate_limits` key. Add `rate_limits` to `statusline.segments` instead (e.g.

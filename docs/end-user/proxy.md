@@ -459,11 +459,13 @@ cost totals **and** cap counters in memory until restarted — so a live proxy's
 `forge proxy costs show` figures do not zero until you restart it (`forge proxy stop <id>` then
 `forge proxy start <id>`).
 
-> **Per-session view:** `forge proxy costs show` is the authoritative, **proxy-scoped** dollar view. For a
-> **session-scoped** rollup of what Forge did — supervisor checks (including failed ones), tokens, and
-> *reported-or-estimated* cost (best-effort, may be partial) — use
-> [`forge activity [session]`](session.md#what-a-session-did-forge-activity--session-end-summary). The two are
-> complementary: spend is billed per proxy; activity is attributed per session.
+> **Per-session view:** `forge proxy costs show` is the authoritative, **proxy-scoped** dollar view. The status-line
+> `cost` segment shows the interactive Claude session's proxy-reported `~$`, scoped by subtracting the proxy total
+> captured at session launch. For a **session-scoped** rollup of what Forge did — supervisor checks (including failed
+> ones), tokens, and *reported-or-estimated* cost (best-effort, may be partial) — use
+> [`forge activity [session]`](session.md#what-a-session-did-forge-activity--session-end-summary). The views are
+> complementary: spend is billed per proxy; activity is attributed per session; the status line is live and best-effort
+> for the current interactive launch.
 
 ### Which surface answers which question?
 
@@ -472,12 +474,12 @@ question. Forge never prices a request from a local table — a missing cost sho
 the provenance column: `forge proxy costs show` is reported-only; `forge activity` also includes best-effort
 verb-snapshot estimates):
 
-| Surface                                | Question it answers                               | Scope                                                                            | Cost provenance                                                                   |
-| -------------------------------------- | ------------------------------------------------- | -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| `forge proxy costs show`               | "What did this proxy actually spend?"             | one proxy's request log (proxy-scoped)                                           | reported `$` or `unavailable`; **authoritative** spend view                       |
-| `forge activity [session]`             | "What did Forge's automation do this session?"    | one Forge session — supervisor, memory writer, workflow verbs + policy decisions | reported-or-estimated `$`, best-effort attribution                                |
-| status-line `cost` segment             | "What is my Claude session costing / quota left?" | the one interactive Claude session                                               | **Claude's** own reported cost, or subscription quota — never recomputed by Forge |
-| status-line `forge +$Y` (`forge_cost`) | "What did Forge add on top of my session?"        | one Forge session, **excluding** the main interactive harness                    | reported-or-nothing (subscription/OAuth → nothing)                                |
+| Surface                                | Question it answers                               | Scope                                                                            | Cost provenance                                                                 |
+| -------------------------------------- | ------------------------------------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `forge proxy costs show`               | "What did this proxy actually spend?"             | one proxy's request log (proxy-scoped)                                           | reported `$` or `unavailable`; **authoritative** spend view                     |
+| `forge activity [session]`             | "What did Forge's automation do this session?"    | one Forge session — supervisor, memory writer, workflow verbs + policy decisions | reported-or-estimated `$`, best-effort attribution                              |
+| status-line `cost` segment             | "What is my Claude session costing / quota left?" | one interactive launch; proxy mode subtracts the proxy launch baseline           | Claude's reported cost/quota, or proxy-reported `~$`; never recomputed by Forge |
+| status-line `forge +$Y` (`forge_cost`) | "What did Forge add on top of my session?"        | one Forge session, **excluding** the main interactive harness                    | reported-or-nothing (subscription/OAuth → nothing)                              |
 
 Set caps on the proxy:
 

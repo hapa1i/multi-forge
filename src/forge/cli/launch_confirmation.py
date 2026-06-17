@@ -15,7 +15,11 @@ launch (status-line UX is non-critical).
 
 from __future__ import annotations
 
+import json
 import logging
+from dataclasses import dataclass
+from urllib.parse import urlparse, urlunparse
+from urllib.request import urlopen
 
 from forge.core.reactive.env import InteractiveApiKeyDecision
 from forge.core.state import now_iso
@@ -28,10 +32,23 @@ logger = logging.getLogger(__name__)
 # helpers are module-internal by convention but imported by siblings, so they are
 # named here to document the exported API.
 __all__ = [
+    "ProxyCostBaseline",
     "record_launch_confirmed",
+    "read_proxy_cost_baseline",
+    "read_proxy_cost_baseline_micros",
     "_routing_mode_for",
     "_infer_launch_confirmation",
 ]
+
+_COST_MICROS_PER_USD = 1_000_000
+
+
+@dataclass(frozen=True)
+class ProxyCostBaseline:
+    """Launch-time snapshot of proxy cumulative cost metrics."""
+
+    cost_micros: int | None
+    started_at: str | None
 
 
 def record_launch_confirmed(
@@ -41,6 +58,8 @@ def record_launch_confirmed(
     proxy_id: str | None,
     base_url: str | None,
     decision: InteractiveApiKeyDecision,
+    proxy_cost_baseline_micros: int | None = None,
+    proxy_cost_baseline_started_at: str | None = None,
 ) -> None:
     """Write immutable launch facts to ``confirmed.launch``.
 
@@ -56,6 +75,8 @@ def record_launch_confirmed(
         routing_mode=routing_mode,
         proxy_id=proxy_id,
         base_url=base_url,
+        proxy_cost_baseline_micros=proxy_cost_baseline_micros,
+        proxy_cost_baseline_started_at=proxy_cost_baseline_started_at,
         api_key_available_to_child=decision.available,
         api_key_source=decision.source,
     )
@@ -75,6 +96,51 @@ def record_launch_confirmed(
         # won't render for this session. Also covers the narrow exists()->update()
         # delete race (the manifest vanishing between the preflight and the locked write).
         logger.debug("record_launch_confirmed: manifest update failed", exc_info=True)
+
+
+def read_proxy_cost_baseline(base_url: str | None, *, timeout_s: float = 0.5) -> ProxyCostBaseline | None:
+    """Read the live proxy's cumulative reported-cost snapshot.
+
+    Status-line proxy metrics are exposed as process-lifetime counters. Capturing
+    this launch-time baseline lets the renderer show the current session's spend
+    instead of prior spend from a reused proxy. Best-effort: launch must proceed
+    if the proxy is unavailable or returns an older/non-Forge response.
+    """
+    if not base_url:
+        return None
+
+    normalized = base_url if "://" in base_url else f"http://{base_url}"
+    parsed = urlparse(normalized)
+    if not parsed.hostname:
+        return None
+    root_url = urlunparse((parsed.scheme or "http", parsed.netloc, "/", "", "", ""))
+
+    try:
+        with urlopen(root_url, timeout=timeout_s) as response:
+            payload = response.read(1_000_000)
+        raw = json.loads(payload.decode("utf-8"))
+    except Exception:
+        logger.debug("read_proxy_cost_baseline: proxy metrics read failed", exc_info=True)
+        return None
+
+    if not isinstance(raw, dict) or raw.get("is_proxy") is not True:
+        return None
+    metrics = raw.get("metrics")
+    costs = metrics.get("costs") if isinstance(metrics, dict) else None
+    started_at = metrics.get("started_at") if isinstance(metrics, dict) else None
+    started_at = started_at if isinstance(started_at, str) and started_at else None
+    total_usd = costs.get("total_usd") if isinstance(costs, dict) else None
+    if isinstance(total_usd, bool) or not isinstance(total_usd, (int, float)):
+        return ProxyCostBaseline(cost_micros=None, started_at=started_at)
+    if total_usd <= 0:
+        return ProxyCostBaseline(cost_micros=0, started_at=started_at)
+    return ProxyCostBaseline(cost_micros=int(round(float(total_usd) * _COST_MICROS_PER_USD)), started_at=started_at)
+
+
+def read_proxy_cost_baseline_micros(base_url: str | None, *, timeout_s: float = 0.5) -> int | None:
+    """Read only the live proxy's cumulative reported-cost total."""
+    baseline = read_proxy_cost_baseline(base_url, timeout_s=timeout_s)
+    return baseline.cost_micros if baseline else None
 
 
 def _routing_mode_for(base_url: str | None, proxy_id: str | None) -> str:

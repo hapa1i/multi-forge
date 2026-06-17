@@ -111,6 +111,8 @@ class TestLaunchConfirmed:
         assert launch.routing_mode is None
         assert launch.proxy_id is None
         assert launch.base_url is None
+        assert launch.proxy_cost_baseline_micros is None
+        assert launch.proxy_cost_baseline_started_at is None
         assert launch.api_key_available_to_child is False
         assert launch.api_key_source is None
 
@@ -128,6 +130,8 @@ class TestLaunchConfirmed:
                 routing_mode="proxy",
                 proxy_id="p1",
                 base_url="http://localhost:8085",
+                proxy_cost_baseline_micros=769_651,
+                proxy_cost_baseline_started_at="2026-06-17T19:00:00Z",
                 api_key_available_to_child=False,
                 api_key_source="omitted_by_config",
             )
@@ -135,6 +139,8 @@ class TestLaunchConfirmed:
         restored = dacite.from_dict(SessionConfirmed, asdict(confirmed), config=dacite.Config(strict=True))
         assert restored.launch is not None
         assert restored.launch.routing_mode == "proxy"
+        assert restored.launch.proxy_cost_baseline_micros == 769_651
+        assert restored.launch.proxy_cost_baseline_started_at == "2026-06-17T19:00:00Z"
         assert restored.launch.api_key_source == "omitted_by_config"
 
     def test_old_manifest_without_launch_deserializes(self) -> None:

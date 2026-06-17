@@ -419,6 +419,8 @@ class LaunchConfirmed:
     Fields:
         routing_mode: "direct" | "proxy" | "custom_base_url".
         proxy_id / base_url: route identity when proxied (None for direct).
+        proxy_cost_baseline_micros: cumulative proxy-reported cost at launch.
+        proxy_cost_baseline_started_at: proxy metrics process timestamp at launch.
         api_key_available_to_child: whether the child can see an ANTHROPIC_API_KEY.
         api_key_source: "env" | "credential_file" | "none" | "omitted_by_config".
     """
@@ -426,6 +428,8 @@ class LaunchConfirmed:
     routing_mode: str | None = None
     proxy_id: str | None = None
     base_url: str | None = None
+    proxy_cost_baseline_micros: int | None = None
+    proxy_cost_baseline_started_at: str | None = None
     api_key_available_to_child: bool = False
     api_key_source: str | None = None
 
