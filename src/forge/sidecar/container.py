@@ -14,7 +14,11 @@ import tempfile
 from pathlib import Path
 
 from forge.core.paths import get_forge_home
-from forge.core.reactive.env import new_root_run_identity
+from forge.core.reactive.env import (
+    CLAUDE_CODE_ATTRIBUTION_HEADER_VAR,
+    apply_attribution_header_policy,
+    new_root_run_identity,
+)
 from forge.sidecar.docker import _docker_name_filter
 
 # In-container Forge home, pinned via FORGE_HOME so audit/cost/config resolution is
@@ -29,6 +33,7 @@ from forge.sidecar.docker import _docker_name_filter
 # /root and its mounted children. Safe for an ephemeral single-session --rm sandbox.
 _SIDECAR_FORGE_HOME = "/root/.forge"
 _SIDECAR_HOME = "/root"
+_SIDECAR_PROXY_BASE_URL = "http://localhost:8085"
 
 
 class ContainerExistsError(RuntimeError):
@@ -106,6 +111,7 @@ def run_sidecar_session(
     # mints a fresh identity with no parent — host env inheritance does not cross the
     # container boundary, and a sidecar session begins its own run tree.
     run_identity = new_root_run_identity()
+    attribution_env = _sidecar_attribution_header_env()
 
     cmd = [
         "docker",
@@ -120,6 +126,8 @@ def run_sidecar_session(
         f"FORGE_TEMPLATE={template}",
         "-e",
         f"CLAUDE_CODE_AUTO_COMPACT_WINDOW={context_limit}",
+        "-e",
+        f"{CLAUDE_CODE_ATTRIBUTION_HEADER_VAR}={attribution_env[CLAUDE_CODE_ATTRIBUTION_HEADER_VAR]}",
         "-e",
         f"FORGE_SESSION={session_name}",
         "-e",
@@ -210,6 +218,19 @@ def _ensure_audit_plumbing_mounts(proxy_id: str) -> list[tuple[str, str, str]]:
         mounts.append((str(host_dir), f"{_SIDECAR_FORGE_HOME}/{subdir}", "rw"))
 
     return mounts
+
+
+def _sidecar_attribution_header_env() -> dict[str, str]:
+    """Derive Claude attribution-header policy for the in-container proxy route.
+
+    The sidecar entrypoint sets ``ANTHROPIC_BASE_URL`` after its local proxy is
+    healthy; the host launcher owns the classifier/cache policy decision and
+    passes the resulting env var into the container so shell and Python cannot
+    drift.
+    """
+    env = {"ANTHROPIC_BASE_URL": _SIDECAR_PROXY_BASE_URL}
+    apply_attribution_header_policy(env)
+    return env
 
 
 def exec_in_container(container_name: str, command: list[str]) -> int:

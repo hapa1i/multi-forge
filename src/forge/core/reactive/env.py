@@ -291,9 +291,10 @@ def apply_attribution_header_policy(env: dict[str, str]) -> None:
     ``CLAUDE_CODE_ATTRIBUTION_HEADER=0`` removes a volatile Claude Code billing
     system block that defeats third-party prompt caching, but upstream reports
     show it also breaks Claude Code auto-mode's safety classifier when inherited
-    into direct Anthropic launches. Forge therefore owns this variable for child
-    Claude processes: proxy-routed calls get the cache-preserving workaround;
-    direct calls scrub any inherited/global value so auto mode can classify.
+    into direct Anthropic launches (Claude Code #64585). Forge therefore owns
+    this variable for child Claude processes: proxy-routed calls get the
+    cache-preserving workaround; direct calls scrub any inherited/global value so
+    auto mode can classify.
     """
     if env.get("ANTHROPIC_BASE_URL"):
         env[CLAUDE_CODE_ATTRIBUTION_HEADER_VAR] = "0"
