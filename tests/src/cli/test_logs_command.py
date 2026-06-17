@@ -60,6 +60,17 @@ def test_logs_shows_level_debug_via_env(tmp_path, monkeypatch):
     assert "debug" in result.output
 
 
+def test_logs_surfaces_per_proxy_request_diagnostics_note(tmp_path, monkeypatch):
+    """forge logs explains the per-proxy request-diagnostics capture model without secrets."""
+    monkeypatch.delenv("FORGE_DEBUG", raising=False)
+    runner = CliRunner()
+    result = runner.invoke(main, ["logs"])
+    assert result.exit_code == 0
+    assert "Request diagnostics:" in result.output
+    assert "per-proxy logging.requests" in result.output
+    assert "no plaintext" in result.output
+
+
 def test_logs_command_does_not_create_self_log_file(tmp_path, monkeypatch):
     """`forge logs` should inspect logs without generating a fresh logs.*.log file."""
     monkeypatch.setenv("FORGE_DEBUG", "1")

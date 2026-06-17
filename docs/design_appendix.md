@@ -409,7 +409,7 @@ open -- common with OpenRouter's open model space).
 
 ---
 
-### A.11 Intercept and audit configuration (§7.x)
+### A.11 Intercept, audit, and request-logging configuration (§7.x)
 
 Optional always-on audit/control fields on the user-owned proxy file. All default to inert, so existing proxies are
 unchanged. Coercion is **strict** — unknown sub-keys raise (a typo like `audit.full_body` must not silently disable
@@ -429,22 +429,48 @@ audit:
   redact_headers: [] # extra header names to redact (denylist + substring)
   retention_days: 14
   max_total_mb: 512
+logging:
+  requests: # bounded debug diagnostics under ~/.forge/logs/requests/ (proxy_log_hygiene)
+    enabled: auto # off | auto (couples to log_level=debug) | on
+    body_capture: metadata # metadata (no body) | redacted (sanitized structure; never plaintext)
+    response_capture: metadata # metadata | redacted
+    max_file_mb: 16 # per-shard rotation cap (0 = unbounded)
+    max_total_mb: 256 # prune oldest shards over budget at startup (0 = unbounded)
+    retention_days: 14 # prune shards older than N days at startup (0 = no age bound)
+    stream_chunks: false # opt-in per-chunk debug dumps (off even at log_level=debug)
+    stream_chunk_max_bytes: 0 # truncate each dumped chunk (0 = small default cap)
 ```
 
-| Field                                      | Values                                       | Meaning                                                                 |
-| ------------------------------------------ | -------------------------------------------- | ----------------------------------------------------------------------- |
-| `wire_shape`                               | `openai_translated`, `anthropic_passthrough` | Wire truth; passthrough preserves thinking blocks (signature-safe)      |
-| `intercept.mode`                           | `passthrough`, `inspect`, `override`         | `override` requires `wire_shape: anthropic_passthrough`                 |
-| `intercept.override.system_prompt_augment` | string                                       | Cache-aware system-prompt insert (after the last `cache_control`)       |
-| `intercept.override.system_prompt_guards`  | list of `{pattern, action}`                  | `pattern` is a regex (compiled at config load); action warn/block/strip |
-| `audit.audit_full_body`                    | bool (default `false`)                       | Capture redacted bodies; there is **no** raw-body mode                  |
-| `audit.redact_headers`                     | list of strings                              | Extra header names to redact beyond the built-in denylist               |
-| `audit.retention_days`                     | int                                          | Prune shards older than N days at proxy startup                         |
-| `audit.max_total_mb`                       | int                                          | Prune oldest shards once total exceeds N MB at startup                  |
+| Field                                      | Values                                       | Meaning                                                                                           |
+| ------------------------------------------ | -------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `wire_shape`                               | `openai_translated`, `anthropic_passthrough` | Wire truth; passthrough preserves thinking blocks (signature-safe)                                |
+| `intercept.mode`                           | `passthrough`, `inspect`, `override`         | `override` requires `wire_shape: anthropic_passthrough`                                           |
+| `intercept.override.system_prompt_augment` | string                                       | Cache-aware system-prompt insert (after the last `cache_control`)                                 |
+| `intercept.override.system_prompt_guards`  | list of `{pattern, action}`                  | `pattern` is a regex (compiled at config load); action warn/block/strip                           |
+| `audit.audit_full_body`                    | bool (default `false`)                       | Capture redacted bodies; there is **no** raw-body mode                                            |
+| `audit.redact_headers`                     | list of strings                              | Extra header names to redact beyond the built-in denylist                                         |
+| `audit.retention_days`                     | int                                          | Prune shards older than N days at proxy startup                                                   |
+| `audit.max_total_mb`                       | int                                          | Prune oldest shards once total exceeds N MB at startup                                            |
+| `logging.requests.enabled`                 | `off`, `auto`, `on` (default `auto`)         | `auto` couples to `log_level=debug`; `on` decouples bounded capture                               |
+| `logging.requests.body_capture`            | `metadata`, `redacted` (default `metadata`)  | `metadata` omits the body; `redacted` reuses the audit redaction builder; **no** `full`/plaintext |
+| `logging.requests.response_capture`        | `metadata`, `redacted` (default `metadata`)  | Same policy for the response body                                                                 |
+| `logging.requests.max_file_mb`             | int (default `16`, `0` = unbounded)          | Per-shard rotation cap                                                                            |
+| `logging.requests.max_total_mb`            | int (default `256`, `0` = unbounded)         | Prune oldest request shards over budget at startup                                                |
+| `logging.requests.retention_days`          | int (default `14`, `0` = no age bound)       | Prune request shards older than N days at startup                                                 |
+| `logging.requests.stream_chunks`           | bool (default `false`)                       | Opt-in per-chunk debug dumps; off even at `log_level=debug`                                       |
+| `logging.requests.stream_chunk_max_bytes`  | int (default `0` = small cap)                | Truncate each dumped chunk                                                                        |
 
 Reasoning-effort pinning in override mode **reuses** `tier_overrides.<tier>.reasoning_effort` (§A.1) — it is not a new
 `intercept` key. `forge proxy set <id> intercept.mode=inspect` (and `audit.audit_full_body=true`, which prints a privacy
 warning naming `~/.forge/audit/`) edits these via the normal proxy surface.
+
+`logging.requests` (`RequestLogConfig`, `forge.config.schema`) governs the **debug request-diagnostics** plane at
+`~/.forge/logs/requests/<YYYYMMDD>_requests.<pid>[.<seq>].jsonl` — owner-only 0600 (`open_secure_append`), PID-sharded,
+rotated at `max_file_mb`. It is distinct from `audit/requests/` and `costs/requests/`, which share the leaf name but are
+separate planes. The block is strictly coerced (unknown sub-keys raise; `body_capture=full` is rejected with a pointer
+to the audit no-plaintext policy) and reuses the audit body redactor — there is no second sanitizer and no plaintext
+mode. Retention is enforced once per process at proxy startup by the shared `prune_jsonl_shards` helper (which also
+backs the audit and provider-trace planes); the global `log_retention_days` sweep remains the coarse floor.
 
 ---
 

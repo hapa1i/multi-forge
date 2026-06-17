@@ -190,15 +190,15 @@ workers (e.g., `claude-opus`) remain on Anthropic routing regardless of `--proxy
 
 ### System
 
-| Command                       | Purpose                                                                             |
-| ----------------------------- | ----------------------------------------------------------------------------------- |
-| `forge info`                  | Show global system information (`--json`)                                           |
-| `forge activity [session]`    | Per-session activity: supervisor checks, cost, tokens (`--json`, `--days`, `--all`) |
-| `forge clean`                 | Remove orphaned state (`--scope`, `--yes`)                                          |
-| `forge config`                | Manage global runtime preferences                                                   |
-| `forge authentication login`  | Store credentials for LLM providers                                                 |
-| `forge authentication status` | Show credential status per provider                                                 |
-| `forge logs`                  | Show log file locations and status                                                  |
+| Command                       | Purpose                                                                                              |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `forge info`                  | Show global system information (`--json`)                                                            |
+| `forge activity [session]`    | Per-session activity: supervisor checks, cost, tokens (`--json`, `--days`, `--all`)                  |
+| `forge clean`                 | Remove orphaned state (`--scope`, `--yes`)                                                           |
+| `forge config`                | Manage global runtime preferences                                                                    |
+| `forge authentication login`  | Store credentials for LLM providers                                                                  |
+| `forge authentication status` | Show credential status per provider                                                                  |
+| `forge logs`                  | Show log file locations/status; notes per-proxy request-diagnostics capture (redacted, no plaintext) |
 
 ### Internal (hidden from `forge --help`)
 

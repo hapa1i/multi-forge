@@ -1,6 +1,9 @@
 # Proxy Log Hygiene -- quiet defaults and bounded request diagnostics
 
-**Status**: Proposed. Split from the OpenRouter observability investigation on 2026-06-14.
+**Status**: Implemented 2026-06-16 (full scope, slices 0-5). Split from the OpenRouter observability investigation on
+2026-06-14. See [checklist.md](checklist.md) for the execution record and `docs/board/change_log.md` for closeout.
+Shipped behavior is normative in the design docs; the Proposal below is the original framing. Recon corrections and the
+resolved open questions are recorded in [Resolution](#resolution-2026-06-16).
 
 **References**: proxy runtime truth `GET /`, request logs under `~/.forge/logs/requests/`, proxy logs under
 `~/.forge/logs/proxy/`, audit/intercept design in `docs/design.md` §7.x and `docs/design_appendix.md` §A.11-A.12.
@@ -123,3 +126,40 @@ plaintext replay fixture mode, that needs a separate design decision that explic
 - **Retention enforced**: diagnostics over the size/date budget prune oldest shards and preserve owner-only permissions.
 - **Logs surface capture mode**: `forge logs` or config output identifies request diagnostics as off/metadata/redacted
   without printing secrets.
+
+## Resolution (2026-06-16)
+
+### Open questions, decided
+
+- **Config home**: **per-proxy** `logging` block on `ProxyConfig`/`ProxyInstanceConfig`, modeled on `audit` /
+  `provider_trace`. No new global `logging.requests` plumbing; edit via `forge proxy edit`, inspect via
+  `forge proxy show`.
+- **Successful `GET /` polls**: 200 -> DEBUG; INFO retained only when `status >= 400` OR `elapsed > _SLOW_POLL_LOG_S`
+  (1.0s). Not silent, not sampled. Slow-poll visibility is new behavior.
+- **Request-JSONL default**: `enabled: auto` preserves today's coupling to `log_level=debug`; `on`/`off` are explicit.
+  `on` decouples bounded+redacted capture from full debug spam.
+- **`forge logs` reporting**: yes -- it points at the per-proxy `logging.requests` block (auto/on/off, bodies
+  redacted/no plaintext) and at `forge proxy show <id>`; no secrets printed.
+
+### Recon claim corrections (the proposal was imprecise)
+
+- The only per-chunk dump offender is `converters.py` (full-chunk dump plus a secondary `tool_calls_delta` dump). Core
+  LLM clients, the client adapter, and the passthrough relay loops were already clean. There is no
+  `proxy/openrouter.py`.
+- "INFO on every poll" only holds at `log_level=info|debug`; the default `off` already suppressed it. The noise was
+  scoped to opted-in users, not global.
+- "Keep failures/slow polls visible" had no existing implementation to preserve -- the slow-poll INFO path is new.
+- `logs/requests/`, `costs/requests/`, and `audit/requests/` are distinct coexisting telemetry planes that share the
+  leaf name `requests`; there is no contradiction with appendix §A.11-A.12.
+
+### Folded-in fix (Slice 0)
+
+A pre-existing loader bug silently dropped the `provider_trace` block between `proxy.yaml` and the running `ProxyConfig`
+(both loader hops omitted it). Fixed alongside the new `logging` wiring, since both flow through the same two loader
+sites. Regression: `tests/regression/test_bug_provider_trace_loader_dropped.py`.
+
+### Retention ownership
+
+Per-proxy prune runs once per process at proxy startup (idempotent, mirroring the audit/provider-trace precedent) to
+bound `logs/requests/` shards; the global `log_retention_days` sweep remains the coarse floor. One shared
+`prune_jsonl_shards` helper now backs all three planes (audit, provider-trace, request).

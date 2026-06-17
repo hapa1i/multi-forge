@@ -569,6 +569,39 @@ forge proxy audit show audit-test        # records written inside the container 
 
 ---
 
+## Request diagnostics logging
+
+Normal proxy logging is quiet by default: successful `GET /` health/runtime-truth polls log at debug, and streaming no
+longer dumps per-chunk bodies — a clean stream produces one compact lifecycle line (request id, chunk count, flags), and
+an error or client disconnect is logged once. You only see noise when something is actually wrong (a `4xx`/`5xx`, a slow
+poll, or a disconnect). The durable "what happened to my request?" answer comes from the cost/audit/usage/provider-trace
+planes, not from log volume.
+
+For deeper debugging, each proxy has an optional **bounded, redacted** request-diagnostics log under
+`~/.forge/logs/requests/` (owner-only), controlled by a `logging.requests` block in the proxy file:
+
+```yaml
+# ~/.forge/proxies/<id>/proxy.yaml
+logging:
+  requests:
+    enabled: auto # off | auto (only when running at log_level=debug) | on (always)
+    body_capture: metadata # metadata (no body) | redacted (sanitized structure, never plaintext)
+    response_capture: metadata
+    max_file_mb: 16 # rotate the active shard at this size (0 = unbounded)
+    max_total_mb: 256 # prune oldest shards over budget at startup (0 = unbounded)
+    retention_days: 14 # prune shards older than this at startup (0 = no age bound)
+    stream_chunks: false # opt-in per-chunk dumps (off even at log_level=debug)
+    stream_chunk_max_bytes: 0 # truncate each dumped chunk (0 = small default cap)
+```
+
+Like audit, this **never** writes plaintext: there is no `full` mode — `body_capture=full` is rejected with a pointer to
+the audit policy, and `redacted` reuses the same redaction as audit (roles, block types, lengths — no prompt/completion/
+tool text). `enabled: on` is the way to capture diagnostics without turning on full `log_level=debug` spam. Retention is
+enforced at proxy startup. `forge logs` notes the current capture mode; `forge proxy show <id> --raw` shows the
+configured block.
+
+---
+
 ## Provider trace (request lifecycle diagnostics)
 
 A fourth, local, **metadata-only** telemetry plane (alongside cost, audit, and usage) answers one question after a

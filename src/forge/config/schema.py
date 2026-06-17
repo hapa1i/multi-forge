@@ -451,6 +451,118 @@ def _coerce_provider_trace_config(value: Any) -> ProviderTraceConfig:
     )
 
 
+_VALID_REQUEST_LOG_ENABLED = ("auto", "off", "on")
+_VALID_REQUEST_LOG_CAPTURE = ("metadata", "redacted")
+
+
+@dataclass
+class RequestLogConfig:
+    """Per-proxy bounded request/response diagnostics (proxy_log_hygiene).
+
+    Controls the redacted request JSONL under ``~/.forge/logs/requests/``. There is NO
+    plaintext/full body mode -- bodies are always redacted (audit policy, design §7.x).
+
+    - ``enabled='auto'`` preserves the historical coupling to ``log_level=debug``; ``'on'``
+      decouples bounded capture from full debug logging; ``'off'`` disables it.
+    - ``body_capture``/``response_capture``: ``metadata`` (no body) vs ``redacted`` (sanitized
+      structure via the audit redaction builders).
+    - ``max_file_mb``/``max_total_mb``/``retention_days``: prune budgets (0 = unbounded).
+    - ``stream_chunks``: opt-in bounded per-chunk debug dumps (off even at ``log_level=debug``
+      by default); ``stream_chunk_max_bytes`` caps each dumped chunk (0 = a small default cap).
+    """
+
+    enabled: str = "auto"
+    body_capture: str = "metadata"
+    response_capture: str = "metadata"
+    max_file_mb: int = 16
+    max_total_mb: int = 256
+    retention_days: int = 14
+    stream_chunks: bool = False
+    stream_chunk_max_bytes: int = 0
+
+    def __post_init__(self) -> None:
+        if self.enabled not in _VALID_REQUEST_LOG_ENABLED:
+            raise ValueError(
+                f"logging.requests.enabled must be one of {', '.join(_VALID_REQUEST_LOG_ENABLED)} (got {self.enabled!r})"
+            )
+        for fname in ("body_capture", "response_capture"):
+            val = getattr(self, fname)
+            if val not in _VALID_REQUEST_LOG_CAPTURE:
+                hint = ""
+                if val == "full":
+                    hint = (
+                        " There is no plaintext/full body mode -- request logging follows the audit "
+                        "redacted-body policy (design §7.x). Use 'redacted' for sanitized structure."
+                    )
+                raise ValueError(
+                    f"logging.requests.{fname} must be one of {', '.join(_VALID_REQUEST_LOG_CAPTURE)} "
+                    f"(got {val!r})." + hint
+                )
+        # bool is an int subclass; reject it so logging.requests.max_file_mb=true fails loudly.
+        # 0 means unbounded (matches the prune helper + global log_retention_days semantics).
+        for fname in ("max_file_mb", "max_total_mb", "retention_days", "stream_chunk_max_bytes"):
+            val = getattr(self, fname)
+            if isinstance(val, bool) or not isinstance(val, int) or val < 0:
+                raise ValueError(f"logging.requests.{fname} must be a non-negative int")
+        if not isinstance(self.stream_chunks, bool):
+            raise ValueError("logging.requests.stream_chunks must be a bool")
+
+
+def _coerce_request_log_config(value: Any) -> RequestLogConfig:
+    if value is None:
+        return RequestLogConfig()
+    if isinstance(value, RequestLogConfig):
+        return value
+    if not isinstance(value, dict):
+        raise ValueError("Invalid logging.requests: must be a mapping")
+    _reject_unknown_keys(
+        value,
+        {
+            "enabled",
+            "body_capture",
+            "response_capture",
+            "max_file_mb",
+            "max_total_mb",
+            "retention_days",
+            "stream_chunks",
+            "stream_chunk_max_bytes",
+        },
+        "logging.requests",
+    )
+    return RequestLogConfig(
+        enabled=value.get("enabled", "auto"),
+        body_capture=value.get("body_capture", "metadata"),
+        response_capture=value.get("response_capture", "metadata"),
+        max_file_mb=value.get("max_file_mb", 16),
+        max_total_mb=value.get("max_total_mb", 256),
+        retention_days=value.get("retention_days", 14),
+        stream_chunks=value.get("stream_chunks", False),
+        stream_chunk_max_bytes=value.get("stream_chunk_max_bytes", 0),
+    )
+
+
+@dataclass
+class LoggingConfig:
+    """Per-proxy logging namespace. Currently just ``requests`` (bounded request diagnostics);
+    forward-compatible with future ``logging.*`` sub-blocks."""
+
+    requests: RequestLogConfig = field(default_factory=RequestLogConfig)
+
+    def __post_init__(self) -> None:
+        self.requests = _coerce_request_log_config(self.requests)
+
+
+def _coerce_logging_config(value: Any) -> LoggingConfig:
+    if value is None:
+        return LoggingConfig()
+    if isinstance(value, LoggingConfig):
+        return value
+    if not isinstance(value, dict):
+        raise ValueError("Invalid logging: must be a mapping")
+    _reject_unknown_keys(value, {"requests"}, "logging")
+    return LoggingConfig(requests=_coerce_request_log_config(value.get("requests", {}) or {}))
+
+
 @dataclass
 class BackendDependency:
     """Backend dependency declaration (proxy runtime requirement).
@@ -517,14 +629,16 @@ class ProxyConfig:
     intercept: InterceptConfig = field(default_factory=InterceptConfig)
     audit: AuditConfig = field(default_factory=AuditConfig)
     provider_trace: ProviderTraceConfig = field(default_factory=ProviderTraceConfig)
+    logging: LoggingConfig = field(default_factory=LoggingConfig)
 
     def __post_init__(self) -> None:
-        # Templates carry wire_shape/intercept/audit/provider_trace/costs/default_tier/tier_overrides
-        # too; coerce + validate here so an invalid combo is rejected at 'forge proxy template edit',
-        # not late at 'forge proxy create' (parity with ProxyInstanceConfig).
+        # Templates carry wire_shape/intercept/audit/provider_trace/logging/costs/default_tier/
+        # tier_overrides too; coerce + validate here so an invalid combo is rejected at
+        # 'forge proxy template edit', not late at 'forge proxy create' (parity with ProxyInstanceConfig).
         self.intercept = _coerce_intercept_config(self.intercept)
         self.audit = _coerce_audit_config(self.audit)
         self.provider_trace = _coerce_provider_trace_config(self.provider_trace)
+        self.logging = _coerce_logging_config(self.logging)
         self.costs = _coerce_cost_config(self.costs)
         if self.wire_shape not in _VALID_WIRE_SHAPES:
             raise ValueError(
@@ -603,6 +717,7 @@ class ProxyInstanceConfig:
     intercept: InterceptConfig = field(default_factory=InterceptConfig)
     audit: AuditConfig = field(default_factory=AuditConfig)
     provider_trace: ProviderTraceConfig = field(default_factory=ProviderTraceConfig)
+    logging: LoggingConfig = field(default_factory=LoggingConfig)
 
     created_at: str | None = None
     updated_at: str | None = None
@@ -640,6 +755,7 @@ class ProxyInstanceConfig:
         self.intercept = _coerce_intercept_config(self.intercept)
         self.audit = _coerce_audit_config(self.audit)
         self.provider_trace = _coerce_provider_trace_config(self.provider_trace)
+        self.logging = _coerce_logging_config(self.logging)
         _validate_wire_shape_intercept(self.wire_shape, self.intercept)
 
         _validate_static_tier_override_constraints(self.tiers, self.tier_overrides)

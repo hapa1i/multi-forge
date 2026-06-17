@@ -35,6 +35,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from forge.config import TierOverride, config, init_config, reload
+from forge.config.schema import RequestLogConfig
 from forge.core.llm.errors import AuthenticationError
 from forge.core.logging import (
     configure_console_logging,
@@ -153,6 +154,7 @@ def _attach_cap_summary(metrics: dict[str, Any], tracker: CostTracker | None) ->
 
 _audit_pruned = False
 _provider_traces_pruned = False
+_request_logs_pruned = False
 
 
 def _maybe_prune_audit_logs() -> None:
@@ -189,6 +191,37 @@ def _maybe_prune_provider_traces() -> None:
         logger.debug("provider trace prune skipped: %s", e)
 
 
+def _maybe_prune_request_logs() -> None:
+    """Enforce request-log retention once per process (best-effort) once config is loaded."""
+    global _request_logs_pruned
+    if _request_logs_pruned:
+        return
+    _request_logs_pruned = True
+    requests_cfg = getattr(getattr(config.proxy, "logging", None), "requests", None)
+    if requests_cfg is None:
+        return
+    try:
+        from forge.proxy.utils import prune_request_logs
+
+        prune_request_logs(retention_days=requests_cfg.retention_days, max_total_mb=requests_cfg.max_total_mb)
+    except Exception as e:
+        logger.debug("request log prune skipped: %s", e)
+
+
+def _request_log_config() -> RequestLogConfig:
+    """Return the per-proxy request-diagnostics config, tolerant of a partial ``config.proxy``.
+
+    Request logging is best-effort telemetry that must never break a response, and ``config.proxy``
+    telemetry fields are already read defensively here (see ``_maybe_prune_*``). Fall back to
+    defaults when the ``logging.requests`` block is absent (e.g. a partial config); the defaults
+    preserve today's auto/debug-gated, metadata-only behavior.
+    """
+    requests = getattr(getattr(config.proxy, "logging", None), "requests", None)
+    if requests is None:
+        return RequestLogConfig()
+    return requests
+
+
 def _ensure_runtime_state() -> None:
     """Ensure the imported app module has proxy config and runtime trackers."""
     if PROXY_ID is None:
@@ -199,6 +232,7 @@ def _ensure_runtime_state() -> None:
     _initialize_cost_tracker_from_config()
     _maybe_prune_audit_logs()
     _maybe_prune_provider_traces()
+    _maybe_prune_request_logs()
 
 
 def _reported_cost_provenance() -> tuple[Reporter | None, Confidence]:
@@ -1170,6 +1204,7 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                     temperature=request_data.temperature,
                     max_tokens=request_data.max_tokens,
                     streaming=True,
+                    request_log=_request_log_config(),
                 )
             )
 
@@ -1238,12 +1273,15 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                     latency_ms=elapsed,
                 )
 
+            _stream_log_cfg = _request_log_config()
             return StreamingResponse(
                 convert_openai_to_anthropic_sse(
                     stream_generator(),
                     request_data,
                     request_id,
                     on_complete=_on_stream_complete,
+                    stream_chunks=_stream_log_cfg.stream_chunks,
+                    stream_chunk_max_bytes=_stream_log_cfg.stream_chunk_max_bytes,
                 ),
                 media_type="text/event-stream",
                 headers=headers,
@@ -1324,6 +1362,7 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                         mapped_model=actual_model_id,
                         request_body=request_data.model_dump(),
                         response_body=response_dict,
+                        request_log=_request_log_config(),
                         status_code=200,
                         duration_ms=duration_ms,
                         num_messages=num_messages,
@@ -1395,6 +1434,7 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                         mapped_model=actual_model_id,
                         request_body=request_data.model_dump(),
                         response_body=None,
+                        request_log=_request_log_config(),
                         status_code=400,
                         duration_ms=duration_ms,
                         error=error_msg,
@@ -1534,6 +1574,7 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                 temperature=request_data.temperature,
                 max_tokens=request_data.max_tokens,
                 streaming=request_data.stream or False,
+                request_log=_request_log_config(),
             )
         )
 
@@ -1832,6 +1873,14 @@ async def root(request: Request):
     return response
 
 
+# A successful, fast completion on a non-verbose endpoint (GET /, health/runtime-truth
+# polls) is logged at DEBUG, not INFO -- the status line polls GET / frequently and an
+# INFO line per poll turns the proxy log into an access-log stream (proxy_log_hygiene).
+# A slow poll above this threshold, or any non-2xx, still logs once at INFO so genuine
+# stalls and failures stay visible.
+_SLOW_POLL_LOG_S = 1.0
+
+
 @app.middleware("http")
 async def log_requests_middleware(request: Request, call_next):
     """Request logging middleware."""
@@ -1903,7 +1952,10 @@ async def log_requests_middleware(request: Request, call_next):
             logger.debug(f"{path} [{request_id}] Middleware: {elapsed:.3f}s")
         else:
             status = response.status_code
-            logger.info(f"{path} [{request_id}] Completed in {elapsed:.3f}s ({status})")
+            # Quiet successful, fast polls (GET / etc.) to DEBUG; keep INFO for failures
+            # and slow responses so they stay visible without an access-log per poll.
+            level = logging.INFO if (status >= 400 or elapsed > _SLOW_POLL_LOG_S) else logging.DEBUG
+            logger.log(level, f"{path} [{request_id}] Completed in {elapsed:.3f}s ({status})")
 
         if "X-Request-ID" not in response.headers:
             response.headers["X-Request-ID"] = request_id

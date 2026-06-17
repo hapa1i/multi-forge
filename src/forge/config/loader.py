@@ -452,6 +452,8 @@ def load_proxy_instance_config_from_dict(data: dict) -> "ProxyInstanceConfig":
         wire_shape=data.get("wire_shape", "openai_translated"),
         intercept=data.get("intercept", {}),
         audit=data.get("audit", {}),
+        provider_trace=data.get("provider_trace", {}),
+        logging=data.get("logging", {}),
         created_at=data.get("created_at"),
         updated_at=data.get("updated_at"),
     )
@@ -564,6 +566,8 @@ def _proxy_instance_to_forge_config(
         wire_shape=proxy_config.wire_shape,
         intercept=proxy_config.intercept,
         audit=proxy_config.audit,
+        provider_trace=proxy_config.provider_trace,
+        logging=proxy_config.logging,
     )
 
     if proxy_config.provider == "gemini":
