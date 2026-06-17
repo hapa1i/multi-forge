@@ -257,8 +257,7 @@ def _resolve_context_limit(proxy_ref: str | None) -> int:
         return _default_context_limit()
 
     try:
-        from forge.config.loader import load_proxy_instance_config
-        from forge.core.models import get_context_window_tokens
+        from forge.cli.claude import _get_context_limit_for_proxy
         from forge.proxy.proxies import ProxyRegistryStore, resolve_proxy_optional
 
         store = ProxyRegistryStore()
@@ -269,18 +268,7 @@ def _resolve_context_limit(proxy_ref: str | None) -> int:
             logger.debug(f"No matching proxy found for '{proxy_ref}', using default")
             return _default_context_limit()
 
-        proxy_config = load_proxy_instance_config(entry.proxy_id)
-        if proxy_config is None:
-            logger.debug(f"No proxy config found for {entry.proxy_id}, using default")
-            return _default_context_limit()
-
-        tier = proxy_config.default_tier or "sonnet"
-        model = proxy_config.tiers.get(tier)
-        if not model:
-            logger.debug(f"No model for tier {tier} in proxy {entry.proxy_id}, using default")
-            return _default_context_limit()
-
-        context_limit = get_context_window_tokens(model)
+        context_limit = _get_context_limit_for_proxy(entry.proxy_id)
         logger.debug(f"Computed context limit {context_limit} for '{proxy_ref}' via proxy {entry.proxy_id}")
         return context_limit
     except Exception as e:

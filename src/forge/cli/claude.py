@@ -24,7 +24,10 @@ from forge.proxy.proxies import (
     ProxyRegistryCorruptedError,
     ProxyResolutionError,
 )
-from forge.session.direct_model import apply_direct_model_env
+from forge.session.direct_model import (
+    apply_direct_model_env,
+    apply_proxy_context_model_defaults,
+)
 
 logger = logging.getLogger(__name__)
 console = Console()
@@ -36,8 +39,26 @@ def _default_context_limit() -> int:
     return get_runtime_config().context_limit
 
 
+def _context_window_for_proxy_model(model: str) -> int:
+    """Return catalog context for a proxy tier model, honoring Claude Code's [1m] suffix."""
+    from forge.core.models import (
+        get_context_window_tokens,
+        model_exists,
+        resolve_model_id,
+    )
+
+    lookup_model = model.removesuffix("[1m]")
+    if model.endswith("[1m]"):
+        canonical_model = resolve_model_id(lookup_model)
+        one_m_model = canonical_model if canonical_model.endswith("-1m") else f"{canonical_model}-1m"
+        if model_exists(one_m_model):
+            lookup_model = one_m_model
+
+    return get_context_window_tokens(lookup_model)
+
+
 def _get_context_limit_for_proxy(proxy_id: str) -> int:
-    """Compute context limit from proxy's default tier model.
+    """Compute context limit from the largest configured proxy tier model.
 
     Deterministic: uses the specific proxy_id to look up the exact model config,
     unlike the heuristic _get_context_limit_for_template() in session.py which
@@ -45,22 +66,28 @@ def _get_context_limit_for_proxy(proxy_id: str) -> int:
     """
     try:
         from forge.config.loader import load_proxy_instance_config
-        from forge.core.models import get_context_window_tokens
 
         proxy_config = load_proxy_instance_config(proxy_id)
         if proxy_config is None:
             logger.debug(f"No proxy config found for {proxy_id}, using default context limit")
             return _default_context_limit()
 
-        tier = proxy_config.default_tier or "sonnet"
+        tier_limits: list[tuple[int, str, str]] = []
+        for tier in ("haiku", "sonnet", "opus"):
+            model = proxy_config.tiers.get(tier)
+            if not model:
+                continue
+            try:
+                tier_limits.append((_context_window_for_proxy_model(model), tier, model))
+            except Exception as e:
+                logger.debug(f"Skipping unknown model {model!r} for tier {tier} in proxy {proxy_id}: {e}")
 
-        model = proxy_config.tiers.get(tier)
-        if not model:
-            logger.debug(f"No model found for tier {tier}, using default context limit")
+        if not tier_limits:
+            logger.debug(f"No catalog-known tier models found for {proxy_id}, using default context limit")
             return _default_context_limit()
 
-        context_limit = get_context_window_tokens(model)
-        logger.debug(f"Computed context limit {context_limit} for model {model} (tier {tier})")
+        context_limit, tier, model = max(tier_limits, key=lambda item: item[0])
+        logger.debug(f"Computed context limit {context_limit} for model {model} (tier {tier}) in proxy {proxy_id}")
         return context_limit
 
     except Exception as e:
@@ -151,6 +178,7 @@ def _build_bare_launch_env(
         env_vars["ANTHROPIC_BASE_URL"] = base_url
         if context_limit is not None:
             env_vars["CLAUDE_CODE_AUTO_COMPACT_WINDOW"] = str(context_limit)
+        apply_proxy_context_model_defaults(env_vars, context_limit)
         if template:
             env_vars["ACTIVE_TEMPLATE"] = template
         else:

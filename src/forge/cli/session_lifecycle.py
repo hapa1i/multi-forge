@@ -53,6 +53,7 @@ from forge.session.claude import build_claude_args
 from forge.session.direct_model import (
     DirectModelPin,
     apply_direct_model_env,
+    apply_proxy_context_model_defaults,
     resolve_direct_model_pin,
     token_estimate_multiplier_for_direct_model,
 )
@@ -410,6 +411,8 @@ def _launch_claude_for_session(
         subprocess_proxy=manifest.intent.subprocess_proxy,
         sidecar=use_sidecar,
     )
+    if runtime_base_url is not None:
+        apply_proxy_context_model_defaults(env_vars, context_limit)
 
     _sess()._warn_if_hooks_missing(forge_root)
     _sess()._warn_if_version_outdated()

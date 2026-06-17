@@ -35,6 +35,7 @@ from forge.session import (
 from forge.session.direct_model import (
     DirectModelPin,
     apply_direct_model_env,
+    apply_proxy_context_model_defaults,
     resolve_direct_model_pin,
 )
 from forge.session.exceptions import (
@@ -782,6 +783,8 @@ def fork(
         subprocess_proxy=fork_manifest.intent.subprocess_proxy,
         sidecar=use_sidecar,
     )
+    if effective_url is not None:
+        apply_proxy_context_model_defaults(env_vars, context_limit)
     fork_name = fork_manifest.name  # Capture for cleanup
     is_worktree_fork = bool(fork_manifest.worktree and fork_manifest.worktree.is_worktree)
     native_relocate = is_worktree_fork and resume_mode == "native-relocate"

@@ -632,6 +632,10 @@ default to direct mode (Anthropic API).
 
 The invariant: choosing a proxy chooses routing defaults (model family, context limit).
 
+For proxy context windows above Claude's 200K baseline, Forge also sets Claude Code's default Opus and Sonnet model
+aliases to 1M Claude variants. This keeps Claude Code's local context estimator from stopping early while the proxy
+still routes requests to the configured backend tier, such as Gemini or OpenAI.
+
 ### Pin a Claude model (`--model`)
 
 ```bash
