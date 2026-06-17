@@ -6,8 +6,8 @@ supervisor-timeout / shadow-sampling incident) and that both re-architect Forge'
 axes**. This card is the single consistent view the member cards lean on; it does **not** replace them. Its
 `checklist.md` is for coordination and sequencing only; member cards remain the execution units.
 
-**Current coordination goal**: pause `openrouter_remote_reconciliation` after Phase 0 and decide whether
-`unified_backend` or `upstream_downstream_ledgers` should lay foundation first.
+**Current coordination goal**: keep `openrouter_remote_reconciliation` paused after Phase 0 and run
+`upstream_downstream_ledgers` as the next foundation card before returning to remote reconciliation.
 
 ## Why an epic, not a merged card
 
@@ -36,13 +36,13 @@ Two telemetry planes, joined by run-tree identity, with one canonical source key
 
 ## Member cards and ownership split
 
-| Concern                                     | Owner card                                                                                  | Status                                       |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------- | -------------------------------------------- |
-| Plane **structure** (direction: up/down)    | [`upstream_downstream_ledgers`](../../proposed/upstream_downstream_ledgers/card.md)         | proposed; sibling foundation candidate       |
-| Source-identity **key** (`backend_id`)      | [`unified_backend`](../../proposed/unified_backend/card.md)                                 | proposed; sibling foundation candidate       |
-| Provider-trace plane (first to be absorbed) | [`openrouter_observability`](../../done/openrouter_observability/card.md)                   | done                                         |
-| Source-identity consumer: logs              | [`proxy_log_hygiene`](../../done/proxy_log_hygiene/card.md)                                 | done                                         |
-| Source-identity consumer: remote reconcile  | [`openrouter_remote_reconciliation`](../../paused/openrouter_remote_reconciliation/card.md) | paused after Phase 0 pending epic sequencing |
+| Concern                                     | Owner card                                                                                  | Status                                         |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| Plane **structure** (direction: up/down)    | [`upstream_downstream_ledgers`](../../proposed/upstream_downstream_ledgers/card.md)         | chosen next foundation card                    |
+| Source-identity **key** (`backend_id`)      | [`unified_backend`](../../proposed/unified_backend/card.md)                                 | proposed; sibling foundation candidate         |
+| Provider-trace plane (first to be absorbed) | [`openrouter_observability`](../../done/openrouter_observability/card.md)                   | done                                           |
+| Source-identity consumer: logs              | [`proxy_log_hygiene`](../../done/proxy_log_hygiene/card.md)                                 | done                                           |
+| Source-identity consumer: remote reconcile  | [`openrouter_remote_reconciliation`](../../paused/openrouter_remote_reconciliation/card.md) | paused after Phase 0 pending ledger foundation |
 
 **Contract (the consistency anchor):**
 
@@ -62,7 +62,7 @@ proposed sibling cards until sequencing is decided; this epic is the reconciliat
 ## Sequencing
 
 `openrouter_observability` shipped provider-trace as a standalone fourth plane -- correctly: a clean break owned later,
-not a speculative seam built on a sample size of one. The current sequencing question is whether to resume
+not a speculative seam built on a sample size of one. The sequencing question was whether to resume
 `openrouter_remote_reconciliation` as planned or first execute one of the sibling foundation cards. Either foundation
 order works:
 
@@ -71,9 +71,14 @@ order works:
 - **`upstream_downstream_ledgers` first** -> downstream keys on `proxy_id` initially and re-keys to `backend_id` when
   `unified_backend` lands.
 
-Both foundation orders are acceptable; the only hard rule is contract item 4 (single shared `emit.py` refactor). If
-remote reconciliation resumes before either foundation, it should keep its op/client narrow enough to survive a later
-`backend_id` and downstream-ledger migration.
+**Decision (2026-06-17): run `upstream_downstream_ledgers` first.** It fixes the telemetry plane shape before more
+OpenRouter-specific reconciliation logic lands, so remote reconciliation can return later as a general downstream
+consumer instead of another special-purpose telemetry path. `unified_backend` remains the source-key foundation that
+should follow or be sliced as a `backend_id` precursor, but it is a larger config/auth/template/CLI refactor and is not
+the next execution card.
+
+Remote reconciliation stays paused until the ledger foundation lands or the epic deliberately reopens the decision. The
+hard rule remains contract item 4: one shared `emit.py` provenance refactor, not independent sibling rewrites.
 
 ## Not in scope here
 
