@@ -1,6 +1,6 @@
 # Proxy Log Hygiene -- quiet defaults and bounded request diagnostics
 
-**Status**: Implemented 2026-06-16 (full scope, slices 0-5). Split from the OpenRouter observability investigation on
+**Status**: Done (`done/`) -- shipped to `main` (2026-06-16). Split from the OpenRouter observability investigation on
 2026-06-14. See [checklist.md](checklist.md) for the execution record and `docs/board/change_log.md` for closeout.
 Shipped behavior is normative in the design docs; the Proposal below is the original framing. Recon corrections and the
 resolved open questions are recorded in [Resolution](#resolution-2026-06-16).

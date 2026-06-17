@@ -156,4 +156,4 @@ review + closeout.
   (`forge logs` delta; `forge proxy show --raw` already covers block rendering).
 - [x] Fold the claim corrections above into `card.md` (Resolution section + Status update).
 - [x] `change_log.md` entry (newest-first) + promoted the loader two-hop / shared-pruner invariants to `impl_notes.md`.
-- [ ] `git mv docs/board/doing/proxy_log_hygiene docs/board/done/proxy_log_hygiene` after merge.
+- [x] `git mv docs/board/doing/proxy_log_hygiene docs/board/done/proxy_log_hygiene` after merge.
