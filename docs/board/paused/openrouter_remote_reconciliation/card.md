@@ -1,7 +1,10 @@
 # OpenRouter Remote Reconciliation -- generation API joins and account-side views
 
-**Status**: Proposed. Depends on the local provider-trace foundation in
-`docs/board/proposed/openrouter_observability/card.md` and the Phase 0 OpenRouter probes recorded there.
+**Status**: Paused after Phase 0. Depends on the shipped local provider-trace foundation in
+`docs/board/done/openrouter_observability/card.md` and the Phase 0 OpenRouter probes recorded there. Paused so the
+active telemetry epic can decide whether `unified_backend` or `upstream_downstream_ledgers` should lay foundation first.
+
+**Epic**: [`epic_telemetry_architecture`](../../doing/epic_telemetry_architecture/card.md).
 
 **References**: OpenRouter `/api/v1/generation`, `/api/v1/activity`, `/api/v1/analytics/query`, management-key
 requirements, Forge provider trace records, cost logs, usage ledger, and run-tree headers.
@@ -20,12 +23,15 @@ This card should therefore enhance local trace, not replace it.
 
 ## Preconditions
 
-Do not start implementation until the provider-trace card has recorded Phase 0 answers for:
+Phase 0 answers are locked in [checklist.md](checklist.md). Implementation should stay within these boundaries:
 
-- where OpenRouter exposes generation ids for Forge's streaming and non-streaming paths
-- whether cancelled-before-final-usage streams appear in `/generation`, `/activity`, dashboard logs, or analytics
-- which endpoints require a normal API key vs a management key
-- whether sticky `session_id` changes latency/cache/provider behavior enough to affect the operator story
+- OpenRouter exposes generation metadata at `/api/v1/generation?id=gen-...`; content lives behind the separate
+  `/api/v1/generation/content` endpoint and is out of scope.
+- Generation metadata lookup uses the normal `openrouter` credential path; activity and analytics use the separate
+  management credential path.
+- Activity/analytics are management-key-gated, and activity is limited to the last 30 completed UTC days.
+- Proxied OpenRouter grouping uses the standard `user` field. Direct `core.llm` `user` injection remains the separate
+  `docs/board/todo/openrouter_user_direct_callers/` card.
 
 ## Proposal
 
@@ -47,18 +53,22 @@ The client must record endpoint provenance and key class without exposing secret
 Prefer a provider namespace so provider-neutral trace concepts can generalize later:
 
 ```bash
-forge provider openrouter generation gen_...
-forge provider openrouter reconcile --session neat-bloodhound-executor --since today
-forge provider openrouter activity --date 2026-06-14
-forge provider openrouter analytics --session neat-bloodhound-executor --since today
+forge provider openrouter generation gen-...
+forge provider openrouter reconcile --session neat-bloodhound-executor --period today
+forge provider openrouter activity --period today
+forge provider openrouter analytics --session neat-bloodhound-executor --period today
+# activity/analytics may also accept explicit --from/--to UTC bounds when OpenRouter requires exact ranges
 ```
 
 Provider-neutral local trace commands remain separate:
 
 ```bash
-forge provider trace list --session neat-bloodhound-executor --since today
+forge provider trace list --session neat-bloodhound-executor --period today
 forge provider trace explain req_...
 ```
+
+The examples intentionally mirror the shipped local trace surface (`--period today|week|month|all`). Explicit
+`--from`/`--to` UTC bounds are the planned escape hatch for activity/analytics endpoints that require concrete ranges.
 
 ### 3. Reconciliation taxonomy
 
@@ -96,15 +106,18 @@ After the standalone CLI works, integrate carefully:
 All integrations must retain provenance labels and avoid implying that a missing remote record means a request never
 happened.
 
-## Open questions
+## Phase 0 Decisions
 
-- Is `/api/v1/generation` available with ordinary API keys for generations created by that key, or does it require
-  management access?
-- Does OpenRouter use `gen-...`, `gen_...`, OpenAI-compatible ids, or endpoint-specific ids for the records Forge can
-  query?
-- How far back can activity/analytics look, and does the API expose enough filters for Forge session ids?
-- Should reconciliation cache remote records locally under the provider trace plane, or query on demand only?
-- Should JSON output be optimized for scripts from the first implementation?
+- Query remote records on demand only in the first implementation; do not add a remote cache or schema yet.
+- Treat `gen-...` as the canonical documented OpenRouter generation id, while accepting `gen_...` defensively if local
+  traces contain it.
+- Use `openrouter` / `OPENROUTER_API_KEY` for generation metadata lookup and `openrouter-management` /
+  `OPENROUTER_MANAGEMENT_KEY` for activity and analytics.
+- Keep the first implementation terminal-only under `forge provider openrouter ...`; no `%provider openrouter ...`
+  direct command yet.
+- Ship stable script-oriented `--json` output from the first implementation.
+- No live OpenRouter probe is required before code. Later real-API checks should be credential-gated and marked
+  `@pytest.mark.slow`.
 
 ## Risks
 

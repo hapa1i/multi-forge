@@ -1,6 +1,6 @@
 # Checklist -- OpenRouter Provider Trace
 
-Execution plan for `docs/board/doing/openrouter_observability/card.md`. Branch: `openrouter-observability`.
+Execution plan for `docs/board/done/openrouter_observability/card.md`. Branch: `openrouter-observability`.
 
 Grounded in a verified codebase investigation (2026-06-15). Every file:line below was confirmed against `src/` before
 planning; see **Card corrections** for claims the code refuted.

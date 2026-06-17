@@ -1,10 +1,13 @@
-# Telemetry Architecture (epic) -- two planes, one source key
+# Epic: Telemetry Architecture -- two planes, one source key
 
-**Status**: Proposed **epic** (a coordinating note, not a directly-executed card). Created 2026-06-16 to hold the shared
-contract between two refactor proposals that were spun -- independently -- from the same root investigation (the
-2026-06-14 supervisor-timeout / shadow-sampling incident) and that both re-architect Forge's telemetry planes, along
-**orthogonal axes**. This card is the single consistent view the member cards lean on; it does **not** replace them and
-carries **no checklist of its own** (its members are the execution units).
+**Status**: Doing **epic** (`doing/epic_telemetry_architecture`). Created 2026-06-16 to hold the shared contract between
+two refactor proposals that were spun -- independently -- from the same root investigation (the 2026-06-14
+supervisor-timeout / shadow-sampling incident) and that both re-architect Forge's telemetry planes, along **orthogonal
+axes**. This card is the single consistent view the member cards lean on; it does **not** replace them. Its
+`checklist.md` is for coordination and sequencing only; member cards remain the execution units.
+
+**Current coordination goal**: pause `openrouter_remote_reconciliation` after Phase 0 and decide whether
+`unified_backend` or `upstream_downstream_ledgers` should lay foundation first.
 
 ## Why an epic, not a merged card
 
@@ -33,12 +36,13 @@ Two telemetry planes, joined by run-tree identity, with one canonical source key
 
 ## Member cards and ownership split
 
-| Concern                                     | Owner card                                              | Status                                                      |
-| ------------------------------------------- | ------------------------------------------------------- | ----------------------------------------------------------- |
-| Plane **structure** (direction: up/down)    | `upstream_downstream_ledgers`                           | proposed (this branch)                                      |
-| Source-identity **key** (`backend_id`)      | `unified_backend`                                       | proposed (on the `openrouter-observability` branch)         |
-| Provider-trace plane (first to be absorbed) | `openrouter_observability`                              | Phases 0-3 shipped on the `openrouter-observability` branch |
-| Source-identity consumers (logs/reconcile)  | `proxy_log_hygiene`, `openrouter_remote_reconciliation` | proposed                                                    |
+| Concern                                     | Owner card                                                                                  | Status                                       |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| Plane **structure** (direction: up/down)    | [`upstream_downstream_ledgers`](../../proposed/upstream_downstream_ledgers/card.md)         | proposed; sibling foundation candidate       |
+| Source-identity **key** (`backend_id`)      | [`unified_backend`](../../proposed/unified_backend/card.md)                                 | proposed; sibling foundation candidate       |
+| Provider-trace plane (first to be absorbed) | [`openrouter_observability`](../../done/openrouter_observability/card.md)                   | done                                         |
+| Source-identity consumer: logs              | [`proxy_log_hygiene`](../../done/proxy_log_hygiene/card.md)                                 | done                                         |
+| Source-identity consumer: remote reconcile  | [`openrouter_remote_reconciliation`](../../paused/openrouter_remote_reconciliation/card.md) | paused after Phase 0 pending epic sequencing |
 
 **Contract (the consistency anchor):**
 
@@ -52,23 +56,26 @@ Two telemetry planes, joined by run-tree identity, with one canonical source key
    must not author independent, mutually blind refactors of the shared provenance branch.
 
 **Source of truth & drift.** This contract is canonical; each member card restates it as a copy for local context. If
-the contract changes, change it **here first**. The members currently live on separate branches (`unified_backend` on
-`openrouter-observability`; `upstream_downstream_ledgers` + this epic on `supervisor_statusline_health`), so until both
-reach `main` the restatements can drift -- this epic is the reconciliation point.
+the contract changes, change it **here first**, then update linked member cards. The active branch may still carry
+proposed sibling cards until sequencing is decided; this epic is the reconciliation point.
 
 ## Sequencing
 
-`openrouter_observability` ships provider-trace as a standalone fourth plane now -- correctly: a clean break owned
-later, not a speculative seam built on a sample size of one. Then either order works:
+`openrouter_observability` shipped provider-trace as a standalone fourth plane -- correctly: a clean break owned later,
+not a speculative seam built on a sample size of one. The current sequencing question is whether to resume
+`openrouter_remote_reconciliation` as planned or first execute one of the sibling foundation cards. Either foundation
+order works:
 
 - **`unified_backend` first** -> `backend_id` exists, and `upstream_downstream_ledgers` keys downstream correctly from
   day one.
 - **`upstream_downstream_ledgers` first** -> downstream keys on `proxy_id` initially and re-keys to `backend_id` when
   `unified_backend` lands.
 
-Both are acceptable; the only hard rule is contract item 4 (single shared `emit.py` refactor).
+Both foundation orders are acceptable; the only hard rule is contract item 4 (single shared `emit.py` refactor). If
+remote reconciliation resumes before either foundation, it should keep its op/client narrow enough to survive a later
+`backend_id` and downstream-ledger migration.
 
 ## Not in scope here
 
-This epic carries no implementation detail of its own -- each member card holds its own problem framing, design sketch,
-risks, and (when executed) checklist. Update this card only when the contract or the member set changes.
+This epic carries no feature implementation detail of its own -- each member card holds its own problem framing, design
+sketch, risks, and execution checklist. Update this card when the contract, member set, or sequencing changes.

@@ -1,7 +1,7 @@
 # Work Board
 
 This directory is Forge's lightweight implementation board. It keeps proposed work, scheduled work, active execution,
-completed work, and project memory in one place.
+active epic coordination, completed work, and project memory in one place.
 
 The authoritative board workflow contract lives in [`docs/developer/board-contract.md`](../developer/board-contract.md).
 This README is a directory guide plus dogfood examples for people inspecting `docs/board/`.
@@ -10,9 +10,9 @@ This README is a directory guide plus dogfood examples for people inspecting `do
 
 | Path                      | Role                                                  | Next move                                                                  |
 | ------------------------- | ----------------------------------------------------- | -------------------------------------------------------------------------- |
-| `proposed/<slug>/card.md` | Idea or design sketch not yet scheduled               | Move to `todo/` when accepted for execution                                |
+| `proposed/<slug>/card.md` | Idea, design sketch, or epic not yet scheduled        | Move to `todo/` when accepted for execution                                |
 | `todo/<slug>/card.md`     | Accepted work parked until an execution branch exists | Move to `doing/` when the branch is created                                |
-| `doing/<slug>/card.md`    | Work currently in flight                              | Add or update `checklist.md` during implementation                         |
+| `doing/<slug>/card.md`    | Work in flight, or active epic coordination           | Add or update `checklist.md` during execution or coordination              |
 | `paused/<slug>/card.md`   | Partially-done work on hold                           | Move back to `doing/` when work resumes                                    |
 | `done/<slug>/card.md`     | Completed work snapshot                               | Keep paired `checklist.md` when one existed                                |
 | `change_log.md`           | Completed-work record                                 | Memory writer may update with `strategy=changelog`; humans keep it compact |
@@ -22,6 +22,10 @@ Every work item is a card directory. `card.md` holds the durable problem framing
 when the card needs an execution plan; it is the in-session scratchpad for phases, assertions, blockers, and
 verification.
 
+Epics are coordinating cards for related implementation cards that share a contract, sequencing decision, or code seam.
+Epic slugs start with `epic_`; an active epic belongs in `doing/` with a lightweight coordination checklist, and member
+cards should link the epic near the top of their `card.md`.
+
 ## Lane Semantics
 
 Summary only; see the [contract](../developer/board-contract.md#lanes) for the full operating rules.
@@ -29,7 +33,7 @@ Summary only; see the [contract](../developer/board-contract.md#lanes) for the f
 Moving a card across lanes is a workflow event:
 
 1. `proposed -> todo`: accepted or scheduled, but no execution branch yet.
-2. `todo -> doing`: execution branch exists and the work is in flight.
+2. `todo -> doing`: execution branch exists and the work is in flight, or an epic coordination branch is active.
 3. `doing -> paused`: work is partially done but on hold (higher-priority card took over, or waiting on a dependency).
 4. `paused -> doing`: work resumes; checklist picks up where it left off.
 5. `doing -> done`: shipped, verified, design docs updated, and closeout recorded.
