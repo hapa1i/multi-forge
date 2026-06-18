@@ -5,9 +5,9 @@ Branch: `openrouter_remote_reconciliation`. Card: [card.md](card.md). Epic:
 
 ## Current Focus
 
-Paused after Phase 0 while `epic_telemetry_architecture` decides the next telemetry member. The
-`upstream_downstream_ledgers` foundation has landed; resume by moving this card back to `doing/` only after the epic
-explicitly chooses remote reconciliation as the next active member.
+Paused after Phase 0 while `epic_telemetry_architecture` runs `unified_backend` as the source-key foundation. Resume by
+moving this card back to `doing/` only after the backend/source identity key lands or the epic explicitly changes the
+sequence.
 
 Original flow: Phase 0 recon and decision lock -> Phase 1 REST client -> Phase 2 credential/key provenance -> Phase 3
 command-core reconciliation -> Phase 4 CLI surface -> Phase 5 optional view integrations -> docs, review, closeout.
@@ -17,7 +17,7 @@ command-core reconciliation -> Phase 4 CLI surface -> Phase 5 optional view inte
 - [x] Phase 0 recon, OpenRouter endpoint verification, and decision lock are complete.
 - [x] Card moved to `paused/` before Phase 1 implementation.
 - [x] Telemetry epic decided not to resume this card next; `upstream_downstream_ledgers` runs first.
-- [ ] Resume only after the telemetry epic explicitly chooses remote reconciliation as the next active member.
+- [ ] Resume only after `unified_backend` lands, or after the telemetry epic explicitly changes the sequence.
 
 ## Decisions To Lock
 
