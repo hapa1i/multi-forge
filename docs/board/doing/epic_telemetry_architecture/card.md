@@ -47,7 +47,9 @@ Two telemetry planes, joined by run-tree identity, with one canonical source key
 **Contract (the consistency anchor):**
 
 1. **Structure was delivered by `upstream_downstream_ledgers`.** It established the two planes (downstream/upstream) and
-   owns the `resolve_measurement` provenance resolver on the downstream write.
+   owns the shipped `core/usage/measurement.py` provenance seam (`UsageMeasurement` plus the
+   `resolve_claude_p_measurement`, `resolve_codex_measurement`, and `resolve_direct_llm_measurement` resolvers) on the
+   downstream write.
 2. **The key is owned by `unified_backend`.** It defines `backend_id` as the canonical model-source identity; downstream
    telemetry attributes to it, retiring provider-trace's hardcoded `provider_name == "openrouter"` gate.
 3. **`unified_backend` §5 defers plane count to this epic / `upstream_downstream_ledgers`.** It should assert only "the

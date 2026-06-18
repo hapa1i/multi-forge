@@ -111,13 +111,15 @@ than extensions of today's runtime-registry JSON.
 | Verb             | Local backend | Remote backend |
 | ---------------- | ------------- | -------------- |
 | `list` / `show`  | yes           | yes            |
+| `create`         | yes           | n/a            |
 | `start` / `stop` | yes           | n/a            |
+| `delete`         | yes           | n/a            |
 | `test-auth`      | yes           | yes            |
 
 ```text
 $ forge backend list
 ID             KIND    ENDPOINT                      CREDENTIAL              STATUS
-litellm-4000   local   http://localhost:4000         GEMINI_API_KEY (env)    healthy (pid 1234)
+litellm-local  local   http://localhost:4000         GEMINI_API_KEY (env)    healthy (instance litellm-4000, pid 1234)
 openrouter     remote  https://openrouter.ai/api/v1  OPENROUTER_API_KEY (env) reachable, authed
 litellm-remote remote  $LITELLM_BASE_URL             LITELLM_API_KEY (file)  reachable
 ```
@@ -137,12 +139,14 @@ provenance class.
 The refactor only pays off if a static **model-source catalog** becomes the **single source of truth** that templates
 reference and credentials attach to. This catalog is the *definition* layer (id, kind, endpoint, required credentials)
 and is **distinct from the runtime instance registry** (`BackendRegistry` / `~/.forge/backends/index.json`, which holds
-PID/port/status for *running local* processes). The split already exists locally -- `forge backend create` writes a
-static config under `~/.forge/backends/<adapter>/`, separate from `index.json` -- and a remote backend has a definition
-but never an instance row (the §1 lifecycle point). The real work is reconciling the scattered *definition* sites:
-provider vocabularies (`ProviderType` and `AdapterProviderType` literals plus `ModelProvider`), template
-`preferred_provider`, provider `base_url`, `BackendDependency`, runtime local/remote LiteLLM override logic, and the
-auth map `TEMPLATE_ENV_VARS` + `credentials_for_template()`. For example, a template might name `source: openrouter`
+PID/port/status for *running local* processes). `forge backend create` already writes a separate
+`~/.forge/backends/<adapter>/config.yaml`, but that file is LiteLLM service config (`model_list`/routing), not a source
+definition manifest. The v1 source catalog is therefore a new built-in, code-level registry (not durable user state and
+not a versioned `~/.forge` catalog); user-defined custom sources are out of scope. A remote backend has a definition but
+never an instance row (the §1 lifecycle point). The real work is reconciling the scattered *definition* sites: provider
+vocabularies (`ProviderType` and `AdapterProviderType` literals plus `ModelProvider`), template `preferred_provider`,
+provider `base_url`, `BackendDependency`, runtime local/remote LiteLLM override logic, and the auth map
+`TEMPLATE_ENV_VARS` + `credentials_for_template()`. For example, a template might name `proxy.source: openrouter`
 instead of carrying an inline base_url. If "remote backend" is bolted on without absorbing those, the result is a fifth
 overlapping concept and *more* surface, not less.
 
@@ -156,8 +160,9 @@ only make `backend_id` the source key downstream records attribute to.
 
 - **provider-trace** is the first migration target: replace the internal early return
   `if provider_name != "openrouter": return` in `provider_trace_logger.py` with a backend-id / source-capability gate.
-  The generalization the observability card deferred (`selected_provider`-based broadening) becomes "this backend, and
-  gateway backends expose their selected upstream" -- a clean axis rather than a hardcoded string.
+  The generalization the observability card deferred (`selected_provider`-based broadening) becomes "this selected
+  backend/source exposes OpenRouter-style lifecycle evidence" -- a clean capability axis rather than a hardcoded string.
+  Do not imply that every configured backend emits provider traces; non-eligible sources stay quiet.
 - **downstream cost/metrics** attribution gains a stable source identity beyond `proxy_id`. The *upstream* outcome plane
   is session-keyed, not backend-keyed (one operation spans many backends), so `backend_id` is a downstream key, not a
   universal one.
@@ -182,26 +187,66 @@ only make `backend_id` the source key downstream records attribute to.
   downstream on `backend_id`) and both edit `core/usage/emit.py`, so §5 owns only the `backend_id` key and defers plane
   count to that card. The epic holds the shared contract and active sequencing decision.
 
-## Open questions
+## Phase 0 Source Map And Proposed Design Lock
 
-- **Naming.** Promote "backend" to the supertype (symmetric, matches the user's intent; cf. Terraform/DB "backends"), or
-  introduce "model source" / "endpoint" as the supertype and keep "backend" = local? Promotion is cleaner *iff* the
-  consolidation (section 4) is real.
-- **Remote identity unit.** Local id is `litellm-<port>` (port is meaningful). Remote has no port you own -- is the id
-  the provider/credential name (`openrouter`)? If so, is a remote backend just the credential re-badged, or does it add
-  real structure (endpoint + health + used-by) worth a distinct concept? Where is the line vs the `Credential` registry?
-- **Direct Anthropic.** `ProviderType` has an `anthropic` literal and `credentials.py` already has a direct Anthropic
-  credential branch. Does direct Anthropic become a remote backend too, or stay a proxy wire-shape detail?
-- **Proxy -> backend reference.** How do templates reference backends -- migrate the five user-facing `*-local`
-  `backend_dependency` blocks, the internal `litellm-gemini-test` dependency, the `openrouter-*` inline `base_url`
-  values, `anthropic-passthrough`, and remote LiteLLM's `LITELLM_BASE_URL` connection value to a `source: <backend-id>`
-  reference? What is the one source of truth?
-- **Remote health semantics.** Reachable vs authed vs rate-limited -- how much to probe, and at what cost/latency, given
-  status surfaces poll frequently?
-- **Provider vocabulary fate.** `ProviderType` and `AdapterProviderType` are `typing.Literal` string unions, not enums;
-  `ModelProvider` is the real enum. Which parts stay as wire-client/provider routing details beneath the backend axis,
-  and which move into the source catalog? `ProviderType` cannot simply disappear while `core.llm.credentials` still uses
-  it for credential/base-url routing.
+**Status (2026-06-18):** source map complete; proposed lock recorded here. Human acknowledgement is still required
+before Phase 1 code.
+
+| Site                                  | Unit Today                                                                   | Phase 0 Read                                                                                 |
+| ------------------------------------- | ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `BackendAdapter` / `BackendManager`   | Local process lifecycle                                                      | Local-only refinement; remote sources must not implement fake lifecycle                      |
+| `BackendInstance` / `BackendRegistry` | Runtime instance id, PID, port, status                                       | Keep as local runtime-instance store; remote definitions never enter `index.json`            |
+| `BackendDependency`                   | Template-local service requirement                                           | Local source definition input; derives localhost endpoint and auto-start behavior            |
+| Proxy templates                       | Template source hints                                                        | Migrate to explicit `proxy.source`; schema must accept the key before strict loading         |
+| Provider config/base URLs             | Endpoint hints by provider config or connection var                          | Source endpoint input, not the source identity itself                                        |
+| `TEMPLATE_ENV_VARS` / credentials     | Template -> env vars -> credential metadata                                  | Source credential dependency map; `Credential.unlocks_features` stays presentation-only      |
+| Provider vocabularies                 | Wire-client routing (`ProviderType`, `AdapterProviderType`, `ModelProvider`) | Use `ProviderType` as the source-definition wire hint; narrow to the others at adapter seams |
+| Downstream writers                    | Writer origin (`source_id` / `source_kind`)                                  | Add a separate canonical backend/source attribution carrier                                  |
+| Provider trace / OpenRouter `user`    | Direct-OpenRouter-only gates                                                 | Migrate only through explicit source capabilities                                            |
+| `forge backend` CLI                   | Runtime local backend registry                                               | Expand list/show/test-auth to source view; keep lifecycle local-only                         |
+
+**Proposed lock:**
+
+- **Supertype name.** Use `ModelSource` / source definition internally; keep `forge backend` as the user-facing CLI noun
+  so operators get one place to inspect local and remote model sources.
+- **Static definition home.** Add a backend-domain source catalog (for example `forge.backend.sources`) distinct from
+  `BackendRegistry`. Source definitions are built-in Python definitions in v1, not user-authored durable state; runtime
+  instances stay in `~/.forge/backends/index.json`. User-defined custom sources are out of scope for v1.
+- **Identity unit.** Use catalog-defined source ids, not credential names and not runtime registry ids. Template names
+  may alias to source ids where a one-to-one migration is easier. Local source ids must live in a disjoint value-space
+  from runtime instance ids: use stable catalog ids such as `litellm-local`, never port-derived ids such as
+  `litellm-4000`. Local source definitions may resolve through a backend dependency and runtime port, but that port is
+  instance metadata; remote ids point at endpoint/auth definitions.
+- **`backend_id` collision.** Add an explicit downstream `backend_id` field as the canonical model-source key, while
+  preserving `BackendInstance.backend_id` as the local runtime-instance id. Phase 4 writes the catalog source id to
+  downstream `backend_id`, not `BackendInstance.backend_id`; the homonym is acceptable only because the value-spaces are
+  deliberately disjoint.
+- **`source_kind` overload.** Keep existing downstream `source_id` / `source_kind` as writer-origin metadata
+  (`proxy`/`provider`). Do not repurpose `source_kind` for `local`/`remote`.
+- **Endpoint representation.** Source definitions support three endpoint forms: literal URL, connection-value reference
+  (`LITELLM_BASE_URL`, `OPENROUTER_BASE_URL`, etc.), and local backend-dependency-derived URL.
+- **Provider vocabulary.** Use `ProviderType` as the source definition's wire hint in Phase 1 because it has the needed
+  v1 coverage (`litellm_remote`, `litellm_local`, `anthropic`, `openrouter`). Keep `AdapterProviderType` and
+  `ModelProvider` as narrower adapter/factory routing vocabulary; deleting/collapsing any of them is a later cleanup
+  only after `core.llm.credentials` no longer depends on `ProviderType` for credential/base-url routing.
+- **Direct writer attribution.** Proxy paths derive downstream `backend_id` from `proxy.source`. Non-proxy direct usage
+  writers (`core/usage/emit.py`) may set `backend_id` only from an explicit provider/reporter -> source mapping; leave
+  it nullable in v1 where the writer only knows an ambiguous reporter/provider.
+- **Direct Anthropic scope.** Include `anthropic-passthrough` as a remote template source in v1. Include
+  `anthropic-direct` as a direct-runtime source for auth/telemetry attribution, but it has no proxy lifecycle.
+- **Template shape.** Add `proxy.source: <source-id>` to template schema and move source identity there. The source
+  catalog becomes the source of truth for endpoint/auth/lifecycle capabilities; legacy fields are transitional inputs,
+  not the final ownership model.
+- **OpenRouter `user` injection.** Keep it direct-OpenRouter-only in v1 unless the source definition explicitly declares
+  an OpenRouter user-grouping capability. Do not automatically broaden it to every gateway-selected OpenRouter route.
+- **Lifecycle CLI shape.** `list`, `show`, and new `test-auth` operate on source ids. `start`/`stop` should accept
+  source operands far enough to return intentional no-lifecycle capability errors for remote sources; local sources
+  resolve to existing adapter/port lifecycle. `create` and `delete` remain local-only in v1 because built-in remote
+  sources are not user-created or user-deleted; their help/errors must make that adapter/instance scope explicit.
+- **Remote health.** `list` is offline and reports configured/missing/unprobed auth state. `test-auth` performs the
+  explicit network/auth probe so routine status surfaces do not pay latency, rate-limit, or token cost.
+- **Auth provenance.** JSON provenance uses `env`, `credential_file`, `none`, and `omitted_by_config` only where the
+  interactive Anthropic policy deliberately omits a key. Human "not configured" copy maps from `none`.
 
 ## Risks
 
@@ -231,7 +276,8 @@ only make `backend_id` the source key downstream records attribute to.
   the runtime `BackendRegistry` instance store), not scattered inline source definitions.
 - **Auth provenance**: one view shows each backend's required credential, resolution source (`env` / `credentials.yaml`
   / `omitted`), and reachability -- no secret ever printed.
-- **Telemetry keys on backend id**: provider-trace's `provider_name != "openrouter"` early-return gate is gone; a trace
-  record's source identity is a backend id, and the plane covers any configured backend.
+- **Telemetry keys on backend id**: provider-trace's `provider_name != "openrouter"` early-return gate is replaced by a
+  backend/source capability gate; eligible OpenRouter-style lifecycle records carry a backend id, while non-eligible
+  sources stay quiet.
 - **Clean break documented**: removed/renamed CLI surfaces fail with intentional framework-native or capability-specific
   errors; the changelog names the replacements.

@@ -34,50 +34,59 @@ more confusing, not less.
 
 ## Phase 0 -- Source Map And Design Lock
 
-- [ ] Enumerate every current source-identity site: `BackendDependency`, `BackendAdapter`/`BackendManager`,
+- [x] Enumerate every current source-identity site: `BackendDependency`, `BackendAdapter`/`BackendManager`,
   `BackendInstance.backend_id` and `BackendRegistry`, `ProviderType` (`typing.Literal` in
   `src/forge/core/llm/detection.py`), `AdapterProviderType` (`typing.Literal` in `src/forge/proxy/client_adapter.py`),
   `ModelProvider` (the enum in `src/forge/proxy/client_factory.py`), proxy template `preferred_provider`, provider
   `base_url`, `BackendDependency`, `TEMPLATE_ENV_VARS`, `credentials_for_template()`, credential connection values,
   downstream writers, provider-trace gating, OpenRouter `user` injection, and `forge backend` CLI verbs.
-- [ ] Record the current unit of each identity: static definition, runtime instance, proxy template, wire-client
+- [x] Record the current unit of each identity: static definition, runtime instance, proxy template, wire-client
   provider, credential dependency, telemetry origin, model-source attribution key, or user-facing display label.
-- [ ] Decide naming: promote `backend` to the supertype or introduce a `model source`/`source` layer while preserving
-  the current local backend lifecycle name.
-- [ ] Decide remote source ids for v1: OpenRouter, remote LiteLLM, local LiteLLM variants, Anthropic passthrough/direct,
-  and whether ids are provider-named, endpoint-named, credential-named, or catalog-defined.
-- [ ] Resolve the `backend_id` name collision: `BackendInstance.backend_id` currently means a local runtime instance id
-  like `litellm-4000`, while the proposed downstream key means a static local-or-remote source id. Decide whether local
-  telemetry maps to the instance id, a catalog id, or a differently named carrier.
-- [ ] Resolve the `source_kind` overload: existing downstream writers use `source_kind="proxy"` or `"provider"` as a
+- [x] Decide naming: use `ModelSource` / source definition internally while keeping `forge backend` as the user-facing
+  CLI noun.
+- [x] Decide source ids for v1: use catalog-defined ids. Template names may alias to source ids where useful; local
+  source ids must stay in a disjoint value-space from runtime instance ids (`litellm-local`, not `litellm-4000`) and may
+  resolve through backend dependency/port metadata, while remote ids point at endpoint/auth definitions.
+- [x] Resolve the `backend_id` name collision: add an explicit downstream `backend_id` as the canonical model-source key
+  while preserving `BackendInstance.backend_id` as the local runtime-instance id. Phase 4 writes the catalog source id
+  to downstream `backend_id`, not the runtime `BackendInstance.backend_id`.
+- [x] Resolve the `source_kind` overload: existing downstream writers use `source_kind="proxy"` or `"provider"` as a
   telemetry-origin axis. Do not silently reuse that field for `local`/`remote`; decide the carrier for backend/source
   attribution while preserving origin semantics.
-- [ ] Decide the static definition home and schema shape. The definition layer must be distinct from
-  `~/.forge/backends/index.json`, which remains a local runtime-instance registry.
-- [ ] Decide endpoint representation for catalog entries: literal URL, connection-value reference (`LITELLM_BASE_URL`,
-  `OPENROUTER_BASE_URL`), template/provider override, or an explicit combination.
-- [ ] Decide provider vocabulary fate: what stays in `ProviderType`, `AdapterProviderType`, and `ModelProvider` as
-  wire-client routing detail, and what moves into source definitions. Include the `core.llm.credentials` routing plan;
-  `ProviderType` cannot simply be deleted while it chooses credential/base-url branches.
-- [ ] Decide direct Anthropic/passthrough scope for v1, including the existing direct Anthropic credential branch.
-- [ ] Decide whether the OpenRouter `user` injection gate in `server.py` migrates with provider-trace or remains an
-  intentionally direct-OpenRouter-only sibling.
-- [ ] Decide lifecycle CLI shape: widen `start`/`stop`/`delete` beyond `click.Choice(["litellm"])` so remote source ids
-  can reach an intentional capability error, or keep adapter-only verbs and document that remote sources are not valid
-  lifecycle operands.
-- [ ] Decide v1 health semantics for remote sources: local config only, network reachable, authenticated, rate-limited,
-  or explicitly unprobed; record latency/cost constraints for status surfaces.
-- [ ] Decide one auth provenance vocabulary for source views. Reconcile `env` / `credential_file` / `none`,
-  `omitted_by_config`, and user-facing "not configured" wording before adding CLI output.
-- [ ] Record the design lock in [card.md](card.md): supertype name, remote id unit, carrier decision, provider
-  vocabulary fate, `source_kind` axis decision, template shape, and lifecycle CLI shape. Get human acknowledgement
-  before Phase 1 code.
-- [ ] Update this checklist if the source map changes the phase ordering before coding.
+- [x] Decide the static definition home and schema shape: add a built-in code-level backend-domain source catalog
+  distinct from `~/.forge/backends/index.json`, which remains a local runtime-instance registry. The existing
+  `~/.forge/backends/<adapter>/config.yaml` is service config, not a source manifest. User-defined custom sources are
+  out of scope for v1. Templates gain `proxy.source`.
+- [x] Decide endpoint representation for catalog entries: support literal URL, connection-value reference
+  (`LITELLM_BASE_URL`, `OPENROUTER_BASE_URL`), and local backend-dependency-derived URL.
+- [x] Decide provider vocabulary fate: use `ProviderType` as the source definition's wire hint in Phase 1, then narrow
+  to `AdapterProviderType` and `ModelProvider` at adapter/factory seams instead of deleting/collapsing them.
+- [x] Decide direct Anthropic/passthrough scope for v1: include `anthropic-passthrough` as a remote template source and
+  `anthropic-direct` as a direct-runtime source for auth/telemetry attribution.
+- [x] Decide whether the OpenRouter `user` injection gate in `server.py` migrates with provider-trace or remains an
+  intentionally direct-OpenRouter-only sibling: keep direct-only unless a source declares an OpenRouter user-grouping
+  capability.
+- [x] Decide direct writer attribution for v1: proxy paths derive downstream `backend_id` from `proxy.source`; non-proxy
+  direct usage writers may set it only from an explicit provider/reporter -> source mapping and otherwise leave it
+  nullable.
+- [x] Decide lifecycle CLI shape: `list`/`show`/`test-auth` use source ids; `start`/`stop` should accept source operands
+  far enough to return intentional remote no-lifecycle capability errors while local sources resolve to existing
+  lifecycle. `create` and `delete` remain local-only adapter/instance operations in v1 because built-in remote sources
+  are not user-created or user-deleted.
+- [x] Decide v1 health semantics for remote sources: `list` stays offline and reports configured/missing/unprobed;
+  `test-auth` performs explicit network/auth probes.
+- [x] Decide one auth provenance vocabulary for source views: JSON uses `env`, `credential_file`, `none`, and
+  `omitted_by_config` only for deliberate interactive-key omission; human "not configured" maps from `none`.
+- [x] Record the proposed design lock in [card.md](card.md): supertype name, remote id unit, carrier decision, provider
+  vocabulary fate, `source_kind` axis decision, template shape, and lifecycle CLI shape.
+- [ ] Get human acknowledgement of the Phase 0 design lock before Phase 1 code.
+- [x] Update this checklist if the source map changes the phase ordering before coding. No phase-order change needed;
+  Phase 1 remains catalog/type primitives first.
 
 ## Phase 1 -- Catalog And Type Primitives
 
 - [ ] Add typed model-source/backend definitions with `id`, `kind`, endpoint/base URL or connection-value reference,
-  provider/wire-client hint, credential dependencies, and capabilities such as provider-trace eligibility.
+  `ProviderType` wire-client hint, credential dependencies, and capabilities such as provider-trace eligibility.
 - [ ] Represent local lifecycle as a local-only refinement or related instance type, not as a field every remote source
   must fake.
 - [ ] Add built-in definitions for existing remote OpenRouter templates, remote LiteLLM templates, local LiteLLM
@@ -103,7 +112,7 @@ more confusing, not less.
 - [ ] Bridge `TEMPLATE_ENV_VARS` and `credentials_for_template()` to the new source definitions, or replace them with a
   single generated/typed dependency map. Do not use `Credential.unlocks_features` as logic.
 - [ ] Update schema/loader sites for any new template key. `_load_template_config()` ends in
-  `dict_to_dataclass(ForgeConfig, config_dict, strict=True)`, so a new top-level `source:` field must be accepted by
+  `dict_to_dataclass(ForgeConfig, config_dict, strict=True)`, so the new `proxy.source` field must be accepted by
   `ProxyConfig` or transformed before strict dataclass loading.
 - [ ] Add no-secret tests for env, credential-file, `auth_ignore_env`, missing key, connection-value provenance, and
   strict-loader rejection of unsupported source shapes.
@@ -119,8 +128,9 @@ more confusing, not less.
   instance state when present.
 - [ ] Add `forge backend test-auth <id>` as a net-new command, or intentionally choose another command name in the Phase
   0 design lock. Cover local and remote sources with typed outcomes and no secret echo in human or JSON output.
-- [ ] Rework lifecycle verb signatures if Phase 0 chooses source-id operands. Remote `start`/`stop`/`delete` attempts
-  must reach a concise capability error rather than dying at Click's `litellm` choice validation.
+- [ ] Rework lifecycle verb signatures according to the Phase 0 verb split. Remote `start`/`stop` attempts must reach a
+  concise no-lifecycle capability error rather than dying at Click's `litellm` choice validation; `create`/`delete`
+  remain local-only adapter/instance operations with explicit help/error text.
 - [ ] Update `forge authentication status` only if needed to point users toward the unified source view without
   duplicating the source table.
 - [ ] Add CLI tests for human and `--json` output, remote no-lifecycle behavior, missing credentials, credential-file
@@ -142,6 +152,9 @@ more confusing, not less.
   against the epic's aspirational `resolve_measurement` name.
 - [ ] Implement the Phase 0 carrier decision: add an explicit `backend_id` field or map the conceptual backend key onto
   an existing field without overloading `source_kind`'s proxy/provider origin semantics.
+- [ ] Populate downstream `backend_id` from the catalog source id, never from `BackendInstance.backend_id`. For
+  non-proxy direct emitters, use an explicit provider/reporter -> source mapping only where unambiguous; otherwise leave
+  `backend_id` nullable for v1.
 - [ ] Add read-side behavior if the carrier needs it. `read_downstream_records()` currently filters by `proxy_id` and
   run/session ids, not by `source_id`/`source_kind` or `backend_id`.
 - [ ] Replace the `provider_trace_logger.py` early return `if provider_name != "openrouter": return` with a
