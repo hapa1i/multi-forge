@@ -11,6 +11,12 @@ import json
 from click.testing import CliRunner
 
 from forge.cli.activity import activity_cmd
+from forge.core.telemetry.downstream import (
+    DownstreamRecord,
+    mint_downstream_event_id,
+    write_downstream_record,
+)
+from forge.core.telemetry.upstream import UpstreamOutcome, write_upstream_outcome
 from forge.core.usage.ledger import UsageEvent, log_usage_event
 
 
@@ -76,10 +82,57 @@ def test_json_shape(monkeypatch) -> None:
     assert result.exit_code == 0
     data = json.loads(result.output)
     assert data["session"] == "planner"
-    assert data["session_tagging_partial"] is True
-    cmds = {c["command"]: c for c in data["commands"]}
-    assert cmds["supervisor"]["calls"] == 1
-    assert cmds["supervisor"]["errors"] == 1
+    assert set(data) == {"session", "since", "upstream", "downstream", "shadow", "subagents", "notes"}
+    assert "session_tagging_partial" in data["notes"]
+    rows = {c["command"]: c for c in data["downstream"]["rows"]}
+    assert rows["supervisor"]["calls"] == 1
+    assert rows["supervisor"]["errors"] == 1
+
+
+def test_two_pane_join_renders_upstream_and_downstream(monkeypatch) -> None:
+    _patch_resolver(monkeypatch)
+    write_upstream_outcome(
+        UpstreamOutcome(
+            command="memory-writer",
+            operation="memory_writer.run",
+            status="error",
+            session="planner",
+            run_id="run_join",
+            root_run_id="run_join",
+            reason_code="exit_1",
+        )
+    )
+    write_downstream_record(
+        DownstreamRecord(
+            kind="attempt",
+            downstream_event_id=mint_downstream_event_id(event_key="memory-writer:run_join"),
+            provider_command="memory-writer",
+            forge_run_id="run_join",
+            forge_root_run_id="run_join",
+            input_tokens=10,
+            output_tokens=5,
+            cost_micros=10_000,
+            failed=True,
+        )
+    )
+
+    human = CliRunner().invoke(activity_cmd, ["planner", "--all"])
+    assert human.exit_code == 0
+    assert "Operation outcomes" in human.output
+    assert "Model calls" in human.output
+    assert "memory-writer" in human.output
+    assert "memory_writer.run" in human.output
+    assert "matched" in human.output
+
+    machine = CliRunner().invoke(activity_cmd, ["planner", "--all", "--json"])
+    assert machine.exit_code == 0
+    data = json.loads(machine.output)
+    operation = data["upstream"]["operations"][0]
+    row = data["downstream"]["rows"][0]
+    assert operation["join_state"] == "matched"
+    assert row["join_state"] == "matched"
+    assert row["attempts"] == 1
+    assert row["errors"] == 1
 
 
 def test_human_render_shows_failing_open(monkeypatch) -> None:
@@ -101,9 +154,9 @@ def test_json_includes_error_kinds(monkeypatch) -> None:
     log_usage_event(_event(status="error", failure_type="subprocess_error"))
     result = CliRunner().invoke(activity_cmd, ["planner", "--all", "--json"])
     assert result.exit_code == 0
-    cmds = {c["command"]: c for c in json.loads(result.output)["commands"]}
-    assert cmds["supervisor"]["error_kinds"] == {"timeout": 2, "error": 1}
-    assert cmds["supervisor"]["errors"] == 3
+    rows = {c["command"]: c for c in json.loads(result.output)["downstream"]["rows"]}
+    assert rows["supervisor"]["error_kinds"] == {"timeout": 2, "error": 1}
+    assert rows["supervisor"]["errors"] == 3
 
 
 def test_empty_session_message(monkeypatch) -> None:
@@ -206,9 +259,10 @@ def test_json_includes_plan_check_counters(monkeypatch, tmp_path) -> None:
     result = CliRunner().invoke(activity_cmd, ["planner", "--all", "--json"])
     assert result.exit_code == 0
     data = json.loads(result.output)
-    assert data["policy"]["plan_check_needs_review"] == 1
-    assert data["policy"]["plan_check_allow"] == 0
-    assert data["policy"]["supervisor_allow"] == 1
+    assert data["upstream"]["policy"]["plan_check_needs_review"] == 1
+    assert data["upstream"]["policy"]["plan_check_allow"] == 0
+    assert data["upstream"]["policy"]["supervisor_allow"] == 1
+    assert data["upstream"]["manifest_fallback_used"] is True
 
 
 def test_days_window_excludes_nothing_recent(monkeypatch) -> None:
@@ -217,7 +271,7 @@ def test_days_window_excludes_nothing_recent(monkeypatch) -> None:
     result = CliRunner().invoke(activity_cmd, ["planner", "--days", "7", "--json"])
     assert result.exit_code == 0
     data = json.loads(result.output)
-    assert data["total_events"] == 1
+    assert data["downstream"]["rows"][0]["attempts"] == 1
 
 
 def test_exact_proxied_cost_renders_without_tilde(monkeypatch) -> None:

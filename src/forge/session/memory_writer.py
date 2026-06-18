@@ -28,6 +28,7 @@ from pathlib import Path
 from forge.core.reactive.env import FORGE_COMMAND_VAR, FORGE_SESSION_VAR
 from forge.core.reactive.routing import resolve_subprocess_routing
 from forge.core.reactive.session_runner import run_claude_session
+from forge.core.telemetry.upstream import UpstreamStatus, record_upstream_operation
 from forge.core.transcript import parse_jsonl_transcript
 from forge.session.claude.invoke import is_claude_available
 from forge.session.exceptions import PassportError
@@ -49,6 +50,31 @@ def _default_timeout() -> int:
     from forge.runtime_config import get_runtime_config
 
     return get_runtime_config().memory_writer_timeout
+
+
+def _record_memory_writer_outcome(
+    session_name: str,
+    status: UpstreamStatus,
+    *,
+    reason_code: str | None = None,
+    message: str | None = None,
+    run_id: str | None = None,
+    parent_run_id: str | None = None,
+    root_run_id: str | None = None,
+    latency_ms: float | None = None,
+) -> None:
+    record_upstream_operation(
+        command="memory-writer",
+        operation="memory_writer.run",
+        status=status,
+        session=session_name,
+        reason_code=reason_code,
+        message=message,
+        run_id=run_id,
+        parent_run_id=parent_run_id,
+        root_run_id=root_run_id,
+        latency_ms=latency_ms,
+    )
 
 
 MULTI_DOC_PROMPT_TEMPLATE = """\
@@ -349,11 +375,18 @@ def run_memory_writer(
     reason = is_safe_designated_doc_path(transcript_snapshot_rel, project_root, project_root.resolve())
     if reason:
         logger.warning("Memory writer: unsafe transcript path (%s)", reason)
+        _record_memory_writer_outcome(session_name, "error", reason_code="unsafe_transcript_path", message=reason)
         return False
     transcript_abs = (project_root / transcript_snapshot_rel).resolve()
 
     if not transcript_abs.is_file():
         logger.warning("Memory writer: transcript not found at %s", transcript_abs)
+        _record_memory_writer_outcome(
+            session_name,
+            "error",
+            reason_code="transcript_not_found",
+            message=str(transcript_abs),
+        )
         return False
 
     turn_count = count_conversation_turns(transcript_abs)
@@ -364,15 +397,23 @@ def run_memory_writer(
             turn_count,
             config.min_turns,
         )
+        _record_memory_writer_outcome(
+            session_name,
+            "skipped",
+            reason_code="below_min_turns",
+            message=f"{turn_count} turns < min_turns={config.min_turns}",
+        )
         return True  # Not a failure — just below threshold
 
     _VALID_MODES = {"augment", "review-only"}
     if config.mode not in _VALID_MODES:
         logger.warning("Memory writer: unknown mode %r (expected %s)", config.mode, _VALID_MODES)
+        _record_memory_writer_outcome(session_name, "error", reason_code="unknown_mode", message=config.mode)
         return False
 
     if not is_claude_available():
         logger.warning("Memory writer: claude CLI not found in PATH")
+        _record_memory_writer_outcome(session_name, "error", reason_code="claude_unavailable")
         return False
 
     if not designated_docs:
@@ -380,6 +421,7 @@ def run_memory_writer(
             "No designated_docs configured; memory writer has nothing to update (session %s)",
             session_name,
         )
+        _record_memory_writer_outcome(session_name, "skipped", reason_code="no_designated_docs")
         return True
 
     safe_docs = _validate_designated_docs(designated_docs, forge_root)
@@ -443,6 +485,7 @@ def run_memory_writer(
             "No designated_docs ready after validation/existence checks (session %s)",
             session_name,
         )
+        _record_memory_writer_outcome(session_name, "skipped", reason_code="no_ready_docs")
         return True
 
     prompt = build_multi_doc_prompt(
@@ -492,6 +535,19 @@ def run_memory_writer(
     if not result.success:
         detail = result.error or (result.stderr[:500] if result.stderr else f"exit {result.returncode}")
         logger.warning("Memory writer for %s failed: %s", session_name, detail)
+        reason_code = "timeout" if result.timed_out else f"exit_{result.returncode}"
+        if result.error and not result.timed_out:
+            reason_code = "subprocess_error"
+        _record_memory_writer_outcome(
+            session_name,
+            "timeout" if result.timed_out else "error",
+            reason_code=reason_code,
+            message=detail,
+            run_id=result.run_id,
+            parent_run_id=result.parent_run_id,
+            root_run_id=result.root_run_id,
+            latency_ms=round(cost.duration_ms, 1) if cost.duration_ms is not None else None,
+        )
         return False
 
     # Persist the agent's stdout to a per-session review file so users can
@@ -519,9 +575,26 @@ def run_memory_writer(
             "Run 'forge claude preset edit' to add Write/Edit to permissions.allow.",
             session_name,
         )
+        _record_memory_writer_outcome(
+            session_name,
+            "error",
+            reason_code="permission_denied",
+            run_id=result.run_id,
+            parent_run_id=result.parent_run_id,
+            root_run_id=result.root_run_id,
+            latency_ms=round(cost.duration_ms, 1) if cost.duration_ms is not None else None,
+        )
         return False
 
     logger.info("Memory writer completed for session %s", session_name)
+    _record_memory_writer_outcome(
+        session_name,
+        "success",
+        run_id=result.run_id,
+        parent_run_id=result.parent_run_id,
+        root_run_id=result.root_run_id,
+        latency_ms=round(cost.duration_ms, 1) if cost.duration_ms is not None else None,
+    )
     return True
 
 

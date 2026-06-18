@@ -193,7 +193,7 @@ workers (e.g., `claude-opus`) remain on Anthropic routing regardless of `--proxy
 | Command                       | Purpose                                                                                              |
 | ----------------------------- | ---------------------------------------------------------------------------------------------------- |
 | `forge info`                  | Show global system information (`--json`)                                                            |
-| `forge activity [session]`    | Per-session activity: supervisor checks, cost, tokens (`--json`, `--days`, `--all`)                  |
+| `forge activity [session]`    | Per-session two-pane activity: operation outcomes + model calls/cost (`--json`, `--days`, `--all`)   |
 | `forge clean`                 | Remove orphaned state (`--scope`, `--yes`)                                                           |
 | `forge config`                | Manage global runtime preferences                                                                    |
 | `forge authentication login`  | Store credentials for LLM providers                                                                  |

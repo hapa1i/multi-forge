@@ -1522,3 +1522,10 @@ class TestCurationUsageEmission:
         assert e.status == "error"
         assert e.failure_type == "unparseable_output"
         assert e.input_tokens == 222  # provider tokens attributed despite the bad output
+        from forge.core.telemetry.upstream import read_upstream_outcomes
+
+        outcomes = read_upstream_outcomes(command="transfer-curate")
+        assert len(outcomes) == 1
+        assert outcomes[0].operation == "transfer.curate"
+        assert outcomes[0].status == "error"
+        assert outcomes[0].reason_code == "unparseable_output"

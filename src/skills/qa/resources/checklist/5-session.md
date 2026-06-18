@@ -630,8 +630,8 @@ forge session delete nr-into-parent --yes --force 2>/dev/null || true
 
 <!-- human:confirm -->
 
-On exit the launcher prints a one-line rollup of what Forge did this session (supervisor checks, cost, tokens,
-workflows) just before the reconnect tip -- the one session-end channel Claude Code does not suppress. It is the
+On exit the launcher prints a one-line rollup of what Forge did this session (policy/supervisor outcomes, workflows,
+cost, tokens) just before the reconnect tip -- the one session-end channel Claude Code does not suppress. It is the
 interactive complement to the non-interactive `forge activity` (section 7.12).
 
 In the **container shell**, launch a session through the QA proxy, do a little work (a file edit or two so the

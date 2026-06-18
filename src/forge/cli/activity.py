@@ -1,17 +1,15 @@
-"""``forge activity`` — per-session Forge *automation* activity (supervisor, memory
-writer, workflow verbs) + policy decisions. NOT your full interactive Claude usage.
+"""``forge activity`` — per-session Forge automation outcomes plus model-call evidence.
 
-Reads the captured planes (usage ledger + ``confirmed.policy.decisions`` plus upstream
-policy outcomes) via :func:`forge.core.ops.usage_summary.build_session_activity_summary` and renders a
-table. Cost is reported-or-estimated (best-effort attribution) — ``forge proxy costs show``
-stays the authoritative spend view.
+Reads upstream outcomes, downstream attempts, transitional usage events, and the capped
+manifest policy fallback via :func:`forge.core.ops.usage_summary.build_session_activity_summary`.
+Cost is reported-or-estimated (best-effort attribution) — ``forge proxy costs show`` stays the
+authoritative spend view.
 """
 
 from __future__ import annotations
 
 import json
 import sys
-from dataclasses import asdict
 from datetime import datetime, timedelta, timezone
 
 import click
@@ -25,6 +23,7 @@ from forge.core.ops.session_context import (
 )
 from forge.core.ops.usage_summary import (
     SessionActivitySummary,
+    activity_summary_to_json,
     build_session_activity_summary,
     format_failing_open,
 )
@@ -38,12 +37,12 @@ console = Console()
 @click.option("--days", "-d", type=int, default=30, help="Look back this many days (default: 30)")
 @click.option("--all", "all_time", is_flag=True, help="Report all time (ignore --days)")
 def activity_cmd(session: str | None, as_json: bool, days: int, all_time: bool) -> None:
-    """Show Forge's automation activity for a session: supervisor checks, cost, tokens.
+    """Show Forge automation outcomes and model-call evidence for a session.
 
     This is what Forge did *on top of* your session — the supervisor, memory writer,
-    and workflow verbs (panel/debate/...) — plus policy decisions. It is **not** your
-    full interactive Claude usage. Reads the usage ledger and the session's
-    policy-decision log. Cost is reported-or-estimated (best-effort attribution);
+    workflow verbs (panel/debate/...), transfer curation, and action tagging — plus
+    the model-call evidence Forge can attribute to those operations. It is **not** your
+    full interactive Claude usage. Cost is reported-or-estimated (best-effort attribution);
     'forge proxy costs show' is the authoritative spend view.
 
     \b
@@ -69,7 +68,7 @@ def activity_cmd(session: str | None, as_json: bool, days: int, all_time: bool) 
     summary = build_session_activity_summary(session_name, forge_root, since=since)
 
     if as_json:
-        console.print_json(data=asdict(summary))
+        console.print_json(data=activity_summary_to_json(summary))
         return
     _render(summary, days=None if all_time else days)
 
@@ -86,32 +85,6 @@ def _render(summary: SessionActivitySummary, *, days: int | None) -> None:
         "not your full interactive session.[/dim]"
     )
 
-    if summary.commands:
-        # The Workers column only earns its width when a fan-out (panel/debate/...) ran;
-        # supervisor/memory-writer have no workers, so most sessions skip it.
-        show_workers = any(c.workers for c in summary.commands)
-        table = Table(show_header=True, header_style="bold", box=None, padding=(0, 2))
-        table.add_column("Command", style="cyan")
-        table.add_column("Calls", justify="right")
-        if show_workers:
-            table.add_column("Workers", justify="right", style="dim")
-        table.add_column("Errors", justify="right")
-        table.add_column("Tokens in/out", justify="right", style="dim")
-        table.add_column("Cost", justify="right", style="dim")
-        for c in summary.commands:
-            errors = f"[red]{c.errors}[/red]" if c.errors else "0"
-            tokens = f"{c.input_tokens}/{c.output_tokens}" if (c.input_tokens or c.output_tokens) else "-"
-            if c.cost_micro_usd is None:
-                cost = "-"
-            else:
-                cost = f"{'~' if c.cost_estimated else ''}{_fmt_usd(c.cost_micro_usd)}"
-            row = [c.command, str(c.calls)]
-            if show_workers:
-                row.append(str(c.workers) if c.workers else "-")
-            row += [errors, tokens, cost]
-            table.add_row(*row)
-        console.print(table)
-
     pol = summary.policy
     # Fail-open breakdown is ledger-derived (the supervisor CommandUsage), so the
     # Supervisor line must render even when there is no decision log (pol is None) --
@@ -119,11 +92,14 @@ def _render(summary: SessionActivitySummary, *, days: int | None) -> None:
     sup_cmd = next((c for c in summary.commands if c.command == "supervisor"), None)
     failing = format_failing_open(sup_cmd)
 
+    console.print("\n[bold]Operation outcomes[/bold]")
+
+    rendered_operation_content = False
     if pol and (pol.plan_check_allow or pol.plan_check_needs_review):
         console.print(
-            f"\n[bold]Plan check (tier-1)[/bold]: {pol.plan_check_allow} allow · "
-            f"{pol.plan_check_needs_review} needs review"
+            f"Plan check (tier-1): {pol.plan_check_allow} allow · " f"{pol.plan_check_needs_review} needs review"
         )
+        rendered_operation_content = True
 
     sup_has_pol = bool(
         pol and (pol.supervisor_allow or pol.supervisor_warn or pol.supervisor_deny or pol.total_warnings)
@@ -134,10 +110,69 @@ def _render(summary: SessionActivitySummary, *, days: int | None) -> None:
             bits.append(f"{pol.supervisor_allow} allow · {pol.supervisor_warn} warn · {pol.supervisor_deny} block")
         if failing:
             bits.append(f"[red]{failing}[/red]")
-        console.print("\n[bold]Supervisor[/bold]: " + " · ".join(bits))
+        console.print("Supervisor: " + " · ".join(bits))
+        rendered_operation_content = True
 
     for warning in pol.recent_warnings if pol else ():
         console.print(f"  [yellow]•[/yellow] {warning}")
+
+    if summary.upstream.operations:
+        table = Table(show_header=True, header_style="bold", box=None, padding=(0, 2))
+        table.add_column("Command", style="cyan")
+        table.add_column("Operation", style="dim")
+        table.add_column("Status")
+        table.add_column("Count", justify="right")
+        table.add_column("Join", style="dim")
+        table.add_column("Reason", style="dim")
+        for operation_row in summary.upstream.operations:
+            status = (
+                f"[red]{operation_row.status}[/red]"
+                if operation_row.status in {"error", "timeout", "deny"}
+                else operation_row.status
+            )
+            table.add_row(
+                operation_row.command,
+                operation_row.operation or operation_row.policy_id or "-",
+                status,
+                str(operation_row.count),
+                operation_row.join_state.replace("_", "-"),
+                operation_row.reason_code or "-",
+            )
+        console.print(table)
+        rendered_operation_content = True
+    if not rendered_operation_content:
+        console.print("[dim]No upstream outcomes recorded for this window.[/dim]")
+
+    if summary.downstream.rows:
+        console.print("\n[bold]Model calls[/bold]")
+        show_workers = any(row.workers for row in summary.downstream.rows)
+        table = Table(show_header=True, header_style="bold", box=None, padding=(0, 2))
+        table.add_column("Command", style="cyan")
+        table.add_column("Calls", justify="right")
+        if show_workers:
+            table.add_column("Workers", justify="right", style="dim")
+        table.add_column("Attempts", justify="right")
+        table.add_column("Errors", justify="right")
+        table.add_column("Join", style="dim")
+        table.add_column("Tokens in/out", justify="right", style="dim")
+        table.add_column("Cost", justify="right", style="dim")
+        for model_row in summary.downstream.rows:
+            tokens = (
+                f"{model_row.input_tokens}/{model_row.output_tokens}"
+                if (model_row.input_tokens or model_row.output_tokens)
+                else "-"
+            )
+            if model_row.cost_micro_usd is None:
+                cost = "-"
+            else:
+                cost = f"{'~' if model_row.cost_estimated else ''}{_fmt_usd(model_row.cost_micro_usd)}"
+            values = [model_row.command, str(model_row.calls)]
+            if show_workers:
+                values.append(str(model_row.workers) if model_row.workers else "-")
+            errors = f"[red]{model_row.errors}[/red]" if model_row.errors else "0"
+            values += [str(model_row.attempts), errors, model_row.join_state.replace("_", "-"), tokens, cost]
+            table.add_row(*values)
+        console.print(table)
 
     sh = summary.shadow
     if sh is not None and sh.has_content:
@@ -170,7 +205,7 @@ def _footnotes(summary: SessionActivitySummary) -> list[str]:
     notes: list[str] = []
     if summary.cost_partial:
         notes.append("cost is best-effort and partial (some calls report no cost)")
-    if summary.policy is not None and summary.policy.log_capped:
+    if summary.upstream.log_capped:
         notes.append("policy decision log is at capacity — older decisions may not be shown")
     if summary.session_tagging_partial:
         notes.append("some calls (e.g. the action tagger) are not session-attributed")

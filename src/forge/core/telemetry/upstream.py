@@ -105,6 +105,64 @@ def write_upstream_outcome(outcome: UpstreamOutcome) -> None:
         logger.warning("Failed to write upstream telemetry: %s", e)
 
 
+def record_upstream_operation(
+    *,
+    command: str,
+    status: UpstreamStatus,
+    session: str | None = None,
+    run_id: str | None = None,
+    parent_run_id: str | None = None,
+    root_run_id: str | None = None,
+    origin: str | None = None,
+    operation: str | None = None,
+    policy_id: str | None = None,
+    tool_name: str | None = None,
+    target_path: str | None = None,
+    reason_code: str | None = None,
+    message: str | None = None,
+    cached: bool = False,
+    latency_ms: float | None = None,
+) -> None:
+    """Best-effort helper for operation-boundary upstream outcomes.
+
+    Explicit run ids win; missing ids are filled from the ambient Forge run
+    identity when one exists.
+    """
+    try:
+        if run_id is None or parent_run_id is None or root_run_id is None:
+            try:
+                from forge.core.reactive.env import get_run_identity
+
+                identity = get_run_identity()
+            except Exception:
+                identity = None
+            if identity is not None:
+                run_id = run_id or identity.run_id
+                parent_run_id = parent_run_id or identity.parent_run_id
+                root_run_id = root_run_id or identity.root_run_id
+        write_upstream_outcome(
+            UpstreamOutcome(
+                command=command,
+                operation=operation,
+                status=status,
+                session=session,
+                run_id=run_id,
+                parent_run_id=parent_run_id,
+                root_run_id=root_run_id,
+                origin=origin,
+                policy_id=policy_id,
+                tool_name=tool_name,
+                target_path=target_path,
+                reason_code=reason_code,
+                message=message,
+                cached=cached,
+                latency_ms=latency_ms,
+            )
+        )
+    except Exception as e:
+        logger.debug("upstream operation telemetry skipped for %s: %s", command, e)
+
+
 def read_upstream_outcomes(
     period_start: datetime | None = None,
     period_end: datetime | None = None,

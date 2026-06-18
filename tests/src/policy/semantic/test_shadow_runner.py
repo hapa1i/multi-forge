@@ -17,6 +17,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from forge.core.reactive.session_runner import SessionResult
+from forge.core.telemetry.upstream import read_upstream_outcomes
 from forge.policy.semantic.shadow import capture_candidate
 from forge.policy.semantic.shadow_runner import (
     STATUS_AGREE,
@@ -251,6 +252,11 @@ class TestRunShadowCandidate:
         record = json.loads(path.with_suffix(".done").read_text())
         assert record["status"] == STATUS_DISAGREE
         assert record["frontier_verdict"] == "divergent"
+        outcomes = read_upstream_outcomes(session="sess", command="supervisor-shadow")
+        assert len(outcomes) == 1
+        assert outcomes[0].operation == "policy.shadow_drain"
+        assert outcomes[0].status == "deny"
+        assert outcomes[0].reason_code == STATUS_DISAGREE
 
     @patch("forge.policy.semantic.supervisor.run_claude_session")
     def test_unparseable_frontier_is_error(self, mock_run: MagicMock, tmp_path: Path) -> None:
@@ -263,6 +269,10 @@ class TestRunShadowCandidate:
         record = json.loads(path.with_suffix(".done").read_text())
         assert record["status"] == STATUS_ERROR
         assert record["parsed"] is False
+        outcomes = read_upstream_outcomes(session="sess", command="supervisor-shadow")
+        assert len(outcomes) == 1
+        assert outcomes[0].status == "error"
+        assert outcomes[0].reason_code == STATUS_ERROR
 
     @patch("forge.policy.semantic.supervisor.run_claude_session")
     def test_at_most_once_atomic_claim(self, mock_run: MagicMock, tmp_path: Path) -> None:

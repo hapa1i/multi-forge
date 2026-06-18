@@ -1,9 +1,9 @@
-"""Tests for the per-session activity summary (forge usage / session-end line).
+"""Tests for the per-session activity summary (forge activity / session-end line).
 
-Two planes are aggregated and kept separate: the usage ledger (supervisor run/error
-counts) and ``confirmed.policy.decisions`` (supervisor allow/warn/deny + warnings,
-capped). The autouse ``isolate_forge_home`` fixture gives each test a fresh
-``FORGE_HOME`` so ledger counts are exact.
+Operation outcomes, downstream/model-call evidence, transitional usage events, and the
+manifest fallback are aggregated but kept visibly separate. The autouse
+``isolate_forge_home`` fixture gives each test a fresh ``FORGE_HOME`` so ledger counts
+are exact.
 """
 
 from __future__ import annotations
@@ -23,6 +23,13 @@ from forge.core.ops.usage_summary import (
     sum_forge_added_cost,
 )
 from forge.core.paths import get_forge_home
+from forge.core.run_id import derive_provider_session_id
+from forge.core.telemetry.downstream import (
+    DownstreamRecord,
+    mint_downstream_event_id,
+    write_downstream_record,
+)
+from forge.core.telemetry.upstream import UpstreamOutcome, write_upstream_outcome
 from forge.core.usage.ledger import UsageEvent, log_usage_event
 from forge.session.models import (
     PolicyConfirmed,
@@ -157,6 +164,187 @@ class TestLedgerPlane:
         summary = build_session_activity_summary("planner", forge_root=None)
         assert summary.total_cost_micro_usd is None
         assert summary.cost_partial is False
+
+    def test_builder_reads_usage_ledger_once(self, monkeypatch) -> None:
+        import forge.core.ops.usage_summary as usage_summary
+
+        calls = 0
+
+        def _fake_read_usage_events(**_kwargs: object) -> list[UsageEvent]:
+            nonlocal calls
+            calls += 1
+            return []
+
+        monkeypatch.setattr(usage_summary, "read_usage_events", _fake_read_usage_events)
+
+        usage_summary.build_session_activity_summary("planner", forge_root=None)
+
+        assert calls == 1
+
+
+class TestActivityPanes:
+    def test_upstream_only_operation_is_visible(self, tmp_path: Path) -> None:
+        write_upstream_outcome(
+            UpstreamOutcome(
+                command="memory-writer",
+                operation="memory_writer.run",
+                status="error",
+                session="planner",
+                run_id="run_memory",
+                root_run_id="run_memory",
+                reason_code="transcript_not_found",
+            )
+        )
+
+        summary = build_session_activity_summary("planner", forge_root=str(tmp_path))
+
+        row = summary.upstream.operations[0]
+        assert (row.command, row.operation, row.status, row.join_state) == (
+            "memory-writer",
+            "memory_writer.run",
+            "error",
+            "upstream_only",
+        )
+        assert summary.downstream.rows == []
+
+    def test_operation_rows_roll_up_by_status_and_reason(self, tmp_path: Path) -> None:
+        for idx in range(24):
+            run_id = f"run_{idx:012x}"
+            write_upstream_outcome(
+                UpstreamOutcome(
+                    command="policy-check",
+                    operation="policy.evaluate",
+                    policy_id="semantic.supervisor",
+                    status="timeout",
+                    session="planner",
+                    run_id=run_id,
+                    root_run_id=run_id,
+                    reason_code="timeout",
+                    message=f"timeout #{idx}",
+                )
+            )
+
+        summary = build_session_activity_summary("planner", forge_root=str(tmp_path))
+
+        rows = [
+            row
+            for row in summary.upstream.operations
+            if row.command == "policy-check" and row.policy_id == "semantic.supervisor"
+        ]
+        assert len(rows) == 1
+        assert rows[0].count == 24
+        assert rows[0].status == "timeout"
+        assert rows[0].reason_code == "timeout"
+
+    def test_matched_operation_and_model_call_share_root(self, tmp_path: Path) -> None:
+        log_usage_event(
+            _event(
+                command="memory-writer",
+                run_id="run_memory",
+                root_run_id="run_memory",
+                cost_micro_usd=10_000,
+                confidence="reported",
+                measurement_source="runtime_native",
+            )
+        )
+        write_upstream_outcome(
+            UpstreamOutcome(
+                command="memory-writer",
+                operation="memory_writer.run",
+                status="error",
+                session="planner",
+                run_id="run_memory",
+                root_run_id="run_memory",
+                reason_code="permission_denied",
+            )
+        )
+
+        summary = build_session_activity_summary("planner", forge_root=str(tmp_path))
+
+        assert summary.upstream.operations[0].join_state == "matched"
+        row = next(row for row in summary.downstream.rows if row.command == "memory-writer")
+        assert row.join_state == "matched"
+        assert row.cost_micro_usd == 10_000
+
+    def test_downstream_only_known_run_tree_is_visible(self, tmp_path: Path) -> None:
+        log_usage_event(
+            _event(
+                command="tagger",
+                run_id="run_tag",
+                root_run_id="run_tag",
+                input_tokens=5,
+                output_tokens=2,
+            )
+        )
+        write_downstream_record(
+            DownstreamRecord(
+                kind="attempt",
+                downstream_event_id=mint_downstream_event_id(event_key="tagger:run_tag"),
+                forge_run_id="run_tag",
+                forge_root_run_id="run_tag",
+                provider="openai",
+                source_id="openai",
+                input_tokens=5,
+                output_tokens=2,
+                cost_micros=1_200,
+            )
+        )
+
+        summary = build_session_activity_summary("planner", forge_root=str(tmp_path))
+
+        row = next(row for row in summary.downstream.rows if row.command == "tagger")
+        assert row.join_state == "downstream_only"
+        assert (row.input_tokens, row.output_tokens) == (5, 2)
+        assert summary.downstream.total_cost_micro_usd == 1_200
+        assert summary.total_cost_micro_usd == 1_200
+
+    def test_provider_session_prefix_downstream_record_is_visible(self, tmp_path: Path) -> None:
+        provider_session_id = derive_provider_session_id("planner", root_run_id="", role="memory_writer")
+        write_downstream_record(
+            DownstreamRecord(
+                kind="attempt",
+                downstream_event_id=mint_downstream_event_id(event_key="provider-session-only"),
+                provider_session_id=provider_session_id,
+                provider_command="memory_writer",
+                provider="openrouter",
+                input_tokens=11,
+                output_tokens=3,
+                cost_micros=2_500,
+            )
+        )
+
+        summary = build_session_activity_summary("planner", forge_root=str(tmp_path))
+
+        assert summary.downstream.downstream_records == 1
+        row = summary.downstream.rows[0]
+        assert row.command == "memory_writer"
+        assert row.join_state == "downstream_only"
+        assert (row.input_tokens, row.output_tokens) == (11, 3)
+        assert summary.downstream.total_input_tokens == 11
+        assert summary.downstream.total_cost_micro_usd == 2_500
+        assert summary.total_input_tokens == 11
+        assert summary.total_cost_micro_usd == 2_500
+
+    def test_session_unknown_downstream_record_is_excluded(self, tmp_path: Path) -> None:
+        write_downstream_record(
+            DownstreamRecord(
+                kind="attempt",
+                downstream_event_id=mint_downstream_event_id(event_key="unknown-session"),
+                forge_run_id="run_unknown",
+                forge_root_run_id="run_unknown",
+                provider_command="memory_writer",
+                provider="openrouter",
+                input_tokens=11,
+                output_tokens=3,
+                cost_micros=2_500,
+            )
+        )
+
+        summary = build_session_activity_summary("planner", forge_root=str(tmp_path))
+
+        assert summary.downstream.rows == []
+        assert summary.downstream.downstream_records == 0
+        assert summary.total_cost_micro_usd is None
 
 
 class TestPolicyPlane:

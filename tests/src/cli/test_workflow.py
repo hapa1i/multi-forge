@@ -1547,13 +1547,18 @@ class TestUsageEmission:
 
     @patch("forge.review.engine.run_multi_review")
     def test_panel_emits_one_verb_event(self, mock_run, monkeypatch):
+        from forge.core.telemetry.upstream import read_upstream_outcomes
         from forge.core.usage.ledger import read_usage_events
+
+        class _RuntimeConfig:
+            upstream_event_volume = "all"
 
         monkeypatch.setenv("FORGE_RUN_ID", "run_panel")
         monkeypatch.setenv("FORGE_ROOT_RUN_ID", "run_panel")
         monkeypatch.setenv("FORGE_SESSION", "planner")
         # No live proxy in tests: skip snapshot fetches so the holder is unmeasured.
         monkeypatch.setattr("forge.core.reactive.cost_tracking.resolve_proxy_urls_from_plan", lambda _plan: [])
+        monkeypatch.setattr("forge.runtime_config.get_runtime_config", lambda: _RuntimeConfig())
         mock_run.return_value = _mock_output()
 
         result = CliRunner().invoke(main, ["workflow", "panel", "-p", "Review this"])
@@ -1566,7 +1571,27 @@ class TestUsageEmission:
         assert e.attribution_granularity == "verb"
         assert e.measurement_source == "unattributed"  # no live proxy in test
         assert e.source_refs is None
-        assert e.session == "planner"  # threaded from $FORGE_SESSION so 'forge usage' can scope it
+        assert e.session == "planner"  # threaded from $FORGE_SESSION so 'forge activity' can scope it
+        outcomes = read_upstream_outcomes(session="planner", command="panel")
+        assert len(outcomes) == 1
+        assert outcomes[0].operation == "workflow.panel"
+        assert outcomes[0].status == "success"
+
+    def test_workflow_outcome_records_worker_failure_reason(self, monkeypatch):
+        from forge.cli.workflow import _record_workflow_outcome
+        from forge.core.telemetry.upstream import read_upstream_outcomes
+
+        monkeypatch.setenv("FORGE_SESSION", "planner")
+        failed = _mock_output([ReviewResult("model-a", "", "failed", False, 1.0, error="failed")])
+
+        _record_workflow_outcome("panel", failed)
+
+        outcomes = read_upstream_outcomes(session="planner", command="panel")
+        assert len(outcomes) == 1
+        assert outcomes[0].operation == "workflow.panel"
+        assert outcomes[0].status == "error"
+        assert outcomes[0].reason_code == "worker_failed"
+        assert outcomes[0].message == "1 worker failed"
 
     @patch("forge.review.engine.run_multi_review")
     def test_no_ambient_identity_emits_nothing(self, mock_run, monkeypatch):

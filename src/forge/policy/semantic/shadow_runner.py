@@ -27,6 +27,7 @@ import os
 from pathlib import Path
 from typing import Any
 
+from forge.core.telemetry.upstream import UpstreamStatus, record_upstream_operation
 from forge.install.models import now_iso
 from forge.policy.semantic.supervisor import (
     SUPERVISOR_INTENT,
@@ -46,6 +47,16 @@ STATUS_AGREE = "agree"  # frontier also found the action aligned
 STATUS_DISAGREE = "disagree"  # frontier would have BLOCKED (high-confidence + cited divergence)
 STATUS_INCONCLUSIVE = "inconclusive"  # frontier divergent but below the block bar
 STATUS_ERROR = "error"  # the frontier run failed or its output did not parse
+
+
+def _shadow_status_to_upstream(status: str) -> UpstreamStatus:
+    if status == STATUS_AGREE:
+        return "success"
+    if status == STATUS_DISAGREE:
+        return "deny"
+    if status == STATUS_INCONCLUSIVE:
+        return "warning"
+    return "error"
 
 
 def classify_shadow(run: SupervisorRun) -> str:
@@ -121,8 +132,10 @@ def run_shadow_candidate(path: Path) -> str | None:
         # read surface counts it as `error` (not phantom pending) and finalize it.
         _log.warning("Unreadable shadow candidate %s; finalizing as error", processing.name)
         _finalize_error(processing, done, {"error": "unreadable candidate JSON"})
+        _record_shadow_drain_outcome(STATUS_ERROR)
         return STATUS_ERROR
 
+    run: SupervisorRun | None = None
     try:
         context = reconstruct_context(candidate)
         config = reconstruct_config(candidate, processing.parent)
@@ -146,6 +159,7 @@ def run_shadow_candidate(path: Path) -> str | None:
     candidate["checked_at"] = now_iso()
     processing.write_text(json.dumps(candidate, indent=2))
     os.rename(processing, done)
+    _record_shadow_drain_outcome(status, candidate=candidate, run=run)
     return status
 
 
@@ -154,6 +168,28 @@ def _finalize_error(processing: Path, done: Path, extra: dict[str, Any]) -> None
     record = {"status": STATUS_ERROR, "checked_at": now_iso(), **extra}
     processing.write_text(json.dumps(record, indent=2))
     os.rename(processing, done)
+
+
+def _record_shadow_drain_outcome(
+    status: str,
+    *,
+    candidate: dict[str, Any] | None = None,
+    run: SupervisorRun | None = None,
+) -> None:
+    candidate = candidate or {}
+    record_upstream_operation(
+        command=SHADOW_USAGE_COMMAND,
+        operation="policy.shadow_drain",
+        status=_shadow_status_to_upstream(status),
+        session=candidate.get("session_name") if isinstance(candidate.get("session_name"), str) else None,
+        run_id=run.decision.telemetry_run_id if run is not None else None,
+        parent_run_id=run.decision.telemetry_parent_run_id if run is not None else None,
+        root_run_id=run.decision.telemetry_root_run_id if run is not None else None,
+        origin=candidate.get("origin") if isinstance(candidate.get("origin"), str) else None,
+        tool_name=candidate.get("tool_name") if isinstance(candidate.get("tool_name"), str) else None,
+        target_path=candidate.get("target_path") if isinstance(candidate.get("target_path"), str) else None,
+        reason_code=status,
+    )
 
 
 def run_shadow_for_session(session_name: str, forge_root: str) -> dict[str, int]:

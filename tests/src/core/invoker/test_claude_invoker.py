@@ -19,6 +19,7 @@ import pytest
 
 from forge.core.invoker import Attribution, ClaudeHeadlessInvoker, HeadlessRequest
 from forge.core.reactive import headless_json as hj
+from forge.core.telemetry.upstream import read_upstream_outcomes
 from forge.core.usage.ledger import read_usage_events
 
 
@@ -373,8 +374,15 @@ class TestPerWorkerEmission:
     @patch("forge.core.invoker._lifecycle.subprocess.Popen")
     def test_failed_worker_emits_error_status(self, mock_popen):
         mock_popen.return_value = _mock_proc("", returncode=1, stderr="boom")
-        ClaudeHeadlessInvoker().run_parallel([_req(env=dict(_IDENT), attribution=Attribution(command="panel"))])
+        ClaudeHeadlessInvoker().run_parallel(
+            [_req(env=dict(_IDENT), attribution=Attribution(command="panel", session="planner"))]
+        )
         assert read_usage_events()[0].status == "error"
+        outcomes = read_upstream_outcomes(session="planner", command="panel")
+        assert len(outcomes) == 1
+        assert outcomes[0].operation == "workflow.worker"
+        assert outcomes[0].status == "error"
+        assert outcomes[0].reason_code == "exit_1"
 
     @patch("forge.core.invoker._lifecycle.subprocess.Popen")
     def test_one_event_per_worker(self, mock_popen):

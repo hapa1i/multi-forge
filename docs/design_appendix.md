@@ -617,34 +617,34 @@ tokens). This is the first emission of `reporter=claude_code` and `measurement_s
 cost/tokens — the verb-level aggregate above holds the estimated proxied total, so attributing per-worker would
 double-count. Helper: `emit_worker_usage`.
 
-**Read surface — `forge activity` and the session-end summary.** `read_usage_events(..., session=<name>)` filters the
-ledger by the `session` field; `forge.core.ops.usage_summary.build_session_activity_summary(name, forge_root, since=)`
-aggregates it with the manifest's `confirmed.policy.decisions` and upstream policy outcomes into a
-`SessionActivitySummary` (ledger -> per-command `CommandUsage` run/error/token/cost rows; decisions/upstream ->
-`PolicyActivity` supervisor allow/warn/deny + warnings, with `log_capped` when the decision log hit `MAX_DECISION_LOG`).
-The builder re-reads the manifest fresh from disk because hooks mutate `confirmed.*` during the run; upstream fills
-no-call/fail-open policy outcomes that never reached the manifest log. `forge activity [session]` renders a table
-(`--json`/`--days`/`--all`); the launcher prints a one-line `render_summary_line(...)` on exit (host, sidecar, fork).
-The `forge activity` Supervisor render and the session-end line append a `failing open: N timeout, N error` clause from
-the window's supervisor `failure_type` split (generic `CommandUsage.error_kinds`, surfaced in `--json`).
-`format_failing_open` returns `None` for an empty/all-zero `error_kinds`; the session-end line (`render_summary_line`)
-then falls back locally to the plain `errors` count for hand-built rows, while the `forge activity` render shows the
-clause only when kinds are populated (its commands table already carries the lumped count). This is the window aggregate
-behind the status line's consecutive `SUP!N` streak (§A.8) — no durable-schema change. Cost is reported-or-estimated
-(best-effort; the verb-snapshot aggregate contributes estimates) and may be partial (`cost_partial`);
-`forge proxy costs show` is authoritative.
+**Read surface — `forge activity` and the session-end summary.**
+`build_session_activity_summary(name, forge_root, since=)` produces a `SessionActivitySummary` with compatibility
+command rollups plus two explicit panes. The `upstream` pane groups `UpstreamOutcome`s by
+command/operation/status/reason and carries `PolicyActivity` from the manifest fallback; the fallback is capped at
+`MAX_DECISION_LOG`, so `log_capped` is surfaced and duplicate manifest/upstream warnings are suppressed. The
+`downstream` pane groups model-call/spend evidence visible to the session: downstream records whose run tree is known
+from upstream or `usage/events`, records whose provider-session id matches the hashed session prefix, and transitional
+`usage/events` command rows for labels/legacy error counts. Rows carry `join_state` (`matched`, `upstream_only`,
+`downstream_only`); a truly orphaned downstream record with no session-known run tree is not session-attributable.
+
+`forge activity --json` is a clean-break shape with top-level `session`, `since`, `upstream`, `downstream`, `shadow`,
+`subagents`, and `notes` only. Old top-level `commands`, `policy`, `total_events`, and `session_tagging_partial` fields
+are represented inside panes or `notes`. The launcher still prints the compact one-line `render_summary_line(...)` on
+exit (host, sidecar, fork) from the same builder. The `failing open: N timeout, N error` clause still comes from the
+window's supervisor failure split; JSON exposes those legacy counts under `downstream.rows[*].error_kinds`. Cost is
+reported-or-estimated and may be partial; `forge proxy costs show` is authoritative.
 
 Per-emitter session coverage (a per-session summary is honest about what it can attribute):
 
-| Emitter                                                        | Tags `session`? | Notes                                                                                    |
-| -------------------------------------------------------------- | --------------- | ---------------------------------------------------------------------------------------- |
-| Semantic supervisor (`emit_usage_for_session_result`)          | Yes             | `session=context.session_name` (= manifest name)                                         |
-| Supervisor shadow (`emit_usage_for_session_result`)            | Yes             | `command=supervisor-shadow`; detached drain worker; re-rooted under the origin session   |
-| Memory writer (`emit_usage_for_session_result`)                | Yes             | `session=session_name`                                                                   |
-| Workflow verbs panel/analyze/debate/consensus                  | Yes             | threaded `session=$FORGE_SESSION` (verb aggregate + per-worker)                          |
-| Transfer curation (`emit_direct_llm_usage`, `transfer-curate`) | Yes             | `session=$FORGE_SESSION`; ai-curated strategy only; `route=core_llm`/`runtime=forge_cli` |
-| Plan check (`emit_direct_llm_usage`, `plan-check`)             | Yes             | cascade tier-1; `session=context.session_name`; `route=core_llm`                         |
-| Action tagger (`emit_direct_llm_usage`)                        | No              | policy-internal classification; left untagged (`session_tagging_partial`)                |
+| Emitter                                                        | Tags `session`? | Notes                                                                                        |
+| -------------------------------------------------------------- | --------------- | -------------------------------------------------------------------------------------------- |
+| Semantic supervisor (`emit_usage_for_session_result`)          | Yes             | `session=context.session_name` (= manifest name)                                             |
+| Supervisor shadow (`emit_usage_for_session_result` + upstream) | Yes             | `command=supervisor-shadow`; `operation=policy.shadow_drain`; re-rooted under origin session |
+| Memory writer (`emit_usage_for_session_result`)                | Yes             | `session=session_name`                                                                       |
+| Workflow verbs panel/analyze/debate/consensus                  | Yes             | threaded `session=$FORGE_SESSION` (verb aggregate + per-worker)                              |
+| Transfer curation (`emit_direct_llm_usage`, `transfer-curate`) | Yes             | `session=$FORGE_SESSION`; ai-curated strategy only; `route=core_llm`/`runtime=forge_cli`     |
+| Plan check (`emit_direct_llm_usage`, `plan-check`)             | Yes             | cascade tier-1; `session=context.session_name`; `route=core_llm`                             |
+| Action tagger (`emit_direct_llm_usage` + upstream outcome)     | Partially       | upstream tags `session`; spend event remains untagged, so cost coverage may be partial       |
 
 **Sidecar.** When a sidecar session launches with a proxy id, the launcher mounts `~/.forge/usage/` rw alongside
 `audit/`, `costs/`, and `telemetry/` (§7), so the in-container supervisor/verb events, downstream/upstream telemetry,

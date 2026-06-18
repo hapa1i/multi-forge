@@ -13,6 +13,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from forge.core.reactive.session_runner import SessionResult
+from forge.core.telemetry.upstream import read_upstream_outcomes
 from forge.session.memory_writer import (
     _dedupe_specs,
     _stdout_indicates_permission_denied,
@@ -629,6 +630,10 @@ class TestRunHandoffAgent:
             designated_docs=self._default_docs(),
         )
         assert result is True  # Skip is not a failure
+        outcomes = read_upstream_outcomes(session="test", command="memory-writer")
+        assert len(outcomes) == 1
+        assert outcomes[0].status == "skipped"
+        assert outcomes[0].reason_code == "below_min_turns"
 
     @patch("forge.session.memory_writer.is_claude_available", return_value=False)
     def test_returns_false_when_claude_not_available(self, mock_claude: MagicMock, workspace: Path) -> None:
@@ -684,6 +689,39 @@ class TestRunHandoffAgent:
             assert "test" in args[0]  # prompt is first positional arg
             assert kwargs["cwd"] == str(workspace)
             assert kwargs["timeout_seconds"] == 120
+
+    def test_failed_subprocess_preserves_zero_latency(self, workspace: Path) -> None:
+        """A real 0.0ms duration is telemetry, not absence."""
+        cost = MagicMock()
+        cost.duration_ms = 0.0
+        mock_result = SessionResult(
+            stdout="",
+            stderr="",
+            returncode=1,
+            error="failed",
+            run_id="run_mw",
+            parent_run_id="run_parent",
+            root_run_id="run_root",
+        )
+        with (
+            patch("forge.session.memory_writer.is_claude_available", return_value=True),
+            patch("forge.session.memory_writer.run_claude_session", return_value=mock_result),
+            patch("forge.core.reactive.cost_tracking.track_verb_cost") as mock_cost,
+        ):
+            mock_cost.return_value.__enter__.return_value = cost
+            result = run_memory_writer(
+                session_name="test",
+                forge_root=workspace,
+                transcript_snapshot_rel=".forge/artifacts/test/transcripts/uuid-123.jsonl",
+                config=MemoryWriterConfig(enabled=True, min_turns=1),
+                designated_docs=self._default_docs(),
+            )
+
+        assert result is False
+        outcomes = read_upstream_outcomes(session="test", command="memory-writer")
+        assert len(outcomes) == 1
+        assert outcomes[0].status == "error"
+        assert outcomes[0].latency_ms == 0.0
 
     def test_stamps_provider_trace_identity_env(self, workspace: Path) -> None:
         """Phase 1: the writer tags its spawn with the session name + memory_writer role."""

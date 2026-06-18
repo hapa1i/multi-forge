@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import Any, NamedTuple
+from typing import Any
 
 from forge.core.reactive.cost_tracking import VerbCostResult
 from forge.core.reactive.env import get_run_identity
@@ -37,10 +37,14 @@ from forge.core.telemetry.downstream import (
 from forge.core.usage.billing import infer_billing_mode
 from forge.core.usage.ledger import (
     BillingMode,
-    MeasurementSource,
     SourceRefs,
     UsageEvent,
     log_usage_event,
+)
+from forge.core.usage.measurement import (
+    resolve_claude_p_measurement,
+    resolve_codex_measurement,
+    resolve_direct_llm_measurement,
 )
 from forge.core.usage.vocabulary import Confidence, Reporter
 
@@ -63,54 +67,6 @@ def _session_status(result: SessionResult) -> tuple[str, str | None]:
     if result.error:
         return "error", "subprocess_error"
     return "error", f"exit_{result.returncode}"
-
-
-class _DirectProvenance(NamedTuple):
-    """Cost/token provenance for a direct (non-proxied) ``claude -p`` run."""
-
-    cost_micro_usd: int | None
-    reporter: Reporter | None
-    confidence: Confidence
-    measurement_source: MeasurementSource
-    input_tokens: int | None
-    output_tokens: int | None
-    cached_tokens: int | None
-
-
-def _direct_cost_provenance(
-    self_cost: int | None,
-    envelope_parsed: bool,
-    input_tokens: int | None,
-    output_tokens: int | None,
-    cached_tokens: int | None,
-) -> _DirectProvenance:
-    """One-reporter cost precedence for a DIRECT (non-proxied) ``claude -p`` run.
-
-    ``self_cost`` is the runtime's self-reported cost, already gated on
-    ``envelope_parsed`` by the caller (``None`` when the envelope did not parse).
-    Three outcomes:
-
-    - self-reported cost present -> ``claude_code`` / ``reported`` / ``runtime_native``
-      with the run's exact in-band tokens.
-    - cost absent but tokens present (e.g. OAuth) -> ``provider_usage_exact`` /
-      ``unavailable`` with exact tokens (cost honestly absent, not $0).
-    - neither -> ``unattributed`` / ``unavailable``, no tokens.
-
-    Shared by the verb (:func:`emit_usage_for_session_result`) and per-worker
-    (:func:`emit_worker_usage`) emitters so the direct-path rule lives once. The
-    PROXIED path is deliberately NOT here -- it diverges by caller: the verb attributes
-    the proxy snapshot, a per-worker event stays unattributed so it does not
-    double-count the verb-level aggregate.
-    """
-    if self_cost is not None:
-        return _DirectProvenance(
-            self_cost, "claude_code", "reported", "runtime_native", input_tokens, output_tokens, cached_tokens
-        )
-    if envelope_parsed and input_tokens is not None:
-        return _DirectProvenance(
-            None, None, "unavailable", "provider_usage_exact", input_tokens, output_tokens, cached_tokens
-        )
-    return _DirectProvenance(None, None, "unavailable", "unattributed", None, None, None)
 
 
 def emit_usage_for_session_result(
@@ -140,50 +96,19 @@ def emit_usage_for_session_result(
         # Cost-provenance precedence (Phase 5). EXACTLY ONE reporter attributes cost
         # per run: forge_proxy (proxied) XOR claude_code (direct self-report) XOR none.
         proxied = bool(base_url)
-        proxy_cost_evident = cost is not None and cost.cost_measured
         # #1: a parsed envelope can carry tokens with NO cost (direct OAuth) -> gate the
         # self-reported cost on envelope_parsed, not on cost presence.
         self_cost = result.cost_micro_usd if result.envelope_parsed else None
-
-        cost_micro_usd: int | None
-        reporter: Reporter | None
-        confidence: Confidence
-        measurement_source: MeasurementSource
-        in_tok: int | None
-        out_tok: int | None
-        cache_tok: int | None
-
-        if proxied:
-            # Proxy snapshot wins. Claude's total_cost_usd is Anthropic-priced -> wrong
-            # for a non-Anthropic proxied backend, and a duplicate of the proxy's report.
-            if proxy_cost_evident and cost is not None:
-                cost_micro_usd, reporter, confidence = cost.total_cost_micros, "forge_proxy", "reported"
-            else:
-                cost_micro_usd, reporter, confidence = None, None, "unavailable"
-            # #4: tokens FOLLOW the cost source -- a proxied event keeps SNAPSHOT tokens,
-            # never exact in-band tokens (no mixed provenance). The snapshot is the figure
-            # source whenever tokens were *measured*, so measurement_source is
-            # verb_snapshot_estimated even on a token-only window (cost_measured=False): a
-            # measured-tokens event must not read as "unattributed" (it carries figures).
-            if cost is not None and cost.measured:
-                in_tok, out_tok, cache_tok = cost.input_tokens, cost.output_tokens, cost.cached_tokens
-                measurement_source = "verb_snapshot_estimated"
-            else:
-                in_tok = out_tok = cache_tok = None
-                measurement_source = "unattributed"
-        else:
-            # Direct / non-proxied: the runtime self-reports (closes today's unavailable gap).
-            # Shared one-reporter precedence (also used per-worker) -- tokens follow the cost source.
-            prov = _direct_cost_provenance(
-                self_cost, result.envelope_parsed, result.input_tokens, result.output_tokens, result.cached_tokens
-            )
-            cost_micro_usd, reporter, confidence, measurement_source = (
-                prov.cost_micro_usd,
-                prov.reporter,
-                prov.confidence,
-                prov.measurement_source,
-            )
-            in_tok, out_tok, cache_tok = prov.input_tokens, prov.output_tokens, prov.cached_tokens
+        measurement = resolve_claude_p_measurement(
+            caller="verb",
+            proxied=proxied,
+            cost=cost,
+            self_cost=self_cost,
+            envelope_parsed=result.envelope_parsed,
+            input_tokens=result.input_tokens,
+            output_tokens=result.output_tokens,
+            cached_tokens=result.cached_tokens,
+        )
 
         # "Direct" for billing only when no proxy is in the path; a proxied call's
         # upstream billing is opaque from here, so it stays "unknown".
@@ -200,19 +125,19 @@ def emit_usage_for_session_result(
             workflow=workflow,
             model=model,
             billing_mode=infer_billing_mode(direct=effective_direct, has_api_key=_anthropic_key_present()),
-            measurement_source=measurement_source,
+            measurement_source=measurement.measurement_source,
             attribution_granularity="verb",
             route="claude_p",
-            reporter=reporter,
-            confidence=confidence,
-            input_tokens=in_tok,
-            output_tokens=out_tok,
-            cached_tokens=cache_tok,
-            cost_micro_usd=cost_micro_usd,
+            reporter=measurement.reporter,
+            confidence=measurement.confidence,
+            input_tokens=measurement.input_tokens,
+            output_tokens=measurement.output_tokens,
+            cached_tokens=measurement.cached_tokens,
+            cost_micro_usd=measurement.cost_micro_usd,
             latency_ms=round(cost.duration_ms, 1) if (cost and cost.duration_ms) else None,
             source_refs=None,  # claude -p: proxy request_id unknown to Forge (4g)
         )
-        if not proxied:
+        if measurement.write_downstream:
             write_downstream_record(
                 DownstreamRecord(
                     kind="attempt",
@@ -220,15 +145,15 @@ def emit_usage_for_session_result(
                     forge_run_id=result.run_id,
                     forge_root_run_id=result.root_run_id or result.run_id,
                     provider=None,
-                    source_id=reporter,
-                    source_kind="provider" if reporter else None,
+                    source_id=measurement.reporter,
+                    source_kind="provider" if measurement.reporter else None,
                     model=model,
-                    input_tokens=in_tok,
-                    output_tokens=out_tok,
-                    cached_tokens=cache_tok,
-                    cost_micros=cost_micro_usd,
-                    reporter=reporter,
-                    confidence=confidence,
+                    input_tokens=measurement.input_tokens,
+                    output_tokens=measurement.output_tokens,
+                    cached_tokens=measurement.cached_tokens,
+                    cost_micros=measurement.cost_micro_usd,
+                    reporter=measurement.reporter,
+                    confidence=measurement.confidence,
                     latency_ms=round(cost.duration_ms, 1) if (cost and cost.duration_ms) else None,
                     failed=status != "success",
                 )
@@ -335,31 +260,15 @@ def emit_worker_usage(
             return
         proxied = bool(base_url)
         self_cost = cost_micro_usd if envelope_parsed else None
-
-        reporter: Reporter | None
-        confidence: Confidence
-        measurement_source: MeasurementSource
-        ev_cost: int | None
-        in_tok: int | None
-        out_tok: int | None
-        cache_tok: int | None
-
-        if proxied:
-            # A per-worker proxy cost is not isolatable here; the verb-level aggregate
-            # (emit_verb_usage) holds the estimated total, so attributing cost per-worker
-            # would double-count. Stay unattributed with null cost/tokens.
-            ev_cost, reporter, confidence, measurement_source = None, None, "unavailable", "unattributed"
-            in_tok = out_tok = cache_tok = None
-        else:
-            # Direct worker: same one-reporter precedence as the verb path.
-            prov = _direct_cost_provenance(self_cost, envelope_parsed, input_tokens, output_tokens, cached_tokens)
-            ev_cost, reporter, confidence, measurement_source = (
-                prov.cost_micro_usd,
-                prov.reporter,
-                prov.confidence,
-                prov.measurement_source,
-            )
-            in_tok, out_tok, cache_tok = prov.input_tokens, prov.output_tokens, prov.cached_tokens
+        measurement = resolve_claude_p_measurement(
+            caller="worker",
+            proxied=proxied,
+            self_cost=self_cost,
+            envelope_parsed=envelope_parsed,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            cached_tokens=cached_tokens,
+        )
 
         event = UsageEvent(
             run_id=run_id,
@@ -374,18 +283,18 @@ def emit_worker_usage(
             model=model,
             proxy_id=proxy_id,
             route="claude_p",
-            reporter=reporter,
-            confidence=confidence,
-            measurement_source=measurement_source,
+            reporter=measurement.reporter,
+            confidence=measurement.confidence,
+            measurement_source=measurement.measurement_source,
             attribution_granularity="worker",
-            input_tokens=in_tok,
-            output_tokens=out_tok,
-            cached_tokens=cache_tok,
-            cost_micro_usd=ev_cost,
+            input_tokens=measurement.input_tokens,
+            output_tokens=measurement.output_tokens,
+            cached_tokens=measurement.cached_tokens,
+            cost_micro_usd=measurement.cost_micro_usd,
             latency_ms=round(latency_ms, 1) if latency_ms is not None else None,
             source_refs=None,
         )
-        if not proxied:
+        if measurement.write_downstream:
             write_downstream_record(
                 DownstreamRecord(
                     kind="attempt",
@@ -396,12 +305,12 @@ def emit_worker_usage(
                     source_id=provider,
                     source_kind="provider" if provider else None,
                     model=model,
-                    input_tokens=in_tok,
-                    output_tokens=out_tok,
-                    cached_tokens=cache_tok,
-                    cost_micros=ev_cost,
-                    reporter=reporter,
-                    confidence=confidence,
+                    input_tokens=measurement.input_tokens,
+                    output_tokens=measurement.output_tokens,
+                    cached_tokens=measurement.cached_tokens,
+                    cost_micros=measurement.cost_micro_usd,
+                    reporter=measurement.reporter,
+                    confidence=measurement.confidence,
                     latency_ms=round(latency_ms, 1) if latency_ms is not None else None,
                     failed=status != "success",
                 )
@@ -439,7 +348,7 @@ def emit_codex_usage(
       stream's exact tokens (the *tokens* are attributed);
     - ``confidence="unavailable"`` -- the ledger's ``confidence`` is a **cost** signal,
       and Codex reports no cost (mirrors the tokens-only direct branch in
-      :func:`_direct_cost_provenance`). Honest absence, never a fabricated $0.
+      ``direct_cost_provenance``. Honest absence, never a fabricated $0.
 
     ``billing_mode`` is the resolved Codex posture (from ``CodexPreflight``); the
     invoker can't infer it. Best-effort; no-ops without a ``run_id``.
@@ -447,6 +356,11 @@ def emit_codex_usage(
     try:
         if not run_id:
             return
+        measurement = resolve_codex_measurement(
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            cached_tokens=cached_tokens,
+        )
         write_downstream_record(
             DownstreamRecord(
                 kind="attempt",
@@ -457,12 +371,12 @@ def emit_codex_usage(
                 source_id=provider,
                 source_kind="provider",
                 model=model,
-                input_tokens=input_tokens,
-                output_tokens=output_tokens,
-                cached_tokens=cached_tokens,
-                cost_micros=None,
-                reporter="codex_jsonl",
-                confidence="unavailable",
+                input_tokens=measurement.input_tokens,
+                output_tokens=measurement.output_tokens,
+                cached_tokens=measurement.cached_tokens,
+                cost_micros=measurement.cost_micro_usd,
+                reporter=measurement.reporter,
+                confidence=measurement.confidence,
                 latency_ms=round(latency_ms, 1) if latency_ms is not None else None,
                 failed=status != "success",
             )
@@ -480,14 +394,14 @@ def emit_codex_usage(
             model=model,
             billing_mode=billing_mode or "unknown",
             route="codex_exec",
-            reporter="codex_jsonl",
-            confidence="unavailable",
-            measurement_source="runtime_native",
+            reporter=measurement.reporter,
+            confidence=measurement.confidence,
+            measurement_source=measurement.measurement_source,
             attribution_granularity="worker",
-            input_tokens=input_tokens,
-            output_tokens=output_tokens,
-            cached_tokens=cached_tokens,
-            cost_micro_usd=None,  # native runtime: no $ figure (no proxy record to join)
+            input_tokens=measurement.input_tokens,
+            output_tokens=measurement.output_tokens,
+            cached_tokens=measurement.cached_tokens,
+            cost_micro_usd=measurement.cost_micro_usd,  # native runtime: no $ figure (no proxy record to join)
             latency_ms=round(latency_ms, 1) if latency_ms is not None else None,
             source_refs=None,  # direct to OpenAI: no Forge proxy request_id exists
         )
@@ -528,12 +442,10 @@ def emit_direct_llm_usage(
         identity = get_run_identity()
         if identity is None:
             return
-        measured = usage is not None
-        # Direct core.llm call: tokens are provider-reported in-band when present, so
-        # reporter="provider"; this helper never computes a $ figure (cost_micro_usd stays
-        # None), so cost confidence is always "unavailable" -- not a contradiction with the
-        # provider-reported tokens, and a joined source_refs cost ref does not change it.
-        reporter: Reporter | None = "provider" if measured else None
+        measurement = resolve_direct_llm_measurement(usage=usage)
+        # Direct core.llm call: tokens are provider-reported in-band when present. This
+        # helper never computes a $ figure, so cost confidence is always unavailable; a
+        # joined source_refs cost ref does not change event-local confidence.
         pm: dict[str, Any] = {}
         if provider_meta is not None:
             model_dump = getattr(provider_meta, "model_dump", None)
@@ -571,12 +483,12 @@ def emit_direct_llm_usage(
                     provider=provider or pm_provider,
                     selected_provider=pm_selected_provider,
                     model=model,
-                    input_tokens=usage.get("prompt_tokens") if usage else None,
-                    output_tokens=usage.get("completion_tokens") if usage else None,
-                    cached_tokens=usage.get("cached_tokens") if usage else None,
-                    cost_micros=None,
-                    reporter=reporter,
-                    confidence="unavailable",
+                    input_tokens=measurement.input_tokens,
+                    output_tokens=measurement.output_tokens,
+                    cached_tokens=measurement.cached_tokens,
+                    cost_micros=measurement.cost_micro_usd,
+                    reporter=measurement.reporter,
+                    confidence=measurement.confidence,
                     latency_ms=round(latency_ms, 1) if latency_ms is not None else None,
                     failed=status != "success",
                     provider_response_id=pm_response_id,
@@ -600,15 +512,15 @@ def emit_direct_llm_usage(
             provider=provider,
             model=model,
             billing_mode=billing_mode,
-            measurement_source="provider_usage_exact" if measured else "unattributed",
+            measurement_source=measurement.measurement_source,
             attribution_granularity="verb",
             route="core_llm",
-            reporter=reporter,
-            confidence="unavailable",
-            input_tokens=usage.get("prompt_tokens") if usage else None,
-            output_tokens=usage.get("completion_tokens") if usage else None,
-            cached_tokens=usage.get("cached_tokens") if usage else None,
-            cost_micro_usd=None,
+            reporter=measurement.reporter,
+            confidence=measurement.confidence,
+            input_tokens=measurement.input_tokens,
+            output_tokens=measurement.output_tokens,
+            cached_tokens=measurement.cached_tokens,
+            cost_micro_usd=measurement.cost_micro_usd,
             latency_ms=round(latency_ms, 1) if latency_ms is not None else None,
             source_refs=SourceRefs(cost_request_id=cost_request_id) if cost_request_id else None,
         )

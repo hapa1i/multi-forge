@@ -27,6 +27,20 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-18
 
+### upstream_downstream_ledgers closeout: two-pane activity + upstream boundary coverage
+
+**Goal**: Finish two-pane `forge activity` and close non-engine upstream outcome gaps.
+
+**Key changes**:
+
+- Extracted shared measurement resolution for proxied/direct/self-reported paths.
+- Routed policy-engine writes through `record_upstream_operation(...)` and added non-engine operation outcomes.
+- Reworked `forge activity` into Operation outcomes and Model calls panes with clean-break JSON and bounded rollups.
+- Kept `render_summary_line(...)` in lockstep and updated design, user, CLI, QA, and board docs.
+
+**Verification**: `mypy` clean for `measurement.py`; targeted suites passed 434/237/517 tests; integration closeout
+passed 36 tests; `make pre-commit` clean.
+
 ### upstream_downstream_ledgers: telemetry clean cut and cap-safe migration
 
 **Goal**: Re-cut Forge telemetry toward downstream model-attempt evidence and upstream operation outcomes without

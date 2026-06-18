@@ -97,7 +97,7 @@ Locked implementation decisions (2026-06-18):
 
 ## Phase 2 -- Downstream Measurement Resolver
 
-- [ ] Extract a single measurement resolver for proxied/direct/self-reported evidence that preserves today's intentional
+- [x] Extract a single measurement resolver for proxied/direct/self-reported evidence that preserves today's intentional
   divergence between verb aggregates and per-worker events.
 - [x] Consume `ProviderTraceMeta` on direct `core.llm` calls so direct OpenRouter-capable calls no longer build provider
   metadata and drop it before persistence.
@@ -116,23 +116,23 @@ Locked implementation decisions (2026-06-18):
 
 ## Phase 3 -- Upstream Outcome Instrumentation
 
-- [ ] Add an operation-boundary helper/context manager that records upstream outcome at the policy evaluation or finer
-  operation boundary, not merely the enclosing CLI verb.
-- [ ] Cover success, warning/fail-open, deny/block, skipped/cached, timeout, parse error, auth/config error, and
-  unexpected exception outcomes.
-- [ ] Instrument semantic supervisor checks, including cached allows, auth/proxy fail-open, timeout, parse fail-open,
-  and high-confidence deny.
-- [ ] Instrument deterministic policy evaluations without flattening one `forge hook policy-check` invocation into one
-  outcome; one invocation can emit N outcomes for N evaluations.
-- [ ] Instrument memory writer, shadow drain, workflow invocations/workers, transfer curation, and action tagger
-  boundaries where they produce user-visible automation outcomes.
-- [ ] Ensure upstream writes are session-tagged where a session exists and honest when no session exists.
-- [ ] Add tests proving no-call operations now produce upstream outcomes and that outcome status is not conflated with
-  subprocess success.
+- [x] Extract a shared operation-boundary helper (`record_upstream_operation`) for non-engine call sites and route the
+  existing policy-engine writer through it.
+- [x] Cover success, warning/fail-open, deny/block, skipped/cached, timeout, parse/auth/config errors, and unexpected
+  exception outcomes while preserving the default `non_success` volume.
+- [x] Verify semantic supervisor no-call returns (cached/config/proxy/depth/parse/deny paths) flow back through
+  `PolicyEngine._record_policy_outcome`; no separate supervisor writer is needed.
+- [x] Verify deterministic policy evaluations stay granular through the existing engine path; one policy-check
+  invocation can emit N per-policy outcomes.
+- [x] Instrument memory writer, supervisor shadow drain, shadow curation, workflow invocations/workers, transfer
+  curation, and action tagger boundaries where they produce user-visible automation outcomes.
+- [x] Ensure upstream writes are session-tagged where a session exists and honest when no session exists.
+- [x] Add tests proving no-call/non-engine operations produce upstream outcomes and that outcome status is not conflated
+  with subprocess success.
 
 ## Phase 4 -- Read Surfaces And Compatibility
 
-- [ ] Rework `forge activity` to read upstream outcomes by session and join downstream cost/tokens by run tree as a
+- [x] Rework `forge activity` to read upstream outcomes by session and join downstream cost/tokens by run tree as a
   two-pane outer join, with unmatched rows on both sides visible.
 - [x] Overlay upstream policy outcomes into the existing activity policy counters so no-call/fail-open policy outcomes
   are visible when they are not present in `confirmed.policy.decisions`.
@@ -142,11 +142,11 @@ Locked implementation decisions (2026-06-18):
   interactive harness, with unavailable cost hidden rather than shown as zero.
 - [x] Keep `forge proxy costs show` authoritative for proxy/downstream spend and make any legacy cost-log fallback
   visibly labeled.
-- [ ] Resolve the `confirmed.policy.decisions` open decision below: keep it only as an audit/debug side-channel or prune
-  it from activity aggregation entirely.
+- [x] Resolve the `confirmed.policy.decisions` open decision below: keep it as a capped manifest fallback for
+  success/cached policy counts and warning text, with upstream/manifest dedupe.
 - [x] Update [cli_reference.md](../../../cli_reference.md) and relevant end-user cost/activity docs for any shipped CLI
   surface changes, or record the deferral as checklist debt.
-- [ ] Add human and `--json` rendering tests for mixed upstream/downstream cases, join misses, exact vs estimated cost,
+- [x] Add human and `--json` rendering tests for mixed upstream/downstream cases, join misses, exact vs estimated cost,
   fail-open breakdowns, and old-log compatibility.
 
 ## Phase 5 -- Migration, Docs, And Closeout
@@ -157,7 +157,7 @@ Locked implementation decisions (2026-06-18):
 - [x] Update [cli_reference.md](../../../cli_reference.md) for any changed `forge activity`, `forge proxy costs`, or
   diagnostic command behavior.
 - [x] Update relevant end-user docs for cost/activity/proxy telemetry behavior.
-- [ ] Verify [design.md](../../../design.md) §3.14, [design_appendix.md](../../../design_appendix.md) §A.12-A.14,
+- [x] Verify [design.md](../../../design.md) §3.14, [design_appendix.md](../../../design_appendix.md) §A.12-A.14,
   [cli_reference.md](../../../cli_reference.md), and end-user cost/activity docs match shipped behavior after the open
   Phase 2/3/4 items land.
 - [x] Add a compact change-log entry when implementation ships.
@@ -191,7 +191,9 @@ Locked implementation decisions (2026-06-18):
 - [x] V1 downstream compatibility: migrate old cost/audit/provider-trace readers, dual-write temporarily, or clean-cut
   with reset instructions?
 - [x] Interim downstream source key before `backend_id`.
-- [ ] Whether `confirmed.policy.decisions` remains in `forge activity` after upstream outcomes ship.
+- [x] Whether `confirmed.policy.decisions` remains in `forge activity` after upstream outcomes ship. Resolved
+  2026-06-18: keep it as a capped fallback for success/cached policy counts and recent warning text; propagate
+  `log_capped` and dedupe any manifest/upstream overlap.
 - [x] Whether provider-trace paths move immediately into downstream layout or stay bridged until `unified_backend`.
-- [ ] Whether tool/function calls are downstream records in v1, or remain out of scope unless they carry independent
-  cost.
+- [x] Whether tool/function calls are downstream records in v1, or remain out of scope unless they carry independent
+  cost. Resolved 2026-06-18: out of scope for v1 unless there is independent model-call/spend evidence.

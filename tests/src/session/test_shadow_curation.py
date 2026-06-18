@@ -203,6 +203,9 @@ class TestRunShadowCuration:
         result.error = None if success else "failed"
         result.stdout = stdout
         result.stderr = ""
+        result.run_id = "run_cur"
+        result.parent_run_id = "run_parent"
+        result.root_run_id = "run_root"
         return result
 
     @patch("forge.core.reactive.session_runner.run_claude_session")
@@ -251,6 +254,7 @@ class TestRunShadowCuration:
     @patch("forge.core.reactive.session_runner.run_claude_session")
     @patch("forge.core.reactive.cost_tracking.track_verb_cost")
     def test_failure_returns_no_report(self, mock_cost: MagicMock, mock_run: MagicMock, tmp_path: Path) -> None:
+        mock_cost.return_value.__enter__.return_value.duration_ms = 0.0
         mock_run.return_value = self._mock_result(success=False)
 
         result = run_shadow_curation(
@@ -263,6 +267,14 @@ class TestRunShadowCuration:
 
         assert not result.success
         assert result.report_path is None
+        from forge.core.telemetry.upstream import read_upstream_outcomes
+
+        outcomes = read_upstream_outcomes(session="s1", command="curation")
+        assert len(outcomes) == 1
+        assert outcomes[0].operation == "memory.shadow_curation"
+        assert outcomes[0].status == "error"
+        assert outcomes[0].reason_code == "subprocess_error"
+        assert outcomes[0].latency_ms == 0.0
 
 
 # ---------------------------------------------------------------------------
