@@ -98,6 +98,54 @@ forge proxy edit my-high-reasoning
 
 **Principle:** Create from template, then edit (don't modify internals).
 
+### A.2.1 Model source catalog (§3.6.5 / unified backend Phase 1)
+
+Forge now has a built-in, code-level model-source catalog in `forge.backend.sources`. It is a static definition layer
+for the upstream model source a proxy or direct runtime reaches; it is **not** user-authored durable state and it is
+distinct from both proxy templates and runtime backend instances.
+
+| Layer                    | Owner / Location                             | Unit                                                                                  |
+| ------------------------ | -------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Model-source catalog     | `forge.backend.sources`                      | Static source definition: id, kind, endpoint shape, credentials, provider, capability |
+| Proxy templates          | `src/forge/config/defaults/templates/*.yaml` | Operational routing profiles; Phase 2 migrates them to `proxy.source`                 |
+| Local backend config     | `~/.forge/backends/<adapter>/config.yaml`    | LiteLLM service config (`model_list` / routing), copied by `forge backend create`     |
+| Runtime backend registry | `~/.forge/backends/index.json`               | PID/port/status rows for running local process instances only                         |
+
+`ModelSource.id` is the canonical catalog id. Local source ids intentionally live in a different value-space from
+runtime instance ids: for example, `litellm-gemini-local` is a source id, while `litellm-4000` remains a
+`BackendInstance.backend_id`. Downstream telemetry may later use `backend_id` for source attribution, but Phase 4 must
+write the catalog source id rather than the runtime instance id.
+
+Source definitions have:
+
+- `id`: stable catalog id, lowercase letters/digits plus `-`, `_`, or `.`
+- `kind`: `local` or `remote`
+- `provider`: `ProviderType` (`litellm_remote`, `litellm_local`, `anthropic`, `openrouter`)
+- `endpoint`: one of `literal_url`, `connection_value`, or `local_backend`
+- `credential_ids`: credential registry names such as `openrouter`, `litellm-remote`, `anthropic-api`, `openai-api`, or
+  `gemini-api`
+- `capabilities`: currently includes auth-probe, provider-trace eligibility, and OpenRouter user-grouping capability
+- `local_lifecycle`: local-only refinement with adapter, default port, and required env vars; remote sources never set
+  it
+- `template_aliases`: current template names that resolve to the canonical source id during the Phase 2 migration
+
+The shipped v1 catalog includes:
+
+| Source id                 | Kind   | Provider         | Endpoint shape                       | Credentials      | Notes                                     |
+| ------------------------- | ------ | ---------------- | ------------------------------------ | ---------------- | ----------------------------------------- |
+| `openrouter`              | remote | `openrouter`     | `OPENROUTER_BASE_URL` + default URL  | `openrouter`     | Provider-trace and user-group capable     |
+| `litellm-remote`          | remote | `litellm_remote` | `LITELLM_BASE_URL`                   | `litellm-remote` | Aliases remote LiteLLM templates          |
+| `anthropic-passthrough`   | remote | `anthropic`      | `https://api.anthropic.com`          | `anthropic-api`  | Proxy-template source, no lifecycle       |
+| `anthropic-direct`        | remote | `anthropic`      | `https://api.anthropic.com`          | `anthropic-api`  | Direct-runtime attribution source         |
+| `litellm-gemini-local`    | local  | `litellm_local`  | local LiteLLM backend on port `4000` | `gemini-api`     | Also aliases `litellm-gemini-flash-local` |
+| `litellm-openai-local`    | local  | `litellm_local`  | local LiteLLM backend on port `4000` | `openai-api`     | Also aliases `litellm-openai-codex-local` |
+| `litellm-anthropic-local` | local  | `litellm_local`  | local LiteLLM backend on port `4000` | `anthropic-api`  | Local Anthropic via LiteLLM               |
+| `litellm-gemini-test`     | local  | `litellm_local`  | local LiteLLM backend on port `4001` | `gemini-api`     | Internal integration-test dependency      |
+
+Catalog validation rejects duplicate source ids or aliases, unknown `kind`/`provider` values, missing or unknown
+credentials, malformed literal URLs, malformed connection-value env var names, remote lifecycle declarations, and local
+sources without lifecycle. Remote definitions are never written to `BackendRegistry`.
+
 ### A.3 Confusion traps / anti-patterns (§3.6.6)
 
 | Anti-pattern                            | Why it fails                                                                        |

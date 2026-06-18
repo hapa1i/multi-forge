@@ -79,23 +79,25 @@ more confusing, not less.
   `omitted_by_config` only for deliberate interactive-key omission; human "not configured" maps from `none`.
 - [x] Record the proposed design lock in [card.md](card.md): supertype name, remote id unit, carrier decision, provider
   vocabulary fate, `source_kind` axis decision, template shape, and lifecycle CLI shape.
-- [ ] Get human acknowledgement of the Phase 0 design lock before Phase 1 code.
+- [x] Get human acknowledgement of the Phase 0 design lock before Phase 1 code. Acknowledged by the 2026-06-18 request
+  to start Phase 1.
 - [x] Update this checklist if the source map changes the phase ordering before coding. No phase-order change needed;
   Phase 1 remains catalog/type primitives first.
 
 ## Phase 1 -- Catalog And Type Primitives
 
-- [ ] Add typed model-source/backend definitions with `id`, `kind`, endpoint/base URL or connection-value reference,
+- [x] Add typed model-source/backend definitions with `id`, `kind`, endpoint/base URL or connection-value reference,
   `ProviderType` wire-client hint, credential dependencies, and capabilities such as provider-trace eligibility.
-- [ ] Represent local lifecycle as a local-only refinement or related instance type, not as a field every remote source
-  must fake.
-- [ ] Add built-in definitions for existing remote OpenRouter templates, remote LiteLLM templates, local LiteLLM
+  Implemented in `src/forge/backend/sources.py`.
+- [x] Represent local lifecycle as a local-only refinement or related instance type, not as a field every remote source
+  must fake. `LocalBackendLifecycle` is optional on `ModelSource` and validation rejects it on remote sources.
+- [x] Add built-in definitions for existing remote OpenRouter templates, remote LiteLLM templates, local LiteLLM
   templates, `litellm-gemini-test`, and Anthropic passthrough/direct behavior according to the Phase 0 decision.
-- [ ] Add strict validation for duplicate ids, unknown kind/provider values, missing credential declarations, and bad
+- [x] Add strict validation for duplicate ids, unknown kind/provider values, missing credential declarations, and bad
   endpoint/connection-value shapes.
-- [ ] Add tests proving remote definitions never enter the PID/port runtime registry and local definitions still map to
-  their lifecycle adapter where needed.
-- [ ] Update [design_appendix.md](../../../design_appendix.md) for the shipped source-definition schema and static-vs-
+- [x] Add tests proving remote definitions never enter the PID/port runtime registry and local definitions still map to
+  their lifecycle adapter where needed. Covered by `tests/src/backend/test_sources.py`.
+- [x] Update [design_appendix.md](../../../design_appendix.md) for the shipped source-definition schema and static-vs-
   runtime ownership before moving to the next phase.
 
 ## Phase 2 -- Template And Auth Integration
@@ -111,6 +113,9 @@ more confusing, not less.
   (`OPENROUTER_BASE_URL`, `LITELLM_BASE_URL`, etc.) without duplicating auth logic.
 - [ ] Bridge `TEMPLATE_ENV_VARS` and `credentials_for_template()` to the new source definitions, or replace them with a
   single generated/typed dependency map. Do not use `Credential.unlocks_features` as logic.
+- [ ] Collapse the temporary Phase 1 auth duplication: local source `credential_ids` / lifecycle `required_env_vars`,
+  `TEMPLATE_ENV_VARS`, and template `backend_dependency.required_env_vars` must derive from one catalog-backed source of
+  truth rather than remain parallel encodings.
 - [ ] Update schema/loader sites for any new template key. `_load_template_config()` ends in
   `dict_to_dataclass(ForgeConfig, config_dict, strict=True)`, so the new `proxy.source` field must be accepted by
   `ProxyConfig` or transformed before strict dataclass loading.

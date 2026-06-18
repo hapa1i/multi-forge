@@ -16,6 +16,19 @@ from forge.backend.registry import (
     BackendRegistry,
     BackendRegistryStore,
 )
+from forge.backend.sources import (
+    LocalBackendLifecycle,
+    ModelSource,
+    ModelSourceCapabilities,
+    ModelSourceCatalogError,
+    ModelSourceNotFoundError,
+    SourceEndpoint,
+    get_model_source,
+    list_model_sources,
+    model_source_for_template,
+    resolve_model_source_id,
+    validate_model_sources,
+)
 
 
 @dataclass(frozen=True)
@@ -171,4 +184,15 @@ __all__ = [
     "BackendRegistry",
     "BackendRegistryStore",
     "BackendStartError",
+    "LocalBackendLifecycle",
+    "ModelSource",
+    "ModelSourceCapabilities",
+    "ModelSourceCatalogError",
+    "ModelSourceNotFoundError",
+    "SourceEndpoint",
+    "get_model_source",
+    "list_model_sources",
+    "model_source_for_template",
+    "resolve_model_source_id",
+    "validate_model_sources",
 ]
