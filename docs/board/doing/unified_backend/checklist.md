@@ -133,21 +133,22 @@ more confusing, not less.
 
 ## Phase 3 -- Backend CLI And Operator Views
 
-- [ ] Rework `forge backend list` to show both local and remote sources with kind, endpoint, required credential,
+- [x] Rework `forge backend list` to show both local and remote sources with kind, endpoint, required credential,
   credential provenance, and health/reachability status. Treat these as net-new output fields; today's `--json` only
-  emits runtime registry fields (`backend_id`, `adapter_type`, `port`, `pid`, `status`).
-- [ ] Rework `forge backend show <id>` to render source definition details and, for local sources, current runtime
+  emits runtime registry fields (`backend_id`, `adapter_type`, `port`, `pid`, `status`). Implemented as built-in source
+  records plus nested local runtime-instance details.
+- [x] Rework `forge backend show <id>` to render source definition details and, for local sources, current runtime
   instance state when present.
-- [ ] Add `forge backend test-auth <id>` as a net-new command, or intentionally choose another command name in the Phase
+- [x] Add `forge backend test-auth <id>` as a net-new command, or intentionally choose another command name in the Phase
   0 design lock. Cover local and remote sources with typed outcomes and no secret echo in human or JSON output.
-- [ ] Rework lifecycle verb signatures according to the Phase 0 verb split. Remote `start`/`stop` attempts must reach a
+- [x] Rework lifecycle verb signatures according to the Phase 0 verb split. Remote `start`/`stop` attempts must reach a
   concise no-lifecycle capability error rather than dying at Click's `litellm` choice validation; `create`/`delete`
   remain local-only adapter/instance operations with explicit help/error text.
-- [ ] Update `forge authentication status` only if needed to point users toward the unified source view without
-  duplicating the source table.
-- [ ] Add CLI tests for human and `--json` output, remote no-lifecycle behavior, missing credentials, credential-file
+- [x] Update `forge authentication status` only if needed to point users toward the unified source view without
+  duplicating the source table. No auth-status change needed; `forge backend list`/`test-auth` now own source views.
+- [x] Add CLI tests for human and `--json` output, remote no-lifecycle behavior, missing credentials, credential-file
   provenance, local runtime-instance display, and command parsing of remote lifecycle operands.
-- [ ] Update [cli_reference.md](../../../cli_reference.md), relevant `docs/end-user/*` guides, and any design appendix
+- [x] Update [cli_reference.md](../../../cli_reference.md), relevant `docs/end-user/*` guides, and any design appendix
   command-contract notes as the CLI behavior ships.
 
 ## Phase 4 -- Proxy Runtime And Downstream Attribution

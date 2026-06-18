@@ -10,19 +10,38 @@ Provides commands to manage backend services (LiteLLM, etc.) that proxies depend
 
 from __future__ import annotations
 
+import json
 import sys
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import click
 from rich.console import Console
 from rich.table import Table
 
-from forge.backend import BackendManager
+from forge.backend import BackendManager, ModelSource, ModelSourceNotFoundError
 from forge.backend.adapters import get_adapter
 from forge.backend.creation import create_backend_config, get_backend_config_path
-from forge.backend.registry import BackendRegistryStore, is_pid_alive
+from forge.backend.registry import BackendInstance, BackendRegistryStore, is_pid_alive
+from forge.backend.sources import (
+    get_model_source,
+    list_model_sources,
+    resolve_model_source_id,
+)
 from forge.cli.output import print_error_with_tip, print_tip
+from forge.core.auth.template_secrets import resolve_env_or_credential_with_source
+from forge.core.credential_registry import EnvVar
 from forge.core.paths import display_path, get_forge_home
+
+_SUPPORTED_ADAPTERS = frozenset({"litellm"})
+
+
+@dataclass(frozen=True)
+class _ProbeResult:
+    status: str
+    detail: str
+    http_status: int | None = None
 
 
 @click.group(context_settings={"help_option_names": ["-h", "--help"]})
@@ -37,51 +56,387 @@ def backend() -> None:
     """
 
 
+def _source_for_identifier(identifier: str) -> ModelSource | None:
+    try:
+        return get_model_source(resolve_model_source_id(identifier))
+    except ModelSourceNotFoundError:
+        return None
+
+
+def _runtime_instance_for_source(
+    source: ModelSource,
+    runtime_instances: dict[str, BackendInstance],
+) -> BackendInstance | None:
+    if source.local_lifecycle is None:
+        return None
+    instance_id = f"{source.local_lifecycle.adapter}-{source.local_lifecycle.default_port}"
+    return runtime_instances.get(instance_id)
+
+
+def _runtime_instance_record(instance: BackendInstance | None) -> dict[str, Any] | None:
+    if instance is None:
+        return None
+    return {
+        "backend_id": instance.backend_id,
+        "adapter_type": instance.adapter_type,
+        "port": instance.port,
+        "pid": instance.pid,
+        "status": instance.status,
+        "created_at": instance.created_at,
+    }
+
+
+def _resolve_env_var(ev: EnvVar) -> dict[str, Any]:
+    value, provenance = resolve_env_or_credential_with_source(ev.name)
+    configured = bool(value) or (not ev.required and ev.default_value is not None)
+    return {
+        "name": ev.name,
+        "required": ev.required,
+        "secret": ev.secret,
+        "connection_value": ev.connection_value,
+        "configured": configured,
+        "provenance": provenance,
+    }
+
+
+def _auth_record(source: ModelSource) -> dict[str, Any]:
+    credentials: list[dict[str, Any]] = []
+    missing_required: list[str] = []
+    configured_required = 0
+    required_count = 0
+
+    for credential_id, credential in zip(source.credential_ids, source.credentials, strict=True):
+        env_vars = [_resolve_env_var(ev) for ev in credential.env_vars]
+        credential_missing = [ev["name"] for ev in env_vars if ev["required"] and not ev["configured"]]
+        credentials.append(
+            {
+                "credential_id": credential_id,
+                "env_vars": env_vars,
+                "configured": not credential_missing,
+            }
+        )
+        missing_required.extend(credential_missing)
+        configured_required += sum(1 for ev in env_vars if ev["required"] and ev["configured"])
+        required_count += sum(1 for ev in env_vars if ev["required"])
+
+    if not missing_required:
+        status = "configured"
+    elif configured_required and configured_required < required_count:
+        status = "partial"
+    else:
+        status = "missing"
+
+    return {
+        "status": status,
+        "credentials": credentials,
+        "missing_required_env_vars": missing_required,
+    }
+
+
+def _endpoint_record(source: ModelSource, instance: BackendInstance | None = None) -> dict[str, Any]:
+    endpoint = source.endpoint
+    if endpoint.kind == "local_backend":
+        lifecycle = source.local_lifecycle
+        return {
+            "kind": endpoint.kind,
+            "adapter": lifecycle.adapter if lifecycle else None,
+            "default_port": lifecycle.default_port if lifecycle else None,
+            "url": f"http://localhost:{instance.port if instance else lifecycle.default_port}" if lifecycle else None,
+        }
+    if endpoint.kind == "connection_value":
+        _, provenance = resolve_env_or_credential_with_source(endpoint.value or "")
+        return {
+            "kind": endpoint.kind,
+            "env_var": endpoint.value,
+            "default_url": endpoint.default_url,
+            "provenance": provenance,
+        }
+    return {
+        "kind": endpoint.kind,
+        "url": endpoint.value,
+    }
+
+
+def _endpoint_display(source: ModelSource, instance: BackendInstance | None = None) -> str:
+    endpoint = _endpoint_record(source, instance)
+    if endpoint["kind"] == "local_backend":
+        return str(endpoint.get("url") or "-")
+    if endpoint["kind"] == "connection_value":
+        env_var = str(endpoint["env_var"])
+        default_url = endpoint.get("default_url")
+        if default_url:
+            return f"{env_var} (default {default_url})"
+        return env_var
+    return str(endpoint.get("url") or "-")
+
+
+def _auth_display(auth: dict[str, Any]) -> str:
+    if auth["status"] == "configured":
+        pieces: list[str] = []
+        for credential in auth["credentials"]:
+            provenances = {
+                env_var["provenance"]
+                for env_var in credential["env_vars"]
+                if env_var["required"] and env_var["configured"]
+            }
+            if not provenances:
+                provenance = "none"
+            else:
+                provenance = "+".join(sorted(provenances))
+            pieces.append(f"{credential['credential_id']}:{provenance}")
+        return ", ".join(pieces)
+    missing = ", ".join(auth["missing_required_env_vars"])
+    return f"{auth['status']} ({missing})" if missing else str(auth["status"])
+
+
+def _source_health(source: ModelSource, instance: BackendInstance | None, auth: dict[str, Any]) -> str:
+    if source.kind == "remote":
+        return "missing" if auth["status"] != "configured" else "unprobed"
+    if instance is None:
+        return "stopped"
+    if instance.pid is not None and not is_pid_alive(instance.pid):
+        return "stopped"
+    return instance.status
+
+
+def _source_record(source: ModelSource, runtime_instances: dict[str, BackendInstance]) -> dict[str, Any]:
+    instance = _runtime_instance_for_source(source, runtime_instances)
+    auth = _auth_record(source)
+    return {
+        "backend_id": source.id,
+        "source_id": source.id,
+        "kind": source.kind,
+        "provider": source.provider,
+        "endpoint": _endpoint_record(source, instance),
+        "required_credentials": list(source.credential_ids),
+        "credentials": auth["credentials"],
+        "auth_status": auth["status"],
+        "missing_required_env_vars": auth["missing_required_env_vars"],
+        "health": _source_health(source, instance, auth),
+        "has_lifecycle": source.has_lifecycle,
+        "runtime_instance": _runtime_instance_record(instance),
+    }
+
+
+def _load_runtime_instances() -> dict[str, BackendInstance]:
+    store = BackendRegistryStore()
+    return {instance.backend_id: instance for instance in store.list_backends()}
+
+
+def _resolve_lifecycle_operand(operand: str, port: int | None) -> tuple[str, int]:
+    source = _source_for_identifier(operand)
+    if source is not None:
+        if source.local_lifecycle is None:
+            raise click.ClickException(
+                f"Backend source '{source.id}' is {source.kind} and has no local lifecycle to start or stop."
+            )
+        lifecycle = source.local_lifecycle
+        return lifecycle.adapter, port or lifecycle.default_port
+
+    if operand in _SUPPORTED_ADAPTERS:
+        if port is None:
+            raise click.ClickException(f"--port is required when using adapter '{operand}'.")
+        return operand, port
+
+    raise click.ClickException(
+        f"Unknown backend source or adapter '{operand}'. Use 'forge backend list' to see source ids."
+    )
+
+
+def _resolve_local_adapter_operand(operand: str) -> str:
+    if operand in _SUPPORTED_ADAPTERS:
+        return operand
+
+    source = _source_for_identifier(operand)
+    if source is not None:
+        if source.kind == "remote":
+            raise click.ClickException(
+                f"Backend source '{source.id}' is built in and remote; it has no local config to create or delete."
+            )
+        adapter = source.local_lifecycle.adapter if source.local_lifecycle else "litellm"
+        raise click.ClickException(
+            f"Backend source '{source.id}' is built in; manage its local adapter config with "
+            f"'forge backend create {adapter}' or 'forge backend delete {adapter}'."
+        )
+
+    raise click.ClickException(f"Unknown backend adapter or source '{operand}'.")
+
+
+def _join_url(base_url: str, path: str) -> str:
+    return f"{base_url.rstrip('/')}/{path.lstrip('/')}"
+
+
+def _resolved_endpoint_url(source: ModelSource, instance: BackendInstance | None = None) -> str | None:
+    endpoint = source.endpoint
+    if endpoint.kind == "literal_url":
+        return endpoint.value
+    if endpoint.kind == "connection_value" and endpoint.value:
+        value, _ = resolve_env_or_credential_with_source(endpoint.value)
+        return value or endpoint.default_url
+    if endpoint.kind == "local_backend":
+        lifecycle = source.local_lifecycle
+        if lifecycle is None:
+            return None
+        return f"http://localhost:{instance.port if instance else lifecycle.default_port}"
+    return None
+
+
+def _probe_model_source(
+    source: ModelSource,
+    *,
+    instance: BackendInstance | None,
+    timeout_s: float,
+) -> _ProbeResult:
+    import httpx
+
+    base_url = _resolved_endpoint_url(source, instance)
+    if not base_url:
+        return _ProbeResult(status="failed", detail="endpoint is not configured")
+
+    if source.provider == "litellm_local":
+        if instance is None:
+            return _ProbeResult(status="skipped", detail="local backend is not running")
+        try:
+            with httpx.Client(timeout=httpx.Timeout(timeout_s)) as client:
+                response = client.get(_join_url(base_url, "/health/liveliness"))
+            if response.status_code == 200:
+                return _ProbeResult(
+                    status="passed",
+                    detail="local backend liveliness check passed",
+                    http_status=200,
+                )
+            return _ProbeResult(
+                status="failed",
+                detail=f"local backend liveliness check returned HTTP {response.status_code}",
+                http_status=response.status_code,
+            )
+        except (httpx.RequestError, httpx.TimeoutException) as e:
+            return _ProbeResult(status="failed", detail=str(e))
+
+    headers: dict[str, str] = {}
+    path = "/models"
+    if source.provider == "anthropic":
+        api_key, _ = resolve_env_or_credential_with_source("ANTHROPIC_API_KEY")
+        headers = {"x-api-key": api_key or "", "anthropic-version": "2023-06-01"}
+        path = "/v1/models"
+    elif source.provider == "openrouter":
+        api_key, _ = resolve_env_or_credential_with_source("OPENROUTER_API_KEY")
+        headers = {"Authorization": f"Bearer {api_key or ''}"}
+    elif source.provider == "litellm_remote":
+        api_key, _ = resolve_env_or_credential_with_source("LITELLM_API_KEY")
+        headers = {"Authorization": f"Bearer {api_key or ''}"}
+
+    try:
+        with httpx.Client(timeout=httpx.Timeout(timeout_s)) as client:
+            response = client.get(_join_url(base_url, path), headers=headers)
+        if 200 <= response.status_code < 300:
+            return _ProbeResult(
+                status="passed",
+                detail="authenticated endpoint probe passed",
+                http_status=response.status_code,
+            )
+        if response.status_code in {401, 403}:
+            return _ProbeResult(
+                status="failed",
+                detail="endpoint rejected the configured credential",
+                http_status=response.status_code,
+            )
+        return _ProbeResult(
+            status="failed",
+            detail=f"endpoint probe returned HTTP {response.status_code}",
+            http_status=response.status_code,
+        )
+    except (httpx.RequestError, httpx.TimeoutException) as e:
+        return _ProbeResult(status="failed", detail=str(e))
+
+
+def _show_source(source: ModelSource, raw: bool, console: Console) -> None:
+    runtime_instances = _load_runtime_instances()
+    instance = _runtime_instance_for_source(source, runtime_instances)
+    auth = _auth_record(source)
+
+    console.print(f"[bold]Backend source:[/bold] [cyan]{source.id}[/cyan]")
+    console.print(f"[bold]Kind:[/bold] {source.kind}")
+    console.print(f"[bold]Provider:[/bold] {source.provider}")
+    console.print(f"[bold]Endpoint:[/bold] {_endpoint_display(source, instance)}")
+    console.print(f"[bold]Credentials:[/bold] {_auth_display(auth)}")
+    console.print(f"[bold]Health:[/bold] {_source_health(source, instance, auth)}")
+
+    if source.template_names:
+        console.print(f"[bold]Templates:[/bold] {', '.join(source.template_names)}")
+
+    if source.local_lifecycle:
+        lifecycle = source.local_lifecycle
+        console.print(f"[bold]Lifecycle:[/bold] {lifecycle.adapter} on default port {lifecycle.default_port}")
+        if instance:
+            console.print(f"[bold]Runtime instance:[/bold] {instance.backend_id}")
+            console.print(f"[bold]Runtime PID:[/bold] {instance.pid or '-'}")
+            console.print(f"[bold]Runtime status:[/bold] {instance.status}")
+        else:
+            console.print("[bold]Runtime instance:[/bold] -")
+
+        config_path = get_backend_config_path(lifecycle.adapter)
+        if config_path.exists():
+            content = config_path.read_text()
+            console.print(f"[bold]Config:[/bold] {display_path(config_path)}\n")
+            if raw:
+                console.print(content)
+            else:
+                from rich.syntax import Syntax
+
+                syntax = Syntax(content, "yaml", theme="monokai", line_numbers=True)
+                console.print(syntax)
+        else:
+            console.print(f"\n[dim]No config found for adapter '{lifecycle.adapter}'.[/dim]")
+            print_tip(
+                f"Run 'forge backend create {lifecycle.adapter}'.",
+                blank_before=False,
+                console=console,
+            )
+    else:
+        console.print("[bold]Lifecycle:[/bold] none")
+
+
 @backend.command("list")
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
 def list_cmd(as_json: bool) -> None:
-    """List all backends."""
+    """List built-in backend sources and local runtime state."""
     console = Console(width=200)
-    store = BackendRegistryStore()
-
-    backends = store.read().backends
+    runtime_instances = _load_runtime_instances()
+    records = [_source_record(source, runtime_instances) for source in list_model_sources()]
 
     if as_json:
-        import json
-
-        data = []
-        for backend_id, b in backends.items():
-            data.append(
-                {
-                    "backend_id": b.backend_id,
-                    "adapter_type": b.adapter_type,
-                    "port": b.port,
-                    "pid": b.pid,
-                    "status": b.status,
-                }
-            )
-        click.echo(json.dumps(data, indent=2, default=str))
+        click.echo(json.dumps(records, indent=2, default=str))
         return
 
-    if not backends:
-        console.print("No backends found.")
-        print_tip("Run 'forge backend create litellm'.", console=console)
-        return
+    table = Table(title="Forge Backend Sources")
+    table.add_column("SOURCE ID", style="cyan")
+    table.add_column("KIND")
+    table.add_column("PROVIDER")
+    table.add_column("ENDPOINT")
+    table.add_column("AUTH")
+    table.add_column("HEALTH")
+    table.add_column("RUNTIME")
 
-    table = Table(title="Forge Backends")
-    table.add_column("BACKEND ID", style="cyan")
-    table.add_column("ADAPTER")
-    table.add_column("PORT", justify="right")
-    table.add_column("PID", justify="right")
-    table.add_column("STATUS")
-
-    for backend_id, backend in backends.items():
+    for record in records:
+        runtime = record["runtime_instance"]
         table.add_row(
-            backend_id,
-            backend.adapter_type,
-            str(backend.port),
-            str(backend.pid) if backend.pid else "-",
-            backend.status,
+            record["source_id"],
+            record["kind"],
+            record["provider"],
+            _endpoint_display(
+                get_model_source(record["source_id"]),
+                runtime_instances.get(runtime["backend_id"]) if runtime else None,
+            ),
+            _auth_display(
+                {
+                    "status": record["auth_status"],
+                    "credentials": record["credentials"],
+                    "missing_required_env_vars": record["missing_required_env_vars"],
+                }
+            ),
+            record["health"],
+            runtime["backend_id"] if runtime else "-",
         )
 
     console.print(table)
@@ -98,6 +453,11 @@ def show_cmd(backend_id: str, raw: bool) -> None:
         forge backend show litellm-4000
     """
     console = Console(width=200)
+    source = _source_for_identifier(backend_id)
+    if source is not None:
+        _show_source(source, raw, console)
+        return
+
     store = BackendRegistryStore()
 
     # Parse adapter type from backend_id (e.g., "litellm-4000" -> "litellm")
@@ -147,11 +507,70 @@ def show_cmd(backend_id: str, raw: bool) -> None:
             console.print(syntax)
     else:
         console.print(f"\n[dim]No config found for adapter '{adapter_type}'.[/dim]")
-        print_tip(f"Run 'forge backend create {adapter_type}'.", blank_before=False, console=console)
+        print_tip(
+            f"Run 'forge backend create {adapter_type}'.",
+            blank_before=False,
+            console=console,
+        )
+
+
+@backend.command("test-auth")
+@click.argument("source_id")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+@click.option(
+    "--timeout",
+    type=float,
+    default=5.0,
+    show_default=True,
+    help="Probe timeout in seconds",
+)
+def test_auth_cmd(source_id: str, as_json: bool, timeout: float) -> None:
+    """Test a backend source's credential configuration and reachable auth endpoint."""
+    console = Console(width=200)
+    source = _source_for_identifier(source_id)
+    if source is None:
+        raise click.ClickException(f"Unknown backend source '{source_id}'. Use 'forge backend list' to see source ids.")
+
+    runtime_instances = _load_runtime_instances()
+    instance = _runtime_instance_for_source(source, runtime_instances)
+    auth = _auth_record(source)
+    probe: _ProbeResult
+    if auth["status"] != "configured":
+        missing = ", ".join(auth["missing_required_env_vars"])
+        probe = _ProbeResult(status="skipped", detail=f"missing required credential values: {missing}")
+    elif not source.capabilities.auth_probe:
+        probe = _ProbeResult(status="skipped", detail="source does not declare an auth probe capability")
+    else:
+        probe = _probe_model_source(source, instance=instance, timeout_s=timeout)
+
+    payload = {
+        "backend_id": source.id,
+        "source_id": source.id,
+        "kind": source.kind,
+        "provider": source.provider,
+        "auth_status": auth["status"],
+        "missing_required_env_vars": auth["missing_required_env_vars"],
+        "credentials": auth["credentials"],
+        "probe": {
+            "status": probe.status,
+            "detail": probe.detail,
+            "http_status": probe.http_status,
+        },
+    }
+
+    if as_json:
+        click.echo(json.dumps(payload, indent=2, default=str))
+    else:
+        console.print(f"[bold]Backend source:[/bold] [cyan]{source.id}[/cyan]")
+        console.print(f"[bold]Auth:[/bold] {_auth_display(auth)}")
+        console.print(f"[bold]Probe:[/bold] {probe.status} - {probe.detail}")
+
+    if auth["status"] != "configured" or probe.status == "failed":
+        sys.exit(1)
 
 
 @backend.command("create")
-@click.argument("adapter", type=click.Choice(["litellm"]))
+@click.argument("adapter")
 @click.option(
     "--config",
     "-c",
@@ -164,6 +583,11 @@ def create_cmd(adapter: str, config: Path | None) -> None:
     Config is shared by all instances of this adapter type.
     """
     console = Console(width=200)
+    try:
+        adapter = _resolve_local_adapter_operand(adapter)
+    except click.ClickException as e:
+        console.print(f"[red]Error:[/red] {e.message}")
+        sys.exit(1)
 
     config_path = get_backend_config_path(adapter)
     if config_path.exists():
@@ -190,11 +614,16 @@ def create_cmd(adapter: str, config: Path | None) -> None:
 
 
 @backend.command("start")
-@click.argument("adapter", type=click.Choice(["litellm"]))
-@click.option("--port", "-p", type=int, required=True, help="Port number")
-def start_cmd(adapter: str, port: int) -> None:
-    """Start a backend instance."""
+@click.argument("source_or_adapter")
+@click.option("--port", "-p", type=int, required=False, help="Port number")
+def start_cmd(source_or_adapter: str, port: int | None) -> None:
+    """Start a local backend instance by source id or adapter."""
     console = Console(width=200)
+    try:
+        adapter, resolved_port = _resolve_lifecycle_operand(source_or_adapter, port)
+    except click.ClickException as e:
+        console.print(f"[red]Error:[/red] {e.message}")
+        sys.exit(1)
 
     config_path = get_backend_config_path(adapter)
     if not config_path.exists():
@@ -206,29 +635,37 @@ def start_cmd(adapter: str, port: int) -> None:
         )
         sys.exit(1)
 
-    backend_id = f"{adapter}-{port}"
+    backend_id = f"{adapter}-{resolved_port}"
     store = BackendRegistryStore()
     manager = BackendManager(store)
     manager.register_adapter(adapter, get_adapter(adapter))
 
     try:
-        result = manager.ensure_backend(backend_id, adapter, port)
+        result = manager.ensure_backend(backend_id, adapter, resolved_port)
         if result.source == "start":
-            console.print(f"[green]Started[/green] backend '{backend_id}' on port {port} (pid {result.instance.pid})")
+            console.print(
+                f"[green]Started[/green] backend '{backend_id}' on port {resolved_port} (pid {result.instance.pid})"
+            )
         else:
-            console.print(f"Backend '{backend_id}' already running on port {port}")
+            console.print(f"Backend '{backend_id}' already running on port {resolved_port}")
     except Exception as e:
         console.print(f"[red]Error:[/red] {e}")
         sys.exit(1)
 
 
 @backend.command("stop")
-@click.argument("adapter", type=click.Choice(["litellm"]))
-@click.option("--port", "-p", type=int, required=True, help="Port number")
-def stop_cmd(adapter: str, port: int) -> None:
-    """Stop a backend instance."""
+@click.argument("source_or_adapter")
+@click.option("--port", "-p", type=int, required=False, help="Port number")
+def stop_cmd(source_or_adapter: str, port: int | None) -> None:
+    """Stop a local backend instance by source id or adapter."""
     console = Console(width=200)
-    backend_id = f"{adapter}-{port}"
+    try:
+        adapter, resolved_port = _resolve_lifecycle_operand(source_or_adapter, port)
+    except click.ClickException as e:
+        console.print(f"[red]Error:[/red] {e.message}")
+        sys.exit(1)
+
+    backend_id = f"{adapter}-{resolved_port}"
 
     store = BackendRegistryStore()
     manager = BackendManager(store)
@@ -243,7 +680,7 @@ def stop_cmd(adapter: str, port: int) -> None:
 
 
 @backend.command("delete")
-@click.argument("adapter", type=click.Choice(["litellm"]))
+@click.argument("adapter")
 @click.option(
     "--port",
     "-p",
@@ -260,6 +697,11 @@ def delete_cmd(adapter: str, port: int | None, yes: bool) -> None:
     import shutil
 
     console = Console(width=200)
+    try:
+        adapter = _resolve_local_adapter_operand(adapter)
+    except click.ClickException as e:
+        console.print(f"[red]Error:[/red] {e.message}")
+        sys.exit(1)
 
     if port is not None:
         backend_id = f"{adapter}-{port}"

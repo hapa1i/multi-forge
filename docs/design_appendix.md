@@ -161,6 +161,16 @@ credentials. OpenRouter templates resolve `OPENROUTER_BASE_URL` the same way, de
 of truth. Credential metadata itself lives in dependency-light `src/forge/core/credential_registry.py`; template-aware
 helpers stay in `src/forge/core/auth/capabilities.py`, avoiding an auth/template/source import cycle.
 
+`forge backend` is the operator view over this catalog. `forge backend list` reads the static sources plus the local
+runtime registry and reports source kind, endpoint shape, required credentials, per-variable provenance, offline
+auth/health status, and any matching local `BackendInstance`. The command stays offline for remote sources: configured
+remote sources show as `unprobed` until an operator runs `forge backend test-auth <source-id>`, which resolves the same
+credentials and performs the source's reachability/auth probe without echoing secret values.
+`forge backend show <source-id>` renders catalog details and local runtime state when a source has lifecycle. `start`
+and `stop` accept local source ids or legacy adapter operands; remote source operands return an intentional no-lifecycle
+capability error. `create` and `delete` remain local adapter/config operations because built-in remote sources are not
+user-created durable state.
+
 ### A.3 Confusion traps / anti-patterns (§3.6.6)
 
 | Anti-pattern                            | Why it fails                                                                        |

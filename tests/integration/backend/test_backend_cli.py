@@ -29,13 +29,15 @@ class TestBackendCLI:
     """Integration tests for forge backend commands."""
 
     def test_backend_list_empty(self, isolated_forge_home: Path) -> None:
-        """Verify backend list shows helpful message when empty."""
+        """Verify backend list shows built-in sources when no local runtime is running."""
         runner = CliRunner()
         result = runner.invoke(main, ["backend", "list"])
 
         assert result.exit_code == 0
-        assert "No backends found" in result.output
-        assert "forge backend create" in result.output
+        assert "Forge Backend Sources" in result.output
+        assert "openrouter" in result.output
+        assert "litellm-remote" in result.output
+        assert "No backends found" not in result.output
 
     def test_backend_create_copies_config(self, isolated_forge_home: Path) -> None:
         """Verify backend create copies config to correct location."""

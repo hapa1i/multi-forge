@@ -91,6 +91,12 @@ OpenRouter templates default to `https://openrouter.ai/api/v1`. Set `OPENROUTER_
 route OpenRouter-compatible traffic through a different endpoint; new proxies created from OpenRouter templates will
 copy that resolved upstream URL into `proxy.yaml`.
 
+Use `forge backend list` to inspect the built-in source catalog, required credentials, and any matching local LiteLLM
+runtime instance. Use `forge backend test-auth <source-id>` when you want Forge to resolve the source's credentials and
+probe the upstream endpoint without printing secret values. Remote sources such as `openrouter` and `litellm-remote` are
+built in and have no local start/stop lifecycle; local LiteLLM sources can be started by source id or by the legacy
+`litellm --port <port>` adapter form.
+
 ---
 
 ## Core commands (cheat sheet)

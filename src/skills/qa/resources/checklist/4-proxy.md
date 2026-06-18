@@ -372,12 +372,12 @@ forge proxy metrics test-proxy-nostart
 <!-- auto -->
 
 ```bash
-# List running backend instances (LiteLLM, etc.)
+# List built-in backend sources and local runtime instances (LiteLLM, etc.)
 forge backend list
 ```
 
-- [ ] Shows "No backends found." (or lists running backends)
-- [ ] Command suggests `forge backend create litellm` when empty
+- [ ] Shows built-in local and remote source rows such as `openrouter` and `litellm-remote`
+- [ ] Shows matching local runtime instances when they are running
 
 ### 4.16 Backend Create (LiteLLM Config)
 
