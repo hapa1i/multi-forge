@@ -2,8 +2,9 @@
 
 **Status**: Paused after Phase 0. Depends on the shipped local provider-trace foundation in
 `docs/board/done/openrouter_observability/card.md` and the Phase 0 OpenRouter probes recorded there. The active
-telemetry epic chose `upstream_downstream_ledgers` as the next foundation, so this card remains paused until remote
-reconciliation can return as a general downstream consumer rather than a second OpenRouter-specific telemetry path.
+telemetry epic ran `upstream_downstream_ledgers` first, so this card now remains paused until the epic explicitly
+chooses it as the next active member, ideally as a general downstream consumer rather than a second OpenRouter-specific
+telemetry path.
 
 **Epic**: [`epic_telemetry_architecture`](../../doing/epic_telemetry_architecture/card.md).
 

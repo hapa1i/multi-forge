@@ -1,20 +1,19 @@
 # Upstream / Downstream Ledgers -- Execution Checklist
 
 Branch: `upstream_downstream_ledgers`. Card: [card.md](card.md). Epic:
-[`epic_telemetry_architecture`](../epic_telemetry_architecture/card.md).
+[`epic_telemetry_architecture`](../../doing/epic_telemetry_architecture/card.md).
 
 ## Current Focus
 
-Move Forge telemetry from four feature-shaped planes toward two direction-shaped planes:
+Completed 2026-06-18. Moved Forge telemetry from four feature-shaped planes toward two direction-shaped planes:
 
 - **Downstream**: one model call; session-blind; request/run/root ids; metrics, cost provenance, optional redacted wire
   evidence, provider lifecycle/correlation.
 - **Upstream**: one operation; session-tagged; run/root ids; outcome, reason, latency, and fail-open classification.
 
-Start by mapping current writers/readers and locking the schema/scope decisions. Do not resume
-`openrouter_remote_reconciliation` and do not implement the full `unified_backend` model-source catalog on this branch.
-Default to keying downstream on today's `proxy_id`/provider identity first unless Phase 0 overturns that, with a clear
-migration seam for later `backend_id`.
+The implementation shipped as `7af22ce2 feat: finish upstream/downstream ledger activity (#38)`. This card deliberately
+did not resume `openrouter_remote_reconciliation` and did not implement the full `unified_backend` model-source catalog;
+downstream keys on today's `proxy_id`/provider identity with a clear migration seam for later `backend_id`.
 
 Locked implementation decisions (2026-06-18):
 
@@ -161,13 +160,13 @@ Locked implementation decisions (2026-06-18):
   [cli_reference.md](../../../cli_reference.md), and end-user cost/activity docs match shipped behavior after the open
   Phase 2/3/4 items land.
 - [x] Add a compact change-log entry when implementation ships.
-- [ ] Promote durable implementation lessons to [impl_notes.md](../../impl_notes.md) after human review.
+- [x] Promote durable implementation lessons to [impl_notes.md](../../impl_notes.md) after human review.
 - [x] Run focused unit/regression tests for usage, proxy telemetry, provider trace, policy, activity, and status-line
   surfaces.
 - [x] Run relevant integration tests if proxy runtime, hooks, sessions, memory writer, or Codex/Claude subprocess
   attribution behavior changes.
 - [x] Run `make pre-commit` before closeout.
-- [ ] After merge, move this card to `docs/board/done/upstream_downstream_ledgers/` and update the epic sequencing.
+- [x] After merge, move this card to `docs/board/done/upstream_downstream_ledgers/` and update the epic sequencing.
 
 ## Acceptance Tests
 

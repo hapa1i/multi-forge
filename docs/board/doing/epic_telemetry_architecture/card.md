@@ -6,8 +6,9 @@ supervisor-timeout / shadow-sampling incident) and that both re-architect Forge'
 axes**. This card is the single consistent view the member cards lean on; it does **not** replace them. Its
 `checklist.md` is for coordination and sequencing only; member cards remain the execution units.
 
-**Current coordination goal**: keep `openrouter_remote_reconciliation` paused after Phase 0 and run
-`upstream_downstream_ledgers` as the next foundation card before returning to remote reconciliation.
+**Current coordination goal**: `upstream_downstream_ledgers` has landed and moved to `done/`. Keep this epic active
+while deciding the next telemetry member: resume `openrouter_remote_reconciliation`, run `unified_backend`, or slice a
+narrow `backend_id` precursor first.
 
 ## Why an epic, not a merged card
 
@@ -36,17 +37,17 @@ Two telemetry planes, joined by run-tree identity, with one canonical source key
 
 ## Member cards and ownership split
 
-| Concern                                     | Owner card                                                                                  | Status                                         |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------- | ---------------------------------------------- |
-| Plane **structure** (direction: up/down)    | [`upstream_downstream_ledgers`](../upstream_downstream_ledgers/card.md)                     | doing                                          |
-| Source-identity **key** (`backend_id`)      | [`unified_backend`](../../proposed/unified_backend/card.md)                                 | proposed; sibling foundation candidate         |
-| Provider-trace plane (first to be absorbed) | [`openrouter_observability`](../../done/openrouter_observability/card.md)                   | done                                           |
-| Source-identity consumer: logs              | [`proxy_log_hygiene`](../../done/proxy_log_hygiene/card.md)                                 | done                                           |
-| Source-identity consumer: remote reconcile  | [`openrouter_remote_reconciliation`](../../paused/openrouter_remote_reconciliation/card.md) | paused after Phase 0 pending ledger foundation |
+| Concern                                     | Owner card                                                                                  | Status                                          |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| Plane **structure** (direction: up/down)    | [`upstream_downstream_ledgers`](../../done/upstream_downstream_ledgers/card.md)             | done                                            |
+| Source-identity **key** (`backend_id`)      | [`unified_backend`](../../proposed/unified_backend/card.md)                                 | proposed; sibling foundation candidate          |
+| Provider-trace plane (first to be absorbed) | [`openrouter_observability`](../../done/openrouter_observability/card.md)                   | done                                            |
+| Source-identity consumer: logs              | [`proxy_log_hygiene`](../../done/proxy_log_hygiene/card.md)                                 | done                                            |
+| Source-identity consumer: remote reconcile  | [`openrouter_remote_reconciliation`](../../paused/openrouter_remote_reconciliation/card.md) | paused after Phase 0 pending next epic decision |
 
 **Contract (the consistency anchor):**
 
-1. **Structure is owned by `upstream_downstream_ledgers`.** It decides there are two planes (downstream/upstream) and
+1. **Structure was delivered by `upstream_downstream_ledgers`.** It established the two planes (downstream/upstream) and
    owns the `resolve_measurement` provenance resolver on the downstream write.
 2. **The key is owned by `unified_backend`.** It defines `backend_id` as the canonical model-source identity; downstream
    telemetry attributes to it, retiring provider-trace's hardcoded `provider_name == "openrouter"` gate.
@@ -71,14 +72,14 @@ order works:
 - **`upstream_downstream_ledgers` first** -> downstream keys on `proxy_id` initially and re-keys to `backend_id` when
   `unified_backend` lands.
 
-**Decision (2026-06-17): run `upstream_downstream_ledgers` first.** It fixes the telemetry plane shape before more
+**Decision (2026-06-17): run `upstream_downstream_ledgers` first.** It fixed the telemetry plane shape before more
 OpenRouter-specific reconciliation logic lands, so remote reconciliation can return later as a general downstream
 consumer instead of another special-purpose telemetry path. `unified_backend` remains the source-key foundation that
-should follow or be sliced as a `backend_id` precursor, but it is a larger config/auth/template/CLI refactor and is not
-the next execution card.
+should follow or be sliced as a `backend_id` precursor, but it is a larger config/auth/template/CLI refactor.
 
-Remote reconciliation stays paused until the ledger foundation lands or the epic deliberately reopens the decision. The
-hard rule remains contract item 4: one shared `emit.py` provenance refactor, not independent sibling rewrites.
+**Update (2026-06-18):** the ledger foundation has landed. Remote reconciliation remains paused only until this epic
+chooses the next active member. The hard rule remains contract item 4: one shared `emit.py` provenance refactor, not
+independent sibling rewrites.
 
 ## Not in scope here
 

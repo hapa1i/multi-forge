@@ -1,11 +1,12 @@
 # Upstream / Downstream Ledgers -- collapse four telemetry planes into two
 
-**Status**: Doing. Chosen by the active telemetry epic as the next foundation before resuming
-`openrouter_remote_reconciliation`. Spun out of the `supervisor_statusline_health` investigation (2026-06-16) -- a
-first-principles dialogue on why surfacing a supervisor timeout on the status line kept colliding with telemetry
-complexity. The conclusion: the messiness is a symptom of Forge's **telemetry planes being split along the wrong axis**
--- consumption, redacted wire capture, per-call provider lifecycle, and outcome scattered across **four** planes, with
-the usage plane conflating two of them.
+**Status**: Done. Closed 2026-06-18 after the implementation merged to `main`
+(`7af22ce2 feat: finish upstream/downstream ledger activity (#38)`). Chosen by the active telemetry epic as the
+foundation before resuming `openrouter_remote_reconciliation`. Spun out of the `supervisor_statusline_health`
+investigation (2026-06-16) -- a first-principles dialogue on why surfacing a supervisor timeout on the status line kept
+colliding with telemetry complexity. The conclusion: the messiness was a symptom of Forge's **telemetry planes being
+split along the wrong axis** -- consumption, redacted wire capture, per-call provider lifecycle, and outcome scattered
+across **four** planes, with the usage plane conflating two of them.
 
 **Updated 2026-06-17.** The now-done `openrouter_observability` card shipped a fourth plane -- provider-trace
 (`~/.forge/providers/<source>/traces/`, `src/forge/proxy/provider_trace_logger.py`) -- and the sibling `unified_backend`
@@ -13,9 +14,9 @@ card proposes a canonical model-source id (`backend_id`) the telemetry planes sh
 **downstream by this card's taxonomy** (per-call, session-blind, metadata-only model-interaction evidence), so the
 target is **four planes -> two**, not three. This card owns plane **structure**; `unified_backend` owns the
 source-identity **key**. The shared contract and member list live in the
-[`epic_telemetry_architecture`](../epic_telemetry_architecture/card.md).
+[`epic_telemetry_architecture`](../../doing/epic_telemetry_architecture/card.md).
 
-**Epic**: [`epic_telemetry_architecture`](../epic_telemetry_architecture/card.md).
+**Epic**: [`epic_telemetry_architecture`](../../doing/epic_telemetry_architecture/card.md).
 
 **References**: `src/forge/core/usage/emit.py` (the proxied/direct provenance branch, inline in two emitters),
 `src/forge/core/usage/ledger.py` (`UsageEvent`), `src/forge/proxy/cost_logger.py` + `src/forge/proxy/audit_logger.py` +
@@ -139,8 +140,8 @@ memory-writer health, TDD outcomes, panel-worker failures -- from one place, wit
   is the `unified_backend` card's deliverable; this refactor **consumes** it as the downstream attribution key rather
   than minting its own. Plane **structure** is owned here; the source-identity **key** is owned there. If
   `unified_backend` lands first, downstream is keyed correctly from day one; if this card lands first, downstream keys
-  on `proxy_id` and re-keys on adoption -- the [`epic_telemetry_architecture`](../epic_telemetry_architecture/card.md)
-  records the sequencing.
+  on `proxy_id` and re-keys on adoption -- the
+  [`epic_telemetry_architecture`](../../doing/epic_telemetry_architecture/card.md) records the sequencing.
 - **Consumers read the right plane -- and `forge activity` becomes the honest join.** Upstream answers health/outcome
   (select by session), downstream answers spend (join by run tree). `forge activity` is then a **two-pane outer join,
   not one conflated row**: an upstream pane (outcomes grouped by verb/session, including the no-call ops downstream
@@ -219,4 +220,4 @@ the same `emit.py` provenance branch, so they must not run as independent, mutua
 provenance, the model-source catalog) is config/CLI/auth work with its own large blast radius and "spike first" posture,
 and chaining this telemetry refactor to it would break independent shippability. The shared contract -- *downstream keys
 on `backend_id`; structure owned here, key owned there* -- and the sequencing live in
-[`epic_telemetry_architecture`](../epic_telemetry_architecture/card.md).
+[`epic_telemetry_architecture`](../../doing/epic_telemetry_architecture/card.md).

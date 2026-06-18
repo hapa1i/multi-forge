@@ -1,12 +1,13 @@
 # Epic: Telemetry Architecture -- Coordination Checklist
 
-Branch: `upstream_downstream_ledgers`. Card: [card.md](card.md).
+Branch: `main` after `upstream_downstream_ledgers` merged. Card: [card.md](card.md).
 
 ## Current Focus
 
-Keep telemetry architecture as the active planning cursor: `openrouter_remote_reconciliation` is paused after Phase 0,
-and `upstream_downstream_ledgers` is chosen as the next foundation card. Do not resume remote reconciliation until that
-foundation lands or this epic explicitly changes the sequence.
+Keep telemetry architecture as the active planning cursor after `upstream_downstream_ledgers` landed. The next decision
+is whether to resume `openrouter_remote_reconciliation`, run the broader `unified_backend` card, or slice a narrow
+`backend_id` precursor first. Do not resume remote reconciliation until this epic explicitly chooses the next active
+member.
 
 ## Active Coordination
 
@@ -21,6 +22,8 @@ foundation lands or this epic explicitly changes the sequence.
   reconciliation: run it first. It fixes the telemetry plane shape that remote reconciliation should plug into.
 - [x] Decide next execution card: `upstream_downstream_ledgers`.
 - [x] Update the chosen member card's status/checklist and move it to `doing/`.
+- [x] Close `upstream_downstream_ledgers` after merge and move it to `done/`.
+- [x] Update this epic's member table and sequencing text after the ledger foundation landed.
 
 ## Sequencing Questions
 
@@ -35,6 +38,14 @@ foundation lands or this epic explicitly changes the sequence.
 Remote reconciliation should return after the upstream/downstream shape exists, so it can generalize around downstream
 model-call evidence rather than hardening a second OpenRouter-specific telemetry surface. `unified_backend` remains the
 source-key sibling; it can follow as the full model-source refactor or be sliced to a narrow `backend_id` precursor.
+
+**Update (2026-06-18):** `upstream_downstream_ledgers` is done. The open sequencing decision is now the next active
+member: remote reconciliation, full `unified_backend`, or a smaller `backend_id` precursor.
+
+## Next Coordination
+
+- [ ] Decide the next active telemetry member now that the ledger foundation is done.
+- [ ] Move the chosen member to `doing/` and update cross-links.
 
 ## Closeout
 

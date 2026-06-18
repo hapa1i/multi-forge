@@ -319,15 +319,17 @@ the usage ledger already records. Sources: `src/forge/core/ops/usage_summary.py`
   `command="supervisor"` excludes `supervisor-shadow`/`plan-check`. `forge proxy costs reset` clears `fhealth-*.json`
   alongside `fcost-*.json` so a wiped ledger can't replay cached health.
 
-### OpenRouter provider trace: local lifecycle evidence for aborted streams (shipped 2026-06-16)
+### OpenRouter provider trace: local lifecycle evidence for aborted streams (shipped 2026-06-16; folded 2026-06-18)
 
 Durable invariants for `openrouter_observability`: Forge can explain a timed-out OpenRouter request from local metadata
-even when OpenRouter never indexes the cancelled stream.
+even when OpenRouter never indexes the cancelled stream. Provider trace originally shipped as a separate fourth plane;
+`upstream_downstream_ledgers` folded its fields into downstream telemetry. Do not recreate a standalone provider-trace
+JSONL plane: CLI/core provider-trace readers should project from `DownstreamRecord` fields.
 
-- **Provider trace is a fourth plane, not a cost-log embellishment.** Cost remains spend truth, audit remains redacted
-  body/control evidence, usage remains run/session attribution, and provider trace records provider lifecycle +
-  correlation evidence under `~/.forge/providers/openrouter/traces/`. The plane is metadata-only, owner-only, bounded
-  like audit, and is intentionally **not** wiped by `forge proxy costs reset`.
+- **Provider trace is downstream model-call evidence.** It records provider lifecycle + correlation metadata for one
+  model attempt, alongside cost, tokens, and optional redacted audit evidence under `~/.forge/telemetry/downstream/`. It
+  is metadata-only, owner-only, and bounded by downstream retention. `forge proxy costs reset` now wipes downstream
+  telemetry and cap state together; provider-trace state is not a separately retained exception.
 - **The shared SSE seam owns lifecycle flags.** The provider metadata carrier is consumed at the converter seam, which
   records stream-start, first user-visible chunk, final usage, and client-disconnect state exactly once through the
   existing `on_complete` path. `CancelledError`/`GeneratorExit` must be caught to mark disconnect and then re-raised;
@@ -340,6 +342,35 @@ even when OpenRouter never indexes the cancelled stream.
   OpenAI-standard `user` field and ignores custom `session_id`. Proxied injection is therefore opt-in per proxy via
   `provider_trace.inject_openrouter_user`, sends only hashed Forge ids, and defaults off. Direct `core.llm` callers are
   a separate card because they need an in-process opt-in owner, not a proxy-owned setting.
+
+### Upstream/downstream telemetry ledgers (shipped 2026-06-18)
+
+Durable invariants for the telemetry re-cut. The change log records the implementation sweep; keep these as design
+constraints for future telemetry, cost, provider-trace, and activity work.
+
+- **Plane split is by direction, not feature.** Downstream is one model attempt: session-blind, keyed by
+  request/run/root ids, with metrics, nullable cost, provenance, optional redacted wire evidence, and provider lifecycle
+  fields. Upstream is one operation outcome: session-tagged, run/root-keyed, with status, reason, latency, and fail-open
+  classification. `forge activity` is the join/read surface; it should not grow a third durable outcome/spend plane.
+- **Run-tree identity is the bridge.** The proxy does not know Forge sessions, so downstream records stay session-blind.
+  Session views select upstream by session, collect run/root ids, then join downstream by run tree. Adding a session
+  field to downstream would be a shortcut around the architecture, not a fix.
+- **Cost telemetry is best-effort; cap accounting is not.** Downstream write failures warn and must not block otherwise
+  successful model traffic, but spend caps reconcile from the durable cap snapshot plus downstream and legacy logs using
+  the larger total. A missing/bad telemetry row must never reset cap enforcement to zero after restart.
+- **`downstream_event_id` is idempotency; `request_id` is correlation.** A caller can supply `X-Request-ID`, so it is
+  not a replay key. The downstream writer owns a stable per-physical-attempt id; duplicate writes of the same attempt
+  merge/count once, distinct retries get distinct ids.
+- **Measurement provenance must preserve the proxied/direct asymmetry.** Direct `claude -p` self-report can be
+  authoritative only when unproxied. Proxied `claude -p` cost uses proxy/downstream evidence and ignores
+  Anthropic-priced runtime self-report. Per-worker proxied events stay unattributed for cost so verb/run-tree exact cost
+  does not double count.
+- **`None` still means unavailable, never free.** Routes with tokens but no reported dollars persist nullable cost and
+  render as unavailable/hidden in spend surfaces, not `$0`. Do not reintroduce local price inference on the accounting
+  path.
+- **`confirmed.policy.decisions` is now a compatibility fallback.** Upstream outcomes are the operation-outcome source
+  for no-call/fail-open paths; the manifest log remains capped fallback material for success/cached policy counts and
+  warning text, with dedupe when both sources mention the same warning.
 
 ### Per-proxy config blocks must be wired through BOTH loader hops (proxy_log_hygiene, shipped 2026-06-16)
 
