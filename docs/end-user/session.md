@@ -139,8 +139,8 @@ forge session list            # Sessions across the workspace (default: --scope 
 forge session list --scope project  # Sessions in current Forge project only
 forge session list --scope all      # All sessions globally
 
-# What a session did (usage ledger + policy decisions)
-forge activity [name]         # Per-session Forge automation activity: supervisor checks, cost, tokens
+# What a session did (operation outcomes + model calls)
+forge activity [name]         # Per-session Forge automation outcomes, model calls, cost, tokens
 forge activity [name] --json --days N --all
 
 # Fork (conversation branching)
@@ -746,11 +746,11 @@ overlay. See [proxy.md](proxy.md) for proxy configuration.
 
 ## What a session did (`forge activity` + session-end summary)
 
-Two read surfaces report what Forge's automation did during a session (supervisor, memory writer, workflow verbs +
-policy decisions — **not** your full interactive Claude usage), over data the usage ledger and the policy-decision log
-already capture. Session-scoped spend figures are **best-effort attribution** (reported dollars, snapshot-attributed
-under concurrency) — `forge proxy costs show` stays the authoritative dollar view (see
-[proxy.md](proxy.md#cost-tracking-and-spend-caps), and
+Two read surfaces report what Forge's automation did during a session (supervisor, memory writer, workflow verbs,
+transfer curation, action tagging, and policy decisions — **not** your full interactive Claude usage). They read
+upstream operation outcomes, downstream model-call evidence, transitional usage events, and the capped policy-decision
+fallback. Session-scoped spend figures are **best-effort attribution** — `forge proxy costs show` stays the
+authoritative dollar view (see [proxy.md](proxy.md#cost-tracking-and-spend-caps), and
 [which surface answers which question?](proxy.md#which-surface-answers-which-question) for when to use each).
 
 **Session-end summary (automatic).** When a session exits, the launcher prints a one-line rollup before the reconnect
@@ -775,9 +775,16 @@ forge activity my-feature --all     # full history
 forge activity my-feature --json    # machine-readable
 ```
 
-It reports per-command calls/errors/tokens/reported-cost (or *unavailable*) plus the supervisor allow/warn/deny
-breakdown with recent warning text. A workflow fan-out (panel/debate/...) counts as **one** call with its worker count
-tracked in a separate column, so a 4-worker panel reads as one workflow, not five.
+It renders two panes. **Operation outcomes** shows upstream outcomes such as policy checks, supervisor fail-open/no-call
+results, memory writer, supervisor shadow drain, shadow curation, workflow worker failures, transfer curation, and
+action tagging. **Model calls** shows the model-call/spend side: calls, workers, attempts, tokens, cost, legacy error
+counts, and whether a row is `matched` to an upstream outcome or `downstream-only` evidence known through the session's
+run tree. A workflow fan-out (panel/debate/...) counts as **one** call with its worker count tracked separately, so a
+4-worker panel reads as one workflow, not five.
+
+`--json` returns the same split as top-level `upstream`, `downstream`, `shadow`, `subagents`, and `notes` fields. Policy
+success/cached counts come from the manifest fallback and may be capped at the last 100 decisions; the output marks that
+with `log_capped`.
 
 The Supervisor line appends `failing open: N timeout, N error` when recent frontier checks failed open — this is the
 always-visible status line's `SUP!N <kind>` marker in detail (recent supervisor checks erroring/timing out means actions
@@ -788,8 +795,9 @@ totals fail-opens across the selected window (`--days`/`--all`).
 > **Sidecar:** both surfaces work in sidecar mode when the session launched with a proxy id (the in-container usage
 > ledger is mounted back to the host). A template-only sidecar shows only the policy-decision half.
 >
-> **Coverage:** some Forge LLM calls (e.g. the action tagger) don't tag a session, so they aren't attributed to one. The
-> summary flags coverage as partial rather than guessing.
+> **Coverage:** model-call spend is session-attributed only when a session-tagged run tree or provider-session id can
+> connect it to the session. Orphaned downstream records are not guessed into a session; the summary flags partial
+> coverage rather than inventing attribution.
 
 ---
 

@@ -740,6 +740,7 @@ def _emit_curation_usage(call: _CurationCall) -> None:
     from forge.core.usage import emit_direct_llm_usage
 
     parse_failed = call.curated is None
+    session = os.environ.get("FORGE_SESSION")
     emit_direct_llm_usage(
         command="transfer-curate",
         model=AI_CURATION_MODEL,
@@ -748,10 +749,21 @@ def _emit_curation_usage(call: _CurationCall) -> None:
         status="error" if parse_failed else "success",
         failure_type="unparseable_output" if parse_failed else None,
         latency_ms=call.latency_ms,
-        session=os.environ.get("FORGE_SESSION"),
+        session=session,
         runtime="forge_cli",
         provider_meta=call.provider_meta,
     )
+    if session or os.environ.get("FORGE_RUN_ID"):
+        from forge.core.telemetry.upstream import record_upstream_operation
+
+        record_upstream_operation(
+            command="transfer-curate",
+            operation="transfer.curate",
+            status="error" if parse_failed else "success",
+            session=session,
+            reason_code="unparseable_output" if parse_failed else None,
+            latency_ms=call.latency_ms,
+        )
 
 
 def _coerce_text(value: Any) -> str:

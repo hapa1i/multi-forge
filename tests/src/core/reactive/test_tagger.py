@@ -117,6 +117,31 @@ class TestTagAction:
         ctx = _make_context()
         result = tag_action(ctx, model="gemini/gemini-2.0-flash", prompt_template="{tool_name}")
         assert result == []
+        from forge.core.telemetry.upstream import read_upstream_outcomes
+
+        outcomes = read_upstream_outcomes(session="test", command="tagger")
+        assert len(outcomes) == 1
+        assert outcomes[0].status == "error"
+        assert outcomes[0].operation == "action.tag"
+        assert outcomes[0].tool_name == "Write"
+        assert outcomes[0].target_path == "src/foo.py"
+
+    @patch("forge.core.llm.get_client")
+    @patch("forge.core.llm.SyncAdapter")
+    def test_no_tags_records_skipped_outcome(self, mock_adapter_cls, mock_get_client):
+        mock_adapter = MagicMock()
+        mock_adapter.complete.return_value = CompletionResponse(text="[]")
+        mock_adapter_cls.return_value = mock_adapter
+
+        result = tag_action(_make_context(), model="gemini/gemini-2.0-flash", prompt_template="{tool_name}")
+
+        assert result == []
+        from forge.core.telemetry.upstream import read_upstream_outcomes
+
+        outcomes = read_upstream_outcomes(session="test", command="tagger")
+        assert len(outcomes) == 1
+        assert outcomes[0].status == "skipped"
+        assert outcomes[0].reason_code == "no_tags"
 
     @patch("forge.core.llm.get_client")
     @patch("forge.core.llm.SyncAdapter")

@@ -105,6 +105,22 @@ class TestCodexResultBuilding:
         assert r.input_tokens is None  # failed turn carried no usage
 
     @patch("forge.core.invoker._lifecycle.subprocess.Popen")
+    def test_error_worker_emits_upstream_outcome(self, mock_popen):
+        from forge.core.telemetry.upstream import read_upstream_outcomes
+
+        mock_popen.return_value = _mock_proc(_ERROR_STREAM, returncode=1)
+        CodexHeadlessInvoker().run_parallel(
+            [_codex_req(env=dict(_IDENT), attribution=Attribution(command="bridge", session="planner"))]
+        )
+
+        outcomes = read_upstream_outcomes(session="planner", command="bridge")
+        assert len(outcomes) == 1
+        assert outcomes[0].operation == "workflow.worker"
+        assert outcomes[0].status == "error"
+        assert outcomes[0].reason_code == "runtime_reported_error"
+        assert (outcomes[0].run_id, outcomes[0].root_run_id) == ("run_c", "run_root")
+
+    @patch("forge.core.invoker._lifecycle.subprocess.Popen")
     def test_error_message_surfaced_on_empty_stderr(self, mock_popen):
         # codex reports the failure reason in the JSONL stream with empty stderr; the
         # provider reason must reach stderr so callers don't see a blank failure.

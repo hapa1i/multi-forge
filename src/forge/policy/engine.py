@@ -13,9 +13,8 @@ from typing import Any
 
 from forge.core.state import now_iso
 from forge.core.telemetry.upstream import (
-    UpstreamOutcome,
     UpstreamStatus,
-    write_upstream_outcome,
+    record_upstream_operation,
 )
 from forge.policy.protocols import Policy, StatefulPolicy
 from forge.policy.types import (
@@ -277,30 +276,22 @@ class PolicyEngine:
     ) -> None:
         status = _policy_decision_status(decision)
         try:
-            from forge.core.reactive.env import get_run_identity
-
-            identity = get_run_identity()
-            run_id = decision.telemetry_run_id or (identity.run_id if identity else None)
-            parent_run_id = decision.telemetry_parent_run_id or (identity.parent_run_id if identity else None)
-            root_run_id = decision.telemetry_root_run_id or (identity.root_run_id if identity else None)
-            write_upstream_outcome(
-                UpstreamOutcome(
-                    command="policy-check",
-                    operation="policy.evaluate",
-                    status=status,
-                    session=context.session_name,
-                    run_id=run_id,
-                    parent_run_id=parent_run_id,
-                    root_run_id=root_run_id,
-                    origin=context.origin,
-                    policy_id=policy.policy_id,
-                    tool_name=context.tool_name,
-                    target_path=context.target_path,
-                    reason_code=reason_code or _policy_reason_code(decision),
-                    message=_policy_message(decision),
-                    cached=decision.cached,
-                    latency_ms=round((time.monotonic() - start) * 1000, 1),
-                )
+            record_upstream_operation(
+                command="policy-check",
+                operation="policy.evaluate",
+                status=status,
+                session=context.session_name,
+                run_id=decision.telemetry_run_id,
+                parent_run_id=decision.telemetry_parent_run_id,
+                root_run_id=decision.telemetry_root_run_id,
+                origin=context.origin,
+                policy_id=policy.policy_id,
+                tool_name=context.tool_name,
+                target_path=context.target_path,
+                reason_code=reason_code or _policy_reason_code(decision),
+                message=_policy_message(decision),
+                cached=decision.cached,
+                latency_ms=round((time.monotonic() - start) * 1000, 1),
             )
         except Exception as e:
             _log.debug("upstream policy telemetry skipped for %s: %s", policy.policy_id, e)

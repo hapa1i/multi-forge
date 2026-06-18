@@ -306,10 +306,11 @@ forge proxy start "$FORGE_QA_OPENAI_PROXY"
 
 <!-- auto -->
 
-`forge activity [session]` reads the usage-attribution ledger (`~/.forge/usage/events/`) filtered by session. Seed
-fixture events for a throwaway session and assert the rollup -- including the workflow worker/verb split (one panel = 1
-call + N workers, not N+1 calls) and the cost-honesty rendering: the aggregate cost is reported-or-estimated/best-effort
-(flagged with `~` and a footnote), while `forge proxy costs show` is the authoritative spend view.
+`forge activity [session]` renders operation outcomes plus model calls. This fixture seeds transitional
+usage-attribution events (`~/.forge/usage/events/`) for a throwaway session and asserts the model-call rollup --
+including the workflow worker/verb split (one panel = 1 call + N workers, not N+1 calls) and the cost-honesty rendering:
+the aggregate cost is reported-or-estimated/best-effort (flagged with `~` and a footnote), while
+`forge proxy costs show` is the authoritative spend view.
 
 ```bash
 cd $FORGE_TEST_REPO
@@ -336,14 +337,14 @@ EOF
 forge activity qa-usage --all --json | python3 -c "
 import json, sys
 d = json.load(sys.stdin)
-cmds = {c['command']: c for c in d['commands']}
+cmds = {c['command']: c for c in d['downstream']['rows']}
 sup, panel = cmds.get('supervisor', {}), cmds.get('panel', {})
-print(f'total_events={d[\"total_events\"]}')
+print(f'total_attempts={sum(c.get(\"attempts\", 0) for c in cmds.values())}')
 print(f'supervisor calls={sup.get(\"calls\")} errors={sup.get(\"errors\")}')
 print(f'panel calls={panel.get(\"calls\")} workers={panel.get(\"workers\")}')
 print('DOUBLE_COUNT_OK' if panel.get('calls') == 1 and panel.get('workers') == 3 else 'DOUBLE_COUNT_FAIL')
-print(f'session={d[\"session\"]} tagging_partial={d[\"session_tagging_partial\"]}')
-print(f'cost_partial={d[\"cost_partial\"]} total_cost_micro_usd={d[\"total_cost_micro_usd\"]}')
+print(f'session={d[\"session\"]} tagging_partial={\"session_tagging_partial\" in d[\"notes\"]}')
+print(f'cost_partial={d[\"downstream\"][\"cost_partial\"]} total_cost_micro_usd={d[\"downstream\"][\"total_cost_micro_usd\"]}')
 "
 
 echo "---"
@@ -355,14 +356,14 @@ rm -f ~/.forge/usage/events/qa-usage-fixture_99999.jsonl
 forge session delete qa-usage --yes --force 2>/dev/null || true
 ```
 
-- [ ] `total_events` is 7 (3 supervisor + 1 panel verb + 3 panel workers)
+- [ ] `total_attempts` is 7 (3 supervisor + 1 panel verb + 3 panel workers)
 - [ ] `supervisor calls=3 errors=1` (the error mirrors an OpenRouter content-filter failure)
 - [ ] `panel calls=1 workers=3` and the script prints `DOUBLE_COUNT_OK` (verb + workers not double-counted)
 - [ ] `session=qa-usage tagging_partial=True`
 - [ ] `cost_partial=True total_cost_micro_usd=2050` (the 3 reported costs sum to 2050; the supervisor error + 3 workers
   report no cost, so the aggregate is flagged best-effort/partial -- missing costs are not priced to 0)
-- [ ] Human render shows a `supervisor` row and a `panel` row, a `Workers` column with `3` on the panel row, and a
-  `Total: 7 events` line
+- [ ] Human render shows the `Model calls` pane with a `supervisor` row and a `panel` row, a `Workers` column with `3`
+  on the panel row, and a `Total: 7 events` line
 - [ ] Human render cost honesty: the `Total:` line carries a `~` best-effort marker, and the footnotes include
   `best-effort and partial` and `reported-or-estimated` (the always-on
   `'forge proxy costs show' is the authoritative spend view` pointer)

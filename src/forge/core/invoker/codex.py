@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import replace
-from typing import Literal
+from typing import Literal, cast
 
 from forge.core.invoker._lifecycle import (
     ParseHints,
@@ -224,6 +224,7 @@ def _emit_codex(request: HeadlessRequest, result: HeadlessResult) -> None:
         return
     from forge.core.usage import emit_codex_usage
 
+    status = _status(result)
     emit_codex_usage(
         run_id=result.run_id,
         parent_run_id=result.parent_run_id,
@@ -235,9 +236,35 @@ def _emit_codex(request: HeadlessRequest, result: HeadlessResult) -> None:
         model=request.model,
         provider=request.provider,
         billing_mode=attribution.billing_mode,
-        status=_status(result),
+        status=status,
         latency_ms=round(result.duration_seconds * 1000, 1) if result.duration_seconds else None,
         input_tokens=result.input_tokens,
         output_tokens=result.output_tokens,
         cached_tokens=result.cached_tokens,
     )
+    from forge.core.telemetry.upstream import UpstreamStatus, record_upstream_operation
+
+    record_upstream_operation(
+        command=attribution.command,
+        operation="workflow.worker",
+        status=cast(UpstreamStatus, status),
+        session=attribution.session,
+        run_id=result.run_id,
+        parent_run_id=result.parent_run_id,
+        root_run_id=result.root_run_id,
+        reason_code=_worker_reason_code(result),
+        message=None if status == "success" else result.error or result.stderr[:200] or None,
+        latency_ms=round(result.duration_seconds * 1000, 1) if result.duration_seconds else None,
+    )
+
+
+def _worker_reason_code(result: HeadlessResult) -> str | None:
+    if result.timed_out:
+        return "timeout"
+    if result.error:
+        return "subprocess_error"
+    if result.runtime_is_error:
+        return "runtime_reported_error"
+    if result.returncode != 0:
+        return f"exit_{result.returncode}"
+    return None

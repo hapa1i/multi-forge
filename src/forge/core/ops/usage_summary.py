@@ -1,14 +1,13 @@
 """Per-session Forge activity summary (command-core).
 
-Aggregates captured telemetry planes into one view a human can read:
+Aggregates captured telemetry planes into a two-pane view a human can read:
 
-- the usage-attribution ledger (``usage/events``) -> per-command run/error counts,
-  tokens, and reported-or-estimated cost. Uncapped and reliable; the authoritative
-  source for "how many times did the supervisor run, and how many failed".
-- the session manifest's ``confirmed.policy.decisions`` plus upstream policy outcomes
-  -> supervisor allow/warn/deny and warning text. The manifest side is capped at
-  ``MAX_DECISION_LOG`` (so ``log_capped`` is surfaced); upstream fills no-call/fail-open
-  gaps that never reached the manifest log.
+- upstream operation outcomes -> policy/supervisor health plus non-engine automation
+  boundaries such as memory writer, workflows, transfer curation, and action tagging.
+- downstream/model-call evidence plus transitional usage events -> per-command calls,
+  worker counts, tokens, legacy error counts, and reported-or-estimated cost.
+- the session manifest's ``confirmed.policy.decisions`` remains a capped fallback for
+  success/cached policy counts that the default upstream volume intentionally drops.
 
 The two planes measure related-but-distinct things and are kept separate on purpose
 (a cached supervisor verdict is a policy *decision* with no ledger event; a failed
@@ -25,10 +24,12 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
+from forge.core.run_id import derive_provider_session_id
+from forge.core.telemetry.downstream import DownstreamRecord, read_downstream_records
 from forge.core.telemetry.upstream import UpstreamOutcome, read_upstream_outcomes
 from forge.core.usage.ledger import UsageEvent, read_usage_events
 from forge.core.usage.vocabulary import ROUTE_CLAUDE_INTERACTIVE, Confidence
@@ -41,6 +42,7 @@ _ERROR_STATUSES = {"error", "timeout"}
 _UPSTREAM_FAIL_OPEN_STATUSES = {"fail_open", "error", "timeout", "skipped"}
 _WORKFLOW_COMMANDS = {"panel", "analyze", "debate", "consensus"}
 _MAX_RECENT_WARNINGS = 5
+_OperationKey = tuple[str, str | None, str | None, str, str | None]
 # Confidences whose dollar figure is trustworthy enough to count toward Forge-added
 # spend (`forge +$Y`): a directly-reported figure or a gateway-computed one.
 # `inferred` (a local estimate), `unavailable`, and `unknown` never contribute -- the
@@ -133,6 +135,75 @@ class ShadowActivity:
 
 
 @dataclass
+class OperationActivity:
+    """Upstream operation-outcome rollup."""
+
+    command: str
+    status: str
+    count: int = 0
+    operation: str | None = None
+    policy_id: str | None = None
+    reason_code: str | None = None
+    message: str | None = None
+    run_id: str | None = None
+    root_run_id: str | None = None
+    latest_at: str | None = None
+    join_state: str = "upstream_only"
+
+
+@dataclass
+class OperationPane:
+    """Upstream operation outcomes plus manifest fallback policy counters."""
+
+    operations: list[OperationActivity] = field(default_factory=list)
+    policy: PolicyActivity | None = None
+    manifest_fallback_used: bool = False
+    log_capped: bool = False
+    upstream_count: int = 0
+
+    @property
+    def has_content(self) -> bool:
+        return bool(self.operations or (self.policy is not None and self.policy.has_content))
+
+
+@dataclass
+class ModelCallActivity:
+    """Downstream/model-call rollup visible to one session."""
+
+    command: str
+    calls: int = 0
+    workers: int = 0
+    attempts: int = 0
+    errors: int = 0
+    error_kinds: dict[str, int] = field(default_factory=dict)
+    input_tokens: int = 0
+    output_tokens: int = 0
+    cached_tokens: int = 0
+    cost_micro_usd: int | None = None
+    cost_estimated: bool = True
+    cost_partial: bool = False
+    join_state: str = "downstream_only"
+    root_run_ids: list[str] = field(default_factory=list)
+
+
+@dataclass
+class ModelCallPane:
+    """Model calls and spend evidence visible to one session."""
+
+    rows: list[ModelCallActivity] = field(default_factory=list)
+    total_cost_micro_usd: int | None = None
+    total_input_tokens: int = 0
+    total_output_tokens: int = 0
+    cost_partial: bool = False
+    cost_estimated: bool = True
+    downstream_records: int = 0
+
+    @property
+    def has_content(self) -> bool:
+        return bool(self.rows)
+
+
+@dataclass
 class SessionActivitySummary:
     """What a Forge session did: per-command usage + supervisor/policy activity."""
 
@@ -145,6 +216,9 @@ class SessionActivitySummary:
     total_events: int = 0
     policy: PolicyActivity | None = None
     shadow: ShadowActivity | None = None
+    upstream: OperationPane = field(default_factory=OperationPane)
+    downstream: ModelCallPane = field(default_factory=ModelCallPane)
+    notes: list[str] = field(default_factory=list)
     subagents: int = 0
     # Explicit coverage flags (JSON-friendly) so a sparse summary reads honestly.
     cost_partial: bool = False  # some in-scope events lacked a measured cost
@@ -166,6 +240,8 @@ class SessionActivitySummary:
             not self.commands
             and (self.policy is None or not self.policy.has_content)
             and (self.shadow is None or not self.shadow.has_content)
+            and not self.upstream.has_content
+            and not self.downstream.has_content
             and self.subagents == 0
         )
 
@@ -183,8 +259,9 @@ def build_session_activity_summary(
     valid, partial summary rather than raising.
     """
     summary = SessionActivitySummary(session=session_name, since=since.isoformat() if since else None)
+    events = _read_session_usage_events(session_name, since)
 
-    _aggregate_ledger(summary, session_name, since)
+    _aggregate_ledger(summary, events, since)
 
     manifest = _load_manifest(session_name, forge_root)
     summary.policy = _policy_activity(manifest, since, session_name)
@@ -194,11 +271,13 @@ def build_session_activity_summary(
             summary.subagents = int(subagents.total_count)
 
     summary.shadow = _shadow_activity(forge_root, session_name, since)
+    _build_activity_panes(summary, session_name, since, events)
 
     # Untagged emitters (e.g. the action tagger) never tag a session, so a per-session
     # view can undercount -- but only flag that once the session has activity to
     # contextualize it; claiming partial coverage of an empty summary is noise.
     summary.session_tagging_partial = not summary.is_empty
+    summary.notes = _activity_notes(summary)
     return summary
 
 
@@ -292,6 +371,19 @@ def render_summary_line(summary: SessionActivitySummary) -> str | None:
     if not parts:
         return None
     return "Forge this session — " + " · ".join(parts)
+
+
+def activity_summary_to_json(summary: SessionActivitySummary) -> dict[str, object]:
+    """Clean-break machine-readable activity shape for ``forge activity --json``."""
+    return {
+        "session": summary.session,
+        "since": summary.since,
+        "upstream": asdict(summary.upstream),
+        "downstream": asdict(summary.downstream),
+        "shadow": asdict(summary.shadow) if summary.shadow is not None else None,
+        "subagents": summary.subagents,
+        "notes": list(summary.notes),
+    }
 
 
 def sum_forge_added_cost(session: str, *, since: datetime | None = None) -> int | None:
@@ -581,13 +673,15 @@ def _join_session_cost(
     )
 
 
-def _aggregate_ledger(summary: SessionActivitySummary, session_name: str, since: datetime | None) -> None:
+def _read_session_usage_events(session_name: str, since: datetime | None) -> list[UsageEvent]:
     try:
-        events = read_usage_events(period_start=since, session=session_name)
+        return read_usage_events(period_start=since, session=session_name)
     except Exception as e:  # best-effort: telemetry read must not break the summary
         logger.debug("usage summary: ledger read failed for %s: %s", session_name, e)
-        return
+        return []
 
+
+def _aggregate_ledger(summary: SessionActivitySummary, events: list[UsageEvent], since: datetime | None) -> None:
     summary.total_events = len(events)
     by_command: dict[str, CommandUsage] = {}
 
@@ -628,6 +722,233 @@ def _aggregate_ledger(summary: SessionActivitySummary, session_name: str, since:
     summary.total_cost_micro_usd = cost.total
     summary.cost_partial = cost.partial
     summary.cost_estimated = cost.estimated
+
+
+def _build_activity_panes(
+    summary: SessionActivitySummary,
+    session_name: str,
+    since: datetime | None,
+    events: list[UsageEvent],
+) -> None:
+    try:
+        outcomes = read_upstream_outcomes(period_start=since, session=session_name)
+    except Exception as e:
+        logger.debug("activity panes: upstream read failed for %s: %s", session_name, e)
+        outcomes = []
+
+    known_roots = {e.root_run_id for e in events if e.root_run_id}
+    known_roots.update(o.root_run_id for o in outcomes if o.root_run_id)
+    known_runs = {e.run_id for e in events if e.run_id}
+    known_runs.update(o.run_id for o in outcomes if o.run_id)
+    provider_prefix = derive_provider_session_id(session_name, root_run_id="", role=None)
+
+    try:
+        records = [
+            rec
+            for rec in read_downstream_records(period_start=since, kind="attempt")
+            if _downstream_visible_to_session(rec, known_roots, known_runs, provider_prefix)
+        ]
+    except Exception as e:
+        logger.debug("activity panes: downstream read failed for %s: %s", session_name, e)
+        records = []
+
+    downstream_roots = {rec.forge_root_run_id for rec in records if rec.forge_root_run_id}
+    downstream_roots.update(event.root_run_id for event in events if event.root_run_id)
+    downstream_runs = {rec.forge_run_id for rec in records if rec.forge_run_id}
+    downstream_runs.update(event.run_id for event in events if event.run_id)
+    upstream_roots = {outcome.root_run_id for outcome in outcomes if outcome.root_run_id}
+
+    summary.upstream = _build_operation_pane(outcomes, downstream_roots, downstream_runs, summary.policy)
+    summary.downstream = _build_model_call_pane(summary, events, records, upstream_roots)
+    if summary.downstream.rows:
+        summary.total_cost_micro_usd = summary.downstream.total_cost_micro_usd
+        summary.total_input_tokens = summary.downstream.total_input_tokens
+        summary.total_output_tokens = summary.downstream.total_output_tokens
+        summary.cost_partial = summary.downstream.cost_partial
+        summary.cost_estimated = summary.downstream.cost_estimated
+
+
+def _downstream_visible_to_session(
+    record: DownstreamRecord,
+    known_roots: set[str],
+    known_runs: set[str],
+    provider_prefix: str,
+) -> bool:
+    if record.forge_root_run_id and record.forge_root_run_id in known_roots:
+        return True
+    if record.forge_run_id and record.forge_run_id in known_runs:
+        return True
+    return _provider_session_matches(record.provider_session_id, provider_prefix)
+
+
+def _provider_session_matches(provider_session_id: str | None, prefix: str) -> bool:
+    if not provider_session_id:
+        return False
+    return provider_session_id == prefix or provider_session_id.startswith(prefix + "_")
+
+
+def _build_operation_pane(
+    outcomes: list[UpstreamOutcome],
+    downstream_roots: set[str],
+    downstream_runs: set[str],
+    policy: PolicyActivity | None,
+) -> OperationPane:
+    grouped: dict[_OperationKey, OperationActivity] = {}
+    for outcome in outcomes:
+        key = (
+            outcome.command,
+            outcome.operation,
+            outcome.policy_id,
+            outcome.status,
+            outcome.reason_code,
+        )
+        row = grouped.get(key)
+        join_state = (
+            "matched"
+            if (outcome.root_run_id and outcome.root_run_id in downstream_roots)
+            or (outcome.run_id and outcome.run_id in downstream_runs)
+            else "upstream_only"
+        )
+        if row is None:
+            grouped[key] = OperationActivity(
+                command=outcome.command,
+                operation=outcome.operation,
+                policy_id=outcome.policy_id,
+                status=outcome.status,
+                reason_code=outcome.reason_code,
+                message=outcome.message,
+                run_id=outcome.run_id,
+                root_run_id=outcome.root_run_id,
+                latest_at=outcome.ts,
+                join_state=join_state,
+                count=1,
+            )
+            continue
+        row.count += 1
+        if outcome.ts >= (row.latest_at or ""):
+            row.latest_at = outcome.ts
+            row.message = outcome.message
+            row.run_id = outcome.run_id
+            row.root_run_id = outcome.root_run_id
+        if row.join_state != "matched" and join_state == "matched":
+            row.join_state = "matched"
+    return OperationPane(
+        operations=sorted(grouped.values(), key=lambda r: (r.latest_at or "", r.command), reverse=True),
+        policy=policy,
+        manifest_fallback_used=policy is not None and policy.has_content,
+        log_capped=bool(policy and policy.log_capped),
+        upstream_count=len(outcomes),
+    )
+
+
+def _build_model_call_pane(
+    summary: SessionActivitySummary,
+    events: list[UsageEvent],
+    records: list[DownstreamRecord],
+    upstream_roots: set[str],
+) -> ModelCallPane:
+    roots_by_command: dict[str, set[str]] = {}
+    used_roots: set[str] = set()
+    used_runs: set[str] = set()
+    for event in events:
+        if event.root_run_id:
+            roots_by_command.setdefault(event.command, set()).add(event.root_run_id)
+            used_roots.add(event.root_run_id)
+        if event.run_id:
+            used_runs.add(event.run_id)
+
+    rows: list[ModelCallActivity] = []
+    used_commands: set[str] = set()
+    for command in summary.commands:
+        roots = sorted(roots_by_command.get(command.command, set()))
+        used_commands.add(command.command)
+        rows.append(
+            ModelCallActivity(
+                command=command.command,
+                calls=command.calls,
+                workers=command.workers,
+                attempts=command.calls + command.workers,
+                errors=command.errors,
+                error_kinds=dict(command.error_kinds),
+                input_tokens=command.input_tokens,
+                output_tokens=command.output_tokens,
+                cached_tokens=command.cached_tokens,
+                cost_micro_usd=command.cost_micro_usd,
+                cost_estimated=command.cost_estimated,
+                cost_partial=command.cost_micro_usd is None and bool(command.calls or command.workers),
+                join_state="matched" if set(roots) & upstream_roots else "downstream_only",
+                root_run_ids=roots,
+            )
+        )
+
+    for label, grouped_records in _group_downstream_records(records).items():
+        if label in used_commands:
+            continue
+        recs = [
+            rec
+            for rec in grouped_records
+            if not (rec.forge_root_run_id and rec.forge_root_run_id in used_roots)
+            and not (rec.forge_run_id and rec.forge_run_id in used_runs)
+        ]
+        if not recs:
+            continue
+        roots = sorted({rec.forge_root_run_id for rec in recs if rec.forge_root_run_id})
+        cost_values = [rec.cost_micros for rec in recs if rec.cost_micros is not None]
+        failures = sum(1 for rec in recs if rec.failed)
+        rows.append(
+            ModelCallActivity(
+                command=label,
+                attempts=len(recs),
+                errors=failures,
+                error_kinds={"error": failures} if failures else {},
+                input_tokens=sum(rec.input_tokens or 0 for rec in recs),
+                output_tokens=sum(rec.output_tokens or 0 for rec in recs),
+                cached_tokens=sum(rec.cached_tokens or 0 for rec in recs),
+                cost_micro_usd=sum(cost_values) if cost_values else None,
+                cost_estimated=False,
+                cost_partial=len(cost_values) != len(recs),
+                join_state="matched" if set(roots) & upstream_roots else "downstream_only",
+                root_run_ids=roots,
+            )
+        )
+
+    rows.sort(key=lambda r: (r.attempts, r.calls + r.workers, r.command), reverse=True)
+    cost_values = [row.cost_micro_usd for row in rows if row.cost_micro_usd is not None]
+    has_cost = bool(cost_values)
+    return ModelCallPane(
+        rows=rows,
+        total_cost_micro_usd=sum(cost_values) if has_cost else None,
+        total_input_tokens=sum(row.input_tokens for row in rows),
+        total_output_tokens=sum(row.output_tokens for row in rows),
+        cost_partial=summary.cost_partial or (has_cost and any(row.cost_partial for row in rows)),
+        cost_estimated=(
+            any(row.cost_estimated for row in rows if row.cost_micro_usd is not None)
+            if has_cost
+            else summary.cost_estimated
+        ),
+        downstream_records=len(records),
+    )
+
+
+def _group_downstream_records(records: list[DownstreamRecord]) -> dict[str, list[DownstreamRecord]]:
+    grouped: dict[str, list[DownstreamRecord]] = {}
+    for record in records:
+        label = record.provider_command or record.source_id or record.provider or "downstream"
+        grouped.setdefault(label, []).append(record)
+    return grouped
+
+
+def _activity_notes(summary: SessionActivitySummary) -> list[str]:
+    notes: list[str] = []
+    if summary.upstream.log_capped:
+        notes.append("policy_manifest_fallback_capped")
+    if summary.session_tagging_partial:
+        notes.append("session_tagging_partial")
+    if summary.cost_partial:
+        notes.append("cost_partial")
+    if summary.cost_estimated:
+        notes.append("cost_estimated")
+    return notes
 
 
 def _load_manifest(session_name: str, forge_root: str | None):  # type: ignore[no-untyped-def]

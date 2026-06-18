@@ -15,13 +15,13 @@ from forge.core.reactive.cost_tracking import VerbCostResult
 from forge.core.reactive.session_runner import SessionResult
 from forge.core.telemetry.downstream import read_downstream_records
 from forge.core.usage.emit import (
-    _direct_cost_provenance,
     emit_direct_llm_usage,
     emit_usage_for_session_result,
     emit_verb_usage,
     emit_worker_usage,
 )
 from forge.core.usage.ledger import read_usage_events
+from forge.core.usage.measurement import direct_cost_provenance
 
 
 def _ok_result(**overrides: Any) -> SessionResult:
@@ -224,12 +224,12 @@ class TestEmitVerbAndWorkerVocabulary:
 class TestDirectCostProvenance:
     """The shared one-reporter precedence for a DIRECT (non-proxied) claude -p run.
 
-    Lives once in ``_direct_cost_provenance`` so the verb and per-worker emitters
+    Lives once in ``direct_cost_provenance`` so the verb and per-worker emitters
     cannot drift. The proxied path is deliberately NOT here (see the divergence test
     below)."""
 
     def test_self_reported_cost_is_runtime_native(self) -> None:
-        p = _direct_cost_provenance(7000, True, 10, 20, 3)
+        p = direct_cost_provenance(7000, True, 10, 20, 3)
         assert (p.cost_micro_usd, p.reporter, p.confidence, p.measurement_source) == (
             7000,
             "claude_code",
@@ -240,7 +240,7 @@ class TestDirectCostProvenance:
 
     def test_tokens_only_is_provider_usage_exact_cost_unavailable(self) -> None:
         # OAuth: usage present, cost absent -> exact tokens kept, cost honestly None.
-        p = _direct_cost_provenance(None, True, 10, 20, 3)
+        p = direct_cost_provenance(None, True, 10, 20, 3)
         assert (p.cost_micro_usd, p.reporter, p.confidence, p.measurement_source) == (
             None,
             None,
@@ -250,13 +250,13 @@ class TestDirectCostProvenance:
         assert p.input_tokens == 10
 
     def test_neither_is_unattributed(self) -> None:
-        p = _direct_cost_provenance(None, True, None, None, None)
+        p = direct_cost_provenance(None, True, None, None, None)
         assert (p.cost_micro_usd, p.confidence, p.measurement_source) == (None, "unavailable", "unattributed")
         assert (p.input_tokens, p.output_tokens, p.cached_tokens) == (None, None, None)
 
     def test_unparsed_envelope_drops_tokens(self) -> None:
         # envelope_parsed=False -> tokens are not trustworthy as provider-exact.
-        p = _direct_cost_provenance(None, False, 10, 20, 3)
+        p = direct_cost_provenance(None, False, 10, 20, 3)
         assert p.measurement_source == "unattributed"
         assert p.input_tokens is None
 

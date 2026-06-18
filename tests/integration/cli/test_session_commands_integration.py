@@ -834,7 +834,7 @@ class TestActivityCommand:
 
         data = json.loads(result.stdout)
         assert data["session"] == "usage-test"
-        supervisor = next(c for c in data["commands"] if c["command"] == "supervisor")
+        supervisor = next(c for c in data["downstream"]["rows"] if c["command"] == "supervisor")
         assert supervisor["calls"] == 3
         assert supervisor["errors"] == 1
 

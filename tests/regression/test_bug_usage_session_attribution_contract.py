@@ -1,16 +1,16 @@
-"""Regression: the per-session usage read surface must agree with what emitters tag.
+"""Regression: the per-session activity read surface must agree with what emitters tag.
 
-``forge usage`` / the session-end summary find a session's ledger events by
-``event.session == manifest.name`` (the read filter) and read its policy decisions from
-that manifest. The supervisor -- the headline emitter, whose ``status="error"`` events are
-the OpenRouter content-filter failures this surface was built to reveal -- tags its ledger
-event with ``session=context.session_name``. So the surface only works if
+``forge activity`` / the session-end summary find a session's legacy usage events by
+``event.session == manifest.name`` and read its policy fallback from that manifest. The
+supervisor -- the headline emitter, whose ``status="error"`` events are the OpenRouter
+content-filter failures this surface was built to reveal -- tags its ledger event with
+``session=context.session_name``. So the surface only works if
 ``ActionContext.session_name == manifest.name``.
 
 That bridge is a single assignment in ``ClaudeHookAdapter.build_contexts``
 (``session_name=manifest.name``). Pin it so a future change (e.g. tagging a Claude UUID
 instead of the name) -- which would silently make supervisor activity invisible to
-``forge usage`` while the policy-decision half kept working -- fails loudly here.
+``forge activity`` while the policy fallback kept working -- fails loudly here.
 
 Affected: ``src/forge/cli/hooks/policy.py``, ``src/forge/core/ops/usage_summary.py``.
 """
@@ -36,7 +36,7 @@ def test_action_context_session_name_is_manifest_name() -> None:
     )
     # The bridge: the supervisor emits its ledger event with session=context.session_name,
     # and the read surface filters event.session == manifest.name. If these diverge, the
-    # ledger half (incl. supervisor errors) goes silently invisible to `forge usage`.
+    # ledger half (incl. supervisor errors) goes silently invisible to `forge activity`.
     assert ctx.session_name == manifest.name
 
 

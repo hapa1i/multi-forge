@@ -67,6 +67,21 @@ def _coerce_passed(val: Any) -> bool:
 console = Console()
 
 
+def _record_workflow_outcome(command: str, output: Any) -> None:
+    from forge.core.telemetry.upstream import UpstreamStatus, record_upstream_operation
+
+    failed = getattr(output, "failed", 0)
+    status: UpstreamStatus = "success" if getattr(output, "successful", 0) else "error"
+    record_upstream_operation(
+        command=command,
+        operation=f"workflow.{command}",
+        status=status,
+        session=os.environ.get("FORGE_SESSION"),
+        reason_code="worker_failed" if failed else None,
+        message=f"{failed} worker{'s' if failed != 1 else ''} failed" if failed else None,
+    )
+
+
 def _run_preflight(
     specs: list[ModelSpec],
     *,
@@ -493,6 +508,7 @@ def panel(
         status="success" if output.successful else "error",
         session=os.environ.get("FORGE_SESSION"),
     )
+    _record_workflow_outcome("panel", output)
 
     _handle_review_output(
         ctx,
@@ -876,6 +892,7 @@ def analyze(
         status="success" if output.successful else "error",
         session=os.environ.get("FORGE_SESSION"),
     )
+    _record_workflow_outcome("analyze", output)
 
     _handle_review_output(
         ctx,
@@ -1319,6 +1336,7 @@ def debate(
         status="success" if output.successful else "error",
         session=os.environ.get("FORGE_SESSION"),
     )
+    _record_workflow_outcome("debate", output)
 
     debate_warnings = _routing_plan_warnings(stance_models, routing_plan)
     debate_resolved_models = _resolved_models_summary(
@@ -2024,6 +2042,7 @@ def consensus(
         status="success" if output.successful else "error",
         session=os.environ.get("FORGE_SESSION"),
     )
+    _record_workflow_outcome("consensus", output)
 
     consensus_warnings = _routing_plan_warnings(role_models, routing_plan)
     consensus_resolved_models = _resolved_models_summary(

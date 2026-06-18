@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from forge.core.ops.context import ExecutionContext
+from forge.core.telemetry.upstream import UpstreamStatus, record_upstream_operation
 
 logger = logging.getLogger(__name__)
 
@@ -309,6 +310,24 @@ def run_shadow_curation(
         session=session_name,
         base_url=base_url,
         direct=direct,
+    )
+    status: UpstreamStatus = "success" if result.success else "timeout" if result.timed_out else "error"
+    reason_code = None
+    if not result.success:
+        reason_code = "timeout" if result.timed_out else f"exit_{result.returncode}"
+        if result.error and not result.timed_out:
+            reason_code = "subprocess_error"
+    record_upstream_operation(
+        command="curation",
+        operation="memory.shadow_curation",
+        status=status,
+        session=session_name,
+        run_id=getattr(result, "run_id", None),
+        parent_run_id=getattr(result, "parent_run_id", None),
+        root_run_id=getattr(result, "root_run_id", None),
+        reason_code=reason_code,
+        message=None if result.success else result.error or result.stderr[:200],
+        latency_ms=round(cost.duration_ms, 1) if cost.duration_ms is not None else None,
     )
 
     if not result.success:

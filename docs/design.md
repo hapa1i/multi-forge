@@ -1036,18 +1036,24 @@ cost-capture or log write failures must not break successful LLM responses.
 
 #### Per-session usage read surface
 
-`forge activity [session]` aggregates the captured per-session planes into one human-readable view: the **usage ledger**
-(`usage/events`, the uncapped source for per-command run/error counts, tokens, and reported-or-estimated cost), the
-manifest's **`confirmed.policy.decisions`** (supervisor allow/warn/deny and warning text, capped at `MAX_DECISION_LOG`),
-and an upstream policy-outcome overlay for no-call/fail-open outcomes that never entered the manifest log. The
-aggregation is a UI-agnostic command-core builder (`forge.core.ops.usage_summary.build_session_activity_summary`, §3.12)
-shared by the CLI and a compact session-end line the launcher prints on exit (host, sidecar, and fork). Cost is
-reported-or-estimated (best-effort per-session attribution; may be partial; the verb-snapshot aggregate contributes
-estimates) — `forge proxy costs show` stays the authoritative spend view. Events are scoped by the `session` field
-(`event.session == manifest.name`); emitters that do not tag a session (e.g. the action tagger) are not attributed to
-one, so the summary records that coverage is partial. See
+`forge activity [session]` aggregates the captured per-session planes into a two-pane human-readable view. The
+**Operation outcomes** pane reads upstream outcomes by `session` (policy checks, supervisor fail-open/no-call outcomes,
+memory writer, supervisor shadow drain, shadow curation, workflows/workers, transfer curation, and action tagging). The
+**Model calls** pane reads downstream spend/token evidence joined by run tree, with `usage/events` retained as a
+transitional source for session-tagged run correlation, labels, legacy error counts, and fallback cost.
+`downstream_only` therefore means "downstream/model-call evidence whose run tree is known to this session but has no
+matching upstream outcome"; fully orphaned downstream records with no session-known run tree are not attributable to a
+session.
+
+The manifest's **`confirmed.policy.decisions`** remains a compatibility fallback for success/cached policy counts and
+warning text that upstream suppresses at the default `upstream_event_volume=non_success`; it is capped at
+`MAX_DECISION_LOG`, so `log_capped` marks that older success/cached counts may be missing. Upstream non-success outcomes
+are uncapped, and manifest/upstream duplicate warnings are deduped. The aggregation is a UI-agnostic command-core
+builder (`forge.core.ops.usage_summary.build_session_activity_summary`, §3.12) shared by the CLI and the compact
+`render_summary_line(...)` launcher exit line (host, sidecar, and fork). Cost is reported-or-estimated and may be
+partial; `forge proxy costs show` stays the authoritative spend view. See
 [design_appendix.md §A.13](design_appendix.md#a13-usage-attribution-ledger-schema-314) for the read surface and
-per-emitter coverage.
+coverage.
 
 ## 4. CLI and command surfaces
 

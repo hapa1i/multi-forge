@@ -83,10 +83,37 @@ def tag_action(
             latency_ms=latency_ms,
         )
 
-        return _parse_tags(response.text)
+        tags = _parse_tags(response.text)
+        from forge.core.telemetry.upstream import record_upstream_operation
+
+        record_upstream_operation(
+            command="tagger",
+            operation="action.tag",
+            status="success" if tags else "skipped",
+            session=context.session_name,
+            origin=context.origin,
+            tool_name=context.tool_name,
+            target_path=context.target_path,
+            reason_code=None if tags else "no_tags",
+            latency_ms=latency_ms,
+        )
+        return tags
 
     except Exception as e:
         _log.warning("tag_action failed (model=%s): %s", model, e)
+        from forge.core.telemetry.upstream import record_upstream_operation
+
+        record_upstream_operation(
+            command="tagger",
+            operation="action.tag",
+            status="error",
+            session=context.session_name,
+            origin=context.origin,
+            tool_name=context.tool_name,
+            target_path=context.target_path,
+            reason_code="exception",
+            message=str(e),
+        )
         return []
 
 
