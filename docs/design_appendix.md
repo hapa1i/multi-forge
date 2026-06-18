@@ -98,7 +98,7 @@ forge proxy edit my-high-reasoning
 
 **Principle:** Create from template, then edit (don't modify internals).
 
-### A.2.1 Model source catalog (§3.6.5 / unified backend Phase 1)
+### A.2.1 Model source catalog (§3.6.5 / unified backend Phase 1/2)
 
 Forge now has a built-in, code-level model-source catalog in `forge.backend.sources`. It is a static definition layer
 for the upstream model source a proxy or direct runtime reaches; it is **not** user-authored durable state and it is
@@ -107,7 +107,7 @@ distinct from both proxy templates and runtime backend instances.
 | Layer                    | Owner / Location                             | Unit                                                                                  |
 | ------------------------ | -------------------------------------------- | ------------------------------------------------------------------------------------- |
 | Model-source catalog     | `forge.backend.sources`                      | Static source definition: id, kind, endpoint shape, credentials, provider, capability |
-| Proxy templates          | `src/forge/config/defaults/templates/*.yaml` | Operational routing profiles; Phase 2 migrates them to `proxy.source`                 |
+| Proxy templates          | `src/forge/config/defaults/templates/*.yaml` | Operational routing profiles that declare `proxy.source`                              |
 | Local backend config     | `~/.forge/backends/<adapter>/config.yaml`    | LiteLLM service config (`model_list` / routing), copied by `forge backend create`     |
 | Runtime backend registry | `~/.forge/backends/index.json`               | PID/port/status rows for running local process instances only                         |
 
@@ -120,14 +120,15 @@ Source definitions have:
 
 - `id`: stable catalog id, lowercase letters/digits plus `-`, `_`, or `.`
 - `kind`: `local` or `remote`
-- `provider`: `ProviderType` (`litellm_remote`, `litellm_local`, `anthropic`, `openrouter`)
+- `provider`: `ProviderType` from dependency-light `forge.core.provider_types` (`litellm_remote`, `litellm_local`,
+  `anthropic`, `openrouter`)
 - `endpoint`: one of `literal_url`, `connection_value`, or `local_backend`
 - `credential_ids`: credential registry names such as `openrouter`, `litellm-remote`, `anthropic-api`, `openai-api`, or
   `gemini-api`
 - `capabilities`: currently includes auth-probe, provider-trace eligibility, and OpenRouter user-grouping capability
-- `local_lifecycle`: local-only refinement with adapter, default port, and required env vars; remote sources never set
-  it
-- `template_aliases`: current template names that resolve to the canonical source id during the Phase 2 migration
+- `local_lifecycle`: local-only refinement with adapter and default port; required env vars are derived from
+  `credential_ids`; remote sources never set it
+- `template_names`: current proxy templates that resolve to the canonical source id during template loading
 
 The shipped v1 catalog includes:
 
@@ -145,6 +146,20 @@ The shipped v1 catalog includes:
 Catalog validation rejects duplicate source ids or aliases, unknown `kind`/`provider` values, missing or unknown
 credentials, malformed literal URLs, malformed connection-value env var names, remote lifecycle declarations, and local
 sources without lifecycle. Remote definitions are never written to `BackendRegistry`.
+
+Proxy templates declare `proxy.source: <source-id-or-alias>`. During template loading, Forge resolves that value through
+the catalog, stores the canonical source id on `ProxyConfig.source`, derives any local `BackendDependency` from the
+source lifecycle, and resolves remote provider `base_url` from the source endpoint shape. Shipped local templates no
+longer carry inline `backend_dependency`; OpenRouter and Anthropic passthrough templates no longer carry inline provider
+`base_url`. Remote LiteLLM templates resolve `LITELLM_BASE_URL` through the same connection-value path used by
+credentials. OpenRouter templates resolve `OPENROUTER_BASE_URL` the same way, defaulting to
+`https://openrouter.ai/api/v1` when no override is configured.
+
+`TEMPLATE_ENV_VARS` remains as a compatibility map for existing auth callers, but it is generated from
+`ModelSource.credential_ids` and source endpoint connection values. Template `backend_dependency.required_env_vars`,
+`credentials_for_template()`, sidecar secrets, and proxy preflight therefore derive from the same catalog-backed source
+of truth. Credential metadata itself lives in dependency-light `src/forge/core/credential_registry.py`; template-aware
+helpers stay in `src/forge/core/auth/capabilities.py`, avoiding an auth/template/source import cycle.
 
 ### A.3 Confusion traps / anti-patterns (§3.6.6)
 
@@ -208,7 +223,10 @@ keep a key out of the interactive session. Withholding a key from interactive Cl
 convenience fallback for bootstrapping proxy creation (`forge proxy create`). Once `proxy.yaml` exists, proxy-owned
 routing is authoritative. Do NOT store other routing configuration in credential storage.
 
-**Capability registry** (`src/forge/core/auth/capabilities.py`):
+**Credential registry and capability helpers**:
+
+- Credential data: `src/forge/core/credential_registry.py`
+- Template-aware helpers: `src/forge/core/auth/capabilities.py`
 
 Single source of truth for credential metadata. Key types and functions:
 
@@ -221,10 +239,11 @@ format_missing_credential_error(credential, *, missing_vars, template=None,
     context=None, extra_hint=None, profile=None, env_ignored=False) -> str
 ```
 
-`credentials_for_template()` bridges `TEMPLATE_ENV_VARS` (template → env var names) to `CREDENTIALS` (credential →
-metadata) via reverse lookup. `format_missing_credential_error()` produces actionable messages with signup URLs,
-`forge auth login` commands, and `not_needed_for` disambiguation (rendered for credentials that define it:
-`anthropic-api` and `codex-api`).
+`TEMPLATE_ENV_VARS` is generated from the model-source catalog for template-facing compatibility. It maps each template
+to required credential env vars and required connection-value env vars such as `LITELLM_BASE_URL`.
+`credentials_for_template()` bridges that generated map to `CREDENTIALS` (credential → metadata) via reverse lookup.
+`format_missing_credential_error()` produces actionable messages with signup URLs, `forge auth login` commands, and
+`not_needed_for` disambiguation (rendered for credentials that define it: `anthropic-api` and `codex-api`).
 
 ### A.7 Runtime config (§3.6.10 -- `~/.forge/config.yaml`)
 
@@ -1111,7 +1130,7 @@ RoutingSource = Literal[
 @dataclass(frozen=True)
 class ModelRoute:
     provider: str              # "openrouter", "litellm", or "direct"
-    credential: str            # Credential from capabilities.py (e.g., "openrouter", "anthropic-api")
+    credential: str            # Credential from credential_registry.py (e.g., "openrouter", "anthropic-api")
     family: str                # Model family (e.g., "openai", "gemini", "anthropic")
     template_id: str | None    # Proxy template this route can use; None for direct
     template_family: str | None  # Template's explicit family metadata; None for direct

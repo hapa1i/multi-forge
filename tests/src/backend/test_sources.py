@@ -8,7 +8,11 @@ from typing import cast
 
 import pytest
 
-from forge.backend.registry import BackendInstance, BackendRegistry, BackendRegistryStore
+from forge.backend.registry import (
+    BackendInstance,
+    BackendRegistry,
+    BackendRegistryStore,
+)
 from forge.backend.sources import (
     LocalBackendLifecycle,
     ModelSource,
@@ -23,7 +27,7 @@ from forge.backend.sources import (
     validate_model_sources,
 )
 from forge.config.loader import list_template_names
-from forge.core.llm.detection import ProviderType
+from forge.core.provider_types import ProviderType
 
 
 def test_builtin_catalog_contains_phase_1_sources() -> None:
@@ -80,13 +84,24 @@ def test_local_sources_map_to_lifecycle_without_using_instance_ids() -> None:
         assert source.local_lifecycle is not None
         assert source.endpoint.kind == "local_backend"
 
-        dependency = source.local_lifecycle.to_backend_dependency()
+        dependency = source.to_backend_dependency()
         assert dependency.adapter == "litellm"
+        assert dependency.required_env_vars == list(source.required_env_vars)
         assert source.id != f"{dependency.adapter}-{dependency.port}"
 
     test_source = get_model_source("litellm-gemini-test")
     assert test_source.local_lifecycle is not None
     assert test_source.local_lifecycle.default_port == 4001
+
+
+def test_source_required_env_vars_derive_from_credentials_and_endpoint() -> None:
+    """Credential/env requirements come from catalog credentials, not lifecycle copies."""
+
+    assert get_model_source("litellm-gemini-local").required_env_vars == ("GEMINI_API_KEY",)
+    assert get_model_source("litellm-openai-local").required_env_vars == ("OPENAI_API_KEY",)
+    assert get_model_source("litellm-anthropic-local").required_env_vars == ("ANTHROPIC_API_KEY",)
+    assert get_model_source("litellm-remote").required_env_vars == ("LITELLM_API_KEY", "LITELLM_BASE_URL")
+    assert get_model_source("openrouter").required_env_vars == ("OPENROUTER_API_KEY",)
 
 
 def test_remote_sources_do_not_enter_runtime_registry(tmp_path: Path) -> None:
@@ -130,7 +145,7 @@ def test_alias_and_source_id_collision_is_rejected() -> None:
     """A template alias cannot collide with another canonical source id."""
 
     first = get_model_source("openrouter")
-    duplicate = replace(get_model_source("litellm-remote"), template_aliases=("openrouter",))
+    duplicate = replace(get_model_source("litellm-remote"), template_names=("openrouter",))
 
     with pytest.raises(ModelSourceCatalogError, match="duplicate model-source identifier"):
         validate_model_sources((first, duplicate))

@@ -12,14 +12,8 @@
 proxy:
   family: openai
   preferred_provider: litellm
+  source: litellm-openai-local
   default_port: 8089
-
-  # Backend dependency (auto-started when proxy starts)
-  backend_dependency:
-    adapter: litellm
-    port: 4000
-    required_env_vars:
-      - OPENAI_API_KEY
 
   litellm:
     tiers:

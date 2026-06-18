@@ -26,7 +26,9 @@ from forge.backend.sources import (
     get_model_source,
     list_model_sources,
     model_source_for_template,
+    required_env_vars_for_source,
     resolve_model_source_id,
+    template_env_vars_by_template,
     validate_model_sources,
 )
 
@@ -193,6 +195,8 @@ __all__ = [
     "get_model_source",
     "list_model_sources",
     "model_source_for_template",
+    "required_env_vars_for_source",
     "resolve_model_source_id",
+    "template_env_vars_by_template",
     "validate_model_sources",
 ]

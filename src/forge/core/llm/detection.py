@@ -4,10 +4,7 @@ This module provides prefix-based provider detection for model IDs.
 core.llm only supports prefixed canonical IDs (e.g., "openai/gpt-5.2").
 """
 
-from typing import Literal
-
-# Provider type - all supported providers (some may not be implemented yet)
-ProviderType = Literal["litellm_remote", "litellm_local", "anthropic", "openrouter"]
+from forge.core.provider_types import ProviderType
 
 # Prefixes that route to remote LiteLLM
 LITELLM_REMOTE_PREFIXES = (

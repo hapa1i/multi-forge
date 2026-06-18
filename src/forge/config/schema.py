@@ -23,6 +23,8 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
+from forge.core.backend_dependency import BackendDependency
+
 # --- CONSTANTS ---
 
 OPENAI_MODELS = [
@@ -563,19 +565,6 @@ def _coerce_logging_config(value: Any) -> LoggingConfig:
     return LoggingConfig(requests=_coerce_request_log_config(value.get("requests", {}) or {}))
 
 
-@dataclass
-class BackendDependency:
-    """Backend dependency declaration (proxy runtime requirement).
-
-    Declares that a proxy template requires a backend service to be running.
-    Example: local LiteLLM proxies require LiteLLM backend on port 4000.
-    """
-
-    adapter: str  # e.g., "litellm"
-    port: int
-    required_env_vars: list[str] = field(default_factory=list)
-
-
 def _validate_wire_shape_intercept(wire_shape: str, intercept: InterceptConfig) -> None:
     """Reject intercept.mode='override' unless wire_shape='anthropic_passthrough'.
 
@@ -618,6 +607,7 @@ class ProxyConfig:
 
     family: str = ""  # model family (e.g., "openai", "anthropic", "gemini")
     preferred_provider: str = ""  # set by --template flag
+    source: str = ""  # canonical model-source id (e.g., "openrouter", "litellm-gemini-local")
     active_template: str = ""
     default_tier: str = "sonnet"
     backend_dependency: BackendDependency | None = None
@@ -695,12 +685,13 @@ class ProxyInstanceConfig:
     template: str  # e.g., "litellm-gemini"
     template_digest: str  # SHA256 at creation time
 
-    provider: str  # litellm | openai | gemini
+    provider: str  # litellm | openai | gemini | openrouter
     proxy_endpoint: str  # e.g., http://localhost:8085
     port: int
     upstream_base_url: str  # e.g., https://litellm.corp.com
 
     tiers: TierModels
+    source: str = ""  # canonical model-source id, when known
     family: str = ""  # model family (e.g., "openai", "anthropic", "gemini")
     tier_overrides: TierOverrides = field(default_factory=TierOverrides)
     model_alternatives: dict[str, dict[str, str]] = field(default_factory=dict)

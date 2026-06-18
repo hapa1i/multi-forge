@@ -8,6 +8,7 @@
 proxy:
   family: deepseek
   preferred_provider: openrouter
+  source: openrouter
   default_port: 8100
 
   openrouter:
@@ -22,5 +23,4 @@ proxy:
         reasoning_effort: high
       opus:
         reasoning_effort: xhigh
-    base_url: "https://openrouter.ai/api/v1"
     error_hints: true

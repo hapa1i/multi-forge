@@ -10,6 +10,7 @@
 proxy:
   family: anthropic
   preferred_provider: openrouter
+  source: openrouter
   default_port: 8095
 
   openrouter:
@@ -21,5 +22,4 @@ proxy:
       opus:
         claude-opus-4-8: anthropic/claude-opus-4.8
         claude-opus-4-6: anthropic/claude-opus-4.6
-    base_url: "https://openrouter.ai/api/v1"
     error_hints: true

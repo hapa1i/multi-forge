@@ -10,11 +10,12 @@ generalizes beyond OpenRouter. The local provider-trace compatibility facade
 
 **References**: `src/forge/backend/` (`BackendAdapter`, `BackendManager`, the runtime-instance `BackendInstance`/
 `BackendRegistry` in `registry.py`), `BackendDependency` (`src/forge/config/schema.py`), the provider vocabularies
-`ProviderType` (`typing.Literal` in `src/forge/core/llm/detection.py`), `AdapterProviderType` (`typing.Literal` in
-`src/forge/proxy/client_adapter.py`), and `ModelProvider` (the real enum in `src/forge/proxy/client_factory.py`), the
-auth dependency map `TEMPLATE_ENV_VARS` (`src/forge/core/auth/template_secrets.py`) + `credentials_for_template()`
-(`forge.core.auth.capabilities`; `Credential.unlocks_features` is presentation-only), proxy templates (`*-local`,
-OpenRouter, remote LiteLLM, and `anthropic-passthrough` in `src/forge/config/defaults/templates/`), downstream telemetry
+`ProviderType` (`typing.Literal` in `src/forge/core/provider_types.py`, re-exported by
+`src/forge/core/llm/detection.py`), `AdapterProviderType` (`typing.Literal` in `src/forge/proxy/client_adapter.py`), and
+`ModelProvider` (the real enum in `src/forge/proxy/client_factory.py`), the auth dependency map `TEMPLATE_ENV_VARS`
+(`src/forge/core/auth/template_secrets.py`) + `credentials_for_template()` (`forge.core.auth.capabilities`;
+`Credential.unlocks_features` is presentation-only), proxy templates (`*-local`, OpenRouter, remote LiteLLM, and
+`anthropic-passthrough` in `src/forge/config/defaults/templates/`), downstream telemetry
 (`src/forge/core/telemetry/downstream.py`), provider-trace projection (`src/forge/proxy/provider_trace_logger.py`),
 design.md §3 (session/proxy separation, identity model), and cli_reference.md §1 (`forge backend` / `forge proxy` /
 `forge authentication`).

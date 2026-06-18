@@ -25,6 +25,11 @@ import yaml
 from dotenv import load_dotenv
 from ruamel.yaml import YAML
 
+from forge.backend.sources import (
+    ModelSource,
+    ModelSourceNotFoundError,
+    model_source_for_template,
+)
 from forge.config.dataclass_utils import dict_to_dataclass
 from forge.config.schema import (
     ForgeConfig,
@@ -441,6 +446,7 @@ def load_proxy_instance_config_from_dict(data: dict) -> "ProxyInstanceConfig":
         port=data.get("port", 0),
         upstream_base_url=data.get("upstream_base_url", ""),
         tiers=tiers,
+        source=data.get("source", ""),
         family=data.get("family", ""),
         tier_overrides=tier_overrides,
         model_alternatives=data.get("model_alternatives", {}),
@@ -559,6 +565,7 @@ def _proxy_instance_to_forge_config(
     proxy_server_config = ProxyConfig(
         family=proxy_config.family,
         preferred_provider=proxy_config.provider,
+        source=proxy_config.source,
         active_template=proxy_config.template,
         default_tier=proxy_config.default_tier,
         default_port=proxy_config.port,
@@ -587,6 +594,66 @@ def _proxy_instance_to_forge_config(
         proxy=proxy_server_config,
         session=session_config,
     )
+
+
+def _resolve_template_source(template: str, proxy_block: dict[str, Any]) -> ModelSource:
+    """Resolve and validate the source declared by a proxy template."""
+
+    raw_source = proxy_block.get("source", template)
+    if not isinstance(raw_source, str) or not raw_source.strip():
+        raise ValueError(f"Template '{template}' has invalid 'proxy.source' (must be a non-blank string)")
+
+    try:
+        return model_source_for_template(raw_source.strip())
+    except ModelSourceNotFoundError as e:
+        if "source" in proxy_block:
+            raise ValueError(f"Template '{template}' references unknown proxy.source '{raw_source}'") from e
+        raise ValueError(
+            f"Template '{template}' must declare proxy.source because no built-in source alias matches its name"
+        ) from e
+
+
+def _apply_template_source(template: str, template_data: dict[str, Any]) -> None:
+    """Apply source-catalog defaults to a template config dict before strict schema loading."""
+
+    proxy_block = template_data.get("proxy")
+    if not isinstance(proxy_block, dict):
+        raise ValueError(f"Template '{template}' must have a 'proxy' mapping")
+
+    source = _resolve_template_source(template, proxy_block)
+    proxy_block["source"] = source.id
+
+    # backend_dependency is derived from the catalog so source identity, lifecycle, and
+    # required env vars do not remain parallel template-maintained facts.
+    legacy_dependency = proxy_block.pop("backend_dependency", None)
+    if legacy_dependency is not None and source.kind != "local":
+        raise ValueError(f"Template '{template}' declares proxy.backend_dependency for remote source '{source.id}'")
+    if source.kind == "local":
+        dependency = source.to_backend_dependency()
+        proxy_block["backend_dependency"] = {
+            "adapter": dependency.adapter,
+            "port": dependency.port,
+            "required_env_vars": dependency.required_env_vars,
+        }
+
+    provider_name = proxy_block.get("preferred_provider") or "litellm"
+    if not isinstance(provider_name, str):
+        raise ValueError(f"Template '{template}' has invalid 'proxy.preferred_provider' (must be a string)")
+    provider_block = proxy_block.setdefault(provider_name, {})
+    if not isinstance(provider_block, dict):
+        raise ValueError(f"Template '{template}' has invalid 'proxy.{provider_name}' (must be a mapping)")
+
+    if source.endpoint.kind == "literal_url":
+        provider_block["base_url"] = source.endpoint.value or ""
+    elif source.endpoint.kind == "connection_value":
+        from forge.core.auth.template_secrets import resolve_env_or_credential
+
+        env_var = source.endpoint.value
+        provider_block["base_url"] = (
+            (resolve_env_or_credential(env_var) if env_var else None) or source.endpoint.default_url or ""
+        )
+    elif source.endpoint.kind == "local_backend":
+        provider_block["base_url"] = ""
 
 
 def _load_template_config(template: str) -> "ForgeConfig":
@@ -619,6 +686,7 @@ def _load_template_config(template: str) -> "ForgeConfig":
     family = proxy_block.get("family", "")
     if not isinstance(family, str) or not family.strip():
         raise ValueError(f"Template '{template}' missing required 'proxy.family' field (must be a non-blank string)")
+    _apply_template_source(template, template_data)
 
     secrets = env_to_dict()
     config_dict = deep_merge(template_data, secrets)

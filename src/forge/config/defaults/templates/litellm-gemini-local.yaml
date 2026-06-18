@@ -10,14 +10,8 @@
 proxy:
   family: gemini
   preferred_provider: litellm
+  source: litellm-gemini-local
   default_port: 8086
-
-  # Backend dependency (auto-started when proxy starts)
-  backend_dependency:
-    adapter: litellm
-    port: 4000
-    required_env_vars:
-      - GEMINI_API_KEY
 
   litellm:
     tiers:

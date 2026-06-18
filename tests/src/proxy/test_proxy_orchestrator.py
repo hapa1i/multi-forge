@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from forge.config.loader import load_proxy_instance_config
 from forge.proxy.proxies import ProxyRegistryStore
 from forge.proxy.proxy_orchestrator import ProxyStartError, start_proxy
 
@@ -162,6 +163,10 @@ def test_start_spawns_new_and_persists(
 
     registry = orch_registry.read()
     assert "proxy_spawned" in registry.proxies
+
+    proxy_config = load_proxy_instance_config("proxy_spawned")
+    assert proxy_config is not None
+    assert proxy_config.source == "litellm-remote"
 
 
 def test_start_persists_failed_reuse_status_before_spawn(

@@ -14,6 +14,7 @@
 proxy:
   family: anthropic
   preferred_provider: litellm
+  source: anthropic-passthrough
   default_port: 8096
   wire_shape: anthropic_passthrough
 
@@ -28,4 +29,3 @@ proxy:
       haiku: claude-haiku-4-5
       sonnet: claude-sonnet-4-6
       opus: claude-fable-5
-    base_url: "https://api.anthropic.com"

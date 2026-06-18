@@ -583,7 +583,7 @@ runner** constrains workers to review/eval skills with stance injection (`{stanc
 outputs), and evidence-weighted synthesis.
 
 **Runtime registry (`core/runtime/`).** The capability half of the runtime seam (the invoker above is the lifecycle
-half). A frozen `RuntimeSpec` per runtime in a module-level `RUNTIMES` table (mirrors `core/auth/capabilities.py`'s
+half). A frozen `RuntimeSpec` per runtime in a module-level `RUNTIMES` table (mirrors `core/credential_registry.py`'s
 `Credential`/`CREDENTIALS` pattern) answers seven capability questions without hard-coding Claude Code assumptions:
 installed (`is_installed()` = PATH presence; `detect()` = best-effort `--version`), interactive, headless, hooks, usage
 source, native resume, and install scopes (plus curated-transfer in/out). Limited or planned support is a multi-state

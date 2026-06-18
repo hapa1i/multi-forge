@@ -11,9 +11,9 @@ from dataclasses import dataclass, field
 from typing import Iterable, Literal, get_args
 from urllib.parse import urlparse
 
-from forge.config.schema import BackendDependency
-from forge.core.auth.capabilities import CREDENTIALS
-from forge.core.llm.detection import ProviderType
+from forge.core.backend_dependency import BackendDependency
+from forge.core.credential_registry import CREDENTIALS, Credential
+from forge.core.provider_types import ProviderType
 
 ModelSourceKind = Literal["local", "remote"]
 EndpointKind = Literal["literal_url", "connection_value", "local_backend"]
@@ -69,24 +69,20 @@ class LocalBackendLifecycle:
 
     adapter: str
     default_port: int
-    required_env_vars: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if not self.adapter:
             raise ModelSourceCatalogError("local lifecycle adapter is required")
         if self.default_port <= 0:
             raise ModelSourceCatalogError("local lifecycle default_port must be positive")
-        for env_var in self.required_env_vars:
-            if not _ENV_VAR_RE.match(env_var):
-                raise ModelSourceCatalogError(f"invalid lifecycle env var: {env_var!r}")
 
-    def to_backend_dependency(self) -> BackendDependency:
+    def to_backend_dependency(self, required_env_vars: Iterable[str] = ()) -> BackendDependency:
         """Convert to the existing template/runtime backend dependency shape."""
 
         return BackendDependency(
             adapter=self.adapter,
             port=self.default_port,
-            required_env_vars=list(self.required_env_vars),
+            required_env_vars=list(required_env_vars),
         )
 
 
@@ -110,7 +106,7 @@ class ModelSource:
     credential_ids: tuple[str, ...]
     capabilities: ModelSourceCapabilities = field(default_factory=ModelSourceCapabilities)
     local_lifecycle: LocalBackendLifecycle | None = None
-    template_aliases: tuple[str, ...] = ()
+    template_names: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         _validate_source(self)
@@ -121,11 +117,34 @@ class ModelSource:
 
         return self.local_lifecycle is not None
 
+    @property
+    def credentials(self) -> tuple[Credential, ...]:
+        """Credential definitions required by this source."""
+
+        return tuple(CREDENTIALS[credential_id] for credential_id in self.credential_ids)
+
+    @property
+    def required_env_vars(self) -> tuple[str, ...]:
+        """Required credential and connection-value env vars for this source."""
+
+        return required_env_vars_for_source(self)
+
+    def to_backend_dependency(self) -> BackendDependency:
+        """Convert a local source to the existing backend dependency shape."""
+
+        if self.local_lifecycle is None:
+            raise ModelSourceCatalogError(f"source {self.id!r} has no local lifecycle")
+        return self.local_lifecycle.to_backend_dependency(self.required_env_vars)
+
 
 def _build_identifier_lookup(sources: Iterable[ModelSource]) -> dict[str, str]:
     lookup: dict[str, str] = {}
     for source in sources:
-        for identifier in (source.id, *source.template_aliases):
+        seen_for_source: set[str] = set()
+        for identifier in (source.id, *source.template_names):
+            if identifier in seen_for_source:
+                continue
+            seen_for_source.add(identifier)
             if not identifier:
                 raise ModelSourceCatalogError(f"source {source.id!r} has an empty identifier")
             if identifier in lookup:
@@ -148,9 +167,9 @@ def _validate_source(source: ModelSource) -> None:
     for credential_id in source.credential_ids:
         if credential_id not in CREDENTIALS:
             raise ModelSourceCatalogError(f"source {source.id!r} references unknown credential {credential_id!r}")
-    for alias in source.template_aliases:
-        if not _SOURCE_ID_RE.match(alias):
-            raise ModelSourceCatalogError(f"source {source.id!r} has invalid template alias {alias!r}")
+    for template_name in source.template_names:
+        if not _SOURCE_ID_RE.match(template_name):
+            raise ModelSourceCatalogError(f"source {source.id!r} has invalid template name {template_name!r}")
 
     if source.kind == "local":
         if source.endpoint.kind != "local_backend":
@@ -193,7 +212,37 @@ def _is_http_url(value: str) -> bool:
     return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
 
 
-OPENROUTER_TEMPLATE_ALIASES: tuple[str, ...] = (
+def required_env_vars_for_source(source: ModelSource) -> tuple[str, ...]:
+    """Return required env vars for a model source in declaration order."""
+
+    required: list[str] = []
+
+    def add(name: str) -> None:
+        if name not in required:
+            required.append(name)
+
+    for credential in source.credentials:
+        for env_var in credential.env_vars:
+            if env_var.required:
+                add(env_var.name)
+
+    if source.endpoint.kind == "connection_value" and source.endpoint.value and source.endpoint.default_url is None:
+        add(source.endpoint.value)
+
+    return tuple(required)
+
+
+def template_env_vars_by_template() -> dict[str, list[str]]:
+    """Return the template -> required env var map derived from source definitions."""
+
+    names: dict[str, list[str]] = {}
+    for source in BUILTIN_MODEL_SOURCES:
+        for template_name in source.template_names:
+            names[template_name] = list(source.required_env_vars)
+    return dict(sorted(names.items()))
+
+
+OPENROUTER_TEMPLATE_NAMES: tuple[str, ...] = (
     "openrouter-anthropic",
     "openrouter-deepseek",
     "openrouter-gemini",
@@ -206,7 +255,7 @@ OPENROUTER_TEMPLATE_ALIASES: tuple[str, ...] = (
     "openrouter-qwen",
 )
 
-REMOTE_LITELLM_TEMPLATE_ALIASES: tuple[str, ...] = (
+REMOTE_LITELLM_TEMPLATE_NAMES: tuple[str, ...] = (
     "litellm-anthropic",
     "litellm-gemini",
     "litellm-openai",
@@ -224,7 +273,7 @@ BUILTIN_MODEL_SOURCES: tuple[ModelSource, ...] = (
         ),
         credential_ids=("openrouter",),
         capabilities=ModelSourceCapabilities(provider_trace=True, openrouter_user_grouping=True),
-        template_aliases=OPENROUTER_TEMPLATE_ALIASES,
+        template_names=OPENROUTER_TEMPLATE_NAMES,
     ),
     ModelSource(
         id="litellm-remote",
@@ -232,7 +281,7 @@ BUILTIN_MODEL_SOURCES: tuple[ModelSource, ...] = (
         provider="litellm_remote",
         endpoint=SourceEndpoint.connection_value("LITELLM_BASE_URL"),
         credential_ids=("litellm-remote",),
-        template_aliases=REMOTE_LITELLM_TEMPLATE_ALIASES,
+        template_names=REMOTE_LITELLM_TEMPLATE_NAMES,
     ),
     ModelSource(
         id="anthropic-passthrough",
@@ -240,6 +289,7 @@ BUILTIN_MODEL_SOURCES: tuple[ModelSource, ...] = (
         provider="anthropic",
         endpoint=SourceEndpoint.literal_url("https://api.anthropic.com"),
         credential_ids=("anthropic-api",),
+        template_names=("anthropic-passthrough",),
     ),
     ModelSource(
         id="anthropic-direct",
@@ -257,9 +307,8 @@ BUILTIN_MODEL_SOURCES: tuple[ModelSource, ...] = (
         local_lifecycle=LocalBackendLifecycle(
             adapter="litellm",
             default_port=4000,
-            required_env_vars=("GEMINI_API_KEY",),
         ),
-        template_aliases=("litellm-gemini-flash-local",),
+        template_names=("litellm-gemini-local", "litellm-gemini-flash-local"),
     ),
     ModelSource(
         id="litellm-openai-local",
@@ -270,9 +319,8 @@ BUILTIN_MODEL_SOURCES: tuple[ModelSource, ...] = (
         local_lifecycle=LocalBackendLifecycle(
             adapter="litellm",
             default_port=4000,
-            required_env_vars=("OPENAI_API_KEY",),
         ),
-        template_aliases=("litellm-openai-codex-local",),
+        template_names=("litellm-openai-local", "litellm-openai-codex-local"),
     ),
     ModelSource(
         id="litellm-anthropic-local",
@@ -283,8 +331,8 @@ BUILTIN_MODEL_SOURCES: tuple[ModelSource, ...] = (
         local_lifecycle=LocalBackendLifecycle(
             adapter="litellm",
             default_port=4000,
-            required_env_vars=("ANTHROPIC_API_KEY",),
         ),
+        template_names=("litellm-anthropic-local",),
     ),
     ModelSource(
         id="litellm-gemini-test",
@@ -295,8 +343,8 @@ BUILTIN_MODEL_SOURCES: tuple[ModelSource, ...] = (
         local_lifecycle=LocalBackendLifecycle(
             adapter="litellm",
             default_port=4001,
-            required_env_vars=("GEMINI_API_KEY",),
         ),
+        template_names=("litellm-gemini-test",),
     ),
 )
 
@@ -360,12 +408,14 @@ __all__ = [
     "ModelSourceCatalogError",
     "ModelSourceKind",
     "ModelSourceNotFoundError",
-    "OPENROUTER_TEMPLATE_ALIASES",
-    "REMOTE_LITELLM_TEMPLATE_ALIASES",
+    "OPENROUTER_TEMPLATE_NAMES",
+    "REMOTE_LITELLM_TEMPLATE_NAMES",
     "SourceEndpoint",
     "get_model_source",
     "list_model_sources",
     "model_source_for_template",
+    "required_env_vars_for_source",
     "resolve_model_source_id",
+    "template_env_vars_by_template",
     "validate_model_sources",
 ]

@@ -36,10 +36,11 @@ more confusing, not less.
 
 - [x] Enumerate every current source-identity site: `BackendDependency`, `BackendAdapter`/`BackendManager`,
   `BackendInstance.backend_id` and `BackendRegistry`, `ProviderType` (`typing.Literal` in
-  `src/forge/core/llm/detection.py`), `AdapterProviderType` (`typing.Literal` in `src/forge/proxy/client_adapter.py`),
-  `ModelProvider` (the enum in `src/forge/proxy/client_factory.py`), proxy template `preferred_provider`, provider
-  `base_url`, `BackendDependency`, `TEMPLATE_ENV_VARS`, `credentials_for_template()`, credential connection values,
-  downstream writers, provider-trace gating, OpenRouter `user` injection, and `forge backend` CLI verbs.
+  `src/forge/core/provider_types.py`, re-exported by `src/forge/core/llm/detection.py`), `AdapterProviderType`
+  (`typing.Literal` in `src/forge/proxy/client_adapter.py`), `ModelProvider` (the enum in
+  `src/forge/proxy/client_factory.py`), proxy template `preferred_provider`, provider `base_url`, `BackendDependency`,
+  `TEMPLATE_ENV_VARS`, `credentials_for_template()`, credential connection values, downstream writers, provider-trace
+  gating, OpenRouter `user` injection, and `forge backend` CLI verbs.
 - [x] Record the current unit of each identity: static definition, runtime instance, proxy template, wire-client
   provider, credential dependency, telemetry origin, model-source attribution key, or user-facing display label.
 - [x] Decide naming: use `ModelSource` / source definition internally while keeping `forge backend` as the user-facing
@@ -102,27 +103,33 @@ more confusing, not less.
 
 ## Phase 2 -- Template And Auth Integration
 
-- [ ] Migrate proxy templates from inline model-source identity to a catalog/source reference where Phase 0 decided it
-  belongs.
-- [ ] Enumerate the actual template classes in tests: five user-facing `*-local` templates plus internal
+- [x] Migrate proxy templates from inline model-source identity to a catalog/source reference where Phase 0 decided it
+  belongs. Shipped templates now declare `proxy.source`, and `ProxyConfig` / `ProxyInstanceConfig` carry the canonical
+  source id.
+- [x] Enumerate the actual template classes in tests: five user-facing `*-local` templates plus internal
   `litellm-gemini-test` use `backend_dependency`; OpenRouter templates and `anthropic-passthrough` carry inline provider
   `base_url`; remote LiteLLM templates resolve endpoint from `LITELLM_BASE_URL`.
-- [ ] Preserve local template auto-start behavior by resolving source definitions to the existing `BackendDependency` /
+- [x] Preserve local template auto-start behavior by resolving source definitions to the existing `BackendDependency` /
   `BackendManager` path or its chosen replacement.
-- [ ] Resolve remote endpoint and connection values through the source definition plus credentials/connection values
+- [x] Resolve remote endpoint and connection values through the source definition plus credentials/connection values
   (`OPENROUTER_BASE_URL`, `LITELLM_BASE_URL`, etc.) without duplicating auth logic.
-- [ ] Bridge `TEMPLATE_ENV_VARS` and `credentials_for_template()` to the new source definitions, or replace them with a
+- [x] Bridge `TEMPLATE_ENV_VARS` and `credentials_for_template()` to the new source definitions, or replace them with a
   single generated/typed dependency map. Do not use `Credential.unlocks_features` as logic.
-- [ ] Collapse the temporary Phase 1 auth duplication: local source `credential_ids` / lifecycle `required_env_vars`,
+- [x] Collapse the temporary Phase 1 auth duplication: local source `credential_ids` / lifecycle `required_env_vars`,
   `TEMPLATE_ENV_VARS`, and template `backend_dependency.required_env_vars` must derive from one catalog-backed source of
-  truth rather than remain parallel encodings.
-- [ ] Update schema/loader sites for any new template key. `_load_template_config()` ends in
+  truth rather than remain parallel encodings. `required_env_vars` now derives from catalog credential ids and endpoint
+  connection values.
+- [x] Keep the catalog/auth dependency graph acyclic. Credential metadata lives in dependency-light
+  `forge.core.credential_registry`; `backend.sources` and `auth.capabilities` depend on that leaf, while
+  `auth.template_secrets` depends on `backend.sources` without lazy import workarounds.
+- [x] Update schema/loader sites for any new template key. `_load_template_config()` ends in
   `dict_to_dataclass(ForgeConfig, config_dict, strict=True)`, so the new `proxy.source` field must be accepted by
   `ProxyConfig` or transformed before strict dataclass loading.
-- [ ] Add no-secret tests for env, credential-file, `auth_ignore_env`, missing key, connection-value provenance, and
+- [x] Add no-secret tests for env, credential-file, `auth_ignore_env`, missing key, connection-value provenance, and
   strict-loader rejection of unsupported source shapes.
-- [ ] Update [design_appendix.md](../../../design_appendix.md), [cli_reference.md](../../../cli_reference.md) if user
-  template syntax changes, and relevant `docs/end-user/*` guides as template/source behavior ships.
+- [x] Update [design_appendix.md](../../../design_appendix.md), [cli_reference.md](../../../cli_reference.md) if user
+  template syntax changes, and relevant `docs/end-user/*` guides as template/source behavior ships. Updated the design
+  appendix and proxy end-user guide; no CLI command syntax changed in Phase 2.
 
 ## Phase 3 -- Backend CLI And Operator Views
 
