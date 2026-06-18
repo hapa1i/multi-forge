@@ -10,6 +10,8 @@ from typing import Any
 
 import pytest
 
+from forge.core.telemetry import downstream as downstream_telemetry
+from forge.core.telemetry.downstream import DownstreamRecord
 from forge.proxy import provider_trace_logger as ptl
 
 
@@ -18,8 +20,10 @@ def _isolated_traces_home(tmp_path, monkeypatch):
     # Fresh FORGE_HOME per test so trace shards never leak across tests.
     monkeypatch.setenv("FORGE_HOME", str(tmp_path))
     ptl._warned_newer_schema = False
+    downstream_telemetry._warned_newer_schema = False
     yield
     ptl._warned_newer_schema = False
+    downstream_telemetry._warned_newer_schema = False
 
 
 def _record(provider_name: str = "openrouter", **kw: Any) -> None:
@@ -45,6 +49,14 @@ def _record(provider_name: str = "openrouter", **kw: Any) -> None:
     ptl.record_provider_trace(provider_name=provider_name, **params)
 
 
+def _downstream_dir():
+    return downstream_telemetry._downstream_dir()
+
+
+def _downstream_path():
+    return downstream_telemetry._current_log_path()
+
+
 class TestGateAndRoundTrip:
     def test_openrouter_record_round_trips_typed(self):
         _record()
@@ -67,7 +79,7 @@ class TestGateAndRoundTrip:
         _record(provider_name="litellm")
         _record(provider_name="unknown")
         assert ptl.read_provider_traces() == []
-        assert not ptl._traces_dir().is_dir() or not list(ptl._traces_dir().glob("*.jsonl"))
+        assert not _downstream_dir().is_dir() or not list(_downstream_dir().glob("*.jsonl"))
 
     def test_local_usage_status_available_from_final_usage(self):
         _record(final_usage_seen=True, reported_cost_micros=None)
@@ -111,7 +123,7 @@ class TestHeaderBypassGuard:
 
     def test_no_secret_key_in_raw_persisted_line(self):
         _record(provider_meta={"headers": {"authorization": "Bearer s", "x-generation-id": "gen-9"}})
-        line = ptl._current_log_path().read_text()
+        line = _downstream_path().read_text()
         assert "authorization" not in line.lower()
         assert "Bearer" not in line
         assert "x-generation-id" in line  # the allowlisted one survived
@@ -120,7 +132,7 @@ class TestHeaderBypassGuard:
 class TestMetadataOnly:
     def test_record_carries_no_body_or_prompt_fields(self):
         _record()
-        rec_keys = set(json.loads(ptl._current_log_path().read_text().splitlines()[0]))
+        rec_keys = set(json.loads(_downstream_path().read_text().splitlines()[0]))
         forbidden = {
             "messages",
             "prompt",
@@ -134,16 +146,16 @@ class TestMetadataOnly:
             "text",
         }
         assert rec_keys.isdisjoint(forbidden)
-        # The persisted key set is exactly the dataclass fields (no surprise payload).
-        assert rec_keys == {f.name for f in fields(ptl.ProviderTraceRecord)}
+        # The persisted key set belongs to the unified downstream schema (no surprise payload).
+        assert rec_keys <= {f.name for f in fields(DownstreamRecord)}
 
 
 class TestPlaneRobustness:
     def test_newer_schema_skipped_with_one_warning(self, caplog):
         _record()  # a valid v1 record
-        path = ptl._current_log_path()
+        path = _downstream_path()
         with open(path, "a") as f:
-            f.write(json.dumps({"schema_version": 99, "request_id": "future"}) + "\n")
+            f.write(json.dumps({"schema_version": 99, "kind": "attempt", "downstream_event_id": "ds_future"}) + "\n")
         with caplog.at_level("WARNING"):
             recs = ptl.read_provider_traces()
         assert all(r.schema_version == 1 for r in recs)
@@ -152,7 +164,7 @@ class TestPlaneRobustness:
 
     def test_unknown_field_is_corruption(self):
         _record()
-        path = ptl._current_log_path()
+        path = _downstream_path()
         good = json.loads(path.read_text().splitlines()[0])
         bad = {**good, "unexpected_field": 1, "request_id": "corrupt"}
         with open(path, "a") as f:
@@ -163,7 +175,7 @@ class TestPlaneRobustness:
 
     def test_bad_literal_value_is_corruption(self):
         _record()
-        path = ptl._current_log_path()
+        path = _downstream_path()
         good = json.loads(path.read_text().splitlines()[0])
         bad = {**good, "local_usage_status": "bogus", "request_id": "badenum"}
         with open(path, "a") as f:
@@ -172,7 +184,7 @@ class TestPlaneRobustness:
 
     def test_non_object_line_skipped(self):
         _record()
-        path = ptl._current_log_path()
+        path = _downstream_path()
         with open(path, "a") as f:
             f.write("[1, 2, 3]\n")
             f.write("not json at all\n")
@@ -187,18 +199,19 @@ class TestPlaneRobustness:
 
     def test_file_and_three_dir_levels_are_owner_only(self):
         _record()
-        files = list(ptl._traces_dir().glob("*.jsonl"))
+        files = list(_downstream_dir().glob("*.jsonl"))
         assert files
         assert oct(files[0].stat().st_mode)[-3:] == "600"
-        traces = ptl._traces_dir()
-        for d in (traces, traces.parent, traces.parent.parent):  # traces/, openrouter/, providers/
+        traces = _downstream_dir()
+        for d in (traces, traces.parent):  # downstream/, telemetry/
             assert oct(d.stat().st_mode)[-3:] == "700"
 
 
 class TestPrune:
-    def test_prune_by_age(self):
+    def test_prune_by_age_deletes_old_downstream_shard(self):
         _record()
-        shard = list(ptl._traces_dir().glob("*.jsonl"))[0]
+        shard = list(_downstream_dir().glob("*.jsonl"))[0]
+        shard = shard.rename(shard.with_name("2000-01_1.jsonl"))
         old = time.time() - 30 * 86400
         os.utime(shard, (old, old))
         ptl.prune_provider_traces(retention_days=14, max_total_mb=512)
@@ -207,10 +220,10 @@ class TestPrune:
     def test_prune_keeps_recent(self):
         _record()
         ptl.prune_provider_traces(retention_days=14, max_total_mb=512)
-        assert list(ptl._traces_dir().glob("*.jsonl"))
+        assert list(_downstream_dir().glob("*.jsonl"))
 
-    def test_prune_by_total_size_oldest_first(self):
-        traces_dir = ptl._traces_dir()
+    def test_prune_by_total_size_deletes_oldest_downstream_shards(self):
+        traces_dir = _downstream_dir()
         traces_dir.mkdir(parents=True, exist_ok=True)
         shards = []
         for i in range(3):  # 0.5 MiB each -> 1.5 MiB total
@@ -222,5 +235,6 @@ class TestPrune:
 
         ptl.prune_provider_traces(retention_days=0, max_total_mb=1)  # cap 1 MiB
 
-        assert not shards[0].exists()  # oldest pruned to fit the cap
-        assert shards[1].exists() and shards[2].exists()
+        assert not shards[0].exists()
+        assert shards[1].exists()
+        assert shards[2].exists()

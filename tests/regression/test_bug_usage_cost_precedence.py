@@ -20,6 +20,7 @@ import pytest
 
 from forge.core.reactive.cost_tracking import VerbCostResult
 from forge.core.reactive.session_runner import SessionResult
+from forge.core.telemetry.downstream import read_downstream_records
 from forge.core.usage.emit import emit_usage_for_session_result
 from forge.core.usage.ledger import read_usage_events
 
@@ -134,6 +135,11 @@ def test_direct_run_self_reports_cost_runtime_native() -> None:
     assert ev.measurement_source == "runtime_native"
     assert ev.cost_micro_usd == 4_200
     assert ev.input_tokens == 200  # exact in-band tokens belong to the runtime-sourced event
+    downstream = read_downstream_records(kind="attempt")
+    assert len(downstream) == 1
+    assert downstream[0].forge_run_id == "r"
+    assert downstream[0].cost_micros == 4_200
+    assert downstream[0].reporter == "claude_code"
 
 
 def test_direct_run_neither_cost_nor_envelope_is_unavailable() -> None:

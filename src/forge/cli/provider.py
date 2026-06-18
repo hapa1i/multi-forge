@@ -1,9 +1,9 @@
-"""CLI command group: forge provider trace (openrouter_observability Phase 4).
+"""CLI command group: forge provider trace.
 
-Read-only surface over the provider-trace plane (``~/.forge/providers/openrouter/traces/``):
-``list`` recent traces, ``show`` one record, ``explain`` a local-only provenance narrative.
-Metadata-only; no secrets, no prompt/completion text, and no remote lookups (remote
-reconciliation is a separate card). Backed by the UI-agnostic ops in
+Read-only surface over provider lifecycle/correlation fields in the downstream telemetry
+plane (``~/.forge/telemetry/downstream/``): ``list`` recent traces, ``show`` one record,
+``explain`` a local-only provenance narrative. Metadata-only; no secrets, no
+prompt/completion text, and no remote lookups. Backed by the UI-agnostic ops in
 ``forge.core.ops.provider_trace`` so the table and ``--json`` cannot drift.
 """
 
@@ -113,9 +113,7 @@ def trace_list(session: str | None, root_run_id: str | None, period: str, limit:
             limit=limit,
         )
     except ForgeOpError as e:
-        print_error_with_tip(
-            str(e), "Provider traces live at '~/.forge/providers/openrouter/traces/'.", console=console
-        )
+        print_error_with_tip(str(e), "Provider traces live in '~/.forge/telemetry/downstream/'.", console=console)
         sys.exit(1)
 
     if as_json:

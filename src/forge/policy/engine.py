@@ -7,10 +7,16 @@ composes their decisions using the "any deny blocks" rule.
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import dataclass, field
 from typing import Any
 
 from forge.core.state import now_iso
+from forge.core.telemetry.upstream import (
+    UpstreamOutcome,
+    UpstreamStatus,
+    write_upstream_outcome,
+)
 from forge.policy.protocols import Policy, StatefulPolicy
 from forge.policy.types import (
     ActionContext,
@@ -179,6 +185,7 @@ class PolicyEngine:
 
         Appends the resulting decision (if any) to ``decisions``.
         """
+        start = time.monotonic()
         # Check if policy applies
         try:
             if not policy.applies_to(context):
@@ -191,12 +198,27 @@ class PolicyEngine:
         except Exception as e:
             _log.warning("Policy %s.applies_to() failed: %s", policy.policy_id, e)
             if self.fail_mode == "closed":
-                decisions.append(
+                decision = PolicyDecision(
+                    decision="deny",
+                    policy_id=policy.policy_id,
+                    warnings=[f"Policy applies_to() failed (fail-closed): {e}"],
+                    failure_type="applies_to_error",
+                )
+                decisions.append(decision)
+                self._record_policy_outcome(policy, context, decision, start, reason_code="applies_to_error")
+            else:
+                self._record_policy_outcome(
+                    policy,
+                    context,
                     PolicyDecision(
-                        decision="deny",
+                        decision="allow",
                         policy_id=policy.policy_id,
-                        warnings=[f"Policy applies_to() failed (fail-closed): {e}"],
-                    )
+                        warnings=[f"Policy applies_to() failed (fail-open): {e}"],
+                        fail_open=True,
+                        failure_type="applies_to_error",
+                    ),
+                    start,
+                    reason_code="applies_to_fail_open",
                 )
             return
 
@@ -205,6 +227,7 @@ class PolicyEngine:
             decision = policy.evaluate(context)
             decision.evaluated_at = now_iso()
             decisions.append(decision)
+            self._record_policy_outcome(policy, context, decision, start)
 
             _log.debug(
                 "Policy %s evaluated: %s (%d violations)",
@@ -216,21 +239,24 @@ class PolicyEngine:
         except Exception as e:
             _log.warning("Policy %s.evaluate() failed: %s", policy.policy_id, e)
             if self.fail_mode == "open":
-                decisions.append(
-                    PolicyDecision(
-                        decision="allow",
-                        policy_id=policy.policy_id,
-                        warnings=[f"Policy evaluation failed (fail-open): {e}"],
-                    )
+                decision = PolicyDecision(
+                    decision="allow",
+                    policy_id=policy.policy_id,
+                    warnings=[f"Policy evaluation failed (fail-open): {e}"],
+                    fail_open=True,
+                    failure_type="policy_error",
                 )
+                decisions.append(decision)
+                self._record_policy_outcome(policy, context, decision, start, reason_code="evaluate_fail_open")
             else:
-                decisions.append(
-                    PolicyDecision(
-                        decision="deny",
-                        policy_id=policy.policy_id,
-                        warnings=[f"Policy evaluation failed (fail-closed): {e}"],
-                    )
+                decision = PolicyDecision(
+                    decision="deny",
+                    policy_id=policy.policy_id,
+                    warnings=[f"Policy evaluation failed (fail-closed): {e}"],
+                    failure_type="policy_error",
                 )
+                decisions.append(decision)
+                self._record_policy_outcome(policy, context, decision, start, reason_code="evaluate_error")
             return
 
         # Collect state from stateful policies
@@ -239,6 +265,87 @@ class PolicyEngine:
                 self._collected_state[policy.policy_id] = policy.get_state()
             except Exception as e:
                 _log.warning("Failed to get state from %s: %s", policy.policy_id, e)
+
+    def _record_policy_outcome(
+        self,
+        policy: Policy,
+        context: ActionContext,
+        decision: PolicyDecision,
+        start: float,
+        *,
+        reason_code: str | None = None,
+    ) -> None:
+        status = _policy_decision_status(decision)
+        try:
+            from forge.core.reactive.env import get_run_identity
+
+            identity = get_run_identity()
+            run_id = decision.telemetry_run_id or (identity.run_id if identity else None)
+            parent_run_id = decision.telemetry_parent_run_id or (identity.parent_run_id if identity else None)
+            root_run_id = decision.telemetry_root_run_id or (identity.root_run_id if identity else None)
+            write_upstream_outcome(
+                UpstreamOutcome(
+                    command="policy-check",
+                    operation="policy.evaluate",
+                    status=status,
+                    session=context.session_name,
+                    run_id=run_id,
+                    parent_run_id=parent_run_id,
+                    root_run_id=root_run_id,
+                    origin=context.origin,
+                    policy_id=policy.policy_id,
+                    tool_name=context.tool_name,
+                    target_path=context.target_path,
+                    reason_code=reason_code or _policy_reason_code(decision),
+                    message=_policy_message(decision),
+                    cached=decision.cached,
+                    latency_ms=round((time.monotonic() - start) * 1000, 1),
+                )
+            )
+        except Exception as e:
+            _log.debug("upstream policy telemetry skipped for %s: %s", policy.policy_id, e)
+
+
+def _policy_decision_status(decision: PolicyDecision) -> UpstreamStatus:
+    if decision.decision == "allow":
+        if decision.fail_open or _warning_mentions_fail_open(decision):
+            if decision.failure_type == "timeout":
+                return "timeout"
+            if decision.failure_type == "skipped":
+                return "skipped"
+            return "fail_open"
+        if decision.warnings:
+            return "warning"
+        return "success"
+    if decision.decision == "warn":
+        return "warning"
+    if decision.decision == "deny":
+        return "deny"
+    return "needs_review"
+
+
+def _policy_reason_code(decision: PolicyDecision) -> str | None:
+    if decision.decision == "allow" and decision.cached:
+        return "cached_allow"
+    if decision.decision == "allow" and (decision.fail_open or _warning_mentions_fail_open(decision)):
+        return decision.failure_type or "fail_open"
+    if decision.violations:
+        return decision.violations[0].rule_id
+    if decision.warnings:
+        return "warning"
+    return decision.decision
+
+
+def _policy_message(decision: PolicyDecision) -> str | None:
+    if decision.warnings:
+        return decision.warnings[0]
+    if decision.violations:
+        return decision.violations[0].message
+    return None
+
+
+def _warning_mentions_fail_open(decision: PolicyDecision) -> bool:
+    return any("fail-open" in warning or "failing open" in warning for warning in decision.warnings)
 
 
 def build_engine(

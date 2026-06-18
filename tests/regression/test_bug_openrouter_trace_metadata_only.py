@@ -20,6 +20,7 @@ from dataclasses import fields
 
 import pytest
 
+from forge.core.telemetry import downstream as downstream_telemetry
 from forge.proxy import provider_trace_logger as ptl
 
 pytestmark = pytest.mark.regression
@@ -87,7 +88,7 @@ def test_persisted_record_carries_no_payload_or_secret_headers(tmp_path, monkeyp
         latency_ms=12.0,
     )
 
-    raw = ptl._current_log_path().read_text()
+    raw = downstream_telemetry._current_log_path().read_text()
     line = raw.splitlines()[0]
     record = json.loads(line)
 
@@ -99,7 +100,7 @@ def test_persisted_record_carries_no_payload_or_secret_headers(tmp_path, monkeyp
         assert forbidden not in lowered, f"secret header {forbidden!r} reached disk"
     assert "secret" not in lowered  # no secret VALUE survived either
     # Only the allowlisted correlation header is retained.
-    assert record["headers"] == {"x-request-id": "req-allow"}
+    assert record["provider_headers"] == {"x-request-id": "req-allow"}
     # And the diagnostic metadata IS present (the plane still does its job).
     assert record["provider_generation_id"] == "gen-1"
     assert record["local_usage_status"] == "unavailable"  # cancelled before final usage

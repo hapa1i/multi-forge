@@ -8,6 +8,7 @@ import time
 
 import pytest
 
+from forge.core.telemetry import downstream as downstream_telemetry
 from forge.proxy import audit_logger
 from forge.proxy.utils import redact_headers
 
@@ -36,6 +37,14 @@ def _meta(request_id="r", proxy_id="p", **kw):
     )
 
 
+def _downstream_dir():
+    return downstream_telemetry._downstream_dir()
+
+
+def _downstream_path():
+    return downstream_telemetry._current_log_path()
+
+
 class TestAuditStatePath:
     """Drift-state file location (Slice 2e: read-only config mount forces a redirect)."""
 
@@ -53,7 +62,7 @@ class TestAuditStatePath:
         # baseline must land in the writable audit mount instead.
         monkeypatch.setenv("FORGE_SIDECAR", "1")
         monkeypatch.setenv("FORGE_PROXY_ID", "px")
-        assert audit_logger._audit_state_path("px") == get_forge_home() / "audit" / "state" / "px.json"
+        assert audit_logger._audit_state_path("px") == get_forge_home() / "telemetry" / "audit_state" / "px.json"
 
     def test_template_only_sidecar_does_not_redirect(self, monkeypatch):
         from forge.core.paths import get_forge_home
@@ -155,13 +164,34 @@ class TestWriteRead:
         assert {r["request_id"] for r in audit_logger.read_audit_logs(request_id="b")} == {"b"}
 
     def test_newer_schema_records_skipped(self):
-        path = audit_logger._current_log_path()
+        path = _downstream_path()
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, "a") as f:
-            f.write(json.dumps({"schema_version": 99, "record_type": "request", "ts": "2026-01-01T00:00:00Z"}) + "\n")
             f.write(
                 json.dumps(
-                    {"schema_version": 1, "record_type": "request", "proxy_id": "ok", "ts": "2026-01-02T00:00:00Z"}
+                    {
+                        "schema_version": 99,
+                        "kind": "audit",
+                        "downstream_event_id": "ds_future",
+                        "payload": {"record_type": "request", "ts": "2026-01-01T00:00:00Z"},
+                    }
+                )
+                + "\n"
+            )
+            f.write(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "kind": "audit",
+                        "downstream_event_id": "ds_ok",
+                        "proxy_id": "ok",
+                        "payload": {
+                            "schema_version": 1,
+                            "record_type": "request",
+                            "proxy_id": "ok",
+                            "ts": "2026-01-02T00:00:00Z",
+                        },
+                    }
                 )
                 + "\n"
             )
@@ -178,10 +208,10 @@ class TestWriteRead:
 
     def test_file_and_dir_permissions(self):
         _meta()
-        files = list(audit_logger._audit_dir().glob("*.jsonl"))
+        files = list(_downstream_dir().glob("*.jsonl"))
         assert files
         assert oct(files[0].stat().st_mode)[-3:] == "600"
-        assert oct(audit_logger._audit_dir().stat().st_mode)[-3:] == "700"
+        assert oct(_downstream_dir().stat().st_mode)[-3:] == "700"
 
 
 class TestDrift:
@@ -227,9 +257,10 @@ class TestDrift:
 
 
 class TestPrune:
-    def test_prune_by_age(self):
+    def test_prune_by_age_deletes_old_downstream_shard(self):
         _meta()
-        shard = list(audit_logger._audit_dir().glob("*.jsonl"))[0]
+        shard = list(_downstream_dir().glob("*.jsonl"))[0]
+        shard = shard.rename(shard.with_name("2000-01_1.jsonl"))
         old = time.time() - 30 * 86400
         os.utime(shard, (old, old))
         audit_logger.prune_audit_logs(retention_days=14, max_total_mb=512)
@@ -238,11 +269,10 @@ class TestPrune:
     def test_prune_keeps_recent(self):
         _meta()
         audit_logger.prune_audit_logs(retention_days=14, max_total_mb=512)
-        assert list(audit_logger._audit_dir().glob("*.jsonl"))
+        assert list(_downstream_dir().glob("*.jsonl"))
 
-    def test_prune_by_total_size_oldest_first(self):
-        """max_total_mb prunes oldest-first until total fits (age path disabled)."""
-        audit_dir = audit_logger._audit_dir()
+    def test_prune_by_total_size_deletes_oldest_downstream_shards(self):
+        audit_dir = _downstream_dir()
         audit_dir.mkdir(parents=True, exist_ok=True)
         shards = []
         for i in range(3):  # 0.5 MiB each -> 1.5 MiB total
@@ -254,8 +284,9 @@ class TestPrune:
 
         audit_logger.prune_audit_logs(retention_days=0, max_total_mb=1)  # cap 1 MiB
 
-        assert not shards[0].exists()  # oldest pruned to fit the cap
-        assert shards[1].exists() and shards[2].exists()  # newer shards retained
+        assert not shards[0].exists()
+        assert shards[1].exists()
+        assert shards[2].exists()
 
 
 class TestRedactHeaders:

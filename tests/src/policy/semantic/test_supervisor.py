@@ -292,6 +292,8 @@ class TestSupervisorDepthGuard:
 
         assert result.decision == "allow"
         assert any("FORGE_DEPTH" in w for w in result.warnings)
+        assert result.fail_open is True
+        assert result.failure_type == "skipped"
         mock_run.assert_not_called()
 
     @patch("forge.policy.semantic.supervisor.run_claude_session")
@@ -617,6 +619,47 @@ class TestSupervisorResumeTargetResolution:
         mock_resolve.assert_not_called()
         assert mock_run.call_args.kwargs["base_url"] is None
         assert mock_run.call_args.kwargs["direct"] is True
+
+    @patch("forge.policy.semantic.supervisor.resolve_subprocess_routing")
+    def test_proxy_not_found_is_structural_fail_open(self, mock_resolve: MagicMock) -> None:
+        from forge.policy.semantic.supervisor import run_supervisor_check
+
+        mock_resolve.side_effect = RuntimeError("proxy offline")
+        raw_uuid = "12345678-1234-1234-1234-123456789abc"
+
+        result = run_supervisor_check(
+            _make_config(resume_id=raw_uuid, proxy="missing-proxy"),
+            _make_context(),
+        )
+
+        assert result.decision.decision == "allow"
+        assert result.decision.fail_open is True
+        assert result.decision.failure_type == "proxy_not_found"
+        assert "missing-proxy" in result.decision.warnings[0]
+
+    @patch("forge.policy.semantic.supervisor.run_claude_session")
+    def test_unparseable_response_is_structural_fail_open(self, mock_run: MagicMock) -> None:
+        from forge.core.reactive.session_runner import SessionResult
+        from forge.policy.semantic.supervisor import run_supervisor_check
+
+        mock_run.return_value = SessionResult(
+            stdout="not json",
+            stderr="",
+            returncode=0,
+            run_id="run_parse_fail",
+            parent_run_id="run_parent",
+            root_run_id="run_root",
+        )
+        raw_uuid = "12345678-1234-1234-1234-123456789abc"
+
+        result = run_supervisor_check(_make_config(resume_id=raw_uuid, direct=True), _make_context())
+
+        assert result.run_ok is True
+        assert result.parsed is False
+        assert result.decision.decision == "allow"
+        assert result.decision.fail_open is True
+        assert result.decision.failure_type == "parse_failure"
+        assert result.decision.telemetry_run_id == "run_parse_fail"
 
 
 # --- Engine Integration Tests ---

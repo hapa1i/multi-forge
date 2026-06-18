@@ -20,7 +20,7 @@ import logging
 
 import pytest
 
-import forge.proxy.cost_logger as cost_logger
+from forge.core.telemetry import downstream as downstream_telemetry
 from forge.proxy.cost_logger import (
     COST_SCHEMA_VERSION,
     log_request_cost,
@@ -56,21 +56,31 @@ def test_read_cost_logs_skips_newer_schema_keeps_current_and_legacy(
 ) -> None:
     """A record from a newer Forge (schema_version > COST_SCHEMA_VERSION) is skipped with a warning;
     current and legacy-unversioned records are still read."""
-    monkeypatch.setattr(cost_logger, "_warned_newer_schema", False)  # reset the one-time latch
+    monkeypatch.setattr(downstream_telemetry, "_warned_newer_schema", False)  # reset the one-time latch
 
-    costs_dir = cost_logger._costs_dir()
-    costs_dir.mkdir(parents=True, exist_ok=True)
-    shard = costs_dir / "2026-06_testshard.jsonl"
+    telemetry_dir = downstream_telemetry._downstream_dir()
+    telemetry_dir.mkdir(parents=True, exist_ok=True)
+    shard = telemetry_dir / "2026-06_testshard.jsonl"
     rows = [
         {
             "schema_version": COST_SCHEMA_VERSION,
+            "kind": "attempt",
+            "downstream_event_id": "ds_current",
             "ts": "2026-06-01T00:00:00Z",
             "request_id": "current",
             "cost_micros": 100,
         },
-        {"ts": "2026-06-01T00:00:01Z", "request_id": "legacy", "cost_micros": 200},  # pre-versioning record
+        {
+            "kind": "attempt",
+            "downstream_event_id": "ds_legacy",
+            "ts": "2026-06-01T00:00:01Z",
+            "request_id": "legacy",
+            "cost_micros": 200,
+        },  # pre-versioning record
         {
             "schema_version": COST_SCHEMA_VERSION + 1,
+            "kind": "attempt",
+            "downstream_event_id": "ds_future",
             "ts": "2026-06-01T00:00:02Z",
             "request_id": "future",
             "cost_micros": 9,
@@ -78,7 +88,7 @@ def test_read_cost_logs_skips_newer_schema_keeps_current_and_legacy(
     ]
     shard.write_text("\n".join(json.dumps(r) for r in rows) + "\n")
 
-    with caplog.at_level(logging.WARNING, logger="forge.proxy.cost_logger"):
+    with caplog.at_level(logging.WARNING, logger="forge.core.telemetry.downstream"):
         records = read_cost_logs()
 
     seen = {r["request_id"] for r in records}
@@ -88,18 +98,27 @@ def test_read_cost_logs_skips_newer_schema_keeps_current_and_legacy(
 
 def test_read_cost_logs_warns_only_once_for_newer_schema(monkeypatch: pytest.MonkeyPatch) -> None:
     """The newer-schema warning is latched: a second read does not re-warn (matches sibling loggers)."""
-    monkeypatch.setattr(cost_logger, "_warned_newer_schema", False)
+    monkeypatch.setattr(downstream_telemetry, "_warned_newer_schema", False)
 
-    costs_dir = cost_logger._costs_dir()
-    costs_dir.mkdir(parents=True, exist_ok=True)
-    (costs_dir / "2026-06_future.jsonl").write_text(
-        json.dumps({"schema_version": COST_SCHEMA_VERSION + 1, "ts": "2026-06-01T00:00:00Z", "request_id": "f"}) + "\n"
+    telemetry_dir = downstream_telemetry._downstream_dir()
+    telemetry_dir.mkdir(parents=True, exist_ok=True)
+    (telemetry_dir / "2026-06_future.jsonl").write_text(
+        json.dumps(
+            {
+                "schema_version": COST_SCHEMA_VERSION + 1,
+                "kind": "attempt",
+                "downstream_event_id": "ds_future",
+                "ts": "2026-06-01T00:00:00Z",
+                "request_id": "f",
+            }
+        )
+        + "\n"
     )
 
     read_cost_logs()
-    assert cost_logger._warned_newer_schema is True, "latch must be set after first newer-schema skip"
+    assert downstream_telemetry._warned_newer_schema is True, "latch must be set after first newer-schema skip"
 
     warned: list[str] = []
-    monkeypatch.setattr(cost_logger.logger, "warning", lambda *a, **_k: warned.append(str(a)))
+    monkeypatch.setattr(downstream_telemetry.logger, "warning", lambda *a, **_k: warned.append(str(a)))
     read_cost_logs()
     assert warned == [], "second read must not re-warn once the latch is set"

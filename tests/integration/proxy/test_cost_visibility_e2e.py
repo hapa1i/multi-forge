@@ -38,12 +38,26 @@ def _read_jsonl_dir(path: Path) -> list[dict[str, Any]]:
     return records
 
 
+def _merged_downstream_attempts(forge_home: Path) -> list[dict[str, Any]]:
+    merged: dict[str, dict[str, Any]] = {}
+    ordered: list[str] = []
+    for record in _read_jsonl_dir(forge_home / "telemetry" / "downstream"):
+        if record.get("kind") != "attempt":
+            continue
+        key = str(record.get("downstream_event_id") or record.get("request_id") or len(ordered))
+        if key not in merged:
+            merged[key] = {}
+            ordered.append(key)
+        for field, value in record.items():
+            if field == "confidence" and value == "unknown" and merged[key].get("confidence") != "unknown":
+                continue
+            if value is not None:
+                merged[key][field] = value
+    return [merged[key] for key in ordered]
+
+
 def _request_records(forge_home: Path) -> list[dict[str, Any]]:
-    return _read_jsonl_dir(forge_home / "costs" / "requests")
-
-
-def _verb_records(forge_home: Path) -> list[dict[str, Any]]:
-    return _read_jsonl_dir(forge_home / "costs" / "verbs")
+    return _merged_downstream_attempts(forge_home)
 
 
 def _wait_for_matching_records(
@@ -204,8 +218,8 @@ def test_local_litellm_streaming_cost_unavailable(
     # Tokens are captured even when cost is unavailable.
     assert record["output_tokens"] > 0
     # No catalog fallback: streaming LiteLLM cost is explicitly unavailable, not invented.
-    assert record["cost_micros"] is None
-    assert record["reporter"] is None
+    assert record.get("cost_micros") is None
+    assert record.get("reporter") is None
     assert record["confidence"] == "unavailable"
 
 
@@ -261,14 +275,19 @@ payload = {
     "temperature": 0,
     "messages": [{"role": "user", "content": prompt}],
 }
+headers = {
+    "content-type": "application/json",
+    "x-api-key": "test",
+    "user-agent": "claude-code/panel-e2e",
+}
+for line in os.environ.get("ANTHROPIC_CUSTOM_HEADERS", "").splitlines():
+    if ":" in line:
+        key, value = line.split(":", 1)
+        headers[key.strip()] = value.strip()
 request = urllib.request.Request(
     base_url.rstrip("/") + "/v1/messages",
     data=json.dumps(payload).encode(),
-    headers={
-        "content-type": "application/json",
-        "x-api-key": "test",
-        "user-agent": "claude-code/panel-e2e",
-    },
+    headers=headers,
     method="POST",
 )
 
@@ -321,7 +340,6 @@ def test_panel_with_subprocess_proxy_records_verb_cost(
 
     all_req_before = _request_records(module_forge_home)
     before_request_matching = len([r for r in all_req_before if r.get("proxy_id") == proxy.proxy_id])
-    before_verb_count = len(_verb_records(module_forge_home))
 
     result = CliRunner().invoke(
         main,
@@ -357,16 +375,7 @@ def test_panel_with_subprocess_proxy_records_verb_cost(
     assert request_records, f"No cost records for proxy_id={proxy.proxy_id}"
     assert any(r.get("cost_micros", 0) > 0 for r in request_records)
 
-    all_verbs = _verb_records(module_forge_home)
-    verb_records = all_verbs[before_verb_count:]
-    panel_records = [r for r in verb_records if r.get("verb") == "panel"]
-    assert panel_records, verb_records
-    panel = panel_records[-1]
-    assert panel["total_cost_micros"] > 0
-    assert panel["request_count"] >= 1
-    assert any(p.get("base_url") == proxy.base_url and p.get("cost_micros", 0) > 0 for p in panel["per_proxy"])
-
-    costs = CliRunner().invoke(main, ["proxy", "costs", proxy.proxy_id, "--period", "today", "--json"])
+    costs = CliRunner().invoke(main, ["proxy", "costs", "show", proxy.proxy_id, "--period", "today", "--json"])
     assert costs.exit_code == 0, costs.output
     summary = json.loads(costs.output)
     assert summary["by_verb"]["panel"]["cost_micros"] > 0

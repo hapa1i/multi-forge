@@ -9,6 +9,7 @@ drifting between planes. Best-effort: telemetry retention must never raise into 
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -18,7 +19,14 @@ _BYTES_PER_MB = 1024 * 1024
 _SECONDS_PER_DAY = 86400
 
 
-def prune_jsonl_shards(directory: Path, *, retention_days: int, max_total_mb: int, pattern: str = "*.jsonl") -> None:
+def prune_jsonl_shards(
+    directory: Path,
+    *,
+    retention_days: int,
+    max_total_mb: int,
+    pattern: str = "*.jsonl",
+    preserve: Callable[[Path], bool] | None = None,
+) -> None:
     """Delete shards older than ``retention_days``, then prune oldest-first over ``max_total_mb``.
 
     ``0`` disables that bound (matches the global ``log_retention_days`` convention). Errors are
@@ -31,11 +39,21 @@ def prune_jsonl_shards(directory: Path, *, retention_days: int, max_total_mb: in
     except OSError:
         return
 
+    def should_preserve(shard: Path) -> bool:
+        if preserve is None:
+            return False
+        try:
+            return preserve(shard)
+        except Exception:
+            return False
+
     now = datetime.now(timezone.utc).timestamp()
     if retention_days > 0:
         cutoff = now - retention_days * _SECONDS_PER_DAY
         for shard in list(shards):
             try:
+                if should_preserve(shard):
+                    continue
                 if shard.stat().st_mtime < cutoff:
                     shard.unlink()
                     shards.remove(shard)
@@ -51,6 +69,8 @@ def prune_jsonl_shards(directory: Path, *, retention_days: int, max_total_mb: in
         for shard in shards:  # oldest first
             if total <= limit:
                 break
+            if should_preserve(shard):
+                continue
             try:
                 size = shard.stat().st_size
                 shard.unlink()

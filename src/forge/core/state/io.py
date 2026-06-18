@@ -1,11 +1,10 @@
 """Atomic file operations for Forge state files.
 
 All write operations use the tempfile + os.replace() pattern for atomicity.
-This ensures that readers never see partial writes.
-
-Durability policy: No fsync. We rely on the filesystem's default behavior.
-This is a deliberate simplicity choice - if crash safety is needed later,
-add fsync before os.replace() and optionally fsync the directory.
+This ensures that readers never see partial writes. The temp file is fsynced
+before replacement and the parent directory is fsynced best-effort after
+replacement, so durable checkpoints such as spend-cap state survive ordinary
+process crashes as well as partial writes.
 """
 
 from __future__ import annotations
@@ -88,7 +87,17 @@ def atomic_write_text(
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(content)
+            f.flush()
+            os.fsync(f.fileno())
         os.replace(temp_path, str(path))
+        try:
+            dir_fd = os.open(str(path.parent), os.O_RDONLY)
+            try:
+                os.fsync(dir_fd)
+            finally:
+                os.close(dir_fd)
+        except OSError:
+            pass
     except Exception:
         # Clean up temp file on failure
         try:

@@ -1,6 +1,6 @@
 # Epic: Telemetry Architecture -- Coordination Checklist
 
-Branch: `main`. Card: [card.md](card.md).
+Branch: `upstream_downstream_ledgers`. Card: [card.md](card.md).
 
 ## Current Focus
 
@@ -20,7 +20,7 @@ foundation lands or this epic explicitly changes the sequence.
 - [x] Re-read `upstream_downstream_ledgers` as a foundation candidate and record whether it should run before remote
   reconciliation: run it first. It fixes the telemetry plane shape that remote reconciliation should plug into.
 - [x] Decide next execution card: `upstream_downstream_ledgers`.
-- [ ] Update the chosen member card's status/checklist and move it to `doing/`.
+- [x] Update the chosen member card's status/checklist and move it to `doing/`.
 
 ## Sequencing Questions
 

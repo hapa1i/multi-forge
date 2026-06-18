@@ -2,13 +2,12 @@
 
 The canonical *attribution* plane: "which run/workflow/session invoked which
 runtime/provider/model via which route, and consumed what." Modeled on
-``audit_logger.py`` (versioned, strictly read) -- NOT ``cost_logger.py``, which is
-unversioned. Three data planes stay physically separate and are joined by a shared
-proxy ``request_id``:
+``audit_logger.py`` (versioned, strictly read). During the downstream clean cut,
+model-call evidence and redacted audit facts live in one downstream plane while
+usage attribution stays separate and is joined by run ids or proxy ``request_id``:
 
-- ``costs/requests/*.jsonl`` -- cap-enforcement spend log (the source of truth for $)
-- ``audit/requests/*.jsonl`` -- privacy-sensitive redacted wire records
-- ``usage/events/*.jsonl`` -- THIS plane: attribution, referencing the other two via
+- ``telemetry/downstream/*.jsonl`` -- model attempts plus redacted audit/drift/mutation facts
+- ``usage/events/*.jsonl`` -- THIS plane: attribution, referencing downstream via
   nullable ``source_refs`` (``{cost_request_id, audit_request_id}``). Native-runtime
   events (Codex/Gemini) carry units directly and leave ``source_refs`` null.
 

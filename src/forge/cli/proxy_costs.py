@@ -132,20 +132,17 @@ def show_cmd(
     Tip: pair with 'forge proxy set <id> costs.caps.per_month=<amount>' to keep
     metered provider usage within a monthly budget.
     """
-    from forge.core.reactive.cost_tracking import read_verb_logs
     from forge.proxy.cost_logger import read_cost_logs
 
     start, end = _local_period_bounds(period)
     if period == "all":
         request_records = read_cost_logs()
-        verb_records = read_verb_logs()
     else:
         request_records = read_cost_logs(period_start=start, period_end=end)
-        verb_records = read_verb_logs(period_start=start, period_end=end)
 
     if proxy_id:
         request_records = [r for r in request_records if r.get("proxy_id") == proxy_id]
-        verb_records = _scope_verb_records_to_proxy(verb_records, _lookup_proxy_base_url(proxy_id))
+    verb_records = _verb_records_from_request_records(request_records, period_start=None if period == "all" else start)
 
     if as_json:
         _output_json(request_records, verb_records, period, proxy_id)
@@ -157,69 +154,41 @@ def show_cmd(
         _display_by_verb(request_records, verb_records, period, proxy_id)
 
 
-def _lookup_proxy_base_url(proxy_id: str) -> str | None:
-    """Resolve a proxy id for filtering verb cost records."""
-    try:
-        from forge.core.reactive.proxy import lookup_proxy_base_url
-
-        return lookup_proxy_base_url(proxy_id)
-    except Exception:
-        return None
-
-
-def _normalize_base_url(base_url: str | None) -> str | None:
-    if not base_url:
-        return None
-    normalized = base_url.strip()
-    if not normalized:
-        return None
-    if "://" not in normalized:
-        normalized = f"http://{normalized}"
-    return normalized.rstrip("/")
-
-
-def _sum_proxy_field(proxies: list[dict], field: str) -> int:
-    return sum(int(p.get(field, 0) or 0) for p in proxies)
-
-
-def _scope_verb_records_to_proxy(verb_records: list[dict], proxy_base_url: str | None) -> list[dict]:
-    """Keep only the per-proxy deltas matching the requested proxy base URL."""
-    target = _normalize_base_url(proxy_base_url)
-    if not target:
+def _verb_records_from_request_records(
+    request_records: list[dict],
+    *,
+    period_start: datetime | None,
+) -> list[dict]:
+    """Build by-verb attribution from downstream attempts joined through run ids."""
+    run_ids = {r.get("forge_run_id") for r in request_records if isinstance(r.get("forge_run_id"), str)}
+    if not run_ids:
         return []
+    try:
+        from forge.core.usage.ledger import read_usage_events
 
-    scoped: list[dict] = []
-    for record in verb_records:
-        per_proxy = record.get("per_proxy", [])
-        if not isinstance(per_proxy, list):
+        events = read_usage_events(period_start=period_start)
+    except Exception:
+        return []
+    run_to_command = {event.run_id: event.command for event in events if event.run_id in run_ids}
+    records: list[dict] = []
+    for record in request_records:
+        run_id = record.get("forge_run_id")
+        if not isinstance(run_id, str):
             continue
-
-        matching = [
-            proxy_delta
-            for proxy_delta in per_proxy
-            if isinstance(proxy_delta, dict) and _normalize_base_url(proxy_delta.get("base_url")) == target
-        ]
-        if not matching:
+        command = run_to_command.get(run_id)
+        if not command:
             continue
-
-        scoped_record = dict(record)
-        scoped_record["per_proxy"] = matching
-        scoped_record["total_cost_micros"] = _sum_proxy_field(matching, "cost_micros")
-        scoped_record["input_tokens"] = _sum_proxy_field(matching, "input_tokens")
-        scoped_record["output_tokens"] = _sum_proxy_field(matching, "output_tokens")
-        scoped_record["cached_tokens"] = _sum_proxy_field(matching, "cached_tokens")
-        scoped_record["request_count"] = _sum_proxy_field(matching, "request_count")
-        # Re-derive cost-evidence for the scoped subset: the unscoped record's
-        # cost_measured covers all proxies, but a single-proxy view may have no
-        # reported-cost request. Trust the per-proxy counter when present; a legacy
-        # delta lacks it, so it reads as cost-unavailable (no resurrected estimate).
-        if any("reported_request_count" in p for p in matching):
-            scoped_record["cost_measured"] = _sum_proxy_field(matching, "reported_request_count") > 0
-        else:
-            scoped_record["cost_measured"] = False
-        scoped.append(scoped_record)
-
-    return scoped
+        cost_micros = _reported_micros(record)
+        records.append(
+            {
+                "verb": command,
+                "total_cost_micros": cost_micros,
+                "cost_measured": cost_micros is not None,
+                "request_count": 1,
+                "per_proxy": [],
+            }
+        )
+    return records
 
 
 def _request_cost_totals(request_records: list[dict]) -> tuple[int, int]:
@@ -392,17 +361,22 @@ def _output_json(
     click.echo(json.dumps(output, indent=2))
 
 
-# Reset wipes the on-disk planes Forge records spend/usage into, plus the derived
+# Reset wipes the on-disk planes Forge records spend/usage/outcome telemetry into, plus the derived
 # status-line caches that would otherwise replay a stale `forge +$Y` / supervisor-health
 # marker within their TTL. Each target carries its own glob (planes shard as `*.jsonl`;
-# the derived caches as `fcost-*.json` / `fhealth-*.json`). Audit records (audit/) are a
-# separate redacted-wire plane and are intentionally NOT touched. In-memory proxy state
-# (ProxyMetrics totals, cap counters) lives in a separate process the CLI cannot reach --
-# the printed tip points at a restart for those.
+# the derived caches as `fcost-*.json` / `fhealth-*.json`). Legacy audit records under
+# audit/requests are intentionally left alone; new downstream shards are reset as part of
+# the research-preview clean cut because they now hold spend truth and provider evidence
+# in one physical file. In-memory proxy state (ProxyMetrics totals, cap counters) lives in
+# a separate process the CLI cannot reach -- the printed tip points at a restart for those.
 _RESET_TARGETS: tuple[tuple[str, tuple[str, ...], str], ...] = (
     ("request cost logs", ("costs", "requests"), "*.jsonl"),
     ("verb cost logs", ("costs", "verbs"), "*.jsonl"),
     ("usage ledger", ("usage", "events"), "*.jsonl"),
+    ("downstream telemetry", ("telemetry", "downstream"), "*.jsonl"),
+    ("upstream telemetry", ("telemetry", "upstream"), "*.jsonl"),
+    ("spend-cap state", ("telemetry", "caps"), "*.json"),
+    ("audit drift state", ("telemetry", "audit_state"), "*.json"),
     ("status-line cost cache", ("cache", "statusline"), "fcost-*.json"),
     ("status-line supervisor-health cache", ("cache", "statusline"), "fhealth-*.json"),
 )
@@ -414,9 +388,10 @@ _RESET_TARGETS: tuple[tuple[str, tuple[str, ...], str], ...] = (
 def reset_cmd(yes: bool, dry_run: bool) -> None:
     """Reset all recorded cost and usage telemetry to zero.
 
-    Deletes the request cost logs, verb cost logs, the usage-attribution ledger, and the
-    derived status-line caches (`forge +$Y` cost + supervisor-health) under FORGE_HOME.
-    Audit records are left untouched. This is irreversible.
+    Deletes legacy cost logs, upstream/downstream telemetry, spend-cap snapshots, the
+    usage-attribution ledger, and the derived status-line caches (`forge +$Y` cost +
+    supervisor-health) under FORGE_HOME. Legacy audit records are left untouched. This is
+    irreversible.
 
     A running proxy keeps its cost totals AND cap counters in memory until restarted, so a
     live proxy's cumulative-cost header, snapshot, and `forge proxy costs show` figures do

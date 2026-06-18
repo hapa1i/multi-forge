@@ -52,6 +52,7 @@ from forge.core.run_id import (
     is_valid_provider_session_id,
     is_valid_run_id,
 )
+from forge.core.telemetry.downstream import mint_downstream_event_id
 from forge.core.usage.vocabulary import Confidence, Reporter
 from forge.proxy.base_client import ProxyStreamError, ToolCallError
 from forge.proxy.client_factory import TierClientFactory
@@ -130,7 +131,11 @@ def _initialize_cost_tracker_from_config() -> CostTracker:
             monthly_cap_usd=cost_cfg.caps.per_month,
             on_cap_hit=cost_cfg.on_cap_hit,
         )
-        cost_tracker.bootstrap_from_logs(get_forge_home() / "costs" / "requests", proxy_id=PROXY_ID)
+        cost_tracker.bootstrap_from_logs(
+            get_forge_home() / "telemetry" / "downstream",
+            proxy_id=PROXY_ID,
+            legacy_log_dir=get_forge_home() / "costs" / "requests",
+        )
     else:
         cost_tracker = CostTracker()
     return cost_tracker
@@ -314,6 +319,7 @@ def _calc_and_log_cost(
     reported_cost_micros: int | None = None,
     forge_run_id: str | None = None,
     forge_root_run_id: str | None = None,
+    downstream_event_id: str | None = None,
 ) -> int | None:
     """Log a request's cost (microdollars) and return it, or ``None`` if unavailable.
 
@@ -346,6 +352,7 @@ def _calc_and_log_cost(
             confidence=confidence,
             forge_run_id=forge_run_id,
             forge_root_run_id=forge_root_run_id,
+            downstream_event_id=downstream_event_id,
         )
 
         # Spend caps account for reported costs only; an unavailable cost advances nothing.
@@ -441,8 +448,12 @@ def _resolve_model_with_alternatives(tier: str, original_model_name: str | None,
 async def lifespan(app: FastAPI):
     """Application lifespan management."""
     logger.info("Server started...")
-    yield
-    logger.info("Server is shutting down... Cleaning up resources")
+    try:
+        yield
+    finally:
+        if cost_tracker is not None:
+            cost_tracker.flush_cap_state()
+        logger.info("Server is shutting down... Cleaning up resources")
 
 
 app = FastAPI(title="Unified LLM Proxy", lifespan=lifespan)
@@ -735,6 +746,7 @@ async def _handle_anthropic_passthrough(raw_request: Request, request_id: str, *
     from forge.proxy.passthrough import forward
 
     start_time = time.time()
+    downstream_event_id = getattr(raw_request.state, "downstream_event_id", None)
     forge_run_id, forge_root_run_id = _forge_run_ids(raw_request)  # Slice 4g run-tree correlation
     forge_session, forge_command = _forge_session_command(raw_request)  # Phase 3 provider-trace join keys
 
@@ -852,6 +864,7 @@ async def _handle_anthropic_passthrough(raw_request: Request, request_id: str, *
             request_id=request_id,
             forge_run_id=forge_run_id,
             forge_root_run_id=forge_root_run_id,
+            downstream_event_id=downstream_event_id,
         )
         proxy_metrics.record_request(
             tier=resolved_tier,
@@ -912,6 +925,7 @@ async def _handle_anthropic_passthrough(raw_request: Request, request_id: str, *
         "forge_root_run_id": forge_root_run_id,
         "provider_session_id": forge_session,
         "provider_command": forge_command,
+        "downstream_event_id": downstream_event_id,
     }
 
     return await forward(
@@ -936,6 +950,7 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
     automatically routing to the appropriate provider based on model name.
     """
     request_id = raw_request.state.request_id
+    downstream_event_id = getattr(raw_request.state, "downstream_event_id", None)
     forge_run_id, forge_root_run_id = _forge_run_ids(raw_request)  # Slice 4g run-tree correlation
     forge_session, forge_command = _forge_session_command(raw_request)  # Phase 3 provider-trace join keys
     start_time = time.time()
@@ -1236,6 +1251,7 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                     reported_cost_micros=usage.get("reported_cost_micros"),
                     forge_run_id=forge_run_id,
                     forge_root_run_id=forge_root_run_id,
+                    downstream_event_id=downstream_event_id,
                 )
                 proxy_metrics.record_request(
                     tier=resolved_tier,
@@ -1271,6 +1287,7 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                     client_disconnected=_lc.get("client_disconnected", False),
                     reported_cost_micros=usage.get("reported_cost_micros"),
                     latency_ms=elapsed,
+                    downstream_event_id=downstream_event_id,
                 )
 
             _stream_log_cfg = _request_log_config()
@@ -1321,6 +1338,7 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                     reported_cost_micros=openai_response.get("_reported_cost_micros"),
                     forge_run_id=forge_run_id,
                     forge_root_run_id=forge_root_run_id,
+                    downstream_event_id=downstream_event_id,
                 )
                 proxy_metrics.record_request(
                     tier=resolved_tier,
@@ -1353,6 +1371,7 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                     client_disconnected=False,
                     reported_cost_micros=openai_response.get("_reported_cost_micros"),
                     latency_ms=duration_ms,
+                    downstream_event_id=downstream_event_id,
                 )
 
                 asyncio.create_task(
@@ -1413,6 +1432,7 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                     request_id=request_id,
                     forge_run_id=forge_run_id,
                     forge_root_run_id=forge_root_run_id,
+                    downstream_event_id=downstream_event_id,
                 )
                 proxy_metrics.record_request(
                     tier=resolved_tier,
@@ -1496,6 +1516,7 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                     reported_cost_micros=openai_response.get("_reported_cost_micros"),
                     forge_run_id=forge_run_id,
                     forge_root_run_id=forge_root_run_id,
+                    downstream_event_id=downstream_event_id,
                 )
                 proxy_metrics.record_request(
                     tier=resolved_tier,
@@ -1543,6 +1564,7 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
             request_id=request_id,
             forge_run_id=forge_run_id,
             forge_root_run_id=forge_root_run_id,
+            downstream_event_id=downstream_event_id,
         )
         proxy_metrics.record_request(
             tier=resolved_tier,
@@ -1895,6 +1917,7 @@ async def log_requests_middleware(request: Request, call_next):
 
     request_id = request.headers.get("X-Request-ID") or f"{prefix}{uuid.uuid4().hex[:12]}"
     request.state.request_id = request_id
+    request.state.downstream_event_id = mint_downstream_event_id(event_key=f"proxy:{request_id}:{uuid.uuid4().hex}")
 
     # Slice 4g: run-tree correlation. Read + VALIDATE the Forge run-id headers a
     # proxy-routed `claude -p` subprocess stamps, so each cost record can join to the

@@ -23,11 +23,17 @@ helpers, so per-callsite wiring here does not become throwaway.
 from __future__ import annotations
 
 import logging
-from typing import NamedTuple
+import uuid
+from typing import Any, NamedTuple
 
 from forge.core.reactive.cost_tracking import VerbCostResult
 from forge.core.reactive.env import get_run_identity
 from forge.core.reactive.session_runner import SessionResult
+from forge.core.telemetry.downstream import (
+    DownstreamRecord,
+    mint_downstream_event_id,
+    write_downstream_record,
+)
 from forge.core.usage.billing import infer_billing_mode
 from forge.core.usage.ledger import (
     BillingMode,
@@ -206,6 +212,27 @@ def emit_usage_for_session_result(
             latency_ms=round(cost.duration_ms, 1) if (cost and cost.duration_ms) else None,
             source_refs=None,  # claude -p: proxy request_id unknown to Forge (4g)
         )
+        if not proxied:
+            write_downstream_record(
+                DownstreamRecord(
+                    kind="attempt",
+                    downstream_event_id=mint_downstream_event_id(event_key=f"claude_p:{result.run_id}:{command}"),
+                    forge_run_id=result.run_id,
+                    forge_root_run_id=result.root_run_id or result.run_id,
+                    provider=None,
+                    source_id=reporter,
+                    source_kind="provider" if reporter else None,
+                    model=model,
+                    input_tokens=in_tok,
+                    output_tokens=out_tok,
+                    cached_tokens=cache_tok,
+                    cost_micros=cost_micro_usd,
+                    reporter=reporter,
+                    confidence=confidence,
+                    latency_ms=round(cost.duration_ms, 1) if (cost and cost.duration_ms) else None,
+                    failed=status != "success",
+                )
+            )
         log_usage_event(event)
     except Exception as e:  # best-effort: telemetry must not break the verb
         logger.debug("emit_usage_for_session_result(%s) failed: %s", command, e)
@@ -358,6 +385,27 @@ def emit_worker_usage(
             latency_ms=round(latency_ms, 1) if latency_ms is not None else None,
             source_refs=None,
         )
+        if not proxied:
+            write_downstream_record(
+                DownstreamRecord(
+                    kind="attempt",
+                    downstream_event_id=mint_downstream_event_id(event_key=f"claude_worker:{run_id}:{command}"),
+                    forge_run_id=run_id,
+                    forge_root_run_id=root_run_id or run_id,
+                    provider=provider,
+                    source_id=provider,
+                    source_kind="provider" if provider else None,
+                    model=model,
+                    input_tokens=in_tok,
+                    output_tokens=out_tok,
+                    cached_tokens=cache_tok,
+                    cost_micros=ev_cost,
+                    reporter=reporter,
+                    confidence=confidence,
+                    latency_ms=round(latency_ms, 1) if latency_ms is not None else None,
+                    failed=status != "success",
+                )
+            )
         log_usage_event(event)
     except Exception as e:  # best-effort: telemetry must not break the fan-out
         logger.debug("emit_worker_usage(%s) failed: %s", command, e)
@@ -399,6 +447,26 @@ def emit_codex_usage(
     try:
         if not run_id:
             return
+        write_downstream_record(
+            DownstreamRecord(
+                kind="attempt",
+                downstream_event_id=mint_downstream_event_id(event_key=f"codex:{run_id}:{command}"),
+                forge_run_id=run_id,
+                forge_root_run_id=root_run_id or run_id,
+                provider=provider,
+                source_id=provider,
+                source_kind="provider",
+                model=model,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                cached_tokens=cached_tokens,
+                cost_micros=None,
+                reporter="codex_jsonl",
+                confidence="unavailable",
+                latency_ms=round(latency_ms, 1) if latency_ms is not None else None,
+                failed=status != "success",
+            )
+        )
         event = UsageEvent(
             run_id=run_id,
             parent_run_id=parent_run_id,
@@ -442,6 +510,7 @@ def emit_direct_llm_usage(
     workflow: str | None = None,
     session: str | None = None,
     runtime: str = "claude_code",
+    provider_meta: object | None = None,
 ) -> None:
     """Emit a UsageEvent for a direct ``core.llm`` call (Forge is the HTTP client).
 
@@ -465,6 +534,59 @@ def emit_direct_llm_usage(
         # None), so cost confidence is always "unavailable" -- not a contradiction with the
         # provider-reported tokens, and a joined source_refs cost ref does not change it.
         reporter: Reporter | None = "provider" if measured else None
+        pm: dict[str, Any] = {}
+        if provider_meta is not None:
+            model_dump = getattr(provider_meta, "model_dump", None)
+            if callable(model_dump):
+                dumped = model_dump(exclude_none=True)
+                if isinstance(dumped, dict):
+                    pm = dumped
+            elif isinstance(provider_meta, dict):
+                pm = provider_meta
+        pm_provider = pm.get("provider") if isinstance(pm.get("provider"), str) else None
+        pm_selected_provider = pm.get("selected_provider") if isinstance(pm.get("selected_provider"), str) else None
+        pm_response_id = pm.get("provider_response_id") if isinstance(pm.get("provider_response_id"), str) else None
+        pm_generation_id = (
+            pm.get("provider_generation_id") if isinstance(pm.get("provider_generation_id"), str) else None
+        )
+        pm_request_id = pm.get("provider_request_id") if isinstance(pm.get("provider_request_id"), str) else None
+        pm_session_id = pm.get("provider_session_id") if isinstance(pm.get("provider_session_id"), str) else None
+        pm_headers = pm.get("headers")
+        provider_headers: dict[str, str] | None = None
+        if isinstance(pm_headers, dict):
+            from forge.core.llm.clients.openai_compat import provider_trace_headers
+
+            provider_headers = provider_trace_headers(pm_headers)
+        if cost_request_id is None:
+            write_downstream_record(
+                DownstreamRecord(
+                    kind="attempt",
+                    downstream_event_id=mint_downstream_event_id(
+                        event_key=f"core_llm:{identity.run_id}:{command}:{uuid.uuid4().hex}"
+                    ),
+                    source_id=provider,
+                    source_kind="provider",
+                    forge_run_id=identity.run_id,
+                    forge_root_run_id=identity.root_run_id,
+                    provider=provider or pm_provider,
+                    selected_provider=pm_selected_provider,
+                    model=model,
+                    input_tokens=usage.get("prompt_tokens") if usage else None,
+                    output_tokens=usage.get("completion_tokens") if usage else None,
+                    cached_tokens=usage.get("cached_tokens") if usage else None,
+                    cost_micros=None,
+                    reporter=reporter,
+                    confidence="unavailable",
+                    latency_ms=round(latency_ms, 1) if latency_ms is not None else None,
+                    failed=status != "success",
+                    provider_response_id=pm_response_id,
+                    provider_generation_id=pm_generation_id,
+                    provider_request_id=pm_request_id,
+                    provider_session_id=pm_session_id,
+                    provider_headers=provider_headers,
+                    local_usage_status="unavailable",
+                )
+            )
         event = UsageEvent(
             run_id=identity.run_id,
             parent_run_id=identity.parent_run_id,

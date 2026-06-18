@@ -479,7 +479,7 @@ class TestRunSidecarSessionProxyAudit:
         return " ".join(captured["cmd"])
 
     def test_proxy_id_adds_env_and_mounts(self) -> None:
-        """proxy_id sets FORGE_PROXY_ID + FORGE_HOME and mounts config (ro) + audit/costs/usage (rw)."""
+        """proxy_id sets FORGE_PROXY_ID + FORGE_HOME and mounts config (ro) + telemetry dirs (rw)."""
         from forge.core.paths import get_forge_home
 
         cmd = self._capture_cmd(proxy_id="audit-test", make_proxy_yaml=True)
@@ -489,9 +489,10 @@ class TestRunSidecarSessionProxyAudit:
         assert "FORGE_HOME=/root/.forge" in cmd
         # Per-proxy config mounted read-only at the in-container forge home
         assert f"{forge_home}/proxies/audit-test:/root/.forge/proxies/audit-test:ro" in cmd
-        # Audit + cost dirs mounted read-write (host-visible logs; caps persist across launches)
+        # Audit + cost + telemetry dirs mounted read-write (host-visible logs; caps persist across launches)
         assert f"{forge_home}/audit:/root/.forge/audit:rw" in cmd
         assert f"{forge_home}/costs:/root/.forge/costs:rw" in cmd
+        assert f"{forge_home}/telemetry:/root/.forge/telemetry:rw" in cmd
         # Usage ledger mounted read-write so the in-container supervisor/verb attribution
         # events survive --rm and feed the host `forge usage` + session-end summary.
         assert f"{forge_home}/usage:/root/.forge/usage:rw" in cmd

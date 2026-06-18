@@ -38,7 +38,7 @@ Two telemetry planes, joined by run-tree identity, with one canonical source key
 
 | Concern                                     | Owner card                                                                                  | Status                                         |
 | ------------------------------------------- | ------------------------------------------------------------------------------------------- | ---------------------------------------------- |
-| Plane **structure** (direction: up/down)    | [`upstream_downstream_ledgers`](../../proposed/upstream_downstream_ledgers/card.md)         | chosen next foundation card                    |
+| Plane **structure** (direction: up/down)    | [`upstream_downstream_ledgers`](../upstream_downstream_ledgers/card.md)                     | doing                                          |
 | Source-identity **key** (`backend_id`)      | [`unified_backend`](../../proposed/unified_backend/card.md)                                 | proposed; sibling foundation candidate         |
 | Provider-trace plane (first to be absorbed) | [`openrouter_observability`](../../done/openrouter_observability/card.md)                   | done                                           |
 | Source-identity consumer: logs              | [`proxy_log_hygiene`](../../done/proxy_log_hygiene/card.md)                                 | done                                           |

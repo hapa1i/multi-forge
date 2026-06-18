@@ -9,7 +9,7 @@ can assert the two end-to-end properties the slice promises:
    host-registry startup validation (which would otherwise abort, since the
    registry isn't in the container and the port is fixed at 8085).
 2. Audit records written inside the container are host-visible on the *writable*
-   audit mount after the container stops (``forge proxy audit show`` reads them).
+   telemetry mount after the container stops (``forge proxy audit show`` reads them).
 3. Usage-ledger events written inside the container are host-visible on the *writable*
    usage mount after the container stops. In sidecar mode the in-container supervisor +
    workflow verbs are the only writers of these events, so without the mount a sidecar
@@ -79,9 +79,11 @@ def test_sidecar_proxy_id_overlay_and_host_visible_audit_and_usage(tmp_path: Pat
     assert (proxy_dir / "proxy.yaml").exists(), "proxy.yaml not written"
     audit_dir = forge_home / "audit"
     costs_dir = forge_home / "costs"
+    telemetry_dir = forge_home / "telemetry"
     usage_dir = forge_home / "usage"
     audit_dir.mkdir(parents=True, exist_ok=True)
     costs_dir.mkdir(parents=True, exist_ok=True)
+    telemetry_dir.mkdir(parents=True, exist_ok=True)
     usage_dir.mkdir(parents=True, exist_ok=True)
 
     # 2) `claude` sleeper keeps the container up after the entrypoint starts the proxy.
@@ -93,9 +95,10 @@ def test_sidecar_proxy_id_overlay_and_host_visible_audit_and_usage(tmp_path: Pat
     _docker("rm", "-f", CONTAINER)
     # NOTE: this intentionally mirrors the env + mounts that
     # forge.sidecar.container.run_sidecar_session / _ensure_audit_plumbing_mounts build
-    # (FORGE_PROXY_ID, FORGE_HOME, proxies ro + audit/costs/usage rw). We hand-roll `docker run`
-    # because the real helper uses `-it` + `exec claude`, which a headless test can't drive.
-    # If you change the helper's env/mounts, update this list (and its unit tests) too.
+    # (FORGE_PROXY_ID, FORGE_HOME, proxies ro + audit/costs/usage/telemetry rw). We
+    # hand-roll `docker run` because the real helper uses `-it` + `exec claude`, which
+    # a headless test can't drive. If you change the helper's env/mounts, update this
+    # list (and its unit tests) too.
     run_cmd = [
         "run",
         "-d",
@@ -121,6 +124,8 @@ def test_sidecar_proxy_id_overlay_and_host_visible_audit_and_usage(tmp_path: Pat
         f"{audit_dir}:/root/.forge/audit:rw",
         "-v",
         f"{costs_dir}:/root/.forge/costs:rw",
+        "-v",
+        f"{telemetry_dir}:/root/.forge/telemetry:rw",
         "-v",
         f"{usage_dir}:/root/.forge/usage:rw",
         "-v",
@@ -190,12 +195,15 @@ def test_sidecar_proxy_id_overlay_and_host_visible_audit_and_usage(tmp_path: Pat
     finally:
         _docker("rm", "-f", CONTAINER)
 
-    # 5) Host sees the record on the writable audit mount after the container is gone.
-    shards = list((audit_dir / "requests").glob("*.jsonl"))
-    assert shards, f"no audit shards under {audit_dir / 'requests'}"
+    # 5) Host sees the audit sub-stream record on the writable telemetry mount after the container is gone.
+    shards = list((telemetry_dir / "downstream").glob("*.jsonl"))
+    assert shards, f"no downstream shards under {telemetry_dir / 'downstream'}"
     records = [json.loads(line) for shard in shards for line in shard.read_text().splitlines() if line.strip()]
+    audit_payloads = [
+        r.get("payload") for r in records if r.get("kind") == "audit" and isinstance(r.get("payload"), dict)
+    ]
     assert any(
-        r.get("proxy_id") == PROXY_ID and r.get("record_type") == "request" for r in records
+        r.get("proxy_id") == PROXY_ID and r.get("record_type") == "request" for r in audit_payloads
     ), f"no request record for {PROXY_ID}: {records}"
 
     # And the host CLI surfaces it (the Rich audit table prints to stderr).

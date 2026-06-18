@@ -1,12 +1,14 @@
 """Per-session Forge activity summary (command-core).
 
-Aggregates two already-captured planes into one view a human can read:
+Aggregates captured telemetry planes into one view a human can read:
 
 - the usage-attribution ledger (``usage/events``) -> per-command run/error counts,
   tokens, and reported-or-estimated cost. Uncapped and reliable; the authoritative
   source for "how many times did the supervisor run, and how many failed".
-- the session manifest's ``confirmed.policy.decisions`` -> supervisor allow/warn/deny
-  and warning text. Capped at ``MAX_DECISION_LOG`` (so ``log_capped`` is surfaced).
+- the session manifest's ``confirmed.policy.decisions`` plus upstream policy outcomes
+  -> supervisor allow/warn/deny and warning text. The manifest side is capped at
+  ``MAX_DECISION_LOG`` (so ``log_capped`` is surfaced); upstream fills no-call/fail-open
+  gaps that never reached the manifest log.
 
 The two planes measure related-but-distinct things and are kept separate on purpose
 (a cached supervisor verdict is a policy *decision* with no ledger event; a failed
@@ -27,6 +29,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
+from forge.core.telemetry.upstream import UpstreamOutcome, read_upstream_outcomes
 from forge.core.usage.ledger import UsageEvent, read_usage_events
 from forge.core.usage.vocabulary import ROUTE_CLAUDE_INTERACTIVE, Confidence
 
@@ -35,6 +38,7 @@ logger = logging.getLogger(__name__)
 _SUPERVISOR_POLICY_ID = "semantic.supervisor"
 _PLAN_CHECK_POLICY_ID = "semantic.plan_check"
 _ERROR_STATUSES = {"error", "timeout"}
+_UPSTREAM_FAIL_OPEN_STATUSES = {"fail_open", "error", "timeout", "skipped"}
 _WORKFLOW_COMMANDS = {"panel", "analyze", "debate", "consensus"}
 _MAX_RECENT_WARNINGS = 5
 # Confidences whose dollar figure is trustworthy enough to count toward Forge-added
@@ -183,8 +187,8 @@ def build_session_activity_summary(
     _aggregate_ledger(summary, session_name, since)
 
     manifest = _load_manifest(session_name, forge_root)
+    summary.policy = _policy_activity(manifest, since, session_name)
     if manifest is not None:
-        summary.policy = _policy_activity(manifest, since)
         subagents = manifest.confirmed.subagents
         if subagents is not None:
             summary.subagents = int(subagents.total_count)
@@ -332,14 +336,23 @@ class SupervisorHealth:
     ``ts``. Empty (``0``/``None``/``None``) means the most recent supervisor run
     succeeded -- or none ran.
 
-    v1 covers only the timeout/subprocess fail-opens the ledger records as a
-    non-``success`` ``status``; parse fail-opens (logged ``success``) and auth/proxy
-    fail-opens (no event) are out of scope (deferred to ``upstream_downstream_ledgers``).
+    Upstream policy outcomes cover no-call and successful-subprocess fail-open
+    branches (for example proxy lookup and parse failures) that the legacy usage
+    ledger cannot represent on its own.
     """
 
     recent_failures: int = 0
     last_kind: str | None = None
     last_seen_at: str | None = None
+
+
+@dataclass
+class _HealthEvent:
+    ts: str
+    status: str
+    failure_type: str | None = None
+    run_id: str | None = None
+    source: str = "legacy"
 
 
 def _failure_kind(failure_type: str | None) -> str:
@@ -355,10 +368,10 @@ def _failure_kind(failure_type: str | None) -> str:
 def read_supervisor_health(session: str, *, since: datetime | None = None) -> SupervisorHealth:
     """Return the recent consecutive frontier-supervisor fail-open run for ``session``.
 
-    Reads ``command="supervisor"`` events newest-first (the ledger sorts ascending by
-    ``ts``) and counts the contiguous ``status in {"error","timeout"}`` prefix, breaking
-    at the first non-failure. ``last_kind`` maps the newest failure's ``failure_type`` to
-    ``"timeout"`` (exact) or ``"error"`` (everything else: subprocess/exit/runtime).
+    Reads upstream supervisor outcomes plus legacy ``command="supervisor"`` usage
+    events newest-first and counts the contiguous fail-open/error/timeout prefix,
+    breaking at the first non-failure. ``last_kind`` maps the newest failure's reason
+    to ``"timeout"`` (exact) or ``"error"`` (everything else).
 
     Frontier-only: ``command="supervisor"`` excludes ``"supervisor-shadow"`` and
     ``"plan-check"`` by exact match. ``since`` bounds the scan to events at/after session
@@ -376,12 +389,12 @@ def read_supervisor_health(session: str, *, since: datetime | None = None) -> Su
     boundary and miscount the streak by one; sub-second ``ts`` resolution would remove the
     dependency.
     """
-    events = read_usage_events(session=session, command="supervisor", period_start=since)
+    events = _supervisor_health_events(session, since)
     count = 0
     last_kind: str | None = None
     last_seen_at: str | None = None
     for event in reversed(events):  # newest-first (read_usage_events sorts ascending by ts)
-        if event.status not in _ERROR_STATUSES:
+        if event.status not in _ERROR_STATUSES and event.status not in _UPSTREAM_FAIL_OPEN_STATUSES:
             break  # the first non-failure (a success) ends the recent fail-open run
         if count == 0:  # the newest failure defines the displayed kind + timestamp
             last_kind = _failure_kind(event.failure_type)
@@ -390,6 +403,69 @@ def read_supervisor_health(session: str, *, since: datetime | None = None) -> Su
     if count == 0:
         return SupervisorHealth()
     return SupervisorHealth(recent_failures=count, last_kind=last_kind, last_seen_at=last_seen_at)
+
+
+def _supervisor_health_events(session: str, since: datetime | None) -> list[_HealthEvent]:
+    """Merge new upstream outcomes with legacy usage events for supervisor health."""
+    events: list[_HealthEvent] = [
+        _HealthEvent(ts=e.ts, status=e.status, failure_type=e.failure_type, run_id=e.run_id, source="legacy")
+        for e in read_usage_events(session=session, command="supervisor", period_start=since)
+    ]
+    for outcome in read_upstream_outcomes(
+        period_start=since,
+        session=session,
+        command="policy-check",
+        policy_id=_SUPERVISOR_POLICY_ID,
+    ):
+        events.append(_health_event_from_upstream(outcome))
+    events = _dedupe_supervisor_health_events(events)
+    events.sort(key=lambda e: e.ts)
+    return events
+
+
+def _health_event_from_upstream(outcome: UpstreamOutcome) -> _HealthEvent:
+    failure_type = "timeout" if outcome.status == "timeout" or outcome.reason_code == "timeout" else outcome.reason_code
+    return _HealthEvent(
+        ts=outcome.ts,
+        status=outcome.status,
+        failure_type=failure_type,
+        run_id=outcome.run_id,
+        source="upstream",
+    )
+
+
+def _dedupe_supervisor_health_events(events: list[_HealthEvent]) -> list[_HealthEvent]:
+    """Collapse duplicate telemetry for the same supervisor child run.
+
+    The legacy usage ledger records the child process result before supervisor
+    parsing can convert malformed/no-call outcomes into a policy fail-open.
+    Prefer the event that preserves health semantics so a legacy ``success``
+    cannot mask an upstream ``fail_open`` for the same child run.
+    """
+    out: list[_HealthEvent] = []
+    events_by_run: dict[str, list[_HealthEvent]] = {}
+    for event in events:
+        if event.run_id:
+            events_by_run.setdefault(event.run_id, []).append(event)
+            continue
+        out.append(event)
+    for run_events in events_by_run.values():
+        sources = {event.source for event in run_events}
+        if len(sources) == 1:
+            out.extend(run_events)
+            continue
+        winning_source = max(
+            sources,
+            key=lambda source: max(_health_event_rank(event) for event in run_events if event.source == source),
+        )
+        out.extend(event for event in run_events if event.source == winning_source)
+    return out
+
+
+def _health_event_rank(event: _HealthEvent) -> tuple[int, int, str]:
+    is_failure = event.status in _ERROR_STATUSES or event.status in _UPSTREAM_FAIL_OPEN_STATUSES
+    is_upstream = event.source == "upstream"
+    return (int(is_failure), int(is_upstream), event.ts)
 
 
 # --- internals ---------------------------------------------------------------
@@ -567,13 +643,11 @@ def _load_manifest(session_name: str, forge_root: str | None):  # type: ignore[n
         return None
 
 
-def _policy_activity(manifest, since: datetime | None) -> PolicyActivity | None:  # type: ignore[no-untyped-def]
+def _policy_activity(manifest, since: datetime | None, session_name: str) -> PolicyActivity | None:  # type: ignore[no-untyped-def]
     try:
-        decisions = manifest.confirmed.policy.decisions
+        decisions = manifest.confirmed.policy.decisions if manifest is not None else []
     except Exception:
-        return None
-    if not decisions:
-        return None
+        decisions = []
 
     from forge.policy.store import MAX_DECISION_LOG
 
@@ -582,6 +656,7 @@ def _policy_activity(manifest, since: datetime | None) -> PolicyActivity | None:
     # indistinguishable from a truncated one -- treat at-capacity as "older may be evicted".
     activity = PolicyActivity(log_capped=len(decisions) >= MAX_DECISION_LOG)
     warnings: list[str] = []
+    manifest_seen: dict[tuple[str, str, str | None], int] = {}
 
     for entry in decisions:
         if not isinstance(entry, dict):
@@ -601,6 +676,10 @@ def _policy_activity(manifest, since: datetime | None) -> PolicyActivity | None:
                 continue
             policy_id = sub.get("policy_id")
             decision = sub.get("decision")
+            message = _policy_subdecision_message(sub)
+            key = _policy_activity_key(policy_id, decision, message)
+            if key:
+                manifest_seen[key] = manifest_seen.get(key, 0) + 1
             if policy_id == _PLAN_CHECK_POLICY_ID:
                 if decision == "allow":
                     activity.plan_check_allow += 1
@@ -619,12 +698,87 @@ def _policy_activity(manifest, since: datetime | None) -> PolicyActivity | None:
             if isinstance(sub_warnings, list):
                 warnings.extend(str(w) for w in sub_warnings)
 
+    _apply_upstream_policy_activity(activity, manifest_seen, warnings, since, session_name)
     activity.total_warnings = len(warnings)
     activity.recent_warnings = warnings[-_MAX_RECENT_WARNINGS:]
     # PolicyActivity is *semantic-tier* activity (supervisor + plan-check); if neither
     # took part in an in-window decision there is nothing to show (and a deterministic
     # policy warning must not surface a phantom "supervisor: 0 checks" section).
     return activity if activity.has_content else None
+
+
+def _policy_activity_key(
+    policy_id: object,
+    decision: object,
+    message: str | None,
+) -> tuple[str, str, str | None] | None:
+    if not isinstance(policy_id, str) or not isinstance(decision, str):
+        return None
+    return policy_id, decision, message
+
+
+def _policy_subdecision_message(sub: dict) -> str | None:
+    sub_warnings = sub.get("warnings")
+    if isinstance(sub_warnings, list) and sub_warnings:
+        return str(sub_warnings[0])
+    violations = sub.get("violations")
+    if isinstance(violations, list) and violations and isinstance(violations[0], dict):
+        message = violations[0].get("message")
+        return str(message) if message else None
+    return None
+
+
+def _apply_upstream_policy_activity(
+    activity: PolicyActivity,
+    manifest_seen: dict[tuple[str, str, str | None], int],
+    warnings: list[str],
+    since: datetime | None,
+    session_name: str,
+) -> None:
+    try:
+        outcomes = read_upstream_outcomes(period_start=since, session=session_name, command="policy-check")
+    except Exception:
+        return
+    for outcome in outcomes:
+        if outcome.policy_id not in {_PLAN_CHECK_POLICY_ID, _SUPERVISOR_POLICY_ID}:
+            continue
+        decision = _upstream_outcome_decision(outcome)
+        if decision is None:
+            continue
+        key = _policy_activity_key(outcome.policy_id, decision, outcome.message)
+        if key and manifest_seen.get(key, 0) > 0:
+            manifest_seen[key] -= 1
+            continue
+
+        if outcome.policy_id == _PLAN_CHECK_POLICY_ID:
+            if decision == "allow":
+                activity.plan_check_allow += 1
+            elif decision == "needs_review":
+                activity.plan_check_needs_review += 1
+            continue
+
+        if decision == "allow":
+            activity.supervisor_allow += 1
+        elif decision == "warn":
+            activity.supervisor_warn += 1
+        elif decision == "deny":
+            activity.supervisor_deny += 1
+        if outcome.message and decision in {"allow", "warn"} and outcome.status != "success":
+            warnings.append(outcome.message)
+
+
+def _upstream_outcome_decision(outcome: UpstreamOutcome) -> str | None:
+    if outcome.status == "success":
+        return "allow"
+    if outcome.status == "warning":
+        return "warn"
+    if outcome.status == "deny":
+        return "deny"
+    if outcome.status == "needs_review":
+        return "needs_review"
+    if outcome.status in _UPSTREAM_FAIL_OPEN_STATUSES:
+        return "allow"
+    return None
 
 
 def _shadow_activity(forge_root: str | None, session_name: str, since: datetime | None) -> ShadowActivity | None:

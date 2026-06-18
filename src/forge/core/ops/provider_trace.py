@@ -269,6 +269,8 @@ def _lookup_cost_confidence(rec: ProviderTraceRecord) -> str | None:
     for cost in records:
         if cost.get("request_id") == rec.request_id:
             conf = cost.get("confidence")
+            if conf == "unknown":
+                continue
             return conf if isinstance(conf, str) else None
     return None
 
