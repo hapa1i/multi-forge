@@ -276,6 +276,40 @@ class TestRunShadowCuration:
         assert outcomes[0].reason_code == "subprocess_error"
         assert outcomes[0].latency_ms == 0.0
 
+    @patch("forge.core.reactive.session_runner.run_claude_session")
+    @patch("forge.core.reactive.cost_tracking.track_verb_cost")
+    def test_result_run_tree_ids_are_optional(self, mock_cost: MagicMock, mock_run: MagicMock, tmp_path: Path) -> None:
+        mock_cost.return_value.__enter__.return_value.duration_ms = 12.3
+        mock_run.return_value = type(
+            "R",
+            (),
+            {
+                "success": False,
+                "returncode": 1,
+                "timed_out": False,
+                "error": "failed",
+                "stdout": "",
+                "stderr": "",
+            },
+        )()
+
+        result = run_shadow_curation(
+            session_name="s1",
+            forge_root=tmp_path,
+            official_path="docs/n.md",
+            official_content="# Notes",
+            shadow_entries=[],
+        )
+
+        assert not result.success
+        from forge.core.telemetry.upstream import read_upstream_outcomes
+
+        outcomes = read_upstream_outcomes(session="s1", command="curation")
+        assert len(outcomes) == 1
+        assert outcomes[0].status == "error"
+        assert outcomes[0].run_id is None
+        assert outcomes[0].root_run_id is None
+
 
 # ---------------------------------------------------------------------------
 # collect_shadow_entries
