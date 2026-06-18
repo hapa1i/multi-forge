@@ -1,7 +1,7 @@
 """CLI command group: forge proxy audit (Phase 2 audit proxy).
 
-Reads the redacted JSONL audit logs written by the proxy in inspect/override
-mode (``~/.forge/audit/requests/``). Metadata-only by default; the records are
+Reads the redacted downstream audit records written by the proxy in inspect/override
+mode (``~/.forge/telemetry/downstream/``). Metadata-only by default; the records are
 already redacted, so no secrets or message text are ever printed.
 """
 
@@ -145,8 +145,8 @@ def audit_show_cmd(proxy_id: str | None, period: str, limit: int, as_json: bool)
         from forge.core.paths import display_path, get_forge_home
 
         print_tip(
-            "Full-body audit is enabled; logs contain redacted request/response structure at "
-            f"{display_path(get_forge_home() / 'audit' / 'requests')}.",
+            "Full-body audit is enabled; downstream telemetry contains redacted request/response structure at "
+            f"{display_path(get_forge_home() / 'telemetry' / 'downstream')}.",
             console=console,
         )
 

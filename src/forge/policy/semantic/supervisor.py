@@ -389,6 +389,26 @@ class SupervisorRun:
     parsed: bool = False
 
 
+def _supervisor_fail_open_decision(
+    warning: str,
+    *,
+    failure_type: str,
+    run_id: str | None = None,
+    parent_run_id: str | None = None,
+    root_run_id: str | None = None,
+) -> PolicyDecision:
+    return PolicyDecision(
+        decision="allow",
+        policy_id="semantic.supervisor",
+        warnings=[warning],
+        fail_open=True,
+        failure_type=failure_type,
+        telemetry_run_id=run_id,
+        telemetry_parent_run_id=parent_run_id,
+        telemetry_root_run_id=root_run_id,
+    )
+
+
 def run_supervisor_check(
     config: SupervisorConfig,
     context: ActionContext,
@@ -408,10 +428,9 @@ def run_supervisor_check(
     if not should_spawn_subprocesses():
         _log.debug("Skipping supervisor at FORGE_DEPTH >= %d", 2)
         return SupervisorRun(
-            PolicyDecision(
-                decision="allow",
-                policy_id="semantic.supervisor",
-                warnings=["Supervisor skipped (FORGE_DEPTH limit reached)"],
+            _supervisor_fail_open_decision(
+                "Supervisor skipped (FORGE_DEPTH limit reached)",
+                failure_type="skipped",
             )
         )
 
@@ -428,10 +447,9 @@ def run_supervisor_check(
     if resolved.warning:
         _log.warning(resolved.warning)
         return SupervisorRun(
-            PolicyDecision(
-                decision="allow",
-                policy_id="semantic.supervisor",
-                warnings=[resolved.warning],
+            _supervisor_fail_open_decision(
+                resolved.warning,
+                failure_type="configuration_error",
             )
         )
 
@@ -462,10 +480,9 @@ def run_supervisor_check(
         except Exception as e:
             _log.warning("Supervisor proxy '%s' not found: %s", config.proxy, e)
             return SupervisorRun(
-                PolicyDecision(
-                    decision="warn",
-                    policy_id="semantic.supervisor",
-                    warnings=[f"Supervisor proxy '{config.proxy}' not found: {e}"],
+                _supervisor_fail_open_decision(
+                    f"Supervisor proxy '{config.proxy}' not found: {e}",
+                    failure_type="proxy_not_found",
                 )
             )
         # Keep executor model pins from leaking into the read-only supervisor.
@@ -517,16 +534,33 @@ def run_supervisor_check(
             "Supervisor invocation failed: %s",
             result.error or f"exit {result.returncode}",
         )
+        failure_type = (
+            "timeout" if result.timed_out else "subprocess_error" if result.error else f"exit_{result.returncode}"
+        )
         return SupervisorRun(
-            PolicyDecision(
-                decision="allow",
-                policy_id="semantic.supervisor",
-                warnings=[f"Supervisor error: {result.error or f'exit {result.returncode}'}, failing open"],
+            _supervisor_fail_open_decision(
+                f"Supervisor error: {result.error or f'exit {result.returncode}'}, failing open",
+                failure_type=failure_type,
+                run_id=result.run_id,
+                parent_run_id=result.parent_run_id,
+                root_run_id=result.root_run_id,
             )
         )
 
     verdict, parsed = parse_supervisor_verdict_with_status(result.stdout)
     decision = verdict_to_decision(verdict, intent=intent)
+    if not parsed:
+        warning = decision.warnings[0] if decision.warnings else "Supervisor verdict could not be parsed, failing open"
+        decision = _supervisor_fail_open_decision(
+            warning,
+            failure_type="parse_failure",
+            run_id=result.run_id,
+            parent_run_id=result.parent_run_id,
+            root_run_id=result.root_run_id,
+        )
+    decision.telemetry_run_id = result.run_id
+    decision.telemetry_parent_run_id = result.parent_run_id
+    decision.telemetry_root_run_id = result.root_run_id
     return SupervisorRun(decision=decision, verdict=verdict, run_ok=True, parsed=parsed)
 
 

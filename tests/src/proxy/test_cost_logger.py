@@ -16,10 +16,10 @@ from forge.proxy.cost_logger import (
 
 @pytest.fixture
 def cost_log_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """Point cost logger to a temp directory."""
-    costs_dir = tmp_path / "costs" / "requests"
-    monkeypatch.setattr("forge.proxy.cost_logger._costs_dir", lambda: costs_dir)
-    return costs_dir
+    """Point downstream telemetry to a temp directory."""
+    telemetry_dir = tmp_path / "telemetry" / "downstream"
+    monkeypatch.setattr("forge.core.telemetry.downstream._downstream_dir", lambda: telemetry_dir)
+    return telemetry_dir
 
 
 class TestLogRequestCost:
@@ -212,7 +212,13 @@ class TestReadCostLogs:
         for pid in [1234, 5678]:
             path = cost_log_dir / f"2026-05_{pid}.jsonl"
             with open(path, "w") as f:
-                record = {"ts": "2026-05-07T10:00:00Z", "cost_micros": pid, "model": "m"}
+                record = {
+                    "kind": "attempt",
+                    "downstream_event_id": f"ds_{pid}",
+                    "ts": "2026-05-07T10:00:00Z",
+                    "cost_micros": pid,
+                    "model": "m",
+                }
                 f.write(json.dumps(record) + "\n")
 
         records = read_cost_logs()
@@ -223,7 +229,12 @@ class TestReadCostLogs:
         path = cost_log_dir / "2026-05_9999.jsonl"
         with open(path, "w") as f:
             for hour in [8, 12, 16]:
-                record = {"ts": f"2026-05-07T{hour:02d}:00:00Z", "cost_micros": 100}
+                record = {
+                    "kind": "attempt",
+                    "downstream_event_id": f"ds_{hour}",
+                    "ts": f"2026-05-07T{hour:02d}:00:00Z",
+                    "cost_micros": 100,
+                }
                 f.write(json.dumps(record) + "\n")
 
         start = datetime(2026, 5, 7, 10, 0, 0, tzinfo=timezone.utc)
@@ -237,12 +248,62 @@ class TestReadCostLogs:
         path = cost_log_dir / "2026-05_9999.jsonl"
         with open(path, "w") as f:
             f.write("not json\n")
-            f.write(json.dumps({"ts": "2026-05-07T10:00:00Z", "ok": True}) + "\n")
+            f.write(
+                json.dumps(
+                    {
+                        "kind": "attempt",
+                        "downstream_event_id": "ds_ok",
+                        "ts": "2026-05-07T10:00:00Z",
+                        "request_id": "req_ok",
+                    }
+                )
+                + "\n"
+            )
             f.write("\n")
 
         records = read_cost_logs()
         assert len(records) == 1
-        assert records[0]["ok"] is True
+        assert records[0]["request_id"] == "req_ok"
+
+    def test_provider_trace_fragment_does_not_clobber_cost_confidence(self, cost_log_dir: Path):
+        """A later provider-trace fragment carries default confidence=unknown, which is not
+        cost evidence and must not replace the cost fragment's provenance."""
+        cost_log_dir.mkdir(parents=True, exist_ok=True)
+        path = cost_log_dir / "2026-05_9999.jsonl"
+        with open(path, "w") as f:
+            f.write(
+                json.dumps(
+                    {
+                        "kind": "attempt",
+                        "downstream_event_id": "ds_one",
+                        "ts": "2026-05-07T10:00:00Z",
+                        "request_id": "req_one",
+                        "proxy_id": "p1",
+                        "cost_micros": 100,
+                        "reporter": "openrouter",
+                        "confidence": "reported",
+                    }
+                )
+                + "\n"
+            )
+            f.write(
+                json.dumps(
+                    {
+                        "kind": "attempt",
+                        "downstream_event_id": "ds_one",
+                        "ts": "2026-05-07T10:00:01Z",
+                        "request_id": "req_one",
+                        "proxy_id": "p1",
+                        "provider_generation_id": "gen_123",
+                        "confidence": "unknown",
+                    }
+                )
+                + "\n"
+            )
+
+        record = read_cost_logs()[0]
+        assert record["confidence"] == "reported"
+        assert record["request_id"] == "req_one"
 
 
 class TestForgeRunCorrelation:
@@ -337,6 +398,8 @@ class TestForgeRunCorrelation:
         shard = next(cost_log_dir.glob("*.jsonl"))
         with shard.open("a", encoding="utf-8") as f:
             corrupt = {
+                "kind": "attempt",
+                "downstream_event_id": "ds_bool",
                 "ts": "2099-01-01T00:00:00+00:00",
                 "forge_root_run_id": "run_A",
                 "forge_run_id": "run_a2",

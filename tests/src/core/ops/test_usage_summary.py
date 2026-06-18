@@ -212,6 +212,137 @@ class TestPolicyPlane:
         assert summary.policy.supervisor_warn == 0
         assert summary.policy.supervisor_deny == 1
 
+    def test_upstream_only_supervisor_fail_open_counts(self, tmp_path: Path) -> None:
+        from forge.core.telemetry.upstream import (
+            UpstreamOutcome,
+            write_upstream_outcome,
+        )
+
+        _write_manifest(tmp_path, "planner", decisions=[])
+        write_upstream_outcome(
+            UpstreamOutcome(
+                command="policy-check",
+                policy_id="semantic.supervisor",
+                session="planner",
+                status="fail_open",
+                reason_code="configuration_error",
+                message="Supervisor error: missing session, failing open",
+                ts="2026-06-03T12:00:00Z",
+            )
+        )
+
+        summary = build_session_activity_summary("planner", forge_root=str(tmp_path))
+
+        assert summary.policy is not None
+        assert summary.policy.supervisor_allow == 1
+        assert summary.policy.total_warnings == 1
+        assert summary.policy.recent_warnings == ["Supervisor error: missing session, failing open"]
+
+    def test_identical_upstream_fail_opens_count_each_occurrence(self, tmp_path: Path) -> None:
+        from forge.core.telemetry.upstream import (
+            UpstreamOutcome,
+            write_upstream_outcome,
+        )
+
+        warning = "Supervisor error: proxy unavailable, failing open"
+        _write_manifest(tmp_path, "planner", decisions=[])
+        for idx in range(3):
+            write_upstream_outcome(
+                UpstreamOutcome(
+                    command="policy-check",
+                    policy_id="semantic.supervisor",
+                    session="planner",
+                    status="fail_open",
+                    reason_code="proxy_not_found",
+                    message=warning,
+                    event_id=f"up_fail_open_{idx}",
+                    ts=f"2026-06-03T12:00:0{idx}Z",
+                )
+            )
+
+        summary = build_session_activity_summary("planner", forge_root=str(tmp_path))
+
+        assert summary.policy is not None
+        assert summary.policy.supervisor_allow == 3
+        assert summary.policy.total_warnings == 3
+
+    def test_upstream_duplicate_of_manifest_warning_is_not_double_counted(self, tmp_path: Path) -> None:
+        from forge.core.telemetry.upstream import (
+            UpstreamOutcome,
+            write_upstream_outcome,
+        )
+
+        warning = "Supervisor error: timed out, failing open"
+        _write_manifest(tmp_path, "planner", decisions=[_decision(supervisor="allow", warnings=[warning])])
+        write_upstream_outcome(
+            UpstreamOutcome(
+                command="policy-check",
+                policy_id="semantic.supervisor",
+                session="planner",
+                status="timeout",
+                reason_code="timeout",
+                message=warning,
+                ts="2026-06-03T12:00:00Z",
+            )
+        )
+
+        summary = build_session_activity_summary("planner", forge_root=str(tmp_path))
+
+        assert summary.policy is not None
+        assert summary.policy.supervisor_allow == 1
+        assert summary.policy.total_warnings == 1
+
+    def test_manifest_duplicate_suppression_preserves_upstream_siblings(self, tmp_path: Path) -> None:
+        from forge.core.telemetry.upstream import (
+            UpstreamOutcome,
+            write_upstream_outcome,
+        )
+
+        warning = "Supervisor error: timed out, failing open"
+        _write_manifest(tmp_path, "planner", decisions=[_decision(supervisor="allow", warnings=[warning])])
+        for idx in range(3):
+            write_upstream_outcome(
+                UpstreamOutcome(
+                    command="policy-check",
+                    policy_id="semantic.supervisor",
+                    session="planner",
+                    status="timeout",
+                    reason_code="timeout",
+                    message=warning,
+                    event_id=f"up_timeout_{idx}",
+                    ts=f"2026-06-03T12:00:0{idx}Z",
+                )
+            )
+
+        summary = build_session_activity_summary("planner", forge_root=str(tmp_path))
+
+        assert summary.policy is not None
+        assert summary.policy.supervisor_allow == 3
+        assert summary.policy.total_warnings == 3
+
+    def test_upstream_plan_check_needs_review_counts(self, tmp_path: Path) -> None:
+        from forge.core.telemetry.upstream import (
+            UpstreamOutcome,
+            write_upstream_outcome,
+        )
+
+        _write_manifest(tmp_path, "planner", decisions=[])
+        write_upstream_outcome(
+            UpstreamOutcome(
+                command="policy-check",
+                policy_id="semantic.plan_check",
+                session="planner",
+                status="needs_review",
+                reason_code="semantic.plan_check.uncertain",
+                ts="2026-06-03T12:00:00Z",
+            )
+        )
+
+        summary = build_session_activity_summary("planner", forge_root=str(tmp_path))
+
+        assert summary.policy is not None
+        assert summary.policy.plan_check_needs_review == 1
+
 
 class TestPlanCheckPlane:
     """Decision-log-derived cascade tier-1 counters (cached allows included)."""
@@ -998,6 +1129,110 @@ class TestReadSupervisorHealth:
         health = read_supervisor_health("planner")
         assert health.recent_failures == 1
         assert health.last_kind == "error"  # everything that is not failure_type="timeout"
+
+    def test_upstream_fail_open_without_usage_event_counts(self) -> None:
+        from forge.core.telemetry.upstream import (
+            UpstreamOutcome,
+            write_upstream_outcome,
+        )
+
+        write_upstream_outcome(
+            UpstreamOutcome(
+                command="policy-check",
+                policy_id="semantic.supervisor",
+                session="planner",
+                status="fail_open",
+                reason_code="proxy_not_found",
+                ts="2026-06-16T12:00:01Z",
+            )
+        )
+        health = read_supervisor_health("planner")
+        assert health.recent_failures == 1
+        assert health.last_kind == "error"
+        assert health.last_seen_at == "2026-06-16T12:00:01Z"
+
+    def test_upstream_skipped_counts_as_fail_open(self) -> None:
+        from forge.core.telemetry.upstream import (
+            UpstreamOutcome,
+            write_upstream_outcome,
+        )
+
+        write_upstream_outcome(
+            UpstreamOutcome(
+                command="policy-check",
+                policy_id="semantic.supervisor",
+                session="planner",
+                status="skipped",
+                reason_code="skipped",
+                ts="2026-06-16T12:00:01Z",
+            )
+        )
+
+        health = read_supervisor_health("planner")
+        assert health.recent_failures == 1
+        assert health.last_kind == "error"
+
+    def test_legacy_and_upstream_same_run_dedupes(self) -> None:
+        from forge.core.telemetry.upstream import (
+            UpstreamOutcome,
+            write_upstream_outcome,
+        )
+
+        log_usage_event(
+            _event(
+                status="timeout",
+                failure_type="timeout",
+                run_id="run_supervisor_child",
+                ts="2026-06-16T12:00:01Z",
+            )
+        )
+        write_upstream_outcome(
+            UpstreamOutcome(
+                command="policy-check",
+                policy_id="semantic.supervisor",
+                session="planner",
+                status="timeout",
+                reason_code="timeout",
+                run_id="run_supervisor_child",
+                ts="2026-06-16T12:00:02Z",
+            )
+        )
+
+        health = read_supervisor_health("planner")
+        assert health.recent_failures == 1
+        assert health.last_kind == "timeout"
+
+    def test_upstream_fail_open_wins_over_legacy_success_for_same_run(self) -> None:
+        from forge.core.telemetry.upstream import (
+            UpstreamOutcome,
+            write_upstream_outcome,
+        )
+
+        log_usage_event(
+            _event(
+                status="success",
+                run_id="run_parse_failure",
+                root_run_id="root_run",
+                ts="2026-06-16T12:00:01Z",
+            )
+        )
+        write_upstream_outcome(
+            UpstreamOutcome(
+                command="policy-check",
+                policy_id="semantic.supervisor",
+                session="planner",
+                status="fail_open",
+                reason_code="parse_failure",
+                run_id="run_parse_failure",
+                root_run_id="root_run",
+                ts="2026-06-16T12:00:01Z",
+            )
+        )
+
+        health = read_supervisor_health("planner")
+        assert health.recent_failures == 1
+        assert health.last_kind == "error"
+        assert health.last_seen_at == "2026-06-16T12:00:01Z"
 
     def test_excludes_shadow_command(self) -> None:
         for i in (1, 2):

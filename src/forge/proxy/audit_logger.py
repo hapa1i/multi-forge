@@ -6,8 +6,9 @@ and bodies before calling ``log_audit_record``, which performs no redaction and
 only appends. This makes the redaction-before-persistence ordering structural —
 no code path hands a raw body to the persistence function.
 
-Location: ``~/.forge/audit/requests/YYYY-MM_<pid>.jsonl`` (owner-only, 0600).
-Drift baseline: ``~/.forge/proxies/<proxy_id>/audit_state.json``.
+Location: ``~/.forge/telemetry/downstream/YYYY-MM_<pid>.jsonl`` (owner-only, 0600).
+Drift baseline: ``~/.forge/proxies/<proxy_id>/audit_state.json`` in host mode, or
+``~/.forge/telemetry/audit_state/<proxy_id>.json`` in proxy-id sidecars.
 """
 
 from __future__ import annotations
@@ -22,7 +23,13 @@ from pathlib import Path
 from typing import Any
 
 from forge.core.paths import get_forge_home
-from forge.core.state import decode_json_object
+from forge.core.telemetry.downstream import (
+    DownstreamKind,
+    DownstreamRecord,
+    mint_downstream_event_id,
+    read_downstream_records,
+    write_downstream_record,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -38,19 +45,6 @@ _drift_state_frozen: set[str] = set()
 
 # One-time warning latch for records written by a newer Forge.
 _warned_newer_schema = False
-
-
-def _pid_suffix() -> str:
-    return str(os.getpid())
-
-
-def _audit_dir() -> Path:
-    return get_forge_home() / "audit" / "requests"
-
-
-def _current_log_path() -> Path:
-    month = datetime.now(timezone.utc).strftime("%Y-%m")
-    return _audit_dir() / f"{month}_{_pid_suffix()}.jsonl"
 
 
 def _now_iso() -> str:
@@ -129,22 +123,31 @@ def log_audit_record(record: dict[str, Any]) -> None:
     record.setdefault("schema_version", AUDIT_SCHEMA_VERSION)
     record.setdefault("ts", _now_iso())
     try:
-        from forge.core.state import open_secure_append
-
-        log_path = _current_log_path()
-        log_path.parent.mkdir(parents=True, exist_ok=True)
-        # Owner-only on both the parent `audit/` and `audit/requests` so neither
-        # the records nor the file-name timestamps leak to other local users.
-        for secure_dir in (_audit_dir().parent, _audit_dir()):
-            try:
-                os.chmod(secure_dir, 0o700)
-            except OSError:
-                pass
-        with _lock:
-            with open_secure_append(log_path) as f:
-                f.write(json.dumps(record, separators=(",", ":"), default=str) + "\n")
+        record_type = str(record.get("record_type") or "request")
+        kind: DownstreamKind
+        if record_type == "drift":
+            kind = "drift"
+        elif record_type == "mutation":
+            kind = "mutation"
+        else:
+            kind = "audit"
+        request_id = record.get("request_id")
+        write_downstream_record(
+            DownstreamRecord(
+                kind=kind,
+                downstream_event_id=mint_downstream_event_id(
+                    event_key=f"{kind}:{request_id}:{record_type}:{record.get('dimension') or ''}",
+                ),
+                request_id=str(request_id) if request_id else None,
+                proxy_id=str(record.get("proxy_id")) if record.get("proxy_id") else None,
+                source_id=str(record.get("proxy_id")) if record.get("proxy_id") else None,
+                source_kind="proxy" if record.get("proxy_id") else None,
+                audit_record_type=record_type,
+                payload=record,
+            )
+        )
     except Exception as e:
-        logger.warning("Failed to write audit log: %s", e)
+        logger.warning("Failed to write audit telemetry: %s", e)
 
 
 def write_metadata_record(
@@ -257,14 +260,14 @@ def _audit_state_path(proxy_id: str) -> Path:
     """Path to the per-proxy drift baseline.
 
     Host mode keeps it beside proxy.yaml. In a proxy-id sidecar that per-proxy config
-    dir is mounted read-only, so redirect the baseline to the writable audit mount
-    (``~/.forge/audit/state/<id>.json``) — otherwise every restart loses the baseline
+    dir is mounted read-only, so redirect the baseline to the writable telemetry mount
+    (``~/.forge/telemetry/audit_state/<id>.json``) — otherwise every restart loses the baseline
     and re-flags the first prompt as drift. Gated on FORGE_PROXY_ID too: template-only
     sidecars set FORGE_SIDECAR but mount no audit/ dir, so the redirect target would
     not exist for them.
     """
     if os.environ.get("FORGE_SIDECAR") and os.environ.get("FORGE_PROXY_ID"):
-        return get_forge_home() / "audit" / "state" / f"{proxy_id}.json"
+        return get_forge_home() / "telemetry" / "audit_state" / f"{proxy_id}.json"
     return get_forge_home() / "proxies" / proxy_id / "audit_state.json"
 
 
@@ -372,53 +375,18 @@ def read_audit_logs(
     Skips malformed lines and records written by a newer Forge (schema_version >
     AUDIT_SCHEMA_VERSION), surfacing the latter once at warning level.
     """
-    audit_dir = _audit_dir()
-    if not audit_dir.is_dir():
-        return []
-
-    global _warned_newer_schema
     records: list[dict[str, Any]] = []
-    for path in sorted(audit_dir.glob("*.jsonl")):
-        try:
-            with open(path) as f:
-                for line in f:
-                    record = decode_json_object(line)
-                    if record is None:
-                        continue
-
-                    ver = record.get("schema_version")
-                    if isinstance(ver, int) and ver > AUDIT_SCHEMA_VERSION:
-                        if not _warned_newer_schema:
-                            logger.warning(
-                                "Skipping audit records written by a newer Forge (schema_version=%s); upgrade Forge",
-                                ver,
-                            )
-                            _warned_newer_schema = True
-                        continue
-
-                    if proxy_id and record.get("proxy_id") != proxy_id:
-                        continue
-                    if record_type and record.get("record_type") != record_type:
-                        continue
-                    if request_id and record.get("request_id") != request_id:
-                        continue
-
-                    if period_start or period_end:
-                        ts_str = record.get("ts", "")
-                        try:
-                            ts = datetime.fromisoformat(ts_str.rstrip("Z").removesuffix("+00:00") + "+00:00")
-                        except (ValueError, TypeError):
-                            continue
-                        if period_start and ts < period_start:
-                            continue
-                        if period_end and ts >= period_end:
-                            continue
-
-                    records.append(record)
-        except OSError as e:
-            logger.warning("Failed to read audit log %s: %s", path, e)
-
-    records.sort(key=lambda r: r.get("ts", ""))
+    for rec in read_downstream_records(period_start, period_end, request_id=request_id, proxy_id=proxy_id):
+        if rec.kind not in {"audit", "drift", "mutation"}:
+            continue
+        payload = dict(rec.payload or {})
+        if not payload:
+            continue
+        if record_type and payload.get("record_type") != record_type:
+            continue
+        payload.setdefault("schema_version", AUDIT_SCHEMA_VERSION)
+        payload.setdefault("ts", rec.ts)
+        records.append(payload)
     return records
 
 
@@ -428,6 +396,6 @@ def read_audit_logs(
 def prune_audit_logs(*, retention_days: int, max_total_mb: int) -> None:
     """Delete audit shards older than retention_days, then prune oldest-first over
     max_total_mb. Best-effort: errors are ignored (telemetry, not critical path)."""
-    from forge.proxy.retention import prune_jsonl_shards
+    from forge.core.telemetry.downstream import prune_downstream_records
 
-    prune_jsonl_shards(_audit_dir(), retention_days=retention_days, max_total_mb=max_total_mb)
+    prune_downstream_records(retention_days=retention_days, max_total_mb=max_total_mb)

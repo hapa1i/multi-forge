@@ -436,6 +436,7 @@ def run_plan_check(
             cost_request_id=request_id,
             latency_ms=latency_ms,
             session=context.session_name,
+            provider_meta=response.provider_meta,
         )
 
         return verdict

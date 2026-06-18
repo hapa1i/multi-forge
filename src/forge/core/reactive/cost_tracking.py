@@ -2,7 +2,9 @@
 
 Wraps subprocess invocations (panel, supervisor, memory-writer, etc.) to
 measure cost by snapshotting proxy metrics before and after execution.
-Results are logged to PID-sharded verb JSONL files.
+Results populate the yielded holder for usage attribution. The historical
+``~/.forge/costs/verbs`` writer is retired; downstream request records joined by
+run-tree identity now back the proxy spend surface.
 
 All verb costs are marked ``estimated`` because concurrent proxy traffic
 (e.g., the main interactive session) may share the same proxy during
@@ -18,8 +20,8 @@ import threading
 import time
 import urllib.request
 from contextlib import contextmanager
-from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -115,34 +117,8 @@ def _verb_log_dir() -> Path:
 
 
 def _log_verb_cost(result: VerbCostResult) -> None:
-    """Append a verb cost record to the PID-sharded JSONL log."""
-    record: dict[str, Any] = {
-        "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "verb": result.verb,
-        "total_cost_micros": result.total_cost_micros,
-        "estimated": result.estimated,
-        "cost_measured": result.cost_measured,
-        "input_tokens": result.input_tokens,
-        "output_tokens": result.output_tokens,
-        "cached_tokens": result.cached_tokens,
-        "request_count": result.request_count,
-        "duration_ms": round(result.duration_ms, 1),
-        "per_proxy": [asdict(p) for p in result.per_proxy],
-    }
-
-    try:
-        from forge.core.state import open_secure_append
-
-        log_dir = _verb_log_dir()
-        log_dir.mkdir(parents=True, exist_ok=True)
-        month = datetime.now(timezone.utc).strftime("%Y-%m")
-        path = log_dir / f"{month}_{os.getpid()}.jsonl"
-
-        with _verb_lock:
-            with open_secure_append(path) as f:
-                f.write(json.dumps(record, separators=(",", ":")) + "\n")
-    except Exception as e:
-        logger.warning("Failed to write verb cost log: %s", e)
+    """Retired durable writer; the holder remains the live attribution contract."""
+    logger.debug("legacy verb cost log skipped for %s", result.verb)
 
 
 def resolve_subprocess_proxy_url() -> str | None:

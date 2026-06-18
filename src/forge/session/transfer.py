@@ -665,6 +665,7 @@ class _CurationCall:
     model_used: str
     usage: dict[str, int] | None
     latency_ms: float
+    provider_meta: Any | None = None
 
 
 def _call_llm_for_curation(transcript_text: str) -> _CurationCall:
@@ -718,6 +719,7 @@ def _call_llm_for_curation(transcript_text: str) -> _CurationCall:
         model_used=f"{AI_CURATION_MODEL} via {AI_CURATION_PROVIDER}",
         usage=response.usage,
         latency_ms=latency_ms,
+        provider_meta=getattr(response, "provider_meta", None),
     )
 
 
@@ -748,6 +750,7 @@ def _emit_curation_usage(call: _CurationCall) -> None:
         latency_ms=call.latency_ms,
         session=os.environ.get("FORGE_SESSION"),
         runtime="forge_cli",
+        provider_meta=call.provider_meta,
     )
 
 

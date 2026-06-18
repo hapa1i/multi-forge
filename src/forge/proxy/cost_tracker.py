@@ -19,11 +19,19 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from forge.core.state import decode_json_object
+from forge.core.telemetry.caps import (
+    CapState,
+    cap_state_path,
+    load_cap_state,
+    write_cap_state,
+)
 
 logger = logging.getLogger(__name__)
 
 _MICROS_PER_DOLLAR = 1_000_000
 _24H_SECONDS = 86400
+_CAP_STATE_PERSIST_EVERY_RECORDS = 10
+_CAP_STATE_PERSIST_INTERVAL_SECONDS = 5.0
 
 
 @dataclass
@@ -34,6 +42,15 @@ class CapResult:
     cap_type: str | None = None  # "daily" or "monthly"
     current_micros: int = 0
     limit_micros: int = 0
+
+
+@dataclass(frozen=True)
+class _ParsedCostRecord:
+    ts_unix: float
+    cost_micros: int
+    month_key: str
+    proxy_id: str | None
+    downstream_event_id: str | None = None
 
 
 class CostTracker:
@@ -57,12 +74,21 @@ class CostTracker:
         self._daily_window: deque[tuple[float, int]] = deque()
         self._monthly_total: int = 0
         self._monthly_key: str = ""
+        self._proxy_id: str | None = None
+        self._dirty_cap_records: int = 0
+        self._last_cap_persisted_at: float = 0.0
 
     @property
     def has_caps(self) -> bool:
         return self.daily_cap_micros is not None or self.monthly_cap_micros is not None
 
-    def bootstrap_from_logs(self, log_dir: Path, *, proxy_id: str | None = None) -> None:
+    def bootstrap_from_logs(
+        self,
+        log_dir: Path,
+        *,
+        proxy_id: str | None = None,
+        legacy_log_dir: Path | None = None,
+    ) -> None:
         """Read existing cost logs to initialize spend counters.
 
         Reads current month + previous month (for rolling 24h window
@@ -72,9 +98,7 @@ class CostTracker:
         Records without a proxy_id field are skipped (pre-proxy-id logs).
         When proxy_id is None, all records are counted (backward compat).
         """
-        if not log_dir.is_dir():
-            return
-
+        self._proxy_id = proxy_id
         now = datetime.now(timezone.utc)
         current_month = now.strftime("%Y-%m")
         self._monthly_key = current_month
@@ -85,8 +109,14 @@ class CostTracker:
             prev_month = f"{now.year}-{now.month - 1:02d}"
 
         cutoff = time.time() - _24H_SECONDS
+        unkeyed_log_records: list[_ParsedCostRecord] = []
+        keyed_log_records: dict[str, _ParsedCostRecord] = {}
 
-        for path in sorted(log_dir.glob("*.jsonl")):
+        paths = list(sorted(log_dir.glob("*.jsonl"))) if log_dir.is_dir() else []
+        if legacy_log_dir is not None and legacy_log_dir.is_dir():
+            paths.extend(sorted(legacy_log_dir.glob("*.jsonl")))
+
+        for path in paths:
             fname = path.stem  # e.g., "2026-05_12345"
             file_month = fname.split("_")[0] if "_" in fname else fname
 
@@ -106,18 +136,50 @@ class CostTracker:
                         if record is None:
                             continue
 
-                        ts_unix, cost_micros, record_month, record_proxy_id = record
-
-                        if proxy_id is not None and record_proxy_id != proxy_id:
+                        if proxy_id is not None and record.proxy_id != proxy_id:
                             continue
 
-                        if record_month == current_month:
-                            self._monthly_total += cost_micros
-
-                        if ts_unix >= cutoff:
-                            self._daily_window.append((ts_unix, cost_micros))
+                        if record.downstream_event_id:
+                            keyed_log_records[record.downstream_event_id] = record
+                        else:
+                            unkeyed_log_records.append(record)
             except OSError as e:
                 logger.warning("Failed to read cost log %s: %s", path, e)
+
+        log_daily_window: deque[tuple[float, int]] = deque()
+        log_monthly_total = 0
+        for record in [*unkeyed_log_records, *keyed_log_records.values()]:
+            if record.month_key == current_month:
+                log_monthly_total += record.cost_micros
+            if record.ts_unix >= cutoff:
+                log_daily_window.append((record.ts_unix, record.cost_micros))
+
+        state = None
+        if proxy_id:
+            try:
+                state = load_cap_state(proxy_id)
+            except Exception as e:
+                logger.warning(
+                    "Ignoring unreadable spend-cap state at %s; will be rebuilt from cost logs on startup: %s",
+                    cap_state_path(proxy_id),
+                    e,
+                )
+        state_daily_window: deque[tuple[float, int]] = deque()
+        state_monthly_total = 0
+        if state:
+            if state.monthly_key == current_month:
+                state_monthly_total = state.monthly_total_micros
+            for ts, cost in state.daily_window:
+                if ts >= cutoff:
+                    state_daily_window.append((ts, cost))
+
+        log_daily_total = sum(c for _, c in log_daily_window)
+        state_daily_total = sum(c for _, c in state_daily_window)
+        self._monthly_total = max(log_monthly_total, state_monthly_total)
+        self._daily_window = state_daily_window if state_daily_total > log_daily_total else log_daily_window
+
+        if proxy_id:
+            self._persist_cap_state()
 
         daily_total = sum(c for _, c in self._daily_window)
         logger.info(
@@ -128,8 +190,8 @@ class CostTracker:
         )
 
     @staticmethod
-    def _parse_record(line: str) -> tuple[float, int, str, str | None] | None:
-        """Parse a JSONL line into (unix_timestamp, cost_micros, month_key, record_proxy_id)."""
+    def _parse_record(line: str) -> _ParsedCostRecord | None:
+        """Parse a JSONL line into one cost-bearing record, or ``None`` when it has no cost."""
         # Skip blank / malformed / non-object lines (`[]`, `1`): return None rather than let
         # `.get` raise AttributeError (bootstrap's broad except would otherwise mask it).
         data = decode_json_object(line)
@@ -153,7 +215,48 @@ class CostTracker:
 
         month_key = ts.strftime("%Y-%m")
         record_proxy_id = data.get("proxy_id")
-        return ts.timestamp(), cost_micros, month_key, record_proxy_id
+        event_id = data.get("downstream_event_id")
+        return _ParsedCostRecord(
+            ts_unix=ts.timestamp(),
+            cost_micros=cost_micros,
+            month_key=month_key,
+            proxy_id=record_proxy_id if isinstance(record_proxy_id, str) else None,
+            downstream_event_id=event_id if isinstance(event_id, str) and event_id else None,
+        )
+
+    def _persist_cap_state(self) -> None:
+        if not self._proxy_id:
+            return
+        try:
+            self._prune_daily_window()
+            write_cap_state(
+                CapState(
+                    proxy_id=self._proxy_id,
+                    monthly_key=self._monthly_key,
+                    monthly_total_micros=self._monthly_total,
+                    daily_window=list(self._daily_window),
+                )
+            )
+            self._dirty_cap_records = 0
+            self._last_cap_persisted_at = time.monotonic()
+        except Exception as e:
+            logger.warning("Failed to persist spend-cap state for %s: %s", self._proxy_id, e)
+
+    def _maybe_persist_cap_state(self) -> None:
+        if not self._proxy_id:
+            return
+        self._dirty_cap_records += 1
+        elapsed = time.monotonic() - self._last_cap_persisted_at
+        if (
+            self._dirty_cap_records >= _CAP_STATE_PERSIST_EVERY_RECORDS
+            or elapsed >= _CAP_STATE_PERSIST_INTERVAL_SECONDS
+        ):
+            self._persist_cap_state()
+
+    def flush_cap_state(self) -> None:
+        """Persist any throttled spend-cap snapshot before process shutdown."""
+        if self._dirty_cap_records > 0:
+            self._persist_cap_state()
 
     def record(self, cost_micros: int | None) -> None:
         """Record a completed request's cost.
@@ -170,6 +273,7 @@ class CostTracker:
 
         self._monthly_total += cost_micros
         self._daily_window.append((now, cost_micros))
+        self._maybe_persist_cap_state()
 
     def _roll_month_if_needed(self) -> None:
         """Reset the calendar-month accumulator when UTC month changes."""

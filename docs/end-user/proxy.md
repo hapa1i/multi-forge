@@ -440,8 +440,9 @@ curl http://localhost:8085/ | jq .metrics
 
 ## Cost tracking and spend caps
 
-Proxy request costs are logged to `~/.forge/costs/requests/` as JSONL. Forge subprocess verb costs are logged to
-`~/.forge/costs/verbs/` as best-effort attribution records.
+Proxy request costs are logged as downstream telemetry under `~/.forge/telemetry/downstream/`. Legacy
+`~/.forge/costs/requests/` and `~/.forge/costs/verbs/` files may exist from older installs; new request spend writes to
+downstream records, and the by-verb view joins those records to run ids instead of writing new verb snapshot files.
 
 ```bash
 forge proxy costs show                    # Today's costs, by verb
@@ -453,11 +454,11 @@ forge proxy costs reset                   # Wipe ALL cost + usage telemetry to z
 forge proxy costs reset --dry-run         # Preview what would be removed, delete nothing
 ```
 
-`forge proxy costs reset` deletes the request cost logs, verb cost logs, **and** the usage-attribution ledger
-(`forge activity`/`forge +$Y` data) under `~/.forge/`. It also clears the derived status-line cost cache so the
-`forge +$Y` segment recomputes from the now-empty ledger instead of replaying a cached value. Audit records are a
-separate plane and are left untouched. It is irreversible (confirm prompt unless `--yes`). A running proxy keeps its
-cost totals **and** cap counters in memory until restarted — so a live proxy's cumulative-cost header, snapshot, and
+`forge proxy costs reset` deletes legacy cost logs, downstream/upstream telemetry shards, spend-cap snapshots, sidecar
+audit drift state, **and** the usage-attribution ledger (`forge activity`/`forge +$Y` data) under `~/.forge/`. It also
+clears the derived status-line cost and supervisor-health caches so status-line segments recompute from the now-empty
+telemetry instead of replaying cached values. It is irreversible (confirm prompt unless `--yes`). A running proxy keeps
+its cost totals **and** cap counters in memory until restarted — so a live proxy's cumulative-cost header, snapshot, and
 `forge proxy costs show` figures do not zero until you restart it (`forge proxy stop <id>` then
 `forge proxy start <id>`).
 
@@ -500,8 +501,11 @@ lets the request continue and returns `X-Spend-Warning`.
 > telling you to.
 
 Cap enforcement is process-local and best-effort. For reliable cap enforcement, run a single proxy process per proxy ID.
-Cost logs accumulate in `~/.forge/costs/` — safely delete old JSONL files to reclaim space; the proxy re-bootstraps from
-remaining logs at next startup.
+Telemetry logs accumulate in `~/.forge/telemetry/` (with legacy cost logs under `~/.forge/costs/` from older installs).
+The proxy re-bootstraps from downstream/legacy cost logs plus `~/.forge/telemetry/caps/<proxy_id>.json` at next startup.
+That cap-state snapshot is deliberate: a path migration or dropped best-effort JSONL write must not silently reset a
+monthly cap to `$0`. Snapshot writes are coalesced by request count/time and flushed on graceful proxy shutdown; the
+live proxy's in-memory counters remain authoritative between flushes.
 
 ### Budget planning
 
@@ -549,13 +553,14 @@ curl -s localhost:<port>/ | jq '.intercept_mode, .wire_shape'   # preflight: is 
 `%proxy audit show` / `%proxy audit diff` are the read-only in-session equivalents (type them in Claude Code).
 
 Audit records are **redacted before they are written** — metadata records hold hashes/lengths/counts only, never prompt
-or response text. Records live at `~/.forge/audit/requests/*.jsonl` (owner-only). Retention is enforced at proxy startup
-via `audit.retention_days` and `audit.max_total_mb`.
+or response text. Records live in downstream telemetry at `~/.forge/telemetry/downstream/*.jsonl` (owner-only).
+Retention is enforced at proxy startup via `audit.retention_days` and `audit.max_total_mb`; current-calendar-month
+downstream shards are preserved because the same files also carry active-month spend evidence for cap bootstrap.
 
 ⚠︎ **`audit_full_body` is a higher-risk opt-in.** It additionally captures **redacted** bodies (roles, block types,
-per-block lengths — still never plaintext) at `~/.forge/audit/`: the request body on every path, and the response body
-only for non-streaming passthrough today (streaming and the translated path don't capture response bodies yet). Forge
-prints a privacy warning when you enable it:
+per-block lengths — still never plaintext) in downstream telemetry: the request body on every path, and the response
+body only for non-streaming passthrough today (streaming and the translated path don't capture response bodies yet).
+Forge prints a privacy warning when you enable it:
 
 ```bash
 forge proxy set audit-test audit.audit_full_body=true
@@ -608,14 +613,13 @@ configured block.
 
 ## Provider trace (request lifecycle diagnostics)
 
-A fourth, local, **metadata-only** telemetry plane (alongside cost, audit, and usage) answers one question after a
-timeout: *what happened to this OpenRouter request?* It was born from an incident -- a supervised fork's checks timed
-out before the final streaming usage chunk and left no trace locally or in OpenRouter's dashboard.
+Provider lifecycle metadata answers one question after a timeout: *what happened to this OpenRouter request?* It was
+born from an incident -- a supervised fork's checks timed out before the final streaming usage chunk and left no trace
+locally or in OpenRouter's dashboard.
 
-Records live owner-only under `~/.forge/providers/openrouter/traces/` and carry **no** prompt, completion, tool output,
-or request body -- only lifecycle/correlation evidence (request id, proxy, model, provider generation id, stream flags,
-disconnect, and whether local cost was seen). Direct-OpenRouter only; not wiped by `forge proxy costs reset`
-(diagnostics, not spend truth); retained 14 days / 512 MB.
+Records live inside owner-only downstream telemetry under `~/.forge/telemetry/downstream/` and carry **no** prompt,
+completion, tool output, or request body -- only lifecycle/correlation evidence (request id, proxy, model, provider
+generation id, stream flags, disconnect, and whether local cost was seen). Direct-OpenRouter only.
 
 ```bash
 # Recent traces (today by default; --period today|week|month|all)

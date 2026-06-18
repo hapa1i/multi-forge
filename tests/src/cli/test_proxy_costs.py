@@ -9,11 +9,23 @@ from click.testing import CliRunner
 
 from forge.cli.proxy_costs import (
     _format_usd,
-    _scope_verb_records_to_proxy,
     _verb_cost_reported,
     costs_group,
 )
 from forge.core.paths import get_forge_home
+from forge.core.usage.ledger import UsageEvent, log_usage_event
+
+
+def _usage_event(run_id: str, command: str) -> None:
+    log_usage_event(
+        UsageEvent(
+            run_id=run_id,
+            root_run_id=run_id,
+            runtime="claude_code",
+            command=command,
+            status="success",
+        )
+    )
 
 
 class TestFormatUsd:
@@ -36,69 +48,25 @@ class TestFormatUsd:
         assert _format_usd(0) == "$0.00"
 
 
-def test_scope_verb_records_to_proxy_slices_multi_proxy_record() -> None:
-    records = [
-        {
-            "verb": "panel",
-            "total_cost_micros": 125_000,
-            "input_tokens": 12_000,
-            "output_tokens": 4_500,
-            "cached_tokens": 2_000,
-            "request_count": 3,
-            "per_proxy": [
-                {
-                    "base_url": "http://localhost:8084",
-                    "cost_micros": 80_000,
-                    "input_tokens": 8_000,
-                    "output_tokens": 3_000,
-                    "cached_tokens": 1_200,
-                    "request_count": 2,
-                },
-                {
-                    "base_url": "http://localhost:8085",
-                    "cost_micros": 45_000,
-                    "input_tokens": 4_000,
-                    "output_tokens": 1_500,
-                    "cached_tokens": 800,
-                    "request_count": 1,
-                },
-            ],
-        },
-        {
-            "verb": "supervisor",
-            "total_cost_micros": 10_000,
-            "request_count": 1,
-            "per_proxy": [
-                {
-                    "base_url": "http://localhost:8085",
-                    "cost_micros": 10_000,
-                    "request_count": 1,
-                }
-            ],
-        },
-    ]
-
-    scoped = _scope_verb_records_to_proxy(records, "http://localhost:8084/")
-
-    assert len(scoped) == 1
-    assert scoped[0]["verb"] == "panel"
-    assert scoped[0]["total_cost_micros"] == 80_000
-    assert scoped[0]["input_tokens"] == 8_000
-    assert scoped[0]["output_tokens"] == 3_000
-    assert scoped[0]["cached_tokens"] == 1_200
-    assert scoped[0]["request_count"] == 2
-    assert len(scoped[0]["per_proxy"]) == 1
-    assert scoped[0]["per_proxy"][0]["base_url"] == "http://localhost:8084"
-
-
 def test_costs_json_filters_verb_records_by_proxy(monkeypatch) -> None:
+    _usage_event("run_panel", "panel")
+    _usage_event("run_supervisor", "supervisor")
     request_records = [
         {
             "proxy_id": "openrouter",
             "model": "anthropic/claude-sonnet-4.6",
-            "cost_micros": 100_000,
+            "cost_micros": 80_000,
             "input_tokens": 1_000,
             "output_tokens": 500,
+            "forge_run_id": "run_panel",
+        },
+        {
+            "proxy_id": "openrouter",
+            "model": "anthropic/claude-sonnet-4.6",
+            "cost_micros": 20_000,
+            "input_tokens": 1_000,
+            "output_tokens": 500,
+            "forge_run_id": None,
         },
         {
             "proxy_id": "litellm-gemini",
@@ -106,48 +74,11 @@ def test_costs_json_filters_verb_records_by_proxy(monkeypatch) -> None:
             "cost_micros": 40_000,
             "input_tokens": 800,
             "output_tokens": 200,
-        },
-    ]
-    verb_records = [
-        {
-            "verb": "panel",
-            "total_cost_micros": 120_000,
-            "cost_measured": True,
-            "request_count": 3,
-            "per_proxy": [
-                {
-                    "base_url": "http://localhost:8084",
-                    "cost_micros": 80_000,
-                    "request_count": 2,
-                    "reported_request_count": 2,
-                },
-                {
-                    "base_url": "http://localhost:8085",
-                    "cost_micros": 40_000,
-                    "request_count": 1,
-                    "reported_request_count": 1,
-                },
-            ],
-        },
-        {
-            "verb": "supervisor",
-            "total_cost_micros": 40_000,
-            "cost_measured": True,
-            "request_count": 1,
-            "per_proxy": [
-                {
-                    "base_url": "http://localhost:8085",
-                    "cost_micros": 40_000,
-                    "request_count": 1,
-                    "reported_request_count": 1,
-                },
-            ],
+            "forge_run_id": "run_supervisor",
         },
     ]
 
     monkeypatch.setattr("forge.proxy.cost_logger.read_cost_logs", lambda *args, **kwargs: request_records)
-    monkeypatch.setattr("forge.core.reactive.cost_tracking.read_verb_logs", lambda *args, **kwargs: verb_records)
-    monkeypatch.setattr("forge.core.reactive.proxy.lookup_proxy_base_url", lambda proxy_id: "http://localhost:8084")
 
     result = CliRunner().invoke(costs_group, ["show", "openrouter", "--json"])
 
@@ -157,7 +88,7 @@ def test_costs_json_filters_verb_records_by_proxy(monkeypatch) -> None:
     assert data["interactive_cost_micros"] == 20_000
     assert set(data["by_verb"]) == {"panel"}
     assert data["by_verb"]["panel"]["cost_micros"] == 80_000
-    assert data["by_verb"]["panel"]["request_count"] == 2
+    assert data["by_verb"]["panel"]["request_count"] == 1
     assert set(data["by_model"]) == {"anthropic/claude-sonnet-4.6"}
 
 
@@ -256,16 +187,15 @@ def test_costs_json_verb_evidence_flag_gates_reported(monkeypatch) -> None:
     Reproduces the reported regression: numeric total_cost_micros (including 0)
     was treated as reported. The evidence flag must gate `reported`.
     """
-    verb_records = [
-        # Passthrough window: tokens advanced, but no reported-cost request.
-        {"verb": "passthrough", "total_cost_micros": 0, "cost_measured": False, "request_count": 2},
-        # Reported window with a genuine $0 (free model): still reported.
-        {"verb": "freebie", "total_cost_micros": 0, "cost_measured": True, "request_count": 1},
-        # Reported window with real cost.
-        {"verb": "panel", "total_cost_micros": 15_000, "cost_measured": True, "request_count": 3},
+    _usage_event("run_passthrough", "passthrough")
+    _usage_event("run_freebie", "freebie")
+    _usage_event("run_panel", "panel")
+    request_records = [
+        {"model": "m", "cost_micros": None, "forge_run_id": "run_passthrough"},
+        {"model": "m", "cost_micros": 0, "forge_run_id": "run_freebie"},
+        {"model": "m", "cost_micros": 15_000, "forge_run_id": "run_panel"},
     ]
-    monkeypatch.setattr("forge.proxy.cost_logger.read_cost_logs", lambda *a, **k: [])
-    monkeypatch.setattr("forge.core.reactive.cost_tracking.read_verb_logs", lambda *a, **k: verb_records)
+    monkeypatch.setattr("forge.proxy.cost_logger.read_cost_logs", lambda *a, **k: request_records)
 
     result = CliRunner().invoke(costs_group, ["show", "--json"])
 
@@ -280,82 +210,15 @@ def test_costs_json_verb_evidence_flag_gates_reported(monkeypatch) -> None:
 
 def test_costs_human_verb_evidence_flag_renders_unavailable(monkeypatch) -> None:
     """Human view shows 'unavailable' for a cost_measured=False verb, not $0.00."""
-    verb_records = [
-        {"verb": "passthrough", "total_cost_micros": 0, "cost_measured": False, "request_count": 2},
-    ]
-    monkeypatch.setattr("forge.proxy.cost_logger.read_cost_logs", lambda *a, **k: [])
-    monkeypatch.setattr("forge.core.reactive.cost_tracking.read_verb_logs", lambda *a, **k: verb_records)
+    _usage_event("run_passthrough", "passthrough")
+    request_records = [{"model": "m", "cost_micros": None, "forge_run_id": "run_passthrough"}]
+    monkeypatch.setattr("forge.proxy.cost_logger.read_cost_logs", lambda *a, **k: request_records)
 
     result = CliRunner().invoke(costs_group, ["show", "--by-verb"])
 
     assert result.exit_code == 0, result.output
     # The verb row reads 'unavailable'; it must not be rendered as a measured $0.00.
     assert "unavailable" in result.output
-
-
-def test_scope_verb_recomputes_cost_measured_from_reported_counter() -> None:
-    """Scoping re-derives cost_measured from the matching per_proxy subset.
-
-    The unscoped flag covers all proxies; a single-proxy view may have no
-    reported-cost request even when the whole-window flag is true.
-    """
-    records = [
-        {
-            "verb": "panel",
-            "total_cost_micros": 80_000,
-            "cost_measured": True,  # true across BOTH proxies
-            "request_count": 3,
-            "per_proxy": [
-                {
-                    "base_url": "http://localhost:8084",
-                    "cost_micros": 80_000,
-                    "request_count": 2,
-                    "reported_request_count": 2,
-                },
-                {
-                    # Passthrough proxy: tokens but no reported cost.
-                    "base_url": "http://localhost:8085",
-                    "cost_micros": 0,
-                    "request_count": 1,
-                    "reported_request_count": 0,
-                },
-            ],
-        }
-    ]
-
-    # Scope to the reporting proxy → still measured.
-    reporting = _scope_verb_records_to_proxy(records, "http://localhost:8084")
-    assert reporting[0]["cost_measured"] is True
-
-    # Scope to the passthrough proxy → no reported cost in this view.
-    passthrough = _scope_verb_records_to_proxy(records, "http://localhost:8085")
-    assert passthrough[0]["cost_measured"] is False
-    assert _verb_cost_reported(passthrough[0]) is False
-
-
-def test_scope_verb_legacy_per_proxy_is_unavailable() -> None:
-    """Legacy per_proxy (no reported_request_count) reads as cost-unavailable.
-
-    Without the evidence counter we can't prove the scoped subset had a reported
-    cost, so cost_measured is set False -- the legacy total (a now-deleted catalog
-    estimate) is never resurrected as route-reported cost.
-    """
-    records = [
-        {
-            "verb": "panel",
-            "total_cost_micros": 80_000,
-            "cost_measured": True,
-            "request_count": 2,
-            "per_proxy": [
-                {"base_url": "http://localhost:8084", "cost_micros": 80_000, "request_count": 2},
-            ],
-        }
-    ]
-
-    scoped = _scope_verb_records_to_proxy(records, "http://localhost:8084")
-
-    assert scoped[0]["cost_measured"] is False
-    assert _verb_cost_reported(scoped[0]) is False
 
 
 class TestCostsReset:

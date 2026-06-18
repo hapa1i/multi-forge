@@ -9,6 +9,12 @@ from pathlib import Path
 
 import pytest
 
+from forge.core.telemetry.caps import (
+    CapState,
+    cap_state_path,
+    load_cap_state,
+    write_cap_state,
+)
 from forge.proxy.cost_tracker import CostTracker
 
 
@@ -234,6 +240,142 @@ class TestBootstrap:
         t = CostTracker(daily_cap_usd=10.0)
         t.bootstrap_from_logs(log_dir, proxy_id="proxy-a")
         assert t.daily_spend_micros() == 100_000
+
+    def test_bootstrap_dedupes_downstream_event_id(self, tmp_path: Path):
+        log_dir = tmp_path / "telemetry" / "downstream"
+        log_dir.mkdir(parents=True)
+
+        now = datetime.now(timezone.utc)
+        month = now.strftime("%Y-%m")
+        ts = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+        path = log_dir / f"{month}_9999.jsonl"
+        with open(path, "w") as f:
+            for _ in range(2):
+                f.write(
+                    json.dumps(
+                        {
+                            "schema_version": 1,
+                            "kind": "attempt",
+                            "downstream_event_id": "ds_same_attempt",
+                            "ts": ts,
+                            "cost_micros": 100_000,
+                            "proxy_id": "proxy-a",
+                        }
+                    )
+                    + "\n"
+                )
+
+        t = CostTracker(daily_cap_usd=10.0, monthly_cap_usd=100.0)
+        t.bootstrap_from_logs(log_dir, proxy_id="proxy-a")
+
+        assert t.daily_spend_micros() == 100_000
+        assert t.monthly_spend_micros() == 100_000
+
+    def test_corrupt_cap_state_falls_back_to_logs(self, tmp_path: Path, caplog: pytest.LogCaptureFixture):
+        log_dir = tmp_path / "telemetry" / "downstream"
+        log_dir.mkdir(parents=True)
+
+        now = datetime.now(timezone.utc)
+        month = now.strftime("%Y-%m")
+        ts = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+        path = log_dir / f"{month}_9999.jsonl"
+        with open(path, "w") as f:
+            f.write(json.dumps({"ts": ts, "cost_micros": 300_000, "proxy_id": "proxy-a"}) + "\n")
+
+        snapshot = cap_state_path("proxy-a")
+        snapshot.parent.mkdir(parents=True)
+        snapshot.write_text("{not json")
+
+        t = CostTracker(daily_cap_usd=10.0, monthly_cap_usd=100.0)
+        with caplog.at_level("WARNING"):
+            t.bootstrap_from_logs(log_dir, proxy_id="proxy-a")
+
+        assert t.daily_spend_micros() == 300_000
+        assert t.monthly_spend_micros() == 300_000
+        assert any("Ignoring unreadable spend-cap state" in message for message in caplog.messages)
+        assert any("will be rebuilt from cost logs on startup" in message for message in caplog.messages)
+
+    def test_snapshot_and_logs_reconcile_by_max_not_sum(self, tmp_path: Path):
+        log_dir = tmp_path / "telemetry" / "downstream"
+        log_dir.mkdir(parents=True)
+
+        now = datetime.now(timezone.utc)
+        month = now.strftime("%Y-%m")
+        ts = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+        path = log_dir / f"{month}_9999.jsonl"
+        with open(path, "w") as f:
+            f.write(json.dumps({"ts": ts, "cost_micros": 500_000, "proxy_id": "proxy-a"}) + "\n")
+
+        write_cap_state(
+            CapState(
+                proxy_id="proxy-a",
+                monthly_key=month,
+                monthly_total_micros=500_000,
+                daily_window=[(time.time(), 500_000)],
+            )
+        )
+
+        t = CostTracker(daily_cap_usd=10.0, monthly_cap_usd=100.0)
+        t.bootstrap_from_logs(log_dir, proxy_id="proxy-a")
+
+        assert t.daily_spend_micros() == 500_000
+        assert t.monthly_spend_micros() == 500_000
+
+    def test_legacy_current_month_import_prevents_clean_cut_reset(self, tmp_path: Path):
+        downstream_dir = tmp_path / "telemetry" / "downstream"
+        legacy_dir = tmp_path / "costs" / "requests"
+        downstream_dir.mkdir(parents=True)
+        legacy_dir.mkdir(parents=True)
+
+        now = datetime.now(timezone.utc)
+        month = now.strftime("%Y-%m")
+        ts = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+        path = legacy_dir / f"{month}_9999.jsonl"
+        with open(path, "w") as f:
+            f.write(json.dumps({"ts": ts, "cost_micros": 700_000, "proxy_id": "proxy-a"}) + "\n")
+
+        t = CostTracker(daily_cap_usd=10.0, monthly_cap_usd=100.0)
+        t.bootstrap_from_logs(downstream_dir, proxy_id="proxy-a", legacy_log_dir=legacy_dir)
+
+        assert t.daily_spend_micros() == 700_000
+        assert t.monthly_spend_micros() == 700_000
+
+    def test_previous_month_snapshot_keeps_rolling_daily_window(self, tmp_path: Path):
+        log_dir = tmp_path / "telemetry" / "downstream"
+        log_dir.mkdir(parents=True)
+
+        now = datetime.now(timezone.utc)
+        previous_month = f"{now.year - 1}-12" if now.month == 1 else f"{now.year}-{now.month - 1:02d}"
+        write_cap_state(
+            CapState(
+                proxy_id="proxy-a",
+                monthly_key=previous_month,
+                monthly_total_micros=900_000,
+                daily_window=[(time.time(), 200_000)],
+            )
+        )
+
+        t = CostTracker(daily_cap_usd=10.0, monthly_cap_usd=100.0)
+        t.bootstrap_from_logs(log_dir, proxy_id="proxy-a")
+
+        assert t.daily_spend_micros() == 200_000
+        assert t.monthly_spend_micros() == 0
+
+    def test_cap_state_persist_is_throttled_and_flushable(self, tmp_path: Path):
+        log_dir = tmp_path / "telemetry" / "downstream"
+
+        t = CostTracker(daily_cap_usd=10.0, monthly_cap_usd=100.0)
+        t.bootstrap_from_logs(log_dir, proxy_id="proxy-a")
+
+        t.record(100_000)
+        state = load_cap_state("proxy-a")
+        assert state is not None
+        assert state.monthly_total_micros == 0
+
+        t.flush_cap_state()
+        state = load_cap_state("proxy-a")
+        assert state is not None
+        assert state.monthly_total_micros == 100_000
 
 
 class TestDailyWindowRolling:

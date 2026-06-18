@@ -1,47 +1,30 @@
-"""PID-sharded JSONL cost log writer.
+"""Proxy downstream cost record adapter.
 
-Each proxy process writes to its own shard file to avoid interprocess
-locking. The CLI aggregates across shards at query time.
-
-Location: ~/.forge/costs/requests/YYYY-MM_<pid>.jsonl
+The public functions keep the old cost-log API shape while the durable records live
+in the downstream telemetry plane at ``~/.forge/telemetry/downstream``.
 """
 
 from __future__ import annotations
 
-import json
 import logging
-import os
-import threading
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from pathlib import Path
+from datetime import datetime
 from typing import Any
 
-from forge.core.paths import get_forge_home
-from forge.core.state import decode_json_object
+from forge.core.telemetry.downstream import (
+    DownstreamRecord,
+    mint_downstream_event_id,
+    read_downstream_records,
+    write_downstream_record,
+)
 from forge.core.usage.vocabulary import Confidence, Reporter
 
 logger = logging.getLogger(__name__)
 
 COST_SCHEMA_VERSION = 1
 
-_lock = threading.Lock()
-
 # One-time warning latch for records written by a newer Forge.
 _warned_newer_schema = False
-
-
-def _pid_suffix() -> str:
-    return str(os.getpid())
-
-
-def _costs_dir() -> Path:
-    return get_forge_home() / "costs" / "requests"
-
-
-def _current_log_path() -> Path:
-    month = datetime.now(timezone.utc).strftime("%Y-%m")
-    return _costs_dir() / f"{month}_{_pid_suffix()}.jsonl"
 
 
 def log_request_cost(
@@ -60,8 +43,9 @@ def log_request_cost(
     confidence: Confidence = "unknown",
     forge_run_id: str | None = None,
     forge_root_run_id: str | None = None,
+    downstream_event_id: str | None = None,
 ) -> None:
-    """Append a cost record to the PID-sharded JSONL log.
+    """Append a cost record to the downstream telemetry plane.
 
     ``cost_micros`` is ``None`` when no route reported a cost — distinct from a
     reported ``0`` (genuinely free). ``confidence`` records the dollar figure's
@@ -79,36 +63,30 @@ def log_request_cost(
     ``reporter``/``confidence``). Best-effort: write failures are logged but never
     block the request.
     """
-    record: dict[str, Any] = {
-        "schema_version": COST_SCHEMA_VERSION,
-        "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "proxy_id": proxy_id,
-        "model": model,
-        "tier": tier,
-        "input_tokens": input_tokens,
-        "output_tokens": output_tokens,
-        "cached_tokens": cached_tokens,
-        "cost_micros": cost_micros,
-        "reporter": reporter,
-        "confidence": confidence,
-        "latency_ms": round(latency_ms, 1),
-        "failed": failed,
-        "request_id": request_id,
-        "forge_run_id": forge_run_id,
-        "forge_root_run_id": forge_root_run_id,
-    }
-
-    try:
-        from forge.core.state import open_secure_append
-
-        log_path = _current_log_path()
-        log_path.parent.mkdir(parents=True, exist_ok=True)
-
-        with _lock:
-            with open_secure_append(log_path) as f:
-                f.write(json.dumps(record, separators=(",", ":")) + "\n")
-    except Exception as e:
-        logger.warning("Failed to write cost log: %s", e)
+    downstream_id = downstream_event_id or mint_downstream_event_id()
+    write_downstream_record(
+        DownstreamRecord(
+            kind="attempt",
+            downstream_event_id=downstream_id,
+            request_id=request_id,
+            proxy_id=proxy_id,
+            source_id=proxy_id,
+            source_kind="proxy",
+            model=model,
+            mapped_model=model,
+            tier=tier,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            cached_tokens=cached_tokens,
+            cost_micros=cost_micros,
+            reporter=reporter,
+            confidence=confidence,
+            latency_ms=round(latency_ms, 1),
+            failed=failed,
+            forge_run_id=forge_run_id,
+            forge_root_run_id=forge_root_run_id,
+        )
+    )
 
 
 def read_cost_logs(
@@ -128,46 +106,28 @@ def read_cost_logs(
     COST_SCHEMA_VERSION), surfacing the latter once at warning level. Legacy
     unversioned records (no schema_version) are read normally.
     """
-    costs_dir = _costs_dir()
-    if not costs_dir.is_dir():
-        return []
-
-    global _warned_newer_schema
     records: list[dict[str, Any]] = []
-    for path in sorted(costs_dir.glob("*.jsonl")):
-        try:
-            with open(path) as f:
-                for line in f:
-                    record = decode_json_object(line)
-                    if record is None:
-                        continue
-
-                    ver = record.get("schema_version")
-                    if isinstance(ver, int) and ver > COST_SCHEMA_VERSION:
-                        if not _warned_newer_schema:
-                            logger.warning(
-                                "Skipping cost records written by a newer Forge (schema_version=%s); upgrade Forge",
-                                ver,
-                            )
-                            _warned_newer_schema = True
-                        continue
-
-                    if period_start or period_end:
-                        ts_str = record.get("ts", "")
-                        try:
-                            ts = datetime.fromisoformat(ts_str.rstrip("Z").removesuffix("+00:00") + "+00:00")
-                        except (ValueError, TypeError):
-                            continue
-                        if period_start and ts < period_start:
-                            continue
-                        if period_end and ts >= period_end:
-                            continue
-
-                    records.append(record)
-        except OSError as e:
-            logger.warning("Failed to read cost log %s: %s", path, e)
-
-    records.sort(key=lambda r: r.get("ts", ""))
+    for rec in read_downstream_records(period_start, period_end, kind="attempt"):
+        records.append(
+            {
+                "schema_version": COST_SCHEMA_VERSION,
+                "ts": rec.ts,
+                "proxy_id": rec.proxy_id,
+                "model": rec.mapped_model or rec.model or "unknown",
+                "tier": rec.tier or "unknown",
+                "input_tokens": rec.input_tokens or 0,
+                "output_tokens": rec.output_tokens or 0,
+                "cached_tokens": rec.cached_tokens or 0,
+                "cost_micros": rec.cost_micros,
+                "reporter": rec.reporter,
+                "confidence": rec.confidence,
+                "latency_ms": rec.latency_ms or 0,
+                "failed": bool(rec.failed),
+                "request_id": rec.request_id,
+                "forge_run_id": rec.forge_run_id,
+                "forge_root_run_id": rec.forge_root_run_id,
+            }
+        )
     return records
 
 

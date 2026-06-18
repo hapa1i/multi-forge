@@ -1,10 +1,11 @@
 # Upstream / Downstream Ledgers -- collapse four telemetry planes into two
 
-**Status**: Proposed. Spun out of the `supervisor_statusline_health` investigation (2026-06-16) -- a first-principles
-dialogue on why surfacing a supervisor timeout on the status line kept colliding with telemetry complexity. The
-conclusion: the messiness is a symptom of Forge's **telemetry planes being split along the wrong axis** -- consumption,
-redacted wire capture, per-call provider lifecycle, and outcome scattered across **four** planes, with the usage plane
-conflating two of them.
+**Status**: Doing. Chosen by the active telemetry epic as the next foundation before resuming
+`openrouter_remote_reconciliation`. Spun out of the `supervisor_statusline_health` investigation (2026-06-16) -- a
+first-principles dialogue on why surfacing a supervisor timeout on the status line kept colliding with telemetry
+complexity. The conclusion: the messiness is a symptom of Forge's **telemetry planes being split along the wrong axis**
+-- consumption, redacted wire capture, per-call provider lifecycle, and outcome scattered across **four** planes, with
+the usage plane conflating two of them.
 
 **Updated 2026-06-17.** The now-done `openrouter_observability` card shipped a fourth plane -- provider-trace
 (`~/.forge/providers/<source>/traces/`, `src/forge/proxy/provider_trace_logger.py`) -- and the sibling `unified_backend`
@@ -12,9 +13,9 @@ card proposes a canonical model-source id (`backend_id`) the telemetry planes sh
 **downstream by this card's taxonomy** (per-call, session-blind, metadata-only model-interaction evidence), so the
 target is **four planes -> two**, not three. This card owns plane **structure**; `unified_backend` owns the
 source-identity **key**. The shared contract and member list live in the
-[`epic_telemetry_architecture`](../../doing/epic_telemetry_architecture/card.md).
+[`epic_telemetry_architecture`](../epic_telemetry_architecture/card.md).
 
-**Epic**: [`epic_telemetry_architecture`](../../doing/epic_telemetry_architecture/card.md).
+**Epic**: [`epic_telemetry_architecture`](../epic_telemetry_architecture/card.md).
 
 **References**: `src/forge/core/usage/emit.py` (the proxied/direct provenance branch, inline in two emitters),
 `src/forge/core/usage/ledger.py` (`UsageEvent`), `src/forge/proxy/cost_logger.py` + `src/forge/proxy/audit_logger.py` +
@@ -26,8 +27,9 @@ planes), `src/forge/core/ops/usage_summary.py` (joins the tangle today), `src/fo
 ## Problem
 
 Forge has **four** durable telemetry planes today -- cost (`~/.forge/costs/requests/`), audit (`~/.forge/audit/`), usage
-(`~/.forge/usage/events/`), and provider-trace (`~/.forge/providers/<source>/traces/`, shipped on the
-`openrouter-observability` branch) -- split along the **wrong axis**. The natural axis is two:
+(`~/.forge/usage/events/`), and provider-trace (`~/.forge/providers/<source>/traces/`, shipped by the done
+`openrouter_observability` card and now present on this branch) -- split along the **wrong axis**. The natural axis is
+two:
 
 - **Downstream** -- model-interaction evidence: tokens, cost, provenance, and optional redacted request/response
   capture. Per call.
@@ -46,9 +48,10 @@ On that axis the current planes are mis-cut:
 
 The conflation surfaces as -- each observed during the supervisor investigation:
 
-- **Misses no-call operations.** A deterministic TDD check (emits nothing), an auth/proxy-not-found fail-open (returns
-  before the call, `supervisor.py:461-469`), and a cached supervisor allow (no call) produce **no usage event** -- so
-  nothing answers "did this verb succeed?" for them.
+- **Misses no-call operations.** A deterministic TDD check (emits nothing), supervisor no-call allows such as missing
+  `resume_id` / target-resolution warnings (`supervisor.py:418-436`), auth/proxy resolution warnings
+  (`supervisor.py:455-470`), and cached supervisor allows (no call) produce **no usage event** -- so nothing answers
+  "did this verb succeed?" for them.
 - **Conflates call-success with operation-success.** A parse fail-open is a *successful subprocess* (`status="success"`)
   whose *verb* failed -- the wrong outcome is recorded.
 - **Forces an accidental outcome side-channel.** Because the usage ledger cannot answer outcome for no-call ops,
@@ -126,18 +129,18 @@ memory-writer health, TDD outcomes, panel-worker failures -- from one place, wit
     persisted **only on the proxied path today** -- the proxy's `on_complete` writes it (`server.py` ->
     `provider_trace_logger.py`), gated on `provider_name == "openrouter"`. The direct `core.llm` clients already
     **build** the same per-call evidence onto the response object (`CompletionResponse.provider_meta` /
-    `StreamEvent.provider_meta`, `ProviderTraceMeta` at `core/llm/types.py:155`), but `emit.py` never reads it -- so a
+    `StreamEvent.provider_meta`, `ProviderTraceMeta` at `core/llm/types.py:168`), but `emit.py` never reads it -- so a
     direct call (action tagger, tier-1 plan-check, transfer curation) constructs `provider_meta` and **drops it**,
     persisting no provider correlation even though cost/tokens are kept. The unified downstream writer must consume
     `provider_meta` on the direct path too -- a `Measurement` that carries provider metadata (not just cost/tokens)
-    closes this in one place. (Cross-branch: these symbols live on `openrouter-observability`, not this branch.)
+    closes this in one place. These symbols already live on this branch, so Phase 2 can consume them directly.
 - **Downstream keys on `backend_id` (owned by `unified_backend`).** Today downstream attribution is `proxy_id` + ad-hoc
   provider strings (provider-trace literally hardcodes `provider_name == "openrouter"`). The canonical model-source id
   is the `unified_backend` card's deliverable; this refactor **consumes** it as the downstream attribution key rather
   than minting its own. Plane **structure** is owned here; the source-identity **key** is owned there. If
   `unified_backend` lands first, downstream is keyed correctly from day one; if this card lands first, downstream keys
-  on `proxy_id` and re-keys on adoption -- the
-  [`epic_telemetry_architecture`](../../doing/epic_telemetry_architecture/card.md) records the sequencing.
+  on `proxy_id` and re-keys on adoption -- the [`epic_telemetry_architecture`](../epic_telemetry_architecture/card.md)
+  records the sequencing.
 - **Consumers read the right plane -- and `forge activity` becomes the honest join.** Upstream answers health/outcome
   (select by session), downstream answers spend (join by run tree). `forge activity` is then a **two-pane outer join,
   not one conflated row**: an upstream pane (outcomes grouped by verb/session, including the no-call ops downstream
@@ -152,18 +155,22 @@ The classic ways a usage/billing system rots. Each was checked against current c
 them.
 
 - **No idempotency on writes (replay / double-write).** The per-call `request_id` (`cost_logger.py:96`) is a *join* key,
-  not an idempotency key: no reader de-dupes on it, a client may supply `X-Request-ID` verbatim, and the auto fallback
-  is a truncated uuid4. The dedupe-tagged id (`event_id`) lives on a different plane. The merged downstream writer must
-  define an explicit idempotency/replay contract -- today there is none.
-- **Double-count is guarded but fragile.** The 4g run-tree suppression (`usage_summary.py:382`,
-  `sum_reported_cost_by_root`) does prevent the snapshot-vs-exact and per-worker-vs-verb overlaps -- per-run-*subtree*,
-  and **best-effort** (a cost-read failure falls back to the snapshot). It is the most intricate code in the stack;
-  change it behind the invoker seam with the suppression suite as the guard, never in the read layer.
-- **Best-effort writes back a cap that is not fail-closed.** Every cost/usage write swallows all exceptions to a warning
-  (`cost_logger.py:101-111`, `ledger.py:159-185`), and spend-cap accounting runs *inside that same swallow path* -- so a
-  dropped write silently under-counts spend against the cap. Fail-open is correct for *outcome* telemetry; the cap is
-  the one consumer that needs a fail-closed or reconciled read. The merge must not fold cap accounting into the
-  best-effort contract.
+  not an idempotency key: no reader de-dupes on it, a client may supply `X-Request-ID` verbatim (`server.py:1896`), and
+  the auto fallback is a truncated uuid4. The dedupe-tagged id (`event_id`) lives on a different plane. The merged
+  downstream writer must mint its own id and define an explicit idempotency/replay contract -- today there is none.
+- **Double-count is guarded but fragile.** The 4g run-tree suppression lives in `_join_session_cost`
+  (`usage_summary.py:409-505`) and calls `sum_reported_cost_by_root` from `cost_logger.py:205`. It does prevent the
+  snapshot-vs-exact and per-worker-vs-verb overlaps -- per-run-*subtree*, and **best-effort** (a cost-read failure falls
+  back to the snapshot). It is the most intricate code in the stack; change it behind the invoker seam with
+  `tests/regression/test_bug_4g_mixed_stamped_unstamped_undercount.py`,
+  `tests/regression/test_bug_usage_workflow_double_count.py`, `tests/regression/test_bug_usage_cost_precedence.py`, and
+  `tests/regression/test_bug_usage_worker_cost_precedence.py` as guards, never in the read layer.
+- **Best-effort writes must not weaken cap enforcement.** Every cost/usage write swallows all exceptions to a warning
+  (`cost_logger.py:101-111`, `ledger.py:159-185`). The in-memory spend-cap total is recorded separately in
+  `_calc_and_log_cost` (`server.py:304-358`), but restart/bootstrap reconciliation re-reads the JSONL
+  (`cost_tracker.py:65`) and can under-count a dropped write after restart. Fail-open is correct for *outcome*
+  telemetry; the cap is the one consumer that needs a fail-closed or reconciled read. The merge must not fold cap
+  accounting into the best-effort contract.
 - **Integer micros, and `None` is not `0`.** Money is integer micro-USD on both planes (no float drift) but **named
   differently** -- `cost_micros` on the cost log, `cost_micro_usd` on the usage ledger -- and `None` means "no route
   reported a cost," not free. The merged schema must unify the name and **preserve the `None`-is-not-`0` distinction**:
@@ -212,4 +219,4 @@ the same `emit.py` provenance branch, so they must not run as independent, mutua
 provenance, the model-source catalog) is config/CLI/auth work with its own large blast radius and "spike first" posture,
 and chaining this telemetry refactor to it would break independent shippability. The shared contract -- *downstream keys
 on `backend_id`; structure owned here, key owned there* -- and the sequencing live in
-[`epic_telemetry_architecture`](../../doing/epic_telemetry_architecture/card.md).
+[`epic_telemetry_architecture`](../epic_telemetry_architecture/card.md).

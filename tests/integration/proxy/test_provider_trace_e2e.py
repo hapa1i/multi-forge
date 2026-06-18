@@ -1,10 +1,10 @@
-"""End-to-end: the provider-trace plane through the real OpenRouter proxy (Phase 3).
+"""End-to-end: provider-trace fields through the real OpenRouter proxy.
 
 Drives a real streaming request Anthropic -> proxy -> core.llm -> OpenRouter and asserts the
-durable provider-trace record the seam wrote. The clean-stream case proves the whole path
-(real SSE -> R1 carrier chunk -> converter lifecycle -> record_provider_trace -> JSONL shard)
-with a real ``gen-`` id; the cancel case is the incident this card exists for — a stream
-dropped before the final usage chunk that still surfaces its generation id.
+durable downstream attempt record the seam wrote. The clean-stream case proves the whole path
+(real SSE -> R1 carrier chunk -> converter lifecycle -> record_provider_trace -> downstream
+JSONL shard) with a real ``gen-`` id; the cancel case is the incident this card exists for --
+a stream dropped before the final usage chunk that still surfaces its generation id.
 
 The disconnect lifecycle itself is exhaustively unit-tested (both CancelledError and
 GeneratorExit) in tests/src/proxy/test_converters_lifecycle.py; this confirms it survives the
@@ -27,15 +27,29 @@ _HEADERS = {"x-api-key": "test", "user-agent": "claude-code/integration-test"}
 
 
 def _read_traces(forge_home: Path) -> list[dict[str, Any]]:
-    traces_dir = forge_home / "providers" / "openrouter" / "traces"
-    records: list[dict[str, Any]] = []
-    if traces_dir.is_dir():
-        for shard in sorted(traces_dir.glob("*.jsonl")):
+    downstream_dir = forge_home / "telemetry" / "downstream"
+    raw: list[dict[str, Any]] = []
+    if downstream_dir.is_dir():
+        for shard in sorted(downstream_dir.glob("*.jsonl")):
             for line in shard.read_text().splitlines():
                 line = line.strip()
                 if line:
-                    records.append(json.loads(line))
-    return records
+                    raw.append(json.loads(line))
+    merged: dict[str, dict[str, Any]] = {}
+    ordered: list[str] = []
+    for record in raw:
+        if record.get("kind") != "attempt":
+            continue
+        key = str(record.get("downstream_event_id") or record.get("request_id") or len(ordered))
+        if key not in merged:
+            merged[key] = {}
+            ordered.append(key)
+        for field, value in record.items():
+            if field == "confidence" and value == "unknown" and merged[key].get("confidence") != "unknown":
+                continue
+            if value is not None:
+                merged[key][field] = value
+    return [merged[key] for key in ordered]
 
 
 def _poll_for_trace(

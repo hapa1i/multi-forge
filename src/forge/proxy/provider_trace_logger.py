@@ -1,4 +1,4 @@
-"""PID-sharded JSONL provider-trace plane (openrouter_observability Phase 3).
+"""Provider lifecycle/correlation projection over downstream telemetry.
 
 The fourth local telemetry plane: provider **lifecycle/correlation evidence** for a
 single OpenRouter request — "did it leave Forge, which route/generation, did the stream
@@ -12,59 +12,35 @@ completion, tool output, or replayable request body ever appears here. The heade
 allowlist is re-applied at the writer (defense in depth) so even a future caller that
 bypasses the Phase 2 boundary cannot persist ``authorization``/``cookie``.
 
-Location: ``~/.forge/providers/openrouter/traces/YYYY-MM_<pid>.jsonl`` (owner-only, 0600).
-Joined to the cost/usage planes by shared ``request_id`` and run-tree ids; NOT wiped by
-``forge proxy costs reset`` (it is diagnostics, not spend truth).
+Location: provider trace fields now live on downstream attempt records under
+``~/.forge/telemetry/downstream/YYYY-MM_<pid>.jsonl`` (owner-only, 0600). The legacy
+append helpers remain only for old retention compatibility; current writes go through
+``write_downstream_record`` and reset with the downstream plane.
 """
 
 from __future__ import annotations
 
-import json
 import logging
-import os
-import threading
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from pathlib import Path
+from datetime import datetime
 from typing import Any, Literal
 
-import dacite
-
-from forge.core.paths import get_forge_home
-from forge.core.state import decode_json_object
+from forge.core.telemetry.downstream import (
+    DownstreamRecord,
+    mint_downstream_event_id,
+    read_downstream_records,
+    write_downstream_record,
+)
 
 logger = logging.getLogger(__name__)
 
 PROVIDER_TRACE_SCHEMA_VERSION = 1
-
-# Dedicated, non-reentrant lock — do NOT reuse audit_logger's; the append re-acquires it.
-_lock = threading.Lock()
 
 # One-time warning latch for records written by a newer Forge (own latch, not audit's).
 _warned_newer_schema = False
 
 RequestMode = Literal["streaming", "non_streaming"]
 LocalUsageStatus = Literal["available", "unavailable"]
-
-
-def _pid_suffix() -> str:
-    return str(os.getpid())
-
-
-def _traces_dir() -> Path:
-    # Forward-ref: this hardcoded "openrouter" segment (and the record_provider_trace gate below) is the
-    # model-source identity the `unified_backend` board proposal migrates to a backend id -- a deliberate
-    # clean break, so it stays a literal, not a seam. (`rg unified_backend` finds the card; lane-stable slug.)
-    return get_forge_home() / "providers" / "openrouter" / "traces"
-
-
-def _current_log_path() -> Path:
-    month = datetime.now(timezone.utc).strftime("%Y-%m")
-    return _traces_dir() / f"{month}_{_pid_suffix()}.jsonl"
-
-
-def _now_iso() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 @dataclass
@@ -108,31 +84,6 @@ class ProviderTraceRecord:
 # --- Write path (best-effort; never raises into the request path) ------------
 
 
-def _append_provider_trace(record: dict[str, Any]) -> None:
-    """Append a built record to the PID-sharded JSONL log. Best-effort: write failures
-    are logged at warning and never block request handling."""
-    record.setdefault("schema_version", PROVIDER_TRACE_SCHEMA_VERSION)
-    record.setdefault("ts", _now_iso())
-    try:
-        from forge.core.state import open_secure_append
-
-        log_path = _current_log_path()
-        log_path.parent.mkdir(parents=True, exist_ok=True)
-        # Owner-only on ALL THREE levels (providers/, providers/openrouter/, .../traces/)
-        # so neither the records nor the file-name timestamps leak to other local users.
-        traces = _traces_dir()
-        for secure_dir in (traces.parent.parent, traces.parent, traces):
-            try:
-                os.chmod(secure_dir, 0o700)
-            except OSError:
-                pass
-        with _lock:
-            with open_secure_append(log_path) as f:
-                f.write(json.dumps(record, separators=(",", ":"), default=str) + "\n")
-    except Exception as e:
-        logger.warning("Failed to write provider trace: %s", e)
-
-
 def write_provider_trace(
     *,
     request_id: str,
@@ -151,6 +102,7 @@ def write_provider_trace(
     local_usage_status: LocalUsageStatus,
     reported_cost_micros: int | None,
     latency_ms: float | None,
+    downstream_event_id: str | None = None,
 ) -> None:
     """Build and persist a metadata-only provider-trace record (no gate).
 
@@ -161,33 +113,36 @@ def write_provider_trace(
     from forge.core.llm.clients.openai_compat import provider_trace_headers
 
     pm = provider_meta or {}
-    _append_provider_trace(
-        {
-            "schema_version": PROVIDER_TRACE_SCHEMA_VERSION,
-            "ts": _now_iso(),
-            "request_id": request_id,
-            "proxy_id": proxy_id,
-            "mapped_model": mapped_model,
-            "forge_run_id": forge_run_id,
-            "forge_root_run_id": forge_root_run_id,
-            "provider_session_id": provider_session_id,
-            "provider_command": provider_command,
-            "provider": pm.get("provider"),
-            "selected_provider": pm.get("selected_provider"),
-            "provider_response_id": pm.get("provider_response_id"),
-            "provider_generation_id": pm.get("provider_generation_id"),
-            "provider_request_id": pm.get("provider_request_id"),
-            "headers": provider_trace_headers(pm.get("headers")),  # re-filter at the edge
-            "request_mode": request_mode,
-            "stream_started": stream_started,
-            "first_chunk_seen": first_chunk_seen,
-            "final_usage_seen": final_usage_seen,
-            "client_disconnected": client_disconnected,
-            "local_usage_status": local_usage_status,
-            "timeout_seen": False,
-            "reported_cost_micros": reported_cost_micros,
-            "latency_ms": latency_ms,
-        }
+    write_downstream_record(
+        DownstreamRecord(
+            kind="attempt",
+            downstream_event_id=downstream_event_id
+            or mint_downstream_event_id(event_key=f"provider_trace:{proxy_id}:{request_id}"),
+            request_id=request_id,
+            proxy_id=proxy_id,
+            source_id=proxy_id,
+            source_kind="proxy",
+            mapped_model=mapped_model,
+            forge_run_id=forge_run_id,
+            forge_root_run_id=forge_root_run_id,
+            provider_session_id=provider_session_id,
+            provider_command=provider_command,
+            provider=pm.get("provider"),
+            selected_provider=pm.get("selected_provider"),
+            provider_response_id=pm.get("provider_response_id"),
+            provider_generation_id=pm.get("provider_generation_id"),
+            provider_request_id=pm.get("provider_request_id"),
+            provider_headers=provider_trace_headers(pm.get("headers")),  # re-filter at the edge
+            request_mode=request_mode,
+            stream_started=stream_started,
+            first_chunk_seen=first_chunk_seen,
+            final_usage_seen=final_usage_seen,
+            client_disconnected=client_disconnected,
+            local_usage_status=local_usage_status,
+            timeout_seen=False,
+            reported_cost_micros=reported_cost_micros,
+            latency_ms=latency_ms,
+        )
     )
 
 
@@ -209,6 +164,7 @@ def record_provider_trace(
     client_disconnected: bool,
     reported_cost_micros: int | None,
     latency_ms: float | None,
+    downstream_event_id: str | None = None,
 ) -> None:
     """Gate to the direct OpenRouter route, derive local_usage_status, and persist.
 
@@ -220,9 +176,9 @@ def record_provider_trace(
     is out of scope for this card, so a ``litellm``/``unknown`` route writes nothing.
 
     Forward-ref: the ``unified_backend`` board proposal (find it with ``rg unified_backend``) migrates
-    this provider-literal gate (and the ``_traces_dir`` path) to a backend-id check, broadening beyond
-    OpenRouter via ``selected_provider``. A deliberate clean break -- kept a hardcoded literal, not a
-    premature seam, until that proposal runs. (Slug, not a board path -- cards move lanes.)
+    this provider-literal gate to a backend-id check, broadening beyond OpenRouter via
+    ``selected_provider``. A deliberate clean break -- kept a hardcoded literal, not a premature seam,
+    until that proposal runs. (Slug, not a board path -- cards move lanes.)
     """
     if provider_name != "openrouter":
         return
@@ -250,6 +206,7 @@ def record_provider_trace(
             local_usage_status=local_usage_status,
             reported_cost_micros=reported_cost_micros,
             latency_ms=latency_ms,
+            downstream_event_id=downstream_event_id,
         )
     except Exception as e:  # belt over the writer's own braces — never break the request
         logger.debug("provider trace record skipped: %s", e)
@@ -274,61 +231,58 @@ def read_provider_traces(
     strict shape validation (unknown field / bad value type is corruption, not
     forward-compat). Filters apply to the raw record before the typed build.
     """
-    traces_dir = _traces_dir()
-    if not traces_dir.is_dir():
-        return []
-
-    global _warned_newer_schema
-    config = dacite.Config(strict=True)
     records: list[ProviderTraceRecord] = []
-    for path in sorted(traces_dir.glob("*.jsonl")):
-        try:
-            with open(path) as f:
-                for line in f:
-                    record = decode_json_object(line)
-                    if record is None:
-                        continue
-
-                    ver = record.get("schema_version")
-                    if isinstance(ver, int) and ver > PROVIDER_TRACE_SCHEMA_VERSION:
-                        if not _warned_newer_schema:
-                            logger.warning(
-                                "Skipping provider traces written by a newer Forge "
-                                "(schema_version=%s); upgrade Forge",
-                                ver,
-                            )
-                            _warned_newer_schema = True
-                        continue
-
-                    if request_id and record.get("request_id") != request_id:
-                        continue
-                    if forge_run_id and record.get("forge_run_id") != forge_run_id:
-                        continue
-                    if forge_root_run_id and record.get("forge_root_run_id") != forge_root_run_id:
-                        continue
-                    if provider_session_id and record.get("provider_session_id") != provider_session_id:
-                        continue
-
-                    if period_start or period_end:
-                        ts_str = record.get("ts", "")
-                        try:
-                            ts = datetime.fromisoformat(ts_str.rstrip("Z").removesuffix("+00:00") + "+00:00")
-                        except (ValueError, TypeError, AttributeError):
-                            continue
-                        if period_start and ts < period_start:
-                            continue
-                        if period_end and ts >= period_end:
-                            continue
-
-                    try:
-                        records.append(dacite.from_dict(ProviderTraceRecord, record, config=config))
-                    except (dacite.DaciteError, TypeError, KeyError, ValueError) as e:
-                        logger.warning("Skipping malformed provider trace in %s: %s", path.name, e)
-                        continue
-        except OSError as e:
-            logger.warning("Failed to read provider trace %s: %s", path, e)
-
-    records.sort(key=lambda r: r.ts)
+    for rec in read_downstream_records(
+        period_start,
+        period_end,
+        kind="attempt",
+        request_id=request_id,
+        forge_run_id=forge_run_id,
+        forge_root_run_id=forge_root_run_id,
+        provider_session_id=provider_session_id,
+    ):
+        if not any(
+            (
+                rec.provider_generation_id,
+                rec.provider_response_id,
+                rec.provider_request_id,
+                rec.request_mode,
+                rec.local_usage_status,
+            )
+        ):
+            continue
+        request_mode: RequestMode = rec.request_mode if rec.request_mode is not None else "non_streaming"
+        local_usage_status: LocalUsageStatus = (
+            rec.local_usage_status if rec.local_usage_status is not None else "unavailable"
+        )
+        records.append(
+            ProviderTraceRecord(
+                schema_version=PROVIDER_TRACE_SCHEMA_VERSION,
+                ts=rec.ts,
+                request_id=rec.request_id or "",
+                proxy_id=rec.proxy_id or "",
+                mapped_model=rec.mapped_model or rec.model or "",
+                forge_run_id=rec.forge_run_id,
+                forge_root_run_id=rec.forge_root_run_id,
+                provider_session_id=rec.provider_session_id,
+                provider_command=rec.provider_command,
+                provider=rec.provider,
+                selected_provider=rec.selected_provider,
+                provider_response_id=rec.provider_response_id,
+                provider_generation_id=rec.provider_generation_id,
+                provider_request_id=rec.provider_request_id,
+                headers=rec.provider_headers,
+                request_mode=request_mode,
+                stream_started=bool(rec.stream_started),
+                first_chunk_seen=bool(rec.first_chunk_seen),
+                final_usage_seen=bool(rec.final_usage_seen),
+                client_disconnected=bool(rec.client_disconnected),
+                local_usage_status=local_usage_status,
+                timeout_seen=bool(rec.timeout_seen),
+                reported_cost_micros=rec.reported_cost_micros,
+                latency_ms=rec.latency_ms,
+            )
+        )
     return records
 
 
@@ -338,6 +292,6 @@ def read_provider_traces(
 def prune_provider_traces(*, retention_days: int, max_total_mb: int) -> None:
     """Delete trace shards older than retention_days, then prune oldest-first over
     max_total_mb. Best-effort: errors are ignored (telemetry, not critical path)."""
-    from forge.proxy.retention import prune_jsonl_shards
+    from forge.core.telemetry.downstream import prune_downstream_records
 
-    prune_jsonl_shards(_traces_dir(), retention_days=retention_days, max_total_mb=max_total_mb)
+    prune_downstream_records(retention_days=retention_days, max_total_mb=max_total_mb)

@@ -13,6 +13,7 @@ from typing import Any
 
 from forge.core.reactive.cost_tracking import VerbCostResult
 from forge.core.reactive.session_runner import SessionResult
+from forge.core.telemetry.downstream import read_downstream_records
 from forge.core.usage.emit import (
     _direct_cost_provenance,
     emit_direct_llm_usage,
@@ -146,11 +147,39 @@ class TestEmitDirectLlmUsage:
         # and confidence stays "unavailable" (the $ lives in the cost plane, not here).
         assert e.cost_micro_usd is None and e.confidence == "unavailable"
         assert (e.route, e.reporter) == ("core_llm", "provider")
+        downstream = read_downstream_records(kind="attempt")
+        assert downstream == []
 
     def test_no_ambient_identity_skips(self, monkeypatch) -> None:
         monkeypatch.delenv("FORGE_RUN_ID", raising=False)
         emit_direct_llm_usage(command="tagger", usage={"prompt_tokens": 1, "completion_tokens": 1})
         assert read_usage_events() == []
+
+    def test_unmeasured_direct_calls_get_distinct_downstream_ids(self, monkeypatch) -> None:
+        monkeypatch.setenv("FORGE_RUN_ID", "run_amb")
+        monkeypatch.setenv("FORGE_ROOT_RUN_ID", "run_amb")
+
+        emit_direct_llm_usage(command="tagger", provider="openai", usage=None)
+        emit_direct_llm_usage(command="tagger", provider="openai", usage=None)
+
+        downstream = read_downstream_records(kind="attempt")
+        assert len(downstream) == 2
+        assert len({record.downstream_event_id for record in downstream}) == 2
+
+    def test_direct_provider_session_id_persists_downstream(self, monkeypatch) -> None:
+        monkeypatch.setenv("FORGE_RUN_ID", "run_amb")
+        monkeypatch.setenv("FORGE_ROOT_RUN_ID", "run_amb")
+
+        emit_direct_llm_usage(
+            command="tagger",
+            provider="openrouter",
+            usage={"prompt_tokens": 1, "completion_tokens": 1},
+            provider_meta={"provider_session_id": "forge_sess_abc_supervisor"},
+        )
+
+        downstream = read_downstream_records(kind="attempt")
+        assert len(downstream) == 1
+        assert downstream[0].provider_session_id == "forge_sess_abc_supervisor"
 
 
 class TestEmitVerbAndWorkerVocabulary:
