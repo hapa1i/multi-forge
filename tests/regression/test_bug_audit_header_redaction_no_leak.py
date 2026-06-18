@@ -55,15 +55,15 @@ def test_full_body_audit_persists_no_plaintext_secret():
         response_body={"id": "msg_1", "role": "assistant", "content": [{"type": "text", "text": RESP}]},
     )
 
-    shards = list(audit_logger._audit_dir().glob("*.jsonl"))
-    assert shards
-    blob = shards[0].read_text()
+    records = audit_logger.read_audit_logs(record_type="request")
+    assert records
+    blob = json.dumps(records, sort_keys=True)
 
     for secret in (BEARER, APIKEY, COOKIE, MSG, SYS, TOOLDESC, RESP):
         assert secret not in blob, f"plaintext secret leaked into audit log: {secret!r}"
 
     # Structure IS retained (proves the record is still useful).
-    rec = json.loads(blob.splitlines()[0])
+    rec = records[0]
     assert rec["full_body"] is True
     assert rec["request_headers"]["Authorization"] == {"redacted": True, "length": len(f"Bearer {BEARER}")}
     assert rec["request_headers"]["anthropic-version"] == "2023-06-01"  # non-secret header preserved
@@ -149,11 +149,11 @@ def test_full_body_audit_through_server_path_no_plaintext(monkeypatch):
     )
     assert r.status_code == 200
 
-    shards = list(audit_logger._audit_dir().glob("*.jsonl"))
-    assert shards
-    blob = "".join(s.read_text() for s in shards)
+    records = audit_logger.read_audit_logs(record_type="request")
+    assert records
+    blob = json.dumps(records, sort_keys=True)
     for secret in (BEARER, APIKEY, MSG, SYS, RESP):
         assert secret not in blob, f"plaintext secret leaked through the server path: {secret!r}"
 
-    full = [json.loads(line) for line in blob.splitlines() if json.loads(line).get("full_body")]
+    full = [record for record in records if record.get("full_body")]
     assert full and full[0]["response_body"] is not None  # response captured + redacted

@@ -407,14 +407,15 @@ rm -f ~/.forge/costs/requests/qa-fixture_prov-99999.jsonl
 
 <!-- destructive -->
 
-`forge proxy costs reset` wipes every recorded cost + usage plane to zero: request cost logs
-(`~/.forge/costs/requests/`), verb cost logs (`~/.forge/costs/verbs/`), and the usage-attribution ledger
+`forge proxy costs reset` wipes every recorded cost + usage telemetry plane to zero: legacy request/verb cost logs
+(`~/.forge/costs/requests/`, `~/.forge/costs/verbs/`), downstream/upstream telemetry (`~/.forge/telemetry/downstream/`,
+`~/.forge/telemetry/upstream/`), durable spend-cap/audit-state snapshots, and the usage-attribution ledger
 (`~/.forge/usage/events/`). It also clears the **derived** status-line cost cache
 (`~/.forge/cache/statusline/fcost-*.json`) so `forge +$Y` recomputes from the now-empty ledger instead of replaying a
-cached value within its TTL — but the unrelated transcript cache-hit entries (`{digest}.json`) survive, and the audit
-plane (`~/.forge/audit/`) is left untouched. `--dry-run` lists what would go without deleting; `--yes` skips the confirm
-prompt. A running proxy keeps its cost totals AND cap counters in memory (a separate process the CLI cannot reach), so
-the command prints a restart tip rather than claiming a live proxy's cumulative cost/caps are zeroed. This is
+cached value within its TTL — but the unrelated transcript cache-hit entries (`{digest}.json`) survive, and the legacy
+audit plane (`~/.forge/audit/`) is left untouched. `--dry-run` lists what would go without deleting; `--yes` skips the
+confirm prompt. A running proxy keeps its cost totals AND cap counters in memory (a separate process the CLI cannot
+reach), so the command prints a restart tip rather than claiming a live proxy's cumulative cost/caps are zeroed. This is
 destructive: it clears all cost telemetry in the container, so it runs last in section 7.
 
 ```bash

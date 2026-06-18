@@ -23,10 +23,10 @@ from forge.core.reactive.env import (
 )
 from forge.sidecar.docker import _docker_name_filter
 
-# In-container Forge home, pinned via FORGE_HOME so audit/cost/config resolution is
+# In-container Forge home, pinned via FORGE_HOME so telemetry/audit/cost/config resolution is
 # deterministic. The sidecar keeps everything under /root (root's home: the
 # entrypoint writes /root/.claude*, the standard mounts target /root/.claude, and the
-# audit/cost/config mounts target /root/.forge).
+# telemetry/audit/cost/config mounts target /root/.forge).
 #
 # Under the Linux `--user uid:gid` mapping the process is a non-root uid with no
 # passwd entry, so two things are needed (both also no-ops for the macOS root run):
@@ -197,13 +197,15 @@ def run_sidecar_session(
 def _ensure_audit_plumbing_mounts(proxy_id: str) -> list[tuple[str, str, str]]:
     """Build the sidecar audit-plumbing mounts, creating host state dirs as needed.
 
-    Side effect: creates the host audit/, costs/, and usage/ dirs (Docker bind sources
+    Side effect: creates the host audit/, costs/, usage/, and telemetry/ dirs (Docker bind sources
     must exist before `docker run`). Narrow mounts (NOT all of ~/.forge, preserving the
     design.md §7 isolation rationale):
     - per-proxy config dir read-only, so the in-container server reads the proxy.yaml
       intercept/audit overlay.
-    - host audit/, costs/, and usage/ read-write, so the proxy's audit records and cost
-      history, spend-cap accounting, and the attribution ledger persist where the host
+    - host telemetry/ read-write, so the upstream/downstream ledgers and durable cap
+      state persist where the host reads them.
+    - legacy host audit/, costs/, and usage/ read-write during the clean-cut migration,
+      so old cost history can seed cap state and any compatibility reads stay durable
       reads them (`forge proxy audit|costs`, `forge activity`, the session-end summary)
       instead of dying with the --rm container. Each would otherwise be lost silently:
       caps bootstrap from cost history, so an unmounted costs/ resets daily/monthly caps
@@ -216,7 +218,7 @@ def _ensure_audit_plumbing_mounts(proxy_id: str) -> list[tuple[str, str, str]]:
         (str(forge_home / "proxies" / proxy_id), f"{_SIDECAR_FORGE_HOME}/proxies/{proxy_id}", "ro"),
     ]
 
-    for subdir in ("audit", "costs", "usage"):
+    for subdir in ("audit", "costs", "usage", "telemetry"):
         host_dir = forge_home / subdir
         host_dir.mkdir(parents=True, exist_ok=True)
         mounts.append((str(host_dir), f"{_SIDECAR_FORGE_HOME}/{subdir}", "rw"))

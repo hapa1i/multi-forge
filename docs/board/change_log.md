@@ -25,6 +25,31 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board-contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-06-18
+
+### upstream_downstream_ledgers: telemetry clean cut and cap-safe migration
+
+**Goal**: Re-cut Forge telemetry toward downstream model-attempt evidence and upstream operation outcomes without
+silently resetting spend caps during the path move.
+
+**Key changes**:
+
+- Added `~/.forge/telemetry/downstream/` and `~/.forge/telemetry/upstream/` JSONL planes. Proxy cost, audit/drift/
+  mutation, provider lifecycle evidence, direct `core.llm`, direct `claude -p`, and Codex usage now write downstream
+  attempt records; policy evaluation outcomes write upstream records.
+- Default upstream volume is `non_success`; `upstream_event_volume=all` enables success/cached-allow operation logs.
+- Spend caps now persist `telemetry/caps/<proxy_id>.json` and bootstrap from
+  `max(cap_state, downstream logs, legacy cost logs)`, so clean-cut migration and dropped best-effort telemetry writes
+  do not reset monthly caps to zero.
+- `forge proxy costs reset` now wipes old cost logs, new upstream/downstream telemetry, cap state, audit sidecar state,
+  usage events, and derived status-line caches; sidecar proxy launches mount `~/.forge/telemetry/` rw.
+- Provider trace reads now project downstream attempt fields, and `forge proxy costs show --by-verb` derives attribution
+  by joining downstream requests to usage run ids instead of writing new `costs/verbs` shards.
+
+**Verification**: Focused telemetry/proxy/policy/activity/sidecar suite green (264 tests), provider-trace CLI/core/
+regression suite green (32 tests), direct/provider metadata regression coverage added, ruff clean on touched Python and
+tests.
+
 ## 2026-06-16
 
 ### proxy_log_hygiene: reviewer follow-ups (no-plaintext leaks + CLI/create completeness)

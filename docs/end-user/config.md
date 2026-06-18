@@ -189,6 +189,17 @@ spend), `forge activity` (Forge automation activity), and the `forge_cost` segme
 **Removed:** the old flat `show_rate_limits` key. Add `rate_limits` to `statusline.segments` instead (e.g.
 `forge config set statusline.segments=path,model,rate_limits`).
 
+**Upstream telemetry volume.** Forge records operation outcomes under `~/.forge/telemetry/upstream/`. The default is a
+low-volume failure/exception log:
+
+```bash
+forge config set upstream_event_volume=non_success  # default
+forge config set upstream_event_volume=all          # also record successes/cached allows
+```
+
+Use `all` only when you want a complete local operation log for debugging; routine deterministic successes can be
+high-volume.
+
 ---
 
 ## Secrets (`forge authentication`)

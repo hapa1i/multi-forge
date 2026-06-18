@@ -103,6 +103,10 @@ class PolicyDecision:
             the goal and surface conflicts instead of working around them)
         cached: Whether this was a cached verdict (for debugging)
         evaluated_at: ISO8601 timestamp when evaluated (for logging)
+        fail_open: Structural marker for allow-through failure paths. This keeps
+            telemetry from inferring fail-open from warning prose.
+        failure_type: Machine-readable failure reason for fail-open/error telemetry
+            (for example ``timeout`` or ``subprocess_error``).
     """
 
     decision: DecisionType
@@ -112,6 +116,11 @@ class PolicyDecision:
     intent: str | None = None
     cached: bool = False
     evaluated_at: str | None = None
+    fail_open: bool = False
+    failure_type: str | None = None
+    telemetry_run_id: str | None = None
+    telemetry_parent_run_id: str | None = None
+    telemetry_root_run_id: str | None = None
 
 
 @dataclass

@@ -1,8 +1,8 @@
 """``forge activity`` — per-session Forge *automation* activity (supervisor, memory
 writer, workflow verbs) + policy decisions. NOT your full interactive Claude usage.
 
-Reads the two already-captured planes (usage ledger + ``confirmed.policy.decisions``)
-via :func:`forge.core.ops.usage_summary.build_session_activity_summary` and renders a
+Reads the captured planes (usage ledger + ``confirmed.policy.decisions`` plus upstream
+policy outcomes) via :func:`forge.core.ops.usage_summary.build_session_activity_summary` and renders a
 table. Cost is reported-or-estimated (best-effort attribution) — ``forge proxy costs show``
 stays the authoritative spend view.
 """

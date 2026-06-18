@@ -524,7 +524,7 @@ forge proxy set intercept-test intercept.mode=inspect
 # override mode mutates the RAW Anthropic body -> rejected unless wire_shape=anthropic_passthrough
 forge proxy set intercept-test intercept.mode=override 2>&1; echo "OVERRIDE_REJECT_EXIT=$?"
 
-# Full-body audit is the high-risk opt-in: must print a privacy warning naming ~/.forge/audit/
+# Full-body audit is the high-risk opt-in: must print a privacy warning naming ~/.forge/telemetry/downstream/
 forge proxy set intercept-test audit.audit_full_body=true 2>&1
 
 # Create a proxy from the anthropic-passthrough template (the only signature-safe wire shape).
@@ -542,7 +542,7 @@ forge proxy delete passthrough-test --yes 2>/dev/null || true
 
 - [ ] `forge proxy set intercept-test intercept.mode=inspect` succeeds on the translated proxy
 - [ ] `intercept.mode=override` is rejected (exit non-zero) naming `requires wire_shape='anthropic_passthrough'`
-- [ ] `audit.audit_full_body=true` prints a privacy warning naming `~/.forge/audit/`
+- [ ] `audit.audit_full_body=true` prints a privacy warning naming `~/.forge/telemetry/downstream/`
 - [ ] `anthropic-passthrough` proxy created config-only with `wire_shape: anthropic_passthrough` (default port 8096)
 - [ ] `intercept.mode=override` succeeds on the `anthropic-passthrough` proxy
 

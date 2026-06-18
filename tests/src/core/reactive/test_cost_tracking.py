@@ -128,7 +128,7 @@ class TestComputeDelta:
 
 
 class TestLogVerbCost:
-    def test_writes_jsonl_record(self, verb_log_dir: Path):
+    def test_retired_writer_leaves_no_jsonl_record(self, verb_log_dir: Path):
         result = VerbCostResult(
             verb="panel",
             total_cost_micros=120_000,
@@ -150,17 +150,7 @@ class TestLogVerbCost:
         _log_verb_cost(result)
 
         files = list(verb_log_dir.glob("*.jsonl"))
-        assert len(files) == 1
-
-        with open(files[0]) as f:
-            record = json.loads(f.readline())
-
-        assert record["verb"] == "panel"
-        assert record["total_cost_micros"] == 120_000
-        assert record["estimated"] is True
-        assert record["request_count"] == 4
-        assert len(record["per_proxy"]) == 1
-        assert record["per_proxy"][0]["base_url"] == "http://localhost:8084"
+        assert files == []
 
 
 class TestReadVerbLogs:
@@ -242,15 +232,14 @@ class TestTrackVerbCost:
             return MockResp()
 
         with patch("forge.core.reactive.cost_tracking.urllib.request.urlopen", mock_urlopen):
-            with track_verb_cost("panel", ["http://localhost:8084"]):
+            with track_verb_cost("panel", ["http://localhost:8084"]) as result:
                 pass
 
-        records = read_verb_logs()
-        assert len(records) == 1
-        assert records[0]["verb"] == "panel"
-        assert records[0]["total_cost_micros"] == 150_000
-        assert records[0]["request_count"] == 3
-        assert records[0]["input_tokens"] == 3000
+        assert result.verb == "panel"
+        assert result.total_cost_micros == 150_000
+        assert result.request_count == 3
+        assert result.input_tokens == 3000
+        assert read_verb_logs() == []
 
     def test_snapshot_delta_logged_when_wrapped_code_raises(self, verb_log_dir: Path):
         """Failed verb invocations should still attribute completed proxy work."""
@@ -289,17 +278,18 @@ class TestTrackVerbCost:
 
             return MockResp()
 
+        result: VerbCostResult | None = None
         with patch("forge.core.reactive.cost_tracking.urllib.request.urlopen", mock_urlopen):
             with pytest.raises(RuntimeError, match="panel failed"):
-                with track_verb_cost("panel", ["http://localhost:8084"]):
+                with track_verb_cost("panel", ["http://localhost:8084"]) as result:
                     raise RuntimeError("panel failed")
 
-        records = read_verb_logs()
-        assert len(records) == 1
-        assert records[0]["verb"] == "panel"
-        assert records[0]["total_cost_micros"] == 75_000
-        assert records[0]["request_count"] == 2
-        assert records[0]["input_tokens"] == 1500
+        assert result is not None
+        assert result.verb == "panel"
+        assert result.total_cost_micros == 75_000
+        assert result.request_count == 2
+        assert result.input_tokens == 1500
+        assert read_verb_logs() == []
 
     def test_cost_measured_true_when_reported_advances(self, verb_log_dir: Path):
         """A window with a reported-cost request marks the verb cost_measured=True."""
@@ -315,12 +305,12 @@ class TestTrackVerbCost:
         }
 
         with patch("forge.core.reactive.cost_tracking.urllib.request.urlopen", _two_snapshot_urlopen(before, after)):
-            with track_verb_cost("panel", ["http://localhost:8084"]):
+            with track_verb_cost("panel", ["http://localhost:8084"]) as result:
                 pass
 
-        record = read_verb_logs()[0]
-        assert record["cost_measured"] is True
-        assert record["total_cost_micros"] == 70_000
+        assert result.cost_measured is True
+        assert result.total_cost_micros == 70_000
+        assert read_verb_logs() == []
 
     def test_cost_measured_false_when_only_tokens_advance(self, verb_log_dir: Path):
         """Passthrough verb: tokens/requests advance, no reported cost → cost_measured=False.
@@ -340,14 +330,14 @@ class TestTrackVerbCost:
         }
 
         with patch("forge.core.reactive.cost_tracking.urllib.request.urlopen", _two_snapshot_urlopen(before, after)):
-            with track_verb_cost("panel", ["http://localhost:8084"]):
+            with track_verb_cost("panel", ["http://localhost:8084"]) as result:
                 pass
 
-        record = read_verb_logs()[0]
         # Tokens/requests captured, but cost is not evidence-backed.
-        assert record["request_count"] == 3
-        assert record["input_tokens"] == 3000
-        assert record["cost_measured"] is False
+        assert result.request_count == 3
+        assert result.input_tokens == 3000
+        assert result.cost_measured is False
+        assert read_verb_logs() == []
 
 
 class TestResolveProxyUrls:

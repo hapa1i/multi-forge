@@ -45,17 +45,32 @@ _ROOT = "run_0011223344ff"
 
 
 def _request_records(forge_home: Path) -> list[dict[str, Any]]:
-    out: list[dict[str, Any]] = []
-    d = forge_home / "costs" / "requests"
+    raw: list[dict[str, Any]] = []
+    d = forge_home / "telemetry" / "downstream"
     if not d.is_dir():
-        return out
+        return raw
     for jsonl in sorted(d.glob("*.jsonl")):
         with open(jsonl) as f:
             for line in f:
                 line = line.strip()
                 if line:
-                    out.append(json.loads(line))
-    return out
+                    raw.append(json.loads(line))
+
+    merged: dict[str, dict[str, Any]] = {}
+    ordered: list[str] = []
+    for record in raw:
+        if record.get("kind") != "attempt":
+            continue
+        key = str(record.get("downstream_event_id") or record.get("request_id") or len(ordered))
+        if key not in merged:
+            merged[key] = {}
+            ordered.append(key)
+        for field, value in record.items():
+            if field == "confidence" and value == "unknown" and merged[key].get("confidence") != "unknown":
+                continue
+            if value is not None:
+                merged[key][field] = value
+    return [merged[key] for key in ordered]
 
 
 def _wait_for_new_record(forge_home: Path, proxy_id: str, before: int, timeout_s: float = 12.0) -> dict[str, Any]:
@@ -128,7 +143,7 @@ def test_malformed_header_dropped_not_trusted(
     assert resp.status_code == 200, resp.text[:500]
 
     record = _wait_for_new_record(module_forge_home, proxy.proxy_id, before)
-    assert record["forge_run_id"] is None  # malformed dropped
+    assert record.get("forge_run_id") is None  # malformed dropped
     assert record["forge_root_run_id"] == _ROOT  # the valid one still stamped
 
 
@@ -143,8 +158,8 @@ def test_absent_headers_are_none(
     assert resp.status_code == 200, resp.text[:500]
 
     record = _wait_for_new_record(module_forge_home, proxy.proxy_id, before)
-    assert record["forge_run_id"] is None
-    assert record["forge_root_run_id"] is None
+    assert record.get("forge_run_id") is None
+    assert record.get("forge_root_run_id") is None
 
 
 # The Claude Code version this forwarding guard was last confirmed against (all six cases

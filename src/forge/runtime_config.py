@@ -159,6 +159,10 @@ class RuntimeConfig:
     # Does NOT affect deny output or substantive warning lines -- those stay visible always.
     policy_summary_feedback: str = "on"
 
+    # Upstream telemetry volume: "non_success" records failure/exception outcomes;
+    # "all" also records successful deterministic passes and cached allows.
+    upstream_event_volume: str = "non_success"
+
     # Log tool failures to ~/.forge/logs/tool_failures/ even without debug mode.
     # Off by default because records may include tool inputs and error payloads.
     log_tool_failures: bool = False
@@ -211,6 +215,12 @@ class RuntimeConfig:
             raise ValueError(
                 f"Invalid policy_summary_feedback: '{self.policy_summary_feedback}' "
                 f"(must be one of: {', '.join(sorted(valid_feedback))})"
+            )
+        valid_upstream_event_volume = {"non_success", "all"}
+        if self.upstream_event_volume not in valid_upstream_event_volume:
+            raise ValueError(
+                f"Invalid upstream_event_volume: '{self.upstream_event_volume}' "
+                f"(must be one of: {', '.join(sorted(valid_upstream_event_volume))})"
             )
         valid_interactive_key_modes = {"inherit", "omit"}
         if self.interactive_anthropic_api_key not in valid_interactive_key_modes:
@@ -523,6 +533,9 @@ proxy_mode: host
 # "on" (default) prints what was checked and the verdict after each policy evaluation.
 # "off" silences summary lines. Deny messages and substantive warnings stay visible always.
 # policy_summary_feedback: "on"
+
+# Upstream outcome telemetry volume: non_success (failure/exception log) or all.
+# upstream_event_volume: "non_success"
 
 # Tool failure telemetry for proxied sessions.
 # Records failed tool call inputs and errors to help refine model-family prompt addendums.

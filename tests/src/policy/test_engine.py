@@ -1,5 +1,6 @@
 """Tests for policy/engine.py."""
 
+from forge.core.telemetry.upstream import read_upstream_outcomes
 from forge.policy.engine import PolicyEngine, build_engine
 from forge.policy.types import ActionContext, PolicyDecision, Violation
 
@@ -171,6 +172,80 @@ class TestPolicyEngine:
         result = engine.evaluate(write_context)
         assert result.final_decision == "allow"
         assert any("fail-open" in w for w in result.all_warnings)
+
+    def test_fail_open_records_upstream_outcome_by_default(self, write_context: ActionContext) -> None:
+        """Default upstream volume records non-success no-call outcomes."""
+
+        class ErrorPolicy:
+            @property
+            def policy_id(self) -> str:
+                return "semantic.supervisor"
+
+            @property
+            def description(self) -> str:
+                return "Error policy"
+
+            def applies_to(self, context: ActionContext) -> bool:
+                return True
+
+            def evaluate(self, context: ActionContext) -> PolicyDecision:
+                raise RuntimeError("Boom!")
+
+        engine = PolicyEngine(fail_mode="open")
+        engine.register(ErrorPolicy())
+
+        engine.evaluate(write_context)
+
+        outcomes = read_upstream_outcomes(session="test-session", policy_id="semantic.supervisor")
+        assert len(outcomes) == 1
+        assert outcomes[0].command == "policy-check"
+        assert outcomes[0].status == "fail_open"
+        assert outcomes[0].reason_code == "evaluate_fail_open"
+
+    def test_structural_supervisor_timeout_records_timeout(self, write_context: ActionContext) -> None:
+        """Supervisor fail-open telemetry uses structured fields, not warning text."""
+
+        class TimeoutPolicy:
+            @property
+            def policy_id(self) -> str:
+                return "semantic.supervisor"
+
+            @property
+            def description(self) -> str:
+                return "Supervisor"
+
+            def applies_to(self, context: ActionContext) -> bool:
+                return True
+
+            def evaluate(self, context: ActionContext) -> PolicyDecision:
+                return PolicyDecision(
+                    decision="allow",
+                    policy_id="semantic.supervisor",
+                    warnings=["Supervisor error: timed out, failing open"],
+                    fail_open=True,
+                    failure_type="timeout",
+                    telemetry_run_id="run_supervisor_child",
+                )
+
+        engine = PolicyEngine(fail_mode="open")
+        engine.register(TimeoutPolicy())
+
+        engine.evaluate(write_context)
+
+        outcomes = read_upstream_outcomes(session="test-session", policy_id="semantic.supervisor")
+        assert len(outcomes) == 1
+        assert outcomes[0].status == "timeout"
+        assert outcomes[0].reason_code == "timeout"
+        assert outcomes[0].run_id == "run_supervisor_child"
+
+    def test_success_not_recorded_at_default_upstream_volume(self, write_context: ActionContext) -> None:
+        """Default upstream volume is a non-success log, not a complete operation log."""
+        engine = PolicyEngine()
+        engine.register(MockPolicy(policy_id="semantic.supervisor", decision="allow"))
+
+        engine.evaluate(write_context)
+
+        assert read_upstream_outcomes(session="test-session", policy_id="semantic.supervisor") == []
 
     def test_fail_closed_on_error(self, write_context: ActionContext) -> None:
         """Fail-closed mode denies on policy errors."""
