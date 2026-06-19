@@ -11,12 +11,14 @@ Provides commands to manage backend services (LiteLLM, etc.) that proxies depend
 from __future__ import annotations
 
 import json
+import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, NoReturn
 
 import click
+import yaml
 from rich.console import Console
 from rich.table import Table
 
@@ -29,12 +31,13 @@ from forge.backend.sources import (
     list_model_sources,
     resolve_model_source_id,
 )
-from forge.cli.output import print_error_with_tip, print_tip
+from forge.cli.output import print_error, print_error_with_tip, print_tip
 from forge.core.auth.template_secrets import resolve_env_or_credential_with_source
 from forge.core.credential_registry import EnvVar
 from forge.core.paths import display_path, get_forge_home
 
 _SUPPORTED_ADAPTERS = frozenset({"litellm"})
+_ENV_REF_RE = re.compile(r"^os\.environ/([A-Z][A-Z0-9_]*)$")
 
 
 @dataclass(frozen=True)
@@ -63,6 +66,48 @@ def _source_for_identifier(identifier: str) -> ModelSource | None:
         return None
 
 
+def _iter_config_strings(value: Any) -> list[str]:
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, dict):
+        strings: list[str] = []
+        for item in value.values():
+            strings.extend(_iter_config_strings(item))
+        return strings
+    if isinstance(value, list):
+        strings = []
+        for item in value:
+            strings.extend(_iter_config_strings(item))
+        return strings
+    return []
+
+
+def _backend_config_env_vars(adapter: str) -> frozenset[str]:
+    """Return env vars referenced by an installed backend adapter config."""
+
+    config_path = get_backend_config_path(adapter)
+    if not config_path.exists():
+        return frozenset()
+    try:
+        data = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError):
+        return frozenset()
+
+    env_vars: set[str] = set()
+    for text in _iter_config_strings(data):
+        match = _ENV_REF_RE.match(text.strip())
+        if match:
+            env_vars.add(match.group(1))
+    return frozenset(env_vars)
+
+
+def _local_source_matches_backend_config(source: ModelSource) -> bool:
+    if source.local_lifecycle is None:
+        return False
+    config_env_vars = _backend_config_env_vars(source.local_lifecycle.adapter)
+    return bool(set(source.required_env_vars) & set(config_env_vars))
+
+
 def _runtime_instance_for_source(
     source: ModelSource,
     runtime_instances: dict[str, BackendInstance],
@@ -70,7 +115,12 @@ def _runtime_instance_for_source(
     if source.local_lifecycle is None:
         return None
     instance_id = f"{source.local_lifecycle.adapter}-{source.local_lifecycle.default_port}"
-    return runtime_instances.get(instance_id)
+    instance = runtime_instances.get(instance_id)
+    if instance is None:
+        return None
+    if not _local_source_matches_backend_config(source):
+        return None
+    return instance
 
 
 def _runtime_instance_record(instance: BackendInstance | None) -> dict[str, Any] | None:
@@ -259,7 +309,16 @@ def _resolve_local_adapter_operand(operand: str) -> str:
             f"'forge backend create {adapter}' or 'forge backend delete {adapter}'."
         )
 
-    raise click.ClickException(f"Unknown backend adapter or source '{operand}'.")
+    valid_adapters = ", ".join(sorted(_SUPPORTED_ADAPTERS))
+    raise click.ClickException(
+        f"Unknown backend adapter or source '{operand}'. Valid adapters: {valid_adapters}. "
+        "Use 'forge backend list' to see source ids."
+    )
+
+
+def _exit_click_error(error: click.ClickException, console: Console) -> NoReturn:
+    print_error(error.message, console=console)
+    sys.exit(1)
 
 
 def _join_url(base_url: str, path: str) -> str:
@@ -529,7 +588,11 @@ def test_auth_cmd(source_id: str, as_json: bool, timeout: float) -> None:
     console = Console(width=200)
     source = _source_for_identifier(source_id)
     if source is None:
-        raise click.ClickException(f"Unknown backend source '{source_id}'. Use 'forge backend list' to see source ids.")
+        print_error(
+            f"Unknown backend source '{source_id}'. Use 'forge backend list' to see source ids.",
+            console=console,
+        )
+        sys.exit(1)
 
     runtime_instances = _load_runtime_instances()
     instance = _runtime_instance_for_source(source, runtime_instances)
@@ -586,8 +649,7 @@ def create_cmd(adapter: str, config: Path | None) -> None:
     try:
         adapter = _resolve_local_adapter_operand(adapter)
     except click.ClickException as e:
-        console.print(f"[red]Error:[/red] {e.message}")
-        sys.exit(1)
+        _exit_click_error(e, console)
 
     config_path = get_backend_config_path(adapter)
     if config_path.exists():
@@ -609,7 +671,7 @@ def create_cmd(adapter: str, config: Path | None) -> None:
         console.print("\n[dim]Start an instance with:[/dim]")
         console.print(f"  forge backend start {adapter} --port 4000")
     except Exception as e:
-        console.print(f"[red]Error:[/red] {e}")
+        print_error(str(e), console=console)
         sys.exit(1)
 
 
@@ -622,8 +684,7 @@ def start_cmd(source_or_adapter: str, port: int | None) -> None:
     try:
         adapter, resolved_port = _resolve_lifecycle_operand(source_or_adapter, port)
     except click.ClickException as e:
-        console.print(f"[red]Error:[/red] {e.message}")
-        sys.exit(1)
+        _exit_click_error(e, console)
 
     config_path = get_backend_config_path(adapter)
     if not config_path.exists():
@@ -649,7 +710,7 @@ def start_cmd(source_or_adapter: str, port: int | None) -> None:
         else:
             console.print(f"Backend '{backend_id}' already running on port {resolved_port}")
     except Exception as e:
-        console.print(f"[red]Error:[/red] {e}")
+        print_error(str(e), console=console)
         sys.exit(1)
 
 
@@ -662,8 +723,7 @@ def stop_cmd(source_or_adapter: str, port: int | None) -> None:
     try:
         adapter, resolved_port = _resolve_lifecycle_operand(source_or_adapter, port)
     except click.ClickException as e:
-        console.print(f"[red]Error:[/red] {e.message}")
-        sys.exit(1)
+        _exit_click_error(e, console)
 
     backend_id = f"{adapter}-{resolved_port}"
 
@@ -675,7 +735,7 @@ def stop_cmd(source_or_adapter: str, port: int | None) -> None:
         manager.stop_backend(backend_id)
         console.print(f"[green]Stopped[/green] backend '{backend_id}'")
     except Exception as e:
-        console.print(f"[red]Error:[/red] {e}")
+        print_error(str(e), console=console)
         sys.exit(1)
 
 
@@ -700,8 +760,7 @@ def delete_cmd(adapter: str, port: int | None, yes: bool) -> None:
     try:
         adapter = _resolve_local_adapter_operand(adapter)
     except click.ClickException as e:
-        console.print(f"[red]Error:[/red] {e.message}")
-        sys.exit(1)
+        _exit_click_error(e, console)
 
     if port is not None:
         backend_id = f"{adapter}-{port}"
@@ -713,7 +772,7 @@ def delete_cmd(adapter: str, port: int | None, yes: bool) -> None:
             stop_cmd.callback(adapter, port)  # type: ignore[misc]  # click.Command.callback is Optional[Callable]; always set here
             console.print(f"[green]Stopped[/green] backend instance '{backend_id}'")
         except Exception as e:
-            console.print(f"[red]Error:[/red] {e}")
+            print_error(str(e), console=console)
             sys.exit(1)
     else:
         backend_dir = get_forge_home() / "backends" / adapter

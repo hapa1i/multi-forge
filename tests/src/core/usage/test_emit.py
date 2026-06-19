@@ -11,10 +11,12 @@ from __future__ import annotations
 
 from typing import Any
 
+from forge.backend.sources import get_model_source
 from forge.core.reactive.cost_tracking import VerbCostResult
 from forge.core.reactive.session_runner import SessionResult
 from forge.core.telemetry.downstream import read_downstream_records
 from forge.core.usage.emit import (
+    _backend_id_for_direct_usage,
     emit_direct_llm_usage,
     emit_usage_for_session_result,
     emit_verb_usage,
@@ -35,6 +37,21 @@ def _ok_result(**overrides: Any) -> SessionResult:
     }
     base.update(overrides)
     return SessionResult(**base)
+
+
+def test_direct_usage_backend_ids_resolve_to_catalog_sources() -> None:
+    """Direct usage attribution must not emit dangling model-source ids."""
+
+    backend_ids = [
+        _backend_id_for_direct_usage(provider=None, reporter="claude_code"),
+        _backend_id_for_direct_usage(provider="anthropic", reporter="provider"),
+        _backend_id_for_direct_usage(provider="openrouter", reporter="provider"),
+        _backend_id_for_direct_usage(provider="openai", reporter="codex_jsonl"),
+    ]
+
+    for backend_id in backend_ids:
+        if backend_id is not None:
+            assert get_model_source(backend_id).id == backend_id
 
 
 class TestEmitForSessionResult:

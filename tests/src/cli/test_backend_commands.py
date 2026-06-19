@@ -80,6 +80,15 @@ def test_list_json_includes_static_sources_and_local_runtime(
     runner: CliRunner,
     forge_home: Path,
 ) -> None:
+    config_path = forge_home / "backends" / "litellm" / "config.yaml"
+    config_path.parent.mkdir(parents=True)
+    config_path.write_text(
+        "model_list:\n"
+        "  - model_name: gemini-test\n"
+        "    litellm_params:\n"
+        "      model: gemini/gemini-test\n"
+        "      api_key: os.environ/GEMINI_API_KEY\n"
+    )
     store = BackendRegistryStore(forge_home / "backends" / "index.json")
     store.write(
         BackendRegistry(
@@ -105,6 +114,8 @@ def test_list_json_includes_static_sources_and_local_runtime(
     assert records["litellm-gemini-local"]["kind"] == "local"
     assert records["litellm-gemini-local"]["runtime_instance"]["backend_id"] == "litellm-4000"
     assert records["litellm-gemini-local"]["health"] == "healthy"
+    assert records["litellm-openai-local"]["runtime_instance"] is None
+    assert records["litellm-anthropic-local"]["runtime_instance"] is None
 
     registry = store.read()
     assert set(registry.backends) == {"litellm-4000"}
@@ -178,6 +189,31 @@ def test_test_auth_missing_credential_is_secret_free_json(runner: CliRunner, for
     assert payload["missing_required_env_vars"] == ["OPENROUTER_API_KEY"]
     assert payload["probe"]["status"] == "skipped"
     assert "sk-" not in result.output
+
+
+def test_test_auth_unknown_source_uses_cli_error_helper(runner: CliRunner, forge_home: Path) -> None:
+    result = runner.invoke(main, ["backend", "test-auth", "missing-source"])
+
+    assert result.exit_code == 1
+    assert result.output.startswith("Error:")
+    assert "forge backend list" in result.output
+
+
+@pytest.mark.parametrize("verb", ["create", "delete"])
+def test_local_only_unknown_adapter_names_valid_choices(
+    runner: CliRunner,
+    forge_home: Path,
+    verb: str,
+) -> None:
+    result = runner.invoke(
+        main,
+        ["backend", verb, "foobar", "--yes"] if verb == "delete" else ["backend", verb, "foobar"],
+    )
+
+    assert result.exit_code == 1
+    assert "Unknown backend adapter or source 'foobar'" in result.output
+    assert "Valid adapters: litellm" in result.output
+    assert "forge backend list" in result.output
 
 
 def test_test_auth_env_provenance_does_not_echo_secret(

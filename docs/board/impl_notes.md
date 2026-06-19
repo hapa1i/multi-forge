@@ -36,6 +36,21 @@ wc -l docs/board/impl_notes.md
 
 ## Notes
 
+### Unified backend: source catalog invariants (shipped)
+
+Shipped 2026-06-18 (`unified_backend`). Keep these boundaries intact when changing backend/source, template, auth, or
+telemetry ownership:
+
+- **Credential registry is a dependency leaf.** Credential data lives in `src/forge/core/credential_registry.py`, while
+  template/source-aware logic lives above it (`forge.backend.sources`, `forge.core.auth.template_secrets`,
+  `forge.core.auth.capabilities`). Do not move `CREDENTIALS` back into a module that imports template/source logic; that
+  recreates the `sources -> auth -> sources` cycle that Phase 2 removed.
+- **Catalog source ids and runtime instance ids are different value-spaces.** `ModelSource.id` values such as
+  `litellm-gemini-local`, `openrouter`, and `anthropic-direct` are static source definitions.
+  `BackendInstance.backend_id` values such as `litellm-4000` are local process instances. Downstream telemetry
+  `backend_id` writes the catalog source id, never the runtime instance id; local catalog ids must not become
+  port-derived.
+
 ### Memory System Architecture (shipped)
 
 Two primitives: passports select docs (project-scoped, git-tracked frontmatter); session activation decides whether the
