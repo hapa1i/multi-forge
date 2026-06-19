@@ -114,11 +114,103 @@ def test_list_json_includes_static_sources_and_local_runtime(
     assert records["litellm-gemini-local"]["kind"] == "local"
     assert records["litellm-gemini-local"]["runtime_instance"]["backend_id"] == "litellm-4000"
     assert records["litellm-gemini-local"]["health"] == "healthy"
+    # A gemini-only config means only one source matches, so the instance is not shared.
+    assert records["litellm-gemini-local"]["runtime_instance"]["shared_with"] == []
     assert records["litellm-openai-local"]["runtime_instance"] is None
     assert records["litellm-anthropic-local"]["runtime_instance"] is None
 
     registry = store.read()
     assert set(registry.backends) == {"litellm-4000"}
+
+
+def test_list_json_marks_shared_local_runtime_instance(
+    runner: CliRunner,
+    forge_home: Path,
+) -> None:
+    """A multi-provider config mirrors the shipped default: one litellm-4000 process
+    serves both Gemini and OpenAI, so both local sources match it and the list marks
+    the instance as shared rather than implying two separate backends."""
+    config_path = forge_home / "backends" / "litellm" / "config.yaml"
+    config_path.parent.mkdir(parents=True)
+    config_path.write_text(
+        "model_list:\n"
+        "  - model_name: gemini-test\n"
+        "    litellm_params:\n"
+        "      model: gemini/gemini-test\n"
+        "      api_key: os.environ/GEMINI_API_KEY\n"
+        "  - model_name: gpt-test\n"
+        "    litellm_params:\n"
+        "      model: openai/gpt-test\n"
+        "      api_key: os.environ/OPENAI_API_KEY\n"
+    )
+    store = BackendRegistryStore(forge_home / "backends" / "index.json")
+    store.write(
+        BackendRegistry(
+            backends={
+                "litellm-4000": BackendInstance(
+                    backend_id="litellm-4000",
+                    adapter_type="litellm",
+                    port=4000,
+                    pid=None,
+                    status="healthy",
+                )
+            }
+        )
+    )
+
+    result = runner.invoke(main, ["backend", "list", "--json"])
+
+    assert result.exit_code == 0
+    records = {item["source_id"]: item for item in _json_output(result)}
+
+    gemini = records["litellm-gemini-local"]["runtime_instance"]
+    openai = records["litellm-openai-local"]["runtime_instance"]
+    # Both sources are backed by the single running instance.
+    assert gemini["backend_id"] == "litellm-4000"
+    assert openai["backend_id"] == "litellm-4000"
+    # Each row names the sibling source it shares the instance with, not itself.
+    assert gemini["shared_with"] == ["litellm-openai-local"]
+    assert openai["shared_with"] == ["litellm-gemini-local"]
+    # anthropic-local is not in the config, so it stays unmatched.
+    assert records["litellm-anthropic-local"]["runtime_instance"] is None
+    # The shared instance is still a single registry entry, not duplicated.
+    assert set(store.read().backends) == {"litellm-4000"}
+
+
+def test_list_human_marks_shared_runtime_instance(runner: CliRunner, forge_home: Path) -> None:
+    """The human table flags a shared instance in the RUNTIME column."""
+    config_path = forge_home / "backends" / "litellm" / "config.yaml"
+    config_path.parent.mkdir(parents=True)
+    config_path.write_text(
+        "model_list:\n"
+        "  - model_name: gemini-test\n"
+        "    litellm_params:\n"
+        "      model: gemini/gemini-test\n"
+        "      api_key: os.environ/GEMINI_API_KEY\n"
+        "  - model_name: gpt-test\n"
+        "    litellm_params:\n"
+        "      model: openai/gpt-test\n"
+        "      api_key: os.environ/OPENAI_API_KEY\n"
+    )
+    store = BackendRegistryStore(forge_home / "backends" / "index.json")
+    store.write(
+        BackendRegistry(
+            backends={
+                "litellm-4000": BackendInstance(
+                    backend_id="litellm-4000",
+                    adapter_type="litellm",
+                    port=4000,
+                    pid=None,
+                    status="healthy",
+                )
+            }
+        )
+    )
+
+    result = runner.invoke(main, ["backend", "list"])
+
+    assert result.exit_code == 0
+    assert "shared" in result.output
 
 
 def test_list_human_shows_sources_even_without_runtime(runner: CliRunner, forge_home: Path) -> None:

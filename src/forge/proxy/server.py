@@ -99,9 +99,29 @@ PROXY_ID: str | None = os.environ.get("FORGE_PROXY_ID")
 cost_tracker: CostTracker | None = None
 
 
+_warned_unknown_backend_sources: set[str] = set()
+
+
 def _backend_source_id() -> str | None:
     source = getattr(config.proxy, "source", "") or None
-    return str(source) if source else None
+    if not source:
+        return None
+    source = str(source)
+    # proxy.yaml is user-owned config (a system boundary): an unrecognized source is a
+    # misconfiguration, not durable-state corruption to reject. Degrade to the raw value
+    # but warn once so the silent telemetry-attribution gap is visible -- best-effort
+    # degradation must log, never be silent (coding-standards section 5).
+    if source not in _warned_unknown_backend_sources:
+        try:
+            get_model_source(source)
+        except ModelSourceNotFoundError:
+            _warned_unknown_backend_sources.add(source)
+            logger.warning(
+                "proxy.source %r is not a known backend source; downstream telemetry for this "
+                "proxy will carry an unrecognized backend_id. Recreate the proxy to refresh proxy.yaml.",
+                source,
+            )
+    return source
 
 
 def _inject_openrouter_user_enabled() -> bool:

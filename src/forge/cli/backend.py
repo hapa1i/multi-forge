@@ -123,7 +123,39 @@ def _runtime_instance_for_source(
     return instance
 
 
-def _runtime_instance_record(instance: BackendInstance | None) -> dict[str, Any] | None:
+def _instance_source_map(runtime_instances: dict[str, BackendInstance]) -> dict[str, list[str]]:
+    """Map each running instance backend_id to the local source ids it backs.
+
+    Local LiteLLM sources share one adapter+port, so a single process can back
+    several sources at once (the default config serves Gemini and OpenAI models
+    from one litellm-4000 process). The list/show views use this to mark a runtime
+    instance as shared instead of implying separate backends.
+    """
+    mapping: dict[str, list[str]] = {}
+    for source in list_model_sources():
+        instance = _runtime_instance_for_source(source, runtime_instances)
+        if instance is not None:
+            mapping.setdefault(instance.backend_id, []).append(source.id)
+    return mapping
+
+
+def _shared_sibling_sources(
+    source: ModelSource,
+    instance: BackendInstance | None,
+    instance_sources: dict[str, list[str]],
+) -> tuple[str, ...]:
+    """Return other source ids that share `instance` with `source`."""
+
+    if instance is None:
+        return ()
+    return tuple(sid for sid in instance_sources.get(instance.backend_id, ()) if sid != source.id)
+
+
+def _runtime_instance_record(
+    instance: BackendInstance | None,
+    *,
+    shared_with: tuple[str, ...] = (),
+) -> dict[str, Any] | None:
     if instance is None:
         return None
     return {
@@ -133,7 +165,21 @@ def _runtime_instance_record(instance: BackendInstance | None) -> dict[str, Any]
         "pid": instance.pid,
         "status": instance.status,
         "created_at": instance.created_at,
+        # Other local sources backed by the same adapter+port process; non-empty
+        # when one local LiteLLM instance serves multiple sources (e.g. Gemini + OpenAI).
+        "shared_with": list(shared_with),
     }
+
+
+def _runtime_cell(runtime: dict[str, Any] | None) -> str:
+    """Render the RUNTIME column, flagging an instance shared across sources."""
+
+    if not runtime:
+        return "-"
+    label = str(runtime["backend_id"])
+    if runtime.get("shared_with"):
+        label += " (shared)"
+    return label
 
 
 def _resolve_env_var(ev: EnvVar) -> dict[str, Any]:
@@ -249,8 +295,13 @@ def _source_health(source: ModelSource, instance: BackendInstance | None, auth: 
     return instance.status
 
 
-def _source_record(source: ModelSource, runtime_instances: dict[str, BackendInstance]) -> dict[str, Any]:
+def _source_record(
+    source: ModelSource,
+    runtime_instances: dict[str, BackendInstance],
+    instance_sources: dict[str, list[str]] | None = None,
+) -> dict[str, Any]:
     instance = _runtime_instance_for_source(source, runtime_instances)
+    shared_with = _shared_sibling_sources(source, instance, instance_sources or {})
     auth = _auth_record(source)
     return {
         "backend_id": source.id,
@@ -264,7 +315,7 @@ def _source_record(source: ModelSource, runtime_instances: dict[str, BackendInst
         "missing_required_env_vars": auth["missing_required_env_vars"],
         "health": _source_health(source, instance, auth),
         "has_lifecycle": source.has_lifecycle,
-        "runtime_instance": _runtime_instance_record(instance),
+        "runtime_instance": _runtime_instance_record(instance, shared_with=shared_with),
     }
 
 
@@ -424,6 +475,7 @@ def _probe_model_source(
 def _show_source(source: ModelSource, raw: bool, console: Console) -> None:
     runtime_instances = _load_runtime_instances()
     instance = _runtime_instance_for_source(source, runtime_instances)
+    shared_with = _shared_sibling_sources(source, instance, _instance_source_map(runtime_instances))
     auth = _auth_record(source)
 
     console.print(f"[bold]Backend source:[/bold] [cyan]{source.id}[/cyan]")
@@ -443,6 +495,8 @@ def _show_source(source: ModelSource, raw: bool, console: Console) -> None:
             console.print(f"[bold]Runtime instance:[/bold] {instance.backend_id}")
             console.print(f"[bold]Runtime PID:[/bold] {instance.pid or '-'}")
             console.print(f"[bold]Runtime status:[/bold] {instance.status}")
+            if shared_with:
+                console.print(f"[bold]Shared with:[/bold] {', '.join(shared_with)}")
         else:
             console.print("[bold]Runtime instance:[/bold] -")
 
@@ -474,7 +528,8 @@ def list_cmd(as_json: bool) -> None:
     """List built-in backend sources and local runtime state."""
     console = Console(width=200)
     runtime_instances = _load_runtime_instances()
-    records = [_source_record(source, runtime_instances) for source in list_model_sources()]
+    instance_sources = _instance_source_map(runtime_instances)
+    records = [_source_record(source, runtime_instances, instance_sources) for source in list_model_sources()]
 
     if as_json:
         click.echo(json.dumps(records, indent=2, default=str))
@@ -507,7 +562,7 @@ def list_cmd(as_json: bool) -> None:
                 }
             ),
             record["health"],
-            runtime["backend_id"] if runtime else "-",
+            _runtime_cell(runtime),
         )
 
     console.print(table)

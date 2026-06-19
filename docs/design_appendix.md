@@ -163,13 +163,15 @@ helpers stay in `src/forge/core/auth/capabilities.py`, avoiding an auth/template
 
 `forge backend` is the operator view over this catalog. `forge backend list` reads the static sources plus the local
 runtime registry and reports source kind, endpoint shape, required credentials, per-variable provenance, offline
-auth/health status, and any matching local `BackendInstance`. The command stays offline for remote sources: configured
-remote sources show as `unprobed` until an operator runs `forge backend test-auth <source-id>`, which resolves the same
-credentials and performs the source's reachability/auth probe without echoing secret values.
-`forge backend show <source-id>` renders catalog details and local runtime state when a source has lifecycle. `start`
-and `stop` accept local source ids or legacy adapter operands; remote source operands return an intentional no-lifecycle
-capability error. `create` and `delete` remain local adapter/config operations because built-in remote sources are not
-user-created durable state.
+auth/health status, and any matching local `BackendInstance`. The local LiteLLM sources share one adapter/port
+(`litellm` on `4000`), so a single runtime instance can back several sources at once; `forge backend list` marks such an
+instance `(shared)` and `--json` carries a `runtime_instance.shared_with` list of the sibling source ids. The command
+stays offline for remote sources: configured remote sources show as `unprobed` until an operator runs
+`forge backend test-auth <source-id>`, which resolves the same credentials and performs the source's reachability/auth
+probe without echoing secret values. `forge backend show <source-id>` renders catalog details and local runtime state
+when a source has lifecycle. `start` and `stop` accept local source ids or legacy adapter operands; remote source
+operands return an intentional no-lifecycle capability error. `create` and `delete` remain local adapter/config
+operations because built-in remote sources are not user-created durable state.
 
 ### A.3 Confusion traps / anti-patterns (§3.6.6)
 

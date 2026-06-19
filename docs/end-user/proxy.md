@@ -97,6 +97,13 @@ probe the upstream endpoint without printing secret values. Remote sources such 
 built in and have no local start/stop lifecycle; local LiteLLM sources can be started by source id or by the legacy
 `litellm --port <port>` adapter form.
 
+The local LiteLLM sources (`litellm-gemini-local`, `litellm-openai-local`, `litellm-anthropic-local`) all share one
+adapter and port (`litellm` on `4000`), so a single LiteLLM process backs every local source whose credential it is
+configured for. The default config serves Gemini and OpenAI models from one `litellm-4000` process, so
+`forge backend list` shows that instance under both sources and marks it `(shared)`; starting a second matching source
+reuses the running process rather than launching a new one. This is expected — there is one local LiteLLM process, not
+one per source.
+
 ---
 
 ## Core commands (cheat sheet)
