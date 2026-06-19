@@ -50,6 +50,19 @@ telemetry ownership:
   `BackendInstance.backend_id` values such as `litellm-4000` are local process instances. Downstream telemetry
   `backend_id` writes the catalog source id, never the runtime instance id; local catalog ids must not become
   port-derived.
+- **The local sources share one adapter+port, so runtime-instance attribution is many-to-one.** All three local LiteLLM
+  sources declare `adapter=litellm, default_port=4000`, and the shipped default `litellm.yaml` references both
+  `GEMINI_API_KEY` and `OPENAI_API_KEY` — so a single `litellm-4000` process legitimately backs both
+  `litellm-gemini-local` and `litellm-openai-local`. `forge backend list`/`show` surface this as `(shared)` /
+  `runtime_instance.shared_with`. The `_local_source_matches_backend_config` heuristic that disambiguates this is
+  **display-only** (`cli/backend.py`); it must never feed downstream telemetry `backend_id`, which stays derived from
+  `proxy.source`. A test fixture narrower than the shipped default (e.g. gemini-only) hides the multi-match case — lock
+  shared-display behavior with a multi-key fixture, not a single-provider one.
+- **`proxy.source` on the durable read path is a system boundary, not strict durable state.** `proxy.yaml` is user-owned
+  ("edit freely"), so an unrecognized `source` is a misconfiguration to warn-and-degrade on, not corruption to reject:
+  `_backend_source_id` (`proxy/server.py`) warns **once** (module-level set guard) and returns the raw value; the
+  capability gates (provider-trace, OpenRouter user) already fail safe on an unknown id. The strict reject-on-unknown
+  contract is scoped to the **template** load path only (`_apply_template_source`), where the value originates in-repo.
 
 ### Memory System Architecture (shipped)
 

@@ -25,6 +25,27 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board-contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-06-19
+
+### unified_backend closeout: shared local-instance display + review follow-up
+
+**Goal**: Land the PR #39 review follow-up and close the `unified_backend` card.
+
+**Key changes**:
+
+- `forge backend list`/`show` now mark a local LiteLLM runtime instance shared across sources (one `litellm-4000`
+  process backs Gemini + OpenAI under the shipped default config); `--json` carries `runtime_instance.shared_with`. The
+  matching heuristic stays display-only and never feeds downstream telemetry `backend_id` (still derived from
+  `proxy.source`).
+- Proxy `_backend_source_id` warns once when `proxy.yaml` carries an unrecognized `source` (warn-and-degrade; user-owned
+  config is a system boundary), instead of silently passing an unknown `backend_id` into telemetry.
+- Added a multi-key backend-list test mirroring the shipped default (the case the prior gemini-only fixture masked) plus
+  warn-once server coverage; documented the shared local LiteLLM process model in `proxy.md` and design appendix §A.2.1.
+- Card moved `doing/ -> done/`; telemetry epic member table updated (`unified_backend` done).
+
+**Verification**: backend CLI + new server suite (22) and proxy/backend/telemetry/usage suites (175) green;
+`make pre-commit` clean (mypy + pyright). Shipped via PR #39 (squash `ab690ac9`).
+
 ## 2026-06-18
 
 ### unified_backend: model-source catalog and downstream source attribution
