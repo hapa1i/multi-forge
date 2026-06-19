@@ -1,20 +1,22 @@
 # OpenRouter Remote Reconciliation -- generation API joins and account-side views
 
-**Status**: Paused after Phase 0. Depends on the shipped local provider-trace foundation in
-`docs/board/done/openrouter_observability/card.md` and the Phase 0 OpenRouter probes recorded there. The active
-telemetry epic is now running `unified_backend`, so this card remains paused until the backend/source identity key lands
-or the epic deliberately changes sequence. The goal is for remote reconciliation to return as a general downstream
-consumer rather than a second OpenRouter-specific telemetry path.
+**Status**: Paused after Phase 0. The local provider-trace foundation
+(`docs/board/done/openrouter_observability/card.md`) and the backend/source identity key (`unified_backend`, PR #39)
+have both landed. This card remains paused until the telemetry epic explicitly chooses it as the next active member. The
+goal is for remote reconciliation to return as a general downstream consumer built on `backend_id` and the shipped
+upstream/downstream telemetry shape, not as a second OpenRouter-specific telemetry path.
 
 **Epic**: [`epic_telemetry_architecture`](../../doing/epic_telemetry_architecture/card.md).
 
 **References**: OpenRouter `/api/v1/generation`, `/api/v1/activity`, `/api/v1/analytics/query`, management-key
-requirements, Forge provider trace records, cost logs, usage ledger, and run-tree headers.
+requirements, Forge provider-trace DTOs projected from downstream telemetry, downstream records keyed by `backend_id`,
+upstream/run-tree attribution, and run-tree headers.
 
 ## Problem
 
-After Forge has a local provider trace, operators still need a way to ask OpenRouter what the account saw: final token
-counts, cost, upstream provider, cancellation status, and activity grouped by session or time window.
+After Forge has local provider lifecycle evidence in downstream telemetry, operators still need a way to ask OpenRouter
+what the account saw: final token counts, cost, upstream provider, cancellation status, and activity grouped by session
+or time window.
 
 Remote reconciliation is useful, but it is contingent. The motivating incident involved streams cancelled by a local
 supervisor timeout before final usage arrived. OpenRouter may not expose those aborted generations through dashboard,
@@ -27,6 +29,10 @@ This card should therefore enhance local trace, not replace it.
 
 Phase 0 answers are locked in [checklist.md](checklist.md). Implementation should stay within these boundaries:
 
+- `upstream_downstream_ledgers` and `unified_backend` have landed. Local provider-trace reads are projections from
+  downstream model-call evidence, and `backend_id` is the canonical downstream source key.
+- Remote reconciliation must build on the shipped downstream/`backend_id` seam and existing provider-trace read DTOs. Do
+  not recreate a standalone provider-trace plane or re-author the shared usage provenance branch.
 - OpenRouter exposes generation metadata at `/api/v1/generation?id=gen-...`; content lives behind the separate
   `/api/v1/generation/content` endpoint and is out of scope.
 - Generation metadata lookup uses the normal `openrouter` credential path; activity and analytics use the separate
@@ -37,8 +43,8 @@ Phase 0 answers are locked in [checklist.md](checklist.md). Implementation shoul
 
 ## Proposal
 
-Add a small OpenRouter REST client and CLI read surfaces that join local provider trace records to remote OpenRouter
-records when possible.
+Add a small OpenRouter REST client and CLI read surfaces that join local provider-trace records, projected from
+downstream telemetry, to remote OpenRouter records when possible.
 
 ### 1. REST client
 
@@ -76,7 +82,7 @@ The examples intentionally mirror the shipped local trace surface (`--period tod
 
 Output should clearly distinguish:
 
-- **local**: what Forge provider trace/cost/audit/usage records saw
+- **local**: what Forge downstream provider-trace/model-call evidence and upstream attribution records saw
 - **remote**: what OpenRouter reports
 - **joined**: local request ids matched to remote generation ids
 - **missing-local**: OpenRouter activity with no matching local record in the selected window

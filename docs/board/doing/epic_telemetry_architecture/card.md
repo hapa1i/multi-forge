@@ -6,9 +6,11 @@ supervisor-timeout / shadow-sampling incident) and that both re-architect Forge'
 axes**. This card is the single consistent view the member cards lean on; it does **not** replace them. Its
 `checklist.md` is for coordination and sequencing only; member cards remain the execution units.
 
-**Current coordination goal**: `unified_backend` is in closeout after landing the backend/source identity key on the
-active branch. Keep remote reconciliation paused until this card merges, then decide whether it resumes next or whether
-another source-key follow-up is needed.
+**Current coordination goal**: `unified_backend` has merged (PR #39) and closed to `done/`, so `backend_id` is now the
+canonical downstream source key. The open coordination decision is whether to resume
+[`openrouter_remote_reconciliation`](../../paused/openrouter_remote_reconciliation/card.md) (paused after Phase 0,
+pending exactly this source-key foundation) as the next member, or whether another source-key follow-up should run
+first.
 
 ## Why an epic, not a merged card
 
@@ -40,7 +42,7 @@ Two telemetry planes, joined by run-tree identity, with one canonical source key
 | Concern                                     | Owner card                                                                                  | Status                                             |
 | ------------------------------------------- | ------------------------------------------------------------------------------------------- | -------------------------------------------------- |
 | Plane **structure** (direction: up/down)    | [`upstream_downstream_ledgers`](../../done/upstream_downstream_ledgers/card.md)             | done                                               |
-| Source-identity **key** (`backend_id`)      | [`unified_backend`](../unified_backend/card.md)                                             | doing / closeout                                   |
+| Source-identity **key** (`backend_id`)      | [`unified_backend`](../../done/unified_backend/card.md)                                     | done                                               |
 | Provider-trace plane (first to be absorbed) | [`openrouter_observability`](../../done/openrouter_observability/card.md)                   | done                                               |
 | Source-identity consumer: logs              | [`proxy_log_hygiene`](../../done/proxy_log_hygiene/card.md)                                 | done                                               |
 | Source-identity consumer: remote reconcile  | [`openrouter_remote_reconciliation`](../../paused/openrouter_remote_reconciliation/card.md) | paused after Phase 0 pending source-key foundation |
@@ -84,6 +86,11 @@ active branch: downstream attempt records carry `backend_id`, proxy/provider wri
 provider trace is source-capability gated. Remote reconciliation remains paused until this branch merges and the epic
 chooses the next member. The hard rule remains contract item 4: one shared `emit.py` provenance refactor, not
 independent sibling rewrites.
+
+**Update (2026-06-19):** `unified_backend` merged via PR #39 (squash `ab690ac9`) and closed to `done/`. Two of the four
+"to be absorbed/keyed" concerns plus structure are now done; only `openrouter_remote_reconciliation` remains live
+(paused). The epic stays in `doing/` as the coordinator pending the next-member decision. Contract item 4 still binds:
+remote reconciliation must build on the shipped `core/usage/measurement.py` + `backend_id` seam, not re-author it.
 
 ## Not in scope here
 

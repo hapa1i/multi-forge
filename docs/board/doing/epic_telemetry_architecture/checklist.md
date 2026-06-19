@@ -4,9 +4,10 @@ Branch: `unified_backend`. Card: [card.md](card.md).
 
 ## Current Focus
 
-Keep telemetry architecture as the active planning cursor after `upstream_downstream_ledgers` landed. The epic has
-chosen `unified_backend` as the next active member so the downstream source key can land before remote reconciliation
-adds more OpenRouter-specific source logic.
+`unified_backend` has merged (PR #39) and closed to `done/`, so `backend_id` is the canonical downstream source key. The
+epic stays the active planning cursor with one open decision: resume `openrouter_remote_reconciliation` (paused after
+Phase 0) as the next member, or run another source-key follow-up first. The epic stays in `doing/` until that is chosen
+and the last live member ships.
 
 ## Active Coordination
 
@@ -46,12 +47,16 @@ identity key lands before remote reconciliation resumes.
 **Update (2026-06-18 closeout):** `unified_backend` stayed scoped to source identity/downstream attribution and landed
 `backend_id` without folding remote reconciliation into the branch.
 
+**Update (2026-06-19):** `unified_backend` merged (PR #39, squash `ab690ac9`) and moved to `done/`; member table marked
+done. The next-member decision is now the sole open coordination item below.
+
 ## Next Coordination
 
 - [x] Keep `unified_backend` scoped to source identity and downstream attribution; do not fold remote reconciliation
   implementation into this branch.
-- [ ] After `unified_backend` lands, decide whether remote reconciliation resumes next or whether another source-key
-  follow-up is needed.
+- [ ] `unified_backend` has landed — decide whether `openrouter_remote_reconciliation` resumes next (it was paused
+  pending exactly this `backend_id` foundation) or whether another source-key follow-up runs first. Maintainer decision
+  pending.
 
 ## Closeout
 

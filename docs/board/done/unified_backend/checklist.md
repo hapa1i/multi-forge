@@ -1,7 +1,7 @@
 # Unified Backend Concept -- Execution Checklist
 
 Branch: `unified_backend`. Card: [card.md](card.md). Epic:
-[`epic_telemetry_architecture`](../epic_telemetry_architecture/card.md).
+[`epic_telemetry_architecture`](../../doing/epic_telemetry_architecture/card.md).
 
 ## Current Focus
 
@@ -197,7 +197,8 @@ more confusing, not less.
 - [x] Run relevant integration tests if proxy startup, backend lifecycle, template resolution, or backend CLI behavior
   changes.
 - [x] Run `make pre-commit` before closeout.
-- [ ] After merge, move this card to `docs/board/done/unified_backend/` and update the epic sequencing.
+- [x] After merge, move this card to `docs/board/done/unified_backend/` and update the epic sequencing. Merged via PR
+  #39 (squash `ab690ac9`); card moved to `done/`, telemetry epic member table updated to done.
 
 ## Acceptance Tests
 

@@ -9,6 +9,7 @@ import pytest
 from forge.core.auth.template_secrets import (
     TEMPLATE_ENV_VARS,
     get_secrets_for_template,
+    required_env_vars_for_template,
     resolve_env_or_credential,
     resolve_env_or_credential_with_source,
 )
@@ -40,6 +41,61 @@ class TestTemplateSecrets:
             "openrouter-qwen",
         ):
             assert "OPENROUTER_API_KEY" in TEMPLATE_ENV_VARS[name]
+
+
+class TestRequiredEnvVarsForTemplate:
+    """Resolve required env vars from a template's declared ``proxy.source``."""
+
+    def _write_template(self, tmp_path, monkeypatch: pytest.MonkeyPatch, name: str, body: str) -> None:
+        monkeypatch.setenv("FORGE_HOME", str(tmp_path))
+        templates_dir = tmp_path / "templates"
+        templates_dir.mkdir(exist_ok=True)
+        (templates_dir / f"{name}.yaml").write_text(body)
+
+    def test_custom_template_resolves_declared_source(self, tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+        # A user-named template (absent from TEMPLATE_ENV_VARS) resolves via proxy.source.
+        self._write_template(tmp_path, monkeypatch, "my-openrouter", "proxy:\n  source: openrouter\n")
+        assert "OPENROUTER_API_KEY" in required_env_vars_for_template("my-openrouter")
+
+    def test_template_without_source_falls_back(self, tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+        # No proxy.source and not in TEMPLATE_ENV_VARS -> empty (no credentials known).
+        self._write_template(tmp_path, monkeypatch, "nosource", "proxy:\n  family: openai\n")
+        assert required_env_vars_for_template("nosource") == []
+
+    def test_unreadable_template_warns_and_falls_back(
+        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        # An existing-but-unreadable template must WARN (not silently skip preflight)
+        # and still fall back to the shipped catalog map for a known template name.
+        def boom(_name: str) -> str:
+            raise PermissionError("denied")
+
+        monkeypatch.setattr("forge.config.loader.read_template", boom)
+        with caplog.at_level("WARNING"):
+            result = required_env_vars_for_template("litellm-openai")
+
+        assert result == TEMPLATE_ENV_VARS["litellm-openai"]
+        assert any(r.levelname == "WARNING" and "Could not read template" in r.message for r in caplog.records)
+
+    def test_invalid_yaml_warns_and_falls_back(
+        self, tmp_path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        self._write_template(tmp_path, monkeypatch, "broken", "proxy: [unclosed\n")
+        with caplog.at_level("WARNING"):
+            result = required_env_vars_for_template("broken")
+
+        assert result == []  # not a shipped name, so the fallback map is empty
+        assert any(r.levelname == "WARNING" and "not valid YAML" in r.message for r in caplog.records)
+
+    def test_unknown_name_is_silent(
+        self, tmp_path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        # A name that is neither shipped nor a user file is normal control flow:
+        # FileNotFoundError -> silent None -> empty fallback, no warning noise.
+        monkeypatch.setenv("FORGE_HOME", str(tmp_path))
+        with caplog.at_level("WARNING"):
+            assert required_env_vars_for_template("does-not-exist") == []
+        assert not any(r.levelname == "WARNING" for r in caplog.records)
 
 
 class TestResolveEnvOrCredential:

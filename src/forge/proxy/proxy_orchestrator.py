@@ -278,9 +278,9 @@ def _ensure_template_credentials(template: str) -> None:
         credentials_for_template,
         format_missing_credential_error,
     )
-    from forge.core.auth.template_secrets import TEMPLATE_ENV_VARS
+    from forge.core.auth.template_secrets import required_env_vars_for_template
 
-    required = TEMPLATE_ENV_VARS.get(template, [])
+    required = required_env_vars_for_template(template)
     if not required:
         return
 
@@ -304,10 +304,13 @@ def _ensure_template_credentials(template: str) -> None:
 
         env_ignored = get_runtime_config().auth_ignore_env
     except Exception as e:
-        logger.debug("Could not read auth_ignore_env; formatting credential error without env-ignored note: %s", e)
+        logger.debug(
+            "Could not read auth_ignore_env; formatting credential error without env-ignored note: %s",
+            e,
+        )
         env_ignored = False
 
-    creds = credentials_for_template(template)
+    creds = credentials_for_template(template, required_vars=required)
     if creds:
         msg = format_missing_credential_error(
             creds[0], missing_vars=missing, template=template, env_ignored=env_ignored
@@ -380,14 +383,20 @@ def _ensure_dependency_backend(backend_dep: BackendDependency, template: str) ->
 
             env_ignored = get_runtime_config().auth_ignore_env
         except Exception as e:
-            logger.debug("Could not read auth_ignore_env; formatting credential error without env-ignored note: %s", e)
+            logger.debug(
+                "Could not read auth_ignore_env; formatting credential error without env-ignored note: %s",
+                e,
+            )
             env_ignored = False
 
         creds = credentials_for_template(template)
         if creds:
             raise ProxyStartError(
                 format_missing_credential_error(
-                    creds[0], missing_vars=missing, template=template, env_ignored=env_ignored
+                    creds[0],
+                    missing_vars=missing,
+                    template=template,
+                    env_ignored=env_ignored,
                 )
             )
         raise ProxyStartError(
@@ -404,7 +413,10 @@ def _ensure_dependency_backend(backend_dep: BackendDependency, template: str) ->
 
         ignore_env = get_runtime_config().auth_ignore_env
     except Exception as e:
-        logger.debug("Could not read auth_ignore_env; using environment credentials for backend subprocess: %s", e)
+        logger.debug(
+            "Could not read auth_ignore_env; using environment credentials for backend subprocess: %s",
+            e,
+        )
         ignore_env = False
 
     _SENTINEL = object()

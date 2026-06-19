@@ -25,6 +25,51 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board-contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-06-19
+
+### unified_backend follow-up: custom templates preflight credentials from declared source
+
+**Goal**: Fix a credential-preflight gap left by `unified_backend` — user-named proxy templates silently skipped
+credential checks because lookups keyed on the shipped-only `TEMPLATE_ENV_VARS` map, so a custom template launched
+without its API key and failed at runtime instead of failing fast at start.
+
+**Key changes**:
+
+- `required_env_vars_for_template()` (`core/auth/template_secrets.py`) reads a template's declared `proxy.source` and
+  resolves required env vars from the model-source catalog, falling back to `TEMPLATE_ENV_VARS` when no source is
+  readable/declared. `credentials_for_template`, `get_secrets_for_template`, and proxy-start
+  `_ensure_template_credentials` route through it.
+- Read hardening: an existing-but-unreadable template (permissions/IO) or invalid YAML now logs at WARNING instead of
+  degrading silently; an unknown name stays silent (`FileNotFoundError`). Still best-effort — returns the safe fallback,
+  never raises into callers.
+- `credentials_for_template(..., required_vars=)` reuses the resolved list on the proxy-start failure path, removing a
+  redundant template read.
+- AGENTS.md: added backend-source / telemetry / provider-trace operator-verification guidance.
+
+**Verification**: New regression `tests/regression/test_bug_custom_template_source_credentials.py` plus 5
+`test_template_secrets.py` unit cases (declared-source resolve, no-source/unknown-name fallback, unreadable-warns,
+invalid-yaml-warns); `tests/src/{proxy,core/auth,backend,sidecar}` + regression green (156 focused); mypy clean;
+`make pre-commit` clean.
+
+### unified_backend closeout: shared local-instance display + review follow-up
+
+**Goal**: Land the PR #39 review follow-up and close the `unified_backend` card.
+
+**Key changes**:
+
+- `forge backend list`/`show` now mark a local LiteLLM runtime instance shared across sources (one `litellm-4000`
+  process backs Gemini + OpenAI under the shipped default config); `--json` carries `runtime_instance.shared_with`. The
+  matching heuristic stays display-only and never feeds downstream telemetry `backend_id` (still derived from
+  `proxy.source`).
+- Proxy `_backend_source_id` warns once when `proxy.yaml` carries an unrecognized `source` (warn-and-degrade; user-owned
+  config is a system boundary), instead of silently passing an unknown `backend_id` into telemetry.
+- Added a multi-key backend-list test mirroring the shipped default (the case the prior gemini-only fixture masked) plus
+  warn-once server coverage; documented the shared local LiteLLM process model in `proxy.md` and design appendix §A.2.1.
+- Card moved `doing/ -> done/`; telemetry epic member table updated (`unified_backend` done).
+
+**Verification**: backend CLI + new server suite (22) and proxy/backend/telemetry/usage suites (175) green;
+`make pre-commit` clean (mypy + pyright). Shipped via PR #39 (squash `ab690ac9`).
+
 ## 2026-06-18
 
 ### unified_backend: model-source catalog and downstream source attribution

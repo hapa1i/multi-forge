@@ -55,6 +55,13 @@ and workflow preflight should fail fast when required auth or proxies are missin
 confirms the local proxy process is reachable; use `forge proxy start <proxy_id> --smoke-test` to verify upstream LLM
 connectivity after first setup, credential changes, or proxy auth changes.
 
+For backend-source, telemetry, provider-trace, and cost-accounting changes, verify the operator read paths:
+`forge backend list|show <source-or-backend-id>|test-auth <source-id>`,
+`forge provider trace list|show <request_id>|explain <request_id>`, and `forge proxy costs show --by-model|--by-verb`.
+Use `forge proxy costs reset --dry-run` before destructive telemetry resets; `reset` wipes legacy costs,
+downstream/upstream telemetry, cap state, audit sidecar state, usage events, and derived status-line caches, while
+running proxies keep in-memory cost/cap counters until restarted.
+
 For resume, transfer, memory-writer, and activity changes, verify the user-facing surfaces:
 `forge session resume <name> --fresh --review`, `forge transfer show|regenerate|edit|diff`,
 `forge memory report show [--all]`, and `forge activity [session]`; `forge usage` is removed, and
@@ -80,8 +87,8 @@ Use `pytest`, not `unittest`. Mirror source paths in `tests/src/` (for example, 
 `test_bug_<id>_<description>.py` and mark them `regression`. Every bug fix should include a regression test, and broken
 tests should be fixed or removed rather than skipped. Docker is expected to be running locally: run integration tests
 (target relevant files via `./scripts/test-integration.sh <path-or-pytest-args>`, not the full suite) for changes
-touching hooks, sessions (including Codex runtime/frontend), the memory writer, proxy runtime, or the installer — don't
-defer them to closeout.
+touching hooks, sessions (including Codex runtime/frontend), the memory writer, proxy runtime, backend source catalog,
+telemetry/cost/provider-trace paths, or the installer — don't defer them to closeout.
 
 ## Release Process
 
