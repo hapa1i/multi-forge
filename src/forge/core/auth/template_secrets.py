@@ -12,11 +12,73 @@ from __future__ import annotations
 
 import logging
 import os
+from typing import Any
 
-from forge.backend.sources import template_env_vars_by_template
+import yaml
+
+from forge.backend.sources import (
+    ModelSourceNotFoundError,
+    model_source_for_template,
+    template_env_vars_by_template,
+)
 
 logger = logging.getLogger(__name__)
 TEMPLATE_ENV_VARS: dict[str, list[str]] = template_env_vars_by_template()
+
+
+def _declared_source_env_vars(template: str) -> list[str] | None:
+    """Return env vars for a template's declared source, if it can be read.
+
+    ``TEMPLATE_ENV_VARS`` is built from shipped catalog aliases. User templates
+    can have arbitrary names, so their credential requirements must come from
+    ``proxy.source`` instead of the filename.
+    """
+
+    try:
+        from forge.config.loader import read_template
+
+        raw = read_template(template)
+    except FileNotFoundError:
+        # Not a known template name (e.g. a shipped alias served by the catalog
+        # map). Expected control flow; the caller falls back to TEMPLATE_ENV_VARS.
+        return None
+    except Exception as e:
+        # The file exists but could not be read (permissions, IO, encoding) or the
+        # loader import failed. For a custom template this would otherwise silently
+        # skip credential preflight, so warn rather than degrade quietly. Still
+        # returns None so callers never fail on a best-effort lookup.
+        logger.warning("Could not read template %s for source credential lookup: %s", template, e)
+        return None
+
+    try:
+        data: Any = yaml.safe_load(raw)
+    except yaml.YAMLError as e:
+        logger.warning("Template %s is not valid YAML; skipping source credential lookup: %s", template, e)
+        return None
+
+    if not isinstance(data, dict):
+        return None
+    proxy = data.get("proxy")
+    if not isinstance(proxy, dict):
+        return None
+    raw_source = proxy.get("source")
+    if not isinstance(raw_source, str) or not raw_source.strip():
+        return None
+
+    try:
+        return list(model_source_for_template(raw_source.strip()).required_env_vars)
+    except ModelSourceNotFoundError as e:
+        logger.debug("Template %s references unknown source %r: %s", template, raw_source, e)
+        return None
+
+
+def required_env_vars_for_template(template: str) -> list[str]:
+    """Return env vars required by a template or its declared model source."""
+
+    declared = _declared_source_env_vars(template)
+    if declared is not None:
+        return declared
+    return list(TEMPLATE_ENV_VARS.get(template, []))
 
 
 def _get_file_secrets() -> dict[str, str]:
@@ -82,7 +144,7 @@ def get_secrets_for_template(template: str) -> dict[str, str]:
     credential file. When ``auth_ignore_env`` is active, skips environment.
     Only includes values that resolve to non-empty strings.
     """
-    required = TEMPLATE_ENV_VARS.get(template, [])
+    required = required_env_vars_for_template(template)
     if not required:
         return {}
 

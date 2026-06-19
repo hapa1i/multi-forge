@@ -6,7 +6,7 @@ can depend on it without importing this template-aware module.
 
 from __future__ import annotations
 
-from forge.core.auth.template_secrets import TEMPLATE_ENV_VARS
+from forge.core.auth.template_secrets import required_env_vars_for_template
 from forge.core.credential_registry import (
     CREDENTIALS,
     RETIRED_NAMES,
@@ -26,13 +26,15 @@ __all__ = [
 ]
 
 
-def credentials_for_template(template: str) -> list[Credential]:
+def credentials_for_template(template: str, *, required_vars: list[str] | None = None) -> list[Credential]:
     """Which credentials does a template need?
 
-    Bridges TEMPLATE_ENV_VARS (template -> env var names) to CREDENTIALS
-    (credential -> env var metadata) via reverse lookup.
+    Bridges template env vars to CREDENTIALS (credential -> env var metadata) via
+    reverse lookup. Pass ``required_vars`` to reuse an already-resolved list and
+    avoid re-reading the template file (the resolver may touch disk).
     """
-    required_vars = TEMPLATE_ENV_VARS.get(template, [])
+    if required_vars is None:
+        required_vars = required_env_vars_for_template(template)
     if not required_vars:
         return []
 

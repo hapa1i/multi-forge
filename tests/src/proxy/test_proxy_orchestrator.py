@@ -854,7 +854,11 @@ class TestAdoptionUnderLock:
         monkeypatch.setattr(orchestrator, "_is_port_in_use", lambda _: False)
         monkeypatch.setattr(orchestrator, "_find_available_port", lambda **_: 7777)
         orch_health(False)
-        monkeypatch.setattr(orchestrator, "_new_proxy_id", lambda existing=None: "proxy_should_not_exist")
+        monkeypatch.setattr(
+            orchestrator,
+            "_new_proxy_id",
+            lambda existing=None: "proxy_should_not_exist",
+        )
         monkeypatch.setattr(orchestrator, "now_iso", lambda: "2026-02-09T00:00:00+00:00")
 
         monkeypatch.setattr(
@@ -1103,9 +1107,15 @@ class TestEnsureProxy:
         started_entry = MagicMock(proxy_id="openrouter-deepseek")
         with (
             patch(f"{_ORCH}.ProxyRegistryStore"),
-            patch(f"{_ORCH}.resolve_proxy", side_effect=ProxyNotFoundError("openrouter-deepseek")),
+            patch(
+                f"{_ORCH}.resolve_proxy",
+                side_effect=ProxyNotFoundError("openrouter-deepseek"),
+            ),
             patch(f"{_ORCH}.template_exists", return_value=True),
-            patch(f"{_ORCH}.start_proxy", return_value=MagicMock(proxy=started_entry, source="spawn")) as start,
+            patch(
+                f"{_ORCH}.start_proxy",
+                return_value=MagicMock(proxy=started_entry, source="spawn"),
+            ) as start,
         ):
             result, started = ensure_proxy("openrouter-deepseek")
 
@@ -1134,7 +1144,10 @@ class TestEnsureProxy:
 
         with (
             patch(f"{_ORCH}.ProxyRegistryStore"),
-            patch(f"{_ORCH}.resolve_proxy", side_effect=AmbiguousProxyError("tmpl", ["a", "b"])),
+            patch(
+                f"{_ORCH}.resolve_proxy",
+                side_effect=AmbiguousProxyError("tmpl", ["a", "b"]),
+            ),
             patch(f"{_ORCH}.template_exists") as tmpl,
             patch(f"{_ORCH}.start_proxy") as start,
         ):
@@ -1158,7 +1171,10 @@ class TestEnsureProxy:
                 side_effect=ProxyNotFoundError("litellm-openai", inactive_ids=["proxy_1"]),
             ),
             patch(f"{_ORCH}.template_exists", return_value=True),
-            patch(f"{_ORCH}.start_proxy", return_value=MagicMock(proxy=started_entry, source="spawn")) as start,
+            patch(
+                f"{_ORCH}.start_proxy",
+                return_value=MagicMock(proxy=started_entry, source="spawn"),
+            ) as start,
         ):
             result, started = ensure_proxy("litellm-openai")
 
@@ -1175,7 +1191,10 @@ class TestEnsureProxy:
             patch(f"{_ORCH}.ProxyRegistryStore"),
             patch(f"{_ORCH}.resolve_proxy", return_value=live),
             patch(f"{_ORCH}.template_exists", return_value=True),
-            patch(f"{_ORCH}.start_proxy", return_value=MagicMock(proxy=live, source="reuse")) as start,
+            patch(
+                f"{_ORCH}.start_proxy",
+                return_value=MagicMock(proxy=live, source="reuse"),
+            ) as start,
         ):
             result, started = ensure_proxy("litellm-openai")
 
@@ -1194,7 +1213,10 @@ class TestEnsureProxy:
             patch(f"{_ORCH}.ProxyRegistryStore"),
             patch(f"{_ORCH}.resolve_proxy", return_value=pidless),
             patch(f"{_ORCH}.template_exists", return_value=True),
-            patch(f"{_ORCH}.start_proxy", return_value=MagicMock(proxy=fresh, source="spawn")) as start,
+            patch(
+                f"{_ORCH}.start_proxy",
+                return_value=MagicMock(proxy=fresh, source="spawn"),
+            ) as start,
         ):
             result, started = ensure_proxy("litellm-openai")
 
@@ -1217,7 +1239,10 @@ class TestEnsureProxy:
             patch(f"{_ORCH}.ProxyRegistryStore"),
             patch(f"{_ORCH}.resolve_proxy", return_value=stale),
             patch(f"{_ORCH}.template_exists", return_value=True),
-            patch(f"{_ORCH}.start_proxy", return_value=MagicMock(proxy=fresh, source="spawn")) as start,
+            patch(
+                f"{_ORCH}.start_proxy",
+                return_value=MagicMock(proxy=fresh, source="spawn"),
+            ) as start,
         ):
             result, started = ensure_proxy("litellm-openai")
 
