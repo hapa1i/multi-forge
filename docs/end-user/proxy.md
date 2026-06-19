@@ -82,6 +82,28 @@ Forge provides ready-to-use proxy configurations (internal templates):
 
 `litellm-gemini-test` also exists internally, but it is hidden from normal end-user template lists.
 
+Built-in templates declare `proxy.source`, the canonical model-source id that owns endpoint and credential requirements.
+If you customize a template under `~/.forge/templates/<name>.yaml`, keep `proxy.source` set to an existing source id
+such as `openrouter`, `litellm-remote`, or `litellm-gemini-local`; Forge derives local backend auto-start and remote
+upstream URLs from that source at proxy creation time.
+
+OpenRouter templates default to `https://openrouter.ai/api/v1`. Set `OPENROUTER_BASE_URL` only when you intentionally
+route OpenRouter-compatible traffic through a different endpoint; new proxies created from OpenRouter templates will
+copy that resolved upstream URL into `proxy.yaml`.
+
+Use `forge backend list` to inspect the built-in source catalog, required credentials, and any matching local LiteLLM
+runtime instance. Use `forge backend test-auth <source-id>` when you want Forge to resolve the source's credentials and
+probe the upstream endpoint without printing secret values. Remote sources such as `openrouter` and `litellm-remote` are
+built in and have no local start/stop lifecycle; local LiteLLM sources can be started by source id or by the legacy
+`litellm --port <port>` adapter form.
+
+The local LiteLLM sources (`litellm-gemini-local`, `litellm-openai-local`, `litellm-anthropic-local`) all share one
+adapter and port (`litellm` on `4000`), so a single LiteLLM process backs every local source whose credential it is
+configured for. The default config serves Gemini and OpenAI models from one `litellm-4000` process, so
+`forge backend list` shows that instance under both sources and marks it `(shared)`; starting a second matching source
+reuses the running process rather than launching a new one. This is expected — there is one local LiteLLM process, not
+one per source.
+
 ---
 
 ## Core commands (cheat sheet)
@@ -330,6 +352,7 @@ template: openrouter-openai
 template_digest: abc123...
 
 provider: openrouter
+source: openrouter
 proxy_endpoint: http://localhost:8096
 port: 8096
 upstream_base_url: https://openrouter.ai/api/v1
@@ -361,8 +384,8 @@ costs:
 ```
 
 **What you'll typically edit:** `default_tier`, `tier_overrides`, and sometimes `provider_settings`. Leave
-`proxy_format`, `template`, `provider`, `proxy_endpoint`, `upstream_base_url`, `port`, and `tiers` alone unless you know
-what you're doing — those are set from the template at creation.
+`proxy_format`, `template`, `provider`, `source`, `proxy_endpoint`, `upstream_base_url`, `port`, and `tiers` alone
+unless you know what you're doing — those are set from the template/source catalog at creation.
 
 **Available tier_override keys:** `reasoning_effort`, `temperature`, `max_tokens`, `thinking_budget_tokens`. All are
 per-tier because each model has different limits and optimal defaults.
@@ -654,18 +677,18 @@ The same three commands are available in-session as `%provider trace list|show|e
 - Remote OpenRouter reconciliation is intentionally out of scope here -- this surface is local-only by design.
 
 **Recording the session id upstream (opt-in).** `provider_trace.inject_openrouter_user` (per-proxy, **default off**)
-makes proxied direct-OpenRouter requests carry the Forge session grouping id in the OpenAI-standard `user` field, so a
+makes source-capable proxied routes carry the Forge session grouping id in the OpenAI-standard `user` field, so a
 session's (or a fork's) requests are **recorded in OpenRouter's `/generation` record for account-side lookup**. The
 value is the hashed `forge_sess_<hash>[_role]` id (or a `forge_run_<hash>` fallback) -- never the raw session name.
 Enable it per proxy and restart the proxy:
 
 ```yaml
 provider_trace:
-  inject_openrouter_user: true # default false; proxied direct-OpenRouter only
+  inject_openrouter_user: true # default false; source-capability gated
 ```
 
-Observability only (not routing -- recognition is stickiness-neutral); direct `core.llm` callers (plan-check, curation)
-are unchanged this release.
+Observability only (not routing -- recognition is stickiness-neutral); non-capable gateway routes stay quiet, and direct
+`core.llm` callers (plan-check, curation) are unchanged this release.
 
 ---
 

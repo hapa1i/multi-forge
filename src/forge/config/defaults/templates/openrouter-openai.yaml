@@ -10,6 +10,7 @@
 proxy:
   family: openai
   preferred_provider: openrouter
+  source: openrouter
   default_port: 8096
 
   openrouter:
@@ -24,5 +25,4 @@ proxy:
       opus:
         reasoning_effort: high
         verbosity: high
-    base_url: "https://openrouter.ai/api/v1"
     error_hints: true

@@ -12,6 +12,7 @@
 proxy:
   family: anthropic
   preferred_provider: litellm
+  source: litellm-remote
   default_port: 8092
 
   litellm:

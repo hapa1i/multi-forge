@@ -1,13 +1,12 @@
 # Epic: Telemetry Architecture -- Coordination Checklist
 
-Branch: `main` after `upstream_downstream_ledgers` merged. Card: [card.md](card.md).
+Branch: `unified_backend`. Card: [card.md](card.md).
 
 ## Current Focus
 
-Keep telemetry architecture as the active planning cursor after `upstream_downstream_ledgers` landed. The next decision
-is whether to resume `openrouter_remote_reconciliation`, run the broader `unified_backend` card, or slice a narrow
-`backend_id` precursor first. Do not resume remote reconciliation until this epic explicitly chooses the next active
-member.
+Keep telemetry architecture as the active planning cursor after `upstream_downstream_ledgers` landed. The epic has
+chosen `unified_backend` as the next active member so the downstream source key can land before remote reconciliation
+adds more OpenRouter-specific source logic.
 
 ## Active Coordination
 
@@ -24,6 +23,8 @@ member.
 - [x] Update the chosen member card's status/checklist and move it to `doing/`.
 - [x] Close `upstream_downstream_ledgers` after merge and move it to `done/`.
 - [x] Update this epic's member table and sequencing text after the ledger foundation landed.
+- [x] Choose `unified_backend` as the next active member after the ledger foundation.
+- [x] Move `unified_backend` to `doing/` and compose its execution checklist.
 
 ## Sequencing Questions
 
@@ -39,13 +40,18 @@ Remote reconciliation should return after the upstream/downstream shape exists, 
 model-call evidence rather than hardening a second OpenRouter-specific telemetry surface. `unified_backend` remains the
 source-key sibling; it can follow as the full model-source refactor or be sliced to a narrow `backend_id` precursor.
 
-**Update (2026-06-18):** `upstream_downstream_ledgers` is done. The open sequencing decision is now the next active
-member: remote reconciliation, full `unified_backend`, or a smaller `backend_id` precursor.
+**Update (2026-06-18):** `upstream_downstream_ledgers` is done. The epic chooses `unified_backend` next so the source
+identity key lands before remote reconciliation resumes.
+
+**Update (2026-06-18 closeout):** `unified_backend` stayed scoped to source identity/downstream attribution and landed
+`backend_id` without folding remote reconciliation into the branch.
 
 ## Next Coordination
 
-- [ ] Decide the next active telemetry member now that the ledger foundation is done.
-- [ ] Move the chosen member to `doing/` and update cross-links.
+- [x] Keep `unified_backend` scoped to source identity and downstream attribution; do not fold remote reconciliation
+  implementation into this branch.
+- [ ] After `unified_backend` lands, decide whether remote reconciliation resumes next or whether another source-key
+  follow-up is needed.
 
 ## Closeout
 

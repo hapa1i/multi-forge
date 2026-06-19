@@ -15,14 +15,8 @@
 proxy:
   family: anthropic
   preferred_provider: litellm
+  source: litellm-anthropic-local
   default_port: 8091
-
-  # Backend dependency (auto-started when proxy starts)
-  backend_dependency:
-    adapter: litellm
-    port: 4000
-    required_env_vars:
-      - ANTHROPIC_API_KEY
 
   litellm:
     tiers:

@@ -160,7 +160,13 @@ def _openrouter_request_data():
     )()
 
 
-async def _capture_openrouter_request(monkeypatch, *, inject_flag: bool, forge_session: str | None) -> dict:
+async def _capture_openrouter_request(
+    monkeypatch,
+    *,
+    inject_flag: bool,
+    forge_session: str | None,
+    source: str = "",
+) -> dict:
     """Drive create_message down the OpenRouter route; return the dict handed to the client adapter."""
     import forge.proxy.server as server
 
@@ -185,6 +191,7 @@ async def _capture_openrouter_request(monkeypatch, *, inject_flag: bool, forge_s
         default_tier = "haiku"
         preferred_provider = "openrouter"
         provider_trace = type("PT", (), {"inject_openrouter_user": inject_flag})()
+        source = ""
 
         @staticmethod
         def get_model_for_tier(_tier: str) -> str:
@@ -193,7 +200,9 @@ async def _capture_openrouter_request(monkeypatch, *, inject_flag: bool, forge_s
     class SessionCfg:
         default_tier = "opus"
 
-    monkeypatch.setattr(server.config, "proxy", ProxyCfg())
+    proxy_config = ProxyCfg()
+    proxy_config.source = source
+    monkeypatch.setattr(server.config, "proxy", proxy_config)
     monkeypatch.setattr(server.config, "session", SessionCfg())
     monkeypatch.setattr(server, "map_model_name", lambda v: v)
     monkeypatch.setattr(server, "convert_anthropic_to_openai", lambda *a, **k: {"messages": []})
@@ -220,7 +229,9 @@ async def _capture_openrouter_request(monkeypatch, *, inject_flag: bool, forge_s
 async def test_create_message_injects_forge_user_when_openrouter_flag_on(monkeypatch):
     """Flag ON + OpenRouter route: the handler sets _forge_user from X-Forge-Session before the adapter handoff."""
     openai_request = await _capture_openrouter_request(
-        monkeypatch, inject_flag=True, forge_session="forge_sess_7e81a1bb765d_supervisor"
+        monkeypatch,
+        inject_flag=True,
+        forge_session="forge_sess_7e81a1bb765d_supervisor",
     )
     assert openai_request["_forge_user"] == "forge_sess_7e81a1bb765d_supervisor"
 
@@ -229,7 +240,21 @@ async def test_create_message_injects_forge_user_when_openrouter_flag_on(monkeyp
 async def test_create_message_no_forge_user_when_flag_off(monkeypatch):
     """Flag OFF: no _forge_user reaches the client even with a valid session id (byte-identical default path)."""
     openai_request = await _capture_openrouter_request(
-        monkeypatch, inject_flag=False, forge_session="forge_sess_7e81a1bb765d_supervisor"
+        monkeypatch,
+        inject_flag=False,
+        forge_session="forge_sess_7e81a1bb765d_supervisor",
+    )
+    assert "_forge_user" not in openai_request
+
+
+@pytest.mark.asyncio
+async def test_create_message_no_forge_user_when_source_not_capable(monkeypatch):
+    """A configured non-capable backend source suppresses the OpenRouter user field."""
+    openai_request = await _capture_openrouter_request(
+        monkeypatch,
+        inject_flag=True,
+        forge_session="forge_sess_7e81a1bb765d_supervisor",
+        source="litellm-remote",
     )
     assert "_forge_user" not in openai_request
 

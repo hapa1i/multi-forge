@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -173,6 +175,31 @@ class TestCredentialRegistry:
                 assert cred.not_needed_for is not None, f"'{cred.name}' should define not_needed_for"
             else:
                 assert cred.not_needed_for is None, f"'{cred.name}' should not define not_needed_for"
+
+    def test_source_template_capability_import_orders_are_acyclic(self):
+        """Fresh interpreters catch hidden cycles that in-process imports can mask."""
+
+        orders = (
+            ("forge.backend.sources", "forge.core.auth.template_secrets", "forge.core.auth.capabilities"),
+            ("forge.core.auth.template_secrets", "forge.backend.sources", "forge.core.auth.capabilities"),
+            ("forge.core.auth.capabilities", "forge.core.auth.template_secrets", "forge.backend.sources"),
+        )
+
+        for order in orders:
+            code = (
+                "import importlib\n"
+                f"for name in {order!r}:\n"
+                "    importlib.import_module(name)\n"
+                "from forge.core.auth.template_secrets import TEMPLATE_ENV_VARS\n"
+                "assert TEMPLATE_ENV_VARS['litellm-gemini-local'] == ['GEMINI_API_KEY']\n"
+            )
+            result = subprocess.run(
+                [sys.executable, "-c", code],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            assert result.returncode == 0, result.stderr
 
 
 # ── Error formatting ──────────────────────────────────────────────

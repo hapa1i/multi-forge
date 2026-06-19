@@ -12,6 +12,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from forge.core.invoker import Attribution, CodexHeadlessInvoker, HeadlessRequest
+from forge.core.telemetry.downstream import read_downstream_records
 from forge.core.usage import emit_codex_usage, emit_worker_usage
 from forge.core.usage.ledger import read_usage_events
 
@@ -46,7 +47,12 @@ class TestEmitCodexUsageProvenance:
         assert e.billing_mode == "api"
         assert e.runtime == "codex"
         assert e.attribution_granularity == "worker"
-        assert (e.run_id, e.parent_run_id, e.root_run_id) == ("run_c", "run_verb", "run_root")
+        assert (e.run_id, e.parent_run_id, e.root_run_id) == (
+            "run_c",
+            "run_verb",
+            "run_root",
+        )
+        assert read_downstream_records(kind="attempt")[0].backend_id is None
 
     def test_billing_mode_defaults_to_unknown(self):
         emit_codex_usage(run_id="run_c", command="bridge", status="success")
@@ -58,7 +64,11 @@ class TestEmitCodexUsageProvenance:
 
 
 class TestInvokerPathEmission:
-    _IDENT = {"FORGE_RUN_ID": "run_c", "FORGE_PARENT_RUN_ID": "run_verb", "FORGE_ROOT_RUN_ID": "run_root"}
+    _IDENT = {
+        "FORGE_RUN_ID": "run_c",
+        "FORGE_PARENT_RUN_ID": "run_verb",
+        "FORGE_ROOT_RUN_ID": "run_root",
+    }
 
     def _req(self, attribution: Attribution | None) -> HeadlessRequest:
         return HeadlessRequest(
@@ -82,14 +92,24 @@ class TestInvokerPathEmission:
         proc.pid = 4242
         mock_popen.return_value = proc
 
-        attr = Attribution(command="bridge", workflow="transfer", session="s1", runtime="codex", billing_mode="api")
+        attr = Attribution(
+            command="bridge",
+            workflow="transfer",
+            session="s1",
+            runtime="codex",
+            billing_mode="api",
+        )
         CodexHeadlessInvoker().run_parallel([self._req(attr)])
 
         events = read_usage_events()
         assert len(events) == 1
         e = events[0]
         assert e.route == "codex_exec" and e.runtime == "codex"
-        assert (e.run_id, e.parent_run_id, e.root_run_id) == ("run_c", "run_verb", "run_root")
+        assert (e.run_id, e.parent_run_id, e.root_run_id) == (
+            "run_c",
+            "run_verb",
+            "run_root",
+        )
         assert (e.input_tokens, e.output_tokens, e.cached_tokens) == (14936, 22, 10624)
         assert (e.command, e.workflow, e.session) == ("bridge", "transfer", "s1")
 

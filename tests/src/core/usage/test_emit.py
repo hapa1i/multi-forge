@@ -11,10 +11,12 @@ from __future__ import annotations
 
 from typing import Any
 
+from forge.backend.sources import get_model_source
 from forge.core.reactive.cost_tracking import VerbCostResult
 from forge.core.reactive.session_runner import SessionResult
 from forge.core.telemetry.downstream import read_downstream_records
 from forge.core.usage.emit import (
+    _backend_id_for_direct_usage,
     emit_direct_llm_usage,
     emit_usage_for_session_result,
     emit_verb_usage,
@@ -37,6 +39,21 @@ def _ok_result(**overrides: Any) -> SessionResult:
     return SessionResult(**base)
 
 
+def test_direct_usage_backend_ids_resolve_to_catalog_sources() -> None:
+    """Direct usage attribution must not emit dangling model-source ids."""
+
+    backend_ids = [
+        _backend_id_for_direct_usage(provider=None, reporter="claude_code"),
+        _backend_id_for_direct_usage(provider="anthropic", reporter="provider"),
+        _backend_id_for_direct_usage(provider="openrouter", reporter="provider"),
+        _backend_id_for_direct_usage(provider="openai", reporter="codex_jsonl"),
+    ]
+
+    for backend_id in backend_ids:
+        if backend_id is not None:
+            assert get_model_source(backend_id).id == backend_id
+
+
 class TestEmitForSessionResult:
     def test_measured_proxy_cost(self) -> None:
         cost = VerbCostResult(
@@ -49,7 +66,11 @@ class TestEmitForSessionResult:
             cost_measured=True,  # the window had a reported-cost request
         )
         emit_usage_for_session_result(
-            _ok_result(), command="memory-writer", session="s1", cost=cost, base_url="http://localhost:8084"
+            _ok_result(),
+            command="memory-writer",
+            session="s1",
+            cost=cost,
+            base_url="http://localhost:8084",
         )
         out = read_usage_events()
         assert len(out) == 1
@@ -62,7 +83,11 @@ class TestEmitForSessionResult:
         assert e.attribution_granularity == "verb"
         assert e.source_refs is None  # claude -p: proxy request_id unknown (4g)
         assert e.billing_mode == "unknown"  # proxied -> opaque upstream
-        assert (e.route, e.reporter, e.confidence) == ("claude_p", "forge_proxy", "reported")
+        assert (e.route, e.reporter, e.confidence) == (
+            "claude_p",
+            "forge_proxy",
+            "reported",
+        )
 
     def test_measured_tokens_but_unreported_cost_logs_null_cost(self) -> None:
         """Passthrough verb: snapshot measured tokens, but no reported cost → null $.
@@ -80,7 +105,11 @@ class TestEmitForSessionResult:
             cost_measured=False,  # no reported-cost request in the window
         )
         emit_usage_for_session_result(
-            _ok_result(), command="memory-writer", session="s1", cost=cost, base_url="http://localhost:8084"
+            _ok_result(),
+            command="memory-writer",
+            session="s1",
+            cost=cost,
+            base_url="http://localhost:8084",
         )
         e = read_usage_events()[0]
         # Tokens attributed; cost is null (not a fabricated $0).
@@ -90,9 +119,15 @@ class TestEmitForSessionResult:
 
     def test_unmeasured_no_proxy_is_unattributed(self, monkeypatch) -> None:
         # A direct/no-proxy verb: holder never measured -> null cost, not $0.
-        monkeypatch.setattr("forge.core.auth.template_secrets.resolve_env_or_credential", lambda _key: "sk-test")
+        monkeypatch.setattr(
+            "forge.core.auth.template_secrets.resolve_env_or_credential",
+            lambda _key: "sk-test",
+        )
         emit_usage_for_session_result(
-            _ok_result(), command="curation", cost=VerbCostResult(verb="curation"), direct=True
+            _ok_result(),
+            command="curation",
+            cost=VerbCostResult(verb="curation"),
+            direct=True,
         )
         e = read_usage_events()[0]
         assert e.measurement_source == "unattributed"
@@ -123,22 +158,38 @@ class TestEmitDirectLlmUsage:
             command="tagger",
             model="gemini/gemini-2.0-flash",
             provider="gemini",
-            usage={"prompt_tokens": 7, "completion_tokens": 3, "total_tokens": 10, "cached_tokens": 4},
+            usage={
+                "prompt_tokens": 7,
+                "completion_tokens": 3,
+                "total_tokens": 10,
+                "cached_tokens": 4,
+            },
             latency_ms=12.0,
         )
         e = read_usage_events()[0]
         assert (e.command, e.run_id, e.provider) == ("tagger", "run_amb", "gemini")
         assert e.measurement_source == "provider_usage_exact"
-        assert (e.input_tokens, e.output_tokens, e.cached_tokens, e.cost_micro_usd) == (7, 3, 4, None)
+        assert (e.input_tokens, e.output_tokens, e.cached_tokens, e.cost_micro_usd) == (
+            7,
+            3,
+            4,
+            None,
+        )
         assert e.latency_ms == 12.0
         assert e.source_refs is None  # no proven proxy target
         assert e.billing_mode == "unknown"  # never guessed -- caller didn't prove direct+credential
-        assert (e.route, e.reporter, e.confidence) == ("core_llm", "provider", "unavailable")
+        assert (e.route, e.reporter, e.confidence) == (
+            "core_llm",
+            "provider",
+            "unavailable",
+        )
 
     def test_proxy_target_sets_cost_request_id(self, monkeypatch) -> None:
         monkeypatch.setenv("FORGE_RUN_ID", "run_amb")
         emit_direct_llm_usage(
-            command="tagger", usage={"prompt_tokens": 1, "completion_tokens": 1}, cost_request_id="req_join"
+            command="tagger",
+            usage={"prompt_tokens": 1, "completion_tokens": 1},
+            cost_request_id="req_join",
         )
         e = read_usage_events()[0]
         assert e.source_refs is not None and e.source_refs.cost_request_id == "req_join"
@@ -165,6 +216,7 @@ class TestEmitDirectLlmUsage:
         downstream = read_downstream_records(kind="attempt")
         assert len(downstream) == 2
         assert len({record.downstream_event_id for record in downstream}) == 2
+        assert {record.backend_id for record in downstream} == {None}
 
     def test_direct_provider_session_id_persists_downstream(self, monkeypatch) -> None:
         monkeypatch.setenv("FORGE_RUN_ID", "run_amb")
@@ -180,6 +232,7 @@ class TestEmitDirectLlmUsage:
         downstream = read_downstream_records(kind="attempt")
         assert len(downstream) == 1
         assert downstream[0].provider_session_id == "forge_sess_abc_supervisor"
+        assert downstream[0].backend_id == "openrouter"
 
 
 class TestEmitVerbAndWorkerVocabulary:
@@ -202,7 +255,13 @@ class TestEmitVerbAndWorkerVocabulary:
         monkeypatch.setenv("FORGE_ROOT_RUN_ID", "run_v")
         emit_verb_usage(
             command="panel",
-            cost=VerbCostResult(verb="panel", total_cost_micros=0, input_tokens=5, measured=True, cost_measured=False),
+            cost=VerbCostResult(
+                verb="panel",
+                total_cost_micros=0,
+                input_tokens=5,
+                measured=True,
+                cost_measured=False,
+            ),
         )
         e = read_usage_events()[0]
         assert e.cost_micro_usd is None
@@ -251,7 +310,11 @@ class TestDirectCostProvenance:
 
     def test_neither_is_unattributed(self) -> None:
         p = direct_cost_provenance(None, True, None, None, None)
-        assert (p.cost_micro_usd, p.confidence, p.measurement_source) == (None, "unavailable", "unattributed")
+        assert (p.cost_micro_usd, p.confidence, p.measurement_source) == (
+            None,
+            "unavailable",
+            "unattributed",
+        )
         assert (p.input_tokens, p.output_tokens, p.cached_tokens) == (None, None, None)
 
     def test_unparsed_envelope_drops_tokens(self) -> None:
@@ -268,7 +331,13 @@ class TestVerbWorkerPrecedenceInvariant:
 
     def test_direct_path_identical_for_verb_and_worker(self) -> None:
         emit_usage_for_session_result(
-            _ok_result(cost_micro_usd=7000, envelope_parsed=True, input_tokens=10, output_tokens=20, cached_tokens=3),
+            _ok_result(
+                cost_micro_usd=7000,
+                envelope_parsed=True,
+                input_tokens=10,
+                output_tokens=20,
+                cached_tokens=3,
+            ),
             command="memory-writer",
             direct=True,
         )
@@ -298,6 +367,7 @@ class TestVerbWorkerPrecedenceInvariant:
             )
 
         assert prov(verb) == prov(worker) == ("claude_code", "reported", "runtime_native", 7000, 10, 20, 3)
+        assert {record.backend_id for record in read_downstream_records(kind="attempt")} == {"anthropic-direct"}
 
     def test_proxied_worker_stays_unattributed_while_verb_attributes(self) -> None:
         # The no-double-count invariant. Even handed a self-cost, a PROXIED worker must
@@ -320,8 +390,17 @@ class TestVerbWorkerPrecedenceInvariant:
         events = read_usage_events()
         verb = next(e for e in events if e.attribution_granularity == "verb")
         worker = next(e for e in events if e.attribution_granularity == "worker")
-        assert (verb.reporter, verb.confidence, verb.cost_micro_usd) == ("forge_proxy", "reported", 900)
-        assert (worker.reporter, worker.confidence, worker.cost_micro_usd, worker.measurement_source) == (
+        assert (verb.reporter, verb.confidence, verb.cost_micro_usd) == (
+            "forge_proxy",
+            "reported",
+            900,
+        )
+        assert (
+            worker.reporter,
+            worker.confidence,
+            worker.cost_micro_usd,
+            worker.measurement_source,
+        ) == (
             None,
             "unavailable",
             None,

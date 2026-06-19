@@ -916,16 +916,20 @@ a route actually reported — OpenRouter's response-body `usage.cost` (`confiden
 `x-litellm-response-cost` header (`confidence="gateway_calculated"`) — and writes `cost_micros:null` /
 `confidence="unavailable"` when no route reported one (Anthropic passthrough always; LiteLLM streaming, whose header
 predates the cost). There is no local price catalog; cost is never inferred from token counts. Each record carries
-`reporter` + `confidence` (the Phase-1 metric-evidence vocabulary). The proxy bootstraps its in-memory `CostTracker`
-from downstream attempts plus legacy current/previous-month request logs on startup, then reconciles with
-`telemetry/caps/<proxy_id>.json` using the larger monthly total so a clean-cut path migration or dropped best-effort
-JSONL write does not silently reset spend caps to `$0`. Live request handling remains in-memory authoritative: a
-downstream write failure warns but does not block successful model traffic. The fail-closed posture lives at bootstrap
-via the durable cap checkpoint, not by turning a transient telemetry write failure into a live-request denial. Cap-state
-writes are coalesced by request count/time and flushed on graceful proxy shutdown so the request path does not fsync on
-every costed request. Downstream retention preserves current-calendar-month shards even when their mtime is old or the
-size budget is tight, so unkeyed/template-mode caps that have no cap snapshot do not lose the active month's JSONL spend
-on restart.
+`reporter` + `confidence` (the Phase-1 metric-evidence vocabulary). Downstream records also carry a nullable
+`backend_id`: the canonical model-source catalog id from `forge.backend.sources` (`openrouter`, `litellm-remote`,
+`anthropic-direct`, etc.). Proxy-origin writers populate it from `proxy.source`; direct emitters populate it only where
+the provider/reporter maps unambiguously (`anthropic-direct`, `openrouter`) and otherwise leave it null for v1.
+`source_id`/`source_kind` remain the telemetry-origin axis (`proxy` or `provider`) and are not overloaded with
+local/remote source kind. The proxy bootstraps its in-memory `CostTracker` from downstream attempts plus legacy
+current/previous-month request logs on startup, then reconciles with `telemetry/caps/<proxy_id>.json` using the larger
+monthly total so a clean-cut path migration or dropped best-effort JSONL write does not silently reset spend caps to
+`$0`. Live request handling remains in-memory authoritative: a downstream write failure warns but does not block
+successful model traffic. The fail-closed posture lives at bootstrap via the durable cap checkpoint, not by turning a
+transient telemetry write failure into a live-request denial. Cap-state writes are coalesced by request count/time and
+flushed on graceful proxy shutdown so the request path does not fsync on every costed request. Downstream retention
+preserves current-calendar-month shards even when their mtime is old or the size budget is tight, so
+unkeyed/template-mode caps that have no cap snapshot do not lose the active month's JSONL spend on restart.
 
 Verb snapshot files under `costs/verbs/` are retired as a durable writer. The default `forge proxy costs show` by-verb
 view now derives attribution by joining downstream attempts to `usage/events` via `forge_run_id`; unjoined requests
@@ -984,23 +988,24 @@ shows both sides of the hop.
 "what happened to this provider request?" after a timeout — born from an incident where a supervised fork's checks
 routed through an OpenRouter proxy, timed out before the final streaming usage chunk, and left no trace locally or in
 OpenRouter's UI. The proxy `on_complete` seam writes one downstream attempt record per request
-([§A.14](design_appendix.md#a14-provider-trace-plane-schema-314), owner-only 0600, versioned). It is
-**direct-OpenRouter-only** by design (the incident path the probes exercised); gateway-routed OpenRouter (LiteLLM →
-OpenRouter) is out of scope. The record carries the provider/generation id (probe 1: OpenRouter's `gen-…` id rides every
-stream `chunk.id`), the selected upstream, allowlisted correlation headers (never auth/cookie), stream lifecycle flags
-(`stream_started`/`first_chunk_seen`/`final_usage_seen`/`client_disconnected`), and a local `local_usage_status`
-(`available` when the proxy saw a final usage/cost figure, else `unavailable`). The generation id is captured on the
-**first** stream event, so a stream **cancelled before the final usage chunk** — the incident — still surfaces its id.
-`timeout_seen` is always `false` at the proxy boundary: the proxy observes only its own client disconnect, never the
-parent's `subprocess.run` timeout (that is a later run-tree-correlation join target). Traces join the cost/usage planes
-by shared `request_id` + run-tree ids; probe 2 (`[REMOTE-ABSENT]`) confirmed an aborted stream is not remotely
-retrievable, which is why the plane answers from local evidence only (no remote `/generation` lookup). The read surface
-is `forge provider trace list|show|explain` (op-backed `core/ops/provider_trace.py`; `%provider trace` mirrors it
-in-session); `explain` answers the incident's five questions from the trace plus a bounded (±5m) cost-plane join for
-confidence, never a remote lookup. An opt-in `provider_trace.inject_openrouter_user` (default off, proxied path) also
-records the Forge session grouping id in OpenRouter's top-level `user` field — probe 3 confirmed `user` (not a custom
-`session_id`) survives in the indexed `/generation` record for account-side lookup; observability only (probe 4
-stickiness-neutral), and direct `core.llm` callers (plan-check, curation) stay a documented follow-up.
+([§A.14](design_appendix.md#a14-provider-trace-plane-schema-314), owner-only 0600, versioned). It is gated by the
+selected backend/source capability (`ModelSource.capabilities.provider_trace`), with `openrouter` enabled in v1 and
+gateway-routed OpenRouter through non-capable sources kept quiet. The record carries the provider/generation id (probe
+1: OpenRouter's `gen-…` id rides every stream `chunk.id`), the selected upstream, allowlisted correlation headers (never
+auth/cookie), stream lifecycle flags (`stream_started`/`first_chunk_seen`/`final_usage_seen`/`client_disconnected`), and
+a local `local_usage_status` (`available` when the proxy saw a final usage/cost figure, else `unavailable`). The
+generation id is captured on the **first** stream event, so a stream **cancelled before the final usage chunk** — the
+incident — still surfaces its id. `timeout_seen` is always `false` at the proxy boundary: the proxy observes only its
+own client disconnect, never the parent's `subprocess.run` timeout (that is a later run-tree-correlation join target).
+Traces join the cost/usage planes by shared `request_id` + run-tree ids; probe 2 (`[REMOTE-ABSENT]`) confirmed an
+aborted stream is not remotely retrievable, which is why the plane answers from local evidence only (no remote
+`/generation` lookup). The read surface is `forge provider trace list|show|explain` (op-backed
+`core/ops/provider_trace.py`; `%provider trace` mirrors it in-session); `explain` answers the incident's five questions
+from the trace plus a bounded (±5m) cost-plane join for confidence, never a remote lookup. An opt-in
+`provider_trace.inject_openrouter_user` (default off) also records the Forge session grouping id in OpenRouter's
+top-level `user` field for source-capable proxied routes — probe 3 confirmed `user` (not a custom `session_id`) survives
+in the indexed `/generation` record for account-side lookup; observability only (probe 4 stickiness-neutral), and direct
+`core.llm` callers (plan-check, curation) stay a documented follow-up.
 
 Each proxy may define:
 

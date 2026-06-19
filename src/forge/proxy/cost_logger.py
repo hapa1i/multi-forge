@@ -44,6 +44,7 @@ def log_request_cost(
     forge_run_id: str | None = None,
     forge_root_run_id: str | None = None,
     downstream_event_id: str | None = None,
+    backend_id: str | None = None,
 ) -> None:
     """Append a cost record to the downstream telemetry plane.
 
@@ -72,6 +73,7 @@ def log_request_cost(
             proxy_id=proxy_id,
             source_id=proxy_id,
             source_kind="proxy",
+            backend_id=backend_id,
             model=model,
             mapped_model=model,
             tier=tier,
@@ -126,6 +128,7 @@ def read_cost_logs(
                 "request_id": rec.request_id,
                 "forge_run_id": rec.forge_run_id,
                 "forge_root_run_id": rec.forge_root_run_id,
+                "backend_id": rec.backend_id,
             }
         )
     return records

@@ -34,6 +34,7 @@ import uvicorn
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
+from forge.backend.sources import ModelSourceNotFoundError, get_model_source
 from forge.config import TierOverride, config, init_config, reload
 from forge.config.schema import RequestLogConfig
 from forge.core.llm.errors import AuthenticationError
@@ -96,6 +97,36 @@ PREFERRED_PROVIDER = None
 PROXY_ID: str | None = os.environ.get("FORGE_PROXY_ID")
 
 cost_tracker: CostTracker | None = None
+
+
+_warned_unknown_backend_sources: set[str] = set()
+
+
+def _backend_source_id() -> str | None:
+    source = getattr(config.proxy, "source", "") or None
+    if not source:
+        return None
+    source = str(source)
+    # proxy.yaml is user-owned config (a system boundary): an unrecognized source is a
+    # misconfiguration, not durable-state corruption to reject. Degrade to the raw value
+    # but warn once so the silent telemetry-attribution gap is visible -- best-effort
+    # degradation must log, never be silent (coding-standards section 5).
+    if source not in _warned_unknown_backend_sources:
+        try:
+            get_model_source(source)
+        except ModelSourceNotFoundError:
+            _warned_unknown_backend_sources.add(source)
+            logger.warning(
+                "proxy.source %r is not a known backend source; downstream telemetry for this "
+                "proxy will carry an unrecognized backend_id. Recreate the proxy to refresh proxy.yaml.",
+                source,
+            )
+    return source
+
+
+def _inject_openrouter_user_enabled() -> bool:
+    provider_trace_config = getattr(config.proxy, "provider_trace", None)
+    return bool(getattr(provider_trace_config, "inject_openrouter_user", False))
 
 
 def _sidecar_mode_active() -> bool:
@@ -208,7 +239,10 @@ def _maybe_prune_request_logs() -> None:
     try:
         from forge.proxy.utils import prune_request_logs
 
-        prune_request_logs(retention_days=requests_cfg.retention_days, max_total_mb=requests_cfg.max_total_mb)
+        prune_request_logs(
+            retention_days=requests_cfg.retention_days,
+            max_total_mb=requests_cfg.max_total_mb,
+        )
     except Exception as e:
         logger.debug("request log prune skipped: %s", e)
 
@@ -286,6 +320,7 @@ def _forge_session_command(request: Request) -> tuple[str | None, str | None]:
 def _openrouter_user_value(
     *,
     provider_name: str,
+    backend_id: str | None = None,
     inject: bool,
     forge_session: str | None,
     forge_root_run_id: str | None,
@@ -293,11 +328,20 @@ def _openrouter_user_value(
 ) -> str | None:
     """The OpenRouter ``user`` grouping id to inject, or None (openrouter_observability Phase 5).
 
-    Opt-in and direct-OpenRouter only. Prefers the already-derived, validated ``X-Forge-Session``
-    id; falls back to ``forge_run_<hash>`` when only run identity exists; returns None when there
-    is nothing to group by (or the flag/route does not apply).
+    Opt-in and source-capability gated. Prefers the already-derived, validated
+    ``X-Forge-Session`` id; falls back to ``forge_run_<hash>`` when only run identity exists;
+    returns None when there is nothing to group by (or the flag/route does not apply).
     """
-    if provider_name != "openrouter" or not inject:
+    if not inject:
+        return None
+    if backend_id:
+        try:
+            if not get_model_source(backend_id).capabilities.openrouter_user_grouping:
+                return None
+        except ModelSourceNotFoundError:
+            logger.debug("unknown backend source for OpenRouter user grouping: %s", backend_id)
+            return None
+    elif provider_name != "openrouter":
         return None
     if forge_session:
         return forge_session
@@ -339,6 +383,7 @@ def _calc_and_log_cost(
 
         log_request_cost(
             proxy_id=PROXY_ID or "unknown",
+            backend_id=_backend_source_id(),
             model=model,
             tier=tier,
             input_tokens=input_tokens,
@@ -540,13 +585,17 @@ def _max_effort(a: str | None, b: str | None) -> str | None:
 def _thinking_summary(thinking: object) -> dict[str, object] | None:
     if not isinstance(thinking, dict):
         return None
-    return {"type": thinking.get("type"), "budget_tokens": thinking.get("budget_tokens")}
+    return {
+        "type": thinking.get("type"),
+        "budget_tokens": thinking.get("budget_tokens"),
+    }
 
 
 def _inspect_route() -> dict[str, Any]:
     return {
         "template": getattr(config.proxy, "active_template", ""),
         "provider": getattr(config.proxy, "preferred_provider", ""),
+        "source": _backend_source_id() or "",
         "wire_shape": getattr(config.proxy, "wire_shape", "openai_translated"),
     }
 
@@ -561,6 +610,7 @@ def _persist_request_side(
     headers: dict[str, str] | None,
     sys_hash: str | None,
     tool_hash: str | None,
+    backend_id: str | None,
     counts: dict[str, int],
     thinking: dict[str, Any] | None,
     full_body: bool,
@@ -578,10 +628,20 @@ def _persist_request_side(
 
     try:
         audit_logger.check_and_record_drift(
-            proxy_id=proxy_id, dimension="system_prompt", current_hash=sys_hash, request_id=request_id, route=route
+            proxy_id=proxy_id,
+            dimension="system_prompt",
+            current_hash=sys_hash,
+            request_id=request_id,
+            route=route,
+            backend_id=backend_id,
         )
         audit_logger.check_and_record_drift(
-            proxy_id=proxy_id, dimension="tool_surface", current_hash=tool_hash, request_id=request_id, route=route
+            proxy_id=proxy_id,
+            dimension="tool_surface",
+            current_hash=tool_hash,
+            request_id=request_id,
+            route=route,
+            backend_id=backend_id,
         )
         if not full_body:
             audit_logger.write_metadata_record(
@@ -593,6 +653,7 @@ def _persist_request_side(
                 tool_surface_hash=tool_hash,
                 thinking=thinking,
                 counts=counts,
+                backend_id=backend_id,
             )
         elif not defer_full_body:
             # Request-only full body (the translated path has no response capture yet);
@@ -609,13 +670,18 @@ def _persist_request_side(
                 tool_surface_hash=tool_hash,
                 counts=counts,
                 thinking=thinking,
+                backend_id=backend_id,
             )
     except Exception as e:
         logger.debug("[%s] inspect persist skipped: %s", request_id, e)
 
 
 async def _observe_request_side(
-    body: dict[str, Any], request_id: str, *, headers: dict[str, str] | None = None, defer_full_body: bool = False
+    body: dict[str, Any],
+    request_id: str,
+    *,
+    headers: dict[str, str] | None = None,
+    defer_full_body: bool = False,
 ) -> dict[str, Any] | None:
     """Inspect-mode observation: hash system/tools, detect drift, write a record.
 
@@ -635,11 +701,15 @@ async def _observe_request_side(
         redact_headers = audit.effective_redact_headers() if audit is not None else set()
         ctx: dict[str, Any] = {
             "proxy_id": PROXY_ID or "unknown",
+            "backend_id": _backend_source_id(),
             "route": _inspect_route(),
             "mode": intercept.mode,
             "sys_hash": audit_logger.hash_system_prompt(body.get("system")),
             "tool_hash": audit_logger.hash_tool_surface(body.get("tools")),
-            "counts": {"num_messages": len(body.get("messages") or []), "num_tools": len(body.get("tools") or [])},
+            "counts": {
+                "num_messages": len(body.get("messages") or []),
+                "num_tools": len(body.get("tools") or []),
+            },
             "thinking": _thinking_summary(body.get("thinking")),
             "full_body": full_body,
             "redact_headers": redact_headers,
@@ -659,6 +729,7 @@ async def _observe_request_side(
             headers=headers,
             sys_hash=ctx["sys_hash"],
             tool_hash=ctx["tool_hash"],
+            backend_id=ctx["backend_id"],
             counts=ctx["counts"],
             thinking=ctx["thinking"],
             full_body=full_body,
@@ -687,7 +758,10 @@ def _tier_from_model_name(model: str) -> str | None:
 
 
 async def _apply_passthrough_override(
-    raw_body: dict[str, Any], request_id: str, resolved_tier: str, ctx: dict[str, Any] | None
+    raw_body: dict[str, Any],
+    request_id: str,
+    resolved_tier: str,
+    ctx: dict[str, Any] | None,
 ) -> JSONResponse | None:
     """Apply override mutations to the raw body and write a mutation record.
 
@@ -721,13 +795,20 @@ async def _apply_passthrough_override(
                 proxy_id=proxy_id,
                 route=route,
                 mutation=result.mutation_record,
+                backend_id=_backend_source_id(),
             )
         except Exception as e:
             logger.debug("[%s] mutation record skipped: %s", request_id, e)
     if result.blocked:
         return JSONResponse(
             status_code=403,
-            content={"type": "error", "error": {"type": "intercept_guard_blocked", "message": result.blocked_reason}},
+            content={
+                "type": "error",
+                "error": {
+                    "type": "intercept_guard_blocked",
+                    "message": result.blocked_reason,
+                },
+            },
             headers={"X-Request-ID": request_id},
         )
     return None
@@ -756,7 +837,10 @@ async def _handle_anthropic_passthrough(raw_request: Request, request_id: str, *
             status_code=500,
             content={
                 "type": "error",
-                "error": {"type": "configuration_error", "message": "passthrough upstream base_url is not configured"},
+                "error": {
+                    "type": "configuration_error",
+                    "message": "passthrough upstream base_url is not configured",
+                },
             },
             headers={"X-Request-ID": request_id},
         )
@@ -782,7 +866,10 @@ async def _handle_anthropic_passthrough(raw_request: Request, request_id: str, *
             status_code=400,
             content={
                 "type": "error",
-                "error": {"type": "invalid_request_error", "message": "Request body must be valid JSON"},
+                "error": {
+                    "type": "invalid_request_error",
+                    "message": "Request body must be valid JSON",
+                },
             },
             headers={"X-Request-ID": request_id},
         )
@@ -792,7 +879,10 @@ async def _handle_anthropic_passthrough(raw_request: Request, request_id: str, *
             status_code=422,
             content={
                 "type": "error",
-                "error": {"type": "invalid_request_error", "message": "Request body must be a JSON object"},
+                "error": {
+                    "type": "invalid_request_error",
+                    "message": "Request body must be a JSON object",
+                },
             },
             headers={"X-Request-ID": request_id},
         )
@@ -826,7 +916,13 @@ async def _handle_anthropic_passthrough(raw_request: Request, request_id: str, *
             if cost_tracker.on_cap_hit == "reject":
                 return JSONResponse(
                     status_code=429,
-                    content={"type": "error", "error": {"type": "spend_cap_exceeded", "message": spend_warning}},
+                    content={
+                        "type": "error",
+                        "error": {
+                            "type": "spend_cap_exceeded",
+                            "message": spend_warning,
+                        },
+                    },
                     headers=_with_spend_warning({"X-Request-ID": request_id}, spend_warning),
                 )
             logger.warning("[%s] %s", request_id, spend_warning)
@@ -899,6 +995,7 @@ async def _handle_anthropic_passthrough(raw_request: Request, request_id: str, *
                     tool_surface_hash=audit_logger.hash_tool_surface(raw_body.get("tools")),
                     counts=ctx["counts"],
                     thinking=_thinking_summary(raw_body.get("thinking")),
+                    backend_id=ctx.get("backend_id"),
                 )
             except Exception as e:
                 logger.debug("[%s] passthrough full-body audit skipped: %s", request_id, e)
@@ -912,12 +1009,12 @@ async def _handle_anthropic_passthrough(raw_request: Request, request_id: str, *
         spend_warning,
     )
 
-    # Provider-trace forward-wiring (Phase 3): the passthrough relay mirrors stream
-    # lifecycle into the same record_provider_trace helper. Latent today -- the helper
-    # gates on direct OpenRouter, which never rides the passthrough (Anthropic-native) wire.
+    # Provider-trace forward-wiring: the passthrough relay mirrors stream lifecycle
+    # into the same source-capability-gated record_provider_trace helper.
     passthrough_provider = getattr(config.proxy, "provider", None) or getattr(config.proxy, "preferred_provider", None)
     provider_trace_ctx = {
         "provider_name": passthrough_provider or "unknown",
+        "backend_id": _backend_source_id(),
         "proxy_id": PROXY_ID or "unknown",
         "mapped_model": model,
         "request_id": request_id,
@@ -1096,11 +1193,12 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
 
         # Opt-in (default off): record the Forge session grouping id in OpenRouter's `user` field
         # so a session/fork is retrievable from OpenRouter's /generation record
-        # (openrouter_observability Phase 5). Direct-OpenRouter only; metadata-only, already hashed.
+        # (openrouter_observability Phase 5). Source-capability gated; metadata-only, already hashed.
         forge_user = _openrouter_user_value(
             provider_name=provider_name,
-            # Read the flag lazily: only OpenRouter routes consult provider_trace config.
-            inject=provider_name == "openrouter" and config.proxy.provider_trace.inject_openrouter_user,
+            backend_id=_backend_source_id(),
+            # Read the flag lazily: source capability decides whether this route uses it.
+            inject=_inject_openrouter_user_enabled(),
             forge_session=forge_session,
             forge_root_run_id=forge_root_run_id,
             forge_command=forge_command,
@@ -1265,13 +1363,14 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                     error_type=error_type,
                     cost_micros=cost,
                 )
-                # Provider-trace plane (Phase 3): gated to direct OpenRouter inside the helper.
+                # Provider-trace plane (Phase 3): source-capability gated inside the helper.
                 # The converter parked provider_meta + stream lifecycle under usage["_provider_trace"];
                 # a stream cancelled before the final usage chunk still carries the generation id here.
                 _trace = usage.get("_provider_trace") or {}
                 _lc = _trace.get("lifecycle", {})
                 record_provider_trace(
                     provider_name=provider_name,
+                    backend_id=_backend_source_id(),
                     request_mode="streaming",
                     proxy_id=PROXY_ID or "unknown",
                     mapped_model=actual_model_id,
@@ -1356,6 +1455,7 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                 # (the full body arrived); provider_meta rides the top-level carrier key.
                 record_provider_trace(
                     provider_name=provider_name,
+                    backend_id=_backend_source_id(),
                     request_mode="non_streaming",
                     proxy_id=PROXY_ID or "unknown",
                     mapped_model=actual_model_id,
@@ -1700,7 +1800,10 @@ async def count_tokens(request_data: TokenCountRequest, raw_request: Request):
         logger.error(f"[{request_id}] Token counting failed: {e}")
         raise HTTPException(
             status_code=500,
-            detail={"type": "api_error", "message": f"Token counting failed [{request_id}]"},
+            detail={
+                "type": "api_error",
+                "message": f"Token counting failed [{request_id}]",
+            },
         )
 
 
@@ -1936,7 +2039,10 @@ async def log_requests_middleware(request: Request, call_next):
     # MessagesRequest binding runs — FastAPI validates the body against a closed
     # content-block union, so an unknown/future block type would 422 before any
     # in-handler wire_shape check. Middleware forwards the raw bytes instead.
-    if request.method == "POST" and path in ("/v1/messages", "/v1/messages/count_tokens"):
+    if request.method == "POST" and path in (
+        "/v1/messages",
+        "/v1/messages/count_tokens",
+    ):
         try:
             _ensure_runtime_state()
             is_passthrough = getattr(config.proxy, "wire_shape", "openai_translated") == "anthropic_passthrough"
@@ -1952,7 +2058,10 @@ async def log_requests_middleware(request: Request, call_next):
                     status_code=500,
                     content={
                         "type": "error",
-                        "error": {"type": "api_error", "message": f"Passthrough error [{request_id}]"},
+                        "error": {
+                            "type": "api_error",
+                            "message": f"Passthrough error [{request_id}]",
+                        },
                     },
                     headers={"X-Request-ID": request_id},
                 )
@@ -2167,7 +2276,11 @@ def find_available_port(start_port: int, max_attempts: int = 10) -> int:
     help="Configuration template to use (e.g., openrouter-gemini, openrouter-openai, openrouter-anthropic)",
 )
 @click.option("--port", type=int, default=8082, help="Port to run the server on (default: 8082)")
-@click.option("--host", default="127.0.0.1", help="Host to bind the server to (default: 127.0.0.1)")
+@click.option(
+    "--host",
+    default="127.0.0.1",
+    help="Host to bind the server to (default: 127.0.0.1)",
+)
 @click.option("--reload", is_flag=True, help="Enable auto-reload on code changes")
 @click.option(
     "--auto-port",

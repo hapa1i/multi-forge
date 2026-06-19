@@ -42,7 +42,7 @@ from forge.core.auth.template_secrets import (
 from forge.core.llm.errors import AuthenticationError, NoApiKeyError
 
 __all__ = [
-    # Credential registry (capabilities.py)
+    # Credential registry and capability helpers
     "CREDENTIALS",
     "RETIRED_NAMES",
     "Credential",

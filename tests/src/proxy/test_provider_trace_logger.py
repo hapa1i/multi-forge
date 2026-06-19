@@ -66,16 +66,26 @@ class TestGateAndRoundTrip:
         assert isinstance(rec, ptl.ProviderTraceRecord)
         assert rec.request_id == "req-1"
         assert rec.proxy_id == "crimson-apricot"
+        assert rec.backend_id is None
         assert rec.mapped_model == "openai/gpt-5.5"
         assert rec.provider_generation_id == "gen-xyz"
         assert rec.provider_session_id == "forge_sess_abc_supervisor"
         assert rec.request_mode == "streaming"
         assert rec.timeout_seen is False  # never proxy-populated
 
+    def test_source_capability_can_enable_trace(self):
+        _record(provider_name="litellm", backend_id="openrouter")
+        recs = ptl.read_provider_traces()
+        assert len(recs) == 1
+        assert recs[0].backend_id == "openrouter"
+
+    def test_non_capable_source_suppresses_openrouter_gateway_route(self):
+        _record(provider_name="openrouter", backend_id="litellm-remote")
+        assert ptl.read_provider_traces() == []
+
     def test_litellm_gateway_route_writes_no_trace_by_design(self):
-        # Direct-OpenRouter-only is intentional scope for this card: gateway-routed OpenRouter
-        # (LiteLLM -> OpenRouter) and any non-OpenRouter route write NOTHING. This is a
-        # deliberate gate, not an accidental miss.
+        # A source must opt in to provider-trace. Gateway-routed OpenRouter
+        # (LiteLLM -> OpenRouter) and unknown routes write nothing by default.
         _record(provider_name="litellm")
         _record(provider_name="unknown")
         assert ptl.read_provider_traces() == []
@@ -155,7 +165,16 @@ class TestPlaneRobustness:
         _record()  # a valid v1 record
         path = _downstream_path()
         with open(path, "a") as f:
-            f.write(json.dumps({"schema_version": 99, "kind": "attempt", "downstream_event_id": "ds_future"}) + "\n")
+            f.write(
+                json.dumps(
+                    {
+                        "schema_version": 99,
+                        "kind": "attempt",
+                        "downstream_event_id": "ds_future",
+                    }
+                )
+                + "\n"
+            )
         with caplog.at_level("WARNING"):
             recs = ptl.read_provider_traces()
         assert all(r.schema_version == 1 for r in recs)

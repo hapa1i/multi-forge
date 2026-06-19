@@ -13,30 +13,10 @@ from __future__ import annotations
 import logging
 import os
 
-logger = logging.getLogger(__name__)
+from forge.backend.sources import template_env_vars_by_template
 
-TEMPLATE_ENV_VARS: dict[str, list[str]] = {
-    "litellm-openai": ["LITELLM_API_KEY", "LITELLM_BASE_URL"],
-    "litellm-gemini": ["LITELLM_API_KEY", "LITELLM_BASE_URL"],
-    "litellm-anthropic": ["LITELLM_API_KEY", "LITELLM_BASE_URL"],
-    "litellm-gemini-local": ["GEMINI_API_KEY"],
-    "litellm-gemini-test": ["GEMINI_API_KEY"],
-    "litellm-gemini-flash-local": ["GEMINI_API_KEY"],
-    "litellm-openai-local": ["OPENAI_API_KEY"],
-    "litellm-openai-codex-local": ["OPENAI_API_KEY"],
-    "litellm-anthropic-local": ["ANTHROPIC_API_KEY"],
-    "anthropic-passthrough": ["ANTHROPIC_API_KEY"],
-    "openrouter-anthropic": ["OPENROUTER_API_KEY"],
-    "openrouter-openai": ["OPENROUTER_API_KEY"],
-    "openrouter-gemini": ["OPENROUTER_API_KEY"],
-    "openrouter-openai-codex": ["OPENROUTER_API_KEY"],
-    "openrouter-gemini-flash": ["OPENROUTER_API_KEY"],
-    "openrouter-deepseek": ["OPENROUTER_API_KEY"],
-    "openrouter-kimi": ["OPENROUTER_API_KEY"],
-    "openrouter-glm": ["OPENROUTER_API_KEY"],
-    "openrouter-minimax": ["OPENROUTER_API_KEY"],
-    "openrouter-qwen": ["OPENROUTER_API_KEY"],
-}
+logger = logging.getLogger(__name__)
+TEMPLATE_ENV_VARS: dict[str, list[str]] = template_env_vars_by_template()
 
 
 def _get_file_secrets() -> dict[str, str]:
@@ -56,7 +36,7 @@ def _get_file_secrets() -> dict[str, str]:
 
 
 def _auth_ignore_env() -> bool:
-    """Check if auth_ignore_env is active (lazy import to avoid cycles)."""
+    """Check if auth_ignore_env is active without importing runtime config at module load."""
     try:
         from forge.runtime_config import get_runtime_config
 

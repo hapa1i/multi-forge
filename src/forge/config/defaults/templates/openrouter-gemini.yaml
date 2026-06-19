@@ -7,6 +7,7 @@
 proxy:
   family: gemini
   preferred_provider: openrouter
+  source: openrouter
   default_port: 8097
 
   openrouter:
@@ -19,5 +20,4 @@ proxy:
         reasoning_effort: medium
       opus:
         reasoning_effort: high
-    base_url: "https://openrouter.ai/api/v1"
     error_hints: true

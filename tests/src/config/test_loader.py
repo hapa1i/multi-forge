@@ -1,8 +1,10 @@
 """Tests for config loader functions (deep_merge, load_yaml, env_to_dict, load_config, proxy I/O, templates)."""
 
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
+import yaml
 
 from forge.config import load_config
 from forge.config.loader import (
@@ -124,10 +126,14 @@ class TestLoadConfig:
 
         assert config.proxy.active_template == "litellm-gemini-local"
         assert config.proxy.preferred_provider == "litellm"
+        assert config.proxy.source == "litellm-gemini-local"
         assert config.proxy.default_port == 8086
-        # base_url resolved at runtime via LITELLM_LOCAL_BASE_URL or backend_dependency
         assert config.proxy.litellm.base_url == ""
         assert config.proxy.litellm.tiers.opus == "gemini/gemini-3.1-pro-preview"
+        assert config.proxy.backend_dependency is not None
+        assert config.proxy.backend_dependency.adapter == "litellm"
+        assert config.proxy.backend_dependency.port == 4000
+        assert config.proxy.backend_dependency.required_env_vars == ["GEMINI_API_KEY"]
 
     def test_template_loading_gemini_flash_local(self):
         """Gemini Flash local template loads with all tiers using Flash."""
@@ -181,12 +187,15 @@ class TestLoadConfig:
         assert config.proxy.get_model_for_tier("sonnet") == "gemini/gemini-3.1-pro-preview"
         assert config.proxy.get_model_for_tier("haiku") == "gemini/gemini-3-flash-preview"
 
-    def test_template_loading_openrouter_anthropic(self):
+    def test_template_loading_openrouter_anthropic(self, monkeypatch: pytest.MonkeyPatch):
         """OpenRouter anthropic template loads with correct provider and tiers."""
+        monkeypatch.delenv("OPENROUTER_BASE_URL", raising=False)
+
         config = load_config(template="openrouter-anthropic")
 
         assert config.proxy.active_template == "openrouter-anthropic"
         assert config.proxy.preferred_provider == "openrouter"
+        assert config.proxy.source == "openrouter"
         assert config.proxy.default_port == 8095
         assert config.proxy.openrouter.tiers.haiku == "anthropic/claude-haiku-4.5"
         assert config.proxy.openrouter.tiers.sonnet == "anthropic/claude-sonnet-4.6"
@@ -199,6 +208,58 @@ class TestLoadConfig:
                 "claude-opus-4-6": "anthropic/claude-opus-4.6",
             }
         }
+
+    def test_openrouter_source_endpoint_resolves_from_env(self, monkeypatch: pytest.MonkeyPatch):
+        """OpenRouter templates intentionally allow the catalog endpoint override."""
+        monkeypatch.setenv("OPENROUTER_BASE_URL", "https://openrouter.internal.example.com/api/v1")
+
+        config = load_config(template="openrouter-anthropic")
+
+        assert config.proxy.source == "openrouter"
+        assert config.proxy.openrouter.base_url == "https://openrouter.internal.example.com/api/v1"
+
+    def test_remote_litellm_source_endpoint_resolves_from_env(self, monkeypatch: pytest.MonkeyPatch):
+        """Remote LiteLLM templates derive upstream base_url from their catalog source."""
+        monkeypatch.setenv("LITELLM_BASE_URL", "https://litellm.env.example.com")
+
+        config = load_config(template="litellm-gemini")
+
+        assert config.proxy.source == "litellm-remote"
+        assert config.proxy.litellm.base_url == "https://litellm.env.example.com"
+
+    def test_remote_litellm_source_endpoint_resolves_from_credential_file(self, monkeypatch: pytest.MonkeyPatch):
+        """Connection-value endpoints can come from the credential file when env is absent."""
+        monkeypatch.delenv("LITELLM_BASE_URL", raising=False)
+        with patch(
+            "forge.core.auth.template_secrets._get_file_secrets",
+            return_value={"LITELLM_BASE_URL": "https://litellm.file.example.com"},
+        ):
+            config = load_config(template="litellm-gemini")
+
+        assert config.proxy.source == "litellm-remote"
+        assert config.proxy.litellm.base_url == "https://litellm.file.example.com"
+
+    def test_remote_litellm_source_endpoint_respects_auth_ignore_env(self, monkeypatch: pytest.MonkeyPatch):
+        """Template loading uses the same auth_ignore_env branch as secret resolution."""
+        monkeypatch.setattr("forge.core.auth.template_secrets._auth_ignore_env", lambda: True)
+        monkeypatch.setenv("LITELLM_BASE_URL", "https://litellm.env.example.com")
+        with patch(
+            "forge.core.auth.template_secrets._get_file_secrets",
+            return_value={"LITELLM_BASE_URL": "https://litellm.file.example.com"},
+        ):
+            config = load_config(template="litellm-gemini")
+
+        assert config.proxy.source == "litellm-remote"
+        assert config.proxy.litellm.base_url == "https://litellm.file.example.com"
+
+    def test_remote_litellm_source_endpoint_missing_is_empty(self, monkeypatch: pytest.MonkeyPatch):
+        """Missing connection values remain empty until proxy creation reports missing credentials."""
+        monkeypatch.delenv("LITELLM_BASE_URL", raising=False)
+        with patch("forge.core.auth.template_secrets._get_file_secrets", return_value={}):
+            config = load_config(template="litellm-gemini")
+
+        assert config.proxy.source == "litellm-remote"
+        assert config.proxy.litellm.base_url == ""
 
     def test_litellm_anthropic_templates_default_opus_to_fable(self):
         """LiteLLM Anthropic templates default opus to Fable 5 with 4.8/4.6 alternatives."""
@@ -218,6 +279,8 @@ class TestLoadConfig:
         """Passthrough forwards the client model unchanged; opus tier default is Fable 5 (no alternatives map)."""
         config = load_config(template="anthropic-passthrough")
 
+        assert config.proxy.source == "anthropic-passthrough"
+        assert config.proxy.litellm.base_url == "https://api.anthropic.com"
         assert config.proxy.litellm.tiers.opus == "claude-fable-5"
         assert config.proxy.litellm.model_alternatives == {}
 
@@ -311,6 +374,7 @@ class TestTemplateFamilyMetadata:
             template="openrouter-gemini",
             template_digest="sha256:test",
             provider="openrouter",
+            source="openrouter",
             proxy_endpoint="http://localhost:8097",
             port=8097,
             upstream_base_url="https://openrouter.ai/api/v1",
@@ -322,6 +386,7 @@ class TestTemplateFamilyMetadata:
 
         forge_config = _proxy_instance_to_forge_config(config)
         assert forge_config.proxy.family == "gemini"
+        assert forge_config.proxy.source == "openrouter"
 
     @pytest.fixture()
     def user_templates_dir(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
@@ -350,6 +415,68 @@ class TestTemplateFamilyMetadata:
         bad.write_text("proxy: null\n")
         with pytest.raises(ValueError, match="must have a 'proxy' mapping"):
             load_config(template="bad-null")
+
+    def test_template_source_validation_rejects_non_string(self, user_templates_dir):
+        """proxy.source must be a string before strict schema loading."""
+        bad = user_templates_dir / "bad-source-shape.yaml"
+        bad.write_text(
+            "proxy:\n"
+            "  family: gemini\n"
+            "  preferred_provider: litellm\n"
+            "  source:\n"
+            "    id: litellm-gemini-local\n"
+            "  default_port: 9999\n"
+        )
+        with pytest.raises(ValueError, match="proxy.source"):
+            load_config(template="bad-source-shape")
+
+    def test_template_source_validation_rejects_unknown_source(self, user_templates_dir):
+        """proxy.source must resolve to a catalog source id or alias."""
+        bad = user_templates_dir / "bad-source-unknown.yaml"
+        bad.write_text(
+            "proxy:\n"
+            "  family: gemini\n"
+            "  preferred_provider: litellm\n"
+            "  source: missing-source\n"
+            "  default_port: 9999\n"
+        )
+        with pytest.raises(ValueError, match="unknown proxy.source"):
+            load_config(template="bad-source-unknown")
+
+    def test_custom_template_without_source_is_rejected(self, user_templates_dir):
+        """Custom templates need proxy.source when their name is not a built-in source alias."""
+        bad = user_templates_dir / "custom-no-source.yaml"
+        bad.write_text("proxy:\n  family: gemini\n  preferred_provider: litellm\n  default_port: 9999\n")
+        with pytest.raises(ValueError, match="must declare proxy.source"):
+            load_config(template="custom-no-source")
+
+    def test_remote_source_rejects_inline_backend_dependency(self, user_templates_dir):
+        """Remote sources cannot smuggle local lifecycle back into templates."""
+        bad = user_templates_dir / "remote-with-backend.yaml"
+        bad.write_text(
+            "proxy:\n"
+            "  family: openai\n"
+            "  preferred_provider: openrouter\n"
+            "  source: openrouter\n"
+            "  default_port: 9999\n"
+            "  backend_dependency:\n"
+            "    adapter: litellm\n"
+            "    port: 4000\n"
+        )
+        with pytest.raises(ValueError, match="backend_dependency.*remote source"):
+            load_config(template="remote-with-backend")
+
+    def test_shipped_templates_declare_source_not_inline_lifecycle_or_base_url(self):
+        """Shipped templates use source catalog ownership for lifecycle and remote endpoint facts."""
+        for template in self._shipped_template_names():
+            data = yaml.safe_load(read_shipped_template(template))
+            proxy = data["proxy"]
+            assert "source" in proxy, template
+            assert "backend_dependency" not in proxy, template
+            if proxy["preferred_provider"] == "openrouter":
+                assert "base_url" not in proxy["openrouter"], template
+            if template == "anthropic-passthrough":
+                assert "base_url" not in proxy["litellm"], template
 
 
 class TestProxyFileIO:

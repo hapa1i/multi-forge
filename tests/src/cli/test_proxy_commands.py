@@ -2368,7 +2368,8 @@ class TestProxyCreateMissingUrl:
     """Regression: missing LITELLM_BASE_URL should give actionable error, not traceback."""
 
     @pytest.fixture(autouse=True)
-    def _no_base_url(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def _no_base_url(self, temp_env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        # Depend on temp_env so this runs after the default remote LiteLLM URL is installed.
         monkeypatch.delenv("LITELLM_BASE_URL", raising=False)
         monkeypatch.delenv("LITELLM_LOCAL_BASE_URL", raising=False)
         # Also block credential-file fallback so the URL is truly missing

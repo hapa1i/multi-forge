@@ -12,14 +12,8 @@ internal: true  # Hidden from user-facing template listings
 proxy:
   family: gemini
   preferred_provider: litellm
+  source: litellm-gemini-test
   default_port: 8087
-
-  # Backend dependency (auto-started when proxy starts, test port for isolation)
-  backend_dependency:
-    adapter: litellm
-    port: 4001
-    required_env_vars:
-      - GEMINI_API_KEY
 
   litellm:
     tiers:

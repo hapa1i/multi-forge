@@ -6,7 +6,7 @@ branch on "can this runtime do X?" should ask this registry instead of hard-codi
 Claude Code assumptions.
 
 Each runtime is a frozen :class:`RuntimeSpec` (mirrors the ``Credential`` /
-``CREDENTIALS`` pattern in ``core/auth/capabilities.py``): a module-level
+``CREDENTIALS`` pattern in ``core/credential_registry.py``): a module-level
 :data:`RUNTIMES` table plus lookup helpers. The data is the capability matrix from
 the runtime-abstraction card; the registry answers the seven questions that card
 poses -- installed? interactive? headless? hooks? usage? native resume? which
