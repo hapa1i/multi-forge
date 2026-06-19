@@ -40,7 +40,7 @@ FORGE_RUN_ID_VAR = "FORGE_RUN_ID"
 FORGE_PARENT_RUN_ID_VAR = "FORGE_PARENT_RUN_ID"
 FORGE_ROOT_RUN_ID_VAR = "FORGE_ROOT_RUN_ID"
 
-# Provider session/command correlation (openrouter_observability Phase 1). FORGE_SESSION
+# Provider session/command correlation. FORGE_SESSION
 # (the human session name, already set by the session-start path) and FORGE_COMMAND (the
 # spawn's role) are hashed/sanitized into the X-Forge-Session / X-Forge-Command headers by
 # _apply_correlation_headers. Local Forge<->proxy correlation only; dropped before the

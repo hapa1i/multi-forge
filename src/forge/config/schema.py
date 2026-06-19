@@ -19,11 +19,14 @@ Usage:
     overrides = config.proxy.litellm.tier_overrides.get("opus")
 """
 
+import logging
 import re
 from dataclasses import dataclass, field
 from typing import Any
 
 from forge.core.backend_dependency import BackendDependency
+
+logger = logging.getLogger(__name__)
 
 # --- CONSTANTS ---
 
@@ -416,7 +419,7 @@ def _coerce_audit_config(value: Any) -> AuditConfig:
 
 @dataclass
 class ProviderTraceConfig:
-    """Retention bounds for the provider-trace plane (openrouter_observability Phase 3).
+    """Retention bounds for the provider-trace plane.
 
     Diagnostics, not spend truth — matches the audit plane's defaults (14d / 512 MB) so the
     two on-disk telemetry surfaces share one mental model.
@@ -424,7 +427,7 @@ class ProviderTraceConfig:
 
     retention_days: int = 14
     max_total_mb: int = 512
-    inject_openrouter_user: bool = False
+    inject_provider_user: bool = False
 
     def __post_init__(self) -> None:
         # bool is an int subclass; reject it so provider_trace.retention_days=true fails loudly.
@@ -432,10 +435,10 @@ class ProviderTraceConfig:
             raise ValueError("provider_trace.retention_days must be a non-negative int")
         if isinstance(self.max_total_mb, bool) or not isinstance(self.max_total_mb, int) or self.max_total_mb <= 0:
             raise ValueError("provider_trace.max_total_mb must be a positive int")
-        # Opt-in (default off): forward the Forge session grouping id into OpenRouter's `user`
-        # field on the proxied direct-OpenRouter path (openrouter_observability Phase 5).
-        if not isinstance(self.inject_openrouter_user, bool):
-            raise ValueError("provider_trace.inject_openrouter_user must be a bool")
+        # Opt-in (default off): forward the Forge session grouping id into the provider's `user`
+        # field on a source-capable proxied route (provider-user grouping).
+        if not isinstance(self.inject_provider_user, bool):
+            raise ValueError("provider_trace.inject_provider_user must be a bool")
 
 
 def _coerce_provider_trace_config(value: Any) -> ProviderTraceConfig:
@@ -445,11 +448,31 @@ def _coerce_provider_trace_config(value: Any) -> ProviderTraceConfig:
         return value
     if not isinstance(value, dict):
         raise ValueError("Invalid provider_trace: must be a mapping")
-    _reject_unknown_keys(value, {"retention_days", "max_total_mb", "inject_openrouter_user"}, "provider_trace")
+    # Back-compat alias: the key was renamed inject_openrouter_user -> inject_provider_user when the
+    # observability plane went provider-generic. proxy.yaml is user-owned config (a system boundary,
+    # not strict durable state): accept the old key, warn, and degrade rather than reject
+    # (coding-standards section 5). Pop it BEFORE the strict allowlist check so it does not trip
+    # _reject_unknown_keys; the new key wins if both are present.
+    inject = value.get("inject_provider_user", False)
+    if "inject_openrouter_user" in value:
+        legacy_value = value["inject_openrouter_user"]
+        value = {k: v for k, v in value.items() if k != "inject_openrouter_user"}
+        if "inject_provider_user" not in value:
+            inject = legacy_value
+            logger.warning(
+                "provider_trace.inject_openrouter_user is deprecated; rename it to inject_provider_user. "
+                "The old key is honored for now."
+            )
+        else:
+            logger.warning(
+                "provider_trace.inject_openrouter_user is deprecated and ignored because "
+                "inject_provider_user is also set; remove the old key."
+            )
+    _reject_unknown_keys(value, {"retention_days", "max_total_mb", "inject_provider_user"}, "provider_trace")
     return ProviderTraceConfig(
         retention_days=value.get("retention_days", 14),
         max_total_mb=value.get("max_total_mb", 512),
-        inject_openrouter_user=value.get("inject_openrouter_user", False),
+        inject_provider_user=inject,
     )
 
 

@@ -6,7 +6,7 @@ the **proxied** path only. This card extends the same observability to Forge's *
 ## Problem
 
 Phase 5 records the Forge session grouping id in OpenRouter's top-level `user` field for **proxied** direct-OpenRouter
-traffic (forks, supervisor — the incident path), gated by per-proxy `provider_trace.inject_openrouter_user`. Forge also
+traffic (forks, supervisor — the incident path), gated by per-proxy `provider_trace.inject_provider_user`. Forge also
 makes **direct** `core.llm` calls to OpenRouter that bypass the proxy and so carry no `user`:
 
 - `policy/semantic/plan_check.py` — `DEFAULT_PLAN_CHECK_PROVIDER = "openrouter"`
@@ -28,7 +28,7 @@ OpenRouter (changing that is a routing change, not a header change).
 
 ## Open question — flag home
 
-Phase 5's flag is per-proxy (`provider_trace.inject_openrouter_user`), which direct callers cannot read (different
+Phase 5's flag is per-proxy (`provider_trace.inject_provider_user`), which direct callers cannot read (different
 process, no proxy binding). The direct-call opt-in needs an in-process source. **Leading candidate**:
 `~/.forge/config.yaml` (`forge.runtime_config`, in-process readable, three-layer defaults→file→env) — *not* an env var
 (an upstream-visible behavior should not depend on ambient process state). Decide whether one logical toggle should
@@ -45,8 +45,8 @@ govern both paths or whether proxied and direct keep separate (documented) homes
 
 ## References
 
-- Phase 5 shipped code: `proxy/server.py` (`_openrouter_user_value`), `proxy/client_adapter.py`
-  (`extra["openai"]["user"]` forward), `config/schema.py` (`ProviderTraceConfig.inject_openrouter_user`).
+- Phase 5 shipped code: `proxy/server.py` (`_provider_user_value`), `proxy/client_adapter.py` (`extra["openai"]["user"]`
+  forward), `config/schema.py` (`ProviderTraceConfig.inject_provider_user`).
 - Channel proof:
   `tests/src/core/llm/test_openrouter.py::TestOpenRouterClientComplete::test_user_from_extra_openai_reaches_create_kwargs`.
 - Minter: `core/run_id.py::derive_provider_session_id`; header precedent:

@@ -54,8 +54,8 @@ def tag_action(
             content=(context.raw_diff or context.new_content or "")[:2000],
         )
 
-        # No provider arg -> routes via local LiteLLM, never direct OpenRouter, so the Phase 5
-        # `user`-field injection (openrouter_observability) is structurally N/A here.
+        # No provider arg -> routes via local LiteLLM, which is not a provider-user-grouping-capable
+        # source, so the provider `user`-field injection is structurally N/A here.
         client = get_client(model)
         adapter = SyncAdapter(client)
 

@@ -945,7 +945,7 @@ _SSE_CONTENT_CHUNKS = (
 )
 
 _PT_CTX = {
-    "provider_name": "litellm",  # passthrough source has no provider-trace capability -> no write
+    # passthrough source (anthropic-passthrough) has no provider-trace capability -> no write
     "backend_id": "anthropic-passthrough",
     "proxy_id": "crimson-apricot",
     "mapped_model": "claude-opus-4-6",
@@ -989,14 +989,13 @@ async def test_passthrough_mirror_records_lifecycle_flags(monkeypatch):
     assert call["client_disconnected"] is False
     assert call["reported_cost_micros"] is None  # passthrough cost is structurally unavailable
     # Context threaded from the server is carried through verbatim.
-    assert call["provider_name"] == "litellm"
     assert call["backend_id"] == "anthropic-passthrough"
     assert call["provider_session_id"] == "forge_sess_abc"
 
 
 @pytest.mark.asyncio
-async def test_passthrough_mirror_is_latent_for_litellm(monkeypatch, tmp_path):
-    """End-to-end through the REAL helper: a non-OpenRouter route persists nothing."""
+async def test_passthrough_mirror_is_latent_for_non_capable_source(monkeypatch, tmp_path):
+    """End-to-end through the REAL helper: a source without provider-trace capability persists nothing."""
     monkeypatch.setenv("FORGE_HOME", str(tmp_path))
     monkeypatch.setattr(passthrough.httpx, "AsyncClient", _SSEContentClient)
 

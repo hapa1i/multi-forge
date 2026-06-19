@@ -1,16 +1,16 @@
 """Regression: a ``proxy.yaml`` ``provider_trace:`` block must survive the loader.
 
-The provider-trace plane (openrouter_observability Phase 3) and its Phase 5
-``inject_openrouter_user`` opt-in are declared on ``ProxyConfig`` /
+The provider-trace plane and its provider-user grouping
+``inject_provider_user`` opt-in are declared on ``ProxyConfig`` /
 ``ProxyInstanceConfig`` (schema), coerced in ``__post_init__``, and read at runtime
-(``server.py``: prune at startup + the OpenRouter ``user`` injection gate). But the
+(``server.py``: prune at startup + the provider ``user`` injection gate). But the
 loader that bridges YAML -> dataclass omitted ``provider_trace`` at BOTH hops:
 
 1. ``load_proxy_instance_config_from_dict`` (dict -> ``ProxyInstanceConfig``)
 2. ``_proxy_instance_to_forge_config`` (``ProxyInstanceConfig`` -> ``ProxyConfig``)
 
 Because the field has a default (``ProviderTraceConfig()``), the omission was
-silent: a user's ``provider_trace: {inject_openrouter_user: true, ...}`` block loaded
+silent: a user's ``provider_trace: {inject_provider_user: true, ...}`` block loaded
 as all-defaults, so Phase 5 injection never fired and custom retention was ignored.
 
 Affected: ``src/forge/config/loader.py`` (both wiring sites).
@@ -37,7 +37,7 @@ _VALID_PROXY = {
     },
 }
 
-_PROVIDER_TRACE = {"retention_days": 7, "max_total_mb": 99, "inject_openrouter_user": True}
+_PROVIDER_TRACE = {"retention_days": 7, "max_total_mb": 99, "inject_provider_user": True}
 
 
 def test_provider_trace_survives_dict_load() -> None:
@@ -48,13 +48,13 @@ def test_provider_trace_survives_dict_load() -> None:
 
     assert instance.provider_trace.retention_days == 7
     assert instance.provider_trace.max_total_mb == 99
-    assert instance.provider_trace.inject_openrouter_user is True
+    assert instance.provider_trace.inject_provider_user is True
 
 
 def test_provider_trace_survives_to_forge_config() -> None:
     """Site 2: the derived ``ProxyConfig`` (what the running proxy reads) must carry it.
 
-    ``server.py`` reads ``config.proxy.provider_trace.inject_openrouter_user`` and prunes
+    ``server.py`` reads ``config.proxy.provider_trace.inject_provider_user`` and prunes
     from ``config.proxy.provider_trace`` -- both off this derived ``ProxyConfig``.
     """
     from forge.config.loader import (
@@ -67,7 +67,7 @@ def test_provider_trace_survives_to_forge_config() -> None:
 
     assert forge_config.proxy.provider_trace.retention_days == 7
     assert forge_config.proxy.provider_trace.max_total_mb == 99
-    assert forge_config.proxy.provider_trace.inject_openrouter_user is True
+    assert forge_config.proxy.provider_trace.inject_provider_user is True
 
 
 def test_provider_trace_defaults_when_absent() -> None:
@@ -81,7 +81,7 @@ def test_provider_trace_defaults_when_absent() -> None:
 
     assert forge_config.proxy.provider_trace.retention_days == 14
     assert forge_config.proxy.provider_trace.max_total_mb == 512
-    assert forge_config.proxy.provider_trace.inject_openrouter_user is False
+    assert forge_config.proxy.provider_trace.inject_provider_user is False
 
 
 def test_template_provider_trace_and_logging_survive_create(monkeypatch) -> None:
@@ -101,7 +101,7 @@ def test_template_provider_trace_and_logging_survive_create(monkeypatch) -> None
 
     # A real template config, then stamp non-default blocks onto cfg.proxy (as a custom template would).
     tmpl = orch.load_config(template="openrouter-anthropic")
-    tmpl.proxy.provider_trace = ProviderTraceConfig(retention_days=7, inject_openrouter_user=True)
+    tmpl.proxy.provider_trace = ProviderTraceConfig(retention_days=7, inject_provider_user=True)
     tmpl.proxy.logging = LoggingConfig(requests=RequestLogConfig(enabled="on", stream_chunks=True))
     monkeypatch.setattr(orch, "load_config", lambda *_a, **_k: tmpl)
 
@@ -115,7 +115,7 @@ def test_template_provider_trace_and_logging_survive_create(monkeypatch) -> None
 
     data = YAML().load(written.read_text())
     instance = load_proxy_instance_config_from_dict(dict(data))
-    assert instance.provider_trace.inject_openrouter_user is True
+    assert instance.provider_trace.inject_provider_user is True
     assert instance.provider_trace.retention_days == 7
     assert instance.logging.requests.enabled == "on"
     assert instance.logging.requests.stream_chunks is True

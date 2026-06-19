@@ -120,7 +120,7 @@ async def test_create_message_request_explicit_tier_wins(monkeypatch):
     assert resp.status_code == 200
 
 
-# --- Phase 5: create_message wires inject_openrouter_user -> _forge_user (config ON -> adapter handoff) ---
+# --- create_message wires inject_provider_user -> _forge_user (config ON -> adapter handoff) ---
 
 
 class _ForgeRequestState:
@@ -190,7 +190,7 @@ async def _capture_openrouter_request(
     class ProxyCfg:
         default_tier = "haiku"
         preferred_provider = "openrouter"
-        provider_trace = type("PT", (), {"inject_openrouter_user": inject_flag})()
+        provider_trace = type("PT", (), {"inject_provider_user": inject_flag})()
         source = ""
 
         @staticmethod
@@ -227,11 +227,12 @@ async def _capture_openrouter_request(
 
 @pytest.mark.asyncio
 async def test_create_message_injects_forge_user_when_openrouter_flag_on(monkeypatch):
-    """Flag ON + OpenRouter route: the handler sets _forge_user from X-Forge-Session before the adapter handoff."""
+    """Flag ON + capable source: the handler sets _forge_user from X-Forge-Session before the adapter handoff."""
     openai_request = await _capture_openrouter_request(
         monkeypatch,
         inject_flag=True,
         forge_session="forge_sess_7e81a1bb765d_supervisor",
+        source="openrouter",
     )
     assert openai_request["_forge_user"] == "forge_sess_7e81a1bb765d_supervisor"
 

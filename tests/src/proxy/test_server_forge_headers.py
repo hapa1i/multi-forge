@@ -1,4 +1,4 @@
-"""Tests for the proxy's provider-trace correlation headers (openrouter_observability Phase 1).
+"""Tests for the proxy's provider-trace correlation headers.
 
 The middleware reads + VALIDATES the inbound ``X-Forge-Session``/``X-Forge-Command`` headers
 a proxy-routed subprocess stamps, stores the sanitized values on ``request.state``, and never
@@ -17,7 +17,7 @@ from forge.core.run_id import FORGE_COMMAND_HEADER, FORGE_SESSION_HEADER
 from forge.proxy import passthrough
 from forge.proxy.server import (
     _forge_session_command,
-    _openrouter_user_value,
+    _provider_user_value,
     _valid_command_header,
     _valid_session_header,
 )
@@ -140,13 +140,13 @@ def test_forge_headers_not_forwarded_upstream() -> None:
     assert headers["anthropic-version"] == "2023-06-01"  # allowlisted header still forwarded
 
 
-# --- Phase 5: the OpenRouter `user`-field injection value (gate + fallback) ---
+# --- The provider `user`-field injection value (opt-in + source-capability gate) ---
 
 
-def test_openrouter_user_value_uses_session_when_present() -> None:
+def test_provider_user_value_uses_session_when_present() -> None:
     assert (
-        _openrouter_user_value(
-            provider_name="openrouter",
+        _provider_user_value(
+            backend_id="openrouter",
             inject=True,
             forge_session=VALID_SESSION,
             forge_root_run_id="run_7e81a1bb765d",
@@ -156,10 +156,10 @@ def test_openrouter_user_value_uses_session_when_present() -> None:
     )
 
 
-def test_openrouter_user_value_falls_back_to_run_hash() -> None:
+def test_provider_user_value_falls_back_to_run_hash() -> None:
     """No session label -> derive forge_run_<hash> from the root run id, with the role suffix."""
-    value = _openrouter_user_value(
-        provider_name="openrouter",
+    value = _provider_user_value(
+        backend_id="openrouter",
         inject=True,
         forge_session=None,
         forge_root_run_id="root_run_xyz",
@@ -170,10 +170,10 @@ def test_openrouter_user_value_falls_back_to_run_hash() -> None:
     assert value.endswith("_review")
 
 
-def test_openrouter_user_value_none_when_flag_off() -> None:
+def test_provider_user_value_none_when_flag_off() -> None:
     assert (
-        _openrouter_user_value(
-            provider_name="openrouter",
+        _provider_user_value(
+            backend_id="openrouter",
             inject=False,
             forge_session=VALID_SESSION,
             forge_root_run_id="root_run_xyz",
@@ -183,10 +183,12 @@ def test_openrouter_user_value_none_when_flag_off() -> None:
     )
 
 
-def test_openrouter_user_value_none_for_non_openrouter() -> None:
+def test_provider_user_value_none_when_no_backend_id() -> None:
+    # No resolved source (e.g. proxy.yaml without source:) -> no grouping id even with the flag
+    # on. Guards the deliberate removal of the provider-name fallback.
     assert (
-        _openrouter_user_value(
-            provider_name="litellm",
+        _provider_user_value(
+            backend_id=None,
             inject=True,
             forge_session=VALID_SESSION,
             forge_root_run_id="root_run_xyz",
@@ -196,10 +198,9 @@ def test_openrouter_user_value_none_for_non_openrouter() -> None:
     )
 
 
-def test_openrouter_user_value_uses_capable_source() -> None:
+def test_provider_user_value_uses_capable_source() -> None:
     assert (
-        _openrouter_user_value(
-            provider_name="litellm",
+        _provider_user_value(
             backend_id="openrouter",
             inject=True,
             forge_session=VALID_SESSION,
@@ -210,10 +211,9 @@ def test_openrouter_user_value_uses_capable_source() -> None:
     )
 
 
-def test_openrouter_user_value_suppressed_by_non_capable_source() -> None:
+def test_provider_user_value_suppressed_by_non_capable_source() -> None:
     assert (
-        _openrouter_user_value(
-            provider_name="openrouter",
+        _provider_user_value(
             backend_id="litellm-remote",
             inject=True,
             forge_session=VALID_SESSION,
@@ -224,11 +224,11 @@ def test_openrouter_user_value_suppressed_by_non_capable_source() -> None:
     )
 
 
-def test_openrouter_user_value_none_when_no_identity() -> None:
-    """Flag on + openrouter but neither session nor run id -> nothing to group by."""
+def test_provider_user_value_none_when_no_identity() -> None:
+    """Flag on + capable source but neither session nor run id -> nothing to group by."""
     assert (
-        _openrouter_user_value(
-            provider_name="openrouter",
+        _provider_user_value(
+            backend_id="openrouter",
             inject=True,
             forge_session=None,
             forge_root_run_id=None,

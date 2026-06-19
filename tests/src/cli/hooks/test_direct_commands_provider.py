@@ -23,7 +23,7 @@ def _isolated_home(tmp_path, monkeypatch):
 
 def _record(**kw: Any) -> None:
     params: dict[str, Any] = dict(
-        provider_name="openrouter",
+        backend_id="openrouter",
         request_mode="streaming",
         request_id="req-1",
         proxy_id="crimson-apricot",

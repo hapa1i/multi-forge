@@ -1,10 +1,10 @@
 """Provider lifecycle/correlation projection over downstream telemetry.
 
 The fourth local telemetry plane: provider **lifecycle/correlation evidence** for a
-single OpenRouter request — "did it leave Forge, which route/generation, did the stream
+single backend request — "did it leave Forge, which route/generation, did the stream
 start/finish or lose its final usage chunk?" Born from an incident where a supervised
 fork's checks timed out before the final streaming usage chunk and left no trace locally
-or in OpenRouter's UI.
+or in the backend provider's dashboard.
 
 Modeled on ``audit_logger.py`` (versioned write/prune, owner-only shards) with the
 strict-dacite read of ``core/usage/ledger.py``. Records are **metadata-only**: no prompt,
@@ -152,7 +152,6 @@ def write_provider_trace(
 
 def record_provider_trace(
     *,
-    provider_name: str,
     request_id: str,
     proxy_id: str,
     mapped_model: str,
@@ -177,11 +176,10 @@ def record_provider_trace(
     passthrough relay (``passthrough.py``) — it lives in this neutral leaf so neither
     caller has to import the other (avoids the ``server`` <-> ``passthrough`` cycle).
 
-    Gateway-routed OpenRouter remains explicit: a source must declare provider-trace
-    capability, so ``litellm``/``unknown`` routes write nothing even if the selected
-    upstream provider later reports OpenRouter.
+    Source-capability gated: the resolved ``backend_id`` must declare provider-trace
+    capability, so a route with no ``backend_id`` (or a non-capable source) writes nothing.
     """
-    if not _provider_trace_enabled(provider_name=provider_name, backend_id=backend_id):
+    if not _provider_trace_enabled(backend_id=backend_id):
         return
     # "available" only when the proxy locally observed a final figure; the incident path
     # (stream cancelled before the final usage chunk) is honestly "unavailable" — probe 2
@@ -214,14 +212,15 @@ def record_provider_trace(
         logger.debug("provider trace record skipped: %s", e)
 
 
-def _provider_trace_enabled(*, provider_name: str, backend_id: str | None) -> bool:
-    if backend_id:
-        try:
-            return get_model_source(backend_id).capabilities.provider_trace
-        except ModelSourceNotFoundError:
-            logger.debug("unknown backend source for provider trace: %s", backend_id)
-            return False
-    return provider_name == "openrouter"
+def _provider_trace_enabled(*, backend_id: str | None) -> bool:
+    # Source-capability gated only: no backend_id (or a non-capable source) means no trace.
+    if not backend_id:
+        return False
+    try:
+        return get_model_source(backend_id).capabilities.provider_trace
+    except ModelSourceNotFoundError:
+        logger.debug("unknown backend source for provider trace: %s", backend_id)
+        return False
 
 
 # --- Read path (for the Phase 4 CLI) -----------------------------------------

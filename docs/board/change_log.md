@@ -27,6 +27,35 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-19
 
+### backend_remote_reconciliation PR 1: generalize provider-trace observability over any backend
+
+**Goal**: Resume the paused `openrouter_remote_reconciliation` work as the provider-generic
+`backend_remote_reconciliation` card (OpenRouter becomes the first adapter, not the feature). PR 1 removes the last
+OpenRouter coupling from the provider-trace / provider-user-grouping surfaces so the upcoming `forge backend reconcile`
+feature builds on a backend-neutral base.
+
+**Key changes**:
+
+- Renamed the source capability `openrouter_user_grouping` -> `provider_user_grouping` (`backend/sources.py`) and the
+  config key `provider_trace.inject_openrouter_user` -> `inject_provider_user` (`config/schema.py`).
+- Removed the two `provider_name == "openrouter"` fallbacks: provider-trace writes and the `user`-field injection are
+  now purely source-capability gated by `backend_id`. Renamed `_openrouter_user_value` -> `_provider_user_value` and
+  `_inject_openrouter_user_enabled` -> `_inject_provider_user_enabled`, and dropped the now-dead `provider_name` param
+  from `record_provider_trace` and all call sites + the passthrough ctx dict.
+- A proxy with no `proxy.source` now writes no trace / injects no user (the fallback's only beneficiary), surfaced once
+  via a dedicated `_warned_absent_backend_source` INFO latch in `server.py`.
+- `proxy.yaml` is user-owned config (system boundary): the old `inject_openrouter_user` key is honored as a
+  warn-and-degrade alias (new key wins if both set), not a hard reject.
+- Genericized provider-coupled comments/docstrings and normative docs (design §3.14, appendix §A.14, cli_reference,
+  end-user/proxy.md incl. an alias note). Board: moved `paused/openrouter_remote_reconciliation` ->
+  `doing/backend_remote_reconciliation`, reframed card/checklist (two-PR plan, superseded Phase 0 decisions), and
+  updated the telemetry epic's member table + the `openrouter_user_direct_callers` references.
+
+**Verification**: `uv run pytest` over the renamed proxy/config/cli/ops surfaces + the new
+`test_bug_provider_trace_inject_alias.py` regression (185 passed); `make pre-commit` clean (mypy + pyright); live
+`tests/integration/proxy/test_provider_trace_e2e.py` (2 passed) confirms the real OpenRouter proxy still writes traces
+via the `source: openrouter` capability gate.
+
 ### unified_backend follow-up: custom templates preflight credentials from declared source
 
 **Goal**: Fix a credential-preflight gap left by `unified_backend` — user-named proxy templates silently skipped

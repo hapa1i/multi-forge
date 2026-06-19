@@ -61,7 +61,7 @@ def test_persisted_record_carries_no_payload_or_secret_headers(tmp_path, monkeyp
     # A caller hands provider_meta whose headers carry secrets (simulating a future bypass of
     # the Phase 2 allowlist). The persisted record must drop them.
     ptl.record_provider_trace(
-        provider_name="openrouter",
+        backend_id="openrouter",
         request_mode="streaming",
         proxy_id="crimson-apricot",
         mapped_model="openai/gpt-5.5",

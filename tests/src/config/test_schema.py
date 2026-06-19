@@ -702,7 +702,7 @@ class TestInterceptAuditConfig:
         with pytest.raises(ValueError, match="audit.retention_days"):
             self._make(audit={"retention_days": -1})
 
-    # --- provider_trace plane retention (openrouter_observability Phase 3) ---
+    # --- provider_trace plane retention + provider-user grouping opt-in ---
 
     def test_provider_trace_defaults_are_inert(self):
         from forge.config.schema import ProviderTraceConfig
@@ -740,18 +740,18 @@ class TestInterceptAuditConfig:
         assert isinstance(cfg.provider_trace, ProviderTraceConfig)
         assert cfg.provider_trace.retention_days == 3
 
-    def test_provider_trace_inject_openrouter_user_defaults_false(self):
-        """Phase 5 opt-in is off unless explicitly enabled."""
+    def test_provider_trace_inject_provider_user_defaults_false(self):
+        """Provider-user grouping is opt-in: off unless explicitly enabled."""
         config = self._make()
-        assert config.provider_trace.inject_openrouter_user is False
+        assert config.provider_trace.inject_provider_user is False
 
-    def test_provider_trace_inject_openrouter_user_coerced_from_dict(self):
-        config = self._make(provider_trace={"inject_openrouter_user": True})
-        assert config.provider_trace.inject_openrouter_user is True
+    def test_provider_trace_inject_provider_user_coerced_from_dict(self):
+        config = self._make(provider_trace={"inject_provider_user": True})
+        assert config.provider_trace.inject_provider_user is True
 
-    def test_provider_trace_inject_openrouter_user_rejects_non_bool(self):
-        with pytest.raises(ValueError, match="provider_trace.inject_openrouter_user"):
-            self._make(provider_trace={"inject_openrouter_user": "yes"})
+    def test_provider_trace_inject_provider_user_rejects_non_bool(self):
+        with pytest.raises(ValueError, match="provider_trace.inject_provider_user"):
+            self._make(provider_trace={"inject_provider_user": "yes"})
 
     def test_system_prompt_guard_requires_pattern(self):
         with pytest.raises(ValueError, match="needs a 'pattern' key"):
