@@ -51,6 +51,16 @@ from forge.core.usage.vocabulary import Confidence, Reporter
 logger = logging.getLogger(__name__)
 
 
+def _backend_id_for_direct_usage(*, provider: str | None, reporter: Reporter | None) -> str | None:
+    if reporter == "claude_code":
+        return "anthropic-direct"
+    if provider == "anthropic":
+        return "anthropic-direct"
+    if provider == "openrouter":
+        return "openrouter"
+    return None
+
+
 def _session_status(result: SessionResult) -> tuple[str, str | None]:
     """Map a SessionResult to (status, failure_type).
 
@@ -147,6 +157,7 @@ def emit_usage_for_session_result(
                     provider=None,
                     source_id=measurement.reporter,
                     source_kind="provider" if measurement.reporter else None,
+                    backend_id=_backend_id_for_direct_usage(provider=None, reporter=measurement.reporter),
                     model=model,
                     input_tokens=measurement.input_tokens,
                     output_tokens=measurement.output_tokens,
@@ -304,6 +315,7 @@ def emit_worker_usage(
                     provider=provider,
                     source_id=provider,
                     source_kind="provider" if provider else None,
+                    backend_id=_backend_id_for_direct_usage(provider=provider, reporter=measurement.reporter),
                     model=model,
                     input_tokens=measurement.input_tokens,
                     output_tokens=measurement.output_tokens,
@@ -370,6 +382,7 @@ def emit_codex_usage(
                 provider=provider,
                 source_id=provider,
                 source_kind="provider",
+                backend_id=_backend_id_for_direct_usage(provider=provider, reporter=measurement.reporter),
                 model=model,
                 input_tokens=measurement.input_tokens,
                 output_tokens=measurement.output_tokens,
@@ -478,6 +491,10 @@ def emit_direct_llm_usage(
                     ),
                     source_id=provider,
                     source_kind="provider",
+                    backend_id=_backend_id_for_direct_usage(
+                        provider=provider or pm_provider,
+                        reporter=measurement.reporter,
+                    ),
                     forge_run_id=identity.run_id,
                     forge_root_run_id=identity.root_run_id,
                     provider=provider or pm_provider,

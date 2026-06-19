@@ -237,7 +237,13 @@ async def forward(
                 response_body = parsed if isinstance(parsed, dict) else None
             except (ValueError, TypeError):
                 response_body = None
-        _safe_on_complete(on_complete, extract_usage_from_message(response_body), response_body, failed, request_id)
+        _safe_on_complete(
+            on_complete,
+            extract_usage_from_message(response_body),
+            response_body,
+            failed,
+            request_id,
+        )
 
     # Return the upstream body unchanged (byte-for-byte) so response thinking
     # blocks / signatures survive for the client's next --resume turn.
@@ -321,12 +327,11 @@ def _record_passthrough_trace(
     final_usage_seen: bool,
     client_disconnected: bool,
 ) -> None:
-    """Mirror the passthrough relay's lifecycle into the provider-trace plane (Phase 3).
+    """Mirror the passthrough relay's lifecycle into the provider-trace plane.
 
-    Forward-wiring: ``record_provider_trace`` gates on ``provider_name == "openrouter"``
-    and passthrough never carries OpenRouter, so this writes nothing today -- the call
-    exists so the plane lights up with no seam change once a passthrough-routed provider
-    populates ``provider_meta``. Best-effort; never raises into the relay teardown.
+    ``record_provider_trace`` gates on source capability. Current passthrough sources do
+    not declare provider-trace capability, so this remains quiet until a source opts in.
+    Best-effort; never raises into the relay teardown.
     """
     if provider_trace_ctx is None:
         return

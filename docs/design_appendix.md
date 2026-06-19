@@ -113,8 +113,8 @@ distinct from both proxy templates and runtime backend instances.
 
 `ModelSource.id` is the canonical catalog id. Local source ids intentionally live in a different value-space from
 runtime instance ids: for example, `litellm-gemini-local` is a source id, while `litellm-4000` remains a
-`BackendInstance.backend_id`. Downstream telemetry may later use `backend_id` for source attribution, but Phase 4 must
-write the catalog source id rather than the runtime instance id.
+`BackendInstance.backend_id`. Downstream telemetry uses `backend_id` for source attribution and writes the catalog
+source id rather than the runtime instance id.
 
 Source definitions have:
 
@@ -443,17 +443,20 @@ Downstream attempt records contain timestamp, proxy/source ID, model/tier, token
 route reported a cost), request ID, latency, metric-evidence provenance (`reporter` + `confidence`), provider lifecycle
 fields, optional redacted audit payloads, and the **run-tree correlation** `forge_run_id`/`forge_root_run_id` (§3.14 /
 §A.13: null for the interactive harness and any non-Forge-originated traffic; set when a Forge-routed `claude -p`
-subprocess forwarded the validated `X-Forge-Run-ID`/`X-Forge-Root-Run-ID` headers). Two companion headers ride the same
-proven-proxy path for provider-trace correlation: `X-Forge-Session` (an opaque `forge_sess_<hash>` / `forge_run_<hash>`
-grouping id derived by hashing the session name + role — the raw name is never sent) and `X-Forge-Command` (the
-sanitized command role). Like the run-id headers they are validated on read, stored on `request.state`, and are
-**internal Forge↔proxy correlation only — never forwarded upstream** (the passthrough allowlist drops them). They are
-distinct from provider-bound metadata such as the OpenRouter `user` field, which is deliberately sent upstream. There is
-no local price catalog, so cost is reported-or-unavailable, never inferred from tokens. The downstream idempotency key
-is `downstream_event_id`: the proxy mints one stable id per physical attempt and uses it for both cost and provider
-lifecycle writes; true duplicate writes of that same attempt merge, while distinct attempts/retries get distinct ids.
-Legacy verb records are no longer written; by-verb cost derives from downstream attempts joined to `usage/events` by run
-id.
+subprocess forwarded the validated `X-Forge-Run-ID`/`X-Forge-Root-Run-ID` headers). `backend_id` is the canonical
+model-source catalog id (`openrouter`, `litellm-remote`, `anthropic-direct`, etc.) used for upstream source attribution.
+It is distinct from `source_id`/`source_kind`, which remain the telemetry-origin axis (`proxy` or `provider`). Two
+companion headers ride the same proven-proxy path for provider-trace correlation: `X-Forge-Session` (an opaque
+`forge_sess_<hash>` / `forge_run_<hash>` grouping id derived by hashing the session name + role — the raw name is never
+sent) and `X-Forge-Command` (the sanitized command role). Like the run-id headers they are validated on read, stored on
+`request.state`, and are **internal Forge↔proxy correlation only — never forwarded upstream** (the passthrough allowlist
+drops them). They are distinct from provider-bound metadata such as the OpenRouter `user` field, which is deliberately
+sent upstream. There is no local price catalog, so cost is reported-or-unavailable, never inferred from tokens. The
+downstream idempotency key is `downstream_event_id`: the proxy mints one stable id per physical attempt and uses it for
+both cost and provider lifecycle writes; true duplicate writes of that same attempt merge, while distinct
+attempts/retries get distinct ids. `backend_id` filtering is applied after duplicate-attempt merge so later same-attempt
+records with null `backend_id` can add evidence without erasing attribution. Legacy verb records are no longer written;
+by-verb cost derives from downstream attempts joined to `usage/events` by run id.
 
 The proxy `GET /` endpoint reports in-memory metrics and cost totals for live status. The JSONL request logs remain the
 bootstrap source for cap enforcement after restart.
@@ -742,22 +745,22 @@ a supervised fork's checks timed out before the final streaming usage chunk and 
 `read_provider_traces()` projects downstream attempts into the legacy `ProviderTraceRecord` DTO for CLI/core-op callers.
 Provider lifecycle fields carried by the downstream schema include:
 
-| Group       | Fields                                                                                                                                |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| Correlation | `request_id`, `proxy_id`, `mapped_model`, `forge_run_id`, `forge_root_run_id`, `provider_session_id`, `provider_command`              |
-| Provider    | `provider`, `selected_provider`, `provider_response_id`, `provider_generation_id`, `provider_request_id`, `provider_headers`          |
-| Lifecycle   | `request_mode`, `stream_started`, `first_chunk_seen`, `final_usage_seen`, `client_disconnected`, `local_usage_status`, `timeout_seen` |
-| Cost echo   | `reported_cost_micros`, `latency_ms` (diagnostic copies; the cost plane stays the spend source of truth)                              |
+| Group       | Fields                                                                                                                                 |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Correlation | `request_id`, `proxy_id`, `backend_id`, `mapped_model`, `forge_run_id`, `forge_root_run_id`, `provider_session_id`, `provider_command` |
+| Provider    | `provider`, `selected_provider`, `provider_response_id`, `provider_generation_id`, `provider_request_id`, `provider_headers`           |
+| Lifecycle   | `request_mode`, `stream_started`, `first_chunk_seen`, `final_usage_seen`, `client_disconnected`, `local_usage_status`, `timeout_seen`  |
+| Cost echo   | `reported_cost_micros`, `latency_ms` (diagnostic copies; the cost plane stays the spend source of truth)                               |
 
 Semantics and invariants:
 
 - **Metadata-only.** There is deliberately no prompt/completion/tool/body field. `provider_headers` is the Phase 2
   correlation allowlist (`x-request-id` / `x-generation-id` / `x-litellm-call-id` / `x-litellm-model-id`), re-applied at
   the writer so a future caller that bypasses the upstream allowlist still cannot persist auth/cookie headers.
-- **Direct-OpenRouter-only.** Written only when the resolved provider is the direct `openrouter` route (the incident the
-  probes exercised); gateway-routed OpenRouter (LiteLLM → OpenRouter) is out of scope and writes nothing. The
-  passthrough relay is instrumented with the same lifecycle (forward-wiring) but is latent — it never carries
-  OpenRouter.
+- **Source-capability gated.** Written only when the selected backend source declares provider-trace capability.
+  `openrouter` opts in for v1; gateway-routed OpenRouter through non-capable LiteLLM sources writes nothing. The
+  passthrough relay is instrumented with the same lifecycle but remains quiet for current non-capable passthrough
+  sources.
 - **`first_chunk_seen`** = first user-visible content chunk; the internal `_provider_meta` carrier (which delivers the
   `gen-…` id, captured on the **first** stream event) does not count, so a stream cancelled before any content still
   records the generation id with `first_chunk_seen=false`.
@@ -777,8 +780,8 @@ Semantics and invariants:
   *label* (re-derived `forge_sess_<hash>` prefix) / `forge_root_run_id` / `--period`; `explain` joins downstream spend
   evidence by `request_id` within ±5m for cost confidence. Local-only — no remote `/generation` lookup.
 - **Session-id injection (Phase 5, opt-in).** `provider_trace.inject_openrouter_user` (default off) forwards the
-  validated `X-Forge-Session` id (or a `forge_run_<hash>` fallback) into OpenRouter's top-level `user` field on the
-  proxied direct-OpenRouter path — probe 3 found `user` is retained in the indexed `/generation` record for account-side
+  validated `X-Forge-Session` id (or a `forge_run_<hash>` fallback) into OpenRouter's top-level `user` field on
+  source-capable proxied routes — probe 3 found `user` is retained in the indexed `/generation` record for account-side
   lookup, while a custom `session_id` is ignored. Server-gated (`_openrouter_user_value`) and adapter-forwarded via
   `extra["openai"]["user"]`; metadata-only, hashed, never the raw session name. Direct `core.llm` callers (plan-check,
   curation) are a documented follow-up, not wired here.

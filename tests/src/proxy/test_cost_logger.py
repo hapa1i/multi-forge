@@ -26,6 +26,7 @@ class TestLogRequestCost:
     def test_creates_dir_and_writes_record(self, cost_log_dir: Path):
         log_request_cost(
             proxy_id="openrouter",
+            backend_id="openrouter",
             model="anthropic/claude-sonnet-4.6",
             tier="sonnet",
             input_tokens=1500,
@@ -49,6 +50,7 @@ class TestLogRequestCost:
 
         record = json.loads(lines[0])
         assert record["proxy_id"] == "openrouter"
+        assert record["backend_id"] == "openrouter"
         assert record["model"] == "anthropic/claude-sonnet-4.6"
         assert record["tier"] == "sonnet"
         assert record["input_tokens"] == 1500
@@ -63,6 +65,7 @@ class TestLogRequestCost:
         assert record["failed"] is False
         assert record["request_id"] == "req_abc123"
         assert record["ts"].endswith("Z")
+        assert read_cost_logs()[0]["backend_id"] == "openrouter"
 
     def test_unavailable_cost_is_none_not_zero(self, cost_log_dir: Path):
         """No reported cost → cost_micros is None (not 0); tokens still recorded."""

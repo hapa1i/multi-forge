@@ -32,8 +32,12 @@ def recorded_costs(monkeypatch: pytest.MonkeyPatch) -> list[int | None]:
     return recorded
 
 
-def _set_provider(monkeypatch: pytest.MonkeyPatch, provider: str) -> None:
-    monkeypatch.setattr(server, "config", SimpleNamespace(proxy=SimpleNamespace(preferred_provider=provider)))
+def _set_provider(monkeypatch: pytest.MonkeyPatch, provider: str, *, source: str = "") -> None:
+    monkeypatch.setattr(
+        server,
+        "config",
+        SimpleNamespace(proxy=SimpleNamespace(preferred_provider=provider, source=source)),
+    )
 
 
 def _calc(**overrides: Any) -> int | None:
@@ -72,13 +76,14 @@ class TestCalcAndLogCostReported:
         captured_log: list[dict[str, Any]],
         recorded_costs: list[int | None],
     ) -> None:
-        _set_provider(monkeypatch, "openrouter")
+        _set_provider(monkeypatch, "openrouter", source="openrouter")
         result = _calc(reported_cost_micros=2300)
 
         assert result == 2300
         assert len(captured_log) == 1
         rec = captured_log[0]
         assert rec["cost_micros"] == 2300
+        assert rec["backend_id"] == "openrouter"
         assert rec["reporter"] == "openrouter"
         assert rec["confidence"] == "reported"
         # Reported cost feeds the spend-cap tracker.

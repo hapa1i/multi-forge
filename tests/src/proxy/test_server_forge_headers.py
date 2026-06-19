@@ -91,7 +91,11 @@ def _capture_state_via_passthrough(monkeypatch, headers: dict[str, str]) -> Simp
     monkeypatch.setattr(server, "_handle_anthropic_passthrough", _spy)
 
     client = TestClient(server.app, raise_server_exceptions=False)
-    client.post("/v1/messages", json={"model": "x", "max_tokens": 1, "messages": []}, headers=headers)
+    client.post(
+        "/v1/messages",
+        json={"model": "x", "max_tokens": 1, "messages": []},
+        headers=headers,
+    )
     return SimpleNamespace(**captured)
 
 
@@ -183,6 +187,34 @@ def test_openrouter_user_value_none_for_non_openrouter() -> None:
     assert (
         _openrouter_user_value(
             provider_name="litellm",
+            inject=True,
+            forge_session=VALID_SESSION,
+            forge_root_run_id="root_run_xyz",
+            forge_command=None,
+        )
+        is None
+    )
+
+
+def test_openrouter_user_value_uses_capable_source() -> None:
+    assert (
+        _openrouter_user_value(
+            provider_name="litellm",
+            backend_id="openrouter",
+            inject=True,
+            forge_session=VALID_SESSION,
+            forge_root_run_id="root_run_xyz",
+            forge_command=None,
+        )
+        == VALID_SESSION
+    )
+
+
+def test_openrouter_user_value_suppressed_by_non_capable_source() -> None:
+    assert (
+        _openrouter_user_value(
+            provider_name="openrouter",
+            backend_id="litellm-remote",
             inject=True,
             forge_session=VALID_SESSION,
             forge_root_run_id="root_run_xyz",

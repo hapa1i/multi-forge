@@ -81,6 +81,7 @@ class DownstreamRecord:
     proxy_id: str | None = None
     source_id: str | None = None
     source_kind: str | None = None
+    backend_id: str | None = None
     forge_run_id: str | None = None
     forge_root_run_id: str | None = None
     provider_session_id: str | None = None
@@ -173,6 +174,7 @@ def read_downstream_records(
     kind: DownstreamKind | None = None,
     request_id: str | None = None,
     proxy_id: str | None = None,
+    backend_id: str | None = None,
     forge_run_id: str | None = None,
     forge_root_run_id: str | None = None,
     provider_session_id: str | None = None,
@@ -230,12 +232,19 @@ def read_downstream_records(
                     try:
                         records.append(dacite.from_dict(DownstreamRecord, record, config=config))
                     except (dacite.DaciteError, TypeError, KeyError, ValueError) as e:
-                        logger.warning("Skipping malformed downstream telemetry in %s: %s", path.name, e)
+                        logger.warning(
+                            "Skipping malformed downstream telemetry in %s: %s",
+                            path.name,
+                            e,
+                        )
         except OSError as e:
             logger.warning("Failed to read downstream telemetry %s: %s", path, e)
 
     records.sort(key=lambda r: r.ts)
-    return _merge_attempt_records(records)
+    merged = _merge_attempt_records(records)
+    if backend_id:
+        return [record for record in merged if record.backend_id == backend_id]
+    return merged
 
 
 def prune_downstream_records(*, retention_days: int, max_total_mb: int) -> None:

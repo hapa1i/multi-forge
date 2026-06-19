@@ -56,6 +56,32 @@ def test_duplicate_attempt_ids_merge_latest_non_null_fields() -> None:
     assert records[0].confidence == "reported"
 
 
+def test_backend_id_survives_later_null_merge_and_can_filter() -> None:
+    write_downstream_record(
+        DownstreamRecord(
+            kind="attempt",
+            downstream_event_id="ds_backend",
+            request_id="req-1",
+            backend_id="openrouter",
+        )
+    )
+    write_downstream_record(
+        DownstreamRecord(
+            kind="attempt",
+            downstream_event_id="ds_backend",
+            output_tokens=5,
+            backend_id=None,
+        )
+    )
+
+    records = read_downstream_records(kind="attempt", backend_id="openrouter")
+
+    assert len(records) == 1
+    assert records[0].backend_id == "openrouter"
+    assert records[0].output_tokens == 5
+    assert read_downstream_records(kind="attempt", backend_id="litellm-remote") == []
+
+
 def test_non_attempt_substreams_do_not_merge() -> None:
     write_downstream_record(
         DownstreamRecord(
@@ -83,7 +109,16 @@ def test_newer_schema_is_skipped(_isolated_downstream: Path, caplog: pytest.LogC
     _isolated_downstream.mkdir(parents=True)
     path = _isolated_downstream / "2026-06_1.jsonl"
     with open(path, "w") as f:
-        f.write(json.dumps({"schema_version": 99, "kind": "attempt", "downstream_event_id": "future"}) + "\n")
+        f.write(
+            json.dumps(
+                {
+                    "schema_version": 99,
+                    "kind": "attempt",
+                    "downstream_event_id": "future",
+                }
+            )
+            + "\n"
+        )
         f.write(json.dumps({"schema_version": 1, "kind": "attempt", "downstream_event_id": "ok"}) + "\n")
 
     with caplog.at_level("WARNING"):
@@ -152,7 +187,9 @@ def test_prune_preserves_current_month_shard_by_age(_isolated_downstream: Path) 
     assert not old.exists()
 
 
-def test_prune_preserves_current_month_shard_by_size(_isolated_downstream: Path) -> None:
+def test_prune_preserves_current_month_shard_by_size(
+    _isolated_downstream: Path,
+) -> None:
     _isolated_downstream.mkdir(parents=True)
     current_month = datetime.now(timezone.utc).strftime("%Y-%m")
     current = _isolated_downstream / f"{current_month}_1.jsonl"

@@ -25,6 +25,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Literal
 
+from forge.backend.sources import ModelSourceNotFoundError, get_model_source
 from forge.core.telemetry.downstream import (
     DownstreamRecord,
     mint_downstream_event_id,
@@ -64,6 +65,7 @@ class ProviderTraceRecord:
     forge_root_run_id: str | None
     provider_session_id: str | None
     provider_command: str | None
+    backend_id: str | None
     provider: str | None
     selected_provider: str | None
     provider_response_id: str | None
@@ -103,6 +105,7 @@ def write_provider_trace(
     reported_cost_micros: int | None,
     latency_ms: float | None,
     downstream_event_id: str | None = None,
+    backend_id: str | None = None,
 ) -> None:
     """Build and persist a metadata-only provider-trace record (no gate).
 
@@ -122,6 +125,7 @@ def write_provider_trace(
             proxy_id=proxy_id,
             source_id=proxy_id,
             source_kind="proxy",
+            backend_id=backend_id,
             mapped_model=mapped_model,
             forge_run_id=forge_run_id,
             forge_root_run_id=forge_root_run_id,
@@ -165,22 +169,19 @@ def record_provider_trace(
     reported_cost_micros: int | None,
     latency_ms: float | None,
     downstream_event_id: str | None = None,
+    backend_id: str | None = None,
 ) -> None:
-    """Gate to the direct OpenRouter route, derive local_usage_status, and persist.
+    """Gate by backend/source capability, derive local_usage_status, and persist.
 
     The shared write entry point for both the converters seam (``server.py``) and the
     passthrough relay (``passthrough.py``) — it lives in this neutral leaf so neither
     caller has to import the other (avoids the ``server`` <-> ``passthrough`` cycle).
 
-    Direct-OpenRouter-only by design: gateway-routed OpenRouter (LiteLLM -> OpenRouter)
-    is out of scope for this card, so a ``litellm``/``unknown`` route writes nothing.
-
-    Forward-ref: the ``unified_backend`` board proposal (find it with ``rg unified_backend``) migrates
-    this provider-literal gate to a backend-id check, broadening beyond OpenRouter via
-    ``selected_provider``. A deliberate clean break -- kept a hardcoded literal, not a premature seam,
-    until that proposal runs. (Slug, not a board path -- cards move lanes.)
+    Gateway-routed OpenRouter remains explicit: a source must declare provider-trace
+    capability, so ``litellm``/``unknown`` routes write nothing even if the selected
+    upstream provider later reports OpenRouter.
     """
-    if provider_name != "openrouter":
+    if not _provider_trace_enabled(provider_name=provider_name, backend_id=backend_id):
         return
     # "available" only when the proxy locally observed a final figure; the incident path
     # (stream cancelled before the final usage chunk) is honestly "unavailable" — probe 2
@@ -207,9 +208,20 @@ def record_provider_trace(
             reported_cost_micros=reported_cost_micros,
             latency_ms=latency_ms,
             downstream_event_id=downstream_event_id,
+            backend_id=backend_id,
         )
     except Exception as e:  # belt over the writer's own braces — never break the request
         logger.debug("provider trace record skipped: %s", e)
+
+
+def _provider_trace_enabled(*, provider_name: str, backend_id: str | None) -> bool:
+    if backend_id:
+        try:
+            return get_model_source(backend_id).capabilities.provider_trace
+        except ModelSourceNotFoundError:
+            logger.debug("unknown backend source for provider trace: %s", backend_id)
+            return False
+    return provider_name == "openrouter"
 
 
 # --- Read path (for the Phase 4 CLI) -----------------------------------------
@@ -266,6 +278,7 @@ def read_provider_traces(
                 forge_root_run_id=rec.forge_root_run_id,
                 provider_session_id=rec.provider_session_id,
                 provider_command=rec.provider_command,
+                backend_id=rec.backend_id,
                 provider=rec.provider,
                 selected_provider=rec.selected_provider,
                 provider_response_id=rec.provider_response_id,

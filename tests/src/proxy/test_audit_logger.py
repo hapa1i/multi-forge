@@ -108,14 +108,23 @@ class TestHashing:
             {"name": "Read", "description": "read", "input_schema": {"type": "object"}},
         ]
         t2 = [
-            {"name": "Read", "description": "DIFFERENT PROSE", "input_schema": {"type": "object"}},
+            {
+                "name": "Read",
+                "description": "DIFFERENT PROSE",
+                "input_schema": {"type": "object"},
+            },
             {"name": "Bash", "description": "run", "input_schema": {"type": "object"}},
         ]
         assert audit_logger.hash_tool_surface(t1) == audit_logger.hash_tool_surface(t2)
 
     def test_tool_surface_changes_on_schema_change(self):
         t1 = [{"name": "Bash", "input_schema": {"type": "object", "properties": {}}}]
-        t2 = [{"name": "Bash", "input_schema": {"type": "object", "properties": {"cmd": {}}}}]
+        t2 = [
+            {
+                "name": "Bash",
+                "input_schema": {"type": "object", "properties": {"cmd": {}}},
+            }
+        ]
         assert audit_logger.hash_tool_surface(t1) != audit_logger.hash_tool_surface(t2)
 
     def test_tool_surface_none_and_empty(self):
@@ -124,6 +133,15 @@ class TestHashing:
 
 
 class TestWriteRead:
+    def test_metadata_record_carries_backend_id(self):
+        _meta(request_id="r-backend", proxy_id="p", backend_id="anthropic-passthrough")
+
+        raw = json.loads(_downstream_path().read_text().splitlines()[0])
+        assert raw["backend_id"] == "anthropic-passthrough"
+
+        payload = audit_logger.read_audit_logs()[0]
+        assert payload["backend_id"] == "anthropic-passthrough"
+
     def test_metadata_round_trip(self):
         _meta(
             request_id="req_1",
@@ -147,15 +165,28 @@ class TestWriteRead:
             proxy_id="p",
             mode="inspect",
             route=ROUTE,
-            request_headers={"Authorization": "Bearer SECRET", "anthropic-version": "2023-06-01"},
-            request_body={"model": "m", "system": "secret sys", "messages": [{"role": "user", "content": "hi secret"}]},
+            request_headers={
+                "Authorization": "Bearer SECRET",
+                "anthropic-version": "2023-06-01",
+            },
+            request_body={
+                "model": "m",
+                "system": "secret sys",
+                "messages": [{"role": "user", "content": "hi secret"}],
+            },
         )
         r = audit_logger.read_audit_logs(record_type="request")[0]
         assert r["full_body"] is True
-        assert r["request_headers"]["Authorization"] == {"redacted": True, "length": len("Bearer SECRET")}
+        assert r["request_headers"]["Authorization"] == {
+            "redacted": True,
+            "length": len("Bearer SECRET"),
+        }
         assert r["request_headers"]["anthropic-version"] == "2023-06-01"
         assert r["request_body"]["model"] == "m"
-        assert r["request_body"]["system"] == {"redacted": True, "length": len("secret sys")}
+        assert r["request_body"]["system"] == {
+            "redacted": True,
+            "length": len("secret sys"),
+        }
 
     def test_read_filters_by_proxy_and_request(self):
         _meta(request_id="a", proxy_id="p1")
@@ -173,7 +204,10 @@ class TestWriteRead:
                         "schema_version": 99,
                         "kind": "audit",
                         "downstream_event_id": "ds_future",
-                        "payload": {"record_type": "request", "ts": "2026-01-01T00:00:00Z"},
+                        "payload": {
+                            "record_type": "request",
+                            "ts": "2026-01-01T00:00:00Z",
+                        },
                     }
                 )
                 + "\n"
@@ -218,7 +252,11 @@ class TestDrift:
     @staticmethod
     def _drift(current_hash, request_id="r", dimension="system_prompt", proxy_id="p"):
         return audit_logger.check_and_record_drift(
-            proxy_id=proxy_id, dimension=dimension, current_hash=current_hash, request_id=request_id, route=ROUTE
+            proxy_id=proxy_id,
+            dimension=dimension,
+            current_hash=current_hash,
+            request_id=request_id,
+            route=ROUTE,
         )
 
     def test_first_observation_is_baseline_not_drift(self):
@@ -291,7 +329,14 @@ class TestPrune:
 
 class TestRedactHeaders:
     def test_defaults_via_substring(self):
-        out = redact_headers({"Authorization": "Bearer x", "x-api-key": "k", "cookie": "c", "anthropic-version": "v"})
+        out = redact_headers(
+            {
+                "Authorization": "Bearer x",
+                "x-api-key": "k",
+                "cookie": "c",
+                "anthropic-version": "v",
+            }
+        )
         assert out["Authorization"]["redacted"] is True
         assert out["x-api-key"]["redacted"] is True
         assert out["cookie"]["redacted"] is True

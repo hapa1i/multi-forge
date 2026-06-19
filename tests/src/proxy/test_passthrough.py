@@ -13,7 +13,12 @@ from forge.proxy import passthrough
 
 
 class _FakeResponse:
-    def __init__(self, status_code: int = 200, content: bytes = b'{"ok":true}', headers: dict | None = None) -> None:
+    def __init__(
+        self,
+        status_code: int = 200,
+        content: bytes = b'{"ok":true}',
+        headers: dict | None = None,
+    ) -> None:
         self.status_code = status_code
         self.content = content
         self.headers = headers or {"content-type": "application/json"}
@@ -63,7 +68,12 @@ class _FakeAsyncClient:
         return _FakeResponse()
 
     def stream(self, method, url, headers=None, json=None):
-        _FakeAsyncClient.captured = {"method": method, "url": url, "headers": headers, "json": json}
+        _FakeAsyncClient.captured = {
+            "method": method,
+            "url": url,
+            "headers": headers,
+            "json": json,
+        }
         return _FakeStream()
 
 
@@ -117,7 +127,10 @@ async def test_forward_sends_raw_body_unchanged(monkeypatch):
 @pytest.mark.asyncio
 async def test_forward_count_tokens_path(monkeypatch):
     monkeypatch.setattr(passthrough.httpx, "AsyncClient", _FakeAsyncClient)
-    raw_body = {"model": "claude-opus-4-6", "messages": [{"role": "user", "content": "hi"}]}
+    raw_body = {
+        "model": "claude-opus-4-6",
+        "messages": [{"role": "user", "content": "hi"}],
+    }
 
     await passthrough.forward(
         raw_body=raw_body,
@@ -202,7 +215,12 @@ async def test_passthrough_handler_forwards_raw_body(monkeypatch):
     monkeypatch.setattr(passthrough.httpx, "AsyncClient", _FakeAsyncClient)
     _FakeAsyncClient.captured = {}
 
-    raw_body = {"model": "claude-opus-4-6", "max_tokens": 10, "messages": [], "extra_field": 1}
+    raw_body = {
+        "model": "claude-opus-4-6",
+        "max_tokens": 10,
+        "messages": [],
+        "extra_field": 1,
+    }
 
     class _RawReq:
         state = type("S", (), {"request_id": "req_pt"})()
@@ -309,7 +327,12 @@ def test_passthrough_middleware_bypasses_validation_for_unknown_block(monkeypatc
     raw_body = {
         "model": "claude-opus-4-6",
         "max_tokens": 16,
-        "messages": [{"role": "user", "content": [{"type": "future_block_99", "payload": {"keep": "me"}}]}],
+        "messages": [
+            {
+                "role": "user",
+                "content": [{"type": "future_block_99", "payload": {"keep": "me"}}],
+            }
+        ],
     }
 
     from fastapi.testclient import TestClient
@@ -339,7 +362,10 @@ def test_passthrough_middleware_rejects_bad_json_body(monkeypatch, body, status_
     monkeypatch.setattr(server, "_ensure_runtime_state", lambda: None)
     monkeypatch.setattr(server.config, "proxy", _passthrough_config().proxy)
     monkeypatch.setattr(server, "cost_tracker", None)
-    monkeypatch.setattr("forge.core.auth.template_secrets.resolve_env_or_credential", lambda var: "UPSTREAM-KEY")
+    monkeypatch.setattr(
+        "forge.core.auth.template_secrets.resolve_env_or_credential",
+        lambda var: "UPSTREAM-KEY",
+    )
 
     client = TestClient(app, raise_server_exceptions=False)
     resp = client.post("/v1/messages", content=body, headers={"content-type": "application/json"})
@@ -506,7 +532,11 @@ async def test_forward_streaming_taps_usage(monkeypatch):
     )
     _ = [chunk async for chunk in resp.body_iterator]  # drain → fires on_complete in finally
 
-    assert captured["usage"] == {"input_tokens": 200, "output_tokens": 77, "cached_tokens": 20}
+    assert captured["usage"] == {
+        "input_tokens": 200,
+        "output_tokens": 77,
+        "cached_tokens": 20,
+    }
     assert captured["failed"] is False
 
 
@@ -524,7 +554,11 @@ async def test_passthrough_logs_cost_from_response_usage(monkeypatch):
     captured_cost: list[dict] = []
     monkeypatch.setattr(server, "_calc_and_log_cost", lambda **kw: captured_cost.append(kw) or 0)
 
-    raw_body = {"model": "claude-opus-4-6", "max_tokens": 50, "messages": [{"role": "user", "content": "hi"}]}
+    raw_body = {
+        "model": "claude-opus-4-6",
+        "max_tokens": 50,
+        "messages": [{"role": "user", "content": "hi"}],
+    }
     resp = await server._handle_anthropic_passthrough(_RawReq(raw_body, "req_cost"), "req_cost")
 
     assert resp.status_code == 200
@@ -587,7 +621,9 @@ async def test_passthrough_full_body_captures_redacted_response(monkeypatch, tmp
     monkeypatch.setattr(server, "PROXY_ID", "pt")
     monkeypatch.setattr(server, "cost_tracker", None)
     monkeypatch.setattr(
-        server.config, "proxy", _passthrough_config(intercept_mode="inspect", audit_full_body=True).proxy
+        server.config,
+        "proxy",
+        _passthrough_config(intercept_mode="inspect", audit_full_body=True).proxy,
     )
     monkeypatch.setattr("forge.core.auth.template_secrets.resolve_env_or_credential", lambda var: "K")
     monkeypatch.setattr(passthrough.httpx, "AsyncClient", _UsageResponseClient)
@@ -600,7 +636,8 @@ async def test_passthrough_full_body_captures_redacted_response(monkeypatch, tmp
         "tools": [{"name": "Bash", "input_schema": {"type": "object"}}],
     }
     await server._handle_anthropic_passthrough(
-        _RawReq(raw_body, "req_fb", headers={"authorization": "Bearer SECRET-TOKEN"}), "req_fb"
+        _RawReq(raw_body, "req_fb", headers={"authorization": "Bearer SECRET-TOKEN"}),
+        "req_fb",
     )
 
     recs = [r for r in audit_logger.read_audit_logs(record_type="request") if r.get("full_body")]
@@ -611,7 +648,12 @@ async def test_passthrough_full_body_captures_redacted_response(monkeypatch, tmp
     assert rec["system_prompt_hash"] == audit_logger.hash_system_prompt("SECRET-SYSTEM")  # M5
     assert rec["counts"]["num_tools"] == 1  # M5
     blob = json.dumps(rec)
-    for secret in ("SECRET-SYSTEM", "SECRET-USER-TEXT", "SECRET-RESPONSE-TEXT", "SECRET-TOKEN"):
+    for secret in (
+        "SECRET-SYSTEM",
+        "SECRET-USER-TEXT",
+        "SECRET-RESPONSE-TEXT",
+        "SECRET-TOKEN",
+    ):
         assert secret not in blob
 
 
@@ -672,7 +714,10 @@ async def test_passthrough_override_guard_block_returns_403(monkeypatch, tmp_pat
     monkeypatch.setattr(
         server.config,
         "proxy",
-        _passthrough_config(intercept_mode="override", guards=[{"pattern": "FORBIDDEN", "action": "block"}]).proxy,
+        _passthrough_config(
+            intercept_mode="override",
+            guards=[{"pattern": "FORBIDDEN", "action": "block"}],
+        ).proxy,
     )
     monkeypatch.setattr("forge.core.auth.template_secrets.resolve_env_or_credential", lambda var: "K")
 
@@ -708,13 +753,20 @@ async def test_passthrough_override_preserves_history_through_server(monkeypatch
     monkeypatch.setattr(server, "_ensure_runtime_state", lambda: None)
     monkeypatch.setattr(server, "PROXY_ID", "pt")
     monkeypatch.setattr(server, "cost_tracker", None)
-    monkeypatch.setattr(server.config, "proxy", _passthrough_config(intercept_mode="override", augment="EXTRA").proxy)
+    monkeypatch.setattr(
+        server.config,
+        "proxy",
+        _passthrough_config(intercept_mode="override", augment="EXTRA").proxy,
+    )
     monkeypatch.setattr("forge.core.auth.template_secrets.resolve_env_or_credential", lambda var: "K")
     monkeypatch.setattr(passthrough.httpx, "AsyncClient", _UsageResponseClient)
     _UsageResponseClient.captured = {}
 
     history = [
-        {"role": "assistant", "content": [{"type": "thinking", "thinking": "x", "signature": "SIG-9"}]},
+        {
+            "role": "assistant",
+            "content": [{"type": "thinking", "thinking": "x", "signature": "SIG-9"}],
+        },
         {"role": "user", "content": "go"},
     ]
     raw_body = {
@@ -809,7 +861,11 @@ async def test_passthrough_override_invariant_violation_fails_closed(monkeypatch
     monkeypatch.setattr(server, "_ensure_runtime_state", lambda: None)
     monkeypatch.setattr(server, "PROXY_ID", "pt")
     monkeypatch.setattr(server, "cost_tracker", None)
-    monkeypatch.setattr(server.config, "proxy", _passthrough_config(intercept_mode="override", augment="X").proxy)
+    monkeypatch.setattr(
+        server.config,
+        "proxy",
+        _passthrough_config(intercept_mode="override", augment="X").proxy,
+    )
     monkeypatch.setattr("forge.core.auth.template_secrets.resolve_env_or_credential", lambda var: "K")
 
     async def _boom(**kwargs):
@@ -889,7 +945,8 @@ _SSE_CONTENT_CHUNKS = (
 )
 
 _PT_CTX = {
-    "provider_name": "litellm",  # passthrough is never OpenRouter -> latent (no write)
+    "provider_name": "litellm",  # passthrough source has no provider-trace capability -> no write
+    "backend_id": "anthropic-passthrough",
     "proxy_id": "crimson-apricot",
     "mapped_model": "claude-opus-4-6",
     "request_id": "req_pt",
@@ -933,6 +990,7 @@ async def test_passthrough_mirror_records_lifecycle_flags(monkeypatch):
     assert call["reported_cost_micros"] is None  # passthrough cost is structurally unavailable
     # Context threaded from the server is carried through verbatim.
     assert call["provider_name"] == "litellm"
+    assert call["backend_id"] == "anthropic-passthrough"
     assert call["provider_session_id"] == "forge_sess_abc"
 
 
@@ -948,7 +1006,7 @@ async def test_passthrough_mirror_is_latent_for_litellm(monkeypatch, tmp_path):
         base_url="https://api.anthropic.com",
         api_key="K",
         request_id="req_pt",
-        provider_trace_ctx=_PT_CTX,  # provider_name="litellm"
+        provider_trace_ctx=_PT_CTX,  # backend_id="anthropic-passthrough"
     )
     _ = [chunk async for chunk in resp.body_iterator]
 

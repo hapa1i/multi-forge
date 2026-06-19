@@ -132,6 +132,7 @@ def log_audit_record(record: dict[str, Any]) -> None:
         else:
             kind = "audit"
         request_id = record.get("request_id")
+        backend_id = record.get("backend_id")
         write_downstream_record(
             DownstreamRecord(
                 kind=kind,
@@ -142,6 +143,7 @@ def log_audit_record(record: dict[str, Any]) -> None:
                 proxy_id=str(record.get("proxy_id")) if record.get("proxy_id") else None,
                 source_id=str(record.get("proxy_id")) if record.get("proxy_id") else None,
                 source_kind="proxy" if record.get("proxy_id") else None,
+                backend_id=str(backend_id) if backend_id else None,
                 audit_record_type=record_type,
                 payload=record,
             )
@@ -161,6 +163,7 @@ def write_metadata_record(
     thinking: dict[str, Any] | None = None,
     cache_markers: dict[str, int] | None = None,
     counts: dict[str, int] | None = None,
+    backend_id: str | None = None,
 ) -> None:
     """Write a metadata-only audit record (no body text, no secrets)."""
     log_audit_record(
@@ -176,6 +179,7 @@ def write_metadata_record(
             "thinking": thinking,
             "cache_markers": cache_markers or {},
             "counts": counts or {},
+            "backend_id": backend_id,
         }
     )
 
@@ -191,6 +195,7 @@ def write_full_body_record(
     response_headers: dict[str, str] | None = None,
     response_body: dict[str, Any] | None = None,
     redact_header_names: set[str] | None = None,
+    backend_id: str | None = None,
     **metadata: Any,
 ) -> None:
     """Write a full-body audit record with headers/bodies REDACTED before persistence.
@@ -212,13 +217,21 @@ def write_full_body_record(
             "request_body": _redact_body_for_log(request_body),
             "response_headers": redact_headers(response_headers, redact_header_names),
             "response_body": _redact_body_for_log(response_body),
+            "backend_id": backend_id,
             **metadata,
         }
     )
 
 
 def write_drift_record(
-    *, request_id: str, proxy_id: str, dimension: str, previous_hash: str, current_hash: str, route: dict[str, Any]
+    *,
+    request_id: str,
+    proxy_id: str,
+    dimension: str,
+    previous_hash: str,
+    current_hash: str,
+    route: dict[str, Any],
+    backend_id: str | None = None,
 ) -> None:
     """Write a drift record (hashes only — safe even in metadata-only mode)."""
     log_audit_record(
@@ -230,11 +243,19 @@ def write_drift_record(
             "previous_hash": previous_hash,
             "current_hash": current_hash,
             "route": route,
+            "backend_id": backend_id,
         }
     )
 
 
-def write_mutation_record(*, request_id: str, proxy_id: str, route: dict[str, Any], mutation: dict[str, Any]) -> None:
+def write_mutation_record(
+    *,
+    request_id: str,
+    proxy_id: str,
+    route: dict[str, Any],
+    mutation: dict[str, Any],
+    backend_id: str | None = None,
+) -> None:
     """Write an override before/after mutation record.
 
     ``mutation`` is the already-redacted payload from ``intercept.apply_override``
@@ -248,6 +269,7 @@ def write_mutation_record(*, request_id: str, proxy_id: str, route: dict[str, An
             "proxy_id": proxy_id,
             "mode": "override",
             "route": route,
+            "backend_id": backend_id,
             **mutation,
         }
     )
@@ -313,7 +335,11 @@ def _persist_drift_baseline(proxy_id: str, baseline: dict[str, str]) -> None:
 
         atomic_write_json(
             _audit_state_path(proxy_id),
-            {"schema_version": AUDIT_SCHEMA_VERSION, "last_seen": baseline, "updated_at": _now_iso()},
+            {
+                "schema_version": AUDIT_SCHEMA_VERSION,
+                "last_seen": baseline,
+                "updated_at": _now_iso(),
+            },
         )
         try:
             os.chmod(_audit_state_path(proxy_id), 0o600)
@@ -324,7 +350,13 @@ def _persist_drift_baseline(proxy_id: str, baseline: dict[str, str]) -> None:
 
 
 def check_and_record_drift(
-    *, proxy_id: str, dimension: str, current_hash: str | None, request_id: str, route: dict[str, Any]
+    *,
+    proxy_id: str,
+    dimension: str,
+    current_hash: str | None,
+    request_id: str,
+    route: dict[str, Any],
+    backend_id: str | None = None,
 ) -> bool:
     """Detect and record drift for one hash dimension. Returns True if drift fired.
 
@@ -355,6 +387,7 @@ def check_and_record_drift(
         previous_hash=previous,
         current_hash=current_hash,
         route=route,
+        backend_id=backend_id,
     )
     return True
 

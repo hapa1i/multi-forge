@@ -153,36 +153,36 @@ more confusing, not less.
 
 ## Phase 4 -- Proxy Runtime And Downstream Attribution
 
-- [ ] Thread the chosen backend/source id through proxy startup and request handling without changing session-owned
+- [x] Thread the chosen backend/source id through proxy startup and request handling without changing session-owned
   routing semantics.
-- [ ] Extend the existing downstream writer seam instead of re-authoring it. Audit and update all current source-id
+- [x] Extend the existing downstream writer seam instead of re-authoring it. Audit and update all current source-id
   writers: `proxy/cost_logger.py` (`source_id=proxy_id`, `source_kind="proxy"`), `proxy/provider_trace_logger.py`
   (`source_id=proxy_id`, `source_kind="proxy"`), `proxy/audit_logger.py` (`source_id=proxy_id`, `source_kind="proxy"`),
   and `core/usage/emit.py` (four `source_id` sites: the `claude_p` path keys on `measurement.reporter`, while the
   worker/Codex/direct `core.llm` paths key on `provider`; all use provider-origin `source_kind` when present).
-- [ ] Use `core/usage/measurement.py` and `UsageMeasurement` as the shipped measurement seam:
+- [x] Use `core/usage/measurement.py` and `UsageMeasurement` as the shipped measurement seam:
   `resolve_claude_p_measurement`, `resolve_codex_measurement`, and `resolve_direct_llm_measurement`. Do not implement
   against the epic's aspirational `resolve_measurement` name.
-- [ ] Implement the Phase 0 carrier decision: add an explicit `backend_id` field or map the conceptual backend key onto
+- [x] Implement the Phase 0 carrier decision: add an explicit `backend_id` field or map the conceptual backend key onto
   an existing field without overloading `source_kind`'s proxy/provider origin semantics.
-- [ ] Populate downstream `backend_id` from the catalog source id, never from `BackendInstance.backend_id`. For
+- [x] Populate downstream `backend_id` from the catalog source id, never from `BackendInstance.backend_id`. For
   non-proxy direct emitters, use an explicit provider/reporter -> source mapping only where unambiguous; otherwise leave
   `backend_id` nullable for v1.
-- [ ] Add read-side behavior if the carrier needs it. `read_downstream_records()` currently filters by `proxy_id` and
+- [x] Add read-side behavior if the carrier needs it. `read_downstream_records()` currently filters by `proxy_id` and
   run/session ids, not by `source_id`/`source_kind` or `backend_id`.
-- [ ] Replace the `provider_trace_logger.py` early return `if provider_name != "openrouter": return` with a
+- [x] Replace the `provider_trace_logger.py` early return `if provider_name != "openrouter": return` with a
   backend/source capability or selected-source gate. Keep callers in `server.py` and `passthrough.py` on the same
   helper, preserve the direct-OpenRouter incident behavior, keep gateway-routed OpenRouter semantics explicit, and
   delete the forward-reference comment in `provider_trace_logger.py` when the migration lands.
-- [ ] Decide and implement whether the OpenRouter `user` injection gate in `server.py` follows the same backend/source
-  capability or remains direct-OpenRouter-only by design.
-- [ ] Preserve run-tree joining and double-count suppression. Backend/source identity is an attribution dimension, not a
+- [x] Decide and implement the OpenRouter `user` injection gate in `server.py`: it follows the same backend/source
+  capability, with no configured source preserving the legacy direct-OpenRouter behavior.
+- [x] Preserve run-tree joining and double-count suppression. Backend/source identity is an attribution dimension, not a
   replacement for `forge_root_run_id`.
-- [ ] Preserve nullable-cost semantics and existing cap bootstrap behavior.
-- [ ] Add regression coverage for provider-trace broadening, proxied/direct measurement precedence, downstream source-id
-  joins, duplicate-`downstream_event_id` merge behavior for the new source key, read-side filtering if added, and no
+- [x] Preserve nullable-cost semantics and existing cap bootstrap behavior.
+- [x] Add regression coverage for provider-trace broadening, proxied/direct measurement precedence, downstream source-id
+  joins, duplicate-`downstream_event_id` merge behavior for the new source key, post-merge read-side filtering, and no
   double-count in `forge activity` / `forge proxy costs show`.
-- [ ] Update [design.md](../../../design.md) §3.14 and [design_appendix.md](../../../design_appendix.md) for the shipped
+- [x] Update [design.md](../../../design.md) §3.14 and [design_appendix.md](../../../design_appendix.md) for the shipped
   downstream attribution key and writer ownership before moving to closeout.
 
 ## Phase 5 -- Migration And Closeout
