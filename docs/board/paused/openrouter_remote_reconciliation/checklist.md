@@ -5,9 +5,9 @@ Branch: `openrouter_remote_reconciliation`. Card: [card.md](card.md). Epic:
 
 ## Current Focus
 
-Paused after Phase 0 while `epic_telemetry_architecture` runs `unified_backend` as the source-key foundation. Resume by
-moving this card back to `doing/` only after the backend/source identity key lands or the epic explicitly changes the
-sequence.
+Paused after Phase 0. `upstream_downstream_ledgers` and `unified_backend` have both landed, so the required telemetry
+shape and backend/source identity key now exist. Resume by moving this card back to `doing/` only after
+`epic_telemetry_architecture` explicitly chooses remote reconciliation as the next active member.
 
 Original flow: Phase 0 recon and decision lock -> Phase 1 REST client -> Phase 2 credential/key provenance -> Phase 3
 command-core reconciliation -> Phase 4 CLI surface -> Phase 5 optional view integrations -> docs, review, closeout.
@@ -17,7 +17,9 @@ command-core reconciliation -> Phase 4 CLI surface -> Phase 5 optional view inte
 - [x] Phase 0 recon, OpenRouter endpoint verification, and decision lock are complete.
 - [x] Card moved to `paused/` before Phase 1 implementation.
 - [x] Telemetry epic decided not to resume this card next; `upstream_downstream_ledgers` runs first.
-- [ ] Resume only after `unified_backend` lands, or after the telemetry epic explicitly changes the sequence.
+- [x] `upstream_downstream_ledgers` landed the upstream/downstream telemetry shape this card should consume.
+- [x] `unified_backend` landed `backend_id` as the canonical downstream source key.
+- [ ] Resume only after the telemetry epic explicitly chooses remote reconciliation as the next active member.
 
 ## Decisions To Lock
 
@@ -59,10 +61,12 @@ command-core reconciliation -> Phase 4 CLI surface -> Phase 5 optional view inte
 
 ### Phase 0 Findings (2026-06-17)
 
-- Local provider trace is already metadata-only and joins to local cost/usage evidence by `request_id` and
-  `forge_root_run_id`. `provider_generation_id` belongs to `ProviderTraceRecord`; cost records do not carry it.
+- Local provider trace is metadata-only and now projects from downstream telemetry. It joins to local model-call and
+  operation evidence by `request_id` and run-tree ids; `backend_id` is the source key. `provider_generation_id` belongs
+  to the provider-trace DTO/read surface, not to upstream operation outcomes.
 - The existing op/CLI shape to mirror is `src/forge/core/ops/provider_trace.py` plus `src/forge/cli/provider.py`: frozen
-  DTOs, `ExecutionContext`, `ForgeOpError`, `render_*_lines`, and `--period today|week|month|all`.
+  DTOs, `ExecutionContext`, `ForgeOpError`, `render_*_lines`, and `--period today|week|month|all`. Do not recreate the
+  retired standalone provider-trace plane.
 - Official docs used: [generation metadata](https://openrouter.ai/docs/api/api-reference/generations/get-generation),
   [generation content](https://openrouter.ai/docs/api/api-reference/generations/list-generation-content),
   [activity](https://openrouter.ai/docs/api/api-reference/analytics/get-user-activity),
@@ -122,10 +126,10 @@ command-core reconciliation -> Phase 4 CLI surface -> Phase 5 optional view inte
 - [ ] Mirror `src/forge/core/ops/provider_trace.py`: frozen DTOs, `ExecutionContext`, `ForgeOpError`, and shared
   `render_*_lines` plain-text helpers so terminal rendering and any future `%` surface cannot drift.
 - [ ] Implement generation lookup by local `request_id` and by raw `generation_id`.
-- [ ] Keep join-key roles precise: local cross-plane joins use `request_id` and/or `forge_root_run_id`
-  (`ProviderTraceRecord` \<-> cost log \<-> usage ledger); local-to-remote lookup uses `provider_generation_id` as the
-  OpenRouter `/generation` id. Use `core/ops/provider_trace.py::_lookup_cost_confidence` as the bounded `request_id`
-  cost-plane join template.
+- [ ] Keep join-key roles precise: local joins use `request_id` and/or `forge_root_run_id` across downstream model-call
+  evidence, upstream operation outcomes, and transitional usage attribution; local-to-remote lookup uses
+  `provider_generation_id` as the OpenRouter `/generation` id. Use the current provider-trace op/read helpers as the
+  local evidence template.
 - [ ] Implement `generation` as the single-id path: local `request_id` -> trace -> `provider_generation_id` -> remote
   generation lookup, or raw `generation_id` -> remote lookup with no local side.
 - [ ] Implement `reconcile` as the windowed two-sided join path: scan local traces and management-key-gated remote
