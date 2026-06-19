@@ -43,10 +43,11 @@ PR 1 (generic refactor) is implemented on `backend_remote_reconciliation`; verif
 - [x] Tests updated to the new names + removed fallback; new regression
   `tests/regression/test_bug_provider_trace_inject_alias.py` (old key honored + one warning, new key wins, no
   unknown-key reject). Focused suite: 185 passed.
-- [ ] `make pre-commit` clean.
-- [ ] Targeted integration `./scripts/test-integration.sh tests/integration/proxy/test_provider_trace_e2e.py -v`
-  (live-OpenRouter; template sets `source: openrouter`, must still pass unchanged) before merge.
-- [ ] Adversarial review of the diff; change_log entry; open PR 1.
+- [x] `make pre-commit` clean (ruff, black, isort, mypy, pyright, mdformat, gitleaks).
+- [x] Targeted integration `./scripts/test-integration.sh tests/integration/proxy/test_provider_trace_e2e.py -v`
+  (live-OpenRouter; template sets `source: openrouter`): 2 passed -- the real proxy still writes traces via the
+  capability gate.
+- [x] Adversarial review of the diff (3 passes, no correctness bugs); change_log entry added; PR 1 opened (#41).
 
 ## PR 2 -- MVP Feature: `forge backend reconcile` (single-id)
 
