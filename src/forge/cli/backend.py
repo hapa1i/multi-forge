@@ -268,6 +268,18 @@ def _source_record(source: ModelSource, runtime_instances: dict[str, BackendInst
     }
 
 
+def _unmatched_runtime_instances(
+    records: list[dict[str, Any]],
+    runtime_instances: dict[str, BackendInstance],
+) -> list[BackendInstance]:
+    matched_backend_ids = {
+        runtime["backend_id"] for record in records if (runtime := record["runtime_instance"]) is not None
+    }
+    return [
+        instance for backend_id, instance in sorted(runtime_instances.items()) if backend_id not in matched_backend_ids
+    ]
+
+
 def _load_runtime_instances() -> dict[str, BackendInstance]:
     store = BackendRegistryStore()
     return {instance.backend_id: instance for instance in store.list_backends()}
@@ -499,6 +511,27 @@ def list_cmd(as_json: bool) -> None:
         )
 
     console.print(table)
+
+    unmatched_runtimes = _unmatched_runtime_instances(records, runtime_instances)
+    if unmatched_runtimes:
+        runtime_table = Table(title="Unmatched Runtime Instances")
+        runtime_table.add_column("RUNTIME", style="cyan")
+        runtime_table.add_column("ADAPTER")
+        runtime_table.add_column("PORT", justify="right")
+        runtime_table.add_column("PID", justify="right")
+        runtime_table.add_column("STATUS")
+
+        for instance in unmatched_runtimes:
+            runtime_table.add_row(
+                instance.backend_id,
+                instance.adapter_type,
+                str(instance.port),
+                str(instance.pid or "-"),
+                instance.status,
+            )
+
+        console.print()
+        console.print(runtime_table)
 
 
 @backend.command("show")

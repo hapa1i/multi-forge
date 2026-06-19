@@ -135,6 +135,7 @@ class TestBackendRegistry:
         result = runner.invoke(main, ["backend", "list"])
 
         assert result.exit_code == 0
+        assert "Unmatched Runtime Instances" in result.output
         assert "litellm-4000" in result.output
         assert "4000" in result.output
 

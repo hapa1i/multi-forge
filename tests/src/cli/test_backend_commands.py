@@ -131,6 +131,39 @@ def test_list_human_shows_sources_even_without_runtime(runner: CliRunner, forge_
     assert "No backends found" not in result.output
 
 
+def test_list_human_shows_unmatched_runtime_without_source_match(
+    runner: CliRunner,
+    forge_home: Path,
+) -> None:
+    store = BackendRegistryStore(forge_home / "backends" / "index.json")
+    store.write(
+        BackendRegistry(
+            backends={
+                "litellm-4000": BackendInstance(
+                    backend_id="litellm-4000",
+                    adapter_type="litellm",
+                    port=4000,
+                    pid=None,
+                    status="healthy",
+                )
+            }
+        )
+    )
+
+    result = runner.invoke(main, ["backend", "list"])
+
+    assert result.exit_code == 0
+    assert "Unmatched Runtime Instances" in result.output
+    assert "litellm-4000" in result.output
+
+    json_result = runner.invoke(main, ["backend", "list", "--json"])
+    assert json_result.exit_code == 0
+    records = {item["source_id"]: item for item in _json_output(json_result)}
+    assert records["litellm-gemini-local"]["runtime_instance"] is None
+    assert records["litellm-openai-local"]["runtime_instance"] is None
+    assert records["litellm-anthropic-local"]["runtime_instance"] is None
+
+
 def test_show_remote_source_details(runner: CliRunner, forge_home: Path) -> None:
     result = runner.invoke(main, ["backend", "show", "openrouter"])
 
