@@ -1,10 +1,11 @@
 # Unified Backend Concept -- local and remote model sources as one first-class axis
 
-**Status**: Doing. Activated by the telemetry epic after `upstream_downstream_ledgers` landed. Spun out of the
-`openrouter_observability` investigation (2026-06-16) while reasoning about whether provider lifecycle evidence
-generalizes beyond OpenRouter. The local provider-trace compatibility facade
-(`src/forge/proxy/provider_trace_logger.py`) is the **first intended consumer**: its hardcoded
-`provider_name != "openrouter"` early-return gate is exactly the model-source identity this card would canonicalize.
+**Status**: Doing / closeout on branch. Activated by the telemetry epic after `upstream_downstream_ledgers` landed. Spun
+out of the `openrouter_observability` investigation (2026-06-16) while reasoning about whether provider lifecycle
+evidence generalizes beyond OpenRouter. The local provider-trace compatibility facade
+(`src/forge/proxy/provider_trace_logger.py`) was the **first intended consumer**: its hardcoded
+`provider_name != "openrouter"` early-return gate has been replaced by the model-source capability gate this card
+canonicalized.
 
 **Epic**: [`epic_telemetry_architecture`](../epic_telemetry_architecture/card.md).
 

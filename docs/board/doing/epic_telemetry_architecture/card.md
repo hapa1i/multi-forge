@@ -6,8 +6,9 @@ supervisor-timeout / shadow-sampling incident) and that both re-architect Forge'
 axes**. This card is the single consistent view the member cards lean on; it does **not** replace them. Its
 `checklist.md` is for coordination and sequencing only; member cards remain the execution units.
 
-**Current coordination goal**: `unified_backend` is the active member after `upstream_downstream_ledgers` landed. Keep
-remote reconciliation paused until the backend/source identity key lands or this epic deliberately changes the sequence.
+**Current coordination goal**: `unified_backend` is in closeout after landing the backend/source identity key on the
+active branch. Keep remote reconciliation paused until this card merges, then decide whether it resumes next or whether
+another source-key follow-up is needed.
 
 ## Why an epic, not a merged card
 
@@ -39,7 +40,7 @@ Two telemetry planes, joined by run-tree identity, with one canonical source key
 | Concern                                     | Owner card                                                                                  | Status                                             |
 | ------------------------------------------- | ------------------------------------------------------------------------------------------- | -------------------------------------------------- |
 | Plane **structure** (direction: up/down)    | [`upstream_downstream_ledgers`](../../done/upstream_downstream_ledgers/card.md)             | done                                               |
-| Source-identity **key** (`backend_id`)      | [`unified_backend`](../unified_backend/card.md)                                             | doing                                              |
+| Source-identity **key** (`backend_id`)      | [`unified_backend`](../unified_backend/card.md)                                             | doing / closeout                                   |
 | Provider-trace plane (first to be absorbed) | [`openrouter_observability`](../../done/openrouter_observability/card.md)                   | done                                               |
 | Source-identity consumer: logs              | [`proxy_log_hygiene`](../../done/proxy_log_hygiene/card.md)                                 | done                                               |
 | Source-identity consumer: remote reconcile  | [`openrouter_remote_reconciliation`](../../paused/openrouter_remote_reconciliation/card.md) | paused after Phase 0 pending source-key foundation |
@@ -78,10 +79,11 @@ OpenRouter-specific reconciliation logic lands, so remote reconciliation can ret
 consumer instead of another special-purpose telemetry path. `unified_backend` remains the source-key foundation that
 should follow or be sliced as a `backend_id` precursor, but it is a larger config/auth/template/CLI refactor.
 
-**Update (2026-06-18):** the ledger foundation has landed, and `unified_backend` is the next active member. Remote
-reconciliation remains paused until the backend/source identity key lands or this epic deliberately changes the
-sequence. The hard rule remains contract item 4: one shared `emit.py` provenance refactor, not independent sibling
-rewrites.
+**Update (2026-06-18):** the ledger foundation has landed, and `unified_backend` has now landed the source key on the
+active branch: downstream attempt records carry `backend_id`, proxy/provider writer-origin fields remain distinct, and
+provider trace is source-capability gated. Remote reconciliation remains paused until this branch merges and the epic
+chooses the next member. The hard rule remains contract item 4: one shared `emit.py` provenance refactor, not
+independent sibling rewrites.
 
 ## Not in scope here
 

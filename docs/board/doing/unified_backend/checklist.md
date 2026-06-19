@@ -187,15 +187,17 @@ more confusing, not less.
 
 ## Phase 5 -- Migration And Closeout
 
-- [ ] Verify all per-phase design-doc, CLI-reference, and end-user doc tasks are complete for the shipped shape.
-- [ ] Update this card and the telemetry epic if the shipped shape changes the shared contract.
-- [ ] Add a compact entry to [change_log.md](../../change_log.md) when implementation ships.
-- [ ] Promote durable lessons to [impl_notes.md](../../impl_notes.md) after human review.
-- [ ] Run focused unit/regression tests for backend, config loader/schema, auth capabilities, templates, proxy
+- [x] Verify all per-phase design-doc, CLI-reference, and end-user doc tasks are complete for the shipped shape.
+- [x] Update this card and the telemetry epic if the shipped shape changes the shared contract.
+- [x] Add a compact entry to [change_log.md](../../change_log.md) when implementation ships.
+- [x] Promote durable lessons to [impl_notes.md](../../impl_notes.md) after human review. Reviewed for promotion; no
+  direct `impl_notes.md` edit in this branch because the durable rules are already captured in the card/design docs and
+  `impl_notes.md` remains human-approved memory.
+- [x] Run focused unit/regression tests for backend, config loader/schema, auth capabilities, templates, proxy
   telemetry, provider trace, activity, and CLI surfaces.
-- [ ] Run relevant integration tests if proxy startup, backend lifecycle, template resolution, or backend CLI behavior
+- [x] Run relevant integration tests if proxy startup, backend lifecycle, template resolution, or backend CLI behavior
   changes.
-- [ ] Run `make pre-commit` before closeout.
+- [x] Run `make pre-commit` before closeout.
 - [ ] After merge, move this card to `docs/board/done/unified_backend/` and update the epic sequencing.
 
 ## Acceptance Tests

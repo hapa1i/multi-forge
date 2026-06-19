@@ -27,6 +27,26 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-18
 
+### unified_backend: model-source catalog and downstream source attribution
+
+**Goal**: Make local and remote model sources one listable backend/source axis and key downstream telemetry on a
+canonical catalog id.
+
+**Key changes**:
+
+- Added a built-in `ModelSource` catalog for local LiteLLM, remote LiteLLM, OpenRouter, Anthropic passthrough, and
+  direct-runtime sources, with endpoint, credential, lifecycle, and capability metadata.
+- Moved proxy templates to `proxy.source`, deriving endpoint/auth/lifecycle facts from the catalog while keeping runtime
+  backend instances separate from static source definitions.
+- Expanded `forge backend list/show/test-auth` around source ids; remote sources have intentional no-lifecycle behavior
+  and local lifecycle still resolves to existing LiteLLM adapters/ports.
+- Added downstream `backend_id` attribution across proxy cost, audit, provider trace, and direct usage emitters while
+  preserving `source_id`/`source_kind` as writer-origin metadata.
+- Replaced OpenRouter-specific provider-trace and `user` injection gates with source capabilities.
+
+**Verification**: Focused unit/regression acceptance slice passed 526 tests; backend integration slice passed 11 tests;
+`make pre-commit` clean.
+
 ### upstream_downstream_ledgers closeout: two-pane activity + upstream boundary coverage
 
 **Goal**: Finish two-pane `forge activity` and close non-engine upstream outcome gaps.
@@ -1042,74 +1062,23 @@ superseded wording are annotated as historical (superseded by round 3) rather th
 `forge runtime list --json` renders `pretool_policy: partial` + `native_hooks: enrollment_gated`; `make pre-commit`
 clean.
 
-### codex_frontend Phase 1: Enrollment-mechanics probe (harness + round-3 findings, codex 0.138.0)
+### codex_frontend Phase 1: Enrollment-mechanics probe (compacted)
 
-**Goal**: Build the Phase 1 probe harness that pins Codex's enrollment mechanics (what `trusted_hash` covers, whether
-Forge can pre-enroll programmatically, which events fire post-enrollment, worktree/path sensitivity), then run it. The
-operator ran the ceremony + headless stages the same day, so the findings landed in this phase (below). The
-findings-gated `codex_preflight.py` `[hooks.state]` slice + the registry `pretool_policy` rise are the one remaining
-code unit, deferred for an explicit decision (see Findings).
+**Goal**: Pin Codex hook enrollment mechanics before building Codex frontend code.
 
-**Key changes** (all under `scripts/experiments/codex-hooks/`, extend-not-fork):
+**Key changes / findings**:
 
-- **`lib.sh` fixture mode (additive)**: `fixture_init`/`fixture_build`/`fixture_require` (a PERSISTENT enrolled
-  `CODEX_HOME`+proj+hookbin under `$CAPTURE_ROOT/fixture`, surviving across runs; auth copied per run, removed on exit);
-  the stable-PATH / swappable-BODY `fixture_tee`/`fixture_arm`/`fixture_tee_all` (the registered command string -- hence
-  the trust key -- never changes, but the body is re-stamped per stage); `fixture_project_specs`/`fixture_register_*`;
-  and a `PROBE_EXEC_CWD` override on `run_exec` (stage 82's worktree turn). 40d (trust survives body change) is the
-  load-bearing assumption; stage 81 re-validates it first.
-- **Stages 80-83**: `80-enroll-fixture` (guided TTY ceremony: register all 10 events + a matcher'd PreToolUse + a
-  user-level + a sacrificial entry before ONE grant, snapshot the trust delta, verify SessionStart fires headless on two
-  fresh runs); `81-enrolled-coverage` (40d re-validation, per-event fired matrix, 30a-30h response contracts with
-  arm/tee discipline -- 30e gates Phase 4, PreToolUse deny/`updatedInput` gate Phase 3 + `pretool_policy`);
-  `82-trust-dimensions` (40e command-string mutation with the primary as control; user-vs-project trust location;
-  worktree path-sensitivity with a project-trust deconfound -> Phase 6 installer scope); `83-preimage`. **No
-  `--dangerously-bypass-hook-trust` in 80-83** -- enrollment is the variable under test.
-- **`hooks/hash-preimage.py`** (offline): parses the enrolled configs, joins each `[hooks.state]` key to its
-  registration, and scans candidate canonicalizations, declaring a winner only when one reproduces EVERY harvested hash;
-  `--emit-state` then forges a `[hooks.state]` record so stage 83 can prove programmatic pre-enrollment end-to-end
-  (fresh home, forged record, headless turn). Honest when no candidate matches (posture -> guided ceremony; source-dive
-  next).
-- **`reproduce.sh`**: 80 added to `GUIDED_STAGES`; new `FIXTURE_STAGES=(81 82 83)` that `resolve_stage` recognizes but
-  both default run sets EXCLUDE (explicit-only -- blind runs would burn quota against a maybe-absent fixture); budget
-  table extended. **README** round-3 section (fixture model, ceremony, stage map, verdict vocabulary).
-- **`tests/fixtures/codex/hooks/README.md` + 5 payloads**: `session_start`/`pre_tool_use`/`post_tool_use`/
-  `user_prompt_submit`/`stop` `.stdin.json`, sanitized + provenance table filled. Surfaced + fixed a real `sanitize.sh`
-  over-match (its `sk-` scan tripped on `task-*` plugin filenames in codex-home tree listings -> word-boundary anchor).
-- **Board**: card.md round-3 facts; checklist 7/7 Phase-1 boxes ticked with verification; the three Phase-0/1 Open
-  Decisions resolved (HookSupport name, guided-ceremony posture, project-scope worktree survival).
+- Extended `scripts/experiments/codex-hooks/` with persistent enrolled-fixture stages 80-83, hash-preimage scanning,
+  sanitized payload fixtures, and board/design updates.
+- Real codex-cli 0.138.0 findings: one guided "trust all" ceremony enrolled headless-firing hooks; the command string is
+  part of `trusted_hash`; `trusted_hash` was not black-box computable, so programmatic pre-enrollment remained blocked
+  pending source-diving; PreToolUse deny and `updatedInput` mutation worked, while malformed PreToolUse failed open.
+- Enrollment survived worktrees of the enrolled project with a path-stable command string, but broad cross-project trust
+  remained untested at this phase.
 
-**Findings (codex-cli 0.138.0; captures at `~/.cache/forge-codex-hooks-probe/`)**:
-
-- **Enrollment**: one "trust all" grant (operator wording: *"trust all - no command or hash"*) enrolled 13 keys;
-  SessionStart fires headless reproducibly. **40d holds** (body-swap kept trust). **40e**: the command string IS in the
-  per-entry `trusted_hash` (moved entry untrusted, primary intact).
-- **Gates**: **30e PASS** (additionalContext token echoed -> Phase 4 SessionStart delivery viable headless); PreToolUse
-  **deny** (JSON + exit-2) blocked and **`updatedInput` mutation took effect** (-> Phase 3 + justifies a
-  `pretool_policy` rise); Stop block-once + UserPromptSubmit block work. **PermissionRequest did not fire under the
-  read-only sandbox probe** (its headless behavior under permission-eliciting conditions is unpinned); **malformed
-  PreToolUse output FAILS OPEN** (refutes the doc fail-closed claim -- Phase 3 caveat). `tool_name` is
-  `"Bash"`/`"apply_patch"` (not `"shell"`).
-- **`trusted_hash` NOT black-box computable** (0/13 over 15 canonicalizations) -> **posture = guided ceremony**
-  (programmatic `[hooks.state]` blocked pending a codex-cli source-dive).
-- **Enrollment survives worktrees of the enrolled project** (82w2, valid run): the project hook fired in a
-  `git worktree` checkout with no folder `trust_level` and no `[hooks.state]` record at the worktree path (cross-checked
-  against the captured clean base). Chained with 40b (folder trust alone does not fire hooks), that can only be a
-  `trusted_hash` match on the definition (byte-identical command string). Mechanism not distinguished (path-independent
-  hash vs worktree->checkout canonicalization), and broad cross-project trust is UNTESTED. **-> Phase 6 (holds either
-  way): project-scope registration with a path-stable command string survives worktrees** (resolves the scope Open
-  Decision; a fresh-project probe is owed before any cross-project trust story). The first 82w2 run was VOID (the
-  persistent fixture had retained a worktree `trust_level` block); stage 82 was hardened with a strip-first clean base,
-  `82w2`-before-`82w` ordering, and an INVALID self-guard, then re-run.
-
-**Verification**: `bash -n` + `shellcheck 0.11.0` clean on `lib.sh` + stages 80-83 + `reproduce.sh` + `sanitize.sh`;
-`py_compile` + self-test green on `hash-preimage.py` (incl. the fallback TOML parser); the live probe ran end-to-end (80
-ceremony + 81/82/83) on real codex 0.138.0; findings cross-checked against the raw captures (streams/payloads/state),
-not just oracle text; `sanitize.sh` passes; `make pre-commit` (incl. gitleaks/mypy/mdformat) clean on every changed
-file; the hardened `82` re-run was cross-checked against the captured clean base (worktree block stripped, no worktree
-`[hooks.state]` record). **Remaining**: the `codex_preflight.py` `[hooks.state]` slice + registry `pretool_policy` rise
-(one `src/`+tests+design.md unit, deferred for a decision -- "hash-not-computable" means a static
-`active`-via-validation verdict is unachievable, so the seam stays `enrollment_gated`).
+**Verification**: `bash -n`/shellcheck clean, hash-preimage self-test green, live stages 80-83 ran against real codex
+0.138.0, captures cross-checked, `sanitize.sh` passed, and `make pre-commit` clean. Detailed probe matrices remain in
+git history before compaction.
 
 ### codex_frontend Phase 0: Registry correction -- `headless_inert` -> `enrollment_gated`
 
@@ -1133,205 +1102,27 @@ execution mode. First code commit of the `codex_frontend` card.
 `forge runtime list` renders `enrollment_gated` and `forge runtime preflight codex` renders
 `Hook seam: enrollment_gated` (render asserted, exit code orthogonal); `make pre-commit` clean.
 
-## 2026-06-09
+## 2026-06-04 -- 2026-06-09 (compacted)
 
-### Phase 6: Codex frontend evaluation (probe-only; runtime_abstraction complete)
-
-**Goal**: Evaluate Codex as a Forge frontend runtime -- a reproducible probe + a go/no-go decision record + a follow-up
-build card -- without shipping product code. Closes the last open phase of `runtime_abstraction`.
-
-**Key changes**:
-
-- **Probe harness** `scripts/experiments/codex-hooks/` (mirrors the native-resume precedent): staged `reproduce.sh`,
-  isolated `CODEX_HOME` (auth copied 0600 into a disposable tree), per-label tee/respond hooks, JSON/TOML registration
-  generator, scan-and-fail `sanitize.sh`. Stages 00/05 (preflight + schema, 0 turns), 10 (headless-fire gate), 20
-  (payloads), 30 (responses, moot-headless), 40/50 (trust/interactive -- headless parts + operator-gated TTY steps), 60
-  (exec-resume), 70 (bypass, moot-headless). A capture-dir false-positive bug was found and fixed (probe_init clears the
-  per-stage dir).
-- **Gate finding (codex-cli 0.138.0):** Codex hooks do **NOT** fire under headless `codex exec` -- 0 firings across all
-  4 registration surfaces, with `--dangerously-bypass-hook-trust`, on repeated same-home runs, confirmed by 5
-  independent clean isolated tests. So headless policy enforcement and SessionStart transfer injection are unavailable
-  on `codex exec`; interactive firing is UNVERIFIED (needs a TTY operator session).
-- **Other pinned facts:** `codex exec resume <thread_id>` works and is **cross-CWD** (`--json` composes; `--last`
-  unreliable); payload shape is snake_case as documented; registration validation is shallow (bogus event names load
-  silently); session files at `$CODEX_HOME/sessions/.../rollout-<ts>-<session_id>.jsonl`; `FORGE_SESSION` reaches the
-  model shell.
-- **Go/no-go:** bridge CLI = **GO** (no hook dep; resume verified); SessionStart delivery = **NO-GO headless ->
-  initial-message stays primary** (vindicates the Phase 5 deferral); hook adapter + interactive frontend = **gated on an
-  interactive-firing probe**; app-server = deferred. Build work seeded in `docs/board/proposed/codex_frontend/`.
-- **Registry correction** (`src/forge/core/runtime/registry.py`): the Codex `RuntimeSpec` read as "hooks work once
-  version-gated" (`native_hooks="gated"`, `pretool_policy="partial"`), but hooks are enabled + version-OK yet do not
-  fire headless. Corrected the **machine-readable fields**, not just the note: `native_hooks="headless_inert"` (new
-  `HookSupport` value) + `pretool_policy="none"`, so a consumer reading the field -- not just the prose -- sees the
-  limit. `codex_preflight.py` aligned: `hook_seam` now returns `headless_inert` (new `HookSeam` literal) for the normal
-  enabled+version-OK headless case instead of `unknown`, so `forge runtime preflight codex` reports a known negative,
-  not "trust unproven" (still never `active`).
-- **Checklist compaction:** Phase 6 planning pushed the checklist over the 30k-token board hook; Phases 2/3-hardening/4
-  (4a-4f) slice bodies compacted (state + decisions + debt preserved; verification bodies in git history + these
-  entries). 31.2k -> ~25k tokens.
-
-**Verification**: `bash -n` + shellcheck clean on the harness; stages 00/05/10/20/60 + headless 40/50 run green with
-captures; the runtime/preflight/CLI suites (`test_registry.py`/`test_runtime.py`/`test_codex_preflight.py`) pass + mypy
-clean after the field/seam/note edits. Probe spent ~10 short ChatGPT-quota turns. No runtime/execution behavior changed
-(nothing branches on these capability values); only `forge runtime list`/`preflight codex` now render the corrected
-`native_hooks`/`pretool_policy`/`hook_seam`. **`runtime_abstraction` is fully executed (Phases 0-6)**; the
-`doing/ -> done/` lane move is gated on the merge to `main`.
-
-### Phase 5f: Phase 5 doc sync + `forge transfer` end-user guide (docs-only closeout)
-
-**Goal**: Sync the normative + end-user docs to shipped Phase 5 (Codex headless runtime) behavior and close out Phase 5.
-
-**Key changes**:
-
-- `design.md` §3.9 rewritten from pre-5e future tense to shipped: the `bridge_session_to_codex` cross-runtime hop
-  (parent -> ai-curated Codex-targeted transfer -> body prepended to the `codex exec` prompt -> `CodexHeadlessInvoker`,
-  one run tree), initial-message delivery as the Phase 5 mechanism (SessionStart-hook delivery deferred to Phase 6), and
-  the honest CLI status (no `--runtime codex` frontend yet; user surface = `regenerate --target-runtime codex` + manual
-  `codex exec`). §3.14 gained a "Transfer curation usage (Phase 5e)" paragraph. The bridge is documented in §3.9 (a
-  cross-runtime resume-delivery op), not §5.5.5, which was already correct.
-- `design_appendix.md` §A.13: `codex_exec` (route) + `codex_jsonl` (reporter) flipped reserved -> emitted; the
-  per-emitter table gained the `transfer-curate` row; §M.1 `target_runtime` comment de-staled.
-- New end-user guide `docs/end-user/transfer.md` (the chosen home): documents the previously-undocumented
-  `forge transfer show|regenerate|edit|diff` group + the three-file model + the cross-runtime "plan in Claude, implement
-  in Codex" workflow (honest that the one-command bridge is Phase 6). Registered in `README.md`; `session.md` repointed.
-- `card.md` Phase 6 note corrected ("Phase 5 uses only `SessionStart`" was wrong -> initial-message delivery). The dated
-  5a change_log "provisional" line is left as a historical snapshot.
-
-**Verification**: `make pre-commit` clean (mdformat + the new guide); design docs under the tiktoken size hook; grep
-gates clean (`SessionStart` outside `done/` names initial-message delivery; `codex_exec`/`codex_jsonl` shown as
-emitted); `forge transfer --help`/`regenerate --help` confirm the guide matches the shipped CLI; the documented
-`regenerate -> show -> codex exec` path is covered end-to-end by the 5e real-codex E2E
-(`tests/integration/core/test_claude_to_codex_resume.py`). **Phase 5 is complete** (5.0/5a-5f shipped).
-
-### Phase 5e: Claude->Codex resume bridge (the payoff)
-
-**Goal**: Compose the Phase 5 build-group parts into the "plan in Claude -> implement in Codex via curated transfer"
-hop, attributed across one run tree.
-
-**Key changes**:
-
-- New `core/ops/codex_bridge.py::bridge_session_to_codex` (UI-agnostic core op; no CLI -- the `--runtime codex` frontend
-  is Phase 6): parent session -> ai-curated transfer (`target_runtime=codex`) -> body **prepended to the `codex exec`
-  prompt** (initial-message delivery, not a `SessionStart` hook -- per-hook trust is unconfirmable, 5a) ->
-  `CodexHeadlessInvoker().run`. Returns `CodexBridgeResult`; raises `ForgeOpError` for bad strategy / missing parent /
-  non-ready Codex (Codex's own success/failure rides on `.codex`, not raised).
-- "One run tree" is an `os.environ` contract: the bridge mints a fresh root (`new_root_run_identity()`) into env via a
-  tested `_temporary_run_env` context manager, so both the curation `core.llm` call and the `codex exec` run derive
-  under it -- no API change to the 5b/5c emitters. Per-run child key (`<parent>-codex-<run-suffix>`) avoids re-feeding a
-  stale frozen snapshot.
-- Part A: instrumented the ai-curated transfer curation (a previously-unattributed `core.llm` call) to emit a usage
-  event (`.ask`->`.complete` to capture in-band tokens; `route=core_llm` / `runtime=forge_cli` /
-  `command=transfer-curate`). General gap-fix: no-ops without an ambient run identity.
-- `compose_codex_initial_message` is the named prompt-composition seam (pure, unit-tested).
-
-**Verification**: hermetic bridge + transfer + codex-emit unit/CIT suites pass (99); real-codex E2E
-(`tests/integration/core/test_claude_to_codex_resume.py`, `@slow`) green against real `codex 0.137.0` (~8s; curation
-mocked so codex auth is the only hard dep); 5b real-codex smoke regression green; `mypy` clean; `make pre-commit` clean.
-
-**Deferred to 5f**: `design.md` §3.9/§3.14/§5.5.5 sync (initial-message delivery; curation usage event; bridge composes
-preflight + invoker) + the end-user cross-runtime workflow doc. No CLI command and no `SessionStart`-hook delivery (both
-Phase 6).
-
-## 2026-06-08 (compacted)
-
-- **Phase 5b-5d: Codex headless runtime.** Probe-first codex-cli 0.137.0 fixtures; `codex_stream.py` parser; extracted
-  `_HeadlessLifecycleBase` (six hooks) shared by Claude + Codex invokers; `CodexHeadlessInvoker`
-  (`codex exec --json --sandbox`); `emit_codex_usage` (`confidence=unavailable`, honest `cost=None`); `target_runtime`
-  threads transfer (default `claude`, byte-identical). Decisions: cost-only ledger confidence; SessionStart-hook
-  delivery deferred to Phase 6. 430 unit + real-codex `@slow` smoke green.
-- **Phase 5a: Codex preflight.** Render-free `CodexPreflight` (`codex_preflight.py`); binary-authoritative auth
-  (`CODEX_API_KEY` -> `CODEX_ACCESS_TOKEN` -> `codex doctor` -> fail closed); `ready` never keys off `overallStatus`;
-  the resolved key is never a result field (no `--json` leak). `codex-api` credential + `forge runtime preflight codex`.
-  85 + 244 tests; live Ready YES on 0.137.0.
-- **Phase 5 planning + Slice 5.0.** Adversarial web sweeps corrected stale Codex facts (hooks default-on; 10 lifecycle
-  events; Responses-only wire). Shipped Codex `RuntimeSpec`; expanded the Phase 5 checklist (5.0-5f); one-shot
-  `codex exec` transport (app-server deferred).
-- **Phase 4g: Exact cost for proxied `claude -p`.** A run-tree join replaces the concurrency-fragile snapshot delta:
-  additive `forge_run_id`/`forge_root_run_id` on cost records (no schema bump); env stamps `X-Forge-Run-ID/-Root-Run-ID`
-  only for a headless child hitting a **proven** Forge proxy; read-time suppression is **per-run-subtree** (whole-root
-  was a silent undercount -- regression guard). No-dollars route renders **unavailable**, never `$0`. Live 4g.0 canary
-  passed (6 cases, Claude Code 2.1.168).
-
-## 2026-06-07 (compacted)
-
-- **Docs: `claude_session_id` pre-seed lifecycle** (design.md §3.3/§3.5 + session.md). Aligned normative + user docs to
-  shipped code: every launch starting a **new** Claude conversation pre-seeds the UUID (`forge session start` +
-  transfer/fresh children impose `--session-id`; the hook validates) — only native `--fork-session` doesn't pre-seed. A
-  non-null UUID alone is **not** "used"; resumable requires hook/transcript evidence (`_is_resumable_session`).
-  Docs-only; `make pre-commit` clean.
-- **Fix: `project_root` git-common-dir-derived** (workspace_scope Slice 1). `start_session` + same-dir `fork` now route
-  through `resolve_project_root()` (not `find_project_root(worktree_path)`), so every worktree of a repo shares the
-  git-common-dir root — manual linked worktrees now group under `--scope workspace`; non-git `.forge/` dirs degrade
-  gracefully. Regression `test_bug_workspace_scope_manual_worktree.py`; 1031 tests pass; matches the existing §3
-  contract.
-- **Rename `--scope repo` → `--scope workspace`** (workspace_scope precursor, clean break). Renamed the flag value
-  across `session list`, `clean`, `memory status|shadows`, `%session list`/`%clean` (`VALID_SCOPES`, Click choices,
-  `--json` `"scope"`). Clean break — `--scope repo` fails with Click's native "invalid choice", no alias
-  (coding-standards §5); durable session index untouched (`project_root` kept). **Preserved deliberately** (Open Q1):
-  the `resolve_session_repo_wide` symbol, `project_root` field, "logical repo" term. 438 tests pass; `make pre-commit`
-  clean.
-
-## 2026-06-06 (compacted)
-
-metric-evidence card closeout + cleanups (shipped 0.4.0, PR #18).
-
-- **Version 0.3.0 → 0.4.0**; metric-evidence card `doing/ → done/`. Breaking CLI: `forge proxy costs` → `costs show`
-  (Click consumes the first positional as a subcommand, so bare `costs` prints group help), `forge usage` →
-  `forge activity` (reports Forge *automation* activity — supervisor/memory-writer/verbs/policy — not total usage). Old
-  names are flag-tolerant hidden tombstones that exit non-zero naming the replacement.
-- **Removed CLI rename-migration tombstones (clean break)**: error-only tombstone commands/flags (`forge usage`,
-  `forge handoff run`, `forge session handoff`/`memory`, `search -q`, `memory track --as`, `--resume-mode handoff`, the
-  `--force` "deprecated alias for --yes") and stale-state migration guards (`_RENAMED_KEYS`/`_REMOVED_KEYS`,
-  `_REMOVED_STRATEGIES`/`scan_stale_passports`) deleted — degrade to the generic unknown-key/strategy-rejection paths.
-  `schema_version` validators KEPT (forward-compat). `coding-standards.md` §5/§6 + `design.md` §4.0 realigned:
-  command/option removals are clean breaks.
-- **`forge proxy costs reset`**: wipes the three telemetry planes (`requests/`, `verbs/`, usage `events/`) + the derived
-  status-line cost cache; spares audit + transcript cache-hit. Restart `Tip:` (a live proxy holds cost/cap totals in a
-  separate process the CLI can't reach). `--dry-run`/`--yes`.
-- **Status-line weekly quota**: both windows (`5h:N% · 7d:M%`, `_extract_windows` clean break), heat-mapped on the
-  shared context gradient; reset countdown binds inline to the hotter window (`7d:52%↻1d`).
-- **PR #18 adversarial review fixes**: tightened headless `--output-format json` retry `_REJECTION_RE` (a transient
-  error echoing argv no longer latches JSON off process-wide / double-bills a proxied retry); `run_parallel` retry spawn
-  mirrors the primary's `cleanup_started` re-check; launch-resurrection `exists()` guard; negative-delta clamp;
-  `forge +$Y` counts `{reported, gateway_calculated}` and excludes the typed `ROUTE_CLAUDE_INTERACTIVE` route; legacy
-  verb fallback trusts `cost_measured` only.
-- **Cleanups folded in**: `sum_forge_added_cost` gained a `since` bound (no whole-ledger re-parse per poll); dormant
-  `stream-json` parse branch removed (seam note left); DRY extractions — `core.state.decode_json_object` (one JSONL
-  guard, 5 readers), shared `proxy_costs.py` aggregation, `emit.py` `_direct_cost_provenance` (proxied path stays
-  per-caller to avoid double-counting the verb aggregate).
-- **QA checklist coverage** (`src/skills/qa/`): closed 6 gaps where a cost-honesty regression would pass the release
-  gate (§3.4 masking misfire, §7.12-7.14 cost honesty/provenance/tombstone, §8.5 `forge +$Y` segment).
-
-## 2026-06-05 (compacted)
-
-metric-evidence-simplification card (Phases 1-5): Forge never invents metric figures — every dollar is
-reported-or-unavailable with recorded provenance.
-
-- **Phase 2 (cost not an oracle)**: proxy cost reported-or-unavailable (`cost_usd` carriers; OpenRouter `usage.cost`,
-  LiteLLM `x-litellm-response-cost`); unreported → `cost_micros=None`/`confidence="unavailable"`. Price catalog
-  (`pricing.py`/`pricing.yaml`) **deleted** so it can't re-enter accounting. Breaking (research-preview): cost-record
-  `estimated`/`pricing_source` → `reporter`+`confidence` (`COST_SCHEMA_VERSION` stays 1). Spend caps fire only for
-  cost-reporting routes.
-- **Phase 3**: `cap_mode` + strict pre-flight estimate removed; post-event enforcement only. Stale `cap_mode:` rejected
-  with a tombstone. Reset: remove the `cap_mode:` line from `proxy.yaml`.
-- **Phase 1/5 (schema + reporters)**: `core/usage/vocabulary.py` `Route`/`Reporter`/`Confidence` literals;
-  `USAGE_SCHEMA_VERSION` stays 1 by decision (a pre-Phase-1 strict reader dropping new records is acceptable for
-  best-effort telemetry). Headless cost precedence: one reporter per run (proxied → `forge_proxy`; direct → native or
-  tokens-only/`unavailable`). Shared `core/reactive/headless_json.py` unwraps the `claude -p --output-format json` array
-  envelope (2.1.165 emits an array, not the documented object; retry-once-and-latch).
-- **Phase 4 (status-line honesty)**: billing `auto` renders `ambiguous` (never infers `api` from `ANTHROPIC_API_KEY`);
-  additive `confirmed.launch`. Deferred: `usd_to_micros` vs proxy `round()` diverge ≤1 micro at half-micro fractions.
-
-## 2026-06-04
-
-- **Cost/audit JSONL readers (metric-evidence Phase 0)**: added the `isinstance(record, dict)` guard to four
-  `.get`-after-`json.loads` readers (`read_cost_logs`, `read_verb_logs`, `read_audit_logs`, `CostTracker._parse_record`)
-  so one non-object line (`[]`/`1`/`null`) no longer aborts `forge proxy costs`/`audit show`. Regression
-  `test_bug_cost_log_non_dict_line.py`.
-- **Status-line PR #16 review (5 findings)**: proxy GET `/` runs idempotent `_ensure_runtime_state()` (caps were
-  load-order dependent); `render_segments` fail-open per producer; tier-scanner parity test; the "byte-identical output"
-  claim qualified to the API billing path. Regressions `test_bug_proxy_root_caps_uninitialized.py`,
-  `test_bug_statusline_producer_failopen.py`.
+- **Codex/runtime_abstraction closeout.** Probe-only Codex frontend evaluation confirmed `codex exec` hooks do not fire
+  headless in codex-cli 0.138.0, so SessionStart transfer delivery and headless policy hooks stay no-go while the bridge
+  path stays initial-message based. Runtime/preflight capability fields now report `headless_inert`/`none`. Phase 5e
+  shipped `bridge_session_to_codex` (parent -> ai-curated Codex transfer -> `codex exec`, one run tree) plus transfer
+  curation usage attribution; Phase 5f synced design docs and added the end-user transfer guide. Codex headless runtime,
+  preflight, stream parser, unavailable-cost usage, and target-runtime transfer threading shipped in the preceding
+  phases.
+- **Metric evidence and activity closeout.** Forge cost accounting moved to reported-or-unavailable figures, deleted the
+  price catalog, removed strict preflight cap estimates, added reporter/confidence vocabulary, and kept spend caps
+  post-event. `forge usage` became `forge activity`; `forge proxy costs reset` now clears telemetry/cap/status-line cost
+  state; tombstones and stale migration shims were removed as clean breaks where appropriate.
+- **Workspace/status-line hardening.** `project_root` resolution became git-common-dir-derived for linked worktrees,
+  `--scope repo` became `--scope workspace`, session pre-seed lifecycle docs were aligned, and status-line producer /
+  cap-load / weekly-quota regressions were fixed.
+- **Reader and proxy safety fixes.** Cost/audit JSONL readers gained non-object guards; headless retry, parallel
+  cleanup, negative-delta, and provenance edge cases from PR review were covered by regressions.
+- **Verification highlights**: Codex probe harness stages and runtime/preflight suites green; bridge/transfer/codex
+  suites and real-codex E2E green; metric/activity/status-line suites and `make pre-commit` clean. Detailed per-phase
+  verification remains in git history before this compaction.
 
 ## 2026-06-03 (compacted)
 

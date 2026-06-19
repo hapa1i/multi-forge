@@ -43,9 +43,12 @@ source-key sibling; it can follow as the full model-source refactor or be sliced
 **Update (2026-06-18):** `upstream_downstream_ledgers` is done. The epic chooses `unified_backend` next so the source
 identity key lands before remote reconciliation resumes.
 
+**Update (2026-06-18 closeout):** `unified_backend` stayed scoped to source identity/downstream attribution and landed
+`backend_id` without folding remote reconciliation into the branch.
+
 ## Next Coordination
 
-- [ ] Keep `unified_backend` scoped to source identity and downstream attribution; do not fold remote reconciliation
+- [x] Keep `unified_backend` scoped to source identity and downstream attribution; do not fold remote reconciliation
   implementation into this branch.
 - [ ] After `unified_backend` lands, decide whether remote reconciliation resumes next or whether another source-key
   follow-up is needed.
