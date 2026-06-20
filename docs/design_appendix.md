@@ -787,6 +787,16 @@ Semantics and invariants:
   custom `session_id` is ignored. Server-gated (`_provider_user_value`) and adapter-forwarded via
   `extra["openai"]["user"]`; metadata-only, hashed, never the raw session name. Direct `core.llm` callers (plan-check,
   curation) are a documented follow-up, not wired here.
+- **Remote reconciliation (single-id MVP).** `forge backend reconcile <source-id>` joins one local downstream trace to
+  one remote account-side record via a backend remote-adapter registry (`forge.backend.remote`). A source is
+  remote-reconcile capable iff it has a registered adapter there — NOT a `ModelSourceCapabilities` flag (a flag could
+  drift; registry presence is the single source of truth and keeps an account-side read concern out of the
+  proxy-write-path capability struct). OpenRouter is the first adapter (`GET /api/v1/generation`, metadata-only, never
+  `/generation/content`). The op (`core/ops/backend_reconcile.py`) buckets are **comparative** —
+  `joined`/`remote`/`missing-remote`/`not-queryable` for the single-id paths; remote/network failures are renderable
+  data (`not-queryable`), never raised, and local cost/tokens are never overwritten by remote figures. Windowed
+  activity/analytics (management key, `missing-local`/`local` buckets) is a designed-for follow-on — the adapter
+  protocol already declares the window seam (`RemoteCapability.window_*`, `fetch_activity`).
 
 ---
 

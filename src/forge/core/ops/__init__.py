@@ -8,6 +8,12 @@ This package contains reusable operations that can be invoked from:
 Ops must be UI-agnostic: no Click usage, no printing, and no hook JSON.
 """
 
+from .backend_reconcile import (
+    ReconcileEntry,
+    ReconcileResult,
+    reconcile_generation,
+    render_reconcile_lines,
+)
 from .context import ExecutionContext
 from .gc import (
     CleanError,
@@ -87,4 +93,9 @@ __all__ = [
     "show_provider_trace",
     "explain_provider_trace",
     "render_explanation_lines",
+    # Backend reconciliation ops
+    "ReconcileEntry",
+    "ReconcileResult",
+    "reconcile_generation",
+    "render_reconcile_lines",
 ]

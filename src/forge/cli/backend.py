@@ -13,7 +13,7 @@ from __future__ import annotations
 import json
 import re
 import sys
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, NoReturn
 
@@ -26,6 +26,7 @@ from forge.backend import BackendManager, ModelSource, ModelSourceNotFoundError
 from forge.backend.adapters import get_adapter
 from forge.backend.creation import create_backend_config, get_backend_config_path
 from forge.backend.registry import BackendInstance, BackendRegistryStore, is_pid_alive
+from forge.backend.remote.base import RemoteAdapterError
 from forge.backend.sources import (
     get_model_source,
     list_model_sources,
@@ -34,6 +35,12 @@ from forge.backend.sources import (
 from forge.cli.output import print_error, print_error_with_tip, print_tip
 from forge.core.auth.template_secrets import resolve_env_or_credential_with_source
 from forge.core.credential_registry import EnvVar
+from forge.core.ops import (
+    ExecutionContext,
+    ForgeOpError,
+    reconcile_generation,
+    render_reconcile_lines,
+)
 from forge.core.paths import display_path, get_forge_home
 
 _SUPPORTED_ADAPTERS = frozenset({"litellm"})
@@ -895,3 +902,61 @@ def delete_cmd(adapter: str, port: int | None, yes: bool) -> None:
 
         shutil.rmtree(backend_dir)
         console.print(f"[green]Deleted[/green] backend config for '{adapter}'")
+
+
+@backend.command("reconcile")
+@click.argument("source_id")
+@click.option(
+    "--request-id",
+    "request_id",
+    default=None,
+    help="Local request id to join to a remote record (scoped to <source-id>).",
+)
+@click.option(
+    "--remote-id",
+    "remote_id",
+    default=None,
+    help="The backend's own record id (e.g. an OpenRouter gen-... id); remote-only.",
+)
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+@click.option("--timeout", type=float, default=5.0, show_default=True, help="Remote lookup timeout (seconds).")
+def reconcile_cmd(source_id: str, request_id: str | None, remote_id: str | None, as_json: bool, timeout: float) -> None:
+    """Reconcile local telemetry against a backend's remote account-side record.
+
+    Provide exactly one of --request-id (local-anchored: local trace -> remote record) or
+    --remote-id (remote-only: the backend's own record id, no local side).
+    """
+    console = Console(width=200)
+    if request_id and remote_id:
+        print_error("Use only one of --request-id or --remote-id, not both.", console=console)
+        sys.exit(1)
+    if not request_id and not remote_id:
+        print_error_with_tip(
+            "Provide a local request id or a remote record id to reconcile.",
+            "Use --request-id <id> (local) or --remote-id <id> (the backend's own record id).",
+            console=console,
+        )
+        sys.exit(1)
+
+    try:
+        result = reconcile_generation(
+            ctx=ExecutionContext.from_cwd(),
+            source_id=source_id,
+            request_id=request_id,
+            remote_id=remote_id,
+            timeout_s=timeout,
+        )
+    except ForgeOpError as e:
+        print_error_with_tip(str(e), "Run 'forge backend list' to see source ids.", console=console)
+        sys.exit(1)
+    except RemoteAdapterError as e:
+        # Adapter bug / config fault (e.g. no base URL) -- a clean CLI error, not a traceback.
+        print_error(f"Remote adapter error: {e}", console=console)
+        sys.exit(1)
+
+    if as_json:
+        click.echo(json.dumps(asdict(result), indent=2, default=str))
+        return
+
+    for line in render_reconcile_lines(result):
+        click.echo(line)
