@@ -16,6 +16,7 @@ the deferred proxied-correlation slice (4g).
 from __future__ import annotations
 
 import logging
+import os
 import uuid
 
 from forge.core.llm import ModelHyperparameters
@@ -51,6 +52,74 @@ def with_forge_request_id(
     openai_extra["extra_headers"] = headers
     base.extra = {**base.extra, "openai": openai_extra}
     return base
+
+
+def with_openrouter_user(
+    hyperparams: ModelHyperparameters | None,
+    user_id: str,
+) -> ModelHyperparameters:
+    """Return hyperparameters with the OpenRouter ``user`` grouping id set.
+
+    Merges into ``extra["openai"]["user"]`` so the OpenAI-compatible client forwards
+    it as a top-level ``user`` field (``build_chat_completion_kwargs`` does
+    ``kwargs.update(extra["openai"])``), where OpenRouter reads it for account-side
+    ``/generation`` grouping. Never clobbers a ``user`` the caller already set, and
+    preserves sibling ``openai`` extras (e.g. an ``extra_headers`` X-Request-ID).
+    Returns a copy -- the caller's instance is never mutated.
+
+    Args:
+        hyperparams: Existing hyperparameters, or None to start from defaults.
+        user_id: The opaque grouping id (mint via :func:`resolve_direct_provider_user`).
+    """
+    base = hyperparams.model_copy(deep=True) if hyperparams is not None else ModelHyperparameters()
+    openai_extra = dict(base.extra.get("openai", {}))
+    openai_extra.setdefault("user", user_id)
+    base.extra = {**base.extra, "openai": openai_extra}
+    return base
+
+
+def resolve_direct_provider_user(role: str | None = None) -> str | None:
+    """The OpenRouter ``user`` grouping id for a direct (non-proxied) call, or None.
+
+    Gated on the global ``provider_trace.inject_provider_user`` toggle. Reads the
+    ambient run identity from the environment and derives the SAME opaque id the
+    proxied path stamps into ``X-Forge-Session`` (:func:`derive_provider_session_id`),
+    so a run's direct and proxied OpenRouter calls group identically account-side.
+
+    Returns None when the flag is off, or when no run identity is present (a bare
+    ``forge resume`` outside a run tree). Best-effort: never raises -- a grouping id
+    is telemetry, not correctness, so any failure degrades to "no grouping".
+
+    The caller is responsible for the route gate (inject only when the call targets
+    OpenRouter); this resolver only answers "what id, if any, should we group under".
+
+    Args:
+        role: Optional role suffix (e.g. ``"plan-check"``) for per-role grouping;
+            canonicalized by ``derive_provider_session_id`` via ``sanitize_label``.
+    """
+    try:
+        from forge.runtime_config import get_runtime_config
+
+        if not get_runtime_config().provider_trace.inject_provider_user:
+            return None
+
+        from forge.core.reactive.env import (
+            FORGE_ROOT_RUN_ID_VAR,
+            FORGE_RUN_ID_VAR,
+            FORGE_SESSION_VAR,
+        )
+        from forge.core.run_id import derive_provider_session_id
+
+        session = os.environ.get(FORGE_SESSION_VAR)
+        # Mirror the proxied path (reactive/env.py): root falls back to the run id when
+        # FORGE_ROOT_RUN_ID is unset, so a root-level call still derives a stable id.
+        root_run_id = os.environ.get(FORGE_ROOT_RUN_ID_VAR) or os.environ.get(FORGE_RUN_ID_VAR)
+        if not session and not root_run_id:
+            return None
+        return derive_provider_session_id(session, root_run_id or "", role)
+    except Exception as e:
+        logger.debug("resolve_direct_provider_user(role=%s) failed: %s", role, e)
+        return None
 
 
 def resolve_client_base_url(model: str) -> str | None:

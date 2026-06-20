@@ -10,6 +10,7 @@ from typing import Any, cast
 import pytest
 
 from forge.core.transcript import parse_jsonl_transcript, truncate
+from forge.runtime_config import RuntimeConfig, RuntimeProviderTraceConfig
 from forge.session.models import SessionState
 from forge.session.transfer import (
     AI_CURATION_MODEL,
@@ -46,6 +47,12 @@ def _fake_completion(text: str, *, usage: dict[str, int] | None = None) -> Any:
         text=text,
         usage=usage if usage is not None else {"prompt_tokens": 120, "completion_tokens": 60},
     )
+
+
+def _patch_inject_flag(monkeypatch: pytest.MonkeyPatch, enabled: bool) -> None:
+    """Force the global provider_trace.inject_provider_user toggle for a test."""
+    cfg = RuntimeConfig(provider_trace=RuntimeProviderTraceConfig(inject_provider_user=enabled))
+    monkeypatch.setattr("forge.runtime_config.get_runtime_config", lambda: cfg)
 
 
 @pytest.fixture
@@ -1529,3 +1536,67 @@ class TestCurationUsageEmission:
         assert outcomes[0].operation == "transfer.curate"
         assert outcomes[0].status == "error"
         assert outcomes[0].reason_code == "unparseable_output"
+
+
+class TestCurationProviderUser:
+    """OpenRouter `user`-grouping injection on the curation call.
+
+    Curation always routes through OpenRouter (AI_CURATION_PROVIDER), so the only gate
+    is the global toggle. The grouping id is the same opaque hash the proxied path
+    stamps, tagged with the ``transfer-curate`` role.
+    """
+
+    _CURATED = {"goal": "g", "decisions": [], "current_state": "s", "files": [], "open_questions": []}
+
+    def _captured_user(
+        self,
+        sample_transcript: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        *,
+        flag: bool,
+        session: str | None = None,
+        root: str | None = "run_root",
+    ) -> str | None:
+        from unittest.mock import MagicMock, patch
+
+        _patch_inject_flag(monkeypatch, flag)
+        for var in ("FORGE_SESSION", "FORGE_ROOT_RUN_ID", "FORGE_RUN_ID"):
+            monkeypatch.delenv(var, raising=False)
+        if session is not None:
+            monkeypatch.setenv("FORGE_SESSION", session)
+        if root is not None:
+            monkeypatch.setenv("FORGE_ROOT_RUN_ID", root)
+
+        mock_adapter = MagicMock()
+        mock_adapter.complete.return_value = _fake_completion(json.dumps(self._CURATED))
+        with (
+            patch("forge.core.llm.SyncAdapter", return_value=mock_adapter),
+            patch("forge.core.llm.get_client"),
+        ):
+            _generate_ai_curated_context(
+                parent_name="p",
+                lineage=["p"],
+                transcript_path=sample_transcript,
+                artifacts_path=None,
+                proxy_template=None,
+                latest_plan_path=None,
+            )
+        hp = mock_adapter.complete.call_args.kwargs["hyperparams"]
+        return hp.extra.get("openai", {}).get("user") if hp is not None else None
+
+    def test_injects_when_flag_on(self, sample_transcript: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        user = self._captured_user(sample_transcript, monkeypatch, flag=True, session="planner")
+        assert user is not None and user.startswith("forge_sess_") and user.endswith("_transfer_curate")
+
+    def test_no_inject_when_flag_off(self, sample_transcript: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        assert self._captured_user(sample_transcript, monkeypatch, flag=False, session="planner") is None
+
+    def test_run_fallback_when_no_session(self, sample_transcript: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        user = self._captured_user(sample_transcript, monkeypatch, flag=True, session=None, root="run_root")
+        assert user is not None and user.startswith("forge_run_") and user.endswith("_transfer_curate")
+
+    def test_user_field_never_leaks_raw_session_name(
+        self, sample_transcript: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        user = self._captured_user(sample_transcript, monkeypatch, flag=True, session="super-secret-session")
+        assert user is not None and "super-secret-session" not in user

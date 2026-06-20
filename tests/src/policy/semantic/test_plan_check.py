@@ -29,9 +29,16 @@ from forge.policy.semantic.plan_check import (
 )
 from forge.policy.semantic.supervisor import plan_fingerprint
 from forge.policy.types import ActionContext, PolicyDecision
+from forge.runtime_config import RuntimeConfig, RuntimeProviderTraceConfig
 from forge.session.models import SupervisorConfig
 
 # --- Fixtures ---
+
+
+def _patch_inject_flag(monkeypatch, enabled: bool) -> None:
+    """Force the global provider_trace.inject_provider_user toggle for a test."""
+    cfg = RuntimeConfig(provider_trace=RuntimeProviderTraceConfig(inject_provider_user=enabled))
+    monkeypatch.setattr("forge.runtime_config.get_runtime_config", lambda: cfg)
 
 
 def _make_context(tool_name: str = "Write", target_path: str = "src/main.py") -> ActionContext:
@@ -440,6 +447,104 @@ class TestRunPlanCheck:
 
 
 # --- applies_to ---
+
+
+class TestRunPlanCheckProviderUser:
+    """OpenRouter `user`-grouping injection: opt-in, OpenRouter-only, hash-only id."""
+
+    @staticmethod
+    def _user_in(mock_adapter: MagicMock) -> str | None:
+        hp = mock_adapter.complete.call_args.kwargs["hyperparams"]
+        if hp is None:
+            return None
+        return hp.extra.get("openai", {}).get("user")
+
+    @patch("forge.core.llm.get_client")
+    @patch("forge.core.llm.SyncAdapter")
+    def test_injects_when_openrouter_and_flag_on(
+        self, mock_adapter_cls: MagicMock, mock_get_client: MagicMock, monkeypatch
+    ) -> None:
+        _patch_inject_flag(monkeypatch, True)
+        monkeypatch.setenv("FORGE_SESSION", "mysession")
+        monkeypatch.setenv("FORGE_ROOT_RUN_ID", "run_aaaaaaaaaaaa")
+        mock_adapter = MagicMock()
+        mock_adapter.complete.return_value = CompletionResponse(text='{"aligned": true}')
+        mock_adapter_cls.return_value = mock_adapter
+
+        run_plan_check(_make_context(), model="google/gemini-3.5-flash", provider="openrouter", plan_text="plan")
+
+        user = self._user_in(mock_adapter)
+        assert user is not None and user.startswith("forge_sess_") and user.endswith("_plan_check")
+
+    @patch("forge.core.llm.get_client")
+    @patch("forge.core.llm.SyncAdapter")
+    def test_no_inject_when_flag_off(
+        self, mock_adapter_cls: MagicMock, mock_get_client: MagicMock, monkeypatch
+    ) -> None:
+        _patch_inject_flag(monkeypatch, False)
+        monkeypatch.setenv("FORGE_SESSION", "mysession")
+        monkeypatch.setenv("FORGE_ROOT_RUN_ID", "run_aaaaaaaaaaaa")
+        mock_adapter = MagicMock()
+        mock_adapter.complete.return_value = CompletionResponse(text='{"aligned": true}')
+        mock_adapter_cls.return_value = mock_adapter
+
+        run_plan_check(_make_context(), model="google/gemini-3.5-flash", provider="openrouter", plan_text="plan")
+
+        assert self._user_in(mock_adapter) is None
+
+    @patch("forge.core.llm.get_client")
+    @patch("forge.core.llm.SyncAdapter")
+    def test_no_inject_when_not_openrouter(
+        self, mock_adapter_cls: MagicMock, mock_get_client: MagicMock, monkeypatch
+    ) -> None:
+        # Flag on, but the route is local LiteLLM -> the `user` field is N/A, never sent.
+        _patch_inject_flag(monkeypatch, True)
+        monkeypatch.setenv("FORGE_SESSION", "mysession")
+        monkeypatch.setenv("FORGE_ROOT_RUN_ID", "run_aaaaaaaaaaaa")
+        mock_adapter = MagicMock()
+        mock_adapter.complete.return_value = CompletionResponse(text='{"aligned": true}')
+        mock_adapter_cls.return_value = mock_adapter
+
+        run_plan_check(_make_context(), model="gemini/gemini-3.5-flash", provider="litellm_local", plan_text="plan")
+
+        assert self._user_in(mock_adapter) is None
+
+    @patch("forge.core.llm.get_client")
+    @patch("forge.core.llm.SyncAdapter")
+    def test_user_field_never_leaks_raw_session_name(
+        self, mock_adapter_cls: MagicMock, mock_get_client: MagicMock, monkeypatch
+    ) -> None:
+        # The human session name is hashed, never sent raw, into the provider user field.
+        _patch_inject_flag(monkeypatch, True)
+        monkeypatch.setenv("FORGE_SESSION", "super-secret-session-name")
+        monkeypatch.setenv("FORGE_ROOT_RUN_ID", "run_aaaaaaaaaaaa")
+        mock_adapter = MagicMock()
+        mock_adapter.complete.return_value = CompletionResponse(text='{"aligned": true}')
+        mock_adapter_cls.return_value = mock_adapter
+
+        run_plan_check(_make_context(), model="google/gemini-3.5-flash", provider="openrouter", plan_text="plan")
+
+        user = self._user_in(mock_adapter)
+        assert user is not None and "super-secret-session-name" not in user
+
+    @patch("forge.core.llm.get_client")
+    @patch("forge.core.llm.SyncAdapter")
+    def test_injected_user_matches_proxied_derivation(
+        self, mock_adapter_cls: MagicMock, mock_get_client: MagicMock, monkeypatch
+    ) -> None:
+        # The injected id is exactly what the proxied path derives for the same identity.
+        from forge.core.run_id import derive_provider_session_id
+
+        _patch_inject_flag(monkeypatch, True)
+        monkeypatch.setenv("FORGE_SESSION", "mysession")
+        monkeypatch.setenv("FORGE_ROOT_RUN_ID", "run_bbbbbbbbbbbb")
+        mock_adapter = MagicMock()
+        mock_adapter.complete.return_value = CompletionResponse(text='{"aligned": true}')
+        mock_adapter_cls.return_value = mock_adapter
+
+        run_plan_check(_make_context(), model="google/gemini-3.5-flash", provider="openrouter", plan_text="plan")
+
+        assert self._user_in(mock_adapter) == derive_provider_session_id("mysession", "run_bbbbbbbbbbbb", "plan-check")
 
 
 class TestPlanCheckAppliesTo:

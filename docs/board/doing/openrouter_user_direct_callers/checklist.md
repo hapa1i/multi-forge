@@ -4,10 +4,10 @@ Execution plan for `feat/openrouter-user-direct-callers`. Card: [card.md](card.m
 
 ## Current focus
 
-Phase 4 — direct-caller injection (the card feature): `with_openrouter_user` helper + wire into
-plan-check and transfer curation. (Phases 1–3 done — the unified-toggle infrastructure: runtime
-toggle, proxied gate repoint, sidecar mount. 1054+ tests green across the touched areas;
-mypy+pyright clean. Sidecar integration run deferred to closeout per testing-guidelines.)
+Phase 5 — docs, changelog, closeout. (Phases 1–4 done: unified toggle + proxied gate repoint +
+sidecar mount + the direct-caller injection feature. 432 tests green across all touched files;
+mypy+pyright clean on every changed source + test module. Sidecar integration run still deferred
+to closeout per testing-guidelines.)
 
 ## Decision (load-bearing)
 
@@ -66,25 +66,26 @@ user-facing switch beats two per-scope homes, even though it requires changing t
 - [x] Tests: `tests/src/sidecar/test_container.py` (present → mounted ro; absent → omitted). **38 sidecar tests green;
       pyright clean.** Integration run (sidecar/proxy runtime touch) deferred to closeout per testing-guidelines.
 
-### Phase 4 — Direct-caller injection (the card feature)
+### Phase 4 — Direct-caller injection (the card feature) ✅
 
-- [ ] `with_openrouter_user(hyperparams, user_id)` in `core/usage/correlation.py` — deep-copy, **no-clobber** (preserve an
-      explicit caller `extra["openai"]["user"]`), sets `extra["openai"]["user"] = user_id`. Mirrors
-      `with_forge_request_id`'s shape. Export from `core/usage/__init__.py`.
-- [ ] `resolve_direct_provider_user(role) -> str | None` (same module): reads the **unified** flag
-      (`get_runtime_config().provider_trace.inject_provider_user`); returns `None` if off; reads `FORGE_SESSION` +
-      `FORGE_ROOT_RUN_ID`; returns `None` when neither is set (nothing to group by); else
-      `derive_provider_session_id(session, root, role)`. Defensive (broad-except → `None`): never raises into a caller.
-- [ ] Wire into `run_plan_check` (`policy/semantic/plan_check.py`): after `hp` is built, gate on the **resolved route
-      provider == "openrouter"**, apply `hp = with_openrouter_user(hp, uid)` when `uid` is non-None. Role = `"plan-check"`.
-- [ ] Wire into curation (`session/transfer.py`): provider is always `AI_CURATION_PROVIDER == "openrouter"`, so apply
-      unconditionally on a non-None `uid`. Role = `"transfer-curate"`.
-- [ ] Tagger stays out (routes via local LiteLLM; cannot reach OpenRouter) — confirm the existing explanatory comment is
-      present; no code change.
-- [ ] Tests: `tests/src/core/usage/test_correlation.py` (no-clobber, deep-copy, sets user; resolver flag-off/no-env/derives);
-      `tests/src/policy/semantic/test_plan_check.py` (injects on openrouter+flag; skips when provider≠openrouter or flag off;
-      **no-path-leak**: injected value matches `forge_sess_…`/`forge_run_…`, never the raw session name or a path; fail-open:
-      a forced derive error leaves the check working); `tests/src/session/test_transfer*.py` (curation injects).
+- [x] `with_openrouter_user(hyperparams, user_id)` in `core/usage/correlation.py` — deep-copy, **no-clobber** (`setdefault`
+      preserves an explicit caller `extra["openai"]["user"]`), preserves sibling `openai` extras (composes with
+      `with_forge_request_id`'s `extra_headers`). Exported from `core/usage/__init__.py`.
+- [x] `resolve_direct_provider_user(role) -> str | None` (same module): reads the **unified** flag; `None` if off; reads
+      `FORGE_SESSION` + `FORGE_ROOT_RUN_ID` **with `FORGE_RUN_ID` fallback for root** (parity with `reactive/env.py:467`);
+      `None` when no identity; else `derive_provider_session_id(session, root, role)`. Broad-except → `None`: never raises.
+- [x] Wired into `run_plan_check` (`policy/semantic/plan_check.py`): added `_effective_provider` (explicit-wins, detect as
+      fallback) and gate `== "openrouter"`; chained the additive wrappers (effort → request-id → user), dropping the
+      `merge_hyperparams` indirection. Role = `"plan-check"`.
+- [x] Wired into curation (`session/transfer.py` `_call_llm_for_curation`): provider is always
+      `AI_CURATION_PROVIDER == "openrouter"`, so applied on any non-None `uid`. Role = `"transfer-curate"`.
+- [x] Tagger stays out — the existing `tagger.py:57-58` comment already documents "local LiteLLM … not a
+      provider-user-grouping-capable source"; no code change needed.
+- [x] Tests (21 new): `test_correlation.py` (`TestWithOpenrouterUser` ×4 + `TestResolveDirectProviderUser` ×7, incl.
+      `test_matches_proxied_derivation` for cross-plane id equality and `test_never_raises_degrades_to_none` for fail-open);
+      `test_plan_check.py` (`TestRunPlanCheckProviderUser` ×5: openrouter+flag, flag-off, non-openrouter, no-leak, derivation
+      match); `test_transfer.py` (`TestCurationProviderUser` ×4: flag-on, flag-off, run-fallback, no-leak).
+      **432 passed across all touched files; mypy + pyright clean on changed source + tests.**
 
 ### Phase 5 — Docs, changelog, closeout
 
@@ -106,12 +107,13 @@ user-facing switch beats two per-scope homes, even though it requires changing t
 | Global flag default off | fresh `~/.forge/config.yaml` absent | `get_runtime_config().provider_trace.inject_provider_user is False` | `tests/src/test_runtime_config.py` |
 | Global flag on | config.yaml sets `provider_trace.inject_provider_user: true` | accessor returns `True` | `tests/src/test_runtime_config.py` |
 | Proxied gate reads runtime flag | runtime flag on, capable backend | `_provider_user_value(...)` returns a non-None id | `tests/src/proxy/test_server_forge_headers.py` |
-| proxy.yaml key deprecated | proxy.yaml has `provider_trace.inject_provider_user: true` | loads, warns once, value ignored | `tests/regression/test_bug_proxy_yaml_inject_key_deprecated.py` |
+| proxy.yaml key deprecated | proxy.yaml has `provider_trace.inject_provider_user: true` | loads, warns once, value ignored | `tests/regression/test_bug_proxy_yaml_inject_key_relocated.py` |
 | Sidecar mounts config.yaml | host config.yaml exists | mount list has `(…/config.yaml, ro)` | `tests/src/sidecar/test_container.py` |
 | Direct plan-check injects | flag on, route openrouter, `FORGE_SESSION` set | `hp.extra["openai"]["user"] == derive_provider_session_id(...)` | `tests/src/policy/semantic/test_plan_check.py` |
 | No-clobber | `hp` already has `extra["openai"]["user"]` | `with_openrouter_user` returns it unchanged | `tests/src/core/usage/test_correlation.py` |
-| No path/name leak | `FORGE_SESSION="secret/path"` | injected value is `forge_sess_<hash>`, contains no `/` and not the raw name | `tests/src/policy/semantic/test_plan_check.py` |
-| Fail-open | forced derive error | plan-check still returns its verdict; no injection | `tests/src/policy/semantic/test_plan_check.py` |
+| Cross-plane id match | flag on, session+root set | direct id `== derive_provider_session_id(session, root, role)` (== proxied path) | `tests/src/core/usage/test_correlation.py` |
+| No name leak | `FORGE_SESSION="super-secret-session-name"` | injected value is `forge_sess_<hash>`; the raw name never appears | `tests/src/policy/semantic/test_plan_check.py`, `tests/src/session/test_transfer.py` |
+| Fail-open | config read raises in resolver | resolver returns `None` (no injection); never raises into the caller | `tests/src/core/usage/test_correlation.py` |
 
 ## Review fixes (post Phase 1–3)
 

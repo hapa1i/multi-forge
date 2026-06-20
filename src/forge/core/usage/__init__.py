@@ -9,8 +9,10 @@ from .billing import infer_billing_mode
 from .correlation import (
     mint_request_id,
     resolve_client_base_url,
+    resolve_direct_provider_user,
     target_is_forge_proxy,
     with_forge_request_id,
+    with_openrouter_user,
 )
 from .emit import (
     emit_codex_usage,
@@ -53,6 +55,8 @@ __all__ = [
     "prune_usage_events",
     "read_usage_events",
     "resolve_client_base_url",
+    "resolve_direct_provider_user",
     "target_is_forge_proxy",
     "with_forge_request_id",
+    "with_openrouter_user",
 ]

@@ -692,6 +692,7 @@ def _call_llm_for_curation(transcript_text: str) -> _CurationCall:
     from forge.core.llm import Message, SyncAdapter, get_client
     from forge.core.llm.types import ModelHyperparameters
     from forge.core.reactive.structured_output import extract_json_from_response
+    from forge.core.usage import resolve_direct_provider_user, with_openrouter_user
 
     client = SyncAdapter(get_client(AI_CURATION_MODEL, provider=AI_CURATION_PROVIDER))
     # .complete (not .ask) so the provider's in-band token usage is captured for
@@ -701,14 +702,18 @@ def _call_llm_for_curation(transcript_text: str) -> _CurationCall:
         Message(role="system", content=AI_CURATION_SYSTEM_PROMPT),
         Message(role="user", content=AI_CURATION_USER_PROMPT_TEMPLATE.format(transcript_text=transcript_text)),
     ]
-    start = time.monotonic()
-    response = client.complete(
-        messages,
-        hyperparams=ModelHyperparameters(
-            max_tokens=AI_CURATION_MAX_OUTPUT_TOKENS,
-            temperature=AI_CURATION_TEMPERATURE,
-        ),
+    hp = ModelHyperparameters(
+        max_tokens=AI_CURATION_MAX_OUTPUT_TOKENS,
+        temperature=AI_CURATION_TEMPERATURE,
     )
+    # Curation always routes through OpenRouter (AI_CURATION_PROVIDER), so the only gate
+    # is the global toggle (resolved inside). Groups this spend account-side with the
+    # rest of the run's OpenRouter calls under one opaque `user` id.
+    provider_user = resolve_direct_provider_user("transfer-curate")
+    if provider_user:
+        hp = with_openrouter_user(hp, provider_user)
+    start = time.monotonic()
+    response = client.complete(messages, hyperparams=hp)
     latency_ms = (time.monotonic() - start) * 1000
     # Unparseable output is returned (curated=None), not raised: the .complete() above
     # spent real tokens, and the caller emits BEFORE the parse gate decides the fallback
