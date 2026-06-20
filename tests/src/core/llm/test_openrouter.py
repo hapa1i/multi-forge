@@ -71,7 +71,7 @@ class TestOpenRouterClientInit:
         assert result["extra_body"]["transforms"] == ["middle-out"]
 
     def test_translate_params_keeps_user_top_level(self):
-        """Phase 5 channel: a top-level `user` survives translation and is NOT moved to extra_body."""
+        """User channel: a top-level `user` survives translation and is NOT moved to extra_body."""
         kwargs = {"model": "test", "messages": [], "user": "forge_sess_abc123", "reasoning_effort": "high"}
         result = OpenRouterClient._translate_params(kwargs)
         assert result["user"] == "forge_sess_abc123"
@@ -181,7 +181,7 @@ class TestOpenRouterClientComplete:
 
     @pytest.mark.asyncio
     async def test_user_from_extra_openai_reaches_create_kwargs(self, client):
-        """Phase 5 channel proof (end-to-end): a `user` under hyperparams.extra["openai"] -- exactly
+        """Channel proof (end-to-end): a `user` under hyperparams.extra["openai"] -- exactly
         what the proxy adapter writes -- reaches chat.completions.create as a TOP-LEVEL `user`
         kwarg, surviving the client's hyperparam merge, and is never nested in extra_body."""
         mock_client = AsyncMock()

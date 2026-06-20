@@ -125,7 +125,7 @@ Source definitions have:
 - `endpoint`: one of `literal_url`, `connection_value`, or `local_backend`
 - `credential_ids`: credential registry names such as `openrouter`, `litellm-remote`, `anthropic-api`, `openai-api`, or
   `gemini-api`
-- `capabilities`: currently includes auth-probe, provider-trace eligibility, and OpenRouter user-grouping capability
+- `capabilities`: currently includes auth-probe, provider-trace eligibility, and provider-user-grouping capability
 - `local_lifecycle`: local-only refinement with adapter and default port; required env vars are derived from
   `credential_ids`; remote sources never set it
 - `template_names`: current proxy templates that resolve to the canonical source id during template loading
@@ -781,10 +781,10 @@ Semantics and invariants:
   `%provider trace` mirrors it via the shared `render_explanation_lines` text contract). `list` filters by session
   *label* (re-derived `forge_sess_<hash>` prefix) / `forge_root_run_id` / `--period`; `explain` joins downstream spend
   evidence by `request_id` within ±5m for cost confidence. Local-only — no remote `/generation` lookup.
-- **Session-id injection (Phase 5, opt-in).** `provider_trace.inject_openrouter_user` (default off) forwards the
-  validated `X-Forge-Session` id (or a `forge_run_<hash>` fallback) into OpenRouter's top-level `user` field on
-  source-capable proxied routes — probe 3 found `user` is retained in the indexed `/generation` record for account-side
-  lookup, while a custom `session_id` is ignored. Server-gated (`_openrouter_user_value`) and adapter-forwarded via
+- **Session-id injection (opt-in).** `provider_trace.inject_provider_user` (default off) forwards the validated
+  `X-Forge-Session` id (or a `forge_run_<hash>` fallback) into the provider's top-level `user` field on source-capable
+  proxied routes — probe 3 found `user` is retained in the indexed `/generation` record for account-side lookup, while a
+  custom `session_id` is ignored. Server-gated (`_provider_user_value`) and adapter-forwarded via
   `extra["openai"]["user"]`; metadata-only, hashed, never the raw session name. Direct `core.llm` callers (plan-check,
   curation) are a documented follow-up, not wired here.
 

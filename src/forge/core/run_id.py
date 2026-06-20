@@ -27,14 +27,14 @@ ANTHROPIC_CUSTOM_HEADERS_VAR = "ANTHROPIC_CUSTOM_HEADERS"
 FORGE_RUN_ID_HEADER = "X-Forge-Run-ID"
 FORGE_ROOT_RUN_ID_HEADER = "X-Forge-Root-Run-ID"
 
-# Provider session/command correlation headers (openrouter_observability Phase 1).
+# Provider session/command correlation headers.
 # Forge stamps these alongside the run-id headers onto a proven-proxy-routed headless
 # child's outbound requests. ``X-Forge-Session`` carries an OPAQUE grouping id derived
 # from a hash of the (never-sent-raw) human session name + role; ``X-Forge-Command``
 # carries the sanitized command role. Both are internal Forge<->proxy correlation
 # headers — consumed by the proxy for trace joins, never forwarded upstream (the
-# passthrough allowlist drops them). Distinct from Phase 5, which injects the
-# OpenAI-standard ``user`` field upstream.
+# passthrough allowlist drops them). Distinct from provider-user grouping, which injects
+# the OpenAI-standard ``user`` field upstream.
 FORGE_SESSION_HEADER = "X-Forge-Session"
 FORGE_COMMAND_HEADER = "X-Forge-Command"
 

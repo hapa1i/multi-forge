@@ -100,11 +100,23 @@ cost_tracker: CostTracker | None = None
 
 
 _warned_unknown_backend_sources: set[str] = set()
+_warned_absent_backend_source: bool = False
 
 
 def _backend_source_id() -> str | None:
+    global _warned_absent_backend_source
     source = getattr(config.proxy, "source", "") or None
     if not source:
+        # No source -> no backend_id, so downstream attribution, provider-trace, and provider-user
+        # grouping are all disabled for this proxy (they gate on a source-capable backend_id).
+        # Surface it once; absent source has no value to key on, so use a dedicated latch rather
+        # than the value-keyed _warned_unknown_backend_sources set (best-effort log, never silent).
+        if not _warned_absent_backend_source:
+            _warned_absent_backend_source = True
+            logger.info(
+                "proxy.yaml has no 'source:'; downstream attribution, provider-trace, and "
+                "provider-user grouping are disabled for this proxy. Recreate it to refresh proxy.yaml."
+            )
         return None
     source = str(source)
     # proxy.yaml is user-owned config (a system boundary): an unrecognized source is a
@@ -124,9 +136,9 @@ def _backend_source_id() -> str | None:
     return source
 
 
-def _inject_openrouter_user_enabled() -> bool:
+def _inject_provider_user_enabled() -> bool:
     provider_trace_config = getattr(config.proxy, "provider_trace", None)
-    return bool(getattr(provider_trace_config, "inject_openrouter_user", False))
+    return bool(getattr(provider_trace_config, "inject_provider_user", False))
 
 
 def _sidecar_mode_active() -> bool:
@@ -317,31 +329,30 @@ def _forge_session_command(request: Request) -> tuple[str | None, str | None]:
     return getattr(state, "forge_session", None), getattr(state, "forge_command", None)
 
 
-def _openrouter_user_value(
+def _provider_user_value(
     *,
-    provider_name: str,
     backend_id: str | None = None,
     inject: bool,
     forge_session: str | None,
     forge_root_run_id: str | None,
     forge_command: str | None,
 ) -> str | None:
-    """The OpenRouter ``user`` grouping id to inject, or None (openrouter_observability Phase 5).
+    """The provider ``user`` grouping id to inject, or None.
 
-    Opt-in and source-capability gated. Prefers the already-derived, validated
+    Opt-in and source-capability gated: the resolved ``backend_id`` must declare
+    ``provider_user_grouping`` (no provider-name fallback). Prefers the already-derived, validated
     ``X-Forge-Session`` id; falls back to ``forge_run_<hash>`` when only run identity exists;
     returns None when there is nothing to group by (or the flag/route does not apply).
     """
     if not inject:
         return None
-    if backend_id:
-        try:
-            if not get_model_source(backend_id).capabilities.openrouter_user_grouping:
-                return None
-        except ModelSourceNotFoundError:
-            logger.debug("unknown backend source for OpenRouter user grouping: %s", backend_id)
+    if not backend_id:
+        return None
+    try:
+        if not get_model_source(backend_id).capabilities.provider_user_grouping:
             return None
-    elif provider_name != "openrouter":
+    except ModelSourceNotFoundError:
+        logger.debug("unknown backend source for provider-user grouping: %s", backend_id)
         return None
     if forge_session:
         return forge_session
@@ -1011,9 +1022,7 @@ async def _handle_anthropic_passthrough(raw_request: Request, request_id: str, *
 
     # Provider-trace forward-wiring: the passthrough relay mirrors stream lifecycle
     # into the same source-capability-gated record_provider_trace helper.
-    passthrough_provider = getattr(config.proxy, "provider", None) or getattr(config.proxy, "preferred_provider", None)
     provider_trace_ctx = {
-        "provider_name": passthrough_provider or "unknown",
         "backend_id": _backend_source_id(),
         "proxy_id": PROXY_ID or "unknown",
         "mapped_model": model,
@@ -1191,14 +1200,13 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                 openai_request_dict["_user_agent"] = incoming_user_agent
                 logger.debug(f"[{request_id}] Forwarding User-Agent: {incoming_user_agent[:120]!r}")
 
-        # Opt-in (default off): record the Forge session grouping id in OpenRouter's `user` field
-        # so a session/fork is retrievable from OpenRouter's /generation record
-        # (openrouter_observability Phase 5). Source-capability gated; metadata-only, already hashed.
-        forge_user = _openrouter_user_value(
-            provider_name=provider_name,
+        # Opt-in (default off): record the Forge session grouping id in the provider's `user` field
+        # so a session/fork is retrievable from the provider's account-side record. Source-capability
+        # gated (the backend_id must declare provider-user grouping); metadata-only, already hashed.
+        forge_user = _provider_user_value(
             backend_id=_backend_source_id(),
             # Read the flag lazily: source capability decides whether this route uses it.
-            inject=_inject_openrouter_user_enabled(),
+            inject=_inject_provider_user_enabled(),
             forge_session=forge_session,
             forge_root_run_id=forge_root_run_id,
             forge_command=forge_command,
@@ -1369,7 +1377,6 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                 _trace = usage.get("_provider_trace") or {}
                 _lc = _trace.get("lifecycle", {})
                 record_provider_trace(
-                    provider_name=provider_name,
                     backend_id=_backend_source_id(),
                     request_mode="streaming",
                     proxy_id=PROXY_ID or "unknown",
@@ -1454,7 +1461,6 @@ async def create_message(request_data: MessagesRequest, raw_request: Request):
                 # Provider-trace plane (Phase 3): non-streaming lifecycle is trivially complete
                 # (the full body arrived); provider_meta rides the top-level carrier key.
                 record_provider_trace(
-                    provider_name=provider_name,
                     backend_id=_backend_source_id(),
                     request_mode="non_streaming",
                     proxy_id=PROXY_ID or "unknown",

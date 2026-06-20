@@ -7,10 +7,10 @@ axes**. This card is the single consistent view the member cards lean on; it doe
 `checklist.md` is for coordination and sequencing only; member cards remain the execution units.
 
 **Current coordination goal**: `unified_backend` has merged (PR #39) and closed to `done/`, so `backend_id` is now the
-canonical downstream source key. The open coordination decision is whether to resume
-[`openrouter_remote_reconciliation`](../../paused/openrouter_remote_reconciliation/card.md) (paused after Phase 0,
-pending exactly this source-key foundation) as the next member, or whether another source-key follow-up should run
-first.
+canonical downstream source key. The next-member decision is made:
+[`backend_remote_reconciliation`](../backend_remote_reconciliation/card.md) is the active member (resumed 2026-06-19
+from the paused `openrouter_remote_reconciliation`, generalized so OpenRouter is the first adapter). It ships in two
+PRs: a generic refactor first, then the MVP `forge backend reconcile` feature.
 
 ## Why an epic, not a merged card
 
@@ -39,13 +39,13 @@ Two telemetry planes, joined by run-tree identity, with one canonical source key
 
 ## Member cards and ownership split
 
-| Concern                                     | Owner card                                                                                  | Status                                             |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| Plane **structure** (direction: up/down)    | [`upstream_downstream_ledgers`](../../done/upstream_downstream_ledgers/card.md)             | done                                               |
-| Source-identity **key** (`backend_id`)      | [`unified_backend`](../../done/unified_backend/card.md)                                     | done                                               |
-| Provider-trace plane (first to be absorbed) | [`openrouter_observability`](../../done/openrouter_observability/card.md)                   | done                                               |
-| Source-identity consumer: logs              | [`proxy_log_hygiene`](../../done/proxy_log_hygiene/card.md)                                 | done                                               |
-| Source-identity consumer: remote reconcile  | [`openrouter_remote_reconciliation`](../../paused/openrouter_remote_reconciliation/card.md) | paused after Phase 0 pending source-key foundation |
+| Concern                                     | Owner card                                                                      | Status                                                |
+| ------------------------------------------- | ------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| Plane **structure** (direction: up/down)    | [`upstream_downstream_ledgers`](../../done/upstream_downstream_ledgers/card.md) | done                                                  |
+| Source-identity **key** (`backend_id`)      | [`unified_backend`](../../done/unified_backend/card.md)                         | done                                                  |
+| Provider-trace plane (first to be absorbed) | [`openrouter_observability`](../../done/openrouter_observability/card.md)       | done                                                  |
+| Source-identity consumer: logs              | [`proxy_log_hygiene`](../../done/proxy_log_hygiene/card.md)                     | done                                                  |
+| Source-identity consumer: remote reconcile  | [`backend_remote_reconciliation`](../backend_remote_reconciliation/card.md)     | doing: PR 1 generic refactor in flight, PR 2 MVP next |
 
 **Contract (the consistency anchor):**
 
@@ -91,6 +91,11 @@ independent sibling rewrites.
 "to be absorbed/keyed" concerns plus structure are now done; only `openrouter_remote_reconciliation` remains live
 (paused). The epic stays in `doing/` as the coordinator pending the next-member decision. Contract item 4 still binds:
 remote reconciliation must build on the shipped `core/usage/measurement.py` + `backend_id` seam, not re-author it.
+
+**Update (2026-06-19, next member chosen):** resumed the paused remote-reconcile member generically as
+[`backend_remote_reconciliation`](../backend_remote_reconciliation/card.md) (`paused/ -> doing/`); OpenRouter is the
+first adapter, not the feature. It ships as PR 1 (generic refactor removing the last `provider_name == "openrouter"`
+coupling -- contract item 2) then PR 2 (MVP single-id `forge backend reconcile`). Contract item 4 still binds.
 
 ## Not in scope here
 

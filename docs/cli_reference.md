@@ -110,11 +110,11 @@ default to the parent cache; `edit`/`diff` resolve a child (inferred when the pa
 
 ### Provider trace
 
-| Command                                     | Purpose                                                                                       |
-| ------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| `forge provider trace list`                 | List recent OpenRouter traces (`--session`, `--root-run-id`, `--period`, `--limit`, `--json`) |
-| `forge provider trace show <request_id>`    | Show one trace record (`--json`)                                                              |
-| `forge provider trace explain <request_id>` | Local-only provenance narrative for a request (`--json`)                                      |
+| Command                                     | Purpose                                                                                     |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `forge provider trace list`                 | List recent provider traces (`--session`, `--root-run-id`, `--period`, `--limit`, `--json`) |
+| `forge provider trace show <request_id>`    | Show one trace record (`--json`)                                                            |
+| `forge provider trace explain <request_id>` | Local-only provenance narrative for a request (`--json`)                                    |
 
 Metadata-only, owner-only diagnostics read from downstream telemetry under `~/.forge/telemetry/downstream/`. `explain`
 answers "what happened to this request?" from local records only -- no remote lookup. `--session` matches the hashed

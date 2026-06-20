@@ -622,7 +622,7 @@ class TestCorrelationHeaders:
         run_id = env[FORGE_RUN_ID_VAR]
         assert f"{self._RUN_H}: {run_id}" in env[self._H]
 
-    # --- Provider session/command headers (openrouter_observability Phase 1) ---
+    # --- Provider session/command headers ---
 
     def test_session_header_falls_back_to_run_id_without_session_name(self) -> None:
         # No FORGE_SESSION/FORGE_COMMAND -> X-Forge-Session is still emitted via the

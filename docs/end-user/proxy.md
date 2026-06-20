@@ -636,13 +636,15 @@ configured block.
 
 ## Provider trace (request lifecycle diagnostics)
 
-Provider lifecycle metadata answers one question after a timeout: *what happened to this OpenRouter request?* It was
-born from an incident -- a supervised fork's checks timed out before the final streaming usage chunk and left no trace
+Provider lifecycle metadata answers one question after a timeout: *what happened to this provider request?* It was born
+from an incident -- a supervised fork's checks timed out before the final streaming usage chunk and left no trace
 locally or in OpenRouter's dashboard.
 
 Records live inside owner-only downstream telemetry under `~/.forge/telemetry/downstream/` and carry **no** prompt,
 completion, tool output, or request body -- only lifecycle/correlation evidence (request id, proxy, model, provider
-generation id, stream flags, disconnect, and whether local cost was seen). Direct-OpenRouter only.
+generation id, stream flags, disconnect, and whether local cost was seen). Written only for routes whose backend source
+declares provider-trace capability (OpenRouter enabled in v1); gateway-routed OpenRouter through non-capable sources
+writes nothing.
 
 ```bash
 # Recent traces (today by default; --period today|week|month|all)
@@ -676,16 +678,19 @@ The same three commands are available in-session as `%provider trace list|show|e
   which is different from a genuine `$0`.
 - Remote OpenRouter reconciliation is intentionally out of scope here -- this surface is local-only by design.
 
-**Recording the session id upstream (opt-in).** `provider_trace.inject_openrouter_user` (per-proxy, **default off**)
-makes source-capable proxied routes carry the Forge session grouping id in the OpenAI-standard `user` field, so a
-session's (or a fork's) requests are **recorded in OpenRouter's `/generation` record for account-side lookup**. The
-value is the hashed `forge_sess_<hash>[_role]` id (or a `forge_run_<hash>` fallback) -- never the raw session name.
-Enable it per proxy and restart the proxy:
+**Recording the session id upstream (opt-in).** `provider_trace.inject_provider_user` (per-proxy, **default off**) makes
+source-capable proxied routes carry the Forge session grouping id in the OpenAI-standard `user` field, so a session's
+(or a fork's) requests are **recorded in the provider's account-side record (e.g. OpenRouter's `/generation` record) for
+account-side lookup**. The value is the hashed `forge_sess_<hash>[_role]` id (or a `forge_run_<hash>` fallback) -- never
+the raw session name. Enable it per proxy and restart the proxy:
 
 ```yaml
 provider_trace:
-  inject_openrouter_user: true # default false; source-capability gated
+  inject_provider_user: true # default false; source-capability gated
 ```
+
+The key was renamed from `inject_openrouter_user`; the old name is still honored with a one-time deprecation warning, so
+existing `proxy.yaml` files keep working until you rename it.
 
 Observability only (not routing -- recognition is stickiness-neutral); non-capable gateway routes stay quiet, and direct
 `core.llm` callers (plan-check, curation) are unchanged this release.

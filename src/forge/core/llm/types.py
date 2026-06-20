@@ -179,7 +179,7 @@ class ProviderTraceMeta(BaseModel):
     provider_response_id: str | None = None  # body.id (non-streaming)
     provider_generation_id: str | None = None  # OpenRouter gen-... (chunk.id / body.id)
     provider_request_id: str | None = None  # upstream request-id header, when present
-    selected_provider: str | None = None  # the upstream OpenRouter routed to
+    selected_provider: str | None = None  # the upstream the provider routed to
     headers: dict[str, str] | None = None  # allowlisted correlation headers only (never auth)
     provider_session_id: str | None = None  # the session/user value Forge sent, if recognized
 

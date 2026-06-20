@@ -1,6 +1,6 @@
 """Regression: the provider-trace plane is metadata-only — never prompt/completion/body.
 
-Bug class: silent privacy leak. The provider-trace plane (openrouter_observability Phase 3)
+Bug class: silent privacy leak. The provider-trace plane
 exists to answer "what happened to this provider request?" from correlation metadata. If a
 body, prompt, completion, tool I/O, or a raw auth header ever reached a persisted record, the
 plane would become a second copy of sensitive payload on disk.
@@ -61,7 +61,7 @@ def test_persisted_record_carries_no_payload_or_secret_headers(tmp_path, monkeyp
     # A caller hands provider_meta whose headers carry secrets (simulating a future bypass of
     # the Phase 2 allowlist). The persisted record must drop them.
     ptl.record_provider_trace(
-        provider_name="openrouter",
+        backend_id="openrouter",
         request_mode="streaming",
         proxy_id="crimson-apricot",
         mapped_model="openai/gpt-5.5",

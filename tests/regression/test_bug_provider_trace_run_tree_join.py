@@ -28,7 +28,7 @@ pytestmark = pytest.mark.regression
 
 def _record(request_id: str, root: str) -> None:
     ptl.record_provider_trace(
-        provider_name="openrouter",
+        backend_id="openrouter",
         request_mode="streaming",
         proxy_id="p",
         mapped_model="openai/gpt-5.5",

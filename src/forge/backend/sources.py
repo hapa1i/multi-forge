@@ -92,7 +92,7 @@ class ModelSourceCapabilities:
 
     auth_probe: bool = True
     provider_trace: bool = False
-    openrouter_user_grouping: bool = False
+    provider_user_grouping: bool = False
 
 
 @dataclass(frozen=True)
@@ -272,7 +272,7 @@ BUILTIN_MODEL_SOURCES: tuple[ModelSource, ...] = (
             default_url="https://openrouter.ai/api/v1",
         ),
         credential_ids=("openrouter",),
-        capabilities=ModelSourceCapabilities(provider_trace=True, openrouter_user_grouping=True),
+        capabilities=ModelSourceCapabilities(provider_trace=True, provider_user_grouping=True),
         template_names=OPENROUTER_TEMPLATE_NAMES,
     ),
     ModelSource(

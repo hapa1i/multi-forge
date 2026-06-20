@@ -311,7 +311,7 @@ class TestReportedCostThreading:
 
 class TestProviderMetaThreading:
     """provider_meta rides into the OpenAI dict as an internal carrier, separate from the
-    synthetic chatcmpl id (openrouter_observability Phase 2)."""
+    synthetic chatcmpl id."""
 
     def test_core_response_carries_provider_meta(self) -> None:
         adapter = _make_adapter_with_mock_client()
@@ -522,13 +522,13 @@ async def test_streaming_completion_forwards_user_agent() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Phase 5: _forge_user -> extra["openai"]["user"] forwarding
+# _forge_user -> extra["openai"]["user"] forwarding (provider-user grouping)
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
 async def test_create_completion_forwards_forge_user() -> None:
-    """`_forge_user` from the server flows to extra["openai"]["user"] (Phase 5)."""
+    """`_forge_user` from the server flows to extra["openai"]["user"]."""
     adapter = _make_adapter_with_mock_client()
     mock_complete = AsyncMock(
         return_value=CompletionResponse(
@@ -554,7 +554,7 @@ async def test_create_completion_forwards_forge_user() -> None:
 
 @pytest.mark.asyncio
 async def test_streaming_completion_forwards_forge_user() -> None:
-    """`_forge_user` forwarding also works on the streaming path (Phase 5)."""
+    """`_forge_user` forwarding also works on the streaming path."""
     adapter = _make_adapter_with_mock_client()
     captured_hyperparams = []
 

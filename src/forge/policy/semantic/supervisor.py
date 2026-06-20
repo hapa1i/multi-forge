@@ -497,7 +497,7 @@ def run_supervisor_check(
     tracking_url = base_url
 
     # Stamp provider-trace identity so the fork's proxied requests group under this
-    # session + the supervisor role in OpenRouter (Phase 1). No session name -> the
+    # session + the supervisor role in the backend provider's dashboard. No session name -> the
     # header derivation falls back to forge_run_<hash>.
     spawn_env = {FORGE_COMMAND_VAR: "supervisor"}
     if context.session_name:

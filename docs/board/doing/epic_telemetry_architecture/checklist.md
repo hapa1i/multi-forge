@@ -1,13 +1,13 @@
 # Epic: Telemetry Architecture -- Coordination Checklist
 
-Branch: `unified_backend`. Card: [card.md](card.md).
+Branch: `backend_remote_reconciliation` (current coordination). Card: [card.md](card.md).
 
 ## Current Focus
 
 `unified_backend` has merged (PR #39) and closed to `done/`, so `backend_id` is the canonical downstream source key. The
-epic stays the active planning cursor with one open decision: resume `openrouter_remote_reconciliation` (paused after
-Phase 0) as the next member, or run another source-key follow-up first. The epic stays in `doing/` until that is chosen
-and the last live member ships.
+next-member decision is made: `backend_remote_reconciliation` (resumed generically from the paused
+`openrouter_remote_reconciliation`) is the active member, shipping as PR 1 (generic refactor) then PR 2 (MVP). The epic
+stays in `doing/` until that last live member ships.
 
 ## Active Coordination
 
@@ -54,9 +54,10 @@ done. The next-member decision is now the sole open coordination item below.
 
 - [x] Keep `unified_backend` scoped to source identity and downstream attribution; do not fold remote reconciliation
   implementation into this branch.
-- [ ] `unified_backend` has landed — decide whether `openrouter_remote_reconciliation` resumes next (it was paused
-  pending exactly this `backend_id` foundation) or whether another source-key follow-up runs first. Maintainer decision
-  pending.
+- [x] `unified_backend` has landed — resume the remote-reconcile member next. Resumed it generically as
+  `backend_remote_reconciliation` (OpenRouter = first adapter), moved `paused/ -> doing/`, and updated both sides of the
+  epic \<-> member link.
+- [x] Update the member table + sequencing notes in [card.md](card.md) for the resumed member.
 
 ## Closeout
 

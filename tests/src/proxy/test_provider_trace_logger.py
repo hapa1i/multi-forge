@@ -1,4 +1,4 @@
-"""Unit tests for the Phase 3 provider-trace plane (write/read/gate/prune/perms)."""
+"""Unit tests for the provider-trace plane (write/read/gate/prune/perms)."""
 
 from __future__ import annotations
 
@@ -26,8 +26,10 @@ def _isolated_traces_home(tmp_path, monkeypatch):
     downstream_telemetry._warned_newer_schema = False
 
 
-def _record(provider_name: str = "openrouter", **kw: Any) -> None:
+def _record(backend_id: str | None = "openrouter", **kw: Any) -> None:
     # dict[str, Any] so the **splat into record_provider_trace's typed kwargs typechecks.
+    # backend_id defaults to the capable "openrouter" source: the source-capability gate is the
+    # only thing that turns provider-trace writes on now (no provider-name fallback).
     params: dict[str, Any] = dict(
         request_mode="streaming",
         request_id="req-1",
@@ -46,7 +48,7 @@ def _record(provider_name: str = "openrouter", **kw: Any) -> None:
         latency_ms=42.0,
     )
     params.update(kw)
-    ptl.record_provider_trace(provider_name=provider_name, **params)
+    ptl.record_provider_trace(backend_id=backend_id, **params)
 
 
 def _downstream_dir():
@@ -58,7 +60,7 @@ def _downstream_path():
 
 
 class TestGateAndRoundTrip:
-    def test_openrouter_record_round_trips_typed(self):
+    def test_record_round_trips_typed(self):
         _record()
         recs = ptl.read_provider_traces()
         assert len(recs) == 1
@@ -66,7 +68,7 @@ class TestGateAndRoundTrip:
         assert isinstance(rec, ptl.ProviderTraceRecord)
         assert rec.request_id == "req-1"
         assert rec.proxy_id == "crimson-apricot"
-        assert rec.backend_id is None
+        assert rec.backend_id == "openrouter"
         assert rec.mapped_model == "openai/gpt-5.5"
         assert rec.provider_generation_id == "gen-xyz"
         assert rec.provider_session_id == "forge_sess_abc_supervisor"
@@ -74,20 +76,22 @@ class TestGateAndRoundTrip:
         assert rec.timeout_seen is False  # never proxy-populated
 
     def test_source_capability_can_enable_trace(self):
-        _record(provider_name="litellm", backend_id="openrouter")
+        _record(backend_id="openrouter")
         recs = ptl.read_provider_traces()
         assert len(recs) == 1
         assert recs[0].backend_id == "openrouter"
 
-    def test_non_capable_source_suppresses_openrouter_gateway_route(self):
-        _record(provider_name="openrouter", backend_id="litellm-remote")
+    def test_non_capable_source_suppresses_trace(self):
+        # litellm-remote is a real source that does not declare provider-trace capability, so an
+        # otherwise well-formed downstream record writes no trace.
+        _record(backend_id="litellm-remote")
         assert ptl.read_provider_traces() == []
 
-    def test_litellm_gateway_route_writes_no_trace_by_design(self):
-        # A source must opt in to provider-trace. Gateway-routed OpenRouter
-        # (LiteLLM -> OpenRouter) and unknown routes write nothing by default.
-        _record(provider_name="litellm")
-        _record(provider_name="unknown")
+    def test_absent_or_unknown_source_writes_no_trace_by_design(self):
+        # A source must opt in to provider-trace via a capability. A route with no backend_id
+        # (proxy.yaml without source:) and unknown sources write nothing by default.
+        _record(backend_id=None)
+        _record(backend_id="unknown-source")
         assert ptl.read_provider_traces() == []
         assert not _downstream_dir().is_dir() or not list(_downstream_dir().glob("*.jsonl"))
 

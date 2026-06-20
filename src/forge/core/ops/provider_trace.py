@@ -1,4 +1,4 @@
-"""Shared provider-trace operations (command-core, openrouter_observability Phase 4).
+"""Shared provider-trace operations (command-core).
 
 UI-agnostic read surface over the provider-trace plane (the fourth telemetry plane,
 ``forge.proxy.provider_trace_logger``). Invoked from both:
