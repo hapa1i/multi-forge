@@ -2,7 +2,7 @@
 
 Spawns the REAL sidecar image + entrypoint on the HOST. A `claude` sleeper keeps
 the container alive after the entrypoint starts the proxy under `--proxy-id`, so we
-can assert the two end-to-end properties the slice promises:
+can assert the end-to-end properties the slice promises:
 
 1. In-container ``GET /`` reports the per-proxy intercept mode — proving the proxy
    loaded the overlay from the *read-only* ``proxy.yaml`` mount AND skipped
@@ -14,6 +14,10 @@ can assert the two end-to-end properties the slice promises:
    usage mount after the container stops. In sidecar mode the in-container supervisor +
    workflow verbs are the only writers of these events, so without the mount a sidecar
    session is invisible to ``forge activity`` and the session-end summary.
+4. The global ``~/.forge/config.yaml`` is mounted read-only, so the in-container
+   ``get_runtime_config()`` reads host runtime settings -- here the
+   ``provider_trace.inject_provider_user`` toggle (openrouter_user_direct_callers). Without
+   this mount the toggle would silently revert to its default inside the sidecar.
 
 The container always runs under the host ``--user uid:gid`` mapping (the Linux
 launch path), so this also exercises arbitrary-uid support on macOS: HOME=/root +
@@ -86,6 +90,11 @@ def test_sidecar_proxy_id_overlay_and_host_visible_audit_and_usage(tmp_path: Pat
     telemetry_dir.mkdir(parents=True, exist_ok=True)
     usage_dir.mkdir(parents=True, exist_ok=True)
 
+    # Global runtime config with the provider-user toggle on; the sidecar must mount this
+    # read-only so the in-container get_runtime_config() reads it (see assertion at 4c).
+    config_file = forge_home / "config.yaml"
+    config_file.write_text("provider_trace:\n  inject_provider_user: true\n")
+
     # 2) `claude` sleeper keeps the container up after the entrypoint starts the proxy.
     sleeper = tmp_path / "claude"
     sleeper.write_text("#!/bin/sh\nexec sleep 300\n")
@@ -95,8 +104,8 @@ def test_sidecar_proxy_id_overlay_and_host_visible_audit_and_usage(tmp_path: Pat
     _docker("rm", "-f", CONTAINER)
     # NOTE: this intentionally mirrors the env + mounts that
     # forge.sidecar.container.run_sidecar_session / _ensure_audit_plumbing_mounts build
-    # (FORGE_PROXY_ID, FORGE_HOME, proxies ro + audit/costs/usage/telemetry rw). We
-    # hand-roll `docker run` because the real helper uses `-it` + `exec claude`, which
+    # (FORGE_PROXY_ID, FORGE_HOME, proxies ro + config.yaml ro + audit/costs/usage/telemetry
+    # rw). We hand-roll `docker run` because the real helper uses `-it` + `exec claude`, which
     # a headless test can't drive. If you change the helper's env/mounts, update this
     # list (and its unit tests) too.
     run_cmd = [
@@ -120,6 +129,8 @@ def test_sidecar_proxy_id_overlay_and_host_visible_audit_and_usage(tmp_path: Pat
         "ANTHROPIC_API_KEY=test-not-real",
         "-v",
         f"{proxy_dir}:/root/.forge/proxies/{PROXY_ID}:ro",
+        "-v",
+        f"{config_file}:/root/.forge/config.yaml:ro",
         "-v",
         f"{audit_dir}:/root/.forge/audit:rw",
         "-v",
@@ -192,6 +203,23 @@ def test_sidecar_proxy_id_overlay_and_host_visible_audit_and_usage(tmp_path: Pat
             ),
         )
         assert usage_write.returncode == 0, f"in-container usage write failed: {usage_write.stderr}"
+
+        # 4c) The in-container runtime reads the global toggle from the read-only
+        # config.yaml mount. Proves the sidecar carries ~/.forge/config.yaml so
+        # provider_trace.inject_provider_user (and any other runtime setting) is in effect
+        # inside the container, not silently reverted to its default.
+        toggle_read = _docker(
+            "exec",
+            CONTAINER,
+            "/forge/.venv/bin/python",
+            "-c",
+            "from forge.runtime_config import get_runtime_config; "
+            "print(get_runtime_config().provider_trace.inject_provider_user)",
+        )
+        assert toggle_read.returncode == 0, f"in-container config read failed: {toggle_read.stderr}"
+        assert (
+            toggle_read.stdout.strip() == "True"
+        ), f"sidecar did not read the toggle from the mounted config.yaml: {toggle_read.stdout!r}"
     finally:
         _docker("rm", "-f", CONTAINER)
 

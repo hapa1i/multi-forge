@@ -1,9 +1,10 @@
 # OpenRouter `user` injection for direct `core.llm` callers
 
-**Status**: Doing — active on branch `feat/openrouter-user-direct-callers`. See [`checklist.md`](checklist.md) for
-execution status and the resolved flag-home decision. Spun out of `openrouter_observability` Phase 5 (2026-06-16), which
-shipped `user`-field injection on the **proxied** path only. This card extends the same observability to Forge's
-**direct** OpenRouter callers.
+**Status**: Done (2026-06-20) — shipped on branch `feat/openrouter-user-direct-callers`. See
+[`checklist.md`](checklist.md) for the execution record and the resolved flag-home decision. Spun out of
+`openrouter_observability` Phase 5 (2026-06-16), which shipped `user`-field injection on the **proxied** path only; this
+card extended the same observability to Forge's **direct** OpenRouter callers and unified the toggle into a single
+global `~/.forge/config.yaml` setting governing both planes.
 
 ## Problem
 

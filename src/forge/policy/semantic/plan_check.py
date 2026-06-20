@@ -428,9 +428,7 @@ def run_plan_check(
         # OpenRouter `user` grouping: opt-in (global toggle, resolved inside) and
         # OpenRouter-only -- the field is an OpenRouter feature, so gate on the route.
         provider_user = (
-            resolve_direct_provider_user("plan-check")
-            if _effective_provider(model, provider) == "openrouter"
-            else None
+            resolve_direct_provider_user("plan-check") if _effective_provider(model, provider) == "openrouter" else None
         )
         # Compose hyperparams by chaining the additive wrappers: each deep-copies and
         # adds only its own key, preserving siblings. Stays None when nothing applies,

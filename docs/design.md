@@ -1002,10 +1002,12 @@ aborted stream is not remotely retrievable, which is why the plane answers from 
 `/generation` lookup). The read surface is `forge provider trace list|show|explain` (op-backed
 `core/ops/provider_trace.py`; `%provider trace` mirrors it in-session); `explain` answers the incident's five questions
 from the trace plus a bounded (±5m) cost-plane join for confidence, never a remote lookup. An opt-in
-`provider_trace.inject_provider_user` (default off) also records the Forge session grouping id in the provider's
-top-level `user` field for source-capable proxied routes — probe 3 confirmed `user` (not a custom `session_id`) survives
-in the indexed `/generation` record for account-side lookup; observability only (probe 4 stickiness-neutral), and direct
-`core.llm` callers (plan-check, curation) stay a documented follow-up.
+`provider_trace.inject_provider_user` (default off, a **global** toggle in `~/.forge/config.yaml`) also records the
+Forge session grouping id in the provider's top-level `user` field for OpenRouter routes — probe 3 confirmed `user` (not
+a custom `session_id`) survives in the indexed `/generation` record for account-side lookup; observability only (probe 4
+stickiness-neutral). One toggle governs **both** proxied routes (server-gated `_provider_user_value`) and direct
+`core.llm` callers (plan-check, curation); both planes derive the id from the same `derive_provider_session_id` hash, so
+a run's proxied and direct OpenRouter calls group identically account-side.
 
 Each proxy may define:
 
@@ -1018,8 +1020,11 @@ costs:
 provider_trace:
   retention_days: 14   # diagnostics, not spend truth; matches the audit plane
   max_total_mb: 512
-  inject_provider_user: false  # opt-in: record the session id in the provider's `user` field
 ```
+
+`provider_trace` in `proxy.yaml` is **retention-only**. The user-injection opt-in moved to the global
+`~/.forge/config.yaml` (`provider_trace.inject_provider_user`, governing both proxied and direct routes); a stale
+`inject_provider_user` left in `proxy.yaml` loads with a one-time relocation warning and is ignored.
 
 Caps are enforced after each completed request, from accumulated recorded spend: a request may cross a cap and complete,
 then the next request is blocked once spend has reached the cap. Because spend accrues only from reported cost, **dollar

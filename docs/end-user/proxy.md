@@ -678,22 +678,24 @@ The same three commands are available in-session as `%provider trace list|show|e
   which is different from a genuine `$0`.
 - Remote OpenRouter reconciliation is intentionally out of scope here -- this surface is local-only by design.
 
-**Recording the session id upstream (opt-in).** `provider_trace.inject_provider_user` (per-proxy, **default off**) makes
-source-capable proxied routes carry the Forge session grouping id in the OpenAI-standard `user` field, so a session's
-(or a fork's) requests are **recorded in the provider's account-side record (e.g. OpenRouter's `/generation` record) for
-account-side lookup**. The value is the hashed `forge_sess_<hash>[_role]` id (or a `forge_run_<hash>` fallback) -- never
-the raw session name. Enable it per proxy and restart the proxy:
+**Recording the session id upstream (opt-in).** `provider_trace.inject_provider_user` (**global, default off**) makes
+OpenRouter routes carry the Forge session grouping id in the OpenAI-standard `user` field, so a session's (or a fork's)
+requests are **recorded in the provider's account-side record (e.g. OpenRouter's `/generation` record) for account-side
+lookup**. The value is the hashed `forge_sess_<hash>[_role]` id (or a `forge_run_<hash>` fallback) -- never the raw
+session name. It is one switch, set in `~/.forge/config.yaml`:
 
-```yaml
-provider_trace:
-  inject_provider_user: true # default false; source-capability gated
+```bash
+forge config set provider_trace.inject_provider_user=true
 ```
 
-The key was renamed from `inject_openrouter_user`; the old name is still honored with a one-time deprecation warning, so
-existing `proxy.yaml` files keep working until you rename it.
+One toggle governs both **proxied** routes and Forge's **direct** `core.llm` calls (plan-check, transfer curation), so a
+run's calls group together upstream regardless of path. Restart any running proxy after enabling so it re-reads the
+toggle. Observability only (not routing -- recognition is stickiness-neutral); non-OpenRouter routes stay quiet.
 
-Observability only (not routing -- recognition is stickiness-neutral); non-capable gateway routes stay quiet, and direct
-`core.llm` callers (plan-check, curation) are unchanged this release.
+> **Moved from `proxy.yaml`.** This was previously a per-proxy `proxy.yaml` key. It is now global in
+> `~/.forge/config.yaml`. A stale `provider_trace.inject_provider_user` left in `proxy.yaml` still loads but is
+> **ignored** with a one-time warning naming the `forge config set` command above. `proxy.yaml`'s `provider_trace` now
+> holds retention keys only (`retention_days`, `max_total_mb`).
 
 ### Remote reconciliation
 

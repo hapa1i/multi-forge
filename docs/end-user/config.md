@@ -200,6 +200,19 @@ forge config set upstream_event_volume=all          # also record successes/cach
 Use `all` only when you want a complete local operation log for debugging; routine deterministic successes can be
 high-volume.
 
+**Provider session grouping (OpenRouter).** Off by default. When on, Forge stamps a hashed session grouping id into the
+OpenAI-standard `user` field on OpenRouter calls, so a session's (or fork's) requests are grouped in OpenRouter's
+account-side `/generation` records:
+
+```bash
+forge config set provider_trace.inject_provider_user=true
+```
+
+One toggle governs both proxied routes and Forge's direct calls (plan-check, transfer curation). The value is a hash
+(`forge_sess_<hash>[_role]`), never the raw session name; it is observability-only and does not affect routing. Restart
+any running proxy after changing it. (This setting was previously a per-proxy `proxy.yaml` key; a stale copy there now
+loads with a one-time warning and is ignored.)
+
 ---
 
 ## Secrets (`forge authentication`)
