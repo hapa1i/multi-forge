@@ -135,7 +135,8 @@ protocol already declares the window methods + per-path credential fields, so no
 
 - [x] Tick final checklist items with verification.
 - [x] change_log entries: PR 1 (2026-06-19) and PR 2 (2026-06-20) -- newest-first.
-- [ ] Promote durable lessons to `impl_notes.md` after human review (candidate below; left unticked pending review).
+- [x] Promote durable lessons to `impl_notes.md` after human review (promoted 2026-06-20: registry-presence capability +
+  total external-data coercers; plus the review-agent worktree-isolation hazard).
 - [x] Verify design/end-user docs match shipped behavior (cli_reference, design_appendix §A.14, end-user/proxy.md
   updated in PR 1 + PR 2).
 - [x] Move `doing/backend_remote_reconciliation -> done/backend_remote_reconciliation` after the PR 2 merge (this

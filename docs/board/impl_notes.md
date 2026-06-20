@@ -64,6 +64,35 @@ telemetry ownership:
   capability gates (provider-trace, OpenRouter user) already fail safe on an unknown id. The strict reject-on-unknown
   contract is scoped to the **template** load path only (`_apply_template_source`), where the value originates in-repo.
 
+### Backend remote reconciliation: registry capability + total external-data coercers (shipped)
+
+Shipped 2026-06-20 (`backend_remote_reconciliation`, PRs #41/#42/#43). `forge backend reconcile` joins one local
+downstream trace to one remote account-side record via an adapter under `src/forge/backend/remote/`.
+
+- **Remote-reconcile capability = adapter-registry presence, not a flag.** A source is reconcilable iff
+  `forge.backend.remote.get_remote_adapter(source_id)` resolves — there is deliberately no `ModelSourceCapabilities`
+  field for it. A flag could drift from the registry, and it keeps an account-side *read* concern out of the
+  proxy-*write*-path capability struct. Add a backend by registering an adapter, not by setting a flag.
+- **The remote read path is external data: coercion must be total, classification never a misleading success.**
+  `httpx`/`json.loads` parse bare `NaN`/`Infinity`/`1e400` by default, so `round()`/`int()` on a 200 body can raise. The
+  error-vs-data invariant requires every surprising-but-parseable response to become
+  `RemoteRecord(outcome="unavailable")`, never an exception (`RemoteAdapterError` is reserved for adapter bugs / config
+  faults, and never embeds a key or body). Concretely in `openrouter.py`: `_as_cost_micros`/`_as_int` drop
+  non-finite/overflow/bool; `_record_from_body` accepts only a generation object (a dict, optionally under a dict `data`
+  wrapper) and maps any other shape (`{"data": []}`, a JSON array/string/number) to `unavailable`, not an empty `found`.
+  Regression: `tests/regression/test_bug_backend_reconcile_malformed_200.py`.
+- **Comparative buckets need both sides.** `missing-remote`/`missing-local` require a local anchor *and* a remote
+  answer; single-sided lookups yield only `remote`/`not-queryable`. Local cost/tokens are never overwritten by remote
+  figures (kept side by side with provenance).
+
+### Review fan-out must not run write-capable agents in the live working tree
+
+Recurring hazard (hit 2026-06-20): an adversarial-review workflow run with `general-purpose` agents (tool access `*`)
+edited source mid-review even though instructed to only return findings; `git checkout` then carried the uncommitted
+change across branches and `git add -A` swept it into an unrelated commit. Run review/finder fan-out with
+`isolation: 'worktree'` or the read-only `Explore` agent type so finders physically cannot mutate the branch under
+review, and `git status` before every `git add -A`.
+
 ### Memory System Architecture (shipped)
 
 Two primitives: passports select docs (project-scoped, git-tracked frontmatter); session activation decides whether the
