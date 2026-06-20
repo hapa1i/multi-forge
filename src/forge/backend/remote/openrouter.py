@@ -106,30 +106,28 @@ class OpenRouterRemoteAdapter:
         )
 
     def _record_from_body(self, remote_id: str, endpoint: str, resp: Any) -> RemoteRecord:
+        def _unavailable(detail: str) -> RemoteRecord:
+            return RemoteRecord(
+                remote_id=remote_id, outcome="unavailable", endpoint=endpoint, http_status=200, detail=detail
+            )
+
         try:
             payload = resp.json()
         except ValueError:
-            return RemoteRecord(
-                remote_id=remote_id,
-                outcome="unavailable",
-                endpoint=endpoint,
-                http_status=200,
-                detail="malformed response body",
-            )
+            return _unavailable("malformed response body")
+
         # A 200 that wraps an error envelope ({"error": {...}} with no generation "data") is not a
         # real record -- classify it as unavailable so it never renders as a misleading join.
         if isinstance(payload, dict) and "error" in payload and not isinstance(payload.get("data"), dict):
-            return RemoteRecord(
-                remote_id=remote_id,
-                outcome="unavailable",
-                endpoint=endpoint,
-                http_status=200,
-                detail="backend returned a 200 error envelope",
-            )
+            return _unavailable("backend returned a 200 error envelope")
 
-        data = payload.get("data") if isinstance(payload, dict) else None
+        # Accept only a generation object: a top-level dict, optionally under a "data" wrapper. A
+        # non-dict body or a non-dict "data" wrapper is malformed -- never a (misleading) empty "found".
+        if not isinstance(payload, dict):
+            return _unavailable("malformed response body")
+        data = payload.get("data", payload)
         if not isinstance(data, dict):
-            data = payload if isinstance(payload, dict) else {}
+            return _unavailable("malformed response body")
 
         # Allowlisted metadata reads only -- content-like fields are never touched, so prompt /
         # completion text cannot enter the record even if the body carries it. The coercers are
@@ -140,13 +138,7 @@ class OpenRouterRemoteAdapter:
             input_tokens = _as_int(data.get("native_tokens_prompt"), data.get("tokens_prompt"))
             output_tokens = _as_int(data.get("native_tokens_completion"), data.get("tokens_completion"))
         except (ValueError, TypeError, OverflowError):
-            return RemoteRecord(
-                remote_id=remote_id,
-                outcome="unavailable",
-                endpoint=endpoint,
-                http_status=200,
-                detail="unparseable usage fields",
-            )
+            return _unavailable("unparseable usage fields")
         cancelled = data.get("cancelled")
         return RemoteRecord(
             remote_id=str(data.get("id") or remote_id),
