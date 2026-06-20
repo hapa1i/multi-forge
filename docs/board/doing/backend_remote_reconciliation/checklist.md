@@ -7,8 +7,8 @@ feature, branched from `main` after PR 1 merges).
 
 ## Current Focus
 
-PR 1 (generic refactor) is implemented on `backend_remote_reconciliation`; verifying and opening the PR. PR 2 (the
-`forge backend reconcile` MVP) follows on a fresh branch after PR 1 merges.
+PR 1 merged (#41). PR 2 (the `forge backend reconcile` MVP) is implemented on `backend_reconcile_mvp`, hardened against
+a 32-agent adversarial review, and ready to open. Closeout (lane move) follows the PR 2 merge.
 
 ## Resume / Supersession Note (2026-06-19)
 
@@ -53,52 +53,60 @@ PR 1 (generic refactor) is implemented on `backend_remote_reconciliation`; verif
 
 ### Adapter registry + DTOs (`src/forge/backend/remote/base.py`)
 
-- [ ] `RemoteOutcome = Literal["found","not_found","not_authorized","unavailable"]`;
+- [x] `RemoteOutcome = Literal["found","not_found","not_authorized","unavailable"]`;
   `KeyClass = Literal["normal","management"]`.
-- [ ] `RemoteCapability(single_lookup, window_activity, window_analytics, single_lookup_key, single_lookup_credential_id, window_key, window_credential_id)`
+- [x] `RemoteCapability(single_lookup, window_activity, window_analytics, single_lookup_key, single_lookup_credential_id, window_key, window_credential_id)`
   -- per-path credential ids.
-- [ ] `RemoteRecord(remote_id, outcome, endpoint, key_class, http_status, remote_input/output_tokens, remote_cost_micros, remote_provider, cancelled, remote_request_id, detail)`
+- [x] `RemoteRecord(remote_id, outcome, endpoint, key_class, http_status, remote_input/output_tokens, remote_cost_micros, remote_provider, cancelled, remote_request_id, detail)`
   -- generic, metadata-only; `detail` never carries a key/body.
-- [ ] `BackendRemoteAdapter` protocol (`source_id`, `capabilities()`, `lookup_remote_record(...)`; `fetch_activity(...)`
+- [x] `BackendRemoteAdapter` protocol (`source_id`, `capabilities()`, `lookup_remote_record(...)`; `fetch_activity(...)`
   declared for the follow-on). Registry `_REMOTE_ADAPTERS`, `get_remote_adapter` (raises `RemoteAdapterNotFoundError`),
   `has_remote_adapter`, `list_remote_adapter_ids`.
-- [ ] Error-vs-data: expected remote/network failures return a `RemoteRecord(outcome=...)`, never raise;
+- [x] Error-vs-data: expected remote/network failures return a `RemoteRecord(outcome=...)`, never raise;
   `RemoteAdapterError` only for adapter bugs / config faults.
 
 ### OpenRouter adapter (`src/forge/backend/remote/openrouter.py`)
 
-- [ ] Narrow `httpx` client (NOT the OpenAI-SDK chat client). Key via
+- [x] Narrow `httpx` client (NOT the OpenAI-SDK chat client). Key via
   `resolve_env_or_credential_with_source("OPENROUTER_API_KEY")` (provenance only); base URL from the source endpoint.
-- [ ] `GET /api/v1/generation?id=<remote-id>` with the normal key; whitelist metadata fields only; never call
+- [x] `GET /api/v1/generation?id=<remote-id>` with the normal key; whitelist metadata fields only; never call
   `/generation/content`; drop content-like fields at parse; normalize `total_cost` USD -> micros; map `cancelled`.
-- [ ] HTTP/network -> outcome as data: 200->found (carry cancelled), 404->not_found, 401/403->not_authorized, all other
+- [x] HTTP/network -> outcome as data: 200->found (carry cancelled), 404->not_found, 401/403->not_authorized, all other
   4xx (incl. 429) + 5xx + timeout + connection -> unavailable (carry status + sanitized detail). Missing key ->
   not_authorized via pre-check (no HTTP call).
+- [x] Review hardening: total numeric coercers (`_as_cost_micros` / `_as_int` drop NaN/Infinity/overflow/bool, never
+  raise) + a parse net so any surprising 200 body becomes `unavailable`; a 200 error-envelope (`{"error":...}`) ->
+  `unavailable`, not a false `found`.
 
 ### Generic op (`src/forge/core/ops/backend_reconcile.py`)
 
-- [ ] `reconcile_generation(*, ctx, source_id, request_id=None, remote_id=None, timeout_s=5.0) -> ReconcileResult` +
+- [x] `reconcile_generation(*, ctx, source_id, request_id=None, remote_id=None, timeout_s=5.0) -> ReconcileResult` +
   `render_reconcile_lines`. Frozen `ReconcileEntry`/`ReconcileResult`;
   `ReconcileBucket = Literal["local","remote","joined","missing-local","missing-remote","not-queryable"]`.
-- [ ] request-id mode scopes `read_downstream_records(backend_id=source_id, request_id=...)`; no local record ->
+- [x] request-id mode scopes `read_downstream_records(backend_id=source_id, request_id=...)`; no local record ->
   `ForgeOpError` naming the source. Bucket logic per the card taxonomy; never overwrite local cost; set
   `needs_credential_id` on `not_authorized`.
-- [ ] Export new symbols from `core/ops/__init__.py`; `--json` via `json.dumps(asdict(result), default=str)` -- no
+- [x] Export new symbols from `core/ops/__init__.py`; `--json` via `json.dumps(asdict(result), default=str)` -- no
   secrets/content.
+- [x] Review hardening: empty-string ids normalized to `None` (xor guard / dispatch agree); template aliases resolved to
+  canonical via `resolve_model_source_id`; render predicate includes `local_output_tokens`.
 
 ### CLI (`src/forge/cli/backend.py`)
 
-- [ ] `forge backend reconcile <source-id>` with `--request-id` / `--remote-id` (mutually exclusive) / `--json` /
-  `--timeout`. Neither id -> usage tip + exit 1. Unknown source -> `print_error` + exit 1. `ForgeOpError` ->
-  `print_error_with_tip(..., "Run 'forge backend list' ...")` + exit 1.
+- [x] `forge backend reconcile <source-id>` with `--request-id` / `--remote-id` (mutually exclusive) / `--json` /
+  `--timeout`. Neither id -> usage tip (`Use --flag`) + exit 1. Unknown source / `ForgeOpError` ->
+  `print_error_with_tip(..., "Run 'forge backend list' ...")` + exit 1. `RemoteAdapterError` -> clean error + exit 1.
 
 ### PR 2 docs + verification
 
-- [ ] `docs/cli_reference.md` (+ `design.md`/`design_appendix.md` if the op/registry seam is normative);
-  `docs/end-user/proxy.md` remote-reconcile subsection.
-- [ ] `uv run pytest tests/src/core/ops/test_backend_reconciliation.py tests/src/cli/test_backend_reconcile.py -v`
-  (network stubbed); `make pre-commit`. Optional credential-gated `@pytest.mark.slow` live OpenRouter smoke (documented,
-  not CI-gated).
+- [x] `docs/cli_reference.md` (`forge backend reconcile` row), `docs/design_appendix.md` §A.14 (remote-reconcile op /
+  adapter-registry seam / comparative buckets / deferred window), `docs/end-user/proxy.md` remote-reconcile subsection.
+- [x] `uv run pytest tests/src/core/ops/test_backend_reconciliation.py tests/src/cli/test_backend_reconcile.py tests/src/backend/remote/test_openrouter_remote.py`
+  -> 52 passed; broader `tests/src/{backend,core/ops,cli}` -> 2322 passed; `make pre-commit` clean (mypy + pyright).
+  Optional credential-gated live OpenRouter smoke remains documented, not CI-gated.
+- [x] Adversarial review: 32-agent workflow (6 finder angles + verify + sweep) over the diff; 21 confirmed findings
+  triaged to distinct root causes and fixed (1 HIGH error-vs-data crash, 2 MED, 4 LOW + test-quality); banker's-rounding
+  nit consciously skipped.
 
 ## Deferred Follow-on (designed-for, NOT shipped here)
 

@@ -132,15 +132,16 @@ session *label*; use `--root-run-id` for an exact match.
 
 ### Backend management
 
-| Command                                     | Purpose                                                               |
-| ------------------------------------------- | --------------------------------------------------------------------- |
-| `forge backend list`                        | List built-in backend sources and local runtime state (`--json`)      |
-| `forge backend show <source-or-backend-id>` | Show source details or legacy runtime details (`--raw`)               |
-| `forge backend test-auth <source-id>`       | Check source credentials and run a reachability/auth probe (`--json`) |
-| `forge backend create <adapter>`            | Create local backend adapter config                                   |
-| `forge backend start <source-or-adapter>`   | Start a local lifecycle source or adapter instance                    |
-| `forge backend stop <source-or-adapter>`    | Stop a local lifecycle source or adapter instance                     |
-| `forge backend delete <adapter>`            | Delete local backend instance or adapter config                       |
+| Command                                     | Purpose                                                                                    |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `forge backend list`                        | List built-in backend sources and local runtime state (`--json`)                           |
+| `forge backend show <source-or-backend-id>` | Show source details or legacy runtime details (`--raw`)                                    |
+| `forge backend test-auth <source-id>`       | Check source credentials and run a reachability/auth probe (`--json`)                      |
+| `forge backend create <adapter>`            | Create local backend adapter config                                                        |
+| `forge backend start <source-or-adapter>`   | Start a local lifecycle source or adapter instance                                         |
+| `forge backend stop <source-or-adapter>`    | Stop a local lifecycle source or adapter instance                                          |
+| `forge backend delete <adapter>`            | Delete local backend instance or adapter config                                            |
+| `forge backend reconcile <source-id>`       | Join local telemetry to a backend's remote record (`--request-id`/`--remote-id`, `--json`) |
 
 ### Policy enforcement
 

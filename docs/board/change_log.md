@@ -25,6 +25,40 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board-contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-06-20
+
+### backend_remote_reconciliation PR 2: `forge backend reconcile` (single-id MVP)
+
+**Goal**: Ship the MVP of backend remote reconciliation -- join one local downstream trace to one remote account-side
+record for any backend with a registered remote adapter. OpenRouter is the first adapter.
+
+**Key changes**:
+
+- New `src/forge/backend/remote/` package: a `BackendRemoteAdapter` protocol + adapter registry (presence in the
+  registry, not a `ModelSourceCapabilities` flag, is what makes a source remote-reconcile capable), generic
+  metadata-only DTOs (`RemoteCapability`, `RemoteRecord`), and `RemoteAdapterError`/`RemoteAdapterNotFoundError`.
+- `OpenRouterRemoteAdapter` (narrow `httpx` client) hits `GET /api/v1/generation?id=...` with the normal key, whitelists
+  metadata only (never `/generation/content`), normalizes `total_cost` USD -> micros, and maps every HTTP/network result
+  to a `RemoteRecord(outcome=...)` (200->found, 404->not_found, 401/403->not_authorized, else->unavailable; missing key
+  -> not_authorized via a no-HTTP pre-check).
+- New op `core/ops/backend_reconcile.py` (`reconcile_generation` + `render_reconcile_lines`): comparative bucket
+  taxonomy `joined`/`remote`/`missing-remote`/`not-queryable`; downstream reads scoped by `backend_id`; local and remote
+  cost/tokens kept separate with provenance; remote/network failures are renderable data, never raised.
+- New CLI leaf `forge backend reconcile <source-id>` (`--request-id`/`--remote-id`/`--json`/`--timeout`), and docs
+  (cli_reference, design_appendix §A.14, end-user/proxy.md). Windowed account-wide activity/analytics (management key,
+  `local`/`missing-local` buckets) stays a declared follow-on -- the protocol already carries the window seam.
+- Review hardening (from a 32-agent adversarial review, 21 confirmed findings): total numeric coercers + a parse net so
+  a malformed-but-parseable 200 body (NaN/Infinity/overflow/bool, default `json.loads` accepts these) maps to
+  `unavailable` instead of crashing the CLI with a traceback (the error-vs-data invariant); empty-string ids normalized
+  so the xor guard and mode dispatch agree; template aliases resolved to canonical; a 200 error-envelope ->
+  `unavailable`; render predicate includes `local_output_tokens`; CLI catches `RemoteAdapterError`; tip wording
+  `Use --flag`.
+
+**Verification**: `tests/src/core/ops/test_backend_reconciliation.py` + `tests/src/cli/test_backend_reconcile.py` +
+`tests/src/backend/remote/test_openrouter_remote.py` -> 52 passed (14 added for the review fixes, incl. a replaced
+tautological content-leak assertion); broader `tests/src/{backend,core/ops,cli}` -> 2322 passed; `make pre-commit` clean
+(mypy + pyright).
+
 ## 2026-06-19
 
 ### backend_remote_reconciliation PR 1: generalize provider-trace observability over any backend

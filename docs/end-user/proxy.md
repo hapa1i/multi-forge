@@ -695,6 +695,29 @@ existing `proxy.yaml` files keep working until you rename it.
 Observability only (not routing -- recognition is stickiness-neutral); non-capable gateway routes stay quiet, and direct
 `core.llm` callers (plan-check, curation) are unchanged this release.
 
+### Remote reconciliation
+
+`forge backend reconcile <source-id>` answers the *other* half of "what happened to this request?": it joins your local
+provider-trace evidence to the **backend's own account-side record**. The mechanism is generic over any backend with a
+remote adapter; **OpenRouter is the first adapter**.
+
+```bash
+# Local-anchored: a local request id -> its generation id -> the remote record
+forge backend reconcile openrouter --request-id req_abc...
+
+# Remote-only: the backend's own record id (e.g. an OpenRouter gen-... id)
+forge backend reconcile openrouter --remote-id gen-...
+
+forge backend reconcile openrouter --request-id req_abc... --json   # stable JSON
+```
+
+Results are bucketed: **joined** (local + remote matched), **remote** (a raw remote-id lookup), **missing-remote**
+(present locally, absent remotely -- e.g. an aborted stream the backend never finalized), and **not-queryable** (a local
+trace with no generation id, or a remote lookup that timed out / was rate-limited / lacked credentials). Remote and
+local cost/tokens are shown **separately with provenance** -- a remote figure never overwrites a locally observed one,
+and a missing remote record never implies the request did not happen. Metadata only: it never fetches prompt/completion
+content. Windowed account-wide activity/analytics (management key) is a planned follow-on.
+
 ---
 
 ## Prerequisites
