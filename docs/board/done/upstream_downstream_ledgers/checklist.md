@@ -1,7 +1,7 @@
 # Upstream / Downstream Ledgers -- Execution Checklist
 
 Branch: `upstream_downstream_ledgers`. Card: [card.md](card.md). Epic:
-[`epic_telemetry_architecture`](../../doing/epic_telemetry_architecture/card.md).
+[`epic_telemetry_architecture`](../epic_telemetry_architecture/card.md).
 
 ## Current Focus
 

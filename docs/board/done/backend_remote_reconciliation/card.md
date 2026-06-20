@@ -1,9 +1,10 @@
 # Backend Remote Reconciliation -- join local downstream telemetry to remote account-side evidence
 
-**Status**: Active in `doing/` (resumed from `paused/openrouter_remote_reconciliation` on 2026-06-19). Generalized from
-the OpenRouter-specific original: the mechanism is now generic over any backend source, with **OpenRouter as the first
-adapter**. `upstream_downstream_ledgers` and `unified_backend` (PR #39) have both landed, so the telemetry shape and the
-`backend_id` source key this card consumes now exist.
+**Status**: Done (shipped via PR #41 generic refactor + PR #42 MVP, closed 2026-06-20). Resumed from
+`paused/openrouter_remote_reconciliation` on 2026-06-19 and generalized from the OpenRouter-specific original: the
+mechanism is generic over any backend source, with **OpenRouter as the first adapter**. `upstream_downstream_ledgers`
+and `unified_backend` (PR #39) landed first, providing the telemetry shape and the `backend_id` source key this card
+consumes.
 
 **Epic**: [`epic_telemetry_architecture`](../epic_telemetry_architecture/card.md).
 

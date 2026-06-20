@@ -1,7 +1,7 @@
 # Unified Backend Concept -- Execution Checklist
 
 Branch: `unified_backend`. Card: [card.md](card.md). Epic:
-[`epic_telemetry_architecture`](../../doing/epic_telemetry_architecture/card.md).
+[`epic_telemetry_architecture`](../epic_telemetry_architecture/card.md).
 
 ## Current Focus
 

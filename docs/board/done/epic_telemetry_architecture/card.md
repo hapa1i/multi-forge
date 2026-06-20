@@ -1,16 +1,16 @@
 # Epic: Telemetry Architecture -- two planes, one source key
 
-**Status**: Doing **epic** (`doing/epic_telemetry_architecture`). Created 2026-06-16 to hold the shared contract between
-two refactor proposals that were spun -- independently -- from the same root investigation (the 2026-06-14
-supervisor-timeout / shadow-sampling incident) and that both re-architect Forge's telemetry planes, along **orthogonal
-axes**. This card is the single consistent view the member cards lean on; it does **not** replace them. Its
-`checklist.md` is for coordination and sequencing only; member cards remain the execution units.
+**Status**: Done **epic** (`done/epic_telemetry_architecture`, closed 2026-06-20). Created 2026-06-16 to hold the shared
+contract between two refactor proposals that were spun -- independently -- from the same root investigation (the
+2026-06-14 supervisor-timeout / shadow-sampling incident) and that both re-architect Forge's telemetry planes, along
+**orthogonal axes**. This card was the single consistent view the member cards leaned on; it did **not** replace them.
+Its `checklist.md` was for coordination and sequencing only; member cards remained the execution units.
 
-**Current coordination goal**: `unified_backend` has merged (PR #39) and closed to `done/`, so `backend_id` is now the
-canonical downstream source key. The next-member decision is made:
-[`backend_remote_reconciliation`](../backend_remote_reconciliation/card.md) is the active member (resumed 2026-06-19
-from the paused `openrouter_remote_reconciliation`, generalized so OpenRouter is the first adapter). It ships in two
-PRs: a generic refactor first, then the MVP `forge backend reconcile` feature.
+**Outcome**: every member concern shipped. The two planes (downstream/upstream) exist, `backend_id` is the canonical
+downstream source key, provider-trace is source-capability gated, and the final consumer
+[`backend_remote_reconciliation`](../backend_remote_reconciliation/card.md) shipped via PR #41 (generic refactor) + PR
+#42 (`forge backend reconcile` MVP). With all members in `done/`, the epic closes -- the shared contract is fully
+discharged and the normative design docs (design.md §3.14, design_appendix §A.14) are now the source of truth.
 
 ## Why an epic, not a merged card
 
@@ -39,13 +39,13 @@ Two telemetry planes, joined by run-tree identity, with one canonical source key
 
 ## Member cards and ownership split
 
-| Concern                                     | Owner card                                                                      | Status                                                |
-| ------------------------------------------- | ------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| Plane **structure** (direction: up/down)    | [`upstream_downstream_ledgers`](../../done/upstream_downstream_ledgers/card.md) | done                                                  |
-| Source-identity **key** (`backend_id`)      | [`unified_backend`](../../done/unified_backend/card.md)                         | done                                                  |
-| Provider-trace plane (first to be absorbed) | [`openrouter_observability`](../../done/openrouter_observability/card.md)       | done                                                  |
-| Source-identity consumer: logs              | [`proxy_log_hygiene`](../../done/proxy_log_hygiene/card.md)                     | done                                                  |
-| Source-identity consumer: remote reconcile  | [`backend_remote_reconciliation`](../backend_remote_reconciliation/card.md)     | doing: PR 1 generic refactor in flight, PR 2 MVP next |
+| Concern                                     | Owner card                                                                  | Status                              |
+| ------------------------------------------- | --------------------------------------------------------------------------- | ----------------------------------- |
+| Plane **structure** (direction: up/down)    | [`upstream_downstream_ledgers`](../upstream_downstream_ledgers/card.md)     | done                                |
+| Source-identity **key** (`backend_id`)      | [`unified_backend`](../unified_backend/card.md)                             | done                                |
+| Provider-trace plane (first to be absorbed) | [`openrouter_observability`](../openrouter_observability/card.md)           | done                                |
+| Source-identity consumer: logs              | [`proxy_log_hygiene`](../proxy_log_hygiene/card.md)                         | done                                |
+| Source-identity consumer: remote reconcile  | [`backend_remote_reconciliation`](../backend_remote_reconciliation/card.md) | done (PR #41 refactor + PR #42 MVP) |
 
 **Contract (the consistency anchor):**
 
@@ -96,6 +96,15 @@ remote reconciliation must build on the shipped `core/usage/measurement.py` + `b
 [`backend_remote_reconciliation`](../backend_remote_reconciliation/card.md) (`paused/ -> doing/`); OpenRouter is the
 first adapter, not the feature. It ships as PR 1 (generic refactor removing the last `provider_name == "openrouter"`
 coupling -- contract item 2) then PR 2 (MVP single-id `forge backend reconcile`). Contract item 4 still binds.
+
+**Update (2026-06-20, epic closed):** `backend_remote_reconciliation` shipped via PR #41 (generic refactor) and PR #42
+(MVP `forge backend reconcile`) and moved to `done/`. With every member concern in the table now `done/`, the epic
+closes to `done/`. The shared contract held end to end: remote reconciliation consumed the shipped
+downstream/`backend_id` + `core/usage/measurement.py` seam (contract item 4) rather than re-authoring it, and
+provider-trace is fully source-capability gated (contract item 2). Normative architecture lives in design.md §3.14 and
+design_appendix §A.14; the standalone
+[`openrouter_user_direct_callers`](../../todo/openrouter_user_direct_callers/card.md) follow-on is an independent card,
+not an epic member.
 
 ## Not in scope here
 

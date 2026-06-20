@@ -1,13 +1,12 @@
 # Epic: Telemetry Architecture -- Coordination Checklist
 
-Branch: `backend_remote_reconciliation` (current coordination). Card: [card.md](card.md).
+Card: [card.md](card.md).
 
 ## Current Focus
 
-`unified_backend` has merged (PR #39) and closed to `done/`, so `backend_id` is the canonical downstream source key. The
-next-member decision is made: `backend_remote_reconciliation` (resumed generically from the paused
-`openrouter_remote_reconciliation`) is the active member, shipping as PR 1 (generic refactor) then PR 2 (MVP). The epic
-stays in `doing/` until that last live member ships.
+**Epic closed (2026-06-20).** The last live member `backend_remote_reconciliation` shipped via PR #41 (generic refactor)
+and PR #42 (MVP `forge backend reconcile`) and moved to `done/`. With every member concern `done/`, the epic moves to
+`done/` as a historical coordinator; normative architecture now lives in design.md §3.14 and design_appendix §A.14.
 
 ## Active Coordination
 
@@ -64,3 +63,10 @@ done. The next-member decision is now the sole open coordination item below.
 - [x] Record the sequencing decision in this checklist and in [card.md](card.md).
 - [x] Move any non-selected active member cards to `todo/` or `paused/` according to their progress.
 - [x] Commit the board-process and lane-state update before starting implementation on the selected member card.
+
+## Epic Close (2026-06-20)
+
+- [x] Last member `backend_remote_reconciliation` shipped (PR #41 + PR #42) and moved to `done/`.
+- [x] Member table in [card.md](card.md) marks every concern `done/`; member links normalized to `done/` siblings.
+- [x] Confirmed `openrouter_user_direct_callers` (todo) is an independent follow-on, not an epic member.
+- [x] Move `doing/epic_telemetry_architecture -> done/epic_telemetry_architecture` (this commit).

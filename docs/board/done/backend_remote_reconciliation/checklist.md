@@ -133,11 +133,18 @@ protocol already declares the window methods + per-path credential fields, so no
 
 ## Closeout
 
-- [ ] Tick final checklist items with verification.
-- [ ] change_log entries: PR 1 (refactor, this branch) and PR 2 (MVP) -- newest-first.
-- [ ] Promote durable lessons to `impl_notes.md` after human review.
-- [ ] Verify design/end-user docs match shipped behavior.
-- [ ] Move `doing/backend_remote_reconciliation -> done/backend_remote_reconciliation` after the PR 2 merge.
+- [x] Tick final checklist items with verification.
+- [x] change_log entries: PR 1 (2026-06-19) and PR 2 (2026-06-20) -- newest-first.
+- [ ] Promote durable lessons to `impl_notes.md` after human review (candidate below; left unticked pending review).
+- [x] Verify design/end-user docs match shipped behavior (cli_reference, design_appendix §A.14, end-user/proxy.md
+  updated in PR 1 + PR 2).
+- [x] Move `doing/backend_remote_reconciliation -> done/backend_remote_reconciliation` after the PR 2 merge (this
+  commit).
+
+**impl_notes candidate (for human review):** remote-reconcile capability is **adapter-registry presence**, not a
+`ModelSourceCapabilities` flag; and external-data coercers on the remote read path must be **total** (drop
+NaN/Infinity/overflow/bool) because `httpx`/`json.loads` accepts non-finite floats by default -- the error-vs-data
+invariant means a surprising 200 body becomes `unavailable`, never a raised exception.
 
 ## Retained Phase 0 Findings (2026-06-17)
 

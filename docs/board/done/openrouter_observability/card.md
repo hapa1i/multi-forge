@@ -4,7 +4,7 @@
 on 2026-06-14, after a supervised fork sent requests through the OpenRouter proxy but the user could not find them in
 OpenRouter's UI or Forge activity/cost surfaces.
 
-**Epic**: [`epic_telemetry_architecture`](../../doing/epic_telemetry_architecture/card.md).
+**Epic**: [`epic_telemetry_architecture`](../epic_telemetry_architecture/card.md).
 
 **Split from**: the original broad OpenRouter observability sketch. Log-volume work now lives in
 `docs/board/done/proxy_log_hygiene/card.md`; remote OpenRouter reconciliation now lives in

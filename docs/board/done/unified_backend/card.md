@@ -8,7 +8,7 @@ generalizes beyond OpenRouter. The local provider-trace compatibility facade
 `provider_name != "openrouter"` early-return gate has been replaced by the model-source capability gate this card
 canonicalized.
 
-**Epic**: [`epic_telemetry_architecture`](../../doing/epic_telemetry_architecture/card.md).
+**Epic**: [`epic_telemetry_architecture`](../epic_telemetry_architecture/card.md).
 
 **References**: `src/forge/backend/` (`BackendAdapter`, `BackendManager`, the runtime-instance `BackendInstance`/
 `BackendRegistry` in `registry.py`), `BackendDependency` (`src/forge/config/schema.py`), the provider vocabularies
