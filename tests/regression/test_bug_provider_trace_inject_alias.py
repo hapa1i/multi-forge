@@ -22,9 +22,19 @@ from typing import Any
 
 import pytest
 
+import forge.config.schema as schema_mod
 from forge.config.schema import ProviderTraceConfig, ProxyConfig
 
 pytestmark = pytest.mark.regression
+
+
+@pytest.fixture(autouse=True)
+def _reset_legacy_warn_latch():
+    # The deprecation warning is one-time per process; reset the module latch so each test that
+    # asserts on the warning actually sees it, regardless of test order.
+    schema_mod._warned_legacy_inject_key = False
+    yield
+    schema_mod._warned_legacy_inject_key = False
 
 
 def _provider_trace(**kwargs: Any) -> ProviderTraceConfig:
@@ -63,3 +73,16 @@ def test_legacy_key_does_not_trip_unknown_key_reject():
     pt = _provider_trace(inject_openrouter_user=True, retention_days=7)
     assert pt.inject_provider_user is True
     assert pt.retention_days == 7
+
+
+def test_warning_is_one_time_per_process(caplog):
+    # The doc promises a one-time deprecation warning; the module latch must suppress repeats so a
+    # config coerced repeatedly within a process does not spam the log. The value is still honored
+    # on every coercion -- only the warning is latched.
+    with caplog.at_level(logging.WARNING):
+        first = _provider_trace(inject_openrouter_user=True)
+        second = _provider_trace(inject_openrouter_user=True)
+    assert first.inject_provider_user is True
+    assert second.inject_provider_user is True
+    deprecations = [m for m in caplog.messages if "inject_openrouter_user is deprecated" in m]
+    assert len(deprecations) == 1

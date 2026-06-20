@@ -930,7 +930,7 @@ async def test_override_full_body_record_is_self_consistent(monkeypatch, tmp_pat
 
 
 # ---------------------------------------------------------------------------
-# Provider-trace mirror (openrouter_observability Phase 3, forward-wiring)
+# Provider-trace mirror (forward-wiring)
 # ---------------------------------------------------------------------------
 
 _SSE_CONTENT_CHUNKS = (

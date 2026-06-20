@@ -1,6 +1,6 @@
 """Regression: the provider-trace plane is metadata-only — never prompt/completion/body.
 
-Bug class: silent privacy leak. The provider-trace plane (openrouter_observability Phase 3)
+Bug class: silent privacy leak. The provider-trace plane
 exists to answer "what happened to this provider request?" from correlation metadata. If a
 body, prompt, completion, tool I/O, or a raw auth header ever reached a persisted record, the
 plane would become a second copy of sensitive payload on disk.

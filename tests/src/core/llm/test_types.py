@@ -307,7 +307,7 @@ class TestCompletionResponse:
 
 
 class TestProviderTraceMeta:
-    """Tests for the provider-trace metadata type (openrouter_observability Phase 2)."""
+    """Tests for the provider-trace metadata type."""
 
     def test_all_fields_optional(self):
         """Every field defaults to None so old providers/fakes stay valid."""

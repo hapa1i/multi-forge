@@ -70,7 +70,7 @@ def _status_cell(final_usage_seen: bool, client_disconnected: bool, local_usage_
 
 @click.group("provider", context_settings={"help_option_names": ["-h", "--help"]})
 def provider() -> None:
-    """Inspect provider-side telemetry (OpenRouter request lifecycle/correlation)."""
+    """Inspect provider-side telemetry (provider request lifecycle/correlation)."""
 
 
 @provider.group("trace", context_settings={"help_option_names": ["-h", "--help"]})

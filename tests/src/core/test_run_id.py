@@ -54,7 +54,7 @@ def test_rejects_malformed_and_injection(value: str | None) -> None:
     assert not is_valid_run_id(value)
 
 
-# --- Provider session/command labels (openrouter_observability Phase 1) ---
+# --- Provider session/command labels ---
 
 
 @pytest.mark.parametrize(

@@ -636,13 +636,15 @@ configured block.
 
 ## Provider trace (request lifecycle diagnostics)
 
-Provider lifecycle metadata answers one question after a timeout: *what happened to this OpenRouter request?* It was
-born from an incident -- a supervised fork's checks timed out before the final streaming usage chunk and left no trace
+Provider lifecycle metadata answers one question after a timeout: *what happened to this provider request?* It was born
+from an incident -- a supervised fork's checks timed out before the final streaming usage chunk and left no trace
 locally or in OpenRouter's dashboard.
 
 Records live inside owner-only downstream telemetry under `~/.forge/telemetry/downstream/` and carry **no** prompt,
 completion, tool output, or request body -- only lifecycle/correlation evidence (request id, proxy, model, provider
-generation id, stream flags, disconnect, and whether local cost was seen). Direct-OpenRouter only.
+generation id, stream flags, disconnect, and whether local cost was seen). Written only for routes whose backend source
+declares provider-trace capability (OpenRouter enabled in v1); gateway-routed OpenRouter through non-capable sources
+writes nothing.
 
 ```bash
 # Recent traces (today by default; --period today|week|month|all)

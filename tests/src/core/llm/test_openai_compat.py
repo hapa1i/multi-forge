@@ -89,7 +89,7 @@ class TestOpenAIResponseToCompletion:
         assert result.cost_usd is None
         assert result.usage is None
 
-    # --- provider_meta population (openrouter_observability Phase 2) ---
+    # --- provider_meta population ---
 
     def test_provider_meta_openrouter_lifts_gen_id_and_upstream(self):
         # OpenRouter's body.id is the gen-... generation id (probe 1); `provider` names

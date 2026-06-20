@@ -11,7 +11,7 @@ loader that bridges YAML -> dataclass omitted ``provider_trace`` at BOTH hops:
 
 Because the field has a default (``ProviderTraceConfig()``), the omission was
 silent: a user's ``provider_trace: {inject_provider_user: true, ...}`` block loaded
-as all-defaults, so Phase 5 injection never fired and custom retention was ignored.
+as all-defaults, so provider-user injection never fired and custom retention was ignored.
 
 Affected: ``src/forge/config/loader.py`` (both wiring sites).
 """

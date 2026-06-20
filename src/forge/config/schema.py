@@ -28,6 +28,10 @@ from forge.core.backend_dependency import BackendDependency
 
 logger = logging.getLogger(__name__)
 
+# One-time-per-process latch for the deprecated provider_trace.inject_openrouter_user alias
+# warning (a config can be coerced repeatedly within a process; per-coercion warnings would spam).
+_warned_legacy_inject_key = False
+
 # --- CONSTANTS ---
 
 OPENAI_MODELS = [
@@ -441,6 +445,19 @@ class ProviderTraceConfig:
             raise ValueError("provider_trace.inject_provider_user must be a bool")
 
 
+def _warn_legacy_inject_key(message: str) -> None:
+    """Surface the deprecated provider_trace.inject_openrouter_user key once per process.
+
+    proxy.yaml is user-owned config (a system boundary): warn-and-degrade, but only once -- the
+    same config can be coerced repeatedly within a process and per-coercion warnings would spam.
+    """
+    global _warned_legacy_inject_key
+    if _warned_legacy_inject_key:
+        return
+    _warned_legacy_inject_key = True
+    logger.warning(message)
+
+
 def _coerce_provider_trace_config(value: Any) -> ProviderTraceConfig:
     if value is None:
         return ProviderTraceConfig()
@@ -459,12 +476,12 @@ def _coerce_provider_trace_config(value: Any) -> ProviderTraceConfig:
         value = {k: v for k, v in value.items() if k != "inject_openrouter_user"}
         if "inject_provider_user" not in value:
             inject = legacy_value
-            logger.warning(
+            _warn_legacy_inject_key(
                 "provider_trace.inject_openrouter_user is deprecated; rename it to inject_provider_user. "
                 "The old key is honored for now."
             )
         else:
-            logger.warning(
+            _warn_legacy_inject_key(
                 "provider_trace.inject_openrouter_user is deprecated and ignored because "
                 "inject_provider_user is also set; remove the old key."
             )

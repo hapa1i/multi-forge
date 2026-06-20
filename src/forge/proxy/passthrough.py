@@ -268,8 +268,8 @@ async def _stream_opened_upstream(
     Usage is side-tapped from a copy of each chunk; ``on_complete`` fires once at
     stream end (even on early client disconnect, via ``finally``). The same lifecycle
     is mirrored into the provider-trace plane (Phase 3) when ``provider_trace_ctx`` is
-    supplied -- latent today (the trace helper gates on direct OpenRouter, which never
-    rides the passthrough wire), but ready for a future passthrough-routed provider.
+    supplied -- latent today (the trace helper gates on source capability, and current
+    passthrough sources do not declare it), but ready for a future passthrough-routed provider.
     """
     accumulator = _UsageAccumulator()
     failed = False

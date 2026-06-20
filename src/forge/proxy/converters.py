@@ -816,7 +816,7 @@ async def convert_openai_to_anthropic_sse(
     final_stop_reason: Optional[str] = None
     chunk_count = 0  # bounded lifecycle summary (proxy_log_hygiene), replaces per-chunk INFO
 
-    # --- Provider-trace lifecycle (openrouter_observability Phase 3) ---
+    # --- Provider-trace lifecycle ---
     # Observed at the seam, packed into final_usage["_provider_trace"] for _on_stream_complete.
     _stream_started = True  # message_start (:790) is yielded before this point is reached
     _first_chunk_seen = False  # first USER-VISIBLE content/tool chunk (the _provider_meta carrier does NOT count)
