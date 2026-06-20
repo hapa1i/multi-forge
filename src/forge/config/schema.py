@@ -28,8 +28,9 @@ from forge.core.backend_dependency import BackendDependency
 
 logger = logging.getLogger(__name__)
 
-# One-time-per-process latch for the deprecated provider_trace.inject_openrouter_user alias
-# warning (a config can be coerced repeatedly within a process; per-coercion warnings would spam).
+# One-time-per-process latch for the relocated provider_trace inject keys (the toggle moved to
+# ~/.forge/config.yaml; a config can be coerced repeatedly within a process and per-coercion
+# warnings would spam).
 _warned_legacy_inject_key = False
 
 # --- CONSTANTS ---
@@ -423,15 +424,19 @@ def _coerce_audit_config(value: Any) -> AuditConfig:
 
 @dataclass
 class ProviderTraceConfig:
-    """Retention bounds for the provider-trace plane.
+    """Retention bounds for the provider-trace plane (proxy-owned, per-proxy).
 
     Diagnostics, not spend truth — matches the audit plane's defaults (14d / 512 MB) so the
     two on-disk telemetry surfaces share one mental model.
+
+    The ``inject_provider_user`` toggle is deliberately NOT here: it moved to the global
+    ``~/.forge/config.yaml`` (``provider_trace.inject_provider_user``, see ``runtime_config.py``)
+    so one switch governs both the proxied and the direct OpenRouter routes. Retention stays
+    proxy-owned — it is a proxy-local disk concern, not a cross-cutting observability preference.
     """
 
     retention_days: int = 14
     max_total_mb: int = 512
-    inject_provider_user: bool = False
 
     def __post_init__(self) -> None:
         # bool is an int subclass; reject it so provider_trace.retention_days=true fails loudly.
@@ -439,14 +444,10 @@ class ProviderTraceConfig:
             raise ValueError("provider_trace.retention_days must be a non-negative int")
         if isinstance(self.max_total_mb, bool) or not isinstance(self.max_total_mb, int) or self.max_total_mb <= 0:
             raise ValueError("provider_trace.max_total_mb must be a positive int")
-        # Opt-in (default off): forward the Forge session grouping id into the provider's `user`
-        # field on a source-capable proxied route (provider-user grouping).
-        if not isinstance(self.inject_provider_user, bool):
-            raise ValueError("provider_trace.inject_provider_user must be a bool")
 
 
 def _warn_legacy_inject_key(message: str) -> None:
-    """Surface the deprecated provider_trace.inject_openrouter_user key once per process.
+    """Surface a relocated provider_trace inject key (moved to ~/.forge/config.yaml) once per process.
 
     proxy.yaml is user-owned config (a system boundary): warn-and-degrade, but only once -- the
     same config can be coerced repeatedly within a process and per-coercion warnings would spam.
@@ -465,31 +466,23 @@ def _coerce_provider_trace_config(value: Any) -> ProviderTraceConfig:
         return value
     if not isinstance(value, dict):
         raise ValueError("Invalid provider_trace: must be a mapping")
-    # Back-compat alias: the key was renamed inject_openrouter_user -> inject_provider_user when the
-    # observability plane went provider-generic. proxy.yaml is user-owned config (a system boundary,
-    # not strict durable state): accept the old key, warn, and degrade rather than reject
-    # (coding-standards section 5). Pop it BEFORE the strict allowlist check so it does not trip
-    # _reject_unknown_keys; the new key wins if both are present.
-    inject = value.get("inject_provider_user", False)
-    if "inject_openrouter_user" in value:
-        legacy_value = value["inject_openrouter_user"]
-        value = {k: v for k, v in value.items() if k != "inject_openrouter_user"}
-        if "inject_provider_user" not in value:
-            inject = legacy_value
-            _warn_legacy_inject_key(
-                "provider_trace.inject_openrouter_user is deprecated; rename it to inject_provider_user. "
-                "The old key is honored for now."
-            )
-        else:
-            _warn_legacy_inject_key(
-                "provider_trace.inject_openrouter_user is deprecated and ignored because "
-                "inject_provider_user is also set; remove the old key."
-            )
-    _reject_unknown_keys(value, {"retention_days", "max_total_mb", "inject_provider_user"}, "provider_trace")
+    # The inject toggle moved out of per-proxy proxy.yaml to the global
+    # ~/.forge/config.yaml (provider_trace.inject_provider_user) so one switch governs both the
+    # proxied and the direct OpenRouter routes. proxy.yaml is user-owned config (a system boundary,
+    # not strict durable state): warn-and-degrade on the relocated keys -- the current key and the
+    # older inject_openrouter_user alias -- rather than reject (coding-standards section 5). Pop
+    # them BEFORE the strict allowlist check so they do not trip _reject_unknown_keys.
+    relocated = [k for k in ("inject_provider_user", "inject_openrouter_user") if k in value]
+    if relocated:
+        value = {k: v for k, v in value.items() if k not in relocated}
+        _warn_legacy_inject_key(
+            "provider_trace.inject_provider_user moved to ~/.forge/config.yaml and is ignored in "
+            "proxy.yaml. Enable it globally with 'forge config set provider_trace.inject_provider_user=true'."
+        )
+    _reject_unknown_keys(value, {"retention_days", "max_total_mb"}, "provider_trace")
     return ProviderTraceConfig(
         retention_days=value.get("retention_days", 14),
         max_total_mb=value.get("max_total_mb", 512),
-        inject_provider_user=inject,
     )
 
 

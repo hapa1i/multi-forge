@@ -20,6 +20,7 @@ import pytest
 from forge.core.paths import get_forge_home
 from forge.runtime_config import (
     RuntimeConfig,
+    RuntimeProviderTraceConfig,
     StatusLineConfig,
     get_default_config_content,
     get_runtime_config,
@@ -580,3 +581,72 @@ class TestStatusLineConfigLoad:
         rc = load_runtime_config(cfg)
         assert rc.statusline.glyphs == "unicode"
         assert rc.statusline.cache_hit_ttl == 30
+
+
+# ---------------------------------------------------------------------------
+# RuntimeProviderTraceConfig (nested provider_trace: section) — the global
+# inject_provider_user toggle that governs both proxied and direct callers.
+# ---------------------------------------------------------------------------
+
+
+class TestProviderTraceConfigDefaults:
+    def test_runtime_config_has_provider_trace_default(self):
+        rc = RuntimeConfig()
+        assert isinstance(rc.provider_trace, RuntimeProviderTraceConfig)
+
+    def test_inject_provider_user_defaults_off(self):
+        assert RuntimeProviderTraceConfig().inject_provider_user is False
+        assert RuntimeConfig().provider_trace.inject_provider_user is False
+
+    def test_dict_coercion_set_edit_path(self):
+        """set/edit build RuntimeConfig(**{provider_trace: {...}}) directly."""
+        rc = RuntimeConfig(provider_trace={"inject_provider_user": True})  # type: ignore[arg-type]  # dict coercion path
+        assert isinstance(rc.provider_trace, RuntimeProviderTraceConfig)
+        assert rc.provider_trace.inject_provider_user is True
+
+    def test_string_bool_coerced(self):
+        """A quoted "true"/"false" in YAML coerces, not silently degrades."""
+        assert RuntimeConfig(provider_trace={"inject_provider_user": "true"}).provider_trace.inject_provider_user is True  # type: ignore[arg-type]
+        assert (
+            RuntimeConfig(provider_trace={"inject_provider_user": "off"}).provider_trace.inject_provider_user is False  # type: ignore[arg-type]
+        )
+
+    def test_bad_value_raises_strict(self):
+        """Construction is strict so set/edit fail closed."""
+        with pytest.raises(ValueError, match="inject_provider_user must be a bool"):
+            RuntimeConfig(provider_trace={"inject_provider_user": "maybe"})  # type: ignore[arg-type]  # dict coercion path
+
+    def test_unknown_subkey_dropped(self):
+        rc = RuntimeConfig(provider_trace={"inject_provider_user": True, "future_key": 1})  # type: ignore[arg-type]  # dict coercion path
+        assert rc.provider_trace.inject_provider_user is True
+        assert not hasattr(rc.provider_trace, "future_key")
+
+
+class TestProviderTraceConfigLoad:
+    def test_load_round_trips_provider_trace(self, tmp_path: Path):
+        cfg = tmp_path / "config.yaml"
+        cfg.write_text("provider_trace:\n  inject_provider_user: true\n")
+        rc = load_runtime_config(cfg)
+        assert rc.provider_trace.inject_provider_user is True
+
+    def test_bad_provider_trace_subtree_fails_open(self, tmp_path: Path, caplog):
+        """A bad provider_trace resets ONLY provider_trace; other keys survive."""
+        cfg = tmp_path / "config.yaml"
+        cfg.write_text("status_timeout: 0.5\nprovider_trace:\n  inject_provider_user: maybe\n")
+        with caplog.at_level(logging.WARNING):
+            rc = load_runtime_config(cfg)
+        assert rc.status_timeout == 0.5  # unrelated key preserved
+        assert rc.provider_trace.inject_provider_user is False  # subtree reset to default
+        assert any("provider_trace" in r.message for r in caplog.records)
+
+    def test_missing_provider_trace_uses_defaults(self, tmp_path: Path):
+        cfg = tmp_path / "config.yaml"
+        cfg.write_text("proxy_mode: host\n")
+        rc = load_runtime_config(cfg)
+        assert rc.provider_trace == RuntimeProviderTraceConfig()
+
+    def test_write_round_trip(self, tmp_path: Path):
+        cfg = tmp_path / "config.yaml"
+        write_runtime_config({"provider_trace": {"inject_provider_user": True}}, cfg)
+        rc = load_runtime_config(cfg)
+        assert rc.provider_trace.inject_provider_user is True

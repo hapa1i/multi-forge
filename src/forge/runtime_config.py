@@ -1,8 +1,10 @@
 """Forge runtime configuration (~/.forge/config.yaml).
 
-Separate from forge.config (which the proxy imports) to avoid leaking
-runtime preferences into routing. The proxy singleton must never see
-these values — they control CLI/session behavior only.
+Separate from forge.config (which the proxy imports for routing) so runtime
+preferences never affect tier->model routing. The proxy MAY read specific
+non-routing fields here (auth_ignore_env, log_tool_failures, and the global
+provider_trace.inject_provider_user observability toggle); none of them may
+influence a routing decision.
 
 File: ~/.forge/config.yaml (optional, fail-open if missing or invalid).
 
@@ -105,6 +107,69 @@ def _coerce_statusline_config(value: Any) -> StatusLineConfig:
 
 
 @dataclass
+class RuntimeProviderTraceConfig:
+    """Nested provider-trace preferences (``provider_trace:`` in config.yaml).
+
+    Home of the single, global ``inject_provider_user`` toggle. It governs BOTH
+    Forge's direct ``core.llm`` OpenRouter callers (plan-check, transfer curation)
+    AND the proxied path (``proxy/server.py`` reads this, not the per-proxy
+    ``proxy.yaml`` key, which is deprecated). One switch, one mental model.
+
+    Retention of the on-disk trace shards stays proxy-owned in ``proxy.yaml``
+    (``provider_trace.retention_days``/``max_total_mb``) — that is a proxy-local
+    disk concern; whether to group at all is a global observability preference.
+    """
+
+    inject_provider_user: bool = False  # opt-in: record the hashed session id in OpenRouter's `user`
+
+    def __post_init__(self) -> None:
+        # Strict bool — fail-closed via set/edit; the disk loader's subtree
+        # fail-open catches this and degrades to the default (see _coerce_bool).
+        if not isinstance(self.inject_provider_user, bool):
+            raise ValueError("provider_trace.inject_provider_user must be a bool")
+
+
+def _coerce_bool(value: Any) -> Any:
+    """Coerce a YAML/CLI scalar to bool, or pass through for __post_init__ to reject.
+
+    A quoted ``"true"`` in config.yaml parses as a string; without this it would
+    fail the strict bool check and silently degrade to the default (the opposite
+    of what the user wrote). Unrecognized values pass through unchanged so the
+    dataclass raises a clear error rather than guessing.
+    """
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        low = value.strip().lower()
+        if low in {"1", "true", "yes", "on"}:
+            return True
+        if low in {"0", "false", "no", "off", ""}:
+            return False
+    return value
+
+
+def _coerce_provider_trace_config(value: Any) -> RuntimeProviderTraceConfig:
+    """Normalize a raw ``provider_trace`` value into ``RuntimeProviderTraceConfig``.
+
+    Mirrors ``_coerce_statusline_config``: required because ``from __future__
+    import annotations`` makes field types strings, and because set/edit build
+    ``RuntimeConfig(**dict)`` directly. Unknown sub-keys are dropped (forward
+    compat); ``inject_provider_user`` is bool-coerced before validation.
+    """
+    if value is None:
+        return RuntimeProviderTraceConfig()
+    if isinstance(value, RuntimeProviderTraceConfig):
+        return value
+    if not isinstance(value, dict):
+        raise ValueError("provider_trace must be a mapping")
+    known = {f.name for f in fields(RuntimeProviderTraceConfig)}
+    kwargs = {k: v for k, v in value.items() if k in known}
+    if "inject_provider_user" in kwargs:
+        kwargs["inject_provider_user"] = _coerce_bool(kwargs["inject_provider_user"])
+    return RuntimeProviderTraceConfig(**kwargs)
+
+
+@dataclass
 class RuntimeConfig:
     """Global Forge runtime preferences — always reflects effective values.
 
@@ -184,11 +249,16 @@ class RuntimeConfig:
     # Nested status-line display preferences (statusline: section in config.yaml).
     statusline: StatusLineConfig = field(default_factory=StatusLineConfig)
 
+    # Nested provider-trace preferences (provider_trace: section in config.yaml).
+    # Home of the global inject_provider_user toggle (governs proxied + direct paths).
+    provider_trace: RuntimeProviderTraceConfig = field(default_factory=RuntimeProviderTraceConfig)
+
     def __post_init__(self) -> None:
         # Coerce a raw dict (from YAML or `forge config set`/`edit`) into the
         # nested dataclass. This is the single convergence point for the load,
         # set, and edit paths (see _coerce_statusline_config).
         self.statusline = _coerce_statusline_config(self.statusline)
+        self.provider_trace = _coerce_provider_trace_config(self.provider_trace)
 
         valid_modes = {"host", "sidecar"}
         if self.proxy_mode not in valid_modes:
@@ -408,6 +478,19 @@ def _dict_to_runtime_config(data: dict[str, Any], source: Path) -> RuntimeConfig
             )
             kwargs["statusline"] = StatusLineConfig()
 
+    # Same subtree fail-open for provider_trace: a bad block resets only this
+    # section, never the whole config (set/edit keep the strict raise).
+    if "provider_trace" in kwargs:
+        try:
+            _coerce_provider_trace_config(kwargs["provider_trace"])
+        except (ValueError, TypeError) as e:
+            logger.warning(
+                "Invalid provider_trace config in %s: %s — using provider_trace defaults",
+                source,
+                e,
+            )
+            kwargs["provider_trace"] = RuntimeProviderTraceConfig()
+
     try:
         return RuntimeConfig(**kwargs)
     except (ValueError, TypeError) as e:
@@ -574,4 +657,14 @@ proxy_mode: host
 #   cost_mode: auto
 #   palette: default
 #   segments: []
+
+# Provider-trace observability (nested section).
+#   inject_provider_user: record the hashed Forge session id in OpenRouter's
+#   top-level `user` field so a session/fork is grouped in OpenRouter's
+#   account-side /generation records. One global switch governs BOTH proxied
+#   OpenRouter traffic AND Forge's direct core.llm callers (plan-check, transfer
+#   curation). Only a hashed id is sent (forge_sess_<hash>), never the raw name.
+#   Off by default. Set with: forge config set provider_trace.inject_provider_user=true
+# provider_trace:
+#   inject_provider_user: false
 """

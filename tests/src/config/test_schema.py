@@ -740,18 +740,20 @@ class TestInterceptAuditConfig:
         assert isinstance(cfg.provider_trace, ProviderTraceConfig)
         assert cfg.provider_trace.retention_days == 3
 
-    def test_provider_trace_inject_provider_user_defaults_false(self):
-        """Provider-user grouping is opt-in: off unless explicitly enabled."""
-        config = self._make()
-        assert config.provider_trace.inject_provider_user is False
+    def test_provider_trace_has_no_inject_field(self):
+        """The inject_provider_user toggle moved to the global ~/.forge/config.yaml (see
+        runtime_config.py); the proxy-owned dataclass is retention-only now."""
+        from forge.config.schema import ProviderTraceConfig
 
-    def test_provider_trace_inject_provider_user_coerced_from_dict(self):
-        config = self._make(provider_trace={"inject_provider_user": True})
-        assert config.provider_trace.inject_provider_user is True
+        assert not hasattr(ProviderTraceConfig(), "inject_provider_user")
 
-    def test_provider_trace_inject_provider_user_rejects_non_bool(self):
-        with pytest.raises(ValueError, match="provider_trace.inject_provider_user"):
-            self._make(provider_trace={"inject_provider_user": "yes"})
+    def test_provider_trace_relocated_inject_key_accepted_and_ignored(self):
+        """A proxy.yaml still carrying the relocated key is accepted (not unknown-key rejected) and
+        ignored (warn-and-degrade): retention siblings survive, no inject field appears. The
+        one-time relocation warning is asserted in the dedicated regression test."""
+        config = self._make(provider_trace={"inject_provider_user": True, "retention_days": 7})
+        assert config.provider_trace.retention_days == 7
+        assert not hasattr(config.provider_trace, "inject_provider_user")
 
     def test_system_prompt_guard_requires_pattern(self):
         with pytest.raises(ValueError, match="needs a 'pattern' key"):

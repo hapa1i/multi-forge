@@ -123,6 +123,23 @@ async def test_create_message_request_explicit_tier_wins(monkeypatch):
 # --- create_message wires inject_provider_user -> _forge_user (config ON -> adapter handoff) ---
 
 
+def test_inject_provider_user_enabled_reads_runtime_config(monkeypatch):
+    """The proxied gate reads the GLOBAL runtime-config toggle (governs both paths), not the
+    per-proxy proxy.yaml block (deprecated). This is the unification's load-bearing read."""
+    import forge.proxy.server as server
+
+    monkeypatch.setattr(
+        "forge.runtime_config.get_runtime_config",
+        lambda: type("RT", (), {"provider_trace": type("PT", (), {"inject_provider_user": True})()})(),
+    )
+    assert server._inject_provider_user_enabled() is True
+    monkeypatch.setattr(
+        "forge.runtime_config.get_runtime_config",
+        lambda: type("RT", (), {"provider_trace": type("PT", (), {"inject_provider_user": False})()})(),
+    )
+    assert server._inject_provider_user_enabled() is False
+
+
 class _ForgeRequestState:
     def __init__(self, request_id: str, forge_session: str | None) -> None:
         self.request_id = request_id
@@ -190,7 +207,6 @@ async def _capture_openrouter_request(
     class ProxyCfg:
         default_tier = "haiku"
         preferred_provider = "openrouter"
-        provider_trace = type("PT", (), {"inject_provider_user": inject_flag})()
         source = ""
 
         @staticmethod
@@ -203,6 +219,12 @@ async def _capture_openrouter_request(
     proxy_config = ProxyCfg()
     proxy_config.source = source
     monkeypatch.setattr(server.config, "proxy", proxy_config)
+    # The inject_provider_user toggle is now the global runtime-config setting (governs both the
+    # proxied and direct paths), not the per-proxy proxy.yaml block. Drive the gate at its source.
+    monkeypatch.setattr(
+        "forge.runtime_config.get_runtime_config",
+        lambda: type("RT", (), {"provider_trace": type("PT", (), {"inject_provider_user": inject_flag})()})(),
+    )
     monkeypatch.setattr(server.config, "session", SessionCfg())
     monkeypatch.setattr(server, "map_model_name", lambda v: v)
     monkeypatch.setattr(server, "convert_anthropic_to_openai", lambda *a, **k: {"messages": []})
