@@ -497,6 +497,23 @@ class TestRunSidecarSessionProxyAudit:
         # events survive --rm and feed the host `forge activity` + session-end summary.
         assert f"{forge_home}/usage:/root/.forge/usage:rw" in cmd
 
+    def test_config_yaml_mounted_ro_when_present(self) -> None:
+        """The global provider_trace.inject_provider_user toggle lives in ~/.forge/config.yaml and
+        governs the in-container proxied OpenRouter route too, so it is mounted read-only when the
+        host file exists."""
+        from forge.core.paths import get_forge_home
+
+        forge_home = get_forge_home()
+        (forge_home / "config.yaml").write_text("provider_trace:\n  inject_provider_user: true\n")
+        cmd = self._capture_cmd(proxy_id="audit-test", make_proxy_yaml=True)
+        assert f"{forge_home}/config.yaml:/root/.forge/config.yaml:ro" in cmd
+
+    def test_config_yaml_not_mounted_when_absent(self) -> None:
+        """Absent config.yaml -> the toggle is its default (off) -> no mount (a Docker bind source
+        must pre-exist; skipping it is the correct no-op, not a silent disable)."""
+        cmd = self._capture_cmd(proxy_id="audit-test", make_proxy_yaml=True)
+        assert "/root/.forge/config.yaml:ro" not in cmd
+
     def test_missing_proxy_yaml_fails_fast(self) -> None:
         """proxy_id with no proxy.yaml raises on the host, never reaching docker run."""
         with (

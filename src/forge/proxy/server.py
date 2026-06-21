@@ -137,8 +137,13 @@ def _backend_source_id() -> str | None:
 
 
 def _inject_provider_user_enabled() -> bool:
-    provider_trace_config = getattr(config.proxy, "provider_trace", None)
-    return bool(getattr(provider_trace_config, "inject_provider_user", False))
+    # The global toggle in ~/.forge/config.yaml governs BOTH the proxied and the direct OpenRouter
+    # routes; the per-proxy proxy.yaml key is deprecated (see config/schema.py). Same runtime-config
+    # read the proxy already uses for auth_ignore_env. Singleton-cached: a running proxy reads it
+    # once (restart to change), matching the prior proxy.yaml-at-startup behavior.
+    from forge.runtime_config import get_runtime_config
+
+    return bool(get_runtime_config().provider_trace.inject_provider_user)
 
 
 def _sidecar_mode_active() -> bool:

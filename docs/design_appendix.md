@@ -781,12 +781,23 @@ Semantics and invariants:
   `%provider trace` mirrors it via the shared `render_explanation_lines` text contract). `list` filters by session
   *label* (re-derived `forge_sess_<hash>` prefix) / `forge_root_run_id` / `--period`; `explain` joins downstream spend
   evidence by `request_id` within ±5m for cost confidence. Local-only — no remote `/generation` lookup.
-- **Session-id injection (opt-in).** `provider_trace.inject_provider_user` (default off) forwards the validated
-  `X-Forge-Session` id (or a `forge_run_<hash>` fallback) into the provider's top-level `user` field on source-capable
-  proxied routes — probe 3 found `user` is retained in the indexed `/generation` record for account-side lookup, while a
-  custom `session_id` is ignored. Server-gated (`_provider_user_value`) and adapter-forwarded via
-  `extra["openai"]["user"]`; metadata-only, hashed, never the raw session name. Direct `core.llm` callers (plan-check,
-  curation) are a documented follow-up, not wired here.
+- **Session-id injection (opt-in, global).** `provider_trace.inject_provider_user` (default off) lives in
+  `~/.forge/config.yaml` (`get_runtime_config().provider_trace`) and governs **both** planes; probe 3 found `user` is
+  retained in the indexed `/generation` record for account-side lookup, while a custom `session_id` is ignored.
+  Metadata-only, hashed, never the raw session name.
+  - **Proxied path.** Forwards the validated `X-Forge-Session` id (or a `forge_run_<hash>` fallback) into the top-level
+    `user` field on source-capable routes — server-gated (`_provider_user_value`), adapter-forwarded via
+    `extra["openai"]["user"]`.
+  - **Direct path.** `resolve_direct_provider_user(role)` (`core/usage/correlation.py`) reads the same global flag plus
+    `FORGE_SESSION`/`FORGE_ROOT_RUN_ID` (root falls back to `FORGE_RUN_ID`, mirroring `reactive/env.py`) and derives the
+    id with the **same** `derive_provider_session_id`, so direct ids match proxied ones for one run.
+    `with_openrouter_user` sets `extra["openai"]["user"]` (deep-copy, no-clobber). Wired into plan-check (role
+    `plan-check`, gated on the resolved route being OpenRouter) and transfer curation (role `transfer-curate`, always
+    OpenRouter). The tagger is excluded by design — it routes via local LiteLLM, which is not a provider-user-grouping
+    sink.
+  - **Migration.** The pre-Phase-4 per-proxy `proxy.yaml` key is deprecated: it loads with a one-time relocation warning
+    and is ignored (warn-and-degrade, user-owned config is a system boundary). The sidecar mounts `~/.forge/config.yaml`
+    read-only so in-container proxied forks read the same toggle.
 - **Remote reconciliation (single-id MVP).** `forge backend reconcile <source-id>` joins one local downstream trace to
   one remote account-side record via a backend remote-adapter registry (`forge.backend.remote`). A source is
   remote-reconcile capable iff it has a registered adapter there — NOT a `ModelSourceCapabilities` flag (a flag could

@@ -27,6 +27,37 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-20
 
+### openrouter_user_direct_callers: unified provider-`user` toggle + direct-caller injection
+
+**Goal**: Extend OpenRouter `user`-field session grouping (shipped for the proxied path) to Forge's direct `core.llm`
+callers, governed by a single global toggle instead of a per-proxy one — chosen on the principle *product experience
+drives architecture* (one switch over two per-scope homes).
+
+**Key changes**:
+
+- **Global toggle**: `provider_trace.inject_provider_user` (default off) now lives in `~/.forge/config.yaml`
+  (`RuntimeProviderTraceConfig`); `forge config set/edit` gained nested-section support via a `_nested_sections()`
+  registry. Loader is fail-open (bad subtree resets only `provider_trace`); write surfaces (`set`/`edit`) fail-closed on
+  unknown subkeys.
+- **Proxied gate repointed**: `_inject_provider_user_enabled()` reads `get_runtime_config().provider_trace` (same
+  pattern as `auth_ignore_env`); `proxy.yaml`'s `provider_trace` is now retention-only.
+- **Sidecar**: mounts `~/.forge/config.yaml` read-only so in-container proxied forks read the same toggle.
+- **Direct injection**: `with_openrouter_user` + `resolve_direct_provider_user(role)` (`core/usage/correlation.py`)
+  wired into plan-check (role `plan-check`, OpenRouter-gated) and transfer curation (role `transfer-curate`). Both
+  derive the id with the same `derive_provider_session_id` as the proxied path, so a run's direct and proxied OpenRouter
+  calls group identically account-side. Tagger excluded by design (local LiteLLM).
+
+**Breaking change (research preview)**: the per-proxy `proxy.yaml` `provider_trace.inject_provider_user` (and its legacy
+`inject_openrouter_user` alias) is removed. A stale key still loads but is **ignored** with a one-time relocation
+warning. Migration: `forge config set provider_trace.inject_provider_user=true` in `~/.forge/config.yaml`. Retention
+keys (`retention_days`, `max_total_mb`) stay proxy-owned.
+
+**Verification**: 432 tests green across all touched files (runtime-config, config CLI, schema, routing invariants,
+sidecar, correlation, plan-check, transfer, 2 regressions); `mypy` + `pyright` clean on every changed source and test
+module. Docs synced (design §3.14, appendix §A.14, end-user config.md + proxy.md). Sidecar integration run passed in
+Docker (`test_audit_plumbing.py`: config.yaml mounted read-only + in-container `get_runtime_config()` reads the toggle).
+`make pre-commit` clean.
+
 ### backend_remote_reconciliation PR 2: `forge backend reconcile` (single-id MVP)
 
 **Goal**: Ship the MVP of backend remote reconciliation -- join one local downstream trace to one remote account-side

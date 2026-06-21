@@ -348,6 +348,21 @@ def _provider_label(model: str, provider: ProviderType | None) -> str:
     return provider or (model.split("/", 1)[0] if "/" in model else "unknown")
 
 
+def _effective_provider(model: str, provider: ProviderType | None) -> ProviderType | None:
+    """The provider a direct call resolves to: explicit if given, else detected.
+
+    ``resolve_plan_check_route`` leaves ``provider`` None when the model string itself
+    encodes the provider, so the OpenRouter user-injection gate must detect it here
+    rather than trust a literal ``provider == "openrouter"``.
+    """
+    if provider is not None:
+        return provider
+    try:
+        return detect_provider(model)
+    except ValueError:
+        return None
+
+
 def _client_base_url(model: str, provider: ProviderType | None) -> str | None:
     if provider is not None:
         from forge.core.llm.credentials import resolve_provider_base_url
@@ -383,13 +398,14 @@ def run_plan_check(
             SyncAdapter,
             get_client,
         )
-        from forge.core.llm.clients.base import merge_hyperparams
         from forge.core.llm.types import ReasoningEffort
         from forge.core.usage import (
             emit_direct_llm_usage,
             mint_request_id,
+            resolve_direct_provider_user,
             target_is_forge_proxy,
             with_forge_request_id,
+            with_openrouter_user,
         )
 
         packed_plan, packed_action = _pack_prompt_sections(plan_text, context, budget_tokens=budget_tokens)
@@ -409,15 +425,22 @@ def run_plan_check(
         # Same exact-cost join as the tagger: forward an X-Request-ID only when the
         # client provably targets a Forge proxy (a dangling ref is worse than none).
         request_id = mint_request_id() if target_is_forge_proxy(_client_base_url(model, provider)) else None
-        # Layer reasoning effort onto the request-id wrapper without clobbering either
-        # (disjoint fields; exclude_unset merge). None when nothing to send, preserving
-        # the prior "no hyperparams" behavior.
-        rid_hp = with_forge_request_id(None, request_id) if request_id else None
+        # OpenRouter `user` grouping: opt-in (global toggle, resolved inside) and
+        # OpenRouter-only -- the field is an OpenRouter feature, so gate on the route.
+        provider_user = (
+            resolve_direct_provider_user("plan-check") if _effective_provider(model, provider) == "openrouter" else None
+        )
+        # Compose hyperparams by chaining the additive wrappers: each deep-copies and
+        # adds only its own key, preserving siblings. Stays None when nothing applies,
+        # preserving the prior "no hyperparams" behavior.
         # reasoning_effort is validated upstream (CLI Choice + SupervisorConfig.__post_init__).
-        effort_hp = (
+        hp: ModelHyperparameters | None = (
             ModelHyperparameters(reasoning_effort=cast(ReasoningEffort, reasoning_effort)) if reasoning_effort else None
         )
-        hp = merge_hyperparams(effort_hp, rid_hp) if (effort_hp or rid_hp) else None
+        if request_id:
+            hp = with_forge_request_id(hp, request_id)
+        if provider_user:
+            hp = with_openrouter_user(hp, provider_user)
 
         start = time.monotonic()
         response = adapter.complete([Message(role="user", content=prompt)], hyperparams=hp)

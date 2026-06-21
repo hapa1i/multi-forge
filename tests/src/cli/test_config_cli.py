@@ -12,7 +12,7 @@ from click.testing import CliRunner
 
 from forge.cli.config_cmd import config
 from forge.core.paths import get_forge_home
-from forge.runtime_config import reset_runtime_config
+from forge.runtime_config import get_runtime_config, reset_runtime_config
 
 
 class TestConfigShow:
@@ -342,6 +342,44 @@ class TestConfigSetStatusline:
         assert "statusline:" in result.output
         assert "cost_mode: subscription" in result.output
 
+
+class TestConfigSetProviderTrace:
+    """Tests for nested `forge config set provider_trace.inject_provider_user=...`."""
+
+    def setup_method(self):
+        reset_runtime_config()
+
+    def teardown_method(self):
+        reset_runtime_config()
+
+    def test_set_inject_provider_user_true_round_trips(self):
+        runner = CliRunner()
+        result = runner.invoke(config, ["set", "provider_trace.inject_provider_user=true"])
+        assert result.exit_code == 0, result.output
+        import yaml
+
+        data = yaml.safe_load((get_forge_home() / "config.yaml").read_text())
+        assert data["provider_trace"]["inject_provider_user"] is True
+        # Round-trips through the loader (the value the proxied + direct paths read).
+        assert get_runtime_config().provider_trace.inject_provider_user is True
+
+    def test_set_inject_provider_user_false(self):
+        runner = CliRunner()
+        assert runner.invoke(config, ["set", "provider_trace.inject_provider_user=false"]).exit_code == 0
+        assert get_runtime_config().provider_trace.inject_provider_user is False
+
+    def test_set_invalid_bool_rejected(self):
+        runner = CliRunner()
+        result = runner.invoke(config, ["set", "provider_trace.inject_provider_user=maybe"])
+        assert result.exit_code == 1
+        assert "Invalid value for 'provider_trace.inject_provider_user'" in result.output
+
+    def test_set_unknown_subkey_rejected(self):
+        runner = CliRunner()
+        result = runner.invoke(config, ["set", "provider_trace.nope=1"])
+        assert result.exit_code == 1
+        assert "Unknown provider_trace key" in result.output
+
     def test_reset_statusline_section(self):
         runner = CliRunner()
         runner.invoke(config, ["set", "statusline.cost_mode=subscription"])
@@ -355,8 +393,9 @@ class TestConfigSetStatusline:
         assert rc.statusline.cost_mode == "auto"
 
 
-class TestConfigEditStatusline:
-    """`forge config edit` must also enforce the segment allowlist (strict gate)."""
+class TestConfigEdit:
+    """`forge config edit` is a write surface: it must reject unknown nested subkeys and bad values
+    (strict gate, parity with `forge config set`), not silently drop them."""
 
     def setup_method(self):
         reset_runtime_config()
@@ -401,3 +440,18 @@ class TestConfigEditStatusline:
         data = yaml.safe_load((get_forge_home() / "config.yaml").read_text())
         assert data["statusline"]["segments"] == ["path", "model"]
         assert data["statusline"]["cost_mode"] == "api"
+
+    def test_edit_rejects_unknown_provider_trace_subkey(self, monkeypatch):
+        # A misspelled subkey must NOT silently persist while the toggle stays off (the edit-path
+        # fail-open hole: RuntimeConfig construction drops unknown nested subkeys, then the original
+        # YAML is written). Parity with `forge config set`, which already rejects unknown subkeys.
+        result = self._run_edit_with("provider_trace:\n  inject_provider_usre: true\n", monkeypatch)
+        assert result.exit_code == 1
+        assert "provider_trace" in result.output
+        assert "inject_provider_usre" in result.output
+
+    def test_edit_accepts_valid_provider_trace(self, monkeypatch):
+        result = self._run_edit_with("provider_trace:\n  inject_provider_user: true\n", monkeypatch)
+        assert result.exit_code == 0
+        # The toggle actually loads on after the edit (the whole point of the user-facing switch).
+        assert get_runtime_config().provider_trace.inject_provider_user is True

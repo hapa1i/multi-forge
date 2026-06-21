@@ -1,7 +1,10 @@
 # OpenRouter `user` injection for direct `core.llm` callers
 
-**Status**: Todo. Spun out of `openrouter_observability` Phase 5 (2026-06-16), which shipped `user`-field injection on
-the **proxied** path only. This card extends the same observability to Forge's **direct** OpenRouter callers.
+**Status**: Done (2026-06-20) — shipped on branch `feat/openrouter-user-direct-callers`. See
+[`checklist.md`](checklist.md) for the execution record and the resolved flag-home decision. Spun out of
+`openrouter_observability` Phase 5 (2026-06-16), which shipped `user`-field injection on the **proxied** path only; this
+card extended the same observability to Forge's **direct** OpenRouter callers and unified the toggle into a single
+global `~/.forge/config.yaml` setting governing both planes.
 
 ## Problem
 
@@ -26,7 +29,15 @@ OpenRouter (changing that is a routing change, not a header change).
   `core/reactive/env.py` reads), gate on the existing `provider == "openrouter"`, behind the opt-in.
 - **Out**: the proxied path (shipped); the tagger (routing limitation); remote reconciliation.
 
-## Open question — flag home
+## Open question — flag home (RESOLVED)
+
+**Resolved — one toggle governs both paths** (see [`checklist.md`](checklist.md) → Decision). The toggle lives in
+`~/.forge/config.yaml` as `provider_trace.inject_provider_user` and governs BOTH the proxied and the direct OpenRouter
+routes; the per-proxy `proxy.yaml` key is deprecated (warn-and-degrade → relocation notice), and the sidecar mounts
+`config.yaml` read-only so the in-container proxy reads the same switch. Chosen on the principle *product experience
+drives architecture* (one switch over two per-scope homes), accepting the architecture cost: proxied-gate repoint,
+sidecar mount, and loss of per-proxy granularity (acceptable for an observability-only grouping id). Original framing
+kept for context:
 
 Phase 5's flag is per-proxy (`provider_trace.inject_provider_user`), which direct callers cannot read (different
 process, no proxy binding). The direct-call opt-in needs an in-process source. **Leading candidate**:

@@ -1,17 +1,17 @@
 """Regression: a ``proxy.yaml`` ``provider_trace:`` block must survive the loader.
 
-The provider-trace plane and its provider-user grouping
-``inject_provider_user`` opt-in are declared on ``ProxyConfig`` /
-``ProxyInstanceConfig`` (schema), coerced in ``__post_init__``, and read at runtime
-(``server.py``: prune at startup + the provider ``user`` injection gate). But the
-loader that bridges YAML -> dataclass omitted ``provider_trace`` at BOTH hops:
+The provider-trace plane's retention bounds (``retention_days`` / ``max_total_mb``) are declared on
+``ProxyConfig`` / ``ProxyInstanceConfig`` (schema), coerced in ``__post_init__``, and read at
+runtime (``server.py`` prunes shards at startup). But the loader that bridges YAML -> dataclass
+omitted ``provider_trace`` at BOTH hops:
 
 1. ``load_proxy_instance_config_from_dict`` (dict -> ``ProxyInstanceConfig``)
 2. ``_proxy_instance_to_forge_config`` (``ProxyInstanceConfig`` -> ``ProxyConfig``)
 
-Because the field has a default (``ProviderTraceConfig()``), the omission was
-silent: a user's ``provider_trace: {inject_provider_user: true, ...}`` block loaded
-as all-defaults, so provider-user injection never fired and custom retention was ignored.
+Because the field has a default (``ProviderTraceConfig()``), the omission was silent: a user's
+``provider_trace: {retention_days: 7, ...}`` block loaded as all-defaults, so custom retention was
+ignored. (The ``inject_provider_user`` toggle has since moved to the global ``~/.forge/config.yaml``
+and is no longer carried on this proxy-owned block -- see ``runtime_config.py``.)
 
 Affected: ``src/forge/config/loader.py`` (both wiring sites).
 """
@@ -37,7 +37,7 @@ _VALID_PROXY = {
     },
 }
 
-_PROVIDER_TRACE = {"retention_days": 7, "max_total_mb": 99, "inject_provider_user": True}
+_PROVIDER_TRACE = {"retention_days": 7, "max_total_mb": 99}
 
 
 def test_provider_trace_survives_dict_load() -> None:
@@ -48,14 +48,13 @@ def test_provider_trace_survives_dict_load() -> None:
 
     assert instance.provider_trace.retention_days == 7
     assert instance.provider_trace.max_total_mb == 99
-    assert instance.provider_trace.inject_provider_user is True
 
 
 def test_provider_trace_survives_to_forge_config() -> None:
     """Site 2: the derived ``ProxyConfig`` (what the running proxy reads) must carry it.
 
-    ``server.py`` reads ``config.proxy.provider_trace.inject_provider_user`` and prunes
-    from ``config.proxy.provider_trace`` -- both off this derived ``ProxyConfig``.
+    ``server.py`` prunes shards from ``config.proxy.provider_trace`` at startup -- off this derived
+    ``ProxyConfig``. (The inject toggle is read separately from the global runtime config.)
     """
     from forge.config.loader import (
         _proxy_instance_to_forge_config,
@@ -67,11 +66,10 @@ def test_provider_trace_survives_to_forge_config() -> None:
 
     assert forge_config.proxy.provider_trace.retention_days == 7
     assert forge_config.proxy.provider_trace.max_total_mb == 99
-    assert forge_config.proxy.provider_trace.inject_provider_user is True
 
 
 def test_provider_trace_defaults_when_absent() -> None:
-    """No ``provider_trace:`` block -> documented defaults (14d / 512 MB / off), not corruption."""
+    """No ``provider_trace:`` block -> documented retention defaults (14d / 512 MB), not corruption."""
     from forge.config.loader import (
         _proxy_instance_to_forge_config,
         load_proxy_instance_config_from_dict,
@@ -81,7 +79,6 @@ def test_provider_trace_defaults_when_absent() -> None:
 
     assert forge_config.proxy.provider_trace.retention_days == 14
     assert forge_config.proxy.provider_trace.max_total_mb == 512
-    assert forge_config.proxy.provider_trace.inject_provider_user is False
 
 
 def test_template_provider_trace_and_logging_survive_create(monkeypatch) -> None:
@@ -101,7 +98,7 @@ def test_template_provider_trace_and_logging_survive_create(monkeypatch) -> None
 
     # A real template config, then stamp non-default blocks onto cfg.proxy (as a custom template would).
     tmpl = orch.load_config(template="openrouter-anthropic")
-    tmpl.proxy.provider_trace = ProviderTraceConfig(retention_days=7, inject_provider_user=True)
+    tmpl.proxy.provider_trace = ProviderTraceConfig(retention_days=7)
     tmpl.proxy.logging = LoggingConfig(requests=RequestLogConfig(enabled="on", stream_chunks=True))
     monkeypatch.setattr(orch, "load_config", lambda *_a, **_k: tmpl)
 
@@ -115,7 +112,6 @@ def test_template_provider_trace_and_logging_survive_create(monkeypatch) -> None
 
     data = YAML().load(written.read_text())
     instance = load_proxy_instance_config_from_dict(dict(data))
-    assert instance.provider_trace.inject_provider_user is True
     assert instance.provider_trace.retention_days == 7
     assert instance.logging.requests.enabled == "on"
     assert instance.logging.requests.stream_chunks is True

@@ -124,7 +124,7 @@ def set_cmd(key_value: str) -> None:
         console.print(f"\n[dim]Available keys: {', '.join(sorted(known_fields))}[/dim]")
         sys.exit(1)
 
-    coerced_value: Any = _coerce_value(key, value, known_fields[key])
+    coerced_value: Any = _coerce_value(value, known_fields[key])
     if coerced_value is _COERCE_ERROR:
         console.print(f"[red]Error:[/red] Invalid value for '{key}': {value}")
         sys.exit(1)
@@ -208,6 +208,22 @@ def edit_cmd() -> None:
             console.print(f"[red]Error:[/red] Invalid configuration: {e}")
             console.print(f"Your changes are saved at: {display_path(tmp_path)}")
             sys.exit(1)
+
+        # RuntimeConfig construction silently DROPS unknown nested subkeys (loader forward-compat,
+        # see _coerce_*_config), so a typo like provider_trace.inject_provider_usre would pass the
+        # validation above and then persist while the toggle stays off. The edit path is a write
+        # surface, so reject unknown nested subkeys here -- parity with `forge config set` (fail-closed).
+        for section_name, section_cls in _nested_sections().items():
+            section_block = edited_data.get(section_name)
+            if not isinstance(section_block, dict):
+                continue
+            known_sub = {f.name for f in fields(section_cls)}
+            unknown_sub = [k for k in section_block if k not in known_sub]
+            if unknown_sub:
+                console.print(f"[red]Error:[/red] Unknown {section_name} key(s): {', '.join(map(str, unknown_sub))}")
+                console.print(f"[dim]Available: {', '.join(sorted(known_sub))}[/dim]")
+                console.print(f"Your changes are saved at: {display_path(tmp_path)}")
+                sys.exit(1)
 
         # Segment names aren't validated by StatusLineConfig (the renderer and
         # the set/edit CLI own that), so the edit path must enforce the allowlist
@@ -301,7 +317,7 @@ def _persist_or_clear(data: MutableMapping[str, Any], config_path: Path) -> None
 _COERCE_ERROR = object()
 
 
-def _coerce_value(key: str, value: str, field_info: Any) -> Any:
+def _coerce_value(value: str, field_info: Any) -> Any:
     """Coerce string CLI value to the field's expected Python type."""
     field_type = field_info.type
 
@@ -342,29 +358,45 @@ def _unknown_segments(segments: list[Any]) -> list[Any]:
     return [s for s in segments if s not in SEGMENT_NAMES]
 
 
-def _set_nested_key(key: str, value: str, console: Console) -> None:
-    """Set a dotted nested config key. Only ``statusline.<subkey>`` is supported.
+def _nested_sections() -> dict[str, type]:
+    """Map nested config section name -> its dataclass (the dotted-key registry).
 
-    Strict (fail-closed): unknown section/subkey, invalid enum values, and
-    unknown segment names all error and exit non-zero, naming valid options.
+    Add a section here to make ``forge config set <section>.<subkey>`` work.
+    """
+    from forge.runtime_config import RuntimeProviderTraceConfig, StatusLineConfig
+
+    return {
+        "statusline": StatusLineConfig,
+        "provider_trace": RuntimeProviderTraceConfig,
+    }
+
+
+def _set_nested_key(key: str, value: str, console: Console) -> None:
+    """Set a dotted nested config key (e.g. ``statusline.cost_mode``,
+    ``provider_trace.inject_provider_user``).
+
+    Strict (fail-closed): unknown section/subkey, invalid values, and unknown
+    statusline segment names all error and exit non-zero, naming valid options.
     """
     from forge.cli.statusline.names import SEGMENT_NAMES
-    from forge.runtime_config import StatusLineConfig
 
+    sections = _nested_sections()
     section, _, subkey = key.partition(".")
-    if section != "statusline":
+    section_cls = sections.get(section)
+    if section_cls is None:
         console.print(f"[red]Error:[/red] Unknown config section: '{section}'")
-        console.print("\n[dim]Only 'statusline.*' nested keys are supported.[/dim]")
+        console.print(f"\n[dim]Nested sections: {', '.join(sorted(sections))}[/dim]")
         sys.exit(1)
 
-    sl_fields = {f.name: f for f in fields(StatusLineConfig)}
-    if subkey not in sl_fields:
-        console.print(f"[red]Error:[/red] Unknown statusline key: '{subkey}'")
-        console.print(f"\n[dim]Available: {', '.join(sorted(sl_fields))}[/dim]")
+    sec_fields = {f.name: f for f in fields(section_cls)}
+    if subkey not in sec_fields:
+        console.print(f"[red]Error:[/red] Unknown {section} key: '{subkey}'")
+        console.print(f"\n[dim]Available: {', '.join(sorted(sec_fields))}[/dim]")
         sys.exit(1)
 
     coerced_sub: Any
-    if subkey == "segments":
+    # statusline.segments is the one list field needing allowlist validation.
+    if section == "statusline" and subkey == "segments":
         coerced_sub = [s.strip() for s in value.split(",") if s.strip()]
         unknown = _unknown_segments(coerced_sub)
         if unknown:
@@ -372,9 +404,9 @@ def _set_nested_key(key: str, value: str, console: Console) -> None:
             console.print(f"\n[dim]Valid segments: {', '.join(SEGMENT_NAMES)}[/dim]")
             sys.exit(1)
     else:
-        coerced_sub = _coerce_value(subkey, value, sl_fields[subkey])
+        coerced_sub = _coerce_value(value, sec_fields[subkey])
         if coerced_sub is _COERCE_ERROR:
-            console.print(f"[red]Error:[/red] Invalid value for 'statusline.{subkey}': {value}")
+            console.print(f"[red]Error:[/red] Invalid value for '{section}.{subkey}': {value}")
             sys.exit(1)
 
     config_path = get_config_path()
@@ -388,14 +420,14 @@ def _set_nested_key(key: str, value: str, console: Console) -> None:
     else:
         data = {}
 
-    section_data = data.get("statusline")
+    section_data = data.get(section)
     if not isinstance(section_data, dict):
         section_data = {}
     section_data[subkey] = coerced_sub
-    data["statusline"] = section_data
+    data[section] = section_data
 
-    # Validate via construction — StatusLineConfig.__post_init__ rejects bad enums
-    # (fail-closed); segment names were already checked above.
+    # Validate via construction — the nested dataclass __post_init__ rejects bad
+    # values (fail-closed); statusline segment names were already checked above.
     known_fields = {f.name for f in fields(RuntimeConfig)}
     try:
         RuntimeConfig(**{k: v for k, v in dict(data).items() if k in known_fields})

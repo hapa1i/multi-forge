@@ -467,6 +467,34 @@ files AND the proxy module logger. Both leaked.
   When auditing a logging surface, trace whether each interpolated value *derives* from caller input, and grep
   `logger.*json.dumps` plus `%s`-style calls, not just known leaky names.
 
+### A toggle that governs both proxied and direct paths belongs in global runtime config (openrouter_user_direct_callers, shipped 2026-06-20)
+
+`provider_trace.inject_provider_user` started per-proxy (`proxy.yaml`) but had to govern both the proxy AND Forge's
+direct `core.llm` callers (plan-check, curation). It moved to the global `~/.forge/config.yaml`
+(`RuntimeProviderTraceConfig`, read via `get_runtime_config().provider_trace`). Keep these rules when a config value
+spans both planes:
+
+- **Ownership test: who reads it.** A value only the proxy reads stays per-proxy (the "BOTH loader hops" note still
+  governs those). A value the proxy AND a non-proxy code path both read belongs in global runtime config. The proxy
+  legitimately reads `get_runtime_config()` for non-routing fields — precedent: `auth_ignore_env`. Splitting one
+  conceptual switch into two per-scope homes to avoid this is the wrong trade (product experience drives architecture).
+  Retention keys (`retention_days`/`max_total_mb`), proxy-only, correctly stayed in `proxy.yaml`.
+- **The sidecar must mount any host config the in-container proxy reads.** Moving the gate to `config.yaml` silently
+  broke in-container proxied forks until `_ensure_audit_plumbing_mounts` (`sidecar/container.py`) bind-mounted
+  `~/.forge/config.yaml` read-only. Mount only when the host file exists (a Docker bind source must pre-exist; absent ⇒
+  toggle defaults off ⇒ the omitted mount is the correct no-op).
+- **Write surfaces fail-closed even though the disk loader is fail-open.** `forge config edit` validates by constructing
+  `RuntimeConfig`, which runs the loader's forward-compat coercion that *drops* unknown nested subkeys — so a typo like
+  `inject_provider_usre: true` would persist with the toggle silently off. The edit path needs its own unknown-subkey
+  check (reuses `_nested_sections()`), restoring parity with `set`. Same dataclass `__post_init__`, but entry paths
+  differ: load degrades, set/edit reject. Regression: `test_edit_rejects_unknown_provider_trace_subkey`.
+- **Cross-plane grouping ids must come from one function.** Direct (`resolve_direct_provider_user`) and proxied
+  (`reactive/env.py`) injection both derive the id via `derive_provider_session_id`, so a run's direct + proxied
+  OpenRouter calls group identically account-side. The direct resolver mirrors env.py's root fallback
+  (`FORGE_ROOT_RUN_ID` else `FORGE_RUN_ID`). Lock this with an equality test, not two independent format assertions
+  (`test_correlation.py::test_matches_proxied_derivation`). User-config relocation is warn-and-degrade (system
+  boundary), not reject.
+
 ### Proposed Promotions From Metric Evidence (awaiting human review, 2026-06-06)
 
 Drafted by the `metric_evidence_simplification` Phase 6 closeout. **Not yet promoted** — a human should review and move

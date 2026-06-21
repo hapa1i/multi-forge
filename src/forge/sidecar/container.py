@@ -212,6 +212,11 @@ def _ensure_audit_plumbing_mounts(proxy_id: str) -> list[tuple[str, str, str]]:
       every launch; and in sidecar mode the in-container supervisor + workflow verbs are
       the *only* writers of their usage events, so an unmounted usage/ makes the whole
       session invisible to `forge activity`.
+    - host config.yaml read-only WHEN IT EXISTS, so the in-container proxy reads the global
+      provider_trace.inject_provider_user toggle (it governs the proxied OpenRouter route too).
+      A Docker bind source must pre-exist; an absent file means the toggle is its default (off),
+      so skipping the mount is the correct no-op, not a silent disable. Single file, ro -- same
+      narrow shape as the proxy.yaml mount above.
     """
     forge_home = get_forge_home()
     mounts: list[tuple[str, str, str]] = [
@@ -222,6 +227,10 @@ def _ensure_audit_plumbing_mounts(proxy_id: str) -> list[tuple[str, str, str]]:
         host_dir = forge_home / subdir
         host_dir.mkdir(parents=True, exist_ok=True)
         mounts.append((str(host_dir), f"{_SIDECAR_FORGE_HOME}/{subdir}", "rw"))
+
+    config_file = forge_home / "config.yaml"
+    if config_file.is_file():
+        mounts.append((str(config_file), f"{_SIDECAR_FORGE_HOME}/config.yaml", "ro"))
 
     return mounts
 
