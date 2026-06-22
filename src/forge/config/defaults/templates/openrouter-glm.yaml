@@ -1,7 +1,7 @@
 # Template: openrouter-glm
 # GLM / Z.ai models via OpenRouter (direct, no LiteLLM)
 #
-# Haiku uses GLM 4.7 Flash. Sonnet/opus use GLM 5.1.
+# Haiku uses GLM 4.7 Flash. Sonnet/opus use GLM 5.2.
 # Requires OPENROUTER_API_KEY in .env (or environment).
 
 proxy:
@@ -13,11 +13,11 @@ proxy:
   openrouter:
     tiers:
       haiku: z-ai/glm-4.7-flash
-      sonnet: z-ai/glm-5.1
-      opus: z-ai/glm-5.1
+      sonnet: z-ai/glm-5.2
+      opus: z-ai/glm-5.2
     tier_overrides:
       sonnet:
         reasoning_effort: high
       opus:
-        reasoning_effort: high
+        reasoning_effort: xhigh
     error_hints: true

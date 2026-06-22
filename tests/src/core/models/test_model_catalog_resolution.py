@@ -163,6 +163,12 @@ class TestOpenRouterSlugAliases:
         assert resolve_model_id("minimax/minimax-m3") == "minimax-m3"
         assert resolve_model_id("z-ai/glm-4.7-flash") == "glm-4.7-flash"
         assert resolve_model_id("z-ai/glm-5.1") == "glm-5.1"
+        assert resolve_model_id("z-ai/glm-5.2") == "glm-5.2"
+
+    def test_dash_aliases_resolve_to_canonical_ids(self):
+        """Dot-to-dash convenience aliases resolve to the canonical dotted IDs."""
+        assert resolve_model_id("glm-5-2") == "glm-5.2"
+        assert resolve_model_id("glm-5-1") == "glm-5.1"
 
     def test_metadata_lookups_accept_openrouter_slugs(self):
         assert get_context_window_tokens("anthropic/claude-opus-4.6") == 1000000
@@ -172,6 +178,7 @@ class TestOpenRouterSlugAliases:
         assert get_context_window_tokens("qwen/qwen3.6-plus") == 1000000
         assert get_context_window_tokens("z-ai/glm-4.7-flash") == 202752
         assert get_context_window_tokens("z-ai/glm-5.1") == 202752
+        assert get_context_window_tokens("z-ai/glm-5.2") == 1048576
         assert get_max_output_tokens("minimax/minimax-m2.5") == 196608
         assert get_max_output_tokens("minimax/minimax-m2.7") == 131072
         assert get_max_output_tokens("minimax/minimax-m3") == 512000

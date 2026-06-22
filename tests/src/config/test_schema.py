@@ -626,6 +626,83 @@ class TestProxyInstanceConfigValidation:
         assert config.tier_overrides.opus is not None
         assert config.tier_overrides.opus.reasoning_effort == "xhigh"
 
+    def test_glm_52_rejects_unsupported_low_reasoning_effort(self):
+        """GLM 5.2 advertises only high/xhigh, so a low/medium override is rejected at load."""
+        from forge.config.schema import (
+            ProxyInstanceConfig,
+            TierModels,
+            TierOverride,
+            TierOverrides,
+        )
+
+        with pytest.raises(ValueError, match="reasoning_effort='low' is not supported"):
+            ProxyInstanceConfig(
+                proxy_format=1,
+                template="test",
+                template_digest="sha256:test",
+                provider="openrouter",
+                proxy_endpoint="http://localhost:8103",
+                port=8103,
+                upstream_base_url="https://openrouter.ai/api/v1",
+                tiers=TierModels(haiku="h", sonnet="z-ai/glm-5.2", opus="z-ai/glm-5.2"),
+                tier_overrides=TierOverrides(sonnet=TierOverride(reasoning_effort="low")),
+            )
+
+    def test_glm_52_accepts_high_and_xhigh_reasoning_effort(self):
+        """GLM 5.2's advertised efforts (high, xhigh) pass static proxy config validation."""
+        from forge.config.schema import (
+            ProxyInstanceConfig,
+            TierModels,
+            TierOverride,
+            TierOverrides,
+        )
+
+        config = ProxyInstanceConfig(
+            proxy_format=1,
+            template="test",
+            template_digest="sha256:test",
+            provider="openrouter",
+            proxy_endpoint="http://localhost:8103",
+            port=8103,
+            upstream_base_url="https://openrouter.ai/api/v1",
+            tiers=TierModels(haiku="h", sonnet="z-ai/glm-5.2", opus="z-ai/glm-5.2"),
+            tier_overrides=TierOverrides(
+                sonnet=TierOverride(reasoning_effort="high"),
+                opus=TierOverride(reasoning_effort="xhigh"),
+            ),
+        )
+
+        assert config.tier_overrides.sonnet is not None
+        assert config.tier_overrides.sonnet.reasoning_effort == "high"
+        assert config.tier_overrides.opus is not None
+        assert config.tier_overrides.opus.reasoning_effort == "xhigh"
+
+    def test_glm_51_rejects_unsupported_xhigh_reasoning_effort(self):
+        """GLM 5.1 advertises low/medium/high only, so an xhigh override is rejected at load.
+
+        Locks the boundary that xhigh is not universal: glm-5.2 added it, but glm-5.1
+        (still resolvable in the catalog) must keep rejecting it.
+        """
+        from forge.config.schema import (
+            ProxyInstanceConfig,
+            TierModels,
+            TierOverride,
+            TierOverrides,
+        )
+
+        with pytest.raises(ValueError, match="reasoning_effort='xhigh' is not supported"):
+            ProxyInstanceConfig(
+                proxy_format=1,
+                template="test",
+                template_digest="sha256:test",
+                provider="openrouter",
+                proxy_endpoint="http://localhost:8103",
+                port=8103,
+                upstream_base_url="https://openrouter.ai/api/v1",
+                tiers=TierModels(haiku="h", sonnet="z-ai/glm-5.1", opus="z-ai/glm-5.1"),
+                tier_overrides=TierOverrides(opus=TierOverride(reasoning_effort="xhigh")),
+            )
+
 
 class TestInterceptAuditConfig:
     """Tests for Phase 2 intercept/audit/wire_shape config on ProxyInstanceConfig."""

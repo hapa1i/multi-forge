@@ -505,6 +505,7 @@ class TestOpenRouterModelMapping:
         assert map_model_name("minimax/minimax-m2.5") == "minimax/minimax-m2.5"
         assert map_model_name("z-ai/glm-4.7-flash") == "z-ai/glm-4.7-flash"
         assert map_model_name("z-ai/glm-5.1") == "z-ai/glm-5.1"
+        assert map_model_name("z-ai/glm-5.2") == "z-ai/glm-5.2"
         assert map_model_name("meta-llama/llama-3.1-70b") == "meta-llama/llama-3.1-70b"
 
     def test_anthropic_flavor_maps_to_openrouter_tier(self, monkeypatch):

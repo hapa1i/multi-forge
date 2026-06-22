@@ -160,7 +160,7 @@ def _build_available_models() -> dict[str, ModelSpec]:
             name=glm_opus,
             model_id=glm_opus,
             family="glm",
-            provider_refs=(("openrouter", "z-ai/glm-5.1"),),
+            provider_refs=(("openrouter", "z-ai/glm-5.2"),),
             preferred_proxy="openrouter-glm",
             description="Cost-efficient general analysis",
         ),

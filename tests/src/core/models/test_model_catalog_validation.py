@@ -381,6 +381,7 @@ class TestOpenRouterOpenModelsCatalog:
             "minimax/minimax-m3": ("minimax-m3", 1048576, 512000),
             "z-ai/glm-4.7-flash": ("glm-4.7-flash", 202752, 16384),
             "z-ai/glm-5.1": ("glm-5.1", 202752, 202752),
+            "z-ai/glm-5.2": ("glm-5.2", 1048576, 131072),
             "google/gemma-4-31b-it": ("gemma-4-31b-it", 262144, 16384),
         }
 
@@ -404,6 +405,20 @@ class TestOpenRouterOpenModelsCatalog:
 
         assert catalog.get("qwen3.6-max-preview").supports_images is False
         assert catalog.get("qwen3-coder").supports_thinking is False
+
+    def test_glm_52_reasoning_effort_list_is_high_xhigh_only(self):
+        """Lock GLM 5.2's effort list to what OpenRouter advertises (high, xhigh only).
+
+        schema._validate_static_tier_override_constraints gates
+        tier_overrides.*.reasoning_effort against this exact list, so listing low/medium
+        would let unsupported config reach the provider. OpenRouter z-ai/glm-5.2 supports
+        only high and xhigh (xhigh is the highest effort it exposes).
+        """
+        catalog = load_model_catalog(force_reload=True)
+
+        spec = catalog.get("glm-5.2")
+        assert spec.litellm_reasoning_efforts == ("high", "xhigh")
+        assert spec.default_reasoning_effort == "high"
 
 
 class TestSystemPromptAddendumValidation:
