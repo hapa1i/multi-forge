@@ -136,3 +136,51 @@ def test_cli_rich_tips_go_through_output_helpers() -> None:
             offenders.append(str(path.relative_to(repo_root)))
 
     assert offenders == []
+
+
+# Files that still hand-roll `[red]Error:[/red]` instead of routing through
+# print_error. Debt ledger tracked by the forge_cli_cleanup card (finding #9);
+# shrink as the retrofit lands, never grow. A file cleaned but left here fails
+# the stale check below, forcing the ledger to shrink with the fix.
+CLI_ERROR_MARKUP_ALLOWLIST = {
+    "src/forge/cli/claude.py",
+    "src/forge/cli/config_cmd.py",
+    "src/forge/cli/editor.py",
+    "src/forge/cli/extensions.py",
+    "src/forge/cli/gc.py",
+    "src/forge/cli/guards.py",
+    "src/forge/cli/logs.py",
+    "src/forge/cli/memory.py",
+    "src/forge/cli/memory_report.py",
+    "src/forge/cli/policy.py",
+    "src/forge/cli/proxy.py",
+    "src/forge/cli/session.py",
+    "src/forge/cli/session_codex.py",
+    "src/forge/cli/session_fork.py",
+    "src/forge/cli/session_lifecycle.py",
+    "src/forge/cli/session_manage.py",
+    "src/forge/cli/session_model_pin.py",
+    "src/forge/cli/workflow.py",
+}
+
+
+def test_cli_rich_errors_go_through_print_error() -> None:
+    """Hand-rolled `[red]Error:[/red]` belongs in print_error, not at call sites.
+
+    Extends the recovery-output rule from tips to errors (cli_style_guidelines.md
+    "Error ownership"). The allowlist is the current debt; new offenders fail.
+    """
+    repo_root = Path(__file__).resolve().parents[3]
+    cli_root = repo_root / "src" / "forge" / "cli"
+
+    offenders: set[str] = set()
+    for path in sorted(cli_root.rglob("*.py")):
+        if path.name == "output.py":
+            continue
+        if "[red]Error:[/red]" in path.read_text(encoding="utf-8"):
+            offenders.add(path.relative_to(repo_root).as_posix())
+
+    new = offenders - CLI_ERROR_MARKUP_ALLOWLIST
+    fixed = CLI_ERROR_MARKUP_ALLOWLIST - offenders
+    assert not new, f"route hand-rolled [red]Error:[/red] through print_error: {sorted(new)}"
+    assert not fixed, f"cleaned -- remove from CLI_ERROR_MARKUP_ALLOWLIST: {sorted(fixed)}"
