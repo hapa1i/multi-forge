@@ -62,8 +62,8 @@ defaults:
     opus: qwen3.6-max-preview
   glm:
     haiku: glm-4.7-flash
-    sonnet: glm-5.1
-    opus: glm-5.1
+    sonnet: glm-5.2
+    opus: glm-5.2
   kimi:
     haiku: gemma-4-31b-it
     sonnet: kimi-k2.6
@@ -1475,6 +1475,31 @@ models:
     intelligence_score: 87
     tags: [agentic, code-gen]
 
+  glm-5.2:
+    friendly_name: GLM 5.2
+    context_window_tokens: 1048576
+    max_output_tokens: 131072
+    max_thinking_tokens: null
+    supports_thinking: true
+    supports_images: false
+    temperature_constraint: range
+    temperature:
+      min: 0.0
+      default: 1.0
+      max: 2.0
+    supports_top_p: true
+    default_timeout_seconds: 180
+    prompt_caching:
+      supports: true
+      mechanism: auto
+      min_tokens: 1024
+    native_thinking_param: reasoning_effort
+    # OpenRouter z-ai/glm-5.2 advertises only high and xhigh (xhigh is the highest effort it exposes); no low/medium.
+    litellm_reasoning_efforts: [high, xhigh]
+    default_reasoning_effort: high
+    intelligence_score: 90
+    tags: [agentic, code-gen]
+
   gemma-4-31b-it:
     friendly_name: Gemma 4 31B
     context_window_tokens: 262144
@@ -1648,7 +1673,9 @@ aliases:
   minimax-m2-7: minimax-m2.7
   z-ai/glm-4.7-flash: glm-4.7-flash
   z-ai/glm-5.1: glm-5.1
+  z-ai/glm-5.2: glm-5.2
   glm-4-7-flash: glm-4.7-flash
   glm-5-1: glm-5.1
+  glm-5-2: glm-5.2
   google/gemma-4-31b-it: gemma-4-31b-it
   gemma-4-31b: gemma-4-31b-it
