@@ -219,7 +219,7 @@ result in a warning, not a block.
 cite specific plan items — that's multi-needle retrieval over a long context, not code writing. SWE-bench Verified is
 the wrong benchmark for this role. For per-family supervisor picks (including the Opus 4.6 vs 4.8 split, when to
 cross-route to Gemini for mid-long or multimodal planning sessions, and DeepSeek V4 Pro as a cost-efficient
-alternative), see [model-selection.md](model-selection.md).
+alternative), see [model_selection.md](model_selection.md).
 
 ### Cascade: a cheap first pass before the supervisor (opt-in)
 

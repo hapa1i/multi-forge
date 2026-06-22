@@ -280,7 +280,7 @@ def test_feature():
 
 ### When Tests Become Obsolete
 
-From `coding-standards.md`:
+From `coding_standards.md`:
 
 **Delete Obsolete Tests**: If functionality is removed, delete its tests (don't skip).
 

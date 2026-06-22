@@ -50,7 +50,7 @@ The memory writer writes suggestions to a **shadow file** for human review, read
 redundant proposals. Use for standards and guidelines where human curation matters.
 
 ```bash
-forge memory track docs/developer/coding-standards.md \
+forge memory track docs/developer/coding_standards.md \
   --propose --shadow-path .forge/memory/shadow_standards.md
 ```
 
@@ -71,7 +71,7 @@ forge memory track docs/checklist.md --strategy checklist
 forge memory track docs/changelog.md --strategy changelog
 
 # Author a human-reviewed shadow proposal passport
-forge memory track docs/developer/coding-standards.md \
+forge memory track docs/developer/coding_standards.md \
   --propose --shadow-path .forge/memory/shadow_standards.md
 
 # Enable memory for a session (or start with --memory on):
@@ -177,7 +177,7 @@ echo "# Implementation Checklist" > docs/checklist.md
 echo "# Change Log" > docs/changelog.md
 
 # Shadow docs (official doc must exist; Forge-owned shadow is created by track --propose)
-# docs/developer/coding-standards.md should already exist
+# docs/developer/coding_standards.md should already exist
 ```
 
 Missing official files are skipped at runtime. `forge memory track` catches missing official docs up front.

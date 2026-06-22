@@ -214,7 +214,7 @@ model_alternatives:
 
 For per-role guidance on when to pin `--model claude-opus-4-8` vs leave the default Fable 5 mapping in place — including
 the supervisor-vs-executor split, the structural reasons MRCR varies across model versions, and per-family cost +
-multi-needle retrieval data — see [model-selection.md](model-selection.md).
+multi-needle retrieval data — see [model_selection.md](model_selection.md).
 
 ---
 

@@ -89,7 +89,7 @@ docker run --rm forge-test uv run pytest tests/integration/
 | E2E        | `tests/integration/`         | Docker        | Full workflows with real Claude Code           |
 | Regression | `tests/regression/`          | Yes           | Bug fix validation                             |
 
-See [testing-guidelines.md](testing-guidelines.md) for details.
+See [testing_guidelines.md](testing_guidelines.md) for details.
 
 ### Docker Test Fixtures: Helper Methods
 
@@ -177,10 +177,11 @@ Forge uses files instead of a database:
 
 | Document                                                   | Purpose                                       |
 | ---------------------------------------------------------- | --------------------------------------------- |
-| [coding-standards.md](coding-standards.md)                 | Python conventions, type safety, async        |
-| [testing-guidelines.md](testing-guidelines.md)             | Test organization, Docker fixtures, real>mock |
-| [documentation-guidelines.md](documentation-guidelines.md) | Doc writing, authority map, size limits       |
-| [board-contract.md](board-contract.md)                     | Board lanes, checklists, closeout contract    |
+| [coding_standards.md](coding_standards.md)                 | Python conventions, type safety, async        |
+| [cli_style_guidelines.md](cli_style_guidelines.md)         | CLI command shape and recovery-tip style      |
+| [testing_guidelines.md](testing_guidelines.md)             | Test organization, Docker fixtures, real>mock |
+| [documentation_guidelines.md](documentation_guidelines.md) | Doc writing, authority map, size limits       |
+| [board_contract.md](board_contract.md)                     | Board lanes, checklists, closeout contract    |
 
 ## Project Docs
 

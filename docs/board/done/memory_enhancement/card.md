@@ -408,7 +408,7 @@ model and point to `forge memory track ...` / `forge memory enable ...` as the r
 
 This matches `README.md`: Multi-Forge is a research preview whose APIs, commands, and file formats may change without
 notice between releases, and pre-OSS Forge installs are not supported in-place. It also follows
-`docs/developer/coding-standards.md` §5: pre-release schema breaks still need strict validation and clear reset
+`docs/developer/coding_standards.md` §5: pre-release schema breaks still need strict validation and clear reset
 instructions, but not compatibility wrappers.
 
 ## Open Questions

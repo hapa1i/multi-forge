@@ -431,7 +431,7 @@ def _dict_to_runtime_config(data: dict[str, Any], source: Path) -> RuntimeConfig
     """Convert a dict to RuntimeConfig, warning on unknown keys.
 
     System boundary: user-edited config. Strict on value validation, best-effort
-    on unknown keys for forward compat (coding-standards.md §5, system boundaries).
+    on unknown keys for forward compat (coding_standards.md §5, system boundaries).
     """
     known_fields = {f.name for f in fields(RuntimeConfig)}
     unknown = set(data.keys()) - known_fields

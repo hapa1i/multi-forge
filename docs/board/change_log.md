@@ -6,7 +6,7 @@ Completed-work record for Forge implementation sessions.
 
 - Updated by the memory writer with `strategy=changelog`, and by humans when closing a phase.
 - Add compact entries for completed work only. Pending tasks belong in card checklists.
-- Follow `docs/developer/board-contract.md` "Change Log Policy": each entry needs Goal, Key changes, and Verification.
+- Follow `docs/developer/board_contract.md` "Change Log Policy": each entry needs Goal, Key changes, and Verification.
 - Keep entries short. Do not list every file unless the file list is the point of the work.
 - Use newest-first order so active work stays near the top.
 - When this file approaches the documentation size limits, compact the oldest entries at the bottom into a dated summary
@@ -22,7 +22,7 @@ wc -l docs/board/change_log.md
 ## Entries
 
 > Format: `## YYYY-MM-DD`, then `### Phase X.Y: Short Title`, with `**Goal**:`, `**Key changes**:` as bullets, and
-> `**Verification**:`. Use newest-first order. See `docs/developer/board-contract.md` "Change Log Policy" for the full
+> `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
 ## 2026-06-20

@@ -692,9 +692,9 @@ class TestDesignatedDoc:
         doc = DesignatedDoc(
             path=".forge/memory/shadow_standards.md",
             strategy="generic",
-            shadows="docs/developer/coding-standards.md",
+            shadows="docs/developer/coding_standards.md",
         )
-        assert doc.shadows == "docs/developer/coding-standards.md"
+        assert doc.shadows == "docs/developer/coding_standards.md"
         assert doc.strategy == "generic"
 
     def test_path_is_relative(self) -> None:

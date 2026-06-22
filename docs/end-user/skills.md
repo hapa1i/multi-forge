@@ -228,7 +228,7 @@ connected to.
 
 For per-role guidance on which family to choose for `/forge:review` (one-shot capability gains favor Opus 4.8) vs
 `/forge:panel` (mix families for diverse independent perspectives) vs the supervisor (multi-needle retrieval favors Opus
-4.6, with Gemini useful for mid-long or multimodal planner contexts), see [model-selection.md](model-selection.md).
+4.6, with Gemini useful for mid-long or multimodal planner contexts), see [model_selection.md](model_selection.md).
 
 ---
 

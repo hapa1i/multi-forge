@@ -33,7 +33,7 @@ from .exceptions import IndexStateCorruptedError
 SEARCH_INDEX_DIR = "search-index"
 STATE_FILENAME = "state.json"
 
-# Schema version — reject anything else (no migration, per coding-standards.md)
+# Schema version — reject anything else (no migration, per coding_standards.md)
 INDEX_STATE_VERSION = 1
 
 # Lock timeouts

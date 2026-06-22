@@ -32,10 +32,11 @@ make pre-commit       # All hooks: ruff, black, isort, mypy, pyright, mdformat
 The full developer guide lives in [`docs/developer/`](docs/developer/):
 
 - [Developer README](docs/developer/README.md) — setup, testing, architecture, common tasks
-- [Coding Standards](docs/developer/coding-standards.md) — Python conventions, type safety, comments
-- [Testing Guidelines](docs/developer/testing-guidelines.md) — test organization, fixtures, Docker
-- [Documentation Guidelines](docs/developer/documentation-guidelines.md) — doc structure, writing style
-- [Work Board Contract](docs/developer/board-contract.md) — board lanes, checklists, closeout
+- [Coding Standards](docs/developer/coding_standards.md) — Python conventions, type safety, comments
+- [Testing Guidelines](docs/developer/testing_guidelines.md) — test organization, fixtures, Docker
+- [Documentation Guidelines](docs/developer/documentation_guidelines.md) — doc structure, writing style
+- [CLI Style Guidelines](docs/developer/cli_style_guidelines.md) - CLI Style guidelines
+- [Work Board Contract](docs/developer/board_contract.md) — board lanes, checklists, closeout
 
 ## Reporting Issues
 

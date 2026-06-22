@@ -160,7 +160,7 @@ forge session start planner --proxy openrouter-anthropic
 forge session start exec --proxy openrouter-anthropic --model claude-opus-4-8 --supervise planner
 ```
 
-See [model-selection.md](model-selection.md) for per-role recommendations, the structural reasons context fidelity
+See [model_selection.md](model_selection.md) for per-role recommendations, the structural reasons context fidelity
 varies across model versions, cost optimization order, and a release-validation checklist.
 
 ### Hooks -- Lifecycle & Artifacts
@@ -211,4 +211,4 @@ Three tiers of verification:
 | `/forge:walkthrough` | Interactive feature tour (hermetic) |
 | `/forge:qa`          | Full Docker-based QA                |
 
-See [manual-testing.md](manual-testing.md).
+See [manual_testing.md](manual_testing.md).

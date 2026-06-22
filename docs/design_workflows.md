@@ -187,7 +187,7 @@ rerun).
   clear cited rule and a high-confidence violation.
 - **Fail open vs fail closed**: Policies MUST define failure behavior per severity (e.g., CLI failure, proxy down,
   timeout). Default to **fail-open (warn-only)** for most checks. Fail-open for policy evaluations is a system-boundary
-  rule (LLM output is external data), not an exception to coding-standards §5. See coding-standards.md §5 (boundary
+  rule (LLM output is external data), not an exception to coding-standards §5. See coding_standards.md §5 (boundary
   framework) for the general framework.
 - **Throttling + caching**: Supervisor checks SHOULD be throttled (e.g., every N turns, only on Write/Edit, only for
   configured path prefixes) and MAY cache the last verdict for identical diffs.

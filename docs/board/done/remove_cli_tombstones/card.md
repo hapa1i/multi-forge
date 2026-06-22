@@ -52,7 +52,7 @@ Bucket 3a:
 - Delete obsolete tests (whole files: `test_session_memory.py`, `test_session_context.py` — wait, context excluded, so
   keep its tests; just the tombstone tests) and tombstone test classes/methods.
 - QA: delete `7-costs.md` §7.14 (`forge usage` rename probe); fix `11-config.md` `--force` → `--yes`.
-- Policy docs: rewrite `coding-standards.md` §1 "Helpful failure" (scope it to durable-state/reset paths, drop the
+- Policy docs: rewrite `coding_standards.md` §1 "Helpful failure" (scope it to durable-state/reset paths, drop the
   command-tombstone allowance) and §6 "Removed shortcuts are tombstones" → clean-break, no command tombstones. Keep the
   durable-state rejection requirement (that protects 3b).
 - `change_log.md` entry.

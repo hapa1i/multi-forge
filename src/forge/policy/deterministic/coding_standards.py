@@ -1,6 +1,6 @@
 """Coding standards bundle policies.
 
-Enforces coding conventions from docs/developer/coding-standards.md:
+Enforces coding conventions from docs/developer/coding_standards.md:
 - no-TYPE_CHECKING: Block TYPE_CHECKING import workarounds
 - no-backward-compat: Block backward compatibility hacks
 - no-emoji: Block colorful emoji in code files (monospace matters)
@@ -34,7 +34,7 @@ BACKWARD_COMPAT_PATTERNS = [
 class NoTypeCheckingPolicy(DeterministicPolicy):
     """Block TYPE_CHECKING import workarounds.
 
-    From coding-standards.md:
+    From coding_standards.md:
     > No TYPE_CHECKING workarounds: Fix circular imports architecturally
     > instead of using `if TYPE_CHECKING:` blocks
 
@@ -97,7 +97,7 @@ class NoTypeCheckingPolicy(DeterministicPolicy):
 class NoBackwardCompatPolicy(DeterministicPolicy):
     """Block backward compatibility hacks.
 
-    From coding-standards.md:
+    From coding_standards.md:
     > No Backward Compatibility Wrappers: Update callers directly, don't create adapters
     > Clean Refactoring: Fix underlying issues over compatibility layers
     > No Fallback Logic: When replacing a component, remove the old one completely

@@ -10,7 +10,7 @@ Tests invoke `forge hook <name>` directly via container.exec() and verify:
 - Wire output (Codex deny JSON on stdout)
 - Manifest updates for policy and compaction state
 
-Placement: tests/integration/docker/ per testing-guidelines.md
+Placement: tests/integration/docker/ per testing_guidelines.md
 Run: uv run pytest tests/integration/docker/test_policy_hooks.py -v
 """
 

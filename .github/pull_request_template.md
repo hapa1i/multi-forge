@@ -10,11 +10,11 @@
 - [ ] Relevant tests pass (`make test-unit`, targeted `make test-integration` / `./scripts/test-integration.sh <path>`,
   `make test-regression`, or `make test`)
 
-<!-- If this is a bug fix, include a regression test (see docs/developer/testing-guidelines.md) -->
+<!-- If this is a bug fix, include a regression test (see docs/developer/testing_guidelines.md) -->
 
 ## Documentation
 
-<!-- Check all that apply. See docs/developer/documentation-guidelines.md for guidelines. -->
+<!-- Check all that apply. See docs/developer/documentation_guidelines.md for guidelines. -->
 
 - [ ] Design docs updated if architecture changed (`docs/design.md`, `docs/design_appendix.md`)
 - [ ] N/A — no doc updates needed

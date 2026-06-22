@@ -3,7 +3,7 @@
 Documentation writing and maintenance standards for Multi-Forge.
 
 This file explains how to write and maintain docs. The board workflow itself is defined in
-[`board-contract.md`](board-contract.md).
+[`board_contract.md`](board_contract.md).
 
 ---
 
@@ -16,9 +16,10 @@ Use one authoritative source per domain:
 | Repository overview                           | `README.md`                                                                                      |
 | Shipped architecture and ownership            | `docs/design.md`, `docs/design_appendix.md`, `docs/design_workflows.md`, `docs/cli_reference.md` |
 | Documentation writing and maintenance         | This file                                                                                        |
-| Work-board lanes, cards, checklists, closeout | `docs/developer/board-contract.md`                                                               |
-| Coding style and durable-state rules          | `docs/developer/coding-standards.md`                                                             |
-| Test policy                                   | `docs/developer/testing-guidelines.md`                                                           |
+| Work-board lanes, cards, checklists, closeout | `docs/developer/board_contract.md`                                                               |
+| Coding style and durable-state rules          | `docs/developer/coding_standards.md`                                                             |
+| CLI command shape and recovery output         | `docs/developer/cli_style_guidelines.md`                                                         |
+| Test policy                                   | `docs/developer/testing_guidelines.md`                                                           |
 | User-facing behavior                          | `docs/end-user/*`                                                                                |
 
 `docs/board/README.md` is a directory guide with examples. It is not the normative board contract.
@@ -37,7 +38,7 @@ Living docs change as work happens:
 - evaluation and manual-test results
 - design docs when shipped architecture changes
 
-Maintain board files according to [`board-contract.md`](board-contract.md).
+Maintain board files according to [`board_contract.md`](board_contract.md).
 
 ### Coding Context Documents
 
@@ -52,7 +53,7 @@ proxy/session semantics, workflow prerequisites, or end-user behavior changes.
 ## Design Documents
 
 Design docs are normative architecture docs. This section defines writing expectations; card-execution procedure lives
-in [`board-contract.md` Design Doc Sync](board-contract.md#design-doc-sync).
+in [`board_contract.md`](board_contract.md#design-doc-sync).
 
 - Describe shipped behavior, not desired future behavior.
 - If a card is mid-execution, document the hybrid shipped state accurately.
@@ -82,7 +83,7 @@ Cards may contain aspirational target architecture. Design docs should not.
 | End-user behavior             | `docs/end-user/*`                                                                                | When user-facing setup or behavior changes |
 | Setup/development workflow    | `docs/developer/*`                                                                               | When maintainer workflow changes           |
 
-The board-specific rules for these files live in [`board-contract.md`](board-contract.md).
+The board-specific rules for these files live in [`board_contract.md`](board_contract.md).
 
 ---
 
@@ -176,4 +177,4 @@ Hard guidance:
 
 ## Living Doc Maintenance
 
-For board living-doc size checks and compaction rules, use [`board-contract.md`](board-contract.md#size-checks).
+For board living-doc size checks and compaction rules, use [`board_contract.md`](board_contract.md#size-checks).

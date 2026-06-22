@@ -1137,7 +1137,7 @@ make test-integration  # Runs: docker build + docker run pytest
 Checklist-driven manual testing covers UX, latency, and real-system failures that unit and integration tests miss. Three
 skills provide escalating isolation (`/forge:smoke-test`, `/forge:walkthrough`, `/forge:qa`); the detailed pattern,
 annotation types, and wrappers live in [design_appendix.md §D](design_appendix.md#d-interactive-manual-testing). The
-end-user guide is [manual-testing.md](end-user/manual-testing.md).
+end-user guide is [manual_testing.md](end-user/manual_testing.md).
 
 ## 6. Directory structure (monorepo)
 

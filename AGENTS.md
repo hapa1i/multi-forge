@@ -11,8 +11,8 @@ docs in `docs/`, runtime images in `docker/`, and automation scripts in `scripts
 ## Documentation Guide
 
 Use the repo docs as the source of truth for their domains: `README.md` for the overview, `docs/developer/` for setup,
-and `CLAUDE.md` for agent context. `docs/developer/coding-standards.md`, `testing-guidelines.md`,
-`documentation-guidelines.md`, and `board-contract.md` define code style, test policy, doc writing, and board workflow
+and `CLAUDE.md` for agent context. `docs/developer/coding_standards.md`, `testing_guidelines.md`,
+`documentation_guidelines.md`, and `board_contract.md` define code style, test policy, doc writing, and board workflow
 rules. `docs/board/README.md` is a board directory guide with examples, not the authority. Update `docs/design.md` and
 `docs/design_appendix.md` when architecture or file ownership changes. When changing config ownership, auth resolution,
 installer behavior, proxy/session semantics, or workflow prerequisites, also update the relevant `docs/end-user/*` guide

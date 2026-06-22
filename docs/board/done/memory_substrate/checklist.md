@@ -243,9 +243,9 @@ Synced every current/normative doc to the shipped memory-writer/transfer vocabul
   one-line transfer pointer; CLI refs → `forge memory report show` / `forge memory-writer run`. KEEP marker prose +
   `handoff/` path. Repointed 5 inbound links (`design.md`, end-user `README.md`/`hook.md`/`config.md`/`session.md`).
 - [x] `docs/end-user/*` sweep: `config.md` `memory_writer_timeout` row; `session.md` resume-mode + transfer wording;
-  `hook.md`, `authentication.md`, `README.md`, `model-selection.md` (incl. `handoff_agent.py`→`memory_writer.py` path).
+  `hook.md`, `authentication.md`, `README.md`, `model_selection.md` (incl. `handoff_agent.py`→`memory_writer.py` path).
 - [x] Current board + agent-context docs (review finding): `docs/board/impl_notes.md` (vocabulary);
-  `docs/board/README.md` (`forge memory report show`, transfer wording); `docs/developer/board-contract.md`
+  `docs/board/README.md` (`forge memory report show`, transfer wording); `docs/developer/board_contract.md`
   (memory-writer wording; KEEP "handoff marker exists" example); `CLAUDE.md:127` `resume/handoff`→`resume/transfer`;
   `change_log.md:7` maintenance header (dated entries below stay historical).
 - [x] `docs/board/todo/runtime_abstraction/**` (parked future work): fixed stale code/command surfaces
@@ -260,10 +260,6 @@ Synced every current/normative doc to the shipped memory-writer/transfer vocabul
 - [x] Test prose/paths: `test_skill_content.py` (`16-memory.md` ×3, `TestQaMemoryWriterChecklist`, `memory_md` var,
   `test_memory_*` methods; KEEP `queued_handoff` + the `"forge handoff run" not in code` negative assertion);
   `test_models.py` class+docstring+var; `test_bug_handoff_forge_root.py` docstring (KEEP file name + marker symbol).
-
-> The Phase 4 plan's "fix stale `work-board-contract.md` references" line was already resolved by `226bba5` (it touched
-> `CLAUDE.md`, `AGENTS.md`, `docs/board/README.md`, `docs/board/change_log.md`); the only remaining mention is this
-> checklist's own description, so the item is dropped rather than re-ticked under this commit.
 
 ### Acceptance
 

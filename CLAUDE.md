@@ -42,7 +42,7 @@ not special-occasion. For changes touching hooks, session start/resume/fork, the
 installer, run the relevant integration tests before finishing; unit tests never exercise the `claude -p` / Docker paths
 these flows use. Stay cost-conscious by targeting files
 (`./scripts/test-integration.sh tests/integration/.../test_*.py`) instead of the full suite. See
-[testing-guidelines.md](docs/developer/testing-guidelines.md#when-to-run-integration-tests).
+[testing_guidelines.md](docs/developer/testing_guidelines.md#when-to-run-integration-tests).
 
 ## Git Branching
 
@@ -67,7 +67,7 @@ The `Publish to PyPI` workflow (`.github/workflows/publish.yml`) builds and publ
 
 ## Work Board Quick Semantics
 
-The authoritative board workflow is in `docs/developer/board-contract.md`. In short: `todo/` means accepted but parked.
+The authoritative board workflow is in `docs/developer/board_contract.md`. In short: `todo/` means accepted but parked.
 When asked to work on a `todo/` card, create or switch to its execution branch, move the card directory to
 `docs/board/doing/<slug>/`, and create/update `checklist.md`. `doing/` is active work; `done/` means shipped, verified,
 design docs synced, and closeout recorded.
@@ -166,8 +166,8 @@ fact_id, orchestration) unless explicitly asked. When in doubt, ask before renam
 
 ## Guidelines (load into context)
 
-@docs/developer/coding-standards.md @docs/developer/testing-guidelines.md @docs/developer/documentation-guidelines.md
-@docs/developer/board-contract.md
+@docs/developer/coding_standards.md @docs/developer/testing_guidelines.md @docs/developer/documentation_guidelines.md
+@docs/developer/board_contract.md
 
 ## Platform & Environment
 
@@ -180,7 +180,7 @@ regex), `gdate` (`--date` parsing), `greadlink -f` (BSD lacks `-f`).
 - `docs/design_appendix.md` - Reference details (schemas, config tables)
 - `docs/design_workflows.md` - Policy, skills, workflow runners, and memory architecture
 - `docs/cli_reference.md` - Terminal and direct-command inventory
-- `docs/developer/board-contract.md` - Work-board lane, checklist, and closeout contract
+- `docs/developer/board_contract.md` - Work-board lane, checklist, and closeout contract
 - `docs/board/README.md` - Board directory guide and dogfood examples
 - `docs/end-user/` - End-user guides (sessions, proxies, hooks, configs)
 
@@ -193,51 +193,15 @@ here. When fixing errors, match the existing error-message style.
 
 ### Console Output Formatting
 
-**Use the `forge.cli.output` helpers for CLI Rich recovery output** so equivalent situations tip identically. All Rich
-`Tip:` output in `src/forge/cli/**` must go through them; tests enforce that `[dim]Tip:` appears only in `output.py`.
-Reach for:
+CLI command shape and recovery-output style live in
+[docs/developer/cli_style_guidelines.md](docs/developer/cli_style_guidelines.md). Always-on essentials:
 
-```python
-from forge.cli.output import print_tip, print_error, print_error_with_tip, handle_session_error
+- **Use the `forge.cli.output` helpers** (`print_tip`, `print_error`, `print_error_with_tip`, `handle_session_error`)
+  for all Rich recovery output. Never hand-roll `[dim]Tip: …[/dim]` in `src/forge/cli/**` — the test
+  `test_cli_rich_tips_go_through_output_helpers` enforces that styled `Tip:` lives only in `output.py`.
+- Always pass the call site's local `console`; only `output.py`'s own fallback is width-less.
+- Commands use `Run '<full command>'`; flags use `Use --flag`. Inline commands in single quotes, never backticks.
+  Multi-line/placeholder commands go in the `commands=[...]` block. Never use `Hint:`.
 
-# Error + recovery tip (the common "already exists" / "not found" shape)
-print_error_with_tip(
-    f"Proxy '{proxy_id}' not found at {display_path(proxy_path)}",
-    f"Run 'forge proxy create <template> --name {proxy_id}' to create it.",
-    console=console,  # pass your file's local console so width=200 tables stay aligned
-)
-
-# Typed ForgeSessionError → prints the error, looks up a context-free tip, sys.exits(1)
-except ForgeSessionError as e:
-    handle_session_error(e, console=console)
-
-# Multi-line / placeholder commands render as a copy-paste block
-print_error_with_tip(
-    f"Backend config already exists: {display_path(config_path)}",
-    "Start an instance with:",
-    commands=[f"forge backend start {adapter} --port 4000"],
-    console=console,
-)
-```
-
-Always pass the call site's local `console`; only `output.py`'s own fallback is width-less.
-
-**Wording conventions** (the helpers preserve the literal `Tip:` / `Error:` prefixes):
-
-- **Commands → `Run '<full command>'`**; **flags/options → `Use --flag`** (e.g. `Run 'forge proxy start'`, but
-  `Use --force to override.`).
-- Inline commands in **single quotes**; never backticks (`` `git branch -d X` `` → `'git branch -d X'`).
-- Multi-line or placeholder commands go in the `commands=` copy-paste block, not inline prose.
-
-**Do NOT use:**
-
-- `Hint:` — inconsistent, slightly condescending tone
-- Unprefixed suggestions — harder for users to scan/recognize
-- Hand-rolled `[dim]Tip: …[/dim]` in CLI modules — use `print_tip` / `print_error_with_tip`
-
-**Other output categories** (no prefix needed):
-
-- Informational: `[dim]Already up to date.[/dim]`
-- Status: `[dim]Backup: {path}[/dim]`
-- Dry-run: `[dim](dry-run)[/dim] Would patch...`
-- Next steps: `\n[dim]Next steps:[/dim]` followed by bullet list
+See the guide for the helper table (including which helpers exit), the `--json`/`as_json` idiom, and the non-recovery
+output categories (informational, status, dry-run, next steps).

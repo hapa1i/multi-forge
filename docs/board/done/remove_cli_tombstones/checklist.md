@@ -58,7 +58,7 @@ verified. Card moved to `done/` on the #18 branch — lands in `done/` on `main`
 - [x] QA: removed `7-costs.md` §7.14 (`forge usage` rename probe); renumbered reset section 7.15 → 7.14; index
   `checklist.md` test-count 537 → 535 + "Last updated" note. Fixed `11-config.md` `claude preset reset --force` →
   `--yes`. Migrated `4-proxy.md` teardown `proxy delete --force` → `--yes` (16 sites).
-- [x] Policy: rewrote `coding-standards.md` §5 "Helpful failure" → split into clean-break-for-commands +
+- [x] Policy: rewrote `coding_standards.md` §5 "Helpful failure" → split into clean-break-for-commands +
   actionable-failure-for-durable-state; §6 "Removed shortcuts are tombstones" → "clean breaks". Updated `design.md` §4.0
   command-shape policy to clean-break.
 - [x] `change_log.md` entry added.

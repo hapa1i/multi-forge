@@ -303,7 +303,7 @@ class TestBuildMultiDocPrompt:
             DesignatedDoc(
                 path=".forge/memory/shadow_standards.md",
                 strategy="generic",
-                shadows="docs/developer/coding-standards.md",
+                shadows="docs/developer/coding_standards.md",
             )
         ]
         prompt = build_multi_doc_prompt(
@@ -311,7 +311,7 @@ class TestBuildMultiDocPrompt:
             transcript_path="/abs/path/t.jsonl",
             docs=_resolve_docs(docs),
         )
-        assert "docs/developer/coding-standards.md" in prompt
+        assert "docs/developer/coding_standards.md" in prompt
         assert ".forge/memory/shadow_standards.md" in prompt
 
     def test_shadow_prompt_reads_official_first(self) -> None:
@@ -1055,7 +1055,7 @@ class TestValidateDesignatedDocs:
             DesignatedDoc(
                 path=".forge/memory/shadow_standards.md",
                 strategy="generic",
-                shadows="docs/developer/coding-standards.md",
+                shadows="docs/developer/coding_standards.md",
             )
         ]
         result = _validate_designated_docs(docs, tmp_path)

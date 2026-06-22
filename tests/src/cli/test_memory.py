@@ -27,7 +27,7 @@ def seeded_session(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Pat
         "docs/checklist.md",
         "docs/changelog.md",
         "docs/impl_notes.md",
-        "docs/coding-standards.md",
+        "docs/coding_standards.md",
         "docs/a.md",
         "docs/b.md",
         ".forge/memory/shadow_impl_notes.md",

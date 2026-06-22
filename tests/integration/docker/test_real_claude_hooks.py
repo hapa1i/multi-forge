@@ -16,7 +16,7 @@ Cost considerations:
 - Use minimal prompts (--print mode, simple tasks)
 - Limited to essential hook verification tests
 
-Placement: tests/integration/docker/ per testing-guidelines.md
+Placement: tests/integration/docker/ per testing_guidelines.md
 Run: uv run pytest tests/integration/docker/test_real_claude_hooks.py -v -m slow
 """
 

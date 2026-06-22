@@ -349,7 +349,7 @@ Tracks Forge-local execution decisions. For broader card framing, see
   `--inherit-extras` / `--no-inherit-extras` (extras only, not project memory). Old values become helpful tombstones.
   Uncommitted passport warning deferred (orthogonal to inheritance retirement).
 
-## Closeout (per [work-board contract](../../../developer/board-contract.md#closeout))
+## Closeout (per [Work Board Contract](../../../developer/board_contract.md#closeout))
 
 - [x] Final compact `change_log.md` entry with verification.
 - [x] Promote durable lessons to `impl_notes.md` after human review.

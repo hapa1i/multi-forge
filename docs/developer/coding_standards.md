@@ -155,13 +155,10 @@ Best-effort patterns MUST:
 
 ### CLI command shape
 
-- **Groups orient**: non-leaf CLI groups print help when invoked without a subcommand. Do not hide work behind a bare
-  group command; use an explicit leaf such as `forge config show` or `forge search query`.
-- **Leaves act**: leaf commands should do the sensible action when optional arguments are omitted. For example,
-  `forge proxy metrics` may show all metrics instead of failing only because no proxy ID was supplied.
-- **Removed shortcuts are clean breaks**: when a command, option, or group-level shortcut is removed, delete it outright
-  and let the framework report "no such command/option". Do not leave a non-executing diagnostic shim behind; the
-  replacement belongs in the changelog and docs, not in a runtime tombstone.
+CLI command shape and recovery-output style (groups orient, leaves act, clean-break removals, root aliases, `--json`,
+command-core ops, and the `forge.cli.output` tip helpers) are specified in
+[cli_style_guidelines.md](cli_style_guidelines.md). Those rules build on the clean-break and durable-state policy in §5
+above.
 
 ---
 

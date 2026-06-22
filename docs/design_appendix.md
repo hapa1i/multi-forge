@@ -1006,7 +1006,7 @@ verification.
 - No per-checklist-item scripts — wrapper + lifecycle scripts are enough
 - `/forge:qa` tied to `full` install profile (Docker dependency)
 
-> See also [testing-guidelines.md](developer/testing-guidelines.md) for the full testing reference.
+> See also [testing_guidelines.md](developer/testing_guidelines.md) for the full testing reference.
 
 ### D.1 Annotation types
 

@@ -1,7 +1,7 @@
 """Integration tests for worktree creation utilities.
 
 These tests require Docker for isolation since they perform real git operations.
-Split from test_create.py to follow testing-guidelines.md naming convention.
+Split from test_create.py to follow testing_guidelines.md naming convention.
 """
 
 from __future__ import annotations

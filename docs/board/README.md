@@ -3,7 +3,7 @@
 This directory is Forge's lightweight implementation board. It keeps proposed work, scheduled work, active execution,
 active epic coordination, completed work, and project memory in one place.
 
-The authoritative board workflow contract lives in [`docs/developer/board-contract.md`](../developer/board-contract.md).
+The authoritative board workflow contract lives in [`docs/developer/board_contract.md`](../developer/board_contract.md).
 This README is a directory guide plus dogfood examples for people inspecting `docs/board/`.
 
 ## Layout
@@ -28,7 +28,7 @@ cards should link the epic near the top of their `card.md`.
 
 ## Lane Semantics
 
-Summary only; see the [contract](../developer/board-contract.md#lanes) for the full operating rules.
+Summary only; see the [contract](../developer/board_contract.md#lanes) for the full operating rules.
 
 Moving a card across lanes is a workflow event:
 
@@ -190,7 +190,7 @@ conflicts in `change_log.md` are expected when branches interleave completed wor
 
 ## Card Lifecycle
 
-Closeout rules live in the [work-board contract](../developer/board-contract.md#closeout). In short: finish the
+Closeout rules live in the [work-board contract](../developer/board_contract.md#closeout). In short: finish the
 checklist, record completed work, promote durable lessons after human review, sync design docs, then move
 `doing/<slug>/` to `done/<slug>/`.
 
@@ -201,5 +201,5 @@ Use the active card checklist as the in-session scratchpad. Leave transient stat
 
 ## Size Checks
 
-Use the [work-board contract size checks](../developer/board-contract.md#size-checks) when a living board doc starts to
+Use the [work-board contract size checks](../developer/board_contract.md#size-checks) when a living board doc starts to
 feel bulky.

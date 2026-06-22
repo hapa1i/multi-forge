@@ -69,7 +69,7 @@ though it requires changing the sidecar mount boundary.
 - [x] Function docstring records config.yaml as a deliberate narrow ro mount (design §7 update lands in Phase 5 doc
   sync).
 - [x] Tests: `tests/src/sidecar/test_container.py` (present → mounted ro; absent → omitted). **38 sidecar tests green;
-  pyright clean.** Integration run (sidecar/proxy runtime touch) deferred to closeout per testing-guidelines.
+  pyright clean.** Integration run (sidecar/proxy runtime touch) deferred to closeout per testing_guidelines.
 
 ### Phase 4 — Direct-caller injection (the card feature) ✅
 
