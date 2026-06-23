@@ -15,6 +15,11 @@ Phase 1 is a **decision gate**, not code. The card is a large clean break; the c
 the taxonomy and the open questions first, then drain the five debt ledgers the test suite already tracks. Do not rename
 a live surface before the matching decision is recorded here.
 
+**Progress (2026-06-23):** Slice 06 shipped (`forge session context` removed). Decision gate: **D1, D3, D7 decided**
+(see Phase 1) — D1 = move to `forge telemetry` + delete emptied `provider`; D3 = build `forge model` namespace (backend
+moves under it); D7 = tiered config-object verbs, `backend` excluded. Still open: **D2, D4, D5, D6, D8, D9**. D3 (build
+`model`) and D1 both reshape `main.py` top-level groups, so they should land before D6 (aliases) settles new nouns.
+
 ## Audit reconciliation (verified 2026-06-23)
 
 ### Corrections to the card (verify before trusting the card text)
@@ -37,7 +42,7 @@ allowlisted entry that was fixed-without-removal. "Done" for these slices = the 
 | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ |
 | `JSON_DEST_ALLOWLIST` (`test_command_tree_invariants.py:49`) | `proxy create`, `proxy metrics`, `policy check`, `policy supervisor`, `workflow {list-models,panel,analyze,debate,consensus}` — 9 using `json_output` not `as_json`                                       | 07           |
 | `JSON_MISSING_ALLOWLIST` (`:134`)                            | `authentication status`, `backend show`, `proxy template {list,show}`, `claude preset show`, `config show`, `memory shadows show`, `memory report show`, `search status` — 9 read leaves with no `--json` | 07           |
-| `SINGLE_LEAF_GROUP_ALLOWLIST` (`:75`)                        | `forge provider` (→ `provider list\|show\|explain`), `forge policy shadow` (→ `show`; `run` hidden), `forge memory report` (→ flatten)                                                                    | 03 / 12      |
+| `SINGLE_LEAF_GROUP_ALLOWLIST` (`:75`)                        | `forge provider` (→ **delete**; `trace` moves to `telemetry trace` per D1), `forge policy shadow` (→ `show`; `run` hidden), `forge memory report` (→ flatten)                                             | 03 / 12      |
 | `LEAF_NAMING_ALLOWLIST` (`:110`)                             | `forge policy: supervise\|supervisor` (confusable; `supervise` is a prefix of `supervisor`)                                                                                                               | 10           |
 | `CLI_ERROR_MARKUP_ALLOWLIST` (`test_output.py`)              | 18 files with hand-rolled `[red]Error:` (244 raw occurrences outside `output.py`)                                                                                                                         | 11           |
 
@@ -48,7 +53,8 @@ allowlisted entry that was fixed-without-removal. "Done" for these slices = the 
   `activity.py`/`provider.py` are already compliant (stdout for both). Adding the guard needs
   `CliRunner(mix_stderr=False)` (slice 07).
 - **Session selectors (F11):** `_(review)_`; rule is written (style guide §Command Shape) but unguarded.
-- **Config-object verbs (F5):** `_(review)_`; the vocabulary is undecided (blocks slice 08 — see Phase 1).
+- **Config-object verbs (F5):** D7 decided (tiered core `{show,edit,reset}` + optional `{set,validate}`, `backend`
+  excluded); slice 08 adds the parity guard on the three pure-config objects.
 - **`--json` guard scope (F4):** only `list/show/status` leaves are checked (`_READ_LEAVES`).
 - **Tip guard scope (F9):** only `[dim]Tip:` Rich markup — misses the 8 plain `click.echo("Tip: …")` sites **and** the 2
   `ClickException`-embedded tips (`session.py:111,126`, `msg += "\nTip: …"`). A literal `Tip:` source scan also hits the
@@ -69,16 +75,24 @@ allowlisted entry that was fixed-without-removal. "Done" for these slices = the 
 Record a decision (with rationale) for each item before any Phase 2 slice that depends on it. Recommendations are
 defaults to accept or override, not commitments.
 
-- [ ] **D1 Observability namespace (F1/F10, slice 03).** Move `forge activity` + `forge provider trace` +
-  `forge proxy costs` under `forge telemetry {activity,trace,costs}`? _Recommend: yes._ Note: moving `provider trace` to
-  `telemetry trace list|show|explain` makes it a 3-leaf subgroup and **clears** the `forge provider` single-leaf-debt —
-  but contradicts the ledger comment's "flatten to `provider list|show|explain`"; pick one target and update that
-  comment.
+- [x] **D1 Observability namespace (F1/F10, slice 03). DECIDED 2026-06-23: YES — move to
+  `forge telemetry {activity,trace,costs}`.** Verified correction: `forge provider`'s only child is the `trace` group
+  (`provider.py:76`), so moving `trace` to `telemetry` **empties** `provider`. Delete the `provider` group + its
+  `main.py:384` registration outright and **remove** the `forge provider` entry from `SINGLE_LEAF_GROUP_ALLOWLIST` (not
+  "edit the comment" — `_assert_ledger` fails on fixed-but-unremoved entries). The 3-leaf subgroup is `telemetry trace`,
+  not provider. **Retire** the `%provider trace` direct-command mirror with no `%telemetry` replacement (clean break;
+  don't grow the surface in a cleanup). Fix `proxy_costs.py:20`/`proxy_audit.py:17` stderr→stdout. `proxy audit` stays
+  under `proxy` (D2 still open). Guard gap to close in slice 03: `test_no_single_leaf_groups` checks `len==1` only —
+  tighten to `len<=1` so an emptied group can't pass silently.
 - [ ] **D2 Proxy audit placement (Q2).** Keep `forge proxy audit show|diff` under `proxy` (capture is proxy-configured),
   or move to `telemetry`? _Recommend: keep under `proxy`_ (2-leaf subgroup, capture/config is proxy-owned).
-- [ ] **D3 Backend namespace (F5/Q3).** `forge model backend …` would make `forge model` a single-child nest the guide
-  forbids. _Recommend: keep top-level `forge backend`_ unless `forge model` gains a second child; record the
-  churn-vs-value call.
+- [x] **D3 Backend namespace (F5/Q3). DECIDED 2026-06-23: BUILD the `forge model` namespace.** Create a `forge model`
+  group, move all 8 backend verbs to `forge model backend` (`list/show/test-auth/create/start/stop/delete/reconcile`,
+  preserved verbatim), and add a real sibling leaf `forge model catalog` (or `list`) wiring `core/models/catalog.py`
+  (zero CLI today). Two children (`backend` subgroup + `catalog` leaf) satisfy the ≥2-visible-leaves rule, so no
+  `SINGLE_LEAF_GROUP_ALLOWLIST` entry and no single-child nest. Public-surface clean break (coding_standards §5): every
+  `forge backend …` path moves to `forge model backend …` in one change (code + tests + docs + changelog). The catalog
+  leaf must do real work, not a stub. New noun `model` flows into D6 alias decisions.
 - [ ] **D4 Memory split (Q4/Q5).** Does `memory enable|disable|status|report` move under `forge session memory`, leaving
   top-level `forge memory` for project-doc passports (`track`/`list`/`passport`/`shadows`)? _Recommend: yes_ — also
   resolves the `forge memory report` single-leaf debt.
@@ -89,10 +103,17 @@ defaults to accept or override, not commitments.
   vocabulary)? Decide which moved/new groups (`telemetry`, `model`) earn aliases; decide whether the
   `extensions -> extension` shim survives. _Recommend: `auth` canonical; minimal alias set; drop the `extensions` shim
   (clean break)._ Do this **after** D1-D4 so new nouns are known.
-- [ ] **D7 Config-object verb vocabulary (F5/slice 08).** Define the shared verb set for editable config objects
-  (`config`, `proxy`, `claude preset`, `proxy template`, `backend`) and which are "lifecycle resources" exempt from it.
-  _Recommend: shared `{show, edit, set, reset, validate}`; backend keeps lifecycle
-  `{create,start,stop,delete,reconcile}` documented as an exception._ Records into the style guide; **blocks slice 08**.
+- [x] **D7 Config-object verb vocabulary (F5/slice 08). DECIDED 2026-06-23: TIERED vocabulary, `backend` EXCLUDED.**
+  Verified verb matrix (all checked at source): `config`={show,edit,set,reset}; `proxy template`={show,edit,reset,list};
+  `claude preset`={show,edit,reset}; `proxy`={show,edit,set,validate,+lifecycle}; `backend`={show,+lifecycle} (no
+  edit/set/reset). So: **core `{show, edit, reset}`** is mandatory and **already satisfied** by config/template/preset
+  (docs-only for them); **optional `{set, validate}`** where meaningful (`set`: config, proxy; `validate`: proxy);
+  `proxy` is a documented partial-lifecycle exception (has `clean`/`delete`, no `reset`). **`backend` is NOT an
+  editable-config object** — it is a lifecycle resource (`create`/`reconcile` regenerate its config; an in-place
+  `edit`/`set` would fight `reconcile`), documented under the lifecycle-sibling rule (style guide L79-81, which already
+  omits backend from the editable-config list at L88-89). Rejected the flat `{show,edit,set,reset,validate}` (no object
+  implements it; would mandate net-new commands). Always fix the false proxy-parity docstring at `config_cmd.py:6-9`.
+  Churn ~2-3 files. Records into the style guide; **unblocks slice 08**.
 - [ ] **D8 `--json` destination policy (Q8).** Normalize all `json_output` → `as_json`, or document the 9-entry
   exception? _Recommend: normalize_ (user-facing `--json` unchanged; drains `JSON_DEST_ALLOWLIST`).
 - [ ] **D9 Workspace-scope coordination (Q7).** Does `forge telemetry … --scope workspace` wait for the
@@ -104,23 +125,29 @@ defaults to accept or override, not commitments.
 Each slice's assertion names an observable behavior and the test that proves it. Tick only when the test passes and the
 verification is recorded.
 
-- [ ] **Slice 03 - Telemetry move (D1, D2).** `forge telemetry activity|trace|costs` exist and work; old paths
-  (`forge activity`, `forge provider trace`, `forge proxy costs`) return Click `No such command` (clean break, no
-  tombstone). `SINGLE_LEAF_GROUP_ALLOWLIST` loses `forge provider` (and `forge memory report` if D4 lands). Human +
-  `--json` of each telemetry leaf share **stdout** (fix `proxy_costs.py:20`/`proxy_audit.py:17` if they move). Tests:
-  `tests/src/cli/test_telemetry.py` (new) + old-path-removal cases.
-  - **Direct-command mirror (mirrors Slice 10's `%policy supervise` treatment):** `%provider trace list|show|explain`
-    (advertised `direct_commands.py:71`, handled `:356`) moves to `%telemetry trace`, or is consciously retained as a
-    documented alias with a test. Update the `%help` advert string and
-    `tests/src/cli/hooks/test_direct_commands_provider.py`. It is the **only** moving surface with a `%` mirror — there
-    is no `%activity` or `%proxy costs`.
+- [ ] **Slice 03 - Telemetry move (D1; D2 still open).** `forge telemetry activity|trace|costs` exist and work; old
+  paths (`forge activity`, `forge provider trace`, `forge proxy costs`) return Click `No such command` (clean break, no
+  tombstone). **Delete the emptied `forge provider` group** + its `main.py:384` registration and **remove** its
+  `SINGLE_LEAF_GROUP_ALLOWLIST` entry (the 3-leaf subgroup is `telemetry trace`, not provider; `forge memory report`
+  leaves too if D4 lands). **Tighten `test_no_single_leaf_groups` to flag `len<=1`** so the emptied group can't pass
+  silently. Human + `--json` of each telemetry leaf share **stdout** (fix `proxy_costs.py:20`/`proxy_audit.py:17`
+  stderr→stdout). Tests: `tests/src/cli/test_telemetry.py` (new) + old-path-removal cases.
+  - **Direct-command mirror (D1 decision = retire):** **delete** `%provider trace list|show|explain` (advertised
+    `direct_commands.py:71`, handled `:356`) with no `%telemetry` replacement — clean break, don't grow the surface.
+    Drop the `%help` advert string and **delete** `tests/src/cli/hooks/test_direct_commands_provider.py` (removed
+    surface → delete test). It is the **only** moving surface with a `%` mirror — there is no `%activity` or
+    `%proxy costs`.
 - [ ] **Slice 02 - Session-scope move (D4).** `forge session transfer show|regenerate|edit|diff` exist; if D4 lands,
   `forge session memory …` exists and top-level `forge memory` keeps only passport/doc verbs. Old `forge transfer …`
   paths removed. Tests assert new paths + `No such command` on old.
-- [ ] **Slice 04 - Backend (D3).** Apply D3; if kept top-level, this slice is docs-only. If moved, preserve every
-  lifecycle/auth/reconcile verb (`backend.py`: list/show/test-auth/create/start/stop/delete/reconcile) and add no
-  single-child nest. Test: `forge backend …` (or chosen path) retains all 8 verbs; `forge model` (if created) has ≥2
-  children.
+- [ ] **Slice 04 - Model namespace (D3 = build).** Create a `forge model` group; move all 8 backend verbs to
+  `forge model backend` (`list/show/test-auth/create/start/stop/delete/reconcile`, preserved verbatim); add a real
+  sibling leaf `forge model catalog` (or `list`) wiring `core/models/catalog.py` (zero CLI today, must do real work +
+  expose `--json`). Old `forge backend …` paths return Click `No such command` (clean break; update every test/doc/
+  example call site in the same change). Tests: `forge model` has ≥2 visible children (no `SINGLE_LEAF_GROUP_ALLOWLIST`
+  entry); `forge model backend` retains all 8 verbs; catalog leaf works. Changelog names the
+  `forge backend → forge model backend` move. Note interplay: `backend show` is in `JSON_MISSING_ALLOWLIST` (slice 07) —
+  the move changes its path to `forge model backend show`; update that allowlist entry in whichever slice lands second.
 - [x] **Slice 06 - Clean-break removals.** Deleted `forge session context` (was `session_manage.py:857`, `hidden=True`)
   and its now-dead `_print_session_context` helper + both `__all__` exports; **deleted**
   `tests/src/cli/test_session_context.py` (removed code → delete test). The ops module `forge.core.ops.session_context`
@@ -139,9 +166,12 @@ verification is recorded.
   - Normalize the 9 `json_output` dests to `as_json` (D8); `JSON_DEST_ALLOWLIST` → `{}`.
   - Make `proxy_costs`/`proxy_audit` human output go to stdout; add the planned stdout/stderr guard with
     `CliRunner(mix_stderr=False)` (asserts `--json` mode is valid JSON on stdout, empty stderr).
-- [ ] **Slice 08 - Config-object parity (blocked by D7).** Apply the D7 verb set across `config`, `proxy`,
-  `claude preset`, `proxy template`, `backend`; fix the `config_cmd.py` docstring that claims proxy-parity it lacks (4
-  vs 11 verbs); record exceptions in the style guide. Add a verb-vocabulary guard or a `_(review)_` note.
+- [ ] **Slice 08 - Config-object parity (D7 = tiered).** Record the tiered vocab in the style guide: core
+  `{show, edit, reset}` (already met by `config`/`proxy template`/`claude preset`), optional `{set, validate}` where
+  meaningful; `proxy` documented as a partial-lifecycle exception (`clean`/`delete`, no `reset`); **`backend` excluded**
+  from the editable-config rule and documented under the lifecycle-sibling rule (L79-81). Fix the false proxy-parity
+  docstring at `config_cmd.py:6-9` (config has 4 verbs, not proxy's 11). Add a parity guard test asserting the core set
+  on the three pure-config objects. No net-new commands required.
 - [ ] **Slice 09 - Destructive consistency (F3).** `clean` verbs preview by default + mutate on `--yes`: fix
   `forge session clean` (`session_manage.py:570`, mutates by default today) and `forge proxy clean` (`proxy.py:1288`, no
   flags today). `delete`/`reset` keep prompt + a single `--yes` bypass name. Decide F14a (is `proxy clean` redundant
