@@ -8,10 +8,11 @@ build the launcher before the probe resolves.
 
 ## Current focus
 
-Phase 1 implementation complete and green (14 unit tests, mypy/pyright/ruff clean). Review-driven revision applied:
-scope detection now mirrors `find_forge_installation` (not bare cwd), `--all` lists local, `registered_pairs` shows
-Forge's footprint only, and `start` is removed (single-leaf `forge codex` allowlisted) rather than shipped as a
-no-`--proxy` placeholder. Remaining: commit.
+Phase 1 shipped (commit `dff6e3a`): `forge codex status` + 14 unit tests, `make pre-commit` clean. Phase 2 live-probe
+**resolved GO** (see below) -- codex accepts a custom Responses base URL via argv (`-c`) + env, so the launcher is
+feasible. Next live cursor: **Phase 3 (Slice 2)** -- the from-scratch Responses proxy transport, the heaviest piece and
+the epic-member work. It is a large multi-file build (proxy route + converters + SSE + capability + posture), so confirm
+scope/sequencing before starting.
 
 ## Phase 1 - `forge codex status` (shippable now)
 
@@ -66,12 +67,46 @@ no-`--proxy` placeholder. Remaining: commit.
 | Group single-leaf; `start` not a command | runtime faked absent                      | `forge --help` lists `codex`; `forge codex start` is "No such command"               | same                                 |
 | Tracking surfaced from installed.json    | seeded `installed.json`                   | `tracked_config_path` / `tracked_commands` populated in scope output                 | same                                 |
 
-## Phase 2 - Live-probe Codex proxy contract (hard go/no-go gate)
+## Phase 2 - Live-probe Codex proxy contract (hard go/no-go gate) -- RESOLVED: GO
 
-**Blocks Phases 3-4.** Pin how the installed Codex CLI accepts a Responses base URL (env/argv vs `config.toml`
-`model_provider`). **Kill criterion**: if routing is reachable only by writing codex-owned `config.toml`, the `--proxy`
-launcher is infeasible as designed -- stop, do not work around it. Document the exact contract in the card closeout.
-(Card Slice 1.)
+Probed `codex-cli 0.141.0` (`/opt/homebrew/bin/codex`) on 2026-06-22. **Decision: GO** -- the kill criterion is NOT
+triggered. Routing to a custom Responses base URL is reachable via **argv (`-c`) + env**, not config-file-only, so the
+launcher's "configure child env/argv" design is feasible. (Card Slice 1.)
+
+### Pinned contract (no codex-owned `config.toml` write)
+
+Inject the provider entirely through `-c` overrides (every subcommand accepts `-c key=value`, dotted, TOML-parsed):
+
+```text
+codex [exec] \
+  -c model_provider=<id> \
+  -c 'model_providers.<id>.name="..."' \
+  -c 'model_providers.<id>.base_url="http://127.0.0.1:<port>/v1"' \
+  -c 'model_providers.<id>.wire_api="responses"' \
+  -c 'model_providers.<id>.env_key="<ENV_VAR>"'
+```
+
+- **Auth = env.** Codex sends the value of `<ENV_VAR>` as the provider token; the loopback proxy must accept it. With a
+  custom provider active, `requires OpenAI auth: false` -- native OpenAI creds are not needed (supports the
+  no-upstream-creds-leak requirement).
+- **`wire_api="responses"`** is HTTP/SSE Responses (what Slice 2 must serve). The separate "Responses WebSocket" feature
+  is disabled by default -- Slice 2 needs HTTP/SSE only, not WebSocket.
+
+### Evidence
+
+`codex doctor --json` with an **empty** `$CODEX_HOME` and argv-only `-c` flags reported: `model provider: forge_local`,
+`forge_local API base URL: http://127.0.0.1:4000/v1 connect failed (required)` (read + attempted -> proves routing),
+`wire API: responses`, `provider auth env var: <VAR> (present)`, `requires OpenAI auth: false`.
+
+### Caveats for Slices 2-3
+
+- **Never pass `--strict-config`.** `codex exec --strict-config` errors on config fields the installed version does not
+  recognize; rely on version-tolerant `-c` overrides instead.
+- `-p/--profile` layers a `$CODEX_HOME/<name>.config.toml` file -- a file-based alternative deliberately NOT used; `-c`
+  argv is the chosen non-file channel.
+- Env scrub (Slice 3): `shell_environment_policy.inherit` is a `-c`-settable key relevant to controlling child env.
+- Slice 1 proves the routing channel only. A full Responses request/response round-trip is Slice 2's acceptance test
+  (`tests/src/proxy/test_responses_transport.py`), not proven here.
 
 ## Phase 3 - Responses proxy transport (gated on Phase 2)
 
@@ -85,8 +120,10 @@ Sessionless proxy-backed TUI launch with full child-env scrub (session + run-tre
 
 ## Blockers / deferred
 
-- Phase 2 probe is a hard gate: a config-only routing result kills the launcher design (Phases 3-4), not just delays it.
-- `forge codex preset` is out of scope by design (`config.toml` is codex-owned and trust-frozen).
+- Phase 2 hard gate: **cleared GO** (argv/env routing exists; not config-file-only). Phases 3-4 are unblocked by the
+  probe; Phase 4 (launcher) remains blocked on Phase 3 (transport).
+- `forge codex preset` is out of scope by design (`config.toml` is codex-owned and trust-frozen). The launcher uses `-c`
+  argv overrides, never a written file -- consistent with that boundary.
 
 ## Closeout
 
