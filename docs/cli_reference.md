@@ -130,6 +130,18 @@ session *label*; use `--root-run-id` for an exact match.
 | `forge claude preset edit`        | Edit settings preset in $EDITOR             |
 | `forge claude preset reset`       | Reset preset to built-in defaults           |
 
+### Codex management
+
+| Command              | Purpose                                                                                  |
+| -------------------- | ---------------------------------------------------------------------------------------- |
+| `forge codex status` | Inspect Codex binary, config, and Forge hook registration (`--scope`, `--all`, `--json`) |
+
+`status` is read-only and reports registration from a static config read; it never claims enrollment. Default scope is
+the detected Forge install scope (else user); `--scope user|project|local` and `--all` widen it. Prove enrollment
+empirically with `forge runtime preflight codex --verify-enrollment`. The proxy-backed launcher
+(`forge codex start --proxy`) is parked until the Responses transport lands and is not a command yet (see
+`docs/board/doing/forge_codex_command_group/`); run native `codex` for direct use.
+
 ### Backend management
 
 | Command                                     | Purpose                                                                                    |

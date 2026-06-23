@@ -25,6 +25,31 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-06-22
+
+### forge_codex_command_group Phase 1: `forge codex status` (read-only Codex inspection)
+
+**Goal**: Ship the read-only Codex inspection surface as the first independently-shippable slice of the codex
+command-group card; the proxy-backed launcher stays parked behind the Phase 2 probe.
+
+**Key changes**:
+
+- New `forge codex` group (`src/forge/cli/codex.py`) with one leaf, `status`: reports binary + version
+  (`get_runtime("codex").detect()`), per-scope Codex config path, managed-block presence, Forge-only event-aware
+  registration pairs, and a static enrollment posture (`yes/no/partial/wrong-event`). Never claims enrollment — points
+  to `forge runtime preflight codex --verify-enrollment`.
+- Scope resolution mirrors the installer: default = detected scope via `find_forge_installation` (else user);
+  project/local roots resolve by walking up for `.git`/`.codex` (not bare cwd); `--all` lists user/project/local
+  distinctly (config collapses project<->local, but tracking is scope-keyed).
+- `start` deliberately **not** shipped: a no-`--proxy` placeholder that always errors would be a tombstone and could pin
+  a `--proxy` contract the Phase 2 kill criterion may invalidate. `forge codex` is allowlisted as intentional
+  single-leaf phasing debt in `SINGLE_LEAF_GROUP_ALLOWLIST` (remove when `start --proxy` ships in Phase 4).
+- Docs: `cli_reference.md` "Codex management" section.
+
+**Verification**: 14 unit tests in `tests/src/cli/test_codex_status.py` (scope detection, subdir root resolution,
+`--all` local, Forge-only filter, wrong-event, no-`start`-command) plus tree-invariant + output guards = 31 pass;
+`make pre-commit` clean (mypy, pyright, ruff, black, isort, mdformat).
+
 ## 2026-06-20
 
 ### openrouter_user_direct_callers: unified provider-`user` toggle + direct-caller injection

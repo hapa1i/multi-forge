@@ -20,6 +20,7 @@ from forge.install.cli import info_cmd  # noqa: E402
 from .auth import auth  # noqa: E402
 from .backend import backend  # noqa: E402
 from .claude import claude  # noqa: E402
+from .codex import codex  # noqa: E402
 from .config_cmd import config as config_cmd  # noqa: E402
 from .extensions import extensions  # noqa: E402
 from .hooks import hooks  # noqa: E402
@@ -384,6 +385,7 @@ main.add_command(provider)
 main.add_command(policy)
 main.add_command(memory_writer)
 main.add_command(claude)
+main.add_command(codex, name="codex")
 main.add_command(config_cmd, name="config")
 main.add_command(hooks)
 main.add_command(memory_cmd, name="memory")

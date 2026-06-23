@@ -76,6 +76,9 @@ SINGLE_LEAF_GROUP_ALLOWLIST = {
     "forge provider",  # -> trace (single child); flatten to provider list|show|explain
     "forge policy shadow",  # -> show (run is hidden)
     "forge memory report",  # -> show; flatten to a leaf
+    # Phased, not flatten: the second leaf `start --proxy` is parked until the Responses
+    # transport ships (card forge_codex_command_group, Phase 4). Remove this when it lands.
+    "forge codex",
 }
 
 
