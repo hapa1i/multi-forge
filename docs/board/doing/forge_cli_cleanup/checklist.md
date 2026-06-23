@@ -15,10 +15,11 @@ Phase 1 is a **decision gate**, not code. The card is a large clean break; the c
 the taxonomy and the open questions first, then drain the five debt ledgers the test suite already tracks. Do not rename
 a live surface before the matching decision is recorded here.
 
-**Progress (2026-06-23):** Slice 06 shipped (`forge session context` removed). Decision gate: **D1, D3, D7 decided**
-(see Phase 1) — D1 = move to `forge telemetry` + delete emptied `provider`; D3 = build `forge model` namespace (backend
-moves under it); D7 = tiered config-object verbs, `backend` excluded. Still open: **D2, D4, D5, D6, D8, D9**. D3 (build
-`model`) and D1 both reshape `main.py` top-level groups, so they should land before D6 (aliases) settles new nouns.
+**Progress (2026-06-23):** Slice 06 shipped (`forge session context` removed). Decision gate: **D1, D2, D3, D7 decided**
+(see Phase 1) — D1 = move to `forge telemetry` + delete emptied `provider`; D2 = keep `proxy audit` under `proxy`; D3 =
+build `forge model` namespace (backend moves under it); D7 = tiered config-object verbs, `backend` excluded. Still open:
+**D4, D5, D6, D8, D9**. D1/D3 both reshape `main.py` top-level groups, so they should land before D6 (aliases) settles
+new nouns.
 
 ## Audit reconciliation (verified 2026-06-23)
 
@@ -84,8 +85,13 @@ defaults to accept or override, not commitments.
   don't grow the surface in a cleanup). Fix `proxy_costs.py:20`/`proxy_audit.py:17` stderr→stdout. `proxy audit` stays
   under `proxy` (D2 still open). Guard gap to close in slice 03: `test_no_single_leaf_groups` checks `len==1` only —
   tighten to `len<=1` so an emptied group can't pass silently.
-- [ ] **D2 Proxy audit placement (Q2).** Keep `forge proxy audit show|diff` under `proxy` (capture is proxy-configured),
-  or move to `telemetry`? _Recommend: keep under `proxy`_ (2-leaf subgroup, capture/config is proxy-owned).
+- [x] **D2 Proxy audit placement (Q2). DECIDED 2026-06-23: KEEP `forge proxy audit show|diff` under `proxy`.** Capture
+  is proxy-configured and the audit is about a specific proxy's downstream behavior, so it stays a 2-leaf subgroup under
+  `proxy` (no telemetry move). Consequence to document at the call site: `audit` reads the same
+  `~/.forge/telemetry/downstream/` data that `forge telemetry trace` (D1) reads, but the two live in different
+  namespaces — note this split in `proxy_audit.py`/docs so it doesn't read as an oversight. Since `audit` is **not**
+  moving, its `proxy_audit.py:17` stderr→stdout stream fix is owned by **slice 07** (stream ownership), not slice 03;
+  slice 03 keeps only `proxy_costs.py:20` (which does move to `telemetry costs`).
 - [x] **D3 Backend namespace (F5/Q3). DECIDED 2026-06-23: BUILD the `forge model` namespace.** Create a `forge model`
   group, move all 8 backend verbs to `forge model backend` (`list/show/test-auth/create/start/stop/delete/reconcile`,
   preserved verbatim), and add a real sibling leaf `forge model catalog` (or `list`) wiring `core/models/catalog.py`
@@ -125,13 +131,14 @@ defaults to accept or override, not commitments.
 Each slice's assertion names an observable behavior and the test that proves it. Tick only when the test passes and the
 verification is recorded.
 
-- [ ] **Slice 03 - Telemetry move (D1; D2 still open).** `forge telemetry activity|trace|costs` exist and work; old
-  paths (`forge activity`, `forge provider trace`, `forge proxy costs`) return Click `No such command` (clean break, no
-  tombstone). **Delete the emptied `forge provider` group** + its `main.py:384` registration and **remove** its
-  `SINGLE_LEAF_GROUP_ALLOWLIST` entry (the 3-leaf subgroup is `telemetry trace`, not provider; `forge memory report`
-  leaves too if D4 lands). **Tighten `test_no_single_leaf_groups` to flag `len<=1`** so the emptied group can't pass
-  silently. Human + `--json` of each telemetry leaf share **stdout** (fix `proxy_costs.py:20`/`proxy_audit.py:17`
-  stderr→stdout). Tests: `tests/src/cli/test_telemetry.py` (new) + old-path-removal cases.
+- [ ] **Slice 03 - Telemetry move (D1, D2).** `forge telemetry activity|trace|costs` exist and work; old paths
+  (`forge activity`, `forge provider trace`, `forge proxy costs`) return Click `No such command` (clean break, no
+  tombstone). `forge proxy audit show|diff` **stays under `proxy`** (D2). **Delete the emptied `forge provider` group**
+  \+ its `main.py:384` registration and **remove** its `SINGLE_LEAF_GROUP_ALLOWLIST` entry (the 3-leaf subgroup is
+  `telemetry trace`, not provider; `forge memory report` leaves too if D4 lands). **Tighten `test_no_single_leaf_groups`
+  to flag `len<=1`** so the emptied group can't pass silently. Human + `--json` of each telemetry leaf share **stdout**
+  (fix `proxy_costs.py:20` stderr→stdout here; `proxy_audit.py:17` is slice 07 since audit doesn't move). Tests:
+  `tests/src/cli/test_telemetry.py` (new) + old-path-removal cases.
   - **Direct-command mirror (D1 decision = retire):** **delete** `%provider trace list|show|explain` (advertised
     `direct_commands.py:71`, handled `:356`) with no `%telemetry` replacement — clean break, don't grow the surface.
     Drop the `%help` advert string and **delete** `tests/src/cli/hooks/test_direct_commands_provider.py` (removed
@@ -164,8 +171,9 @@ verification is recorded.
     `forge transfer diff`; extend `_READ_LEAVES`/the guard so `profiles`/`diff` are covered; `JSON_MISSING_ALLOWLIST` →
     `{}`.
   - Normalize the 9 `json_output` dests to `as_json` (D8); `JSON_DEST_ALLOWLIST` → `{}`.
-  - Make `proxy_costs`/`proxy_audit` human output go to stdout; add the planned stdout/stderr guard with
-    `CliRunner(mix_stderr=False)` (asserts `--json` mode is valid JSON on stdout, empty stderr).
+  - Make `proxy audit` human output go to stdout (`proxy_audit.py:17`; `proxy costs` → `telemetry costs` is fixed in
+    slice 03). Add the planned stdout/stderr guard with `CliRunner(mix_stderr=False)` covering the telemetry leaves +
+    `proxy audit` (asserts `--json` mode is valid JSON on stdout, empty stderr).
 - [ ] **Slice 08 - Config-object parity (D7 = tiered).** Record the tiered vocab in the style guide: core
   `{show, edit, reset}` (already met by `config`/`proxy template`/`claude preset`), optional `{set, validate}` where
   meaningful; `proxy` documented as a partial-lifecycle exception (`clean`/`delete`, no `reset`); **`backend` excluded**
