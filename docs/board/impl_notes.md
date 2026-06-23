@@ -367,9 +367,9 @@ code (file:line) before promotion.
 ### Supervisor status-line health: surface fail-open from the usage ledger (shipped 2026-06-16)
 
 Durable invariants for `supervisor_statusline_health` (#30): make a silently fail-open supervisor visible on the
-always-on status line (`SUP!N <kind>`) and in `forge activity` (`failing open: N timeout, N error`), reading the outcome
-the usage ledger already records. Sources: `src/forge/core/ops/usage_summary.py`, `src/forge/cli/status_line.py`,
-`src/forge/cli/statusline/{throttle,context,registry}.py`, `src/forge/cli/activity.py`.
+always-on status line (`SUP!N <kind>`) and in `forge telemetry activity` (`failing open: N timeout, N error`), reading
+the outcome the usage ledger already records. Sources: `src/forge/core/ops/usage_summary.py`,
+`src/forge/cli/status_line.py`, `src/forge/cli/statusline/{throttle,context,registry}.py`, `src/forge/cli/activity.py`.
 
 - **Read the ledger, not the decision log — the on-model source.** The supervisor's timeout/subprocess fail-open is
   already in the usage ledger as a non-`success` `UsageEvent.status`/`failure_type` (`emit_usage_for_session_result`).
@@ -379,10 +379,10 @@ the usage ledger already records. Sources: `src/forge/core/ops/usage_summary.py`
   auth fail-opens that emit no event, and exact cached-allow reset).
 - **Two read shapes off one ledger, one kind vocabulary.** `read_supervisor_health` returns the **newest-first
   contiguous fail-open streak** (resets on the first `success`) for the status-line `SUP!N`; `_aggregate_ledger` returns
-  the **window total** per kind (`CommandUsage.error_kinds`) for `forge activity`. They are deliberately different
-  numbers and the docs say so. Both map `failure_type` through the single `_failure_kind` helper (`timeout` exact,
-  everything incl. `None`/subprocess/exit/runtime → `error`) — keep that the only source of the kind mapping or the two
-  surfaces drift.
+  the **window total** per kind (`CommandUsage.error_kinds`) for `forge telemetry activity`. They are deliberately
+  different numbers and the docs say so. Both map `failure_type` through the single `_failure_kind` helper (`timeout`
+  exact, everything incl. `None`/subprocess/exit/runtime → `error`) — keep that the only source of the kind mapping or
+  the two surfaces drift.
 - **Generic data, supervisor-only interpretation.** `CommandUsage.error_kinds` is a generic per-kind split of the
   existing generic `errors` count, populated uniformly for every command in `_aggregate_ledger` (no
   `command == "supervisor"` branch). "Failing open" is applied **only** by the supervisor formatter
@@ -392,15 +392,15 @@ the usage ledger already records. Sources: `src/forge/core/ops/usage_summary.py`
   co-populate both (`_failure_kind(None) == "error"`), so `errors>0 / error_kinds={}` is exclusively a hand-built /
   internal summary. The helper returns `None` there; `render_summary_line` falls back **locally** to the legacy
   `"{errors} errors"` so the count is never silently dropped (regression: `test_errors_only_falls_back_to_count`; the
-  three pre-existing hand-built `TestRenderLine` tests stay green unchanged). `forge activity` needs no fallback — its
-  commands table already shows the lumped count, so the Supervisor line carries pure breakdown detail.
+  three pre-existing hand-built `TestRenderLine` tests stay green unchanged). `forge telemetry activity` needs no
+  fallback — its commands table already shows the lumped count, so the Supervisor line carries pure breakdown detail.
 - **Status-line health stays fail-open + posture-preserving.** The throttled read (`read_or_compute_session_health`,
   same `forge_cost_ttl` window, distinct `fhealth-` cache) degrades a read error to **posture-only** (no suffix), never
   hiding the posture — unlike `forge_cost`, whose whole value is ledger-derived. `SUP!N` attaches to any posture
   (`SUP`/`SUP(susp)`/`SUP(off)`) so suspended/off keeps prior fail-open history visible. `recent_failures==0` is
   byte-identical to today (golden-safe; `supervisor` stays out of `DEFAULT_ORDER`). Frontier-only:
-  `command="supervisor"` excludes `supervisor-shadow`/`plan-check`. `forge proxy costs reset` clears `fhealth-*.json`
-  alongside `fcost-*.json` so a wiped ledger can't replay cached health.
+  `command="supervisor"` excludes `supervisor-shadow`/`plan-check`. `forge telemetry costs reset` clears
+  `fhealth-*.json` alongside `fcost-*.json` so a wiped ledger can't replay cached health.
 
 ### OpenRouter provider trace: local lifecycle evidence for aborted streams (shipped 2026-06-16; folded 2026-06-18)
 
@@ -411,7 +411,7 @@ JSONL plane: CLI/core provider-trace readers should project from `DownstreamReco
 
 - **Provider trace is downstream model-call evidence.** It records provider lifecycle + correlation metadata for one
   model attempt, alongside cost, tokens, and optional redacted audit evidence under `~/.forge/telemetry/downstream/`. It
-  is metadata-only, owner-only, and bounded by downstream retention. `forge proxy costs reset` now wipes downstream
+  is metadata-only, owner-only, and bounded by downstream retention. `forge telemetry costs reset` now wipes downstream
   telemetry and cap state together; provider-trace state is not a separately retained exception.
 - **The shared SSE seam owns lifecycle flags.** The provider metadata carrier is consumed at the converter seam, which
   records stream-start, first user-visible chunk, final usage, and client-disconnect state exactly once through the
@@ -434,7 +434,8 @@ constraints for future telemetry, cost, provider-trace, and activity work.
 - **Plane split is by direction, not feature.** Downstream is one model attempt: session-blind, keyed by
   request/run/root ids, with metrics, nullable cost, provenance, optional redacted wire evidence, and provider lifecycle
   fields. Upstream is one operation outcome: session-tagged, run/root-keyed, with status, reason, latency, and fail-open
-  classification. `forge activity` is the join/read surface; it should not grow a third durable outcome/spend plane.
+  classification. `forge telemetry activity` is the join/read surface; it should not grow a third durable outcome/spend
+  plane.
 - **Run-tree identity is the bridge.** The proxy does not know Forge sessions, so downstream records stay session-blind.
   Session views select upstream by session, collect run/root ids, then join downstream by run tree. Adding a session
   field to downstream would be a shortcut around the architecture, not a fix.
@@ -542,8 +543,8 @@ the durable items into the body above, then delete this section.
   (Forge may hydrate it into an OAuth session). `RenderContext.has_api_key` was deleted; `billing_mode` is a declaration
   (`cost_mode`) + `rate_limits` evidence. The interactive/headless key axis is `interactive_anthropic_api_key: omit`,
   distinct from `auth_ignore_env` (source-only, both interactive + headless).
-- **Rename the user-facing surface, not the domain plane.** `forge usage` → `forge activity` (it reports Forge
-  *automation* activity, not total interactive usage), but the durable **usage ledger** plane (`UsageEvent`,
-  `usage/events/`, `read_usage_events`, `usage_summary.py`) keeps its name. Removed CLI commands become hidden,
-  **flag-tolerant** tombstones (`ignore_unknown_options` + `UNPROCESSED`) so old `--flag` invocations reach the rename
-  message, not Click's "No such option".
+- **Rename the user-facing surface, not the domain plane.** `forge usage` → `forge activity` →
+  `forge telemetry activity` (it reports Forge *automation* activity, not total interactive usage), but the durable
+  **usage ledger** plane (`UsageEvent`, `usage/events/`, `read_usage_events`, `usage_summary.py`) keeps its name.
+  Removed CLI commands become hidden, **flag-tolerant** tombstones (`ignore_unknown_options` + `UNPROCESSED`) so old
+  `--flag` invocations reach the rename message, not Click's "No such option".

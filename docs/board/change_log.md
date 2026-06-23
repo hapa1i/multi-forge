@@ -762,6 +762,9 @@ derivation test); 4 integration tests green (new same-dir transfer argv has `--s
   interactive TUI support, codex-hooks installation/enrollment plumbing, capability/version guards, and review fixes
   around fork/rollback isolation, enrollment state, policy persistence, handoff artifacts, and invoker behavior. The
   closeout moved the card to done and recorded remaining empirical enrollment residuals.
+- **Deferred Codex items remain tracked** (full detail in `done/codex_frontend/` and `done/runtime_abstraction/`):
+  app-server transport (`codex app-server`/`--stdio`, unevaluated by scope decision), filing the upstream fail-open
+  issue (draft ready), and the PermissionRequest/`trusted_hash` source-dive (documented-not-built).
 - **Codex probe and enrollment evidence was preserved at the decision level.** Stages 84-87 covered cross-project trust,
   version churn, guided enrollment, and interactive reattach smoke paths. The durable outcome was that trust is scoped,
   `pretool_policy` is partial/enrollment-gated, SessionStart additional context is viable when enrolled, and some

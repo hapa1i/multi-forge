@@ -39,8 +39,8 @@ Users think about work at the repository/worktree-family level. Status of each n
   manual worktrees after Slice 1).
 - "What active worktrees do I have for this repo?" — **remaining**: the index only knows worktrees that *have* sessions;
   listing empty or prunable worktrees needs the `git worktree list` join.
-- "What did Forge automation spend across this whole workspace?" — **partial**: `forge activity` is per-session today;
-  `--scope workspace` aggregation is part of this slice.
+- "What did Forge automation spend across this whole workspace?" — **partial**: `forge telemetry activity` is
+  per-session today; `--scope workspace` aggregation is part of this slice.
 - "Which sessions exist in this worktree family, including deleted or inactive checkouts?" — **partial**: grouping
   works, but the "live worktree vs historical session" distinction needs the git join.
 
@@ -98,7 +98,7 @@ Workspace as a scope and read surface (commands marked shipped vs proposed):
 
 ```bash
 forge session list --scope workspace   # SHIPPED
-forge activity --scope workspace        # proposed (activity has no --scope today)
+forge telemetry activity --scope workspace        # proposed (activity has no --scope today)
 forge workspace worktrees               # proposed (Slice 2 — the git-worktree-list join)
 forge workspace sessions                # proposed (Slice 2)
 forge workspace status                  # proposed (Slice 2)
@@ -120,10 +120,10 @@ Activity:
   workflows: 12
 ```
 
-`forge proxy costs show --scope workspace` is tempting but needs sharper naming: proxy cost logs are proxy-owned and
+`forge telemetry costs show --scope workspace` is tempting but needs sharper naming: proxy cost logs are proxy-owned and
 global, while workspace activity is session-attributed via the usage ledger. The first implementation should probably
-route workspace cost questions through `forge activity --scope workspace` unless a reliable request/session attribution
-join is available.
+route workspace cost questions through `forge telemetry activity --scope workspace` unless a reliable request/session
+attribution join is available.
 
 ## Relationship To Existing Concepts
 
@@ -152,8 +152,8 @@ correct and is the foundation the read surface builds on.
 3. Join `git worktree list` (live worktrees, including empty/prunable) with the session index grouped by `project_root`
    (Slice 1 made this reliable). Distinguish live worktrees from historical sessions whose checkout is gone.
 4. Join active session state from `~/.forge/sessions/active.json` for the "N active" counts.
-5. For `forge activity --scope workspace`, aggregate usage-ledger events for sessions resolved into the workspace;
-   surface coverage caveats when emitters lack session attribution (inherits the documented `cost_partial` /
+5. For `forge telemetry activity --scope workspace`, aggregate usage-ledger events for sessions resolved into the
+   workspace; surface coverage caveats when emitters lack session attribution (inherits the documented `cost_partial` /
    `session_tagging_partial` limits).
 6. Read-only. No `forge workspace create`, no user-managed membership.
 
