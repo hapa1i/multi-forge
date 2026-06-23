@@ -17,10 +17,10 @@ OpenAI key (this environment's `OPENAI_API_KEY` is dead). Card stays in `doing/`
 a live key.
 
 **Phase 4 shipped**: `forge codex start --proxy <id-or-template>` -- the sessionless, scrubbed Codex TUI launcher (4
-seams: version gate, capability gate, bare invocation, CLI leaf; 55 new unit tests). `make pre-commit` clean and the
-live argv-routing gate ran: the list-mode `-c` argv routes real codex 0.141.0 to `POST /v1/responses` (risk #1
-validated). The 200 reasoning round-trip remains credential-blocked (dead key), like Phase 3 -- the card stays in
-`doing/` until a working key confirms it.
+seams: version gate, capability gate, bare invocation, CLI leaf; 62 new unit tests incl. the post-commit proxy-identity
+fix). `make pre-commit` clean and the live argv-routing gate ran: the list-mode `-c` argv routes real codex 0.141.0 to
+`POST /v1/responses` (risk #1 validated). The 200 reasoning round-trip remains credential-blocked (dead key), like Phase
+3 -- the card stays in `doing/` until a working key confirms it.
 
 ## Phase 1 - `forge codex status` (shippable now)
 
@@ -270,6 +270,18 @@ byte-identical `-c` provider tokens.
   then 429 (dead/rate-limited OpenAI key), past the proxy's routing -- the same deferral as Phase 3, not a launcher
   defect.
 - [x] `make pre-commit` clean (ruff, black, isort, mypy, pyright, mdformat, gitleaks; under the 2.5k-line file cap).
+
+### Review fixes (post-commit)
+
+- [x] **Wrong-proxy identity gap (caught in review).** `ensure_proxy` resolves an exact proxy_id by registry presence,
+  not liveness, and the capability gate originally passed only `entry.base_url` to `assert_proxy_responses_capable` --
+  so a stale entry whose port is now held by a *different* capable Forge proxy could route Codex through the wrong
+  upstream while the UI named the requested proxy. Fix: `assert_proxy_responses_capable` now takes
+  `expected_proxy_id`/`expected_template` and verifies identity (`is_proxy` + `proxy_id` + `template`) from the *same*
+  `GET /` body, **before** the capability conjunction, raising `ProxyIdentityMismatchError` (mirrors
+  `check_proxy_health` / the Claude launcher's `_healthcheck_proxy`). The CLI passes `entry.proxy_id`/`entry.template`
+  and tips the stale-entry recovery. *(TestProxyIdentityVerification + test_identity_mismatch_shows_stale_entry_tip;
+  live-verified against a real proxy body: correct id passes, wrong id rejects.)*
 
 ## Blockers / deferred
 

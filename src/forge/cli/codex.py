@@ -330,6 +330,7 @@ def start_cmd(proxy: str, sandbox: str, codex_args: tuple[str, ...]) -> None:
         ProxyResolutionError,
     )
     from forge.proxy.proxy_orchestrator import (
+        ProxyIdentityMismatchError,
         ProxyNotResponsesCapableError,
         ProxyStartError,
         ProxyUnreachableError,
@@ -358,17 +359,28 @@ def start_cmd(proxy: str, sandbox: str, codex_args: tuple[str, ...]) -> None:
     if started:
         console.print(f"[dim]Started proxy '{entry.proxy_id}' from '{proxy}'.[/dim]")
 
-    # 4. Hard Responses-capability gate (doubles as the post-start health check). On
-    #    failure we leave the proxy running -- capability mismatch is a static property of
+    # 4. Hard Responses-capability gate (also re-checks proxy identity + liveness, since
+    #    ensure_proxy resolves an exact proxy_id by registry presence, not liveness). On a
+    #    capability/identity failure we leave the proxy running -- it's a static property of
     #    the proxy, so killing it would be user-hostile.
     try:
         # wire_shape is "openai_responses_passthrough" on success (uninformative); the
         # failure path names the actual shape via the exception instead.
-        default_model, _ = assert_proxy_responses_capable(entry.base_url)
+        default_model, _ = assert_proxy_responses_capable(
+            entry.base_url, expected_proxy_id=entry.proxy_id, expected_template=entry.template
+        )
     except ProxyUnreachableError as e:
         print_error_with_tip(
             str(e),
             f"Run 'forge proxy start {entry.proxy_id}' to (re)start it.",
+            console=err_console,
+        )
+        sys.exit(1)
+    except ProxyIdentityMismatchError as e:
+        print_error_with_tip(
+            str(e),
+            f"The registry entry for '{entry.proxy_id}' looks stale. "
+            f"Run 'forge proxy start {entry.proxy_id}' to re-resolve it.",
             console=err_console,
         )
         sys.exit(1)

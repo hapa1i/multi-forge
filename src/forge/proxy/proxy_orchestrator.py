@@ -66,6 +66,27 @@ class ProxyUnreachableError(Exception):
     """Raised when a proxy's ``GET /`` cannot be read (down, non-200, or non-JSON body)."""
 
 
+class ProxyIdentityMismatchError(Exception):
+    """Raised when the live proxy at a resolved ``base_url`` is not the resolved proxy.
+
+    ``ensure_proxy`` returns an exact proxy_id by registry *presence*, not liveness, so a
+    stale entry whose port is now held by a *different* Forge proxy (or a non-proxy) would
+    otherwise route a launch through the wrong upstream while the UI names the requested
+    proxy. Carries expected/actual proxy_id for the recovery message.
+    """
+
+    def __init__(
+        self, base_url: str, *, expected_proxy_id: str | None, actual_proxy_id: str | None, detail: str
+    ) -> None:
+        self.base_url = base_url
+        self.expected_proxy_id = expected_proxy_id
+        self.actual_proxy_id = actual_proxy_id
+        super().__init__(
+            f"proxy identity mismatch at {base_url}: {detail} "
+            "(stale registry entry -- a different proxy now holds this address)"
+        )
+
+
 class ProxyNotResponsesCapableError(Exception):
     """Raised when a proxy does not advertise the Codex Responses ingress.
 
@@ -898,7 +919,50 @@ def _default_model_from_root(data: dict[str, Any]) -> str | None:
     return model if isinstance(model, str) else None
 
 
-def assert_proxy_responses_capable(base_url: str, *, timeout_s: float = 5.0) -> tuple[str | None, str]:
+def _verify_proxy_identity(
+    data: dict[str, Any], *, base_url: str, expected_proxy_id: str | None, expected_template: str | None
+) -> None:
+    """Reject a ``GET /`` body that is not the resolved proxy's identity.
+
+    Mirrors ``check_proxy_health``'s identity gate (is_proxy + template + proxy_id) so a
+    launch cannot route through a different proxy that happens to occupy a stale entry's
+    port. No-op when neither expected value is given (capability-only callers).
+    """
+    if expected_proxy_id is None and expected_template is None:
+        return
+    if data.get("is_proxy") is not True:
+        raise ProxyIdentityMismatchError(
+            base_url,
+            expected_proxy_id=expected_proxy_id,
+            actual_proxy_id=None,
+            detail="responded but is_proxy is not true",
+        )
+    proxy_block = data.get("proxy")
+    actual_proxy_id = proxy_block.get("proxy_id") if isinstance(proxy_block, dict) else None
+    if expected_proxy_id is not None and actual_proxy_id != expected_proxy_id:
+        raise ProxyIdentityMismatchError(
+            base_url,
+            expected_proxy_id=expected_proxy_id,
+            actual_proxy_id=actual_proxy_id,
+            detail=f"expected proxy_id '{expected_proxy_id}', got '{actual_proxy_id}'",
+        )
+    actual_template = data.get("template")
+    if expected_template is not None and actual_template != expected_template:
+        raise ProxyIdentityMismatchError(
+            base_url,
+            expected_proxy_id=expected_proxy_id,
+            actual_proxy_id=actual_proxy_id,
+            detail=f"expected template '{expected_template}', got '{actual_template}'",
+        )
+
+
+def assert_proxy_responses_capable(
+    base_url: str,
+    *,
+    expected_proxy_id: str | None = None,
+    expected_template: str | None = None,
+    timeout_s: float = 5.0,
+) -> tuple[str | None, str]:
     """Assert a proxy advertises the Codex Responses ingress; return ``(default_model, wire_shape)``.
 
     Reads ``GET {base_url}/`` and enforces the *same conjunction* the runtime route gate
@@ -908,12 +972,20 @@ def assert_proxy_responses_capable(base_url: str, *, timeout_s: float = 5.0) -> 
     different wire shape is still rejected -- the launcher mirrors the runtime gate
     instead of trusting the server's internal invariant that the advert already ANDs them.
 
+    When ``expected_proxy_id``/``expected_template`` are given, also verifies the live
+    proxy's identity (is_proxy + proxy_id + template) from the same body -- so a stale
+    registry entry whose port is now held by a *different* capable Forge proxy is rejected
+    rather than silently routed (``ensure_proxy`` returns exact ids by presence, not
+    liveness). Identity is checked *before* capability, so the wrong-proxy case reports a
+    mismatch, not a misleading capability verdict.
+
     ``default_model`` is the advertised default tier's model when present, else ``None``
     (the caller then skips ``-m`` and lets codex/proxy choose).
 
     Raises:
         ProxyUnreachableError: GET / failed (connection, timeout, non-200, or non-JSON).
-        ProxyNotResponsesCapableError: reachable, but the capability conjunction is false.
+        ProxyIdentityMismatchError: reachable, but not the resolved proxy (stale entry).
+        ProxyNotResponsesCapableError: right proxy, but the capability conjunction is false.
     """
     url = f"{base_url.rstrip('/')}/"
     try:
@@ -929,6 +1001,10 @@ def assert_proxy_responses_capable(base_url: str, *, timeout_s: float = 5.0) -> 
         raise ProxyUnreachableError(f"proxy at {base_url} returned a non-JSON GET / body") from e
     if not isinstance(data, dict):
         raise ProxyUnreachableError(f"proxy at {base_url} returned an unexpected GET / body")
+
+    _verify_proxy_identity(
+        data, base_url=base_url, expected_proxy_id=expected_proxy_id, expected_template=expected_template
+    )
 
     wire_shape = data.get("wire_shape")
     wire_shape_str = wire_shape if isinstance(wire_shape, str) else "unknown"

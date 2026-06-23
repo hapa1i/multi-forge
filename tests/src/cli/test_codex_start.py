@@ -22,6 +22,7 @@ from forge.proxy.proxies import (
     ProxyRegistryCorruptedError,
 )
 from forge.proxy.proxy_orchestrator import (
+    ProxyIdentityMismatchError,
     ProxyNotResponsesCapableError,
     ProxyStartError,
     ProxyUnreachableError,
@@ -70,7 +71,9 @@ class TestHappyPath:
         result, ensure, capable, invoke = _invoke_start(["--proxy", "codex-responses-local"])
         assert result.exit_code == 0
         ensure.assert_called_once_with("codex-responses-local")
-        capable.assert_called_once_with("http://127.0.0.1:8084")
+        capable.assert_called_once_with(
+            "http://127.0.0.1:8084", expected_proxy_id="proxy_abc", expected_template="codex-responses-local"
+        )
         kw = invoke.call_args.kwargs
         assert kw["base_url"] == "http://127.0.0.1:8084"
         assert kw["sandbox"] == "workspace-write"
@@ -104,9 +107,7 @@ class TestHappyPath:
 class TestPreflightGates:
     def test_codex_not_installed_exits_before_ensure(self) -> None:
         ensure = MagicMock()
-        result, ensure, _, invoke = _invoke_start(
-            ["--proxy", "p"], runtime=_runtime(installed=False), ensure=ensure
-        )
+        result, ensure, _, invoke = _invoke_start(["--proxy", "p"], runtime=_runtime(installed=False), ensure=ensure)
         assert result.exit_code == 1
         ensure.assert_not_called()
         invoke.assert_not_called()
@@ -114,9 +115,7 @@ class TestPreflightGates:
 
     def test_old_version_hard_blocks_before_ensure(self) -> None:
         ensure = MagicMock()
-        result, ensure, _, invoke = _invoke_start(
-            ["--proxy", "p"], runtime=_runtime(version="0.140.0"), ensure=ensure
-        )
+        result, ensure, _, invoke = _invoke_start(["--proxy", "p"], runtime=_runtime(version="0.140.0"), ensure=ensure)
         assert result.exit_code == 1
         ensure.assert_not_called()
         invoke.assert_not_called()
@@ -169,6 +168,22 @@ class TestCapabilityGate:
         assert result.exit_code == 1
         assert "Responses-capable proxy required" in result.stderr
         assert "openai_translated" in result.stderr
+        invoke.assert_not_called()
+
+    def test_identity_mismatch_shows_stale_entry_tip(self) -> None:
+        # Stale exact-proxy_id entry whose port now serves a different capable proxy.
+        capable = MagicMock(
+            side_effect=ProxyIdentityMismatchError(
+                "http://127.0.0.1:8084",
+                expected_proxy_id="proxy_abc",
+                actual_proxy_id="proxy_other",
+                detail="expected proxy_id 'proxy_abc', got 'proxy_other'",
+            )
+        )
+        result, _, _, invoke = _invoke_start(["--proxy", "proxy_abc"], capable=capable)
+        assert result.exit_code == 1
+        assert "stale" in result.stderr.lower()
+        assert "forge proxy start" in result.stderr
         invoke.assert_not_called()
 
 

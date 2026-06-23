@@ -332,7 +332,10 @@ manifests as a backstop. The CLI accepts `--runtime claude|codex` but manifests 
 
 - Codex analog of `forge claude start` -- sessionless, no `FORGE_SESSION`, no `.forge/` required.
 - Requires a **Responses-capable** proxy (`wire_shape: openai_responses_passthrough` + a `responses_ingress` source,
-  §3.7); the launcher re-checks that conjunction against `GET /` and fails closed (`ProxyNotResponsesCapableError`).
+  §3.7); the launcher re-checks that conjunction against `GET /` and fails closed (`ProxyNotResponsesCapableError`). The
+  same `GET /` also re-verifies proxy **identity** (`is_proxy` + `proxy_id` + `template`) -- `ensure_proxy` resolves an
+  exact proxy_id by registry presence, not liveness, so a stale entry whose port is now held by a *different* capable
+  proxy is rejected (`ProxyIdentityMismatchError`), not silently routed.
 - Routes Codex through the loopback proxy via list-mode
   `-c model_providers.forge_proxy.{base_url,wire_api=responses,env_key}` overrides (never `--strict-config`); a custom
   provider means Codex needs no OpenAI login.

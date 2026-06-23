@@ -43,7 +43,10 @@ Phase 3 Responses transport.
 - **Capability gate** (`proxy/proxy_orchestrator.py`): `assert_proxy_responses_capable()` + `ProxyUnreachableError` /
   `ProxyNotResponsesCapableError`. Requires the full `wire_shape == openai_responses_passthrough` AND
   `capabilities.responses_ingress` conjunction off `GET /` (mirrors the runtime route gate); returns the proxy's
-  default-tier model.
+  default-tier model. **Review fix**: also re-verifies proxy identity (`is_proxy` + `proxy_id` + `template`) from the
+  same body via `expected_proxy_id`/`expected_template`, raising `ProxyIdentityMismatchError` -- `ensure_proxy` returns
+  exact ids by registry presence, not liveness, so a stale entry on a reused port can't misroute Codex to a different
+  proxy.
 - **Bare invocation** (`session/codex_invoke.py`): `invoke_codex_bare_proxy` + pure env/argv builders.
   `_CODEX_BARE_PROXY_STRIP_VARS` scrubs native codex/OpenAI auth, the 5 OpenAI account/routing vars, and
   session/run-tree identity; re-establishes NO native auth (the proxy owns upstream); list-mode `-c` provider argv; `-m`
@@ -51,9 +54,10 @@ Phase 3 Responses transport.
 - **Allowlist**: removed `forge codex` from `SINGLE_LEAF_GROUP_ALLOWLIST` (now 2 leaves); updated the registration test.
 - **Docs**: `cli_reference.md` `start` row; `design.md` §3.4 "Bare launch (Codex)" + §3.7 consumer cross-ref.
 
-**Verification**: 55 new unit tests (version blocker, capability gate, env/argv/invoke, CLI matrix) pass; full
-`tests/src/cli` suite (1953) green. `make pre-commit` + the live argv-routing gate run at closeout (a 200 turn stays
-credential-blocked, as in Phase 3).
+**Verification**: 62 new unit tests (version blocker, capability + identity gate, env/argv/invoke, CLI matrix) pass;
+full `tests/src/cli` suite green; `make pre-commit` clean. Live gate: real codex 0.141.0 routed via the list-mode `-c`
+argv to `POST /v1/responses`, and the identity check was live-verified against a real proxy body (correct id passes,
+wrong id rejects). The 200 reasoning round-trip stays credential-blocked (dead key), as in Phase 3.
 
 ## 2026-06-22
 

@@ -11,6 +11,7 @@ import pytest
 from forge.config.loader import load_proxy_instance_config
 from forge.proxy.proxies import ProxyRegistryStore
 from forge.proxy.proxy_orchestrator import (
+    ProxyIdentityMismatchError,
     ProxyNotResponsesCapableError,
     ProxyStartError,
     ProxyUnreachableError,
@@ -1265,8 +1266,11 @@ class TestEnsureProxy:
 
 
 def _capable_root_body(**overrides):
-    """A GET / body that passes the Responses-capability conjunction."""
+    """A GET / body that passes both the identity and Responses-capability checks."""
     body = {
+        "is_proxy": True,
+        "proxy": {"proxy_id": "proxy_abc"},
+        "template": "codex-responses-local",
         "wire_shape": "openai_responses_passthrough",
         "capabilities": {"responses_ingress": True},
         "routing": {"default_tier": "sonnet"},
@@ -1379,3 +1383,58 @@ class TestAssertProxyResponsesCapable:
         with _patch_root(body=["not", "a", "dict"]):
             with pytest.raises(ProxyUnreachableError):
                 assert_proxy_responses_capable("http://x")
+
+
+class TestProxyIdentityVerification:
+    """Guards the wrong-proxy race: a stale exact-proxy_id entry whose port is now held by
+    a *different* capable Forge proxy must be rejected, not silently routed."""
+
+    def test_matching_identity_passes(self) -> None:
+        with _patch_root(body=_capable_root_body()):
+            model, ws = assert_proxy_responses_capable(
+                "http://x", expected_proxy_id="proxy_abc", expected_template="codex-responses-local"
+            )
+        assert (model, ws) == ("gpt-5.5", "openai_responses_passthrough")
+
+    def test_proxy_id_mismatch_rejects(self) -> None:
+        # The stale entry's port now serves a different (also capable) proxy.
+        with _patch_root(body=_capable_root_body(proxy={"proxy_id": "proxy_other"})):
+            with pytest.raises(ProxyIdentityMismatchError) as ei:
+                assert_proxy_responses_capable("http://x", expected_proxy_id="proxy_abc")
+        assert ei.value.expected_proxy_id == "proxy_abc"
+        assert ei.value.actual_proxy_id == "proxy_other"
+
+    def test_template_mismatch_rejects(self) -> None:
+        with _patch_root(body=_capable_root_body(template="openrouter-qwen")):
+            with pytest.raises(ProxyIdentityMismatchError):
+                assert_proxy_responses_capable("http://x", expected_template="codex-responses-local")
+
+    def test_is_proxy_false_rejects(self) -> None:
+        with _patch_root(body=_capable_root_body(is_proxy=False)):
+            with pytest.raises(ProxyIdentityMismatchError):
+                assert_proxy_responses_capable("http://x", expected_proxy_id="proxy_abc")
+
+    def test_missing_proxy_block_with_expected_id_rejects(self) -> None:
+        with _patch_root(body=_capable_root_body(proxy=None)):
+            with pytest.raises(ProxyIdentityMismatchError) as ei:
+                assert_proxy_responses_capable("http://x", expected_proxy_id="proxy_abc")
+        assert ei.value.actual_proxy_id is None
+
+    def test_identity_checked_before_capability(self) -> None:
+        # Wrong proxy AND not capable -> identity error wins (we don't judge the wrong
+        # proxy's capability and emit a misleading "not Responses-capable" verdict).
+        body = _capable_root_body(
+            proxy={"proxy_id": "proxy_other"},
+            wire_shape="openai_translated",
+            capabilities={"responses_ingress": False},
+        )
+        with _patch_root(body=body):
+            with pytest.raises(ProxyIdentityMismatchError):
+                assert_proxy_responses_capable("http://x", expected_proxy_id="proxy_abc")
+
+    def test_no_expected_skips_identity(self) -> None:
+        # Capability-only callers (no expected_*) don't trigger identity checks, even on a
+        # body that wouldn't pass identity -- backward-compatible with the original signature.
+        with _patch_root(body=_capable_root_body(is_proxy=False, proxy=None)):
+            _model, ws = assert_proxy_responses_capable("http://x")
+        assert ws == "openai_responses_passthrough"
