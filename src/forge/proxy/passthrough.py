@@ -16,7 +16,6 @@ module only extracts usage and forwards bytes).
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 from collections.abc import AsyncIterator, Callable, Mapping
@@ -26,6 +25,7 @@ import httpx
 from fastapi.responses import Response, StreamingResponse
 
 from forge.proxy.provider_trace_logger import record_provider_trace
+from forge.proxy.stream_relay import relay_upstream
 from forge.proxy.utils import format_stream_lifecycle_summary
 
 logger = logging.getLogger(__name__)
@@ -101,6 +101,18 @@ class _UsageAccumulator:
         # Lifecycle side-signals for the Phase 3 provider-trace mirror.
         self.saw_content = False  # first user-visible content_block_start/delta seen
         self.saw_final_usage = False  # final message_delta carried output_tokens
+        # Anthropic passthrough cost is structurally unavailable (no cost header).
+        self.reported_cost_micros: int | None = None
+
+    @property
+    def first_chunk_seen(self) -> bool:
+        """StreamUsageAccumulator interface alias for ``saw_content``."""
+        return self.saw_content
+
+    @property
+    def final_usage_seen(self) -> bool:
+        """StreamUsageAccumulator interface alias for ``saw_final_usage``."""
+        return self.saw_final_usage
 
     def feed(self, chunk: bytes) -> None:
         try:
@@ -266,34 +278,14 @@ async def _stream_opened_upstream(
     """Stream raw SSE bytes from upstream back to the client unchanged.
 
     Usage is side-tapped from a copy of each chunk; ``on_complete`` fires once at
-    stream end (even on early client disconnect, via ``finally``). The same lifecycle
-    is mirrored into the provider-trace plane (Phase 3) when ``provider_trace_ctx`` is
-    supplied -- latent today (the trace helper gates on source capability, and current
-    passthrough sources do not declare it), but ready for a future passthrough-routed provider.
+    stream end (even on early client disconnect). The shared relay
+    (``stream_relay.relay_upstream``) owns the byte relay + teardown; the
+    Anthropic-specific cost, provider-trace mirror, and lifecycle log live in
+    ``_on_end`` here.
     """
     accumulator = _UsageAccumulator()
-    failed = False
-    stream_started = False
-    client_disconnected = False
-    chunk_count = 0
-    try:
-        async for chunk in resp.aiter_bytes():
-            stream_started = True
-            chunk_count += 1
-            yield chunk  # byte-faithful, unchanged
-            accumulator.feed(chunk)  # tolerant side-tap (copy); never alters bytes
-    except httpx.HTTPError as e:
-        failed = True
-        logger.warning("[%s] passthrough upstream stream failed: %s", request_id, e)
-        yield b'{"type":"error","error":{"type":"upstream_error","message":"passthrough upstream stream failed"}}'
-    except (asyncio.CancelledError, GeneratorExit):
-        # Client dropped the relay. Both are BaseException (the httpx.HTTPError handler
-        # never sees them); record the disconnect, then re-raise for clean teardown.
-        client_disconnected = True
-        raise
-    finally:
-        await stream_cm.__aexit__(None, None, None)
-        await client_cm.__aexit__(None, None, None)
+
+    def _on_end(*, failed: bool, client_disconnected: bool, stream_started: bool, chunk_count: int) -> None:
         _safe_on_complete(on_complete, accumulator.usage, None, failed, request_id)
         _record_passthrough_trace(
             provider_trace_ctx,
@@ -317,6 +309,17 @@ async def _stream_opened_upstream(
             logger.info(_summary)
         else:
             logger.debug(_summary)
+
+    async for chunk in relay_upstream(
+        client_cm,
+        stream_cm,
+        resp,
+        request_id,
+        accumulator=accumulator,
+        on_end=_on_end,
+        error_body=b'{"type":"error","error":{"type":"upstream_error","message":"passthrough upstream stream failed"}}',
+    ):
+        yield chunk
 
 
 def _record_passthrough_trace(

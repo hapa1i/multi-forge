@@ -257,7 +257,7 @@ def _coerce_cost_config(value: Any) -> CostConfig:
 # --- Intercept / audit config (Phase 2 audit proxy) ---
 
 _VALID_INTERCEPT_MODES = ("passthrough", "inspect", "override")
-_VALID_WIRE_SHAPES = ("openai_translated", "anthropic_passthrough")
+_VALID_WIRE_SHAPES = ("openai_translated", "anthropic_passthrough", "openai_responses_passthrough")
 _VALID_GUARD_ACTIONS = ("warn", "block", "strip")
 _DEFAULT_REDACT_HEADERS = (
     "authorization",

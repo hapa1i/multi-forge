@@ -5,11 +5,19 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import httpx
 import pytest
 
 from forge.config.loader import load_proxy_instance_config
 from forge.proxy.proxies import ProxyRegistryStore
-from forge.proxy.proxy_orchestrator import ProxyStartError, start_proxy
+from forge.proxy.proxy_orchestrator import (
+    ProxyIdentityMismatchError,
+    ProxyNotResponsesCapableError,
+    ProxyStartError,
+    ProxyUnreachableError,
+    assert_proxy_responses_capable,
+    start_proxy,
+)
 
 
 class _Proc:
@@ -1250,3 +1258,183 @@ class TestEnsureProxy:
         assert start.call_args.kwargs["template"] == "litellm-openai"
         assert result is fresh
         assert started is True
+
+
+# ---------------------------------------------------------------------------
+# assert_proxy_responses_capable (Phase 4 `forge codex start --proxy` gate)
+# ---------------------------------------------------------------------------
+
+
+def _capable_root_body(**overrides):
+    """A GET / body that passes both the identity and Responses-capability checks."""
+    body = {
+        "is_proxy": True,
+        "proxy": {"proxy_id": "proxy_abc"},
+        "template": "codex-responses-local",
+        "wire_shape": "openai_responses_passthrough",
+        "capabilities": {"responses_ingress": True},
+        "routing": {"default_tier": "sonnet"},
+        "tiers": {"sonnet": {"model": "gpt-5.5"}},
+    }
+    body.update(overrides)
+    return body
+
+
+class _FakeRootClient:
+    """Context-manager httpx.Client stand-in returning one canned GET / response."""
+
+    def __init__(self, *, resp=None, get_exc=None):
+        self._resp = resp
+        self._get_exc = get_exc
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_a):
+        return False
+
+    def get(self, _url):
+        if self._get_exc is not None:
+            raise self._get_exc
+        return self._resp
+
+
+def _patch_root(*, status=200, body=None, json_exc=None, get_exc=None):
+    resp = MagicMock()
+    resp.status_code = status
+    if json_exc is not None:
+        resp.json.side_effect = json_exc
+    else:
+        resp.json.return_value = body
+    return patch(f"{_ORCH}.httpx.Client", return_value=_FakeRootClient(resp=resp, get_exc=get_exc))
+
+
+class TestAssertProxyResponsesCapable:
+    def test_capable_returns_model_and_wire_shape(self) -> None:
+        with _patch_root(body=_capable_root_body()):
+            model, ws = assert_proxy_responses_capable("http://127.0.0.1:8084")
+        assert model == "gpt-5.5"
+        assert ws == "openai_responses_passthrough"
+
+    def test_trailing_slash_base_url_is_fine(self) -> None:
+        with _patch_root(body=_capable_root_body()):
+            model, ws = assert_proxy_responses_capable("http://127.0.0.1:8084/")
+        assert (model, ws) == ("gpt-5.5", "openai_responses_passthrough")
+
+    def test_responses_ingress_false_rejects(self) -> None:
+        with _patch_root(body=_capable_root_body(capabilities={"responses_ingress": False})):
+            with pytest.raises(ProxyNotResponsesCapableError):
+                assert_proxy_responses_capable("http://x")
+
+    def test_capabilities_absent_rejects_fail_closed(self) -> None:
+        body = _capable_root_body()
+        del body["capabilities"]
+        with _patch_root(body=body):
+            with pytest.raises(ProxyNotResponsesCapableError):
+                assert_proxy_responses_capable("http://x")
+
+    def test_wrong_wire_shape_with_ingress_true_still_rejects(self) -> None:
+        # The conjunction: responses_ingress True under a different shape -> still rejected.
+        with _patch_root(body=_capable_root_body(wire_shape="openai_translated")):
+            with pytest.raises(ProxyNotResponsesCapableError) as ei:
+                assert_proxy_responses_capable("http://x")
+        assert ei.value.wire_shape == "openai_translated"
+
+    def test_missing_wire_shape_rejects_as_unknown(self) -> None:
+        body = _capable_root_body()
+        del body["wire_shape"]
+        with _patch_root(body=body):
+            with pytest.raises(ProxyNotResponsesCapableError) as ei:
+                assert_proxy_responses_capable("http://x")
+        assert ei.value.wire_shape == "unknown"
+
+    def test_default_tier_none_returns_none_model(self) -> None:
+        with _patch_root(body=_capable_root_body(routing={"default_tier": None})):
+            model, ws = assert_proxy_responses_capable("http://x")
+        assert model is None
+        assert ws == "openai_responses_passthrough"
+
+    def test_malformed_tiers_returns_none_model(self) -> None:
+        with _patch_root(body=_capable_root_body(tiers="not-a-dict")):
+            model, _ = assert_proxy_responses_capable("http://x")
+        assert model is None
+
+    def test_default_tier_absent_from_tiers_returns_none(self) -> None:
+        with _patch_root(body=_capable_root_body(routing={"default_tier": "opus"})):
+            model, _ = assert_proxy_responses_capable("http://x")
+        assert model is None  # 'opus' is not a key in tiers
+
+    def test_non_200_raises_unreachable(self) -> None:
+        with _patch_root(status=503, body={}):
+            with pytest.raises(ProxyUnreachableError):
+                assert_proxy_responses_capable("http://x")
+
+    def test_connect_error_raises_unreachable(self) -> None:
+        with _patch_root(get_exc=httpx.ConnectError("boom")):
+            with pytest.raises(ProxyUnreachableError):
+                assert_proxy_responses_capable("http://x")
+
+    def test_non_json_body_raises_unreachable(self) -> None:
+        with _patch_root(json_exc=ValueError("not json")):
+            with pytest.raises(ProxyUnreachableError):
+                assert_proxy_responses_capable("http://x")
+
+    def test_non_dict_body_raises_unreachable(self) -> None:
+        with _patch_root(body=["not", "a", "dict"]):
+            with pytest.raises(ProxyUnreachableError):
+                assert_proxy_responses_capable("http://x")
+
+
+class TestProxyIdentityVerification:
+    """Guards the wrong-proxy race: a stale exact-proxy_id entry whose port is now held by
+    a *different* capable Forge proxy must be rejected, not silently routed."""
+
+    def test_matching_identity_passes(self) -> None:
+        with _patch_root(body=_capable_root_body()):
+            model, ws = assert_proxy_responses_capable(
+                "http://x", expected_proxy_id="proxy_abc", expected_template="codex-responses-local"
+            )
+        assert (model, ws) == ("gpt-5.5", "openai_responses_passthrough")
+
+    def test_proxy_id_mismatch_rejects(self) -> None:
+        # The stale entry's port now serves a different (also capable) proxy.
+        with _patch_root(body=_capable_root_body(proxy={"proxy_id": "proxy_other"})):
+            with pytest.raises(ProxyIdentityMismatchError) as ei:
+                assert_proxy_responses_capable("http://x", expected_proxy_id="proxy_abc")
+        assert ei.value.expected_proxy_id == "proxy_abc"
+        assert ei.value.actual_proxy_id == "proxy_other"
+
+    def test_template_mismatch_rejects(self) -> None:
+        with _patch_root(body=_capable_root_body(template="openrouter-qwen")):
+            with pytest.raises(ProxyIdentityMismatchError):
+                assert_proxy_responses_capable("http://x", expected_template="codex-responses-local")
+
+    def test_is_proxy_false_rejects(self) -> None:
+        with _patch_root(body=_capable_root_body(is_proxy=False)):
+            with pytest.raises(ProxyIdentityMismatchError):
+                assert_proxy_responses_capable("http://x", expected_proxy_id="proxy_abc")
+
+    def test_missing_proxy_block_with_expected_id_rejects(self) -> None:
+        with _patch_root(body=_capable_root_body(proxy=None)):
+            with pytest.raises(ProxyIdentityMismatchError) as ei:
+                assert_proxy_responses_capable("http://x", expected_proxy_id="proxy_abc")
+        assert ei.value.actual_proxy_id is None
+
+    def test_identity_checked_before_capability(self) -> None:
+        # Wrong proxy AND not capable -> identity error wins (we don't judge the wrong
+        # proxy's capability and emit a misleading "not Responses-capable" verdict).
+        body = _capable_root_body(
+            proxy={"proxy_id": "proxy_other"},
+            wire_shape="openai_translated",
+            capabilities={"responses_ingress": False},
+        )
+        with _patch_root(body=body):
+            with pytest.raises(ProxyIdentityMismatchError):
+                assert_proxy_responses_capable("http://x", expected_proxy_id="proxy_abc")
+
+    def test_no_expected_skips_identity(self) -> None:
+        # Capability-only callers (no expected_*) don't trigger identity checks, even on a
+        # body that wouldn't pass identity -- backward-compatible with the original signature.
+        with _patch_root(body=_capable_root_body(is_proxy=False, proxy=None)):
+            _model, ws = assert_proxy_responses_capable("http://x")
+        assert ws == "openai_responses_passthrough"

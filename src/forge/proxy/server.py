@@ -73,6 +73,11 @@ from forge.proxy.data_models import (
 from forge.proxy.error_hints import enrich_error_content
 from forge.proxy.metrics import proxy_metrics
 from forge.proxy.provider_trace_logger import record_provider_trace
+from forge.proxy.responses_ingress import (
+    advertise_responses_ingress,
+    build_intercept_capability_section,
+    register_responses_routes,
+)
 from forge.proxy.utils import (
     log_request_beautifully,
     log_request_response,
@@ -1052,6 +1057,12 @@ async def _handle_anthropic_passthrough(raw_request: Request, request_id: str, *
     )
 
 
+# Codex-facing OpenAI Responses ingress (openai_responses_passthrough). The handler
+# and capability advert live in responses_ingress.py to keep this module's size
+# bounded; create-before-catch-all registration order is owned there.
+register_responses_routes(app)
+
+
 @app.post("/v1/messages", response_model=None)
 async def create_message(request_data: MessagesRequest, raw_request: Request):
     """
@@ -1970,17 +1981,11 @@ async def root(request: Request):
     _intercept_cfg = getattr(config.proxy, "intercept", None)
     _intercept_mode = _intercept_cfg.mode if _intercept_cfg is not None else "passthrough"
     _audit_cfg = getattr(config.proxy, "audit", None)
-    intercept_section = {
-        "mode": _intercept_mode,
-        "wire_shape": _wire_shape,
-        "thinking_blocks_preserved": _wire_shape == "anthropic_passthrough",
-        "can_inspect": {
-            "system_prompt": _intercept_mode in ("inspect", "override"),
-            "drift_detection": _intercept_mode in ("inspect", "override"),
-            "override": _intercept_mode == "override",
-            "full_body_audit": bool(getattr(_audit_cfg, "audit_full_body", False)),
-        },
-    }
+    intercept_section = build_intercept_capability_section(
+        _wire_shape, _intercept_mode, bool(getattr(_audit_cfg, "audit_full_body", False))
+    )
+    # Advertised Responses-ingress capability for the Phase 4 launcher health-check.
+    _responses_ingress = advertise_responses_ingress(_wire_shape, getattr(config.proxy, "source", "") or "")
 
     # Per-proxy metrics (request counts, token usage, latency); spend-cap
     # proximity is attached under metrics.costs.caps when caps are configured.
@@ -1996,6 +2001,7 @@ async def root(request: Request):
         "wire_shape": _wire_shape,
         "intercept_mode": _intercept_mode,
         "intercept": intercept_section,
+        "capabilities": {"responses_ingress": _responses_ingress},
         "tiers": tiers,
         "status": "running",
         "routing": routing_section,
