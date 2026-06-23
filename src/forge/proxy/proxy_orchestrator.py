@@ -62,6 +62,46 @@ class ProxyStartError(ValueError):
     """Raised when a proxy cannot be started."""
 
 
+class ProxyUnreachableError(Exception):
+    """Raised when a proxy's ``GET /`` cannot be read (down, non-200, or non-JSON body)."""
+
+
+class ProxyIdentityMismatchError(Exception):
+    """Raised when the live proxy at a resolved ``base_url`` is not the resolved proxy.
+
+    ``ensure_proxy`` returns an exact proxy_id by registry *presence*, not liveness, so a
+    stale entry whose port is now held by a *different* Forge proxy (or a non-proxy) would
+    otherwise route a launch through the wrong upstream while the UI names the requested
+    proxy. Carries expected/actual proxy_id for the recovery message.
+    """
+
+    def __init__(
+        self, base_url: str, *, expected_proxy_id: str | None, actual_proxy_id: str | None, detail: str
+    ) -> None:
+        self.base_url = base_url
+        self.expected_proxy_id = expected_proxy_id
+        self.actual_proxy_id = actual_proxy_id
+        super().__init__(
+            f"proxy identity mismatch at {base_url}: {detail} "
+            "(stale registry entry -- a different proxy now holds this address)"
+        )
+
+
+class ProxyNotResponsesCapableError(Exception):
+    """Raised when a proxy does not advertise the Codex Responses ingress.
+
+    Carries the advertised ``wire_shape`` so a launcher can name it in recovery
+    output (e.g. ``wire_shape=openai_translated``).
+    """
+
+    def __init__(self, wire_shape: str) -> None:
+        self.wire_shape = wire_shape
+        super().__init__(
+            f"proxy is not Responses-capable (wire_shape={wire_shape}); "
+            "needs wire_shape=openai_responses_passthrough and a responses_ingress source"
+        )
+
+
 @dataclass
 class TierOverrideOptions:
     """CLI options for per-tier hyperparameter overrides.
@@ -862,12 +902,130 @@ def check_proxy_health(
     return True
 
 
+def _default_model_from_root(data: dict[str, Any]) -> str | None:
+    """Best-effort ``tiers[routing.default_tier].model`` from a ``GET /`` body.
+
+    Returns ``None`` when ``default_tier`` is unset (proxy missing
+    ``config.proxy.default_tier``) or the body is malformed -- every access is
+    guarded so the launcher degrades to "let codex pick" rather than crashing.
+    """
+    routing = data.get("routing")
+    default_tier = routing.get("default_tier") if isinstance(routing, dict) else None
+    if not isinstance(default_tier, str):
+        return None
+    tiers = data.get("tiers")
+    tier_entry = tiers.get(default_tier) if isinstance(tiers, dict) else None
+    model = tier_entry.get("model") if isinstance(tier_entry, dict) else None
+    return model if isinstance(model, str) else None
+
+
+def _verify_proxy_identity(
+    data: dict[str, Any], *, base_url: str, expected_proxy_id: str | None, expected_template: str | None
+) -> None:
+    """Reject a ``GET /`` body that is not the resolved proxy's identity.
+
+    Mirrors ``check_proxy_health``'s identity gate (is_proxy + template + proxy_id) so a
+    launch cannot route through a different proxy that happens to occupy a stale entry's
+    port. No-op when neither expected value is given (capability-only callers).
+    """
+    if expected_proxy_id is None and expected_template is None:
+        return
+    if data.get("is_proxy") is not True:
+        raise ProxyIdentityMismatchError(
+            base_url,
+            expected_proxy_id=expected_proxy_id,
+            actual_proxy_id=None,
+            detail="responded but is_proxy is not true",
+        )
+    proxy_block = data.get("proxy")
+    actual_proxy_id = proxy_block.get("proxy_id") if isinstance(proxy_block, dict) else None
+    if expected_proxy_id is not None and actual_proxy_id != expected_proxy_id:
+        raise ProxyIdentityMismatchError(
+            base_url,
+            expected_proxy_id=expected_proxy_id,
+            actual_proxy_id=actual_proxy_id,
+            detail=f"expected proxy_id '{expected_proxy_id}', got '{actual_proxy_id}'",
+        )
+    actual_template = data.get("template")
+    if expected_template is not None and actual_template != expected_template:
+        raise ProxyIdentityMismatchError(
+            base_url,
+            expected_proxy_id=expected_proxy_id,
+            actual_proxy_id=actual_proxy_id,
+            detail=f"expected template '{expected_template}', got '{actual_template}'",
+        )
+
+
+def assert_proxy_responses_capable(
+    base_url: str,
+    *,
+    expected_proxy_id: str | None = None,
+    expected_template: str | None = None,
+    timeout_s: float = 5.0,
+) -> tuple[str | None, str]:
+    """Assert a proxy advertises the Codex Responses ingress; return ``(default_model, wire_shape)``.
+
+    Reads ``GET {base_url}/`` and enforces the *same conjunction* the runtime route gate
+    enforces: top-level ``wire_shape == "openai_responses_passthrough"`` **and**
+    ``capabilities.responses_ingress is True``. Checking both fields (not only the
+    pre-ANDed ``responses_ingress``) means a proxy that advertised the flag under a
+    different wire shape is still rejected -- the launcher mirrors the runtime gate
+    instead of trusting the server's internal invariant that the advert already ANDs them.
+
+    When ``expected_proxy_id``/``expected_template`` are given, also verifies the live
+    proxy's identity (is_proxy + proxy_id + template) from the same body -- so a stale
+    registry entry whose port is now held by a *different* capable Forge proxy is rejected
+    rather than silently routed (``ensure_proxy`` returns exact ids by presence, not
+    liveness). Identity is checked *before* capability, so the wrong-proxy case reports a
+    mismatch, not a misleading capability verdict.
+
+    ``default_model`` is the advertised default tier's model when present, else ``None``
+    (the caller then skips ``-m`` and lets codex/proxy choose).
+
+    Raises:
+        ProxyUnreachableError: GET / failed (connection, timeout, non-200, or non-JSON).
+        ProxyIdentityMismatchError: reachable, but not the resolved proxy (stale entry).
+        ProxyNotResponsesCapableError: right proxy, but the capability conjunction is false.
+    """
+    url = f"{base_url.rstrip('/')}/"
+    try:
+        with httpx.Client(timeout=httpx.Timeout(timeout_s)) as client:
+            resp = client.get(url)
+    except (httpx.RequestError, httpx.TimeoutException) as e:
+        raise ProxyUnreachableError(f"proxy at {base_url} is unreachable: {e}") from e
+    if resp.status_code != 200:
+        raise ProxyUnreachableError(f"proxy at {base_url} returned HTTP {resp.status_code} for GET /")
+    try:
+        data = resp.json()
+    except ValueError as e:
+        raise ProxyUnreachableError(f"proxy at {base_url} returned a non-JSON GET / body") from e
+    if not isinstance(data, dict):
+        raise ProxyUnreachableError(f"proxy at {base_url} returned an unexpected GET / body")
+
+    _verify_proxy_identity(
+        data, base_url=base_url, expected_proxy_id=expected_proxy_id, expected_template=expected_template
+    )
+
+    wire_shape = data.get("wire_shape")
+    wire_shape_str = wire_shape if isinstance(wire_shape, str) else "unknown"
+    capabilities = data.get("capabilities")
+    responses_ingress = capabilities.get("responses_ingress") if isinstance(capabilities, dict) else None
+    if wire_shape_str != "openai_responses_passthrough" or responses_ingress is not True:
+        raise ProxyNotResponsesCapableError(wire_shape_str)
+
+    return _default_model_from_root(data), wire_shape_str
+
+
 def smoke_test_proxy(*, base_url: str, timeout_s: float = 30.0) -> tuple[bool, str]:
     """Send a minimal completion request through the proxy to verify the upstream LLM.
 
     Returns (success, detail) where detail is the model response text on
     success or the error message on failure. Retries once on failure.
     """
+    # Responses passthrough proxies serve /v1/responses, not /v1/messages.
+    if _proxy_wire_shape(base_url=base_url, timeout_s=timeout_s) == "openai_responses_passthrough":
+        return _smoke_test_responses(base_url=base_url, timeout_s=timeout_s)
+
     url = f"{base_url.rstrip('/')}/v1/messages"
     last_error = ""
 
@@ -918,9 +1076,9 @@ def smoke_test_proxy(*, base_url: str, timeout_s: float = 30.0) -> tuple[bool, s
 def _resolve_smoke_test_model(*, client: httpx.Client, base_url: str) -> str:
     """Pick the smoke-test model for the proxy's wire shape.
 
-    Translated proxies accept the local ``sonnet`` tier alias. Anthropic
-    passthrough proxies forward the client model unchanged, so the smoke test
-    must use the resolved Claude model reported by ``GET /``.
+    Translated proxies accept the local ``sonnet`` tier alias. Passthrough
+    proxies (Anthropic or Responses) forward the client model unchanged, so the
+    smoke test must use the resolved upstream model reported by ``GET /``.
     """
     fallback = "sonnet"
     try:
@@ -932,7 +1090,10 @@ def _resolve_smoke_test_model(*, client: httpx.Client, base_url: str) -> str:
         logger.debug("Could not resolve proxy smoke-test model from GET /: %s", e)
         return fallback
 
-    if not isinstance(data, dict) or data.get("wire_shape") != "anthropic_passthrough":
+    if not isinstance(data, dict) or data.get("wire_shape") not in (
+        "anthropic_passthrough",
+        "openai_responses_passthrough",
+    ):
         return fallback
 
     routing = data.get("routing")
@@ -961,6 +1122,82 @@ def _resolve_smoke_test_model(*, client: httpx.Client, base_url: str) -> str:
             return tier_info
 
     return fallback
+
+
+def _proxy_wire_shape(*, base_url: str, timeout_s: float) -> str | None:
+    """Read the proxy's wire shape from ``GET /`` (None if unreachable)."""
+    try:
+        with httpx.Client(timeout=httpx.Timeout(timeout_s)) as client:
+            resp = client.get(f"{base_url.rstrip('/')}/")
+        if resp.status_code != 200:
+            return None
+        data = resp.json()
+    except Exception as e:
+        logger.debug("Could not resolve proxy wire shape from GET /: %s", e)
+        return None
+    return data.get("wire_shape") if isinstance(data, dict) else None
+
+
+def _smoke_test_responses(*, base_url: str, timeout_s: float = 30.0) -> tuple[bool, str]:
+    """Smoke-test a Responses passthrough proxy via ``POST /v1/responses``."""
+    url = f"{base_url.rstrip('/')}/v1/responses"
+    last_error = ""
+
+    for attempt in range(2):
+        if attempt > 0:
+            time.sleep(2)
+        try:
+            with httpx.Client(timeout=httpx.Timeout(timeout_s)) as client:
+                payload = {
+                    "model": _resolve_smoke_test_model(client=client, base_url=base_url),
+                    "input": "Say hi",
+                    "max_output_tokens": 256,
+                    "stream": False,
+                }
+                resp = client.post(url, json=payload)
+
+            if resp.status_code != 200:
+                last_error = f"HTTP {resp.status_code}: {resp.text[:200]}"
+                continue
+
+            data = resp.json()
+            text = _extract_responses_text(data)
+            if text:
+                return True, text.strip()
+
+            model = data.get("model", "unknown") if isinstance(data, dict) else "unknown"
+            usage = data.get("usage", {}) if isinstance(data, dict) else {}
+            last_error = (
+                f"Empty response from {model} "
+                f"(input={usage.get('input_tokens', '?')}, "
+                f"output={usage.get('output_tokens', '?')} tokens)"
+            )
+        except httpx.TimeoutException:
+            last_error = f"Request timed out after {timeout_s}s"
+        except (httpx.RequestError, ValueError) as e:
+            last_error = str(e)
+
+    return False, last_error
+
+
+def _extract_responses_text(data: object) -> str:
+    """Extract assistant text from a Responses object (``output_text`` or ``output[]``)."""
+    if not isinstance(data, dict):
+        return ""
+    output_text = data.get("output_text")
+    if isinstance(output_text, str) and output_text:
+        return output_text
+    output = data.get("output")
+    if isinstance(output, list):
+        for item in output:
+            if not isinstance(item, dict) or item.get("type") != "message":
+                continue
+            for part in item.get("content", []) or []:
+                if isinstance(part, dict) and part.get("type") == "output_text":
+                    text = part.get("text")
+                    if isinstance(text, str) and text:
+                        return text
+    return ""
 
 
 def _find_available_port(*, start_port: int, max_attempts: int) -> int:

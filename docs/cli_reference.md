@@ -130,6 +130,24 @@ session *label*; use `--root-run-id` for an exact match.
 | `forge claude preset edit`        | Edit settings preset in $EDITOR             |
 | `forge claude preset reset`       | Reset preset to built-in defaults           |
 
+### Codex management
+
+| Command                          | Purpose                                                                                      |
+| -------------------------------- | -------------------------------------------------------------------------------------------- |
+| `forge codex status`             | Inspect Codex binary, config, and Forge hook registration (`--scope`, `--all`, `--json`)     |
+| `forge codex start --proxy <id>` | Launch the Codex TUI routed through a Responses-capable proxy (`--sandbox`, `-- codex-args`) |
+
+`status` is read-only and reports registration from a static config read; it never claims enrollment. Default scope is
+the detected Forge install scope (else user); `--scope user|project|local` and `--all` widen it. Prove enrollment
+empirically with `forge runtime preflight codex --verify-enrollment`.
+
+`start --proxy <id-or-template>` launches the Codex TUI routed through a Responses-capable proxy
+(`wire_shape: openai_responses_passthrough` + a `responses_ingress` source). It is **sessionless and scrubbed** — the
+proxy owns upstream auth, so no native codex/OpenAI login is required or leaked. It hard-blocks a codex older than the
+proxy-contract-validated version (≥0.141.0) before starting a proxy, auto-defaults `-m` from the proxy's default tier
+(override with `-- -m <model>`), and accepts `--sandbox read-only|workspace-write|danger-full-access` (default
+`workspace-write`). For direct use without a proxy, run native `codex`.
+
 ### Backend management
 
 | Command                                     | Purpose                                                                                    |

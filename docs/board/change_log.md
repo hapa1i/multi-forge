@@ -25,6 +25,105 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-06-23
+
+### forge_codex_command_group Phase 4: `forge codex start --proxy` launcher
+
+**Goal**: Ship the sessionless, proxy-backed Codex TUI launcher -- the consumer the card was built for -- on top of the
+Phase 3 Responses transport.
+
+**Key changes**:
+
+- **CLI** (`src/forge/cli/codex.py`): new `forge codex start --proxy <id-or-template> [--sandbox] [-- codex-args]` leaf.
+  Order: codex-installed -> hard version gate -> `ensure_proxy` -> capability gate -> exec, with the full error matrix
+  on a stderr `Console` via `forge.cli.output` helpers (closes the Phase 1 stderr-Console deferral).
+- **Version gate** (`core/runtime/codex_preflight.py`): `CODEX_PROXY_CONTRACT_VALIDATED = "0.141.0"` +
+  `codex_proxy_contract_blocker()`. Fail-closed below the floor (parsed only); unparseable/None allowed. Distinct
+  surface from the 0.139.0 probe ceiling and the 0.131.0 hook floor.
+- **Capability gate** (`proxy/proxy_orchestrator.py`): `assert_proxy_responses_capable()` + `ProxyUnreachableError` /
+  `ProxyNotResponsesCapableError`. Requires the full `wire_shape == openai_responses_passthrough` AND
+  `capabilities.responses_ingress` conjunction off `GET /` (mirrors the runtime route gate); returns the proxy's
+  default-tier model. **Review fix**: also re-verifies proxy identity (`is_proxy` + `proxy_id` + `template`) from the
+  same body via `expected_proxy_id`/`expected_template`, raising `ProxyIdentityMismatchError` -- `ensure_proxy` returns
+  exact ids by registry presence, not liveness, so a stale entry on a reused port can't misroute Codex to a different
+  proxy.
+- **Bare invocation** (`session/codex_invoke.py`): `invoke_codex_bare_proxy` + pure env/argv builders.
+  `_CODEX_BARE_PROXY_STRIP_VARS` scrubs native codex/OpenAI auth, the 5 OpenAI account/routing vars, and
+  session/run-tree identity; re-establishes NO native auth (the proxy owns upstream); list-mode `-c` provider argv; `-m`
+  auto-default suppressed when the user passes one; never `--strict-config`.
+- **Allowlist**: removed `forge codex` from `SINGLE_LEAF_GROUP_ALLOWLIST` (now 2 leaves); updated the registration test.
+- **Docs**: `cli_reference.md` `start` row; `design.md` §3.4 "Bare launch (Codex)" + §3.7 consumer cross-ref.
+
+**Verification**: 62 new unit tests (version blocker, capability + identity gate, env/argv/invoke, CLI matrix) pass;
+full `tests/src/cli` suite green; `make pre-commit` clean. Live gate: real codex 0.141.0 routed via the list-mode `-c`
+argv to `POST /v1/responses`, and the identity check was live-verified against a real proxy body (correct id passes,
+wrong id rejects). The 200 reasoning round-trip stays credential-blocked (dead key), as in Phase 3.
+
+## 2026-06-22
+
+### forge_codex_command_group Phase 3: Codex Responses proxy transport (passthrough)
+
+**Goal**: Give Forge's proxy a Codex-facing OpenAI **Responses** ingress so `forge codex start --proxy` (Phase 4) has a
+Responses-capable proxy, and flip the dead `proxy_supported` preflight posture live — without dropping Codex's
+reasoning-item continuity.
+
+**Key changes** (revises card Slice 2: passthrough, not the originally-scoped translating transport — translation drops
+signed reasoning):
+
+- New `openai_responses_passthrough` wire shape forwards Codex's raw `/v1/responses*` traffic byte-for-byte. Shared
+  SSE-teardown core extracted to `proxy/stream_relay.py` (Anthropic passthrough's 32 tests unchanged);
+  Responses-specific forwarding in `proxy/responses_passthrough.py` (Bearer injection + strip inbound
+  auth/`OpenAI-Organization`/`-Project`, tolerant usage side-tap, `x-litellm-response-cost` USD→micros, response-header
+  allowlist that also drops the proxy-owned `x-request-id`).
+- `proxy/responses_ingress.py` (new): the FastAPI\<->transport glue — the `/v1/responses*` handler, route registrar
+  (`POST /v1/responses` create before the `{rest:path}` catch-all), and GET / advertisement helpers. Route gated on
+  `wire_shape == openai_responses_passthrough` **and** the source's `responses_ingress` else 501; bodyless GET/DELETE
+  never call `.json()`. Extracted from `server.py` to keep that module under the 2.5k-line cap (reads proxy runtime
+  state via a lazy `import forge.proxy.server`, which also avoids a load-time cycle). `server.py` registers the routes
+  and uses the helpers in `GET /`.
+- `backend/sources.py`: `responses_ingress` capability, `codex-responses-local` source/template (litellm-local upstream
+  so cost is reported), `source_bearer_auth_env_var()` (single secret env var; fail-closed on 0/>1).
+- `core/runtime/codex_preflight.py`: `proxy_supported` now returned, gated on the **same** wire_shape ∧
+  `responses_ingress` conjunction the route enforces (file-read preflight can't green-light a proxy the runtime would
+  501).
+- `proxy_orchestrator.py`: smoke test POSTs a Responses request for this wire shape.
+- Accounting precision (pre-merge review): cost/metrics/spend-cap are wired only for the generation endpoint
+  (`POST /v1/responses`), so a `GET /v1/responses/{id}` retrieve echoing the original `usage` can't double-count; the
+  `OnComplete` callback now carries `error_type`, and a terminal `response.failed` (streamed or non-streamed 200) folds
+  into `failed=True` instead of being recorded as success (`response.incomplete` stays a billed partial success).
+- Docs: `docs/design.md` §3.4 wire-shape section.
+
+**Verification**: 54 unit tests (`tests/src/proxy/test_responses_transport.py`, incl. the accounting-gate +
+terminal-status regressions) + preflight conjunction cases; full unit suite green (6702 passed) — the new source's only
+ripple was the `backend list` shared-instance test (codex-responses-local is an OpenAI-credentialed co-tenant of
+litellm-4000, now in its `shared_with`); `make pre-commit` clean. **Live gate** (real `codex-cli 0.141.0` → forge
+`:8105` → litellm `:4000` → OpenAI): `GET /` advert + intercept table confirmed; codex drove `POST /v1/responses`
+(streaming) through the route (not 501), single `X-Request-ID` relayed back. **Deferred**: a 200 reasoning round-trip is
+credential-blocked (this env's `OPENAI_API_KEY` is dead) — must be re-confirmed with a live key before the card closes.
+
+### forge_codex_command_group Phase 1: `forge codex status` (read-only Codex inspection)
+
+**Goal**: Ship the read-only Codex inspection surface as the first independently-shippable slice of the codex
+command-group card; the proxy-backed launcher stays parked behind the Phase 2 probe.
+
+**Key changes**:
+
+- New `forge codex` group (`src/forge/cli/codex.py`) with one leaf, `status`: reports binary + version
+  (`get_runtime("codex").detect()`), per-scope Codex config path, managed-block presence, Forge-only event-aware
+  registration pairs, and a static enrollment posture (`yes/no/partial/wrong-event`). Never claims enrollment — points
+  to `forge runtime preflight codex --verify-enrollment`.
+- Scope resolution mirrors the installer: default = detected scope via `find_forge_installation` (else user);
+  project/local roots resolve by walking up for `.git`/`.codex` (not bare cwd); `--all` lists user/project/local
+  distinctly (config collapses project\<->local, but tracking is scope-keyed).
+- `start` deliberately **not** shipped: a no-`--proxy` placeholder that always errors would be a tombstone and could pin
+  a `--proxy` contract the Phase 2 kill criterion may invalidate. `forge codex` is allowlisted as intentional
+  single-leaf phasing debt in `SINGLE_LEAF_GROUP_ALLOWLIST` (remove when `start --proxy` ships in Phase 4).
+- Docs: `cli_reference.md` "Codex management" section.
+
+**Verification**: 14 unit tests in `tests/src/cli/test_codex_status.py` (scope detection, subdir root resolution,
+`--all` local, Forge-only filter, wrong-event, no-`start`-command) plus tree-invariant + output guards = 31 pass;
+`make pre-commit` clean (mypy, pyright, ruff, black, isort, mdformat).
+
 ## 2026-06-20
 
 ### openrouter_user_direct_callers: unified provider-`user` toggle + direct-caller injection
