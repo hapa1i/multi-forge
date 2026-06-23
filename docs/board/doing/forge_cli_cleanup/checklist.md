@@ -121,9 +121,15 @@ verification is recorded.
   lifecycle/auth/reconcile verb (`backend.py`: list/show/test-auth/create/start/stop/delete/reconcile) and add no
   single-child nest. Test: `forge backend …` (or chosen path) retains all 8 verbs; `forge model` (if created) has ≥2
   children.
-- [ ] **Slice 06 - Clean-break removals.** Delete `forge session context` (`session_manage.py:857`, `hidden=True`),
-  **delete** `tests/src/cli/test_session_context.py` (removed code → delete test), and drop the `cli_reference.md:44`
-  note. `forge session context` returns Click `No such command`. Sweep for any other hidden tombstone.
+- [x] **Slice 06 - Clean-break removals.** Deleted `forge session context` (was `session_manage.py:857`, `hidden=True`)
+  and its now-dead `_print_session_context` helper + both `__all__` exports; **deleted**
+  `tests/src/cli/test_session_context.py` (removed code → delete test). The ops module `forge.core.ops.session_context`
+  is kept — used by `session show`/`activity`/`policy`/direct commands — and its
+  `tests/src/core/ops/test_session_context.py` stays; corrected its "Used by" docstring and two mis-attributed comments
+  in `session_manage.py`. Dropped the `cli_reference.md` note; fixed the stale "deprecated" `impl_notes.md` reference.
+  Verified `forge session context` exits 2 with Click `No such command` (no tombstone). **Tombstone sweep:** `context`
+  was the only deprecated-alias `hidden=True` command; `hook`/`memory-writer`/`status-line`/`policy shadow run` are live
+  internals, left intact. 267 affected tests pass.
 - [ ] **Slice 07 - Read-output consistency.**
   - `forge search query <terms>` prints a human table by default and emits the documented JSON shape only under `--json`
     (`search.py:76` currently always `json.dumps`); `forge search query --json` round-trips the prior structure.

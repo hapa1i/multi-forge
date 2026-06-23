@@ -159,8 +159,8 @@ Shipped 2026-05-31 (commit `2b70c29`). Durable invariants for `src/forge/session
   evidence quality.
 - **Namespace**: `forge transfer` is a **top-level** group (pairs with `forge memory`), not `forge session transfer`.
   `forge session resume --fresh --review` is a delegating entry point that edits the `.notes.md` overlay, not a
-  competing namespace. `forge transfer show` (assembled artifact) is distinct from the deprecated
-  `forge session context` (folded into `forge session show`).
+  competing namespace. `forge transfer show` (assembled artifact) is distinct from `forge session show`'s context view
+  (`forge session context` was removed in the CLI cleanup; its `--field`/`--json` behavior folded into `session show`).
 - **`target_runtime`** is reserved in the frontmatter (`TRANSFER_TARGET_RUNTIME = "claude"`) for Phase 5 cross-runtime
   tuning: Phase 5 retargets presentation without changing transcript source artifacts or schema semantics.
 - **`ctx` is prior art and inspiration only, never a dependency**: the transfer schema is Forge-owned and canonical

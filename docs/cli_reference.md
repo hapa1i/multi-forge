@@ -41,9 +41,9 @@ reports "no such command/option" — no tombstone shims. List/show commands supp
 | `forge session incognito [name]`       | Start an ephemeral session (auto-delete on exit)                                                                            |
 | `forge session shell [name]`           | Open shell in sidecar container                                                                                             |
 
-Note: `session context` is a deprecated alias for `session show`. `session resume --fresh --review` opens the per-child
-user-notes overlay (`children/<child>.notes.md`) in `$EDITOR` before launching Claude; the AI snapshot stays read-only.
-`forge session memory` is removed; use `forge memory`.
+Note: `session resume --fresh --review` opens the per-child user-notes overlay (`children/<child>.notes.md`) in
+`$EDITOR` before launching Claude; the AI snapshot stays read-only. `forge session memory` is removed; use
+`forge memory`.
 
 `fork` and `start` accept the tier-1 launch controls alongside `--supervise`: `--cascade`, `--checker-model`,
 `--checker-provider`, `--checker-effort` (`none/low/medium/high/xhigh`), and `--supervisor-effort`

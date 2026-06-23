@@ -1,4 +1,4 @@
-"""Session management commands: delete, list, clean, show, context, shell, set, reset.
+"""Session management commands: delete, list, clean, show, shell, set, reset.
 
 Split from session.py for file-size compliance. All public and private
 names are re-exported by session.py so that ``patch("forge.cli.session.XXX")``
@@ -74,7 +74,6 @@ __all__ = [
     "list_sessions",
     "clean",
     "show",
-    "context_cmd",
     "shell",
     "set_override",
     "reset",
@@ -85,7 +84,6 @@ __all__ = [
     "_build_show_json",
     "_empty_show_plan_json",
     "_build_show_plan_json",
-    "_print_session_context",
     "_print_session_summary",
     "_print_plan_info",
     "_print_session_detail",
@@ -766,7 +764,7 @@ def show(session_id: str | None, as_json: bool, field_path: str | None) -> None:
 
     # When no argument and no env var: for human mode, show a helpful message.
     # For --json/--field, fall through to get_session_context() which builds
-    # env-derived context (backward compat with old `session context --json`).
+    # env-derived context so scripted callers always get a usable shape.
     if session_id is None and not os.environ.get("FORGE_SESSION") and not (as_json or field_path):
         console.print("[dim]No session specified. Use a name or launch through Forge.[/dim]")
         return
@@ -854,68 +852,6 @@ def show(session_id: str | None, as_json: bool, field_path: str | None) -> None:
     _print_session_detail(state, entry, ctx)
 
 
-@session.command("context", hidden=True)
-@click.argument("session_id", required=False)
-@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
-@click.option(
-    "--field",
-    "field_path",
-    help="Extract a single dotted field (e.g., model_family, proxy.template). Missing path exits 1; null value prints empty.",
-)
-def context_cmd(session_id: str | None, as_json: bool, field_path: str | None) -> None:
-    """Show session context (metadata, proxy, model family).
-
-    Deprecated: use ``forge session show`` instead.
-
-    SESSION_ID can be a Forge session name or a Claude session UUID.
-    Without SESSION_ID, resolves from $FORGE_SESSION.
-
-    \b
-    Examples:
-        forge session context                        # current session
-        forge session context --json                 # full JSON
-        forge session context --field model_family   # just the family
-        forge session context abc-123-uuid --json    # by Claude UUID
-    """
-    import json
-
-    from forge.core.ops.session_context import (
-        SessionContextError,
-        extract_field,
-        get_session_context,
-    )
-
-    try:
-        ctx = get_session_context(session_id)
-    except SessionContextError as e:
-        console.print(f"[red]Error:[/red] {e}")
-        raise SystemExit(1) from None
-
-    data = ctx.to_dict()
-
-    if field_path:
-        try:
-            value = extract_field(data, field_path)
-        except KeyError:
-            console.print(f"[red]Error:[/red] Field '{field_path}' not found")
-            raise SystemExit(1) from None
-        # Raw value output for scripting -- no JSON wrapper, no quotes for strings.
-        # None prints empty (jq -r convention) so callers can tell "field exists but unset".
-        if value is None:
-            click.echo("")
-        elif isinstance(value, str):
-            click.echo(value)
-        else:
-            click.echo(json.dumps(value))
-        return
-
-    if as_json:
-        click.echo(json.dumps(data, indent=2))
-        return
-
-    _print_session_context(ctx)
-
-
 def _build_show_json(
     state: SessionState | None,
     ctx: SessionContext,
@@ -990,7 +926,7 @@ def _build_show_json(
         },
     }
 
-    # Top-level aliases for backward compat with old `session context --field`
+    # Top-level aliases so `session show --field model_family` (and main_model) resolve directly.
     data["model_family"] = ctx.model_family
     data["main_model"] = ctx.main_model
     data["models"] = dict(ctx.models)
@@ -1047,47 +983,6 @@ def _build_show_plan_json(state: SessionState | None) -> dict[str, Any]:
         "exists": displayed.exists if displayed else None,
         "kind": kind,
     }
-
-
-def _print_session_context(ctx: SessionContext) -> None:
-    """Print session context in human-readable format."""
-
-    table = Table(show_header=False, box=None, padding=(0, 2))
-    table.add_column("Key", style="dim")
-    table.add_column("Value")
-
-    table.add_row("Session", ctx.session_name)
-    if ctx.claude_session_id:
-        table.add_row("Claude UUID", ctx.claude_session_id)
-    table.add_row("Model Family", f"[cyan]{ctx.model_family}[/cyan]")
-
-    if ctx.proxy.is_direct:
-        table.add_row("Proxy", "[dim]direct (no proxy)[/dim]")
-    else:
-        proxy_parts = []
-        if ctx.proxy.template:
-            proxy_parts.append(ctx.proxy.template)
-        if ctx.proxy.base_url:
-            proxy_parts.append(ctx.proxy.base_url)
-        table.add_row("Proxy", " | ".join(proxy_parts))
-
-    if ctx.models:
-        model_str = ", ".join(f"{t}={m}" for t, m in ctx.models.items())
-        table.add_row("Models", model_str)
-
-    if ctx.worktree_path:
-        table.add_row("Worktree", ctx.worktree_path)
-
-    if ctx.parent_session:
-        table.add_row("Parent", ctx.parent_session)
-
-    if ctx.is_fork:
-        table.add_row("Fork", "yes")
-
-    if ctx.policy.enabled:
-        table.add_row("Policy", f"enabled (bundles: {', '.join(ctx.policy.bundles) or 'none'})")
-
-    console.print(table)
 
 
 @session.command()

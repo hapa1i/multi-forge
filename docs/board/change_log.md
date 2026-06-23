@@ -27,6 +27,28 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-23
 
+### forge_cli_cleanup Slice 06: remove `forge session context` (clean break)
+
+**Goal**: Drain the last hidden CLI tombstone — remove the deprecated `forge session context` alias so the surface
+relies on Click's native "No such command" instead of a redirect shim.
+
+**Key changes**:
+
+- Deleted the hidden `forge session context` command and its now-dead `_print_session_context` helper from
+  `session_manage.py` (plus the two `__all__` exports). The behavior already lives in `forge session show`
+  (`--json`/`--field`).
+- Kept the `forge.core.ops.session_context` module — still used by `session show`, `activity`, `policy`, and the
+  `%`-direct commands. Corrected its "Used by" docstring and two mis-attributed comments in `session_manage.py`.
+- Dropped the `session context` note from `cli_reference.md`; fixed the now-stale "deprecated" reference in
+  `impl_notes.md`.
+- Deleted `tests/src/cli/test_session_context.py` (removed code → delete test); the ops test
+  `tests/src/core/ops/test_session_context.py` stays.
+
+**Verification**: `forge session context` exits 2 with Click "No such command" (no tombstone). Tombstone sweep confirmed
+`context` was the only deprecated-alias `hidden=True` command (`hook`/`memory-writer`/`status-line`/`policy shadow run`
+are live internals). 267 tests pass across `test_session_commands`, `test_session_context` (ops),
+`test_command_tree_invariants`, `test_activity`, `test_policy_shadow`, `test_direct_commands_provider`.
+
 ### forge_codex_command_group closeout: sessionless Codex proxy launcher card
 
 **Goal**: Close the active `forge_codex_command_group` card after the status surface, Responses passthrough transport,
