@@ -178,9 +178,10 @@ verification is recorded.
 
 ## Docs and verification
 
-- [ ] Fix debt-ledger breadcrumb rot (zero-dependency; safe to do now): update the provenance comment at
-  `tests/src/cli/test_command_tree_invariants.py:7` from `docs/board/proposed/forge_cli_cleanup/card.md` to the `doing/`
-  path. `test_output.py:142` carries no path, so it needs no change.
+- [x] Fix debt-ledger breadcrumb rot: provenance comment at `tests/src/cli/test_command_tree_invariants.py:7` now points
+  at `docs/board/doing/forge_cli_cleanup/card.md` (was `proposed/`). `test_output.py:142` carries no path, so it needed
+  no change. (Two stale cross-links remain in `docs/board/proposed/rewind_resume_strategy/card.md:27,260` — a different
+  card's content; tracked separately, not fixed here.)
 - [ ] Update `docs/cli_reference.md` for every moved/removed/added surface (drop the `session context` note; re-document
   aliases per D6).
 - [ ] Update relevant `docs/end-user/*` guides (`hook.md` per D5, `proxy.md`/`session.md`/`memory.md` for moves).

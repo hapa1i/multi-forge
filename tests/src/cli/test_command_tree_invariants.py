@@ -4,7 +4,7 @@ Mechanical guards for the `cli_style_guidelines.md` rules that are checkable by
 walking the Click tree (group depth, leaf naming, `--json` scripting contract).
 
 Each ``*_ALLOWLIST`` is a debt ledger of pre-existing violations tracked by
-``docs/board/proposed/forge_cli_cleanup/card.md``. Every check asserts both that
+``docs/board/doing/forge_cli_cleanup/card.md``. Every check asserts both that
 no *new* violation appears and that no allowlisted entry has been *fixed without
 being removed* -- so the ledger can only shrink, never silently grow or rot.
 """
