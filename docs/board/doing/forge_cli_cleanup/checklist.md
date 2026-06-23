@@ -15,11 +15,11 @@ Phase 1 is a **decision gate**, not code. The card is a large clean break; the c
 the taxonomy and the open questions first, then drain the five debt ledgers the test suite already tracks. Do not rename
 a live surface before the matching decision is recorded here.
 
-**Progress (2026-06-23):** Slice 06 shipped (`forge session context` removed). Decision gate: **D1, D2, D3, D7 decided**
-(see Phase 1) — D1 = move to `forge telemetry` + delete emptied `provider`; D2 = keep `proxy audit` under `proxy`; D3 =
-build `forge model` namespace (backend moves under it); D7 = tiered config-object verbs, `backend` excluded. Still open:
-**D4, D5, D6, D8, D9**. D1/D3 both reshape `main.py` top-level groups, so they should land before D6 (aliases) settles
-new nouns.
+**Progress (2026-06-23):** Slice 06 shipped (`forge session context` removed). Decision gate: **D1, D2, D3, D5, D7
+decided** (see Phase 1) — D1 = move to `forge telemetry` + delete emptied `provider`; D2 = keep `proxy audit` under
+`proxy`; D3 = build `forge model` namespace (backend moves under it); D5 = route hook install through `extension`
+(de-document `hook enable|disable`); D7 = tiered config-object verbs, `backend` excluded. Still open: **D4, D6, D8,
+D9**. D1/D3 both reshape `main.py` top-level groups, so they should land before D6 (aliases) settles new nouns.
 
 ## Audit reconciliation (verified 2026-06-23)
 
@@ -102,9 +102,17 @@ defaults to accept or override, not commitments.
 - [ ] **D4 Memory split (Q4/Q5).** Does `memory enable|disable|status|report` move under `forge session memory`, leaving
   top-level `forge memory` for project-doc passports (`track`/`list`/`passport`/`shadows`)? _Recommend: yes_ — also
   resolves the `forge memory report` single-leaf debt.
-- [ ] **D5 Hook visibility (F8/Q6).** Expose `forge hook`, route users to `forge extension enable|disable`, or stop
-  documenting `forge hook enable|disable`? _Recommend: route through `extension`_; keep handlers hidden; drop the
-  end-user `hook enable|disable` docs.
+- [x] **D5 Hook visibility (F8/Q6). DECIDED 2026-06-23: route end-users through `forge extension enable|disable`;
+  de-document `forge hook enable|disable`.** Verified state: `forge hook` is already `hidden=True`
+  (`hooks/_group.py:8`), so the command tree does **not** change — D5 is a docs decision. Keep the dispatcher handlers
+  (`forge hook session-start|stop|policy-check|codex-session-start|codex-policy-check`) hidden and documented only as
+  *what Claude Code / Codex invoke*. **Nuance (verified):** `forge hook enable|disable` are **not** redundant with
+  `extension enable|disable` — `forge hook enable` always targets `settings.local.json`, while `forge extension enable`
+  uses the scope's main settings file (`hook.md:96,358`; `extension*.py:526` enable / `:768` disable). So the
+  lower-level `hook enable|disable` commands **stay** (hidden) for advanced `settings.local.json` targeting; we only
+  stop presenting them as the user path. Docs work (tracked under "Docs and verification" → `hook.md`): rewrite the
+  user-facing install sections (`hook.md:~88-96, ~340, ~358`) to point at `forge extension enable|disable`; keep the
+  `forge hook <name>` dispatcher table (`hook.md` + `cli_reference.md:227`). No code change.
 - [ ] **D6 Alias + canonical names (F12/Q10/Q11).** Make `auth` canonical (style-guide rule: canonical = user
   vocabulary)? Decide which moved/new groups (`telemetry`, `model`) earn aliases; decide whether the
   `extensions -> extension` shim survives. _Recommend: `auth` canonical; minimal alias set; drop the `extensions` shim
