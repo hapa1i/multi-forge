@@ -141,7 +141,8 @@ class BackendManager:
         config_path = get_backend_config_path(adapter_type)
         if not config_path.exists():
             raise BackendStartError(
-                f"Backend config not found: {config_path}\n" f"Create it with: forge backend create {adapter_type}"
+                f"Backend config not found: {config_path}\n"
+                f"Create it with: forge model backend create {adapter_type}"
             )
 
         instance = adapter.start(backend_id, config_path, port)

@@ -68,6 +68,9 @@ Check which models are locally routable with `forge workflow list-models`. Model
 show `[configured]` / `[not configured]` status. Models whose proxy isn't running or whose API key isn't configured show
 as **unavailable**. Use `--available` to see only ready models, or `--json` for structured output.
 
+Use `forge model catalog` for Forge's static model capability catalog; `forge workflow list-models` is the runtime
+readiness view for workflow runners.
+
 ---
 
 ## Workflows

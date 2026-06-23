@@ -1,6 +1,6 @@
 """Integration tests for backend CLI commands.
 
-These tests verify the forge backend CLI works end-to-end.
+These tests verify the forge model backend CLI works end-to-end.
 They don't require actual LiteLLM to be running - they test
 the config management and registry operations.
 """
@@ -26,12 +26,12 @@ def isolated_forge_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path
 
 
 class TestBackendCLI:
-    """Integration tests for forge backend commands."""
+    """Integration tests for forge model backend commands."""
 
     def test_backend_list_empty(self, isolated_forge_home: Path) -> None:
         """Verify backend list shows built-in sources when no local runtime is running."""
         runner = CliRunner()
-        result = runner.invoke(main, ["backend", "list"])
+        result = runner.invoke(main, ["model", "backend", "list"])
 
         assert result.exit_code == 0
         assert "Forge Backend Sources" in result.output
@@ -42,7 +42,7 @@ class TestBackendCLI:
     def test_backend_create_copies_config(self, isolated_forge_home: Path) -> None:
         """Verify backend create copies config to correct location."""
         runner = CliRunner()
-        result = runner.invoke(main, ["backend", "create", "litellm"])
+        result = runner.invoke(main, ["model", "backend", "create", "litellm"])
 
         assert result.exit_code == 0
         assert "Created" in result.output
@@ -60,26 +60,26 @@ class TestBackendCLI:
         runner = CliRunner()
 
         # First create
-        result1 = runner.invoke(main, ["backend", "create", "litellm"])
+        result1 = runner.invoke(main, ["model", "backend", "create", "litellm"])
         assert result1.exit_code == 0
 
         # Second create - should error with tip to start instead
-        result2 = runner.invoke(main, ["backend", "create", "litellm"])
+        result2 = runner.invoke(main, ["model", "backend", "create", "litellm"])
         assert result2.exit_code == 1
         assert "already exists" in result2.output
-        assert "forge backend start" in result2.output
+        assert "forge model backend start" in result2.output
 
     def test_backend_delete_removes_config(self, isolated_forge_home: Path) -> None:
         """Verify backend delete removes config directory."""
         runner = CliRunner()
 
         # Create first
-        runner.invoke(main, ["backend", "create", "litellm"])
+        runner.invoke(main, ["model", "backend", "create", "litellm"])
         config_dir = isolated_forge_home / "backends" / "litellm"
         assert config_dir.exists()
 
         # Delete with --yes to skip confirmation
-        result = runner.invoke(main, ["backend", "delete", "litellm", "--yes"])
+        result = runner.invoke(main, ["model", "backend", "delete", "litellm", "--yes"])
         assert result.exit_code == 0
         assert "Deleted" in result.output
         assert not config_dir.exists()
@@ -87,7 +87,7 @@ class TestBackendCLI:
     def test_backend_delete_nonexistent_errors(self, isolated_forge_home: Path) -> None:
         """Verify backend delete errors for nonexistent backend."""
         runner = CliRunner()
-        result = runner.invoke(main, ["backend", "delete", "litellm", "--yes"])
+        result = runner.invoke(main, ["model", "backend", "delete", "litellm", "--yes"])
 
         assert result.exit_code == 1
         assert "not found" in result.output.lower()
@@ -95,7 +95,7 @@ class TestBackendCLI:
     def test_backend_start_requires_config(self, isolated_forge_home: Path) -> None:
         """Verify backend start fails without config."""
         runner = CliRunner()
-        result = runner.invoke(main, ["backend", "start", "litellm", "--port", "4000"])
+        result = runner.invoke(main, ["model", "backend", "start", "litellm", "--port", "4000"])
 
         assert result.exit_code == 1
         assert "config not found" in result.output.lower() or "create it first" in result.output.lower()
@@ -132,7 +132,7 @@ class TestBackendRegistry:
 
         # Now list should show the backend
         runner = CliRunner()
-        result = runner.invoke(main, ["backend", "list"])
+        result = runner.invoke(main, ["model", "backend", "list"])
 
         assert result.exit_code == 0
         assert "Unmatched Runtime Instances" in result.output

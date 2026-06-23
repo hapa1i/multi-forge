@@ -7,7 +7,7 @@
 # Backend (LiteLLM on port 4000) starts automatically.
 #
 # Note: If you added OPENAI_API_KEY after the backend started,
-# restart with: forge backend stop litellm-4000
+# restart with: forge model backend stop litellm-4000
 
 proxy:
   family: openai

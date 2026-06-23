@@ -148,18 +148,23 @@ proxy-contract-validated version (≥0.141.0) before starting a proxy, auto-defa
 (override with `-- -m <model>`), and accepts `--sandbox read-only|workspace-write|danger-full-access` (default
 `workspace-write`). For direct use without a proxy, run native `codex`.
 
-### Backend management
+### Model management
 
-| Command                                     | Purpose                                                                                    |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `forge backend list`                        | List built-in backend sources and local runtime state (`--json`)                           |
-| `forge backend show <source-or-backend-id>` | Show source details or legacy runtime details (`--raw`)                                    |
-| `forge backend test-auth <source-id>`       | Check source credentials and run a reachability/auth probe (`--json`)                      |
-| `forge backend create <adapter>`            | Create local backend adapter config                                                        |
-| `forge backend start <source-or-adapter>`   | Start a local lifecycle source or adapter instance                                         |
-| `forge backend stop <source-or-adapter>`    | Stop a local lifecycle source or adapter instance                                          |
-| `forge backend delete <adapter>`            | Delete local backend instance or adapter config                                            |
-| `forge backend reconcile <source-id>`       | Join local telemetry to a backend's remote record (`--request-id`/`--remote-id`, `--json`) |
+`forge model catalog` lists Forge's static model catalog: canonical model ids, aliases, provider defaults, context
+windows, and model capabilities. `forge workflow list-models` is separate: it checks runtime readiness for workflow
+runners.
+
+| Command                                           | Purpose                                                                                    |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `forge model catalog`                             | List the static model catalog (`--json`)                                                   |
+| `forge model backend list`                        | List built-in backend sources and local runtime state (`--json`)                           |
+| `forge model backend show <source-or-backend-id>` | Show source details or legacy runtime details (`--raw`)                                    |
+| `forge model backend test-auth <source-id>`       | Check source credentials and run a reachability/auth probe (`--json`)                      |
+| `forge model backend create <adapter>`            | Create local backend adapter config                                                        |
+| `forge model backend start <source-or-adapter>`   | Start a local lifecycle source or adapter instance                                         |
+| `forge model backend stop <source-or-adapter>`    | Stop a local lifecycle source or adapter instance                                          |
+| `forge model backend delete <adapter>`            | Delete local backend instance or adapter config                                            |
+| `forge model backend reconcile <source-id>`       | Join local telemetry to a backend's remote record (`--request-id`/`--remote-id`, `--json`) |
 
 ### Policy enforcement
 
@@ -189,7 +194,7 @@ proxy-contract-validated version (≥0.141.0) before starting a proxy, auto-defa
 | `forge workflow analyze [topic]`     | Deep single-model analysis                 |
 | `forge workflow debate [subject]`    | Adversarial evaluation with stance workers |
 | `forge workflow consensus [subject]` | Two-round multi-model convergence          |
-| `forge workflow list-models`         | Show available model backends              |
+| `forge workflow list-models`         | Show available workflow models             |
 
 Workflow model specs support proxy-backed workers and explicit direct Claude workers. The stable `claude-opus` worker is
 kept on Claude Opus 4.6; newer direct workers such as `claude-opus-4.8` are opt-in and can attach per-worker prompt

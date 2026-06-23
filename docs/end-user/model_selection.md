@@ -245,6 +245,9 @@ strengths matter.
 | `/forge:debate` | `forge workflow debate ...`                        | `src/forge/review/engine.py` (adversarial runner)            |
 | Memory writer   | Runs at Stop hook + async work queue               | `src/forge/session/memory_writer.py`                         |
 
-For the panel and debate model catalog, see `src/forge/review/models.py`. To add a new model alternative or change the
+Use `forge model catalog` to inspect Forge's static model capability catalog. Use `forge workflow list-models` when you
+need runtime readiness for panel/debate workflow runners.
+
+For the panel and debate model specs, see `src/forge/review/models.py`. To add a new model alternative or change the
 default tier mapping, edit the proxy template under `src/forge/config/defaults/templates/` and reset proxies that use it
 with `forge proxy template reset <name>`.

@@ -373,7 +373,7 @@ forge proxy metrics test-proxy-nostart
 
 ```bash
 # List built-in backend sources and local runtime instances (LiteLLM, etc.)
-forge backend list
+forge model backend list
 ```
 
 - [ ] Shows built-in local and remote source rows such as `openrouter` and `litellm-remote`
@@ -385,14 +385,14 @@ forge backend list
 
 ```bash
 # Create backend config (shared by all instances)
-forge backend create litellm
+forge model backend create litellm
 
 # Show config + status (even if not running)
-forge backend show litellm-4000 --raw
+forge model backend show litellm-4000 --raw
 ```
 
 - [ ] Backend config created (or reports it already exists)
-- [ ] `forge backend show` displays config YAML
+- [ ] `forge model backend show` displays config YAML
 
 ### 4.17 OpenRouter Templates
 

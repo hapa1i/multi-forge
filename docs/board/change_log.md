@@ -27,6 +27,23 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-23
 
+### forge_cli_cleanup Slice 04: move backend under `forge model`
+
+**Goal**: Build the decided `forge model` namespace and clean-break the old top-level backend path.
+
+**Key changes**:
+
+- Added `forge model` with visible children `backend` and `catalog`; `catalog` renders the static model catalog with
+  `--json`.
+- Moved all backend verbs to `forge model backend`; old `forge backend ...` now falls through to Click's native
+  "No such command" handling.
+- Updated recovery tips, shipped QA/config templates, integration harness/fixture paths, `AGENTS.md`, docs, impl notes,
+  and command-tree invariant debt (`forge model backend show`, plus `catalog` in the read-leaf JSON guard).
+- Kept `forge workflow list-models` as runtime readiness and reworded it to "workflow models".
+
+**Verification**: focused unit/regression slice (69 passed); backend integration (8 passed); proxy smoke (1 passed);
+`uv build`; CLI sanity checks; `make pre-commit`.
+
 ### forge_cli_cleanup Slice 06: remove `forge session context` (clean break)
 
 **Goal**: Drain the last hidden CLI tombstone — remove the deprecated `forge session context` alias so the surface

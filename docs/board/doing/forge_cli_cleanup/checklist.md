@@ -2,8 +2,7 @@
 
 **Card**: [card.md](card.md) - **Branch**: `forge_cli_cleanup` - **Lane**: doing
 
-Accepted 2026-06-23 at user request and moved `proposed/ -> doing/` directly. Phase 0 (board start) is the only work
-landed; no command surface has changed yet.
+Accepted 2026-06-23 at user request and moved `proposed/ -> doing/` directly.
 
 Deepened 2026-06-23 from a read-only verification pass over the live CLI (every card finding checked at file:line,
 corrections adversarially refuted). The reconciliation below is the basis for the concrete assertions in Phases 1-2 —
@@ -15,11 +14,12 @@ Phase 1 is a **decision gate**, not code. The card is a large clean break; the c
 the taxonomy and the open questions first, then drain the five debt ledgers the test suite already tracks. Do not rename
 a live surface before the matching decision is recorded here.
 
-**Progress (2026-06-23):** Slice 06 shipped (`forge session context` removed). Decision gate: **D1, D2, D3, D5, D7
-decided** (see Phase 1) — D1 = move to `forge telemetry` + delete emptied `provider`; D2 = keep `proxy audit` under
+**Progress (2026-06-23):** Slice 04 shipped (`forge backend` moved to `forge model backend`; `forge model catalog`
+added) and Slice 06 shipped (`forge session context` removed). Decision gate: **D1, D2, D3, D5, D7 decided**; see the
+Phase 1 section for details. D1 = move to `forge telemetry` + delete emptied `provider`; D2 = keep `proxy audit` under
 `proxy`; D3 = build `forge model` namespace (backend moves under it); D5 = route hook install through `extension`
 (de-document `hook enable|disable`); D7 = tiered config-object verbs, `backend` excluded. Still open: **D4, D6, D8,
-D9**. D1/D3 both reshape `main.py` top-level groups, so they should land before D6 (aliases) settles new nouns.
+D9**. D1 still reshapes `main.py` top-level groups, so it should land before D6 (aliases) settles new nouns.
 
 ## Audit reconciliation (verified 2026-06-23)
 
@@ -30,7 +30,7 @@ D9**. D1/D3 both reshape `main.py` top-level groups, so they should land before 
 | F13                                   | `forge config`/`forge search` hand-roll `invoke_without_command` "for a reason" | Both **only echo help**; `subcommand_metavar`/`help_option_names` work fine with `no_args_is_help=True` (adversarially confirmed). The card's normalization point **stands**.                                                                                                                                                                                | Normalize both to `no_args_is_help=True` (slice 12).                                                                                                                |
 | F14f                                  | `forge proxy edit` "proxy overlay" wording may be stale                         | "Proxy overlay" is **canonical** terminology (design_appendix §A.1 title; `proxy_orchestrator.py:134 _get_proxy_overlay_dir`). Not stale.                                                                                                                                                                                                                    | **No-op.** Drop this bullet; do not "fix" the wording.                                                                                                              |
 | F3                                    | Table lists per-command cleanup defaults                                        | All six rows confirmed; `forge proxy clean` (`proxy.py:1288`) has **zero** safety flags and prunes immediately — the most dangerous.                                                                                                                                                                                                                         | Standardize `clean` verbs (slice 09).                                                                                                                               |
-| `forge model backend` (slice 04 / Q3) | Proposed nesting                                                                | `forge model` with a single child `backend` is a **single-child group nest** the guide forbids and `test_no_single_leaf_groups` would flag.                                                                                                                                                                                                                  | Keep top-level `forge backend`, **or** only introduce `forge model` with ≥2 children. Decide in Phase 1.                                                            |
+| `forge model backend` (slice 04 / Q3) | Proposed nesting                                                                | `forge model` with a single child `backend` is a **single-child group nest** the guide forbids and `test_no_single_leaf_groups` would flag.                                                                                                                                                                                                                  | **Resolved in Slice 04:** introduced `forge model` only with ≥2 visible children (`backend` + `catalog`).                                                           |
 | F4                                    | "11 read surfaces lack `--json`"                                                | Confirmed; but the guard only inspects leaves named `list/show/status`, so `forge authentication profiles` and `forge transfer diff` are **invisible** to it (not in `JSON_MISSING_ALLOWLIST`).                                                                                                                                                              | Add `--json` to all; extend the guard to cover `profiles`/`diff` (slice 07).                                                                                        |
 | F9                                    | Hand-rolled tips/errors bypass helpers                                          | `test_cli_rich_tips_*` only catches Rich `[dim]Tip:`; **10 terminal tips** slip through — 8 plain `click.echo("Tip: …")` (auth ×4, claude ×2, install ×2) **plus 2 `ClickException`-embedded** (`session.py:111,126`, my prior row wrongly said session.py has only errors). 3 assistant-facing payloads (`direct_commands.py:79,162,705`) must stay exempt. | Migrate all 10; `ClickException` bodies become plain-error-only; reword the 2 non-recovery sites; guard allowlist = the 3 `direct_commands.py` payloads (slice 11). |
 
@@ -39,13 +39,13 @@ D9**. D1/D3 both reshape `main.py` top-level groups, so they should land before 
 Each `*_ALLOWLIST` is a pre-existing-violation ledger; `_assert_ledger` fails on a *new* violation **and** on an
 allowlisted entry that was fixed-without-removal. "Done" for these slices = the entry is gone from the ledger.
 
-| Ledger (file)                                                | Entries                                                                                                                                                                                                   | Owning slice |
-| ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ |
-| `JSON_DEST_ALLOWLIST` (`test_command_tree_invariants.py:49`) | `proxy create`, `proxy metrics`, `policy check`, `policy supervisor`, `workflow {list-models,panel,analyze,debate,consensus}` — 9 using `json_output` not `as_json`                                       | 07           |
-| `JSON_MISSING_ALLOWLIST` (`:134`)                            | `authentication status`, `backend show`, `proxy template {list,show}`, `claude preset show`, `config show`, `memory shadows show`, `memory report show`, `search status` — 9 read leaves with no `--json` | 07           |
-| `SINGLE_LEAF_GROUP_ALLOWLIST` (`:75`)                        | `forge provider` (→ **delete**; `trace` moves to `telemetry trace` per D1), `forge policy shadow` (→ `show`; `run` hidden), `forge memory report` (→ flatten)                                             | 03 / 12      |
-| `LEAF_NAMING_ALLOWLIST` (`:110`)                             | `forge policy: supervise\|supervisor` (confusable; `supervise` is a prefix of `supervisor`)                                                                                                               | 10           |
-| `CLI_ERROR_MARKUP_ALLOWLIST` (`test_output.py`)              | 18 files with hand-rolled `[red]Error:` (244 raw occurrences outside `output.py`)                                                                                                                         | 11           |
+| Ledger (file)                                                | Entries                                                                                                                                                                                                         | Owning slice |
+| ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ |
+| `JSON_DEST_ALLOWLIST` (`test_command_tree_invariants.py:49`) | `proxy create`, `proxy metrics`, `policy check`, `policy supervisor`, `workflow {list-models,panel,analyze,debate,consensus}` — 9 using `json_output` not `as_json`                                             | 07           |
+| `JSON_MISSING_ALLOWLIST` (`:134`)                            | `authentication status`, `model backend show`, `proxy template {list,show}`, `claude preset show`, `config show`, `memory shadows show`, `memory report show`, `search status` — 9 read leaves with no `--json` | 07           |
+| `SINGLE_LEAF_GROUP_ALLOWLIST` (`:75`)                        | `forge provider` (→ **delete**; `trace` moves to `telemetry trace` per D1), `forge policy shadow` (→ `show`; `run` hidden), `forge memory report` (→ flatten)                                                   | 03 / 12      |
+| `LEAF_NAMING_ALLOWLIST` (`:110`)                             | `forge policy: supervise\|supervisor` (confusable; `supervise` is a prefix of `supervisor`)                                                                                                                     | 10           |
+| `CLI_ERROR_MARKUP_ALLOWLIST` (`test_output.py`)              | 18 files with hand-rolled `[red]Error:` (244 raw occurrences outside `output.py`)                                                                                                                               | 11           |
 
 ### Guard gaps (rules with no mechanical enforcement yet)
 
@@ -155,14 +155,16 @@ verification is recorded.
 - [ ] **Slice 02 - Session-scope move (D4).** `forge session transfer show|regenerate|edit|diff` exist; if D4 lands,
   `forge session memory …` exists and top-level `forge memory` keeps only passport/doc verbs. Old `forge transfer …`
   paths removed. Tests assert new paths + `No such command` on old.
-- [ ] **Slice 04 - Model namespace (D3 = build).** Create a `forge model` group; move all 8 backend verbs to
-  `forge model backend` (`list/show/test-auth/create/start/stop/delete/reconcile`, preserved verbatim); add a real
-  sibling leaf `forge model catalog` (or `list`) wiring `core/models/catalog.py` (zero CLI today, must do real work +
-  expose `--json`). Old `forge backend …` paths return Click `No such command` (clean break; update every test/doc/
-  example call site in the same change). Tests: `forge model` has ≥2 visible children (no `SINGLE_LEAF_GROUP_ALLOWLIST`
-  entry); `forge model backend` retains all 8 verbs; catalog leaf works. Changelog names the
-  `forge backend → forge model backend` move. Note interplay: `backend show` is in `JSON_MISSING_ALLOWLIST` (slice 07) —
-  the move changes its path to `forge model backend show`; update that allowlist entry in whichever slice lands second.
+- [x] **Slice 04 - Model namespace (D3 = build).** Created `forge model` with two visible children: `backend` and
+  `catalog`. Moved all 8 backend verbs to `forge model backend`
+  (`list/show/test-auth/create/start/stop/delete/reconcile`, preserved verbatim). Added `forge model catalog` over
+  `core/models/catalog.py` with human output and `--json` (`as_json`, covered by the read-leaf guard). Old
+  `forge backend …` paths return Click `No such command` (clean break). Updated tests, docs, shipped QA checklist,
+  shipped config templates/defaults, backend recovery guidance, integration harness/fixtures, `AGENTS.md`,
+  `impl_notes.md`, and the changelog. Reworded `forge workflow list-models` as workflow-model readiness to avoid
+  catalog/static vs runtime-readiness overlap. Updated `JSON_MISSING_ALLOWLIST` from `forge backend show` to
+  `forge model backend show`; `forge model backend show --json` remains Slice 07 debt. Verification: 69 targeted
+  unit/regression tests, backend integration (8), and proxy fixture smoke (1) passed.
 - [x] **Slice 06 - Clean-break removals.** Deleted `forge session context` (was `session_manage.py:857`, `hidden=True`)
   and its now-dead `_print_session_context` helper + both `__all__` exports; **deleted**
   `tests/src/cli/test_session_context.py` (removed code → delete test). The ops module `forge.core.ops.session_context`

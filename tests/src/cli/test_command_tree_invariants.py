@@ -128,12 +128,12 @@ def test_no_confusable_sibling_leaves() -> None:
 
 
 # --- Rule: read leaves (list/show/status) expose `--json` for scripting -------
-_READ_LEAVES = {"list", "show", "status"}
+_READ_LEAVES = {"catalog", "list", "show", "status"}
 # Pre-existing read surfaces with no `--json`; each needs an explicit raw-vs-json
 # decision per cleanup-card finding #4.
 JSON_MISSING_ALLOWLIST = {
     "forge authentication status",
-    "forge backend show",
+    "forge model backend show",
     "forge proxy template list",
     "forge proxy template show",
     "forge claude preset show",

@@ -5,7 +5,7 @@ Provides:
 - forge workflow analyze: Deep single-model analysis
 - forge workflow debate: Adversarial evaluation with stance injection
 - forge workflow consensus: Two-round multi-model consensus building
-- forge workflow list-models: Show available model backends
+- forge workflow list-models: Show available workflow models
 """
 
 from __future__ import annotations
@@ -227,7 +227,7 @@ def workflow_cmd() -> None:
 @click.option("--json", "json_output", is_flag=True, help="Output as JSON")
 @click.option("--available", "available_only", is_flag=True, help="Show only ready models")
 def list_models(json_output: bool, available_only: bool) -> None:
-    """Show available model backends for workflow runners."""
+    """Show workflow model readiness."""
     from forge.review.models import available_model_specs, check_model_availability
 
     availabilities = check_model_availability(available_model_specs())

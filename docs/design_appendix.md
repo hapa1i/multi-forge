@@ -104,12 +104,12 @@ Forge now has a built-in, code-level model-source catalog in `forge.backend.sour
 for the upstream model source a proxy or direct runtime reaches; it is **not** user-authored durable state and it is
 distinct from both proxy templates and runtime backend instances.
 
-| Layer                    | Owner / Location                             | Unit                                                                                  |
-| ------------------------ | -------------------------------------------- | ------------------------------------------------------------------------------------- |
-| Model-source catalog     | `forge.backend.sources`                      | Static source definition: id, kind, endpoint shape, credentials, provider, capability |
-| Proxy templates          | `src/forge/config/defaults/templates/*.yaml` | Operational routing profiles that declare `proxy.source`                              |
-| Local backend config     | `~/.forge/backends/<adapter>/config.yaml`    | LiteLLM service config (`model_list` / routing), copied by `forge backend create`     |
-| Runtime backend registry | `~/.forge/backends/index.json`               | PID/port/status rows for running local process instances only                         |
+| Layer                    | Owner / Location                             | Unit                                                                                    |
+| ------------------------ | -------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Model-source catalog     | `forge.backend.sources`                      | Static source definition: id, kind, endpoint shape, credentials, provider, capability   |
+| Proxy templates          | `src/forge/config/defaults/templates/*.yaml` | Operational routing profiles that declare `proxy.source`                                |
+| Local backend config     | `~/.forge/backends/<adapter>/config.yaml`    | LiteLLM service config (`model_list` / routing), copied by `forge model backend create` |
+| Runtime backend registry | `~/.forge/backends/index.json`               | PID/port/status rows for running local process instances only                           |
 
 `ModelSource.id` is the canonical catalog id. Local source ids intentionally live in a different value-space from
 runtime instance ids: for example, `litellm-gemini-local` is a source id, while `litellm-4000` remains a
@@ -161,17 +161,17 @@ credentials. OpenRouter templates resolve `OPENROUTER_BASE_URL` the same way, de
 of truth. Credential metadata itself lives in dependency-light `src/forge/core/credential_registry.py`; template-aware
 helpers stay in `src/forge/core/auth/capabilities.py`, avoiding an auth/template/source import cycle.
 
-`forge backend` is the operator view over this catalog. `forge backend list` reads the static sources plus the local
-runtime registry and reports source kind, endpoint shape, required credentials, per-variable provenance, offline
-auth/health status, and any matching local `BackendInstance`. The local LiteLLM sources share one adapter/port
-(`litellm` on `4000`), so a single runtime instance can back several sources at once; `forge backend list` marks such an
-instance `(shared)` and `--json` carries a `runtime_instance.shared_with` list of the sibling source ids. The command
-stays offline for remote sources: configured remote sources show as `unprobed` until an operator runs
-`forge backend test-auth <source-id>`, which resolves the same credentials and performs the source's reachability/auth
-probe without echoing secret values. `forge backend show <source-id>` renders catalog details and local runtime state
-when a source has lifecycle. `start` and `stop` accept local source ids or legacy adapter operands; remote source
-operands return an intentional no-lifecycle capability error. `create` and `delete` remain local adapter/config
-operations because built-in remote sources are not user-created durable state.
+`forge model backend` is the operator view over this catalog. `forge model backend list` reads the static sources plus
+the local runtime registry and reports source kind, endpoint shape, required credentials, per-variable provenance,
+offline auth/health status, and any matching local `BackendInstance`. The local LiteLLM sources share one adapter/port
+(`litellm` on `4000`), so a single runtime instance can back several sources at once; `forge model backend list` marks
+such an instance `(shared)` and `--json` carries a `runtime_instance.shared_with` list of the sibling source ids. The
+command stays offline for remote sources: configured remote sources show as `unprobed` until an operator runs
+`forge model backend test-auth <source-id>`, which resolves the same credentials and performs the source's
+reachability/auth probe without echoing secret values. `forge model backend show <source-id>` renders catalog details
+and local runtime state when a source has lifecycle. `start` and `stop` accept local source ids or legacy adapter
+operands; remote source operands return an intentional no-lifecycle capability error. `create` and `delete` remain local
+adapter/config operations because built-in remote sources are not user-created durable state.
 
 ### A.3 Confusion traps / anti-patterns (§3.6.6)
 
@@ -798,8 +798,8 @@ Semantics and invariants:
   - **Migration.** The pre-Phase-4 per-proxy `proxy.yaml` key is deprecated: it loads with a one-time relocation warning
     and is ignored (warn-and-degrade, user-owned config is a system boundary). The sidecar mounts `~/.forge/config.yaml`
     read-only so in-container proxied forks read the same toggle.
-- **Remote reconciliation (single-id MVP).** `forge backend reconcile <source-id>` joins one local downstream trace to
-  one remote account-side record via a backend remote-adapter registry (`forge.backend.remote`). A source is
+- **Remote reconciliation (single-id MVP).** `forge model backend reconcile <source-id>` joins one local downstream
+  trace to one remote account-side record via a backend remote-adapter registry (`forge.backend.remote`). A source is
   remote-reconcile capable iff it has a registered adapter there — NOT a `ModelSourceCapabilities` flag (a flag could
   drift; registry presence is the single source of truth and keeps an account-side read concern out of the
   proxy-write-path capability struct). OpenRouter is the first adapter (`GET /api/v1/generation`, metadata-only, never

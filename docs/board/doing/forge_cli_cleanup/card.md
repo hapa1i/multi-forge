@@ -1,7 +1,7 @@
 # Forge CLI Cleanup And Taxonomy
 
-**Status**: In progress (`doing/`). Accepted and moved from `proposed/` on 2026-06-23; no command surface has changed
-yet. This card records the CLI style audit and proposes a taxonomy-level cleanup before adding more command groups.
+**Status**: In progress (`doing/`). Accepted and moved from `proposed/` on 2026-06-23; Slice 04 and Slice 06 have
+shipped. This card records the CLI style audit and taxonomy-level cleanup before adding more command groups.
 
 **References**: `docs/developer/cli_style_guidelines.md`, `docs/cli_reference.md`, `docs/design.md` §3.12,
 `docs/board/done/remove_cli_tombstones/`, `docs/board/done/forge_codex_command_group/card.md`.
@@ -165,7 +165,7 @@ The style guide says list/show and other scriptable read commands expose `--json
 
 - `forge authentication status`
 - `forge authentication profiles`
-- `forge backend show`
+- `forge model backend show`
 - `forge claude preset show`
 - `forge config show`
 - `forge memory report show`

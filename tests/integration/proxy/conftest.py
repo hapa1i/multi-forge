@@ -291,11 +291,11 @@ def local_litellm() -> Generator[str, None, None]:
         pytest.fail(f"GEMINI_API_KEY not set and local LiteLLM not running on port {test_port}")
 
     # Ensure backend config exists
-    subprocess.run(["uv", "run", "forge", "backend", "create", "litellm"], check=False)
+    subprocess.run(["uv", "run", "forge", "model", "backend", "create", "litellm"], check=False)
 
-    # Start LiteLLM on test port using forge backend CLI
+    # Start LiteLLM on test port using forge model backend CLI
     result = subprocess.run(
-        ["uv", "run", "forge", "backend", "start", "litellm", "--port", str(test_port)],
+        ["uv", "run", "forge", "model", "backend", "start", "litellm", "--port", str(test_port)],
         check=False,
     )
 
@@ -309,7 +309,7 @@ def local_litellm() -> Generator[str, None, None]:
 
     # Cleanup - stop the test instance
     subprocess.run(
-        ["uv", "run", "forge", "backend", "stop", "litellm", "--port", str(test_port)],
+        ["uv", "run", "forge", "model", "backend", "stop", "litellm", "--port", str(test_port)],
         check=False,
     )
 

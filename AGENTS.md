@@ -56,7 +56,7 @@ confirms the local proxy process is reachable; use `forge proxy start <proxy_id>
 connectivity after first setup, credential changes, or proxy auth changes.
 
 For backend-source, telemetry, provider-trace, and cost-accounting changes, verify the operator read paths:
-`forge backend list|show <source-or-backend-id>|test-auth <source-id>`,
+`forge model backend list|show <source-or-backend-id>|test-auth <source-id>`,
 `forge provider trace list|show <request_id>|explain <request_id>`, and `forge proxy costs show --by-model|--by-verb`.
 Use `forge proxy costs reset --dry-run` before destructive telemetry resets; `reset` wipes legacy costs,
 downstream/upstream telemetry, cap state, audit sidecar state, usage events, and derived status-line caches, while

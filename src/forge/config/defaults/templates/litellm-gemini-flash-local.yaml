@@ -8,7 +8,7 @@
 # All tiers use Flash, differentiated by reasoning_effort.
 #
 # Note: If you added GEMINI_API_KEY after the backend started,
-# restart with: forge backend stop litellm-4000
+# restart with: forge model backend stop litellm-4000
 
 proxy:
   family: gemini

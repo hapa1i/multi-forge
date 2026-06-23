@@ -165,7 +165,7 @@ print_error_with_tip(
 
 print_tip(
     "Start an instance with:",
-    commands=[f"forge backend start {adapter} --port 4000"],
+    commands=[f"forge model backend start {adapter} --port 4000"],
     console=console,
 )
 ```

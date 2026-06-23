@@ -109,7 +109,7 @@ def reconcile_generation(
         raise ForgeOpError("Provide exactly one of --request-id or --remote-id")
 
     # Resolve template aliases (e.g. openrouter-anthropic) to the canonical source id, like the
-    # other `forge backend` subcommands; the canonical id keys both the adapter and downstream reads.
+    # other `forge model backend` subcommands; the canonical id keys both the adapter and downstream reads.
     try:
         source_id = get_model_source(resolve_model_source_id(source_id)).id
     except ModelSourceNotFoundError:

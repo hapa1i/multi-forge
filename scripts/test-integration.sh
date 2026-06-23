@@ -163,14 +163,14 @@ ensure_local_litellm() {
     fi
 
     # Ensure backend config exists
-    if ! uv run forge backend create litellm 2>/dev/null; then
+    if ! uv run forge model backend create litellm 2>/dev/null; then
         # Config already exists or creation failed - either way, try to start
         :
     fi
 
     # Start local LiteLLM in background on test port 4001
     info "Starting local LiteLLM on port ${TEST_PORT} (test instance)..."
-    if ! uv run forge backend start litellm --port ${TEST_PORT}; then
+    if ! uv run forge model backend start litellm --port ${TEST_PORT}; then
         warn "Failed to start local LiteLLM - tests requiring it will fail"
         return 0  # Don't block tests
     fi

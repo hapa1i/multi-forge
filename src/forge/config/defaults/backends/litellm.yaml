@@ -18,7 +18,7 @@
 #     - openai/gpt-5.4, gpt-5.4-pro
 #     - openai/gpt-5.5
 #
-# Start with: forge backend start litellm --port 4000
+# Start with: forge model backend start litellm --port 4000
 
 model_list:
   # Gemini 3.1 Pro Preview - latest model with thinking support

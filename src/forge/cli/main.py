@@ -18,7 +18,6 @@ load_dotenv()
 from forge.install.cli import info_cmd  # noqa: E402
 
 from .auth import auth  # noqa: E402
-from .backend import backend  # noqa: E402
 from .claude import claude  # noqa: E402
 from .codex import codex  # noqa: E402
 from .config_cmd import config as config_cmd  # noqa: E402
@@ -26,6 +25,7 @@ from .extensions import extensions  # noqa: E402
 from .hooks import hooks  # noqa: E402
 from .memory import memory as memory_cmd  # noqa: E402
 from .memory_writer import memory_writer  # noqa: E402
+from .model import model as model_cmd  # noqa: E402
 from .policy import policy  # noqa: E402
 from .provider import provider  # noqa: E402
 from .proxy import proxy  # noqa: E402
@@ -378,7 +378,7 @@ def main(ctx: click.Context) -> None:
 
 
 main.add_command(auth, name="authentication")
-main.add_command(backend)
+main.add_command(model_cmd, name="model")
 main.add_command(session)
 main.add_command(proxy)
 main.add_command(provider)

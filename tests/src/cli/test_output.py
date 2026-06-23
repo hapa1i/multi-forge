@@ -57,12 +57,12 @@ def test_print_tip_commands_block_rendered_indented() -> None:
     c, buf = _console()
     print_tip(
         "Start an instance with:",
-        commands=["forge backend start litellm --port 4000"],
+        commands=["forge model backend start litellm --port 4000"],
         console=c,
     )
     out = buf.getvalue()
     assert "Tip: Start an instance with:" in out
-    assert "  forge backend start litellm --port 4000" in out
+    assert "  forge model backend start litellm --port 4000" in out
 
 
 def test_print_tip_no_args_is_noop() -> None:

@@ -53,7 +53,7 @@ telemetry ownership:
 - **The local sources share one adapter+port, so runtime-instance attribution is many-to-one.** All three local LiteLLM
   sources declare `adapter=litellm, default_port=4000`, and the shipped default `litellm.yaml` references both
   `GEMINI_API_KEY` and `OPENAI_API_KEY` — so a single `litellm-4000` process legitimately backs both
-  `litellm-gemini-local` and `litellm-openai-local`. `forge backend list`/`show` surface this as `(shared)` /
+  `litellm-gemini-local` and `litellm-openai-local`. `forge model backend list`/`show` surface this as `(shared)` /
   `runtime_instance.shared_with`. The `_local_source_matches_backend_config` heuristic that disambiguates this is
   **display-only** (`cli/backend.py`); it must never feed downstream telemetry `backend_id`, which stays derived from
   `proxy.source`. A test fixture narrower than the shipped default (e.g. gemini-only) hides the multi-match case — lock
@@ -66,7 +66,7 @@ telemetry ownership:
 
 ### Backend remote reconciliation: registry capability + total external-data coercers (shipped)
 
-Shipped 2026-06-20 (`backend_remote_reconciliation`, PRs #41/#42/#43). `forge backend reconcile` joins one local
+Shipped 2026-06-20 (`backend_remote_reconciliation`, PRs #41/#42/#43). `forge model backend reconcile` joins one local
 downstream trace to one remote account-side record via an adapter under `src/forge/backend/remote/`.
 
 - **Remote-reconcile capability = adapter-registry presence, not a flag.** A source is reconcilable iff

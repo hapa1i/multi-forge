@@ -92,18 +92,18 @@ OpenRouter templates default to `https://openrouter.ai/api/v1`. Set `OPENROUTER_
 route OpenRouter-compatible traffic through a different endpoint; new proxies created from OpenRouter templates will
 copy that resolved upstream URL into `proxy.yaml`.
 
-Use `forge backend list` to inspect the built-in source catalog, required credentials, and any matching local LiteLLM
-runtime instance. Use `forge backend test-auth <source-id>` when you want Forge to resolve the source's credentials and
-probe the upstream endpoint without printing secret values. Remote sources such as `openrouter` and `litellm-remote` are
-built in and have no local start/stop lifecycle; local LiteLLM sources can be started by source id or by the legacy
-`litellm --port <port>` adapter form.
+Use `forge model backend list` to inspect the built-in source catalog, required credentials, and any matching local
+LiteLLM runtime instance. Use `forge model backend test-auth <source-id>` when you want Forge to resolve the source's
+credentials and probe the upstream endpoint without printing secret values. Remote sources such as `openrouter` and
+`litellm-remote` are built in and have no local start/stop lifecycle; local LiteLLM sources can be started by source id
+or by the legacy `litellm --port <port>` adapter form.
 
 The local LiteLLM sources (`litellm-gemini-local`, `litellm-openai-local`, `litellm-anthropic-local`) all share one
 adapter and port (`litellm` on `4000`), so a single LiteLLM process backs every local source whose credential it is
 configured for. The default config serves Gemini and OpenAI models from one `litellm-4000` process, so
-`forge backend list` shows that instance under both sources and marks it `(shared)`; starting a second matching source
-reuses the running process rather than launching a new one. This is expected — there is one local LiteLLM process, not
-one per source.
+`forge model backend list` shows that instance under both sources and marks it `(shared)`; starting a second matching
+source reuses the running process rather than launching a new one. This is expected — there is one local LiteLLM
+process, not one per source.
 
 ---
 
@@ -722,18 +722,18 @@ toggle. Observability only (not routing -- recognition is stickiness-neutral); n
 
 ### Remote reconciliation
 
-`forge backend reconcile <source-id>` answers the *other* half of "what happened to this request?": it joins your local
-provider-trace evidence to the **backend's own account-side record**. The mechanism is generic over any backend with a
-remote adapter; **OpenRouter is the first adapter**.
+`forge model backend reconcile <source-id>` answers the *other* half of "what happened to this request?": it joins your
+local provider-trace evidence to the **backend's own account-side record**. The mechanism is generic over any backend
+with a remote adapter; **OpenRouter is the first adapter**.
 
 ```bash
 # Local-anchored: a local request id -> its generation id -> the remote record
-forge backend reconcile openrouter --request-id req_abc...
+forge model backend reconcile openrouter --request-id req_abc...
 
 # Remote-only: the backend's own record id (e.g. an OpenRouter gen-... id)
-forge backend reconcile openrouter --remote-id gen-...
+forge model backend reconcile openrouter --remote-id gen-...
 
-forge backend reconcile openrouter --request-id req_abc... --json   # stable JSON
+forge model backend reconcile openrouter --request-id req_abc... --json   # stable JSON
 ```
 
 Results are bucketed: **joined** (local + remote matched), **remote** (a raw remote-id lookup), **missing-remote**
