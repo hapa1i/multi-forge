@@ -542,6 +542,40 @@ class TestValidatedVersionGuard:
         assert preflight_codex().version_beyond_validated is False
 
 
+class TestProxyContractBlocker:
+    """The launcher's hard floor for the -c proxy-provider contract (separate from the
+    general probe ceiling CODEX_VERSION_VALIDATED and the hook-registration floor)."""
+
+    def test_below_floor_blocks_naming_floor_and_actual(self) -> None:
+        reason = cp.codex_proxy_contract_blocker("0.140.0")
+        assert reason is not None
+        assert cp.CODEX_PROXY_CONTRACT_VALIDATED in reason
+        assert "0.140.0" in reason
+
+    def test_at_floor_allows(self) -> None:
+        assert cp.codex_proxy_contract_blocker(cp.CODEX_PROXY_CONTRACT_VALIDATED) is None
+
+    def test_above_floor_allows(self) -> None:
+        assert cp.codex_proxy_contract_blocker("0.200.0") is None
+
+    def test_none_version_allows(self) -> None:
+        # Unparseable/absent: unknown != provably-old, so let the binary try.
+        assert cp.codex_proxy_contract_blocker(None) is None
+
+    def test_banner_string_allows(self) -> None:
+        # A non-numeric token yields an empty version tuple -> "unknown", not below-floor.
+        assert cp.codex_proxy_contract_blocker("codex-cli") is None
+
+    def test_short_version_pads_to_floor(self) -> None:
+        # "0.141" must meet the "0.141.0" floor (padding, not shorter-sorts-lower).
+        assert cp.codex_proxy_contract_blocker("0.141") is None
+
+    def test_proxy_floor_is_above_general_ceiling(self) -> None:
+        # The proxy contract was proved later than the general probe ceiling; the two
+        # constants are intentionally distinct surfaces.
+        assert cp._version_lt(cp.CODEX_VERSION_VALIDATED, cp.CODEX_PROXY_CONTRACT_VALIDATED)
+
+
 class TestHappyPathAndAssert:
     def test_full_ready_result_shape(self, monkeypatch) -> None:
         # Mirrors the live machine: chatgpt auth, hooks enabled, no proxy.

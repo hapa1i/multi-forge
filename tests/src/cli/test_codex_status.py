@@ -1,11 +1,9 @@
 """Unit tests for `forge codex status` (read-only Codex inspection).
 
-Phase 1 of the forge_codex_command_group card. `forge codex start --proxy` is
-parked until the Responses transport ships (Phase 4), so the group is an
-intentional single leaf here. Runtime detection is faked so tests are
-deterministic regardless of whether `codex` is on the host PATH; Codex config is
-written under a temp ``$CODEX_HOME``. installed.json is isolated by the autouse
-FORGE_HOME fixture.
+Covers the read-only `status` leaf (the proxy-backed `start` launcher is tested in
+`test_codex_start.py`). Runtime detection is faked so tests are deterministic
+regardless of whether `codex` is on the host PATH; Codex config is written under a
+temp ``$CODEX_HOME``. installed.json is isolated by the autouse FORGE_HOME fixture.
 """
 
 from __future__ import annotations
@@ -174,12 +172,15 @@ def test_codex_group_registered_and_visible():
     assert "codex" in top.output
     group = CliRunner().invoke(main, ["codex", "--help"])
     assert group.exit_code == 0
+    # Two visible leaves now that the Phase 4 launcher shipped (card forge_codex_command_group).
     assert "status" in group.output
-    # `start --proxy` is parked until the Responses transport ships (card Phase 4):
-    # not a registered subcommand yet (group is allowlisted single-leaf).
-    no_start = CliRunner().invoke(main, ["codex", "start"])
-    assert no_start.exit_code != 0
-    assert "No such command" in no_start.output
+    assert "start" in group.output
+    # `start` is a registered subcommand: invoking it without the required --proxy is a
+    # missing-option error, not "No such command".
+    no_proxy = CliRunner().invoke(main, ["codex", "start"])
+    assert no_proxy.exit_code != 0
+    assert "No such command" not in no_proxy.output
+    assert "--proxy" in no_proxy.output
 
 
 def test_status_all_includes_local_scope(codex_home, monkeypatch):

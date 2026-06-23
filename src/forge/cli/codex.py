@@ -1,9 +1,9 @@
 """`forge codex` command group.
 
-Read-only Codex inspection (`forge codex status`). The proxy-backed launcher
-(`forge codex start --proxy`) is parked until the Responses transport exists
-(the forge_codex_command_group card, Phases 2-4); until then `forge codex` is a
-single diagnostic leaf and native `codex` remains the direct path.
+Two leaves: `forge codex status` (read-only enrollment inspection) and `forge codex
+start --proxy` (launch the Codex TUI routed through a Responses-capable Forge proxy).
+The launcher is sessionless and scrubbed -- the proxy owns upstream auth, so no native
+codex/OpenAI login is required or leaked; native-direct Codex is just `codex`.
 
 `status` reports registration facts from a static config read; it never claims
 enrollment, which can only be proven by `forge runtime preflight codex
@@ -14,14 +14,19 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import sys
 from dataclasses import dataclass
 from pathlib import Path
+from typing import cast
 
 import click
 from rich.console import Console
 
+from forge.cli.output import print_error, print_error_with_tip
+from forge.core.invoker.codex import CodexSandbox
 from forge.core.paths import display_path
 from forge.core.runtime import get_runtime
+from forge.core.runtime.codex_preflight import codex_proxy_contract_blocker
 from forge.install.codex_hooks import (
     codex_registration_pairs,
     get_builtin_codex_entries,
@@ -34,19 +39,18 @@ from forge.install.models import InstallScope
 from forge.install.tracking import TrackingStore
 
 console = Console()
+err_console = Console(stderr=True)
 
 _VERIFY_COMMAND = "forge runtime preflight codex --verify-enrollment"
 
 
 @click.group(context_settings={"help_option_names": ["-h", "--help"]})
 def codex() -> None:
-    """Inspect Codex enrollment through Forge.
+    """Inspect Codex enrollment and launch Codex through a Forge proxy.
 
     \b
-    forge codex status   # Read-only: binary, config, managed-hook registration
-
-    The proxy-backed launcher (`forge codex start --proxy`) is parked until the
-    Responses transport lands; until then, run native `codex` directly.
+    forge codex status              # Read-only: binary, config, managed-hook registration
+    forge codex start --proxy <id>  # Launch the Codex TUI routed through a Responses proxy
     """
 
 
@@ -269,3 +273,123 @@ def status_cmd(scope: str | None, show_all: bool, as_json: bool) -> None:
         return
 
     _render_human(report)
+
+
+@codex.command("start")
+@click.option(
+    "--proxy",
+    "proxy",
+    type=str,
+    required=True,
+    help="Responses-capable proxy to route through (proxy_id or template name)",
+)
+@click.option(
+    "--sandbox",
+    type=click.Choice(["read-only", "workspace-write", "danger-full-access"]),
+    default="workspace-write",
+    show_default=True,
+    help="Codex sandbox policy for the launched TUI",
+)
+@click.argument("codex_args", nargs=-1, type=click.UNPROCESSED)
+def start_cmd(proxy: str, sandbox: str, codex_args: tuple[str, ...]) -> None:
+    """Launch the Codex TUI routed through a Responses-capable Forge proxy.
+
+    Sessionless and scrubbed: the proxy owns upstream auth, so no native codex/OpenAI
+    login is required or leaked. Pass extra codex args after `--` (e.g. `-m` to override
+    the proxy's default model).
+
+    \b
+    Examples:
+        forge codex start --proxy codex-responses-local
+        forge codex start --proxy my-proxy --sandbox read-only
+        forge codex start --proxy my-proxy -- -m gpt-5.5
+    """
+    # 1. codex installed? FIRST -- cheap, no side effects, so we never start a proxy the
+    #    user can't use.
+    runtime = get_runtime("codex")
+    if not runtime.is_installed():
+        print_error_with_tip(
+            "codex CLI not found in PATH.",
+            "Install codex >=0.141.0 (the proxy-contract-validated version), then retry.",
+            console=err_console,
+        )
+        sys.exit(1)
+
+    # 2. Hard version gate, BEFORE ensure_proxy: a stale codex must not start a proxy and
+    #    then fail cryptically at the first -c override. Unparseable version is allowed
+    #    (unknown != provably-old).
+    blocker = codex_proxy_contract_blocker(runtime.detect())
+    if blocker is not None:
+        print_error_with_tip(blocker, "Upgrade codex to >=0.141.0.", console=err_console)
+        sys.exit(1)
+
+    # Heavy proxy/invoke imports are deferred so `forge codex status` stays light.
+    from forge.proxy.proxies import (
+        ProxyNotFoundError,
+        ProxyRegistryCorruptedError,
+        ProxyResolutionError,
+    )
+    from forge.proxy.proxy_orchestrator import (
+        ProxyNotResponsesCapableError,
+        ProxyStartError,
+        ProxyUnreachableError,
+        assert_proxy_responses_capable,
+        ensure_proxy,
+    )
+    from forge.session.codex_invoke import invoke_codex_bare_proxy
+
+    # 3. Resolve + start/adopt the proxy.
+    try:
+        entry, started = ensure_proxy(proxy)
+    except ProxyRegistryCorruptedError as e:
+        print_error(str(e), console=err_console)
+        sys.exit(1)
+    except (ProxyResolutionError, ProxyStartError) as e:
+        if isinstance(e, ProxyNotFoundError):
+            print_error_with_tip(
+                str(e),
+                "Run 'forge proxy template list' to see available templates.",
+                console=err_console,
+            )
+        else:  # AmbiguousProxyError / ProxyStartError already name their fix
+            print_error(str(e), console=err_console)
+        sys.exit(1)
+
+    if started:
+        console.print(f"[dim]Started proxy '{entry.proxy_id}' from '{proxy}'.[/dim]")
+
+    # 4. Hard Responses-capability gate (doubles as the post-start health check). On
+    #    failure we leave the proxy running -- capability mismatch is a static property of
+    #    the proxy, so killing it would be user-hostile.
+    try:
+        # wire_shape is "openai_responses_passthrough" on success (uninformative); the
+        # failure path names the actual shape via the exception instead.
+        default_model, _ = assert_proxy_responses_capable(entry.base_url)
+    except ProxyUnreachableError as e:
+        print_error_with_tip(
+            str(e),
+            f"Run 'forge proxy start {entry.proxy_id}' to (re)start it.",
+            console=err_console,
+        )
+        sys.exit(1)
+    except ProxyNotResponsesCapableError as e:
+        print_error_with_tip(
+            f"Responses-capable proxy required: proxy '{entry.proxy_id}' ({e}).",
+            "Use an openai_responses_passthrough proxy with a responses_ingress source, "
+            "or run native 'codex' directly.",
+            console=err_console,
+        )
+        sys.exit(1)
+
+    console.print(
+        f"Starting Codex through proxy [green]{entry.proxy_id}[/green] "
+        f"({entry.template}, model={default_model or 'proxy default'})"
+    )
+    sys.exit(
+        invoke_codex_bare_proxy(
+            base_url=entry.base_url,
+            sandbox=cast(CodexSandbox, sandbox),
+            model=default_model,
+            passthrough=list(codex_args),
+        )
+    )

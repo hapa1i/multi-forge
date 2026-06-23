@@ -132,15 +132,21 @@ session *label*; use `--root-run-id` for an exact match.
 
 ### Codex management
 
-| Command              | Purpose                                                                                  |
-| -------------------- | ---------------------------------------------------------------------------------------- |
-| `forge codex status` | Inspect Codex binary, config, and Forge hook registration (`--scope`, `--all`, `--json`) |
+| Command                          | Purpose                                                                                      |
+| -------------------------------- | -------------------------------------------------------------------------------------------- |
+| `forge codex status`             | Inspect Codex binary, config, and Forge hook registration (`--scope`, `--all`, `--json`)     |
+| `forge codex start --proxy <id>` | Launch the Codex TUI routed through a Responses-capable proxy (`--sandbox`, `-- codex-args`) |
 
 `status` is read-only and reports registration from a static config read; it never claims enrollment. Default scope is
 the detected Forge install scope (else user); `--scope user|project|local` and `--all` widen it. Prove enrollment
-empirically with `forge runtime preflight codex --verify-enrollment`. The proxy-backed launcher
-(`forge codex start --proxy`) is parked until the Responses transport lands and is not a command yet (see
-`docs/board/doing/forge_codex_command_group/`); run native `codex` for direct use.
+empirically with `forge runtime preflight codex --verify-enrollment`.
+
+`start --proxy <id-or-template>` launches the Codex TUI routed through a Responses-capable proxy
+(`wire_shape: openai_responses_passthrough` + a `responses_ingress` source). It is **sessionless and scrubbed** — the
+proxy owns upstream auth, so no native codex/OpenAI login is required or leaked. It hard-blocks a codex older than the
+proxy-contract-validated version (≥0.141.0) before starting a proxy, auto-defaults `-m` from the proxy's default tier
+(override with `-- -m <model>`), and accepts `--sandbox read-only|workspace-write|danger-full-access` (default
+`workspace-write`). For direct use without a proxy, run native `codex`.
 
 ### Backend management
 

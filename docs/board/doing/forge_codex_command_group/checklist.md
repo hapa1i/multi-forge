@@ -14,7 +14,13 @@ Responses _passthrough_** (not the card's original translating transport -- see 
 shipped, 49 unit tests, `make pre-commit` clean, and a **live integration gate run** (real codex 0.141.0 -> the proxy).
 One acceptance item is **credential-blocked**, not code-blocked: a successful 200 reasoning round-trip needs a working
 OpenAI key (this environment's `OPENAI_API_KEY` is dead). Card stays in `doing/` until that round-trip is confirmed with
-a live key. Next cursor after that: **Phase 4** -- the `forge codex start --proxy` launcher.
+a live key.
+
+**Phase 4 shipped**: `forge codex start --proxy <id-or-template>` -- the sessionless, scrubbed Codex TUI launcher (4
+seams: version gate, capability gate, bare invocation, CLI leaf; 55 new unit tests). `make pre-commit` clean and the
+live argv-routing gate ran: the list-mode `-c` argv routes real codex 0.141.0 to `POST /v1/responses` (risk #1
+validated). The 200 reasoning round-trip remains credential-blocked (dead key), like Phase 3 -- the card stays in
+`doing/` until a working key confirms it.
 
 ## Phase 1 - `forge codex status` (shippable now)
 
@@ -46,7 +52,8 @@ a live key. Next cursor after that: **Phase 4** -- the `forge codex start --prox
   placeholder, it contradicts the card (launcher = parked), and it would pin a `--proxy` contract the **Phase 2 kill
   criterion** may invalidate. Resolution: remove `start`; allowlist `forge codex` in `SINGLE_LEAF_GROUP_ALLOWLIST` as
   deliberate **phasing** debt (distinct from the flatten-style entries), to be removed when `start --proxy` ships in
-  Phase 4. *(test_codex_group_registered_and_visible asserts `forge codex start` is "No such command".)*
+  Phase 4. *(test_codex_group_registered_and_visible asserts `forge codex start` is "No such command".)* **\[Phase 4:
+  reversed -- `start` shipped; the allowlist entry is removed and the test now asserts `start` exists.\]**
 - [x] `status` exposes `--json` with dest `as_json` (read-leaf rule). With `start` removed, the module has no
   hand-rolled error markup and no `print_error` call; `status`'s only error is Click's `UsageError` (already stderr), so
   the stdout/stderr split holds. **Deferred to Phase 4:** when `start` returns it must use a stderr `Console`.
@@ -195,10 +202,74 @@ OpenAI). Confirmed against the **running** system:
   AND `responses_ingress` gate.
 - [x] `docs/board/change_log.md`: Phase 3 entry.
 
-## Phase 4 - `forge codex start --proxy` launcher (blocked on Phases 2-3)
+## Phase 4 - `forge codex start --proxy` launcher -- IMPLEMENTED
 
-Sessionless proxy-backed TUI launch with full child-env scrub (session + run-tree + subprocess vars); no `.forge/`, no
-`confirmed.codex`. Parked until the transport exists. (Card Slices 3-4.)
+Sessionless proxy-backed TUI launch with full child-env scrub; no `.forge/`, no `confirmed.codex`. (Card Slice 3.)
+
+### Seams shipped
+
+- [x] **Version gate** (`src/forge/core/runtime/codex_preflight.py`): `CODEX_PROXY_CONTRACT_VALIDATED = "0.141.0"` +
+  `codex_proxy_contract_blocker(version)` (reuses `_version_lt`). Blocks only a *parsed* version strictly below the
+  floor; unparseable/None is allowed (unknown != provably-old). Distinct from `CODEX_VERSION_VALIDATED` (0.139.0 probe
+  ceiling) and the hook floor (0.131.0). *(TestProxyContractBlocker)*
+- [x] **Capability gate** (`src/forge/proxy/proxy_orchestrator.py`):
+  `assert_proxy_responses_capable(base_url) -> (default_model|None, wire_shape)` + `ProxyUnreachableError` /
+  `ProxyNotResponsesCapableError`. Enforces the full runtime conjunction off `GET /` -- top-level
+  `wire_shape == openai_responses_passthrough` AND `capabilities.responses_ingress is True` -- so a flag set under a
+  wrong shape still fails closed. Default model from `routing.default_tier -> tiers[tier].model` (guarded).
+  *(TestAssertProxyResponsesCapable)*
+- [x] **Bare invocation** (`src/forge/session/codex_invoke.py`): `invoke_codex_bare_proxy` + pure
+  `_build_codex_proxy_env` / `_build_codex_proxy_argv`. Env composes `_CODEX_BARE_PROXY_STRIP_VARS` (= the shared
+  `_CODEX_CHILD_STRIP_VARS` + session/fork + run-tree + the 5 OpenAI account/routing vars), advances `FORGE_DEPTH`, sets
+  the loopback token, and re-establishes NO native auth. Argv = list-mode
+  `-c model_providers.forge_proxy.{name,base_url,wire_api=responses,env_key}`; `-m` auto-defaults from the proxy unless
+  the user passed `-m`/`--model`; never `--strict-config`. *(TestBareProxyArgv, TestBareProxyEnv, TestBareProxyInvoke)*
+- [x] **CLI leaf** (`src/forge/cli/codex.py`): `forge codex start --proxy <id-or-template> [--sandbox] [-- codex-args]`.
+  Order: installed -> version gate -> `ensure_proxy` -> capability gate -> exec. Errors on a stderr `Console` via
+  `print_error` / `print_error_with_tip` (closes the Phase 1 stderr-Console deferral). On a gate failure the started
+  proxy is left running. *(tests/src/cli/test_codex_start.py)*
+- [x] **Single-leaf allowlist**: removed `forge codex` from `SINGLE_LEAF_GROUP_ALLOWLIST` (now 2 leaves);
+  `test_codex_group_registered_and_visible` updated to assert `start` exists and errors on missing `--proxy` (not "No
+  such command"). *(test_no_single_leaf_groups)*
+
+### Acceptance tests (Phase 4)
+
+| Test                                     | Fixture                                       | Assertion                                                   | Test File                                    |
+| ---------------------------------------- | --------------------------------------------- | ----------------------------------------------------------- | -------------------------------------------- |
+| Old codex hard-blocks before proxy start | runtime version 0.140.0                       | exit 1, `ensure_proxy` not called, tip names 0.141.0        | `tests/src/cli/test_codex_start.py`          |
+| Unparseable version proceeds             | runtime version None                          | reaches `invoke_codex_bare_proxy` (exit 0)                  | `tests/src/cli/test_codex_start.py`          |
+| Capability conjunction fail-closed       | `responses_ingress:true` + wrong `wire_shape` | raises `ProxyNotResponsesCapableError` (wire_shape carried) | `tests/src/proxy/test_proxy_orchestrator.py` |
+| No native-account leakage                | `OPENAI_*` + `CODEX_*` set in env             | all absent from bare env; loopback token set                | `tests/src/session/test_codex_invoke.py`     |
+| `-c` argv exact tokens (list-mode)       | base_url with/without trailing slash          | exact provider argv, single `/v1`, no `--strict-config`     | `tests/src/session/test_codex_invoke.py`     |
+| Not-capable surfaces required message    | capability gate raises                        | exit 1, "Responses-capable proxy required" on stderr        | `tests/src/cli/test_codex_start.py`          |
+
+**Verification**: 55 new unit tests pass; full `tests/src/cli` suite (1953) green; the modified preflight / orchestrator
+/ codex_invoke / codex_status / command-tree files green.
+
+### Design-doc sync (Phase 4)
+
+- [x] `docs/cli_reference.md`: `forge codex start` row + shipped description (dropped the "parked" note).
+- [x] `docs/design.md` §3.4: "Bare launch (Codex)" subsection (sessionless launch + scrubbed child env); §3.7 wire-shape
+  bullet cross-references the launcher consumer.
+- [x] `docs/board/change_log.md`: Phase 4 entry (`## 2026-06-23`).
+
+### Live integration gate (Phase 4) -- RUN (2026-06-23)
+
+Started a real `codex-responses-local` proxy (forge `:8105` -> litellm `:4000`), ran the **real**
+`assert_proxy_responses_capable('http://localhost:8105')` -> `('openai/gpt-5.5', 'openai_responses_passthrough')` (live
+GET / conjunction + default-model extraction), then drove `codex-cli 0.141.0` through the **exact list-mode `-c`
+tokens** from `_build_codex_proxy_argv` via `subprocess.run` (no shell -- same quoting path as
+`invoke_codex_bare_proxy`). The TUI itself needs a tty, so the request-generating leg used `codex exec` with
+byte-identical `-c` provider tokens.
+
+- [x] **List-mode `-c` argv routes codex to the proxy (risk #1 validated).** codex reported `provider: forge_proxy`,
+  `model: openai/gpt-5.5`, `wire_api=responses` (it accepted the literal inner-quote tokens), and the proxy access log
+  shows two `POST /v1/responses` requests reaching `responses_passthrough._forward_streaming` (`req_84925e2a4325`,
+  `req_72401ff602ae`). The shell-quoted Phase 2 probe and now the list-mode path both route.
+- [x] **200 reasoning round-trip stays credential-blocked, not code-blocked.** The two POSTs failed upstream with 401
+  then 429 (dead/rate-limited OpenAI key), past the proxy's routing -- the same deferral as Phase 3, not a launcher
+  defect.
+- [x] `make pre-commit` clean (ruff, black, isort, mypy, pyright, mdformat, gitleaks; under the 2.5k-line file cap).
 
 ## Blockers / deferred
 
@@ -212,6 +283,7 @@ Sessionless proxy-backed TUI launch with full child-env scrub (session + run-tre
 - [x] `forge codex status` documented in `docs/cli_reference.md` ("Codex management" section). End-user guide: no Day 1
   behavior change yet (read-only diagnostic; `start` still gated) -- revisit when the launcher ships.
 - [ ] Phase 1 merged.
-- [ ] `docs/design.md` updated if the codex CLI surface or ownership changes.
+- [x] `docs/design.md` updated for the codex CLI surface change (§3.4 "Bare launch (Codex)", §3.7 wire-shape consumer
+  cross-ref).
 - [ ] Promote to `epic_forge_codex` once Phase 2 resolves and transport work activates (two or more live members).
 - [ ] `change_log.md` entry at phase closeout; move `doing/ -> done/` when the card's live scope ships.

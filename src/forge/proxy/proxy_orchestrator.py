@@ -62,6 +62,25 @@ class ProxyStartError(ValueError):
     """Raised when a proxy cannot be started."""
 
 
+class ProxyUnreachableError(Exception):
+    """Raised when a proxy's ``GET /`` cannot be read (down, non-200, or non-JSON body)."""
+
+
+class ProxyNotResponsesCapableError(Exception):
+    """Raised when a proxy does not advertise the Codex Responses ingress.
+
+    Carries the advertised ``wire_shape`` so a launcher can name it in recovery
+    output (e.g. ``wire_shape=openai_translated``).
+    """
+
+    def __init__(self, wire_shape: str) -> None:
+        self.wire_shape = wire_shape
+        super().__init__(
+            f"proxy is not Responses-capable (wire_shape={wire_shape}); "
+            "needs wire_shape=openai_responses_passthrough and a responses_ingress source"
+        )
+
+
 @dataclass
 class TierOverrideOptions:
     """CLI options for per-tier hyperparameter overrides.
@@ -860,6 +879,65 @@ def check_proxy_health(
         return False
 
     return True
+
+
+def _default_model_from_root(data: dict[str, Any]) -> str | None:
+    """Best-effort ``tiers[routing.default_tier].model`` from a ``GET /`` body.
+
+    Returns ``None`` when ``default_tier`` is unset (proxy missing
+    ``config.proxy.default_tier``) or the body is malformed -- every access is
+    guarded so the launcher degrades to "let codex pick" rather than crashing.
+    """
+    routing = data.get("routing")
+    default_tier = routing.get("default_tier") if isinstance(routing, dict) else None
+    if not isinstance(default_tier, str):
+        return None
+    tiers = data.get("tiers")
+    tier_entry = tiers.get(default_tier) if isinstance(tiers, dict) else None
+    model = tier_entry.get("model") if isinstance(tier_entry, dict) else None
+    return model if isinstance(model, str) else None
+
+
+def assert_proxy_responses_capable(base_url: str, *, timeout_s: float = 5.0) -> tuple[str | None, str]:
+    """Assert a proxy advertises the Codex Responses ingress; return ``(default_model, wire_shape)``.
+
+    Reads ``GET {base_url}/`` and enforces the *same conjunction* the runtime route gate
+    enforces: top-level ``wire_shape == "openai_responses_passthrough"`` **and**
+    ``capabilities.responses_ingress is True``. Checking both fields (not only the
+    pre-ANDed ``responses_ingress``) means a proxy that advertised the flag under a
+    different wire shape is still rejected -- the launcher mirrors the runtime gate
+    instead of trusting the server's internal invariant that the advert already ANDs them.
+
+    ``default_model`` is the advertised default tier's model when present, else ``None``
+    (the caller then skips ``-m`` and lets codex/proxy choose).
+
+    Raises:
+        ProxyUnreachableError: GET / failed (connection, timeout, non-200, or non-JSON).
+        ProxyNotResponsesCapableError: reachable, but the capability conjunction is false.
+    """
+    url = f"{base_url.rstrip('/')}/"
+    try:
+        with httpx.Client(timeout=httpx.Timeout(timeout_s)) as client:
+            resp = client.get(url)
+    except (httpx.RequestError, httpx.TimeoutException) as e:
+        raise ProxyUnreachableError(f"proxy at {base_url} is unreachable: {e}") from e
+    if resp.status_code != 200:
+        raise ProxyUnreachableError(f"proxy at {base_url} returned HTTP {resp.status_code} for GET /")
+    try:
+        data = resp.json()
+    except ValueError as e:
+        raise ProxyUnreachableError(f"proxy at {base_url} returned a non-JSON GET / body") from e
+    if not isinstance(data, dict):
+        raise ProxyUnreachableError(f"proxy at {base_url} returned an unexpected GET / body")
+
+    wire_shape = data.get("wire_shape")
+    wire_shape_str = wire_shape if isinstance(wire_shape, str) else "unknown"
+    capabilities = data.get("capabilities")
+    responses_ingress = capabilities.get("responses_ingress") if isinstance(capabilities, dict) else None
+    if wire_shape_str != "openai_responses_passthrough" or responses_ingress is not True:
+        raise ProxyNotResponsesCapableError(wire_shape_str)
+
+    return _default_model_from_root(data), wire_shape_str
 
 
 def smoke_test_proxy(*, base_url: str, timeout_s: float = 30.0) -> tuple[bool, str]:

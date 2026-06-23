@@ -1,8 +1,9 @@
 # forge codex command group: proxy-backed sessionless Codex launcher
 
-**Status**: Proposed implementation card. The accepted product value is `forge codex start --proxy <id-or-template>`: a
-sessionless Codex TUI routed through a Forge-managed, Responses-capable proxy. Nothing in this card is shipped yet.
-`docs/design.md` §3.4/§3.5/§3.9 remain normative; this card defers to them on conflict.
+**Status**: In progress (`doing/`). **Slice 1 (`forge codex status`) shipped**; **Slice 2 (Responses passthrough
+transport) shipped** (Phase 3); **Slice 3 (`forge codex start --proxy` launcher) shipped** (Phase 4). The one open item
+is a live 200 reasoning round-trip, which is **credential-blocked** (this env's `OPENAI_API_KEY` is dead), not
+code-blocked. `docs/design.md` §3.4/§3.5/§3.7 are normative; this card defers to them on conflict.
 
 **Type**: Recorded as one proposed card, but **split it before execution** — the evidence already requires it.
 Verification (2026-06-22, against the codebase) confirmed Forge's proxy serves no Responses API and that pointing the
@@ -13,8 +14,9 @@ Codex CLI at a local base URL is unverified, so this is not a thin vertical path
    build, not a config toggle. **Shipped as a byte-faithful _passthrough_** (new `/v1/responses*` route, raw SSE relay,
    advertised capability, and the live `proxy_supported` posture), **not** the translating transport this card
    originally sketched — translation drops Codex's reasoning-item continuity. See the revised Slice 2.
-3. **`forge codex start --proxy`** stays parked until the probe resolves *and* the transport ships — otherwise it is a
-   CLI shell over a backend that does not exist.
+3. **`forge codex start --proxy`** — **shipped** (Phase 4) once the probe resolved and the transport landed: a
+   sessionless, scrubbed Codex TUI through the Responses-capable proxy, with hard version + capability gates and no
+   native-account leakage.
 
 Do not execute all three as one vertical card.
 

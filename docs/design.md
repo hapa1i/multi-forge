@@ -328,6 +328,19 @@ manifests as a backstop. The CLI accepts `--runtime claude|codex` but manifests 
 - Does NOT require `.forge/` -- works from any directory
 - Only sets `ANTHROPIC_BASE_URL` (proxy mode) or nothing (direct mode)
 
+**Bare launch (Codex)** (`forge codex start --proxy <id-or-template>`):
+
+- Codex analog of `forge claude start` -- sessionless, no `FORGE_SESSION`, no `.forge/` required.
+- Requires a **Responses-capable** proxy (`wire_shape: openai_responses_passthrough` + a `responses_ingress` source,
+  §3.7); the launcher re-checks that conjunction against `GET /` and fails closed (`ProxyNotResponsesCapableError`).
+- Routes Codex through the loopback proxy via list-mode
+  `-c model_providers.forge_proxy.{base_url,wire_api=responses,env_key}` overrides (never `--strict-config`); a custom
+  provider means Codex needs no OpenAI login.
+- **Scrubbed child env**: drops native codex/OpenAI auth and OpenAI account/routing vars (the proxy owns upstream auth
+  -- no native-account leakage) plus session/run-tree identity, and advances `FORGE_DEPTH`. Unlike session-managed
+  `invoke_codex_interactive`, it re-establishes **no** native auth (`invoke_codex_bare_proxy`).
+- Hard-blocks a codex older than the proxy-contract-validated version (`0.141.0`) *before* starting a proxy.
+
 **Subprocess proxy launch variant** (`forge session start --subprocess-proxy <proxy_id>`):
 
 - Creates a normal direct-mode Forge session for the main Claude process
@@ -548,7 +561,8 @@ The proxy exposes runtime truth via `GET /`:
   false). The route is served only when `wire_shape == openai_responses_passthrough` **and** the proxy's model source
   declares the `responses_ingress` capability — the same conjunction `GET /`'s `capabilities.responses_ingress` field
   advertises and the codex preflight's `proxy_supported` posture mirrors. Dollar cost is recorded only when the upstream
-  reports it (`x-litellm-response-cost`, USD→micros); an OpenAI-direct upstream is token-telemetry-only.
+  reports it (`x-litellm-response-cost`, USD→micros); an OpenAI-direct upstream is token-telemetry-only. The launcher
+  that consumes this shape is `forge codex start --proxy` (§3.4, Bare launch (Codex)).
 
 **Tier selection precedence:**
 

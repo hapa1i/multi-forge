@@ -25,6 +25,36 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-06-23
+
+### forge_codex_command_group Phase 4: `forge codex start --proxy` launcher
+
+**Goal**: Ship the sessionless, proxy-backed Codex TUI launcher -- the consumer the card was built for -- on top of the
+Phase 3 Responses transport.
+
+**Key changes**:
+
+- **CLI** (`src/forge/cli/codex.py`): new `forge codex start --proxy <id-or-template> [--sandbox] [-- codex-args]` leaf.
+  Order: codex-installed -> hard version gate -> `ensure_proxy` -> capability gate -> exec, with the full error matrix
+  on a stderr `Console` via `forge.cli.output` helpers (closes the Phase 1 stderr-Console deferral).
+- **Version gate** (`core/runtime/codex_preflight.py`): `CODEX_PROXY_CONTRACT_VALIDATED = "0.141.0"` +
+  `codex_proxy_contract_blocker()`. Fail-closed below the floor (parsed only); unparseable/None allowed. Distinct
+  surface from the 0.139.0 probe ceiling and the 0.131.0 hook floor.
+- **Capability gate** (`proxy/proxy_orchestrator.py`): `assert_proxy_responses_capable()` + `ProxyUnreachableError` /
+  `ProxyNotResponsesCapableError`. Requires the full `wire_shape == openai_responses_passthrough` AND
+  `capabilities.responses_ingress` conjunction off `GET /` (mirrors the runtime route gate); returns the proxy's
+  default-tier model.
+- **Bare invocation** (`session/codex_invoke.py`): `invoke_codex_bare_proxy` + pure env/argv builders.
+  `_CODEX_BARE_PROXY_STRIP_VARS` scrubs native codex/OpenAI auth, the 5 OpenAI account/routing vars, and
+  session/run-tree identity; re-establishes NO native auth (the proxy owns upstream); list-mode `-c` provider argv; `-m`
+  auto-default suppressed when the user passes one; never `--strict-config`.
+- **Allowlist**: removed `forge codex` from `SINGLE_LEAF_GROUP_ALLOWLIST` (now 2 leaves); updated the registration test.
+- **Docs**: `cli_reference.md` `start` row; `design.md` §3.4 "Bare launch (Codex)" + §3.7 consumer cross-ref.
+
+**Verification**: 55 new unit tests (version blocker, capability gate, env/argv/invoke, CLI matrix) pass; full
+`tests/src/cli` suite (1953) green. `make pre-commit` + the live argv-routing gate run at closeout (a 200 turn stays
+credential-blocked, as in Phase 3).
+
 ## 2026-06-22
 
 ### forge_codex_command_group Phase 3: Codex Responses proxy transport (passthrough)
