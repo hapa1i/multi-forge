@@ -128,8 +128,9 @@ def test_list_json_marks_shared_local_runtime_instance(
     forge_home: Path,
 ) -> None:
     """A multi-provider config mirrors the shipped default: one litellm-4000 process
-    serves both Gemini and OpenAI, so both local sources match it and the list marks
-    the instance as shared rather than implying two separate backends."""
+    serves both Gemini and OpenAI, so every local source backed by it (Gemini, OpenAI,
+    and the OpenAI-credentialed codex-responses source) matches the single instance and
+    the list marks it as shared rather than implying separate backends."""
     config_path = forge_home / "backends" / "litellm" / "config.yaml"
     config_path.parent.mkdir(parents=True)
     config_path.write_text(
@@ -168,9 +169,10 @@ def test_list_json_marks_shared_local_runtime_instance(
     # Both sources are backed by the single running instance.
     assert gemini["backend_id"] == "litellm-4000"
     assert openai["backend_id"] == "litellm-4000"
-    # Each row names the sibling source it shares the instance with, not itself.
-    assert gemini["shared_with"] == ["litellm-openai-local"]
-    assert openai["shared_with"] == ["litellm-gemini-local"]
+    # Each row names the sibling sources it shares the instance with (catalog order),
+    # never itself. codex-responses-local is an OpenAI-credentialed co-tenant on 4000.
+    assert gemini["shared_with"] == ["litellm-openai-local", "codex-responses-local"]
+    assert openai["shared_with"] == ["litellm-gemini-local", "codex-responses-local"]
     # anthropic-local is not in the config, so it stays unmatched.
     assert records["litellm-anthropic-local"]["runtime_instance"] is None
     # The shared instance is still a single registry entry, not duplicated.

@@ -468,11 +468,12 @@ def _resolve_responses_posture(proxy_id: str | None) -> _Responses:
     No ``--proxy`` -> ``native_direct`` (direct ``codex exec`` to OpenAI; preferred, not a
     blocker). With ``--proxy <id>``: read that *existing* proxy's ``proxy.yaml`` via the
     config loader (lazy import -- keeps this module light and avoids a ``core -> config``
-    edge at import time; it reads the file and starts nothing). Both wire shapes
-    (``openai_translated``/``anthropic_passthrough``) serve Anthropic/OpenAI-chat, never
-    Responses, so a found proxy is ``proxy_unsupported``; the backend may translate, but
-    the Codex-facing surface cannot. No ``/v1/responses`` route is added (out of scope for
-    Phase 5 / the native Codex path).
+    edge at import time; it reads the file and starts nothing). A proxy is
+    ``proxy_supported`` only when its wire shape is ``openai_responses_passthrough``
+    AND its source declares the ``responses_ingress`` capability -- the same
+    conjunction the proxy ``/v1/responses`` route enforces, so a green preflight
+    cannot 501 at launch. The ``openai_translated``/``anthropic_passthrough`` shapes
+    serve Anthropic/OpenAI-chat, never Responses, so they are ``proxy_unsupported``.
     """
     if proxy_id is None:
         return _Responses("native_direct", None)
@@ -495,6 +496,20 @@ def _resolve_responses_posture(proxy_id: str | None) -> _Responses:
             f"proxy '{proxy_id}' not found (run 'forge proxy list'). "
             "Omit --proxy to run native 'codex exec' directly.",
         )
+
+    # proxy_supported requires BOTH the responses passthrough wire shape AND a
+    # source that declares responses_ingress -- the exact conjunction the proxy
+    # /v1/responses route enforces (fail closed on an unknown/empty source).
+    if config.wire_shape == "openai_responses_passthrough":
+        from forge.backend.sources import ModelSourceNotFoundError, get_model_source
+
+        source_id = getattr(config, "source", "") or ""
+        try:
+            if source_id and get_model_source(source_id).capabilities.responses_ingress:
+                return _Responses("proxy_supported", None)
+        except ModelSourceNotFoundError:
+            pass  # fail closed -> proxy_unsupported below
+
     return _Responses(
         "proxy_unsupported",
         f"proxy '{proxy_id}' (wire_shape={config.wire_shape!r}) cannot serve the Responses API "

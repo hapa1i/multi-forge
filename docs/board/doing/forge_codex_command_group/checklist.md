@@ -9,10 +9,12 @@ build the launcher before the probe resolves.
 ## Current focus
 
 Phase 1 shipped (commit `dff6e3a`): `forge codex status` + 14 unit tests, `make pre-commit` clean. Phase 2 live-probe
-**resolved GO** (see below) -- codex accepts a custom Responses base URL via argv (`-c`) + env, so the launcher is
-feasible. Next live cursor: **Phase 3 (Slice 2)** -- the from-scratch Responses proxy transport, the heaviest piece and
-the epic-member work. It is a large multi-file build (proxy route + converters + SSE + capability + posture), so confirm
-scope/sequencing before starting.
+**resolved GO** -- codex accepts a custom Responses base URL via argv (`-c`) + env. Phase 3 (Slice 2) **implemented as a
+Responses _passthrough_** (not the card's original translating transport -- see the revised Slice 2 rationale): 6 seams
+shipped, 49 unit tests, `make pre-commit` clean, and a **live integration gate run** (real codex 0.141.0 -> the proxy).
+One acceptance item is **credential-blocked**, not code-blocked: a successful 200 reasoning round-trip needs a working
+OpenAI key (this environment's `OPENAI_API_KEY` is dead). Card stays in `doing/` until that round-trip is confirmed with
+a live key. Next cursor after that: **Phase 4** -- the `forge codex start --proxy` launcher.
 
 ## Phase 1 - `forge codex status` (shippable now)
 
@@ -108,10 +110,90 @@ codex [exec] \
 - Slice 1 proves the routing channel only. A full Responses request/response round-trip is Slice 2's acceptance test
   (`tests/src/proxy/test_responses_transport.py`), not proven here.
 
-## Phase 3 - Responses proxy transport (gated on Phase 2)
+## Phase 3 - Responses proxy transport (gated on Phase 2) -- IMPLEMENTED (passthrough); 200-completion credential-blocked
 
-From-scratch build: `/v1/responses` route + Responses\<->internal converters + SSE translation + advertised capability +
-live `proxy_supported` posture. Not a config toggle; this is the epic-member work the Type note flags. (Card Slice 2.)
+**Decision: passthrough, not translating.** Translating Responses\<->the proxy's internal layer drops reasoning-item
+continuity (`converters.py`, `core/llm/types.py` has no reasoning channel). Codex is a reasoning-model client that
+depends on that continuity -- the exact failure `anthropic_passthrough` exists to avoid. So Slice 2 ships an
+`openai_responses_passthrough` wire shape that forwards Codex's raw Responses traffic byte-for-byte (reasoning
+preserved, signature-safe). Tier re-routing + a core.llm reasoning channel are deferred. This **revises card Slice 2**.
+
+### Seams shipped
+
+- [x] **Seam 1 (config).** `openai_responses_passthrough` in `_VALID_WIRE_SHAPES`; `responses_ingress` capability on
+  `ModelSourceCapabilities`; `codex-responses-local` source (litellm-local upstream so the cost header is present) +
+  template; `source_bearer_auth_env_var()` (the single secret, non-connection-value env var; fail-closed on 0 or >1).
+- [x] **Seam 2 (forwarding).** Extracted `proxy/stream_relay.py` (wire-agnostic SSE teardown shared with the Anthropic
+  passthrough -- its 32 tests stay green) + new `proxy/responses_passthrough.py` (method/body/query-aware `forward`,
+  Bearer-injecting header builder that strips inbound auth + `OpenAI-Organization`/`OpenAI-Project`, tolerant usage
+  side-tap, USD->micros cost from `x-litellm-response-cost`, response-header allowlist that drops hop-by-hop **and the
+  proxy-owned `x-request-id`**).
+- [x] **Seam 3 (routes).** `POST /v1/responses` (create, stream-aware) registered before the catch-all
+  `api_route("/v1/responses/{rest:path}", methods=[GET,POST,DELETE])`; body read only for POST (bodyless GET/DELETE
+  never call `.json()`); gate = `wire_shape == openai_responses_passthrough` AND `source.responses_ingress` else
+  **501**. Handler + registrar + GET / helpers live in the new `proxy/responses_ingress.py` (extracted from `server.py`
+  to keep it under the 2.5k-line cap; reads proxy runtime state via a lazy `import forge.proxy.server`).
+- [x] **Seam 4 (GET /).** `build_intercept_capability_section` + `advertise_responses_ingress` (pure helpers in
+  `responses_ingress.py`): `thinking_blocks_preserved` true, `can_inspect.*` uniformly false,
+  `capabilities.responses_ingress` mirrors the route gate.
+- [x] **Seam 5 (preflight).** `_resolve_responses_posture` returns the previously-dead `proxy_supported` only on the
+  same wire_shape AND `responses_ingress` conjunction the route enforces (fail-closed on empty/unknown source).
+- [x] **Seam 6 (smoke test).** `proxy_orchestrator` smoke test POSTs a minimal Responses request to `/v1/responses` for
+  this wire shape (not `/v1/messages`).
+
+### Acceptance tests (Phase 3)
+
+| Test                                            | Fixture                                                              | Assertion                                                                                                             | Test File                                        |
+| ----------------------------------------------- | -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| Non-stream + stream POST relayed faithfully     | mock upstream                                                        | method/url/body forwarded byte-for-byte; SSE bytes unchanged                                                          | `tests/src/proxy/test_responses_transport.py`    |
+| Bodyless GET/DELETE + top-level non-`{id}` path | mock upstream                                                        | method/query preserved; no `.json()` on bodyless                                                                      | same                                             |
+| Usage + cost accounting                         | `response.completed` + `x-litellm-response-cost`                     | token usage from SSE/body; `"0.000123"->123`; negative/absent->unavailable                                            | same                                             |
+| Capability gate -> 501                          | wrong wire_shape / non-ingress / unknown / empty source              | route returns 501                                                                                                     | same                                             |
+| GET / truth table                               | each wire shape                                                      | reasoning preserved + inspect false for responses-pt; ingress advert mirrors gate                                     | same                                             |
+| Header hygiene                                  | inbound + upstream headers                                           | Bearer injected; org/project stripped; hop-by-hop + duplicate `x-request-id` dropped                                  | same                                             |
+| `source_bearer_auth_env_var` fail-closed        | 0 / 2 secret env vars                                                | raises `ModelSourceCatalogError`                                                                                      | same                                             |
+| Preflight conjunction                           | proxy.yaml wire_shape x source                                       | `proxy_supported` only when both; else `proxy_unsupported`                                                            | `tests/src/core/runtime/test_codex_preflight.py` |
+| Accounting only on the generation endpoint      | GET retrieve / DELETE / cancel / input_tokens vs POST create         | on_complete + provider-trace + spend-cap wired only for `POST /v1/responses`; a retrieve echoing usage is not counted | `tests/src/proxy/test_responses_transport.py`    |
+| Terminal status folds into failure              | streamed `response.failed`/`incomplete`; non-stream `status: failed` | failed -> `failed=True` + `error_type`; incomplete -> billed partial success; usage still captured                    | same                                             |
+
+### Review fixes (pre-merge)
+
+- **Accounting double-count.** The generation-accounting callback was attached to *every* `/v1/responses*` method, so a
+  later `GET /v1/responses/{id}` (which echoes the original response's `usage`) would double-count tokens, and
+  retrieve/cancel/delete logged zero-token "attempts". Gated to `POST /v1/responses` only — the spend cap too, so a run
+  can be cancelled while over cap.
+- **Terminal-status accuracy.** The streamed `failed` flag was transport-only, so a 200 stream ending in
+  `response.failed` was recorded as success. The accumulator now tracks terminal status and folds `response.failed` into
+  `failed=True` + `error_type="response_failed"`; `response.incomplete` stays a billed partial success.
+
+### Live integration gate (2026-06-22)
+
+Ran a real `codex-cli 0.141.0` against a live `codex-responses-local` proxy (forge `:8105` -> litellm `:4000` ->
+OpenAI). Confirmed against the **running** system:
+
+- `GET /` advertises `wire_shape=openai_responses_passthrough`, `capabilities.responses_ingress=true`, and the exact
+  intercept truth table (`thinking_blocks_preserved=true`, all `can_inspect.*=false`).
+
+- LiteLLM genuinely serves `/v1/responses` and routes upstream (an OpenAI-originated error relays back through forge ->
+  litellm -> client), so the upstream architecture is real, not theoretical.
+
+- Direct probes: non-stream POST, stream POST, and **bodyless GET** all forward + relay the upstream response; exactly
+  **one** `X-Request-ID` row (the dedup fix); bodyless GET does not crash on `.json()`.
+
+- **Real codex drives the route**: with the Phase 2 `-c` contract (`base_url=...:8105/v1`, `wire_api="responses"`,
+  `env_key`), codex sends `POST /v1/responses` (streaming, via `_forward_streaming`); the route **opens** (not 501) and
+  relays the upstream status. Codex even read the proxy's `X-Request-ID` back in its retry log.
+
+- [ ] **Credential-blocked (not code):** a successful **200 reasoning round-trip + interrupt** could not complete --
+  this environment's `OPENAI_API_KEY` is dead (OpenAI returns 401 directly; codex then hits a 429 retry storm). Re-run
+  the gate with a working OpenAI (or LiteLLM) key and confirm a reasoning-bearing turn completes **before** moving the
+  card to `done/`.
+
+### Design-doc sync (Phase 3)
+
+- [x] `docs/design.md` §3.4: `proxy_supported` goes live; document the Responses passthrough wire shape + the wire_shape
+  AND `responses_ingress` gate.
+- [x] `docs/board/change_log.md`: Phase 3 entry.
 
 ## Phase 4 - `forge codex start --proxy` launcher (blocked on Phases 2-3)
 

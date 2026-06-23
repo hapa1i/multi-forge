@@ -10,7 +10,9 @@ Codex CLI at a local base URL is unverified, so this is not a thin vertical path
 
 1. **`forge codex status`** ships as a standalone card now — every building block exists today.
 2. **The Responses-capable proxy transport** is an epic member, gated on the Slice 1 probe. It is a from-scratch proxy
-   build (new route + converters + streaming translation), not a config toggle.
+   build, not a config toggle. **Shipped as a byte-faithful _passthrough_** (new `/v1/responses*` route, raw SSE relay,
+   advertised capability, and the live `proxy_supported` posture), **not** the translating transport this card
+   originally sketched — translation drops Codex's reasoning-item continuity. See the revised Slice 2.
 3. **`forge codex start --proxy`** stays parked until the probe resolves *and* the transport ships — otherwise it is a
    CLI shell over a backend that does not exist.
 
@@ -242,15 +244,19 @@ because command registration happens at import time in `src/forge/cli/main.py`.
    `forge codex start --proxy` is infeasible as designed (the launcher configures child *env*, and the card forbids
    Forge owning `config.toml`); stop, do not work around it. Document the exact env/config/argv contract in the card
    closeout or design docs.
-2. **Build the Responses proxy transport (the largest piece — from scratch).** The proxy today serves only
-   `/v1/messages` + `/v1/messages/count_tokens` (`src/forge/proxy/server.py`) with no Responses converter, and the
-   `proxy_supported` value in the `ProxyResponses` literal (`src/forge/core/runtime/codex_preflight.py:108`) is **dead
-   code** — `_resolve_responses_posture` (`:465-502`) only ever returns `native_direct` or `proxy_unsupported`. This
-   slice adds: a new `/v1/responses` route in `src/forge/proxy/server.py`; OpenAI-Responses ↔ internal request/response
-   converters beside `src/forge/proxy/converters.py` / `passthrough.py`; SSE/streaming-event translation; a real
-   Responses capability advertised on `GET /`; and the live `proxy_supported` return path in
-   `_resolve_responses_posture`. Then teach `forge runtime preflight codex --proxy <id-or-template>` to require that
-   capability. This is multi-file transport work, not a config toggle — it is the epic member named in the Type note.
+2. **Build the Responses proxy transport (the largest piece — from scratch). Shipped as a passthrough (revised).** The
+   proxy previously served only `/v1/messages` + `/v1/messages/count_tokens` (`src/forge/proxy/server.py`), and the
+   `proxy_supported` value in the `ProxyResponses` literal was **dead code** — `_resolve_responses_posture` only ever
+   returned `native_direct` or `proxy_unsupported`. The card originally scoped this as OpenAI-Responses ↔ internal
+   **converters** + SSE translation. That was **reversed during execution**: translation drops Codex's signed
+   reasoning-item continuity (the failure `anthropic_passthrough` exists to avoid), so the slice instead adds an
+   `openai_responses_passthrough` wire shape that forwards Codex's raw Responses traffic byte-for-byte. Shipped:
+   `POST /v1/responses` + a method/body/query-aware catch-all over the whole `/v1/responses*` surface
+   (`src/forge/proxy/server.py`); a raw-SSE relay (`src/forge/proxy/stream_relay.py` + `responses_passthrough.py`); a
+   real `responses_ingress` capability advertised on `GET /`; and the live `proxy_supported` return path gated on
+   `wire_shape == openai_responses_passthrough` AND the source's `responses_ingress`, mirrored exactly in
+   `forge runtime preflight codex --proxy`. Tier re-routing + a core.llm reasoning channel are deferred. Multi-file
+   transport work, not a config toggle — the epic member named in the Type note.
 3. **`forge codex start --proxy`.** New `src/forge/cli/codex.py` group with proxy-backed TUI launch; ensure/adopt proxy,
    health-check capability, configure child, scrub inherited env, and launch foreground Codex. Blocked on Slices 1 and
    2\.
@@ -266,7 +272,7 @@ because command registration happens at import time in `src/forge/cli/main.py`.
 
 | Test                                            | Fixture                                      | Assertion                                                                                                                                              | Test File                                     |
 | ----------------------------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------- |
-| Proxy serves a Responses request end-to-end     | proxy with the new Responses route (Slice 2) | proxy accepts a Responses-shaped POST, translates, and returns a Responses-shaped reply; `GET /` advertises the capability                             | `tests/src/proxy/test_responses_transport.py` |
+| Proxy serves a Responses request end-to-end     | proxy with the new Responses route (Slice 2) | proxy accepts a Responses-shaped POST and relays it byte-for-byte (passthrough, no translation); `GET /` advertises `responses_ingress`                | `tests/src/proxy/test_responses_transport.py` |
 | Proxy start ensures selected proxy              | proxy id/template fixture                    | launcher starts or adopts the proxy before execing `codex`                                                                                             | `tests/src/cli/test_codex_launcher.py`        |
 | Proxy start rejects non-Responses proxy         | proxy advertises no Responses capability     | command fails before launch with actionable "Responses-capable proxy required" guidance                                                                | same                                          |
 | Proxy start configures Codex child              | mocked `codex` executable                    | child receives the probe-pinned base URL/auth/config and routes through local proxy                                                                    | same                                          |

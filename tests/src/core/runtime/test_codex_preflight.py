@@ -79,11 +79,11 @@ def _doctor(
     }
 
 
-def _write_proxy_yaml(proxy_id: str, wire_shape: str) -> None:
+def _write_proxy_yaml(proxy_id: str, wire_shape: str, source: str | None = None) -> None:
     """Write a minimal valid proxy.yaml under the isolated FORGE_HOME (real loader path)."""
     path = get_proxy_file_path(proxy_id)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
+    body = (
         "proxy_format: 1\n"
         "provider: litellm\n"
         "proxy_endpoint: http://localhost:8085\n"
@@ -93,6 +93,9 @@ def _write_proxy_yaml(proxy_id: str, wire_shape: str) -> None:
         "  sonnet: some-model\n"
         f"wire_shape: {wire_shape}\n"
     )
+    if source is not None:
+        body += f"source: {source}\n"
+    path.write_text(body)
 
 
 class TestFailClosed:
@@ -393,6 +396,58 @@ class TestResponsesPosture:
         assert result.proxy_responses == "proxy_unsupported"
         assert result.ready is False
         assert "anthropic_passthrough" in (result.blocking_reason or "")
+
+    def test_responses_passthrough_with_capable_source_is_supported(self, monkeypatch) -> None:
+        # The full conjunction: responses wire shape AND a responses_ingress source.
+        _write_proxy_yaml("codex-responses", wire_shape="openai_responses_passthrough", source="codex-responses-local")
+        _stub_probes(monkeypatch)
+        monkeypatch.setenv("CODEX_API_KEY", "sk-env")
+
+        result = preflight_codex(proxy_id="codex-responses")
+
+        assert result.proxy_responses == "proxy_supported"
+        assert result.ready is True  # supported proxy is not a blocker
+        assert result.blocking_reason is None
+
+    def test_responses_wire_shape_without_capable_source_is_unsupported(self, monkeypatch) -> None:
+        # Right wire shape, but the source does not declare responses_ingress: the
+        # conjunction fails, so preflight cannot green-light what the route would 501.
+        _write_proxy_yaml(
+            "codex-responses-badsrc", wire_shape="openai_responses_passthrough", source="litellm-gemini-test"
+        )
+        _stub_probes(monkeypatch)
+        monkeypatch.setenv("CODEX_API_KEY", "sk-env")
+
+        result = preflight_codex(proxy_id="codex-responses-badsrc")
+
+        assert result.proxy_responses == "proxy_unsupported"
+        assert result.ready is False
+        assert "openai_responses_passthrough" in (result.blocking_reason or "")
+
+    def test_responses_wire_shape_with_empty_source_is_unsupported(self, monkeypatch) -> None:
+        # Responses wire shape but no source declared -> fail closed (empty string).
+        _write_proxy_yaml("codex-responses-nosrc", wire_shape="openai_responses_passthrough")
+        _stub_probes(monkeypatch)
+        monkeypatch.setenv("CODEX_API_KEY", "sk-env")
+
+        result = preflight_codex(proxy_id="codex-responses-nosrc")
+
+        assert result.proxy_responses == "proxy_unsupported"
+        assert result.ready is False
+
+    def test_responses_wire_shape_with_unknown_source_is_unsupported(self, monkeypatch) -> None:
+        # Responses wire shape with a source id absent from the catalog -> fail closed
+        # (ModelSourceNotFoundError is swallowed into proxy_unsupported, no traceback).
+        _write_proxy_yaml(
+            "codex-responses-unknownsrc", wire_shape="openai_responses_passthrough", source="no-such-source"
+        )
+        _stub_probes(monkeypatch)
+        monkeypatch.setenv("CODEX_API_KEY", "sk-env")
+
+        result = preflight_codex(proxy_id="codex-responses-unknownsrc")
+
+        assert result.proxy_responses == "proxy_unsupported"
+        assert result.ready is False
 
     def test_unknown_proxy_id_reports_not_found(self, monkeypatch) -> None:
         _stub_probes(monkeypatch)

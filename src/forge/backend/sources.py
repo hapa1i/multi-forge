@@ -93,6 +93,10 @@ class ModelSourceCapabilities:
     auth_probe: bool = True
     provider_trace: bool = False
     provider_user_grouping: bool = False
+    # Source's upstream serves the OpenAI Responses API on the proxy's Codex-facing
+    # ingress (forge codex start --proxy). Gates the proxy `/v1/responses` route and
+    # the codex preflight `proxy_supported` posture.
+    responses_ingress: bool = False
 
 
 @dataclass(frozen=True)
@@ -334,6 +338,22 @@ BUILTIN_MODEL_SOURCES: tuple[ModelSource, ...] = (
         ),
         template_names=("litellm-anthropic-local",),
     ),
+    # Codex-facing OpenAI Responses passthrough (forge codex start --proxy). A
+    # local LiteLLM serves /v1/responses upstream, so reasoning is preserved
+    # byte-for-byte and the x-litellm-response-cost header yields real cost.
+    ModelSource(
+        id="codex-responses-local",
+        kind="local",
+        provider="litellm_local",
+        endpoint=SourceEndpoint.local_backend(),
+        credential_ids=("openai-api",),
+        capabilities=ModelSourceCapabilities(responses_ingress=True, provider_trace=True),
+        local_lifecycle=LocalBackendLifecycle(
+            adapter="litellm",
+            default_port=4000,
+        ),
+        template_names=("codex-responses-local",),
+    ),
     ModelSource(
         id="litellm-gemini-test",
         kind="local",
@@ -380,6 +400,32 @@ def model_source_for_template(template_name: str) -> ModelSource:
         return _SOURCE_BY_IDENTIFIER[template_name]
     except KeyError:
         raise ModelSourceNotFoundError(f"Unknown model source or alias: {template_name}") from None
+
+
+def source_bearer_auth_env_var(source: ModelSource) -> str:
+    """Return the single secret bearer-token env var for a source.
+
+    Selects the one credential env var that is a secret and not a connection
+    value, so a ``*_BASE_URL`` connection value is never mistaken for a bearer
+    token. The Responses passthrough route injects the resolved value as
+    ``Authorization: Bearer``.
+
+    Raises:
+        ModelSourceCatalogError: if zero or more than one qualifying env var
+            exists. The choice must be unambiguous -- fail closed, never guess.
+    """
+    candidates = [
+        env_var.name
+        for credential in source.credentials
+        for env_var in credential.env_vars
+        if env_var.secret and not env_var.connection_value
+    ]
+    if len(candidates) != 1:
+        raise ModelSourceCatalogError(
+            f"source {source.id!r} must declare exactly one secret bearer env var for "
+            f"Responses passthrough auth; found {len(candidates)}: {candidates}"
+        )
+    return candidates[0]
 
 
 def validate_model_sources(sources: Iterable[ModelSource]) -> None:

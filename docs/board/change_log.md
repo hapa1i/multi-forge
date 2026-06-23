@@ -27,6 +27,46 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-22
 
+### forge_codex_command_group Phase 3: Codex Responses proxy transport (passthrough)
+
+**Goal**: Give Forge's proxy a Codex-facing OpenAI **Responses** ingress so `forge codex start --proxy` (Phase 4) has a
+Responses-capable proxy, and flip the dead `proxy_supported` preflight posture live — without dropping Codex's
+reasoning-item continuity.
+
+**Key changes** (revises card Slice 2: passthrough, not the originally-scoped translating transport — translation drops
+signed reasoning):
+
+- New `openai_responses_passthrough` wire shape forwards Codex's raw `/v1/responses*` traffic byte-for-byte. Shared
+  SSE-teardown core extracted to `proxy/stream_relay.py` (Anthropic passthrough's 32 tests unchanged);
+  Responses-specific forwarding in `proxy/responses_passthrough.py` (Bearer injection + strip inbound
+  auth/`OpenAI-Organization`/`-Project`, tolerant usage side-tap, `x-litellm-response-cost` USD→micros, response-header
+  allowlist that also drops the proxy-owned `x-request-id`).
+- `proxy/responses_ingress.py` (new): the FastAPI\<->transport glue — the `/v1/responses*` handler, route registrar
+  (`POST /v1/responses` create before the `{rest:path}` catch-all), and GET / advertisement helpers. Route gated on
+  `wire_shape == openai_responses_passthrough` **and** the source's `responses_ingress` else 501; bodyless GET/DELETE
+  never call `.json()`. Extracted from `server.py` to keep that module under the 2.5k-line cap (reads proxy runtime
+  state via a lazy `import forge.proxy.server`, which also avoids a load-time cycle). `server.py` registers the routes
+  and uses the helpers in `GET /`.
+- `backend/sources.py`: `responses_ingress` capability, `codex-responses-local` source/template (litellm-local upstream
+  so cost is reported), `source_bearer_auth_env_var()` (single secret env var; fail-closed on 0/>1).
+- `core/runtime/codex_preflight.py`: `proxy_supported` now returned, gated on the **same** wire_shape ∧
+  `responses_ingress` conjunction the route enforces (file-read preflight can't green-light a proxy the runtime would
+  501).
+- `proxy_orchestrator.py`: smoke test POSTs a Responses request for this wire shape.
+- Accounting precision (pre-merge review): cost/metrics/spend-cap are wired only for the generation endpoint
+  (`POST /v1/responses`), so a `GET /v1/responses/{id}` retrieve echoing the original `usage` can't double-count; the
+  `OnComplete` callback now carries `error_type`, and a terminal `response.failed` (streamed or non-streamed 200) folds
+  into `failed=True` instead of being recorded as success (`response.incomplete` stays a billed partial success).
+- Docs: `docs/design.md` §3.4 wire-shape section.
+
+**Verification**: 54 unit tests (`tests/src/proxy/test_responses_transport.py`, incl. the accounting-gate +
+terminal-status regressions) + preflight conjunction cases; full unit suite green (6702 passed) — the new source's only
+ripple was the `backend list` shared-instance test (codex-responses-local is an OpenAI-credentialed co-tenant of
+litellm-4000, now in its `shared_with`); `make pre-commit` clean. **Live gate** (real `codex-cli 0.141.0` → forge
+`:8105` → litellm `:4000` → OpenAI): `GET /` advert + intercept table confirmed; codex drove `POST /v1/responses`
+(streaming) through the route (not 501), single `X-Request-ID` relayed back. **Deferred**: a 200 reasoning round-trip is
+credential-blocked (this env's `OPENAI_API_KEY` is dead) — must be re-confirmed with a live key before the card closes.
+
 ### forge_codex_command_group Phase 1: `forge codex status` (read-only Codex inspection)
 
 **Goal**: Ship the read-only Codex inspection surface as the first independently-shippable slice of the codex
@@ -40,7 +80,7 @@ command-group card; the proxy-backed launcher stays parked behind the Phase 2 pr
   to `forge runtime preflight codex --verify-enrollment`.
 - Scope resolution mirrors the installer: default = detected scope via `find_forge_installation` (else user);
   project/local roots resolve by walking up for `.git`/`.codex` (not bare cwd); `--all` lists user/project/local
-  distinctly (config collapses project<->local, but tracking is scope-keyed).
+  distinctly (config collapses project\<->local, but tracking is scope-keyed).
 - `start` deliberately **not** shipped: a no-`--proxy` placeholder that always errors would be a tombstone and could pin
   a `--proxy` contract the Phase 2 kill criterion may invalidate. `forge codex` is allowlisted as intentional
   single-leaf phasing debt in `SINGLE_LEAF_GROUP_ALLOWLIST` (remove when `start --proxy` ships in Phase 4).

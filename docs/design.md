@@ -542,6 +542,13 @@ The proxy exposes runtime truth via `GET /`:
 - `wire_shape` is the authoritative wire truth (a passthrough proxy may carry `provider: litellm` as a credential slot
   only); `intercept_mode` + `intercept.can_inspect` let a launcher report "inspect active (signature-safe)" vs "inspect
   active (lossy)" before launch (§7.x)
+- `wire_shape: openai_responses_passthrough` is the **Codex-facing** shape: it serves the OpenAI **Responses** API on
+  `/v1/responses*` (create + retrieve/cancel/input_items/delete/compact/input_tokens), forwarding Codex's raw traffic
+  byte-for-byte so reasoning items survive (signature-safe; like `anthropic_passthrough`, `can_inspect.*` is uniformly
+  false). The route is served only when `wire_shape == openai_responses_passthrough` **and** the proxy's model source
+  declares the `responses_ingress` capability — the same conjunction `GET /`'s `capabilities.responses_ingress` field
+  advertises and the codex preflight's `proxy_supported` posture mirrors. Dollar cost is recorded only when the upstream
+  reports it (`x-litellm-response-cost`, USD→micros); an OpenAI-direct upstream is token-telemetry-only.
 
 **Tier selection precedence:**
 

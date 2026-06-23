@@ -1,0 +1,27 @@
+# Template: codex-responses-local
+# OpenAI Responses API passthrough for Codex (forge codex start --proxy).
+#
+# Forwards Codex's raw Responses traffic (/v1/responses*) to a local LiteLLM that
+# serves the Responses API, WITHOUT translation, so reasoning items survive
+# byte-for-byte (signature-safe) and the x-litellm-response-cost header yields
+# real cost. `wire_shape: openai_responses_passthrough` is the authoritative wire
+# truth (GET / reports it); the client's model is forwarded unchanged.
+#
+# Requires:
+#   - OPENAI_API_KEY in .env (LiteLLM uses it to reach OpenAI)
+#
+# Backend (LiteLLM on port 4000) starts automatically.
+
+proxy:
+  family: openai
+  preferred_provider: litellm
+  source: codex-responses-local
+  default_port: 8105
+  wire_shape: openai_responses_passthrough
+
+  litellm:
+    tiers:
+      haiku: openai/gpt-5.4-mini
+      sonnet: openai/gpt-5.5
+      opus: openai/gpt-5.5
+    openai_api_mode: auto

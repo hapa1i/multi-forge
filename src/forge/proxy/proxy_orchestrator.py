@@ -868,6 +868,10 @@ def smoke_test_proxy(*, base_url: str, timeout_s: float = 30.0) -> tuple[bool, s
     Returns (success, detail) where detail is the model response text on
     success or the error message on failure. Retries once on failure.
     """
+    # Responses passthrough proxies serve /v1/responses, not /v1/messages.
+    if _proxy_wire_shape(base_url=base_url, timeout_s=timeout_s) == "openai_responses_passthrough":
+        return _smoke_test_responses(base_url=base_url, timeout_s=timeout_s)
+
     url = f"{base_url.rstrip('/')}/v1/messages"
     last_error = ""
 
@@ -918,9 +922,9 @@ def smoke_test_proxy(*, base_url: str, timeout_s: float = 30.0) -> tuple[bool, s
 def _resolve_smoke_test_model(*, client: httpx.Client, base_url: str) -> str:
     """Pick the smoke-test model for the proxy's wire shape.
 
-    Translated proxies accept the local ``sonnet`` tier alias. Anthropic
-    passthrough proxies forward the client model unchanged, so the smoke test
-    must use the resolved Claude model reported by ``GET /``.
+    Translated proxies accept the local ``sonnet`` tier alias. Passthrough
+    proxies (Anthropic or Responses) forward the client model unchanged, so the
+    smoke test must use the resolved upstream model reported by ``GET /``.
     """
     fallback = "sonnet"
     try:
@@ -932,7 +936,10 @@ def _resolve_smoke_test_model(*, client: httpx.Client, base_url: str) -> str:
         logger.debug("Could not resolve proxy smoke-test model from GET /: %s", e)
         return fallback
 
-    if not isinstance(data, dict) or data.get("wire_shape") != "anthropic_passthrough":
+    if not isinstance(data, dict) or data.get("wire_shape") not in (
+        "anthropic_passthrough",
+        "openai_responses_passthrough",
+    ):
         return fallback
 
     routing = data.get("routing")
@@ -961,6 +968,82 @@ def _resolve_smoke_test_model(*, client: httpx.Client, base_url: str) -> str:
             return tier_info
 
     return fallback
+
+
+def _proxy_wire_shape(*, base_url: str, timeout_s: float) -> str | None:
+    """Read the proxy's wire shape from ``GET /`` (None if unreachable)."""
+    try:
+        with httpx.Client(timeout=httpx.Timeout(timeout_s)) as client:
+            resp = client.get(f"{base_url.rstrip('/')}/")
+        if resp.status_code != 200:
+            return None
+        data = resp.json()
+    except Exception as e:
+        logger.debug("Could not resolve proxy wire shape from GET /: %s", e)
+        return None
+    return data.get("wire_shape") if isinstance(data, dict) else None
+
+
+def _smoke_test_responses(*, base_url: str, timeout_s: float = 30.0) -> tuple[bool, str]:
+    """Smoke-test a Responses passthrough proxy via ``POST /v1/responses``."""
+    url = f"{base_url.rstrip('/')}/v1/responses"
+    last_error = ""
+
+    for attempt in range(2):
+        if attempt > 0:
+            time.sleep(2)
+        try:
+            with httpx.Client(timeout=httpx.Timeout(timeout_s)) as client:
+                payload = {
+                    "model": _resolve_smoke_test_model(client=client, base_url=base_url),
+                    "input": "Say hi",
+                    "max_output_tokens": 256,
+                    "stream": False,
+                }
+                resp = client.post(url, json=payload)
+
+            if resp.status_code != 200:
+                last_error = f"HTTP {resp.status_code}: {resp.text[:200]}"
+                continue
+
+            data = resp.json()
+            text = _extract_responses_text(data)
+            if text:
+                return True, text.strip()
+
+            model = data.get("model", "unknown") if isinstance(data, dict) else "unknown"
+            usage = data.get("usage", {}) if isinstance(data, dict) else {}
+            last_error = (
+                f"Empty response from {model} "
+                f"(input={usage.get('input_tokens', '?')}, "
+                f"output={usage.get('output_tokens', '?')} tokens)"
+            )
+        except httpx.TimeoutException:
+            last_error = f"Request timed out after {timeout_s}s"
+        except (httpx.RequestError, ValueError) as e:
+            last_error = str(e)
+
+    return False, last_error
+
+
+def _extract_responses_text(data: object) -> str:
+    """Extract assistant text from a Responses object (``output_text`` or ``output[]``)."""
+    if not isinstance(data, dict):
+        return ""
+    output_text = data.get("output_text")
+    if isinstance(output_text, str) and output_text:
+        return output_text
+    output = data.get("output")
+    if isinstance(output, list):
+        for item in output:
+            if not isinstance(item, dict) or item.get("type") != "message":
+                continue
+            for part in item.get("content", []) or []:
+                if isinstance(part, dict) and part.get("type") == "output_text":
+                    text = part.get("text")
+                    if isinstance(text, str) and text:
+                        return text
+    return ""
 
 
 def _find_available_port(*, start_port: int, max_attempts: int) -> int:
