@@ -539,6 +539,29 @@ async def test_responses_route_forwards_when_capable(monkeypatch):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("body", [b"[]", b'"oops"', b"123", b"null"])
+async def test_responses_route_rejects_non_object_post_json(monkeypatch, body):
+    """Regression: valid-but-non-object JSON must not be transformed into no body."""
+    monkeypatch.setattr(server, "_ensure_runtime_state", lambda: None)
+    monkeypatch.setattr(
+        server.config, "proxy", _proxy_cfg(wire_shape="openai_responses_passthrough", source="codex-responses-local")
+    )
+    monkeypatch.setattr("forge.core.auth.template_secrets.resolve_env_or_credential", lambda var: "UPSTREAM-KEY")
+
+    async def _unexpected_forward(**kwargs):
+        raise AssertionError("non-object POST JSON must fail before forwarding")
+
+    monkeypatch.setattr("forge.proxy.responses_passthrough.forward", _unexpected_forward)
+
+    resp = await ri.handle_responses_passthrough(
+        _RawReq(method="POST", body=body), method="POST", url_path="/v1/responses"
+    )
+
+    assert resp.status_code == 400
+    assert b"JSON object" in bytes(resp.body)
+
+
+@pytest.mark.asyncio
 async def test_responses_route_bodyless_get_never_reads_json(monkeypatch):
     monkeypatch.setattr(server, "_ensure_runtime_state", lambda: None)
     monkeypatch.setattr(
