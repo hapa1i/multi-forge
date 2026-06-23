@@ -99,7 +99,7 @@ withheld.
 | ---------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
 | `openrouter`     | `OPENROUTER_API_KEY` (+ optional `OPENROUTER_BASE_URL`) | All `openrouter-*` proxy templates, OSS workflow models                                          |
 | `anthropic-api`  | `ANTHROPIC_API_KEY`                                     | Forge subprocesses, direct Anthropic workers, `litellm-anthropic-local`, `anthropic-passthrough` |
-| `openai-api`     | `OPENAI_API_KEY`                                        | `litellm-openai-local` proxy                                                                     |
+| `openai-api`     | `OPENAI_API_KEY`                                        | `litellm-openai-local` and `codex-responses-local` proxies                                       |
 | `gemini-api`     | `GEMINI_API_KEY`                                        | `litellm-gemini-local` proxy                                                                     |
 | `codex-api`      | `CODEX_API_KEY`                                         | Native Codex headless runs (`codex exec`); not `OPENAI_API_KEY` or the ChatGPT login             |
 | `litellm-remote` | `LITELLM_API_KEY` + `LITELLM_BASE_URL`                  | All remote `litellm-*` proxy templates                                                           |

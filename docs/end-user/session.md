@@ -86,6 +86,20 @@ forge claude start --no-proxy
 No `FORGE_SESSION` set, no session manifest, no artifacts. Session-specific hooks and status line are no-ops. Does not
 require `.forge/`. Use `forge session start` for managed sessions.
 
+**Bare Codex proxy launch** (`forge codex start --proxy`) — Responses proxy routing only, no session state:
+
+```bash
+forge codex status
+forge codex start --proxy codex-responses-local
+forge codex start --proxy my-codex-proxy --sandbox read-only -- -m gpt-5.5
+```
+
+This opens the foreground Codex TUI through a Responses-capable Forge proxy. It creates no Forge session, requires no
+`.forge/`, writes no `confirmed.codex`, and is not resumable through `forge session resume`. Forge configures Codex with
+argv `-c` provider overrides instead of editing Codex's `config.toml`, and the child env is scrubbed so native Codex /
+OpenAI account variables and inherited Forge session or run-tree identity do not leak into the sessionless launch. Use
+`forge session start --runtime codex` when you want a managed Codex session with recorded thread state.
+
 Running `claude` directly bypasses both paths.
 
 ---
@@ -100,6 +114,11 @@ Running `claude` directly bypasses both paths.
 # Bare launch (proxy routing only, no session state)
 forge claude start --proxy <proxy_id>
 forge claude start --no-proxy
+
+# Bare Codex launch (Responses proxy routing only, no session state)
+forge codex status
+forge codex start --proxy codex-responses-local
+forge codex start --proxy <proxy_id> --sandbox read-only -- -m gpt-5.5
 
 # Create/start managed session (full lifecycle tracking)
 forge session start [name] \

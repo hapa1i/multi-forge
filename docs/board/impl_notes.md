@@ -229,6 +229,32 @@ Durable invariants for Forge's first alternate agent runtime. Sources: `src/forg
   isolation:** codex hook/installer tests MUST use the autouse `isolate_codex_home` fixture (`tests/conftest.py`) or
   they write the real `~/.codex/config.toml` (a real leak caught and fixed in Phase 6 slice 2).
 
+### Sessionless Codex proxy launcher: Responses passthrough + identity gates (shipped 2026-06-23)
+
+Durable invariants from `forge_codex_command_group` for `forge codex start --proxy` and the Codex-facing Responses
+transport.
+
+- **Codex proxy support is a Responses passthrough, not a translation layer.** The shipped wire shape is
+  `openai_responses_passthrough`: Codex's raw `/v1/responses*` HTTP/SSE traffic is forwarded byte-for-byte so signed
+  reasoning items survive. Do not "simplify" this through the Anthropic/OpenAI chat converters unless `core.llm` has a
+  first-class reasoning-item channel and the signature/continuity story is re-proven.
+- **Capability is the full runtime conjunction.** A proxy is Codex-launchable only when live `GET /` reports both
+  `wire_shape == "openai_responses_passthrough"` and `capabilities.responses_ingress is true`; file presence or a
+  healthy Anthropic `/v1/messages` proxy is not enough. Keep preflight, route gating, smoke tests, and
+  `assert_proxy_responses_capable` aligned to that same conjunction.
+- **Identity verification is part of the capability gate.** `ensure_proxy()` resolves a proxy id by registry presence,
+  not by proving the live port still belongs to that id.
+  `assert_proxy_responses_capable(..., expected_proxy_id, expected_template)` must re-check `is_proxy`, `proxy_id`, and
+  `template` from the same live `GET /` body before routing Codex. This prevents a stale registry entry whose port is
+  now held by another capable proxy from silently misrouting the TUI.
+- **The launcher configures Codex with argv `-c` provider overrides, never by writing `config.toml`.** The Phase 2 live
+  probe proved list-mode `-c model_providers.forge_proxy.*` + env auth is sufficient. Preserve the no-`config.toml`
+  boundary because Codex hook trust hashes the registration/config surface.
+- **Sessionless means scrubbed and untracked.** `invoke_codex_bare_proxy` must not re-establish native Codex/OpenAI
+  auth, `FORGE_SESSION`, `FORGE_FORGE_ROOT`, fork/session vars, `FORGE_SUBPROCESS_*`, or run-tree identity. It creates
+  no manifest, no `confirmed.codex`, and no Forge resume path. Managed Codex sessions remain the
+  `forge session start/resume --runtime codex` surface.
+
 ### Supervisor shadow sampling: deferred-audit + detached-worker reliability (shipped 2026-06-14)
 
 Durable invariants for `src/forge/policy/semantic/shadow.py`, `shadow_runner.py`, `policy/semantic/plan_check.py`, and

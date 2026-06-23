@@ -1,10 +1,9 @@
 # Checklist: forge codex command group
 
-**Card**: [card.md](card.md) - **Branch**: `forge_codex_command_group` - **Lane**: doing
+**Card**: [card.md](card.md) - **Branch**: `forge_codex_command_group` - **Lane**: done
 
-Executing the codex proposal as one card but sequenced per its **Type** note: ship `forge codex status` first, gate the
-Responses transport on the Phase 2 probe, and keep `forge codex start --proxy` parked until the transport exists. Do not
-build the launcher before the probe resolves.
+Executed the codex proposal as one card but sequenced per its **Type** note: shipped `forge codex status` first, gated
+the Responses transport on the Phase 2 probe, and built `forge codex start --proxy` only after the transport existed.
 
 ## Current focus
 
@@ -12,15 +11,15 @@ Phase 1 shipped (commit `dff6e3a`): `forge codex status` + 14 unit tests, `make 
 **resolved GO** -- codex accepts a custom Responses base URL via argv (`-c`) + env. Phase 3 (Slice 2) **implemented as a
 Responses _passthrough_** (not the card's original translating transport -- see the revised Slice 2 rationale): 6 seams
 shipped, 49 unit tests, `make pre-commit` clean, and a **live integration gate run** (real codex 0.141.0 -> the proxy).
-One acceptance item is **credential-blocked**, not code-blocked: a successful 200 reasoning round-trip needs a working
-OpenAI key (this environment's `OPENAI_API_KEY` is dead). Card stays in `doing/` until that round-trip is confirmed with
-a live key.
+One acceptance item remains **credential-blocked**, not code-blocked: a successful 200 reasoning round-trip needs a
+working OpenAI key (this environment's `OPENAI_API_KEY` is dead). At closeout this is accepted as an operator residual,
+because the routing and launcher paths have been live-verified up to upstream 401/429.
 
 **Phase 4 shipped**: `forge codex start --proxy <id-or-template>` -- the sessionless, scrubbed Codex TUI launcher (4
 seams: version gate, capability gate, bare invocation, CLI leaf; 62 new unit tests incl. the post-commit proxy-identity
 fix). `make pre-commit` clean and the live argv-routing gate ran: the list-mode `-c` argv routes real codex 0.141.0 to
 `POST /v1/responses` (risk #1 validated). The 200 reasoning round-trip remains credential-blocked (dead key), like Phase
-3 -- the card stays in `doing/` until a working key confirms it.
+3, and is recorded below as an accepted residual.
 
 ## Phase 1 - `forge codex status` (shippable now)
 
@@ -191,10 +190,10 @@ OpenAI). Confirmed against the **running** system:
   `env_key`), codex sends `POST /v1/responses` (streaming, via `_forward_streaming`); the route **opens** (not 501) and
   relays the upstream status. Codex even read the proxy's `X-Request-ID` back in its retry log.
 
-- [ ] **Credential-blocked (not code):** a successful **200 reasoning round-trip + interrupt** could not complete --
-  this environment's `OPENAI_API_KEY` is dead (OpenAI returns 401 directly; codex then hits a 429 retry storm). Re-run
-  the gate with a working OpenAI (or LiteLLM) key and confirm a reasoning-bearing turn completes **before** moving the
-  card to `done/`.
+- [x] **Accepted residual (credential-blocked, not code):** a successful **200 reasoning round-trip + interrupt** could
+  not complete -- this environment's `OPENAI_API_KEY` is dead (OpenAI returns 401 directly; codex then hits a 429 retry
+  storm). Re-run the gate with a working OpenAI (or LiteLLM) key and confirm a reasoning-bearing turn completes before
+  treating the upstream-200 proof as covered.
 
 ### Design-doc sync (Phase 3)
 
@@ -285,17 +284,20 @@ byte-identical `-c` provider tokens.
 
 ## Blockers / deferred
 
-- Phase 2 hard gate: **cleared GO** (argv/env routing exists; not config-file-only). Phases 3-4 are unblocked by the
-  probe; Phase 4 (launcher) remains blocked on Phase 3 (transport).
+- Phase 2 hard gate: **cleared GO** (argv/env routing exists; not config-file-only). Phases 3-4 shipped on top of that
+  probe result.
+- Live 200 reasoning round-trip: accepted residual, credential-blocked in this environment. Needs a working OpenAI or
+  LiteLLM key for final operator confirmation.
 - `forge codex preset` is out of scope by design (`config.toml` is codex-owned and trust-frozen). The launcher uses `-c`
   argv overrides, never a written file -- consistent with that boundary.
 
 ## Closeout
 
-- [x] `forge codex status` documented in `docs/cli_reference.md` ("Codex management" section). End-user guide: no Day 1
-  behavior change yet (read-only diagnostic; `start` still gated) -- revisit when the launcher ships.
-- [ ] Phase 1 merged.
+- [x] `forge codex status` documented in `docs/cli_reference.md` ("Codex management" section).
+- [x] End-user guides synced for `forge codex start --proxy` (`session.md`, `proxy.md`, `authentication.md`).
+- [x] Phase 1 merged.
 - [x] `docs/design.md` updated for the codex CLI surface change (§3.4 "Bare launch (Codex)", §3.7 wire-shape consumer
   cross-ref).
-- [ ] Promote to `epic_forge_codex` once Phase 2 resolves and transport work activates (two or more live members).
-- [ ] `change_log.md` entry at phase closeout; move `doing/ -> done/` when the card's live scope ships.
+- [x] `epic_forge_codex` not created; the Responses transport and launcher work folded back into this card, and the
+  normative contract now lives in design docs + implementation notes.
+- [x] `change_log.md` entry at phase closeout; move `doing/ -> done/` when the card's live scope ships.

@@ -27,6 +27,22 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-23
 
+### forge_codex_command_group closeout: sessionless Codex proxy launcher card
+
+**Goal**: Close the active `forge_codex_command_group` card after the status surface, Responses passthrough transport,
+and sessionless `forge codex start --proxy` launcher shipped.
+
+**Key changes**:
+
+- Moved the card from `doing/` to `done/` and updated its checklist/card closeout state.
+- Synced end-user docs for the sessionless Codex proxy launch path, including the `codex-responses-local` template,
+  Responses-capable proxy requirement, env scrub/no-`config.toml` boundary, and `openai-api` credential ownership.
+- Promoted durable implementation notes for the Codex Responses passthrough and launcher identity/capability gates.
+- Recorded the remaining live 200 reasoning round-trip as an accepted operator residual: it still needs a working
+  OpenAI/LiteLLM key, but the routing/launcher path has been verified up to upstream 401/429.
+
+**Verification**: Docs-only closeout; `make pre-commit-md` clean.
+
 ### forge_codex_command_group Phase 4: `forge codex start --proxy` launcher
 
 **Goal**: Ship the sessionless, proxy-backed Codex TUI launcher -- the consumer the card was built for -- on top of the

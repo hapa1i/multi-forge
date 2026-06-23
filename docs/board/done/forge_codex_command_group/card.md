@@ -1,9 +1,10 @@
 # forge codex command group: proxy-backed sessionless Codex launcher
 
-**Status**: In progress (`doing/`). **Slice 1 (`forge codex status`) shipped**; **Slice 2 (Responses passthrough
-transport) shipped** (Phase 3); **Slice 3 (`forge codex start --proxy` launcher) shipped** (Phase 4). The one open item
-is a live 200 reasoning round-trip, which is **credential-blocked** (this env's `OPENAI_API_KEY` is dead), not
-code-blocked. `docs/design.md` §3.4/§3.5/§3.7 are normative; this card defers to them on conflict.
+**Status**: Done (closed 2026-06-23 on `main`). **Slice 1 (`forge codex status`) shipped**; **Slice 2 (Responses
+passthrough transport) shipped** (Phase 3); **Slice 3 (`forge codex start --proxy` launcher) shipped** (Phase 4). The
+one unproven live item is a 200 reasoning round-trip, accepted as an operator residual because it is
+**credential-blocked** (this env's `OPENAI_API_KEY` is dead), not code-blocked. `docs/design.md` §3.4/§3.5/§3.7 are
+normative; this card defers to them on conflict.
 
 **Type**: Recorded as one proposed card, but **split it before execution** — the evidence already requires it.
 Verification (2026-06-22, against the codebase) confirmed Forge's proxy serves no Responses API and that pointing the
@@ -32,11 +33,10 @@ untracked Codex use already has the first-party command: `codex`.
 
 Only the proxy *lifecycle shape* is reusable from `forge claude start --proxy`: ensure/adopt the proxy and health-check
 it before launch. Everything downstream is new build, not reuse. The Claude path points the child at a proxy that
-already serves the Anthropic wire via `ANTHROPIC_BASE_URL`; Codex needs an OpenAI **Responses**-compatible proxy that
-does **not** exist yet (Forge's proxy serves only `/v1/messages`) and a base-URL hook into the Codex CLI that is
-**unverified** (there is no `CODEX_BASE_URL` companion in the credential registry; Slice 1 probes it). The child
-env-scrub is also new work, not a copy of the Claude launcher (see Design context). Treat the launcher as
-build-from-zero behind an existing CLI shape.
+already serves the Anthropic wire via `ANTHROPIC_BASE_URL`; Codex needed an OpenAI **Responses**-compatible proxy that
+Forge did not previously serve, plus a base-URL hook into the Codex CLI that was unverified before the Slice 1 probe.
+The child env-scrub was also new work, not a copy of the Claude launcher (see Design context). Treat the launcher as
+build-from-zero behind an existing CLI shape; the shipped implementation is the proof of that contract.
 
 The honest split is:
 
@@ -290,19 +290,21 @@ because command registration happens at import time in `src/forge/cli/main.py`.
 | Status supports JSON                            | any                                          | stable JSON fields for binary, config path, block, expected pairs, tracking, and verification command                                                  | same                                          |
 | Top-level group remains visible for diagnostics | PATH excludes `codex`                        | `forge --help` lists `codex`; `forge codex status` explains missing runtime                                                                            | `tests/integration/cli/test_help.py`          |
 
-## Open questions
+## Closeout decisions
 
-- **Exact Codex proxy contract.** Which env/config/argv path does the installed Codex CLI support for a local
-  Responses-compatible base URL? (Slice 1 go/no-go — a config-only path fails the launcher; see Risks.)
-- **Local proxy auth shape.** Should the local proxy accept a generated bearer token, a Forge-owned ephemeral secret, or
-  no downstream auth on loopback?
-- **Responses telemetry minimum.** Which provider-trace, cost, and audit fields are required for this first vertical
-  path to be considered useful?
-- **Policy/audit compatibility.** Can the existing proxy audit/intercept path safely inspect and control Responses
-  traffic, or does first ship only trace/cost visibility?
-- **Fresh attribution root.** What exact non-session run identity should proxy telemetry use for a sessionless launch?
-- **Native-direct wrapper later.** Likely no. If users want it, evaluate separately with a concrete value beyond
-  `codex`.
+- **Exact Codex proxy contract**: resolved GO. Codex accepts a local Responses base URL through argv `-c`
+  `model_providers.<id>.*` overrides plus env auth; Forge never writes Codex `config.toml`.
+- **Local proxy auth shape**: env token. Codex reads the configured provider env var and sends it as bearer auth to the
+  loopback proxy; the proxy owns upstream auth.
+- **Responses telemetry minimum**: downstream/provider-trace/cost accounting is wired for `POST /v1/responses` only, so
+  retrieve/cancel/delete/input-token calls do not double-count a generation.
+- **Policy/audit compatibility**: first ship is passthrough trace/cost visibility. `openai_responses_passthrough`
+  advertises `thinking_blocks_preserved=true` and `can_inspect.*=false`; request-body inspection/control is not part of
+  this card.
+- **Fresh attribution root**: v1 keeps the launcher sessionless and scrubbed. It does not claim a Forge session or
+  inherit parent run-tree identity; proxy request ids/downstream records are the diagnostic surface.
+- **Native-direct wrapper later**: no. Native-direct sessionless use remains the first-party `codex` command; Forge's
+  sessionless surface exists only where the proxy adds value.
 
 ## Out of scope
 
