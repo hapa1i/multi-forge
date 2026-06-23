@@ -86,35 +86,40 @@ default to the parent cache; `edit`/`diff` resolve a child (inferred when the pa
 
 ### Proxy management
 
-| Command                              | Purpose                                                                |
-| ------------------------------------ | ---------------------------------------------------------------------- |
-| `forge proxy create <template>`      | Create a proxy from template and start it                              |
-| `forge proxy list`                   | List all proxies (`--json`)                                            |
-| `forge proxy show <id>`              | Show proxy configuration (`--json`, `--raw`)                           |
-| `forge proxy edit <id>`              | Edit proxy overlay in $EDITOR                                          |
-| `forge proxy set <id> <key>=<value>` | Set a proxy configuration value                                        |
-| `forge proxy start <id>`             | Start server for existing proxy                                        |
-| `forge proxy stop <id>`              | Stop server (keeps config)                                             |
-| `forge proxy delete <id>...`         | Delete one or more proxies (`--all` for bulk deletion)                 |
-| `forge proxy clean`                  | Remove stale proxies (dead pids)                                       |
-| `forge proxy validate <id>`          | Validate proxy configuration                                           |
-| `forge proxy metrics [id]`           | Show runtime metrics (`--json`, `--all`)                               |
-| `forge proxy costs show [id]`        | Show cost summary (`--period`, `--by-model`, `--by-verb`, `--json`)    |
-| `forge proxy costs reset`            | Wipe cost, usage, upstream/downstream telemetry (`--yes`, `--dry-run`) |
-| `forge proxy audit show [id]`        | Show redacted audit records (hashes/counts, no secrets)                |
-| `forge proxy audit diff [id]`        | Show system/tool drift + override mutations over time                  |
-| `forge proxy template list`          | List available templates                                               |
-| `forge proxy template show <name>`   | Show template configuration (`--raw`)                                  |
-| `forge proxy template edit <name>`   | Customize a template (copy-on-first-edit)                              |
-| `forge proxy template reset <name>`  | Reset template to built-in defaults                                    |
+| Command                              | Purpose                                                 |
+| ------------------------------------ | ------------------------------------------------------- |
+| `forge proxy create <template>`      | Create a proxy from template and start it               |
+| `forge proxy list`                   | List all proxies (`--json`)                             |
+| `forge proxy show <id>`              | Show proxy configuration (`--json`, `--raw`)            |
+| `forge proxy edit <id>`              | Edit proxy overlay in $EDITOR                           |
+| `forge proxy set <id> <key>=<value>` | Set a proxy configuration value                         |
+| `forge proxy start <id>`             | Start server for existing proxy                         |
+| `forge proxy stop <id>`              | Stop server (keeps config)                              |
+| `forge proxy delete <id>...`         | Delete one or more proxies (`--all` for bulk deletion)  |
+| `forge proxy clean`                  | Remove stale proxies (dead pids)                        |
+| `forge proxy validate <id>`          | Validate proxy configuration                            |
+| `forge proxy metrics [id]`           | Show runtime metrics (`--json`, `--all`)                |
+| `forge proxy audit show [id]`        | Show redacted audit records (hashes/counts, no secrets) |
+| `forge proxy audit diff [id]`        | Show system/tool drift + override mutations over time   |
+| `forge proxy template list`          | List available templates                                |
+| `forge proxy template show <name>`   | Show template configuration (`--raw`)                   |
+| `forge proxy template edit <name>`   | Customize a template (copy-on-first-edit)               |
+| `forge proxy template reset <name>`  | Reset template to built-in defaults                     |
 
-### Provider trace
+### Telemetry
 
-| Command                                     | Purpose                                                                                     |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| `forge provider trace list`                 | List recent provider traces (`--session`, `--root-run-id`, `--period`, `--limit`, `--json`) |
-| `forge provider trace show <request_id>`    | Show one trace record (`--json`)                                                            |
-| `forge provider trace explain <request_id>` | Local-only provenance narrative for a request (`--json`)                                    |
+`forge telemetry` groups operator observability surfaces: per-session activity, proxy-scoped cost telemetry, and local
+provider traces. `activity` is best-effort per-session attribution; `costs show` is the authoritative proxy-scoped spend
+view.
+
+| Command                                      | Purpose                                                                                            |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `forge telemetry activity [session]`         | Per-session two-pane activity: operation outcomes + model calls/cost (`--json`, `--days`, `--all`) |
+| `forge telemetry costs show [id]`            | Show cost summary (`--period`, `--by-model`, `--by-verb`, `--json`)                                |
+| `forge telemetry costs reset`                | Wipe cost, usage, upstream/downstream telemetry (`--yes`, `--dry-run`)                             |
+| `forge telemetry trace list`                 | List recent provider traces (`--session`, `--root-run-id`, `--period`, `--limit`, `--json`)        |
+| `forge telemetry trace show <request_id>`    | Show one trace record (`--json`)                                                                   |
+| `forge telemetry trace explain <request_id>` | Local-only provenance narrative for a request (`--json`)                                           |
 
 Metadata-only, owner-only diagnostics read from downstream telemetry under `~/.forge/telemetry/downstream/`. `explain`
 answers "what happened to this request?" from local records only -- no remote lookup. `--session` matches the hashed
@@ -218,7 +223,6 @@ workers (e.g., `claude-opus`) remain on Anthropic routing regardless of `--proxy
 | Command                       | Purpose                                                                                              |
 | ----------------------------- | ---------------------------------------------------------------------------------------------------- |
 | `forge info`                  | Show global system information (`--json`)                                                            |
-| `forge activity [session]`    | Per-session two-pane activity: operation outcomes + model calls/cost (`--json`, `--days`, `--all`)   |
 | `forge clean`                 | Remove orphaned state (`--scope`, `--yes`)                                                           |
 | `forge config`                | Manage global runtime preferences                                                                    |
 | `forge authentication login`  | Store credentials for LLM providers                                                                  |
@@ -253,8 +257,6 @@ scope rationale remain in design.md.
 - **Session / plan**: allow `%session list` and `%plan`.
 - **Proxy**: allow read-only `%proxy list`, `%proxy show`, and `%proxy audit show/diff`; disallow `%proxy create`,
   `%proxy edit`, `%proxy set`, and `%proxy delete`.
-- **Provider trace**: allow read-only `%provider trace list`, `%provider trace show`, and `%provider trace explain`
-  (metadata only, never secrets).
 - **Policy / verification**: allow `%policy status`, `%policy enable`, `%policy disable`, `%policy check`,
   `%policy supervise`, and `%cancel-verification`.
 - **Cleanup**: allow `%clean [--scope workspace|project|all]` as a read-only report. Destructive cleanup stays in the
@@ -275,7 +277,6 @@ Shared commands (mirrors CLI syntax):
 - `%proxy list` (read-only: shows available proxies)
 - `%proxy show <id>` (read-only: shows proxy details and tier mappings)
 - `%proxy audit show|diff [id]` (read-only: recent audit metadata / wire changes; metadata only, never secrets)
-- `%provider trace list|show|explain` (read-only: recent provider traces / one record / local provenance narrative)
 - `%policy status` (shows current policy config and state)
 - `%policy enable --bundle tdd [--permissive]` (enables policy enforcement)
 - `%policy disable` (disables all policies for the session)

@@ -14,7 +14,7 @@ The two planes measure related-but-distinct things and are kept separate on purp
 ``claude -p`` is a ledger *error* the decision log may record as a fail-open allow).
 
 Pure logic (no Click, no printing), per design §3.12: returns a
-:class:`SessionActivitySummary`. Rendered by ``forge activity`` (table) and the
+:class:`SessionActivitySummary`. Rendered by ``forge telemetry activity`` (table) and the
 session-end launcher line (:func:`render_summary_line`). The manifest is **re-read
 fresh from disk** because hooks mutate ``confirmed.*`` during the run, after the
 launcher's in-memory copy was taken.
@@ -341,7 +341,7 @@ def render_summary_line(summary: SessionActivitySummary) -> str | None:
     sh = summary.shadow
     if sh is not None and sh.has_content:
         # At session end the candidates were just enqueued (drain runs on a LATER CLI
-        # invocation), so `pending` is the usual case; a later `forge activity` shows
+        # invocation), so `pending` is the usual case; a later `forge telemetry activity` shows
         # `audited`. Lead with the disagree headline once any are checked.
         if sh.checked:
             seg = f"shadow: {sh.checked} audited ({sh.disagree} disagree"
@@ -353,7 +353,7 @@ def render_summary_line(summary: SessionActivitySummary) -> str | None:
     if summary.total_cost_micro_usd is not None:
         # `~` flags the figure as approximate (the aggregate mixes route-reported cost with
         # verb-snapshot estimates); when no snapshot estimate is mixed in (cost-plane-exact
-        # and/or runtime-reported) it is dropped. `forge proxy costs show` stays authoritative.
+        # and/or runtime-reported) it is dropped. `forge telemetry costs show` stays authoritative.
         prefix = "~" if summary.cost_estimated else ""
         parts.append(f"{prefix}${summary.total_cost_micro_usd / 1_000_000:.2f}")
 
@@ -374,7 +374,7 @@ def render_summary_line(summary: SessionActivitySummary) -> str | None:
 
 
 def activity_summary_to_json(summary: SessionActivitySummary) -> dict[str, object]:
-    """Clean-break machine-readable activity shape for ``forge activity --json``."""
+    """Clean-break machine-readable activity shape for ``forge telemetry activity --json``."""
     return {
         "session": summary.session,
         "since": summary.since,

@@ -159,8 +159,8 @@ forge session list --scope project  # Sessions in current Forge project only
 forge session list --scope all      # All sessions globally
 
 # What a session did (operation outcomes + model calls)
-forge activity [name]         # Per-session Forge automation outcomes, model calls, cost, tokens
-forge activity [name] --json --days N --all
+forge telemetry activity [name]         # Per-session Forge automation outcomes, model calls, cost, tokens
+forge telemetry activity [name] --json --days N --all
 
 # Fork (conversation branching)
 forge session fork <parent> [--name <name>] [--model <claude-model>] [--incognito] [--branch <branch>] [--worktree] [--into <path>] [--supervise] [--supervisor-proxy <id>] [--no-supervisor-proxy] [--cascade] [--checker-model <id>] [--checker-provider <p>] [--checker-effort <level>] [--supervisor-effort <level>] [--no-launch]
@@ -413,7 +413,7 @@ same transfer context.
 forge session start impl --runtime codex --resume-from planner --task "Implement the plan."
 forge session resume impl --task "Now add tests."
 forge session show impl      # Runtime, Codex thread id, rollout path, auth posture
-forge activity impl          # transfer-curate + codex turns under one run tree
+forge telemetry activity impl          # transfer-curate + codex turns under one run tree
 ```
 
 Requires `codex` installed and authenticated (`forge runtime preflight codex` → `Ready YES`). The start command curates
@@ -763,12 +763,12 @@ overlay. See [proxy.md](proxy.md) for proxy configuration.
 
 ---
 
-## What a session did (`forge activity` + session-end summary)
+## What a session did (`forge telemetry activity` + session-end summary)
 
 Two read surfaces report what Forge's automation did during a session (supervisor, memory writer, workflow verbs,
 transfer curation, action tagging, and policy decisions — **not** your full interactive Claude usage). They read
 upstream operation outcomes, downstream model-call evidence, transitional usage events, and the capped policy-decision
-fallback. Session-scoped spend figures are **best-effort attribution** — `forge proxy costs show` stays the
+fallback. Session-scoped spend figures are **best-effort attribution** — `forge telemetry costs show` stays the
 authoritative dollar view (see [proxy.md](proxy.md#cost-tracking-and-spend-caps), and
 [which surface answers which question?](proxy.md#which-surface-answers-which-question) for when to use each).
 
@@ -784,14 +784,14 @@ The `failing open` clause surfaces supervisor LLM calls that errored or timed ou
 proceeded without frontier review), broken down by kind — for example a 45s timeout or an OpenRouter content-filter
 rejection. The line is best-effort and prints only when the session had activity; incognito sessions are skipped.
 
-**`forge activity [session]` (on demand).** Inspect any session's Forge automation activity anytime:
+**`forge telemetry activity [session]` (on demand).** Inspect any session's Forge automation activity anytime:
 
 ```bash
-forge activity                      # current session ($FORGE_SESSION)
-forge activity my-feature           # a named session (or Claude UUID)
-forge activity my-feature --days 7  # last 7 days (default: 30)
-forge activity my-feature --all     # full history
-forge activity my-feature --json    # machine-readable
+forge telemetry activity                      # current session ($FORGE_SESSION)
+forge telemetry activity my-feature           # a named session (or Claude UUID)
+forge telemetry activity my-feature --days 7  # last 7 days (default: 30)
+forge telemetry activity my-feature --all     # full history
+forge telemetry activity my-feature --json    # machine-readable
 ```
 
 It renders two panes. **Operation outcomes** shows upstream outcomes such as policy checks, supervisor fail-open/no-call
@@ -808,8 +808,8 @@ with `log_capped`.
 The Supervisor line appends `failing open: N timeout, N error` when recent frontier checks failed open — this is the
 always-visible status line's `SUP!N <kind>` marker in detail (recent supervisor checks erroring/timing out means actions
 may be proceeding without frontier review). The two are scoped differently, so the counts can differ: `SUP!N` is the
-**current consecutive** fail-open streak (it resets on the supervisor's next successful check), while `forge activity`
-totals fail-opens across the selected window (`--days`/`--all`).
+**current consecutive** fail-open streak (it resets on the supervisor's next successful check), while
+`forge telemetry activity` totals fail-opens across the selected window (`--days`/`--all`).
 
 > **Sidecar:** both surfaces work in sidecar mode when the session launched with a proxy id (the in-container usage
 > ledger is mounted back to the host). A template-only sidecar shows only the policy-decision half.

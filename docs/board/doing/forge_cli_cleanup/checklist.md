@@ -14,12 +14,13 @@ Phase 1 is a **decision gate**, not code. The card is a large clean break; the c
 the taxonomy and the open questions first, then drain the five debt ledgers the test suite already tracks. Do not rename
 a live surface before the matching decision is recorded here.
 
-**Progress (2026-06-23):** Slice 04 shipped (`forge backend` moved to `forge model backend`; `forge model catalog`
-added) and Slice 06 shipped (`forge session context` removed). Decision gate: **D1, D2, D3, D5, D7 decided**; see the
-Phase 1 section for details. D1 = move to `forge telemetry` + delete emptied `provider`; D2 = keep `proxy audit` under
-`proxy`; D3 = build `forge model` namespace (backend moves under it); D5 = route hook install through `extension`
-(de-document `hook enable|disable`); D7 = tiered config-object verbs, `backend` excluded. Still open: **D4, D6, D8,
-D9**. D1 still reshapes `main.py` top-level groups, so it should land before D6 (aliases) settles new nouns.
+**Progress (2026-06-23):** Slice 03 shipped (`forge activity`/`forge provider trace`/`forge proxy costs` moved to
+`forge telemetry`, `%provider trace` retired), Slice 04 shipped (`forge backend` moved to `forge model backend`;
+`forge model catalog` added), and Slice 06 shipped (`forge session context` removed). Decision gate: **D1, D2, D3, D5,
+D7 decided**; see the Phase 1 section for details. D1 = move to `forge telemetry` + delete emptied `provider`; D2 = keep
+`proxy audit` under `proxy`; D3 = build `forge model` namespace (backend moves under it); D5 = route hook install
+through `extension` (de-document `hook enable|disable`); D7 = tiered config-object verbs, `backend` excluded. Still
+open: **D4, D6, D8, D9**.
 
 ## Audit reconciliation (verified 2026-06-23)
 
@@ -49,10 +50,10 @@ allowlisted entry that was fixed-without-removal. "Done" for these slices = the 
 
 ### Guard gaps (rules with no mechanical enforcement yet)
 
-- **Stream ownership (F10):** `_(review)_` only; no stdout/stderr capture test. `proxy_costs.py:20` and
-  `proxy_audit.py:17` render human tables to `Console(stderr=True)` while `--json` goes to stdout —
-  `activity.py`/`provider.py` are already compliant (stdout for both). Adding the guard needs
-  `CliRunner(mix_stderr=False)` (slice 07).
+- **Stream ownership (F10):** `_(review)_` only; no tree-wide stdout/stderr capture test. Slice 03 moved
+  `proxy_costs.py` to stdout for both human and `--json` telemetry-cost output and added focused assertions.
+  `proxy_audit.py:17` still renders human tables to `Console(stderr=True)` while `--json` goes to stdout, so the general
+  guard remains slice 07 work.
 - **Session selectors (F11):** `_(review)_`; rule is written (style guide §Command Shape) but unguarded.
 - **Config-object verbs (F5):** D7 decided (tiered core `{show,edit,reset}` + optional `{set,validate}`, `backend`
   excluded); slice 08 adds the parity guard on the three pure-config objects.
@@ -139,19 +140,18 @@ defaults to accept or override, not commitments.
 Each slice's assertion names an observable behavior and the test that proves it. Tick only when the test passes and the
 verification is recorded.
 
-- [ ] **Slice 03 - Telemetry move (D1, D2).** `forge telemetry activity|trace|costs` exist and work; old paths
-  (`forge activity`, `forge provider trace`, `forge proxy costs`) return Click `No such command` (clean break, no
-  tombstone). `forge proxy audit show|diff` **stays under `proxy`** (D2). **Delete the emptied `forge provider` group**
-  \+ its `main.py:384` registration and **remove** its `SINGLE_LEAF_GROUP_ALLOWLIST` entry (the 3-leaf subgroup is
-  `telemetry trace`, not provider; `forge memory report` leaves too if D4 lands). **Tighten `test_no_single_leaf_groups`
-  to flag `len<=1`** so the emptied group can't pass silently. Human + `--json` of each telemetry leaf share **stdout**
-  (fix `proxy_costs.py:20` stderr→stdout here; `proxy_audit.py:17` is slice 07 since audit doesn't move). Tests:
-  `tests/src/cli/test_telemetry.py` (new) + old-path-removal cases.
-  - **Direct-command mirror (D1 decision = retire):** **delete** `%provider trace list|show|explain` (advertised
-    `direct_commands.py:71`, handled `:356`) with no `%telemetry` replacement — clean break, don't grow the surface.
-    Drop the `%help` advert string and **delete** `tests/src/cli/hooks/test_direct_commands_provider.py` (removed
-    surface → delete test). It is the **only** moving surface with a `%` mirror — there is no `%activity` or
-    `%proxy costs`.
+- [x] **Slice 03 - Telemetry move (D1, D2).** Added `forge telemetry activity|trace|costs`; old terminal paths
+  (`forge activity`, `forge provider trace`, `forge proxy costs`) now return Click `No such command` (clean break, no
+  tombstone). `forge proxy audit show|diff` **stays under `proxy`** (D2). Deleted the emptied `forge provider` group,
+  its `main.py` registration, and its `SINGLE_LEAF_GROUP_ALLOWLIST` entry. Tightened `test_no_single_leaf_groups` to
+  flag `len<=1`. Moved telemetry-cost human output to stdout and asserted both human and `--json` cost output use stdout
+  with empty stderr. **Direct-command mirror retired:** deleted `%provider trace list|show|explain` with no `%telemetry`
+  replacement, removed the `%help` advert, and deleted `tests/src/cli/hooks/test_direct_commands_provider.py`. Updated
+  docs/QA/operator guidance. Verification:
+  `uv run pytest tests/src/cli/test_telemetry.py tests/src/cli/test_activity.py tests/src/cli/test_provider_trace.py tests/src/cli/test_proxy_costs.py tests/src/cli/test_command_tree_invariants.py tests/src/cli/hooks`
+  (213 passed) and
+  `./scripts/test-integration.sh tests/integration/cli/test_session_commands_integration.py::TestActivityCommand::test_activity_reports_supervisor_errors`
+  (1 passed). Also ran `uv build` and `make pre-commit`.
 - [ ] **Slice 02 - Session-scope move (D4).** `forge session transfer show|regenerate|edit|diff` exist; if D4 lands,
   `forge session memory …` exists and top-level `forge memory` keeps only passport/doc verbs. Old `forge transfer …`
   paths removed. Tests assert new paths + `No such command` on old.
@@ -228,7 +228,7 @@ verification is recorded.
 | Test                        | Fixture                          | Assertion                                                                                                                                                                                                                                          | Test File                                                 |
 | --------------------------- | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
 | Telemetry new paths         | proxy + session with telemetry   | `forge telemetry {activity,trace,costs}` exit 0; shapes match old `--json`                                                                                                                                                                         | `tests/src/cli/test_telemetry.py`                         |
-| Telemetry old paths removed | n/a                              | `forge activity` / `forge provider trace` / `forge proxy costs` exit 2 "No such command"; `%provider trace` → `%telemetry trace` (or retained alias) + `%help` advert updated                                                                      | `tests/src/cli/test_telemetry.py`                         |
+| Telemetry old paths removed | n/a                              | `forge activity` / `forge provider trace` / `forge proxy costs` exit 2 "No such command"; `%provider trace` produces no hook output and `%help` no longer advertises it                                                                            | `tests/src/cli/test_telemetry.py`                         |
 | Single-leaf debt shrinks    | full command tree                | `SINGLE_LEAF_GROUP_ALLOWLIST` no longer lists `forge provider` (+ `forge memory report` if D4)                                                                                                                                                     | `test_command_tree_invariants.py`                         |
 | `search query` inverted     | indexed transcript               | bare `query` prints human table on stdout; `--json` emits documented array; `--json` round-trips old shape                                                                                                                                         | `tests/src/cli/test_search.py`                            |
 | `--json` missing drained    | each read leaf                   | every `JSON_MISSING_ALLOWLIST` leaf + `authentication profiles` + `transfer diff` emits valid JSON; ledger `{}`                                                                                                                                    | `test_command_tree_invariants.py`                         |
@@ -251,7 +251,7 @@ verification is recorded.
   once wired, the alias rule (D6), and remove "settled in the forge_cli_cleanup card" placeholders as each lands.
 - [ ] Update `docs/design.md`/`cli_reference.md` ownership tables if command ownership changes (telemetry, memory
   split).
-- [ ] Add a `change_log.md` entry per shipped slice naming the moved live commands (`forge activity` →
+- [x] Add a `change_log.md` entry per shipped slice naming the moved live commands (`forge activity` →
   `forge telemetry activity`, etc.).
 - [ ] Run targeted CLI tests for old/new paths, help text, `--json` shape, and stream behavior after each slice.
 - [ ] `make pre-commit` before closeout; promote durable taxonomy/alias decisions to `impl_notes.md` after review.

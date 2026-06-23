@@ -83,7 +83,7 @@ forge session resume impl --task "Now add tests for the edge cases."
 
 # 4. Inspect what happened:
 forge session show impl     # Runtime, thread id, rollout path, auth posture
-forge activity impl         # transfer-curate + codex turns under one run tree
+forge telemetry activity impl         # transfer-curate + codex turns under one run tree
 ```
 
 By default the curated context rides the first `codex exec` prompt (zero setup). With a trust-enrolled
@@ -109,8 +109,9 @@ Your task: implement the change described in the context above."
 
 `--target-runtime codex` stamps the transfer for Codex: the `## Runtime Hints` section names Codex idioms (`codex exec`,
 sandbox modes) instead of Claude's. `ai-curated` makes a billed `core.llm` curation call; Forge records it in the usage
-ledger (`transfer-curate` in `forge activity`) **only when it runs inside a Forge run tree** — the cross-runtime bridge
-does, but a bare `forge transfer regenerate` from a shell runs the curation without a ledger row (no ambient run tree).
+ledger (`transfer-curate` in `forge telemetry activity`) **only when it runs inside a Forge run tree** — the
+cross-runtime bridge does, but a bare `forge transfer regenerate` from a shell runs the curation without a ledger row
+(no ambient run tree).
 
 > **Note:** `forge transfer show` prints the transfer's YAML frontmatter (metadata — strategy, lineage,
 > `target_runtime`) ahead of the curated body; both are harmless context for Codex, and the `## Runtime Hints` section

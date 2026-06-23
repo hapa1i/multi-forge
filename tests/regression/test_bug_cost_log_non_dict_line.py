@@ -4,7 +4,7 @@ Bug: ``read_cost_logs`` / ``read_verb_logs`` / ``read_audit_logs`` called ``reco
 ``json.loads``, assuming every line decodes to a dict. A valid-but-non-object line (``[]``, ``"x"``, ``1``) raised
 ``AttributeError`` -- NOT caught by the file-level ``except OSError`` (it subclasses ``Exception``, not ``OSError``), so
 it escaped the reader and aborted the ENTIRE read, dropping every shard's records and crashing the caller (e.g.
-``forge proxy costs show`` / ``forge proxy audit show``). The contract is "skip malformed records," so one bad line must
+``forge telemetry costs show`` / ``forge proxy audit show``). The contract is "skip malformed records," so one bad line must
 not nuke the read.
 
 Root cause / fix: guard with ``isinstance(record, dict)`` before ``.get``, mirroring

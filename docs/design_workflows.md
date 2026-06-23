@@ -140,10 +140,10 @@ frontier-always, never to unsupervised. In cascade mode the supervisor is regist
 §1.5): it is invoked only when a policy emitted `needs_review` and nothing denied, so clearly-aligned actions never pay
 the frontier call. Tier-1 reasons ride in low-severity violations (persisted to the decision log, never printed on
 resolved allows). Measurement is built in: session-tagged `plan-check` usage events plus decision-log-derived
-`plan_check_allow`/`plan_check_needs_review` counters in `forge activity` expose the short-circuit rate; the supervisor
-counters are the resolver runs (a tier-1 `needs_review` alongside a deterministic deny skips the resolver, so the two
-can differ). Cascade off (the default) is exactly the pre-cascade behavior — the supervisor runs as a regular policy on
-every throttle-missing check.
+`plan_check_allow`/`plan_check_needs_review` counters in `forge telemetry activity` expose the short-circuit rate; the
+supervisor counters are the resolver runs (a tier-1 `needs_review` alongside a deterministic deny skips the resolver, so
+the two can differ). Cascade off (the default) is exactly the pre-cascade behavior — the supervisor runs as a regular
+policy on every throttle-missing check.
 
 **Shadow sampling (audit, opt-in):** The cascade's blind spot is the **false-aligned** case — a tier-1 `allow` that
 short-circuits a frontier check the frontier would have blocked. Shadow sampling measures that rate without slowing the
@@ -160,8 +160,8 @@ runs the frontier, and classifies the verdict with the supervisor's **own** bloc
 `disagree` (frontier would have blocked — high-confidence, cited), `inconclusive` (divergent below the bar), or `error`
 (run failed or output unparseable, kept distinct from a real low-confidence `inconclusive`). It records the verdict and
 renames `.processing` → `.done`; it **never enforces**. Spend is a separate `supervisor-shadow` usage row (the worker is
-the sole emitter, re-rooted under the originating session). The read surface is `forge activity` (a Shadow line with
-checked/disagree/pending counts) and `forge policy shadow show` (the disagreement artifacts with citations).
+the sole emitter, re-rooted under the originating session). The read surface is `forge telemetry activity` (a Shadow
+line with checked/disagree/pending counts) and `forge policy shadow show` (the disagreement artifacts with citations).
 
 **Supervisor stuck playbook:** When the supervisor blocks because the plan evolved:
 

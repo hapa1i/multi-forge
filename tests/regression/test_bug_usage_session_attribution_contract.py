@@ -1,6 +1,6 @@
 """Regression: the per-session activity read surface must agree with what emitters tag.
 
-``forge activity`` / the session-end summary find a session's legacy usage events by
+``forge telemetry activity`` / the session-end summary find a session's legacy usage events by
 ``event.session == manifest.name`` and read its policy fallback from that manifest. The
 supervisor -- the headline emitter, whose ``status="error"`` events are the OpenRouter
 content-filter failures this surface was built to reveal -- tags its ledger event with
@@ -10,7 +10,7 @@ content-filter failures this surface was built to reveal -- tags its ledger even
 That bridge is a single assignment in ``ClaudeHookAdapter.build_contexts``
 (``session_name=manifest.name``). Pin it so a future change (e.g. tagging a Claude UUID
 instead of the name) -- which would silently make supervisor activity invisible to
-``forge activity`` while the policy fallback kept working -- fails loudly here.
+``forge telemetry activity`` while the policy fallback kept working -- fails loudly here.
 
 Affected: ``src/forge/cli/hooks/policy.py``, ``src/forge/core/ops/usage_summary.py``.
 """
@@ -36,7 +36,7 @@ def test_action_context_session_name_is_manifest_name() -> None:
     )
     # The bridge: the supervisor emits its ledger event with session=context.session_name,
     # and the read surface filters event.session == manifest.name. If these diverge, the
-    # ledger half (incl. supervisor errors) goes silently invisible to `forge activity`.
+    # ledger half (incl. supervisor errors) goes silently invisible to `forge telemetry activity`.
     assert ctx.session_name == manifest.name
 
 

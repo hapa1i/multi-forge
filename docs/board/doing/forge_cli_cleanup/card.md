@@ -1,6 +1,6 @@
 # Forge CLI Cleanup And Taxonomy
 
-**Status**: In progress (`doing/`). Accepted and moved from `proposed/` on 2026-06-23; Slice 04 and Slice 06 have
+**Status**: In progress (`doing/`). Accepted and moved from `proposed/` on 2026-06-23; Slices 03, 04, and 06 have
 shipped. This card records the CLI style audit and taxonomy-level cleanup before adding more command groups.
 
 **References**: `docs/developer/cli_style_guidelines.md`, `docs/cli_reference.md`, `docs/design.md` §3.12,

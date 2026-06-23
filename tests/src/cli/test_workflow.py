@@ -1571,7 +1571,7 @@ class TestUsageEmission:
         assert e.attribution_granularity == "verb"
         assert e.measurement_source == "unattributed"  # no live proxy in test
         assert e.source_refs is None
-        assert e.session == "planner"  # threaded from $FORGE_SESSION so 'forge activity' can scope it
+        assert e.session == "planner"  # threaded from $FORGE_SESSION so 'forge telemetry activity' can scope it
         outcomes = read_upstream_outcomes(session="planner", command="panel")
         assert len(outcomes) == 1
         assert outcomes[0].operation == "workflow.panel"

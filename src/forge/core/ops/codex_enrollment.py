@@ -230,7 +230,7 @@ def _run_probe_turn(preflight: CodexPreflight, *, timeout_seconds: int) -> tuple
             request = prepare_codex_request(
                 prompt=_PROBE_PROMPT,
                 preflight=preflight,
-                # session left untagged: a throwaway probe must not pollute `forge activity`.
+                # session left untagged: a throwaway probe must not pollute `forge telemetry activity`.
                 attribution=Attribution(command="codex-enroll-verify"),
                 cwd=str(repo),
                 sandbox="read-only",

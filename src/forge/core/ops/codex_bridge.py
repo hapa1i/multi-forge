@@ -10,7 +10,7 @@ Command-core op (UI-agnostic; returns structured data, raises ``ForgeOpError``) 
       -> compose initial message (transfer prepended to the task)
       -> ``codex exec`` (``CodexHeadlessInvoker``)
 
-all under **one run tree**, so ``forge activity`` / ``read_usage_events(root_run_id=...)``
+all under **one run tree**, so ``forge telemetry activity`` / ``read_usage_events(root_run_id=...)``
 attribute the curation step and the Codex run together.
 
 Two deliberate properties:

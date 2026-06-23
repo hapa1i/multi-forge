@@ -955,10 +955,10 @@ flushed on graceful proxy shutdown so the request path does not fsync on every c
 preserves current-calendar-month shards even when their mtime is old or the size budget is tight, so
 unkeyed/template-mode caps that have no cap snapshot do not lose the active month's JSONL spend on restart.
 
-Verb snapshot files under `costs/verbs/` are retired as a durable writer. The default `forge proxy costs show` by-verb
-view now derives attribution by joining downstream attempts to `usage/events` via `forge_run_id`; unjoined requests
-remain "Interactive"/unattributed. The usage ledger itself remains during the transition for session activity and
-run-tree joins, but it is no longer the durable spend source.
+Verb snapshot files under `costs/verbs/` are retired as a durable writer. The default `forge telemetry costs show`
+by-verb view now derives attribution by joining downstream attempts to `usage/events` via `forge_run_id`; unjoined
+requests remain "Interactive"/unattributed. The usage ledger itself remains during the transition for session activity
+and run-tree joins, but it is no longer the durable spend source.
 
 A third plane, the **usage-attribution ledger** (`~/.forge/usage/events/`, schema in
 [§A.13](design_appendix.md#a13-usage-attribution-ledger-schema-314)), records *which run/workflow/session* invoked which
@@ -977,9 +977,9 @@ events carry null `source_refs` because Forge is not the HTTP client and can't k
 correlation instead ties a proxied `claude -p` run to its **exact** cost through the run tree, not a per-request ref:
 Forge stamps the headless subprocess's outbound requests with validated `X-Forge-Run-ID`/`X-Forge-Root-Run-ID` headers
 (only when the target is a proven Forge proxy), the proxy records `forge_run_id`/`forge_root_run_id` on each cost
-record, and the read surface (`forge activity`, `forge +$Y`) sums cost records by `forge_root_run_id` — superseding the
-concurrency-fragile verb snapshot rather than adding to it. `source_refs` stays null by design (one run makes many
-requests; the single-valued ref is the wrong shape — see
+record, and the read surface (`forge telemetry activity`, `forge +$Y`) sums cost records by `forge_root_run_id` —
+superseding the concurrency-fragile verb snapshot rather than adding to it. `source_refs` stays null by design (one run
+makes many requests; the single-valued ref is the wrong shape — see
 [§A.13](design_appendix.md#a13-usage-attribution-ledger-schema-314)).
 
 **Headless self-report.** Every `claude -p` run requests `--output-format json` (capability-gated with a
@@ -998,15 +998,15 @@ to join: `emit_codex_usage` records `route=codex_exec`/`reporter=codex_jsonl`/`r
 from the JSONL `turn.completed.usage`, but `cost_micro_usd=null`/`source_refs=null` and `confidence=unavailable` (the
 ledger's `confidence` is a cost signal, and Codex reports no dollars — honest absence, not a fabricated $0). The event
 carries the resolved `billing_mode` from `CodexPreflight`. Because the Codex child shares its parent's run tree
-(`stamp_run_identity`), a Codex leaf and a Claude leaf join under the same `root_run_id` in `forge activity`.
+(`stamp_run_identity`), a Codex leaf and a Claude leaf join under the same `root_run_id` in `forge telemetry activity`.
 
 **Transfer curation usage.** The `ai-curated` transfer's curation step makes a `core.llm` call (an Anthropic model via
 OpenRouter) that is now attributed: it emits `route=core_llm`/`reporter=provider`/`runtime=forge_cli`/
 `command=transfer-curate` with the provider's exact tokens (cost `unavailable` — `emit_direct_llm_usage` computes no
 dollar figure for a direct `core.llm` call, so the event records exact tokens but no cost). The emit no-ops without an
 ambient run identity, so a plain `forge session resume --strategy ai-curated` stays silent; the cross-runtime bridge
-mints a run-tree root, so there the curation event and the `codex exec` run share one `root_run_id` and `forge activity`
-shows both sides of the hop.
+mints a run-tree root, so there the curation event and the `codex exec` run share one `root_run_id` and
+`forge telemetry activity` shows both sides of the hop.
 
 **Provider lifecycle evidence.** Provider-trace data is now stored as fields on downstream attempt records, answering
 "what happened to this provider request?" after a timeout — born from an incident where a supervised fork's checks
@@ -1023,9 +1023,9 @@ incident — still surfaces its id. `timeout_seen` is always `false` at the prox
 own client disconnect, never the parent's `subprocess.run` timeout (that is a later run-tree-correlation join target).
 Traces join the cost/usage planes by shared `request_id` + run-tree ids; probe 2 (`[REMOTE-ABSENT]`) confirmed an
 aborted stream is not remotely retrievable, which is why the plane answers from local evidence only (no remote
-`/generation` lookup). The read surface is `forge provider trace list|show|explain` (op-backed
-`core/ops/provider_trace.py`; `%provider trace` mirrors it in-session); `explain` answers the incident's five questions
-from the trace plus a bounded (±5m) cost-plane join for confidence, never a remote lookup. An opt-in
+`/generation` lookup). The read surface is `forge telemetry trace list|show|explain` (op-backed
+`core/ops/provider_trace.py`; no in-session `%` mirror); `explain` answers the incident's five questions from the trace
+plus a bounded (±5m) cost-plane join for confidence, never a remote lookup. An opt-in
 `provider_trace.inject_provider_user` (default off, a **global** toggle in `~/.forge/config.yaml`) also records the
 Forge session grouping id in the provider's top-level `user` field for OpenRouter routes — probe 3 confirmed `user` (not
 a custom `session_id`) survives in the indexed `/generation` record for account-side lookup; observability only (probe 4
@@ -1070,7 +1070,7 @@ cost-capture or log write failures must not break successful LLM responses.
 
 #### Per-session usage read surface
 
-`forge activity [session]` aggregates the captured per-session planes into a two-pane human-readable view. The
+`forge telemetry activity [session]` aggregates the captured per-session planes into a two-pane human-readable view. The
 **Operation outcomes** pane reads upstream outcomes by `session` (policy checks, supervisor fail-open/no-call outcomes,
 memory writer, supervisor shadow drain, shadow curation, workflows/workers, transfer curation, and action tagging). The
 **Model calls** pane reads downstream spend/token evidence joined by run tree, with `usage/events` retained as a
@@ -1085,7 +1085,7 @@ warning text that upstream suppresses at the default `upstream_event_volume=non_
 are uncapped, and manifest/upstream duplicate warnings are deduped. The aggregation is a UI-agnostic command-core
 builder (`forge.core.ops.usage_summary.build_session_activity_summary`, §3.12) shared by the CLI and the compact
 `render_summary_line(...)` launcher exit line (host, sidecar, and fork). Cost is reported-or-estimated and may be
-partial; `forge proxy costs show` stays the authoritative spend view. See
+partial; `forge telemetry costs show` stays the authoritative spend view. See
 [design_appendix.md §A.13](design_appendix.md#a13-usage-attribution-ledger-schema-314) for the read surface and
 coverage.
 
@@ -1206,12 +1206,12 @@ mounts that proxy's `~/.forge/proxies/<id>/` read-only (so the in-container prox
 `~/.forge/audit/`, `~/.forge/costs/`, `~/.forge/usage/`, and `~/.forge/telemetry/` read-write (so legacy audit/cost
 files, downstream/upstream telemetry, cap state, and the usage-attribution ledger persist on the host instead of dying
 with the `--rm` container — the ledger is the only record of the in-container supervisor/verb activity, and it feeds
-`forge activity` and the session-end summary for sidecar sessions). These are the only `~/.forge` subdirs mounted,
-preserving the port-isolation rationale. On Linux the sidecar runs as the host `--user uid:gid`; that uid has no passwd
-entry, so the launcher pins `HOME=/root` and the image makes `/root` traversable/writable (`chmod 0777 /root`) so the
-mapped uid can reach the `/root/.forge` and `/root/.claude` mounts — an accommodation for the ephemeral single-session
-`--rm` sandbox, **not** a security-sandbox guarantee. Sidecar sessions also persist their launch mode, extra mounts, and
-image in `intent.launch` so `forge session resume <name>` can replay the same runtime wiring later.
+`forge telemetry activity` and the session-end summary for sidecar sessions). These are the only `~/.forge` subdirs
+mounted, preserving the port-isolation rationale. On Linux the sidecar runs as the host `--user uid:gid`; that uid has
+no passwd entry, so the launcher pins `HOME=/root` and the image makes `/root` traversable/writable (`chmod 0777 /root`)
+so the mapped uid can reach the `/root/.forge` and `/root/.claude` mounts — an accommodation for the ephemeral
+single-session `--rm` sandbox, **not** a security-sandbox guarantee. Sidecar sessions also persist their launch mode,
+extra mounts, and image in `intent.launch` so `forge session resume <name>` can replay the same runtime wiring later.
 
 **Forge still owns:** Docker test infrastructure, runtime config. `src/forge/sidecar/` provides sidecar mode —
 operational, not a security sandbox.

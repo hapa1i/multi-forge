@@ -632,7 +632,7 @@ forge session delete nr-into-parent --yes --force 2>/dev/null || true
 
 On exit the launcher prints a one-line rollup of what Forge did this session (policy/supervisor outcomes, workflows,
 cost, tokens) just before the reconnect tip -- the one session-end channel Claude Code does not suppress. It is the
-interactive complement to the non-interactive `forge activity` (section 7.12).
+interactive complement to the non-interactive `forge telemetry activity` (section 7.12).
 
 In the **container shell**, launch a session through the QA proxy, do a little work (a file edit or two so the
 supervisor runs when a policy bundle is enabled), then exit (`/exit`) and read the final lines.
@@ -643,7 +643,7 @@ forge session delete test-session-end --yes --force 2>/dev/null || true
 forge session start test-session-end --proxy "$FORGE_QA_OPENAI_PROXY"
 
 # After exiting, the same activity is available non-interactively:
-forge activity test-session-end
+forge telemetry activity test-session-end
 
 # Clean up
 forge session delete test-session-end --yes --force 2>/dev/null || true
@@ -653,8 +653,8 @@ forge session delete test-session-end --yes --force 2>/dev/null || true
 - [ ] The line reports supervisor `errors` when an LLM call failed (e.g. an OpenRouter content-filter rejection)
 - [ ] If a cost figure appears, it carries the `~` best-effort marker (e.g. `~$0.04`) with no ` est` suffix (Phase 6
   dropped ` est`)
-- [ ] `forge activity test-session-end` reports the same session's activity (or `No Forge activity` if the session was
-  idle)
+- [ ] `forge telemetry activity test-session-end` reports the same session's activity (or `No Forge activity` if the
+  session was idle)
 
 ### 5.22 Same-Directory Transfer Fork (`--resume-mode transfer` + auto-switch)
 

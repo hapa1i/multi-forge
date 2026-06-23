@@ -491,42 +491,42 @@ Proxy request costs are logged as downstream telemetry under `~/.forge/telemetry
 downstream records, and the by-verb view joins those records to run ids instead of writing new verb snapshot files.
 
 ```bash
-forge proxy costs show                    # Today's costs, by verb
-forge proxy costs show --by-model         # Today's costs, by model
-forge proxy costs show --period week      # This week
-forge proxy costs show openrouter-anthropic    # Filter by proxy
+forge telemetry costs show                    # Today's costs, by verb
+forge telemetry costs show --by-model         # Today's costs, by model
+forge telemetry costs show --period week      # This week
+forge telemetry costs show openrouter-anthropic    # Filter by proxy
 
-forge proxy costs reset                   # Wipe ALL cost + usage telemetry to zero (prompts; --yes to skip)
-forge proxy costs reset --dry-run         # Preview what would be removed, delete nothing
+forge telemetry costs reset                   # Wipe ALL cost + usage telemetry to zero (prompts; --yes to skip)
+forge telemetry costs reset --dry-run         # Preview what would be removed, delete nothing
 ```
 
-`forge proxy costs reset` deletes legacy cost logs, downstream/upstream telemetry shards, spend-cap snapshots, sidecar
-audit drift state, **and** the usage-attribution ledger (`forge activity`/`forge +$Y` data) under `~/.forge/`. It also
-clears the derived status-line cost and supervisor-health caches so status-line segments recompute from the now-empty
-telemetry instead of replaying cached values. It is irreversible (confirm prompt unless `--yes`). A running proxy keeps
-its cost totals **and** cap counters in memory until restarted — so a live proxy's cumulative-cost header, snapshot, and
-`forge proxy costs show` figures do not zero until you restart it (`forge proxy stop <id>` then
-`forge proxy start <id>`).
+`forge telemetry costs reset` deletes legacy cost logs, downstream/upstream telemetry shards, spend-cap snapshots,
+sidecar audit drift state, **and** the usage-attribution ledger (`forge telemetry activity`/`forge +$Y` data) under
+`~/.forge/`. It also clears the derived status-line cost and supervisor-health caches so status-line segments recompute
+from the now-empty telemetry instead of replaying cached values. It is irreversible (confirm prompt unless `--yes`). A
+running proxy keeps its cost totals **and** cap counters in memory until restarted — so a live proxy's cumulative-cost
+header, snapshot, and `forge telemetry costs show` figures do not zero until you restart it (`forge proxy stop <id>`
+then `forge proxy start <id>`).
 
-> **Per-session view:** `forge proxy costs show` is the authoritative, **proxy-scoped** dollar view. The status-line
+> **Per-session view:** `forge telemetry costs show` is the authoritative, **proxy-scoped** dollar view. The status-line
 > `cost` segment shows the interactive Claude session's proxy-reported `~$`, scoped by subtracting the proxy total
 > captured at session launch. For a **session-scoped** rollup of what Forge did — supervisor checks (including failed
 > ones), tokens, and *reported-or-estimated* cost (best-effort, may be partial) — use
-> [`forge activity [session]`](session.md#what-a-session-did-forge-activity--session-end-summary). The views are
-> complementary: spend is billed per proxy; activity is attributed per session; the status line is live and best-effort
-> for the current interactive launch.
+> [`forge telemetry activity [session]`](session.md#what-a-session-did-forge-telemetry-activity--session-end-summary).
+> The views are complementary: spend is billed per proxy; activity is attributed per session; the status line is live
+> and best-effort for the current interactive launch.
 
 ### Which surface answers which question?
 
 Forge surfaces cost and usage through several views with deliberately different scopes. Pick the one that matches your
 question. Forge never prices a request from a local table — a missing cost shows as `unavailable`, never invented (per
-the provenance column: `forge proxy costs show` is reported-only; `forge activity` also includes best-effort
-verb-snapshot estimates):
+the provenance column: `forge telemetry costs show` is reported-only; `forge telemetry activity` also includes
+best-effort verb-snapshot estimates):
 
 | Surface                                | Question it answers                               | Scope                                                                   | Cost provenance                                                                 |
 | -------------------------------------- | ------------------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| `forge proxy costs show`               | "What did this proxy actually spend?"             | one proxy's request log (proxy-scoped)                                  | reported `$` or `unavailable`; **authoritative** spend view                     |
-| `forge activity [session]`             | "What did Forge's automation do this session?"    | one Forge session — operation outcomes + model calls joined by run tree | reported-or-estimated `$`, best-effort attribution                              |
+| `forge telemetry costs show`           | "What did this proxy actually spend?"             | one proxy's request log (proxy-scoped)                                  | reported `$` or `unavailable`; **authoritative** spend view                     |
+| `forge telemetry activity [session]`   | "What did Forge's automation do this session?"    | one Forge session — operation outcomes + model calls joined by run tree | reported-or-estimated `$`, best-effort attribution                              |
 | status-line `cost` segment             | "What is my Claude session costing / quota left?" | one interactive launch; proxy mode subtracts the proxy launch baseline  | Claude's reported cost/quota, or proxy-reported `~$`; never recomputed by Forge |
 | status-line `forge +$Y` (`forge_cost`) | "What did Forge add on top of my session?"        | one Forge session, **excluding** the main interactive harness           | reported-or-nothing (subscription/OAuth → nothing)                              |
 
@@ -563,8 +563,8 @@ forge proxy set openrouter-openai costs.on_cap_hit=reject
 ```
 
 Caps are enforced after each completed request — a request may cross the cap and complete, then the next is blocked. Use
-`on_cap_hit=warn` if you prefer alerts without hard stops. Pair with `forge proxy costs show --period month` to monitor
-burn rate.
+`on_cap_hit=warn` if you prefer alerts without hard stops. Pair with `forge telemetry costs show --period month` to
+monitor burn rate.
 
 ---
 
@@ -671,14 +671,14 @@ writes nothing.
 
 ```bash
 # Recent traces (today by default; --period today|week|month|all)
-forge provider trace list
-forge provider trace list --session my-session      # by session label
-forge provider trace list --root-run-id run_abc...   # exact run tree
-forge provider trace list --period week --json
+forge telemetry trace list
+forge telemetry trace list --session my-session      # by session label
+forge telemetry trace list --root-run-id run_abc...   # exact run tree
+forge telemetry trace list --period week --json
 
 # One record / a plain-language explanation
-forge provider trace show <request_id>
-forge provider trace explain <request_id>
+forge telemetry trace show <request_id>
+forge telemetry trace explain <request_id>
 ```
 
 `explain` answers five questions from **local records only** (no remote lookup):
@@ -691,7 +691,7 @@ Local cost is unavailable, not zero.
 No remote lookup was performed.
 ```
 
-The same three commands are available in-session as `%provider trace list|show|explain` (read-only).
+Provider-trace diagnostics are terminal-only; there is no in-chat direct-command mirror.
 
 **Notes:**
 

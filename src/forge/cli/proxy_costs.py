@@ -1,4 +1,4 @@
-"""CLI command: forge proxy costs.
+"""CLI command group: forge telemetry costs.
 
 Shows cost breakdowns from persistent JSONL cost logs. Reads both
 per-request logs (model/tier analysis) and per-verb logs (functional
@@ -17,7 +17,7 @@ from rich.table import Table
 from forge.cli.output import print_tip
 from forge.core.paths import display_path, get_forge_home
 
-console = Console(stderr=True)
+console = Console()
 
 
 def _local_period_bounds(period: str) -> tuple[datetime, datetime]:
@@ -96,7 +96,7 @@ def costs_group() -> None:
     """Show or reset proxy cost telemetry.
 
     'show' renders the cost summary; 'reset' wipes all recorded cost + usage
-    telemetry. Run a subcommand (a bare 'forge proxy costs' prints this help).
+    telemetry. Run a subcommand (a bare 'forge telemetry costs' prints this help).
     """
 
 
@@ -122,11 +122,11 @@ def show_cmd(
 
     \b
     Examples:
-        forge proxy costs show                    # Today's costs, by verb
-        forge proxy costs show --by-model         # Today's costs, by model
-        forge proxy costs show --period week      # This week
-        forge proxy costs show --period all       # All time
-        forge proxy costs show openrouter         # Filter by proxy
+        forge telemetry costs show                    # Today's costs, by verb
+        forge telemetry costs show --by-model         # Today's costs, by model
+        forge telemetry costs show --period week      # This week
+        forge telemetry costs show --period all       # All time
+        forge telemetry costs show openrouter         # Filter by proxy
 
     \b
     Tip: pair with 'forge proxy set <id> costs.caps.per_month=<amount>' to keep
@@ -394,7 +394,7 @@ def reset_cmd(yes: bool, dry_run: bool) -> None:
     irreversible.
 
     A running proxy keeps its cost totals AND cap counters in memory until restarted, so a
-    live proxy's cumulative-cost header, snapshot, and `forge proxy costs show` figures do
+    live proxy's cumulative-cost header, snapshot, and `forge telemetry costs show` figures do
     not zero until it is restarted (see the printed tip).
     """
     home = get_forge_home()

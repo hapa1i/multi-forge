@@ -467,7 +467,7 @@ Cap enforcement is process-local. Each proxy process bootstraps from shared JSON
 is not coordinated across concurrent processes. To coordinate caps across processes, run a single proxy process per
 proxy ID.
 
-Telemetry logs accumulate indefinitely. `forge proxy costs reset` wipes legacy cost-log planes (`costs/requests/` +
+Telemetry logs accumulate indefinitely. `forge telemetry costs reset` wipes legacy cost-log planes (`costs/requests/` +
 `costs/verbs/`), downstream/upstream telemetry shards, cap-state snapshots, audit sidecar state, **and** the
 usage-attribution ledger (`usage/events/`) to zero in one step, and clears the derived status-line caches
 (`cache/statusline/fcost-*.json` for `forge +$Y`, `fhealth-*.json` for supervisor health) so a wiped ledger cannot
@@ -619,8 +619,8 @@ Enumerations are `Literal`s (provenance is recorded, never inferred):
   runtime self-reported its own cost+usage: a direct `claude -p --output-format json` run (`reporter=claude_code`), or a
   native `codex`/`gemini` runtime later. `proxy_request_exact` (Phase 4g) is the provenance of a **read-time** figure,
   not a stored event source: a proxied `claude -p` event keeps `verb_snapshot_estimated` in the ledger, but
-  `forge activity` / `forge +$Y` recompute that run tree's cost exactly from the cost plane (sum of cost records by
-  `forge_root_run_id`) and label the result `proxy_request_exact`, **suppressing** the snapshot to avoid
+  `forge telemetry activity` / `forge +$Y` recompute that run tree's cost exactly from the cost plane (sum of cost
+  records by `forge_root_run_id`) and label the result `proxy_request_exact`, **suppressing** the snapshot to avoid
   double-counting. Suppression is **per-run-subtree** (the snapshot's own run, or a verb whose direct children produced
   records — derived from worker `parent_run_id`), never whole-root, so a correctly-unstamped sibling sharing the session
   root keeps its snapshot instead of being silently dropped. A figure with no snapshot estimate mixed in — cost-plane
@@ -699,7 +699,7 @@ tokens). This is the first emission of `reporter=claude_code` and `measurement_s
 cost/tokens — the verb-level aggregate above holds the estimated proxied total, so attributing per-worker would
 double-count. Helper: `emit_worker_usage`.
 
-**Read surface — `forge activity` and the session-end summary.**
+**Read surface — `forge telemetry activity` and the session-end summary.**
 `build_session_activity_summary(name, forge_root, since=)` produces a `SessionActivitySummary` with compatibility
 command rollups plus two explicit panes. The `upstream` pane groups `UpstreamOutcome`s by
 command/operation/status/reason and carries `PolicyActivity` from the manifest fallback; the fallback is capped at
@@ -709,12 +709,13 @@ from upstream or `usage/events`, records whose provider-session id matches the h
 `usage/events` command rows for labels/legacy error counts. Rows carry `join_state` (`matched`, `upstream_only`,
 `downstream_only`); a truly orphaned downstream record with no session-known run tree is not session-attributable.
 
-`forge activity --json` is a clean-break shape with top-level `session`, `since`, `upstream`, `downstream`, `shadow`,
-`subagents`, and `notes` only. Old top-level `commands`, `policy`, `total_events`, and `session_tagging_partial` fields
-are represented inside panes or `notes`. The launcher still prints the compact one-line `render_summary_line(...)` on
-exit (host, sidecar, fork) from the same builder. The `failing open: N timeout, N error` clause still comes from the
-window's supervisor failure split; JSON exposes those legacy counts under `downstream.rows[*].error_kinds`. Cost is
-reported-or-estimated and may be partial; `forge proxy costs show` is authoritative.
+`forge telemetry activity --json` is a clean-break shape with top-level `session`, `since`, `upstream`, `downstream`,
+`shadow`, `subagents`, and `notes` only. Old top-level `commands`, `policy`, `total_events`, and
+`session_tagging_partial` fields are represented inside panes or `notes`. The launcher still prints the compact one-line
+`render_summary_line(...)` on exit (host, sidecar, fork) from the same builder. The `failing open: N timeout, N error`
+clause still comes from the window's supervisor failure split; JSON exposes those legacy counts under
+`downstream.rows[*].error_kinds`. Cost is reported-or-estimated and may be partial; `forge telemetry costs show` is
+authoritative.
 
 Per-emitter session coverage (a per-session summary is honest about what it can attribute):
 
@@ -777,10 +778,10 @@ Semantics and invariants:
   shape) records with unknown fields or bad `Literal` values. `read_provider_traces()` is the typed read surface.
   Provider-trace retention delegates to unified downstream shard pruning; current-calendar-month downstream shards are
   preserved for spend-cap bootstrap, and filtered compaction is follow-up work.
-- **Read surface (Phase 4).** `forge provider trace list|show|explain` (op-backed `core/ops/provider_trace.py`;
-  `%provider trace` mirrors it via the shared `render_explanation_lines` text contract). `list` filters by session
-  *label* (re-derived `forge_sess_<hash>` prefix) / `forge_root_run_id` / `--period`; `explain` joins downstream spend
-  evidence by `request_id` within ±5m for cost confidence. Local-only — no remote `/generation` lookup.
+- **Read surface (Phase 4).** `forge telemetry trace list|show|explain` (op-backed `core/ops/provider_trace.py`;
+  terminal-only, no `%` mirror). `list` filters by session *label* (re-derived `forge_sess_<hash>` prefix) /
+  `forge_root_run_id` / `--period`; `explain` joins downstream spend evidence by `request_id` within ±5m for cost
+  confidence. Local-only — no remote `/generation` lookup.
 - **Session-id injection (opt-in, global).** `provider_trace.inject_provider_user` (default off) lives in
   `~/.forge/config.yaml` (`get_runtime_config().provider_trace`) and governs **both** planes; probe 3 found `user` is
   retained in the indexed `/generation` record for account-side lookup, while a custom `session_id` is ignored.

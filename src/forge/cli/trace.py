@@ -1,4 +1,4 @@
-"""CLI command group: forge provider trace.
+"""CLI command group: forge telemetry trace.
 
 Read-only surface over provider lifecycle/correlation fields in the downstream telemetry
 plane (``~/.forge/telemetry/downstream/``): ``list`` recent traces, ``show`` one record,
@@ -68,12 +68,7 @@ def _status_cell(final_usage_seen: bool, client_disconnected: bool, local_usage_
     return f"{lifecycle} / {local_usage_status}"
 
 
-@click.group("provider", context_settings={"help_option_names": ["-h", "--help"]})
-def provider() -> None:
-    """Inspect provider-side telemetry (provider request lifecycle/correlation)."""
-
-
-@provider.group("trace", context_settings={"help_option_names": ["-h", "--help"]})
+@click.group("trace", context_settings={"help_option_names": ["-h", "--help"]})
 def trace() -> None:
     """Local provider-trace records (metadata only; no secrets, no remote lookups)."""
 
@@ -94,10 +89,10 @@ def trace_list(session: str | None, root_run_id: str | None, period: str, limit:
 
     \b
     Examples:
-        forge provider trace list                          # today, all sessions
-        forge provider trace list --session my-session     # by session label
-        forge provider trace list --root-run-id run_abc... # exact run tree
-        forge provider trace list --period week --json
+        forge telemetry trace list                          # today, all sessions
+        forge telemetry trace list --session my-session     # by session label
+        forge telemetry trace list --root-run-id run_abc... # exact run tree
+        forge telemetry trace list --period week --json
 
     Note: --session matches the hashed session *label* only (two same-named sessions in
     one FORGE_HOME share it); use --root-run-id when exactness matters.
@@ -154,7 +149,7 @@ def trace_show(request_id: str, as_json: bool) -> None:
     try:
         result = show_provider_trace(ctx=ExecutionContext.from_cwd(), request_id=request_id)
     except ForgeOpError as e:
-        print_error_with_tip(str(e), "Run 'forge provider trace list' to see recent request ids.", console=console)
+        print_error_with_tip(str(e), "Run 'forge telemetry trace list' to see recent request ids.", console=console)
         sys.exit(1)
 
     if as_json:
@@ -197,7 +192,7 @@ def trace_explain(request_id: str, as_json: bool) -> None:
     try:
         explanation = explain_provider_trace(ctx=ExecutionContext.from_cwd(), request_id=request_id)
     except ForgeOpError as e:
-        print_error_with_tip(str(e), "Run 'forge provider trace list' to see recent request ids.", console=console)
+        print_error_with_tip(str(e), "Run 'forge telemetry trace list' to see recent request ids.", console=console)
         sys.exit(1)
 
     if as_json:

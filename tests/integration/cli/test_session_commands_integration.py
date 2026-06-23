@@ -799,7 +799,7 @@ class TestTransactionalBehavior:
 
 
 class TestActivityCommand:
-    """'forge activity' reads the real on-disk ledger + manifest through the wheel CLI.
+    """'forge telemetry activity' reads the real on-disk ledger + manifest through the wheel CLI.
 
     Exercises the real session resolver and ledger read (which unit tests mock) so a
     supervisor's error count -- e.g. OpenRouter content-filter failures -- is visible.
@@ -829,7 +829,7 @@ class TestActivityCommand:
             """,
         )
 
-        result = mock_claude_workspace.exec("cd /workspace && forge activity usage-test --all --json")
+        result = mock_claude_workspace.exec("cd /workspace && forge telemetry activity usage-test --all --json")
         assert result.returncode == 0, result.stderr
 
         data = json.loads(result.stdout)

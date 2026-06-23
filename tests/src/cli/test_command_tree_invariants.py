@@ -73,7 +73,6 @@ def test_json_option_dest_is_as_json() -> None:
 # --- Rule: a group earns a path segment only with >=2 visible leaves ----------
 # Hidden groups (internal workers) are exempt. Pre-existing single-leaf groups:
 SINGLE_LEAF_GROUP_ALLOWLIST = {
-    "forge provider",  # -> trace (single child); flatten to provider list|show|explain
     "forge policy shadow",  # -> show (run is hidden)
     "forge memory report",  # -> show; flatten to a leaf
 }
@@ -86,7 +85,7 @@ def test_no_single_leaf_groups() -> None:
             continue
         if path == "forge":
             continue
-        if len(_visible_subcommands(cmd)) == 1:
+        if len(_visible_subcommands(cmd)) <= 1:
             violations.add(path)
     _assert_ledger(violations, SINGLE_LEAF_GROUP_ALLOWLIST, "group needs >=2 visible leaves")
 

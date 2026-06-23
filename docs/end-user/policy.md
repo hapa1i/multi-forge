@@ -53,8 +53,8 @@ have been touched) persists in the session manifest between hook invocations.
 > **Seeing `warn` verdicts.** A `warn` does not block, and Claude Code does **not** surface non-blocking hook output to
 > you at the terminal (it goes to the model as context, not your console). So a warning is effectively invisible
 > mid-session. Forge records every verdict; review them after the fact with
-> [`forge activity [session]`](session.md#what-a-session-did-forge-activity--session-end-summary) (supervisor
-> allow/warn/deny plus recent warning text) or the one-line session-end summary the launcher prints on exit.
+> [`forge telemetry activity [session]`](session.md#what-a-session-did-forge-telemetry-activity--session-end-summary)
+> (supervisor allow/warn/deny plus recent warning text) or the one-line session-end summary the launcher prints on exit.
 
 ---
 
@@ -261,10 +261,10 @@ How it behaves:
   degrades to exactly the non-cascade behavior; supervision is never silently skipped.
 - `%policy supervise cascade on` / `%policy supervise cascade off` toggles it in-session.
 
-Reading the results in `forge activity`: the **Plan check (tier-1)** line shows allow vs needs-review counts (your
-short-circuit rate), the **Supervisor** line shows what the frontier decided when it ran, and the **Model calls** pane
-shows tier-1 call volume, tokens, and errors. The two lines can differ: a needs-review verdict that coincides with a
-deterministic block (for example TDD) never reaches the supervisor. When recent frontier checks fail open, the
+Reading the results in `forge telemetry activity`: the **Plan check (tier-1)** line shows allow vs needs-review counts
+(your short-circuit rate), the **Supervisor** line shows what the frontier decided when it ran, and the **Model calls**
+pane shows tier-1 call volume, tokens, and errors. The two lines can differ: a needs-review verdict that coincides with
+a deterministic block (for example TDD) never reaches the supervisor. When recent frontier checks fail open, the
 **Supervisor** line also appends `failing open: N timeout, N error` — a window aggregate, distinct from the status
 line's `SUP!N` consecutive streak.
 

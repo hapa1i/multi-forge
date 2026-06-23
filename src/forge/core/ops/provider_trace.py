@@ -1,10 +1,9 @@
 """Shared provider-trace operations (command-core).
 
 UI-agnostic read surface over the provider-trace plane (the fourth telemetry plane,
-``forge.proxy.provider_trace_logger``). Invoked from both:
+``forge.proxy.provider_trace_logger``). Invoked from:
 
-- the CLI (``forge provider trace list|show|explain``), and
-- the in-chat direct command dispatcher (``%provider trace ...``).
+- the CLI (``forge telemetry trace list|show|explain``).
 
 Returns structured DTOs and raises ``ForgeOpError`` on failure. ``explain`` answers the
 incident's five questions from LOCAL records only (trace plane + cost plane) — it never
@@ -171,8 +170,7 @@ def explain_provider_trace(*, ctx: ExecutionContext, request_id: str) -> Provide
 def render_explanation_lines(exp: ProviderTraceExplanation) -> list[str]:
     """Render an explanation as stable plain text (no Rich, no markup).
 
-    A stable plain-text *contract* shared by ``forge provider trace explain`` and
-    ``%provider trace explain`` so both surfaces render byte-identical output.
+    A stable plain-text *contract* for ``forge telemetry trace explain``.
     Precedent: ``render_summary_line`` in ``usage_summary.py``.
     """
     provider_label = exp.provider or "the provider"

@@ -27,12 +27,12 @@ from .memory import memory as memory_cmd  # noqa: E402
 from .memory_writer import memory_writer  # noqa: E402
 from .model import model as model_cmd  # noqa: E402
 from .policy import policy  # noqa: E402
-from .provider import provider  # noqa: E402
 from .proxy import proxy  # noqa: E402
 from .runtime import runtime  # noqa: E402
 from .search import search_cmd  # noqa: E402
 from .session import session  # noqa: E402
 from .status_line import status_line  # noqa: E402
+from .telemetry import telemetry  # noqa: E402
 from .transfer import transfer as transfer_cmd  # noqa: E402
 from .workflow import workflow_cmd  # noqa: E402
 
@@ -381,7 +381,7 @@ main.add_command(auth, name="authentication")
 main.add_command(model_cmd, name="model")
 main.add_command(session)
 main.add_command(proxy)
-main.add_command(provider)
+main.add_command(telemetry)
 main.add_command(policy)
 main.add_command(memory_writer)
 main.add_command(claude)
@@ -397,13 +397,11 @@ main.add_command(workflow_cmd, name="workflow")
 main.add_command(search_cmd, name="search")
 main.add_command(runtime, name="runtime")
 
-from forge.cli.activity import activity_cmd  # noqa: E402
 from forge.cli.gc import clean_cmd  # noqa: E402
 from forge.cli.logs import logs_cmd  # noqa: E402
 
 main.add_command(clean_cmd, name="clean")
 main.add_command(logs_cmd, name="logs")
-main.add_command(activity_cmd, name="activity")
 
 
 if __name__ == "__main__":

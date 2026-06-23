@@ -1,4 +1,4 @@
-"""Unit tests for the `forge provider trace` CLI (table + --json parity)."""
+"""Unit tests for the `forge telemetry trace` CLI (table + --json parity)."""
 
 from __future__ import annotations
 
@@ -8,8 +8,12 @@ from typing import Any
 import pytest
 from click.testing import CliRunner
 
-from forge.cli.provider import provider
+from forge.cli.main import main
 from forge.proxy import provider_trace_logger as ptl
+
+
+def _trace_args(*args: str) -> list[str]:
+    return ["telemetry", "trace", *args]
 
 
 @pytest.fixture(autouse=True)
@@ -43,26 +47,17 @@ def _record(**kw: Any) -> None:
     ptl.record_provider_trace(**params)
 
 
-def test_provider_group_orients_to_subcommands():
-    # Bare group is "Missing command" (exit 2, prints usage), matching every other forge group.
-    bare = CliRunner().invoke(provider, [])
+def test_trace_group_orients_to_leaves():
+    bare = CliRunner().invoke(main, _trace_args())
     assert bare.exit_code == 2
     assert "Usage:" in bare.output
-    # --help lists the trace subgroup.
-    helped = CliRunner().invoke(provider, ["--help"])
-    assert helped.exit_code == 0
-    assert "trace" in helped.output
-
-
-def test_trace_group_orients_to_leaves():
-    assert CliRunner().invoke(provider, ["trace"]).exit_code == 2
-    helped = CliRunner().invoke(provider, ["trace", "--help"])
+    helped = CliRunner().invoke(main, _trace_args("--help"))
     assert helped.exit_code == 0
     assert "list" in helped.output and "explain" in helped.output
 
 
 def test_list_empty():
-    result = CliRunner().invoke(provider, ["trace", "list", "--period", "all"])
+    result = CliRunner().invoke(main, _trace_args("list", "--period", "all"))
     assert result.exit_code == 0
     assert "No provider traces" in result.output
 
@@ -70,7 +65,7 @@ def test_list_empty():
 def test_list_json_is_bare_array():
     _record(request_id="req-1")
     _record(request_id="req-2")
-    result = CliRunner().invoke(provider, ["trace", "list", "--period", "all", "--json"])
+    result = CliRunner().invoke(main, _trace_args("list", "--period", "all", "--json"))
     assert result.exit_code == 0
     data = json.loads(result.output)
     assert isinstance(data, list)  # bare array, NOT the wrapper dict
@@ -79,7 +74,7 @@ def test_list_json_is_bare_array():
 
 def test_list_table_shows_record():
     _record(request_id="req-1")
-    result = CliRunner().invoke(provider, ["trace", "list", "--period", "all"])
+    result = CliRunner().invoke(main, _trace_args("list", "--period", "all"))
     assert result.exit_code == 0
     assert "req-1" in result.output
     assert "disconnect" in result.output
@@ -87,7 +82,7 @@ def test_list_table_shows_record():
 
 def test_show_json_single_dict():
     _record(request_id="req-1")
-    result = CliRunner().invoke(provider, ["trace", "show", "req-1", "--json"])
+    result = CliRunner().invoke(main, _trace_args("show", "req-1", "--json"))
     assert result.exit_code == 0
     data = json.loads(result.output)
     assert isinstance(data, dict)
@@ -96,7 +91,7 @@ def test_show_json_single_dict():
 
 
 def test_show_missing_exits_1_with_tip():
-    result = CliRunner().invoke(provider, ["trace", "show", "nope"])
+    result = CliRunner().invoke(main, _trace_args("show", "nope"))
     assert result.exit_code == 1
     assert "No provider trace found" in result.output
     assert "Tip:" in result.output
@@ -104,7 +99,7 @@ def test_show_missing_exits_1_with_tip():
 
 def test_explain_json_whole_dto():
     _record(request_id="req-1")
-    result = CliRunner().invoke(provider, ["trace", "explain", "req-1", "--json"])
+    result = CliRunner().invoke(main, _trace_args("explain", "req-1", "--json"))
     assert result.exit_code == 0
     data = json.loads(result.output)
     assert data["request_id"] == "req-1"
@@ -113,20 +108,20 @@ def test_explain_json_whole_dto():
 
 def test_explain_text_incident():
     _record(request_id="req-1")
-    result = CliRunner().invoke(provider, ["trace", "explain", "req-1"])
+    result = CliRunner().invoke(main, _trace_args("explain", "req-1"))
     assert result.exit_code == 0
     assert "unavailable, not zero" in result.output
     assert "No remote lookup was performed." in result.output
 
 
 def test_explain_missing_exits_1():
-    result = CliRunner().invoke(provider, ["trace", "explain", "nope"])
+    result = CliRunner().invoke(main, _trace_args("explain", "nope"))
     assert result.exit_code == 1
 
 
 def test_no_secret_value_printed():
     _record(request_id="req-1")
-    for args in (["trace", "list", "--period", "all"], ["trace", "show", "req-1"], ["trace", "explain", "req-1"]):
-        out = CliRunner().invoke(provider, args).output
+    for args in (["list", "--period", "all"], ["show", "req-1"], ["explain", "req-1"]):
+        out = CliRunner().invoke(main, _trace_args(*args)).output
         assert "sk-" not in out
         assert "Bearer" not in out

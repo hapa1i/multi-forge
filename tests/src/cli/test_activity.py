@@ -1,4 +1,4 @@
-"""Tests for ``forge activity``.
+"""Tests for ``forge telemetry activity``.
 
 Session resolution is exercised by ``test_session_context``; here we monkeypatch the
 resolver so the tests focus on the command's rendering / JSON contract / error tip.
@@ -10,7 +10,7 @@ import json
 
 from click.testing import CliRunner
 
-from forge.cli.activity import activity_cmd
+from forge.cli.main import main
 from forge.core.telemetry.downstream import (
     DownstreamRecord,
     mint_downstream_event_id,
@@ -18,6 +18,10 @@ from forge.core.telemetry.downstream import (
 )
 from forge.core.telemetry.upstream import UpstreamOutcome, write_upstream_outcome
 from forge.core.usage.ledger import UsageEvent, log_usage_event
+
+
+def _activity_args(*args: str) -> list[str]:
+    return ["telemetry", "activity", *args]
 
 
 def _event(**overrides: object) -> UsageEvent:
@@ -47,7 +51,7 @@ def test_not_found_prints_tip_and_exits_1(monkeypatch) -> None:
         raise SessionContextError("No session 'ghost' found")
 
     monkeypatch.setattr("forge.cli.activity.resolve_session_identifier", _raise)
-    result = CliRunner().invoke(activity_cmd, ["ghost"])
+    result = CliRunner().invoke(main, _activity_args("ghost"))
     assert result.exit_code == 1
     assert "forge session list" in result.output
 
@@ -59,7 +63,7 @@ def test_not_found_json(monkeypatch) -> None:
         raise SessionContextError("nope")
 
     monkeypatch.setattr("forge.cli.activity.resolve_session_identifier", _raise)
-    result = CliRunner().invoke(activity_cmd, ["ghost", "--json"])
+    result = CliRunner().invoke(main, _activity_args("ghost", "--json"))
     assert result.exit_code == 1
     assert json.loads(result.output)["error"] == "nope"
 
@@ -68,7 +72,7 @@ def test_human_render_shows_supervisor(monkeypatch) -> None:
     _patch_resolver(monkeypatch)
     log_usage_event(_event(status="success"))
     log_usage_event(_event(status="error"))
-    result = CliRunner().invoke(activity_cmd, ["planner", "--all"])
+    result = CliRunner().invoke(main, _activity_args("planner", "--all"))
     assert result.exit_code == 0
     assert "Forge activity" in result.output
     assert "planner" in result.output
@@ -78,7 +82,7 @@ def test_human_render_shows_supervisor(monkeypatch) -> None:
 def test_json_shape(monkeypatch) -> None:
     _patch_resolver(monkeypatch)
     log_usage_event(_event(command="supervisor", status="error"))
-    result = CliRunner().invoke(activity_cmd, ["planner", "--all", "--json"])
+    result = CliRunner().invoke(main, _activity_args("planner", "--all", "--json"))
     assert result.exit_code == 0
     data = json.loads(result.output)
     assert data["session"] == "planner"
@@ -116,7 +120,7 @@ def test_two_pane_join_renders_upstream_and_downstream(monkeypatch) -> None:
         )
     )
 
-    human = CliRunner().invoke(activity_cmd, ["planner", "--all"])
+    human = CliRunner().invoke(main, _activity_args("planner", "--all"))
     assert human.exit_code == 0
     assert "Operation outcomes" in human.output
     assert "Model calls" in human.output
@@ -124,7 +128,7 @@ def test_two_pane_join_renders_upstream_and_downstream(monkeypatch) -> None:
     assert "memory_writer.run" in human.output
     assert "matched" in human.output
 
-    machine = CliRunner().invoke(activity_cmd, ["planner", "--all", "--json"])
+    machine = CliRunner().invoke(main, _activity_args("planner", "--all", "--json"))
     assert machine.exit_code == 0
     data = json.loads(machine.output)
     operation = data["upstream"]["operations"][0]
@@ -142,7 +146,7 @@ def test_human_render_shows_failing_open(monkeypatch) -> None:
     log_usage_event(_event(status="timeout", failure_type="timeout"))
     log_usage_event(_event(status="timeout", failure_type="timeout"))
     log_usage_event(_event(status="error", failure_type="subprocess_error"))
-    result = CliRunner().invoke(activity_cmd, ["planner", "--all"])
+    result = CliRunner().invoke(main, _activity_args("planner", "--all"))
     assert result.exit_code == 0
     assert "failing open: 2 timeout, 1 error" in result.output
 
@@ -152,7 +156,7 @@ def test_json_includes_error_kinds(monkeypatch) -> None:
     log_usage_event(_event(status="timeout", failure_type="timeout"))
     log_usage_event(_event(status="timeout", failure_type="timeout"))
     log_usage_event(_event(status="error", failure_type="subprocess_error"))
-    result = CliRunner().invoke(activity_cmd, ["planner", "--all", "--json"])
+    result = CliRunner().invoke(main, _activity_args("planner", "--all", "--json"))
     assert result.exit_code == 0
     rows = {c["command"]: c for c in json.loads(result.output)["downstream"]["rows"]}
     assert rows["supervisor"]["error_kinds"] == {"timeout": 2, "error": 1}
@@ -161,7 +165,7 @@ def test_json_includes_error_kinds(monkeypatch) -> None:
 
 def test_empty_session_message(monkeypatch) -> None:
     _patch_resolver(monkeypatch, name="quiet")
-    result = CliRunner().invoke(activity_cmd, ["quiet"])
+    result = CliRunner().invoke(main, _activity_args("quiet"))
     assert result.exit_code == 0
     assert "No Forge activity" in result.output
 
@@ -177,7 +181,7 @@ def test_human_render_shows_subagents(monkeypatch, tmp_path) -> None:
     _patch_resolver(monkeypatch, name="planner", forge_root=str(tmp_path))
     log_usage_event(_event(command="supervisor"))
 
-    result = CliRunner().invoke(activity_cmd, ["planner", "--all"])
+    result = CliRunner().invoke(main, _activity_args("planner", "--all"))
     assert result.exit_code == 0
     assert "Subagents" in result.output
     assert "3" in result.output
@@ -213,7 +217,7 @@ def test_human_render_shows_plan_check_counters(monkeypatch, tmp_path) -> None:
     _patch_resolver(monkeypatch, name="planner", forge_root=str(tmp_path))
     log_usage_event(_event(command="plan-check"))
 
-    result = CliRunner().invoke(activity_cmd, ["planner", "--all"])
+    result = CliRunner().invoke(main, _activity_args("planner", "--all"))
     assert result.exit_code == 0
     assert "Plan check (tier-1)" in result.output
     assert "1 allow" in result.output
@@ -256,7 +260,7 @@ def test_json_includes_plan_check_counters(monkeypatch, tmp_path) -> None:
     _patch_resolver(monkeypatch, name="planner", forge_root=str(tmp_path))
     log_usage_event(_event(command="plan-check"))
 
-    result = CliRunner().invoke(activity_cmd, ["planner", "--all", "--json"])
+    result = CliRunner().invoke(main, _activity_args("planner", "--all", "--json"))
     assert result.exit_code == 0
     data = json.loads(result.output)
     assert data["upstream"]["policy"]["plan_check_needs_review"] == 1
@@ -268,7 +272,7 @@ def test_json_includes_plan_check_counters(monkeypatch, tmp_path) -> None:
 def test_days_window_excludes_nothing_recent(monkeypatch) -> None:
     _patch_resolver(monkeypatch)
     log_usage_event(_event(command="supervisor"))
-    result = CliRunner().invoke(activity_cmd, ["planner", "--days", "7", "--json"])
+    result = CliRunner().invoke(main, _activity_args("planner", "--days", "7", "--json"))
     assert result.exit_code == 0
     data = json.loads(result.output)
     assert data["downstream"]["rows"][0]["attempts"] == 1
@@ -307,7 +311,7 @@ def test_exact_proxied_cost_renders_without_tilde(monkeypatch) -> None:
         forge_run_id="run_mw",
         forge_root_run_id="run_mw",
     )
-    result = CliRunner().invoke(activity_cmd, ["planner", "--all"])
+    result = CliRunner().invoke(main, _activity_args("planner", "--all"))
     assert result.exit_code == 0
     assert "$0.12" in result.output
     assert "~$0.12" not in result.output  # exact -> no estimate marker
@@ -341,7 +345,7 @@ def test_human_render_shows_shadow_section(monkeypatch, tmp_path) -> None:
     _write_shadow_done(tmp_path, "d1", status="disagree", frontier_verdict="divergent", frontier_confidence=0.9)
     _patch_resolver(monkeypatch, name="planner", forge_root=str(tmp_path))
 
-    result = CliRunner().invoke(activity_cmd, ["planner", "--all"])
+    result = CliRunner().invoke(main, _activity_args("planner", "--all"))
     assert result.exit_code == 0
     assert "Shadow (audit)" in result.output
     assert "2 checked" in result.output
@@ -356,7 +360,7 @@ def test_json_includes_shadow(monkeypatch, tmp_path) -> None:
     _write_shadow_done(tmp_path, "d1", status="disagree")
     _patch_resolver(monkeypatch, name="planner", forge_root=str(tmp_path))
 
-    result = CliRunner().invoke(activity_cmd, ["planner", "--all", "--json"])
+    result = CliRunner().invoke(main, _activity_args("planner", "--all", "--json"))
     assert result.exit_code == 0
     data = json.loads(result.output)
     assert data["shadow"]["checked"] == 1
