@@ -2,14 +2,58 @@
 
 **Card**: [card.md](card.md) - **Branch**: `forge_cli_cleanup` - **Lane**: doing
 
-Accepted 2026-06-23 at user request and moved `proposed/ -> doing/` directly. This first branch commit only starts the
-execution lane; no command surface changes yet.
+Accepted 2026-06-23 at user request and moved `proposed/ -> doing/` directly. Phase 0 (board start) is the only work
+landed; no command surface has changed yet.
+
+Deepened 2026-06-23 from a read-only verification pass over the live CLI (every card finding checked at file:line,
+corrections adversarially refuted). The reconciliation below is the basis for the concrete assertions in Phases 1-2 —
+read it before starting a slice.
 
 ## Current focus
 
-Start with a taxonomy decision slice before touching live commands. The card proposes a large clean break across
-top-level command groups, so the first implementation work should reduce ambiguity rather than rename surfaces
-piecemeal.
+Phase 1 is a **decision gate**, not code. The card is a large clean break; the cheapest way to de-risk it is to settle
+the taxonomy and the open questions first, then drain the five debt ledgers the test suite already tracks. Do not rename
+a live surface before the matching decision is recorded here.
+
+## Audit reconciliation (verified 2026-06-23)
+
+### Corrections to the card (verify before trusting the card text)
+
+| #                                     | Card framing                                                                    | Verified reality                                                                                                                                                                                                                                                                                                                                             | Action                                                                                                                                      |
+| ------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| F13                                   | `forge config`/`forge search` hand-roll `invoke_without_command` "for a reason" | Both **only echo help**; `subcommand_metavar`/`help_option_names` work fine with `no_args_is_help=True` (adversarially confirmed). The card's normalization point **stands**.                                                                                                                                                                                | Normalize both to `no_args_is_help=True` (slice 12).                                                                                        |
+| F14f                                  | `forge proxy edit` "proxy overlay" wording may be stale                         | "Proxy overlay" is **canonical** terminology (design_appendix §A.1 title; `proxy_orchestrator.py:134 _get_proxy_overlay_dir`). Not stale.                                                                                                                                                                                                                    | **No-op.** Drop this bullet; do not "fix" the wording.                                                                                      |
+| F3                                    | Table lists per-command cleanup defaults                                        | All six rows confirmed; `forge proxy clean` (`proxy.py:1288`) has **zero** safety flags and prunes immediately — the most dangerous.                                                                                                                                                                                                                         | Standardize `clean` verbs (slice 09).                                                                                                       |
+| `forge model backend` (slice 04 / Q3) | Proposed nesting                                                                | `forge model` with a single child `backend` is a **single-child group nest** the guide forbids and `test_no_single_leaf_groups` would flag.                                                                                                                                                                                                                  | Keep top-level `forge backend`, **or** only introduce `forge model` with ≥2 children. Decide in Phase 1.                                    |
+| F4                                    | "11 read surfaces lack `--json`"                                                | Confirmed; but the guard only inspects leaves named `list/show/status`, so `forge authentication profiles` and `forge transfer diff` are **invisible** to it (not in `JSON_MISSING_ALLOWLIST`).                                                                                                                                                              | Add `--json` to all; extend the guard to cover `profiles`/`diff` (slice 07).                                                                |
+| F9                                    | Hand-rolled tips/errors bypass helpers                                          | `test_cli_rich_tips_*` only catches Rich `[dim]Tip:`; **10 terminal tips** slip through — 8 plain `click.echo("Tip: …")` (auth ×4, claude ×2, install ×2) **plus 2 `ClickException`-embedded** (`session.py:111,126`, my prior row wrongly said session.py has only errors). 3 assistant-facing payloads (`direct_commands.py:79,162,705`) must stay exempt. | Migrate all 10; `ClickException` bodies become plain-error-only; guard scans `Tip:` in CLI source with a non-terminal allowlist (slice 11). |
+
+### Debt ledgers already tracking this card (drain, never grow)
+
+Each `*_ALLOWLIST` is a pre-existing-violation ledger; `_assert_ledger` fails on a *new* violation **and** on an
+allowlisted entry that was fixed-without-removal. "Done" for these slices = the entry is gone from the ledger.
+
+| Ledger (file)                                                | Entries                                                                                                                                                                                                   | Owning slice |
+| ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ |
+| `JSON_DEST_ALLOWLIST` (`test_command_tree_invariants.py:49`) | `proxy create`, `proxy metrics`, `policy check`, `policy supervisor`, `workflow {list-models,panel,analyze,debate,consensus}` — 9 using `json_output` not `as_json`                                       | 07           |
+| `JSON_MISSING_ALLOWLIST` (`:134`)                            | `authentication status`, `backend show`, `proxy template {list,show}`, `claude preset show`, `config show`, `memory shadows show`, `memory report show`, `search status` — 9 read leaves with no `--json` | 07           |
+| `SINGLE_LEAF_GROUP_ALLOWLIST` (`:75`)                        | `forge provider` (→ `provider list\|show\|explain`), `forge policy shadow` (→ `show`; `run` hidden), `forge memory report` (→ flatten)                                                                    | 03 / 12      |
+| `LEAF_NAMING_ALLOWLIST` (`:110`)                             | `forge policy: supervise\|supervisor` (confusable; `supervise` is a prefix of `supervisor`)                                                                                                               | 10           |
+| `CLI_ERROR_MARKUP_ALLOWLIST` (`test_output.py`)              | 18 files with hand-rolled `[red]Error:` (244 raw occurrences outside `output.py`)                                                                                                                         | 11           |
+
+### Guard gaps (rules with no mechanical enforcement yet)
+
+- **Stream ownership (F10):** `_(review)_` only; no stdout/stderr capture test. `proxy_costs.py:20` and
+  `proxy_audit.py:17` render human tables to `Console(stderr=True)` while `--json` goes to stdout —
+  `activity.py`/`provider.py` are already compliant (stdout for both). Adding the guard needs
+  `CliRunner(mix_stderr=False)` (slice 07).
+- **Session selectors (F11):** `_(review)_`; rule is written (style guide §Command Shape) but unguarded.
+- **Config-object verbs (F5):** `_(review)_`; the vocabulary is undecided (blocks slice 08 — see Phase 1).
+- **`--json` guard scope (F4):** only `list/show/status` leaves are checked (`_READ_LEAVES`).
+- **Tip guard scope (F9):** only `[dim]Tip:` Rich markup — misses the 8 plain `click.echo("Tip: …")` sites **and** the 2
+  `ClickException`-embedded tips (`session.py:111,126`, `msg += "\nTip: …"`). A literal `Tip:` source scan must also
+  skip non-terminal contexts: assistant-facing `hooks/direct_commands.py` payloads (×3), plus false positives in a help
+  docstring (`proxy_costs.py:132`) and a convention comment (`session_fork.py:467`).
 
 ## Phase 0 - Board start
 
@@ -19,53 +63,147 @@ piecemeal.
 - [x] Add this initial checklist.
 - [x] Commit initial board-start state on the branch.
 
-## Phase 1 - Taxonomy decision slice
+## Phase 1 - Taxonomy decision gate
 
-- [ ] Confirm final command tree for:
-  - `forge telemetry activity|trace|costs`;
-  - `forge model backend`;
-  - `forge session transfer`;
-  - top-level `memory`, `runtime`, `proxy`, and `codex` boundaries.
-- [ ] Decide whether `forge proxy audit show|diff` stays under `proxy` or moves under `telemetry`.
-- [ ] Decide whether session memory activation/reporting moves under `session memory`.
-- [ ] Decide user-facing hook-management surface (`extension` vs visible `hook` vs docs removal).
-- [ ] Decide alias policy, including `auth` versus `authentication`.
-- [ ] Record resolved decisions in the checklist before implementation slices start.
+Record a decision (with rationale) for each item before any Phase 2 slice that depends on it. Recommendations are
+defaults to accept or override, not commitments.
+
+- [ ] **D1 Observability namespace (F1/F10, slice 03).** Move `forge activity` + `forge provider trace` +
+  `forge proxy costs` under `forge telemetry {activity,trace,costs}`? _Recommend: yes._ Note: moving `provider trace` to
+  `telemetry trace list|show|explain` makes it a 3-leaf subgroup and **clears** the `forge provider` single-leaf-debt —
+  but contradicts the ledger comment's "flatten to `provider list|show|explain`"; pick one target and update that
+  comment.
+- [ ] **D2 Proxy audit placement (Q2).** Keep `forge proxy audit show|diff` under `proxy` (capture is proxy-configured),
+  or move to `telemetry`? _Recommend: keep under `proxy`_ (2-leaf subgroup, capture/config is proxy-owned).
+- [ ] **D3 Backend namespace (F5/Q3).** `forge model backend …` would make `forge model` a single-child nest the guide
+  forbids. _Recommend: keep top-level `forge backend`_ unless `forge model` gains a second child; record the
+  churn-vs-value call.
+- [ ] **D4 Memory split (Q4/Q5).** Does `memory enable|disable|status|report` move under `forge session memory`, leaving
+  top-level `forge memory` for project-doc passports (`track`/`list`/`passport`/`shadows`)? _Recommend: yes_ — also
+  resolves the `forge memory report` single-leaf debt.
+- [ ] **D5 Hook visibility (F8/Q6).** Expose `forge hook`, route users to `forge extension enable|disable`, or stop
+  documenting `forge hook enable|disable`? _Recommend: route through `extension`_; keep handlers hidden; drop the
+  end-user `hook enable|disable` docs.
+- [ ] **D6 Alias + canonical names (F12/Q10/Q11).** Make `auth` canonical (style-guide rule: canonical = user
+  vocabulary)? Decide which moved/new groups (`telemetry`, `model`) earn aliases; decide whether the
+  `extensions -> extension` shim survives. _Recommend: `auth` canonical; minimal alias set; drop the `extensions` shim
+  (clean break)._ Do this **after** D1-D4 so new nouns are known.
+- [ ] **D7 Config-object verb vocabulary (F5/slice 08).** Define the shared verb set for editable config objects
+  (`config`, `proxy`, `claude preset`, `proxy template`, `backend`) and which are "lifecycle resources" exempt from it.
+  _Recommend: shared `{show, edit, set, reset, validate}`; backend keeps lifecycle
+  `{create,start,stop,delete,reconcile}` documented as an exception._ Records into the style guide; **blocks slice 08**.
+- [ ] **D8 `--json` destination policy (Q8).** Normalize all `json_output` → `as_json`, or document the 9-entry
+  exception? _Recommend: normalize_ (user-facing `--json` unchanged; drains `JSON_DEST_ALLOWLIST`).
+- [ ] **D9 Workspace-scope coordination (Q7).** Does `forge telemetry … --scope workspace` wait for the
+  `workspace_scope` proposal, or reserve the flag now? _Recommend: reserve the flag name, defer the aggregation._
+- [ ] Record every D1-D9 outcome inline here (with date) before starting the matching Phase 2 slice.
 
 ## Phase 2 - Implementation slices
 
-- [ ] Session-scope move: `forge session transfer ...` and any chosen session-memory surfaces.
-- [ ] Telemetry move: activity, provider trace, and costs under the chosen telemetry namespace.
-- [ ] Model/backend move under the chosen model namespace while preserving lifecycle/auth/reconcile behavior.
-- [ ] Clean-break removals, including `forge session context`.
-- [ ] Read-output consistency: missing `--json`, `as_json` destination normalization, stdout/stderr policy, and
-  `forge search query` human default.
-- [ ] Config-object parity across `config`, `proxy`, `claude preset`, `proxy template`, and backend config.
-- [ ] Destructive cleanup semantics pass.
-- [ ] Policy supervisor naming/action cleanup.
-- [ ] Recovery-output helper cleanup.
-- [ ] Non-leaf group normalization.
-- [ ] Smaller surface cleanup pass.
+Each slice's assertion names an observable behavior and the test that proves it. Tick only when the test passes and the
+verification is recorded.
+
+- [ ] **Slice 03 - Telemetry move (D1, D2).** `forge telemetry activity|trace|costs` exist and work; old paths
+  (`forge activity`, `forge provider trace`, `forge proxy costs`) return Click `No such command` (clean break, no
+  tombstone). `SINGLE_LEAF_GROUP_ALLOWLIST` loses `forge provider` (and `forge memory report` if D4 lands). Human +
+  `--json` of each telemetry leaf share **stdout** (fix `proxy_costs.py:20`/`proxy_audit.py:17` if they move). Tests:
+  `tests/src/cli/test_telemetry.py` (new) + old-path-removal cases.
+- [ ] **Slice 02 - Session-scope move (D4).** `forge session transfer show|regenerate|edit|diff` exist; if D4 lands,
+  `forge session memory …` exists and top-level `forge memory` keeps only passport/doc verbs. Old `forge transfer …`
+  paths removed. Tests assert new paths + `No such command` on old.
+- [ ] **Slice 04 - Backend (D3).** Apply D3; if kept top-level, this slice is docs-only. If moved, preserve every
+  lifecycle/auth/reconcile verb (`backend.py`: list/show/test-auth/create/start/stop/delete/reconcile) and add no
+  single-child nest. Test: `forge backend …` (or chosen path) retains all 8 verbs; `forge model` (if created) has ≥2
+  children.
+- [ ] **Slice 06 - Clean-break removals.** Delete `forge session context` (`session_manage.py:857`, `hidden=True`),
+  **delete** `tests/src/cli/test_session_context.py` (removed code → delete test), and drop the `cli_reference.md:44`
+  note. `forge session context` returns Click `No such command`. Sweep for any other hidden tombstone.
+- [ ] **Slice 07 - Read-output consistency.**
+  - `forge search query <terms>` prints a human table by default and emits the documented JSON shape only under `--json`
+    (`search.py:76` currently always `json.dumps`); `forge search query --json` round-trips the prior structure.
+  - Add `--json` (dest `as_json`) to the 9 `JSON_MISSING_ALLOWLIST` leaves **plus** `forge authentication profiles` and
+    `forge transfer diff`; extend `_READ_LEAVES`/the guard so `profiles`/`diff` are covered; `JSON_MISSING_ALLOWLIST` →
+    `{}`.
+  - Normalize the 9 `json_output` dests to `as_json` (D8); `JSON_DEST_ALLOWLIST` → `{}`.
+  - Make `proxy_costs`/`proxy_audit` human output go to stdout; add the planned stdout/stderr guard with
+    `CliRunner(mix_stderr=False)` (asserts `--json` mode is valid JSON on stdout, empty stderr).
+- [ ] **Slice 08 - Config-object parity (blocked by D7).** Apply the D7 verb set across `config`, `proxy`,
+  `claude preset`, `proxy template`, `backend`; fix the `config_cmd.py` docstring that claims proxy-parity it lacks (4
+  vs 11 verbs); record exceptions in the style guide. Add a verb-vocabulary guard or a `_(review)_` note.
+- [ ] **Slice 09 - Destructive consistency (F3).** `clean` verbs preview by default + mutate on `--yes`: fix
+  `forge session clean` (`session_manage.py:570`, mutates by default today) and `forge proxy clean` (`proxy.py:1288`, no
+  flags today). `delete`/`reset` keep prompt + a single `--yes` bypass name. Decide F14a (is `proxy clean` redundant
+  with list/create pruning?) — remove only if behavior is fully covered. Tests assert each command's default and
+  `--yes`/`--dry-run` behavior.
+- [ ] **Slice 10 - Policy supervisor cleanup (F7).** Split `forge policy supervise` (12+ flags) into
+  `forge policy supervisor {status,set,off,on,reload,evaluate}`; `evaluate` (not `check`) is the one-shot file-vs-plan
+  eval; `forge policy check` keeps bundle-engine eval. Removing the collision drops `forge policy: supervise|supervisor`
+  from `LEAF_NAMING_ALLOWLIST`. Old `forge policy supervise` returns `No such command`. Update `%policy supervise`
+  direct command + docs.
+- [ ] **Slice 11 - Recovery-output cleanup (F9).** Route **all** terminal/user-visible `Tip:` output through
+  `print_tip`/`print_error_with_tip`, **including tips embedded in `ClickException` messages**: the 8 plain
+  `click.echo("Tip: …")` sites (auth.py ×4, claude.py ×2, hooks/install.py ×2) and the 2 `ClickException`-embedded tips
+  (`session.py:111,126`). Policy (per card finding #9): a `ClickException` body is plain error text only — no embedded
+  `Tip:`; route the tip via `print_error_with_tip` then exit. **Explicitly exempt assistant-facing direct-command JSON
+  payloads** (`hooks/direct_commands.py:79,162,705`) — they are not terminal output.
+  - Migrate the 18 `CLI_ERROR_MARKUP_ALLOWLIST` files to `print_error*` until that ledger is `{}`.
+  - Extend the guard to fail on a literal `Tip:` anywhere in `src/forge/cli/**` except `output.py`, with a small
+    documented non-terminal allowlist (the `direct_commands.py` payloads; the `proxy_costs.py:132` help docstring and
+    `session_fork.py:467` comment unless reworded). Mirror the shrink-only `CLI_ERROR_MARKUP_ALLOWLIST` ledger style — a
+    source scan, not AST-only, since the `session.py` `msg += Tip:` → `ClickException` pattern has no `click.echo` to
+    match.
+- [ ] **Slice 12 - Non-leaf + small surfaces.** Normalize `forge config`/`forge search` to `no_args_is_help=True` (F13
+  stands). Resolve remaining `SINGLE_LEAF_GROUP_ALLOWLIST` entries (`forge policy shadow`). Audit the F14 candidates:
+  `proxy metrics --all` (redundant with no-arg aggregate — remove or document), `memory track` naming, `extension sync`
+  vs `enable` naming, `resume-mode` value divergence (`resume {native,transfer}` vs `fork {transfer,native-relocate}` —
+  document the intentional asymmetry at the call site). F14f is a **no-op** (proxy-overlay wording is canonical).
+- [ ] **Slice 05 - Alias + canonical pass (D6).** Apply canonical/alias decisions; update `_ALIASES`, `_DISPLAY_ALIASES`
+  (`main.py:49-72`), `cli_reference.md`, and the style guide alias section together. Run **last** so new nouns from
+  D1-D4 are settled.
+
+### Acceptance table (risky / multi-file moves)
+
+| Test                        | Fixture                          | Assertion                                                                                                                                                                           | Test File                                                 |
+| --------------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| Telemetry new paths         | proxy + session with telemetry   | `forge telemetry {activity,trace,costs}` exit 0; shapes match old `--json`                                                                                                          | `tests/src/cli/test_telemetry.py`                         |
+| Telemetry old paths removed | n/a                              | `forge activity` / `forge provider trace` / `forge proxy costs` exit 2, "No such command"                                                                                           | `tests/src/cli/test_telemetry.py`                         |
+| Single-leaf debt shrinks    | full command tree                | `SINGLE_LEAF_GROUP_ALLOWLIST` no longer lists `forge provider` (+ `forge memory report` if D4)                                                                                      | `test_command_tree_invariants.py`                         |
+| `search query` inverted     | indexed transcript               | bare `query` prints human table on stdout; `--json` emits documented array; `--json` round-trips old shape                                                                          | `tests/src/cli/test_search.py`                            |
+| `--json` missing drained    | each read leaf                   | every `JSON_MISSING_ALLOWLIST` leaf + `authentication profiles` + `transfer diff` emits valid JSON; ledger `{}`                                                                     | `test_command_tree_invariants.py`                         |
+| `--json` dest normalized    | full tree                        | no leaf binds `json_output`; `JSON_DEST_ALLOWLIST` `{}`                                                                                                                             | `test_command_tree_invariants.py`                         |
+| Stream ownership            | `proxy costs`/`audit` (or moved) | `--json` mode: valid JSON on stdout, empty stderr; human mode on stdout                                                                                                             | `tests/src/cli/test_*` with `CliRunner(mix_stderr=False)` |
+| Supervisor split            | session with supervisor          | `forge policy supervisor {status,set,off,on,reload,evaluate}` work; `supervise` exits 2; `LEAF_NAMING_ALLOWLIST` `{}`                                                               | `tests/src/cli/test_policy.py`                            |
+| `session context` removed   | n/a                              | `forge session context` exits 2 "No such command"; `test_session_context.py` deleted                                                                                                | (removal)                                                 |
+| Error markup drained        | CLI source scan                  | `CLI_ERROR_MARKUP_ALLOWLIST` `{}`; all 10 terminal tips routed (incl. 2 `ClickException`); tip guard fails on `Tip:` in CLI source minus the `direct_commands.py` payload allowlist | `tests/src/cli/test_output.py`                            |
 
 ## Docs and verification
 
-- [ ] Update `docs/cli_reference.md`.
-- [ ] Update relevant `docs/end-user/*` guides.
-- [ ] Update `docs/developer/cli_style_guidelines.md` for new taxonomy/output/alias rules.
-- [ ] Update `docs/design.md` if ownership boundaries change.
-- [ ] Add migration notes/changelog naming moved live commands.
-- [ ] Run targeted CLI tests for old/new paths, help, JSON, and stream behavior.
-- [ ] Run `make pre-commit` before closeout.
+- [ ] Fix debt-ledger breadcrumb rot (zero-dependency; safe to do now): update the provenance comment at
+  `tests/src/cli/test_command_tree_invariants.py:7` from `docs/board/proposed/forge_cli_cleanup/card.md` to the `doing/`
+  path. `test_output.py:142` carries no path, so it needs no change.
+- [ ] Update `docs/cli_reference.md` for every moved/removed/added surface (drop the `session context` note; re-document
+  aliases per D6).
+- [ ] Update relevant `docs/end-user/*` guides (`hook.md` per D5, `proxy.md`/`session.md`/`memory.md` for moves).
+- [ ] Update `docs/developer/cli_style_guidelines.md`: record the config-object verb vocabulary (D7), the stream guard
+  once wired, the alias rule (D6), and remove "settled in the forge_cli_cleanup card" placeholders as each lands.
+- [ ] Update `docs/design.md`/`cli_reference.md` ownership tables if command ownership changes (telemetry, memory
+  split).
+- [ ] Add a `change_log.md` entry per shipped slice naming the moved live commands (`forge activity` →
+  `forge telemetry activity`, etc.).
+- [ ] Run targeted CLI tests for old/new paths, help text, `--json` shape, and stream behavior after each slice.
+- [ ] `make pre-commit` before closeout; promote durable taxonomy/alias decisions to `impl_notes.md` after review.
 
 ## Open decisions carried from the card
 
-- [ ] Scope flags for `telemetry activity|costs|trace`.
-- [ ] Final placement of proxy audit.
-- [ ] Final backend namespace and churn budget.
-- [ ] Placement of memory report/enable/disable/status.
-- [ ] Hook-management visibility.
-- [ ] Whether workspace-level telemetry waits for `workspace_scope`.
-- [ ] Whether any `--json` destinations intentionally remain `json_output`.
-- [ ] Human read-output stdout/stderr rule and exceptions.
-- [ ] Canonical `auth` vs `authentication`.
-- [ ] Alias rule for new top-level groups.
+Most are now folded into Phase 1 (D1-D9). Remaining specifics to settle during execution:
+
+- [ ] Exact shared scope flags for `telemetry activity|costs|trace` (`--session` vs optional positional `[session]`,
+  `--scope`, `--period`) — instantiate the F11 session-selector rule, not a per-command guess.
+- [ ] Final placement of `proxy audit` (D2).
+- [ ] Backend namespace + churn budget (D3).
+- [ ] Memory `report`/`enable`/`disable`/`status` placement (D4).
+- [ ] Hook-management visibility (D5).
+- [ ] Whether workspace-level telemetry waits for `workspace_scope` (D9).
+- [ ] Whether any `--json` dest intentionally stays `json_output` (D8) — default is normalize.
+- [ ] Human read-output stdout/stderr rule + any documented exceptions (slice 07).
+- [ ] Canonical `auth` vs `authentication` and the alias-eligibility rule (D6).
