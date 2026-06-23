@@ -17,13 +17,14 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 from collections.abc import Callable, Mapping
 from typing import Any
 
 import httpx
 from fastapi.responses import Response, StreamingResponse
 
-from forge.proxy.provider_trace_logger import record_provider_trace
+from forge.proxy.provider_trace_logger import RequestMode, record_provider_trace
 from forge.proxy.stream_relay import relay_upstream
 from forge.proxy.utils import format_stream_lifecycle_summary
 
@@ -94,6 +95,13 @@ def relay_response_headers(upstream: Mapping[str, str], request_id: str) -> dict
     return out
 
 
+def _merge_extra(headers: dict[str, str], extra: Mapping[str, str] | None) -> dict[str, str]:
+    """Overlay caller-supplied response headers (e.g. ``X-Spend-Warning``) onto the relay set."""
+    if extra:
+        headers.update(extra)
+    return headers
+
+
 def reported_cost_micros_from_headers(headers: Any) -> int | None:
     """Read the LiteLLM-reported cost (USD) from response headers as microdollars.
 
@@ -110,18 +118,49 @@ def reported_cost_micros_from_headers(headers: Any) -> int | None:
     return round(usd * 1_000_000)
 
 
+def _coerce_int(value: Any) -> int | None:
+    """Coerce one external usage field to a non-negative int, or None when malformed.
+
+    Upstream usage is external data: a 200 body or SSE event carrying a non-numeric,
+    infinite, or negative token field must degrade to 'unavailable' (the field is
+    omitted) instead of raising into the relay or the non-streaming response path.
+    """
+    if isinstance(value, bool):  # bool is an int subclass but never a real token count
+        return None
+    if isinstance(value, int):
+        return value if value >= 0 else None
+    if isinstance(value, float):
+        return int(value) if math.isfinite(value) and value >= 0 else None
+    if isinstance(value, str):
+        try:
+            parsed = int(value.strip())
+        except (TypeError, ValueError):
+            return None
+        return parsed if parsed >= 0 else None
+    return None
+
+
 def _normalize_usage(usage: Any) -> dict[str, int]:
-    """Map a Responses ``usage`` object onto the cost fields the proxy logs."""
+    """Map a Responses ``usage`` object onto the cost fields the proxy logs.
+
+    Each field is coerced defensively (``_coerce_int``): a malformed/negative/non-finite
+    token count degrades to omitted (unavailable) rather than raising, so one bad field
+    can never abort an otherwise successful relay (streaming side-tap or non-streaming body).
+    """
     if not isinstance(usage, Mapping):
         return {}
     out: dict[str, int] = {}
-    if usage.get("input_tokens") is not None:
-        out["input_tokens"] = int(usage.get("input_tokens") or 0)
-    if usage.get("output_tokens") is not None:
-        out["output_tokens"] = int(usage.get("output_tokens") or 0)
+    input_tokens = _coerce_int(usage.get("input_tokens"))
+    if input_tokens is not None:
+        out["input_tokens"] = input_tokens
+    output_tokens = _coerce_int(usage.get("output_tokens"))
+    if output_tokens is not None:
+        out["output_tokens"] = output_tokens
     details = usage.get("input_tokens_details")
-    if isinstance(details, Mapping) and details.get("cached_tokens") is not None:
-        out["cached_tokens"] = int(details.get("cached_tokens") or 0)
+    if isinstance(details, Mapping):
+        cached_tokens = _coerce_int(details.get("cached_tokens"))
+        if cached_tokens is not None:
+            out["cached_tokens"] = cached_tokens
     return out
 
 
@@ -213,6 +252,7 @@ async def forward(
     request_id: str,
     on_complete: OnComplete | None = None,
     provider_trace_ctx: Mapping[str, Any] | None = None,
+    extra_response_headers: Mapping[str, str] | None = None,
 ) -> Response:
     """Forward a raw Responses-API request to ``{base_url}{url_path}``.
 
@@ -221,6 +261,8 @@ async def forward(
     query string is preserved. ``on_complete(usage, reported_cost_micros, failed,
     error_type)`` fires once usage/cost are known so the caller can log cost + audit;
     pass ``on_complete=None`` for non-generation endpoints that must not be accounted.
+    ``extra_response_headers`` (e.g. ``X-Spend-Warning`` in warn mode) ride every
+    returned response so a warn-mode cap is never silently dropped.
     """
     url = base_url.rstrip("/") + url_path
     if query_string:
@@ -236,6 +278,7 @@ async def forward(
             request_id=request_id,
             on_complete=on_complete,
             provider_trace_ctx=provider_trace_ctx,
+            extra_response_headers=extra_response_headers,
         )
 
     try:
@@ -248,10 +291,12 @@ async def forward(
             status_code=502,
             content=_ERROR_BODY,
             media_type="application/json",
-            headers={"X-Request-ID": request_id},
+            headers=_merge_extra({"X-Request-ID": request_id}, extra_response_headers),
         )
 
-    if on_complete is not None:
+    # Accounting and the provider-trace plane both attach only to the billable
+    # generation endpoint, so a non-generation relay skips body parsing entirely.
+    if on_complete is not None or provider_trace_ctx is not None:
         response_body: dict[str, Any] | None = None
         if "json" in resp.headers.get("content-type", ""):
             try:
@@ -259,26 +304,41 @@ async def forward(
                 response_body = parsed if isinstance(parsed, dict) else None
             except (ValueError, TypeError):
                 response_body = None
-        # Fail on transport status OR a terminal application status of "failed"
-        # (a 200 body can still carry "status": "failed").
-        status_failed, status_error = _failure_from_terminal_status(
-            (response_body or {}).get("status") if isinstance(response_body, Mapping) else None
-        )
-        http_failed = resp.status_code >= 400
-        _safe_on_complete(
-            on_complete,
-            extract_usage_from_response(response_body),
-            reported_cost_micros_from_headers(resp.headers),
-            http_failed or status_failed,
-            "upstream_error" if http_failed else status_error,
-            request_id,
+        usage = extract_usage_from_response(response_body)
+        reported_cost = reported_cost_micros_from_headers(resp.headers)
+        if on_complete is not None:
+            # Fail on transport status OR a terminal application status of "failed"
+            # (a 200 body can still carry "status": "failed").
+            status_failed, status_error = _failure_from_terminal_status(
+                (response_body or {}).get("status") if isinstance(response_body, Mapping) else None
+            )
+            http_failed = resp.status_code >= 400
+            _safe_on_complete(
+                on_complete,
+                usage,
+                reported_cost,
+                http_failed or status_failed,
+                "upstream_error" if http_failed else status_error,
+                request_id,
+            )
+        # Provider-trace plane (Phase 3): a non-streaming body arrives whole, so the
+        # lifecycle is trivially complete; final_usage_seen reflects whether the body
+        # actually carried usage (a failed generation may carry none).
+        _record_responses_trace(
+            provider_trace_ctx,
+            request_mode="non_streaming",
+            stream_started=True,
+            first_chunk_seen=True,
+            final_usage_seen=bool(usage),
+            client_disconnected=False,
+            reported_cost_micros=reported_cost,
         )
 
     return Response(
         status_code=resp.status_code,
         content=resp.content,
         media_type=resp.headers.get("content-type", "application/json"),
-        headers=relay_response_headers(resp.headers, request_id),
+        headers=_merge_extra(relay_response_headers(resp.headers, request_id), extra_response_headers),
     )
 
 
@@ -290,6 +350,7 @@ async def _forward_streaming(
     request_id: str,
     on_complete: OnComplete | None,
     provider_trace_ctx: Mapping[str, Any] | None,
+    extra_response_headers: Mapping[str, str] | None,
 ) -> Response:
     client_cm = httpx.AsyncClient(timeout=_RESPONSES_TIMEOUT)
     stream_cm = None
@@ -305,7 +366,7 @@ async def _forward_streaming(
             status_code=502,
             content=_ERROR_BODY,
             media_type="application/json",
-            headers={"X-Request-ID": request_id},
+            headers=_merge_extra({"X-Request-ID": request_id}, extra_response_headers),
         )
 
     if resp.status_code != 200:
@@ -318,7 +379,7 @@ async def _forward_streaming(
             status_code=resp.status_code,
             content=upstream_body,
             media_type=resp.headers.get("content-type", "application/json"),
-            headers=relay_response_headers(resp.headers, request_id),
+            headers=_merge_extra(relay_response_headers(resp.headers, request_id), extra_response_headers),
         )
 
     # Cost is on the response headers (x-litellm-response-cost), known at open.
@@ -334,6 +395,7 @@ async def _forward_streaming(
         _safe_on_complete(on_complete, accumulator.usage, cost_micros, combined_failed, error_type, request_id)
         _record_responses_trace(
             provider_trace_ctx,
+            request_mode="streaming",
             stream_started=stream_started,
             first_chunk_seen=accumulator.first_chunk_seen,
             final_usage_seen=accumulator.final_usage_seen,
@@ -354,7 +416,7 @@ async def _forward_streaming(
         else:
             logger.debug(_summary)
 
-    stream_headers = relay_response_headers(resp.headers, request_id)
+    stream_headers = _merge_extra(relay_response_headers(resp.headers, request_id), extra_response_headers)
     stream_headers["Cache-Control"] = "no-cache"
     return StreamingResponse(
         relay_upstream(
@@ -374,23 +436,25 @@ async def _forward_streaming(
 def _record_responses_trace(
     provider_trace_ctx: Mapping[str, Any] | None,
     *,
+    request_mode: RequestMode,
     stream_started: bool,
     first_chunk_seen: bool,
     final_usage_seen: bool,
     client_disconnected: bool,
     reported_cost_micros: int | None,
 ) -> None:
-    """Mirror the Responses relay's lifecycle into the provider-trace plane.
+    """Mirror a Responses relay's lifecycle into the provider-trace plane.
 
-    ``record_provider_trace`` gates on source capability; best-effort, never
-    raises into the relay teardown.
+    Shared by both the streaming relay teardown (``request_mode="streaming"``) and
+    the non-streaming response path (``"non_streaming"``). ``record_provider_trace``
+    gates on source capability; best-effort, never raises into either caller.
     """
     if provider_trace_ctx is None:
         return
     try:
         record_provider_trace(
             **provider_trace_ctx,
-            request_mode="streaming",
+            request_mode=request_mode,
             provider_meta=None,
             stream_started=stream_started,
             first_chunk_seen=first_chunk_seen,

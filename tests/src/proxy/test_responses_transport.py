@@ -8,14 +8,15 @@ Covers the wire-shape's three honesty constraints from the card:
 
 from __future__ import annotations
 
+import logging
 from types import SimpleNamespace
 
 import pytest
 
+import forge.proxy.responses_ingress as ri
+import forge.proxy.responses_passthrough as rp
+import forge.proxy.server as server
 from forge.core.credential_registry import Credential, EnvVar
-from forge.proxy import responses_ingress as ri
-from forge.proxy import responses_passthrough as rp
-from forge.proxy import server
 
 
 class _FakeResponse:
@@ -86,6 +87,18 @@ class _FakeAsyncClient:
     def stream(self, method, url, headers=None, json=None):
         _FakeAsyncClient.captured = {"method": method, "url": url, "headers": headers, "json": json}
         return type(self).stream_factory()
+
+
+@pytest.fixture(autouse=True)
+def _reset_captured():
+    """Isolate the class-level ``_FakeAsyncClient.captured`` between tests.
+
+    The fake records the last outbound request on a shared class attribute; resetting
+    it before every test removes the cross-test bleed in one place (module-local state,
+    so it lives here rather than in conftest.py).
+    """
+    _FakeAsyncClient.captured = {}
+    yield
 
 
 # ── Header builder (g) ──────────────────────────────────────────────────────────────
@@ -221,7 +234,6 @@ async def test_forward_non_streaming_post_relays_and_accounts(monkeypatch):
             )
 
     monkeypatch.setattr(_FakeAsyncClient, "response_factory", staticmethod(_CostingResponse))
-    _FakeAsyncClient.captured = {}
     seen: dict = {}
 
     def _on_complete(usage, cost_micros, failed, error_type):
@@ -295,7 +307,6 @@ async def test_forward_streaming_post_relays_bytes_and_usage(monkeypatch):
 
     monkeypatch.setattr(rp.httpx, "AsyncClient", _FakeAsyncClient)
     monkeypatch.setattr(_FakeAsyncClient, "stream_factory", staticmethod(_SSEStream))
-    _FakeAsyncClient.captured = {}
     seen: dict = {}
 
     resp = await rp.forward(
@@ -331,7 +342,6 @@ async def test_forward_streaming_post_relays_bytes_and_usage(monkeypatch):
 async def test_forward_bodyless_sends_no_json(monkeypatch, method):
     monkeypatch.setattr(rp.httpx, "AsyncClient", _FakeAsyncClient)
     monkeypatch.setattr(_FakeAsyncClient, "response_factory", staticmethod(_FakeResponse))
-    _FakeAsyncClient.captured = {}
 
     await rp.forward(
         method=method,
@@ -356,7 +366,6 @@ async def test_forward_top_level_non_id_path_preserves_query(monkeypatch):
     # the same catch-all with method + query preserved.
     monkeypatch.setattr(rp.httpx, "AsyncClient", _FakeAsyncClient)
     monkeypatch.setattr(_FakeAsyncClient, "response_factory", staticmethod(_FakeResponse))
-    _FakeAsyncClient.captured = {}
 
     await rp.forward(
         method="POST",
@@ -808,3 +817,383 @@ async def test_non_streaming_status_failed_is_recorded_as_failure(monkeypatch):
     assert resp.status_code == 200  # transport succeeded...
     assert seen["failed"] is True  # ...but the generation failed
     assert seen["error_type"] == "response_failed"
+
+
+# ── Issue 3: warn-mode spend caps surface X-Spend-Warning on the Responses path ──────
+
+
+def _cap_tracker(*, on_cap_hit: str):
+    """Fake over-cap cost tracker, mirroring test_passthrough.py's _Tracker/_CapResult."""
+
+    class _CapResult:
+        exceeded = True
+        cap_type = "daily"
+        current_micros = 11_000_000
+        limit_micros = 10_000_000
+
+    class _Tracker:
+        has_caps = True
+
+        def __init__(self) -> None:
+            self.on_cap_hit = on_cap_hit
+
+        def check_cap(self):
+            return _CapResult()
+
+    return _Tracker()
+
+
+@pytest.mark.asyncio
+async def test_responses_warn_mode_cap_attaches_spend_warning(monkeypatch):
+    """Issue 3 regression: warn-mode caps forward the request AND surface the cap message
+    in X-Spend-Warning (design.md). The bug forwarded silently with no header."""
+    monkeypatch.setattr(server, "_ensure_runtime_state", lambda: None)
+    monkeypatch.setattr(
+        server.config, "proxy", _proxy_cfg(wire_shape="openai_responses_passthrough", source="codex-responses-local")
+    )
+    monkeypatch.setattr("forge.core.auth.template_secrets.resolve_env_or_credential", lambda var: "K")
+    monkeypatch.setattr(server, "cost_tracker", _cap_tracker(on_cap_hit="warn"))
+    forwarded: dict = {}
+
+    async def _fake_forward(**kwargs):
+        forwarded.update(kwargs)
+        from fastapi.responses import Response
+
+        # forward() merges extra_response_headers onto the relayed response; emulate that
+        # here so the test proves the header actually reaches the client.
+        headers = {"X-Request-ID": "req"}
+        headers.update(kwargs.get("extra_response_headers") or {})
+        return Response(status_code=200, content=b"{}", headers=headers)
+
+    monkeypatch.setattr("forge.proxy.responses_passthrough.forward", _fake_forward)
+
+    req = _RawReq(method="POST", body=b'{"model":"m","input":"hi"}')
+    resp = await ri.handle_responses_passthrough(req, method="POST", url_path="/v1/responses")
+
+    assert resp.status_code == 200  # warn mode forwards (does not reject)
+    warning = forwarded["extra_response_headers"]["X-Spend-Warning"]
+    assert "spend cap reached" in warning  # the cap message is passed to forward...
+    assert resp.headers["X-Spend-Warning"] == warning  # ...and surfaces on the response
+
+
+@pytest.mark.asyncio
+async def test_responses_reject_mode_cap_returns_429_without_forwarding(monkeypatch):
+    """Issue 3 companion: reject-mode caps return 429 with X-Spend-Warning, never forward."""
+    monkeypatch.setattr(server, "_ensure_runtime_state", lambda: None)
+    monkeypatch.setattr(
+        server.config, "proxy", _proxy_cfg(wire_shape="openai_responses_passthrough", source="codex-responses-local")
+    )
+    monkeypatch.setattr("forge.core.auth.template_secrets.resolve_env_or_credential", lambda var: "K")
+    monkeypatch.setattr(server, "cost_tracker", _cap_tracker(on_cap_hit="reject"))
+
+    async def _boom(**kwargs):
+        raise AssertionError("forward must not run when the cap rejects")
+
+    monkeypatch.setattr("forge.proxy.responses_passthrough.forward", _boom)
+
+    req = _RawReq(method="POST", body=b'{"model":"m","input":"hi"}')
+    resp = await ri.handle_responses_passthrough(req, method="POST", url_path="/v1/responses")
+
+    assert resp.status_code == 429
+    assert b"spend_cap_exceeded" in bytes(resp.body)
+    assert resp.headers["X-Spend-Warning"]  # the cap message rides the 429 too
+
+
+@pytest.mark.asyncio
+async def test_forward_merges_extra_response_headers_non_streaming(monkeypatch):
+    """Issue 3 unit: forward() overlays extra_response_headers onto the relayed
+    non-streaming response without dropping the relayed ones."""
+    monkeypatch.setattr(rp.httpx, "AsyncClient", _FakeAsyncClient)
+    monkeypatch.setattr(_FakeAsyncClient, "response_factory", staticmethod(_FakeResponse))
+
+    resp = await rp.forward(
+        method="POST",
+        url_path="/v1/responses",
+        body={"model": "m", "input": "hi"},
+        query_string="",
+        inbound_headers={},
+        base_url="https://u.test",
+        api_key="K",
+        request_id="req_extra",
+        extra_response_headers={"X-Spend-Warning": "daily spend cap reached: ..."},
+    )
+
+    assert resp.headers["X-Spend-Warning"].startswith("daily spend cap reached")
+    assert resp.headers["X-Request-ID"] == "req_extra"  # relayed header preserved alongside
+
+
+@pytest.mark.asyncio
+async def test_forward_merges_extra_response_headers_streaming(monkeypatch):
+    """Issue 3 unit: the streaming StreamingResponse also carries extra_response_headers."""
+    monkeypatch.setattr(rp.httpx, "AsyncClient", _FakeAsyncClient)
+    monkeypatch.setattr(_FakeAsyncClient, "stream_factory", staticmethod(_FakeStream))
+
+    resp = await rp.forward(
+        method="POST",
+        url_path="/v1/responses",
+        body={"model": "m", "input": "hi", "stream": True},
+        query_string="",
+        inbound_headers={},
+        base_url="https://u.test",
+        api_key="K",
+        request_id="req_extra_stream",
+        extra_response_headers={"X-Spend-Warning": "monthly spend cap reached: ..."},
+    )
+
+    assert resp.headers["X-Spend-Warning"].startswith("monthly spend cap reached")
+    assert resp.headers["Cache-Control"] == "no-cache"  # stream-specific header still set
+    await _drain(resp)  # consume the generator so its teardown runs cleanly
+
+
+# ── Issue 4: malformed upstream usage degrades instead of aborting the relay ─────────
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        (5, 5),
+        (0, 0),
+        (5.0, 5),
+        (5.9, 5),  # float truncates, matching the prior int() behavior
+        ("7", 7),
+        ("  7  ", 7),  # surrounding whitespace tolerated
+        (None, None),  # absent -> unavailable
+        ("bad", None),  # non-numeric string -> unavailable (was: ValueError)
+        ("", None),
+        (-1, None),  # negative is not a real token count
+        (-2.0, None),
+        (True, None),  # bool is not a token count even though it's an int subclass
+        (False, None),
+        (float("inf"), None),  # non-finite -> unavailable
+        (float("nan"), None),
+        ([], None),  # wrong type
+        ({}, None),
+    ],
+)
+def test_coerce_int_degrades_malformed_to_none(value, expected):
+    assert rp._coerce_int(value) == expected
+
+
+def test_normalize_usage_degrades_malformed_field_without_raising():
+    # A single bad field must degrade to omitted (unavailable), never raise.
+    usage = {"input_tokens": "bad", "output_tokens": 7, "input_tokens_details": {"cached_tokens": "x"}}
+    assert rp._normalize_usage(usage) == {"output_tokens": 7}
+
+
+@pytest.mark.asyncio
+async def test_forward_non_streaming_malformed_usage_degrades_not_aborts(monkeypatch):
+    """Issue 4 regression: a 200 body with a non-numeric token field must NOT raise
+    (which would abort the otherwise-successful response); usage degrades to unavailable."""
+
+    class _MalformedUsage(_FakeResponse):
+        def __init__(self):
+            super().__init__(content=b'{"id":"r","usage":{"input_tokens":"bad","output_tokens":7}}')
+
+    monkeypatch.setattr(rp.httpx, "AsyncClient", _FakeAsyncClient)
+    monkeypatch.setattr(_FakeAsyncClient, "response_factory", staticmethod(_MalformedUsage))
+    seen: dict = {}
+
+    resp = await rp.forward(
+        method="POST",
+        url_path="/v1/responses",
+        body={"model": "m", "input": "hi"},
+        query_string="",
+        inbound_headers={},
+        base_url="https://u.test",
+        api_key="K",
+        request_id="req_badusage",
+        on_complete=lambda u, c, f, e: seen.update(usage=u, failed=f),
+    )
+
+    assert resp.status_code == 200  # the successful response is preserved...
+    assert seen["usage"] == {"output_tokens": 7}  # ...the malformed input_tokens degrades away
+    assert seen["failed"] is False
+
+
+@pytest.mark.asyncio
+async def test_forward_streaming_malformed_usage_does_not_corrupt_stream(monkeypatch):
+    """Issue 4 regression: a response.completed event with a non-numeric token field must
+    not raise into the relay -- bytes still flow byte-faithfully, usage degrades."""
+    sse = (
+        b'data: {"type":"response.output_text.delta","delta":"hi"}\n\n',
+        b'data: {"type":"response.completed","response":{"usage":{"input_tokens":"bad","output_tokens":9}}}\n\n',
+    )
+
+    class _BadStream(_FakeStream):
+        def __init__(self):
+            super().__init__(chunks=sse, headers={"content-type": "text/event-stream"})
+
+    monkeypatch.setattr(rp.httpx, "AsyncClient", _FakeAsyncClient)
+    monkeypatch.setattr(_FakeAsyncClient, "stream_factory", staticmethod(_BadStream))
+    seen: dict = {}
+
+    resp = await rp.forward(
+        method="POST",
+        url_path="/v1/responses",
+        body={"model": "m", "input": "hi", "stream": True},
+        query_string="",
+        inbound_headers={},
+        base_url="https://u.test",
+        api_key="K",
+        request_id="req_badstream",
+        on_complete=lambda u, c, f, e: seen.update(usage=u, failed=f),
+    )
+    streamed = await _drain(resp)
+
+    assert streamed == b"".join(sse)  # byte-faithful relay survives the malformed usage
+    assert seen["usage"] == {"output_tokens": 9}  # malformed input_tokens degraded
+    assert seen["failed"] is False
+
+
+# ── Issue 5: non-streaming generations also write a provider trace ───────────────────
+
+
+_TRACE_CTX = {
+    "backend_id": "codex-responses-local",
+    "proxy_id": "p1",
+    "mapped_model": "gpt-5.5-codex",
+    "request_id": "req_trace",
+    "forge_run_id": None,
+    "forge_root_run_id": None,
+    "provider_session_id": None,
+    "provider_command": None,
+    "downstream_event_id": None,
+}
+
+
+@pytest.mark.asyncio
+async def test_forward_non_streaming_records_provider_trace(monkeypatch):
+    """Issue 5 regression: a non-streaming generation records a provider trace with
+    request_mode='non_streaming'. Before the fix, only the streaming path traced."""
+    monkeypatch.setattr(rp.httpx, "AsyncClient", _FakeAsyncClient)
+    monkeypatch.setattr(_FakeAsyncClient, "response_factory", staticmethod(_FakeResponse))
+    traces: list = []
+    monkeypatch.setattr(rp, "record_provider_trace", lambda **kw: traces.append(kw))
+
+    await rp.forward(
+        method="POST",
+        url_path="/v1/responses",
+        body={"model": "m", "input": "hi"},
+        query_string="",
+        inbound_headers={},
+        base_url="https://u.test",
+        api_key="K",
+        request_id="req_trace",
+        on_complete=lambda u, c, f, e: None,
+        provider_trace_ctx=_TRACE_CTX,
+    )
+
+    assert len(traces) == 1
+    assert traces[0]["request_mode"] == "non_streaming"
+    assert traces[0]["final_usage_seen"] is True  # the _FakeResponse body carries usage
+    assert traces[0]["proxy_id"] == "p1"  # ctx fields forwarded verbatim
+
+
+@pytest.mark.asyncio
+async def test_forward_non_streaming_no_trace_without_ctx(monkeypatch):
+    """A non-generation relay (no provider_trace_ctx) records no trace and skips body parse."""
+    monkeypatch.setattr(rp.httpx, "AsyncClient", _FakeAsyncClient)
+    monkeypatch.setattr(_FakeAsyncClient, "response_factory", staticmethod(_FakeResponse))
+    traces: list = []
+    monkeypatch.setattr(rp, "record_provider_trace", lambda **kw: traces.append(kw))
+
+    await rp.forward(
+        method="GET",
+        url_path="/v1/responses/resp_1",
+        body=None,
+        query_string="",
+        inbound_headers={},
+        base_url="https://u.test",
+        api_key="K",
+        request_id="req_notrace",
+    )
+
+    assert traces == []  # no ctx -> no trace
+
+
+@pytest.mark.asyncio
+async def test_forward_non_streaming_trace_final_usage_false_when_body_lacks_usage(monkeypatch):
+    """final_usage_seen is honest: a non-streaming body with no usage records it False."""
+
+    class _NoUsage(_FakeResponse):
+        def __init__(self):
+            super().__init__(content=b'{"id":"r"}')
+
+    monkeypatch.setattr(rp.httpx, "AsyncClient", _FakeAsyncClient)
+    monkeypatch.setattr(_FakeAsyncClient, "response_factory", staticmethod(_NoUsage))
+    traces: list = []
+    monkeypatch.setattr(rp, "record_provider_trace", lambda **kw: traces.append(kw))
+
+    await rp.forward(
+        method="POST",
+        url_path="/v1/responses",
+        body={"model": "m", "input": "hi"},
+        query_string="",
+        inbound_headers={},
+        base_url="https://u.test",
+        api_key="K",
+        request_id="req_nousagetrace",
+        on_complete=lambda u, c, f, e: None,
+        provider_trace_ctx=_TRACE_CTX,
+    )
+
+    assert len(traces) == 1
+    assert traces[0]["final_usage_seen"] is False  # no usage in body -> honestly unavailable
+
+
+@pytest.mark.asyncio
+async def test_forward_streaming_still_records_streaming_trace_mode(monkeypatch):
+    """The streaming path still records request_mode='streaming' after parameterization."""
+    monkeypatch.setattr(rp.httpx, "AsyncClient", _FakeAsyncClient)
+    monkeypatch.setattr(_FakeAsyncClient, "stream_factory", staticmethod(_FakeStream))
+    traces: list = []
+    monkeypatch.setattr(rp, "record_provider_trace", lambda **kw: traces.append(kw))
+
+    resp = await rp.forward(
+        method="POST",
+        url_path="/v1/responses",
+        body={"model": "m", "input": "hi", "stream": True},
+        query_string="",
+        inbound_headers={},
+        base_url="https://u.test",
+        api_key="K",
+        request_id="req_streamtrace",
+        on_complete=lambda u, c, f, e: None,
+        provider_trace_ctx=_TRACE_CTX,
+    )
+    await _drain(resp)  # the trace fires in the relay's finally, after full consumption
+
+    assert len(traces) == 1
+    assert traces[0]["request_mode"] == "streaming"
+
+
+# ── Issue 29 (CWE-209): catalog errors must not leak exception text to the client ────
+
+
+@pytest.mark.asyncio
+async def test_responses_catalog_error_does_not_leak_exception_text(monkeypatch, caplog):
+    """Code-scanning #29 (py/stack-trace-exposure): a bearer-secret catalog error must NOT
+    surface its message (source id, env var names) to the Codex client. The client gets a
+    generic configuration error; the detail is logged server-side for the operator."""
+    monkeypatch.setattr(server, "_ensure_runtime_state", lambda: None)
+    monkeypatch.setattr(
+        server.config, "proxy", _proxy_cfg(wire_shape="openai_responses_passthrough", source="codex-responses-local")
+    )
+    secret = "source 'codex-responses-local' declares 2 secret bearer vars: FOO_KEY, BAR_KEY"
+
+    def _raise(_source):
+        raise ValueError(secret)
+
+    # The handler imports source_bearer_auth_env_var from forge.backend.sources at call time.
+    monkeypatch.setattr("forge.backend.sources.source_bearer_auth_env_var", _raise)
+
+    req = _RawReq(method="POST", body=b'{"model":"m","input":"hi"}')
+    with caplog.at_level(logging.WARNING):
+        resp = await ri.handle_responses_passthrough(req, method="POST", url_path="/v1/responses")
+
+    assert resp.status_code == 500
+    leaked = bytes(resp.body)
+    assert secret.encode() not in leaked  # the catalog message is not exposed...
+    assert b"FOO_KEY" not in leaked and b"BAR_KEY" not in leaked  # ...nor any env var name
+    assert b"misconfigured" in leaked  # a generic, non-leaking message is returned instead
+    assert secret in caplog.text  # ...while the full detail stays available in the server log

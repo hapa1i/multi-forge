@@ -119,7 +119,10 @@ async def handle_responses_passthrough(raw_request: Request, *, method: str, url
     try:
         bearer_env = source_bearer_auth_env_var(source)
     except ValueError as e:  # ModelSourceCatalogError: ambiguous/missing bearer secret
-        return _error(500, "configuration_error", str(e))
+        # Log the catalog detail (source id, env var names) server-side only; return a
+        # generic message so the Codex client can't read internal config (CWE-209).
+        logger.warning("[%s] responses passthrough bearer-secret resolution failed: %s", request_id, e)
+        return _error(500, "configuration_error", "responses passthrough upstream credential is misconfigured")
     api_key = resolve_env_or_credential(bearer_env)
     if not api_key:
         return _error(401, "authentication_error", f"{bearer_env} is not configured for responses passthrough")
@@ -217,6 +220,9 @@ async def handle_responses_passthrough(raw_request: Request, *, method: str, url
         else None
     )
 
+    # Warn-mode caps forward the request but must still surface the cap message on the
+    # response (design.md: warn mode returns it in X-Spend-Warning). reject mode already
+    # returned 429 above, so a non-None spend_warning here is always warn mode.
     return await forward(
         method=method,
         url_path=url_path,
@@ -228,6 +234,7 @@ async def handle_responses_passthrough(raw_request: Request, *, method: str, url
         request_id=request_id,
         on_complete=_on_complete if is_generation else None,
         provider_trace_ctx=provider_trace_ctx,
+        extra_response_headers=server._with_spend_warning({}, spend_warning) or None,
     )
 
 
