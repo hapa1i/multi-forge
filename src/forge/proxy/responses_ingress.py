@@ -136,7 +136,9 @@ async def handle_responses_passthrough(raw_request: Request, *, method: str, url
                 parsed = json.loads(raw)
             except (JSONDecodeError, ValueError):
                 return _error(400, "invalid_request_error", "Request body must be valid JSON")
-            body = parsed if isinstance(parsed, dict) else None
+            if not isinstance(parsed, dict):
+                return _error(400, "invalid_request_error", "Request body must be a JSON object")
+            body = parsed
 
     model = str(body.get("model")) if body and body.get("model") else "unknown"
     resolved_tier = getattr(config.proxy, "default_tier", None) or "sonnet"

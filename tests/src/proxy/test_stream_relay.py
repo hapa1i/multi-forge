@@ -29,6 +29,19 @@ class _RaisingAccumulator:
         raise ValueError("simulated side-tap bug")
 
 
+class _TerminalAccumulator:
+    """A side-tap that marks final usage as soon as it sees the first chunk."""
+
+    usage: dict[str, int] = {"input_tokens": 1, "output_tokens": 1}
+    reported_cost_micros: int | None = None
+    first_chunk_seen: bool = False
+    final_usage_seen: bool = False
+
+    def feed(self, chunk: bytes) -> None:
+        self.first_chunk_seen = True
+        self.final_usage_seen = True
+
+
 class _FakeCM:
     """Stand-in for the httpx stream/client context managers (teardown only)."""
 
@@ -79,3 +92,38 @@ async def test_relay_absorbs_accumulator_feed_exception():
     assert out == b"abc"  # every chunk relayed despite feed() raising on each
     assert acc.fed == 3  # feed attempted for all chunks (the guard does not short-circuit the loop)
     assert ended == [(False, False, True, 3)]  # on_end once: not failed, not disconnected, all 3 chunks
+
+
+@pytest.mark.asyncio
+async def test_relay_side_taps_chunk_before_yield_to_survive_disconnect_after_terminal_chunk():
+    """Regression: if a client disconnects after receiving the terminal usage chunk,
+    the side-tap must already have seen that chunk before the generator is closed."""
+    acc = _TerminalAccumulator()
+    ended: list = []
+
+    def _on_end(*, failed, client_disconnected, stream_started, chunk_count):
+        ended.append(
+            (
+                failed,
+                client_disconnected,
+                stream_started,
+                chunk_count,
+                acc.first_chunk_seen,
+                acc.final_usage_seen,
+            )
+        )
+
+    gen = relay_upstream(
+        _FakeCM(),
+        _FakeCM(),
+        _FakeUpstream((b"terminal-usage",)),  # type: ignore[arg-type]
+        "req_disconnect_after_terminal",
+        accumulator=acc,
+        on_end=_on_end,
+        error_body=b"ERR",
+    )
+
+    assert await gen.__anext__() == b"terminal-usage"
+    await gen.aclose()
+
+    assert ended == [(False, True, True, 1, True, True)]

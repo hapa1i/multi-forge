@@ -70,7 +70,6 @@ async def relay_upstream(
         async for chunk in resp.aiter_bytes():
             stream_started = True
             chunk_count += 1
-            yield chunk  # byte-faithful, unchanged
             try:
                 accumulator.feed(chunk)  # tolerant side-tap (copy); never alters bytes
             except Exception:
@@ -79,6 +78,7 @@ async def relay_upstream(
                 # not corrupt the stream. NOT BaseException: client disconnect
                 # (CancelledError/GeneratorExit) must still propagate to the handler below.
                 logger.debug("[%s] passthrough usage side-tap raised; continuing relay", request_id)
+            yield chunk  # byte-faithful, unchanged
     except httpx.HTTPError as e:
         failed = True
         logger.warning("[%s] passthrough upstream stream failed: %s", request_id, e)
