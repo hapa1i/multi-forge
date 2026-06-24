@@ -36,6 +36,37 @@ wc -l docs/board/impl_notes.md
 
 ## Notes
 
+### CLI command aliases and canonical names (forge_cli_cleanup Slice 05, shipped 2026-06-24)
+
+Durable rules for `src/forge/cli/main.py` aliasing and any future CLI command rename.
+
+- **Two maps, one mechanism.** `_ALIASES` (alias -> canonical, resolved by `AliasGroup.get_command`) and
+  `_DISPLAY_ALIASES` (canonical -> alias, surfaced in `--help` by `AliasGroup.format_commands`). Shipped set is
+  `ext`/`sess`/`mem`/`cfg` only.
+- **D6 alias policy (recorded in `cli_style_guidelines.md`).** Durable short aliases only when deliberately chosen
+  (a rationale-backed UX affordance); new top-level nouns get NO alias by default (`telemetry`/`model` have none);
+  canonical names follow user vocabulary (`auth` is canonical, not `authentication`); rename/back-compat shims are
+  temporary -- remove them in a cleanup slice, never keep them indefinitely.
+- **Removing an alias for a canonical command is atomic with the registration rename.** `forge <alias>` resolves only
+  via `_ALIASES`, so deleting `"auth": "authentication"` is coherent only when `main.add_command(auth, ...)` is flipped
+  to `name="auth"` in the SAME change. Delete-without-rename breaks the command; rename-without-delete leaves a stale
+  alias. (coding_standards "change interfaces atomically".)
+- **Recurring trap: Python symbol/module path != CLI alias string.** `from forge.cli.extensions import extensions` and
+  `runner.invoke(extensions, ...)` are the command-object symbol (module `forge.cli.extensions`), unrelated to the CLI
+  alias string. Renaming/removing a CLI alias changes ONLY invocations through `main` with the literal token
+  (`["extensions", ...]`, shell `forge extensions`); direct command-object invocations and imports stay. `forge
+  extensions` (with a space) never matches `forge.cli.extensions` (dots), so it is a safe `replace_all` pattern -- the
+  bare word `extensions` is not.
+- **Clean-break + drift verification.** `test_command_tree_invariants.py::test_removed_aliases_are_clean_breaks` pins
+  removed aliases (bare AND leaf forms) to exit 2 "No such command" and canonical names to resolve; assert on
+  `result.output` (this repo's `CliRunner()` surfaces the Click usage error there even though Click writes it to
+  stderr). For a CLI rename run a zero-tolerance command-form drift sweep
+  (`rg "forge authentication|forge extensions" --glob '!docs/board/**'` must be empty) plus a broader prefix-less sweep
+  that is a *classify* step (English prose like "Show extensions status" is fine, not a hit). Installer/extension-path
+  renames need the Docker integration run (`test_installer.py` etc.): `CliRunner` cannot catch a test asserting on the
+  real binary's tip text (a latent plural-vs-singular assertion at `test_installer.py:158` was only proven correct by
+  the live run).
+
 ### Unified backend: source catalog invariants (shipped)
 
 Shipped 2026-06-18 (`unified_backend`). Keep these boundaries intact when changing backend/source, template, auth, or
