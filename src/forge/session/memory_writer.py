@@ -16,7 +16,7 @@ Supports two modes:
 Each run persists its stdout to
 ``<forge_root>/.forge/artifacts/<session>/handoff/review-<timestamp>.md`` so
 users can inspect proposed/applied changes -- surfaced via
-``forge memory report show``.
+``forge session memory report``.
 """
 
 from __future__ import annotations
@@ -617,7 +617,7 @@ def _persist_review_report(
     Returns the absolute path of the written file. The work queue spawns the
     agent detached so stdout/stderr go to DEVNULL; this file is the only way
     users can inspect what the agent proposed or applied. See
-    ``forge memory report show``.
+    ``forge session memory report``.
     """
     from datetime import datetime, timezone
 

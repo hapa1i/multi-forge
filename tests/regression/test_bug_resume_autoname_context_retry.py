@@ -88,7 +88,7 @@ def test_resume_autoname_collision_preserves_winner_curated_context(tmp_path: Pa
     _generate_resume_name picked a fresh suffix and the collision -- and the entire
     `except SessionExistsError` fix branch -- never ran (it passed with the fix reverted). This
     version injects the winner mid-`add_from_state` (like the first test) so the loser actually hits
-    the branch, and covers the case the first test does not: a winner that ran `forge transfer edit`
+    the branch, and covers the case the first test does not: a winner that ran `forge session transfer edit`
     has content != generated.md, and winner_owns must preserve it (the fix short-circuits the
     orphan-unlink before any byte-compare).
     """
@@ -110,7 +110,7 @@ def test_resume_autoname_collision_preserves_winner_curated_context(tmp_path: Pa
     )
 
     winner_snapshot = child_path(project, "parent", "parent-resumed")
-    curated = "WINNER-CURATED (user-edited via forge transfer edit)\n"
+    curated = "WINNER-CURATED (user-edited via forge session transfer edit)\n"
 
     original_add = manager.index_store.add_from_state
     failed_once = False

@@ -533,8 +533,8 @@ EOF
 forge memory track .forge/memory/walkthrough-notes.md --strategy generic
 forge memory list
 forge memory list --json
-forge memory enable --session walkthrough-demo
-forge memory status
+forge session memory enable --session walkthrough-demo
+forge session memory status
 forge memory passport remove .forge/memory/walkthrough-notes.md
 forge memory list
 ```

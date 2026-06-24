@@ -383,8 +383,8 @@ resumes carry the conversation verbatim and have no editable artifact).
 
 **Curating with `--review`.** When you pass `--review`, Forge opens the per-child **user-notes overlay**
 (`children/<child>.notes.md`) in `$EDITOR` and waits — the AI snapshot (`children/<child>.md`) stays read-only, so your
-notes survive a later `forge transfer regenerate`. Save and exit normally to launch; abort (`:cq` in vim) to skip the
-launch. Your notes are preserved on disk regardless. If you abort, the child remains unlaunched; run
+notes survive a later `forge session transfer regenerate`. Save and exit normally to launch; abort (`:cq` in vim) to
+skip the launch. Your notes are preserved on disk regardless. If you abort, the child remains unlaunched; run
 `forge session resume <child>` later. Notes are merged after the snapshot at launch.
 
 **Per-parent layout for resume artifacts.** Each parent gets a directory under `.forge/prev_sessions/`:
@@ -399,9 +399,10 @@ launch. Your notes are preserved on disk regardless. If you abort, the child rem
 ```
 
 Re-resuming the same parent regenerates `generated.md` but never disturbs an existing `children/<child>.md` **or** its
-`.notes.md` overlay. Write your edits to the notes overlay (via `--review` or `forge transfer edit`) so they survive
-regeneration. Inspect or reshape any of this with the `forge transfer` group (`show`/`regenerate`/`edit`/`diff`) — see
-[transfer.md](transfer.md), which also covers the cross-runtime (Codex) workflow.
+`.notes.md` overlay. Write your edits to the notes overlay (via `--review` or `forge session transfer edit`) so they
+survive regeneration. Inspect or reshape any of this with the `forge session transfer` group
+(`show`/`regenerate`/`edit`/`diff`) — see [transfer.md](transfer.md), which also covers the cross-runtime (Codex)
+workflow.
 
 Resume and fork-recovery launches inject the per-child file directly with `--append-system-prompt-file`. If you
 customize `CLAUDE.md`, do not also add manual references to `.forge/prev_sessions/...` there, or you may duplicate the

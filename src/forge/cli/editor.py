@@ -1,7 +1,7 @@
 """Shared $EDITOR launcher for editable transfer/context files.
 
 Extracted from ``session_lifecycle`` so both ``forge session resume --review``
-and ``forge transfer edit`` use one editor-launch path with the same
+and ``forge session transfer edit`` use one editor-launch path with the same
 git-commit-style abort behavior: a non-zero editor exit aborts and leaves the
 file untouched.
 """

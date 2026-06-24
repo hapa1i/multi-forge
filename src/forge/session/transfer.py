@@ -154,7 +154,7 @@ def parse_transfer_frontmatter(text: str) -> tuple[dict[str, Any] | None, str, s
     raises. The transfer doc is an LLM-consumed context artifact with a
     user-editable notes overlay (a system boundary), so malformed frontmatter
     degrades to ``(None, original_text, warning)`` instead of failing -- callers
-    such as ``forge transfer show`` still render the body.
+    such as ``forge session transfer show`` still render the body.
     """
     from forge.session.exceptions import PassportError
     from forge.session.passport import extract_frontmatter

@@ -111,7 +111,7 @@ class TestRealClaudeMemory:
 
         for command in (
             "cd /workspace && forge memory track docs/state.md --strategy project-state",
-            f"cd /workspace && forge memory enable --review-only --session {session_name}",
+            f"cd /workspace && forge session memory enable --review-only --session {session_name}",
             f"cd /workspace && forge session set --session {session_name} memory.auto_update.min_turns 1",
         ):
             result = forge_workspace.exec(command)
@@ -144,7 +144,7 @@ class TestRealClaudeMemory:
         assert f"# Memory Writer Report -- {session_name}" in report
         assert "**Mode**: review-only" in report
 
-        show_result = forge_workspace.exec(f"cd /workspace && forge memory report show {session_name} --latest")
+        show_result = forge_workspace.exec(f"cd /workspace && forge session memory report {session_name} --latest")
         assert show_result.returncode == 0, show_result.stderr
         assert "Memory Writer Report" in show_result.stdout
 

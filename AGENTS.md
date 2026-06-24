@@ -63,9 +63,9 @@ telemetry resets; `reset` wipes legacy costs, downstream/upstream telemetry, cap
 events, and derived status-line caches, while running proxies keep in-memory cost/cap counters until restarted.
 
 For resume, transfer, memory-writer, and activity changes, verify the user-facing surfaces:
-`forge session resume <name> --fresh --review`, `forge transfer show|regenerate|edit|diff`,
-`forge memory report show [--all]`, and `forge telemetry activity [session]`; `forge usage` is removed, and
-`forge telemetry costs show` remains the authoritative proxy-scoped spend view.
+`forge session resume <name> --fresh --review`, `forge session transfer show|regenerate|edit|diff`,
+`forge session memory report [session] [--latest|--all|--json]`, and `forge telemetry activity [session]`; `forge usage`
+is removed, and `forge telemetry costs show` remains the authoritative proxy-scoped spend view.
 
 For Codex-runtime session changes, start with `forge runtime preflight codex`, then verify the relevant launch path:
 `forge session start <name> --runtime codex --resume-from <parent> --task "..."`,

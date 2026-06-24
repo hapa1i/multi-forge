@@ -1333,8 +1333,8 @@ snapshot; section 8 is the separate notes overlay (so the snapshot has 7 headers
 ```
 
 The launcher appends the snapshot plus the notes overlay (when it has user content) to one `--append-system-prompt-file`
-via `_combine_prompt_files`. `forge transfer regenerate` rewrites only `generated.md`; snapshots and notes are never
-overwritten. GC pairs a notes file's liveness to its snapshot — it is never orphaned independently
+via `_combine_prompt_files`. `forge session transfer regenerate` rewrites only `generated.md`; snapshots and notes are
+never overwritten. GC pairs a notes file's liveness to its snapshot — it is never orphaned independently
 (`_detect_orphan_transfer_files`).
 
 ### H.4 Relationship to `ctx` (prior art)

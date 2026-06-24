@@ -667,9 +667,9 @@ creates a real Codex-runtime session (manifest `intent.launch.runtime="codex"`, 
 A failed first turn keeps the session (a turn that never reached `thread.started` leaves no `thread_id`; resume refuses
 with delete-and-retry guidance). Headless continuation is `forge session resume <name> --task "…"` ->
 `codex exec resume <thread_id>`, cross-CWD in the session's recorded worktree with the prompt on stdin — both codex-cli
-behaviors pinned live by a standing E2E. `forge transfer regenerate <parent> --target-runtime {claude|codex}` remains
-the sessionless surface (re-stamps a cache, defaulting the runtime from the existing frontmatter so a regenerate never
-silently flips it back).
+behaviors pinned live by a standing E2E. `forge session transfer regenerate <parent> --target-runtime {claude|codex}`
+remains the sessionless surface (re-stamps a cache, defaulting the runtime from the existing frontmatter so a regenerate
+never silently flips it back).
 
 **Interactive Codex sessions** (`core/ops/codex_interactive.py`): omitting `--task` launches the foreground `codex` TUI
 as a managed session — bare (no parent, no transfer, `context_delivery` stays `None`) or an interactive bridge
@@ -730,11 +730,11 @@ earlier sessions in the ancestry chain.
 <forge_root>/.forge/prev_sessions/<parent-name>/children/<child>.notes.md  # Per-child user-notes overlay (edit this)
 ```
 
-The child snapshot is a **pure AI artifact**: `forge session resume --fresh --review` and `forge transfer edit` write
-user edits to the separate `.notes.md` overlay, which is merged after the snapshot at launch (via
+The child snapshot is a **pure AI artifact**: `forge session resume --fresh --review` and `forge session transfer edit`
+write user edits to the separate `.notes.md` overlay, which is merged after the snapshot at launch (via
 `--append-system-prompt-file`). You can resume the same parent with different strategies — the parent cache is
 regenerated, while existing per-child snapshots **and** their notes are never overwritten. Inspect and reshape transfer
-context with `forge transfer show|regenerate|edit|diff` (§4.0).
+context with `forge session transfer show|regenerate|edit|diff` (§4.0).
 
 **Session derivation tracking:**
 

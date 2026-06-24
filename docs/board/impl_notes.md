@@ -85,13 +85,30 @@ downstream trace to one remote account-side record via an adapter under `src/for
   answer; single-sided lookups yield only `remote`/`not-queryable`. Local cost/tokens are never overwritten by remote
   figures (kept side by side with provenance).
 
-### Review fan-out must not run write-capable agents in the live working tree
+### Review/audit fan-out must not run agents with Bash against the live working tree
 
 Recurring hazard (hit 2026-06-20): an adversarial-review workflow run with `general-purpose` agents (tool access `*`)
 edited source mid-review even though instructed to only return findings; `git checkout` then carried the uncommitted
-change across branches and `git add -A` swept it into an unrelated commit. Run review/finder fan-out with
-`isolation: 'worktree'` or the read-only `Explore` agent type so finders physically cannot mutate the branch under
-review, and `git status` before every `git add -A`.
+change across branches and `git add -A` swept it into an unrelated commit.
+
+**`Explore` is NOT a sufficient guard (hit 2026-06-23).** An audit workflow run with the read-only `Explore` agent type
+(no Edit/Write) still has **Bash**. Agents instructed to "use git log/diff to inspect each slice" ran `git stash` +
+`git checkout <commit>` + `git reset` to view historical state, which **reverted the entire uncommitted working tree**
+to HEAD and left the repo in detached HEAD — clobbering ~33 files of unstaged Slice-02 work. Read-only file tools do not
+prevent state-changing git via Bash.
+
+Protections, in order of reliability:
+
+- **Commit (or at least `git stash`) the work before any fan-out.** Committed/stashed state is recoverable; raw unstaged
+  changes overwritten by `git reset --hard`/`git checkout -f` are not.
+- Use `isolation: 'worktree'` so agents operate on their own checkout and cannot touch the primary tree.
+- If agents must run in the live tree, instruct them: **read-only git only** (`log`/`diff`/`show`/`status`); never
+  `checkout`/`switch`/`reset`/`restore`/`stash`/`clean`.
+
+**Recovery:** if a tree gets reverted, check `git stash list` and `git reflog` first — an agent's `git stash` *saves*
+the work (`git stash apply stash@{0}` restores it); the reflog's `reset: moving to HEAD` /
+`checkout: moving from <branch> to <sha>` entries show what happened. Untracked files survive checkout/reset, so
+newly-created modules are usually still present. Always `git status` before every `git add -A`.
 
 ### Memory System Architecture (shipped)
 
@@ -101,9 +118,16 @@ memory writer runs (`memory.auto_update.enabled`). No checkout-level config, no 
 - **Passports are the sole doc source**: `forge_memory` YAML frontmatter in docs declares strategy, writers, intent.
   Stop-time `scan_passported_docs()` discovers them under hardcoded roots (`docs/` + `.forge/memory/`). No manifest doc
   lists; `DesignatedDoc` is a runtime-only type for the scanner -> memory-writer pipeline.
-- **Session activation**: `forge memory enable/disable --session` or `--memory on|off` at start/fork/resume. Both gates
-  (Stop hook, detached runner) check `effective.memory.auto_update.enabled` directly. Incognito never enqueues.
-- **Tombstone for old CLI**: `forge session memory` is a hidden tombstone group that errors with replacement guidance.
+- **Session activation**: `forge session memory enable/disable --session` or `--memory on|off` at start/fork/resume.
+  Both gates (Stop hook, detached runner) check `effective.memory.auto_update.enabled` directly. Incognito never
+  enqueues.
+- **Namespace (Slice 02, forge_cli_cleanup)**: the session-scoped activation/report verbs live under
+  `forge session memory` (`enable`/`disable`/`status`/`report`, the last flattened from `forge memory report show`).
+  This is now a **real** group, not a tombstone — the earlier hidden `forge session memory` tombstone is gone. Top-level
+  `forge memory` keeps the project-doc passport verbs (`track`/`list`/`passport`/`shadows`). The verb modules live in
+  `cli/session_memory.py` (+ the flattened `report` from `cli/memory_report.py`); both subgroups are wired onto the
+  `session` group in `cli/main.py` (not `session.py`) because `transfer.py`/`session_memory.py` import `console` from
+  `session.py`, so parent-imports-child would cycle.
 - **Stop-time chain**: stop hook -> work queue marker -> fire-and-forget `forge memory-writer run` -> passport scan ->
   writer filter -> `run_claude_session()`. Detached failures are not retried.
 - **Shadow path encoding**: `derive_shadow_path()` encodes the immediate parent directory to avoid collisions.
@@ -121,7 +145,7 @@ The `memory_substrate` card split the overloaded "handoff" term into two concept
 
 - **Memory writer** — Stop-time project-doc curation: `session/memory_writer.py` (`run_memory_writer`,
   `resolve_writer_base_url`, `memory_report_dir`), `MemoryWriterConfig`, `memory_writer_timeout`,
-  `forge memory-writer run`, `forge memory report show`.
+  `forge memory-writer run`, `forge session memory report`.
 - **Transfer** — resume/fork context assembly: `session/transfer.py` (`assemble_transfer_context`, `TransferResult`),
   `--resume-mode transfer`.
 - **3-layer memory taxonomy** (design.md §5.6): raw memory (`.forge/artifacts/`), project memory (passported docs under
@@ -133,9 +157,11 @@ fixtures:** work-queue marker `kind="handoff"` + `enqueue_handoff_marker()` (eph
 the intentional-mismatch comment in `memory_writer.py`); the `queued_handoff` Stop-hook JSON field; QA fixture filenames
 (`manual-handoff-*.jsonl`); and the industry-English "design-to-code handoff" in the skills-writing guide.
 
-**CLI tombstone collision (gotcha):** the report command is `forge memory report show` (new `cli/memory_report.py`), not
-`forge session memory show`, because `forge session memory` was already an occupied tombstone group. Before renaming a
-CLI surface, check whether the target path is already a tombstone.
+**CLI tombstone reclamation (Slice 02):** the report command now lives at `forge session memory report` (flattened leaf
+in the new `cli/session_memory.py` group). It earlier sat at `forge memory report show` only because a tombstone group
+occupied `forge session memory`; Slice 02 removed that tombstone and reclaimed the path for the real session-scoped
+memory group (`enable`/`disable`/`status`/`report`), wired onto `session` in `cli/main.py`. Durable lesson: before
+renaming a CLI surface, check whether the target path is already a (possibly hidden) tombstone group.
 
 **Durable-value rename pattern (resume_mode):** `confirmed.derivation.resume_mode` migrated `"handoff"` → `"transfer"`
 via accept-and-tolerate, not reject — readers map legacy `"handoff"`/`None` to transfer with no branching; writers emit
@@ -148,8 +174,8 @@ Shipped 2026-05-31 (commit `2b70c29`). Durable invariants for `src/forge/session
 
 - **Three-file artifact model** under `<forge_root>/.forge/prev_sessions/<parent>/`: `generated.md` (regeneratable
   parent cache), `children/<child>.md` (frozen AI snapshot, schema sections 1-7), `children/<child>.notes.md` (user
-  overlay, section 8). `forge transfer regenerate` rewrites only `generated.md`; `ensure_child` never overwrites an
-  existing child; GC ties a notes file's liveness to its snapshot (never orphaned independently).
+  overlay, section 8). `forge session transfer regenerate` rewrites only `generated.md`; `ensure_child` never overwrites
+  an existing child; GC ties a notes file's liveness to its snapshot (never orphaned independently).
 - **Child-agnostic frontmatter (load-bearing)**: the transfer frontmatter carries no `child` field, so `generated.md`
   and the copied `children/<child>.md` stay byte-identical. `ensure_child` and the auto-name retry byte-compare in
   `manager.py` both depend on this — do not add per-child fields to the frontmatter.
@@ -157,10 +183,12 @@ Shipped 2026-05-31 (commit `2b70c29`). Durable invariants for `src/forge/session
   fallback is `"compatibility-fallback"`. `_validate_decision_citations()` drops any citation outside the `[turn N]`
   range the model actually saw (keeps the decision text, blanks false provenance), so `schema: full` never overstates
   evidence quality.
-- **Namespace**: `forge transfer` is a **top-level** group (pairs with `forge memory`), not `forge session transfer`.
-  `forge session resume --fresh --review` is a delegating entry point that edits the `.notes.md` overlay, not a
-  competing namespace. `forge transfer show` (assembled artifact) is distinct from `forge session show`'s context view
-  (`forge session context` was removed in the CLI cleanup; its `--field`/`--json` behavior folded into `session show`).
+- **Namespace**: `forge session transfer` is a **session-scoped** group (Slice 02 of forge_cli_cleanup moved it under
+  `forge session`; it pairs with the `forge session memory` activation verbs), distinct from top-level `forge memory`
+  (project-doc passports). `forge session resume --fresh --review` is a delegating entry point that edits the
+  `.notes.md` overlay, not a competing namespace. `forge session transfer show` (assembled artifact) is distinct from
+  `forge session show`'s context view (`forge session context` was removed in the CLI cleanup; its `--field`/`--json`
+  behavior folded into `session show`).
 - **`target_runtime`** is reserved in the frontmatter (`TRANSFER_TARGET_RUNTIME = "claude"`) for Phase 5 cross-runtime
   tuning: Phase 5 retargets presentation without changing transcript source artifacts or schema semantics.
 - **`ctx` is prior art and inspiration only, never a dependency**: the transfer schema is Forge-owned and canonical
@@ -358,11 +386,11 @@ code (file:line) before promotion.
   `checker_effort` feeds `ModelHyperparameters` via `merge_hyperparams` **and** is part of the plan-check throttle cache
   key (a different effort must not reuse a cached verdict). All additive optional `str | None` fields — no
   `SCHEMA_VERSION` bump.
-- **Memory-enable early-return must compare effort too (recurring silent-drop shape).** `_set_memory_activation`
-  short-circuits only when enabled AND mode AND effort are all unchanged. The bug was short-circuiting on enabled+mode
-  alone, silently dropping `forge memory enable --effort high` on an already-enabled, same-mode session. Regression in
-  `test_memory.py`. When adding a new persisted activation field, add it to the no-op comparison or it joins this class
-  of silent drop.
+- **Memory-enable early-return must compare effort too (recurring silent-drop shape).** `_set_memory_activation` (moved
+  to `cli/session_memory.py` in Slice 02) short-circuits only when enabled AND mode AND effort are all unchanged. The
+  bug was short-circuiting on enabled+mode alone, silently dropping `forge session memory enable --effort high` on an
+  already-enabled, same-mode session. Regression in `test_memory.py`. When adding a new persisted activation field, add
+  it to the no-op comparison or it joins this class of silent drop.
 
 ### Supervisor status-line health: surface fail-open from the usage ledger (shipped 2026-06-16)
 

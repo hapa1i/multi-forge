@@ -83,7 +83,7 @@ Forge CLI commands use explicit verbs and predictable command boundaries.
 - **Session selectors are consistent.** Use an optional positional for the session only when the session is the
   command's primary object (`forge session show [session]`); use `--session` when the session is ambient scope for some
   other primary object (`forge policy status --session`). For multi-entity commands the primary entity is the positional
-  and the rest are options (`forge transfer show <parent> --child <child>`). _(review)_
+  and the rest are options (`forge session transfer show <parent> --child <child>`). _(review)_
 
 - **Editable config objects share a verb vocabulary.** Config-like surfaces (`forge config`, `forge proxy`,
   `forge claude preset`, `forge proxy template`) use one verb set for the same operations and document deliberate

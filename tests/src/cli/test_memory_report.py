@@ -1,7 +1,8 @@
-"""Tests for ``forge memory report show`` (memory writer report surface)."""
+"""Tests for ``forge session memory report`` (memory writer report surface, Slice 02 flattened leaf)."""
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from unittest.mock import patch
 
@@ -59,7 +60,7 @@ class TestShowCommand:
         real_manager = SessionManager()
         with patch("forge.cli.memory_report.SessionManager", return_value=real_manager):
             with patch("forge.cli.memory_report._cwd_forge_root", return_value=forge_root):
-                result = runner.invoke(main, ["memory", "report", "show", "s1"])
+                result = runner.invoke(main, ["session", "memory", "report", "s1"])
         assert result.exit_code == 0, result.output
         assert "No memory reports found" in result.output
 
@@ -71,7 +72,7 @@ class TestShowCommand:
         real_manager = SessionManager()
         with patch("forge.cli.memory_report.SessionManager", return_value=real_manager):
             with patch("forge.cli.memory_report._cwd_forge_root", return_value=forge_root):
-                result = runner.invoke(main, ["memory", "report", "show", "s1"])
+                result = runner.invoke(main, ["session", "memory", "report", "s1"])
 
         assert result.exit_code == 0, result.output
         # Latest is the highest-numbered (run 2)
@@ -88,14 +89,14 @@ class TestShowCommand:
         real_manager = SessionManager()
         with patch("forge.cli.memory_report.SessionManager", return_value=real_manager):
             with patch("forge.cli.memory_report._cwd_forge_root", return_value=forge_root):
-                result = runner.invoke(main, ["memory", "report", "show", "s1", "--all"])
+                result = runner.invoke(main, ["session", "memory", "report", "s1", "--all"])
 
         assert result.exit_code == 0, result.output
         for report in reports:
             assert report.name in result.output
 
     def test_latest_and_all_mutually_exclusive(self, runner: CliRunner) -> None:
-        result = runner.invoke(main, ["memory", "report", "show", "s1", "--latest", "--all"])
+        result = runner.invoke(main, ["session", "memory", "report", "s1", "--latest", "--all"])
         assert result.exit_code != 0
         assert "mutually exclusive" in result.output
 
@@ -105,7 +106,7 @@ class TestShowCommand:
         real_manager = SessionManager()
         with patch("forge.cli.memory_report.SessionManager", return_value=real_manager):
             with patch("forge.cli.memory_report._cwd_forge_root", return_value=None):
-                result = runner.invoke(main, ["memory", "report", "show"])
+                result = runner.invoke(main, ["session", "memory", "report"])
         assert result.exit_code != 0
         assert "Not inside a Forge project" in result.output
 
@@ -122,8 +123,47 @@ class TestShowCommand:
         real_manager = SessionManager()
         with patch("forge.cli.memory_report.SessionManager", return_value=real_manager):
             with patch("forge.cli.memory_report._cwd_forge_root", return_value=forge_root):
-                result = runner.invoke(main, ["memory", "report", "show"])
+                result = runner.invoke(main, ["session", "memory", "report"])
 
         assert result.exit_code == 0, result.output
         assert "current" in result.output
         assert "run 0" in result.output
+
+
+class TestReportJson:
+    """``--json`` makes this read surface scriptable (Slice 02 read-debt resolved here, not deferred)."""
+
+    def _run(self, runner: CliRunner, forge_root: Path, argv: list[str]) -> str:
+        from forge.session import SessionManager
+
+        real_manager = SessionManager()
+        with patch("forge.cli.memory_report.SessionManager", return_value=real_manager):
+            with patch("forge.cli.memory_report._cwd_forge_root", return_value=forge_root):
+                result = runner.invoke(main, argv)
+        assert result.exit_code == 0, result.output
+        return result.output
+
+    def test_latest_json_carries_path_and_content(self, runner: CliRunner, tmp_path: Path) -> None:
+        forge_root, reports = _seed_session_with_reports(tmp_path, "s1", report_count=3)
+        out = self._run(runner, forge_root, ["session", "memory", "report", "s1", "--json"])
+        data = json.loads(out)
+        assert data["session"] == "s1"
+        assert data["report"]["name"] == reports[-1].name  # latest
+        assert data["report"]["path"] == str(reports[-1])
+        assert "run 2" in data["report"]["content"]
+
+    def test_all_json_lists_every_report(self, runner: CliRunner, tmp_path: Path) -> None:
+        forge_root, reports = _seed_session_with_reports(tmp_path, "s1", report_count=3)
+        out = self._run(runner, forge_root, ["session", "memory", "report", "s1", "--all", "--json"])
+        data = json.loads(out)
+        assert data["session"] == "s1"
+        names = [r["name"] for r in data["reports"]]
+        assert names == [r.name for r in reports]  # oldest -> newest, all present
+        assert all("path" in r for r in data["reports"])
+
+    def test_no_reports_json_is_null_report(self, runner: CliRunner, tmp_path: Path) -> None:
+        forge_root, _ = _seed_session_with_reports(tmp_path, "s1", report_count=0)
+        out = self._run(runner, forge_root, ["session", "memory", "report", "s1", "--json"])
+        data = json.loads(out)
+        assert data["session"] == "s1"
+        assert data["report"] is None  # structured empty, no human tip leaking into JSON

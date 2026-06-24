@@ -55,8 +55,8 @@ decides whether it runs.
 | ------------------------------ | ---------------- | ------------------------------------------------- |
 | `forge memory track <doc>`     | The markdown doc | Adds or updates the doc's `forge_memory` passport |
 | `forge memory passport remove` | The markdown doc | Removes the passport; stops project discovery     |
-| `forge memory enable`          | Session manifest | Enables the memory writer for a session           |
-| `forge memory disable`         | Session manifest | Disables the memory writer for a session          |
+| `forge session memory enable`  | Session manifest | Enables the memory writer for a session           |
+| `forge session memory disable` | Session manifest | Disables the memory writer for a session          |
 
 Forge discovers docs by scanning hardcoded roots (`docs/` plus `.forge/memory/`) for passports at Stop time.
 
@@ -72,13 +72,13 @@ forge memory track docs/board/impl_notes.md --propose --shadow-path .forge/memor
 forge session start planner --memory on
 
 # Or enable for an existing session:
-forge memory enable --session planner
+forge session memory enable --session planner
 ```
 
 After the first session, inspect the output:
 
 ```bash
-forge memory report show planner --latest
+forge session memory report planner --latest
 ```
 
 Review and curate implementation-note proposals before promoting anything into `impl_notes.md`:
@@ -120,7 +120,7 @@ forge session start planner --memory on --proxy openrouter-openai
 Have the planner produce and approve the plan. After the planner stops, inspect the memory report:
 
 ```bash
-forge memory report show planner --latest
+forge session memory report planner --latest
 ```
 
 ### 2. Supervised Executor

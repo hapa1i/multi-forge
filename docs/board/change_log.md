@@ -27,6 +27,36 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-23
 
+### forge_cli_cleanup Slice 02: session-scope move (transfer + memory split)
+
+**Goal**: Move session-scoped surfaces under `forge session` so the command taxonomy mirrors ownership -- transfer
+context and memory activation are session concerns; project-doc passports stay top-level.
+
+**Key changes**:
+
+- `forge transfer show|regenerate|edit|diff` -> `forge session transfer ...` (clean break; old paths return Click "No
+  such command", exit 2). The transfer group is wired onto `session` in `cli/main.py` (assembly layer) to avoid a
+  `session <-> transfer` import cycle.
+- Memory split (D4): activation/report verbs move to a new `forge session memory` group
+  (`enable`/`disable`/`status`/`report`); top-level `forge memory` keeps passport verbs (`track`/`list`/`passport`/
+  `shadows`). `report` is flattened from the former single-leaf `forge memory report show`.
+- New module `cli/session_memory.py` (errors routed through `print_error`, no hand-rolled markup); `memory_report.py`'s
+  `report` group collapsed to a single `report` command.
+- Resolved two debt ledgers in `test_command_tree_invariants.py`: removed `forge memory report` from
+  `SINGLE_LEAF_GROUP_ALLOWLIST` (flattened), and **fixed** the `forge memory report show` JSON-missing debt rather than
+  hiding it — `forge session memory report` gained a `--json` mode (dest `as_json`; latest path+content, or the report
+  list under `--all`), and `report` was added to the guard's `_READ_LEAVES` so the flattened leaf stays enforced (the
+  rename had moved it out of the `show`-named coverage). One fewer leaf for Slice 07 to drain.
+- Synced docs to the new paths: `cli_reference.md`, end-user (`transfer.md`/`session.md`/`memory.md`/`README.md`),
+  design docs, `board/README.md`, `impl_notes.md`, `AGENTS.md`, and QA/walkthrough checklist command blocks.
+
+**Verification**: full `tests/src/cli` unit suite including the new `test_session_memory.py` and `report --json` cases
+in `test_memory_report.py`; `test_command_tree_invariants.py` confirms `forge session memory report` is now a guarded
+read leaf with `--json`; the cross-package `tests/src/review/test_skill_content.py` guard repointed to
+`forge session memory enable`; `make pre-commit` clean (ruff/black/isort/mypy/pyright/mdformat/gitleaks); handoff
+integration (`tests/integration/cli/test_handoff_integration.py`, 10 passed) exercises
+`forge session memory enable`/`report` end-to-end against a wheel-installed forge in Docker.
+
 ### forge_cli_cleanup Slice 03: move telemetry surfaces
 
 **Goal**: Co-locate operator observability under `forge telemetry` and clean-break the old scattered paths.

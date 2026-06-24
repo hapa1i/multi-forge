@@ -1,7 +1,7 @@
 """Regression: ensure_child must copy generated.md -> children/<child>.md atomically.
 
 Bug (audit P3/#2, low): ensure_child used shutil.copyfile(source, target), which opens the FINAL
-path with O_WRONLY|O_TRUNC and streams into it. A concurrent reader -- `forge transfer show/diff`,
+path with O_WRONLY|O_TRUNC and streams into it. A concurrent reader -- `forge session transfer show/diff`,
 or the resume-time GC byte-compare that decides whether a colliding auto-name owns its snapshot --
 could observe children/<child>.md at 0 or partial bytes during first creation, corrupting the
 diff/compare. The torn window also threatens the generated==child byte-identity invariant the

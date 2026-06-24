@@ -31,6 +31,7 @@ from .proxy import proxy  # noqa: E402
 from .runtime import runtime  # noqa: E402
 from .search import search_cmd  # noqa: E402
 from .session import session  # noqa: E402
+from .session_memory import session_memory  # noqa: E402
 from .status_line import status_line  # noqa: E402
 from .telemetry import telemetry  # noqa: E402
 from .transfer import transfer as transfer_cmd  # noqa: E402
@@ -389,13 +390,18 @@ main.add_command(codex, name="codex")
 main.add_command(config_cmd, name="config")
 main.add_command(hooks)
 main.add_command(memory_cmd, name="memory")
-main.add_command(transfer_cmd, name="transfer")
 main.add_command(extensions, name="extension")
 main.add_command(status_line)
 main.add_command(info_cmd, name="info")
 main.add_command(workflow_cmd, name="workflow")
 main.add_command(search_cmd, name="search")
 main.add_command(runtime, name="runtime")
+
+# Session-scoped subgroups are wired onto `session` here (the assembly layer),
+# not inside session.py: both transfer.py and session_memory.py import `console`
+# from session.py, so having session.py import them would form a cycle.
+session.add_command(transfer_cmd, name="transfer")
+session.add_command(session_memory, name="memory")
 
 from forge.cli.gc import clean_cmd  # noqa: E402
 from forge.cli.logs import logs_cmd  # noqa: E402

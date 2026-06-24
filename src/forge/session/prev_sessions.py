@@ -114,7 +114,7 @@ def ensure_notes_template(forge_root: Path, parent_name: str, child_name: str) -
     """Return the per-child notes overlay path, creating a template if absent.
 
     Name-based convenience over ``ensure_notes_overlay`` for callers that hold
-    ``(forge_root, parent, child)`` (e.g. ``forge transfer edit``). The overlay
+    ``(forge_root, parent, child)`` (e.g. ``forge session transfer edit``). The overlay
     (``children/<child>.notes.md``) is the only user-editable transfer surface.
     """
     return ensure_notes_overlay(child_path(forge_root, parent_name, child_name))

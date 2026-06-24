@@ -1,9 +1,10 @@
-"""``forge transfer`` -- inspect and reshape resume/fork transfer context.
+"""``forge session transfer`` -- inspect and reshape resume/fork transfer context.
 
-Pairs with ``forge memory`` as the two halves of the former "handoff":
-``forge memory`` curates project docs; ``forge transfer`` assembles the
-resume/fork context that moves a session forward. Every verb takes a parent
-session argument -- transfer is session-derived, not a session subresource.
+Pairs with ``forge memory`` (project-doc curation) as the two halves of session
+continuity: ``forge memory`` curates project docs; ``forge session transfer``
+assembles the resume/fork context that moves a session forward. Every verb takes
+a parent session argument -- transfer is session-derived, which is why it lives
+under ``forge session``.
 
 \b
 Layout (see prev_sessions.py):
@@ -45,11 +46,11 @@ def transfer() -> None:
 
     \b
     Examples:
-        forge transfer show planner                 # show the parent AI cache
-        forge transfer show planner --child exec     # show a child's composed transfer view
-        forge transfer edit planner --child exec      # edit that child's user notes
-        forge transfer regenerate planner             # rebuild the cache (same strategy)
-        forge transfer diff planner --child exec      # cache-vs-snapshot drift
+        forge session transfer show planner                # show the parent AI cache
+        forge session transfer show planner --child exec   # show a child's composed transfer view
+        forge session transfer edit planner --child exec   # edit that child's user notes
+        forge session transfer regenerate planner          # rebuild the cache (same strategy)
+        forge session transfer diff planner --child exec   # cache-vs-snapshot drift
     """
 
 
@@ -98,7 +99,7 @@ def show_cmd(parent: str, child: str | None, as_json: bool) -> None:
     click.echo(view.content)
     if view.child is not None and not view.has_notes:
         print_tip(
-            f"No user notes yet. Run 'forge transfer edit {parent} --child {view.child}' to add some.",
+            f"No user notes yet. Run 'forge session transfer edit {parent} --child {view.child}' to add some.",
             console=console,
         )
 
@@ -154,7 +155,7 @@ def edit_cmd(parent: str, child: str | None) -> None:
     except ForgeOpError as e:
         print_error_with_tip(
             str(e),
-            f"Run 'forge transfer show {parent}' to list available transfer context.",
+            f"Run 'forge session transfer show {parent}' to list available transfer context.",
             console=console,
         )
         raise SystemExit(1) from e
@@ -183,7 +184,7 @@ def diff_cmd(parent: str, child: str | None) -> None:
     except ForgeOpError as e:
         print_error_with_tip(
             str(e),
-            f"Run 'forge transfer show {parent}' to list available transfer context.",
+            f"Run 'forge session transfer show {parent}' to list available transfer context.",
             console=console,
         )
         raise SystemExit(1) from e

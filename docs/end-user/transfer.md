@@ -1,6 +1,6 @@
-# Forge Transfer — Resume/Fork Context Guide
+# Forge Session Transfer — Resume/Fork Context Guide
 
-**Status:** Implemented (`forge transfer show|regenerate|edit|diff`). The cross-runtime hop is one command:
+**Status:** Implemented (`forge session transfer show|regenerate|edit|diff`). The cross-runtime hop is one command:
 `forge session start <name> --runtime codex --resume-from <parent> --task "…"` (see [session.md](session.md)); the
 manual `regenerate → show → codex exec` recipe below remains for sessionless handoffs.
 
@@ -15,8 +15,9 @@ manual `regenerate → show → codex exec` recipe below remains for sessionless
 
 **Transfer** is the curated context that carries a session forward across a resume, a fork, or — with
 `--target-runtime codex` — a different agent runtime. It is the editable, inspectable half of session continuity:
-`forge memory` curates project docs, `forge transfer` shapes the resume/fork context. Every `forge transfer` verb takes
-a **parent session** argument; transfer is session-derived, not a session subresource.
+`forge memory` curates project docs, `forge session transfer` shapes the resume/fork context. Every
+`forge session transfer` verb takes a **parent session** argument; transfer is session-derived, not a session
+subresource.
 
 Native `--resume --fork-session` carries the full conversation but is opaque and locked to one runtime and working
 directory. **Curated transfer is the portable substrate**: a parent's context is distilled into a Markdown doc you can
@@ -39,13 +40,13 @@ re-resume.
 ## Commands
 
 ```bash
-forge transfer show <parent>                       # show the parent AI cache
-forge transfer show <parent> --child <c>           # show a child's composed launch view (snapshot + notes)
-forge transfer show <parent> --json                # frontmatter + sections + content, as JSON
-forge transfer regenerate <parent>                 # rebuild the cache (same strategy/depth/runtime as before)
-forge transfer regenerate <parent> --strategy ai-curated --depth 2
-forge transfer edit <parent> --child <c>           # edit the child's user-notes overlay in $EDITOR
-forge transfer diff <parent> --child <c>           # how the cache has drifted from the child's frozen snapshot
+forge session transfer show <parent>                       # show the parent AI cache
+forge session transfer show <parent> --child <c>           # show a child's composed launch view (snapshot + notes)
+forge session transfer show <parent> --json                # frontmatter + sections + content, as JSON
+forge session transfer regenerate <parent>                 # rebuild the cache (same strategy/depth/runtime as before)
+forge session transfer regenerate <parent> --strategy ai-curated --depth 2
+forge session transfer edit <parent> --child <c>           # edit the child's user-notes overlay in $EDITOR
+forge session transfer diff <parent> --child <c>           # how the cache has drifted from the child's frozen snapshot
 ```
 
 | Command      | What it does                                                                                                                                                                                                                          |
@@ -96,13 +97,13 @@ prompt as your task alone and injects the context as `additionalContext`; see
 
 ```bash
 # Distil into a Codex-targeted curated transfer (creates the cache if absent):
-forge transfer regenerate planner --target-runtime codex --strategy ai-curated
+forge session transfer regenerate planner --target-runtime codex --strategy ai-curated
 
 # Review the curated context:
-forge transfer show planner
+forge session transfer show planner
 
 # Hand it to Codex as the initial message, with your task appended:
-codex exec "$(forge transfer show planner)
+codex exec "$(forge session transfer show planner)
 
 Your task: implement the change described in the context above."
 ```
@@ -110,10 +111,10 @@ Your task: implement the change described in the context above."
 `--target-runtime codex` stamps the transfer for Codex: the `## Runtime Hints` section names Codex idioms (`codex exec`,
 sandbox modes) instead of Claude's. `ai-curated` makes a billed `core.llm` curation call; Forge records it in the usage
 ledger (`transfer-curate` in `forge telemetry activity`) **only when it runs inside a Forge run tree** — the
-cross-runtime bridge does, but a bare `forge transfer regenerate` from a shell runs the curation without a ledger row
-(no ambient run tree).
+cross-runtime bridge does, but a bare `forge session transfer regenerate` from a shell runs the curation without a
+ledger row (no ambient run tree).
 
-> **Note:** `forge transfer show` prints the transfer's YAML frontmatter (metadata — strategy, lineage,
+> **Note:** `forge session transfer show` prints the transfer's YAML frontmatter (metadata — strategy, lineage,
 > `target_runtime`) ahead of the curated body; both are harmless context for Codex, and the `## Runtime Hints` section
 > tells Codex how to run.
 
@@ -124,8 +125,8 @@ cross-runtime bridge does, but a bare `forge transfer regenerate` from a shell r
 
 ## Troubleshooting
 
-- **`No transfer context for '<parent>'`** — the parent has no cache yet. Run `forge transfer regenerate <parent>` (or
-  `forge session resume <parent> --fresh`) to create it.
+- **`No transfer context for '<parent>'`** — the parent has no cache yet. Run
+  `forge session transfer regenerate <parent>` (or `forge session resume <parent> --fresh`) to create it.
 - **`ai-curated` produced a plain (structured) body** — no `OPENROUTER_API_KEY`, or the parent has no transcript.
   Curation is best-effort; the deterministic body still ships.
 - **Codex isn't ready** — run `forge runtime preflight codex` for the blocking reason (install / authenticate `codex`).

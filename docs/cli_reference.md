@@ -42,8 +42,9 @@ reports "no such command/option" — no tombstone shims. List/show commands supp
 | `forge session shell [name]`           | Open shell in sidecar container                                                                                             |
 
 Note: `session resume --fresh --review` opens the per-child user-notes overlay (`children/<child>.notes.md`) in
-`$EDITOR` before launching Claude; the AI snapshot stays read-only. `forge session memory` is removed; use
-`forge memory`.
+`$EDITOR` before launching Claude; the AI snapshot stays read-only. Session-scoped memory activation lives under
+`forge session memory` (enable/disable/status/report); top-level `forge memory` keeps the project-doc passport verbs.
+Session transfer context lives under `forge session transfer`.
 
 `fork` and `start` accept the tier-1 launch controls alongside `--supervise`: `--cascade`, `--checker-model`,
 `--checker-provider`, `--checker-effort` (`none/low/medium/high/xhigh`), and `--supervisor-effort`
@@ -58,31 +59,42 @@ Codex runtime ([design.md §3.9](design.md#39-session-resume-context-management)
 `forge session resume <name>` reattaches the TUI; with `--task "…"` it runs the next headless `codex exec resume` turn.
 `--task` is Codex-only.
 
-### Transfer context
+### Session transfer context
 
-| Command                              | Purpose                                                                    |
-| ------------------------------------ | -------------------------------------------------------------------------- |
-| `forge transfer show <parent>`       | Show the parent AI cache, or a child's composed view (`--child`, `--json`) |
-| `forge transfer regenerate <parent>` | Rebuild the parent cache only (defaults to its current strategy/depth)     |
-| `forge transfer edit <parent>`       | Edit a child's user-notes overlay in `$EDITOR` (`--child`)                 |
-| `forge transfer diff <parent>`       | Show cache-vs-child-snapshot drift (`--child`)                             |
+| Command                                      | Purpose                                                                    |
+| -------------------------------------------- | -------------------------------------------------------------------------- |
+| `forge session transfer show <parent>`       | Show the parent AI cache, or a child's composed view (`--child`, `--json`) |
+| `forge session transfer regenerate <parent>` | Rebuild the parent cache only (defaults to its current strategy/depth)     |
+| `forge session transfer edit <parent>`       | Edit a child's user-notes overlay in `$EDITOR` (`--child`)                 |
+| `forge session transfer diff <parent>`       | Show cache-vs-child-snapshot drift (`--child`)                             |
 
-`forge transfer` pairs with `forge memory` as the two halves of the former "handoff": `forge memory` curates project
-docs; `forge transfer` assembles resume/fork context. Every verb takes a parent session argument. `show`/`regenerate`
-default to the parent cache; `edit`/`diff` resolve a child (inferred when the parent has exactly one, else `--child`).
+`forge session transfer` and `forge memory` are the two halves of session continuity: `forge memory` curates project
+docs; `forge session transfer` assembles resume/fork context. Every verb takes a parent session argument.
+`show`/`regenerate` default to the parent cache; `edit`/`diff` resolve a child (inferred when the parent has exactly
+one, else `--child`).
 
 ### Memory management
 
+Project-doc passports (project-scoped, git-tracked; sessionless):
+
 - `forge memory track <path>`: author a project passport on a doc, sessionless (`--strategy`, `--intent`, `--writers`,
   `--propose`, `--shadow-path`).
-- `forge memory enable|disable`: toggle session memory auto-update (`--session`, resolves `$FORGE_SESSION`). `enable`
-  takes `--effort` (`claude --effort` for the writer; updates effort even when already enabled in the same mode).
 - `forge memory list`: list passported memory docs under scan roots (`--json`).
-- `forge memory status`: show memory activation across sessions (`--scope`, `--json`).
-- `forge memory report show`: inspect memory writer review reports for a session (`--latest`, `--all`).
 - `forge memory shadows list|show|review`: list accumulated shadow proposals, inspect one doc's proposals, or curate
   them (`--scope`, `--for`, `--curate`, `--show-latest`, `--effort` with `--curate`).
 - `forge memory passport show|remove`: inspect or remove the project passport embedded in a memory doc (`--json`).
+
+### Session memory
+
+Session-scoped activation and reports (whether the memory writer runs for a session):
+
+- `forge session memory enable|disable`: toggle session memory auto-update (`--session`, resolves `$FORGE_SESSION`).
+  `enable` takes `--effort` (`claude --effort` for the writer; updates effort even when already enabled in the same
+  mode).
+- `forge session memory status`: show memory activation across sessions (`--scope`, `--json`).
+- `forge session memory report`: inspect memory writer review reports for a session (`--latest`, `--all`, `--json`).
+  `--json` emits the latest report's path + content, or the report list under `--all`. Flattened leaf (the former
+  `forge memory report show`).
 
 ### Proxy management
 

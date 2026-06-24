@@ -822,7 +822,7 @@ The memory writer runs `claude -p` (headless prompt mode) on the full session tr
 **retrospectively**, selecting what mattered with full-session hindsight (higher signal than incremental capture).
 
 ```yaml
-# In session intent (set via forge memory enable or --memory on)
+# In session intent (set via forge session memory enable or --memory on)
 memory:
   auto_update:
     enabled: true
@@ -933,9 +933,9 @@ Memory activation is session-scoped. Each session decides whether the memory wri
 `intent.memory.auto_update.enabled` (or an override). There is no checkout-level config file.
 
 ```bash
-forge memory enable                    # resolves $FORGE_SESSION
-forge memory enable --session planner  # named session
-forge memory disable --session planner
+forge session memory enable                    # resolves $FORGE_SESSION
+forge session memory enable --session planner  # named session
+forge session memory disable --session planner
 forge session start planner --memory on
 ```
 
@@ -955,7 +955,7 @@ deferred.
 - **`forge memory track <path>`** authors a **passport** (project-lifetime, git-tracked frontmatter). Sessionless.
   `--propose` authors a shadow-only passport. A passported doc outside the scan roots is written but warns.
 - **`forge memory passport remove <path>`** removes the passport, preserving unrelated frontmatter.
-- **`forge memory enable`** / **`disable`** sets session activation (`memory.auto_update.enabled`). Resolves
+- **`forge session memory enable`** / **`disable`** sets session activation (`memory.auto_update.enabled`). Resolves
   `$FORGE_SESSION` when `--session` is omitted; errors outside a session without `--session`.
 - **`forge memory list`** shows passported docs under scan roots (sessionless scan, no writer filtering).
 
@@ -1012,7 +1012,7 @@ forge memory track docs/board/impl_notes.md \
   --propose --shadow-path .forge/memory/shadow_impl_notes.md
 
 # Enable memory for a session:
-forge memory enable --session planner
+forge session memory enable --session planner
 
 # Verify:
 forge memory passport show docs/board/change_log.md

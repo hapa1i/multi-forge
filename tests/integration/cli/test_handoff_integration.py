@@ -350,7 +350,7 @@ class TestHandoffRunMultiDoc:
         assert result.returncode == 0, result.stderr
 
         result = mock_claude_workspace.exec(
-            f"cd /workspace && forge memory enable --review-only --session {session_name}"
+            f"cd /workspace && forge session memory enable --review-only --session {session_name}"
         )
         assert result.returncode == 0, result.stderr
         result = mock_claude_workspace.exec(
@@ -380,7 +380,9 @@ class TestHandoffRunMultiDoc:
         assert "Do NOT modify any files" in prompt
         assert "docs/state.md" in prompt
 
-        show_result = mock_claude_workspace.exec(f"cd /workspace && forge memory report show {session_name} --latest")
+        show_result = mock_claude_workspace.exec(
+            f"cd /workspace && forge session memory report {session_name} --latest"
+        )
         assert show_result.returncode == 0, show_result.stderr
         assert "Memory Writer Report -- memory-review" in show_result.stdout
         assert "Mode**: review-only" in show_result.stdout

@@ -74,7 +74,6 @@ def test_json_option_dest_is_as_json() -> None:
 # Hidden groups (internal workers) are exempt. Pre-existing single-leaf groups:
 SINGLE_LEAF_GROUP_ALLOWLIST = {
     "forge policy shadow",  # -> show (run is hidden)
-    "forge memory report",  # -> show; flatten to a leaf
 }
 
 
@@ -126,8 +125,10 @@ def test_no_confusable_sibling_leaves() -> None:
     _assert_ledger(violations, LEAF_NAMING_ALLOWLIST, "sibling leaves must not be confusable")
 
 
-# --- Rule: read leaves (list/show/status) expose `--json` for scripting -------
-_READ_LEAVES = {"catalog", "list", "show", "status"}
+# --- Rule: read leaves (catalog/list/report/show/status) expose `--json` ------
+# `report` is here because `forge session memory report` was flattened from a
+# `show` leaf in Slice 02; without it the read-surface debt would escape the guard.
+_READ_LEAVES = {"catalog", "list", "report", "show", "status"}
 # Pre-existing read surfaces with no `--json`; each needs an explicit raw-vs-json
 # decision per cleanup-card finding #4.
 JSON_MISSING_ALLOWLIST = {
@@ -138,7 +139,6 @@ JSON_MISSING_ALLOWLIST = {
     "forge claude preset show",
     "forge config show",
     "forge memory shadows show",
-    "forge memory report show",
     "forge search status",
 }
 
