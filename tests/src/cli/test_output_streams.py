@@ -112,3 +112,84 @@ def test_audit_diff_human_table_on_stdout(monkeypatch: pytest.MonkeyPatch) -> No
     assert "Wire changes" in result.stdout
     assert "audit-test" in result.stdout
     assert result.stderr == ""
+
+
+# --- Failure paths: --json read leaves keep stdout clean, diagnostics on stderr -
+# The Slice 07 stream contract also governs *errors*: a `--json` read-leaf failure
+# must not emit non-JSON (Rich `Error:`/`Tip:`) on stdout, or a script piping stdout
+# into a JSON parser chokes on the diagnostic. The error goes to stderr (err_console),
+# stdout stays empty, exit is non-zero. Regression guard for the stdout-diagnostic
+# leak fixed in model.py / trace.py / session_memory.py.
+
+
+def test_model_catalog_json_failure_keeps_stdout_clean(monkeypatch: pytest.MonkeyPatch) -> None:
+    from forge.core.models.catalog import ModelCatalogError
+
+    def _boom() -> None:
+        raise ModelCatalogError("bad catalog")
+
+    monkeypatch.setattr("forge.cli.model.load_model_catalog", _boom)
+    result = CliRunner().invoke(main, ["model", "catalog", "--json"])
+    assert result.exit_code == 1
+    assert result.stdout.strip() == ""
+    assert "bad catalog" in result.stderr
+
+
+def test_trace_show_json_failure_keeps_stdout_clean() -> None:
+    # Relies on the autouse isolate_forge_home fixture: the empty home has no trace,
+    # so `show` raises ForgeOpError before the --json branch.
+    result = CliRunner().invoke(main, ["telemetry", "trace", "show", "missing", "--json"])
+    assert result.exit_code == 1
+    assert result.stdout.strip() == ""
+    assert "Error:" in result.stderr
+
+
+def test_trace_list_json_failure_keeps_stdout_clean(monkeypatch: pytest.MonkeyPatch) -> None:
+    from forge.core.ops import ForgeOpError
+
+    def _boom(**_: object) -> None:
+        raise ForgeOpError("trace read failed")
+
+    monkeypatch.setattr("forge.cli.trace.list_provider_traces", _boom)
+    result = CliRunner().invoke(main, ["telemetry", "trace", "list", "--json"])
+    assert result.exit_code == 1
+    assert result.stdout.strip() == ""
+    assert "trace read failed" in result.stderr
+
+
+def test_session_memory_status_json_failure_keeps_stdout_clean(monkeypatch: pytest.MonkeyPatch) -> None:
+    from forge.core.ops.session import ForgeOpError
+
+    def _boom(**_: object) -> None:
+        raise ForgeOpError("session listing failed")
+
+    monkeypatch.setattr("forge.core.ops.session.list_sessions", _boom)
+    result = CliRunner().invoke(main, ["session", "memory", "status", "--json"])
+    assert result.exit_code == 1
+    assert result.stdout.strip() == ""
+    assert "session listing failed" in result.stderr
+
+
+def test_memory_list_json_failure_keeps_stdout_clean(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Outside a Forge project: the no-root guard fires before the --json branch.
+    monkeypatch.chdir(tmp_path)
+    result = CliRunner().invoke(main, ["memory", "list", "--json"])
+    assert result.exit_code == 1
+    assert result.stdout.strip() == ""
+    assert "Not inside a Forge project" in result.stderr
+
+
+def test_memory_report_json_failure_keeps_stdout_clean() -> None:
+    # `--latest`/`--all` mutual exclusivity is checked before the --json branch.
+    result = CliRunner().invoke(main, ["session", "memory", "report", "s1", "--latest", "--all", "--json"])
+    assert result.exit_code == 1
+    assert result.stdout.strip() == ""
+    assert "mutually exclusive" in result.stderr
+
+
+def test_session_list_json_failure_keeps_stdout_clean() -> None:
+    # `--older-than` validation fires before the --json branch.
+    result = CliRunner().invoke(main, ["session", "list", "--older-than", "0", "--json"])
+    assert result.exit_code == 1
+    assert result.stdout.strip() == ""
+    assert "--older-than must be >= 1" in result.stderr

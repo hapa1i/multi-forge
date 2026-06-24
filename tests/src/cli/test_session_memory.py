@@ -101,7 +101,7 @@ class TestSessionMemoryEnable:
         monkeypatch.delenv("FORGE_SESSION", raising=False)
         result = runner.invoke(main, ["session", "memory", "enable"])
         assert result.exit_code != 0
-        assert "session-scoped" in result.output.lower()
+        assert "session-scoped" in result.stderr.lower()
 
     def test_enable_writes_effective_memory_state(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
         """Enable from intent.memory=None produces correct effective state."""
@@ -161,7 +161,7 @@ class TestSessionMemoryEnable:
         monkeypatch.delenv("FORGE_SESSION", raising=False)
         result = runner.invoke(main, ["session", "memory", "disable"])
         assert result.exit_code != 0
-        assert "session-scoped" in result.output.lower()
+        assert "session-scoped" in result.stderr.lower()
 
 
 class TestMemoryActivationCleanBreak:

@@ -15,7 +15,7 @@ import sys
 import click
 
 from forge.cli.memory_report import report_cmd
-from forge.cli.output import print_error
+from forge.cli.output import err_console, print_error
 from forge.cli.session import console
 from forge.core.effort import CLAUDE_EFFORT_LEVELS, validate_claude_effort
 from forge.core.ops.context import ExecutionContext
@@ -71,7 +71,7 @@ def enable_cmd(session_name: str | None, review_only: bool, effort: str | None) 
         print_error(
             "Memory activation is session-scoped. "
             "Use --session <name> or run inside a Forge session ($FORGE_SESSION).",
-            console=console,
+            console=err_console,
         )
         sys.exit(1)
     _set_memory_activation(resolved_name, enabled=True, mode=target_mode, effort=effort)
@@ -95,7 +95,7 @@ def disable_cmd(session_name: str | None) -> None:
         print_error(
             "Memory activation is session-scoped. "
             "Use --session <name> or run inside a Forge session ($FORGE_SESSION).",
-            console=console,
+            console=err_console,
         )
         sys.exit(1)
     _set_memory_activation(resolved_name, enabled=False)
@@ -115,7 +115,7 @@ def _set_memory_activation(
         ctx = ExecutionContext.from_cwd()
         resolved = resolve_session(ctx=ctx, session_name=session_name)
     except ForgeOpError as e:
-        print_error(str(e), console=console)
+        print_error(str(e), console=err_console)
         sys.exit(1)
 
     from forge.session.effective import compute_effective_intent
@@ -165,7 +165,7 @@ def _set_memory_activation(
                 value_str=json.dumps(effort),
             )
     except ForgeOpError as e:
-        print_error(str(e), console=console)
+        print_error(str(e), console=err_console)
         sys.exit(1)
 
     if enabled:
@@ -201,7 +201,7 @@ def status_cmd(scope: str, as_json: bool) -> None:
         ctx = ExecutionContext.from_cwd()
         result = list_sessions(ctx=ctx, include_incognito=False, scope=scope)
     except ForgeOpError as e:
-        print_error(str(e), console=console)
+        print_error(str(e), console=err_console)
         sys.exit(1)
 
     manager = SessionManager()

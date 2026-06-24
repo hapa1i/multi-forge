@@ -21,7 +21,7 @@ from pathlib import Path
 import click
 from rich.syntax import Syntax
 
-from forge.cli.output import print_error, print_error_with_tip, print_tip
+from forge.cli.output import err_console, print_error, print_error_with_tip, print_tip
 from forge.cli.session import _cwd_forge_root, console, handle_session_error
 from forge.session import ForgeSessionError, SessionManager
 from forge.session.memory_writer import memory_report_dir
@@ -57,7 +57,7 @@ def _resolve_session_forge_root(session_name: str | None) -> tuple[str, Path]:
             print_error_with_tip(
                 "Not inside a Forge project, and no session name given.",
                 "Run from a directory with .forge/ or pass an explicit session name.",
-                console=console,
+                console=err_console,
             )
             sys.exit(1)
         sessions = manager.list_sessions(
@@ -65,12 +65,14 @@ def _resolve_session_forge_root(session_name: str | None) -> tuple[str, Path]:
             forge_root_filter=str(current_root),
         )
         if len(sessions) == 0:
-            print_error(f"No sessions found under {current_root}.", console=console)
+            print_error(f"No sessions found under {current_root}.", console=err_console)
             sys.exit(1)
         if len(sessions) > 1:
-            print_error("Multiple sessions in this Forge project; " "specify which one explicitly.", console=console)
+            print_error(
+                "Multiple sessions in this Forge project; " "specify which one explicitly.", console=err_console
+            )
             for name, _entry in sessions:
-                console.print(f"  - {name}")
+                err_console.print(f"  - {name}")
             sys.exit(1)
         return sessions[0][0], Path(sessions[0][1].forge_root or sessions[0][1].worktree_path)
 
@@ -80,7 +82,7 @@ def _resolve_session_forge_root(session_name: str | None) -> tuple[str, Path]:
             forge_root=str(current_root) if current_root else None,
         )
     except ForgeSessionError as e:
-        handle_session_error(e)
+        handle_session_error(e, console=err_console)
         raise  # for mypy; handle_session_error sys.exits
 
     return session_name, Path(resolved_entry.forge_root or resolved_entry.worktree_path)
@@ -149,7 +151,7 @@ def report_cmd(session_name: str | None, show_latest: bool, show_all: bool, as_j
         forge session memory report --json          # Latest report as JSON
     """
     if show_latest and show_all:
-        print_error("--latest and --all are mutually exclusive.", console=console)
+        print_error("--latest and --all are mutually exclusive.", console=err_console)
         sys.exit(1)
 
     resolved_name, forge_root = _resolve_session_forge_root(session_name)

@@ -93,8 +93,9 @@ def test_show_json_single_dict():
 def test_show_missing_exits_1_with_tip():
     result = CliRunner().invoke(main, _trace_args("show", "nope"))
     assert result.exit_code == 1
-    assert "No provider trace found" in result.output
-    assert "Tip:" in result.output
+    # Error + tip go to stderr; stdout stays clean for the JSON/results stream.
+    assert "No provider trace found" in result.stderr
+    assert "Tip:" in result.stderr
 
 
 def test_explain_json_whole_dto():

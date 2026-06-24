@@ -12,7 +12,7 @@ from rich.console import Console
 from rich.table import Table
 
 from forge.cli.backend import backend
-from forge.cli.output import print_error
+from forge.cli.output import err_console, print_error
 from forge.core.models.catalog import ModelCatalogError, load_model_catalog
 from forge.core.models.types import ModelCatalog, ModelSpec
 
@@ -93,7 +93,8 @@ def catalog_cmd(as_json: bool) -> None:
     try:
         catalog = load_model_catalog()
     except ModelCatalogError as e:
-        print_error(str(e), console=console)
+        # Diagnostics to stderr so `--json` stdout stays parseable (cli_style_guidelines.md "Output Streams").
+        print_error(str(e), console=err_console)
         sys.exit(1)
 
     if as_json:

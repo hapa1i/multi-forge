@@ -18,7 +18,7 @@ import click
 from rich.console import Console
 from rich.table import Table
 
-from forge.cli.output import print_error_with_tip
+from forge.cli.output import err_console, print_error_with_tip
 from forge.core.ops import (
     ForgeOpError,
     explain_provider_trace,
@@ -108,7 +108,7 @@ def trace_list(session: str | None, root_run_id: str | None, period: str, limit:
             limit=limit,
         )
     except ForgeOpError as e:
-        print_error_with_tip(str(e), "Provider traces live in '~/.forge/telemetry/downstream/'.", console=console)
+        print_error_with_tip(str(e), "Provider traces live in '~/.forge/telemetry/downstream/'.", console=err_console)
         sys.exit(1)
 
     if as_json:
@@ -149,7 +149,7 @@ def trace_show(request_id: str, as_json: bool) -> None:
     try:
         result = show_provider_trace(ctx=ExecutionContext.from_cwd(), request_id=request_id)
     except ForgeOpError as e:
-        print_error_with_tip(str(e), "Run 'forge telemetry trace list' to see recent request ids.", console=console)
+        print_error_with_tip(str(e), "Run 'forge telemetry trace list' to see recent request ids.", console=err_console)
         sys.exit(1)
 
     if as_json:
@@ -192,7 +192,7 @@ def trace_explain(request_id: str, as_json: bool) -> None:
     try:
         explanation = explain_provider_trace(ctx=ExecutionContext.from_cwd(), request_id=request_id)
     except ForgeOpError as e:
-        print_error_with_tip(str(e), "Run 'forge telemetry trace list' to see recent request ids.", console=console)
+        print_error_with_tip(str(e), "Run 'forge telemetry trace list' to see recent request ids.", console=err_console)
         sys.exit(1)
 
     if as_json:

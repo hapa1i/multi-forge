@@ -17,7 +17,7 @@ from typing import Any, cast
 import click
 from rich.table import Table
 
-from forge.cli.output import print_error, print_error_with_tip, print_tip
+from forge.cli.output import err_console, print_error, print_error_with_tip, print_tip
 from forge.core.ops.session_context import SessionContext
 from forge.core.paths import display_path
 from forge.core.state import parse_iso
@@ -428,7 +428,8 @@ def list_sessions(include_incognito: bool, older_than: int | None, scope: str, a
         forge session list --older-than 30  # Old sessions in current repo
     """
     if older_than is not None and older_than < 1:
-        print_error("--older-than must be >= 1", console=console)
+        # Diagnostics to stderr so `--json` stdout stays parseable (this fires before the --json branch).
+        print_error("--older-than must be >= 1", console=err_console)
         sys.exit(1)
 
     from forge.core.ops.context import ExecutionContext

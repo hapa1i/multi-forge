@@ -63,5 +63,6 @@ def test_model_catalog_errors_use_cli_helper(monkeypatch) -> None:
     result = CliRunner().invoke(main, ["model", "catalog"])
 
     assert result.exit_code == 1
-    assert result.output.startswith("Error:")
-    assert "bad catalog" in result.output
+    # Diagnostics go to stderr (clean stdout for the JSON/results stream).
+    assert result.stderr.startswith("Error:")
+    assert "bad catalog" in result.stderr

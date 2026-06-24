@@ -14,7 +14,7 @@ from typing import Any
 
 import click
 
-from forge.cli.output import print_error, print_tip
+from forge.cli.output import err_console, print_error, print_tip
 from forge.cli.session import console
 from forge.core.effort import CLAUDE_EFFORT_LEVELS
 from forge.core.ops.context import ExecutionContext
@@ -419,7 +419,8 @@ def list_cmd(as_json: bool) -> None:
 
     ctx = ExecutionContext.from_cwd()
     if ctx.forge_root is None:
-        print_error("Not inside a Forge project.", console=console)
+        # Diagnostics to stderr so `--json` stdout stays parseable (this fires before the --json branch).
+        print_error("Not inside a Forge project.", console=err_console)
         sys.exit(1)
     forge_root = ctx.forge_root
 

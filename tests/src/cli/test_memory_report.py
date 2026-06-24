@@ -98,7 +98,7 @@ class TestShowCommand:
     def test_latest_and_all_mutually_exclusive(self, runner: CliRunner) -> None:
         result = runner.invoke(main, ["session", "memory", "report", "s1", "--latest", "--all"])
         assert result.exit_code != 0
-        assert "mutually exclusive" in result.output
+        assert "mutually exclusive" in result.stderr
 
     def test_no_session_name_outside_forge_project(self, runner: CliRunner, tmp_path: Path) -> None:
         from forge.session import SessionManager
@@ -108,7 +108,7 @@ class TestShowCommand:
             with patch("forge.cli.memory_report._cwd_forge_root", return_value=None):
                 result = runner.invoke(main, ["session", "memory", "report"])
         assert result.exit_code != 0
-        assert "Not inside a Forge project" in result.output
+        assert "Not inside a Forge project" in result.stderr
 
     def test_no_session_name_prefers_forge_session_env(
         self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
