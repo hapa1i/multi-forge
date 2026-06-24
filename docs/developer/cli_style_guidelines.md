@@ -25,8 +25,9 @@ Forge CLI commands use explicit verbs and predictable command boundaries.
 
 - **Groups earn their depth.** A group earns a path segment only when it holds two or more visible leaves (or a
   documented, imminent one). No single-leaf subgroups and no single-child group nests -- attach the leaf to the parent.
-  Non-leaf groups print help and exit 0 on bare invocation; prefer `no_args_is_help=True` over hand-rolling
-  `invoke_without_command` only to echo help. _Guard:_ `test_command_tree_invariants::test_no_single_leaf_groups`.
+  Non-leaf groups print help on bare invocation via `no_args_is_help=True` (help to stderr, exit 2); prefer it over
+  hand-rolling `invoke_without_command` only to echo help. _Guard:_
+  `test_command_tree_invariants::test_no_single_leaf_groups`.
 
 - **Name leaves distinctly.** Sibling leaves must not collide on tab-completion: none may be a prefix of another or
   share a six-character-or-longer prefix, and one verb must not name two different engines in a group. _Guard:_

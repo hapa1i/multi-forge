@@ -24,7 +24,7 @@ from rich.console import Console
 from rich.table import Table
 from rich.text import Text
 
-from forge.cli.output import print_error, print_error_with_tip, print_tip
+from forge.cli.output import err_console, print_error, print_error_with_tip, print_tip
 from forge.core.effort import CLAUDE_EFFORT_LEVELS
 from forge.core.llm.types import REASONING_EFFORT_LEVELS
 from forge.core.paths import display_path
@@ -123,17 +123,19 @@ def _resolve_policy_session(cwd: Path, explicit: str | None) -> tuple[SessionSto
     (zero local sessions) and the ambiguous case (multiple, none selected) produce distinct
     messages so the caller isn't told "No session found" when several exist.
     """
+    # Diagnostics go to err_console (stderr): this resolver only ever prints on failure, so
+    # nothing here is a result. Keeps stdout clean for --json read leaves (e.g. shadow status).
     if explicit:
         try:
             return _resolve_session_for_display(explicit, cwd)
         except AmbiguousSessionError as exc:
-            print_error(f"Session '{explicit}' exists in multiple projects:", console=console)
+            print_error(f"Session '{explicit}' exists in multiple projects:", console=err_console)
             for root in exc.forge_roots:
-                console.print(Text(f"  - {display_path(root)}", style="dim", no_wrap=True), soft_wrap=True)
-            console.print("[dim]Run the command from the target project directory.[/dim]")
+                err_console.print(Text(f"  - {display_path(root)}", style="dim", no_wrap=True), soft_wrap=True)
+            err_console.print("[dim]Run the command from the target project directory.[/dim]")
             sys.exit(1)
         except ForgeSessionError as exc:
-            print_error(f"Session '{explicit}' not found: {exc}", console=console)
+            print_error(f"Session '{explicit}' not found: {exc}", console=err_console)
             sys.exit(1)
 
     name = os.environ.get(ENV_SESSION)
@@ -142,21 +144,23 @@ def _resolve_policy_session(cwd: Path, explicit: str | None) -> tuple[SessionSto
         if len(candidates) == 1:
             name = candidates[0]
         elif not candidates:
-            print_error(f"No session found in {display_path(cwd)}", console=console)
-            console.print("  Run 'forge session start' first to create a session.")
+            print_error(f"No session found in {display_path(cwd)}", console=err_console)
+            err_console.print("  Run 'forge session start' first to create a session.")
             sys.exit(1)
         else:
-            print_error(f"Multiple sessions in {display_path(cwd)}; specify one with --session.", console=console)
-            console.print("  Sessions: " + ", ".join(candidates))
-            print_tip(f"Run 'forge policy <command> --session {candidates[0]}'.", blank_before=False, console=console)
+            print_error(f"Multiple sessions in {display_path(cwd)}; specify one with --session.", console=err_console)
+            err_console.print("  Sessions: " + ", ".join(candidates))
+            print_tip(
+                f"Run 'forge policy <command> --session {candidates[0]}'.", blank_before=False, console=err_console
+            )
             sys.exit(1)
 
     store = SessionStore(_resolve_forge_root(cwd), name)
     try:
         state = store.read()
     except Exception:
-        print_error(f"No session found in {display_path(cwd)}", console=console)
-        console.print("  Run 'forge session start' first to create a session.")
+        print_error(f"No session found in {display_path(cwd)}", console=err_console)
+        err_console.print("  Run 'forge session start' first to create a session.")
         sys.exit(1)
     return store, state
 
@@ -1448,6 +1452,70 @@ def shadow_show_cmd(session: str | None, show_all: bool, as_json: bool) -> None:
     console.print(f"\n[bold]Shadow audit — {session_name}[/bold] [dim]({len(records)} shown)[/dim]")
     for r in records:
         _render_shadow_record(r)
+
+
+@shadow_group.command(name="status")
+@click.argument("session", required=False)
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def shadow_status_cmd(session: str | None, as_json: bool) -> None:
+    """Show shadow-sampling status for a session: sample rate + pending/done audit counts.
+
+    Sample rate is the configured probability of shadowing an uncached tier-1 allow
+    (0 = disabled, null = no supervisor configured). Pending = candidates captured but
+    not yet drained; done tallies the finalized audit verdicts.
+
+    \b
+    Examples:
+        forge policy shadow status            # current session ($FORGE_SESSION)
+        forge policy shadow status planner --json
+    """
+    from forge.policy.semantic.shadow import count_pending_candidates, read_done_records
+    from forge.policy.semantic.shadow_runner import (
+        STATUS_AGREE,
+        STATUS_DISAGREE,
+        STATUS_ERROR,
+        STATUS_INCONCLUSIVE,
+    )
+
+    # Resolve once via the policy-session path so the rate and the counts always
+    # describe the same session (resolve_session_identifier could diverge on $FORGE_SESSION).
+    cwd = Path.cwd().resolve()
+    _, manifest = _resolve_policy_session(cwd, session)
+    session_name = manifest.name
+    forge_root = manifest.forge_root
+
+    sample_rate: float | None = None
+    try:
+        effective = compute_effective_intent(manifest)
+        sup = effective.policy.supervisor if effective.policy else None
+        if sup is not None:
+            sample_rate = sup.shadow_sample_rate
+    except Exception:
+        # Best-effort: a read command never hard-fails on config resolution.
+        sample_rate = None
+
+    pending = count_pending_candidates(forge_root, session_name)
+    # Seed every status so the shape is stable with zero records.
+    done = {STATUS_AGREE: 0, STATUS_DISAGREE: 0, STATUS_INCONCLUSIVE: 0, STATUS_ERROR: 0}
+    for record in read_done_records(forge_root, session_name):
+        status = record.get("status")
+        if status in done:
+            done[status] += 1
+
+    if as_json:
+        click.echo(
+            json.dumps(
+                {"session": session_name, "sample_rate": sample_rate, "pending": pending, "done": done},
+                indent=2,
+            )
+        )
+        return
+
+    rate_str = "disabled" if not sample_rate else f"{sample_rate:.0%}"
+    console.print(f"\n[bold]Shadow status — {session_name}[/bold]")
+    console.print(f"  sample rate: {rate_str}")
+    console.print(f"  pending: {pending}")
+    console.print("  done: " + ", ".join(f"{k}={v}" for k, v in done.items()))
 
 
 def _render_shadow_record(record: dict[str, Any]) -> None:

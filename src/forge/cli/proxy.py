@@ -1533,9 +1533,12 @@ def _display_all_metrics(
 @proxy.command("metrics")
 @click.argument("proxy_id", required=False)
 @click.option("--json", "as_json", is_flag=True, help="Output raw JSON")
-@click.option("--all", "show_all", is_flag=True, help="Show all active proxies")
-def metrics_cmd(proxy_id: str | None, as_json: bool, show_all: bool) -> None:
-    """Show runtime metrics for a running proxy."""
+def metrics_cmd(proxy_id: str | None, as_json: bool) -> None:
+    """Show runtime metrics for a running proxy.
+
+    With no PROXY_ID, shows the sole registered proxy, or an aggregate table when
+    several are registered.
+    """
     import json
 
     console = Console(width=200)
@@ -1545,18 +1548,6 @@ def metrics_cmd(proxy_id: str | None, as_json: bool, show_all: bool) -> None:
     except ProxyRegistryCorruptedError as e:
         print_error(f"Proxy registry error: {e}", console=console)
         sys.exit(1)
-
-    if show_all:
-        try:
-            proxies = store.list_proxies()
-        except ProxyRegistryCorruptedError as e:
-            print_error(f"Proxy registry error: {e}", console=console)
-            sys.exit(1)
-        if not proxies:
-            console.print("[dim]No proxies registered.[/dim]")
-            return
-        _display_all_metrics(console, proxies, as_json=as_json)
-        return
 
     if not proxy_id:
         try:

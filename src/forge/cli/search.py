@@ -45,11 +45,10 @@ def _resolve_forge_root() -> Path:
 
 
 @click.group(
-    invoke_without_command=True,
+    no_args_is_help=True,
     context_settings={"help_option_names": ["-h", "--help"]},
 )
-@click.pass_context
-def search_cmd(ctx: click.Context) -> None:
+def search_cmd() -> None:
     """Search session transcripts.
 
     \b
@@ -58,10 +57,6 @@ def search_cmd(ctx: click.Context) -> None:
       forge search rebuild-index           Rebuild the search index
       forge search status                  Show index statistics
     """
-    if ctx.invoked_subcommand is not None:
-        return
-
-    click.echo(ctx.get_help())
 
 
 @search_cmd.command("query")

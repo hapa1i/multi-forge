@@ -1460,6 +1460,9 @@ def start(
     default=1,
     help="Lineage traversal depth (only with --fresh, 1=parent only)",
 )
+# Value asymmetry with `session fork`'s --resume-mode ({transfer, native-relocate}): resume
+# stays in the same directory, so the full conversation is reachable via Claude's --fork-session
+# in place -- no JSONL relocation needed -- hence `native`, not `native-relocate`.
 @click.option(
     "--resume-mode",
     "resume_mode",

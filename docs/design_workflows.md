@@ -161,7 +161,8 @@ runs the frontier, and classifies the verdict with the supervisor's **own** bloc
 (run failed or output unparseable, kept distinct from a real low-confidence `inconclusive`). It records the verdict and
 renames `.processing` → `.done`; it **never enforces**. Spend is a separate `supervisor-shadow` usage row (the worker is
 the sole emitter, re-rooted under the originating session). The read surface is `forge telemetry activity` (a Shadow
-line with checked/disagree/pending counts) and `forge policy shadow show` (the disagreement artifacts with citations).
+line with checked/disagree/pending counts), `forge policy shadow show` (the disagreement artifacts with citations), and
+`forge policy shadow status` (the sample rate plus pending/done counts for one session).
 
 **Supervisor stuck playbook:** When the supervisor blocks because the plan evolved:
 

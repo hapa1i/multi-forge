@@ -140,12 +140,12 @@ class TestSearchCommand:
     """Tests for forge search query <terms>."""
 
     def test_bare_search_prints_help(self, runner: CliRunner) -> None:
-        """Bare non-leaf command orients users; query is the explicit action."""
+        """Bare non-leaf prints help to stderr and exits 2 (usage error), like every other group."""
         result = runner.invoke(main, ["search"])
-        assert result.exit_code == 0
-        assert "Usage:" in result.output
-        assert "query" in result.output
-        assert "rebuild-index" in result.output
+        assert result.exit_code == 2
+        assert "Usage:" in result.stderr
+        assert "query" in result.stderr
+        assert "rebuild-index" in result.stderr
 
     def test_search_default_renders_table(self, runner: CliRunner, populated_store: SearchDocumentStore) -> None:
         """Default (no --json) renders a human table with a result-count footer, not JSON."""

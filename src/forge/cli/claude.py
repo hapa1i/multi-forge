@@ -18,7 +18,7 @@ import click
 import httpx
 from rich.console import Console
 
-from forge.cli.output import print_error, print_error_with_tip
+from forge.cli.output import err_console, print_error, print_error_with_tip
 from forge.core.paths import display_path
 from forge.core.reactive.env import FORGE_PROXY_WIRE_SHAPE_VAR, resolve_proxy_wire_shape
 from forge.proxy.proxies import (
@@ -225,10 +225,10 @@ def start_cmd(
         forge claude start --proxy my-proxy -- --debug
     """
     if direct and proxy_id:
-        print_error("--no-proxy and --proxy are mutually exclusive", console=console)
+        print_error("--no-proxy and --proxy are mutually exclusive", console=err_console)
         sys.exit(1)
     if not direct and not proxy_id:
-        print_error("one of --proxy or --no-proxy is required", console=console)
+        print_error("one of --proxy or --no-proxy is required", console=err_console)
         sys.exit(1)
 
     from forge.session.claude.invoke import invoke_claude
@@ -245,17 +245,17 @@ def start_cmd(
         try:
             entry, started = ensure_proxy(proxy_id)
         except ProxyRegistryCorruptedError as e:
-            print_error(str(e), console=console)
+            print_error(str(e), console=err_console)
             sys.exit(1)
         except (ProxyResolutionError, ProxyStartError) as e:
             if isinstance(e, ProxyNotFoundError):
                 print_error_with_tip(
                     str(e),
                     "Run 'forge proxy template list' to see available templates.",
-                    console=console,
+                    console=err_console,
                 )
             else:
-                print_error(str(e), console=console)
+                print_error(str(e), console=err_console)
             sys.exit(1)
 
         if started:
@@ -272,10 +272,10 @@ def start_cmd(
                 print_error_with_tip(
                     str(e),
                     f"Run 'forge proxy start {entry.proxy_id}' to start it.",
-                    console=console,
+                    console=err_console,
                 )
             else:
-                print_error(str(e), console=console)
+                print_error(str(e), console=err_console)
             sys.exit(1)
 
         template = entry.template
@@ -296,7 +296,7 @@ def start_cmd(
         direct_model = get_default_direct_model()
         error = apply_direct_model_env(env_vars, direct_model)
         if error:
-            print_error(error, console=console)
+            print_error(error, console=err_console)
             sys.exit(1)
 
     if proxy_display:

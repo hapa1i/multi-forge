@@ -38,9 +38,8 @@ from forge.runtime_config import (
 )
 
 
-@click.group(invoke_without_command=True, subcommand_metavar="[COMMAND] [ARGS]...")
-@click.pass_context
-def config(ctx: click.Context) -> None:
+@click.group(no_args_is_help=True, subcommand_metavar="[COMMAND] [ARGS]...")
+def config() -> None:
     """Manage Forge global configuration.
 
     \b
@@ -53,8 +52,6 @@ def config(ctx: click.Context) -> None:
         forge config set proxy_mode=sidecar
         forge config edit                 # Open in $EDITOR
     """
-    if ctx.invoked_subcommand is None:
-        click.echo(ctx.get_help())
 
 
 @config.command("show")

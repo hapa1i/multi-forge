@@ -157,6 +157,21 @@ def has_pending_candidates(forge_root: str | None, session_name: str) -> bool:
     return any(directory.glob("*.json"))
 
 
+def count_pending_candidates(forge_root: str | None, session_name: str) -> int:
+    """Count pending (``*.json``) shadow candidates awaiting a drain.
+
+    Unlike ``count_existing_candidates`` (which counts every lifecycle state for
+    cap enforcement), this counts only un-claimed ``*.json`` records -- the
+    "waiting to be audited" number a status view reports.
+    """
+    if not forge_root:
+        return 0
+    directory = get_artifact_paths(Path(forge_root), session_name).shadow_abs
+    if not directory.is_dir():
+        return 0
+    return sum(1 for _ in directory.glob("*.json"))
+
+
 def read_done_records(forge_root: str | None, session_name: str) -> list[dict[str, Any]]:
     """Load all finalized (``.done``) shadow records for a session, newest first.
 

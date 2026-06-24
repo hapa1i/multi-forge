@@ -1596,10 +1596,10 @@ class TestProxyMetrics:
         assert data["total_requests"] == 42
         assert data["tokens"]["cached"] == 60000
 
-    def test_metrics_all_json_is_valid_single_object(
+    def test_metrics_multiple_json_marks_unreachable_null(
         self, runner: CliRunner, temp_env: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """--all --json must emit a single valid JSON object."""
+        """Bare `metrics --json` with >1 proxy emits one JSON object; unreachable proxies are null."""
         _create_proxy_registry_from_entries(
             {
                 "proxy-a": ProxyEntry(proxy_id="proxy-a", template="t", base_url="http://localhost:8085", port=8085),
@@ -1615,13 +1615,19 @@ class TestProxyMetrics:
 
         monkeypatch.setattr("forge.cli.proxy._fetch_proxy_info", _mock_fetch)
 
-        result = runner.invoke(main, ["proxy", "metrics", "--all", "--json"])
+        result = runner.invoke(main, ["proxy", "metrics", "--json"])
 
         assert result.exit_code == 0
         data = json.loads(result.output)  # Must parse as single JSON
         assert "proxy-a" in data
         assert data["proxy-a"]["total_requests"] == 42
         assert data["proxy-b"] is None  # unreachable
+
+    def test_metrics_all_flag_removed(self, runner: CliRunner) -> None:
+        """`--all` was removed (Slice 12) -- bare `metrics` already aggregates. Clean break: exit 2."""
+        result = runner.invoke(main, ["proxy", "metrics", "--all"])
+        assert result.exit_code == 2
+        assert "No such option" in result.stderr
 
     def test_metrics_proxy_not_found(self, runner: CliRunner, temp_env: Path) -> None:
         result = runner.invoke(main, ["proxy", "metrics", "nonexistent"])
@@ -1757,10 +1763,10 @@ class TestProxyMetrics:
         assert result.exit_code == 0
         assert "litellm-openai" in result.output
 
-    def test_metrics_all_shows_separators(
+    def test_metrics_multiple_shows_separators(
         self, runner: CliRunner, temp_env: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """--all with multiple proxies shows separator lines between them."""
+        """Bare `metrics` with multiple proxies shows separator lines between them."""
         _create_proxy_registry_from_entries(
             {
                 "proxy-a": ProxyEntry(proxy_id="proxy-a", template="t", base_url="http://localhost:8085", port=8085),
@@ -1771,7 +1777,7 @@ class TestProxyMetrics:
             "forge.cli.proxy._fetch_proxy_info", lambda _: _ProxyInfo(metrics=_SAMPLE_METRICS, template="t")
         )
 
-        result = runner.invoke(main, ["proxy", "metrics", "--all"])
+        result = runner.invoke(main, ["proxy", "metrics"])
 
         assert result.exit_code == 0
         assert "proxy-a" in result.output

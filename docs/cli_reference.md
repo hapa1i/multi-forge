@@ -109,7 +109,7 @@ Session-scoped activation and reports (whether the memory writer runs for a sess
 | `forge proxy stop <id>`              | Stop server (keeps config)                              |
 | `forge proxy delete <id>...`         | Delete one or more proxies (`--all` for bulk deletion)  |
 | `forge proxy validate <id>`          | Validate proxy configuration                            |
-| `forge proxy metrics [id]`           | Show runtime metrics (`--json`, `--all`)                |
+| `forge proxy metrics [id]`           | Show runtime metrics (`--json`; aggregates all when >1) |
 | `forge proxy audit show [id]`        | Show redacted audit records (hashes/counts, no secrets) |
 | `forge proxy audit diff [id]`        | Show system/tool drift + override mutations over time   |
 | `forge proxy template list`          | List available templates                                |
@@ -201,6 +201,7 @@ runners.
 | `forge policy supervisor reload`                               | Reload latest relevant approved plan                                |
 | `forge policy supervisor reload --from <path>`                 | Reload plan from explicit file                                      |
 | `forge policy shadow show [session]`                           | Show shadow-audit disagreements (`--all`/`--json`)                  |
+| `forge policy shadow status [session]`                         | Show shadow sample rate + pending/done audit counts (`--json`)      |
 
 ### Workflow
 

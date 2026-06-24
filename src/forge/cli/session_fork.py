@@ -155,6 +155,9 @@ __all__ = ["fork"]
     default=None,
     help="Fork into an existing non-main worktree directory",
 )
+# Value asymmetry with `session resume`'s --resume-mode ({native, transfer}): a fork can target a
+# different worktree/--into directory, so byte-faithful Claude resume must relocate the parent JSONL
+# into the child's dir -- hence `native-relocate`, not bare `native`.
 @click.option(
     "--resume-mode",
     "resume_mode",

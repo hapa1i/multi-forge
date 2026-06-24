@@ -340,18 +340,18 @@ forge proxy metrics "$FORGE_QA_GEMINI_PROXY"
 # JSON output
 forge proxy metrics "$FORGE_QA_GEMINI_PROXY" --json
 
-# All proxies
-forge proxy metrics --all
+# All proxies (the default aggregate when more than one is registered)
+forge proxy metrics
 
 # All proxies JSON (must be a single valid JSON object)
-forge proxy metrics --all --json
+forge proxy metrics --json
 ```
 
 - [ ] `forge proxy metrics` displays request counts, token totals, per-tier breakdown
 - [ ] Per-tier breakdown includes avg latency
 - [ ] `--json` outputs valid parseable JSON
-- [ ] `--all --json` outputs a single valid JSON object (not one per proxy)
-- [ ] Unreachable proxies show `null` in `--all --json` output
+- [ ] bare `metrics --json` (with >1 proxy) outputs a single valid JSON object (not one per proxy)
+- [ ] Unreachable proxies show `null` in `metrics --json` output
 
 ### 4.14 Proxy Metrics (Not Found / Shared-Port)
 

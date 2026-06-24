@@ -47,14 +47,14 @@ class TestConfigShow:
         assert "Forge Runtime Config" not in result.output
 
     def test_bare_config_prints_help(self):
-        """Bare non-leaf command orients users; `show` is the explicit action."""
+        """Bare non-leaf prints help to stderr and exits 2 (usage error), like every other group."""
         runner = CliRunner()
         result = runner.invoke(config)
-        assert result.exit_code == 0
-        assert "Usage:" in result.output
-        assert "forge config show" in result.output
-        assert "Commands:" in result.output
-        assert "proxy_mode: host" not in result.output
+        assert result.exit_code == 2
+        assert "Usage:" in result.stderr
+        assert "forge config show" in result.stderr
+        assert "Commands:" in result.stderr
+        assert "proxy_mode: host" not in result.stderr
 
     def test_help_marks_subcommand_optional(self):
         """Help usage should match the bare `forge config` help behavior."""

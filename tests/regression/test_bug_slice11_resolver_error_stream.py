@@ -26,9 +26,7 @@ pytestmark = pytest.mark.regression
 
 def test_unknown_proxy_error_and_tip_go_to_stderr() -> None:
     """An unresolvable --proxy fails on stderr with a clean stdout stream."""
-    result = CliRunner().invoke(
-        main, ["session", "start", "smoke", "--proxy", "definitely-not-a-proxy-template"]
-    )
+    result = CliRunner().invoke(main, ["session", "start", "smoke", "--proxy", "definitely-not-a-proxy-template"])
 
     assert result.exit_code == 1
     # Error + recovery tip belong on the diagnostics stream.

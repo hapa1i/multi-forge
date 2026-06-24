@@ -50,7 +50,7 @@ allowlisted entry that was fixed-without-removal. "Done" for these slices = the 
 | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ |
 | `JSON_DEST_ALLOWLIST` (`test_command_tree_invariants.py:49`) | `proxy create`, `proxy metrics`, `policy check`, `policy supervisor`, `workflow {list-models,panel,analyze,debate,consensus}` — 9 using `json_output` not `as_json`                                                                                                                               | 07           |
 | `JSON_MISSING_ALLOWLIST` (`:134`)                            | `authentication status`, `model backend show`, `proxy template {list,show}`, `claude preset show`, `config show`, `memory shadows show`, `search status` — 8 read leaves with no `--json` (the 9th, `memory report show`, was resolved early in Slice 02 as `forge session memory report --json`) | 07           |
-| `SINGLE_LEAF_GROUP_ALLOWLIST` (`:75`)                        | `forge provider` (→ **delete**; `trace` moves to `telemetry trace` per D1), `forge policy shadow` (→ `show`; `run` hidden), `forge memory report` (→ flatten)                                                                                                                                     | 03 / 12      |
+| `SINGLE_LEAF_GROUP_ALLOWLIST` (`:65`)                        | ~~`forge provider`, `forge policy shadow`, `forge memory report`~~ **DRAINED to `set()`** (provider deleted Slice 03; memory report flattened Slice 02; `policy shadow` gained a `status` leaf Slice 12). Locked never-grow guard.                                                                | 03 / 12      |
 | `LEAF_NAMING_ALLOWLIST` (`:110`)                             | `forge policy: supervise\|supervisor` (confusable; `supervise` is a prefix of `supervisor`)                                                                                                                                                                                                       | 10           |
 | `CLI_ERROR_MARKUP_ALLOWLIST` (`test_output.py`)              | ~~18 files with hand-rolled `[red]Error:`~~ **DRAINED to `set()` in Slice 11** (234 sites routed to `print_error`); now a locked never-grow guard                                                                                                                                                 | 11           |
 
@@ -337,11 +337,26 @@ verification is recorded.
     scope); regression test `tests/regression/test_bug_slice11_resolver_error_stream.py` exercises the real (unmocked)
     resolver. (2) **Tip allowlist tightened** file-level → payload-level: pinned to the 3 exact `direct_commands.py`
     payload sentences + stale-check, so a new `Tip:` even inside that file now fails (all 4 branches verified).
-- [ ] **Slice 12 - Non-leaf + small surfaces.** Normalize `forge config`/`forge search` to `no_args_is_help=True` (F13
-  stands). Resolve remaining `SINGLE_LEAF_GROUP_ALLOWLIST` entries (`forge policy shadow`). Audit the F14 candidates:
-  `proxy metrics --all` (redundant with no-arg aggregate — remove or document), `memory track` naming, `extension sync`
-  vs `enable` naming, `resume-mode` value divergence (`resume {native,transfer}` vs `fork {transfer,native-relocate}` —
-  document the intentional asymmetry at the call site). F14f is a **no-op** (proxy-overlay wording is canonical).
+- [x] **Slice 12 - Non-leaf + small surfaces. SHIPPED 2026-06-24.** Normalized the two hand-rolled non-leaf groups,
+  drained the last single-leaf-group entry, and resolved the F14 candidates.
+  - **F13**: `forge config` + `forge search` → `no_args_is_help=True` (drop the `invoke_without_command` help
+    callbacks). Behavior change recorded: bare invocation now prints help to stderr + exit **2** (was exit 0/stdout),
+    matching `telemetry`/`model`. Updated the two bare-help tests (exit 2, assert on `result.stderr`).
+  - **Single-leaf drain**: added `forge policy shadow status [session] --json` (sample rate + pending/done counts) →
+    `shadow` is now show + status; `SINGLE_LEAF_GROUP_ALLOWLIST` → `set()`. Hidden `run` worker + its Stop-hook `Popen`
+    untouched (chosen over collapsing to avoid the silent DEVNULL spawn path). New named `count_pending_candidates`
+    helper (vs `count_existing_candidates`, which counts all lifecycle states).
+  - **F14 `proxy metrics --all` removed** (clean break): bare `metrics` already aggregates when >1; old `--all` → exit 2
+    "No such option". Converted the two `--all` tests + added a clean-break test.
+  - **F14 resume-mode**: documented the intentional `{native,transfer}` vs `{transfer,native-relocate}` asymmetry at
+    both call sites (comment only).
+  - **F14 `memory track` / `extension sync`**: kept as-is — names are defensible (rename suggestions rested on a
+    misread: `enable` = first-time setup, `sync` = refresh existing). F14f no-op (proxy-overlay wording canonical).
+  - **Fold-in**: `claude.py start_cmd`'s 5 error sites → `output.err_console` (stderr); updated 3 stderr assertions.
+  - Docs: `cli_reference.md` (+shadow status, −metrics --all), `end-user/proxy.md`, QA `4-proxy.md`,
+    `design_workflows.md` (+shadow status), `cli_style_guidelines.md` (no_args_is_help → stderr/exit 2).
+  - Verification: 267 tests across touched CLI files pass; tree invariants pass with both allowlists empty;
+    `make pre-commit` clean.
 - [ ] **Slice 05 - Alias + canonical pass (D6, finalized).** Apply the D6 alias set. Run **last** so new nouns from
   D1-D4 are settled. Verified blast radius (map+verify workflow, 2026-06-23):
   - `src/forge/cli/main.py`: `_ALIASES` (50-57) remove `"auth": "authentication"` (51) and `"extensions": "extension"`

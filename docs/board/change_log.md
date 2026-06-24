@@ -27,6 +27,44 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-24
 
+### forge_cli_cleanup Slice 12: non-leaf + small-surface cleanup
+
+**Goal**: Close the last non-alias slice — normalize the two hand-rolled non-leaf groups (F13), drain the final
+`SINGLE_LEAF_GROUP_ALLOWLIST` entry, and resolve the F14 small-surface candidates.
+
+**Key changes**:
+
+- **F13**: `forge config` + `forge search` now use `no_args_is_help=True` (the `telemetry`/`model` pattern), dropping
+  their hand-rolled `invoke_without_command` help-echo callbacks. **Behavior change**: bare
+  `forge config`/`forge search` now print help to stderr and exit **2** (was exit 0 on stdout), matching every other
+  group.
+- **Single-leaf drain**: added `forge policy shadow status [session] [--json]` (sample rate + pending/done audit
+  counts), making `shadow` a real 2-leaf group (show + status); the hidden `run` worker and its Stop-hook `Popen` are
+  untouched. `SINGLE_LEAF_GROUP_ALLOWLIST` drained to `set()`. New `count_pending_candidates` helper in
+  `policy/semantic/shadow.py` names "pending" precisely (vs `count_existing_candidates`, which counts all states).
+- **F14 `proxy metrics --all` removed** (clean break): bare `metrics` already aggregates when >1 proxy. Old `--all` →
+  Click "No such option" (exit 2).
+- **F14 resume-mode asymmetry documented** (comment only): `resume` uses `{native, transfer}` (stays in place), `fork`
+  uses `{transfer, native-relocate}` (can relocate to a worktree) — cross-referenced at both call sites.
+- **F14 kept as-is**: `memory track` and `extension sync` — the names are defensible (the audit's rename suggestions
+  rested on a misread; `enable` = first-time setup, `sync` = refresh an existing install).
+- **Fold-in**: `claude.py start_cmd`'s 5 error sites now route through `output.err_console` (stderr), fixing a
+  pre-existing stream-rule violation; the Slice 11 `err_console` primitive is reused.
+
+**Verification**: 267 tests across the touched CLI files pass, incl. new `shadow status` cases, the `metrics --all`
+clean-break test, and updated `test_claude_command.py` stderr assertions; tree invariants pass with both allowlists
+empty; `make pre-commit` clean.
+
+**Follow-up (post-review fixes)**:
+
+- **Stream contract for policy resolver**: `_resolve_policy_session` wrote its "session not found" / "multiple sessions"
+  diagnostics through the stdout module console, so a failing `policy shadow status <bad> --json` (the new read leaf)
+  emitted the error on stdout with empty stderr. Routed all of that helper's diagnostics through `output.err_console` —
+  it only ever prints on failure, so nothing there is a result. This fixes the whole policy surface (`policy status`,
+  `supervisor status`, etc.), not just `shadow status`. Regression test
+  `tests/regression/test_bug_slice12_policy_resolver_error_stream.py`.
+- Fixed a duplicated Slice 05 checklist line (edit artifact from the Slice 12 closeout).
+
 ### forge_cli_cleanup Slice 11: recovery-output cleanup
 
 **Goal**: Resolve card finding F9 — route every hand-rolled terminal `Tip:` and `[red]Error:[/red]` through the

@@ -133,8 +133,7 @@ forge proxy set <proxy_id> <key>=<value>
 forge proxy delete <proxy_id> [--yes] [--kill-adopted]
 
 # Metrics
-forge proxy metrics [proxy_id]   # Runtime metrics (tokens, latency, failures)
-forge proxy metrics --all        # Metrics for all active proxies
+forge proxy metrics [proxy_id]   # Runtime metrics (tokens, latency, failures); aggregates all when >1
 forge proxy metrics --json       # Raw JSON output
 
 # Maintenance
@@ -464,8 +463,8 @@ breakdowns, failure rates, and latency. Metrics reset on proxy restart.
 # View metrics for a specific proxy
 forge proxy metrics my-proxy
 
-# View all active proxies
-forge proxy metrics --all
+# View all active proxies (the default when more than one is registered)
+forge proxy metrics
 
 # JSON output (for scripting)
 forge proxy metrics --json

@@ -61,10 +61,9 @@ def test_json_option_dest_is_as_json() -> None:
 
 
 # --- Rule: a group earns a path segment only with >=2 visible leaves ----------
-# Hidden groups (internal workers) are exempt. Pre-existing single-leaf groups:
-SINGLE_LEAF_GROUP_ALLOWLIST = {
-    "forge policy shadow",  # -> show (run is hidden)
-}
+# Hidden groups (internal workers) are exempt. Drained empty by forge_cli_cleanup
+# Slice 12: `forge policy shadow` gained a `status` leaf (now show + status visible).
+SINGLE_LEAF_GROUP_ALLOWLIST: set[str] = set()
 
 
 def test_no_single_leaf_groups() -> None:
