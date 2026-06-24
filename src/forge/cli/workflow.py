@@ -20,7 +20,7 @@ from typing import Any
 import click
 from rich.console import Console
 
-from forge.cli.output import print_tip
+from forge.cli.output import print_error, print_tip
 from forge.core.effort import CLAUDE_EFFORT_LEVELS
 from forge.proxy.proxies import ProxyResolutionError
 from forge.review.models import (
@@ -104,7 +104,7 @@ def _run_preflight(
             data["routing_warnings"] = warnings
         click.echo(json.dumps(data))
     else:
-        console.print("[red]Error:[/red] Workflow preflight failed:")
+        print_error("Workflow preflight failed:", console=console)
         for err in errors:
             console.print(f"  - {err}")
         print_tip(
@@ -196,7 +196,7 @@ def _handle_routing_error(error: Exception, *, as_json: bool = False) -> None:
     if as_json:
         click.echo(json.dumps({"routing_error": msg}))
     else:
-        console.print(f"[red]Error:[/red] Routing failed: {msg}")
+        print_error(f"Routing failed: {msg}", console=console)
     sys.exit(1)
 
 
@@ -421,18 +421,18 @@ def panel(
     elif context_mode.startswith("resume:"):
         resume_id = context_mode[len("resume:") :]
         if not resume_id:
-            console.print("[red]Error:[/red] --context resume:<uuid> requires a UUID.")
+            print_error("--context resume:<uuid> requires a UUID.", console=console)
             ctx.exit(2)
             return
     else:
-        console.print(f'[red]Error:[/red] Invalid --context "{context_mode}".' ' Use "blind" or "resume:<uuid>".')
+        print_error(f'Invalid --context "{context_mode}".' ' Use "blind" or "resume:<uuid>".', console=console)
         ctx.exit(2)
         return
 
     # Prompt composition: (1) resolve base prompt/resource
     resolved_prompt = _resolve_panel_prompt(target, prompt, code_mode, review_type)
     if resolved_prompt is None:
-        console.print("[red]Error:[/red] No prompt provided. Use target argument, -p, or stdin.")
+        print_error("No prompt provided. Use target argument, -p, or stdin.", console=console)
         ctx.exit(2)
         return
 
@@ -441,7 +441,7 @@ def panel(
     # Skip when -p or stdin provided a custom prompt (review_type is ignored).
     uses_resource = not prompt and bool(target)
     if uses_resource and review_type in ("security", "performance") and not code_mode:
-        console.print(f"[red]Error:[/red] --review-type {review_type} requires --code.")
+        print_error(f"--review-type {review_type} requires --code.", console=console)
         ctx.exit(2)
         return
 
@@ -456,7 +456,7 @@ def panel(
     try:
         specs = resolve_model_specs(models)
     except ValueError as e:
-        console.print(f"[red]Error:[/red] {e}")
+        print_error(f"{e}", console=console)
         ctx.exit(2)
         return
 
@@ -465,7 +465,7 @@ def panel(
         try:
             role_list = _parse_roles(roles)
         except ValueError as e:
-            console.print(f"[red]Error:[/red] {e}")
+            print_error(f"{e}", console=console)
             ctx.exit(2)
             return
         specs = _apply_panel_roles(specs, role_list, resolved_prompt)
@@ -841,14 +841,14 @@ def analyze(
     """
     resolved_topic = " ".join(topic) if topic else prompt_text
     if not resolved_topic:
-        console.print("[red]Error:[/red] No topic provided. Pass as argument or use -p.")
+        print_error("No topic provided. Pass as argument or use -p.", console=console)
         ctx.exit(2)
         return
 
     try:
         specs = resolve_model_specs(models)
     except ValueError as e:
-        console.print(f"[red]Error:[/red] {e}")
+        print_error(f"{e}", console=console)
         ctx.exit(2)
         return
 
@@ -1254,14 +1254,14 @@ def debate(
     from forge.review.adversarial import run_adversarial, validate_resource
 
     if workers and models:
-        console.print("[red]Error:[/red] --worker and --models are mutually exclusive.")
+        print_error("--worker and --models are mutually exclusive.", console=console)
         ctx.exit(2)
         return
 
     resolved = _resolve_debate_prompt(subject, prompt_text, code_mode)
     if not resolved:
         label = "target" if code_mode else "subject"
-        console.print(f"[red]Error:[/red] No {label} provided. Pass as argument or use -p.")
+        print_error(f"No {label} provided. Pass as argument or use -p.", console=console)
         ctx.exit(2)
         return
 
@@ -1276,7 +1276,7 @@ def debate(
         try:
             validate_resource(resource_path)
         except ValueError as e:
-            console.print(f"[red]Error:[/red] {e}")
+            print_error(f"{e}", console=console)
             ctx.exit(2)
             return
 
@@ -1284,14 +1284,14 @@ def debate(
             try:
                 stances = _parse_worker_specs(workers, code_mode=code_mode)
             except ValueError as e:
-                console.print(f"[red]Error:[/red] {e}")
+                print_error(f"{e}", console=console)
                 ctx.exit(2)
                 return
         else:
             try:
                 specs = resolve_model_specs(models)
             except ValueError as e:
-                console.print(f"[red]Error:[/red] {e}")
+                print_error(f"{e}", console=console)
                 ctx.exit(2)
                 return
             stances = _build_stances(specs, code_mode=code_mode)
@@ -1955,7 +1955,7 @@ def consensus(
     from forge.review.consensus import run_consensus, validate_resource
 
     if workers and models:
-        console.print("[red]Error:[/red] --worker and --models are mutually exclusive.")
+        print_error("--worker and --models are mutually exclusive.", console=console)
         ctx.exit(2)
         return
 
@@ -1967,7 +1967,7 @@ def consensus(
     resolved = _resolve_consensus_prompt((), raw_subject, code_mode)
     if not resolved:
         label = "target" if code_mode else "subject"
-        console.print(f"[red]Error:[/red] No {label} provided. Pass as argument or use -p.")
+        print_error(f"No {label} provided. Pass as argument or use -p.", console=console)
         ctx.exit(2)
         return
 
@@ -1981,7 +1981,7 @@ def consensus(
         try:
             validate_resource(resource_path)
         except ValueError as e:
-            console.print(f"[red]Error:[/red] {e}")
+            print_error(f"{e}", console=console)
             ctx.exit(2)
             return
 
@@ -1989,14 +1989,14 @@ def consensus(
             try:
                 role_specs = _parse_consensus_worker_specs(workers)
             except ValueError as e:
-                console.print(f"[red]Error:[/red] {e}")
+                print_error(f"{e}", console=console)
                 ctx.exit(2)
                 return
         else:
             try:
                 specs = resolve_model_specs(models)
             except ValueError as e:
-                console.print(f"[red]Error:[/red] {e}")
+                print_error(f"{e}", console=console)
                 ctx.exit(2)
                 return
             role_specs = _build_consensus_roles(specs, code_mode)

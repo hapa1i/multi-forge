@@ -9,6 +9,7 @@ from typing import Any
 
 import click
 
+from forge.cli.output import err_console, print_error_with_tip, print_tip
 from forge.install.preset import get_builtin_preset
 from forge.session.claude.paths import get_claude_home
 
@@ -98,8 +99,11 @@ def enable(scope: str | None, force: bool) -> None:
 
     version_check = check_minimum_version()
     if not version_check.ok:
-        click.echo(f"Error: {version_check.reason}", err=True)
-        click.echo("Tip: Run 'claude update' to upgrade.", err=True)
+        print_error_with_tip(
+            version_check.reason,
+            "Run 'claude update' to upgrade.",
+            console=err_console,
+        )
         raise SystemExit(1)
 
     settings_file, location = _find_hooks_target(scope)
@@ -117,7 +121,7 @@ def enable(scope: str | None, force: bool) -> None:
     existing_hooks = settings.get("hooks", {})
     if any(key in existing_hooks for key in FORGE_HOOK_CONFIG["hooks"].keys()) and not force:
         click.echo(f"Forge hooks already configured in {settings_file}")
-        click.echo("Tip: Use --force to overwrite")
+        print_tip("Use --force to overwrite", blank_before=False)
         raise SystemExit(1)
 
     if "hooks" not in settings:

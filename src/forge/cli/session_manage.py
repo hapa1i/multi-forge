@@ -17,7 +17,7 @@ from typing import Any, cast
 import click
 from rich.table import Table
 
-from forge.cli.output import print_error_with_tip, print_tip
+from forge.cli.output import print_error, print_error_with_tip, print_tip
 from forge.core.ops.session_context import SessionContext
 from forge.core.paths import display_path
 from forge.core.state import parse_iso
@@ -123,11 +123,11 @@ def delete(
     Use --keep-worktree to preserve the worktree directory.
     """
     if delete_all and names:
-        console.print("[red]Error:[/red] Cannot combine --all with explicit session names")
+        print_error("Cannot combine --all with explicit session names", console=console)
         sys.exit(1)
 
     if not delete_all and not names:
-        console.print("[red]Error:[/red] Provide session name(s) or use --all")
+        print_error("Provide session name(s) or use --all", console=console)
         sys.exit(1)
 
     manager = _sess().SessionManager()
@@ -217,7 +217,7 @@ def delete(
                 if resolved.is_cross_project:
                     console.print(f"[dim]Deleting session from {display_path(actual_fr)}[/dim]")
             except AmbiguousSessionError as e:
-                console.print(f"[red]Error:[/red] {e}")
+                print_error(f"{e}", console=console)
                 failed += 1
                 continue
             except SessionNotFoundError:
@@ -260,16 +260,16 @@ def delete(
                     console=console,
                 )
                 raise SystemExit(1)
-            console.print(f"[red]Error:[/red] {name}: {e}")
+            print_error(f"{name}: {e}", console=console)
             failed += 1
         except ForgeSessionError as e:
             if len(targets) == 1:
                 handle_session_error(e)
             else:
-                console.print(f"[red]Error:[/red] {name}: {e}")
+                print_error(f"{name}: {e}", console=console)
                 failed += 1
         except Exception as e:
-            console.print(f"[red]Error:[/red] {name}: {e}")
+            print_error(f"{name}: {e}", console=console)
             failed += 1
 
     if len(targets) > 1:
@@ -352,7 +352,7 @@ def _delete_single_session(
                 )
             console.print(f"Cleaned up orphaned session directory [green]{name}[/green]")
             return
-        console.print(f"[red]Error:[/red] session '{name}' not found")
+        print_error(f"session '{name}' not found", console=console)
         raise SystemExit(1)
 
     try:
@@ -428,7 +428,7 @@ def list_sessions(include_incognito: bool, older_than: int | None, scope: str, a
         forge session list --older-than 30  # Old sessions in current repo
     """
     if older_than is not None and older_than < 1:
-        console.print("[red]Error:[/red] --older-than must be >= 1")
+        print_error("--older-than must be >= 1", console=console)
         sys.exit(1)
 
     from forge.core.ops.context import ExecutionContext
@@ -459,7 +459,7 @@ def list_sessions(include_incognito: bool, older_than: int | None, scope: str, a
 
             click.echo(json.dumps({"error": str(e)}, indent=2), err=True)
         else:
-            console.print(f"[red]Error:[/red] {e}", style="red")
+            print_error(f"{e}", console=console)
         sys.exit(1)
 
     items = result.sessions
@@ -605,11 +605,11 @@ def clean(
     remove them).
     """
     if older_than < 1:
-        console.print("[red]Error:[/red] --older-than must be >= 1")
+        print_error("--older-than must be >= 1", console=console)
         sys.exit(1)
 
     if delete_branch and not delete_worktree:
-        console.print("[red]Error:[/red] --delete-branch requires --delete-worktree")
+        print_error("--delete-branch requires --delete-worktree", console=console)
         sys.exit(1)
 
     if not yes:
@@ -633,7 +633,7 @@ def clean(
         return
 
     if result.aborted:
-        console.print("[red]Error:[/red] Session cleanup aborted before evaluation completed.")
+        print_error("Session cleanup aborted before evaluation completed.", console=console)
         console.print(f"  [dim]{result.aborted_error}[/dim]")
     elif result.has_only_skips:
         console.print("[dim]No sessions cleaned.[/dim]")
@@ -781,13 +781,13 @@ def show(session_id: str | None, as_json: bool, field_path: str | None) -> None:
         if as_json:
             click.echo(json.dumps({"error": str(e)}, indent=2))
         else:
-            console.print(f"[red]Error:[/red] {e}")
+            print_error(f"{e}", console=console)
         sys.exit(1)
     except SessionContextError as e:
         if as_json:
             click.echo(json.dumps({"error": str(e)}, indent=2))
         else:
-            console.print(f"[red]Error:[/red] {e}")
+            print_error(f"{e}", console=console)
         sys.exit(1)
 
     # Resolve the forge_root once -- either from get_session_context's prior
@@ -834,7 +834,7 @@ def show(session_id: str | None, as_json: bool, field_path: str | None) -> None:
             try:
                 value = extract_field(data, field_path)
             except KeyError:
-                console.print(f"[red]Error:[/red] Field '{field_path}' not found")
+                print_error(f"Field '{field_path}' not found", console=console)
                 sys.exit(1)
             if value is None:
                 click.echo("")
@@ -849,7 +849,7 @@ def show(session_id: str | None, as_json: bool, field_path: str | None) -> None:
 
     state, entry, is_cross_project = _load_state_and_entry()
     if state is None or entry is None:
-        console.print(f"[red]Error:[/red] session '{ctx.session_name}' not found")
+        print_error(f"session '{ctx.session_name}' not found", console=console)
         sys.exit(1)
 
     if is_cross_project:
@@ -1018,7 +1018,7 @@ def shell(name: str | None) -> None:
     _fr = _cwd_forge_root()
     if not manager.session_exists(name, forge_root=_fr):
         if not _hint_cross_project_session(name, _fr):
-            console.print(f"[red]Error:[/red] Session '{name}' not found")
+            print_error(f"Session '{name}' not found", console=console)
         sys.exit(1)
 
     try:
@@ -1028,7 +1028,7 @@ def shell(name: str | None) -> None:
         return
 
     if not manifest.confirmed.is_sandboxed:
-        console.print(f"[red]Error:[/red] Session '{name}' is not a sidecar session")
+        print_error(f"Session '{name}' is not a sidecar session", console=console)
         console.print("\nOnly sessions started with --sidecar can use shell.")
         console.print("Start a sidecar session with: [cyan]forge session start <name> --sidecar[/cyan]")
         sys.exit(1)
@@ -1036,7 +1036,7 @@ def shell(name: str | None) -> None:
     # Check if container is running (deterministic naming)
     container_name = f"forge-{name}"
     if not is_container_running(container_name):
-        console.print(f"[red]Error:[/red] Container '{container_name}' is not running")
+        print_error(f"Container '{container_name}' is not running", console=console)
         console.print("\nThe sidecar session may have exited.")
         sys.exit(1)
 
@@ -1081,7 +1081,7 @@ def set_override(key: str, value: str, session_name: str | None) -> None:
                 )
                 print_tip("Run 'forge extension enable' to install hooks.", blank_before=False, console=console)
     except ForgeOpError as e:
-        console.print(f"[red]Error:[/red] {e}")
+        print_error(f"{e}", console=console)
         sys.exit(1)
 
 
@@ -1110,7 +1110,7 @@ def reset(key: str | None, clear_all: bool, session_name: str | None) -> None:
     from forge.core.ops.session import reset_session_overrides as reset_overrides_op
 
     if key and clear_all:
-        console.print("[red]Error:[/red] Cannot specify both KEY and --all")
+        print_error("Cannot specify both KEY and --all", console=console)
         sys.exit(1)
 
     try:
@@ -1128,7 +1128,7 @@ def reset(key: str | None, clear_all: bool, session_name: str | None) -> None:
             else:
                 console.print(f"[dim]No override for {result.key} (no-op)[/dim]")
     except ForgeOpError as e:
-        console.print(f"[red]Error:[/red] {e}")
+        print_error(f"{e}", console=console)
         sys.exit(1)
 
 

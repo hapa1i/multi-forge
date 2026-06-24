@@ -14,7 +14,7 @@ from typing import Any
 
 import click
 
-from forge.cli.output import print_tip
+from forge.cli.output import print_error, print_tip
 from forge.cli.session import console
 from forge.core.effort import CLAUDE_EFFORT_LEVELS
 from forge.core.ops.context import ExecutionContext
@@ -419,7 +419,7 @@ def list_cmd(as_json: bool) -> None:
 
     ctx = ExecutionContext.from_cwd()
     if ctx.forge_root is None:
-        console.print("[red]Error:[/red] Not inside a Forge project.")
+        print_error("Not inside a Forge project.", console=console)
         sys.exit(1)
     forge_root = ctx.forge_root
 
@@ -519,7 +519,7 @@ def shadows_list_cmd(scope: str, as_json: bool) -> None:
     try:
         entries, scanned_roots = _collect_shadow_entries(scope, None)
     except ForgeOpError as e:
-        console.print(f"[red]Error:[/red] {e}")
+        print_error(f"{e}", console=console)
         sys.exit(1)
 
     # Deduplicate by (forge_root, official, shadow_path)
@@ -584,7 +584,7 @@ def shadows_show_cmd(for_doc: str, scope: str, as_json: bool) -> None:
     try:
         entries, scanned_roots = _collect_shadow_entries(scope, None)
     except ForgeOpError as e:
-        console.print(f"[red]Error:[/red] {e}")
+        print_error(f"{e}", console=console)
         sys.exit(1)
 
     matches = [entry for entry in entries if entry.official == for_doc]

@@ -26,6 +26,7 @@ import click
 from rich.console import Console
 from rich.syntax import Syntax
 
+from forge.cli.output import print_error
 from forge.core.paths import display_path
 from forge.runtime_config import (
     RuntimeConfig,
@@ -122,7 +123,7 @@ def set_cmd(key_value: str) -> None:
     console = Console(width=200)
 
     if "=" not in key_value:
-        console.print(f"[red]Error:[/red] Expected format: key=value (got: {key_value})")
+        print_error(f"Expected format: key=value (got: {key_value})", console=console)
         sys.exit(1)
 
     key, value = key_value.split("=", 1)
@@ -134,13 +135,13 @@ def set_cmd(key_value: str) -> None:
 
     known_fields = {f.name: f for f in fields(RuntimeConfig)}
     if key not in known_fields:
-        console.print(f"[red]Error:[/red] Unknown config key: '{key}'")
+        print_error(f"Unknown config key: '{key}'", console=console)
         console.print(f"\n[dim]Available keys: {', '.join(sorted(known_fields))}[/dim]")
         sys.exit(1)
 
     coerced_value: Any = _coerce_value(value, known_fields[key])
     if coerced_value is _COERCE_ERROR:
-        console.print(f"[red]Error:[/red] Invalid value for '{key}': {value}")
+        print_error(f"Invalid value for '{key}': {value}", console=console)
         sys.exit(1)
 
     config_path = get_config_path()
@@ -159,7 +160,7 @@ def set_cmd(key_value: str) -> None:
     try:
         RuntimeConfig(**{k: v for k, v in dict(data).items() if k in known_fields})
     except (ValueError, TypeError) as e:
-        console.print(f"[red]Error:[/red] Invalid configuration: {e}")
+        print_error(f"Invalid configuration: {e}", console=console)
         sys.exit(1)
 
     write_runtime_config(data)
@@ -179,7 +180,7 @@ def edit_cmd() -> None:
     editor = os.environ.get("EDITOR", "vim")
 
     if not shutil.which(editor):
-        console.print(f"[red]Error:[/red] Editor '{editor}' not found. Set $EDITOR to an available editor.")
+        print_error(f"Editor '{editor}' not found. Set $EDITOR to an available editor.", console=console)
         sys.exit(1)
 
     # Copy to temp file for safe editing
@@ -191,7 +192,7 @@ def edit_cmd() -> None:
     try:
         result = subprocess.run([editor, str(tmp_path)])
         if result.returncode != 0:
-            console.print(f"[red]Error:[/red] Editor exited with code {result.returncode}")
+            print_error(f"Editor exited with code {result.returncode}", console=console)
             console.print(f"Your changes are saved at: {display_path(tmp_path)}")
             sys.exit(1)
 
@@ -203,7 +204,7 @@ def edit_cmd() -> None:
             with open(tmp_path) as f:
                 edited_data = ruamel.load(f)
         except Exception as e:
-            console.print(f"[red]Error:[/red] Invalid YAML: {e}")
+            print_error(f"Invalid YAML: {e}", console=console)
             console.print(f"Your changes are saved at: {display_path(tmp_path)}")
             sys.exit(1)
 
@@ -211,7 +212,7 @@ def edit_cmd() -> None:
             edited_data = {}
 
         if not isinstance(edited_data, dict):
-            console.print("[red]Error:[/red] Config must be a YAML mapping")
+            print_error("Config must be a YAML mapping", console=console)
             console.print(f"Your changes are saved at: {display_path(tmp_path)}")
             sys.exit(1)
 
@@ -219,7 +220,7 @@ def edit_cmd() -> None:
         try:
             RuntimeConfig(**{k: v for k, v in dict(edited_data).items() if k in known_fields})
         except (ValueError, TypeError) as e:
-            console.print(f"[red]Error:[/red] Invalid configuration: {e}")
+            print_error(f"Invalid configuration: {e}", console=console)
             console.print(f"Your changes are saved at: {display_path(tmp_path)}")
             sys.exit(1)
 
@@ -234,7 +235,7 @@ def edit_cmd() -> None:
             known_sub = {f.name for f in fields(section_cls)}
             unknown_sub = [k for k in section_block if k not in known_sub]
             if unknown_sub:
-                console.print(f"[red]Error:[/red] Unknown {section_name} key(s): {', '.join(map(str, unknown_sub))}")
+                print_error(f"Unknown {section_name} key(s): {', '.join(map(str, unknown_sub))}", console=console)
                 console.print(f"[dim]Available: {', '.join(sorted(known_sub))}[/dim]")
                 console.print(f"Your changes are saved at: {display_path(tmp_path)}")
                 sys.exit(1)
@@ -248,7 +249,7 @@ def edit_cmd() -> None:
             if unknown_segs:
                 from forge.cli.statusline.names import SEGMENT_NAMES
 
-                console.print(f"[red]Error:[/red] Unknown statusline segment(s): {', '.join(map(str, unknown_segs))}")
+                print_error(f"Unknown statusline segment(s): {', '.join(map(str, unknown_segs))}", console=console)
                 console.print(f"[dim]Valid segments: {', '.join(SEGMENT_NAMES)}[/dim]")
                 console.print(f"Your changes are saved at: {display_path(tmp_path)}")
                 sys.exit(1)
@@ -294,7 +295,7 @@ def reset_cmd(key: str | None = None, yes: bool = False) -> None:
 
     known_fields = {f.name for f in fields(RuntimeConfig)}
     if key not in known_fields:
-        console.print(f"[red]Error:[/red] Unknown config key: '{key}'")
+        print_error(f"Unknown config key: '{key}'", console=console)
         console.print(f"\n[dim]Available keys: {', '.join(sorted(known_fields))}[/dim]")
         sys.exit(1)
 
@@ -398,13 +399,13 @@ def _set_nested_key(key: str, value: str, console: Console) -> None:
     section, _, subkey = key.partition(".")
     section_cls = sections.get(section)
     if section_cls is None:
-        console.print(f"[red]Error:[/red] Unknown config section: '{section}'")
+        print_error(f"Unknown config section: '{section}'", console=console)
         console.print(f"\n[dim]Nested sections: {', '.join(sorted(sections))}[/dim]")
         sys.exit(1)
 
     sec_fields = {f.name: f for f in fields(section_cls)}
     if subkey not in sec_fields:
-        console.print(f"[red]Error:[/red] Unknown {section} key: '{subkey}'")
+        print_error(f"Unknown {section} key: '{subkey}'", console=console)
         console.print(f"\n[dim]Available: {', '.join(sorted(sec_fields))}[/dim]")
         sys.exit(1)
 
@@ -414,13 +415,13 @@ def _set_nested_key(key: str, value: str, console: Console) -> None:
         coerced_sub = [s.strip() for s in value.split(",") if s.strip()]
         unknown = _unknown_segments(coerced_sub)
         if unknown:
-            console.print(f"[red]Error:[/red] Unknown segment(s): {', '.join(unknown)}")
+            print_error(f"Unknown segment(s): {', '.join(unknown)}", console=console)
             console.print(f"\n[dim]Valid segments: {', '.join(SEGMENT_NAMES)}[/dim]")
             sys.exit(1)
     else:
         coerced_sub = _coerce_value(value, sec_fields[subkey])
         if coerced_sub is _COERCE_ERROR:
-            console.print(f"[red]Error:[/red] Invalid value for '{section}.{subkey}': {value}")
+            print_error(f"Invalid value for '{section}.{subkey}': {value}", console=console)
             sys.exit(1)
 
     config_path = get_config_path()
@@ -446,7 +447,7 @@ def _set_nested_key(key: str, value: str, console: Console) -> None:
     try:
         RuntimeConfig(**{k: v for k, v in dict(data).items() if k in known_fields})
     except (ValueError, TypeError) as e:
-        console.print(f"[red]Error:[/red] Invalid configuration: {e}")
+        print_error(f"Invalid configuration: {e}", console=console)
         sys.exit(1)
 
     write_runtime_config(data)

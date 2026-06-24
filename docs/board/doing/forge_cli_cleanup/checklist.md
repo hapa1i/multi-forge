@@ -52,7 +52,7 @@ allowlisted entry that was fixed-without-removal. "Done" for these slices = the 
 | `JSON_MISSING_ALLOWLIST` (`:134`)                            | `authentication status`, `model backend show`, `proxy template {list,show}`, `claude preset show`, `config show`, `memory shadows show`, `search status` — 8 read leaves with no `--json` (the 9th, `memory report show`, was resolved early in Slice 02 as `forge session memory report --json`) | 07           |
 | `SINGLE_LEAF_GROUP_ALLOWLIST` (`:75`)                        | `forge provider` (→ **delete**; `trace` moves to `telemetry trace` per D1), `forge policy shadow` (→ `show`; `run` hidden), `forge memory report` (→ flatten)                                                                                                                                     | 03 / 12      |
 | `LEAF_NAMING_ALLOWLIST` (`:110`)                             | `forge policy: supervise\|supervisor` (confusable; `supervise` is a prefix of `supervisor`)                                                                                                                                                                                                       | 10           |
-| `CLI_ERROR_MARKUP_ALLOWLIST` (`test_output.py`)              | 18 files with hand-rolled `[red]Error:` (244 raw occurrences outside `output.py`)                                                                                                                                                                                                                 | 11           |
+| `CLI_ERROR_MARKUP_ALLOWLIST` (`test_output.py`)              | ~~18 files with hand-rolled `[red]Error:`~~ **DRAINED to `set()` in Slice 11** (234 sites routed to `print_error`); now a locked never-grow guard                                                                                                                                                 | 11           |
 
 ### Guard gaps (rules with no mechanical enforcement yet)
 
@@ -72,11 +72,11 @@ allowlisted entry that was fixed-without-removal. "Done" for these slices = the 
   coverage (as `report show` -> `report` did, caught and fixed in Slice 02). Slice 07 must extend `_READ_LEAVES` for
   `profiles`/`diff`/`query` and should consider a complementary keyword/docstring guard so a future rename can't
   silently drop a read surface.
-- **Tip guard scope (F9):** only `[dim]Tip:` Rich markup — misses the 8 plain `click.echo("Tip: …")` sites **and** the 2
-  `ClickException`-embedded tips (`session.py:111,126`, `msg += "\nTip: …"`). A literal `Tip:` source scan also hits the
-  3 assistant-facing `hooks/direct_commands.py` payloads (the only legitimate exemption), plus a Click **help
-  docstring** (`proxy_costs.py:132` — user-visible terminal help, not "non-terminal") and a convention comment
-  (`session_fork.py:467`); the latter two are reworded in slice 11 so the final allowlist is just the payloads.
+- **Tip guard scope (F9):** ~~only `[dim]Tip:` Rich markup~~ **CLOSED in Slice 11** —
+  `test_cli_rich_tips_go_through_output_helpers` now scans the literal `Tip:` (catches plain `click.echo("Tip: …")` and
+  the 2 `ClickException`-embedded tips), allowlisting only the 3 assistant-facing `hooks/direct_commands.py` payloads.
+  The `proxy_costs.py` help docstring and `session_fork.py` convention comment were reworded, so the final allowlist is
+  exactly the payloads. Error markup is guarded the same way; both ledgers are drained and locked.
 
 ## Phase 0 - Board start
 
@@ -311,20 +311,32 @@ verification is recorded.
   clean-break tests + configured/unconfigured `status --json` shapes), 84 in `test_user_prompt_dispatcher.py` (incl.
   old-verb-falls-through), 7 tree invariants, 2032 in `tests/src/cli`; complete doc/QA sweep (10 files) with empty stale
   greps; `make pre-commit` clean.
-- [ ] **Slice 11 - Recovery-output cleanup (F9).** Route **all** terminal/user-visible `Tip:` output through
-  `print_tip`/`print_error_with_tip`, **including tips embedded in `ClickException` messages**: the 8 plain
-  `click.echo("Tip: …")` sites (auth.py ×4, claude.py ×2, hooks/install.py ×2) and the 2 `ClickException`-embedded tips
-  (`session.py:111,126`). Policy (per card finding #9): a `ClickException` body is plain error text only — no embedded
-  `Tip:`; route the tip via `print_error_with_tip` then exit. **Explicitly exempt assistant-facing direct-command JSON
-  payloads** (`hooks/direct_commands.py:79,162,705`) — they are not terminal output.
-  - Migrate the 18 `CLI_ERROR_MARKUP_ALLOWLIST` files to `print_error*` until that ledger is `{}`.
-  - Reword the two non-recovery `Tip:` sites so neither leaves a literal `Tip:`: the `proxy_costs.py:132` Click help
-    docstring (user-visible help, not recovery — drop the `Tip:` prefix, keep the guidance) and the
-    `session_fork.py:467` convention comment. After rewording, the final guard allowlist is **exactly** the three
-    `direct_commands.py` assistant payloads — nothing else.
-  - Extend the guard to fail on a literal `Tip:` anywhere in `src/forge/cli/**` except `output.py` and that
-    direct-command-payload allowlist. Mirror the shrink-only `CLI_ERROR_MARKUP_ALLOWLIST` ledger style — a source scan,
-    not AST-only, since the `session.py` `msg += Tip:` → `ClickException` pattern has no `click.echo` to match.
+- [x] **Slice 11 - Recovery-output cleanup (F9). SHIPPED 2026-06-24.** Routed every hand-rolled terminal `Tip:` and
+  `[red]Error:[/red]` through `forge.cli.output`, and locked both debt ledgers.
+  - **234 `[red]Error:[/red]` → `print_error`** across 18 modules via two deterministic codemods (221 single-line + 13
+    multi-line concat blocks), receiver-preserving so rendered output is byte-identical (`print_error` reconstructs the
+    same `console.print`); redundant `style="red"` kwargs dropped. `CLI_ERROR_MARKUP_ALLOWLIST` → `set()`.
+  - **10 tips routed**: 8 plain `click.echo("Tip: …")` (auth ×4, claude ×2, hooks/install ×2) → `print_tip`; the 2
+    `session.py` `ClickException`-embedded tips → `print_error_with_tip` + `sys.exit(1)`. The proxy resolver
+    (`_resolve_routing_from_cli`) now prints-and-exits instead of raising — verified no caller catches `ClickException`
+    (only `backend.py` does, and it doesn't call the resolver) and all 13 resolver tests mock it. `claude.py`
+    proxy-error branches use `print_error_with_tip` too.
+  - **2 non-recovery `Tip:` reworded**: `proxy_costs.py` help docstring (dropped the `Tip:` prefix, kept guidance) and
+    the `session_fork.py` convention comment. Final remaining literal `Tip:` outside `output.py` = exactly the 3
+    `hooks/direct_commands.py` assistant payloads.
+  - **Guard broadened**: `test_cli_rich_tips_go_through_output_helpers` now scans the literal `Tip:` (superset of
+    `[dim]Tip:`; catches plain echoes + ClickException-embedded) with a file allowlist `{direct_commands.py}`, mirroring
+    the shrink-only error ledger. Both guards fail on any new offender.
+  - **Scope boundary (recorded)**: plain `click.echo("Error: …")` without Rich markup (~11 files) is out of F9 scope;
+    only `[red]Error:[/red]`/`Tip:` are guarded. Plain echoes migrated only where intertwined with a moved tip.
+  - Verification: full unit 6879 passed (clean run-tree env), `tests/src/cli` 2032 passed incl. 13 `test_output.py`
+    guards, `make pre-commit` clean. Docs synced (`CLAUDE.md`, `cli_style_guidelines.md`).
+  - **Post-review fixes (2026-06-24):** (1) **stream regression** — the resolver's `print_error*(console=console)` had
+    moved proxy errors/tips from Click's stderr onto stdout; added shared `output.err_console` and routed the resolver's
+    5 sites (and `hooks/install.py`) through it; helper defaults stay stdout (flipping them = ~71 bare sites, out of
+    scope); regression test `tests/regression/test_bug_slice11_resolver_error_stream.py` exercises the real (unmocked)
+    resolver. (2) **Tip allowlist tightened** file-level → payload-level: pinned to the 3 exact `direct_commands.py`
+    payload sentences + stale-check, so a new `Tip:` even inside that file now fails (all 4 branches verified).
 - [ ] **Slice 12 - Non-leaf + small surfaces.** Normalize `forge config`/`forge search` to `no_args_is_help=True` (F13
   stands). Resolve remaining `SINGLE_LEAF_GROUP_ALLOWLIST` entries (`forge policy shadow`). Audit the F14 candidates:
   `proxy metrics --all` (redundant with no-arg aggregate — remove or document), `memory track` naming, `extension sync`

@@ -22,6 +22,7 @@ import os
 
 import click
 
+from forge.cli.output import print_tip
 from forge.core.auth.capabilities import (
     CREDENTIALS,
     RETIRED_NAMES,
@@ -217,7 +218,7 @@ def login(credential: str | None, profile: str | None) -> None:
             f"✓ Credentials saved to {path} (profile: {profile_name})",
             fg="green",
         )
-        click.echo("Tip: Use 'forge auth status' to verify.")
+        print_tip("Use 'forge auth status' to verify.", blank_before=False)
     else:
         click.echo("\nNo credentials to save.")
 
@@ -397,7 +398,7 @@ def status(profile: str | None, as_json: bool) -> None:
     except ValueError:
         file_secrets = {}
         click.secho("⚠︎ Credentials file is corrupt -- file-based values unavailable.", fg="yellow")
-        click.echo("Tip: Run 'forge auth login' to recreate the file.")
+        print_tip("Run 'forge auth login' to recreate the file.", blank_before=False)
 
     click.echo(f"\nCredential status (profile: {profile_name})")
     click.echo("=" * 50)
@@ -505,12 +506,12 @@ def profiles_cmd(as_json: bool) -> None:
         raise SystemExit(1)
     except ValueError as e:
         click.secho(f"Error reading credentials file: {e}", fg="red")
-        click.echo("\nTip: Run 'forge auth login' to recreate the file.")
+        print_tip("Run 'forge auth login' to recreate the file.")
         raise SystemExit(1)
 
     if not profile_names:
         click.echo("No profiles found.")
-        click.echo("\nTip: Run 'forge auth login' to create one.")
+        print_tip("Run 'forge auth login' to create one.")
         return
 
     active = resolve_profile()

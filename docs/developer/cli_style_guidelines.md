@@ -130,12 +130,19 @@ When adding a new CLI command:
 
 ## Tips And Recovery Output
 
-All Rich-styled recovery output goes through `forge.cli.output`. Never hand-roll a `[dim]Tip: ...[/dim]` in a CLI
-module: `tests/src/cli/test_output.py::test_cli_rich_tips_go_through_output_helpers` scans `src/forge/cli/**` for the
-literal `[dim]Tip:` and fails if it appears anywhere except `output.py`. The same applies to errors: terminal errors go
-through `print_error` / `print_error_with_tip`, and `test_output.py::test_cli_rich_errors_go_through_print_error` guards
-hand-rolled `[red]Error:[/red]` the same way, with an allowlist tracking the pre-existing call sites the
-`forge_cli_cleanup` card retires.
+All recovery output goes through `forge.cli.output`. Never hand-roll a `Tip:` line in a CLI module:
+`tests/src/cli/test_output.py::test_cli_rich_tips_go_through_output_helpers` scans `src/forge/cli/**` for the literal
+`Tip:` (a superset of the Rich `[dim]Tip:` markup that also catches plain `click.echo("Tip: ...")` and
+`ClickException`-embedded tips) and fails if it appears anywhere except `output.py`. The only allowlisted exceptions are
+three exact assistant-facing payload sentences in `hooks/direct_commands.py` (returned to Claude as JSON text, not
+terminal output) — the allowlist is pinned to those payloads, not the whole file, so a new `Tip:` even inside
+`direct_commands.py` still fails. The same applies to errors: terminal errors go through `print_error` /
+`print_error_with_tip`, and `test_output.py::test_cli_rich_errors_go_through_print_error` guards hand-rolled
+`[red]Error:[/red]` the same way. Both allowlists are now drained (Slice 11) and locked: a new offender fails the test.
+
+Errors that must not pollute stdout (the results stream) pass `console=err_console` — the shared `Console(stderr=True)`
+in `output.py`. Use it for failures that previously raised `click.ClickException` (which Click renders to stderr); the
+helper defaults stay stdout, so opt into stderr explicitly at the call site.
 
 ```python
 from forge.cli.output import print_error, print_error_with_tip, print_tip, handle_session_error

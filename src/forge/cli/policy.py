@@ -24,7 +24,7 @@ from rich.console import Console
 from rich.table import Table
 from rich.text import Text
 
-from forge.cli.output import print_error_with_tip, print_tip
+from forge.cli.output import print_error, print_error_with_tip, print_tip
 from forge.core.effort import CLAUDE_EFFORT_LEVELS
 from forge.core.llm.types import REASONING_EFFORT_LEVELS
 from forge.core.paths import display_path
@@ -127,13 +127,13 @@ def _resolve_policy_session(cwd: Path, explicit: str | None) -> tuple[SessionSto
         try:
             return _resolve_session_for_display(explicit, cwd)
         except AmbiguousSessionError as exc:
-            console.print(f"[red]Error:[/red] Session '{explicit}' exists in multiple projects:")
+            print_error(f"Session '{explicit}' exists in multiple projects:", console=console)
             for root in exc.forge_roots:
                 console.print(Text(f"  - {display_path(root)}", style="dim", no_wrap=True), soft_wrap=True)
             console.print("[dim]Run the command from the target project directory.[/dim]")
             sys.exit(1)
         except ForgeSessionError as exc:
-            console.print(f"[red]Error:[/red] Session '{explicit}' not found: {exc}")
+            print_error(f"Session '{explicit}' not found: {exc}", console=console)
             sys.exit(1)
 
     name = os.environ.get(ENV_SESSION)
@@ -142,11 +142,11 @@ def _resolve_policy_session(cwd: Path, explicit: str | None) -> tuple[SessionSto
         if len(candidates) == 1:
             name = candidates[0]
         elif not candidates:
-            console.print(f"[red]Error:[/red] No session found in {display_path(cwd)}")
+            print_error(f"No session found in {display_path(cwd)}", console=console)
             console.print("  Run 'forge session start' first to create a session.")
             sys.exit(1)
         else:
-            console.print(f"[red]Error:[/red] Multiple sessions in {display_path(cwd)}; specify one with --session.")
+            print_error(f"Multiple sessions in {display_path(cwd)}; specify one with --session.", console=console)
             console.print("  Sessions: " + ", ".join(candidates))
             print_tip(f"Run 'forge policy <command> --session {candidates[0]}'.", blank_before=False, console=console)
             sys.exit(1)
@@ -155,7 +155,7 @@ def _resolve_policy_session(cwd: Path, explicit: str | None) -> tuple[SessionSto
     try:
         state = store.read()
     except Exception:
-        console.print(f"[red]Error:[/red] No session found in {display_path(cwd)}")
+        print_error(f"No session found in {display_path(cwd)}", console=console)
         console.print("  Run 'forge session start' first to create a session.")
         sys.exit(1)
     return store, state
@@ -263,7 +263,7 @@ def enable(bundles: tuple[str, ...], fail_mode: str, permissive: bool, session_n
     try:
         store.update(timeout_s=HOOK_LOCK_TIMEOUT_S, mutate=_mutate)
     except Exception as e:
-        console.print(f"[red]Error:[/red] Failed to update session: {e}")
+        print_error(f"Failed to update session: {e}", console=console)
         sys.exit(1)
 
     console.print(f"[green]Policy enabled[/green] with bundles: {', '.join(bundles)}")
@@ -313,7 +313,7 @@ def disable(session_name: str | None) -> None:
     try:
         store.update(timeout_s=HOOK_LOCK_TIMEOUT_S, mutate=_mutate)
     except Exception as e:
-        console.print(f"[red]Error:[/red] Failed to update session: {e}")
+        print_error(f"Failed to update session: {e}", console=console)
         sys.exit(1)
 
     console.print("[green]Policy enforcement disabled[/green]")
@@ -366,7 +366,7 @@ def status(as_json: bool, session_name: str | None) -> None:
     try:
         effective = compute_effective_intent(manifest)
     except Exception as exc:
-        console.print(f"[red]Error:[/red] Failed to compute effective config: {exc}")
+        print_error(f"Failed to compute effective config: {exc}", console=console)
         sys.exit(1)
 
     if as_json:
@@ -560,14 +560,14 @@ def check(
     from forge.policy.types import ActionContext, extract_added_lines
 
     if not file_path and not use_diff:
-        console.print("[red]Error:[/red] Provide --file or --diff")
+        print_error("Provide --file or --diff", console=console)
         sys.exit(2)
 
     cwd = Path.cwd().resolve()
 
     if use_diff:
         if sys.stdin.isatty():
-            console.print("[red]Error:[/red] --diff requires input on stdin (e.g., git diff | forge policy check ...)")
+            print_error("--diff requires input on stdin (e.g., git diff | forge policy check ...)", console=console)
             sys.exit(2)
         raw_input = sys.stdin.read()
         tool_name = "Edit"
@@ -579,7 +579,7 @@ def check(
         try:
             raw_input = target.read_text()
         except Exception as e:
-            console.print(f"[red]Error:[/red] Failed to read {display_path(file_path)}: {e}")
+            print_error(f"Failed to read {display_path(file_path)}: {e}", console=console)
             sys.exit(2)
         tool_name = "Write"
         new_content = raw_input
@@ -607,7 +607,7 @@ def check(
         if as_json:
             click.echo(json.dumps({"error": str(e), "passed": False}))
         else:
-            console.print(f"[red]Error:[/red] Policy evaluation failed: {e}")
+            print_error(f"Policy evaluation failed: {e}", console=console)
         sys.exit(2)
 
     # Determine exit code: allow and warn both exit 0 (warn = advisory)
@@ -765,7 +765,7 @@ def supervisor_evaluate(
         forge policy supervisor evaluate -f src/foo.py -r abc-123 --no-proxy
     """
     if direct and proxy_name:
-        console.print("[red]Error:[/red] --no-proxy and --proxy are mutually exclusive")
+        print_error("--no-proxy and --proxy are mutually exclusive", console=console)
         sys.exit(1)
 
     from forge.policy.semantic.supervisor import SUPERVISOR_INTENT, invoke_supervisor
@@ -779,7 +779,7 @@ def supervisor_evaluate(
         if as_json:
             click.echo(json.dumps({"error": str(e), "passed": False}))
         else:
-            console.print(f"[red]Error:[/red] Failed to read {display_path(file_path)}: {e}")
+            print_error(f"Failed to read {display_path(file_path)}: {e}", console=console)
         sys.exit(2)
 
     cwd = Path.cwd().resolve()
@@ -814,7 +814,7 @@ def supervisor_evaluate(
         if as_json:
             click.echo(json.dumps({"error": str(e), "passed": False}))
         else:
-            console.print(f"[red]Error:[/red] Supervisor invocation failed: {e}")
+            print_error(f"Supervisor invocation failed: {e}", console=console)
         sys.exit(2)
 
     # Detect infra failures hidden behind fail-open allow decisions
@@ -909,7 +909,7 @@ def supervisor_status(as_json: bool, session_name: str | None) -> None:
     try:
         effective = compute_effective_intent(manifest)
     except Exception as exc:
-        console.print(f"[red]Error:[/red] Failed to compute effective config: {exc}")
+        print_error(f"Failed to compute effective config: {exc}", console=console)
         sys.exit(1)
 
     sup = effective.policy.supervisor if effective.policy else None
@@ -1044,15 +1044,15 @@ def supervisor_set(
     )
 
     if supervisor_proxy and supervisor_direct:
-        console.print("[red]Error:[/red] --supervisor-proxy and --no-supervisor-proxy are mutually exclusive")
+        print_error("--supervisor-proxy and --no-supervisor-proxy are mutually exclusive", console=console)
         sys.exit(1)
     if cascade_flag is False:
-        console.print("[red]Error:[/red] --no-cascade is redundant on set (cascade defaults to off)")
+        print_error("--no-cascade is redundant on set (cascade defaults to off)", console=console)
         sys.exit(1)
     try:
         validate_checker_model(checker_model)
     except ValueError as e:
-        console.print(f"[red]Error:[/red] {e}")
+        print_error(f"{e}", console=console)
         print_tip("Example: google/gemini-3.5-flash", blank_before=False, console=console)
         sys.exit(1)
     checker_option_supplied = bool(checker_model or checker_provider or checker_effort)
@@ -1067,7 +1067,7 @@ def supervisor_set(
     try:
         source_state = validate_supervisor_target(target, forge_root=_policy_fr)
     except ValueError as e:
-        console.print(f"[red]Error:[/red] {e}")
+        print_error(f"{e}", console=console)
         sys.exit(1)
 
     # Resolve/auto-start the supervisor proxy only after the target validates, so a bad
@@ -1076,7 +1076,7 @@ def supervisor_set(
         try:
             _sup_proxy_id, _sup_started = ensure_supervisor_proxy(supervisor_proxy)
         except ValueError as e:
-            console.print(f"[red]Error:[/red] {e}")
+            print_error(f"{e}", console=console)
             sys.exit(1)
         if _sup_started:
             console.print(f"[dim]Started proxy '{_sup_proxy_id}' from template '{supervisor_proxy}'.[/dim]")
@@ -1219,7 +1219,7 @@ def supervisor_reload(reload_path: str | None, session_name: str | None) -> None
     manifest = store.read()
     effective = compute_effective_intent(manifest)
     if not effective.policy or not effective.policy.supervisor or not effective.policy.supervisor.resume_id:
-        console.print("[red]Error:[/red] No supervisor configured.")
+        print_error("No supervisor configured.", console=console)
         sys.exit(1)
 
     if reload_path:
@@ -1227,7 +1227,7 @@ def supervisor_reload(reload_path: str | None, session_name: str | None) -> None
         if not resolved.is_absolute():
             resolved = (cwd / resolved).resolve()
         if not resolved.is_file():
-            console.print(f"[red]Error:[/red] Plan file not found: {resolved}")
+            print_error(f"Plan file not found: {resolved}", console=console)
             sys.exit(1)
         plan_path = str(resolved)
         source_desc = str(resolved)
@@ -1238,7 +1238,7 @@ def supervisor_reload(reload_path: str | None, session_name: str | None) -> None
 
         result = resolve_supervisor_reload_plan_path(effective.policy.supervisor, manifest)
         if result is None:
-            console.print("[red]Error:[/red] No approved plan found for supervisor target or related sessions.")
+            print_error("No approved plan found for supervisor target or related sessions.", console=console)
             sys.exit(1)
         plan_path = result.path
         source_map = {
@@ -1295,12 +1295,12 @@ def supervisor_cascade(
     """
     cascade_on = state == "on"
     if not cascade_on and (checker_model or checker_provider or checker_effort):
-        console.print("[red]Error:[/red] Checker options only apply when enabling cascade (state 'on')")
+        print_error("Checker options only apply when enabling cascade (state 'on')", console=console)
         sys.exit(1)
     try:
         validate_checker_model(checker_model)
     except ValueError as e:
-        console.print(f"[red]Error:[/red] {e}")
+        print_error(f"{e}", console=console)
         print_tip("Example: google/gemini-3.5-flash", blank_before=False, console=console)
         sys.exit(1)
 

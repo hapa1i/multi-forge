@@ -129,7 +129,7 @@ def show_cmd(
         forge telemetry costs show openrouter         # Filter by proxy
 
     \b
-    Tip: pair with 'forge proxy set <id> costs.caps.per_month=<amount>' to keep
+    Pair with 'forge proxy set <id> costs.caps.per_month=<amount>' to keep
     metered provider usage within a monthly budget.
     """
     from forge.proxy.cost_logger import read_cost_logs

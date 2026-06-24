@@ -21,7 +21,7 @@ from pathlib import Path
 import click
 from rich.syntax import Syntax
 
-from forge.cli.output import print_error_with_tip, print_tip
+from forge.cli.output import print_error, print_error_with_tip, print_tip
 from forge.cli.session import _cwd_forge_root, console, handle_session_error
 from forge.session import ForgeSessionError, SessionManager
 from forge.session.memory_writer import memory_report_dir
@@ -65,10 +65,10 @@ def _resolve_session_forge_root(session_name: str | None) -> tuple[str, Path]:
             forge_root_filter=str(current_root),
         )
         if len(sessions) == 0:
-            console.print(f"[red]Error:[/red] No sessions found under {current_root}.")
+            print_error(f"No sessions found under {current_root}.", console=console)
             sys.exit(1)
         if len(sessions) > 1:
-            console.print("[red]Error:[/red] Multiple sessions in this Forge project; " "specify which one explicitly.")
+            print_error("Multiple sessions in this Forge project; " "specify which one explicitly.", console=console)
             for name, _entry in sessions:
                 console.print(f"  - {name}")
             sys.exit(1)
@@ -149,7 +149,7 @@ def report_cmd(session_name: str | None, show_latest: bool, show_all: bool, as_j
         forge session memory report --json          # Latest report as JSON
     """
     if show_latest and show_all:
-        console.print("[red]Error:[/red] --latest and --all are mutually exclusive.")
+        print_error("--latest and --all are mutually exclusive.", console=console)
         sys.exit(1)
 
     resolved_name, forge_root = _resolve_session_forge_root(session_name)

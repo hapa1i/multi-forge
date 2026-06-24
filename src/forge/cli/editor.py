@@ -17,7 +17,7 @@ from pathlib import Path
 
 from rich.console import Console
 
-from forge.cli.output import print_tip
+from forge.cli.output import print_error, print_tip
 
 
 def open_in_editor(file_path: Path, *, console: Console, abort_tip: str | None = None) -> None:
@@ -30,10 +30,10 @@ def open_in_editor(file_path: Path, *, console: Console, abort_tip: str | None =
     editor = os.environ.get("EDITOR", "vim")
     editor_argv = shlex.split(editor)
     if not editor_argv:
-        console.print("[red]Error:[/red] $EDITOR is empty. Set $EDITOR to an available editor.")
+        print_error("$EDITOR is empty. Set $EDITOR to an available editor.", console=console)
         sys.exit(1)
     if not shutil.which(editor_argv[0]):
-        console.print(f"[red]Error:[/red] Editor '{editor}' not found. Set $EDITOR to an available editor.")
+        print_error(f"Editor '{editor}' not found. Set $EDITOR to an available editor.", console=console)
         sys.exit(1)
 
     result = subprocess.run([*editor_argv, str(file_path)])

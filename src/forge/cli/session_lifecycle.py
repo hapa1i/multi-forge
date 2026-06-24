@@ -80,7 +80,7 @@ def _sess():  # type: ignore[return]
 
 
 from forge.cli.editor import open_in_editor  # noqa: E402
-from forge.cli.output import print_error_with_tip, print_tip  # noqa: E402
+from forge.cli.output import print_error, print_error_with_tip, print_tip  # noqa: E402
 from forge.cli.session import (  # noqa: E402
     ResolvedRouting,
     _apply_routing_override_to_state,
@@ -374,9 +374,10 @@ def _launch_claude_for_session(
     # launching Claude against it would corrupt the session's runtime facts.
     _runtime = manifest.intent.launch.runtime if manifest.intent.launch else "claude_code"
     if _runtime != "claude_code":
-        console.print(
-            f"[red]Error:[/red] session '{manifest.name}' has runtime '{_runtime}' "
-            "and cannot be launched with Claude. Use the matching runtime command."
+        print_error(
+            f"session '{manifest.name}' has runtime '{_runtime}' "
+            "and cannot be launched with Claude. Use the matching runtime command.",
+            console=console,
         )
         return 1
 
@@ -449,7 +450,7 @@ def _launch_claude_for_session(
 
     if use_sidecar:
         if effective_template is None or runtime_base_url is None:
-            console.print("[red]Error:[/red] Direct sessions are not supported with --sidecar")
+            print_error("Direct sessions are not supported with --sidecar", console=console)
             sys.exit(1)
 
         # Recover proxy_id from base_url when not explicitly provided (relaunch paths)
@@ -468,7 +469,7 @@ def _launch_claude_for_session(
         from forge.sidecar.docker import is_docker_available
 
         if not is_docker_available():
-            console.print("[red]Error:[/red] Docker is not available or not running")
+            print_error("Docker is not available or not running", console=console)
             sys.exit(1)
 
         store.update(timeout_s=5.0, mutate=lambda m: setattr(m.confirmed, "is_sandboxed", True))
@@ -476,7 +477,7 @@ def _launch_claude_for_session(
         try:
             extra_mounts = parse_mounts(mounts) if mounts else []
         except ValueError as e:
-            console.print(f"[red]Error:[/red] {e}")
+            print_error(f"{e}", console=console)
             sys.exit(1)
 
         claude_dir = launch_root / ".claude"
@@ -610,7 +611,7 @@ def _launch_claude_for_session(
                 timeout_s=5.0,
                 mutate=lambda m: setattr(m.confirmed, "is_sandboxed", False),
             )
-            console.print(f"[red]Error:[/red] {e}")
+            print_error(f"{e}", console=console)
             sys.exit(1)
         except Exception:
             store.update(
@@ -656,7 +657,7 @@ def _launch_claude_for_session(
         direct_model = direct_model or get_default_direct_model()
         error = apply_direct_model_env(env_vars, direct_model)
         if error:
-            console.print(f"[red]Error:[/red] {error}")
+            print_error(f"{error}", console=console)
             return 1
     elif manifest.intent.launch and manifest.intent.launch.direct_model and proxy_id:
         # Proxy mode with explicit --model: apply model pin so Claude Code sends
@@ -664,7 +665,7 @@ def _launch_claude_for_session(
         # Only apply if the proxy actually configures alternatives for this model.
         error = _apply_direct_model_env_if_supported(env_vars, proxy_id, manifest.intent.launch.direct_model)
         if error:
-            console.print(f"[red]Error:[/red] {error}")
+            print_error(f"{error}", console=console)
             return 1
 
     exit_code = _sess().run_with_active_session(
@@ -855,31 +856,31 @@ def launch_new_session(
     """
     # --- flag validation ---
     if branch and not worktree:
-        console.print("[red]Error:[/red] --branch requires --worktree")
+        print_error("--branch requires --worktree", console=console)
         return 1
     if sidecar and host_proxy:
-        console.print("[red]Error:[/red] --sidecar and --host-proxy are mutually exclusive")
+        print_error("--sidecar and --host-proxy are mutually exclusive", console=console)
         return 1
     if direct and (template or base_url):
-        console.print("[red]Error:[/red] --no-proxy cannot be combined with --template or --base-url")
+        print_error("--no-proxy cannot be combined with --template or --base-url", console=console)
         return 1
     if direct and sidecar:
-        console.print("[red]Error:[/red] --no-proxy cannot be combined with --sidecar")
+        print_error("--no-proxy cannot be combined with --sidecar", console=console)
         return 1
     if direct and host_proxy:
-        console.print("[red]Error:[/red] --no-proxy cannot be combined with --host-proxy")
+        print_error("--no-proxy cannot be combined with --host-proxy", console=console)
         return 1
     if direct_model and sidecar:
-        console.print("[red]Error:[/red] --model cannot be combined with --sidecar")
+        print_error("--model cannot be combined with --sidecar", console=console)
         return 1
     if direct_model and host_proxy:
-        console.print("[red]Error:[/red] --model cannot be combined with --host-proxy")
+        print_error("--model cannot be combined with --host-proxy", console=console)
         return 1
     if incognito and no_launch:
-        console.print("[red]Error:[/red] --incognito and --no-launch are mutually exclusive")
+        print_error("--incognito and --no-launch are mutually exclusive", console=console)
         return 1
     if no_launch and (system_prompt or system_prompt_file):
-        console.print("[red]Error:[/red] --system-prompt is launch-only and lost with --no-launch")
+        print_error("--system-prompt is launch-only and lost with --no-launch", console=console)
         return 1
 
     launch_mode = LAUNCH_MODE_HOST if direct else _resolve_launch_mode(sidecar=sidecar, host_proxy=host_proxy)
@@ -893,14 +894,14 @@ def launch_new_session(
             direct_model_pin = resolve_direct_model_pin(direct_model)
             normalized_direct_model = direct_model_pin.env_model
         except ValueError as e:
-            console.print(f"[red]Error:[/red] {e}")
+            print_error(f"{e}", console=console)
             return 1
 
     # Validate --model against proxy model_alternatives when in proxy mode
     if direct_model_pin and proxy_id and not direct:
         error = _validate_proxy_model_pin(proxy_id, direct_model_pin)
         if error:
-            console.print(f"[red]Error:[/red] {error}")
+            print_error(f"{error}", console=console)
             return 1
 
     # Resolve system prompt to absolute path BEFORE worktree creation
@@ -925,7 +926,7 @@ def launch_new_session(
                 supervise_target, forge_root=_sess()._cwd_forge_root()
             )
         except ValueError as e:
-            console.print(f"[red]Error:[/red] {e}")
+            print_error(f"{e}", console=console)
             return 1
     if supervisor_proxy:
         from forge.policy.semantic.supervisor import ensure_supervisor_proxy
@@ -933,7 +934,7 @@ def launch_new_session(
         try:
             _sup_proxy_id, _sup_started = ensure_supervisor_proxy(supervisor_proxy)
         except ValueError as e:
-            console.print(f"[red]Error:[/red] {e}")
+            print_error(f"{e}", console=console)
             return 1
         if _sup_started:
             console.print(f"[dim]Started proxy '{_sup_proxy_id}' from template '{supervisor_proxy}'.[/dim]")
@@ -969,13 +970,13 @@ def launch_new_session(
         print_error_with_tip(str(e), "Remove the directory or use a different session name.", console=console)
         return 1
     except InvalidBranchNameError as e:
-        console.print(f"[red]Error:[/red] {e}")
+        print_error(f"{e}", console=console)
         return 1
     except ForgeSessionError as e:
-        console.print(f"[red]Error:[/red] {e}", style="red")
+        print_error(f"{e}", console=console)
         return 1
     except FileNotFoundError as e:
-        console.print(f"[red]Error:[/red] {e}", style="red")
+        print_error(f"{e}", console=console)
         return 1
 
     # --- set memory activation (if requested) ---
@@ -1327,27 +1328,28 @@ def start(
         sys.exit(codex_rc)
 
     if direct and proxy_name:
-        console.print("[red]Error:[/red] --no-proxy and --proxy are mutually exclusive")
+        print_error("--no-proxy and --proxy are mutually exclusive", console=console)
         sys.exit(1)
     if supervisor_proxy and supervisor_direct:
-        console.print("[red]Error:[/red] --supervisor-proxy and --no-supervisor-proxy are mutually exclusive")
+        print_error("--supervisor-proxy and --no-supervisor-proxy are mutually exclusive", console=console)
         sys.exit(1)
     if (supervisor_proxy or supervisor_direct) and not supervise_target:
-        console.print("[red]Error:[/red] --supervisor-proxy/--no-supervisor-proxy require --supervise")
+        print_error("--supervisor-proxy/--no-supervisor-proxy require --supervise", console=console)
         sys.exit(1)
     if (
         cascade_flag or checker_model or checker_provider or checker_effort or supervisor_effort
     ) and not supervise_target:
-        console.print("[red]Error:[/red] --cascade/--checker-*/--supervisor-effort require --supervise")
+        print_error("--cascade/--checker-*/--supervisor-effort require --supervise", console=console)
         sys.exit(1)
     try:
         validate_checker_model(checker_model)
     except ValueError as e:
-        console.print(f"[red]Error:[/red] {e}")
+        print_error(f"{e}", console=console)
         sys.exit(1)
     if subprocess_proxy and proxy_name:
-        console.print(
-            "[red]Error:[/red] --subprocess-proxy is for direct-mode sessions; use --proxy alone for full proxy routing"
+        print_error(
+            "--subprocess-proxy is for direct-mode sessions; use --proxy alone for full proxy routing",
+            console=console,
         )
         sys.exit(1)
 
@@ -1524,7 +1526,7 @@ def resume(
       forge session resume my-session --fresh --no-proxy # Fresh conversation, direct mode
     """
     if direct and proxy_name:
-        console.print("[red]Error:[/red] --no-proxy and --proxy are mutually exclusive")
+        print_error("--no-proxy and --proxy are mutually exclusive", console=console)
         sys.exit(1)
 
     normalized_direct_model: str | None = None
@@ -1534,31 +1536,33 @@ def resume(
             direct_model_pin = resolve_direct_model_pin(direct_model)
             normalized_direct_model = direct_model_pin.env_model
         except ValueError as e:
-            console.print(f"[red]Error:[/red] {e}")
+            print_error(f"{e}", console=console)
             sys.exit(1)
 
     if resume_mode and not fresh:
-        console.print("[red]Error:[/red] --resume-mode requires --fresh")
+        print_error("--resume-mode requires --fresh", console=console)
         sys.exit(1)
 
     if not fresh and child_name:
-        console.print("[red]Error:[/red] --child-name requires --fresh")
+        print_error("--child-name requires --fresh", console=console)
         sys.exit(1)
 
     if memory_flag and not fresh:
-        console.print(
-            "[red]Error:[/red] --memory requires --fresh (creates a new child session). Add --fresh or omit --memory."
+        print_error(
+            "--memory requires --fresh (creates a new child session). Add --fresh or omit --memory.",
+            console=console,
         )
         sys.exit(1)
 
     if review and not fresh:
-        console.print("[red]Error:[/red] --review requires --fresh")
+        print_error("--review requires --fresh", console=console)
         sys.exit(1)
 
     if review and resume_mode == "native":
-        console.print(
-            "[red]Error:[/red] --review is only meaningful in transfer mode; "
-            "native resume carries the parent conversation verbatim with no editable artifact."
+        print_error(
+            "--review is only meaningful in transfer mode; "
+            "native resume carries the parent conversation verbatim with no editable artifact.",
+            console=console,
         )
         sys.exit(1)
 
@@ -1623,7 +1627,7 @@ def resume(
         sys.exit(run_codex_resume(ctx, name, task, manifest))
 
     if task is not None:
-        console.print("[red]Error:[/red] --task is only supported for Codex sessions")
+        print_error("--task is only supported for Codex sessions", console=console)
         sys.exit(1)
 
     if cross_project:
@@ -1651,7 +1655,7 @@ def resume(
             surface="resume",
         )
         if error:
-            console.print(f"[red]Error:[/red] {error}")
+            print_error(f"{error}", console=console)
             sys.exit(1)
 
     if fresh:
@@ -1669,10 +1673,11 @@ def resume(
             # Native requires a hook-confirmed session (UUID + confirmed_by/transcript evidence).
             # A pre-seeded UUID alone is not enough — there must be a real conversation to resume.
             if not _is_resumable_session(manifest):
-                console.print(
-                    "[red]Error:[/red] --resume-mode native requires a parent with a confirmed "
+                print_error(
+                    "--resume-mode native requires a parent with a confirmed "
                     "Claude session (hook-confirmed or transcript-backed). "
-                    "Use --resume-mode transfer for transcript-artifact-based resume."
+                    "Use --resume-mode transfer for transcript-artifact-based resume.",
+                    console=console,
                 )
                 sys.exit(1)
             _resume_fresh_native(
@@ -1711,8 +1716,9 @@ def resume(
     elif _is_resumable_session(manifest):
         active_entry = _get_active_session_entry(name, forge_root=manifest.forge_root)
         if active_entry is not None and not force:
-            console.print(
-                f"[red]Error:[/red] Cannot reconnect: session [bold]{name}[/bold] appears to still be active."
+            print_error(
+                f"Cannot reconnect: session [bold]{name}[/bold] appears to still be active.",
+                console=console,
             )
             console.print(f"  Launch mode: {active_entry.launch_mode}")
             if active_entry.launcher_pid is not None:
@@ -2417,7 +2423,7 @@ def incognito(
         forge session incognito my-test                  # Custom name
     """
     if direct and proxy_name:
-        console.print("[red]Error:[/red] --no-proxy and --proxy are mutually exclusive")
+        print_error("--no-proxy and --proxy are mutually exclusive", console=console)
         sys.exit(1)
 
     # Default to direct mode when neither --proxy nor --no-proxy is given,

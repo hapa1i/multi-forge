@@ -18,6 +18,7 @@ import click
 import httpx
 from rich.console import Console
 
+from forge.cli.output import print_error, print_error_with_tip
 from forge.core.paths import display_path
 from forge.core.reactive.env import FORGE_PROXY_WIRE_SHAPE_VAR, resolve_proxy_wire_shape
 from forge.proxy.proxies import (
@@ -224,10 +225,10 @@ def start_cmd(
         forge claude start --proxy my-proxy -- --debug
     """
     if direct and proxy_id:
-        click.echo("Error: --no-proxy and --proxy are mutually exclusive")
+        print_error("--no-proxy and --proxy are mutually exclusive", console=console)
         sys.exit(1)
     if not direct and not proxy_id:
-        click.echo("Error: one of --proxy or --no-proxy is required")
+        print_error("one of --proxy or --no-proxy is required", console=console)
         sys.exit(1)
 
     from forge.session.claude.invoke import invoke_claude
@@ -244,12 +245,17 @@ def start_cmd(
         try:
             entry, started = ensure_proxy(proxy_id)
         except ProxyRegistryCorruptedError as e:
-            click.echo(f"Error: {e}")
+            print_error(str(e), console=console)
             sys.exit(1)
         except (ProxyResolutionError, ProxyStartError) as e:
-            click.echo(f"Error: {e}")
             if isinstance(e, ProxyNotFoundError):
-                click.echo("Tip: Run 'forge proxy template list' to see available templates.")
+                print_error_with_tip(
+                    str(e),
+                    "Run 'forge proxy template list' to see available templates.",
+                    console=console,
+                )
+            else:
+                print_error(str(e), console=console)
             sys.exit(1)
 
         if started:
@@ -262,9 +268,14 @@ def start_cmd(
                 expected_proxy_id=entry.proxy_id,
             )
         except ValueError as e:
-            click.echo(f"Error: {e}")
             if "not running" in str(e):
-                click.echo(f"Tip: Run 'forge proxy start {entry.proxy_id}' to start it.")
+                print_error_with_tip(
+                    str(e),
+                    f"Run 'forge proxy start {entry.proxy_id}' to start it.",
+                    console=console,
+                )
+            else:
+                print_error(str(e), console=console)
             sys.exit(1)
 
         template = entry.template
@@ -285,7 +296,7 @@ def start_cmd(
         direct_model = get_default_direct_model()
         error = apply_direct_model_env(env_vars, direct_model)
         if error:
-            click.echo(f"Error: {error}")
+            print_error(error, console=console)
             sys.exit(1)
 
     if proxy_display:
@@ -391,7 +402,7 @@ def preset_edit() -> None:
 
     editor = os.environ.get("EDITOR", "vim")
     if not shutil.which(editor):
-        console.print(f"[red]Error:[/red] Editor '{editor}' not found. Set $EDITOR to an available editor.")
+        print_error(f"Editor '{editor}' not found. Set $EDITOR to an available editor.", console=console)
         sys.exit(1)
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as tmp:
@@ -402,7 +413,7 @@ def preset_edit() -> None:
     try:
         result = subprocess.run([editor, str(tmp_path)])
         if result.returncode != 0:
-            console.print(f"[red]Error:[/red] Editor exited with code {result.returncode}")
+            print_error(f"Editor exited with code {result.returncode}", console=console)
             console.print(f"Your changes are saved at: {display_path(tmp_path)}")
             sys.exit(1)
 
@@ -410,12 +421,12 @@ def preset_edit() -> None:
             with open(tmp_path, encoding="utf-8") as f:
                 edited_data = json.load(f)
         except json.JSONDecodeError as e:
-            console.print(f"[red]Error:[/red] Invalid JSON: {e}")
+            print_error(f"Invalid JSON: {e}", console=console)
             console.print(f"Your changes are saved at: {display_path(tmp_path)}")
             sys.exit(1)
 
         if not isinstance(edited_data, dict):
-            console.print("[red]Error:[/red] Preset must be a JSON object")
+            print_error("Preset must be a JSON object", console=console)
             console.print(f"Your changes are saved at: {display_path(tmp_path)}")
             sys.exit(1)
 

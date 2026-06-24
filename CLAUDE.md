@@ -197,8 +197,10 @@ CLI command shape and recovery-output style live in
 [docs/developer/cli_style_guidelines.md](docs/developer/cli_style_guidelines.md). Always-on essentials:
 
 - **Use the `forge.cli.output` helpers** (`print_tip`, `print_error`, `print_error_with_tip`, `handle_session_error`)
-  for all Rich recovery output. Never hand-roll `[dim]Tip: …[/dim]` in `src/forge/cli/**` — the test
-  `test_cli_rich_tips_go_through_output_helpers` enforces that styled `Tip:` lives only in `output.py`.
+  for all recovery output. Never hand-roll a `Tip:` line or `[red]Error:[/red]` markup in `src/forge/cli/**` —
+  `test_cli_rich_tips_go_through_output_helpers` scans for the literal `Tip:` and
+  `test_cli_rich_errors_go_through_print_error` for `[red]Error:[/red]`, both enforcing the prefixes live only in
+  `output.py` (the assistant-facing `hooks/direct_commands.py` payloads are the sole `Tip:` exception).
 - Always pass the call site's local `console`; only `output.py`'s own fallback is width-less.
 - Commands use `Run '<full command>'`; flags use `Use --flag`. Inline commands in single quotes, never backticks.
   Multi-line/placeholder commands go in the `commands=[...]` block. Never use `Hint:`.

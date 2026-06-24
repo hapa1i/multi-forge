@@ -27,6 +27,50 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-24
 
+### forge_cli_cleanup Slice 11: recovery-output cleanup
+
+**Goal**: Resolve card finding F9 — route every hand-rolled terminal `Tip:` and `[red]Error:[/red]` through the
+`forge.cli.output` helpers, and turn the two debt ledgers into locked, never-grow guards.
+
+**Key changes**:
+
+- **234 `[red]Error:[/red]` sites → `print_error`** across 18 CLI modules. The transform is receiver-preserving
+  (`<recv>.print(f"[red]Error:[/red] {x}")` → `print_error(f"{x}", console=<recv>)`), so rendered output is
+  byte-identical (`print_error` reconstructs the same `console.print`); redundant `style="red"` kwargs dropped. Done via
+  two deterministic codemods (single-line, then the 13 multi-line concat blocks).
+- **10 terminal tips routed**: 8 plain `click.echo("Tip: …")` (auth ×4, claude ×2, hooks/install ×2) → `print_tip`; the
+  2 `session.py` `ClickException`-embedded tips → `print_error_with_tip` + `sys.exit(1)`. The proxy resolver now
+  prints-and-exits instead of raising (no caller catches it; all 13 resolver tests mock it). `claude.py` proxy-error
+  branches likewise use `print_error_with_tip`.
+- **2 non-recovery `Tip:` reworded**: the `forge telemetry costs show` help docstring (`proxy_costs.py`) and a
+  `session_fork.py` convention comment, so no stray literal `Tip:` survives outside the helper/allowlist.
+- **Guards locked**: `CLI_ERROR_MARKUP_ALLOWLIST` drained to `set()`; `test_cli_rich_tips_go_through_output_helpers`
+  broadened from `[dim]Tip:` to literal `Tip:` (catches plain echoes + ClickException-embedded), allowlisting only the 3
+  assistant-facing `hooks/direct_commands.py` payloads. Both fail on any new offender.
+- **Scope boundary (recorded)**: plain `click.echo("Error: …")` without Rich markup (~11 files) stays out of F9 scope;
+  the guards target `[red]Error:[/red]`/`Tip:` only. Migrated plain echoes only where intertwined with a moved tip
+  (claude/install).
+- Docs: `CLAUDE.md` + `cli_style_guidelines.md` recovery-output rules updated for the broadened tip scan and the drained
+  ledgers.
+
+**Verification**: full unit suite 6879 passed (clean run-tree env — the lone failure under a live Forge shell was an
+ambient `FORGE_RUN_ID` leak into a shadow-curation subprocess, unrelated); `tests/src/cli` 2032 passed incl. the 13
+`test_output.py` guards; `make pre-commit` clean (black reformatted 2 files, then green; mypy/pyright/isort/mdformat/
+gitleaks pass). Every multi-line and nuanced edit reviewed against the final post-black source.
+
+**Follow-up (post-review fixes)**:
+
+- **Stream regression fixed**: the `session._resolve_routing_from_cli` rewrite had moved proxy-resolution errors/tips
+  from Click's stderr (old `ClickException`) onto stdout, polluting the results stream (cli_style_guidelines.md "Output
+  Streams"). Added a shared `output.err_console` (`Console(stderr=True)`) and routed the resolver's 5 error/tip sites
+  through it; `hooks/install.py` now imports the same `err_console` instead of constructing its own. Helper defaults
+  stay stdout (changing them would flip ~71 bare call sites — out of scope). New regression test
+  `tests/regression/test_bug_slice11_resolver_error_stream.py` exercises the real resolver (the 5 unit tests all mock
+  it) and asserts error+tip on stderr, clean stdout.
+- **Tip allowlist tightened** from file-level to payload-level: pinned to the 3 exact assistant-payload sentences in
+  `direct_commands.py` (plus a stale-payload check), so a new `Tip:` anywhere — including elsewhere in that file — now
+  fails. Verified all four branches fire (clean / stray-in-pinned-file / stray-elsewhere / removed-payload).
+
 ### forge_cli_cleanup Slice 10: policy supervisor cleanup
 
 **Goal**: Resolve card F7 — split the overloaded `forge policy supervise` (15 options, 7 mutually-exclusive actions)
