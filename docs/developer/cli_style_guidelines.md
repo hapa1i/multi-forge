@@ -88,10 +88,22 @@ Forge CLI commands use explicit verbs and predictable command boundaries.
   `costs show [proxy_id]`, and `trace list --session` differ correctly because each applies the rule to its own primary
   object.
 
-- **Editable config objects share a verb vocabulary.** Config-like surfaces (`forge config`, `forge proxy`,
-  `forge claude preset`, `forge proxy template`) use one verb set for the same operations and document deliberate
-  exceptions. _(review)_ The exact vocabulary is being settled in the `forge_cli_cleanup` card; do not enumerate it here
-  until it ships.
+- **Editable config objects share a verb vocabulary.** A surface whose primary object is an editable config file exposes
+  a common core, plus optional verbs where meaningful. Lifecycle resources (`create`/`start`/`stop`/`delete`) follow the
+  sibling-verbs rule above, not this one. Core {`show`, `edit`, `reset`} is mandatory and mechanically guarded; optional
+  {`set`, `validate`} and the documented exceptions are review-only.
+
+  | Surface                | Core {show, edit, reset} | Optional          | Note                                                          |
+  | ---------------------- | ------------------------ | ----------------- | ------------------------------------------------------------- |
+  | `forge config`         | yes                      | `set`             | editable config object                                        |
+  | `forge proxy template` | yes                      | --                | editable config object                                        |
+  | `forge claude preset`  | yes                      | --                | editable config object                                        |
+  | `forge proxy`          | `show`, `edit` only      | `set`, `validate` | partial-lifecycle exception: has `clean`/`delete`, no `reset` |
+  | `forge model backend`  | n/a                      | --                | lifecycle resource; sibling-verbs rule applies                |
+
+  _Guard:_ `test_command_tree_invariants::test_editable_config_objects_share_core_verbs` -- core set on the three
+  editable config objects, plus the no-`reset` boundary for `proxy`/`model backend`. Optional verbs and the exception
+  rationale are _(review)_.
 
 When adding a new CLI command:
 

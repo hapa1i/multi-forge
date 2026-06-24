@@ -27,6 +27,27 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-23
 
+### forge_cli_cleanup Slice 08: config-object verb parity
+
+**Goal**: Implement D7 — enumerate the tiered editable-config verb vocabulary in the style guide (un-defer the
+placeholder), correct a docstring that implied false `forge proxy` parity, and lock the core set with a regression
+guard. No behavior change, no net-new commands.
+
+**Key changes**:
+
+- `cli_style_guidelines.md`: replaced the deferred config-object rule (which punted to "the forge_cli_cleanup card")
+  with the enumerated tiered vocabulary — core `{show, edit, reset}` (met by `config`/`proxy template`/`claude preset`),
+  optional `{set, validate}`, a per-surface table, and a dual `_Guard:_`/`_(review)_` marker. `proxy` documented as the
+  partial-lifecycle exception (no `reset`); `backend` excluded as a lifecycle resource under the sibling-verbs rule.
+- `config_cmd.py`: reworded the module docstring to drop the false "matches forge proxy show/set/edit" parity claim; it
+  now names the core+optional membership and points at the style guide.
+- `test_command_tree_invariants.py`: new `test_editable_config_objects_share_core_verbs` — a positive core-set assertion
+  on the three editable-config objects plus a boundary lock asserting `proxy`/`model backend` carry no `reset`. Positive
+  assertion (not the `_assert_ledger` debt helper) because there is zero pre-existing debt — all three already comply.
+
+**Verification**: `test_command_tree_invariants.py` (5 passed, incl. the new guard); full `tests/src/cli` (2022 passed);
+`make pre-commit` clean.
+
 ### forge_cli_cleanup Slice 07: read-output consistency (+ F11 audit)
 
 **Goal**: Make every read surface default to human output, expose a stable `--json`, and keep human + JSON on stdout --

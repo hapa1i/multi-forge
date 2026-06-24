@@ -133,3 +133,33 @@ def test_read_leaves_expose_json() -> None:
         if path.split()[-1] in _READ_LEAVES and not _json_dests(cmd):
             violations.add(path)
     _assert_ledger(violations, JSON_MISSING_ALLOWLIST, "read leaf should expose --json")
+
+
+# --- Rule: editable config objects expose the core {show, edit, reset} vocabulary
+# Tiered decision (forge_cli_cleanup Slice 08 / D7): editable-config objects share a
+# core verb set; lifecycle resources follow the sibling-verbs rule instead. This guard
+# covers ONLY the mandatory core on the three editable-config objects, plus a boundary
+# lock that `proxy`/`model backend` carry no `reset`. Optional verbs (`set`/`validate`)
+# and the exception rationale are review-only (see cli_style_guidelines.md).
+_EDITABLE_CONFIG_OBJECTS = ("forge config", "forge proxy template", "forge claude preset")
+_CORE_CONFIG_VERBS = {"show", "edit", "reset"}
+
+
+def test_editable_config_objects_share_core_verbs() -> None:
+    tree = dict(_tree())
+    for path in _EDITABLE_CONFIG_OBJECTS:
+        group = tree.get(path)
+        assert isinstance(group, click.Group), f"editable config object not a reachable group: {path!r}"
+        missing = _CORE_CONFIG_VERBS - set(_visible_subcommands(group))
+        assert not missing, f"{path}: editable config object missing core verb(s): {sorted(missing)}"
+
+    # Boundary lock: `proxy` and `model backend` are deliberately NOT editable config
+    # objects. The documented exception is "no `reset`"; if either grows one, force a
+    # conscious doc update rather than silent drift.
+    for path in ("forge proxy", "forge model backend"):
+        group = tree.get(path)
+        assert isinstance(group, click.Group), f"expected reachable group: {path!r}"
+        assert "reset" not in _visible_subcommands(group), (
+            f"{path} grew a `reset` verb -- if it is now an editable config object, add it to "
+            f"_EDITABLE_CONFIG_OBJECTS and update cli_style_guidelines.md"
+        )

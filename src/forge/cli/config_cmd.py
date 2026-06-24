@@ -3,10 +3,11 @@
 Manages ~/.forge/config.yaml — global runtime preferences that affect
 CLI and session behavior (not proxy routing).
 
-Patterns:
-- show: matches forge proxy show (syntax-highlighted YAML)
-- set: matches forge proxy set (type coercion, atomic write)
-- edit: matches forge proxy edit ($EDITOR + validation)
+`forge config` is an editable-config object: it implements the core verb
+vocabulary {show, edit, reset} plus the optional `set`, per the
+"Editable config objects share a verb vocabulary" rule in
+docs/developer/cli_style_guidelines.md. It is not modeled on `forge proxy`,
+which is a partial-lifecycle exception with no `reset`.
 """
 
 from __future__ import annotations

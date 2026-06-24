@@ -267,12 +267,16 @@ verification is recorded.
     shape tests across the 10 new branches (parseability, exact key sets, dispatch/empty/error/no-secret paths),
     authored + adversarially verified via a fan-out workflow. Fixed the `auth status` silent corrupt-file degrade (now a
     `warning` key) and corrected `cli_style_guidelines.md`, which still called the stream guard "planned/not wired".
-- [ ] **Slice 08 - Config-object parity (D7 = tiered).** Record the tiered vocab in the style guide: core
-  `{show, edit, reset}` (already met by `config`/`proxy template`/`claude preset`), optional `{set, validate}` where
-  meaningful; `proxy` documented as a partial-lifecycle exception (`clean`/`delete`, no `reset`); **`backend` excluded**
-  from the editable-config rule and documented under the lifecycle-sibling rule (L79-81). Fix the false proxy-parity
-  docstring at `config_cmd.py:6-9` (config has 4 verbs, not proxy's 11). Add a parity guard test asserting the core set
-  on the three pure-config objects. No net-new commands required.
+- [x] **Slice 08 - Config-object parity (D7 = tiered).** SHIPPED 2026-06-23. Enumerated the tiered vocab in the style
+  guide (replacing the deferred placeholder at L91-94): core `{show, edit, reset}` (already met by
+  `config`/`proxy template`/`claude preset`), optional `{set, validate}`, a per-surface table, and a dual
+  `_Guard:_`/`_(review)_` marker. `proxy` documented as the partial-lifecycle exception (`clean`/`delete`, no `reset`);
+  **`backend` excluded** as a lifecycle resource under the sibling-verbs rule (L79-81). Reworded the false proxy-parity
+  docstring at `config_cmd.py:1-10` (dropped the "matches forge proxy show/set/edit" lines; names core+optional
+  membership and points at the style guide). Added `test_editable_config_objects_share_core_verbs` — a **positive**
+  core-set assertion (no debt to drain) on the three editable-config objects plus a **boundary lock** asserting
+  `proxy`/`model backend` carry no `reset`, so prose and code can't drift. No net-new commands. Verification: the new
+  guard + the 4 existing tree invariants (5 passed); full `tests/src/cli` (2022 passed); `make pre-commit` clean.
 - [ ] **Slice 09 - Destructive consistency (F3).** `clean` verbs preview by default + mutate on `--yes`: fix
   `forge session clean` (`session_manage.py:570`, mutates by default today) and `forge proxy clean` (`proxy.py:1288`, no
   flags today). `delete`/`reset` keep prompt + a single `--yes` bypass name. Decide F14a (is `proxy clean` redundant
@@ -352,7 +356,9 @@ verification is recorded.
   aliases per D6).
 - [ ] Update relevant `docs/end-user/*` guides (`hook.md` per D5, `proxy.md`/`session.md`/`memory.md` for moves).
 - [ ] Update `docs/developer/cli_style_guidelines.md`: record the config-object verb vocabulary (D7), the stream guard
-  once wired, the alias rule (D6), and remove "settled in the forge_cli_cleanup card" placeholders as each lands.
+  once wired, the alias rule (D6), and remove "settled in the forge_cli_cleanup card" placeholders as each lands. (D7
+  config-object vocab done 2026-06-23, Slice 08; stream guard done Slice 07; **D6 alias rule still pending Slice 05** —
+  box stays unchecked until D6 lands.)
 - [x] Update `docs/design.md`/`cli_reference.md` ownership tables if command ownership changes (telemetry, memory
   split). Done for both shipped moves: design.md §4.0/§3.x and cli_reference reflect `forge session memory` +
   `forge session transfer`; verified no stale `forge memory enable|disable|status|report` / bare `forge transfer <verb>`
