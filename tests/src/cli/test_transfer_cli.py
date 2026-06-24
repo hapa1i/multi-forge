@@ -201,6 +201,46 @@ class TestTransferDiff:
         assert "No drift" in result.output
         assert "generated_at" not in result.output
 
+    def test_diff_json_no_drift_wrapper(self, runner: CliRunner, transfer_project: Path) -> None:
+        result = runner.invoke(main, ["session", "transfer", "diff", "planner", "--child", "exec", "--json"])
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output)
+        assert set(payload) == {"parent", "child", "has_drift", "diff"}
+        assert payload["parent"] == "planner"
+        assert payload["child"] == "exec"
+        assert payload["has_drift"] is False
+        assert payload["diff"] == ""
+
+    def test_diff_json_drift_wrapper(self, runner: CliRunner, transfer_project: Path) -> None:
+        cache = transfer_project / ".forge" / "prev_sessions" / "planner" / "generated.md"
+        cache.write_text(cache.read_text(encoding="utf-8") + "\nDRIFTED LINE\n", encoding="utf-8")
+        result = runner.invoke(main, ["session", "transfer", "diff", "planner", "--child", "exec", "--json"])
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output)
+        assert set(payload) == {"parent", "child", "has_drift", "diff"}
+        assert payload["parent"] == "planner"
+        assert payload["child"] == "exec"
+        assert payload["has_drift"] is True
+        assert "DRIFTED LINE" in payload["diff"]
+
+    def test_diff_json_inferred_child(self, runner: CliRunner, transfer_project: Path) -> None:
+        # No --child: the single seeded child ('exec') is inferred and echoed back.
+        result = runner.invoke(main, ["session", "transfer", "diff", "planner", "--json"])
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output)
+        assert payload["child"] == "exec"
+        assert payload["has_drift"] is False
+        assert payload["diff"] == ""
+
+    def test_diff_json_missing_parent_stays_human_error(self, runner: CliRunner, transfer_project: Path) -> None:
+        # Error path (no transfer context) stays human + exit 1, never JSON.
+        result = runner.invoke(main, ["session", "transfer", "diff", "nope", "--json"])
+        assert result.exit_code == 1
+        assert "Error:" in result.output
+        assert "show" in result.output  # recovery tip names the show path
+        with pytest.raises(json.JSONDecodeError):
+            json.loads(result.output)
+
 
 class TestTransferCleanBreak:
     """The old top-level ``forge transfer`` group is gone (Slice 02 clean break)."""

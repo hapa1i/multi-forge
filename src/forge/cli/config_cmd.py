@@ -57,7 +57,8 @@ def config(ctx: click.Context) -> None:
 
 @config.command("show")
 @click.option("--raw", is_flag=True, help="Output raw YAML without syntax highlighting")
-def show_cmd(raw: bool = False) -> None:
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def show_cmd(raw: bool = False, as_json: bool = False) -> None:
     """Show effective runtime configuration.
 
     Displays current values (from file + defaults + env var overrides).
@@ -68,8 +69,6 @@ def show_cmd(raw: bool = False) -> None:
     rc = load_runtime_config()
     env_sources: dict[str, str] = getattr(rc, "_env_sources", {})
 
-    import yaml
-
     effective: dict[str, Any] = {}
     for f in fields(RuntimeConfig):
         val = getattr(rc, f.name)
@@ -78,6 +77,20 @@ def show_cmd(raw: bool = False) -> None:
         if is_dataclass(val) and not isinstance(val, type):
             val = asdict(val)
         effective[f.name] = val
+
+    if as_json:
+        import json
+
+        click.echo(
+            json.dumps(
+                {"path": str(config_path), "env_sources": env_sources, "config": effective},
+                indent=2,
+                default=str,
+            )
+        )
+        return
+
+    import yaml
 
     content = yaml.dump(effective, default_flow_style=False, sort_keys=False)
 

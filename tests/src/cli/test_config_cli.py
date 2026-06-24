@@ -74,6 +74,95 @@ class TestConfigShow:
         assert "debug" in result.output
 
 
+class TestConfigShowJson:
+    """Tests for `forge config show --json`.
+
+    Shape: {path, env_sources, config} where config is the effective
+    RuntimeConfig mapping (nested sections render as plain dicts).
+    """
+
+    def setup_method(self):
+        reset_runtime_config()
+
+    def teardown_method(self):
+        reset_runtime_config()
+
+    def test_json_has_three_top_level_keys(self):
+        runner = CliRunner()
+        result = runner.invoke(config, ["show", "--json"])
+        assert result.exit_code == 0
+        import json
+
+        payload = json.loads(result.output)
+        assert set(payload.keys()) == {"path", "env_sources", "config"}
+
+    def test_json_path_points_at_config_file(self):
+        runner = CliRunner()
+        result = runner.invoke(config, ["show", "--json"])
+        assert result.exit_code == 0
+        import json
+
+        payload = json.loads(result.output)
+        assert payload["path"] == str(get_forge_home() / "config.yaml")
+
+    def test_json_config_contains_known_runtime_fields(self):
+        """config maps every RuntimeConfig field, including nested sections."""
+        runner = CliRunner()
+        result = runner.invoke(config, ["show", "--json"])
+        assert result.exit_code == 0
+        import json
+        from dataclasses import fields
+
+        from forge.runtime_config import RuntimeConfig
+
+        payload = json.loads(result.output)
+        cfg = payload["config"]
+        expected = {f.name for f in fields(RuntimeConfig)}
+        assert set(cfg.keys()) == expected
+        # Spot-check representative fields across types (str/int/nested).
+        assert cfg["proxy_mode"] == "host"
+        assert cfg["context_limit"] == 200000
+        # Nested dataclasses must serialize as plain mappings (json can't dump a
+        # dataclass instance; show_cmd asdict()s them).
+        assert isinstance(cfg["statusline"], dict)
+        assert isinstance(cfg["provider_trace"], dict)
+
+    def test_json_env_sources_empty_without_overrides(self):
+        runner = CliRunner()
+        result = runner.invoke(config, ["show", "--json"])
+        assert result.exit_code == 0
+        import json
+
+        payload = json.loads(result.output)
+        assert payload["env_sources"] == {}
+
+    def test_json_reflects_file_values(self):
+        (get_forge_home() / "config.yaml").write_text("proxy_mode: sidecar\n")
+        runner = CliRunner()
+        result = runner.invoke(config, ["show", "--json"])
+        assert result.exit_code == 0
+        import json
+
+        payload = json.loads(result.output)
+        assert payload["config"]["proxy_mode"] == "sidecar"
+
+    def test_json_surfaces_env_override_in_env_sources(self, monkeypatch):
+        """An env override is reported in env_sources AND applied in config.
+
+        Mirrors test_show_annotates_env_overrides: FORGE_DEBUG maps to log_level.
+        """
+        monkeypatch.setenv("FORGE_DEBUG", "1")
+        reset_runtime_config()
+        runner = CliRunner()
+        result = runner.invoke(config, ["show", "--json"])
+        assert result.exit_code == 0
+        import json
+
+        payload = json.loads(result.output)
+        assert payload["env_sources"] == {"log_level": "FORGE_DEBUG"}
+        assert payload["config"]["log_level"] == "debug"
+
+
 class TestConfigSet:
     """Tests for `forge config set`."""
 

@@ -16,6 +16,7 @@ Usage:
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 
@@ -332,7 +333,8 @@ def _prompt_env_var(
     default=None,
     help="Profile to check (default: 'default' or FORGE_PROFILE)",
 )
-def status(profile: str | None) -> None:
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def status(profile: str | None, as_json: bool) -> None:
     """Show credential status with capability summary and source details.
 
     \b
@@ -343,6 +345,49 @@ def status(profile: str | None) -> None:
     profile_name = resolve_profile(profile)
 
     ignore_env = _get_auth_ignore_env()
+
+    if as_json:
+        # Mirror the human path: a corrupt file degrades to env-only values, but the
+        # degradation must not be silent (coding_standards.md best-effort rule). Surface
+        # it as an always-present `warning` key (null when clean), like transfer show --json.
+        warning: str | None = None
+        try:
+            json_secrets = load_profile(profile_name)
+        except CredentialVersionError as e:
+            click.echo(json.dumps({"error": str(e)}))
+            raise SystemExit(1)
+        except ValueError:
+            json_secrets = {}
+            warning = "Credentials file is corrupt -- file-based values unavailable."
+        creds = []
+        for cred in CREDENTIALS.values():
+            state = _credential_state(cred, json_secrets, ignore_env, profile_name)
+            env_vars = []
+            for ev in cred.env_vars:
+                value, source = _resolve_var_source(ev, json_secrets, ignore_env)
+                env_vars.append(
+                    {
+                        "name": ev.name,
+                        "configured": bool(value),
+                        "source": f"file:{profile_name}" if source == "file" else source,
+                        "is_secret": ev.secret,
+                        "is_default": bool(ev.default_value and source == "not configured"),
+                        "value": value if (value and not ev.secret) else None,
+                    }
+                )
+            primary_source = state.split("(", 1)[1].rstrip(")") if "(" in state else None
+            creds.append(
+                {
+                    "name": cred.name,
+                    "summary": _capability_summary(cred),
+                    "configured": state.startswith("configured"),
+                    "state": state,
+                    "primary_source": primary_source,
+                    "env_vars": env_vars,
+                }
+            )
+        click.echo(json.dumps({"profile": profile_name, "credentials": creds, "warning": warning}, indent=2))
+        return
 
     try:
         file_secrets = load_profile(profile_name)
@@ -434,13 +479,25 @@ def logout(profile: str | None, yes: bool) -> None:
 
 
 @auth.command("profiles")
-def profiles_cmd() -> None:
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def profiles_cmd(as_json: bool) -> None:
     """List saved credential profiles.
 
     \b
     Examples:
         forge authentication profiles
     """
+    if as_json:
+        try:
+            names = list_profiles()
+        except (CredentialVersionError, ValueError) as e:
+            click.echo(json.dumps({"error": str(e)}))
+            raise SystemExit(1)
+        active = resolve_profile()
+        profiles = [{"name": n, "key_count": len(load_profile(n)), "is_active": n == active} for n in names]
+        click.echo(json.dumps({"profiles": profiles}, indent=2))
+        return
+
     try:
         profile_names = list_profiles()
     except CredentialVersionError as e:

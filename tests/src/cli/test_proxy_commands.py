@@ -2363,6 +2363,88 @@ class TestProxyTemplate:
         result = runner.invoke(main, ["proxy", "show", "foo", "--template"])
         assert result.exit_code != 0
 
+    def test_template_list_json_lists_builtins(self, runner: CliRunner, temp_env: Path) -> None:
+        """`template list --json` -> {templates: [{name, source, description}]} with built-ins present."""
+        result = runner.invoke(main, ["proxy", "template", "list", "--json"])
+
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert set(data.keys()) == {"templates"}
+        templates = data["templates"]
+        assert isinstance(templates, list)
+        assert templates, "Built-in templates ship with Forge; list must be non-empty"
+        for row in templates:
+            assert set(row.keys()) == {"name", "source", "description"}
+            assert row["source"] in {"built-in", "user", "customized"}
+
+        by_name = {row["name"]: row for row in templates}
+        # A known built-in ships with Forge and needs no setup.
+        assert "anthropic-passthrough" in by_name
+        assert by_name["anthropic-passthrough"]["source"] == "built-in"
+        # Description is parsed from the second comment line of the template YAML.
+        assert by_name["litellm-openai"]["description"] == "OpenAI models via remote/shared LiteLLM"
+
+    def test_template_list_json_marks_customized_source(self, runner: CliRunner, temp_env: Path) -> None:
+        """`template list --json` reports source=customized when a user copy overrides a built-in."""
+        forge_home = Path(os.environ["FORGE_HOME"])
+        tpl_dir = forge_home / "templates"
+        tpl_dir.mkdir(parents=True)
+        (tpl_dir / "litellm-openai.yaml").write_text("# user override\nproxy:\n  default_port: 9999\n")
+
+        result = runner.invoke(main, ["proxy", "template", "list", "--json"])
+
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        by_name = {row["name"]: row for row in data["templates"]}
+        assert by_name["litellm-openai"]["source"] == "customized"
+
+    def test_template_show_json_builtin(self, runner: CliRunner, temp_env: Path) -> None:
+        """`template show <name> --json` -> {name, source, path, content} with raw YAML content."""
+        result = runner.invoke(main, ["proxy", "template", "show", "litellm-openai", "--json"])
+
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert set(data.keys()) == {"name", "source", "path", "content"}
+        assert data["name"] == "litellm-openai"
+        assert data["source"] == "built-in"
+        assert data["path"].endswith("litellm-openai.yaml")
+        # content is the raw YAML string, including the leading template comment.
+        assert "# Template: litellm-openai" in data["content"]
+        assert "proxy:" in data["content"]
+
+    def test_template_show_json_customized_source(self, runner: CliRunner, temp_env: Path) -> None:
+        """`template show --json` reports the customized source label when a user copy overrides built-in."""
+        forge_home = Path(os.environ["FORGE_HOME"])
+        tpl_dir = forge_home / "templates"
+        tpl_dir.mkdir(parents=True)
+        (tpl_dir / "litellm-openai.yaml").write_text("# user override\nproxy:\n  family: openai\n")
+
+        result = runner.invoke(main, ["proxy", "template", "show", "litellm-openai", "--json"])
+
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert data["source"] == "customized (overrides built-in)"
+        # content reflects the user copy, not the shipped template.
+        assert "# user override" in data["content"]
+
+    def test_template_show_json_unknown_errors(self, runner: CliRunner, temp_env: Path) -> None:
+        """`template show <unknown> --json` -> {error: ...} with nonzero exit."""
+        result = runner.invoke(main, ["proxy", "template", "show", "nonexistent", "--json"])
+
+        assert result.exit_code != 0
+        data = json.loads(result.output)
+        assert set(data.keys()) == {"error"}
+        assert "not found" in data["error"].lower()
+
+    def test_template_show_json_invalid_name_errors(self, runner: CliRunner, temp_env: Path) -> None:
+        """`template show --json` rejects path traversal as a structured {error: ...} payload."""
+        result = runner.invoke(main, ["proxy", "template", "show", "../outside", "--json"])
+
+        assert result.exit_code != 0
+        data = json.loads(result.output)
+        assert set(data.keys()) == {"error"}
+        assert "Invalid template name" in data["error"]
+
 
 class TestProxyCreateMissingUrl:
     """Regression: missing LITELLM_BASE_URL should give actionable error, not traceback."""

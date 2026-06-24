@@ -85,7 +85,7 @@ def _record_workflow_outcome(command: str, output: Any) -> None:
 def _run_preflight(
     specs: list[ModelSpec],
     *,
-    json_output: bool = False,
+    as_json: bool = False,
     routing_plan: Any | None = None,
 ) -> None:
     """Check resolved routing/auth before spawning workers. Exit 1 on failure."""
@@ -94,11 +94,11 @@ def _run_preflight(
     errors = preflight_check(specs, routing_plan=routing_plan)
     warnings = _routing_plan_warnings(specs, routing_plan)
     if not errors:
-        if not json_output:
+        if not as_json:
             for warning in warnings:
                 console.print(f"[yellow]Routing warning:[/yellow] {warning}")
         return
-    if json_output:
+    if as_json:
         data: dict[str, Any] = {"preflight_errors": errors}
         if warnings:
             data["routing_warnings"] = warnings
@@ -190,10 +190,10 @@ def _format_resolved_models(summary: dict[str, dict[str, Any]]) -> str:
     return "\n".join(lines) + "\n\n"
 
 
-def _handle_routing_error(error: Exception, *, json_output: bool = False) -> None:
+def _handle_routing_error(error: Exception, *, as_json: bool = False) -> None:
     """Handle routing resolution errors with clean CLI output. Calls sys.exit(1)."""
     msg = str(error)
-    if json_output:
+    if as_json:
         click.echo(json.dumps({"routing_error": msg}))
     else:
         console.print(f"[red]Error:[/red] Routing failed: {msg}")
@@ -224,9 +224,9 @@ def workflow_cmd() -> None:
 
 
 @workflow_cmd.command(name="list-models")
-@click.option("--json", "json_output", is_flag=True, help="Output as JSON")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
 @click.option("--available", "available_only", is_flag=True, help="Show only ready models")
-def list_models(json_output: bool, available_only: bool) -> None:
+def list_models(as_json: bool, available_only: bool) -> None:
     """Show workflow model readiness."""
     from forge.review.models import available_model_specs, check_model_availability
 
@@ -235,7 +235,7 @@ def list_models(json_output: bool, available_only: bool) -> None:
     if available_only:
         availabilities = [a for a in availabilities if a.status == "ready"]
 
-    if json_output:
+    if as_json:
         items = [
             {
                 "name": a.spec.name,
@@ -353,7 +353,7 @@ def _print_grouped_models(availabilities: list) -> None:
     help="Comma-separated model names (default: all)",
 )
 @click.option("--timeout", "-t", type=int, default=600, help="Per-model timeout in seconds")
-@click.option("--json", "json_output", is_flag=True, help="Output structured JSON")
+@click.option("--json", "as_json", is_flag=True, help="Output structured JSON")
 @click.option(
     "--check",
     "check_mode",
@@ -396,7 +396,7 @@ def panel(
     context_mode: str,
     models: str | None,
     timeout: int,
-    json_output: bool,
+    as_json: bool,
     check_mode: bool,
     roles: str | None,
     review_type: str,
@@ -480,10 +480,10 @@ def panel(
     try:
         routing_plan = resolve_invocation_routing(specs, via=via)
     except _ROUTING_ERRORS as e:
-        _handle_routing_error(e, json_output=json_output)
+        _handle_routing_error(e, as_json=as_json)
         return
 
-    _run_preflight(specs, json_output=json_output, routing_plan=routing_plan)
+    _run_preflight(specs, as_json=as_json, routing_plan=routing_plan)
 
     from forge.core.invoker import Attribution
 
@@ -514,7 +514,7 @@ def panel(
         ctx,
         output,
         check_mode=check_mode,
-        json_output=json_output,
+        as_json=as_json,
         resolved_models=_resolved_models_summary(specs, routing_plan),
         routing_warnings=_routing_plan_warnings(specs, routing_plan),
     )
@@ -750,7 +750,7 @@ def _handle_review_output(
     output: MultiReviewOutput,
     *,
     check_mode: bool,
-    json_output: bool,
+    as_json: bool,
     resolved_models: dict[str, dict[str, Any]] | None = None,
     routing_warnings: list[str] | None = None,
 ) -> None:
@@ -770,7 +770,7 @@ def _handle_review_output(
         ctx.exit(0 if passed else 1)
         return
 
-    if json_output:
+    if as_json:
         data = build_json_dict(output)
         if resolved_models:
             data["resolved_models"] = resolved_models
@@ -802,7 +802,7 @@ def _handle_review_output(
     help="Comma-separated model names (default: claude-opus)",
 )
 @click.option("--timeout", "-t", type=int, default=600, help="Per-model timeout in seconds")
-@click.option("--json", "json_output", is_flag=True, help="Output structured JSON")
+@click.option("--json", "as_json", is_flag=True, help="Output structured JSON")
 @click.option(
     "--check",
     "check_mode",
@@ -825,7 +825,7 @@ def analyze(
     prompt_text: str | None,
     models: str,
     timeout: int,
-    json_output: bool,
+    as_json: bool,
     check_mode: bool,
     via: str | None,
     cwd: str | None,
@@ -865,10 +865,10 @@ def analyze(
     try:
         routing_plan = resolve_invocation_routing(specs, via=via)
     except _ROUTING_ERRORS as e:
-        _handle_routing_error(e, json_output=json_output)
+        _handle_routing_error(e, as_json=as_json)
         return
 
-    _run_preflight(specs, json_output=json_output, routing_plan=routing_plan)
+    _run_preflight(specs, as_json=as_json, routing_plan=routing_plan)
 
     from forge.core.invoker import Attribution
 
@@ -898,7 +898,7 @@ def analyze(
         ctx,
         output,
         check_mode=check_mode,
-        json_output=json_output,
+        as_json=as_json,
         resolved_models=_resolved_models_summary(specs, routing_plan),
         routing_warnings=_routing_plan_warnings(specs, routing_plan),
     )
@@ -1202,7 +1202,7 @@ def _resolve_debate_prompt(
     help="Comma-separated model names (default: all)",
 )
 @click.option("--timeout", "-t", type=int, default=600, help="Per-model timeout in seconds")
-@click.option("--json", "json_output", is_flag=True, help="Output structured JSON")
+@click.option("--json", "as_json", is_flag=True, help="Output structured JSON")
 @click.option("--check", "check_mode", is_flag=True, help="Gate on verdicts: any REJECT exits 1")
 @click.option(
     "--worker",
@@ -1228,7 +1228,7 @@ def debate(
     code_mode: bool,
     models: str | None,
     timeout: int,
-    json_output: bool,
+    as_json: bool,
     check_mode: bool,
     workers: tuple[str, ...],
     via: str | None,
@@ -1306,10 +1306,10 @@ def debate(
         try:
             routing_plan = resolve_invocation_routing(stance_models, via=via)
         except _ROUTING_ERRORS as e:
-            _handle_routing_error(e, json_output=json_output)
+            _handle_routing_error(e, as_json=as_json)
             return
 
-        _run_preflight(stance_models, json_output=json_output, routing_plan=routing_plan)
+        _run_preflight(stance_models, as_json=as_json, routing_plan=routing_plan)
 
         from forge.core.invoker import Attribution
 
@@ -1361,7 +1361,7 @@ def debate(
         ctx.exit(0 if passed else 1)
         return
 
-    if json_output:
+    if as_json:
         data = _build_adversarial_json(
             output,
             resolved_models=debate_resolved_models,
@@ -1898,7 +1898,7 @@ def _print_consensus_text(output: ConsensusOutput, resolved_models: dict[str, di
     default=600,
     help="Per-round timeout in seconds (total wall time ~2x for two rounds)",
 )
-@click.option("--json", "json_output", is_flag=True, help="Output structured JSON")
+@click.option("--json", "as_json", is_flag=True, help="Output structured JSON")
 @click.option(
     "--check",
     "check_mode",
@@ -1929,7 +1929,7 @@ def consensus(
     code_mode: bool,
     models: str | None,
     timeout: int,
-    json_output: bool,
+    as_json: bool,
     check_mode: bool,
     workers: tuple[str, ...],
     via: str | None,
@@ -2011,10 +2011,10 @@ def consensus(
         try:
             routing_plan = resolve_invocation_routing(role_models, via=via)
         except _ROUTING_ERRORS as e:
-            _handle_routing_error(e, json_output=json_output)
+            _handle_routing_error(e, as_json=as_json)
             return
 
-        _run_preflight(role_models, json_output=json_output, routing_plan=routing_plan)
+        _run_preflight(role_models, as_json=as_json, routing_plan=routing_plan)
 
         from forge.core.invoker import Attribution
 
@@ -2066,7 +2066,7 @@ def consensus(
         ctx.exit(0 if passed else 1)
         return
 
-    if json_output:
+    if as_json:
         data = _build_consensus_json(
             output,
             resolved_models=consensus_resolved_models,

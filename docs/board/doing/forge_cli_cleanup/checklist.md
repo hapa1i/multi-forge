@@ -18,15 +18,15 @@ a live surface before the matching decision is recorded here.
 `forge memory enable|disable|status|report` -> `forge session memory ...`, passport verbs stay top-level), Slice 03
 shipped (`forge activity`/`forge provider trace`/`forge proxy costs` moved to `forge telemetry`, `%provider trace`
 retired), Slice 04 shipped (`forge backend` moved to `forge model backend`; `forge model catalog` added), and Slice 06
-shipped (`forge session context` removed). Decision gate: **D1, D2, D3, D4, D5, D7, D8, D9 decided; D6 partial.** See
-the Phase 1 section for details. D1 = move to `forge telemetry` + delete emptied `provider`; D2 = keep `proxy audit`
-under `proxy`; D3 = build `forge model` namespace (backend moves under it); **D4 = split `forge memory` —
-activation/report verbs move to `forge session memory`, passport verbs stay top-level**; D5 = route hook install through
-`extension` (de-document `hook enable|disable`); D7 = tiered config-object verbs, `backend` excluded; **D8 = normalize
-all `json_output` -> `as_json`**; **D9 = wait for the `workspace_scope` card (no `--scope workspace` on telemetry
-here)**. **D6 partial:** `auth` is canonical with no `authentication` alias; remaining alias eligibility
-(`telemetry`/`model`/`extensions` shim) deferred to Slice 05 (runs last). **Remaining slices (05 runs last; 07-12) are
-parked pending direction.**
+shipped (`forge session context` removed). Decision gate: **D1-D9 all decided.** See the Phase 1 section for details. D1
+= move to `forge telemetry` + delete emptied `provider`; D2 = keep `proxy audit` under `proxy`; D3 = build `forge model`
+namespace (backend moves under it); **D4 = split `forge memory` — activation/report verbs move to
+`forge session memory`, passport verbs stay top-level**; D5 = route hook install through `extension` (de-document
+`hook enable|disable`); D7 = tiered config-object verbs, `backend` excluded; **D8 = normalize all `json_output` ->
+`as_json`**; **D9 = wait for the `workspace_scope` card (no `--scope workspace` on telemetry here)**. **D6 =
+finalized:** `auth` canonical (no `authentication` alias); new nouns `telemetry`/`model` get no alias; the `extensions`
+shim is removed; `ext`/`sess`/`mem`/`cfg` kept. Slice 05 (runs last) implements. **Remaining slices (05 runs last;
+07-12) are parked pending direction.**
 
 ## Audit reconciliation (verified 2026-06-23)
 
@@ -96,6 +96,7 @@ defaults to accept or override, not commitments.
   don't grow the surface in a cleanup). Fix `proxy_costs.py:20`/`proxy_audit.py:17` stderr→stdout. `proxy audit` stays
   under `proxy` (D2 still open). Guard gap to close in slice 03: `test_no_single_leaf_groups` checks `len==1` only —
   tighten to `len<=1` so an emptied group can't pass silently.
+
 - [x] **D2 Proxy audit placement (Q2). DECIDED 2026-06-23: KEEP `forge proxy audit show|diff` under `proxy`.** Capture
   is proxy-configured and the audit is about a specific proxy's downstream behavior, so it stays a 2-leaf subgroup under
   `proxy` (no telemetry move). Consequence to document at the call site: `audit` reads the same
@@ -103,6 +104,7 @@ defaults to accept or override, not commitments.
   namespaces — note this split in `proxy_audit.py`/docs so it doesn't read as an oversight. Since `audit` is **not**
   moving, its `proxy_audit.py:17` stderr→stdout stream fix is owned by **slice 07** (stream ownership), not slice 03;
   slice 03 keeps only `proxy_costs.py:20` (which does move to `telemetry costs`).
+
 - [x] **D3 Backend namespace (F5/Q3). DECIDED 2026-06-23: BUILD the `forge model` namespace.** Create a `forge model`
   group, move all 8 backend verbs to `forge model backend` (`list/show/test-auth/create/start/stop/delete/reconcile`,
   preserved verbatim), and add a real sibling leaf `forge model catalog` (or `list`) wiring `core/models/catalog.py`
@@ -110,6 +112,7 @@ defaults to accept or override, not commitments.
   `SINGLE_LEAF_GROUP_ALLOWLIST` entry and no single-child nest. Public-surface clean break (coding_standards §5): every
   `forge backend …` path moves to `forge model backend …` in one change (code + tests + docs + changelog). The catalog
   leaf must do real work, not a stub. New noun `model` flows into D6 alias decisions.
+
 - [x] **D4 Memory split (Q4/Q5). DECIDED 2026-06-23: YES — split `forge memory`.** Session-scoped activation/report
   verbs (`enable`/`disable`/`status`/`report`) move under a new `forge session memory` subgroup; top-level
   `forge memory` keeps the project-doc passport verbs (`track`/`list`/`passport`/`shadows`). `report` **flattens** on
@@ -118,6 +121,7 @@ defaults to accept or override, not commitments.
   `forge memory {enable,disable,status}` and `forge memory report show` return Click `No such command` in the same
   change (code + tests + docs + QA/walkthrough checklists + changelog). Owns Slice 02 alongside the unconditional
   `forge transfer -> forge session transfer` move.
+
 - [x] **D5 Hook visibility (F8/Q6). DECIDED 2026-06-23: route end-users through `forge extension enable|disable`;
   de-document `forge hook enable|disable`.** Verified state: `forge hook` is already `hidden=True`
   (`hooks/_group.py:8`), so the command tree does **not** change — D5 is a docs decision. Keep the dispatcher handlers
@@ -129,14 +133,25 @@ defaults to accept or override, not commitments.
   stop presenting them as the user path. Docs work (tracked under "Docs and verification" → `hook.md`): rewrite the
   user-facing install sections (`hook.md:~88-96, ~340, ~358`) to point at `forge extension enable|disable`; keep the
   `forge hook <name>` dispatcher table (`hook.md` + `cli_reference.md:227`). No code change.
-- [ ] **D6 Alias + canonical names (F12/Q10/Q11). PARTIAL DECISION 2026-06-23.** `auth` becomes the **canonical**
-  command name (register `name="auth"`, not `"authentication"`); **no `authentication` alias** is kept — clean break
-  (user: "auth is one word, I'm ok with the shortened version" + "not authentication alias needed either"). Remove the
-  `"auth" -> "authentication"` entry from `_ALIASES` and the `"authentication" -> "auth"` entry from `_DISPLAY_ALIASES`.
-  **Still open** (settle when Slice 05 runs **last**, after D1-D4 nouns are final): whether the new nouns
-  `telemetry`/`model` earn short aliases, and whether the `extensions -> extension` back-compat shim survives. _Leaning:
-  minimal alias set; drop the `extensions` shim._ Keep this box unchecked until the full alias set is settled in Slice
-  05\.
+
+- [x] **D6 Alias + canonical names (F12/Q10/Q11). DECIDED 2026-06-23 (was partial; now complete).** `auth` is the
+  **canonical** command name (register `name="auth"`, not `"authentication"`); **no `authentication` alias** kept —
+  clean break (user: "auth is one word, I'm ok with the shortened version"). New nouns `telemetry`/`model` get **no
+  short alias** — the names are already short and guessable (user: "no short aliases"). The `extensions -> extension`
+  back-compat shim is **removed** (clean break; user: "back-compat can be removed"). The deliberate pre-existing short
+  aliases **stay**: `ext`/`sess`/`mem`/`cfg`. **Rule recorded for the style guide (slice 05):** a top-level group earns
+  a short alias only as a deliberate, rationale-backed UX affordance; new nouns get none by default; canonical names
+  follow user vocabulary (short human form wins); pure back-compat rename shims are clean-broken, not kept.
+
+  - **Final `_ALIASES` (alias -> target) after Slice 05:** `ext`->`extension`, `sess`->`session`, `mem`->`memory`,
+    `cfg`->`config` (four; `auth`->`authentication` and `extensions`->`extension` removed).
+  - **Final `_DISPLAY_ALIASES`:** remove `authentication`->`auth`; keep `extension`->`ext`, `session`->`sess`,
+    `memory`->`mem`, `config`->`cfg`; no entries for `telemetry`/`model`.
+  - Verified against live `main.py:50-65` by a map+verify workflow: every current alias has a verdict and
+    `telemetry`/`model` are confirmed alias-free. Slice 05 carries the implementation (still runs **last**); its
+    expanded blast radius (the canonical-rename mechanics plus doc/test/QA fallout the verify pass surfaced) is folded
+    into the Slice 05 task below.
+
 - [x] **D7 Config-object verb vocabulary (F5/slice 08). DECIDED 2026-06-23: TIERED vocabulary, `backend` EXCLUDED.**
   Verified verb matrix (all checked at source): `config`={show,edit,set,reset}; `proxy template`={show,edit,reset,list};
   `claude preset`={show,edit,reset}; `proxy`={show,edit,set,validate,+lifecycle}; `backend`={show,+lifecycle} (no
@@ -148,17 +163,21 @@ defaults to accept or override, not commitments.
   omits backend from the editable-config list at L88-89). Rejected the flat `{show,edit,set,reset,validate}` (no object
   implements it; would mandate net-new commands). Always fix the false proxy-parity docstring at `config_cmd.py:6-9`.
   Churn ~2-3 files. Records into the style guide; **unblocks slice 08**.
+
 - [x] **D8 `--json` destination policy (Q8). DECIDED 2026-06-23: NORMALIZE all `json_output` -> `as_json`.** All 9
   `JSON_DEST_ALLOWLIST` leaves (`proxy create`, `proxy metrics`, `policy check`, `policy supervisor`,
   `workflow {list-models,panel,analyze,debate,consensus}`) rebind the `--json` option dest to `as_json`. The user-facing
   `--json` flag name is unchanged (implementation hygiene, not a flag rename); `JSON_DEST_ALLOWLIST` drains to `{}`.
   Implemented in Slice 07.
+
 - [x] **D9 Workspace-scope coordination (Q7). DECIDED 2026-06-23: WAIT for the `workspace_scope` card.** This cleanup
   card does **not** introduce or reserve `forge telemetry … --scope workspace`; the workspace-scoped telemetry
   aggregation (flag + behavior) is owned by `docs/board/proposed/workspace_scope/`. `forge telemetry activity` keeps its
   current selector (optional positional `[session]` + `--days`/`--all`). Slice 07 scope-flag work is limited to the F11
   session-selector rule, not workspace scope.
-- [ ] Record every D1-D9 outcome inline here (with date) before starting the matching Phase 2 slice.
+
+- [x] Record every D1-D9 outcome inline here (with date) before starting the matching Phase 2 slice. (D1-D9 all recorded
+  with dates as of 2026-06-23.)
 
 ## Phase 2 - Implementation slices
 
@@ -215,17 +234,39 @@ verification is recorded.
   Verified `forge session context` exits 2 with Click `No such command` (no tombstone). **Tombstone sweep:** `context`
   was the only deprecated-alias `hidden=True` command; `hook`/`memory-writer`/`status-line`/`policy shadow run` are live
   internals, left intact. 267 affected tests pass.
-- [ ] **Slice 07 - Read-output consistency.**
-  - `forge search query <terms>` prints a human table by default and emits the documented JSON shape only under `--json`
-    (`search.py:76` currently always `json.dumps`); `forge search query --json` round-trips the prior structure.
-  - Add `--json` (dest `as_json`) to the 8 remaining `JSON_MISSING_ALLOWLIST` leaves (the 9th,
-    `forge session memory report`, was done in Slice 02) **plus** `forge authentication profiles` and
-    `forge session transfer diff`; extend `_READ_LEAVES`/the guard so `profiles`/`diff` are covered (Slice 02 already
-    added `report`); `JSON_MISSING_ALLOWLIST` → `{}`.
-  - Normalize the 9 `json_output` dests to `as_json` (D8); `JSON_DEST_ALLOWLIST` → `{}`.
-  - Make `proxy audit` human output go to stdout (`proxy_audit.py:17`; `proxy costs` → `telemetry costs` is fixed in
-    slice 03). Add the planned stdout/stderr guard with `CliRunner(mix_stderr=False)` covering the telemetry leaves +
-    `proxy audit` (asserts `--json` mode is valid JSON on stdout, empty stderr).
+- [x] **Slice 07 - Read-output consistency.**
+  - **A (`--json` added).** 10 read leaves grew `--json` (dest `as_json`): the 8 `JSON_MISSING_ALLOWLIST` leaves
+    (`auth status`, `model backend show`, `proxy template list/show`, `claude preset show`, `config show`,
+    `memory shadows show`, `search status`) **plus** `auth profiles` and `session transfer diff`. New shapes are stable
+    - fully populated even on empty/early-return paths. Notable shapes: `auth status` exposes only source/provenance
+      labels — secret `value` is `null` (verified programmatically, no leakage) — and carries an always-present
+      `warning` key (corrupt-file degrade is no longer silent, matching the human path); `memory shadows show` is
+      multi-row `{official, scope, shadows:[…]}`; `claude preset show` parses **only** in the `--json` branch (human
+      mode still tolerates a corrupt file); `transfer diff` is `{parent, child, has_drift, diff}`. `_READ_LEAVES` +=
+      `profiles`/`diff`; `JSON_MISSING_ALLOWLIST` → `{}`.
+  - **B (`--json` dest normalized, D8).** 9 leaves' `--json` dest `json_output` → `as_json` across
+    `proxy.py`/`policy.py`/ `workflow.py`. Deviation from plan: a uniform `replace_all` rename (helpers + leaves
+    together) instead of adapting at the call boundary — every `json_output` ref was leaf-private
+    (`_display_all_metrics`, `_run_preflight`, `_handle_routing_error`, `_handle_review_output`), so the uniform rename
+    is simpler with no cross-leaf ripple. `JSON_DEST_ALLOWLIST` → `{}`.
+  - **C (`search query` inverted).** `forge search query` now prints a Rich table (`Score`/`Session`/`Snippet` +
+    `Found N result(s)`) by default; `--json` re-emits the prior shape **byte-stable**, including its conditional
+    `error`/`hint`/empty variants. Consumers updated: 11 JSON-parsing sites in `test_search.py` (+2 new human-default
+    tests), the walkthrough-stop regression test, the search integration test, QA 12.3 + walkthrough 10.5 checklists,
+    `search.md`, and `cli_reference.md`. Stale "outputs JSON" docstrings reworded.
+  - **D (stream ownership).** `proxy_audit.py:17` `Console(stderr=True)` → `Console()` so both `audit show`/`diff` human
+    tables land on stdout (JSON already did). New `tests/src/cli/test_output_streams.py` (7 tests, plain `CliRunner()` —
+    Click 8.2 removed `mix_stderr`): `--json` for `telemetry costs show`/`trace list`/`proxy audit show`/`diff` is valid
+    JSON on stdout with empty stderr; `telemetry activity --json` seeded via monkeypatch (bare call exits 1, no
+    session); audit human tables asserted on stdout.
+  - **F11 (session-selectors, record-only).** Audit of ~32 session-scoped commands found 100% compliance with
+    `cli_style_guidelines.md:83-86`; the rule stays `_(review)_` (no new guard). Resolves card Open Question 1:
+    `telemetry activity [session]` / `costs show [proxy_id]` / `trace list --session` differ correctly because each
+    applies the selector rule to its own primary object (no shared selector to unify).
+  - **Shape tests (review follow-up).** The structural guard only proves `--json` presence, so added ~40 behavioral
+    shape tests across the 10 new branches (parseability, exact key sets, dispatch/empty/error/no-secret paths),
+    authored + adversarially verified via a fan-out workflow. Fixed the `auth status` silent corrupt-file degrade (now a
+    `warning` key) and corrected `cli_style_guidelines.md`, which still called the stream guard "planned/not wired".
 - [ ] **Slice 08 - Config-object parity (D7 = tiered).** Record the tiered vocab in the style guide: core
   `{show, edit, reset}` (already met by `config`/`proxy template`/`claude preset`), optional `{set, validate}` where
   meaningful; `proxy` documented as a partial-lifecycle exception (`clean`/`delete`, no `reset`); **`backend` excluded**
@@ -261,24 +302,45 @@ verification is recorded.
   `proxy metrics --all` (redundant with no-arg aggregate — remove or document), `memory track` naming, `extension sync`
   vs `enable` naming, `resume-mode` value divergence (`resume {native,transfer}` vs `fork {transfer,native-relocate}` —
   document the intentional asymmetry at the call site). F14f is a **no-op** (proxy-overlay wording is canonical).
-- [ ] **Slice 05 - Alias + canonical pass (D6).** Apply canonical/alias decisions; update `_ALIASES`, `_DISPLAY_ALIASES`
-  (`main.py:49-72`), `cli_reference.md`, and the style guide alias section together. Run **last** so new nouns from
-  D1-D4 are settled.
+- [ ] **Slice 05 - Alias + canonical pass (D6, finalized).** Apply the D6 alias set. Run **last** so new nouns from
+  D1-D4 are settled. Verified blast radius (map+verify workflow, 2026-06-23):
+  - `src/forge/cli/main.py`: `_ALIASES` (50-57) remove `"auth": "authentication"` (51) and `"extensions": "extension"`
+    (53); `_DISPLAY_ALIASES` (59-65) remove `"authentication": "auth"` (60). **Load-bearing:** flip the registration
+    `main.add_command(auth, name="authentication")` (~381) to `name="auth"` — removing the alias is only coherent once
+    `auth` is the registered canonical. `main.add_command(extensions, name="extension")` (393) is unchanged (the Python
+    symbol `extensions` is the command object, unrelated to the removed CLI string).
+  - `docs/cli_reference.md`: rewrite the alias sentence (10-11) — drop the `authentication`/`auth` clause (auth is now
+    canonical, not an alias) and the `extensions` clause; reword the command table (240-241)
+    `forge authentication login|status` -> `forge auth ...`.
+  - `docs/developer/cli_style_guidelines.md`: update the enumerated alias set (45) to `ext`/`sess`/`mem`/`cfg` only;
+    drop the `extensions` shim mention (47); record the D6 alias rule; clear the alias placeholder.
+  - `tests/src/cli/test_command_tree_invariants.py:135`: `JSON_MISSING_ALLOWLIST` entry `forge authentication status` ->
+    `forge auth status` (canonical-path keyed; otherwise `test_read_leaves_expose_json` fails). Slice 07 also drains
+    this entry's `--json` debt — coordinate the two touches.
+  - Shim removal in tests: `tests/src/cli/test_startup_queue.py` (44,112,132,175,188,208) and
+    `tests/integration/cli/test_startup_queue_integration.py` (60,72,148) change CLI string `"extensions"` ->
+    `"extension"`. **Do NOT touch** `tests/src/install/test_version.py`'s `from forge.cli.extensions import extensions`
+    — that is the Python module/symbol path, not the CLI alias string. `tests/src/cli/test_auth.py` already invokes the
+    (soon-canonical) `auth` form and should stay green; `tests/src/cli/test_memory.py:836` `mem` alias test stays.
+  - QA checklist: `src/skills/qa/resources/checklist/3-authentication.md` (~15 `forge authentication ...` ->
+    `forge auth ...`) and `src/skills/qa/resources/checklist.md:44,46`.
+  - Old `forge authentication ...` and `forge extensions ...` paths return Click `No such command` (clean break, no
+    tombstone). Update `_ALIASES`, `_DISPLAY_ALIASES`, `cli_reference.md`, and the style guide alias section together.
 
 ### Acceptance table (risky / multi-file moves)
 
-| Test                        | Fixture                          | Assertion                                                                                                                                                                                                                                          | Test File                                                 |
-| --------------------------- | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| Telemetry new paths         | proxy + session with telemetry   | `forge telemetry {activity,trace,costs}` exit 0; shapes match old `--json`                                                                                                                                                                         | `tests/src/cli/test_telemetry.py`                         |
-| Telemetry old paths removed | n/a                              | `forge activity` / `forge provider trace` / `forge proxy costs` exit 2 "No such command"; `%provider trace` produces no hook output and `%help` no longer advertises it                                                                            | `tests/src/cli/test_telemetry.py`                         |
-| Single-leaf debt shrinks    | full command tree                | `SINGLE_LEAF_GROUP_ALLOWLIST` no longer lists `forge provider` (+ `forge memory report` if D4)                                                                                                                                                     | `test_command_tree_invariants.py`                         |
-| `search query` inverted     | indexed transcript               | bare `query` prints human table on stdout; `--json` emits documented array; `--json` round-trips old shape                                                                                                                                         | `tests/src/cli/test_search.py`                            |
-| `--json` missing drained    | each read leaf                   | every `JSON_MISSING_ALLOWLIST` leaf + `authentication profiles` + `transfer diff` emits valid JSON; ledger `{}`                                                                                                                                    | `test_command_tree_invariants.py`                         |
-| `--json` dest normalized    | full tree                        | no leaf binds `json_output`; `JSON_DEST_ALLOWLIST` `{}`                                                                                                                                                                                            | `test_command_tree_invariants.py`                         |
-| Stream ownership            | `proxy costs`/`audit` (or moved) | `--json` mode: valid JSON on stdout, empty stderr; human mode on stdout                                                                                                                                                                            | `tests/src/cli/test_*` with `CliRunner(mix_stderr=False)` |
-| Supervisor split            | session with supervisor          | `forge policy supervisor {status,set,off,on,reload,evaluate}` work; `supervise` exits 2; `LEAF_NAMING_ALLOWLIST` `{}`                                                                                                                              | `tests/src/cli/test_policy.py`                            |
-| `session context` removed   | n/a                              | `forge session context` exits 2 "No such command"; `test_session_context.py` deleted                                                                                                                                                               | (removal)                                                 |
-| Error markup drained        | CLI source scan                  | `CLI_ERROR_MARKUP_ALLOWLIST` `{}`; all 10 terminal tips routed (incl. 2 `ClickException`); `proxy_costs.py:132` + `session_fork.py:467` reworded; tip guard fails on `Tip:` in CLI source, allowlist = exactly the 3 `direct_commands.py` payloads | `tests/src/cli/test_output.py`                            |
+| Test                        | Fixture                          | Assertion                                                                                                                                                                                                                                          | Test File                                                    |
+| --------------------------- | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| Telemetry new paths         | proxy + session with telemetry   | `forge telemetry {activity,trace,costs}` exit 0; shapes match old `--json`                                                                                                                                                                         | `tests/src/cli/test_telemetry.py`                            |
+| Telemetry old paths removed | n/a                              | `forge activity` / `forge provider trace` / `forge proxy costs` exit 2 "No such command"; `%provider trace` produces no hook output and `%help` no longer advertises it                                                                            | `tests/src/cli/test_telemetry.py`                            |
+| Single-leaf debt shrinks    | full command tree                | `SINGLE_LEAF_GROUP_ALLOWLIST` no longer lists `forge provider` (+ `forge memory report` if D4)                                                                                                                                                     | `test_command_tree_invariants.py`                            |
+| `search query` inverted     | indexed transcript               | bare `query` prints human table on stdout; `--json` emits documented array; `--json` round-trips old shape                                                                                                                                         | `tests/src/cli/test_search.py`                               |
+| `--json` missing drained    | each read leaf                   | every `JSON_MISSING_ALLOWLIST` leaf + `authentication profiles` + `transfer diff` emits valid JSON; ledger `{}`                                                                                                                                    | `test_command_tree_invariants.py`                            |
+| `--json` dest normalized    | full tree                        | no leaf binds `json_output`; `JSON_DEST_ALLOWLIST` `{}`                                                                                                                                                                                            | `test_command_tree_invariants.py`                            |
+| Stream ownership            | `proxy costs`/`audit` (or moved) | `--json` mode: valid JSON on stdout, empty stderr; human mode on stdout                                                                                                                                                                            | `tests/src/cli/test_output_streams.py` (plain `CliRunner()`) |
+| Supervisor split            | session with supervisor          | `forge policy supervisor {status,set,off,on,reload,evaluate}` work; `supervise` exits 2; `LEAF_NAMING_ALLOWLIST` `{}`                                                                                                                              | `tests/src/cli/test_policy.py`                               |
+| `session context` removed   | n/a                              | `forge session context` exits 2 "No such command"; `test_session_context.py` deleted                                                                                                                                                               | (removal)                                                    |
+| Error markup drained        | CLI source scan                  | `CLI_ERROR_MARKUP_ALLOWLIST` `{}`; all 10 terminal tips routed (incl. 2 `ClickException`); `proxy_costs.py:132` + `session_fork.py:467` reworded; tip guard fails on `Tip:` in CLI source, allowlist = exactly the 3 `direct_commands.py` payloads | `tests/src/cli/test_output.py`                               |
 
 ## Docs and verification
 
@@ -302,16 +364,22 @@ verification is recorded.
 
 ## Open decisions carried from the card
 
-Most are now folded into Phase 1 (D1-D9). Remaining specifics to settle during execution:
+Phase 1 decisions are now folded into D1-D9. Remaining unchecked items are execution details, not unresolved taxonomy
+decisions:
 
 - [ ] Exact shared scope flags for `telemetry activity|costs|trace` (`--session` vs optional positional `[session]`,
   `--scope`, `--period`) — instantiate the F11 session-selector rule, not a per-command guess.
-- [ ] Final placement of `proxy audit` (D2).
-- [ ] Backend namespace + churn budget (D3).
+- [x] Final placement of `proxy audit` (D2) — RESOLVED 2026-06-23: stays under `forge proxy audit`.
+- [x] Backend namespace + churn budget (D3) — RESOLVED + shipped (Slice 04): `forge model backend ...` plus
+  `forge model catalog`.
 - [x] Memory placement (D4) — RESOLVED + shipped (Slice 02): `enable`/`disable`/`status`/`report` live under
   `forge session memory`; passport verbs stay top-level `forge memory`.
-- [ ] Hook-management visibility (D5).
-- [ ] Whether workspace-level telemetry waits for `workspace_scope` (D9).
-- [ ] Whether any `--json` dest intentionally stays `json_output` (D8) — default is normalize.
+- [x] Hook-management visibility (D5) — RESOLVED 2026-06-23: end users go through `forge extension enable|disable`;
+  hidden `forge hook enable|disable` stays lower-level and de-documented as the user path.
+- [x] Whether workspace-level telemetry waits for `workspace_scope` (D9) — RESOLVED 2026-06-23: wait for the separate
+  `workspace_scope` card.
+- [x] Whether any `--json` dest intentionally stays `json_output` (D8) — RESOLVED 2026-06-23: normalize all to
+  `as_json`.
 - [ ] Human read-output stdout/stderr rule + any documented exceptions (slice 07).
-- [ ] Canonical `auth` vs `authentication` and the alias-eligibility rule (D6).
+- [x] Canonical `auth` vs `authentication` and the alias-eligibility rule (D6) — RESOLVED 2026-06-23: `auth` canonical;
+  new nouns get no alias; `extensions` shim removed; `ext`/`sess`/`mem`/`cfg` kept. See D6.

@@ -600,7 +600,8 @@ def list_cmd(as_json: bool) -> None:
 @backend.command("show")
 @click.argument("backend_id")
 @click.option("--raw", is_flag=True, help="Output raw config without syntax highlighting")
-def show_cmd(backend_id: str, raw: bool) -> None:
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def show_cmd(backend_id: str, raw: bool, as_json: bool) -> None:
     """Show backend details and configuration.
 
     \b
@@ -610,6 +611,11 @@ def show_cmd(backend_id: str, raw: bool) -> None:
     console = Console(width=200)
     source = _source_for_identifier(backend_id)
     if source is not None:
+        if as_json:
+            runtime_instances = _load_runtime_instances()
+            instance_sources = _instance_source_map(runtime_instances)
+            click.echo(json.dumps(_source_record(source, runtime_instances, instance_sources), indent=2, default=str))
+            return
         _show_source(source, raw, console)
         return
 
@@ -618,6 +624,41 @@ def show_cmd(backend_id: str, raw: bool) -> None:
     # Parse adapter type from backend_id (e.g., "litellm-4000" -> "litellm")
     parts = backend_id.rsplit("-", 1)
     adapter_type = parts[0] if len(parts) == 2 else backend_id
+
+    if as_json:
+        json_instance = None
+        try:
+            json_instance = store.read().backends.get(backend_id)
+        except Exception:
+            json_instance = None
+        json_config_path = get_backend_config_path(adapter_type)
+        runtime_record: dict[str, Any] | None = None
+        if json_instance is not None:
+            alive = json_instance.pid is not None and is_pid_alive(json_instance.pid)
+            runtime_record = {
+                "backend_id": backend_id,
+                "adapter_type": json_instance.adapter_type,
+                "port": json_instance.port,
+                "pid": json_instance.pid,
+                "status": json_instance.status,
+                "alive": alive,
+                "created_at": json_instance.created_at,
+            }
+        click.echo(
+            json.dumps(
+                {
+                    "backend_id": backend_id,
+                    "source_id": None,
+                    "found": json_instance is not None,
+                    "adapter_type": adapter_type,
+                    "runtime_instance": runtime_record,
+                    "config_path": str(json_config_path) if json_config_path.exists() else None,
+                },
+                indent=2,
+                default=str,
+            )
+        )
+        return
 
     try:
         registry = store.read()

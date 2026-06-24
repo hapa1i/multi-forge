@@ -523,7 +523,7 @@ def _extract_path_from_diff(diff: str) -> str | None:
 )
 @click.option(
     "--json",
-    "json_output",
+    "as_json",
     is_flag=True,
     help="Output structured JSON",
 )
@@ -532,7 +532,7 @@ def check(
     file_path: str | None,
     use_diff: bool,
     fail_mode: str,
-    json_output: bool,
+    as_json: bool,
 ) -> None:
     """Evaluate policies on demand against a file or diff.
 
@@ -593,7 +593,7 @@ def check(
         engine = build_engine(list(bundles), fail_mode=fail_mode)  # type: ignore[arg-type]
         result = engine.evaluate(context)
     except Exception as e:
-        if json_output:
+        if as_json:
             click.echo(json.dumps({"error": str(e), "passed": False}))
         else:
             console.print(f"[red]Error:[/red] Policy evaluation failed: {e}")
@@ -603,7 +603,7 @@ def check(
     passed = result.final_decision in ("allow", "warn")
     exit_code = 0 if passed else 1
 
-    if json_output:
+    if as_json:
         # Build violations with intent from their parent decisions
         violations_json = []
         for d in result.decisions:
@@ -702,7 +702,7 @@ _INFRA_FAILURE_PREFIXES = ("Supervisor error:", "Supervisor skipped")
 )
 @click.option(
     "--json",
-    "json_output",
+    "as_json",
     is_flag=True,
     help="Output structured JSON",
 )
@@ -713,7 +713,7 @@ def supervisor_cmd(
     direct: bool,
     timeout: int,
     supervisor_effort: str | None,
-    json_output: bool,
+    as_json: bool,
 ) -> None:
     """Evaluate a single file against a supervisor plan (one-shot).
 
@@ -740,7 +740,7 @@ def supervisor_cmd(
     try:
         file_content = target.read_text()
     except Exception as e:
-        if json_output:
+        if as_json:
             click.echo(json.dumps({"error": str(e), "passed": False}))
         else:
             console.print(f"[red]Error:[/red] Failed to read {display_path(file_path)}: {e}")
@@ -775,7 +775,7 @@ def supervisor_cmd(
     try:
         decision = invoke_supervisor(config, context, intent=SUPERVISOR_INTENT)
     except Exception as e:
-        if json_output:
+        if as_json:
             click.echo(json.dumps({"error": str(e), "passed": False}))
         else:
             console.print(f"[red]Error:[/red] Supervisor invocation failed: {e}")
@@ -796,7 +796,7 @@ def supervisor_cmd(
         passed = True
         exit_code = 0
 
-    if json_output:
+    if as_json:
         violations_list = []
         for v in decision.violations:
             v_entry: dict[str, str | None] = {

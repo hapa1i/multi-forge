@@ -10,6 +10,7 @@ import json
 import logging
 import sys
 from pathlib import Path
+from typing import Any
 
 import click
 
@@ -577,7 +578,8 @@ def shadows_list_cmd(scope: str, as_json: bool) -> None:
     show_default=True,
     help="Scope for discovery.",
 )
-def shadows_show_cmd(for_doc: str, scope: str) -> None:
+@click.option("--json", "as_json", is_flag=True, default=False, help="Emit JSON.")
+def shadows_show_cmd(for_doc: str, scope: str, as_json: bool) -> None:
     """Show shadow proposal content for an official doc."""
     try:
         entries, scanned_roots = _collect_shadow_entries(scope, None)
@@ -586,6 +588,43 @@ def shadows_show_cmd(for_doc: str, scope: str) -> None:
         sys.exit(1)
 
     matches = [entry for entry in entries if entry.official == for_doc]
+
+    if as_json:
+        # Multi-row: one entry per (forge_root, shadow_path). Unsafe/absent files
+        # report readable=false + reason with content=null rather than dropping out.
+        seen_rows: dict[tuple[str, str], list[str]] = {}
+        for entry in matches:
+            seen_rows.setdefault((entry.forge_root, entry.shadow_path), []).append(entry.session)
+
+        shadows: list[dict[str, Any]] = []
+        for (fr, shadow_path), sessions in sorted(seen_rows.items()):
+            entry_root = Path(fr)
+            shadow_err = is_safe_designated_doc_path(shadow_path, entry_root, entry_root.resolve())
+            content: str | None = None
+            readable = False
+            reason: str | None = None
+            if shadow_err:
+                reason = shadow_err
+            else:
+                abs_path = entry_root / shadow_path
+                if not abs_path.is_file():
+                    reason = "shadow file does not exist yet"
+                else:
+                    content = abs_path.read_text(encoding="utf-8").strip()
+                    readable = True
+            shadows.append(
+                {
+                    "shadow_path": shadow_path,
+                    "forge_root": fr,
+                    "sessions": sorted(set(sessions)),
+                    "content": content,
+                    "readable": readable,
+                    "reason": reason,
+                }
+            )
+        click.echo(json.dumps({"official": for_doc, "scope": scope, "shadows": shadows}, indent=2))
+        return
+
     if not matches:
         console.print(f"[dim]No shadow proposals found for {for_doc} (scope: {scope}).[/dim]")
         return

@@ -536,6 +536,85 @@ class TestMemoryShadowsShow:
         assert result.exit_code == 0, result.output
         assert "does not exist" in result.output
 
+    def test_show_json_no_match(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        """Unknown doc emits structured empty payload, not human text."""
+        result = runner.invoke(main, ["memory", "shadows", "show", "--for", "docs/nonexistent.md", "--json"])
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data == {"official": "docs/nonexistent.md", "scope": "project", "shadows": []}
+
+    def test_show_json_populated_readable(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        """A real shadow file's content comes through with readable=true and reason=null."""
+        forge_root = seeded_session[0]
+        runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--propose"])
+        shadow_path = ".forge/memory/shadow_docs_impl_notes.md"
+        (forge_root / shadow_path).write_text("- [ ] Add error handling notes\n", encoding="utf-8")
+
+        result = runner.invoke(main, ["memory", "shadows", "show", "--for", "docs/impl_notes.md", "--json"])
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["official"] == "docs/impl_notes.md"
+        assert data["scope"] == "project"
+        shadows = data["shadows"]
+        assert len(shadows) == 1
+        row = shadows[0]
+        assert set(row) == {"shadow_path", "forge_root", "sessions", "content", "readable", "reason"}
+        assert row["shadow_path"] == shadow_path
+        assert row["forge_root"] == str(forge_root)
+        assert row["sessions"] == sorted(set(row["sessions"]))
+        assert row["readable"] is True
+        assert row["reason"] is None
+        assert "Add error handling notes" in row["content"]
+
+    def test_show_json_isolates_to_requested_official(
+        self, runner: CliRunner, seeded_session: tuple[Path, str]
+    ) -> None:
+        """With two passported officials, --for selects only the matching shadow rows.
+
+        collect_shadow_entries keys discovered shadows by (forge_root, shadow_path)
+        with official = the passport's host doc, so each official yields one row;
+        --for must filter to the requested doc, not bleed the sibling's shadow.
+        """
+        forge_root = seeded_session[0]
+        runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--propose"])
+        runner.invoke(main, ["memory", "track", "docs/changelog.md", "--propose"])
+        (forge_root / ".forge/memory/shadow_docs_impl_notes.md").write_text(
+            "- [ ] Impl note source\n", encoding="utf-8"
+        )
+        (forge_root / ".forge/memory/shadow_docs_changelog.md").write_text("- [ ] Changelog source\n", encoding="utf-8")
+
+        result = runner.invoke(main, ["memory", "shadows", "show", "--for", "docs/impl_notes.md", "--json"])
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["official"] == "docs/impl_notes.md"
+        rows = data["shadows"]
+        assert isinstance(rows, list)
+        assert len(rows) == 1
+        row = rows[0]
+        assert set(row) == {"shadow_path", "forge_root", "sessions", "content", "readable", "reason"}
+        assert row["shadow_path"] == ".forge/memory/shadow_docs_impl_notes.md"
+        assert row["readable"] is True
+        assert "Impl note source" in row["content"]
+        # The sibling's shadow must not leak into this official's rows.
+        assert "Changelog source" not in row["content"]
+
+    def test_show_json_absent_file(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        """A passported-but-absent shadow file reports content=null, readable=false, reason set."""
+        forge_root = seeded_session[0]
+        runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--propose"])
+        shadow_path = ".forge/memory/shadow_docs_impl_notes.md"
+        (forge_root / shadow_path).unlink()
+
+        result = runner.invoke(main, ["memory", "shadows", "show", "--for", "docs/impl_notes.md", "--json"])
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert len(data["shadows"]) == 1
+        row = data["shadows"][0]
+        assert row["content"] is None
+        assert row["readable"] is False
+        assert row["reason"] is not None
+        assert "does not exist" in row["reason"]
+
 
 # ---------------------------------------------------------------------------
 # shadows review

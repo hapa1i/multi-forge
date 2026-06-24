@@ -45,18 +45,8 @@ def _assert_ledger(violations: set[str], allowlist: set[str], rule: str) -> None
 
 
 # --- Rule: read surfaces bind `--json` to dest `as_json` ----------------------
-# Pre-existing `json_output` dests; normalize to `as_json` under the cleanup card.
-JSON_DEST_ALLOWLIST = {
-    "forge proxy create",
-    "forge proxy metrics",
-    "forge policy check",
-    "forge policy supervisor",
-    "forge workflow list-models",
-    "forge workflow panel",
-    "forge workflow analyze",
-    "forge workflow debate",
-    "forge workflow consensus",
-}
+# Drained in Slice 07 (forge_cli_cleanup): every read-surface `--json` now binds dest `as_json`.
+JSON_DEST_ALLOWLIST: set[str] = set()
 
 
 def test_json_option_dest_is_as_json() -> None:
@@ -125,22 +115,14 @@ def test_no_confusable_sibling_leaves() -> None:
     _assert_ledger(violations, LEAF_NAMING_ALLOWLIST, "sibling leaves must not be confusable")
 
 
-# --- Rule: read leaves (catalog/list/report/show/status) expose `--json` ------
+# --- Rule: read leaves (catalog/list/report/show/status/profiles/diff) expose `--json`
 # `report` is here because `forge session memory report` was flattened from a
 # `show` leaf in Slice 02; without it the read-surface debt would escape the guard.
-_READ_LEAVES = {"catalog", "list", "report", "show", "status"}
-# Pre-existing read surfaces with no `--json`; each needs an explicit raw-vs-json
-# decision per cleanup-card finding #4.
-JSON_MISSING_ALLOWLIST = {
-    "forge authentication status",
-    "forge model backend show",
-    "forge proxy template list",
-    "forge proxy template show",
-    "forge claude preset show",
-    "forge config show",
-    "forge memory shadows show",
-    "forge search status",
-}
+# `profiles`/`diff` were added in Slice 07 once `auth profiles` and
+# `session transfer diff` grew `--json` (the only previously-bare leaves with those names).
+_READ_LEAVES = {"catalog", "list", "report", "show", "status", "profiles", "diff"}
+# Drained in Slice 07 (forge_cli_cleanup): every read leaf now exposes `--json`.
+JSON_MISSING_ALLOWLIST: set[str] = set()
 
 
 def test_read_leaves_expose_json() -> None:

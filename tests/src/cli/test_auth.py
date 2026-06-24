@@ -394,6 +394,316 @@ class TestAuthStatus:
         assert "(default)" in result.output
 
 
+# --- Status --json ---
+
+
+# Keys the status JSON payload must clear so leaked env values don't masquerade
+# as test setup. Mirrors the credential catalog's secret + connection vars.
+_ALL_AUTH_ENV_KEYS = (
+    "ANTHROPIC_API_KEY",
+    "OPENROUTER_API_KEY",
+    "OPENROUTER_BASE_URL",
+    "OPENAI_API_KEY",
+    "GEMINI_API_KEY",
+    "CODEX_API_KEY",
+    "LITELLM_API_KEY",
+    "LITELLM_BASE_URL",
+)
+
+
+def _clear_auth_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Drop every credential env var so only test-set values appear."""
+    for key in _ALL_AUTH_ENV_KEYS:
+        monkeypatch.delenv(key, raising=False)
+
+
+class TestAuthStatusJson:
+
+    def _find_cred(self, payload: dict, name: str) -> dict:
+        for cred in payload["credentials"]:
+            if cred["name"] == name:
+                return cred
+        raise AssertionError(f"credential {name!r} not in payload")
+
+    def _find_env_var(self, cred: dict, name: str) -> dict:
+        for ev in cred["env_vars"]:
+            if ev["name"] == name:
+                return ev
+        raise AssertionError(f"env var {name!r} not in credential {cred['name']!r}")
+
+    def test_status_json_shape_not_configured(
+        self, runner: CliRunner, creds_file: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Empty/not-configured payload has the documented top-level + per-cred keys."""
+        import json
+
+        _clear_auth_env(monkeypatch)
+
+        result = runner.invoke(main, ["auth", "status", "--json"])
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+
+        assert set(payload.keys()) == {"profile", "credentials", "warning"}
+        assert payload["profile"] == "default"
+        assert payload["warning"] is None  # clean file -> no degradation warning
+        assert isinstance(payload["credentials"], list)
+        assert payload["credentials"]  # catalog is non-empty
+
+        for cred in payload["credentials"]:
+            assert set(cred.keys()) == {
+                "name",
+                "summary",
+                "configured",
+                "state",
+                "primary_source",
+                "env_vars",
+            }
+            assert cred["configured"] is False
+            assert cred["primary_source"] is None  # not configured -> no source label
+            assert isinstance(cred["env_vars"], list)
+            for ev in cred["env_vars"]:
+                assert set(ev.keys()) == {
+                    "name",
+                    "configured",
+                    "source",
+                    "is_secret",
+                    "is_default",
+                    "value",
+                }
+
+    def test_status_json_no_plaintext_secret_in_payload(
+        self, runner: CliRunner, creds_file: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """SECURITY: a real secret value must never appear in the JSON payload.
+
+        Every env_var flagged is_secret==True must report value==None, regardless
+        of whether the secret resolves from env or the credentials file. The raw
+        secret string must not appear anywhere in the serialized output.
+        """
+        import json
+
+        _clear_auth_env(monkeypatch)
+
+        # A secret env var (ANTHROPIC_API_KEY, secret=True) with a real value set,
+        # plus a file-sourced secret to cover both resolution paths.
+        env_secret = "sk-ant-env-PLAINTEXT-SECRET-9999"
+        file_secret = "sk-or-file-PLAINTEXT-SECRET-8888"
+        monkeypatch.setenv("ANTHROPIC_API_KEY", env_secret)
+
+        from forge.core.auth.credentials_file import save_profile
+
+        save_profile("default", {"OPENROUTER_API_KEY": file_secret}, path=creds_file)
+
+        result = runner.invoke(main, ["auth", "status", "--json"])
+
+        assert result.exit_code == 0
+
+        # The raw secrets must not appear anywhere in the serialized output.
+        assert env_secret not in result.output
+        assert file_secret not in result.output
+
+        payload = json.loads(result.output)
+
+        # Airtight: across ALL credentials, every secret env var has value None.
+        secret_vars_seen = 0
+        for cred in payload["credentials"]:
+            for ev in cred["env_vars"]:
+                if ev["is_secret"]:
+                    secret_vars_seen += 1
+                    assert ev["value"] is None, f"plaintext secret leaked for {ev['name']}: {ev['value']!r}"
+        assert secret_vars_seen > 0  # at least one secret var exercised
+
+        # The env secret resolved (configured True, sourced from env) but value hidden.
+        anthropic = self._find_cred(payload, "anthropic-api")
+        api_key = self._find_env_var(anthropic, "ANTHROPIC_API_KEY")
+        assert api_key["is_secret"] is True
+        assert api_key["configured"] is True
+        assert api_key["source"] == "env"
+        assert api_key["value"] is None
+
+        # The file secret resolved (configured True, file-sourced) but value hidden.
+        openrouter = self._find_cred(payload, "openrouter")
+        or_key = self._find_env_var(openrouter, "OPENROUTER_API_KEY")
+        assert or_key["is_secret"] is True
+        assert or_key["configured"] is True
+        assert or_key["source"] == "file:default"
+        assert or_key["value"] is None
+
+    def test_status_json_non_secret_value_exposed(
+        self, runner: CliRunner, creds_file: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A non-secret connection value (is_secret False) is returned in plaintext."""
+        import json
+
+        _clear_auth_env(monkeypatch)
+
+        base_url = "https://litellm.example.com"
+        from forge.core.auth.credentials_file import save_profile
+
+        save_profile(
+            "default",
+            {"LITELLM_API_KEY": "sk-litellm-secret", "LITELLM_BASE_URL": base_url},
+            path=creds_file,
+        )
+
+        result = runner.invoke(main, ["auth", "status", "--json"])
+
+        assert result.exit_code == 0
+        # The secret key must still be hidden even though the base url is shown.
+        assert "sk-litellm-secret" not in result.output
+
+        payload = json.loads(result.output)
+        litellm = self._find_cred(payload, "litellm-remote")
+
+        url_var = self._find_env_var(litellm, "LITELLM_BASE_URL")
+        assert url_var["is_secret"] is False
+        assert url_var["configured"] is True
+        assert url_var["value"] == base_url
+
+        key_var = self._find_env_var(litellm, "LITELLM_API_KEY")
+        assert key_var["is_secret"] is True
+        assert key_var["value"] is None
+
+    def test_status_json_default_value_flagged(
+        self, runner: CliRunner, creds_file: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """An unset var with a default value is reported with is_default True."""
+        import json
+
+        _clear_auth_env(monkeypatch)
+
+        result = runner.invoke(main, ["auth", "status", "--json"])
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        openrouter = self._find_cred(payload, "openrouter")
+        base_url = self._find_env_var(openrouter, "OPENROUTER_BASE_URL")
+
+        assert base_url["is_default"] is True
+        assert base_url["configured"] is False
+        assert base_url["source"] == "not configured"
+
+    def test_status_json_primary_source_populated(
+        self, runner: CliRunner, creds_file: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A configured credential reports the source extracted into primary_source."""
+        import json
+
+        _clear_auth_env(monkeypatch)
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-from-env")
+
+        result = runner.invoke(main, ["auth", "status", "--json"])
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        anthropic = self._find_cred(payload, "anthropic-api")
+
+        assert anthropic["configured"] is True
+        assert anthropic["state"] == "configured (env)"
+        assert anthropic["primary_source"] == "env"
+
+    def test_status_json_with_profile(
+        self, runner: CliRunner, creds_file: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """--profile is reflected in the payload and file source labels."""
+        import json
+
+        _clear_auth_env(monkeypatch)
+        from forge.core.auth.credentials_file import save_profile
+
+        save_profile("work", {"LITELLM_API_KEY": "sk-litellm-work"}, path=creds_file)
+
+        result = runner.invoke(main, ["auth", "status", "--profile", "work", "--json"])
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["profile"] == "work"
+
+        litellm = self._find_cred(payload, "litellm-remote")
+        key_var = self._find_env_var(litellm, "LITELLM_API_KEY")
+        assert key_var["configured"] is True
+        assert key_var["source"] == "file:work"
+        assert key_var["value"] is None  # still secret
+
+    def test_status_json_env_ignored_secret_stays_hidden(
+        self, runner: CliRunner, creds_file: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """With auth_ignore_env, env secret is ignored AND never leaks into JSON."""
+        import json
+
+        _clear_auth_env(monkeypatch)
+        env_secret = "sk-ant-env-IGNORED-SECRET"
+        monkeypatch.setenv("ANTHROPIC_API_KEY", env_secret)
+        monkeypatch.setattr("forge.cli.auth._get_auth_ignore_env", lambda: True)
+
+        result = runner.invoke(main, ["auth", "status", "--json"])
+
+        assert result.exit_code == 0
+        assert env_secret not in result.output
+
+        payload = json.loads(result.output)
+        anthropic = self._find_cred(payload, "anthropic-api")
+        api_key = self._find_env_var(anthropic, "ANTHROPIC_API_KEY")
+
+        assert api_key["configured"] is False
+        assert api_key["source"] == "not configured (env ignored)"
+        assert api_key["value"] is None
+
+    def test_status_json_blocks_on_version_mismatch(
+        self, runner: CliRunner, creds_file: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A future-version file yields an {error} JSON object and exit code 1."""
+        import json
+
+        _clear_auth_env(monkeypatch)
+        creds_file.parent.mkdir(parents=True, exist_ok=True)
+        creds_file.write_text(yaml.dump({"version": 99, "profiles": {}}))
+
+        result = runner.invoke(main, ["auth", "status", "--json"])
+
+        assert result.exit_code == 1
+        payload = json.loads(result.output)
+        assert set(payload.keys()) == {"error"}
+        assert "version 99" in payload["error"]
+
+    def test_status_json_warns_on_corrupt_file(
+        self, runner: CliRunner, creds_file: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A corrupt file degrades to env-only values but is NOT silent (warning surfaced).
+
+        Mirrors the human path's '⚠︎ Credentials file is corrupt' notice. Unlike a
+        version mismatch (which fails loud, exit 1), a parse error is recoverable: the
+        payload still lists credentials, env-resolved secrets still apply, and the
+        always-present `warning` key carries the degradation message.
+        """
+        import json
+
+        _clear_auth_env(monkeypatch)
+        env_secret = "sk-ant-env-DEGRADE-SECRET"
+        monkeypatch.setenv("ANTHROPIC_API_KEY", env_secret)
+
+        creds_file.parent.mkdir(parents=True, exist_ok=True)
+        creds_file.write_text("{corrupt yaml: [unterminated")
+
+        result = runner.invoke(main, ["auth", "status", "--json"])
+
+        assert result.exit_code == 0  # recoverable: degrade, don't fail
+        assert env_secret not in result.output  # secret still never leaks
+        payload = json.loads(result.output)
+
+        assert payload["warning"] is not None
+        assert "corrupt" in payload["warning"].lower()
+        assert payload["credentials"]  # degraded, not empty
+
+        # Env-resolved secret still applies (degrade != fail) and stays redacted.
+        anthropic = self._find_cred(payload, "anthropic-api")
+        api_key = self._find_env_var(anthropic, "ANTHROPIC_API_KEY")
+        assert api_key["configured"] is True
+        assert api_key["source"] == "env"
+        assert api_key["value"] is None
+
+
 # --- Logout ---
 
 
@@ -501,6 +811,99 @@ class TestAuthProfiles:
         active_lines = [line for line in lines if "← active" in line]
         assert len(active_lines) == 1
         assert "work" in active_lines[0]
+
+
+# --- Profiles --json ---
+
+
+class TestAuthProfilesJson:
+
+    def test_profiles_json_empty(self, runner: CliRunner, creds_file: Path) -> None:
+        """No saved profiles -> {profiles: []} with exit code 0."""
+        import json
+
+        result = runner.invoke(main, ["auth", "profiles", "--json"])
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload == {"profiles": []}
+
+    def test_profiles_json_populated_shape(
+        self, runner: CliRunner, creds_file: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Each profile entry has name/key_count/is_active with correct values."""
+        import json
+
+        monkeypatch.delenv("FORGE_PROFILE", raising=False)
+        from forge.core.auth.credentials_file import save_profile
+
+        save_profile("default", {"KEY_A": "a", "KEY_B": "b"}, path=creds_file)
+        save_profile("work", {"KEY_C": "c"}, path=creds_file)
+
+        result = runner.invoke(main, ["auth", "profiles", "--json"])
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert set(payload.keys()) == {"profiles"}
+
+        by_name = {p["name"]: p for p in payload["profiles"]}
+        assert set(by_name) == {"default", "work"}
+        for entry in payload["profiles"]:
+            assert set(entry.keys()) == {"name", "key_count", "is_active"}
+
+        assert by_name["default"]["key_count"] == 2
+        assert by_name["work"]["key_count"] == 1
+
+        # Exactly one active profile; 'default' is active without FORGE_PROFILE set.
+        active = [p["name"] for p in payload["profiles"] if p["is_active"]]
+        assert active == ["default"]
+
+    def test_profiles_json_active_from_env(
+        self, runner: CliRunner, creds_file: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """FORGE_PROFILE selects which profile is_active in the payload."""
+        import json
+
+        monkeypatch.setenv("FORGE_PROFILE", "work")
+        from forge.core.auth.credentials_file import save_profile
+
+        save_profile("default", {"KEY": "val"}, path=creds_file)
+        save_profile("work", {"KEY": "val"}, path=creds_file)
+
+        result = runner.invoke(main, ["auth", "profiles", "--json"])
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        active = [p["name"] for p in payload["profiles"] if p["is_active"]]
+        assert active == ["work"]
+
+    def test_profiles_json_blocks_on_version_mismatch(self, runner: CliRunner, creds_file: Path) -> None:
+        """A future-version file yields an {error} JSON object and exit code 1."""
+        import json
+
+        creds_file.parent.mkdir(parents=True, exist_ok=True)
+        creds_file.write_text(yaml.dump({"version": 99, "profiles": {}}))
+
+        result = runner.invoke(main, ["auth", "profiles", "--json"])
+
+        assert result.exit_code == 1
+        payload = json.loads(result.output)
+        assert set(payload.keys()) == {"error"}
+        assert "version 99" in payload["error"]
+
+    def test_profiles_json_blocks_on_corrupt_file(self, runner: CliRunner, creds_file: Path) -> None:
+        """A corrupt YAML file yields an {error} JSON object and exit code 1."""
+        import json
+
+        creds_file.parent.mkdir(parents=True, exist_ok=True)
+        creds_file.write_text("{corrupt yaml: [unterminated")
+
+        result = runner.invoke(main, ["auth", "profiles", "--json"])
+
+        assert result.exit_code == 1
+        payload = json.loads(result.output)
+        assert set(payload.keys()) == {"error"}
+        assert payload["error"]
 
 
 # --- Auth group ---

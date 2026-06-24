@@ -27,6 +27,43 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-23
 
+### forge_cli_cleanup Slice 07: read-output consistency (+ F11 audit)
+
+**Goal**: Make every read surface default to human output, expose a stable `--json`, and keep human + JSON on stdout --
+draining the `JSON_MISSING_ALLOWLIST` / `JSON_DEST_ALLOWLIST` debt ledgers to empty.
+
+**Key changes**:
+
+- **`--json` added (A)**: 10 read leaves grew `--json` (dest `as_json`) -- the 8 allowlist leaves plus `auth profiles`
+  and `session transfer diff`. New shapes are stable + fully populated on empty paths. `auth status` exposes only
+  source/provenance labels (secret `value` is `null` -- verified no leakage); `memory shadows show` is multi-row;
+  `claude preset show` parses only inside the `--json` branch (human mode still tolerates a corrupt file).
+  `_READ_LEAVES` gained `profiles`/`diff`; `JSON_MISSING_ALLOWLIST` -> `{}`.
+- **`--json` dest normalized (B, D8)**: 9 leaves rebound `json_output` -> `as_json` across `proxy.py`/`policy.py`/
+  `workflow.py` (uniform rename -- every ref was leaf-private). `JSON_DEST_ALLOWLIST` -> `{}`.
+- **`search query` inverted (C)**: now prints a Rich table by default; `--json` re-emits the prior shape byte-stable
+  (including conditional `error`/`hint`/empty variants). Updated all JSON-parsing consumers: `test_search.py` (+2 new
+  human-default tests), the stop-snapshot regression test, the search integration test, QA 12.3 + walkthrough 10.5
+  checklists, `search.md`, `cli_reference.md`.
+- **Stream ownership (D)**: `proxy_audit.py` shared console flipped `stderr=True` -> stdout so `audit show`/`diff` human
+  tables join their JSON on stdout. New `tests/src/cli/test_output_streams.py` (plain `CliRunner()`; Click 8.2 removed
+  `mix_stderr`) asserts `--json` is valid JSON on stdout with empty stderr for the telemetry + audit leaves.
+- **F11 (record-only)**: audited ~32 session-scoped commands at 100% selector compliance; rule stays `_(review)_`, card
+  Open Question 1 resolved. Annotated the style-guide rule "audited compliant 2026-06-23".
+- **Shape-test backfill + hardening (review follow-up)**: the structural guard only proves `--json` *presence*, so added
+  ~40 behavioral shape tests across the 10 new branches (parseability, exact key sets, dispatch/empty/error paths) --
+  authored + adversarially verified via a fan-out workflow. The `auth status` no-secret-leak contract is now pinned by a
+  test that sets a real secret (env + file) and asserts every `is_secret` var serializes `value: null`. Fixed a real bug
+  this surfaced: `auth status --json` silently swallowed a corrupt-credentials `ValueError` (the human path warns),
+  violating the "best-effort degradation is never silent" rule -- now it carries an always-present `warning` key (null
+  when clean), mirroring `transfer show --json`. Also corrected `cli_style_guidelines.md`, which still called the
+  stdout/stderr JSON guard "planned/not yet wired".
+
+**Verification**: ~2021 CLI unit tests pass (4 `test_command_tree_invariants.py` guards with both ledgers empty,
+`test_search.py` ×25, `test_output_streams.py` ×7, ~40 new `--json` shape tests across the touched leaf suites,
+regression); secret-redaction + JSON round-trip smoke-checked; the wheel-installed `forge search query --json`
+integration test passes in Docker; `make pre-commit` clean (black/isort/ruff/mypy/pyright/mdformat).
+
 ### forge_cli_cleanup Slice 02: session-scope move (transfer + memory split)
 
 **Goal**: Move session-scoped surfaces under `forge session` so the command taxonomy mirrors ownership -- transfer

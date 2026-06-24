@@ -14,7 +14,7 @@ import click
 from rich.console import Console
 from rich.table import Table
 
-console = Console(stderr=True, width=200)
+console = Console(width=200)
 
 
 def _period_bounds(period: str) -> tuple[datetime, datetime]:

@@ -415,3 +415,114 @@ def test_delete_missing_config_errors_with_create_tip(
     assert "not found" in result.output
     assert "Tip:" in result.output
     assert "forge model backend create litellm" in result.output
+
+
+_SOURCE_RECORD_KEYS = {
+    "backend_id",
+    "source_id",
+    "kind",
+    "provider",
+    "endpoint",
+    "required_credentials",
+    "credentials",
+    "auth_status",
+    "missing_required_env_vars",
+    "health",
+    "has_lifecycle",
+    "runtime_instance",
+}
+
+_REGISTRY_FALLBACK_KEYS = {
+    "backend_id",
+    "source_id",
+    "found",
+    "adapter_type",
+    "runtime_instance",
+    "config_path",
+}
+
+
+def test_show_json_configured_source_emits_source_record(
+    runner: CliRunner,
+    forge_home: Path,
+) -> None:
+    """show <source-id> --json dispatches through _source_record (path 1).
+
+    A built-in source like openrouter resolves via _source_for_identifier, so the
+    payload carries the full source-record shape, not the registry-fallback shape.
+    """
+    result = runner.invoke(main, _backend_args("show", "openrouter", "--json"))
+
+    assert result.exit_code == 0
+    payload = _json_output(result)
+    assert set(payload) == _SOURCE_RECORD_KEYS
+    assert payload["backend_id"] == "openrouter"
+    assert payload["source_id"] == "openrouter"
+    assert payload["kind"] == "remote"
+    # Remote source has no local lifecycle, so no runtime instance is matched.
+    assert payload["runtime_instance"] is None
+    assert payload["has_lifecycle"] is False
+    assert isinstance(payload["credentials"], list)
+    assert "OPENROUTER_API_KEY" in payload["missing_required_env_vars"]
+
+
+def test_show_json_registry_only_fallback_when_not_a_source(
+    runner: CliRunner,
+    forge_home: Path,
+) -> None:
+    """show <registry-id> --json uses the registry fallback shape (path 2).
+
+    litellm-4000 is a registry backend_id but not a model source, so the command
+    falls through to the registry-only branch and reports found=true with a
+    populated runtime_instance record.
+    """
+    store = BackendRegistryStore(forge_home / "backends" / "index.json")
+    store.write(
+        BackendRegistry(
+            backends={
+                "litellm-4000": BackendInstance(
+                    backend_id="litellm-4000",
+                    adapter_type="litellm",
+                    port=4000,
+                    pid=None,
+                    status="healthy",
+                )
+            }
+        )
+    )
+
+    result = runner.invoke(main, _backend_args("show", "litellm-4000", "--json"))
+
+    assert result.exit_code == 0
+    payload = _json_output(result)
+    assert set(payload) == _REGISTRY_FALLBACK_KEYS
+    assert payload["backend_id"] == "litellm-4000"
+    assert payload["source_id"] is None
+    assert payload["found"] is True
+    assert payload["adapter_type"] == "litellm"
+    runtime = payload["runtime_instance"]
+    assert runtime is not None
+    assert runtime["backend_id"] == "litellm-4000"
+    assert runtime["adapter_type"] == "litellm"
+    assert runtime["port"] == 4000
+    assert runtime["status"] == "healthy"
+    assert runtime["alive"] is False
+
+
+def test_show_json_unknown_id_reports_not_found(
+    runner: CliRunner,
+    forge_home: Path,
+) -> None:
+    """show <unknown-id> --json reports found=false with empty runtime/config (path 3)."""
+    result = runner.invoke(main, _backend_args("show", "nope-9999", "--json"))
+
+    assert result.exit_code == 0
+    payload = _json_output(result)
+    assert set(payload) == _REGISTRY_FALLBACK_KEYS
+    assert payload["backend_id"] == "nope-9999"
+    assert payload["source_id"] is None
+    assert payload["found"] is False
+    # rsplit("-", 1) on "nope-9999" yields adapter "nope".
+    assert payload["adapter_type"] == "nope"
+    assert payload["runtime_instance"] is None
+    assert payload["config_path"] is None

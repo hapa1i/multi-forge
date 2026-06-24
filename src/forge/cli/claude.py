@@ -339,8 +339,11 @@ def preset() -> None:
 
 @preset.command("show")
 @click.option("--raw", is_flag=True, help="Output raw JSON without syntax highlighting")
-def preset_show(raw: bool = False) -> None:
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def preset_show(raw: bool = False, as_json: bool = False) -> None:
     """Show current Claude Code settings preset."""
+    import json
+
     from rich.syntax import Syntax
 
     from forge.install.preset import ensure_preset, get_preset_path
@@ -349,6 +352,16 @@ def preset_show(raw: bool = False) -> None:
     ensure_preset()
 
     content = preset_path.read_text(encoding="utf-8")
+
+    if as_json:
+        # Parse only in the --json branch; human/raw modes still render a corrupt
+        # file verbatim, but structured consumers must fail loud on bad JSON.
+        try:
+            preset_data = json.loads(content)
+        except json.JSONDecodeError as e:
+            raise click.ClickException(f"Preset file is not valid JSON: {e}") from e
+        click.echo(json.dumps({"path": str(preset_path), "preset": preset_data}, indent=2))
+        return
 
     if raw:
         console.print(content, end="")

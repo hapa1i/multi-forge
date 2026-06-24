@@ -83,7 +83,10 @@ Forge CLI commands use explicit verbs and predictable command boundaries.
 - **Session selectors are consistent.** Use an optional positional for the session only when the session is the
   command's primary object (`forge session show [session]`); use `--session` when the session is ambient scope for some
   other primary object (`forge policy status --session`). For multi-entity commands the primary entity is the positional
-  and the rest are options (`forge session transfer show <parent> --child <child>`). _(review)_
+  and the rest are options (`forge session transfer show <parent> --child <child>`). _(review)_ Audited compliant
+  2026-06-23 (all ~32 session-scoped commands; `forge_cli_cleanup` Slice 07 F11) — `telemetry activity [session]`,
+  `costs show [proxy_id]`, and `trace list --session` differ correctly because each applies the rule to its own primary
+  object.
 
 - **Editable config objects share a verb vocabulary.** Config-like surfaces (`forge config`, `forge proxy`,
   `forge claude preset`, `forge proxy template`) use one verb set for the same operations and document deliberate
@@ -104,8 +107,10 @@ When adding a new CLI command:
   same result stream: do not render the human table on stderr while JSON goes to stdout.
 - **Place the non-recovery categories.** Dry-run previews and `Next steps:` blocks are results (stdout); status lines
   like `Backup: {path}` are diagnostics (stderr).
-- _(review)_ today. A mechanical guard (`--json` mode emits valid JSON on stdout and nothing on stderr) is a planned
-  follow-up; it needs runtime stdout/stderr capture, so it is not yet wired.
+- A mechanical guard wires this contract: `tests/src/cli/test_output_streams.py` (plain `CliRunner()`, which captures
+  stdout and stderr separately) asserts that `--json` mode emits valid JSON on stdout and nothing on stderr for the
+  telemetry leaves (`costs show`, `trace list`, seeded `activity`) and `proxy audit show|diff`, and that their human
+  tables land on stdout. Extend it whenever a new read leaf could split its result stream.
 
 ## Tips And Recovery Output
 

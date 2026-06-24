@@ -175,7 +175,10 @@ def edit_cmd(parent: str, child: str | None) -> None:
 @transfer.command("diff")
 @click.argument("parent")
 @click.option("--child", default=None, help="Child to diff (inferred when the parent has exactly one).")
-def diff_cmd(parent: str, child: str | None) -> None:
+@click.option(
+    "--json", "as_json", is_flag=True, default=False, help="Emit JSON (parent/child + drift flag + diff text)."
+)
+def diff_cmd(parent: str, child: str | None, as_json: bool) -> None:
     """Show how the parent cache has drifted from a child's frozen snapshot."""
     ctx = ExecutionContext.from_cwd()
     try:
@@ -188,6 +191,20 @@ def diff_cmd(parent: str, child: str | None) -> None:
             console=console,
         )
         raise SystemExit(1) from e
+
+    if as_json:
+        click.echo(
+            json.dumps(
+                {
+                    "parent": parent,
+                    "child": resolved_child,
+                    "has_drift": bool(diff_text),
+                    "diff": diff_text or "",
+                },
+                indent=2,
+            )
+        )
+        return
 
     if not diff_text:
         console.print(f"[dim]No drift: child '{resolved_child}' snapshot matches the current cache.[/dim]")

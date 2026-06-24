@@ -12,8 +12,11 @@ per-project BM25 index for fast lookup.
 ## Quick start
 
 ```bash
-# Search for a keyword or phrase
+# Search for a keyword or phrase (human-readable table)
 forge search query "timeout config"
+
+# Machine-readable JSON for scripting
+forge search query "timeout config" --json
 
 # Limit results
 forge search query "proxy routing" -n 5
@@ -22,8 +25,9 @@ forge search query "proxy routing" -n 5
 forge search query "auth refactor" --scope all
 ```
 
-Results are JSON output with `session_name`, `session_id`, `score`, `snippet`, `transcript_path`, and `metadata`
-(including timestamps).
+By default `query` prints a table (`Score`, `Session`, `Snippet`) with a `Found N result(s)` footer. Pass `--json` for
+the scripting shape: an object with `query`, `total_results`, and a `results` array whose entries carry `session_name`,
+`session_id`, `score`, `snippet`, `transcript_path`, and `metadata` (including timestamps).
 
 ---
 
@@ -52,12 +56,13 @@ Indexing is **incremental** — only new or modified transcripts are processed. 
 ### Search
 
 ```bash
-forge search query <query> [-n <limit>] [--scope project|all]
+forge search query <query> [-n <limit>] [--scope project|all] [--json]
 ```
 
 - `<query>` — search terms (quote phrases with spaces)
 - `-n` / `--limit` — max results to return
 - `--scope` — `project` (default, current project only) or `all` (all indexed projects)
+- `--json` — emit the machine-readable JSON shape instead of the default table
 
 ### Index management
 
