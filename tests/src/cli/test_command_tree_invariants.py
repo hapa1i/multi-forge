@@ -163,3 +163,41 @@ def test_editable_config_objects_share_core_verbs() -> None:
             f"{path} grew a `reset` verb -- if it is now an editable config object, add it to "
             f"_EDITABLE_CONFIG_OBJECTS and update cli_style_guidelines.md"
         )
+
+
+# --- Rule: `clean` verbs preview by default and mutate only with --yes ---------
+# Destructive decision (forge_cli_cleanup Slice 09 / F3): a `clean` leaf previews by
+# default and mutates only with `--yes`. Preview-by-default makes `--dry-run` redundant,
+# so a clean leaf must carry `--yes` and must NOT carry `--dry-run`. (`forge proxy clean`
+# was removed as redundant in the same slice.)
+def _option_dests(cmd: click.Command) -> set[str]:
+    return {p.name for p in cmd.params if isinstance(p, click.Option) and p.name is not None}
+
+
+def test_clean_verbs_preview_by_default() -> None:
+    for path, cmd in _tree():
+        if isinstance(cmd, click.Group) or getattr(cmd, "hidden", False):
+            continue
+        if path.split()[-1] != "clean":
+            continue
+        dests = _option_dests(cmd)
+        assert "yes" in dests, f"{path}: clean leaf must expose --yes (preview is the default)"
+        assert "dry_run" not in dests, f"{path}: clean leaf must not carry --dry-run (preview is already the default)"
+
+
+# --- Rule: delete/reset leaves expose the --yes confirmation-bypass ------------
+# One confirmation-bypass flag name across the CLI (Slice 09 / F3). `forge session reset`
+# resets the session override layer (a persisted but non-deleting config rewind -- it
+# removes no sessions, worktrees, or artifacts); it acts immediately by design and is the
+# one permanent exemption.
+_DESTRUCTIVE_PROMPT_VERBS = {"delete", "reset"}
+_OVERRIDE_RESET_LEAVES = {"forge session reset"}
+
+
+def test_destructive_prompt_verbs_use_yes() -> None:
+    for path, cmd in _tree():
+        if isinstance(cmd, click.Group) or getattr(cmd, "hidden", False):
+            continue
+        if path.split()[-1] not in _DESTRUCTIVE_PROMPT_VERBS or path in _OVERRIDE_RESET_LEAVES:
+            continue
+        assert "yes" in _option_dests(cmd), f"{path}: delete/reset leaf must expose the --yes confirmation-bypass"

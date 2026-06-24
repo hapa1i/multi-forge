@@ -11,7 +11,6 @@ Commands:
 - forge proxy start <id>        # Start server for existing proxy
 - forge proxy stop <id>         # Stop server for proxy
 - forge proxy set <id> k=v      # Set single value
-- forge proxy clean             # Clean up stale proxies
 - forge proxy validate <id>     # Validate proxy config
 - forge proxy metrics [id]      # Show runtime metrics for a running proxy
 - forge proxy template list     # List available templates
@@ -1278,29 +1277,6 @@ def _delete_single_proxy(
         console.print(f"[dim]Server kept alive (other proxies share port {entry.port})[/dim]")
 
     console.print(f"[green]Deleted[/green] proxy '{proxy_id}'")
-
-
-# --- Prune ---
-
-
-@proxy.command("clean")
-def clean_cmd() -> None:
-    """Clean up stale proxies (dead server processes)."""
-    console = Console(width=200)
-
-    try:
-        result = prune_stale_proxies()
-    except ProxyRegistryCorruptedError as e:
-        console.print(f"[red]Error:[/red] {e}")
-        sys.exit(1)
-
-    if not result.pruned_proxy_ids:
-        console.print("No stale proxies to clean.")
-        return
-
-    console.print(f"Cleaned {len(result.pruned_proxy_ids)} stale proxy(ies):")
-    for pid in result.pruned_proxy_ids:
-        console.print(f"  - {pid}")
 
 
 # --- Validate ---

@@ -565,7 +565,7 @@ def _print_session_list_tips(items: list) -> None:
     metavar="DAYS",
     help="Delete sessions not accessed in DAYS days",
 )
-@click.option("--dry-run", "-n", is_flag=True, help="Show what would be deleted without deleting")
+@click.option("--yes", "-y", is_flag=True, help="Actually delete (default is a preview)")
 @click.option("--force", "-f", is_flag=True, help="Bypass dirty-worktree protection")
 @click.option(
     "--keep-transcripts",
@@ -586,7 +586,7 @@ def _print_session_list_tips(items: list) -> None:
 )
 def clean(
     older_than: int,
-    dry_run: bool,
+    yes: bool,
     force: bool,
     keep_transcripts: bool,
     delete_worktree: bool,
@@ -596,12 +596,13 @@ def clean(
 
     \b
     Examples:
-        forge session clean --older-than 30          # Delete sessions > 30 days old
-        forge session clean --older-than 30 --dry-run # Preview what would be cleaned
-        forge session clean --older-than 90 -k       # Keep transcript files
+        forge session clean --older-than 30          # Preview sessions > 30 days old
+        forge session clean --older-than 30 --yes    # Actually delete them
+        forge session clean --older-than 90 -k --yes # Delete but keep transcript files
 
-    Active sessions are always skipped. Worktrees are preserved by default
-    (use --delete-worktree to remove them).
+    Previews by default; pass --yes to delete. Active sessions are always
+    skipped. Worktrees are preserved by default (use --delete-worktree to
+    remove them).
     """
     if older_than < 1:
         console.print("[red]Error:[/red] --older-than must be >= 1")
@@ -611,8 +612,10 @@ def clean(
         console.print("[red]Error:[/red] --delete-branch requires --delete-worktree")
         sys.exit(1)
 
-    if dry_run:
-        _clean_sessions_dry_run(older_than)
+    if not yes:
+        deletable = _clean_sessions_dry_run(older_than)
+        if deletable:
+            print_tip("Use --yes to delete.", console=console)
         return
 
     from forge.session.cleanup import clean_old_sessions
@@ -663,11 +666,13 @@ def clean(
         sys.exit(1)
 
 
-def _clean_sessions_dry_run(older_than_days: int) -> None:
-    """Preview which sessions would be cleaned.
+def _clean_sessions_dry_run(older_than_days: int) -> int:
+    """Preview which sessions would be cleaned; return the deletable count.
 
     Iterates all sessions directly (same path as clean_old_sessions) so that
     unparseable timestamps and active-registry errors are visible in the preview.
+    The returned count lets the caller offer a `--yes` tip only when there is
+    something to delete.
     """
     from forge.session.active import ActiveSessionStore
 
@@ -716,7 +721,7 @@ def _clean_sessions_dry_run(older_than_days: int) -> None:
 
     if not any_old:
         console.print(f"[dim]No sessions older than {older_than_days} days found.[/dim]")
-        return
+        return 0
 
     console.print(table)
 
@@ -731,6 +736,7 @@ def _clean_sessions_dry_run(older_than_days: int) -> None:
         + (f", skip {skipped}" if skipped else "")
         + ".[/dim]"
     )
+    return deletable
 
 
 @session.command()

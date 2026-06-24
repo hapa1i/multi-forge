@@ -121,16 +121,18 @@ forge proxy delete <proxy_id>
 - [ ] `validate` reports config health
 - [ ] `delete` removes proxy and cleans up registry
 
-### 4.5 Proxy Clean
+### 4.5 Stale Proxy Pruning
 
 <!-- auto -->
 
+Stale proxies (dead PIDs) are pruned automatically by `list`/`create`/`start`; `forge clean` removes them globally.
+There is no dedicated `forge proxy clean` command.
+
 ```bash
-# Clean up stale proxies (dead processes)
-forge proxy clean
+forge proxy list   # auto-prunes dead-PID entries as a side effect
 ```
 
-- [ ] Clean removes stale entries (or reports none found)
+- [ ] `proxy list` succeeds and shows no dead-PID entries
 
 ### 4.6 Launch Session with Host Proxy
 

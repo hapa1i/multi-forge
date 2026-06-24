@@ -56,6 +56,10 @@ allowlisted entry that was fixed-without-removal. "Done" for these slices = the 
 
 ### Guard gaps (rules with no mechanical enforcement yet)
 
+- **Destructive verbs (F3):** ~~`_(review)_`~~ **CLOSED in Slice 09** — `test_clean_verbs_preview_by_default` +
+  `test_destructive_prompt_verbs_use_yes` now guard the clean/delete/reset flag shape; the style guide rule is
+  `_Guard:_` (only the prompt presence/wording stays review). F14a (`proxy clean` redundancy) resolved here by removal,
+  so the Slice 12 / F14 candidate list no longer needs to cover it.
 - **Stream ownership (F10):** `_(review)_` only; no tree-wide stdout/stderr capture test. Slice 03 moved
   `proxy_costs.py` to stdout for both human and `--json` telemetry-cost output and added focused assertions.
   `proxy_audit.py:17` still renders human tables to `Console(stderr=True)` while `--json` goes to stdout, so the general
@@ -277,11 +281,21 @@ verification is recorded.
   core-set assertion (no debt to drain) on the three editable-config objects plus a **boundary lock** asserting
   `proxy`/`model backend` carry no `reset`, so prose and code can't drift. No net-new commands. Verification: the new
   guard + the 4 existing tree invariants (5 passed); full `tests/src/cli` (2022 passed); `make pre-commit` clean.
-- [ ] **Slice 09 - Destructive consistency (F3).** `clean` verbs preview by default + mutate on `--yes`: fix
-  `forge session clean` (`session_manage.py:570`, mutates by default today) and `forge proxy clean` (`proxy.py:1288`, no
-  flags today). `delete`/`reset` keep prompt + a single `--yes` bypass name. Decide F14a (is `proxy clean` redundant
-  with list/create pruning?) — remove only if behavior is fully covered. Tests assert each command's default and
-  `--yes`/`--dry-run` behavior.
+- [x] **Slice 09 - Destructive consistency (F3).** SHIPPED 2026-06-24. `clean` verbs now preview by default and mutate
+  only with `--yes`. **F14a resolved → REMOVE:** verified `forge proxy clean` fully redundant (`prune_stale_proxies()`
+  prunes registry **and** overlay dirs, and `list`/`create`/`start` each call it before their work; `forge clean` covers
+  it globally) → deleted the command + its 7 stale doc/QA refs (module header, cli_reference, design.md, three
+  `end-user/proxy.md` incl. the troubleshooting recovery row, the QA auto step) with `forge clean`/auto-pruning named as
+  the replacement. **Conformed** `forge session clean` (dropped `--dry-run`, added `--yes`, default→preview;
+  `main.py:46` exemption comment updated) and `forge search clean` (added `--yes` + read-only `find_missing()` detectors
+  on `SearchDocumentStore`/`IndexStateStore` for the preview). **Two guards** (positive assertions, no ledger):
+  `test_clean_verbs_preview_by_default` (clean leaves carry `--yes`, never `--dry-run`) and
+  `test_destructive_prompt_verbs_use_yes` (delete/reset carry `--yes`; `forge session reset` is the one permanent
+  exemption — a non-deleting override-layer reset, not a session/artifact delete). Style guide destructive rule flipped
+  `_(review)_` → `_Guard:_`. Verification: 395 tests across `test_command_tree_invariants` (7), `test_session_commands`,
+  `test_search`, `test_proxy_commands` (removal → exit 2), and the search-store `find_missing` units;
+  `forge proxy clean` errors via Click; no stale `proxy clean` reference survives outside board files; `make pre-commit`
+  clean.
 - [ ] **Slice 10 - Policy supervisor cleanup (F7).** Split `forge policy supervise` (12+ flags) into
   `forge policy supervisor {status,set,off,on,reload,evaluate}`; `evaluate` (not `check`) is the one-shot file-vs-plan
   eval; `forge policy check` keeps bundle-engine eval. Removing the collision drops `forge policy: supervise|supervisor`

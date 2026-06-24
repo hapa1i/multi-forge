@@ -55,6 +55,14 @@ def test_proxy_list_empty_shows_message(runner: CliRunner, temp_env: Path) -> No
     assert "No proxies found" in result.output
 
 
+def test_proxy_clean_removed_clean_break(runner: CliRunner, temp_env: Path) -> None:
+    """`forge proxy clean` was removed (F14a, fully redundant): Click reports No such command."""
+    result = runner.invoke(main, ["proxy", "clean"])
+
+    assert result.exit_code == 2
+    assert "No such command 'clean'" in result.output
+
+
 def test_proxy_list_shows_entries(runner: CliRunner, temp_env: Path) -> None:
     forge_home = Path(os.environ["FORGE_HOME"])
     proxies_index = forge_home / "proxies" / "index.json"

@@ -505,13 +505,53 @@ class TestPruneCmd:
         state = IndexState(indexed_files={"/nonexistent/ghost.jsonl": IndexedFileEntry(mtime=0, size=0, indexed_at="")})
         index_store.write(state)
 
-        result = runner.invoke(main, ["search", "clean"])
+        result = runner.invoke(main, ["search", "clean", "--yes"])
         assert result.exit_code == 0
         assert "1" in result.output and "orphaned documents" in result.output
         assert "1" in result.output and "stale index entries" in result.output
         # Both stores cleaned
         assert store.read() == []
         assert index_store.read().indexed_files == {}
+
+    def test_clean_previews_by_default_without_pruning(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Bare `clean` previews orphans and offers --yes, removing nothing."""
+        from forge.search.index_state import (
+            IndexedFileEntry,
+            IndexState,
+            IndexStateStore,
+        )
+
+        project_root = tmp_path / "project"
+        project_root.mkdir()
+        (project_root / ".git").mkdir()
+        monkeypatch.chdir(project_root)
+
+        store = SearchDocumentStore(forge_root=project_root)
+        store.write(
+            [
+                SearchDocumentMeta(
+                    transcript_path="/nonexistent/ghost.jsonl",
+                    session_name="ghost",
+                    session_id="g1",
+                    extracted_at="2026-01-01T00:00:00+00:00",
+                    metadata={},
+                ),
+            ]
+        )
+        index_store = IndexStateStore(forge_root=project_root)
+        index_store.write(
+            IndexState(indexed_files={"/nonexistent/ghost.jsonl": IndexedFileEntry(mtime=0, size=0, indexed_at="")})
+        )
+
+        result = runner.invoke(main, ["search", "clean"])
+        assert result.exit_code == 0
+        assert "Would prune" in result.output
+        assert "Use --yes to prune." in result.output
+        # Nothing removed by the preview
+        assert len(store.read()) == 1
+        assert index_store.read().indexed_files != {}
 
     def test_prune_nothing_to_do(self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """Prune with all valid documents reports nothing to do."""

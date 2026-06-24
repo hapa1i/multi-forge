@@ -72,9 +72,13 @@ Forge CLI commands use explicit verbs and predictable command boundaries.
   direct-command layers own all rendering. (Many ops use frozen dataclasses, but that is a local convention, not part of
   the contract.)
 
-- **Destructive verbs are predictable.** A `clean` verb previews by default and mutates only with `--yes`. A `delete` or
-  `reset` verb may act after a prompt, but the prompt and its `--yes` bypass must be explicit and documented. Use one
-  confirmation-bypass flag name across the CLI. _(review)_
+- **Destructive verbs are predictable.** A `clean` verb previews by default and mutates only with `--yes` (no
+  `--dry-run` -- preview is already the default). A `delete` or `reset` verb may act after a prompt, but the prompt and
+  its `--yes` bypass must be explicit and documented. Use one confirmation-bypass flag name (`--yes`) across the CLI.
+  _Guard:_ `test_command_tree_invariants::test_clean_verbs_preview_by_default` (clean leaves expose `--yes`, never
+  `--dry-run`) and `::test_destructive_prompt_verbs_use_yes` (every `delete`/`reset` leaf exposes `--yes`; the
+  non-deleting `forge session reset`, which rewinds the session override layer rather than deleting any
+  session/worktree/artifact, is exempt). The prompt presence and its wording stay _(review)_.
 
 - **Sibling resources expose comparable verbs.** Resource groups with a `create`/`start`/`stop`/`delete` lifecycle offer
   the same verb set as their siblings; document any intentional asymmetry at the call site instead of letting it drift.
@@ -192,7 +196,7 @@ print_tip(
 The rules tagged _(review)_ above are enforced here, not by tests. On any CLI change, confirm:
 
 - A leaf with a missing required selector exits non-zero, not warn-and-exit-0.
-- `clean` previews by default; `delete` / `reset` confirmation and its `--yes` bypass are explicit and documented.
+- A `delete`/`reset` prompt is present and its wording is clear (the `--yes`/`--dry-run` flag *shape* is now guarded).
 - Sibling lifecycle resources expose comparable verbs, or the asymmetry is documented at the call site.
 - Session selection follows the positional-vs-`--session` rule.
 - Editable config objects use the shared verb vocabulary.

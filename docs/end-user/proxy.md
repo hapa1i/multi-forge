@@ -138,9 +138,11 @@ forge proxy metrics --all        # Metrics for all active proxies
 forge proxy metrics --json       # Raw JSON output
 
 # Maintenance
-forge proxy clean                # Clean up stale proxies
 forge proxy validate <proxy_id>  # Validate config
 ```
+
+Stale proxies (dead PIDs) are pruned automatically by `forge proxy list`, `create`, and `start`; `forge clean` removes
+them globally.
 
 **Auto-start from a template.** `--proxy` (on `forge session start/resume/fork` and `forge claude start`) and
 `--supervisor-proxy` (on `forge session start/fork` and `forge policy supervise`) accept a **template name** as well as
@@ -321,12 +323,12 @@ Stops the proxy and cleans up registry entries and overlay files.
 ### Other commands
 
 ```bash
-# Prune stale proxies (dead processes)
-forge proxy clean
-
 # Validate a proxy config file
 forge proxy validate <proxy_id>
 ```
+
+Stale proxy entries (dead processes) are pruned automatically by `forge proxy list`, `create`, and `start`;
+`forge clean` removes them globally.
 
 ---
 
@@ -817,8 +819,8 @@ File caches (index.json, proxy.yaml) are convenience; proxy state is truth.
 
 ### Gotchas
 
-| Trap                                    | Explanation                                                |
-| --------------------------------------- | ---------------------------------------------------------- |
-| "Edited proxy.yaml but nothing changed" | Restart proxy or re-create for changes to take effect      |
-| "Proxy says healthy but proxy is dead"  | Run `forge proxy clean` to clean stale entries             |
-| "Can't find my proxy"                   | Check `~/.forge/proxies/index.json` for registered proxies |
+| Trap                                    | Explanation                                                         |
+| --------------------------------------- | ------------------------------------------------------------------- |
+| "Edited proxy.yaml but nothing changed" | Restart proxy or re-create for changes to take effect               |
+| "Proxy says healthy but proxy is dead"  | `forge proxy list` auto-prunes dead entries; `forge clean` does too |
+| "Can't find my proxy"                   | Check `~/.forge/proxies/index.json` for registered proxies          |

@@ -4,7 +4,7 @@ Provides:
 - forge search query <terms>: Search transcripts (human table; --json for the machine-readable shape)
 - forge search rebuild-index: Full index rebuild (writes three stores)
 - forge search status: Show index statistics
-- forge search clean: Remove orphaned documents
+- forge search clean: Preview orphaned documents (--yes to prune)
 
 Stores are per-project at <forge_root>/.forge/search-index/:
 - documents.json (v2): metadata only
@@ -382,11 +382,13 @@ def rebuild_index_cmd() -> None:
 
 
 @search_cmd.command("clean")
-def clean_cmd() -> None:
+@click.option("--yes", "-y", is_flag=True, help="Actually prune (default is a preview)")
+def clean_cmd(yes: bool) -> None:
     """Remove orphaned documents whose transcript files no longer exist.
 
-    Scans all three stores and index state, removing entries that point
-    to transcript files that have been deleted or moved.
+    Scans all three stores and index state for entries that point to transcript
+    files that have been deleted or moved. Previews by default; pass --yes to
+    actually prune.
     """
     console = Console()
 
@@ -397,6 +399,19 @@ def clean_cmd() -> None:
     bm25_store = BM25IndexStore(forge_root=project_root)
     content_store = ContentStore(forge_root=project_root)
     index_store = IndexStateStore(forge_root=project_root)
+
+    if not yes:
+        missing_docs = doc_store.find_missing()
+        missing_index = index_store.find_missing()
+        if missing_docs or missing_index:
+            console.print(
+                f"Would prune [cyan]{len(missing_docs)}[/cyan] orphaned document(s)"
+                f" and [cyan]{len(missing_index)}[/cyan] stale index entr(ies)."
+            )
+            print_tip("Use --yes to prune.", console=console)
+        else:
+            console.print("[dim]No orphaned entries found.[/dim]")
+        return
 
     removed_docs = doc_store.prune_missing()
 

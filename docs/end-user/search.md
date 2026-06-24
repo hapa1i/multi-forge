@@ -73,8 +73,9 @@ forge search status
 # Full rebuild from all transcript artifacts
 forge search rebuild-index
 
-# Remove orphaned entries (transcripts that were deleted)
+# Preview orphaned entries (transcripts that were deleted); --yes to prune
 forge search clean
+forge search clean --yes
 ```
 
 ---
@@ -127,10 +128,11 @@ forge search rebuild-index
 
 ### "Orphaned documents"
 
-If you deleted transcript files but the index still references them:
+If you deleted transcript files but the index still references them (previews by default; `--yes` to prune):
 
 ```bash
-forge search clean
+forge search clean         # preview what would be pruned
+forge search clean --yes   # actually prune
 ```
 
 ### "Index corrupted"

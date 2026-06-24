@@ -111,12 +111,13 @@ class TestCleanCmdErrors:
 class TestVerbRenames:
     """Verify the renamed commands exist."""
 
-    def test_proxy_clean_exists(self) -> None:
+    def test_proxy_clean_removed(self) -> None:
+        # Removed in Slice 09 (F14a, fully redundant); stale proxies are auto-pruned
+        # by list/create/start and by `forge clean`.
         from forge.cli.proxy import proxy
 
         cmd = proxy.get_command(None, "clean")  # type: ignore[arg-type]
-        assert cmd is not None
-        assert "stale proxies" in (cmd.help or "").lower()
+        assert cmd is None
 
     def test_proxy_prune_removed(self) -> None:
         from forge.cli.proxy import proxy

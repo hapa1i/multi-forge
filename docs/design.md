@@ -448,9 +448,6 @@ forge proxy list
 forge proxy create litellm-openai \
   --opus-reasoning high \
   --sonnet-temperature 0.7
-
-# Prune stale proxies (dead pids)
-forge proxy clean
 ```
 
 **Also implemented:**

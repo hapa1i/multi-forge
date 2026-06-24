@@ -43,7 +43,7 @@ from .workflow import workflow_cmd  # noqa: E402
 _EXEMPT_SUBCOMMANDS = frozenset({"hook", "status-line", "logs", "clean"})
 
 # Session auto-cleanup is also exempt for session subcommands so that
-# inspection commands (list, clean --dry-run, show) are side-effect-free.
+# inspection commands (list, clean preview, show) are side-effect-free.
 # Auto-cleanup still fires on every other forge command.
 _SESSION_CLEANUP_EXEMPT = frozenset({"hook", "status-line", "logs", "session", "clean"})
 

@@ -25,7 +25,40 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
-## 2026-06-23
+## 2026-06-24
+
+### forge_cli_cleanup Slice 09: destructive-command consistency
+
+**Goal**: Standardize destructive verbs (card F3 + F14a) — a `clean` verb previews by default and mutates only with
+`--yes`; every `delete`/`reset` keeps one `--yes` bypass — and convert the `_(review)_` rule into mechanical guards.
+
+**Key changes**:
+
+- **`forge proxy clean` removed (F14a, clean break)**: verified fully redundant — `prune_stale_proxies()` prunes the
+  registry **and** deletes overlay dirs, and `forge proxy list`/`create`/`start` each call it before their work, while
+  `forge clean`'s always-global `proxies` category covers it too. Deleted the command and **all** 7 stale references
+  (module header, `cli_reference.md`, `design.md` §3.6.3, three `end-user/proxy.md` refs incl. the troubleshooting
+  recovery row, and the QA auto step), naming `forge clean` / auto-pruning as the replacement. Old path → Click
+  `No such command`.
+- **`forge session clean` conformed**: dropped `--dry-run`, added `--yes`; default now previews
+  (`_clean_sessions_dry_run` returns the deletable count so the caller offers a `Use --yes to delete.` tip), `--yes`
+  deletes. Updated the `main.py` session-cleanup-exemption comment (`clean --dry-run` → `clean preview`).
+- **`forge search clean` conformed**: added `--yes`; default previews via new **read-only** `find_missing()` detectors
+  on `SearchDocumentStore` and `IndexStateStore` (siblings of `prune_missing`, same predicate, no lock/write), `--yes`
+  prunes (unchanged).
+- **Two mechanical guards** (`test_command_tree_invariants.py`, positive assertions):
+  `test_clean_verbs_preview_by_default` (every `clean` leaf carries `--yes`, never `--dry-run`) and
+  `test_destructive_prompt_verbs_use_yes` (every `delete`/`reset` leaf carries `--yes`; `forge session reset`, a
+  non-deleting override-layer reset, is the one permanent exemption). Style-guide destructive rule flipped `_(review)_`
+  → `_Guard:_`.
+
+**Breaking change (research preview)**: `forge proxy clean` and `forge session clean --dry-run` are removed. Stale
+proxies are pruned automatically by `proxy list/create/start` (and `forge clean`); `session clean` now previews by
+default — pass `--yes` to delete. `search clean` likewise previews by default; pass `--yes` to prune.
+
+**Verification**: 395 tests across `test_command_tree_invariants` (7), `test_session_commands`, `test_search`,
+`test_proxy_commands` (removal → exit 2), and the search-store `find_missing` units; `forge proxy clean` errors via
+Click; a repo-wide grep confirms no stale `proxy clean` reference outside board files; `make pre-commit` clean.
 
 ### forge_cli_cleanup Slice 08: config-object verb parity
 

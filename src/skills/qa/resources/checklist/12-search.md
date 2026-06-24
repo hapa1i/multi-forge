@@ -53,10 +53,12 @@ forge search query "hello world" --scope all --json
 <!-- auto -->
 
 ```bash
-forge search clean
+forge search clean          # preview (default)
+forge search clean --yes    # actually prune
 ```
 
-- [ ] Removes entries for deleted transcripts
+- [ ] Bare `clean` previews ("Would prune ...") without removing
+- [ ] `--yes` removes entries for deleted transcripts
 - [ ] Reports removed/pruned count or "No orphaned entries found."
 
 ---

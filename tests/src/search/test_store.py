@@ -199,6 +199,20 @@ class TestSearchDocumentStorePrune:
         assert removed == []
         assert mtime_before == mtime_after
 
+    def test_find_missing_returns_orphans_without_mutating(self, store: SearchDocumentStore, tmp_path: Path) -> None:
+        """find_missing() reports orphans with the same predicate as prune_missing, but never writes."""
+        real_file = tmp_path / "real.jsonl"
+        real_file.write_text("{}")
+        store.write([self._make_meta(str(real_file)), self._make_meta("/nonexistent/ghost.jsonl")])
+
+        mtime_before = store.store_path.stat().st_mtime_ns
+        missing = store.find_missing()
+        mtime_after = store.store_path.stat().st_mtime_ns
+
+        assert missing == ["/nonexistent/ghost.jsonl"]
+        assert len(store.read()) == 2  # nothing removed
+        assert mtime_before == mtime_after  # nothing written
+
 
 class TestSearchDocumentStoreRemove:
     """Tests for remove behavior."""

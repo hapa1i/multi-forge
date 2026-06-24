@@ -37,7 +37,7 @@ reports "no such command/option" — no tombstone shims. List/show commands supp
 | `forge session set <key> <value>`      | Set a mid-session override                                                                                                  |
 | `forge session reset [key]`            | Reset overrides to intent                                                                                                   |
 | `forge session delete <name>...`       | Delete one or more sessions (`--all` for bulk deletion)                                                                     |
-| `forge session clean --older-than N`   | Bulk-delete sessions older than N days                                                                                      |
+| `forge session clean --older-than N`   | Preview sessions older than N days; `--yes` to delete                                                                       |
 | `forge session incognito [name]`       | Start an ephemeral session (auto-delete on exit)                                                                            |
 | `forge session shell [name]`           | Open shell in sidecar container                                                                                             |
 
@@ -108,7 +108,6 @@ Session-scoped activation and reports (whether the memory writer runs for a sess
 | `forge proxy start <id>`             | Start server for existing proxy                         |
 | `forge proxy stop <id>`              | Stop server (keeps config)                              |
 | `forge proxy delete <id>...`         | Delete one or more proxies (`--all` for bulk deletion)  |
-| `forge proxy clean`                  | Remove stale proxies (dead pids)                        |
 | `forge proxy validate <id>`          | Validate proxy configuration                            |
 | `forge proxy metrics [id]`           | Show runtime metrics (`--json`, `--all`)                |
 | `forge proxy audit show [id]`        | Show redacted audit records (hashes/counts, no secrets) |
@@ -228,7 +227,7 @@ workers (e.g., `claude-opus`) remain on Anthropic routing regardless of `--proxy
 | `forge search query <query>` | Search transcripts (table; `--json` for JSON) |
 | `forge search rebuild-index` | Full index rebuild from artifacts             |
 | `forge search status`        | Show index statistics                         |
-| `forge search clean`         | Remove orphaned documents from index          |
+| `forge search clean`         | Preview orphaned documents; `--yes` to prune  |
 
 ### System
 

@@ -168,8 +168,8 @@ forge session fork <parent> [--name <name>] [--model <claude-model>] [--incognit
 # Delete
 forge session delete <name> [--keep-worktree] [--delete-branch] [--force] [--keep-transcripts]
 
-# Clean (age-based bulk delete)
-forge session clean --older-than DAYS [--dry-run] [--force] [--keep-transcripts] [--delete-worktree] [--delete-branch]
+# Clean (age-based bulk delete; previews by default, --yes to delete)
+forge session clean --older-than DAYS [--yes] [--force] [--keep-transcripts] [--delete-worktree] [--delete-branch]
 
 # Incognito (same options as start, auto-deletes on exit)
 forge session incognito [name] [--proxy <proxy_id>] [--no-proxy]
@@ -195,8 +195,8 @@ removed while Claude keeps running until the launch exits) and also overrides di
 Clean up old sessions by age:
 
 ```bash
-forge session clean --older-than 30           # Delete sessions > 30 days old
-forge session clean --older-than 30 --dry-run # Preview what would be cleaned
+forge session clean --older-than 30           # Preview sessions > 30 days old
+forge session clean --older-than 30 --yes     # Actually delete them
 forge session list --older-than 30            # List old sessions before cleaning
 ```
 
