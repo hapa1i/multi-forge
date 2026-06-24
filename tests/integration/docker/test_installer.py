@@ -30,20 +30,20 @@ class TestForgeExtensionEnable:
     """Tests for forge extension enable command."""
 
     def test_init_user_scope_creates_claude_dir(self, synced_container: ContainerLike) -> None:
-        """Verify forge extensions enable --scope user creates ~/.claude/."""
+        """Verify forge extension enable --scope user creates ~/.claude/."""
         synced_container.exec("rm -rf ~/.claude ~/.forge")
 
-        result = synced_container.exec("cd /forge && uv run forge extensions enable --scope user --profile minimal")
+        result = synced_container.exec("cd /forge && uv run forge extension enable --scope user --profile minimal")
         assert result.returncode == 0, f"Init failed: {result.stderr}"
 
         check = synced_container.exec("test -d ~/.claude && echo 'exists'")
         assert "exists" in check.stdout, "~/.claude/ directory not created"
 
     def test_init_user_scope_creates_tracking_file(self, synced_container: ContainerLike) -> None:
-        """Verify forge extensions enable creates the tracking manifest."""
+        """Verify forge extension enable creates the tracking manifest."""
         synced_container.exec("rm -rf ~/.claude ~/.forge")
 
-        result = synced_container.exec("cd /forge && uv run forge extensions enable --scope user --profile minimal")
+        result = synced_container.exec("cd /forge && uv run forge extension enable --scope user --profile minimal")
         assert result.returncode == 0
 
         tracking_path = _get_tracking_path(synced_container)
@@ -51,10 +51,10 @@ class TestForgeExtensionEnable:
         assert "found" in check.stdout
 
     def test_init_standard_profile_adds_hooks(self, synced_container: ContainerLike) -> None:
-        """Verify forge extensions enable --profile standard adds hooks to settings.json."""
+        """Verify forge extension enable --profile standard adds hooks to settings.json."""
         synced_container.exec("rm -rf ~/.claude ~/.forge")
 
-        result = synced_container.exec("cd /forge && uv run forge extensions enable --scope user --profile standard")
+        result = synced_container.exec("cd /forge && uv run forge extension enable --scope user --profile standard")
         assert result.returncode == 0
 
         # Parse settings.json and verify hooks key exists
@@ -71,15 +71,15 @@ print('hooks present')
         assert "hooks present" in check.stdout
 
     def test_init_is_idempotent(self, synced_container: ContainerLike) -> None:
-        """Verify running extensions enable twice doesn't error."""
+        """Verify running extension enable twice doesn't error."""
         synced_container.exec("rm -rf ~/.claude ~/.forge")
 
         # First init
-        result1 = synced_container.exec("cd /forge && uv run forge extensions enable --scope user --profile minimal")
+        result1 = synced_container.exec("cd /forge && uv run forge extension enable --scope user --profile minimal")
         assert result1.returncode == 0
 
         # Second init (should succeed)
-        result2 = synced_container.exec("cd /forge && uv run forge extensions enable --scope user --profile minimal")
+        result2 = synced_container.exec("cd /forge && uv run forge extension enable --scope user --profile minimal")
         assert result2.returncode == 0
 
     def test_init_auto_detect_creates_project_anchor_under_home(self, synced_container: ContainerLike) -> None:
@@ -93,7 +93,7 @@ print('hooks present')
             git config user.name "Forge Test"
             echo "# Auto Detect" > README.md
             git add . && git commit -m "init"
-            /forge/.venv/bin/forge extensions enable --profile minimal
+            /forge/.venv/bin/forge extension enable --profile minimal
         """)
         assert result.returncode == 0, f"Auto-detect enable failed: {result.stderr}"
 
@@ -104,7 +104,7 @@ print('hooks present')
         assert "no-user-fallback" in home_check.stdout, f"Unexpected user-scope install: {home_check.stderr}"
 
     def test_enable_creates_forge_anchor(self, synced_container: ContainerLike) -> None:
-        """forge extensions enable --scope local creates both .claude/ and .forge/ (Rule 1)."""
+        """forge extension enable --scope local creates both .claude/ and .forge/ (Rule 1)."""
         synced_container.exec("rm -rf ~/.claude ~/.forge ~/repo-forge-anchor")
 
         result = synced_container.exec("""
@@ -114,7 +114,7 @@ print('hooks present')
             git config user.name "Forge Test"
             echo "# Forge Anchor" > README.md
             git add . && git commit -m "init"
-            /forge/.venv/bin/forge extensions enable --scope local --profile minimal
+            /forge/.venv/bin/forge extension enable --scope local --profile minimal
         """)
         assert result.returncode == 0, f"Enable failed: {result.stderr}"
 
@@ -135,7 +135,7 @@ print('hooks present')
             git config user.name "Forge Test"
             echo "# Dry Run" > README.md
             git add . && git commit -m "init"
-            /forge/.venv/bin/forge extensions enable --scope project --profile minimal --dry-run
+            /forge/.venv/bin/forge extension enable --scope project --profile minimal --dry-run
         """)
         assert result.returncode == 0, f"Dry-run enable failed: {result.stderr}"
 
@@ -149,20 +149,20 @@ class TestForgeExtensionSync:
     """Tests for forge extension sync command."""
 
     def test_update_requires_existing_installation(self, synced_container: ContainerLike) -> None:
-        """Verify forge extensions sync fails without prior install."""
+        """Verify forge extension sync fails without prior install."""
         synced_container.exec("rm -rf ~/.claude ~/.forge")
 
-        result = synced_container.exec("cd /forge && uv run forge extensions sync --scope user 2>&1")
+        result = synced_container.exec("cd /forge && uv run forge extension sync --scope user 2>&1")
         assert result.returncode != 0
         # Error message says "no Forge installation found" or similar
-        assert "no forge installation" in result.stdout.lower() or "forge extensions enable" in result.stdout.lower()
+        assert "no forge installation" in result.stdout.lower() or "forge extension enable" in result.stdout.lower()
 
     def test_update_preserves_user_settings(self, synced_container: ContainerLike) -> None:
         """Verify update doesn't clobber user customizations."""
         synced_container.exec("rm -rf ~/.claude ~/.forge")
 
         # Init first
-        synced_container.exec("cd /forge && uv run forge extensions enable --scope user --profile minimal")
+        synced_container.exec("cd /forge && uv run forge extension enable --scope user --profile minimal")
 
         # Add user customization to settings (preserve existing structure)
         synced_container.exec("""
@@ -177,7 +177,7 @@ settings_path.write_text(json.dumps(settings, indent=2))
         """)
 
         # Update
-        result = synced_container.exec("cd /forge && uv run forge extensions sync --scope user")
+        result = synced_container.exec("cd /forge && uv run forge extension sync --scope user")
         assert result.returncode == 0
 
         # User key should still be there
@@ -197,18 +197,18 @@ class TestForgeExtensionDisable:
     """Tests for forge extension disable command."""
 
     def test_uninstall_removes_tracked_files(self, synced_container: ContainerLike) -> None:
-        """Verify forge extensions disable removes installed files."""
+        """Verify forge extension disable removes installed files."""
         synced_container.exec("rm -rf ~/.claude ~/.forge")
 
         # Init first
-        synced_container.exec("cd /forge && uv run forge extensions enable --scope user --profile minimal")
+        synced_container.exec("cd /forge && uv run forge extension enable --scope user --profile minimal")
 
         # Verify installation exists
         check1 = synced_container.exec("test -d ~/.claude && echo 'exists'")
         assert "exists" in check1.stdout
 
         # Uninstall (--yes to avoid confirmation prompt hanging)
-        result = synced_container.exec("cd /forge && uv run forge extensions disable --scope user --yes")
+        result = synced_container.exec("cd /forge && uv run forge extension disable --scope user --yes")
         assert result.returncode == 0
 
         # Verify tracking entry removed (file may still exist but scope entry gone)
@@ -230,10 +230,10 @@ else:
         assert "entry removed" in check2.stdout or "file gone" in check2.stdout
 
     def test_uninstall_without_installation_is_noop(self, synced_container: ContainerLike) -> None:
-        """Verify forge extensions disable on empty system is a graceful no-op."""
+        """Verify forge extension disable on empty system is a graceful no-op."""
         synced_container.exec("rm -rf ~/.claude ~/.forge")
 
-        result = synced_container.exec("cd /forge && uv run forge extensions disable --scope user --yes 2>&1")
+        result = synced_container.exec("cd /forge && uv run forge extension disable --scope user --yes 2>&1")
         # CLI returns 0 and informs user - graceful no-op behavior
         assert result.returncode == 0
         assert "no forge installation" in result.stdout.lower()
@@ -247,7 +247,7 @@ class TestSymlinkMode:
         synced_container.exec("rm -rf ~/.claude ~/.forge")
 
         result = synced_container.exec(
-            "cd /forge && uv run forge extensions enable --scope user --profile standard --symlink"
+            "cd /forge && uv run forge extension enable --scope user --profile standard --symlink"
         )
         assert result.returncode == 0
 
@@ -282,7 +282,7 @@ class TestCodexHooksModule:
 
         result = synced_container.exec(
             "cd /forge && CODEX_HOME=/tmp/codex-home PATH=/tmp/fake-bin:$PATH"
-            " uv run forge extensions enable --scope user --profile standard"
+            " uv run forge extension enable --scope user --profile standard"
         )
         assert result.returncode == 0, f"Enable failed: {result.stderr}"
         assert "Next steps (Codex hooks):" in result.stdout
@@ -293,12 +293,12 @@ class TestCodexHooksModule:
         assert "forge hook codex-policy-check" in config
 
         status = synced_container.exec(
-            "cd /forge && CODEX_HOME=/tmp/codex-home uv run forge extensions status --scope user"
+            "cd /forge && CODEX_HOME=/tmp/codex-home uv run forge extension status --scope user"
         )
         assert "Codex:" in status.stdout
 
         result = synced_container.exec(
-            "cd /forge && CODEX_HOME=/tmp/codex-home uv run forge extensions disable --scope user --yes"
+            "cd /forge && CODEX_HOME=/tmp/codex-home uv run forge extension disable --scope user --yes"
         )
         assert result.returncode == 0, f"Disable failed: {result.stderr}"
         # Forge created the file, so removing the block deletes it entirely.
@@ -310,7 +310,7 @@ class TestCodexHooksModule:
         synced_container.exec("mkdir -p /tmp/codex-home")
 
         result = synced_container.exec(
-            "cd /forge && CODEX_HOME=/tmp/codex-home" " uv run forge extensions enable --scope user --profile standard"
+            "cd /forge && CODEX_HOME=/tmp/codex-home" " uv run forge extension enable --scope user --profile standard"
         )
         assert result.returncode == 0, f"Enable failed: {result.stderr}"
         assert "Codex hooks skipped: codex binary not found on PATH" in result.stdout
@@ -328,7 +328,7 @@ class TestCodexHooksModule:
 
         enable = (
             "cd /forge && CODEX_HOME=/tmp/codex-home PATH=/tmp/fake-bin:$PATH"
-            " uv run forge extensions enable --scope user --profile standard"
+            " uv run forge extension enable --scope user --profile standard"
         )
         assert synced_container.exec(enable).returncode == 0
 
@@ -337,7 +337,7 @@ class TestCodexHooksModule:
         assert "# >>> forge hooks >>>" in config
 
         result = synced_container.exec(
-            "cd /forge && CODEX_HOME=/tmp/codex-home uv run forge extensions disable --scope user --yes"
+            "cd /forge && CODEX_HOME=/tmp/codex-home uv run forge extension disable --scope user --yes"
         )
         assert result.returncode == 0
         assert synced_container.read_file("/tmp/codex-home/config.toml") == 'model = "gpt-5.5-codex"\n'

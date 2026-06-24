@@ -7,8 +7,9 @@ workflow-layer behavior lives in [design_workflows.md](design_workflows.md).
 
 ## 1. Terminal Command Reference
 
-**Command aliases:** `authentication` (canonical) has alias `auth`; `extension` (canonical) has alias `ext` and
-`extensions`; `session` (canonical) has alias `sess`. Full names always work; aliases are convenience shortcuts.
+**Command aliases:** `extension` (canonical) has alias `ext`; `session` has alias `sess`; `memory` has alias `mem`;
+`config` has alias `cfg`. Full names always work; aliases are convenience shortcuts. Credential management is
+canonically `forge auth` (there is no `authentication` alias).
 
 **Command-shape policy:** Forge uses explicit verbs for all commands. Non-leaf groups print help when invoked without a
 subcommand; they do not hide work behind bare group invocation. Leaf commands should do the sensible action when
@@ -232,14 +233,14 @@ workers (e.g., `claude-opus`) remain on Anthropic routing regardless of `--proxy
 
 ### System
 
-| Command                       | Purpose                                                                                              |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `forge info`                  | Show global system information (`--json`)                                                            |
-| `forge clean`                 | Remove orphaned state (`--scope`, `--yes`)                                                           |
-| `forge config`                | Manage global runtime preferences                                                                    |
-| `forge authentication login`  | Store credentials for LLM providers                                                                  |
-| `forge authentication status` | Show credential status per provider                                                                  |
-| `forge logs`                  | Show log file locations/status; notes per-proxy request-diagnostics capture (redacted, no plaintext) |
+| Command             | Purpose                                                                                              |
+| ------------------- | ---------------------------------------------------------------------------------------------------- |
+| `forge info`        | Show global system information (`--json`)                                                            |
+| `forge clean`       | Remove orphaned state (`--scope`, `--yes`)                                                           |
+| `forge config`      | Manage global runtime preferences                                                                    |
+| `forge auth login`  | Store credentials for LLM providers                                                                  |
+| `forge auth status` | Show credential status per provider                                                                  |
+| `forge logs`        | Show log file locations/status; notes per-proxy request-diagnostics capture (redacted, no plaintext) |
 
 ### Internal (hidden from `forge --help`)
 

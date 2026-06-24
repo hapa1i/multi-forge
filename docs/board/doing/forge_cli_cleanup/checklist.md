@@ -25,8 +25,10 @@ namespace (backend moves under it); **D4 = split `forge memory` — activation/r
 `hook enable|disable`); D7 = tiered config-object verbs, `backend` excluded; **D8 = normalize all `json_output` ->
 `as_json`**; **D9 = wait for the `workspace_scope` card (no `--scope workspace` on telemetry here)**. **D6 =
 finalized:** `auth` canonical (no `authentication` alias); new nouns `telemetry`/`model` get no alias; the `extensions`
-shim is removed; `ext`/`sess`/`mem`/`cfg` kept. Slice 05 (runs last) implements. **Remaining slices (05 runs last;
-07-12) are parked pending direction.**
+shim is removed; `ext`/`sess`/`mem`/`cfg` kept. **Slice 05 shipped 2026-06-24 — the final code slice. All Phase 2 slices
+(02-12) are complete and the card's code work is done. Closeout done: change log entry added, docs synced,
+`make pre-commit` clean, Docker integration 34/34 pass. Remaining: human-gated `impl_notes` promotion and the `doing/`
+-> `done/` lane move (on merge).**
 
 ## Audit reconciliation (verified 2026-06-23)
 
@@ -357,30 +359,37 @@ verification is recorded.
     `design_workflows.md` (+shadow status), `cli_style_guidelines.md` (no_args_is_help → stderr/exit 2).
   - Verification: 267 tests across touched CLI files pass; tree invariants pass with both allowlists empty;
     `make pre-commit` clean.
-- [ ] **Slice 05 - Alias + canonical pass (D6, finalized).** Apply the D6 alias set. Run **last** so new nouns from
-  D1-D4 are settled. Verified blast radius (map+verify workflow, 2026-06-23):
-  - `src/forge/cli/main.py`: `_ALIASES` (50-57) remove `"auth": "authentication"` (51) and `"extensions": "extension"`
-    (53); `_DISPLAY_ALIASES` (59-65) remove `"authentication": "auth"` (60). **Load-bearing:** flip the registration
-    `main.add_command(auth, name="authentication")` (~381) to `name="auth"` — removing the alias is only coherent once
-    `auth` is the registered canonical. `main.add_command(extensions, name="extension")` (393) is unchanged (the Python
-    symbol `extensions` is the command object, unrelated to the removed CLI string).
-  - `docs/cli_reference.md`: rewrite the alias sentence (10-11) — drop the `authentication`/`auth` clause (auth is now
-    canonical, not an alias) and the `extensions` clause; reword the command table (240-241)
-    `forge authentication login|status` -> `forge auth ...`.
-  - `docs/developer/cli_style_guidelines.md`: update the enumerated alias set (45) to `ext`/`sess`/`mem`/`cfg` only;
-    drop the `extensions` shim mention (47); record the D6 alias rule; clear the alias placeholder.
-  - `tests/src/cli/test_command_tree_invariants.py:135`: `JSON_MISSING_ALLOWLIST` entry `forge authentication status` ->
-    `forge auth status` (canonical-path keyed; otherwise `test_read_leaves_expose_json` fails). Slice 07 also drains
-    this entry's `--json` debt — coordinate the two touches.
-  - Shim removal in tests: `tests/src/cli/test_startup_queue.py` (44,112,132,175,188,208) and
-    `tests/integration/cli/test_startup_queue_integration.py` (60,72,148) change CLI string `"extensions"` ->
-    `"extension"`. **Do NOT touch** `tests/src/install/test_version.py`'s `from forge.cli.extensions import extensions`
-    — that is the Python module/symbol path, not the CLI alias string. `tests/src/cli/test_auth.py` already invokes the
-    (soon-canonical) `auth` form and should stay green; `tests/src/cli/test_memory.py:836` `mem` alias test stays.
-  - QA checklist: `src/skills/qa/resources/checklist/3-authentication.md` (~15 `forge authentication ...` ->
-    `forge auth ...`) and `src/skills/qa/resources/checklist.md:44,46`.
-  - Old `forge authentication ...` and `forge extensions ...` paths return Click `No such command` (clean break, no
-    tombstone). Update `_ALIASES`, `_DISPLAY_ALIASES`, `cli_reference.md`, and the style guide alias section together.
+- [x] **Slice 05 - Alias + canonical pass (D6). SHIPPED 2026-06-24.** Applied the D6 alias set as the final code slice.
+  - **Functional (`src/forge/cli/main.py`)**: `_ALIASES` -> `{ext, sess, mem, cfg}` (dropped `auth`/`extensions`);
+    `_DISPLAY_ALIASES` -> `{extension, session, memory, config}` (dropped `authentication`); flipped the registration to
+    `main.add_command(auth, name="auth")`. The `extensions` Python symbol and its `name="extension"` registration are
+    unchanged (symbol != CLI alias).
+  - **Help/comment accuracy** (kept drift sweep 1 clean): `auth.py` help text -> `forge auth`;
+    `install/{cli,hooks,preset,settings_merge}.py` comments + `test_version.py` docstrings + QA `2-extension.md` ->
+    singular `extension`.
+  - **Tests**: `extensions` -> `extension` CLI strings in `test_startup_queue.py` (6) + 3 integration files
+    (`test_installer.py` — incl. the `:158` output assertion, now matching the real singular `forge extension enable`
+    tip; `test_project_identity.py`; `test_startup_queue_integration.py`). Added `test_removed_aliases_are_clean_breaks`
+    (bare + leaf `authentication`/`extensions` forms exit 2 "No such command") and
+    `test_canonical_command_names_resolve` in `test_command_tree_invariants.py`.
+    `test_extension_enable.py`/`test_version.py` object-invocations and `test_auth.py`/`test_memory.py` (`mem`) left
+    untouched (verified safe).
+  - **Docs**: `cli_reference.md` (alias sentence + table rows), `cli_style_guidelines.md` (crisp D6 rule: deliberate
+    aliases only / new nouns get none / rename shims are temporary), `end-user/authentication.md` (removed the now-false
+    "Alias" banner + all command forms), `end-user/README.md`, `config.md`, root `README.md`, QA `checklist.md` +
+    `3-authentication.md`.
+  - **Reconciliation with the original planned bullets (verified 2026-06-24)**: (a) the planned `JSON_MISSING_ALLOWLIST`
+    rename (`forge authentication status` -> `forge auth status`) was a **no-op** — that ledger was already drained to
+    `{}` in Slice 07, so there was nothing to rename. (b) The blast radius was **wider** than the original bullets
+    enumerated: it also required `auth.py` help text, `install/*.py` + `test_version.py` docstrings, the
+    `test_installer.py`/`test_project_identity.py` integration shell commands, and
+    `authentication.md`/`README.md`/`config.md` end-user docs.
+  - **Verification**: 2314 cli+install unit tests pass; new clean-break + canonical guards pass; manual smoke (exit
+    2/2/0/0; help shows `auth` + `extension (ext)`); both drift sweeps clean (sweep 2's two `extensions.py` hits are
+    benign English prose, `forge extension status` already singular); a 3-lens read-only adversarial verification
+    workflow (completeness / alias-mechanism / diff-review) returned clean with zero findings; `make pre-commit` clean;
+    Docker integration 34/34 pass (`test_installer.py` / `test_project_identity.py` /
+    `test_startup_queue_integration.py`) on a wheel-installed forge.
 
 ### Acceptance table (risky / multi-file moves)
 
@@ -396,6 +405,7 @@ verification is recorded.
 | Supervisor split            | session with supervisor          | `forge policy supervisor {status,set,off,on,remove,reload,cascade,evaluate}` work; `supervise` + bare `supervisor -f` exit 2; `status --json` shapes pinned; `LEAF_NAMING_ALLOWLIST` `{}`                                                          | `tests/src/cli/test_policy_supervisor.py`                    |
 | `session context` removed   | n/a                              | `forge session context` exits 2 "No such command"; `test_session_context.py` deleted                                                                                                                                                               | (removal)                                                    |
 | Error markup drained        | CLI source scan                  | `CLI_ERROR_MARKUP_ALLOWLIST` `{}`; all 10 terminal tips routed (incl. 2 `ClickException`); `proxy_costs.py:132` + `session_fork.py:467` reworded; tip guard fails on `Tip:` in CLI source, allowlist = exactly the 3 `direct_commands.py` payloads | `tests/src/cli/test_output.py`                               |
+| Aliases clean break (D6)    | full command tree                | `forge authentication`/`forge extensions` (bare + leaf) exit 2 "No such command"; `forge auth`/`forge extension` resolve; `_ALIASES`/`_DISPLAY_ALIASES` = `{ext,sess,mem,cfg}`                                                                     | `tests/src/cli/test_command_tree_invariants.py`              |
 
 ## Docs and verification
 
@@ -403,21 +413,25 @@ verification is recorded.
   at `docs/board/doing/forge_cli_cleanup/card.md` (was `proposed/`). `test_output.py:142` carries no path, so it needed
   no change. (Two stale cross-links remain in `docs/board/proposed/rewind_resume_strategy/card.md:27,260` — a different
   card's content; tracked separately, not fixed here.)
-- [ ] Update `docs/cli_reference.md` for every moved/removed/added surface (drop the `session context` note; re-document
-  aliases per D6).
-- [ ] Update relevant `docs/end-user/*` guides (`hook.md` per D5, `proxy.md`/`session.md`/`memory.md` for moves).
-- [ ] Update `docs/developer/cli_style_guidelines.md`: record the config-object verb vocabulary (D7), the stream guard
+- [x] Update `docs/cli_reference.md` for every moved/removed/added surface (`session context` note dropped in Slice 06;
+  alias sentence + `forge auth` table rows re-documented per D6 in Slice 05).
+- [x] Update relevant `docs/end-user/*` guides (`hook.md` already in the D5 state — `forge extension enable` is the
+  primary path, `forge hook enable|disable` kept as the lower-level advanced option; `proxy.md`/`session.md`/`memory.md`
+  synced in their moves; `authentication.md`/`README.md`/`config.md` updated for D6 in Slice 05).
+- [x] Update `docs/developer/cli_style_guidelines.md`: record the config-object verb vocabulary (D7), the stream guard
   once wired, the alias rule (D6), and remove "settled in the forge_cli_cleanup card" placeholders as each lands. (D7
-  config-object vocab done 2026-06-23, Slice 08; stream guard done Slice 07; **D6 alias rule still pending Slice 05** —
-  box stays unchecked until D6 lands.)
+  config-object vocab Slice 08; stream guard Slice 07; **D6 alias rule recorded in Slice 05** — deliberate aliases only
+  / new nouns get none / rename shims are temporary.)
 - [x] Update `docs/design.md`/`cli_reference.md` ownership tables if command ownership changes (telemetry, memory
   split). Done for both shipped moves: design.md §4.0/§3.x and cli_reference reflect `forge session memory` +
   `forge session transfer`; verified no stale `forge memory enable|disable|status|report` / bare `forge transfer <verb>`
   in the four normative docs (one intentional "(former `forge memory report show`)" breadcrumb kept).
 - [x] Add a `change_log.md` entry per shipped slice naming the moved live commands (`forge activity` →
   `forge telemetry activity`, etc.).
-- [ ] Run targeted CLI tests for old/new paths, help text, `--json` shape, and stream behavior after each slice.
-- [ ] `make pre-commit` before closeout; promote durable taxonomy/alias decisions to `impl_notes.md` after review.
+- [x] Run targeted CLI tests for old/new paths, help text, `--json` shape, and stream behavior after each slice. (Slice
+  05: 2314 cli+install unit tests + new clean-break/canonical guards pass; manual smoke confirms exit 2/2/0/0.)
+- [x] `make pre-commit` before closeout (clean — see change log). Durable taxonomy/alias decisions are queued for
+  human-gated promotion to `impl_notes.md` (the D6 alias rule + the "symbol != CLI alias" reconciliation lesson).
 
 ## Open decisions carried from the card
 

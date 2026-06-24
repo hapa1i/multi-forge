@@ -12,6 +12,7 @@ being removed* -- so the ledger can only shrink, never silently grow or rot.
 from __future__ import annotations
 
 import click
+from click.testing import CliRunner
 
 from forge.cli.main import main
 
@@ -199,3 +200,37 @@ def test_destructive_prompt_verbs_use_yes() -> None:
         if path.split()[-1] not in _DESTRUCTIVE_PROMPT_VERBS or path in _OVERRIDE_RESET_LEAVES:
             continue
         assert "yes" in _option_dests(cmd), f"{path}: delete/reset leaf must expose the --yes confirmation-bypass"
+
+
+# --- Rule: removed aliases are clean breaks, not tombstones --------------------
+# forge_cli_cleanup Slice 05 (D6): `auth` is the canonical command name (the
+# `authentication` alias is gone) and the `extensions` -> `extension` rename shim
+# is removed. Both old paths -- bare group and a real old leaf -- must fail through
+# Click's native "No such command", and the canonical names must still resolve.
+_REMOVED_ALIAS_ARGVS = (
+    ["authentication"],
+    ["authentication", "status"],
+    ["extensions"],
+    ["extensions", "status"],
+)
+_CANONICAL_ALIAS_ARGVS = (
+    ["auth", "--help"],
+    ["extension", "--help"],
+)
+
+
+def test_removed_aliases_are_clean_breaks() -> None:
+    runner = CliRunner()
+    for argv in _REMOVED_ALIAS_ARGVS:
+        result = runner.invoke(main, argv)
+        joined = " ".join(argv)
+        assert result.exit_code == 2, f"{joined!r} should be a clean break (exit 2), got {result.exit_code}"
+        assert "No such command" in result.output, f"{joined!r} should fail with Click 'No such command'"
+
+
+def test_canonical_command_names_resolve() -> None:
+    runner = CliRunner()
+    for argv in _CANONICAL_ALIAS_ARGVS:
+        result = runner.invoke(main, argv)
+        joined = " ".join(argv)
+        assert result.exit_code == 0, f"{joined!r} should resolve (exit 0), got {result.exit_code}: {result.output}"

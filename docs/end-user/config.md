@@ -215,7 +215,7 @@ loads with a one-time warning and is ignored.)
 
 ---
 
-## Secrets (`forge authentication`)
+## Secrets (`forge auth`)
 
 API keys and credentials are managed via `forge auth login` and stored in `~/.forge/credentials.yaml`. These are for
 Forge proxy routing and subprocesses, not your Claude Code login. Environment variables (`.env`, shell exports) still

@@ -1,17 +1,17 @@
 """Authentication CLI commands.
 
-Provides ``forge authentication login`` for storing credentials in
-``~/.forge/credentials.yaml``, ``forge authentication status`` to check
-credential status, ``forge authentication logout`` to remove stored
-credentials, and ``forge authentication profiles`` to list saved profiles.
+Provides ``forge auth login`` for storing credentials in
+``~/.forge/credentials.yaml``, ``forge auth status`` to check
+credential status, ``forge auth logout`` to remove stored
+credentials, and ``forge auth profiles`` to list saved profiles.
 
 Usage:
-    forge authentication login                            # Credential selection menu
-    forge authentication login -c anthropic-api           # Single credential
-    forge authentication login -c anthropic-api --profile work
-    forge authentication status                           # Dual-view status
-    forge authentication logout --profile default         # Remove stored credentials
-    forge authentication profiles                         # List saved profiles
+    forge auth login                            # Credential selection menu
+    forge auth login -c anthropic-api           # Single credential
+    forge auth login -c anthropic-api --profile work
+    forge auth status                           # Dual-view status
+    forge auth logout --profile default         # Remove stored credentials
+    forge auth profiles                         # List saved profiles
 """
 
 from __future__ import annotations
@@ -138,9 +138,9 @@ def auth() -> None:
 
     \b
     Examples:
-        forge authentication login               # Store credentials
-        forge authentication status              # Check credential sources
-        forge authentication profiles            # List saved profiles
+        forge auth login               # Store credentials
+        forge auth status              # Check credential sources
+        forge auth profiles            # List saved profiles
     """
     pass
 
@@ -340,8 +340,8 @@ def status(profile: str | None, as_json: bool) -> None:
 
     \b
     Examples:
-        forge authentication status
-        forge authentication status --profile work
+        forge auth status
+        forge auth status --profile work
     """
     profile_name = resolve_profile(profile)
 
@@ -462,9 +462,9 @@ def logout(profile: str | None, yes: bool) -> None:
 
     \b
     Examples:
-        forge authentication logout
-        forge authentication logout --profile work
-        forge authentication logout -y  # Skip confirmation
+        forge auth logout
+        forge auth logout --profile work
+        forge auth logout -y  # Skip confirmation
     """
     profile_name = resolve_profile(profile)
 
@@ -486,7 +486,7 @@ def profiles_cmd(as_json: bool) -> None:
 
     \b
     Examples:
-        forge authentication profiles
+        forge auth profiles
     """
     if as_json:
         try:

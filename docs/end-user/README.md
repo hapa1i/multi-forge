@@ -45,7 +45,7 @@ If you want to route through other providers (Gemini, GPT, etc.):
 
 ```bash
 # Store your credentials (API keys + connection values)
-forge authentication login
+forge auth login
 
 # Create a proxy (OpenRouter direct, no LiteLLM needed)
 forge proxy create openrouter-anthropic
@@ -81,8 +81,8 @@ No patching required.
 ### F. Store credentials
 
 ```bash
-forge authentication login               # Prompt for API keys, store in ~/.forge/credentials.yaml
-forge authentication status              # Show where each credential comes from (env, file, missing)
+forge auth login               # Prompt for API keys, store in ~/.forge/credentials.yaml
+forge auth status              # Show where each credential comes from (env, file, missing)
 ```
 
 See [authentication.md](authentication.md) for profiles and credential resolution.

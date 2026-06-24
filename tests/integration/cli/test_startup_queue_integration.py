@@ -47,7 +47,7 @@ class TestStartupQueueProcessing:
     """Tests for CLI startup queue processing behavior."""
 
     def test_forge_status_processes_queue(self, mock_claude_workspace: ContainerLike) -> None:
-        """forge extensions status (non-exempt) triggers pending-work processing and deletes markers."""
+        """forge extension status (non-exempt) triggers pending-work processing and deletes markers."""
         # Create a marker
         marker_path = _create_stop_marker(mock_claude_workspace)
 
@@ -55,21 +55,21 @@ class TestStartupQueueProcessing:
         check = mock_claude_workspace.exec(f"test -f {marker_path} && echo exists || echo missing")
         assert "exists" in check.stdout
 
-        # Run a non-exempt command: forge extensions status
+        # Run a non-exempt command: forge extension status
         # Command may fail (no install state), but startup processing runs first
-        mock_claude_workspace.exec("forge extensions status")
+        mock_claude_workspace.exec("forge extension status")
 
         # Marker should be deleted by startup processing
         check = mock_claude_workspace.exec(f"test -f {marker_path} && echo exists || echo missing")
         assert "missing" in check.stdout, "Non-exempt command should process and delete pending-work markers"
 
     def test_forge_status_handles_empty_queue(self, mock_claude_workspace: ContainerLike) -> None:
-        """forge extensions status handles empty queue gracefully (fast path)."""
+        """forge extension status handles empty queue gracefully (fast path)."""
         # Ensure queue directory doesn't exist
         mock_claude_workspace.exec("rm -rf $HOME/.forge/pending-work")
 
         # Should not crash even with empty queue
-        result = mock_claude_workspace.exec("forge extensions status")
+        result = mock_claude_workspace.exec("forge extension status")
 
         # Command completes (may fail if no install state, but shouldn't crash)
         # We just verify it produces output without crashing
@@ -145,7 +145,7 @@ class TestStartupQueueRobustness:
             assert "exists" in check.stdout
 
         # Run non-exempt command
-        mock_claude_workspace.exec("forge extensions status")
+        mock_claude_workspace.exec("forge extension status")
 
         # All markers should be deleted
         for marker in markers:

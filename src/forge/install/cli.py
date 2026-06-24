@@ -1,7 +1,7 @@
 """CLI command for forge info (global installation information).
 
 The info command remains at top-level for quick diagnostics.
-Other installation lifecycle commands have moved to `forge extensions` group.
+Other installation lifecycle commands have moved to the `forge extension` group.
 """
 
 from __future__ import annotations

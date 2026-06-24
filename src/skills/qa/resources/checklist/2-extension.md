@@ -7,7 +7,7 @@
 <!-- auto -->
 
 ```bash
-# Install forge extensions (default: standard profile, user scope)
+# Install Forge extensions (default: standard profile, user scope)
 cd $FORGE_TEST_REPO
 forge extension enable --scope user --symlink
 

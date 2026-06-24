@@ -27,6 +27,45 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-24
 
+### forge_cli_cleanup Slice 05: alias + canonical-name pass (final code slice)
+
+**Goal**: Apply the D6 alias decision — make `auth` the canonical command (remove the `authentication` alias) and remove
+the `extensions` -> `extension` back-compat shim — closing the last code slice of the CLI cleanup card.
+
+**Key changes**:
+
+- **Clean break (`src/forge/cli/main.py`)**: `_ALIASES` -> `{ext, sess, mem, cfg}`; `_DISPLAY_ALIASES` ->
+  `{extension, session, memory, config}`; registration flipped to `main.add_command(auth, name="auth")`. The rename and
+  the alias removal are atomic — `forge auth` resolves via the alias today, so both must land together.
+  `forge authentication ...` and `forge extensions ...` now fail via Click "No such command" (exit 2, no tombstone).
+- **Help/comment accuracy**: `auth.py` help text -> `forge auth`; `install/{cli,hooks,preset,settings_merge}.py`
+  comments, `test_version.py` docstrings, and QA `2-extension.md` -> singular `extension` (keeps the drift sweep clean).
+- **Tests**: `extensions` -> `extension` CLI strings in `test_startup_queue.py` (6) + 3 integration files
+  (`test_installer.py` incl. the `:158` output assertion now matching the real singular tip, `test_project_identity.py`,
+  `test_startup_queue_integration.py`); new `test_removed_aliases_are_clean_breaks` (bare + leaf forms) +
+  `test_canonical_command_names_resolve` guards. Python symbol/module paths (`from forge.cli.extensions import ...`,
+  `runner.invoke(extensions, ...)`) intentionally untouched.
+- **Docs**: `cli_reference.md` (alias sentence + `forge auth` table rows); `cli_style_guidelines.md` (crisp D6 rule:
+  deliberate aliases only, new nouns get none, rename shims are temporary); `end-user/authentication.md` (removed the
+  now-false "Alias" banner); `end-user/README.md`, `config.md`, root `README.md`, QA
+  `checklist.md`/`3-authentication.md`.
+
+**Breaking change (research preview)**: `forge authentication` and `forge extensions` are removed — use `forge auth` and
+`forge extension`. Kept aliases: `ext`/`sess`/`mem`/`cfg`. New nouns `telemetry`/`model` have no alias.
+
+**Reconciliation with the planned checklist**: the planned `JSON_MISSING_ALLOWLIST` rename was a no-op (the ledger was
+already drained to `{}` in Slice 07); the real blast radius was wider than the original card bullets (also `auth.py` /
+`install/*.py` / `test_version.py` docstrings, two integration shell-command files, and three end-user docs).
+
+**Verification**: 2314 cli+install unit tests pass; manual smoke (exit 2/2/0/0; `forge --help` shows `auth` +
+`extension (ext)`); both drift sweeps clean (the two residual `extensions.py` hits are benign English prose); a 3-lens
+read-only adversarial verification workflow (completeness / alias-mechanism / diff-review) returned clean with zero
+findings; `make pre-commit` clean; Docker integration 34/34 pass (`test_installer.py` / `test_project_identity.py` /
+`test_startup_queue_integration.py`) on a wheel-installed forge — confirms `forge extension` works end-to-end with the
+`extensions` alias removed.
+
+**Card status**: final code slice — all Phase 2 slices (02-12) complete; the card is ready to move `doing/` -> `done/`.
+
 ### forge_cli_cleanup Slice 12: non-leaf + small-surface cleanup
 
 **Goal**: Close the last non-alias slice — normalize the two hand-rolled non-leaf groups (F13), drain the final

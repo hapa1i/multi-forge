@@ -41,7 +41,7 @@ targeting, memory 16.4 re-track)
 
 <!-- section: 2 checklist/2-extension.md -->
 
-- [3. Authentication (`forge authentication`)](checklist/3-authentication.md)
+- [3. Authentication (`forge auth`)](checklist/3-authentication.md)
 
 <!-- section: 3 checklist/3-authentication.md -->
 

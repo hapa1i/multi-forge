@@ -39,9 +39,9 @@ class TestStartupQueueProcessing:
         marker = _create_test_marker(tmp_path)
         assert marker.is_file()
 
-        # Run a non-exempt command: forge extensions status
+        # Run a non-exempt command: forge extension status
         runner = CliRunner()
-        runner.invoke(main, ["extensions", "status"])
+        runner.invoke(main, ["extension", "status"])
 
         # Command may fail (no install state), but that's OK -
         # the important thing is startup processing ran first
@@ -107,9 +107,9 @@ class TestStartupQueueRobustness:
         corrupt_marker = queue_dir / "corrupted.json"
         corrupt_marker.write_text("not valid json")
 
-        # Run non-exempt command (extensions status triggers startup processing)
+        # Run non-exempt command (extension status triggers startup processing)
         runner = CliRunner()
-        result = runner.invoke(main, ["extensions", "status"])
+        result = runner.invoke(main, ["extension", "status"])
 
         # Should not crash (best-effort processing)
         assert result.exception is None or isinstance(result.exception, SystemExit)
@@ -129,7 +129,7 @@ class TestStartupQueueRobustness:
 
         # Run non-exempt command
         runner = CliRunner()
-        runner.invoke(main, ["extensions", "status"])
+        runner.invoke(main, ["extension", "status"])
 
         # All markers should be deleted
         assert all(not m.is_file() for m in markers), "All valid markers should be processed"
@@ -172,7 +172,7 @@ class TestIndexMarkerProcessing:
         assert marker.is_file()
 
         runner = CliRunner()
-        runner.invoke(main, ["extensions", "status"])
+        runner.invoke(main, ["extension", "status"])
 
         assert not marker.is_file(), "Index marker should be deleted by startup processing"
 
@@ -185,7 +185,7 @@ class TestIndexMarkerProcessing:
         assert index_marker.is_file()
 
         runner = CliRunner()
-        runner.invoke(main, ["extensions", "status"])
+        runner.invoke(main, ["extension", "status"])
 
         assert not stop_marker.is_file(), "Stop marker should be processed"
         assert not index_marker.is_file(), "Index marker should be processed"
@@ -205,7 +205,7 @@ class TestIndexMarkerProcessing:
         _create_index_marker_with_transcript(tmp_path, session_id="doc-test")
 
         runner = CliRunner()
-        runner.invoke(main, ["extensions", "status"])
+        runner.invoke(main, ["extension", "status"])
 
         from forge.search.store import SearchDocumentStore
 

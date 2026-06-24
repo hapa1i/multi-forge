@@ -43,14 +43,16 @@ Forge CLI commands use explicit verbs and predictable command boundaries.
 
 - **Add deliberate aliases only.** The short root aliases are an intentional UX affordance, not a general compatibility
   pattern. They are defined in two maps in `src/forge/cli/main.py`: `_ALIASES` (resolution) and `_DISPLAY_ALIASES`
-  (surfaced in `--help`). The current set is `auth` -> `authentication`, `ext` -> `extension`, `sess` -> `session`,
-  `mem` -> `memory`, `cfg` -> `config`. Add a new alias only when the proposal explicitly justifies it, and update both
-  maps. (`extensions` -> `extension` also exists in `_ALIASES` as a one-off rename shim; that is back-compat, not the
-  alias pattern.)
+  (surfaced in `--help`). The current set is `ext` -> `extension`, `sess` -> `session`, `mem` -> `memory`, `cfg` ->
+  `config`. Durable short aliases are allowed only when **deliberately chosen** (a rationale-backed UX affordance);
+  update both maps when adding one. New top-level nouns do **not** automatically get an alias. Rename/back-compat shims
+  are **temporary** — remove them in a cleanup slice rather than keeping them indefinitely (the `auth` ->
+  `authentication` and `extensions` -> `extension` shims were removed in the `forge_cli_cleanup` card).
 
 - **Canonical names follow user vocabulary.** The canonical command name is the word users actually type, not the
-  implementation or historical name; the short form is the alias, not the canonical. A new alias needs a recorded
-  rationale and a matching update to `_ALIASES`, `_DISPLAY_ALIASES`, and the docs. _(review)_
+  implementation or historical name; the short form is the alias, not the canonical (for example `auth` is canonical,
+  not `authentication`). A new alias needs a recorded rationale and a matching update to `_ALIASES`, `_DISPLAY_ALIASES`,
+  and the docs. _(review)_
 
 - **Support scripting on read surfaces.** List/show and other scriptable read commands expose a `--json` flag with a
   stable structured shape. Use the project idiom, which names the option destination `as_json` so it does not shadow the

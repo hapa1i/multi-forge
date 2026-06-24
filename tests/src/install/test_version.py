@@ -136,7 +136,7 @@ class TestCheckMinimumVersion:
 
 
 class TestVersionGateOnExtensionsEnable:
-    """Verify that ``forge extensions enable`` blocks on old Claude Code."""
+    """Verify that ``forge extension enable`` blocks on old Claude Code."""
 
     def test_enable_blocks_on_old_version(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         from click.testing import CliRunner
@@ -169,7 +169,7 @@ class TestVersionGateOnExtensionsEnable:
 
 
 class TestVersionGateOnExtensionsSync:
-    """Verify that ``forge extensions sync`` blocks on old Claude Code."""
+    """Verify that ``forge extension sync`` blocks on old Claude Code."""
 
     def test_sync_blocks_on_old_version(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         from click.testing import CliRunner

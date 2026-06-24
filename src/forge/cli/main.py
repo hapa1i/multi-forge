@@ -48,16 +48,13 @@ _EXEMPT_SUBCOMMANDS = frozenset({"hook", "status-line", "logs", "clean"})
 _SESSION_CLEANUP_EXEMPT = frozenset({"hook", "status-line", "logs", "session", "clean"})
 
 _ALIASES: dict[str, str] = {
-    "auth": "authentication",
     "ext": "extension",
-    "extensions": "extension",  # backward compat (renamed from plural)
     "sess": "session",
     "mem": "memory",
     "cfg": "config",
 }
 # Display aliases: canonical -> preferred short alias (shown in help)
 _DISPLAY_ALIASES: dict[str, str] = {
-    "authentication": "auth",
     "extension": "ext",
     "session": "sess",
     "memory": "mem",
@@ -378,7 +375,7 @@ def main(ctx: click.Context) -> None:
         _auto_clean_sessions_best_effort()
 
 
-main.add_command(auth, name="authentication")
+main.add_command(auth, name="auth")
 main.add_command(model_cmd, name="model")
 main.add_command(session)
 main.add_command(proxy)
