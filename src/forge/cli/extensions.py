@@ -870,7 +870,7 @@ def disable_cmd(scope: str | None, uninstall_all: bool, yes: bool) -> None:
         print_error(f"{e}", console=console)
         sys.exit(1)
     except TrackingCorruptedError as e:
-        console.print(f"[bold red]Error:[/bold red] {e}")
+        print_error(f"{e}", console=console)
         sys.exit(1)
     except ForgeInstallError as e:
         print_error(f"{e}", console=console)

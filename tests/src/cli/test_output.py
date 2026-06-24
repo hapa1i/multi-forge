@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import re
 from pathlib import Path
 
 import pytest
@@ -172,16 +173,26 @@ def test_cli_rich_tips_go_through_output_helpers() -> None:
 
 
 # Drained empty by forge_cli_cleanup Slice 11 (finding #9): every hand-rolled
-# `[red]Error:[/red]` now routes through print_error. Kept as a locked, never-grow
+# red-styled `Error:` now routes through print_error. Kept as a locked, never-grow
 # ledger -- a new offender makes `new` (below) non-empty and fails the test.
 CLI_ERROR_MARKUP_ALLOWLIST: set[str] = set()
 
+# Any Rich red style tag (`[red]`, `[bold red]`, `[bright_red]`, ...) immediately
+# before `Error:`. The original guard matched only the exact `[red]Error:[/red]`
+# literal, so a `[bold red]Error:[/bold red]` site slipped the net (forge_cli_cleanup
+# review M2). Plain `Error:` (no markup) is out of scope, and non-error red phrases
+# (`[bold red]Conflicts detected:`) do not match. Closing tags (`[/red]`) can't match
+# because `/` is outside the char class.
+_RED_ERROR_MARKUP = re.compile(r"\[[\w ]*red\]\s*Error:")
+
 
 def test_cli_rich_errors_go_through_print_error() -> None:
-    """Hand-rolled `[red]Error:[/red]` belongs in print_error, not at call sites.
+    """Hand-rolled red-styled `Error:` belongs in print_error, not at call sites.
 
     Extends the recovery-output rule from tips to errors (cli_style_guidelines.md
-    "Error ownership"). The allowlist is the current debt; new offenders fail.
+    "Error ownership"). Catches every red style variant before `Error:`, not just the
+    exact `[red]Error:[/red]` literal. The allowlist is the current debt; new offenders
+    fail.
     """
     repo_root = Path(__file__).resolve().parents[3]
     cli_root = repo_root / "src" / "forge" / "cli"
@@ -190,10 +201,10 @@ def test_cli_rich_errors_go_through_print_error() -> None:
     for path in sorted(cli_root.rglob("*.py")):
         if path.name == "output.py":
             continue
-        if "[red]Error:[/red]" in path.read_text(encoding="utf-8"):
+        if _RED_ERROR_MARKUP.search(path.read_text(encoding="utf-8")):
             offenders.add(path.relative_to(repo_root).as_posix())
 
     new = offenders - CLI_ERROR_MARKUP_ALLOWLIST
     fixed = CLI_ERROR_MARKUP_ALLOWLIST - offenders
-    assert not new, f"route hand-rolled [red]Error:[/red] through print_error: {sorted(new)}"
+    assert not new, f"route hand-rolled red-styled 'Error:' through print_error: {sorted(new)}"
     assert not fixed, f"cleaned -- remove from CLI_ERROR_MARKUP_ALLOWLIST: {sorted(fixed)}"
