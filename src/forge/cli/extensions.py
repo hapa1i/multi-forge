@@ -17,7 +17,7 @@ import click
 from rich.console import Console
 from rich.table import Table
 
-from forge.cli.output import print_error, print_tip
+from forge.cli.output import err_console, print_error, print_tip
 from forge.core.paths import display_path
 from forge.install.exceptions import (
     ForgeInstallError,
@@ -928,7 +928,7 @@ def status_cmd(scope: str | None, path: str | None, show_all: bool, as_json: boo
         tracking = TrackingStore()
         tracking.read()
     except TrackingCorruptedError as e:
-        console.print(f"[bold red]Error:[/bold red] {e}")
+        print_error(str(e), console=err_console)
         raise SystemExit(1) from None
 
     cwd = os.getcwd()

@@ -370,7 +370,7 @@ def status(as_json: bool, session_name: str | None) -> None:
     try:
         effective = compute_effective_intent(manifest)
     except Exception as exc:
-        print_error(f"Failed to compute effective config: {exc}", console=console)
+        print_error(f"Failed to compute effective config: {exc}", console=err_console)
         sys.exit(1)
 
     if as_json:
@@ -564,14 +564,14 @@ def check(
     from forge.policy.types import ActionContext, extract_added_lines
 
     if not file_path and not use_diff:
-        print_error("Provide --file or --diff", console=console)
+        print_error("Provide --file or --diff", console=err_console)
         sys.exit(2)
 
     cwd = Path.cwd().resolve()
 
     if use_diff:
         if sys.stdin.isatty():
-            print_error("--diff requires input on stdin (e.g., git diff | forge policy check ...)", console=console)
+            print_error("--diff requires input on stdin (e.g., git diff | forge policy check ...)", console=err_console)
             sys.exit(2)
         raw_input = sys.stdin.read()
         tool_name = "Edit"
@@ -583,7 +583,7 @@ def check(
         try:
             raw_input = target.read_text()
         except Exception as e:
-            print_error(f"Failed to read {display_path(file_path)}: {e}", console=console)
+            print_error(f"Failed to read {display_path(file_path)}: {e}", console=err_console)
             sys.exit(2)
         tool_name = "Write"
         new_content = raw_input
@@ -769,7 +769,7 @@ def supervisor_evaluate(
         forge policy supervisor evaluate -f src/foo.py -r abc-123 --no-proxy
     """
     if direct and proxy_name:
-        print_error("--no-proxy and --proxy are mutually exclusive", console=console)
+        print_error("--no-proxy and --proxy are mutually exclusive", console=err_console)
         sys.exit(1)
 
     from forge.policy.semantic.supervisor import SUPERVISOR_INTENT, invoke_supervisor
@@ -913,7 +913,7 @@ def supervisor_status(as_json: bool, session_name: str | None) -> None:
     try:
         effective = compute_effective_intent(manifest)
     except Exception as exc:
-        print_error(f"Failed to compute effective config: {exc}", console=console)
+        print_error(f"Failed to compute effective config: {exc}", console=err_console)
         sys.exit(1)
 
     sup = effective.policy.supervisor if effective.policy else None

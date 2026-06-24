@@ -520,7 +520,7 @@ def shadows_list_cmd(scope: str, as_json: bool) -> None:
     try:
         entries, scanned_roots = _collect_shadow_entries(scope, None)
     except ForgeOpError as e:
-        print_error(f"{e}", console=console)
+        print_error(f"{e}", console=err_console)
         sys.exit(1)
 
     # Deduplicate by (forge_root, official, shadow_path)
@@ -585,7 +585,7 @@ def shadows_show_cmd(for_doc: str, scope: str, as_json: bool) -> None:
     try:
         entries, scanned_roots = _collect_shadow_entries(scope, None)
     except ForgeOpError as e:
-        print_error(f"{e}", console=console)
+        print_error(f"{e}", console=err_console)
         sys.exit(1)
 
     matches = [entry for entry in entries if entry.official == for_doc]

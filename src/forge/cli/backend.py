@@ -32,7 +32,7 @@ from forge.backend.sources import (
     list_model_sources,
     resolve_model_source_id,
 )
-from forge.cli.output import print_error, print_error_with_tip, print_tip
+from forge.cli.output import err_console, print_error, print_error_with_tip, print_tip
 from forge.core.auth.template_secrets import resolve_env_or_credential_with_source
 from forge.core.credential_registry import EnvVar
 from forge.core.ops import (
@@ -727,7 +727,7 @@ def test_auth_cmd(source_id: str, as_json: bool, timeout: float) -> None:
     if source is None:
         print_error(
             f"Unknown backend source '{source_id}'. Use '{_BACKEND_COMMAND} list' to see source ids.",
-            console=console,
+            console=err_console,
         )
         sys.exit(1)
 
@@ -968,15 +968,14 @@ def reconcile_cmd(source_id: str, request_id: str | None, remote_id: str | None,
     Provide exactly one of --request-id (local-anchored: local trace -> remote record) or
     --remote-id (remote-only: the backend's own record id, no local side).
     """
-    console = Console(width=200)
     if request_id and remote_id:
-        print_error("Use only one of --request-id or --remote-id, not both.", console=console)
+        print_error("Use only one of --request-id or --remote-id, not both.", console=err_console)
         sys.exit(1)
     if not request_id and not remote_id:
         print_error_with_tip(
             "Provide a local request id or a remote record id to reconcile.",
             "Use --request-id <id> (local) or --remote-id <id> (the backend's own record id).",
-            console=console,
+            console=err_console,
         )
         sys.exit(1)
 
@@ -989,11 +988,11 @@ def reconcile_cmd(source_id: str, request_id: str | None, remote_id: str | None,
             timeout_s=timeout,
         )
     except ForgeOpError as e:
-        print_error_with_tip(str(e), f"Run '{_BACKEND_COMMAND} list' to see source ids.", console=console)
+        print_error_with_tip(str(e), f"Run '{_BACKEND_COMMAND} list' to see source ids.", console=err_console)
         sys.exit(1)
     except RemoteAdapterError as e:
         # Adapter bug / config fault (e.g. no base URL) -- a clean CLI error, not a traceback.
-        print_error(f"Remote adapter error: {e}", console=console)
+        print_error(f"Remote adapter error: {e}", console=err_console)
         sys.exit(1)
 
     if as_json:

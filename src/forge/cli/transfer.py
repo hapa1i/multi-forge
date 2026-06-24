@@ -20,7 +20,7 @@ import json
 import click
 
 from forge.cli.editor import open_in_editor
-from forge.cli.output import print_error_with_tip, print_tip
+from forge.cli.output import err_console, print_error_with_tip, print_tip
 from forge.cli.session import console
 from forge.core.ops.context import ExecutionContext
 from forge.core.ops.session import ForgeOpError
@@ -71,7 +71,7 @@ def show_cmd(parent: str, child: str | None, as_json: bool) -> None:
         print_error_with_tip(
             str(e),
             f"Run 'forge session resume {parent} --fresh' to create transfer context.",
-            console=console,
+            console=err_console,
         )
         raise SystemExit(1) from e
 
@@ -188,7 +188,7 @@ def diff_cmd(parent: str, child: str | None, as_json: bool) -> None:
         print_error_with_tip(
             str(e),
             f"Run 'forge session transfer show {parent}' to list available transfer context.",
-            console=console,
+            console=err_console,
         )
         raise SystemExit(1) from e
 

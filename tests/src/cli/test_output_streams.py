@@ -193,3 +193,47 @@ def test_session_list_json_failure_keeps_stdout_clean() -> None:
     assert result.exit_code == 1
     assert result.stdout.strip() == ""
     assert "--older-than must be >= 1" in result.stderr
+
+
+# --- Broader sweep: every --json command keeps stdout clean on a pre-flight error.
+# Each argv triggers a validation/lookup error that fires before the command's
+# `as_json` branch. The diagnostic must land on stderr; stdout must carry no Rich
+# `Error:`/`Tip:` (a script piping `--json` stdout into a parser must not choke).
+# Relies on the autouse isolate_forge_home fixture for the lookup-miss cases.
+_JSON_ERROR_PATH_CASES = [
+    (["policy", "check", "--bundle", "tdd", "--json"], "Provide --file or --diff"),
+    (["session", "transfer", "show", "no-such-parent-xyz", "--json"], "Error:"),
+    (["session", "transfer", "diff", "no-such-parent-xyz", "--json"], "Error:"),
+    (["proxy", "show", "no-such-proxy-xyz", "--json"], "Error:"),
+    (["proxy", "metrics", "no-such-proxy-xyz", "--json"], "not found in registry"),
+    (["proxy", "create", "no-such-template-xyz", "--json"], "not found"),
+    (["model", "backend", "test-auth", "no-such-source-xyz", "--json"], "Unknown backend source"),
+    (["model", "backend", "reconcile", "no-such-source-xyz", "--json"], "Provide a local request id"),
+    (["workflow", "panel", "x.md", "--context", "bogus", "--json"], "Invalid --context"),
+    (["workflow", "analyze", "--json"], "No topic provided"),
+    (["workflow", "debate", "--json"], "provided"),
+    (["workflow", "consensus", "--json"], "provided"),
+]
+
+
+@pytest.mark.parametrize("argv,stderr_substr", _JSON_ERROR_PATH_CASES, ids=lambda v: v if isinstance(v, str) else None)
+def test_json_command_error_paths_keep_stdout_clean(argv: list[str], stderr_substr: str) -> None:
+    result = CliRunner().invoke(main, argv)
+    assert result.exit_code != 0, f"{argv} should fail"
+    assert "Error:" not in result.stdout, f"{argv} leaked an Error: to stdout: {result.stdout!r}"
+    assert "Tip:" not in result.stdout, f"{argv} leaked a Tip: to stdout: {result.stdout!r}"
+    assert stderr_substr in result.stderr, f"{argv} stderr missing {stderr_substr!r}: {result.stderr!r}"
+
+
+def test_supervisor_evaluate_json_failure_keeps_stdout_clean(tmp_path: Path) -> None:
+    # `--no-proxy`/`--proxy` mutual exclusivity fires before the --json branch.
+    # `-f` needs a real path (Click `exists=True`) to reach the function body.
+    target = tmp_path / "x.py"
+    target.write_text("x = 1\n")
+    result = CliRunner().invoke(
+        main,
+        ["policy", "supervisor", "evaluate", "-f", str(target), "-r", "id", "--no-proxy", "--proxy", "p", "--json"],
+    )
+    assert result.exit_code != 0
+    assert "Error:" not in result.stdout
+    assert "mutually exclusive" in result.stderr

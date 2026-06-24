@@ -20,7 +20,7 @@ from typing import Any
 import click
 from rich.console import Console
 
-from forge.cli.output import print_error, print_tip
+from forge.cli.output import err_console, print_error, print_tip
 from forge.core.effort import CLAUDE_EFFORT_LEVELS
 from forge.proxy.proxies import ProxyResolutionError
 from forge.review.models import (
@@ -421,18 +421,18 @@ def panel(
     elif context_mode.startswith("resume:"):
         resume_id = context_mode[len("resume:") :]
         if not resume_id:
-            print_error("--context resume:<uuid> requires a UUID.", console=console)
+            print_error("--context resume:<uuid> requires a UUID.", console=err_console)
             ctx.exit(2)
             return
     else:
-        print_error(f'Invalid --context "{context_mode}".' ' Use "blind" or "resume:<uuid>".', console=console)
+        print_error(f'Invalid --context "{context_mode}".' ' Use "blind" or "resume:<uuid>".', console=err_console)
         ctx.exit(2)
         return
 
     # Prompt composition: (1) resolve base prompt/resource
     resolved_prompt = _resolve_panel_prompt(target, prompt, code_mode, review_type)
     if resolved_prompt is None:
-        print_error("No prompt provided. Use target argument, -p, or stdin.", console=console)
+        print_error("No prompt provided. Use target argument, -p, or stdin.", console=err_console)
         ctx.exit(2)
         return
 
@@ -441,7 +441,7 @@ def panel(
     # Skip when -p or stdin provided a custom prompt (review_type is ignored).
     uses_resource = not prompt and bool(target)
     if uses_resource and review_type in ("security", "performance") and not code_mode:
-        print_error(f"--review-type {review_type} requires --code.", console=console)
+        print_error(f"--review-type {review_type} requires --code.", console=err_console)
         ctx.exit(2)
         return
 
@@ -456,7 +456,7 @@ def panel(
     try:
         specs = resolve_model_specs(models)
     except ValueError as e:
-        print_error(f"{e}", console=console)
+        print_error(f"{e}", console=err_console)
         ctx.exit(2)
         return
 
@@ -465,7 +465,7 @@ def panel(
         try:
             role_list = _parse_roles(roles)
         except ValueError as e:
-            print_error(f"{e}", console=console)
+            print_error(f"{e}", console=err_console)
             ctx.exit(2)
             return
         specs = _apply_panel_roles(specs, role_list, resolved_prompt)
@@ -841,14 +841,14 @@ def analyze(
     """
     resolved_topic = " ".join(topic) if topic else prompt_text
     if not resolved_topic:
-        print_error("No topic provided. Pass as argument or use -p.", console=console)
+        print_error("No topic provided. Pass as argument or use -p.", console=err_console)
         ctx.exit(2)
         return
 
     try:
         specs = resolve_model_specs(models)
     except ValueError as e:
-        print_error(f"{e}", console=console)
+        print_error(f"{e}", console=err_console)
         ctx.exit(2)
         return
 
@@ -1254,14 +1254,14 @@ def debate(
     from forge.review.adversarial import run_adversarial, validate_resource
 
     if workers and models:
-        print_error("--worker and --models are mutually exclusive.", console=console)
+        print_error("--worker and --models are mutually exclusive.", console=err_console)
         ctx.exit(2)
         return
 
     resolved = _resolve_debate_prompt(subject, prompt_text, code_mode)
     if not resolved:
         label = "target" if code_mode else "subject"
-        print_error(f"No {label} provided. Pass as argument or use -p.", console=console)
+        print_error(f"No {label} provided. Pass as argument or use -p.", console=err_console)
         ctx.exit(2)
         return
 
@@ -1276,7 +1276,7 @@ def debate(
         try:
             validate_resource(resource_path)
         except ValueError as e:
-            print_error(f"{e}", console=console)
+            print_error(f"{e}", console=err_console)
             ctx.exit(2)
             return
 
@@ -1284,14 +1284,14 @@ def debate(
             try:
                 stances = _parse_worker_specs(workers, code_mode=code_mode)
             except ValueError as e:
-                print_error(f"{e}", console=console)
+                print_error(f"{e}", console=err_console)
                 ctx.exit(2)
                 return
         else:
             try:
                 specs = resolve_model_specs(models)
             except ValueError as e:
-                print_error(f"{e}", console=console)
+                print_error(f"{e}", console=err_console)
                 ctx.exit(2)
                 return
             stances = _build_stances(specs, code_mode=code_mode)
@@ -1955,7 +1955,7 @@ def consensus(
     from forge.review.consensus import run_consensus, validate_resource
 
     if workers and models:
-        print_error("--worker and --models are mutually exclusive.", console=console)
+        print_error("--worker and --models are mutually exclusive.", console=err_console)
         ctx.exit(2)
         return
 
@@ -1967,7 +1967,7 @@ def consensus(
     resolved = _resolve_consensus_prompt((), raw_subject, code_mode)
     if not resolved:
         label = "target" if code_mode else "subject"
-        print_error(f"No {label} provided. Pass as argument or use -p.", console=console)
+        print_error(f"No {label} provided. Pass as argument or use -p.", console=err_console)
         ctx.exit(2)
         return
 
@@ -1981,7 +1981,7 @@ def consensus(
         try:
             validate_resource(resource_path)
         except ValueError as e:
-            print_error(f"{e}", console=console)
+            print_error(f"{e}", console=err_console)
             ctx.exit(2)
             return
 
@@ -1989,14 +1989,14 @@ def consensus(
             try:
                 role_specs = _parse_consensus_worker_specs(workers)
             except ValueError as e:
-                print_error(f"{e}", console=console)
+                print_error(f"{e}", console=err_console)
                 ctx.exit(2)
                 return
         else:
             try:
                 specs = resolve_model_specs(models)
             except ValueError as e:
-                print_error(f"{e}", console=console)
+                print_error(f"{e}", console=err_console)
                 ctx.exit(2)
                 return
             role_specs = _build_consensus_roles(specs, code_mode)
