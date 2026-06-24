@@ -473,7 +473,7 @@ class TestQaMemoryWriterChecklist:
         content = memory_md.read_text()
         step = content.split("### 16.1", 1)[1].split("### 16.2", 1)[0]
         assert "forge memory track" in step
-        assert "forge memory enable --session" in step
+        assert "forge session memory enable --session" in step
         assert "forge memory list" in step
 
     def test_memory_includes_shadow_doc_step(self):

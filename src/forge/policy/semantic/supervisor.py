@@ -605,7 +605,7 @@ def apply_checker_options(
 ) -> None:
     """Apply tier-1 checker options onto a SupervisorConfig (in place).
 
-    Shared by ``forge policy supervise`` and the launch-time fork/start paths so
+    Shared by ``forge policy supervisor set`` and the launch-time fork/start paths so
     checker validation and field mutation never drift across surfaces.
     """
     if checker_model:

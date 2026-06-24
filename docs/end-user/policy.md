@@ -53,8 +53,8 @@ have been touched) persists in the session manifest between hook invocations.
 > **Seeing `warn` verdicts.** A `warn` does not block, and Claude Code does **not** surface non-blocking hook output to
 > you at the terminal (it goes to the model as context, not your console). So a warning is effectively invisible
 > mid-session. Forge records every verdict; review them after the fact with
-> [`forge activity [session]`](session.md#what-a-session-did-forge-activity--session-end-summary) (supervisor
-> allow/warn/deny plus recent warning text) or the one-line session-end summary the launcher prints on exit.
+> [`forge telemetry activity [session]`](session.md#what-a-session-did-forge-telemetry-activity--session-end-summary)
+> (supervisor allow/warn/deny plus recent warning text) or the one-line session-end summary the launcher prints on exit.
 
 ---
 
@@ -139,13 +139,13 @@ git diff | forge policy check --bundle coding_standards --diff
 
 Exit codes: 0 (passed or warnings only), 1 (policy violation), 2 (usage error or engine failure).
 
-### `forge policy supervisor`
+### `forge policy supervisor evaluate`
 
 Evaluate a file against an approved plan via the semantic supervisor. Fail-closed with 3-way exit codes.
 
 ```bash
-forge policy supervisor -f src/foo.py -r <session-uuid>
-forge policy supervisor -f src/foo.py -r <session-uuid> --proxy openrouter-openai --json
+forge policy supervisor evaluate -f src/foo.py -r <session-uuid>
+forge policy supervisor evaluate -f src/foo.py -r <session-uuid> --proxy openrouter-openai --json
 ```
 
 - `--file` / `-f` — file to evaluate (required)
@@ -207,7 +207,7 @@ Configured in the session manifest under `policy.supervisor`:
 - `resume_id` — Claude session UUID of the planning session
 - `proxy` — proxy for supervisor LLM calls (optional, defaults to session proxy)
 - `timeout_seconds` — max wait for supervisor response (default: 45s). Set at configure time with
-  `forge policy supervise <target> --timeout N`, or adjust a live session with
+  `forge policy supervisor set <target> --timeout N`, or adjust a live session with
   `forge session set policy.supervisor.timeout_seconds N`
 - `throttle_seconds` — cache window for repeated checks (default: 30s)
 
@@ -229,13 +229,13 @@ uncertain ones:
 
 ```bash
 # Enable when setting the supervisor, or toggle later
-forge policy supervise planner --cascade
-forge policy supervise --cascade          # enable on existing config
-forge policy supervise --no-cascade       # disable (supervisor checks every action again)
+forge policy supervisor set planner --cascade
+forge policy supervisor cascade on          # enable on existing config
+forge policy supervisor cascade off       # disable (supervisor checks every action again)
 
 # Optional: pick the tier-1 route
-forge policy supervise --cascade --checker-provider litellm-local
-forge policy supervise --cascade --checker-model google/gemini-3.5-flash
+forge policy supervisor cascade on --checker-provider litellm-local
+forge policy supervisor cascade on --checker-model google/gemini-3.5-flash
 
 # Advanced: tune the persisted checker prompt budget
 forge session set policy.supervisor.checker_budget_tokens 64000
@@ -251,20 +251,20 @@ How it behaves:
   (`gemini/gemini-3.5-flash`) when OpenRouter is unavailable. Local LiteLLM backends generated before that model was
   added to the default backend config may need their `litellm` backend config recreated or updated; otherwise use
   `--checker-model gemini/gemini-2.5-flash` until the backend serves the 3.5 model.
-- `checker_budget_tokens` is intentionally a session config setting rather than a `policy supervise` flag; use
-  `forge session set policy.supervisor.checker_budget_tokens <tokens>` when you need to tune it.
+- `checker_budget_tokens` is intentionally a session config setting rather than a `forge policy supervisor cascade`
+  flag; use `forge session set policy.supervisor.checker_budget_tokens <tokens>` when you need to tune it.
 - Long plans and actions are packed with head+tail excerpts. Unified diffs keep hunk/file headers, Edit checks include
   the old/new fragments, Write checks include target existence metadata, and the prompt explicitly marks whether plan or
   action text was truncated.
 - Tier-1 can only approve or escalate — it never blocks on its own. Anything uncertain, plus **every** checker failure
   (model unreachable, unparseable output, missing plan file), escalates to the full supervisor. Worst case the cascade
   degrades to exactly the non-cascade behavior; supervision is never silently skipped.
-- `%policy supervise cascade on` / `%policy supervise cascade off` toggles it in-session.
+- `%policy supervisor cascade on` / `%policy supervisor cascade off` toggles it in-session.
 
-Reading the results in `forge activity`: the **Plan check (tier-1)** line shows allow vs needs-review counts (your
-short-circuit rate), the **Supervisor** line shows what the frontier decided when it ran, and the **Model calls** pane
-shows tier-1 call volume, tokens, and errors. The two lines can differ: a needs-review verdict that coincides with a
-deterministic block (for example TDD) never reaches the supervisor. When recent frontier checks fail open, the
+Reading the results in `forge telemetry activity`: the **Plan check (tier-1)** line shows allow vs needs-review counts
+(your short-circuit rate), the **Supervisor** line shows what the frontier decided when it ran, and the **Model calls**
+pane shows tier-1 call volume, tokens, and errors. The two lines can differ: a needs-review verdict that coincides with
+a deterministic block (for example TDD) never reaches the supervisor. When recent frontier checks fail open, the
 **Supervisor** line also appends `failing open: N timeout, N error` — a window aggregate, distinct from the status
 line's `SUP!N` consecutive streak.
 
@@ -282,11 +282,11 @@ specific plan section and explain the divergence, giving the executor enough inf
 
 **Surfacing plan gaps.** Supervision works bidirectionally. When the executor hits a supervisor block and the plan
 genuinely didn't account for something (a dependency, an interface constraint), the executor stops and surfaces the
-conflict. This forces **explicit plan evolution** via `%policy supervise reload` instead of silent improvisation. Each
+conflict. This forces **explicit plan evolution** via `%policy supervisor reload` instead of silent improvisation. Each
 reload is an auditable moment where the plan's authority changed.
 
 **Explicit deviation.** When a multi-model review (see [`workflow.md`](workflow.md)) recommends an improvement that
-wasn't in the plan, you can turn the supervisor off (`%policy supervise off`), apply the change, and optionally reload
+wasn't in the plan, you can turn the supervisor off (`%policy supervisor off`), apply the change, and optionally reload
 an updated plan. The deviation goes through *you* — not silently absorbed by the executor.
 
 ---
@@ -369,7 +369,7 @@ The semantic supervisor has a 45s default timeout. If it exceeds this:
   request usually completes after Forge stops waiting
 - Check proxy connectivity: is the supervisor's proxy running?
 - Reduce supervisor response time: use a faster model via `proxy`
-- Raise the budget for slow models: `forge policy supervise <target> --timeout 90` at configure time, or
+- Raise the budget for slow models: `forge policy supervisor set <target> --timeout 90` at configure time, or
   `forge session set policy.supervisor.timeout_seconds 90` on a live session. Note the hook that invokes the supervisor
   has its own 60s budget; timeouts above ~55s won't take effect end-to-end
 

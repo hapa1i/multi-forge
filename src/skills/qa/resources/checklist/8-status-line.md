@@ -227,9 +227,9 @@ forge config reset statusline
 
 The opt-in `forge_cost` segment (off by default) shows Forge's ADDITIONAL headless LLM spend for the session (memory
 writer, supervisor, review fan-out) as `forge +$Y`, distinct from Claude's native `cost`. Its honesty contract is
-stricter than `forge activity`: only `confidence=reported` events count (reported-or-NOTHING, never estimated), and the
-main interactive harness (`route=claude_interactive`) is excluded. A session with no reported Forge cost renders NO
-segment (not a misleading `+$0.00`).
+stricter than `forge telemetry activity`: only `confidence=reported` events count (reported-or-NOTHING, never
+estimated), and the main interactive harness (`route=claude_interactive`) is excluded. A session with no reported Forge
+cost renders NO segment (not a misleading `+$0.00`).
 
 ```bash
 cd $FORGE_TEST_REPO

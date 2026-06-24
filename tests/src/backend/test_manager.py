@@ -154,7 +154,7 @@ class TestBackendManager:
             manager.ensure_backend("mock-4000", "mock", 4000)
 
         assert "config not found" in str(exc_info.value).lower()
-        assert "forge backend create" in str(exc_info.value)
+        assert "forge model backend create" in str(exc_info.value)
 
     def test_ensure_backend_raises_for_unknown_adapter(self, tmp_path: Path) -> None:
         """Verify ensure_backend raises for unknown adapter type."""

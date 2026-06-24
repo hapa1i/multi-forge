@@ -16,7 +16,7 @@ from typing import Any
 
 import click
 
-from forge.cli.output import print_error_with_tip, print_tip
+from forge.cli.output import print_error, print_error_with_tip, print_tip
 from forge.cli.session import console
 from forge.core.invoker import HeadlessResult
 from forge.core.invoker.codex import CodexSandbox
@@ -137,9 +137,10 @@ def run_codex_start(ctx: click.Context) -> int:
     """
     p = ctx.params
     if p["task"] and not p["resume_from"]:
-        console.print(
-            "[red]Error:[/red] --task requires --resume-from <parent> -- headless Codex turns "
-            "derive from a parent session; omit --task for an interactive session"
+        print_error(
+            "--task requires --resume-from <parent> -- headless Codex turns "
+            "derive from a parent session; omit --task for an interactive session",
+            console=console,
         )
         return 1
     interactive = not p["task"]
@@ -151,7 +152,7 @@ def run_codex_start(ctx: click.Context) -> int:
             ("context_delivery", "--context-delivery"),
         ]:
             if p[key] is not None:
-                console.print(f"[red]Error:[/red] {flag} requires --resume-from <parent>")
+                print_error(f"{flag} requires --resume-from <parent>", console=console)
                 return 1
     # Codex runs direct-to-OpenAI with no hooks: Claude routing, sidecar,
     # supervision, memory, and prompt-injection flags have no Codex meaning.
@@ -181,10 +182,10 @@ def run_codex_start(ctx: click.Context) -> int:
     ]
     for value, flag in rejected_for_codex:
         if value:
-            console.print(f"[red]Error:[/red] {flag} is not supported with --runtime codex")
+            print_error(f"{flag} is not supported with --runtime codex", console=console)
             return 1
     if p["branch"] and not p["worktree"]:
-        console.print("[red]Error:[/red] --branch requires --worktree")
+        print_error("--branch requires --worktree", console=console)
         return 1
 
     from forge.cli.guards import require_main_repo_root, require_repo_root
@@ -234,7 +235,7 @@ def reject_codex_flags_for_claude(params: dict[str, Any]) -> int | None:
         ("context_delivery", "--context-delivery"),
     ]:
         if params[key] is not None:
-            console.print(f"[red]Error:[/red] {codex_flag} requires --runtime codex")
+            print_error(f"{codex_flag} requires --runtime codex", console=console)
             return 1
     return None
 
@@ -262,7 +263,7 @@ def run_codex_resume(ctx: click.Context, name: str, task: str | None, manifest: 
     ]
     for param, flag in claude_only_flags:
         if ctx.get_parameter_source(param) == click.core.ParameterSource.COMMANDLINE:
-            console.print(f"[red]Error:[/red] {flag} is not supported for Codex sessions")
+            print_error(f"{flag} is not supported for Codex sessions", console=console)
             return 1
     if task:
         return resume_codex_session(name=name, task=task, sandbox="workspace-write")
@@ -271,7 +272,7 @@ def run_codex_resume(ctx: click.Context, name: str, task: str | None, manifest: 
     # escape -- two TUIs on one thread would interleave a single rollout.
     active_entry = _sess()._get_active_session_entry(name, forge_root=manifest.forge_root)
     if active_entry is not None:
-        console.print(f"[red]Error:[/red] Cannot reconnect: session [bold]{name}[/bold] appears to still be active.")
+        print_error(f"Cannot reconnect: session [bold]{name}[/bold] appears to still be active.", console=console)
         console.print(f"  Launch mode: {active_entry.launch_mode}")
         if active_entry.launcher_pid is not None:
             console.print(f"  Launcher PID: {active_entry.launcher_pid}")
@@ -315,7 +316,7 @@ def launch_codex_session(
             context_delivery=context_delivery,
         )
     except ForgeOpError as e:
-        console.print(f"[red]Error:[/red] {e}")
+        print_error(f"{e}", console=console)
         return 1
 
     _render_start(result)
@@ -344,7 +345,7 @@ def resume_codex_session(*, name: str, task: str, sandbox: CodexSandbox) -> int:
             sandbox=sandbox,
         )
     except ForgeOpError as e:
-        console.print(f"[red]Error:[/red] {e}")
+        print_error(f"{e}", console=console)
         return 1
 
     _render_resume(result)
@@ -377,7 +378,7 @@ def launch_interactive_codex_session(
             announce=_render_interactive_launch,
         )
     except ForgeOpError as e:
-        console.print(f"[red]Error:[/red] {e}")
+        print_error(f"{e}", console=console)
         return 1
 
     return _finish_interactive(result)
@@ -393,7 +394,7 @@ def reattach_interactive_codex_session(*, name: str) -> int:
             announce=_render_interactive_launch,
         )
     except ForgeOpError as e:
-        console.print(f"[red]Error:[/red] {e}")
+        print_error(f"{e}", console=console)
         return 1
 
     return _finish_interactive(result)

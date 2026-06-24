@@ -25,8 +25,9 @@ Forge CLI commands use explicit verbs and predictable command boundaries.
 
 - **Groups earn their depth.** A group earns a path segment only when it holds two or more visible leaves (or a
   documented, imminent one). No single-leaf subgroups and no single-child group nests -- attach the leaf to the parent.
-  Non-leaf groups print help and exit 0 on bare invocation; prefer `no_args_is_help=True` over hand-rolling
-  `invoke_without_command` only to echo help. _Guard:_ `test_command_tree_invariants::test_no_single_leaf_groups`.
+  Non-leaf groups print help on bare invocation via `no_args_is_help=True` (help to stderr, exit 2); prefer it over
+  hand-rolling `invoke_without_command` only to echo help. _Guard:_
+  `test_command_tree_invariants::test_no_single_leaf_groups`.
 
 - **Name leaves distinctly.** Sibling leaves must not collide on tab-completion: none may be a prefix of another or
   share a six-character-or-longer prefix, and one verb must not name two different engines in a group. _Guard:_
@@ -42,14 +43,16 @@ Forge CLI commands use explicit verbs and predictable command boundaries.
 
 - **Add deliberate aliases only.** The short root aliases are an intentional UX affordance, not a general compatibility
   pattern. They are defined in two maps in `src/forge/cli/main.py`: `_ALIASES` (resolution) and `_DISPLAY_ALIASES`
-  (surfaced in `--help`). The current set is `auth` -> `authentication`, `ext` -> `extension`, `sess` -> `session`,
-  `mem` -> `memory`, `cfg` -> `config`. Add a new alias only when the proposal explicitly justifies it, and update both
-  maps. (`extensions` -> `extension` also exists in `_ALIASES` as a one-off rename shim; that is back-compat, not the
-  alias pattern.)
+  (surfaced in `--help`). The current set is `ext` -> `extension`, `sess` -> `session`, `mem` -> `memory`, `cfg` ->
+  `config`. Durable short aliases are allowed only when **deliberately chosen** (a rationale-backed UX affordance);
+  update both maps when adding one. New top-level nouns do **not** automatically get an alias. Rename/back-compat shims
+  are **temporary** — remove them in a cleanup slice rather than keeping them indefinitely (the `auth` ->
+  `authentication` and `extensions` -> `extension` shims were removed in the `forge_cli_cleanup` card).
 
 - **Canonical names follow user vocabulary.** The canonical command name is the word users actually type, not the
-  implementation or historical name; the short form is the alias, not the canonical. A new alias needs a recorded
-  rationale and a matching update to `_ALIASES`, `_DISPLAY_ALIASES`, and the docs. _(review)_
+  implementation or historical name; the short form is the alias, not the canonical (for example `auth` is canonical,
+  not `authentication`). A new alias needs a recorded rationale and a matching update to `_ALIASES`, `_DISPLAY_ALIASES`,
+  and the docs. _(review)_
 
 - **Support scripting on read surfaces.** List/show and other scriptable read commands expose a `--json` flag with a
   stable structured shape. Use the project idiom, which names the option destination `as_json` so it does not shadow the
@@ -72,9 +75,13 @@ Forge CLI commands use explicit verbs and predictable command boundaries.
   direct-command layers own all rendering. (Many ops use frozen dataclasses, but that is a local convention, not part of
   the contract.)
 
-- **Destructive verbs are predictable.** A `clean` verb previews by default and mutates only with `--yes`. A `delete` or
-  `reset` verb may act after a prompt, but the prompt and its `--yes` bypass must be explicit and documented. Use one
-  confirmation-bypass flag name across the CLI. _(review)_
+- **Destructive verbs are predictable.** A `clean` verb previews by default and mutates only with `--yes` (no
+  `--dry-run` -- preview is already the default). A `delete` or `reset` verb may act after a prompt, but the prompt and
+  its `--yes` bypass must be explicit and documented. Use one confirmation-bypass flag name (`--yes`) across the CLI.
+  _Guard:_ `test_command_tree_invariants::test_clean_verbs_preview_by_default` (clean leaves expose `--yes`, never
+  `--dry-run`) and `::test_destructive_prompt_verbs_use_yes` (every `delete`/`reset` leaf exposes `--yes`; the
+  non-deleting `forge session reset`, which rewinds the session override layer rather than deleting any
+  session/worktree/artifact, is exempt). The prompt presence and its wording stay _(review)_.
 
 - **Sibling resources expose comparable verbs.** Resource groups with a `create`/`start`/`stop`/`delete` lifecycle offer
   the same verb set as their siblings; document any intentional asymmetry at the call site instead of letting it drift.
@@ -83,12 +90,27 @@ Forge CLI commands use explicit verbs and predictable command boundaries.
 - **Session selectors are consistent.** Use an optional positional for the session only when the session is the
   command's primary object (`forge session show [session]`); use `--session` when the session is ambient scope for some
   other primary object (`forge policy status --session`). For multi-entity commands the primary entity is the positional
-  and the rest are options (`forge transfer show <parent> --child <child>`). _(review)_
+  and the rest are options (`forge session transfer show <parent> --child <child>`). _(review)_ Audited compliant
+  2026-06-23 (all ~32 session-scoped commands; `forge_cli_cleanup` Slice 07 F11) — `telemetry activity [session]`,
+  `costs show [proxy_id]`, and `trace list --session` differ correctly because each applies the rule to its own primary
+  object.
 
-- **Editable config objects share a verb vocabulary.** Config-like surfaces (`forge config`, `forge proxy`,
-  `forge claude preset`, `forge proxy template`) use one verb set for the same operations and document deliberate
-  exceptions. _(review)_ The exact vocabulary is being settled in the `forge_cli_cleanup` card; do not enumerate it here
-  until it ships.
+- **Editable config objects share a verb vocabulary.** A surface whose primary object is an editable config file exposes
+  a common core, plus optional verbs where meaningful. Lifecycle resources (`create`/`start`/`stop`/`delete`) follow the
+  sibling-verbs rule above, not this one. Core {`show`, `edit`, `reset`} is mandatory and mechanically guarded; optional
+  {`set`, `validate`} and the documented exceptions are review-only.
+
+  | Surface                | Core {show, edit, reset} | Optional          | Note                                                          |
+  | ---------------------- | ------------------------ | ----------------- | ------------------------------------------------------------- |
+  | `forge config`         | yes                      | `set`             | editable config object                                        |
+  | `forge proxy template` | yes                      | --                | editable config object                                        |
+  | `forge claude preset`  | yes                      | --                | editable config object                                        |
+  | `forge proxy`          | `show`, `edit` only      | `set`, `validate` | partial-lifecycle exception: has `clean`/`delete`, no `reset` |
+  | `forge model backend`  | n/a                      | --                | lifecycle resource; sibling-verbs rule applies                |
+
+  _Guard:_ `test_command_tree_invariants::test_editable_config_objects_share_core_verbs` -- core set on the three
+  editable config objects, plus the no-`reset` boundary for `proxy`/`model backend`. Optional verbs and the exception
+  rationale are _(review)_.
 
 When adding a new CLI command:
 
@@ -104,17 +126,26 @@ When adding a new CLI command:
   same result stream: do not render the human table on stderr while JSON goes to stdout.
 - **Place the non-recovery categories.** Dry-run previews and `Next steps:` blocks are results (stdout); status lines
   like `Backup: {path}` are diagnostics (stderr).
-- _(review)_ today. A mechanical guard (`--json` mode emits valid JSON on stdout and nothing on stderr) is a planned
-  follow-up; it needs runtime stdout/stderr capture, so it is not yet wired.
+- A mechanical guard wires this contract: `tests/src/cli/test_output_streams.py` (plain `CliRunner()`, which captures
+  stdout and stderr separately) asserts that `--json` mode emits valid JSON on stdout and nothing on stderr for the
+  telemetry leaves (`costs show`, `trace list`, seeded `activity`) and `proxy audit show|diff`, and that their human
+  tables land on stdout. Extend it whenever a new read leaf could split its result stream.
 
 ## Tips And Recovery Output
 
-All Rich-styled recovery output goes through `forge.cli.output`. Never hand-roll a `[dim]Tip: ...[/dim]` in a CLI
-module: `tests/src/cli/test_output.py::test_cli_rich_tips_go_through_output_helpers` scans `src/forge/cli/**` for the
-literal `[dim]Tip:` and fails if it appears anywhere except `output.py`. The same applies to errors: terminal errors go
-through `print_error` / `print_error_with_tip`, and `test_output.py::test_cli_rich_errors_go_through_print_error` guards
-hand-rolled `[red]Error:[/red]` the same way, with an allowlist tracking the pre-existing call sites the
-`forge_cli_cleanup` card retires.
+All recovery output goes through `forge.cli.output`. Never hand-roll a `Tip:` line in a CLI module:
+`tests/src/cli/test_output.py::test_cli_rich_tips_go_through_output_helpers` scans `src/forge/cli/**` for the literal
+`Tip:` (a superset of the Rich `[dim]Tip:` markup that also catches plain `click.echo("Tip: ...")` and
+`ClickException`-embedded tips) and fails if it appears anywhere except `output.py`. The only allowlisted exceptions are
+three exact assistant-facing payload sentences in `hooks/direct_commands.py` (returned to Claude as JSON text, not
+terminal output) — the allowlist is pinned to those payloads, not the whole file, so a new `Tip:` even inside
+`direct_commands.py` still fails. The same applies to errors: terminal errors go through `print_error` /
+`print_error_with_tip`, and `test_output.py::test_cli_rich_errors_go_through_print_error` guards hand-rolled
+`[red]Error:[/red]` the same way. Both allowlists are now drained (Slice 11) and locked: a new offender fails the test.
+
+Errors that must not pollute stdout (the results stream) pass `console=err_console` — the shared `Console(stderr=True)`
+in `output.py`. Use it for failures that previously raised `click.ClickException` (which Click renders to stderr); the
+helper defaults stay stdout, so opt into stderr explicitly at the call site.
 
 ```python
 from forge.cli.output import print_error, print_error_with_tip, print_tip, handle_session_error
@@ -165,7 +196,7 @@ print_error_with_tip(
 
 print_tip(
     "Start an instance with:",
-    commands=[f"forge backend start {adapter} --port 4000"],
+    commands=[f"forge model backend start {adapter} --port 4000"],
     console=console,
 )
 ```
@@ -175,7 +206,7 @@ print_tip(
 The rules tagged _(review)_ above are enforced here, not by tests. On any CLI change, confirm:
 
 - A leaf with a missing required selector exits non-zero, not warn-and-exit-0.
-- `clean` previews by default; `delete` / `reset` confirmation and its `--yes` bypass are explicit and documented.
+- A `delete`/`reset` prompt is present and its wording is clear (the `--yes`/`--dry-run` flag *shape* is now guarded).
 - Sibling lifecycle resources expose comparable verbs, or the asymmetry is documented at the call site.
 - Session selection follows the positional-vs-`--session` rule.
 - Editable config objects use the shared verb vocabulary.

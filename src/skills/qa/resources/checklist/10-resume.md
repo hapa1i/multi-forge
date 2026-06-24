@@ -140,26 +140,26 @@ cat .forge/prev_sessions/test-session-1/generated.md
 - [ ] No warning about missing remote LiteLLM infrastructure in the default OpenRouter QA profile
 - [ ] No `No transcript available; using minimal strategy` warning
 
-### 10.6 `forge transfer` (Inspect / Reshape Transfer Context)
+### 10.6 `forge session transfer` (Inspect / Reshape Transfer Context)
 
 <!-- prereq: 10.1 -->
 
 <!-- auto -->
 
-`forge transfer` is the read/reshape surface for resume/fork context, keyed by a parent session. Uses the parent
+`forge session transfer` is the read/reshape surface for resume/fork context, keyed by a parent session. Uses the parent
 transcript fixture from 10.1.
 
 ```bash
 cd $FORGE_TEST_REPO
 
 # Rebuild the parent cache (generated.md) from the parent's transcript -- never touches children/notes
-forge transfer regenerate test-session-1
+forge session transfer regenerate test-session-1
 
 # Show the parent cache
-forge transfer show test-session-1 >/dev/null; echo "SHOW_EXIT=$?"
+forge session transfer show test-session-1 >/dev/null; echo "SHOW_EXIT=$?"
 
 # JSON view (frontmatter + sections + content) -- must be valid JSON with a parent field
-forge transfer show test-session-1 --json | jq -e '.parent' >/dev/null && echo "JSON_VALID=true"
+forge session transfer show test-session-1 --json | jq -e '.parent' >/dev/null && echo "JSON_VALID=true"
 
 # Seed a frozen child snapshot so diff/edit have a child to operate on
 CHILD_DIR=".forge/prev_sessions/test-session-1/children"
@@ -167,18 +167,18 @@ mkdir -p "$CHILD_DIR"
 printf '# Parent Context\n\nOlder snapshot body.\n' > "$CHILD_DIR/xfer-child.md"
 
 # diff: parent cache vs the child's frozen snapshot
-forge transfer diff test-session-1 --child xfer-child >/dev/null; echo "DIFF_EXIT=$?"
+forge session transfer diff test-session-1 --child xfer-child >/dev/null; echo "DIFF_EXIT=$?"
 
 # edit: opens the child's notes overlay in $EDITOR. EDITOR=true is a non-interactive smoke
 # that exits immediately; it must create the notes file.
-EDITOR=true forge transfer edit test-session-1 --child xfer-child
+EDITOR=true forge session transfer edit test-session-1 --child xfer-child
 test -f "$CHILD_DIR/xfer-child.notes.md" && echo "NOTES_CREATED=true" || echo "NOTES_CREATED=false"
 ```
 
-- [ ] `forge transfer regenerate` rewrites `generated.md` (names strategy/depth; children unchanged)
-- [ ] `forge transfer show` prints the cache (exit 0); `--json` is valid JSON with a `parent` field
-- [ ] `forge transfer diff --child` reports drift or `No drift` cleanly (exit 0)
-- [ ] `EDITOR=true forge transfer edit --child` creates the child notes overlay (`children/<child>.notes.md`)
+- [ ] `forge session transfer regenerate` rewrites `generated.md` (names strategy/depth; children unchanged)
+- [ ] `forge session transfer show` prints the cache (exit 0); `--json` is valid JSON with a `parent` field
+- [ ] `forge session transfer diff --child` reports drift or `No drift` cleanly (exit 0)
+- [ ] `EDITOR=true forge session transfer edit --child` creates the child notes overlay (`children/<child>.notes.md`)
 
 ### 10.7 Resume `--fresh --review` (Edit Context Before Launch)
 

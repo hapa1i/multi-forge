@@ -30,17 +30,21 @@ forge search rebuild-index
 <!-- auto -->
 
 ```bash
-# Search for a keyword
+# Search for a keyword (human table by default)
 forge search query "hello world"
+
+# Machine-readable JSON for scripting
+forge search query "hello world" --json
 
 # Limit results
 forge search query "test" -n 3
 
 # Search all projects
-forge search query "hello world" --scope all
+forge search query "hello world" --scope all --json
 ```
 
-- [ ] Returns JSON results with session_name, score, snippet
+- [ ] Bare query prints a human table (Score / Session / Snippet) with a `Found N result(s)` footer
+- [ ] `--json` returns JSON results with session_name, score, snippet
 - [ ] `--scope all` searches indexed projects (including the current project)
 - [ ] Results ranked by BM25 relevance
 
@@ -49,10 +53,12 @@ forge search query "hello world" --scope all
 <!-- auto -->
 
 ```bash
-forge search clean
+forge search clean          # preview (default)
+forge search clean --yes    # actually prune
 ```
 
-- [ ] Removes entries for deleted transcripts
+- [ ] Bare `clean` previews ("Would prune ...") without removing
+- [ ] `--yes` removes entries for deleted transcripts
 - [ ] Reports removed/pruned count or "No orphaned entries found."
 
 ---

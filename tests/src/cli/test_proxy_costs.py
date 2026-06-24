@@ -7,13 +7,17 @@ from pathlib import Path
 
 from click.testing import CliRunner
 
+from forge.cli.main import main
 from forge.cli.proxy_costs import (
     _format_usd,
     _verb_cost_reported,
-    costs_group,
 )
 from forge.core.paths import get_forge_home
 from forge.core.usage.ledger import UsageEvent, log_usage_event
+
+
+def _costs_args(*args: str) -> list[str]:
+    return ["telemetry", "costs", *args]
 
 
 def _usage_event(run_id: str, command: str) -> None:
@@ -80,7 +84,7 @@ def test_costs_json_filters_verb_records_by_proxy(monkeypatch) -> None:
 
     monkeypatch.setattr("forge.proxy.cost_logger.read_cost_logs", lambda *args, **kwargs: request_records)
 
-    result = CliRunner().invoke(costs_group, ["show", "openrouter", "--json"])
+    result = CliRunner().invoke(main, _costs_args("show", "openrouter", "--json"))
 
     assert result.exit_code == 0
     data = json.loads(result.output)
@@ -125,7 +129,7 @@ def test_costs_json_mixed_reported_and_unavailable(monkeypatch) -> None:
     monkeypatch.setattr("forge.proxy.cost_logger.read_cost_logs", lambda *a, **k: request_records)
     monkeypatch.setattr("forge.core.reactive.cost_tracking.read_verb_logs", lambda *a, **k: [])
 
-    result = CliRunner().invoke(costs_group, ["show", "--json"])
+    result = CliRunner().invoke(main, _costs_args("show", "--json"))
 
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
@@ -146,13 +150,41 @@ def test_costs_human_output_renders_unavailable(monkeypatch) -> None:
     monkeypatch.setattr("forge.proxy.cost_logger.read_cost_logs", lambda *a, **k: request_records)
     monkeypatch.setattr("forge.core.reactive.cost_tracking.read_verb_logs", lambda *a, **k: [])
 
-    by_model = CliRunner().invoke(costs_group, ["show", "--by-model"])
+    by_model = CliRunner().invoke(main, _costs_args("show", "--by-model"))
     assert by_model.exit_code == 0, by_model.output
     assert "unavailable" in by_model.output
 
-    by_verb = CliRunner().invoke(costs_group, ["show", "--by-verb"])
+    by_verb = CliRunner().invoke(main, _costs_args("show", "--by-verb"))
     assert by_verb.exit_code == 0, by_verb.output
     assert "cost unavailable" in by_verb.output
+
+
+def test_costs_human_output_uses_stdout(monkeypatch) -> None:
+    request_records = [
+        {"proxy_id": "p", "model": "m", "cost_micros": 25_000, "input_tokens": 10, "output_tokens": 5},
+    ]
+    monkeypatch.setattr("forge.proxy.cost_logger.read_cost_logs", lambda *a, **k: request_records)
+    monkeypatch.setattr("forge.core.reactive.cost_tracking.read_verb_logs", lambda *a, **k: [])
+
+    result = CliRunner().invoke(main, _costs_args("show", "--by-model"))
+
+    assert result.exit_code == 0, result.output
+    assert "By Model" in result.stdout
+    assert result.stderr == ""
+
+
+def test_costs_json_output_uses_stdout(monkeypatch) -> None:
+    request_records = [
+        {"proxy_id": "p", "model": "m", "cost_micros": 25_000, "input_tokens": 10, "output_tokens": 5},
+    ]
+    monkeypatch.setattr("forge.proxy.cost_logger.read_cost_logs", lambda *a, **k: request_records)
+    monkeypatch.setattr("forge.core.reactive.cost_tracking.read_verb_logs", lambda *a, **k: [])
+
+    result = CliRunner().invoke(main, _costs_args("show", "--json"))
+
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.stdout)["total_cost_micros"] == 25_000
+    assert result.stderr == ""
 
 
 class TestVerbCostReported:
@@ -197,7 +229,7 @@ def test_costs_json_verb_evidence_flag_gates_reported(monkeypatch) -> None:
     ]
     monkeypatch.setattr("forge.proxy.cost_logger.read_cost_logs", lambda *a, **k: request_records)
 
-    result = CliRunner().invoke(costs_group, ["show", "--json"])
+    result = CliRunner().invoke(main, _costs_args("show", "--json"))
 
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
@@ -214,7 +246,7 @@ def test_costs_human_verb_evidence_flag_renders_unavailable(monkeypatch) -> None
     request_records = [{"model": "m", "cost_micros": None, "forge_run_id": "run_passthrough"}]
     monkeypatch.setattr("forge.proxy.cost_logger.read_cost_logs", lambda *a, **k: request_records)
 
-    result = CliRunner().invoke(costs_group, ["show", "--by-verb"])
+    result = CliRunner().invoke(main, _costs_args("show", "--by-verb"))
 
     assert result.exit_code == 0, result.output
     # The verb row reads 'unavailable'; it must not be rendered as a measured $0.00.
@@ -222,7 +254,7 @@ def test_costs_human_verb_evidence_flag_renders_unavailable(monkeypatch) -> None
 
 
 class TestCostsReset:
-    """`forge proxy costs reset` wipes the three spend/usage planes plus the derived
+    """`forge telemetry costs reset` wipes the three spend/usage planes plus the derived
     status-line cost cache (the autouse `isolate_forge_home` fixture gives each test its
     own FORGE_HOME)."""
 
@@ -241,7 +273,7 @@ class TestCostsReset:
 
     def test_dry_run_lists_but_deletes_nothing(self) -> None:
         files = self._seed()
-        result = CliRunner().invoke(costs_group, ["reset", "--dry-run"])
+        result = CliRunner().invoke(main, _costs_args("reset", "--dry-run"))
         assert result.exit_code == 0, result.output
         assert "dry-run" in result.output
         assert all(f.exists() for f in files)
@@ -249,7 +281,7 @@ class TestCostsReset:
     def test_yes_wipes_all_three_planes(self) -> None:
         files = self._seed()
         home = get_forge_home()
-        result = CliRunner().invoke(costs_group, ["reset", "--yes"])
+        result = CliRunner().invoke(main, _costs_args("reset", "--yes"))
         assert result.exit_code == 0, result.output
         assert not any(f.exists() for f in files)
         for parts in self._PLANES:
@@ -257,12 +289,12 @@ class TestCostsReset:
 
     def test_confirmation_abort_keeps_files(self) -> None:
         files = self._seed()
-        result = CliRunner().invoke(costs_group, ["reset"], input="n\n")
+        result = CliRunner().invoke(main, _costs_args("reset"), input="n\n")
         assert result.exit_code != 0  # Click abort on declined confirmation
         assert all(f.exists() for f in files)
 
     def test_empty_is_noop(self) -> None:
-        result = CliRunner().invoke(costs_group, ["reset", "--yes"])
+        result = CliRunner().invoke(main, _costs_args("reset", "--yes"))
         assert result.exit_code == 0, result.output
         assert "No cost or usage telemetry" in result.output
 
@@ -272,7 +304,7 @@ class TestCostsReset:
         audit_shard = home / "audit" / "requests" / "2026-06_1.jsonl"
         audit_shard.parent.mkdir(parents=True, exist_ok=True)
         audit_shard.write_text('{"x": 1}\n')
-        result = CliRunner().invoke(costs_group, ["reset", "--yes"])
+        result = CliRunner().invoke(main, _costs_args("reset", "--yes"))
         assert result.exit_code == 0, result.output
         assert audit_shard.exists()  # audit is a separate plane, intentionally NOT reset
 
@@ -286,7 +318,7 @@ class TestCostsReset:
         cache_hit = cache / "deadbeef.json"
         fcost.write_text('{"version": 1, "computed_at": 0, "cost_micro_usd": 9999}\n')
         cache_hit.write_text('{"version": 1, "cache_hit_rate": 0.5}\n')
-        result = CliRunner().invoke(costs_group, ["reset", "--yes"])
+        result = CliRunner().invoke(main, _costs_args("reset", "--yes"))
         assert result.exit_code == 0, result.output
         assert not fcost.exists()  # stale derived cost segment cleared
         assert cache_hit.exists()  # transcript cache-hit rate is not cost telemetry
@@ -303,7 +335,7 @@ class TestCostsReset:
             '{"version": 1, "computed_at": 0, "recent_failures": 3, "last_kind": "timeout", "last_seen_at": "ts"}\n'
         )
         cache_hit.write_text('{"version": 1, "cache_hit_rate": 0.5}\n')
-        result = CliRunner().invoke(costs_group, ["reset", "--yes"])
+        result = CliRunner().invoke(main, _costs_args("reset", "--yes"))
         assert result.exit_code == 0, result.output
         assert not fhealth.exists()  # stale derived health marker cleared
         assert cache_hit.exists()  # transcript cache-hit rate is not telemetry
@@ -312,7 +344,7 @@ class TestCostsReset:
         cache = get_forge_home() / "cache" / "statusline"
         cache.mkdir(parents=True, exist_ok=True)
         (cache / "fhealth-deadbeef.json").write_text("{}\n")
-        result = CliRunner().invoke(costs_group, ["reset", "--dry-run"])
+        result = CliRunner().invoke(main, _costs_args("reset", "--dry-run"))
         assert result.exit_code == 0, result.output
         assert "supervisor-health" in result.output  # previewed as its own target
         assert (cache / "fhealth-deadbeef.json").exists()  # dry-run deletes nothing

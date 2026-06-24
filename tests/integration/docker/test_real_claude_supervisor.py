@@ -1,6 +1,6 @@
 """Best-effort real-Claude supervisor smoke test.
 
-Exercises the real ``forge policy supervisor`` path against a live planning
+Exercises the real ``forge policy supervisor evaluate`` path against a live planning
 session so ``claude -p --resume`` is covered with a real Claude backend.
 
 Assertions stay narrow to reduce flakiness:
@@ -106,7 +106,7 @@ PY
         try:
             result = forge_workspace.exec(
                 "export ANTHROPIC_API_KEY=$(cat /tmp/.anthropic_key) && "
-                f"cd /workspace && forge policy supervisor -f src/demo.py -r {planner_resume_id} --json",
+                f"cd /workspace && forge policy supervisor evaluate -f src/demo.py -r {planner_resume_id} --json",
                 timeout=120,
             )
         finally:

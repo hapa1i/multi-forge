@@ -1,4 +1,4 @@
-"""Tests for the per-session activity summary (forge activity / session-end line).
+"""Tests for the per-session activity summary (forge telemetry activity / session-end line).
 
 Operation outcomes, downstream/model-call evidence, transitional usage events, and the
 manifest fallback are aggregated but kept visibly separate. The autouse
@@ -910,7 +910,7 @@ class TestSumForgeAddedCost:
     def test_includes_gateway_calculated_cost(self) -> None:
         # A gateway-computed figure (e.g. LiteLLM's x-litellm-response-cost) is
         # trustworthy enough to count toward Forge-added spend, like a directly-
-        # reported one. Pins the predicate so `forge +$Y` and `forge activity` agree.
+        # reported one. Pins the predicate so `forge +$Y` and `forge telemetry activity` agree.
         log_usage_event(
             _event(
                 command="panel",

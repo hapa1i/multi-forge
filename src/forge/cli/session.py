@@ -20,15 +20,16 @@ Both are re-exported here so ``patch("forge.cli.session.XXX")`` keeps working.
 from __future__ import annotations
 
 import logging
+import sys
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
 import click
 
-from forge.cli.output import console
+from forge.cli.output import console, err_console
 from forge.cli.output import handle_session_error as handle_session_error
-from forge.cli.output import print_tip
+from forge.cli.output import print_error, print_error_with_tip, print_tip
 from forge.core.paths import display_path
 from forge.core.reactive.env import (
     FORGE_PROXY_WIRE_SHAPE_VAR,
@@ -88,7 +89,8 @@ def _resolve_routing_from_cli(
     a direct routing for --no-proxy. Callers must validate mutual
     exclusivity before calling.
 
-    Raises click.ClickException on resolution/healthcheck failure.
+    Prints an error (plus a recovery tip where one applies) and exits 1 on
+    resolution/healthcheck failure.
     """
     if direct or not proxy_name:
         return ResolvedRouting()
@@ -104,12 +106,18 @@ def _resolve_routing_from_cli(
     try:
         entry, started = ensure_proxy(proxy_name)
     except ProxyRegistryCorruptedError as e:
-        raise click.ClickException(str(e))
+        print_error(str(e), console=err_console)
+        sys.exit(1)
     except (ProxyResolutionError, ProxyStartError) as e:
-        msg = str(e)
         if isinstance(e, ProxyNotFoundError):
-            msg += "\nTip: Run 'forge proxy template list' to see available templates."
-        raise click.ClickException(msg)
+            print_error_with_tip(
+                str(e),
+                "Run 'forge proxy template list' to see available templates.",
+                console=err_console,
+            )
+        else:
+            print_error(str(e), console=err_console)
+        sys.exit(1)
 
     if started:
         console.print(f"[dim]Started proxy '{entry.proxy_id}' from template '{proxy_name}'.[/dim]")
@@ -121,10 +129,15 @@ def _resolve_routing_from_cli(
             expected_proxy_id=entry.proxy_id,
         )
     except ValueError as e:
-        msg = str(e)
-        if "not running" in msg:
-            msg += f"\nTip: Run 'forge proxy start {entry.proxy_id}' to start it."
-        raise click.ClickException(msg)
+        if "not running" in str(e):
+            print_error_with_tip(
+                str(e),
+                f"Run 'forge proxy start {entry.proxy_id}' to start it.",
+                console=err_console,
+            )
+        else:
+            print_error(str(e), console=err_console)
+        sys.exit(1)
 
     return ResolvedRouting(
         template=entry.template,
@@ -814,7 +827,7 @@ def _hint_cross_project_session(name: str, forge_root: str | None) -> bool:
         entry = IndexStore().get_session(name, forge_root=None)
         other_root = entry.forge_root or entry.worktree_path
         if other_root and other_root != forge_root:
-            console.print(f"[red]Error:[/red] session '{name}' not found in current project")
+            print_error(f"session '{name}' not found in current project", console=console)
             print_tip(f"Session '{name}' exists in:", console=console)
             console.print(
                 Text(display_path(other_root), style="dim", no_wrap=True),
@@ -823,7 +836,7 @@ def _hint_cross_project_session(name: str, forge_root: str | None) -> bool:
             console.print("[dim]Run the command from that directory instead.[/dim]")
             return True
     except AmbiguousSessionError as e:
-        console.print(f"[red]Error:[/red] session '{name}' not found in current project")
+        print_error(f"session '{name}' not found in current project", console=console)
         print_tip(f"Session '{name}' exists in multiple projects:", console=console)
         for root in e.forge_roots:
             console.print(

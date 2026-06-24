@@ -87,10 +87,10 @@ git diff HEAD~1 | forge policy check --bundle tdd --diff --json
 
 ```bash
 # Verify CLI is wired up
-forge policy supervisor --help
+forge policy supervisor evaluate --help
 
 # Missing file produces clear error (exit 2)
-forge policy supervisor -f /nonexistent/file.py -r 00000000-0000-0000-0000-000000000000 --json
+forge policy supervisor evaluate -f /nonexistent/file.py -r 00000000-0000-0000-0000-000000000000 --json
 echo "exit: $?"
 ```
 
@@ -188,7 +188,7 @@ Then exit:
 cd $FORGE_TEST_REPO
 
 forge session fork policy-planner --name policy-executor --no-proxy --no-launch
-forge policy supervise policy-supervisor --session policy-executor --supervisor-proxy "$FORGE_QA_OPENAI_PROXY"
+forge policy supervisor set policy-supervisor --session policy-executor --supervisor-proxy "$FORGE_QA_OPENAI_PROXY"
 FORGE_SESSION=policy-executor forge policy status
 forge session resume policy-executor
 ```
@@ -216,16 +216,16 @@ After Claude finishes, exit:
 cd $FORGE_TEST_REPO
 
 cat src/supervisor_demo.py
-forge policy supervisor -f src/supervisor_demo.py -r policy-supervisor --json
+forge policy supervisor evaluate -f src/supervisor_demo.py -r policy-supervisor --json
 echo "exit: $?"
 ```
 
 - [ ] Planner and supervisor sessions launch successfully; the planner has an approved plan and the supervisor session
   materializes with a confirmed Claude session
-- [ ] Executor forks planner with `--no-proxy`, `forge policy supervise` wires `policy-supervisor`,
+- [ ] Executor forks planner with `--no-proxy`, `forge policy supervisor set` wires `policy-supervisor`,
   `forge policy status` shows `Supervisor: Configured`, and the executor implements the exact tiny planned file
-- [ ] `forge policy supervisor -f src/supervisor_demo.py -r policy-supervisor --json` returns structured output for the
-  real tiny task (expected: aligned / exit 0)
+- [ ] `forge policy supervisor evaluate -f src/supervisor_demo.py -r policy-supervisor --json` returns structured output
+  for the real tiny task (expected: aligned / exit 0)
 
 ### 13.8 Disable Policies
 

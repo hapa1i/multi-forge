@@ -1,10 +1,10 @@
 # Forge CLI Cleanup And Taxonomy
 
-**Status**: Proposed. No command surface has changed yet. This card records the CLI style audit and proposes a
-taxonomy-level cleanup before adding more command groups.
+**Status**: In progress (`doing/`). Accepted and moved from `proposed/` on 2026-06-23; Slices 03, 04, and 06 have
+shipped. This card records the CLI style audit and taxonomy-level cleanup before adding more command groups.
 
 **References**: `docs/developer/cli_style_guidelines.md`, `docs/cli_reference.md`, `docs/design.md` §3.12,
-`docs/board/done/remove_cli_tombstones/`, `docs/board/proposed/forge_codex_command_group/card.md`.
+`docs/board/done/remove_cli_tombstones/`, `docs/board/done/forge_codex_command_group/card.md`.
 
 ## Summary
 
@@ -165,7 +165,7 @@ The style guide says list/show and other scriptable read commands expose `--json
 
 - `forge authentication status`
 - `forge authentication profiles`
-- `forge backend show`
+- `forge model backend show`
 - `forge claude preset show`
 - `forge config show`
 - `forge memory report show`
@@ -447,6 +447,10 @@ This card intentionally proposes a large clean break. The migration notes should
 01. What exact scope flags should `forge telemetry activity|costs|trace` share (`--session`,
     `--scope workspace|project|all`, `--period`, etc.), and how do they instantiate the session-selector rule from
     finding 11?
+    - **Resolved (Slice 07, 2026-06-23):** the selector-rule half is settled — the F11 audit found `activity [session]`
+      / `costs show [proxy_id]` / `trace list --session` already comply, each applying the rule to its own primary
+      object (no shared selector to unify). The broader `--scope workspace` aggregation stays deferred to the
+      `workspace_scope` card (see Q07).
 02. Should `forge proxy audit show|diff` stay under `proxy` because capture/configuration is proxy-owned, or move into
     `telemetry` once the observability namespace exists?
 03. Should `forge model backend` be the final backend nesting, or is the rename churn from top-level `backend` too high
@@ -459,7 +463,12 @@ This card intentionally proposes a large clean break. The migration notes should
     reserve names such as `forge telemetry activity --scope workspace`?
 08. Are any `--json` destinations intentionally clearer as `json_output`, or should the implementation standardize on
     `as_json` everywhere?
+    - **Resolved (Slice 07, 2026-06-23):** standardize on `as_json` everywhere (D8). All 9 `json_output` dests were
+      rebound and `JSON_DEST_ALLOWLIST` drained to `{}`; the structural guard now rejects any new `json_output` dest.
 09. Should human read output always go to stdout, or are there existing terminal UX exceptions worth preserving?
+    - **Resolved (Slice 07, 2026-06-23):** yes -- results (human and `--json`) go to stdout, diagnostics to stderr. The
+      one offender (`proxy audit`, which rendered its table to stderr) was fixed and
+      `tests/src/cli/test_output_streams.py` now guards the contract for the telemetry + audit leaves.
 10. Should `auth` become canonical instead of `authentication`, and what rule decides which groups get aliases?
 11. Should new top-level groups such as `telemetry` or `model` have aliases, or should the cleanup reduce aliases
     overall?

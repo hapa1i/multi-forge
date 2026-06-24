@@ -182,8 +182,8 @@ proxy's cumulative reported-cost total at session start and subtracts that basel
 table, and concurrent sessions sharing one proxy can still overlap.
 
 The status-line `cost` is the **interactive harness** signal, not Forge's automation spend: Claude's native cost/quota
-in direct mode, or proxy-reported `~$` under a proxy. For when to use it vs `forge proxy costs show` (authoritative
-spend), `forge activity` (Forge automation activity), and the `forge_cost` segment, see
+in direct mode, or proxy-reported `~$` under a proxy. For when to use it vs `forge telemetry costs show` (authoritative
+spend), `forge telemetry activity` (Forge automation activity), and the `forge_cost` segment, see
 [which surface answers which question?](proxy.md#which-surface-answers-which-question).
 
 **Removed:** the old flat `show_rate_limits` key. Add `rate_limits` to `statusline.segments` instead (e.g.
@@ -215,7 +215,7 @@ loads with a one-time warning and is ignored.)
 
 ---
 
-## Secrets (`forge authentication`)
+## Secrets (`forge auth`)
 
 API keys and credentials are managed via `forge auth login` and stored in `~/.forge/credentials.yaml`. These are for
 Forge proxy routing and subprocesses, not your Claude Code login. Environment variables (`.env`, shell exports) still

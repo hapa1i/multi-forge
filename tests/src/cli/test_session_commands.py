@@ -375,7 +375,7 @@ class TestSessionList:
         _seed_cleanup_session(temp_env, temp_env)
 
         with patch("forge.session.cleanup.ActiveSessionStore", return_value=_BrokenActiveSessionStore()):
-            result = runner.invoke(main, ["session", "clean", "--older-than", "30"])
+            result = runner.invoke(main, ["session", "clean", "--older-than", "30", "--yes"])
 
         assert result.exit_code == 1
         assert "Session cleanup aborted before evaluation completed" in result.output
@@ -385,18 +385,18 @@ class TestSessionList:
         assert "active session registry" in result.output
         assert SessionStore(str(temp_env), "old-session").exists()
 
-    def test_clean_dry_run_warns_when_active_registry_unreadable(self, runner: CliRunner, temp_env: Path) -> None:
-        """Dry-run should warn that real cleanup would abort when registry reads fail."""
+    def test_clean_preview_warns_when_active_registry_unreadable(self, runner: CliRunner, temp_env: Path) -> None:
+        """The default preview should warn that real cleanup would abort when registry reads fail."""
         _seed_cleanup_session(temp_env, temp_env)
 
         with patch("forge.session.active.ActiveSessionStore", return_value=_BrokenActiveSessionStore()):
-            result = runner.invoke(main, ["session", "clean", "--older-than", "30", "--dry-run"])
+            result = runner.invoke(main, ["session", "clean", "--older-than", "30"])
 
         assert result.exit_code == 0
         assert "Could not read active session registry" in result.output
         assert "Actual cleanup would abort" in result.output
         assert "old-session" in result.output
-        assert "unreadable" not in result.output  # keep dry-run wording user-facing
+        assert "unreadable" not in result.output  # keep preview wording user-facing
         assert SessionStore(str(temp_env), "old-session").exists()
 
     def test_clean_older_than_reports_nothing_when_registry_healthy_and_no_matches(
@@ -407,6 +407,28 @@ class TestSessionList:
 
         assert result.exit_code == 0
         assert "No sessions older than 30 days found." in result.output
+
+    def test_clean_previews_by_default_without_deleting(self, runner: CliRunner, temp_env: Path) -> None:
+        """Bare `clean` previews the deletable sessions and offers --yes, deleting nothing."""
+        _seed_cleanup_session(temp_env, temp_env)
+
+        result = runner.invoke(main, ["session", "clean", "--older-than", "30"])
+
+        assert result.exit_code == 0
+        assert "old-session" in result.output
+        assert "Would delete 1 session" in result.output
+        assert "Use --yes to delete." in result.output
+        assert SessionStore(str(temp_env), "old-session").exists()  # nothing removed
+
+    def test_clean_yes_deletes(self, runner: CliRunner, temp_env: Path) -> None:
+        """`clean --yes` actually deletes the old session."""
+        _seed_cleanup_session(temp_env, temp_env)
+
+        result = runner.invoke(main, ["session", "clean", "--older-than", "30", "--yes"])
+
+        assert result.exit_code == 0
+        assert "Cleaned 1 session" in result.output
+        assert not SessionStore(str(temp_env), "old-session").exists()
 
 
 class TestSessionShow:

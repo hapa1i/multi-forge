@@ -45,7 +45,7 @@ If you want to route through other providers (Gemini, GPT, etc.):
 
 ```bash
 # Store your credentials (API keys + connection values)
-forge authentication login
+forge auth login
 
 # Create a proxy (OpenRouter direct, no LiteLLM needed)
 forge proxy create openrouter-anthropic
@@ -81,8 +81,8 @@ No patching required.
 ### F. Store credentials
 
 ```bash
-forge authentication login               # Prompt for API keys, store in ~/.forge/credentials.yaml
-forge authentication status              # Show where each credential comes from (env, file, missing)
+forge auth login               # Prompt for API keys, store in ~/.forge/credentials.yaml
+forge auth status              # Show where each credential comes from (env, file, missing)
 ```
 
 See [authentication.md](authentication.md) for profiles and credential resolution.
@@ -103,8 +103,8 @@ forge session show my-feature                                  # Session details
 ```
 
 See [session.md](session.md) for worktrees, fork, incognito, and `%` commands. See [transfer.md](transfer.md) for the
-`forge transfer` group (inspect and reshape resume context) and the cross-runtime workflow (plan in Claude, implement in
-Codex).
+`forge session transfer` group (inspect and reshape resume context) and the cross-runtime workflow (plan in Claude,
+implement in Codex).
 
 ### Policies -- Code Quality Gates
 
@@ -112,11 +112,11 @@ Enable TDD enforcement, coding standards checks, or a semantic supervisor that v
 
 ```bash
 forge policy enable --bundle tdd                        # Deterministic TDD policy
-forge policy supervise planner                          # Semantic plan supervision
+forge policy supervisor set planner                     # Semantic plan supervision
 forge session fork planner --name executor --supervise # Wire at fork time
-forge policy supervise --off                            # Suspend (preserves config)
-forge policy supervise --on                             # Resume
-forge policy supervise --reload                         # Reload plan after changes
+forge policy supervisor off                             # Suspend (preserves config)
+forge policy supervisor on                              # Resume
+forge policy supervisor reload                          # Reload plan after changes
 ```
 
 See [policy.md](policy.md).

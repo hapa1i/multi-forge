@@ -1,4 +1,4 @@
-"""Unit tests for the `forge backend reconcile` CLI leaf (op mocked; no network)."""
+"""Unit tests for the `forge model backend reconcile` CLI leaf (op mocked; no network)."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from typing import Any
 
 from click.testing import CliRunner
 
-from forge.cli.backend import backend
+from forge.cli.main import main
 from forge.core.ops import ForgeOpError, ReconcileEntry, ReconcileResult
 
 
@@ -46,16 +46,20 @@ def _patch_op(monkeypatch, *, result: ReconcileResult | None = None, exc: Except
     return captured
 
 
+def _backend_args(*args: str) -> list[str]:
+    return ["model", "backend", *args]
+
+
 def test_request_id_text_renders(monkeypatch):
     _patch_op(monkeypatch)
-    res = CliRunner().invoke(backend, ["reconcile", "openrouter", "--request-id", "req-1"])
+    res = CliRunner().invoke(main, _backend_args("reconcile", "openrouter", "--request-id", "req-1"))
     assert res.exit_code == 0
     assert "joined" in res.output and "openrouter" in res.output
 
 
 def test_json_shape_has_counts_and_entries_no_secrets(monkeypatch):
     _patch_op(monkeypatch)
-    res = CliRunner().invoke(backend, ["reconcile", "openrouter", "--request-id", "req-1", "--json"])
+    res = CliRunner().invoke(main, _backend_args("reconcile", "openrouter", "--request-id", "req-1", "--json"))
     assert res.exit_code == 0
     data = json.loads(res.output)
     assert data["source_id"] == "openrouter"
@@ -67,7 +71,9 @@ def test_json_shape_has_counts_and_entries_no_secrets(monkeypatch):
 
 def test_timeout_and_ids_forwarded(monkeypatch):
     captured = _patch_op(monkeypatch)
-    res = CliRunner().invoke(backend, ["reconcile", "openrouter", "--request-id", "req-1", "--timeout", "2.5"])
+    res = CliRunner().invoke(
+        main, _backend_args("reconcile", "openrouter", "--request-id", "req-1", "--timeout", "2.5")
+    )
     assert res.exit_code == 0
     assert captured["source_id"] == "openrouter"
     assert captured["request_id"] == "req-1"
@@ -77,38 +83,38 @@ def test_timeout_and_ids_forwarded(monkeypatch):
 
 def test_remote_id_forwarded(monkeypatch):
     captured = _patch_op(monkeypatch, result=_result(mode="remote-id"))
-    res = CliRunner().invoke(backend, ["reconcile", "openrouter", "--remote-id", "gen-x"])
+    res = CliRunner().invoke(main, _backend_args("reconcile", "openrouter", "--remote-id", "gen-x"))
     assert res.exit_code == 0
     assert captured["remote_id"] == "gen-x" and captured["request_id"] is None
 
 
 def test_mutually_exclusive_ids_exit_1(monkeypatch):
     _patch_op(monkeypatch)
-    res = CliRunner().invoke(backend, ["reconcile", "openrouter", "--request-id", "a", "--remote-id", "b"])
+    res = CliRunner().invoke(main, _backend_args("reconcile", "openrouter", "--request-id", "a", "--remote-id", "b"))
     assert res.exit_code == 1
     assert "only one" in res.output.lower()
 
 
 def test_no_id_prints_tip_exit_1(monkeypatch):
     _patch_op(monkeypatch)
-    res = CliRunner().invoke(backend, ["reconcile", "openrouter"])
+    res = CliRunner().invoke(main, _backend_args("reconcile", "openrouter"))
     assert res.exit_code == 1
     assert "Tip:" in res.output
 
 
 def test_forge_op_error_exits_1_with_backend_list_tip(monkeypatch):
     _patch_op(monkeypatch, exc=ForgeOpError("Unknown backend source 'nope'"))
-    res = CliRunner().invoke(backend, ["reconcile", "nope", "--remote-id", "gen-x"])
+    res = CliRunner().invoke(main, _backend_args("reconcile", "nope", "--remote-id", "gen-x"))
     assert res.exit_code == 1
     assert "Unknown backend source" in res.output
-    assert "forge backend list" in res.output
+    assert "forge model backend list" in res.output
 
 
 def test_remote_adapter_error_exits_1_clean(monkeypatch):
     from forge.backend.remote.base import RemoteAdapterError
 
     _patch_op(monkeypatch, exc=RemoteAdapterError("no base url configured"))
-    res = CliRunner().invoke(backend, ["reconcile", "openrouter", "--remote-id", "gen-x"])
+    res = CliRunner().invoke(main, _backend_args("reconcile", "openrouter", "--remote-id", "gen-x"))
     assert res.exit_code == 1
     assert "Remote adapter error" in res.output and "no base url" in res.output
 
@@ -126,7 +132,7 @@ def test_not_authorized_renders_credential_hint(monkeypatch):
         needs_key_class="normal",
     )
     _patch_op(monkeypatch, result=result)
-    res = CliRunner().invoke(backend, ["reconcile", "openrouter", "--remote-id", "gen-x"])
+    res = CliRunner().invoke(main, _backend_args("reconcile", "openrouter", "--remote-id", "gen-x"))
     assert res.exit_code == 0
     assert "credential 'openrouter'" in res.output
     assert "sk-" not in res.output

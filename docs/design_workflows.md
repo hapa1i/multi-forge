@@ -125,7 +125,7 @@ ambiguities.
 - Auto-reload may succeed even if the supervisor target session has been deleted (the current session or a related fork
   may still hold the plan). Status surfaces show `Target: <name>` when resolvable and omit it otherwise.
 
-**Cascade (tier-1 plan check, opt-in):** `forge policy supervise --cascade` (or `<target> --cascade`) routes checks
+**Cascade (tier-1 plan check, opt-in):** `forge policy supervisor set --cascade` (or `<target> --cascade`) routes checks
 through a cheap tier before the frontier. A stateless `core.llm` call (`PlanCheckPolicy`, `semantic.plan_check`, default
 OpenRouter model `google/gemini-3.5-flash`, configurable per provider via `--checker-provider`/`--checker-model`, with a
 configurable default prompt budget of roughly 32K tokens stored as `policy.supervisor.checker_budget_tokens`) evaluates
@@ -140,10 +140,10 @@ frontier-always, never to unsupervised. In cascade mode the supervisor is regist
 §1.5): it is invoked only when a policy emitted `needs_review` and nothing denied, so clearly-aligned actions never pay
 the frontier call. Tier-1 reasons ride in low-severity violations (persisted to the decision log, never printed on
 resolved allows). Measurement is built in: session-tagged `plan-check` usage events plus decision-log-derived
-`plan_check_allow`/`plan_check_needs_review` counters in `forge activity` expose the short-circuit rate; the supervisor
-counters are the resolver runs (a tier-1 `needs_review` alongside a deterministic deny skips the resolver, so the two
-can differ). Cascade off (the default) is exactly the pre-cascade behavior — the supervisor runs as a regular policy on
-every throttle-missing check.
+`plan_check_allow`/`plan_check_needs_review` counters in `forge telemetry activity` expose the short-circuit rate; the
+supervisor counters are the resolver runs (a tier-1 `needs_review` alongside a deterministic deny skips the resolver, so
+the two can differ). Cascade off (the default) is exactly the pre-cascade behavior — the supervisor runs as a regular
+policy on every throttle-missing check.
 
 **Shadow sampling (audit, opt-in):** The cascade's blind spot is the **false-aligned** case — a tier-1 `allow` that
 short-circuits a frontier check the frontier would have blocked. Shadow sampling measures that rate without slowing the
@@ -160,15 +160,16 @@ runs the frontier, and classifies the verdict with the supervisor's **own** bloc
 `disagree` (frontier would have blocked — high-confidence, cited), `inconclusive` (divergent below the bar), or `error`
 (run failed or output unparseable, kept distinct from a real low-confidence `inconclusive`). It records the verdict and
 renames `.processing` → `.done`; it **never enforces**. Spend is a separate `supervisor-shadow` usage row (the worker is
-the sole emitter, re-rooted under the originating session). The read surface is `forge activity` (a Shadow line with
-checked/disagree/pending counts) and `forge policy shadow show` (the disagreement artifacts with citations).
+the sole emitter, re-rooted under the originating session). The read surface is `forge telemetry activity` (a Shadow
+line with checked/disagree/pending counts), `forge policy shadow show` (the disagreement artifacts with citations), and
+`forge policy shadow status` (the sample rate plus pending/done counts for one session).
 
 **Supervisor stuck playbook:** When the supervisor blocks because the plan evolved:
 
-- `%policy supervise off` (suspend, config preserved)
+- `%policy supervisor off` (suspend, config preserved)
 - Make the approved changes
-- `%policy supervise reload` (searches current session, forks, then target) or `%policy supervise reload <path>`
-- `%policy supervise on` (resume with updated plan context)
+- `%policy supervisor reload` (searches current session, forks, then target) or `%policy supervisor reload <path>`
+- `%policy supervisor on` (resume with updated plan context)
 
 **The underspecification problem (biggest failure mode):** Supervision catches explicit divergence (plan says X, agent
 did Y, citations are clear). Underspecification is harder: the plan is silent, the model picks a plausible default, and
@@ -822,7 +823,7 @@ The memory writer runs `claude -p` (headless prompt mode) on the full session tr
 **retrospectively**, selecting what mattered with full-session hindsight (higher signal than incremental capture).
 
 ```yaml
-# In session intent (set via forge memory enable or --memory on)
+# In session intent (set via forge session memory enable or --memory on)
 memory:
   auto_update:
     enabled: true
@@ -933,9 +934,9 @@ Memory activation is session-scoped. Each session decides whether the memory wri
 `intent.memory.auto_update.enabled` (or an override). There is no checkout-level config file.
 
 ```bash
-forge memory enable                    # resolves $FORGE_SESSION
-forge memory enable --session planner  # named session
-forge memory disable --session planner
+forge session memory enable                    # resolves $FORGE_SESSION
+forge session memory enable --session planner  # named session
+forge session memory disable --session planner
 forge session start planner --memory on
 ```
 
@@ -955,7 +956,7 @@ deferred.
 - **`forge memory track <path>`** authors a **passport** (project-lifetime, git-tracked frontmatter). Sessionless.
   `--propose` authors a shadow-only passport. A passported doc outside the scan roots is written but warns.
 - **`forge memory passport remove <path>`** removes the passport, preserving unrelated frontmatter.
-- **`forge memory enable`** / **`disable`** sets session activation (`memory.auto_update.enabled`). Resolves
+- **`forge session memory enable`** / **`disable`** sets session activation (`memory.auto_update.enabled`). Resolves
   `$FORGE_SESSION` when `--session` is omitted; errors outside a session without `--session`.
 - **`forge memory list`** shows passported docs under scan roots (sessionless scan, no writer filtering).
 
@@ -1012,7 +1013,7 @@ forge memory track docs/board/impl_notes.md \
   --propose --shadow-path .forge/memory/shadow_impl_notes.md
 
 # Enable memory for a session:
-forge memory enable --session planner
+forge session memory enable --session planner
 
 # Verify:
 forge memory passport show docs/board/change_log.md

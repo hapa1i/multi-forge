@@ -15,14 +15,15 @@
 **Last updated**: 2026-06-15 (same-directory transfer fork: section 5.22 covers explicit `--resume-mode transfer` and
 the `--strategy`/`--inline-plan` auto-switch on a same-dir fork, with the native default as control. Earlier 2026-06-12:
 codex-hooks installer module: registration block + trust-ceremony guidance (2.10), presence-gated skip without the codex
-binary (2.11). Earlier 2026-06-06: clean-break tombstone purge: removed the `forge usage`->`forge activity` rename probe
-(old §7.14) along with the CLI tombstone commands themselves; `forge proxy costs reset` telemetry-wipe coverage
-renumbered to 7.14. Earlier: cost CLI is now a group: `forge proxy costs` -> `forge proxy costs show`; metric-evidence
-cost-honesty coverage: `forge activity` cost footnotes/`~` marker (7.12), cost provenance reported-vs-`unavailable`
-split (7.13), the `forge_cost`/`forge +$Y` status-line segment with harness exclusion (8.5), session-end `~` marker
-(5.21), and the §3.4 secret-vs-non-secret masking fix (OPENROUTER_BASE_URL shown in full); earlier: renamed the
-per-session command to `forge activity` (7.12/5.21), status-line customization checks (§8.4), the workflow worker/verb
-double-count assertion (7.12), non-interactive docker-exec fixes, policy `--session` targeting, memory 16.4 re-track)
+binary (2.11). Earlier 2026-06-06: clean-break tombstone purge: removed the `forge usage`->`forge telemetry activity`
+rename probe (old §7.14) along with the CLI tombstone commands themselves; `forge telemetry costs reset` telemetry-wipe
+coverage renumbered to 7.14. Earlier: cost CLI is now a group: `forge telemetry costs` -> `forge telemetry costs show`;
+metric-evidence cost-honesty coverage: `forge telemetry activity` cost footnotes/`~` marker (7.12), cost provenance
+reported-vs-`unavailable` split (7.13), the `forge_cost`/`forge +$Y` status-line segment with harness exclusion (8.5),
+session-end `~` marker (5.21), and the §3.4 secret-vs-non-secret masking fix (OPENROUTER_BASE_URL shown in full);
+earlier: renamed the per-session command to `forge telemetry activity` (7.12/5.21), status-line customization checks
+(§8.4), the workflow worker/verb double-count assertion (7.12), non-interactive docker-exec fixes, policy `--session`
+targeting, memory 16.4 re-track)
 
 ---
 
@@ -40,7 +41,7 @@ double-count assertion (7.12), non-interactive docker-exec fixes, policy `--sess
 
 <!-- section: 2 checklist/2-extension.md -->
 
-- [3. Authentication (`forge authentication`)](checklist/3-authentication.md)
+- [3. Authentication (`forge auth`)](checklist/3-authentication.md)
 
 <!-- section: 3 checklist/3-authentication.md -->
 

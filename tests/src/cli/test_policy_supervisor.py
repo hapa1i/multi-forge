@@ -1,4 +1,4 @@
-"""Tests for forge policy supervisor on-demand command."""
+"""Tests for the forge policy supervisor command group."""
 
 from __future__ import annotations
 
@@ -168,25 +168,57 @@ def _warn_decision(**kwargs) -> PolicyDecision:
     return PolicyDecision(decision="warn", policy_id="semantic.supervisor", **kwargs)
 
 
+# --- Slice 10 clean break: `supervise` removed, one-shot moved under `evaluate` ---
+
+
+class TestSupervisorCleanBreak:
+    def test_supervise_verb_removed(self) -> None:
+        """`forge policy supervise` no longer exists (Click reports no such command)."""
+        result = CliRunner().invoke(main, ["policy", "supervise"])
+        assert result.exit_code == 2
+        assert "No such command" in result.output
+
+    def test_bare_oneshot_requires_evaluate(self, tmp_path) -> None:
+        """`supervisor` is now a group: the bare one-shot `-f/-r` form no longer parses."""
+        f = tmp_path / "src.py"
+        f.write_text("x = 1")
+        result = CliRunner().invoke(main, ["policy", "supervisor", "-f", str(f), "-r", "abc-123"])
+        assert result.exit_code == 2
+
+    @patch("forge.policy.semantic.supervisor.invoke_supervisor")
+    def test_evaluate_subcommand_runs(self, mock_invoke, tmp_path) -> None:
+        f = tmp_path / "src.py"
+        f.write_text("x = 1")
+        mock_invoke.return_value = _allow_decision()
+        result = CliRunner().invoke(main, ["policy", "supervisor", "evaluate", "-f", str(f), "-r", "abc-123"])
+        assert result.exit_code == 0
+
+
 class TestSupervisorHelp:
     def test_help_exits_zero(self):
         runner = CliRunner()
-        result = runner.invoke(main, ["policy", "supervisor", "--help"])
+        result = runner.invoke(main, ["policy", "supervisor", "evaluate", "--help"])
         assert result.exit_code == 0
         assert "--resume-id" in result.output
         assert "--file" in result.output
         assert "--json" in result.output
 
+    def test_group_help_lists_leaves(self):
+        result = CliRunner().invoke(main, ["policy", "supervisor", "--help"])
+        assert result.exit_code == 0
+        for leaf in ("status", "set", "off", "on", "remove", "reload", "cascade", "evaluate"):
+            assert leaf in result.output
+
     def test_missing_resume_id_exits_error(self, tmp_path):
         f = tmp_path / "test.py"
         f.write_text("pass")
         runner = CliRunner()
-        result = runner.invoke(main, ["policy", "supervisor", "-f", str(f)])
+        result = runner.invoke(main, ["policy", "supervisor", "evaluate", "-f", str(f)])
         assert result.exit_code != 0
 
     def test_missing_file_exits_error(self):
         runner = CliRunner()
-        result = runner.invoke(main, ["policy", "supervisor", "-r", "abc-123"])
+        result = runner.invoke(main, ["policy", "supervisor", "evaluate", "-r", "abc-123"])
         assert result.exit_code != 0
 
 
@@ -198,7 +230,7 @@ class TestSupervisorAligned:
         mock_invoke.return_value = _allow_decision()
 
         runner = CliRunner()
-        result = runner.invoke(main, ["policy", "supervisor", "-f", str(f), "-r", "abc-123"])
+        result = runner.invoke(main, ["policy", "supervisor", "evaluate", "-f", str(f), "-r", "abc-123"])
         assert result.exit_code == 0
 
     @patch("forge.policy.semantic.supervisor.invoke_supervisor")
@@ -208,7 +240,7 @@ class TestSupervisorAligned:
         mock_invoke.return_value = _allow_decision()
 
         runner = CliRunner()
-        result = runner.invoke(main, ["policy", "supervisor", "-f", str(f), "-r", "abc-123", "--json"])
+        result = runner.invoke(main, ["policy", "supervisor", "evaluate", "-f", str(f), "-r", "abc-123", "--json"])
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert data["passed"] is True
@@ -223,7 +255,7 @@ class TestSupervisorAligned:
         mock_invoke.return_value = _warn_decision(warnings=["Possible divergence: minor (confidence: 50%)"])
 
         runner = CliRunner()
-        result = runner.invoke(main, ["policy", "supervisor", "-f", str(f), "-r", "abc-123"])
+        result = runner.invoke(main, ["policy", "supervisor", "evaluate", "-f", str(f), "-r", "abc-123"])
         assert result.exit_code == 0
 
 
@@ -246,7 +278,7 @@ class TestSupervisorDivergent:
         )
 
         runner = CliRunner()
-        result = runner.invoke(main, ["policy", "supervisor", "-f", str(f), "-r", "abc-123"])
+        result = runner.invoke(main, ["policy", "supervisor", "evaluate", "-f", str(f), "-r", "abc-123"])
         assert result.exit_code == 1
 
     @patch("forge.policy.semantic.supervisor.invoke_supervisor")
@@ -266,7 +298,7 @@ class TestSupervisorDivergent:
         )
 
         runner = CliRunner()
-        result = runner.invoke(main, ["policy", "supervisor", "-f", str(f), "-r", "abc-123", "--json"])
+        result = runner.invoke(main, ["policy", "supervisor", "evaluate", "-f", str(f), "-r", "abc-123", "--json"])
         assert result.exit_code == 1
         data = json.loads(result.output)
         assert data["passed"] is False
@@ -278,24 +310,24 @@ class TestSupervisorDivergent:
 class TestSupervisorInfraFailure:
     @patch("forge.policy.semantic.supervisor.invoke_supervisor")
     def test_supervisor_error_exits_2(self, mock_invoke, tmp_path):
-        """Fail-open allow with infra-failure markers → exit 2."""
+        """Fail-open allow with infra-failure markers -> exit 2."""
         f = tmp_path / "src.py"
         f.write_text("x = 1")
         mock_invoke.return_value = _allow_decision(warnings=["Supervisor error: exit 1, failing open"])
 
         runner = CliRunner()
-        result = runner.invoke(main, ["policy", "supervisor", "-f", str(f), "-r", "abc-123"])
+        result = runner.invoke(main, ["policy", "supervisor", "evaluate", "-f", str(f), "-r", "abc-123"])
         assert result.exit_code == 2
 
     @patch("forge.policy.semantic.supervisor.invoke_supervisor")
     def test_supervisor_skipped_exits_2(self, mock_invoke, tmp_path):
-        """Supervisor skipped (depth limit) → exit 2."""
+        """Supervisor skipped (depth limit) -> exit 2."""
         f = tmp_path / "src.py"
         f.write_text("x = 1")
         mock_invoke.return_value = _allow_decision(warnings=["Supervisor skipped (FORGE_DEPTH limit reached)"])
 
         runner = CliRunner()
-        result = runner.invoke(main, ["policy", "supervisor", "-f", str(f), "-r", "abc-123"])
+        result = runner.invoke(main, ["policy", "supervisor", "evaluate", "-f", str(f), "-r", "abc-123"])
         assert result.exit_code == 2
 
     @patch("forge.policy.semantic.supervisor.invoke_supervisor")
@@ -305,7 +337,7 @@ class TestSupervisorInfraFailure:
         mock_invoke.return_value = _allow_decision(warnings=["Supervisor error: timeout, failing open"])
 
         runner = CliRunner()
-        result = runner.invoke(main, ["policy", "supervisor", "-f", str(f), "-r", "abc-123", "--json"])
+        result = runner.invoke(main, ["policy", "supervisor", "evaluate", "-f", str(f), "-r", "abc-123", "--json"])
         assert result.exit_code == 2
         data = json.loads(result.output)
         assert data["passed"] is False
@@ -314,22 +346,22 @@ class TestSupervisorInfraFailure:
 
     @patch("forge.policy.semantic.supervisor.invoke_supervisor")
     def test_exception_exits_2(self, mock_invoke, tmp_path):
-        """Exception during invocation → exit 2."""
+        """Exception during invocation -> exit 2."""
         f = tmp_path / "src.py"
         f.write_text("x = 1")
         mock_invoke.side_effect = RuntimeError("connection failed")
 
         runner = CliRunner()
-        result = runner.invoke(main, ["policy", "supervisor", "-f", str(f), "-r", "abc-123"])
+        result = runner.invoke(main, ["policy", "supervisor", "evaluate", "-f", str(f), "-r", "abc-123"])
         assert result.exit_code == 2
 
 
-class TestSupervisorOptions:
+class TestSupervisorSet:
     @patch("forge.install.hooks.has_forge_hook", side_effect=_hooks_installed)
     @patch("forge.policy.semantic.supervisor.apply_supervisor_to_intent", side_effect=_apply_supervisor_to_intent)
     @patch("forge.policy.semantic.supervisor.auto_seed_supervisor_proxy", side_effect=_auto_seed_supervisor_proxy)
     @patch("forge.policy.semantic.supervisor.validate_supervisor_target", side_effect=_validate_supervisor_target)
-    def test_supervise_session_uses_current_project_scope(
+    def test_set_session_uses_current_project_scope(
         self,
         _mock_validate,
         _mock_seed,
@@ -340,7 +372,7 @@ class TestSupervisorOptions:
     ):
         forge_root_a, _forge_root_b = _seed_duplicate_supervisor_targets(temp_guard_env)
 
-        result = runner.invoke(main, ["policy", "supervise", "shared", "--session", "controller"])
+        result = runner.invoke(main, ["policy", "supervisor", "set", "shared", "--session", "controller"])
 
         assert result.exit_code == 0
         assert _read_supervisor_resume_id(forge_root_a, "controller") == "shared"
@@ -350,7 +382,7 @@ class TestSupervisorOptions:
     @patch("forge.policy.semantic.supervisor.apply_supervisor_to_intent", side_effect=_apply_supervisor_to_intent)
     @patch("forge.policy.semantic.supervisor.auto_seed_supervisor_proxy", side_effect=_auto_seed_supervisor_proxy)
     @patch("forge.policy.semantic.supervisor.validate_supervisor_target", side_effect=_validate_supervisor_target)
-    def test_supervise_session_validates_in_selected_session_scope(
+    def test_set_session_validates_in_selected_session_scope(
         self,
         mock_validate,
         _mock_seed,
@@ -362,7 +394,7 @@ class TestSupervisorOptions:
         """Validation should use the selected session's forge_root, not CWD."""
         forge_root_a, _forge_root_b = _seed_duplicate_supervisor_targets(temp_guard_env)
 
-        result = runner.invoke(main, ["policy", "supervise", "shared", "--session", "controller"])
+        result = runner.invoke(main, ["policy", "supervisor", "set", "shared", "--session", "controller"])
         assert result.exit_code == 0
 
         # validate_supervisor_target must be called with the selected session's
@@ -381,7 +413,7 @@ class TestSupervisorOptions:
     @patch("forge.policy.semantic.supervisor.apply_supervisor_to_intent", side_effect=_apply_supervisor_to_intent)
     @patch("forge.policy.semantic.supervisor.auto_seed_supervisor_proxy", side_effect=_auto_seed_supervisor_proxy)
     @patch("forge.policy.semantic.supervisor.validate_supervisor_target", side_effect=_validate_supervisor_target)
-    def test_supervise_show_uses_same_project_target_metadata(
+    def test_status_uses_same_project_target_metadata(
         self,
         _mock_validate,
         _mock_seed,
@@ -391,10 +423,10 @@ class TestSupervisorOptions:
         temp_guard_env: Path,
     ):
         forge_root_a, _forge_root_b = _seed_duplicate_supervisor_targets(temp_guard_env)
-        result = runner.invoke(main, ["policy", "supervise", "shared", "--session", "controller"])
+        result = runner.invoke(main, ["policy", "supervisor", "set", "shared", "--session", "controller"])
         assert result.exit_code == 0
 
-        show_result = runner.invoke(main, ["policy", "supervise", "--session", "controller"])
+        show_result = runner.invoke(main, ["policy", "supervisor", "status", "--session", "controller"])
 
         assert show_result.exit_code == 0
         assert "Supervisor: [green]shared[/green]" not in show_result.output
@@ -402,6 +434,8 @@ class TestSupervisorOptions:
         assert "Claude UUID: uuid-alpha" in show_result.output or "Claude UUID: uuid-alpha..." in show_result.output
         assert "Source model: template-a" in show_result.output
 
+
+class TestEvaluateContext:
     @patch("forge.policy.semantic.supervisor.invoke_supervisor")
     def test_proxy_passed_to_config(self, mock_invoke, tmp_path):
         f = tmp_path / "src.py"
@@ -411,7 +445,7 @@ class TestSupervisorOptions:
         runner = CliRunner()
         runner.invoke(
             main,
-            ["policy", "supervisor", "-f", str(f), "-r", "abc-123", "--proxy", "litellm-openai"],
+            ["policy", "supervisor", "evaluate", "-f", str(f), "-r", "abc-123", "--proxy", "litellm-openai"],
         )
         config = mock_invoke.call_args[0][0]
         assert config.proxy == "litellm-openai"
@@ -425,7 +459,7 @@ class TestSupervisorOptions:
         runner = CliRunner()
         runner.invoke(
             main,
-            ["policy", "supervisor", "-f", str(f), "-r", "abc-123", "-t", "90"],
+            ["policy", "supervisor", "evaluate", "-f", str(f), "-r", "abc-123", "-t", "90"],
         )
         config = mock_invoke.call_args[0][0]
         assert config.timeout_seconds == 90
@@ -437,12 +471,12 @@ class TestSupervisorOptions:
         mock_invoke.return_value = _allow_decision()
 
         runner = CliRunner()
-        runner.invoke(main, ["policy", "supervisor", "-f", str(f), "-r", "abc-123"])
+        runner.invoke(main, ["policy", "supervisor", "evaluate", "-f", str(f), "-r", "abc-123"])
         context = mock_invoke.call_args[0][1]
         assert "def hello(): pass" in (context.new_content or "")
 
 
-# --- Toggle tests for `forge policy supervise --off/--on/--remove/--reload` ---
+# --- Toggle tests for `forge policy supervisor off/on/remove/reload` ---
 
 
 def _make_supervised_project(project: Path, monkeypatch, *, suspended: bool = False) -> SessionStore:
@@ -467,10 +501,10 @@ def _make_supervised_project(project: Path, monkeypatch, *, suspended: bool = Fa
     return store
 
 
-class TestSuperviseRoutingDisplay:
-    """Tests for supervisor routing display in forge policy supervise (show)."""
+class TestSupervisorStatus:
+    """Tests for `forge policy supervisor status` (display + --json)."""
 
-    def test_show_displays_proxy_routing(self, runner: CliRunner, temp_guard_env: Path, monkeypatch) -> None:
+    def test_status_displays_proxy_routing(self, runner: CliRunner, temp_guard_env: Path, monkeypatch) -> None:
         from forge.session.models import SupervisorConfig
 
         monkeypatch.setenv("FORGE_SESSION", "worker")
@@ -482,11 +516,11 @@ class TestSuperviseRoutingDisplay:
         )
         SessionStore(str(temp_guard_env), "worker").write(manifest)
 
-        result = runner.invoke(main, ["policy", "supervise"])
+        result = runner.invoke(main, ["policy", "supervisor", "status"])
         assert result.exit_code == 0
         assert "Routing: proxy: litellm-gemini" in result.output
 
-    def test_show_displays_direct_routing(self, runner: CliRunner, temp_guard_env: Path, monkeypatch) -> None:
+    def test_status_displays_direct_routing(self, runner: CliRunner, temp_guard_env: Path, monkeypatch) -> None:
         from forge.session.models import SupervisorConfig
 
         monkeypatch.setenv("FORGE_SESSION", "worker")
@@ -498,17 +532,59 @@ class TestSuperviseRoutingDisplay:
         )
         SessionStore(str(temp_guard_env), "worker").write(manifest)
 
-        result = runner.invoke(main, ["policy", "supervise"])
+        result = runner.invoke(main, ["policy", "supervisor", "status"])
         assert result.exit_code == 0
         assert "Routing: direct (no proxy)" in result.output
 
+    _SUPERVISOR_JSON_KEYS = {
+        "resume_id",
+        "suspended",
+        "plan_override_path",
+        "proxy",
+        "direct",
+        "fork_session",
+        "timeout_seconds",
+        "throttle_seconds",
+        "cascade",
+        "checker_model",
+        "checker_provider",
+        "checker_budget_tokens",
+        "checker_effort",
+        "supervisor_effort",
+        "resolved_uuid",
+        "source_model",
+    }
 
-class TestSuperviseToggle:
-    """Tests for forge policy supervise --off/--on/--remove."""
+    def test_status_json_configured(self, runner: CliRunner, temp_guard_env: Path, monkeypatch) -> None:
+        _make_supervised_project(temp_guard_env, monkeypatch)
+        result = runner.invoke(main, ["policy", "supervisor", "status", "--json"])
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["session_name"] == "worker"
+        sup = data["supervisor"]
+        assert sup is not None
+        assert sup["resume_id"] == "planner"
+        assert set(sup.keys()) == self._SUPERVISOR_JSON_KEYS
+
+    def test_status_json_unconfigured(self, runner: CliRunner, temp_guard_env: Path, monkeypatch) -> None:
+        monkeypatch.setenv("FORGE_SESSION", "worker")
+        manifest = create_session_state("worker", worktree_path=str(temp_guard_env))
+        manifest.forge_root = str(temp_guard_env)
+        SessionStore(str(temp_guard_env), "worker").write(manifest)
+
+        result = runner.invoke(main, ["policy", "supervisor", "status", "--json"])
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["session_name"] == "worker"
+        assert data["supervisor"] is None
+
+
+class TestSupervisorToggle:
+    """Tests for forge policy supervisor off/on/remove."""
 
     def test_off_suspends(self, runner: CliRunner, temp_guard_env: Path, monkeypatch) -> None:
         store = _make_supervised_project(temp_guard_env, monkeypatch)
-        result = runner.invoke(main, ["policy", "supervise", "--off"])
+        result = runner.invoke(main, ["policy", "supervisor", "off"])
 
         assert result.exit_code == 0
         assert "suspended" in result.output.lower()
@@ -521,7 +597,7 @@ class TestSuperviseToggle:
 
     def test_on_resumes(self, runner: CliRunner, temp_guard_env: Path, monkeypatch) -> None:
         store = _make_supervised_project(temp_guard_env, monkeypatch, suspended=True)
-        result = runner.invoke(main, ["policy", "supervise", "--on"])
+        result = runner.invoke(main, ["policy", "supervisor", "on"])
 
         assert result.exit_code == 0
         assert "resumed" in result.output.lower()
@@ -533,7 +609,7 @@ class TestSuperviseToggle:
 
     def test_remove_clears(self, runner: CliRunner, temp_guard_env: Path, monkeypatch) -> None:
         store = _make_supervised_project(temp_guard_env, monkeypatch)
-        result = runner.invoke(main, ["policy", "supervise", "--remove"])
+        result = runner.invoke(main, ["policy", "supervisor", "remove"])
 
         assert result.exit_code == 0
         assert "removed" in result.output.lower()
@@ -550,21 +626,16 @@ class TestSuperviseToggle:
         manifest.forge_root = str(temp_guard_env)
         SessionStore(str(temp_guard_env), "worker").write(manifest)
 
-        result = runner.invoke(main, ["policy", "supervise", "--off"])
+        result = runner.invoke(main, ["policy", "supervisor", "off"])
         assert result.exit_code == 0
         assert "no supervisor configured" in result.output.lower()
-
-    def test_mutual_exclusivity(self, runner: CliRunner, temp_guard_env: Path, monkeypatch) -> None:
-        _make_supervised_project(temp_guard_env, monkeypatch)
-        result = runner.invoke(main, ["policy", "supervise", "--off", "--on"])
-        assert result.exit_code != 0 or "only one action" in result.output.lower()
 
     def test_reload_from_path(self, runner: CliRunner, temp_guard_env: Path, monkeypatch) -> None:
         store = _make_supervised_project(temp_guard_env, monkeypatch)
         plan = temp_guard_env / "plan.md"
         plan.write_text("# Updated Plan")
 
-        result = runner.invoke(main, ["policy", "supervise", "--reload-from", str(plan)])
+        result = runner.invoke(main, ["policy", "supervisor", "reload", "--from", str(plan)])
 
         assert result.exit_code == 0
         assert "plan updated" in result.output.lower()
@@ -576,29 +647,30 @@ class TestSuperviseToggle:
         assert "plan.md" in updated.intent.policy.supervisor.plan_override_path
 
 
-class TestSupervisorProxyFlags:
-    """Tests for --supervisor-proxy / --no-supervisor-proxy on policy supervise."""
+class TestSupervisorSetProxyFlags:
+    """Tests for --supervisor-proxy / --no-supervisor-proxy on `policy supervisor set`."""
 
     def test_supervisor_proxy_mutual_exclusivity(self, temp_guard_env: Path) -> None:
         runner = CliRunner()
         result = runner.invoke(
             main,
-            ["policy", "supervise", "planner", "--supervisor-proxy", "x", "--no-supervisor-proxy"],
+            ["policy", "supervisor", "set", "planner", "--supervisor-proxy", "x", "--no-supervisor-proxy"],
         )
         assert result.exit_code == 1
         assert "mutually exclusive" in result.output
 
     def test_supervisor_proxy_requires_target(self, temp_guard_env: Path) -> None:
+        """`set` makes the target positional, so the proxy flag can't be used without it."""
         runner = CliRunner()
-        result = runner.invoke(main, ["policy", "supervise", "--supervisor-proxy", "x"])
-        assert result.exit_code == 1
-        assert "require a target" in result.output
+        result = runner.invoke(main, ["policy", "supervisor", "set", "--supervisor-proxy", "x"])
+        assert result.exit_code == 2
+        assert "TARGET" in result.output
 
     def test_no_supervisor_proxy_requires_target(self, temp_guard_env: Path) -> None:
         runner = CliRunner()
-        result = runner.invoke(main, ["policy", "supervise", "--no-supervisor-proxy"])
-        assert result.exit_code == 1
-        assert "require a target" in result.output
+        result = runner.invoke(main, ["policy", "supervisor", "set", "--no-supervisor-proxy"])
+        assert result.exit_code == 2
+        assert "TARGET" in result.output
 
     @patch("forge.policy.semantic.supervisor.validate_supervisor_target", side_effect=_validate_supervisor_target)
     @patch("forge.policy.semantic.supervisor.apply_supervisor_routing")
@@ -617,7 +689,7 @@ class TestSupervisorProxyFlags:
         with patch.dict("os.environ", monkeypatch_env):
             result = runner.invoke(
                 main,
-                ["policy", "supervise", "planner", "--supervisor-proxy", "litellm-gemini"],
+                ["policy", "supervisor", "set", "planner", "--supervisor-proxy", "litellm-gemini"],
             )
 
         assert result.exit_code == 0, f"Expected exit 0, got {result.exit_code}: {result.output}"
@@ -626,11 +698,11 @@ class TestSupervisorProxyFlags:
         assert mock_apply.call_args.kwargs.get("supervisor_proxy") == "litellm-gemini"
 
 
-class TestSuperviseTimeoutFlag:
-    """--timeout on policy supervise: an attribute of the target action, not a new action."""
+class TestSupervisorSetTimeoutFlag:
+    """--timeout on `policy supervisor set`: a modifier on the target, enforced structurally."""
 
     def _set_supervisor(self, project: Path, args: list[str]) -> SupervisorConfig:
-        """Run ``policy supervise planner <args>`` against a real store; return persisted config."""
+        """Run ``policy supervisor set planner <args>`` against a real store; return persisted config."""
         store = SessionStore(str(project), "test-session")
         state = create_session_state("test-session", worktree_path=str(project))
         state.forge_root = str(project)
@@ -645,7 +717,7 @@ class TestSuperviseTimeoutFlag:
             ),
             patch("forge.policy.semantic.supervisor.apply_supervisor_routing"),
         ):
-            result = runner.invoke(main, ["policy", "supervise", "planner", *args])
+            result = runner.invoke(main, ["policy", "supervisor", "set", "planner", *args])
         assert result.exit_code == 0, f"Expected exit 0, got {result.exit_code}: {result.output}"
         manifest = store.read()
         assert manifest.intent.policy is not None and manifest.intent.policy.supervisor is not None
@@ -660,26 +732,19 @@ class TestSuperviseTimeoutFlag:
         assert sup.timeout_seconds == 45
 
     def test_timeout_requires_target(self, temp_guard_env: Path) -> None:
+        """`--timeout` lives only on `set`, whose TARGET is required (Click usage error)."""
         runner = CliRunner()
-        result = runner.invoke(main, ["policy", "supervise", "--timeout", "90"])
-        assert result.exit_code == 1
-        assert "requires a target" in result.output
-
-    def test_timeout_with_other_action_errors_cleanly(self, temp_guard_env: Path) -> None:
-        # Attribute-not-action: the requires-target error fires, not the action count.
-        runner = CliRunner()
-        result = runner.invoke(main, ["policy", "supervise", "--off", "--timeout", "90"])
-        assert result.exit_code == 1
-        assert "requires a target" in result.output
-        assert "only one action" not in result.output
+        result = runner.invoke(main, ["policy", "supervisor", "set", "--timeout", "90"])
+        assert result.exit_code == 2
+        assert "TARGET" in result.output
 
     def test_timeout_rejects_non_positive(self, temp_guard_env: Path) -> None:
         runner = CliRunner()
-        result = runner.invoke(main, ["policy", "supervise", "planner", "--timeout", "0"])
+        result = runner.invoke(main, ["policy", "supervisor", "set", "planner", "--timeout", "0"])
         assert result.exit_code == 2  # Click IntRange(min=1) usage error
 
 
-# --- Cascade tests for `forge policy supervise --cascade/--no-cascade/--checker-model` ---
+# --- Cascade tests for `forge policy supervisor cascade` and `set --cascade` ---
 
 
 def _fake_resolved_plan(path: str, source: str = "self", session_name: str = "worker"):
@@ -704,8 +769,8 @@ def _read_supervisor(store: SessionStore):
     return manifest.intent.policy.supervisor
 
 
-class TestSuperviseCascade:
-    """Tests for the cascade flags (modifier with target, standalone toggle without)."""
+class TestSupervisorCascade:
+    """Tests for the `cascade` leaf (standalone toggle) and `set --cascade` (modifier)."""
 
     def test_standalone_cascade_enables_with_existing_plan(
         self, runner: CliRunner, temp_guard_env: Path, monkeypatch
@@ -715,7 +780,7 @@ class TestSuperviseCascade:
         plan.write_text("# Plan")
         _set_supervisor_fields(store, plan_override_path=str(plan))
 
-        result = runner.invoke(main, ["policy", "supervise", "--cascade"])
+        result = runner.invoke(main, ["policy", "supervisor", "cascade", "on"])
         assert result.exit_code == 0, result.output
         assert "cascade enabled" in result.output.lower()
 
@@ -732,7 +797,7 @@ class TestSuperviseCascade:
             "forge.policy.semantic.supervisor.resolve_supervisor_reload_plan_path",
             return_value=_fake_resolved_plan(str(plan)),
         ):
-            result = runner.invoke(main, ["policy", "supervise", "--cascade"])
+            result = runner.invoke(main, ["policy", "supervisor", "cascade", "on"])
 
         assert result.exit_code == 0, result.output
         assert "current session" in result.output
@@ -750,7 +815,7 @@ class TestSuperviseCascade:
             "forge.policy.semantic.supervisor.resolve_supervisor_reload_plan_path",
             return_value=None,
         ):
-            result = runner.invoke(main, ["policy", "supervise", "--cascade"])
+            result = runner.invoke(main, ["policy", "supervisor", "cascade", "on"])
 
         assert result.exit_code == 1
         assert "No approved plan snapshot" in result.output
@@ -760,11 +825,11 @@ class TestSuperviseCascade:
         assert sup.cascade is False
         assert sup.plan_override_path is None
 
-    def test_standalone_no_cascade_disables(self, runner: CliRunner, temp_guard_env: Path, monkeypatch) -> None:
+    def test_standalone_cascade_off_disables(self, runner: CliRunner, temp_guard_env: Path, monkeypatch) -> None:
         store = _make_supervised_project(temp_guard_env, monkeypatch)
         _set_supervisor_fields(store, cascade=True, plan_override_path="/tmp/plan.md")
 
-        result = runner.invoke(main, ["policy", "supervise", "--no-cascade"])
+        result = runner.invoke(main, ["policy", "supervisor", "cascade", "off"])
         assert result.exit_code == 0, result.output
         assert "cascade disabled" in result.output.lower()
 
@@ -779,22 +844,24 @@ class TestSuperviseCascade:
         manifest.forge_root = str(temp_guard_env)
         SessionStore(str(temp_guard_env), "worker").write(manifest)
 
-        result = runner.invoke(main, ["policy", "supervise", "--cascade"])
+        result = runner.invoke(main, ["policy", "supervisor", "cascade", "on"])
         assert result.exit_code == 0
         assert "no supervisor configured" in result.output.lower()
 
-    def test_no_cascade_with_target_rejected(self, runner: CliRunner, temp_guard_env: Path) -> None:
-        result = runner.invoke(main, ["policy", "supervise", "planner", "--no-cascade"])
+    def test_cascade_rejects_bad_state(self, runner: CliRunner, temp_guard_env: Path, monkeypatch) -> None:
+        """`cascade` takes a positional on|off; anything else is a Click usage error."""
+        _make_supervised_project(temp_guard_env, monkeypatch)
+        result = runner.invoke(main, ["policy", "supervisor", "cascade", "maybe"])
+        assert result.exit_code == 2
+
+    def test_no_cascade_on_set_rejected(self, runner: CliRunner, temp_guard_env: Path) -> None:
+        result = runner.invoke(main, ["policy", "supervisor", "set", "planner", "--no-cascade"])
         assert result.exit_code == 1
         assert "redundant" in result.output
 
-    def test_bare_checker_model_rejected(self, runner: CliRunner, temp_guard_env: Path) -> None:
-        result = runner.invoke(main, ["policy", "supervise", "--checker-model", "google/gemini-3.5-flash"])
-        assert result.exit_code == 1
-        assert "Checker options require a target argument or --cascade" in result.output
-
-    def test_checker_model_must_be_prefixed(self, runner: CliRunner, temp_guard_env: Path) -> None:
-        result = runner.invoke(main, ["policy", "supervise", "--cascade", "--checker-model", "flash"])
+    def test_checker_model_must_be_prefixed(self, runner: CliRunner, temp_guard_env: Path, monkeypatch) -> None:
+        _make_supervised_project(temp_guard_env, monkeypatch)
+        result = runner.invoke(main, ["policy", "supervisor", "cascade", "on", "--checker-model", "flash"])
         assert result.exit_code == 1
         assert "prefixed model id" in result.output
 
@@ -807,7 +874,7 @@ class TestSuperviseCascade:
         _set_supervisor_fields(store, plan_override_path=str(plan))
 
         result = runner.invoke(
-            main, ["policy", "supervise", "--cascade", "--checker-model", "openrouter/some-cheap-model"]
+            main, ["policy", "supervisor", "cascade", "on", "--checker-model", "openrouter/some-cheap-model"]
         )
         assert result.exit_code == 0, result.output
 
@@ -826,8 +893,9 @@ class TestSuperviseCascade:
             main,
             [
                 "policy",
-                "supervise",
-                "--cascade",
+                "supervisor",
+                "cascade",
+                "on",
                 "--checker-provider",
                 "litellm-local",
             ],
@@ -839,25 +907,19 @@ class TestSuperviseCascade:
         assert sup.checker_budget_tokens is None
         assert "gemini/gemini-3.5-flash via litellm_local" in result.output
 
-    def test_checker_budget_is_not_a_supervise_option(self, runner: CliRunner, temp_guard_env: Path) -> None:
-        result = runner.invoke(main, ["policy", "supervise", "--cascade", "--checker-budget-tokens", "64000"])
+    def test_checker_budget_is_not_a_cascade_option(self, runner: CliRunner, temp_guard_env: Path, monkeypatch) -> None:
+        _make_supervised_project(temp_guard_env, monkeypatch)
+        result = runner.invoke(main, ["policy", "supervisor", "cascade", "on", "--checker-budget-tokens", "64000"])
         assert result.exit_code == 2
         assert "No such option" in result.output
         assert "--checker-budget-tokens" in result.output
 
-    def test_cascade_is_standalone_action(self, runner: CliRunner, temp_guard_env: Path, monkeypatch) -> None:
-        """Standalone cascade flags participate in the one-action rule."""
-        _make_supervised_project(temp_guard_env, monkeypatch)
-        result = runner.invoke(main, ["policy", "supervise", "--cascade", "--off"])
-        assert result.exit_code == 1
-        assert "only one action" in result.output.lower()
-
     @patch("forge.policy.semantic.supervisor.validate_supervisor_target", side_effect=_validate_supervisor_target)
     @patch("forge.policy.semantic.supervisor.apply_supervisor_routing", return_value=None)
-    def test_target_with_cascade_modifier(
+    def test_set_with_cascade_modifier(
         self, mock_apply, mock_validate, runner: CliRunner, temp_guard_env: Path, monkeypatch
     ) -> None:
-        """--cascade with a target is a modifier, not a second action."""
+        """`set <target> --cascade` is a modifier on the set action."""
         monkeypatch.setenv("FORGE_SESSION", "worker")
         manifest = create_session_state("worker", worktree_path=str(temp_guard_env))
         manifest.forge_root = str(temp_guard_env)
@@ -870,7 +932,7 @@ class TestSuperviseCascade:
             "forge.policy.semantic.supervisor.resolve_supervisor_reload_plan_path",
             return_value=_fake_resolved_plan(str(plan), source="target"),
         ):
-            result = runner.invoke(main, ["policy", "supervise", "planner", "--cascade"])
+            result = runner.invoke(main, ["policy", "supervisor", "set", "planner", "--cascade"])
 
         assert result.exit_code == 0, result.output
         assert "Cascade: on" in result.output
@@ -881,7 +943,7 @@ class TestSuperviseCascade:
 
     @patch("forge.policy.semantic.supervisor.validate_supervisor_target", side_effect=_validate_supervisor_target)
     @patch("forge.policy.semantic.supervisor.apply_supervisor_routing", return_value=None)
-    def test_target_with_cascade_unresolvable_plan_exits_1(
+    def test_set_with_cascade_unresolvable_plan_exits_1(
         self, mock_apply, mock_validate, runner: CliRunner, temp_guard_env: Path, monkeypatch
     ) -> None:
         """Wiring-time plan resolution failure exits before any manifest mutation."""
@@ -895,7 +957,7 @@ class TestSuperviseCascade:
             "forge.policy.semantic.supervisor.resolve_supervisor_reload_plan_path",
             return_value=None,
         ):
-            result = runner.invoke(main, ["policy", "supervise", "planner", "--cascade"])
+            result = runner.invoke(main, ["policy", "supervisor", "set", "planner", "--cascade"])
 
         assert result.exit_code == 1
         assert "No approved plan snapshot" in result.output
@@ -903,62 +965,62 @@ class TestSuperviseCascade:
         updated = store.read()
         assert updated.intent.policy is None or updated.intent.policy.supervisor is None
 
-    def test_show_displays_cascade(self, runner: CliRunner, temp_guard_env: Path, monkeypatch) -> None:
+    def test_status_displays_cascade(self, runner: CliRunner, temp_guard_env: Path, monkeypatch) -> None:
         store = _make_supervised_project(temp_guard_env, monkeypatch)
         _set_supervisor_fields(store, cascade=True, plan_override_path="/tmp/plan.md")
 
-        result = runner.invoke(main, ["policy", "supervise"])
+        result = runner.invoke(main, ["policy", "supervisor", "status"])
         assert result.exit_code == 0
         assert "Cascade: on" in result.output
         assert "Checker provider: openrouter" in result.output
         assert "Checker model: google/gemini-3.5-flash" in result.output
         assert "Checker budget: 32000 tokens" in result.output
 
-    def test_show_displays_effort_fields(self, runner: CliRunner, temp_guard_env: Path, monkeypatch) -> None:
+    def test_status_displays_effort_fields(self, runner: CliRunner, temp_guard_env: Path, monkeypatch) -> None:
         store = _make_supervised_project(temp_guard_env, monkeypatch)
         _set_supervisor_fields(store, cascade=True, supervisor_effort="high", checker_effort="low")
 
-        result = runner.invoke(main, ["policy", "supervise"])
+        result = runner.invoke(main, ["policy", "supervisor", "status"])
 
         assert result.exit_code == 0, result.output
         assert "Supervisor effort: high" in result.output
         assert "Checker effort: low" in result.output
 
-    def test_show_hides_checker_effort_when_cascade_off(
+    def test_status_hides_checker_effort_when_cascade_off(
         self, runner: CliRunner, temp_guard_env: Path, monkeypatch
     ) -> None:
         store = _make_supervised_project(temp_guard_env, monkeypatch)
         _set_supervisor_fields(store, cascade=False, supervisor_effort="high", checker_effort="low")
 
-        result = runner.invoke(main, ["policy", "supervise"])
+        result = runner.invoke(main, ["policy", "supervisor", "status"])
 
         assert result.exit_code == 0, result.output
         # supervisor_effort governs the always-on frontier; checker_effort is cascade-only.
         assert "Supervisor effort: high" in result.output
         assert "Checker effort" not in result.output
 
-    def test_show_displays_unsupported_checker_provider(
+    def test_status_displays_unsupported_checker_provider(
         self, runner: CliRunner, temp_guard_env: Path, monkeypatch
     ) -> None:
         store = _make_supervised_project(temp_guard_env, monkeypatch)
         _set_supervisor_fields(store, cascade=True, checker_provider="anthropic")
 
-        result = runner.invoke(main, ["policy", "supervise"])
+        result = runner.invoke(main, ["policy", "supervisor", "status"])
 
         assert result.exit_code == 0, result.output
         assert "Checker provider: anthropic (unsupported)" in result.output
         assert "Checker model: unresolved" in result.output
 
-    def test_show_displays_cascade_off_by_default(self, runner: CliRunner, temp_guard_env: Path, monkeypatch) -> None:
+    def test_status_displays_cascade_off_by_default(self, runner: CliRunner, temp_guard_env: Path, monkeypatch) -> None:
         _make_supervised_project(temp_guard_env, monkeypatch)
-        result = runner.invoke(main, ["policy", "supervise"])
+        result = runner.invoke(main, ["policy", "supervisor", "status"])
         assert result.exit_code == 0
         assert "Cascade: off" in result.output
         assert "Checker model" not in result.output
 
 
-class TestSupervisorOneShotEffort:
-    """Effort controls for the one-shot `forge policy supervisor` command."""
+class TestEvaluateEffort:
+    """Effort controls for the one-shot `forge policy supervisor evaluate` command."""
 
     @patch("forge.policy.semantic.supervisor.invoke_supervisor")
     def test_supervisor_effort_passed_to_config(self, mock_invoke, tmp_path):
@@ -970,18 +1032,18 @@ class TestSupervisorOneShotEffort:
         runner = CliRunner()
         result = runner.invoke(
             main,
-            ["policy", "supervisor", "-f", str(f), "-r", "abc-123", "--supervisor-effort", "high"],
+            ["policy", "supervisor", "evaluate", "-f", str(f), "-r", "abc-123", "--supervisor-effort", "high"],
         )
         assert result.exit_code == 0, result.output
         config = mock_invoke.call_args[0][0]
         assert config.supervisor_effort == "high"
 
-    def test_checker_effort_is_not_a_supervisor_option(self):
-        """The one-shot command intentionally has no --checker-effort; Click rejects it."""
+    def test_checker_effort_is_not_an_evaluate_option(self):
+        """The one-shot evaluate command intentionally has no --checker-effort; Click rejects it."""
         runner = CliRunner()
         result = runner.invoke(
             main,
-            ["policy", "supervisor", "-f", "ignored.py", "-r", "abc-123", "--checker-effort", "low"],
+            ["policy", "supervisor", "evaluate", "-f", "ignored.py", "-r", "abc-123", "--checker-effort", "low"],
         )
         assert result.exit_code == 2
         assert "no such option" in result.output.lower()

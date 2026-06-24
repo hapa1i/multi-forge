@@ -22,7 +22,7 @@ forge memory track .forge/memory/debugging.md --strategy generic
 head -5 .forge/memory/debugging.md | grep -q 'forge_memory'
 
 # Enable memory for the session.
-forge memory enable --session test-session-1
+forge session memory enable --session test-session-1
 forge session set memory.auto_update.min_turns 1 --session test-session-1
 
 # List passported docs (sessionless scan).
@@ -36,7 +36,7 @@ cat .forge/sessions/test-session-1/forge.session.json | jq '.overrides.memory'
 ```
 
 - [ ] `forge memory track` writes a passport into the doc (sessionless)
-- [ ] `forge memory enable --session` sets activation override
+- [ ] `forge session memory enable --session` sets activation override
 - [ ] `forge memory list` discovers passported docs via scan
 - [ ] Memory writer config written to session overrides (`enabled`, `min_turns`)
 
@@ -73,14 +73,14 @@ echo "before=$BEFORE_LINES after=$AFTER_LINES"
 cat .forge/memory/debugging.md
 
 ls .forge/artifacts/test-session-1/handoff/review-*.md
-forge memory report show test-session-1 --latest
+forge session memory report test-session-1 --latest
 
 test "$AFTER_LINES" -gt "$BEFORE_LINES"
 ```
 
 - [ ] `forge memory-writer run` succeeds with the transcript artifact path provided
 - [ ] Passported docs are discovered via scan and updated with session takeaways
-- [ ] Memory writer stdout is persisted and visible via `forge memory report show --latest`
+- [ ] Memory writer stdout is persisted and visible via `forge session memory report --latest`
 
 ### 16.3 Shadow Memory Writer (`--propose` + shadow mode)
 

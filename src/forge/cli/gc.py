@@ -8,7 +8,7 @@ import sys
 import click
 from rich.console import Console
 
-from forge.cli.output import print_tip
+from forge.cli.output import err_console, print_error, print_tip
 from forge.core.ops.context import ExecutionContext
 from forge.core.ops.gc import CleanError, CleanReport, collect_clean_report, run_clean
 
@@ -42,13 +42,13 @@ def clean_cmd(scope: str, yes: bool, verbose: bool, as_json: bool) -> None:
     try:
         ctx = ExecutionContext.from_cwd()
     except Exception as e:
-        console.print(f"[red]Error:[/red] {e}")
+        print_error(f"{e}", console=err_console)
         sys.exit(1)
 
     try:
         report = collect_clean_report(ctx=ctx, scope=scope)
     except CleanError as e:
-        console.print(f"[red]Error:[/red] {e}")
+        print_error(f"{e}", console=err_console)
         sys.exit(1)
 
     if as_json and yes:
@@ -91,7 +91,7 @@ def _run_and_report(ctx: ExecutionContext, scope: str, report: CleanReport, cons
     try:
         result = run_clean(ctx=ctx, scope=scope)
     except CleanError as e:
-        console.print(f"[red]Error:[/red] {e}")
+        print_error(f"{e}", console=console)
         sys.exit(1)
 
     if result.deleted_count == 0 and not result.failed:

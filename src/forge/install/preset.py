@@ -1,7 +1,7 @@
 """Claude Code settings preset management.
 
 The preset (~/.forge/claude.preset.json) defines what settings Forge merges
-into Claude Code's settings.json on ``forge extensions enable``.
+into Claude Code's settings.json on ``forge extension enable``.
 
 Built-in content contains only essential infrastructure:
 - hooks: all 13 Forge-managed hook events wiring ``forge hook <name>`` commands

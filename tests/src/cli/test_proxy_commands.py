@@ -55,6 +55,14 @@ def test_proxy_list_empty_shows_message(runner: CliRunner, temp_env: Path) -> No
     assert "No proxies found" in result.output
 
 
+def test_proxy_clean_removed_clean_break(runner: CliRunner, temp_env: Path) -> None:
+    """`forge proxy clean` was removed (F14a, fully redundant): Click reports No such command."""
+    result = runner.invoke(main, ["proxy", "clean"])
+
+    assert result.exit_code == 2
+    assert "No such command 'clean'" in result.output
+
+
 def test_proxy_list_shows_entries(runner: CliRunner, temp_env: Path) -> None:
     forge_home = Path(os.environ["FORGE_HOME"])
     proxies_index = forge_home / "proxies" / "index.json"
@@ -1588,10 +1596,10 @@ class TestProxyMetrics:
         assert data["total_requests"] == 42
         assert data["tokens"]["cached"] == 60000
 
-    def test_metrics_all_json_is_valid_single_object(
+    def test_metrics_multiple_json_marks_unreachable_null(
         self, runner: CliRunner, temp_env: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """--all --json must emit a single valid JSON object."""
+        """Bare `metrics --json` with >1 proxy emits one JSON object; unreachable proxies are null."""
         _create_proxy_registry_from_entries(
             {
                 "proxy-a": ProxyEntry(proxy_id="proxy-a", template="t", base_url="http://localhost:8085", port=8085),
@@ -1607,13 +1615,19 @@ class TestProxyMetrics:
 
         monkeypatch.setattr("forge.cli.proxy._fetch_proxy_info", _mock_fetch)
 
-        result = runner.invoke(main, ["proxy", "metrics", "--all", "--json"])
+        result = runner.invoke(main, ["proxy", "metrics", "--json"])
 
         assert result.exit_code == 0
         data = json.loads(result.output)  # Must parse as single JSON
         assert "proxy-a" in data
         assert data["proxy-a"]["total_requests"] == 42
         assert data["proxy-b"] is None  # unreachable
+
+    def test_metrics_all_flag_removed(self, runner: CliRunner) -> None:
+        """`--all` was removed (Slice 12) -- bare `metrics` already aggregates. Clean break: exit 2."""
+        result = runner.invoke(main, ["proxy", "metrics", "--all"])
+        assert result.exit_code == 2
+        assert "No such option" in result.stderr
 
     def test_metrics_proxy_not_found(self, runner: CliRunner, temp_env: Path) -> None:
         result = runner.invoke(main, ["proxy", "metrics", "nonexistent"])
@@ -1749,10 +1763,10 @@ class TestProxyMetrics:
         assert result.exit_code == 0
         assert "litellm-openai" in result.output
 
-    def test_metrics_all_shows_separators(
+    def test_metrics_multiple_shows_separators(
         self, runner: CliRunner, temp_env: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """--all with multiple proxies shows separator lines between them."""
+        """Bare `metrics` with multiple proxies shows separator lines between them."""
         _create_proxy_registry_from_entries(
             {
                 "proxy-a": ProxyEntry(proxy_id="proxy-a", template="t", base_url="http://localhost:8085", port=8085),
@@ -1763,7 +1777,7 @@ class TestProxyMetrics:
             "forge.cli.proxy._fetch_proxy_info", lambda _: _ProxyInfo(metrics=_SAMPLE_METRICS, template="t")
         )
 
-        result = runner.invoke(main, ["proxy", "metrics", "--all"])
+        result = runner.invoke(main, ["proxy", "metrics"])
 
         assert result.exit_code == 0
         assert "proxy-a" in result.output
@@ -2362,6 +2376,88 @@ class TestProxyTemplate:
         """--template flag was removed from proxy show."""
         result = runner.invoke(main, ["proxy", "show", "foo", "--template"])
         assert result.exit_code != 0
+
+    def test_template_list_json_lists_builtins(self, runner: CliRunner, temp_env: Path) -> None:
+        """`template list --json` -> {templates: [{name, source, description}]} with built-ins present."""
+        result = runner.invoke(main, ["proxy", "template", "list", "--json"])
+
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert set(data.keys()) == {"templates"}
+        templates = data["templates"]
+        assert isinstance(templates, list)
+        assert templates, "Built-in templates ship with Forge; list must be non-empty"
+        for row in templates:
+            assert set(row.keys()) == {"name", "source", "description"}
+            assert row["source"] in {"built-in", "user", "customized"}
+
+        by_name = {row["name"]: row for row in templates}
+        # A known built-in ships with Forge and needs no setup.
+        assert "anthropic-passthrough" in by_name
+        assert by_name["anthropic-passthrough"]["source"] == "built-in"
+        # Description is parsed from the second comment line of the template YAML.
+        assert by_name["litellm-openai"]["description"] == "OpenAI models via remote/shared LiteLLM"
+
+    def test_template_list_json_marks_customized_source(self, runner: CliRunner, temp_env: Path) -> None:
+        """`template list --json` reports source=customized when a user copy overrides a built-in."""
+        forge_home = Path(os.environ["FORGE_HOME"])
+        tpl_dir = forge_home / "templates"
+        tpl_dir.mkdir(parents=True)
+        (tpl_dir / "litellm-openai.yaml").write_text("# user override\nproxy:\n  default_port: 9999\n")
+
+        result = runner.invoke(main, ["proxy", "template", "list", "--json"])
+
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        by_name = {row["name"]: row for row in data["templates"]}
+        assert by_name["litellm-openai"]["source"] == "customized"
+
+    def test_template_show_json_builtin(self, runner: CliRunner, temp_env: Path) -> None:
+        """`template show <name> --json` -> {name, source, path, content} with raw YAML content."""
+        result = runner.invoke(main, ["proxy", "template", "show", "litellm-openai", "--json"])
+
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert set(data.keys()) == {"name", "source", "path", "content"}
+        assert data["name"] == "litellm-openai"
+        assert data["source"] == "built-in"
+        assert data["path"].endswith("litellm-openai.yaml")
+        # content is the raw YAML string, including the leading template comment.
+        assert "# Template: litellm-openai" in data["content"]
+        assert "proxy:" in data["content"]
+
+    def test_template_show_json_customized_source(self, runner: CliRunner, temp_env: Path) -> None:
+        """`template show --json` reports the customized source label when a user copy overrides built-in."""
+        forge_home = Path(os.environ["FORGE_HOME"])
+        tpl_dir = forge_home / "templates"
+        tpl_dir.mkdir(parents=True)
+        (tpl_dir / "litellm-openai.yaml").write_text("# user override\nproxy:\n  family: openai\n")
+
+        result = runner.invoke(main, ["proxy", "template", "show", "litellm-openai", "--json"])
+
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert data["source"] == "customized (overrides built-in)"
+        # content reflects the user copy, not the shipped template.
+        assert "# user override" in data["content"]
+
+    def test_template_show_json_unknown_errors(self, runner: CliRunner, temp_env: Path) -> None:
+        """`template show <unknown> --json` -> {error: ...} with nonzero exit."""
+        result = runner.invoke(main, ["proxy", "template", "show", "nonexistent", "--json"])
+
+        assert result.exit_code != 0
+        data = json.loads(result.output)
+        assert set(data.keys()) == {"error"}
+        assert "not found" in data["error"].lower()
+
+    def test_template_show_json_invalid_name_errors(self, runner: CliRunner, temp_env: Path) -> None:
+        """`template show --json` rejects path traversal as a structured {error: ...} payload."""
+        result = runner.invoke(main, ["proxy", "template", "show", "../outside", "--json"])
+
+        assert result.exit_code != 0
+        data = json.loads(result.output)
+        assert set(data.keys()) == {"error"}
+        assert "Invalid template name" in data["error"]
 
 
 class TestProxyCreateMissingUrl:

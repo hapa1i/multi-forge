@@ -36,6 +36,37 @@ wc -l docs/board/impl_notes.md
 
 ## Notes
 
+### CLI command aliases and canonical names (forge_cli_cleanup Slice 05, shipped 2026-06-24)
+
+Durable rules for `src/forge/cli/main.py` aliasing and any future CLI command rename.
+
+- **Two maps, one mechanism.** `_ALIASES` (alias -> canonical, resolved by `AliasGroup.get_command`) and
+  `_DISPLAY_ALIASES` (canonical -> alias, surfaced in `--help` by `AliasGroup.format_commands`). Shipped set is
+  `ext`/`sess`/`mem`/`cfg` only.
+- **D6 alias policy (recorded in `cli_style_guidelines.md`).** Durable short aliases only when deliberately chosen (a
+  rationale-backed UX affordance); new top-level nouns get NO alias by default (`telemetry`/`model` have none);
+  canonical names follow user vocabulary (`auth` is canonical, not `authentication`); rename/back-compat shims are
+  temporary -- remove them in a cleanup slice, never keep them indefinitely.
+- **Removing an alias for a canonical command is atomic with the registration rename.** `forge <alias>` resolves only
+  via `_ALIASES`, so deleting `"auth": "authentication"` is coherent only when `main.add_command(auth, ...)` is flipped
+  to `name="auth"` in the SAME change. Delete-without-rename breaks the command; rename-without-delete leaves a stale
+  alias. (coding_standards "change interfaces atomically".)
+- **Recurring trap: Python symbol/module path != CLI alias string.** `from forge.cli.extensions import extensions` and
+  `runner.invoke(extensions, ...)` are the command-object symbol (module `forge.cli.extensions`), unrelated to the CLI
+  alias string. Renaming/removing a CLI alias changes ONLY invocations through `main` with the literal token
+  (`["extensions", ...]`, shell `forge extensions`); direct command-object invocations and imports stay.
+  `forge extensions` (with a space) never matches `forge.cli.extensions` (dots), so it is a safe `replace_all` pattern
+  -- the bare word `extensions` is not.
+- **Clean-break + drift verification.** `test_command_tree_invariants.py::test_removed_aliases_are_clean_breaks` pins
+  removed aliases (bare AND leaf forms) to exit 2 "No such command" and canonical names to resolve; assert on
+  `result.output` (this repo's `CliRunner()` surfaces the Click usage error there even though Click writes it to
+  stderr). For a CLI rename run a zero-tolerance command-form drift sweep
+  (`rg "forge authentication|forge extensions" --glob '!docs/board/**'` must be empty) plus a broader prefix-less sweep
+  that is a *classify* step (English prose like "Show extensions status" is fine, not a hit). Installer/extension-path
+  renames need the Docker integration run (`test_installer.py` etc.): `CliRunner` cannot catch a test asserting on the
+  real binary's tip text (a latent plural-vs-singular assertion at `test_installer.py:158` was only proven correct by
+  the live run).
+
 ### Unified backend: source catalog invariants (shipped)
 
 Shipped 2026-06-18 (`unified_backend`). Keep these boundaries intact when changing backend/source, template, auth, or
@@ -53,7 +84,7 @@ telemetry ownership:
 - **The local sources share one adapter+port, so runtime-instance attribution is many-to-one.** All three local LiteLLM
   sources declare `adapter=litellm, default_port=4000`, and the shipped default `litellm.yaml` references both
   `GEMINI_API_KEY` and `OPENAI_API_KEY` — so a single `litellm-4000` process legitimately backs both
-  `litellm-gemini-local` and `litellm-openai-local`. `forge backend list`/`show` surface this as `(shared)` /
+  `litellm-gemini-local` and `litellm-openai-local`. `forge model backend list`/`show` surface this as `(shared)` /
   `runtime_instance.shared_with`. The `_local_source_matches_backend_config` heuristic that disambiguates this is
   **display-only** (`cli/backend.py`); it must never feed downstream telemetry `backend_id`, which stays derived from
   `proxy.source`. A test fixture narrower than the shipped default (e.g. gemini-only) hides the multi-match case — lock
@@ -66,7 +97,7 @@ telemetry ownership:
 
 ### Backend remote reconciliation: registry capability + total external-data coercers (shipped)
 
-Shipped 2026-06-20 (`backend_remote_reconciliation`, PRs #41/#42/#43). `forge backend reconcile` joins one local
+Shipped 2026-06-20 (`backend_remote_reconciliation`, PRs #41/#42/#43). `forge model backend reconcile` joins one local
 downstream trace to one remote account-side record via an adapter under `src/forge/backend/remote/`.
 
 - **Remote-reconcile capability = adapter-registry presence, not a flag.** A source is reconcilable iff
@@ -85,13 +116,30 @@ downstream trace to one remote account-side record via an adapter under `src/for
   answer; single-sided lookups yield only `remote`/`not-queryable`. Local cost/tokens are never overwritten by remote
   figures (kept side by side with provenance).
 
-### Review fan-out must not run write-capable agents in the live working tree
+### Review/audit fan-out must not run agents with Bash against the live working tree
 
 Recurring hazard (hit 2026-06-20): an adversarial-review workflow run with `general-purpose` agents (tool access `*`)
 edited source mid-review even though instructed to only return findings; `git checkout` then carried the uncommitted
-change across branches and `git add -A` swept it into an unrelated commit. Run review/finder fan-out with
-`isolation: 'worktree'` or the read-only `Explore` agent type so finders physically cannot mutate the branch under
-review, and `git status` before every `git add -A`.
+change across branches and `git add -A` swept it into an unrelated commit.
+
+**`Explore` is NOT a sufficient guard (hit 2026-06-23).** An audit workflow run with the read-only `Explore` agent type
+(no Edit/Write) still has **Bash**. Agents instructed to "use git log/diff to inspect each slice" ran `git stash` +
+`git checkout <commit>` + `git reset` to view historical state, which **reverted the entire uncommitted working tree**
+to HEAD and left the repo in detached HEAD — clobbering ~33 files of unstaged Slice-02 work. Read-only file tools do not
+prevent state-changing git via Bash.
+
+Protections, in order of reliability:
+
+- **Commit (or at least `git stash`) the work before any fan-out.** Committed/stashed state is recoverable; raw unstaged
+  changes overwritten by `git reset --hard`/`git checkout -f` are not.
+- Use `isolation: 'worktree'` so agents operate on their own checkout and cannot touch the primary tree.
+- If agents must run in the live tree, instruct them: **read-only git only** (`log`/`diff`/`show`/`status`); never
+  `checkout`/`switch`/`reset`/`restore`/`stash`/`clean`.
+
+**Recovery:** if a tree gets reverted, check `git stash list` and `git reflog` first — an agent's `git stash` *saves*
+the work (`git stash apply stash@{0}` restores it); the reflog's `reset: moving to HEAD` /
+`checkout: moving from <branch> to <sha>` entries show what happened. Untracked files survive checkout/reset, so
+newly-created modules are usually still present. Always `git status` before every `git add -A`.
 
 ### Memory System Architecture (shipped)
 
@@ -101,9 +149,16 @@ memory writer runs (`memory.auto_update.enabled`). No checkout-level config, no 
 - **Passports are the sole doc source**: `forge_memory` YAML frontmatter in docs declares strategy, writers, intent.
   Stop-time `scan_passported_docs()` discovers them under hardcoded roots (`docs/` + `.forge/memory/`). No manifest doc
   lists; `DesignatedDoc` is a runtime-only type for the scanner -> memory-writer pipeline.
-- **Session activation**: `forge memory enable/disable --session` or `--memory on|off` at start/fork/resume. Both gates
-  (Stop hook, detached runner) check `effective.memory.auto_update.enabled` directly. Incognito never enqueues.
-- **Tombstone for old CLI**: `forge session memory` is a hidden tombstone group that errors with replacement guidance.
+- **Session activation**: `forge session memory enable/disable --session` or `--memory on|off` at start/fork/resume.
+  Both gates (Stop hook, detached runner) check `effective.memory.auto_update.enabled` directly. Incognito never
+  enqueues.
+- **Namespace (Slice 02, forge_cli_cleanup)**: the session-scoped activation/report verbs live under
+  `forge session memory` (`enable`/`disable`/`status`/`report`, the last flattened from `forge memory report show`).
+  This is now a **real** group, not a tombstone — the earlier hidden `forge session memory` tombstone is gone. Top-level
+  `forge memory` keeps the project-doc passport verbs (`track`/`list`/`passport`/`shadows`). The verb modules live in
+  `cli/session_memory.py` (+ the flattened `report` from `cli/memory_report.py`); both subgroups are wired onto the
+  `session` group in `cli/main.py` (not `session.py`) because `transfer.py`/`session_memory.py` import `console` from
+  `session.py`, so parent-imports-child would cycle.
 - **Stop-time chain**: stop hook -> work queue marker -> fire-and-forget `forge memory-writer run` -> passport scan ->
   writer filter -> `run_claude_session()`. Detached failures are not retried.
 - **Shadow path encoding**: `derive_shadow_path()` encodes the immediate parent directory to avoid collisions.
@@ -121,7 +176,7 @@ The `memory_substrate` card split the overloaded "handoff" term into two concept
 
 - **Memory writer** — Stop-time project-doc curation: `session/memory_writer.py` (`run_memory_writer`,
   `resolve_writer_base_url`, `memory_report_dir`), `MemoryWriterConfig`, `memory_writer_timeout`,
-  `forge memory-writer run`, `forge memory report show`.
+  `forge memory-writer run`, `forge session memory report`.
 - **Transfer** — resume/fork context assembly: `session/transfer.py` (`assemble_transfer_context`, `TransferResult`),
   `--resume-mode transfer`.
 - **3-layer memory taxonomy** (design.md §5.6): raw memory (`.forge/artifacts/`), project memory (passported docs under
@@ -133,9 +188,11 @@ fixtures:** work-queue marker `kind="handoff"` + `enqueue_handoff_marker()` (eph
 the intentional-mismatch comment in `memory_writer.py`); the `queued_handoff` Stop-hook JSON field; QA fixture filenames
 (`manual-handoff-*.jsonl`); and the industry-English "design-to-code handoff" in the skills-writing guide.
 
-**CLI tombstone collision (gotcha):** the report command is `forge memory report show` (new `cli/memory_report.py`), not
-`forge session memory show`, because `forge session memory` was already an occupied tombstone group. Before renaming a
-CLI surface, check whether the target path is already a tombstone.
+**CLI tombstone reclamation (Slice 02):** the report command now lives at `forge session memory report` (flattened leaf
+in the new `cli/session_memory.py` group). It earlier sat at `forge memory report show` only because a tombstone group
+occupied `forge session memory`; Slice 02 removed that tombstone and reclaimed the path for the real session-scoped
+memory group (`enable`/`disable`/`status`/`report`), wired onto `session` in `cli/main.py`. Durable lesson: before
+renaming a CLI surface, check whether the target path is already a (possibly hidden) tombstone group.
 
 **Durable-value rename pattern (resume_mode):** `confirmed.derivation.resume_mode` migrated `"handoff"` → `"transfer"`
 via accept-and-tolerate, not reject — readers map legacy `"handoff"`/`None` to transfer with no branching; writers emit
@@ -148,8 +205,8 @@ Shipped 2026-05-31 (commit `2b70c29`). Durable invariants for `src/forge/session
 
 - **Three-file artifact model** under `<forge_root>/.forge/prev_sessions/<parent>/`: `generated.md` (regeneratable
   parent cache), `children/<child>.md` (frozen AI snapshot, schema sections 1-7), `children/<child>.notes.md` (user
-  overlay, section 8). `forge transfer regenerate` rewrites only `generated.md`; `ensure_child` never overwrites an
-  existing child; GC ties a notes file's liveness to its snapshot (never orphaned independently).
+  overlay, section 8). `forge session transfer regenerate` rewrites only `generated.md`; `ensure_child` never overwrites
+  an existing child; GC ties a notes file's liveness to its snapshot (never orphaned independently).
 - **Child-agnostic frontmatter (load-bearing)**: the transfer frontmatter carries no `child` field, so `generated.md`
   and the copied `children/<child>.md` stay byte-identical. `ensure_child` and the auto-name retry byte-compare in
   `manager.py` both depend on this — do not add per-child fields to the frontmatter.
@@ -157,10 +214,12 @@ Shipped 2026-05-31 (commit `2b70c29`). Durable invariants for `src/forge/session
   fallback is `"compatibility-fallback"`. `_validate_decision_citations()` drops any citation outside the `[turn N]`
   range the model actually saw (keeps the decision text, blanks false provenance), so `schema: full` never overstates
   evidence quality.
-- **Namespace**: `forge transfer` is a **top-level** group (pairs with `forge memory`), not `forge session transfer`.
-  `forge session resume --fresh --review` is a delegating entry point that edits the `.notes.md` overlay, not a
-  competing namespace. `forge transfer show` (assembled artifact) is distinct from the deprecated
-  `forge session context` (folded into `forge session show`).
+- **Namespace**: `forge session transfer` is a **session-scoped** group (Slice 02 of forge_cli_cleanup moved it under
+  `forge session`; it pairs with the `forge session memory` activation verbs), distinct from top-level `forge memory`
+  (project-doc passports). `forge session resume --fresh --review` is a delegating entry point that edits the
+  `.notes.md` overlay, not a competing namespace. `forge session transfer show` (assembled artifact) is distinct from
+  `forge session show`'s context view (`forge session context` was removed in the CLI cleanup; its `--field`/`--json`
+  behavior folded into `session show`).
 - **`target_runtime`** is reserved in the frontmatter (`TRANSFER_TARGET_RUNTIME = "claude"`) for Phase 5 cross-runtime
   tuning: Phase 5 retargets presentation without changing transcript source artifacts or schema semantics.
 - **`ctx` is prior art and inspiration only, never a dependency**: the transfer schema is Forge-owned and canonical
@@ -343,33 +402,33 @@ code (file:line) before promotion.
   rerun-at-default. This is deliberately the opposite of the `--output-format json` telemetry path, which
   retries-once-and-latches (`headless_json.mark_json_output_unsupported`). Rationale: effort changes model behavior, so
   a silent default-rerun would misreport what actually ran.
-- **Cascade-at-launch is flag-only — the asymmetry with `policy supervise --cascade` is intentional.**
+- **Cascade-at-launch is flag-only — the asymmetry with `policy supervisor cascade on` is intentional.**
   `fork`/`start --supervise --cascade` set `cascade=True` only; the runtime hook escalates to the frontier when no
-  approved plan exists yet. `forge policy supervise --cascade` instead resolves the approved-plan snapshot eagerly (via
-  the `--reload` machinery) and exits 1 if none resolves. Do not "fix" the divergence: launch time legitimately has no
-  plan snapshot yet.
+  approved plan exists yet. `forge policy supervisor cascade on` (and `supervisor set <target> --cascade`) instead
+  resolve the approved-plan snapshot eagerly (via the `--reload` machinery) and exit 1 if none resolves. Do not "fix"
+  the divergence: launch time legitimately has no plan snapshot yet.
 - **One Click-free checker-helper source prevents launch/policy drift.** `CHECKER_PROVIDER_CHOICES`,
   `normalize_checker_provider_arg`, `validate_checker_model` (raises `ValueError` containing "prefixed model id"), and
   `apply_checker_options` live in `policy/semantic/supervisor.py` (no Click). `cli/policy.py` and `plan_check.py` import
-  them, so launch commands, persistent `policy supervise`, and the tier-1 checker share one validation/normalization
-  source. Add new checker controls there, not at each CLI surface.
+  them, so launch commands, persistent `policy supervisor set`, and the tier-1 checker share one
+  validation/normalization source. Add new checker controls there, not at each CLI surface.
 - **Effort is per-caller by design — no global knob.** Wired per consumer: `SupervisorConfig.supervisor_effort` /
   `.checker_effort`, `MemoryWriterConfig.effort`, `TeamSupervisorConfig.effort`, `run_multi_review(reasoning_effort=)`.
   `checker_effort` feeds `ModelHyperparameters` via `merge_hyperparams` **and** is part of the plan-check throttle cache
   key (a different effort must not reuse a cached verdict). All additive optional `str | None` fields — no
   `SCHEMA_VERSION` bump.
-- **Memory-enable early-return must compare effort too (recurring silent-drop shape).** `_set_memory_activation`
-  short-circuits only when enabled AND mode AND effort are all unchanged. The bug was short-circuiting on enabled+mode
-  alone, silently dropping `forge memory enable --effort high` on an already-enabled, same-mode session. Regression in
-  `test_memory.py`. When adding a new persisted activation field, add it to the no-op comparison or it joins this class
-  of silent drop.
+- **Memory-enable early-return must compare effort too (recurring silent-drop shape).** `_set_memory_activation` (moved
+  to `cli/session_memory.py` in Slice 02) short-circuits only when enabled AND mode AND effort are all unchanged. The
+  bug was short-circuiting on enabled+mode alone, silently dropping `forge session memory enable --effort high` on an
+  already-enabled, same-mode session. Regression in `test_memory.py`. When adding a new persisted activation field, add
+  it to the no-op comparison or it joins this class of silent drop.
 
 ### Supervisor status-line health: surface fail-open from the usage ledger (shipped 2026-06-16)
 
 Durable invariants for `supervisor_statusline_health` (#30): make a silently fail-open supervisor visible on the
-always-on status line (`SUP!N <kind>`) and in `forge activity` (`failing open: N timeout, N error`), reading the outcome
-the usage ledger already records. Sources: `src/forge/core/ops/usage_summary.py`, `src/forge/cli/status_line.py`,
-`src/forge/cli/statusline/{throttle,context,registry}.py`, `src/forge/cli/activity.py`.
+always-on status line (`SUP!N <kind>`) and in `forge telemetry activity` (`failing open: N timeout, N error`), reading
+the outcome the usage ledger already records. Sources: `src/forge/core/ops/usage_summary.py`,
+`src/forge/cli/status_line.py`, `src/forge/cli/statusline/{throttle,context,registry}.py`, `src/forge/cli/activity.py`.
 
 - **Read the ledger, not the decision log — the on-model source.** The supervisor's timeout/subprocess fail-open is
   already in the usage ledger as a non-`success` `UsageEvent.status`/`failure_type` (`emit_usage_for_session_result`).
@@ -379,10 +438,10 @@ the usage ledger already records. Sources: `src/forge/core/ops/usage_summary.py`
   auth fail-opens that emit no event, and exact cached-allow reset).
 - **Two read shapes off one ledger, one kind vocabulary.** `read_supervisor_health` returns the **newest-first
   contiguous fail-open streak** (resets on the first `success`) for the status-line `SUP!N`; `_aggregate_ledger` returns
-  the **window total** per kind (`CommandUsage.error_kinds`) for `forge activity`. They are deliberately different
-  numbers and the docs say so. Both map `failure_type` through the single `_failure_kind` helper (`timeout` exact,
-  everything incl. `None`/subprocess/exit/runtime → `error`) — keep that the only source of the kind mapping or the two
-  surfaces drift.
+  the **window total** per kind (`CommandUsage.error_kinds`) for `forge telemetry activity`. They are deliberately
+  different numbers and the docs say so. Both map `failure_type` through the single `_failure_kind` helper (`timeout`
+  exact, everything incl. `None`/subprocess/exit/runtime → `error`) — keep that the only source of the kind mapping or
+  the two surfaces drift.
 - **Generic data, supervisor-only interpretation.** `CommandUsage.error_kinds` is a generic per-kind split of the
   existing generic `errors` count, populated uniformly for every command in `_aggregate_ledger` (no
   `command == "supervisor"` branch). "Failing open" is applied **only** by the supervisor formatter
@@ -392,15 +451,15 @@ the usage ledger already records. Sources: `src/forge/core/ops/usage_summary.py`
   co-populate both (`_failure_kind(None) == "error"`), so `errors>0 / error_kinds={}` is exclusively a hand-built /
   internal summary. The helper returns `None` there; `render_summary_line` falls back **locally** to the legacy
   `"{errors} errors"` so the count is never silently dropped (regression: `test_errors_only_falls_back_to_count`; the
-  three pre-existing hand-built `TestRenderLine` tests stay green unchanged). `forge activity` needs no fallback — its
-  commands table already shows the lumped count, so the Supervisor line carries pure breakdown detail.
+  three pre-existing hand-built `TestRenderLine` tests stay green unchanged). `forge telemetry activity` needs no
+  fallback — its commands table already shows the lumped count, so the Supervisor line carries pure breakdown detail.
 - **Status-line health stays fail-open + posture-preserving.** The throttled read (`read_or_compute_session_health`,
   same `forge_cost_ttl` window, distinct `fhealth-` cache) degrades a read error to **posture-only** (no suffix), never
   hiding the posture — unlike `forge_cost`, whose whole value is ledger-derived. `SUP!N` attaches to any posture
   (`SUP`/`SUP(susp)`/`SUP(off)`) so suspended/off keeps prior fail-open history visible. `recent_failures==0` is
   byte-identical to today (golden-safe; `supervisor` stays out of `DEFAULT_ORDER`). Frontier-only:
-  `command="supervisor"` excludes `supervisor-shadow`/`plan-check`. `forge proxy costs reset` clears `fhealth-*.json`
-  alongside `fcost-*.json` so a wiped ledger can't replay cached health.
+  `command="supervisor"` excludes `supervisor-shadow`/`plan-check`. `forge telemetry costs reset` clears
+  `fhealth-*.json` alongside `fcost-*.json` so a wiped ledger can't replay cached health.
 
 ### OpenRouter provider trace: local lifecycle evidence for aborted streams (shipped 2026-06-16; folded 2026-06-18)
 
@@ -411,7 +470,7 @@ JSONL plane: CLI/core provider-trace readers should project from `DownstreamReco
 
 - **Provider trace is downstream model-call evidence.** It records provider lifecycle + correlation metadata for one
   model attempt, alongside cost, tokens, and optional redacted audit evidence under `~/.forge/telemetry/downstream/`. It
-  is metadata-only, owner-only, and bounded by downstream retention. `forge proxy costs reset` now wipes downstream
+  is metadata-only, owner-only, and bounded by downstream retention. `forge telemetry costs reset` now wipes downstream
   telemetry and cap state together; provider-trace state is not a separately retained exception.
 - **The shared SSE seam owns lifecycle flags.** The provider metadata carrier is consumed at the converter seam, which
   records stream-start, first user-visible chunk, final usage, and client-disconnect state exactly once through the
@@ -434,7 +493,8 @@ constraints for future telemetry, cost, provider-trace, and activity work.
 - **Plane split is by direction, not feature.** Downstream is one model attempt: session-blind, keyed by
   request/run/root ids, with metrics, nullable cost, provenance, optional redacted wire evidence, and provider lifecycle
   fields. Upstream is one operation outcome: session-tagged, run/root-keyed, with status, reason, latency, and fail-open
-  classification. `forge activity` is the join/read surface; it should not grow a third durable outcome/spend plane.
+  classification. `forge telemetry activity` is the join/read surface; it should not grow a third durable outcome/spend
+  plane.
 - **Run-tree identity is the bridge.** The proxy does not know Forge sessions, so downstream records stay session-blind.
   Session views select upstream by session, collect run/root ids, then join downstream by run tree. Adding a session
   field to downstream would be a shortcut around the architecture, not a fix.
@@ -542,8 +602,8 @@ the durable items into the body above, then delete this section.
   (Forge may hydrate it into an OAuth session). `RenderContext.has_api_key` was deleted; `billing_mode` is a declaration
   (`cost_mode`) + `rate_limits` evidence. The interactive/headless key axis is `interactive_anthropic_api_key: omit`,
   distinct from `auth_ignore_env` (source-only, both interactive + headless).
-- **Rename the user-facing surface, not the domain plane.** `forge usage` → `forge activity` (it reports Forge
-  *automation* activity, not total interactive usage), but the durable **usage ledger** plane (`UsageEvent`,
-  `usage/events/`, `read_usage_events`, `usage_summary.py`) keeps its name. Removed CLI commands become hidden,
-  **flag-tolerant** tombstones (`ignore_unknown_options` + `UNPROCESSED`) so old `--flag` invocations reach the rename
-  message, not Click's "No such option".
+- **Rename the user-facing surface, not the domain plane.** `forge usage` → `forge activity` →
+  `forge telemetry activity` (it reports Forge *automation* activity, not total interactive usage), but the durable
+  **usage ledger** plane (`UsageEvent`, `usage/events/`, `read_usage_events`, `usage_summary.py`) keeps its name.
+  Removed CLI commands become hidden, **flag-tolerant** tombstones (`ignore_unknown_options` + `UNPROCESSED`) so old
+  `--flag` invocations reach the rename message, not Click's "No such option".

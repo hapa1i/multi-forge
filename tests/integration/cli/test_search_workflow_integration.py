@@ -60,7 +60,7 @@ class TestSearchE2E:
         rebuild = mock_claude_workspace.exec("cd /workspace && forge search rebuild-index", timeout=60)
         assert rebuild.returncode == 0, rebuild.stderr
 
-        query = mock_claude_workspace.exec("cd /workspace && forge search query timeout", timeout=30)
+        query = mock_claude_workspace.exec("cd /workspace && forge search query timeout --json", timeout=30)
         assert query.returncode == 0, query.stderr
 
         data = json.loads(query.stdout)

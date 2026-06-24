@@ -278,6 +278,15 @@ class IndexStateStore:
 
         self.update(timeout_s=timeout_s, mutate=_mutate)
 
+    def find_missing(self) -> list[str]:
+        """Return indexed paths whose files no longer exist on disk.
+
+        Read-only counterpart to prune_missing (no lock, no write): the preview
+        for `forge search clean`. Same predicate as IndexState.prune_missing, so
+        the count a preview reports matches what --yes would remove.
+        """
+        return [key for key in self.read().indexed_files if not Path(key).is_file()]
+
     def prune_missing(self, *, timeout_s: float = CLI_LOCK_TIMEOUT_S) -> list[str]:
         """Remove entries for deleted files (locked read-modify-write).
 

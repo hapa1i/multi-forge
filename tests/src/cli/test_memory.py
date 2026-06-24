@@ -64,107 +64,6 @@ def seeded_session(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Pat
 
 
 # ---------------------------------------------------------------------------
-# enable
-# ---------------------------------------------------------------------------
-
-
-class TestMemoryEnable:
-    """Session-scoped enable (``--session`` or ``$FORGE_SESSION``)."""
-
-    def test_enable_sets_auto_update(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
-        result = runner.invoke(main, ["memory", "enable", "--session", "s1"])
-        assert result.exit_code == 0, result.output
-        assert "enabled" in result.output
-        assert "augment" in result.output
-
-    def test_enable_idempotent(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
-        runner.invoke(main, ["memory", "enable", "--session", "s1"])
-        result = runner.invoke(main, ["memory", "enable", "--session", "s1"])
-        assert result.exit_code == 0, result.output
-        assert "already enabled" in result.output
-
-    def test_enable_review_only(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
-        result = runner.invoke(main, ["memory", "enable", "--review-only", "--session", "s1"])
-        assert result.exit_code == 0, result.output
-        assert "review-only" in result.output
-
-    def test_enable_changes_mode(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
-        runner.invoke(main, ["memory", "enable", "--session", "s1"])
-        result = runner.invoke(main, ["memory", "enable", "--review-only", "--session", "s1"])
-        assert result.exit_code == 0, result.output
-        assert "enabled" in result.output
-        assert "review-only" in result.output
-
-    def test_enable_outside_session_errors(
-        self, runner: CliRunner, seeded_session: tuple[Path, str], monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        monkeypatch.delenv("FORGE_SESSION", raising=False)
-        result = runner.invoke(main, ["memory", "enable"])
-        assert result.exit_code != 0
-        assert "session-scoped" in result.output.lower()
-
-    def test_enable_writes_effective_memory_state(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
-        """Enable from intent.memory=None produces correct effective state."""
-        forge_root, _ = seeded_session
-        result = runner.invoke(main, ["memory", "enable", "--session", "s1"])
-        assert result.exit_code == 0, result.output
-
-        from forge.session.effective import compute_effective_intent
-        from forge.session.store import SessionStore
-
-        state = SessionStore(str(forge_root), "s1").read()
-        effective = compute_effective_intent(state)
-        assert effective.memory is not None
-        assert effective.memory.auto_update is not None
-        assert effective.memory.auto_update.enabled is True
-
-    def test_effort_only_change_persists_when_already_enabled(
-        self, runner: CliRunner, seeded_session: tuple[Path, str]
-    ) -> None:
-        """Regression: an effort-only change must persist even when memory is
-        already enabled in the same mode.
-
-        The old early-return short-circuited on "already enabled AND same mode",
-        silently dropping the --effort override. The fix only short-circuits when
-        nothing (enabled/mode/effort) is pending.
-        """
-        forge_root, _ = seeded_session
-
-        # First enable in the default (augment) mode, no effort set.
-        first = runner.invoke(main, ["memory", "enable", "--session", "s1"])
-        assert first.exit_code == 0, first.output
-
-        # Same mode (augment), but now request an effort change.
-        result = runner.invoke(main, ["memory", "enable", "--session", "s1", "--effort", "high"])
-        assert result.exit_code == 0, result.output
-        # Must NOT have taken the "already enabled" no-op path.
-        assert "already enabled" not in result.output
-
-        from forge.session.effective import compute_effective_intent
-        from forge.session.store import SessionStore
-
-        state = SessionStore(str(forge_root), "s1").read()
-        effective = compute_effective_intent(state)
-        assert effective.memory is not None
-        assert effective.memory.auto_update is not None
-        assert effective.memory.auto_update.effort == "high"
-
-    def test_disable_session_scoped(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
-        runner.invoke(main, ["memory", "enable", "--session", "s1"])
-        result = runner.invoke(main, ["memory", "disable", "--session", "s1"])
-        assert result.exit_code == 0, result.output
-        assert "disabled" in result.output
-
-    def test_disable_outside_session_errors(
-        self, runner: CliRunner, seeded_session: tuple[Path, str], monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        monkeypatch.delenv("FORGE_SESSION", raising=False)
-        result = runner.invoke(main, ["memory", "disable"])
-        assert result.exit_code != 0
-        assert "session-scoped" in result.output.lower()
-
-
-# ---------------------------------------------------------------------------
 # track
 # ---------------------------------------------------------------------------
 
@@ -566,41 +465,6 @@ class TestMemoryList:
 
 
 # ---------------------------------------------------------------------------
-# status
-# ---------------------------------------------------------------------------
-
-
-class TestMemoryStatus:
-    """status shows per-session activation (enabled/disabled)."""
-
-    def test_status_shows_session_activation(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
-        runner.invoke(main, ["memory", "enable", "--session", "s1"])
-        result = runner.invoke(main, ["memory", "status"])
-        assert result.exit_code == 0, result.output
-        assert "s1" in result.output
-        assert "on" in result.output
-
-    def test_status_empty(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
-        result = runner.invoke(main, ["memory", "status"])
-        assert result.exit_code == 0, result.output
-        # Session exists but memory is off; still shown
-        assert "s1" in result.output or "No sessions" in result.output
-
-    def test_status_json(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
-        runner.invoke(main, ["memory", "enable", "--session", "s1"])
-        result = runner.invoke(main, ["memory", "status", "--json"])
-        assert result.exit_code == 0, result.output
-        data = json.loads(result.output)
-        assert "sessions" in data
-        assert len(data["sessions"]) >= 1
-        session_entry = data["sessions"][0]
-        assert "session" in session_entry
-        assert "enabled" in session_entry
-        assert "mode" in session_entry
-        assert session_entry["enabled"] is True
-
-
-# ---------------------------------------------------------------------------
 # shadows list/show
 # ---------------------------------------------------------------------------
 
@@ -671,6 +535,85 @@ class TestMemoryShadowsShow:
         result = runner.invoke(main, ["memory", "shadows", "show", "--for", "docs/impl_notes.md"])
         assert result.exit_code == 0, result.output
         assert "does not exist" in result.output
+
+    def test_show_json_no_match(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        """Unknown doc emits structured empty payload, not human text."""
+        result = runner.invoke(main, ["memory", "shadows", "show", "--for", "docs/nonexistent.md", "--json"])
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data == {"official": "docs/nonexistent.md", "scope": "project", "shadows": []}
+
+    def test_show_json_populated_readable(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        """A real shadow file's content comes through with readable=true and reason=null."""
+        forge_root = seeded_session[0]
+        runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--propose"])
+        shadow_path = ".forge/memory/shadow_docs_impl_notes.md"
+        (forge_root / shadow_path).write_text("- [ ] Add error handling notes\n", encoding="utf-8")
+
+        result = runner.invoke(main, ["memory", "shadows", "show", "--for", "docs/impl_notes.md", "--json"])
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["official"] == "docs/impl_notes.md"
+        assert data["scope"] == "project"
+        shadows = data["shadows"]
+        assert len(shadows) == 1
+        row = shadows[0]
+        assert set(row) == {"shadow_path", "forge_root", "sessions", "content", "readable", "reason"}
+        assert row["shadow_path"] == shadow_path
+        assert row["forge_root"] == str(forge_root)
+        assert row["sessions"] == sorted(set(row["sessions"]))
+        assert row["readable"] is True
+        assert row["reason"] is None
+        assert "Add error handling notes" in row["content"]
+
+    def test_show_json_isolates_to_requested_official(
+        self, runner: CliRunner, seeded_session: tuple[Path, str]
+    ) -> None:
+        """With two passported officials, --for selects only the matching shadow rows.
+
+        collect_shadow_entries keys discovered shadows by (forge_root, shadow_path)
+        with official = the passport's host doc, so each official yields one row;
+        --for must filter to the requested doc, not bleed the sibling's shadow.
+        """
+        forge_root = seeded_session[0]
+        runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--propose"])
+        runner.invoke(main, ["memory", "track", "docs/changelog.md", "--propose"])
+        (forge_root / ".forge/memory/shadow_docs_impl_notes.md").write_text(
+            "- [ ] Impl note source\n", encoding="utf-8"
+        )
+        (forge_root / ".forge/memory/shadow_docs_changelog.md").write_text("- [ ] Changelog source\n", encoding="utf-8")
+
+        result = runner.invoke(main, ["memory", "shadows", "show", "--for", "docs/impl_notes.md", "--json"])
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["official"] == "docs/impl_notes.md"
+        rows = data["shadows"]
+        assert isinstance(rows, list)
+        assert len(rows) == 1
+        row = rows[0]
+        assert set(row) == {"shadow_path", "forge_root", "sessions", "content", "readable", "reason"}
+        assert row["shadow_path"] == ".forge/memory/shadow_docs_impl_notes.md"
+        assert row["readable"] is True
+        assert "Impl note source" in row["content"]
+        # The sibling's shadow must not leak into this official's rows.
+        assert "Changelog source" not in row["content"]
+
+    def test_show_json_absent_file(self, runner: CliRunner, seeded_session: tuple[Path, str]) -> None:
+        """A passported-but-absent shadow file reports content=null, readable=false, reason set."""
+        forge_root = seeded_session[0]
+        runner.invoke(main, ["memory", "track", "docs/impl_notes.md", "--propose"])
+        shadow_path = ".forge/memory/shadow_docs_impl_notes.md"
+        (forge_root / shadow_path).unlink()
+
+        result = runner.invoke(main, ["memory", "shadows", "show", "--for", "docs/impl_notes.md", "--json"])
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert len(data["shadows"]) == 1
+        row = data["shadows"][0]
+        assert row["content"] is None
+        assert row["readable"] is False
+        assert row["reason"] is not None
+        assert "does not exist" in row["reason"]
 
 
 # ---------------------------------------------------------------------------

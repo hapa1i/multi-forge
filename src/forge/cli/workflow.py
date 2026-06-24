@@ -5,7 +5,7 @@ Provides:
 - forge workflow analyze: Deep single-model analysis
 - forge workflow debate: Adversarial evaluation with stance injection
 - forge workflow consensus: Two-round multi-model consensus building
-- forge workflow list-models: Show available model backends
+- forge workflow list-models: Show available workflow models
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ from typing import Any
 import click
 from rich.console import Console
 
-from forge.cli.output import print_tip
+from forge.cli.output import err_console, print_error, print_tip
 from forge.core.effort import CLAUDE_EFFORT_LEVELS
 from forge.proxy.proxies import ProxyResolutionError
 from forge.review.models import (
@@ -85,7 +85,7 @@ def _record_workflow_outcome(command: str, output: Any) -> None:
 def _run_preflight(
     specs: list[ModelSpec],
     *,
-    json_output: bool = False,
+    as_json: bool = False,
     routing_plan: Any | None = None,
 ) -> None:
     """Check resolved routing/auth before spawning workers. Exit 1 on failure."""
@@ -94,17 +94,17 @@ def _run_preflight(
     errors = preflight_check(specs, routing_plan=routing_plan)
     warnings = _routing_plan_warnings(specs, routing_plan)
     if not errors:
-        if not json_output:
+        if not as_json:
             for warning in warnings:
                 console.print(f"[yellow]Routing warning:[/yellow] {warning}")
         return
-    if json_output:
+    if as_json:
         data: dict[str, Any] = {"preflight_errors": errors}
         if warnings:
             data["routing_warnings"] = warnings
         click.echo(json.dumps(data))
     else:
-        console.print("[red]Error:[/red] Workflow preflight failed:")
+        print_error("Workflow preflight failed:", console=console)
         for err in errors:
             console.print(f"  - {err}")
         print_tip(
@@ -190,13 +190,13 @@ def _format_resolved_models(summary: dict[str, dict[str, Any]]) -> str:
     return "\n".join(lines) + "\n\n"
 
 
-def _handle_routing_error(error: Exception, *, json_output: bool = False) -> None:
+def _handle_routing_error(error: Exception, *, as_json: bool = False) -> None:
     """Handle routing resolution errors with clean CLI output. Calls sys.exit(1)."""
     msg = str(error)
-    if json_output:
+    if as_json:
         click.echo(json.dumps({"routing_error": msg}))
     else:
-        console.print(f"[red]Error:[/red] Routing failed: {msg}")
+        print_error(f"Routing failed: {msg}", console=console)
     sys.exit(1)
 
 
@@ -224,10 +224,10 @@ def workflow_cmd() -> None:
 
 
 @workflow_cmd.command(name="list-models")
-@click.option("--json", "json_output", is_flag=True, help="Output as JSON")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
 @click.option("--available", "available_only", is_flag=True, help="Show only ready models")
-def list_models(json_output: bool, available_only: bool) -> None:
-    """Show available model backends for workflow runners."""
+def list_models(as_json: bool, available_only: bool) -> None:
+    """Show workflow model readiness."""
     from forge.review.models import available_model_specs, check_model_availability
 
     availabilities = check_model_availability(available_model_specs())
@@ -235,7 +235,7 @@ def list_models(json_output: bool, available_only: bool) -> None:
     if available_only:
         availabilities = [a for a in availabilities if a.status == "ready"]
 
-    if json_output:
+    if as_json:
         items = [
             {
                 "name": a.spec.name,
@@ -353,7 +353,7 @@ def _print_grouped_models(availabilities: list) -> None:
     help="Comma-separated model names (default: all)",
 )
 @click.option("--timeout", "-t", type=int, default=600, help="Per-model timeout in seconds")
-@click.option("--json", "json_output", is_flag=True, help="Output structured JSON")
+@click.option("--json", "as_json", is_flag=True, help="Output structured JSON")
 @click.option(
     "--check",
     "check_mode",
@@ -396,7 +396,7 @@ def panel(
     context_mode: str,
     models: str | None,
     timeout: int,
-    json_output: bool,
+    as_json: bool,
     check_mode: bool,
     roles: str | None,
     review_type: str,
@@ -421,18 +421,18 @@ def panel(
     elif context_mode.startswith("resume:"):
         resume_id = context_mode[len("resume:") :]
         if not resume_id:
-            console.print("[red]Error:[/red] --context resume:<uuid> requires a UUID.")
+            print_error("--context resume:<uuid> requires a UUID.", console=err_console)
             ctx.exit(2)
             return
     else:
-        console.print(f'[red]Error:[/red] Invalid --context "{context_mode}".' ' Use "blind" or "resume:<uuid>".')
+        print_error(f'Invalid --context "{context_mode}".' ' Use "blind" or "resume:<uuid>".', console=err_console)
         ctx.exit(2)
         return
 
     # Prompt composition: (1) resolve base prompt/resource
     resolved_prompt = _resolve_panel_prompt(target, prompt, code_mode, review_type)
     if resolved_prompt is None:
-        console.print("[red]Error:[/red] No prompt provided. Use target argument, -p, or stdin.")
+        print_error("No prompt provided. Use target argument, -p, or stdin.", console=err_console)
         ctx.exit(2)
         return
 
@@ -441,7 +441,7 @@ def panel(
     # Skip when -p or stdin provided a custom prompt (review_type is ignored).
     uses_resource = not prompt and bool(target)
     if uses_resource and review_type in ("security", "performance") and not code_mode:
-        console.print(f"[red]Error:[/red] --review-type {review_type} requires --code.")
+        print_error(f"--review-type {review_type} requires --code.", console=err_console)
         ctx.exit(2)
         return
 
@@ -456,7 +456,7 @@ def panel(
     try:
         specs = resolve_model_specs(models)
     except ValueError as e:
-        console.print(f"[red]Error:[/red] {e}")
+        print_error(f"{e}", console=err_console)
         ctx.exit(2)
         return
 
@@ -465,7 +465,7 @@ def panel(
         try:
             role_list = _parse_roles(roles)
         except ValueError as e:
-            console.print(f"[red]Error:[/red] {e}")
+            print_error(f"{e}", console=err_console)
             ctx.exit(2)
             return
         specs = _apply_panel_roles(specs, role_list, resolved_prompt)
@@ -480,10 +480,10 @@ def panel(
     try:
         routing_plan = resolve_invocation_routing(specs, via=via)
     except _ROUTING_ERRORS as e:
-        _handle_routing_error(e, json_output=json_output)
+        _handle_routing_error(e, as_json=as_json)
         return
 
-    _run_preflight(specs, json_output=json_output, routing_plan=routing_plan)
+    _run_preflight(specs, as_json=as_json, routing_plan=routing_plan)
 
     from forge.core.invoker import Attribution
 
@@ -514,7 +514,7 @@ def panel(
         ctx,
         output,
         check_mode=check_mode,
-        json_output=json_output,
+        as_json=as_json,
         resolved_models=_resolved_models_summary(specs, routing_plan),
         routing_warnings=_routing_plan_warnings(specs, routing_plan),
     )
@@ -750,7 +750,7 @@ def _handle_review_output(
     output: MultiReviewOutput,
     *,
     check_mode: bool,
-    json_output: bool,
+    as_json: bool,
     resolved_models: dict[str, dict[str, Any]] | None = None,
     routing_warnings: list[str] | None = None,
 ) -> None:
@@ -770,7 +770,7 @@ def _handle_review_output(
         ctx.exit(0 if passed else 1)
         return
 
-    if json_output:
+    if as_json:
         data = build_json_dict(output)
         if resolved_models:
             data["resolved_models"] = resolved_models
@@ -802,7 +802,7 @@ def _handle_review_output(
     help="Comma-separated model names (default: claude-opus)",
 )
 @click.option("--timeout", "-t", type=int, default=600, help="Per-model timeout in seconds")
-@click.option("--json", "json_output", is_flag=True, help="Output structured JSON")
+@click.option("--json", "as_json", is_flag=True, help="Output structured JSON")
 @click.option(
     "--check",
     "check_mode",
@@ -825,7 +825,7 @@ def analyze(
     prompt_text: str | None,
     models: str,
     timeout: int,
-    json_output: bool,
+    as_json: bool,
     check_mode: bool,
     via: str | None,
     cwd: str | None,
@@ -841,14 +841,14 @@ def analyze(
     """
     resolved_topic = " ".join(topic) if topic else prompt_text
     if not resolved_topic:
-        console.print("[red]Error:[/red] No topic provided. Pass as argument or use -p.")
+        print_error("No topic provided. Pass as argument or use -p.", console=err_console)
         ctx.exit(2)
         return
 
     try:
         specs = resolve_model_specs(models)
     except ValueError as e:
-        console.print(f"[red]Error:[/red] {e}")
+        print_error(f"{e}", console=err_console)
         ctx.exit(2)
         return
 
@@ -865,10 +865,10 @@ def analyze(
     try:
         routing_plan = resolve_invocation_routing(specs, via=via)
     except _ROUTING_ERRORS as e:
-        _handle_routing_error(e, json_output=json_output)
+        _handle_routing_error(e, as_json=as_json)
         return
 
-    _run_preflight(specs, json_output=json_output, routing_plan=routing_plan)
+    _run_preflight(specs, as_json=as_json, routing_plan=routing_plan)
 
     from forge.core.invoker import Attribution
 
@@ -898,7 +898,7 @@ def analyze(
         ctx,
         output,
         check_mode=check_mode,
-        json_output=json_output,
+        as_json=as_json,
         resolved_models=_resolved_models_summary(specs, routing_plan),
         routing_warnings=_routing_plan_warnings(specs, routing_plan),
     )
@@ -1202,7 +1202,7 @@ def _resolve_debate_prompt(
     help="Comma-separated model names (default: all)",
 )
 @click.option("--timeout", "-t", type=int, default=600, help="Per-model timeout in seconds")
-@click.option("--json", "json_output", is_flag=True, help="Output structured JSON")
+@click.option("--json", "as_json", is_flag=True, help="Output structured JSON")
 @click.option("--check", "check_mode", is_flag=True, help="Gate on verdicts: any REJECT exits 1")
 @click.option(
     "--worker",
@@ -1228,7 +1228,7 @@ def debate(
     code_mode: bool,
     models: str | None,
     timeout: int,
-    json_output: bool,
+    as_json: bool,
     check_mode: bool,
     workers: tuple[str, ...],
     via: str | None,
@@ -1254,14 +1254,14 @@ def debate(
     from forge.review.adversarial import run_adversarial, validate_resource
 
     if workers and models:
-        console.print("[red]Error:[/red] --worker and --models are mutually exclusive.")
+        print_error("--worker and --models are mutually exclusive.", console=err_console)
         ctx.exit(2)
         return
 
     resolved = _resolve_debate_prompt(subject, prompt_text, code_mode)
     if not resolved:
         label = "target" if code_mode else "subject"
-        console.print(f"[red]Error:[/red] No {label} provided. Pass as argument or use -p.")
+        print_error(f"No {label} provided. Pass as argument or use -p.", console=err_console)
         ctx.exit(2)
         return
 
@@ -1276,7 +1276,7 @@ def debate(
         try:
             validate_resource(resource_path)
         except ValueError as e:
-            console.print(f"[red]Error:[/red] {e}")
+            print_error(f"{e}", console=err_console)
             ctx.exit(2)
             return
 
@@ -1284,14 +1284,14 @@ def debate(
             try:
                 stances = _parse_worker_specs(workers, code_mode=code_mode)
             except ValueError as e:
-                console.print(f"[red]Error:[/red] {e}")
+                print_error(f"{e}", console=err_console)
                 ctx.exit(2)
                 return
         else:
             try:
                 specs = resolve_model_specs(models)
             except ValueError as e:
-                console.print(f"[red]Error:[/red] {e}")
+                print_error(f"{e}", console=err_console)
                 ctx.exit(2)
                 return
             stances = _build_stances(specs, code_mode=code_mode)
@@ -1306,10 +1306,10 @@ def debate(
         try:
             routing_plan = resolve_invocation_routing(stance_models, via=via)
         except _ROUTING_ERRORS as e:
-            _handle_routing_error(e, json_output=json_output)
+            _handle_routing_error(e, as_json=as_json)
             return
 
-        _run_preflight(stance_models, json_output=json_output, routing_plan=routing_plan)
+        _run_preflight(stance_models, as_json=as_json, routing_plan=routing_plan)
 
         from forge.core.invoker import Attribution
 
@@ -1361,7 +1361,7 @@ def debate(
         ctx.exit(0 if passed else 1)
         return
 
-    if json_output:
+    if as_json:
         data = _build_adversarial_json(
             output,
             resolved_models=debate_resolved_models,
@@ -1898,7 +1898,7 @@ def _print_consensus_text(output: ConsensusOutput, resolved_models: dict[str, di
     default=600,
     help="Per-round timeout in seconds (total wall time ~2x for two rounds)",
 )
-@click.option("--json", "json_output", is_flag=True, help="Output structured JSON")
+@click.option("--json", "as_json", is_flag=True, help="Output structured JSON")
 @click.option(
     "--check",
     "check_mode",
@@ -1929,7 +1929,7 @@ def consensus(
     code_mode: bool,
     models: str | None,
     timeout: int,
-    json_output: bool,
+    as_json: bool,
     check_mode: bool,
     workers: tuple[str, ...],
     via: str | None,
@@ -1955,7 +1955,7 @@ def consensus(
     from forge.review.consensus import run_consensus, validate_resource
 
     if workers and models:
-        console.print("[red]Error:[/red] --worker and --models are mutually exclusive.")
+        print_error("--worker and --models are mutually exclusive.", console=err_console)
         ctx.exit(2)
         return
 
@@ -1967,7 +1967,7 @@ def consensus(
     resolved = _resolve_consensus_prompt((), raw_subject, code_mode)
     if not resolved:
         label = "target" if code_mode else "subject"
-        console.print(f"[red]Error:[/red] No {label} provided. Pass as argument or use -p.")
+        print_error(f"No {label} provided. Pass as argument or use -p.", console=err_console)
         ctx.exit(2)
         return
 
@@ -1981,7 +1981,7 @@ def consensus(
         try:
             validate_resource(resource_path)
         except ValueError as e:
-            console.print(f"[red]Error:[/red] {e}")
+            print_error(f"{e}", console=err_console)
             ctx.exit(2)
             return
 
@@ -1989,14 +1989,14 @@ def consensus(
             try:
                 role_specs = _parse_consensus_worker_specs(workers)
             except ValueError as e:
-                console.print(f"[red]Error:[/red] {e}")
+                print_error(f"{e}", console=err_console)
                 ctx.exit(2)
                 return
         else:
             try:
                 specs = resolve_model_specs(models)
             except ValueError as e:
-                console.print(f"[red]Error:[/red] {e}")
+                print_error(f"{e}", console=err_console)
                 ctx.exit(2)
                 return
             role_specs = _build_consensus_roles(specs, code_mode)
@@ -2011,10 +2011,10 @@ def consensus(
         try:
             routing_plan = resolve_invocation_routing(role_models, via=via)
         except _ROUTING_ERRORS as e:
-            _handle_routing_error(e, json_output=json_output)
+            _handle_routing_error(e, as_json=as_json)
             return
 
-        _run_preflight(role_models, json_output=json_output, routing_plan=routing_plan)
+        _run_preflight(role_models, as_json=as_json, routing_plan=routing_plan)
 
         from forge.core.invoker import Attribution
 
@@ -2066,7 +2066,7 @@ def consensus(
         ctx.exit(0 if passed else 1)
         return
 
-    if json_output:
+    if as_json:
         data = _build_consensus_json(
             output,
             resolved_models=consensus_resolved_models,

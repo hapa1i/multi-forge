@@ -173,7 +173,7 @@ def sum_reported_cost_by_root(
     """Sum cost records whose ``forge_root_run_id`` is in ``roots`` (Slice 4g).
 
     The race-free, authoritative join for proxied ``claude -p`` cost: the parent
-    reads this at query time (``forge activity`` / ``forge +$Y``), long after every
+    reads this at query time (``forge telemetry activity`` / ``forge +$Y``), long after every
     request flushed its record. Sums reported ``cost_micros`` only (a ``None`` cost
     is presence-without-dollars, not a measured $0). ``since`` bounds the scan
     (pass the session ``created_at``). Returns an empty :class:`RootCostJoin` for an

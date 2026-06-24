@@ -7,7 +7,7 @@ The backend registry is stored at:
 
 This module implements a small, versioned JSON store with atomic writes.
 
-Ownership: Forge Backend Manager (`forge backend` CLI).
+Ownership: Forge Backend Manager (`forge model backend` CLI).
 """
 
 from __future__ import annotations

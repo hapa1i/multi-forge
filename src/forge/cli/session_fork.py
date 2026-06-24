@@ -14,7 +14,7 @@ from typing import cast
 
 import click
 
-from forge.cli.output import print_error_with_tip, print_tip
+from forge.cli.output import print_error, print_error_with_tip, print_tip
 from forge.cli.session_addendum import (
     resolve_addendum_content_for_proxy,
     write_managed_addendum,
@@ -155,6 +155,9 @@ __all__ = ["fork"]
     default=None,
     help="Fork into an existing non-main worktree directory",
 )
+# Value asymmetry with `session resume`'s --resume-mode ({native, transfer}): a fork can target a
+# different worktree/--into directory, so byte-faithful Claude resume must relocate the parent JSONL
+# into the child's dir -- hence `native-relocate`, not bare `native`.
 @click.option(
     "--resume-mode",
     "resume_mode",
@@ -281,23 +284,23 @@ def fork(
         forge session fork parent-session --no-proxy           # Fork, bypass proxy
     """
     if direct and proxy_name:
-        console.print("[red]Error:[/red] --no-proxy and --proxy are mutually exclusive")
+        print_error("--no-proxy and --proxy are mutually exclusive", console=console)
         sys.exit(1)
     if supervisor_proxy and supervisor_direct:
-        console.print("[red]Error:[/red] --supervisor-proxy and --no-supervisor-proxy are mutually exclusive")
+        print_error("--supervisor-proxy and --no-supervisor-proxy are mutually exclusive", console=console)
         sys.exit(1)
     if (supervisor_proxy or supervisor_direct) and not supervise_target:
-        console.print("[red]Error:[/red] --supervisor-proxy/--no-supervisor-proxy require --supervise")
+        print_error("--supervisor-proxy/--no-supervisor-proxy require --supervise", console=console)
         sys.exit(1)
     if (
         cascade_flag or checker_model or checker_provider or checker_effort or supervisor_effort
     ) and not supervise_target:
-        console.print("[red]Error:[/red] --cascade/--checker-*/--supervisor-effort require --supervise")
+        print_error("--cascade/--checker-*/--supervisor-effort require --supervise", console=console)
         sys.exit(1)
     try:
         validate_checker_model(checker_model)
     except ValueError as e:
-        console.print(f"[red]Error:[/red] {e}")
+        print_error(f"{e}", console=console)
         sys.exit(1)
 
     normalized_direct_model: str | None = None
@@ -307,7 +310,7 @@ def fork(
             direct_model_pin = resolve_direct_model_pin(direct_model)
             normalized_direct_model = direct_model_pin.env_model
         except ValueError as e:
-            console.print(f"[red]Error:[/red] {e}")
+            print_error(f"{e}", console=console)
             sys.exit(1)
 
     if branch:
@@ -319,10 +322,10 @@ def fork(
     into_target_common: str | None = None
     if into_path is not None:
         if worktree:
-            console.print("[red]Error:[/red] --into and --worktree are mutually exclusive")
+            print_error("--into and --worktree are mutually exclusive", console=console)
             sys.exit(1)
         if branch:
-            console.print("[red]Error:[/red] --into and --branch are mutually exclusive")
+            print_error("--into and --branch are mutually exclusive", console=console)
             sys.exit(1)
 
         import subprocess as _sp
@@ -335,7 +338,7 @@ def fork(
                 check=True,
             ).stdout.strip()
         except _sp.CalledProcessError:
-            console.print(f"[red]Error:[/red] '{display_path(into_path)}' is not inside a git repository")
+            print_error(f"'{display_path(into_path)}' is not inside a git repository", console=console)
             sys.exit(1)
 
         # Resolve git-common-dir for the target (absolute, to avoid .git relative path bug)
@@ -349,7 +352,7 @@ def fork(
             # git returns relative paths from the checkout root; resolve against it
             target_common = str((Path(into_resolved) / target_common_raw).resolve())
         except _sp.CalledProcessError:
-            console.print("[red]Error:[/red] Failed to resolve git repository for --into target")
+            print_error("Failed to resolve git repository for --into target", console=console)
             sys.exit(1)
 
         # Store for deferred comparison after parent session is loaded
@@ -369,9 +372,9 @@ def fork(
             # Main repo root is the parent of the .git directory
             main_repo_root = main_git_dir_abs.parent if main_git_dir_abs.name == ".git" else main_git_dir_abs
             if Path(into_resolved).resolve() == main_repo_root:
-                console.print(
-                    "[red]Error:[/red] --into targets existing worktrees, not the main checkout. "
-                    "Use a same-directory fork instead."
+                print_error(
+                    "--into targets existing worktrees, not the main checkout. " "Use a same-directory fork instead.",
+                    console=console,
                 )
                 sys.exit(1)
         except _sp.CalledProcessError:
@@ -443,8 +446,9 @@ def fork(
                 ).stdout.strip()
                 parent_common = str((Path(parent_wt_pre) / parent_common_raw).resolve())
                 if into_target_common != parent_common:
-                    console.print(
-                        "[red]Error:[/red] --into target is not part of the same repository as the parent session"
+                    print_error(
+                        "--into target is not part of the same repository as the parent session",
+                        console=console,
                     )
                     sys.exit(1)
         except _sp2.CalledProcessError:
@@ -463,8 +467,8 @@ def fork(
     # --resume-mode native-relocate never auto-switches.
     if not is_cross_dir and resume_mode is None and (_strategy_explicit or _inline_plan_explicit):
         resume_mode = "transfer"
-        # Status notice (an action Forge took), not a recovery Tip -- per CLAUDE.md UX guidelines,
-        # informational output is an unprefixed dim line; 'Tip:' is reserved for recovery suggestions.
+        # Status notice (an action Forge took), not a recovery hint -- per CLAUDE.md UX guidelines,
+        # informational output is an unprefixed dim line, distinct from print_tip recovery suggestions.
         console.print(
             "[dim]Same-directory fork switched to transfer mode "
             "(--strategy/--inline-plan implies a transfer fork).[/dim]"
@@ -550,7 +554,7 @@ def fork(
             parent_state_for_model = manager.get_session(parent, forge_root=_fr)
         except SessionNotFoundError:
             if not _hint_cross_project_session(parent, _fr):
-                console.print(f"[red]Error:[/red] session '{parent}' not found")
+                print_error(f"session '{parent}' not found", console=console)
             sys.exit(1)
         except ForgeSessionError as e:
             handle_session_error(e)
@@ -562,7 +566,7 @@ def fork(
                 inherited_launch is not None and inherited_launch.mode == LAUNCH_MODE_SIDECAR
             )
             if inherited_sidecar:
-                console.print("[red]Error:[/red] --model cannot be combined with sidecar fork")
+                print_error("--model cannot be combined with sidecar fork", console=console)
                 sys.exit(1)
 
             _, inherited_base_url, inherited_proxy_id = _get_effective_proxy_for_session(parent_state_for_model)
@@ -573,7 +577,7 @@ def fork(
                 surface="fork",
             )
             if error:
-                console.print(f"[red]Error:[/red] {error}")
+                print_error(f"{error}", console=console)
                 sys.exit(1)
 
     if (is_cross_dir or resume_mode == "transfer") and strategy == "full" and not direct:
@@ -626,7 +630,7 @@ def fork(
         try:
             _sup_proxy_id, _sup_started = ensure_supervisor_proxy(supervisor_proxy)
         except ValueError as e:
-            console.print(f"[red]Error:[/red] {e}")
+            print_error(f"{e}", console=console)
             sys.exit(1)
         if _sup_started:
             console.print(f"[dim]Started proxy '{_sup_proxy_id}' from template '{supervisor_proxy}'.[/dim]")
@@ -668,11 +672,11 @@ def fork(
         print_error_with_tip(str(e), "Remove the directory or use a different fork name.", console=console)
         sys.exit(1)
     except InvalidBranchNameError as e:
-        console.print(f"[red]Error:[/red] {e}")
+        print_error(f"{e}", console=console)
         sys.exit(1)
     except SessionNotFoundError:
         if not _hint_cross_project_session(parent, _fr):
-            console.print(f"[red]Error:[/red] session '{parent}' not found")
+            print_error(f"session '{parent}' not found", console=console)
         sys.exit(1)
     except ForgeSessionError as e:
         handle_session_error(e)
@@ -762,7 +766,7 @@ def fork(
 
     parent_session_id = parent_manifest.confirmed.claude_session_id
     if not parent_session_id:
-        console.print("[red]Error:[/red] Parent session has no UUID")
+        print_error("Parent session has no UUID", console=console)
         console.print("The parent session may not have been started yet.")
         sys.exit(1)
 
@@ -805,14 +809,14 @@ def fork(
         fork_direct_model = fork_direct_model or get_default_direct_model()
         error = apply_direct_model_env(env_vars, fork_direct_model)
         if error:
-            console.print(f"[red]Error:[/red] {error}")
+            print_error(f"{error}", console=console)
             sys.exit(1)
     elif fork_manifest.intent.launch and fork_manifest.intent.launch.direct_model and effective_proxy_id:
         error = _apply_direct_model_env_if_supported(
             env_vars, effective_proxy_id, fork_manifest.intent.launch.direct_model
         )
         if error:
-            console.print(f"[red]Error:[/red] {error}")
+            print_error(f"{error}", console=console)
             sys.exit(1)
 
     # Assigned only in the fresh-transfer branch (worktree transfer or same-dir transfer);

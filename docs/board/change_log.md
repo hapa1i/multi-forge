@@ -25,7 +25,341 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
-## 2026-06-23
+## 2026-06-24
+
+### forge_cli_cleanup Slice 05: alias + canonical-name pass (final code slice)
+
+**Goal**: Apply the D6 alias decision — make `auth` the canonical command (remove the `authentication` alias) and remove
+the `extensions` -> `extension` back-compat shim — closing the last code slice of the CLI cleanup card.
+
+**Key changes**:
+
+- **Clean break (`src/forge/cli/main.py`)**: `_ALIASES` -> `{ext, sess, mem, cfg}`; `_DISPLAY_ALIASES` ->
+  `{extension, session, memory, config}`; registration flipped to `main.add_command(auth, name="auth")`. The rename and
+  the alias removal are atomic — `forge auth` resolves via the alias today, so both must land together.
+  `forge authentication ...` and `forge extensions ...` now fail via Click "No such command" (exit 2, no tombstone).
+- **Help/comment accuracy**: `auth.py` help text -> `forge auth`; `install/{cli,hooks,preset,settings_merge}.py`
+  comments, `test_version.py` docstrings, and QA `2-extension.md` -> singular `extension` (keeps the drift sweep clean).
+- **Tests**: `extensions` -> `extension` CLI strings in `test_startup_queue.py` (6) + 3 integration files
+  (`test_installer.py` incl. the `:158` output assertion now matching the real singular tip, `test_project_identity.py`,
+  `test_startup_queue_integration.py`); new `test_removed_aliases_are_clean_breaks` (bare + leaf forms) +
+  `test_canonical_command_names_resolve` guards. Python symbol/module paths (`from forge.cli.extensions import ...`,
+  `runner.invoke(extensions, ...)`) intentionally untouched.
+- **Docs**: `cli_reference.md` (alias sentence + `forge auth` table rows); `cli_style_guidelines.md` (crisp D6 rule:
+  deliberate aliases only, new nouns get none, rename shims are temporary); `end-user/authentication.md` (removed the
+  now-false "Alias" banner); `end-user/README.md`, `config.md`, root `README.md`, QA
+  `checklist.md`/`3-authentication.md`.
+
+**Breaking change (research preview)**: `forge authentication` and `forge extensions` are removed — use `forge auth` and
+`forge extension`. Kept aliases: `ext`/`sess`/`mem`/`cfg`. New nouns `telemetry`/`model` have no alias.
+
+**Reconciliation with the planned checklist**: the planned `JSON_MISSING_ALLOWLIST` rename was a no-op (the ledger was
+already drained to `{}` in Slice 07); the real blast radius was wider than the original card bullets (also `auth.py` /
+`install/*.py` / `test_version.py` docstrings, two integration shell-command files, and three end-user docs).
+
+**Verification**: 2314 cli+install unit tests pass; manual smoke (exit 2/2/0/0; `forge --help` shows `auth` +
+`extension (ext)`); both drift sweeps clean (the two residual `extensions.py` hits are benign English prose); a 3-lens
+read-only adversarial verification workflow (completeness / alias-mechanism / diff-review) returned clean with zero
+findings; `make pre-commit` clean; Docker integration 34/34 pass (`test_installer.py` / `test_project_identity.py` /
+`test_startup_queue_integration.py`) on a wheel-installed forge — confirms `forge extension` works end-to-end with the
+`extensions` alias removed.
+
+**Card status**: final code slice — all Phase 2 slices (02-12) complete; the card is ready to move `doing/` -> `done/`.
+
+### forge_cli_cleanup Slice 12: non-leaf + small-surface cleanup
+
+**Goal**: Close the last non-alias slice — normalize the two hand-rolled non-leaf groups (F13), drain the final
+`SINGLE_LEAF_GROUP_ALLOWLIST` entry, and resolve the F14 small-surface candidates.
+
+**Key changes**:
+
+- **F13**: `forge config` + `forge search` now use `no_args_is_help=True` (the `telemetry`/`model` pattern), dropping
+  their hand-rolled `invoke_without_command` help-echo callbacks. **Behavior change**: bare
+  `forge config`/`forge search` now print help to stderr and exit **2** (was exit 0 on stdout), matching every other
+  group.
+- **Single-leaf drain**: added `forge policy shadow status [session] [--json]` (sample rate + pending/done audit
+  counts), making `shadow` a real 2-leaf group (show + status); the hidden `run` worker and its Stop-hook `Popen` are
+  untouched. `SINGLE_LEAF_GROUP_ALLOWLIST` drained to `set()`. New `count_pending_candidates` helper in
+  `policy/semantic/shadow.py` names "pending" precisely (vs `count_existing_candidates`, which counts all states).
+- **F14 `proxy metrics --all` removed** (clean break): bare `metrics` already aggregates when >1 proxy. Old `--all` →
+  Click "No such option" (exit 2).
+- **F14 resume-mode asymmetry documented** (comment only): `resume` uses `{native, transfer}` (stays in place), `fork`
+  uses `{transfer, native-relocate}` (can relocate to a worktree) — cross-referenced at both call sites.
+- **F14 kept as-is**: `memory track` and `extension sync` — the names are defensible (the audit's rename suggestions
+  rested on a misread; `enable` = first-time setup, `sync` = refresh an existing install).
+- **Fold-in**: `claude.py start_cmd`'s 5 error sites now route through `output.err_console` (stderr), fixing a
+  pre-existing stream-rule violation; the Slice 11 `err_console` primitive is reused.
+
+**Verification**: 267 tests across the touched CLI files pass, incl. new `shadow status` cases, the `metrics --all`
+clean-break test, and updated `test_claude_command.py` stderr assertions; tree invariants pass with both allowlists
+empty; `make pre-commit` clean.
+
+**Follow-up (post-review fixes)**:
+
+- **Stream contract for policy resolver**: `_resolve_policy_session` wrote its "session not found" / "multiple sessions"
+  diagnostics through the stdout module console, so a failing `policy shadow status <bad> --json` (the new read leaf)
+  emitted the error on stdout with empty stderr. Routed all of that helper's diagnostics through `output.err_console` —
+  it only ever prints on failure, so nothing there is a result. This fixes the whole policy surface (`policy status`,
+  `supervisor status`, etc.), not just `shadow status`. Regression test
+  `tests/regression/test_bug_slice12_policy_resolver_error_stream.py`.
+- Fixed a duplicated Slice 05 checklist line (edit artifact from the Slice 12 closeout).
+
+### forge_cli_cleanup Slice 11: recovery-output cleanup
+
+**Goal**: Resolve card finding F9 — route every hand-rolled terminal `Tip:` and `[red]Error:[/red]` through the
+`forge.cli.output` helpers, and turn the two debt ledgers into locked, never-grow guards.
+
+**Key changes**:
+
+- **234 `[red]Error:[/red]` sites → `print_error`** across 18 CLI modules. The transform is receiver-preserving
+  (`<recv>.print(f"[red]Error:[/red] {x}")` → `print_error(f"{x}", console=<recv>)`), so rendered output is
+  byte-identical (`print_error` reconstructs the same `console.print`); redundant `style="red"` kwargs dropped. Done via
+  two deterministic codemods (single-line, then the 13 multi-line concat blocks).
+- **10 terminal tips routed**: 8 plain `click.echo("Tip: …")` (auth ×4, claude ×2, hooks/install ×2) → `print_tip`; the
+  2 `session.py` `ClickException`-embedded tips → `print_error_with_tip` + `sys.exit(1)`. The proxy resolver now
+  prints-and-exits instead of raising (no caller catches it; all 13 resolver tests mock it). `claude.py` proxy-error
+  branches likewise use `print_error_with_tip`.
+- **2 non-recovery `Tip:` reworded**: the `forge telemetry costs show` help docstring (`proxy_costs.py`) and a
+  `session_fork.py` convention comment, so no stray literal `Tip:` survives outside the helper/allowlist.
+- **Guards locked**: `CLI_ERROR_MARKUP_ALLOWLIST` drained to `set()`; `test_cli_rich_tips_go_through_output_helpers`
+  broadened from `[dim]Tip:` to literal `Tip:` (catches plain echoes + ClickException-embedded), allowlisting only the 3
+  assistant-facing `hooks/direct_commands.py` payloads. Both fail on any new offender.
+- **Scope boundary (recorded)**: plain `click.echo("Error: …")` without Rich markup (~11 files) stays out of F9 scope;
+  the guards target `[red]Error:[/red]`/`Tip:` only. Migrated plain echoes only where intertwined with a moved tip
+  (claude/install).
+- Docs: `CLAUDE.md` + `cli_style_guidelines.md` recovery-output rules updated for the broadened tip scan and the drained
+  ledgers.
+
+**Verification**: full unit suite 6879 passed (clean run-tree env — the lone failure under a live Forge shell was an
+ambient `FORGE_RUN_ID` leak into a shadow-curation subprocess, unrelated); `tests/src/cli` 2032 passed incl. the 13
+`test_output.py` guards; `make pre-commit` clean (black reformatted 2 files, then green; mypy/pyright/isort/mdformat/
+gitleaks pass). Every multi-line and nuanced edit reviewed against the final post-black source.
+
+**Follow-up (post-review fixes)**:
+
+- **Stream regression fixed**: the `session._resolve_routing_from_cli` rewrite had moved proxy-resolution errors/tips
+  from Click's stderr (old `ClickException`) onto stdout, polluting the results stream (cli_style_guidelines.md "Output
+  Streams"). Added a shared `output.err_console` (`Console(stderr=True)`) and routed the resolver's 5 error/tip sites
+  through it; `hooks/install.py` now imports the same `err_console` instead of constructing its own. Helper defaults
+  stay stdout (changing them would flip ~71 bare call sites — out of scope). New regression test
+  `tests/regression/test_bug_slice11_resolver_error_stream.py` exercises the real resolver (the 5 unit tests all mock
+  it) and asserts error+tip on stderr, clean stdout.
+- **Tip allowlist tightened** from file-level to payload-level: pinned to the 3 exact assistant-payload sentences in
+  `direct_commands.py` (plus a stale-payload check), so a new `Tip:` anywhere — including elsewhere in that file — now
+  fails. Verified all four branches fire (clean / stray-in-pinned-file / stray-elsewhere / removed-payload).
+
+### forge_cli_cleanup Slice 10: policy supervisor cleanup
+
+**Goal**: Resolve card F7 — split the overloaded `forge policy supervise` (15 options, 7 mutually-exclusive actions)
+that collided with the separate one-shot `forge policy supervisor`, by deleting `supervise` and promoting `supervisor`
+into a verb group.
+
+**Key changes**:
+
+- **`forge policy supervisor` is now a group with 8 leaves**:
+  `{status, set, off, on, remove, reload, cascade, evaluate}`. Each leaf lifts one branch of the old `supervise_cmd`;
+  the per-invocation cross-flag validation (action-count, "`--timeout` requires a target") is gone because Click's tree
+  enforces it structurally. The `src/forge/policy/semantic/supervisor.py` ops layer was unchanged — leaves map 1:1 to
+  existing functions.
+- **One-shot file eval is now `forge policy supervisor evaluate`** (renamed from the standalone `supervisor` leaf;
+  `evaluate`, not `check`, since `forge policy check` owns bundle-engine eval and stays untouched).
+- **`supervisor status` gained `--json`** via a shared `_supervisor_status_dict()` helper reused by `policy status` (one
+  canonical supervisor JSON shape; configured + unconfigured shapes pinned in tests). Required by the `_READ_LEAVES`
+  guard — any leaf named `status` must expose `--json`.
+- **Direct command `%policy supervise` renamed to `%policy supervisor`** (`_handle_policy_supervisor`); sub-verbs
+  (off/on/remove/reload/cascade/`<target>`) unchanged.
+- **Guard**: dropped `forge policy: supervise|supervisor` from `LEAF_NAMING_ALLOWLIST` (now `{}`); the split dissolves
+  the confusable-sibling collision and introduces no new ones.
+- **Docs/QA**: complete clean-break sweep across 10 files (`cli_reference`, `design`, `design_workflows`, five
+  `end-user/*`, QA `13-policy.md`) mapping every `supervise`/one-shot form to the new leaves.
+
+**Breaking change (research preview)**: `forge policy supervise` is removed (every action moved to a `supervisor` leaf),
+and the bare one-shot `forge policy supervisor -f … -r …` now requires the `evaluate` subcommand because `supervisor`
+became a group. On the CLI both error via Click (exit 2). The in-session `%policy supervise` falls through the
+direct-command dispatcher to a block-JSON usage message naming `%policy supervisor`. `--reload`/`--reload-from`
+collapsed to `reload [--from PATH]`.
+
+**Verification**: 59 tests in `test_policy_supervisor.py` (incl. two clean-break tests and configured/unconfigured
+`status --json` shapes), 84 in `test_user_prompt_dispatcher.py` (incl. old-verb-falls-through), 7 tree invariants, 2032
+in `tests/src/cli`; live CLI confirms both clean breaks; repo-wide greps show no stale `supervise`/bare-one-shot refs
+outside board files; `make pre-commit` clean.
+
+### forge_cli_cleanup Slice 09: destructive-command consistency
+
+**Goal**: Standardize destructive verbs (card F3 + F14a) — a `clean` verb previews by default and mutates only with
+`--yes`; every `delete`/`reset` keeps one `--yes` bypass — and convert the `_(review)_` rule into mechanical guards.
+
+**Key changes**:
+
+- **`forge proxy clean` removed (F14a, clean break)**: verified fully redundant — `prune_stale_proxies()` prunes the
+  registry **and** deletes overlay dirs, and `forge proxy list`/`create`/`start` each call it before their work, while
+  `forge clean`'s always-global `proxies` category covers it too. Deleted the command and **all** 7 stale references
+  (module header, `cli_reference.md`, `design.md` §3.6.3, three `end-user/proxy.md` refs incl. the troubleshooting
+  recovery row, and the QA auto step), naming `forge clean` / auto-pruning as the replacement. Old path → Click
+  `No such command`.
+- **`forge session clean` conformed**: dropped `--dry-run`, added `--yes`; default now previews
+  (`_clean_sessions_dry_run` returns the deletable count so the caller offers a `Use --yes to delete.` tip), `--yes`
+  deletes. Updated the `main.py` session-cleanup-exemption comment (`clean --dry-run` → `clean preview`).
+- **`forge search clean` conformed**: added `--yes`; default previews via new **read-only** `find_missing()` detectors
+  on `SearchDocumentStore` and `IndexStateStore` (siblings of `prune_missing`, same predicate, no lock/write), `--yes`
+  prunes (unchanged).
+- **Two mechanical guards** (`test_command_tree_invariants.py`, positive assertions):
+  `test_clean_verbs_preview_by_default` (every `clean` leaf carries `--yes`, never `--dry-run`) and
+  `test_destructive_prompt_verbs_use_yes` (every `delete`/`reset` leaf carries `--yes`; `forge session reset`, a
+  non-deleting override-layer reset, is the one permanent exemption). Style-guide destructive rule flipped `_(review)_`
+  → `_Guard:_`.
+
+**Breaking change (research preview)**: `forge proxy clean` and `forge session clean --dry-run` are removed. Stale
+proxies are pruned automatically by `proxy list/create/start` (and `forge clean`); `session clean` now previews by
+default — pass `--yes` to delete. `search clean` likewise previews by default; pass `--yes` to prune.
+
+**Verification**: 395 tests across `test_command_tree_invariants` (7), `test_session_commands`, `test_search`,
+`test_proxy_commands` (removal → exit 2), and the search-store `find_missing` units; `forge proxy clean` errors via
+Click; a repo-wide grep confirms no stale `proxy clean` reference outside board files; `make pre-commit` clean.
+
+### forge_cli_cleanup Slice 08: config-object verb parity
+
+**Goal**: Implement D7 — enumerate the tiered editable-config verb vocabulary in the style guide (un-defer the
+placeholder), correct a docstring that implied false `forge proxy` parity, and lock the core set with a regression
+guard. No behavior change, no net-new commands.
+
+**Key changes**:
+
+- `cli_style_guidelines.md`: replaced the deferred config-object rule (which punted to "the forge_cli_cleanup card")
+  with the enumerated tiered vocabulary — core `{show, edit, reset}` (met by `config`/`proxy template`/`claude preset`),
+  optional `{set, validate}`, a per-surface table, and a dual `_Guard:_`/`_(review)_` marker. `proxy` documented as the
+  partial-lifecycle exception (no `reset`); `backend` excluded as a lifecycle resource under the sibling-verbs rule.
+- `config_cmd.py`: reworded the module docstring to drop the false "matches forge proxy show/set/edit" parity claim; it
+  now names the core+optional membership and points at the style guide.
+- `test_command_tree_invariants.py`: new `test_editable_config_objects_share_core_verbs` — a positive core-set assertion
+  on the three editable-config objects plus a boundary lock asserting `proxy`/`model backend` carry no `reset`. Positive
+  assertion (not the `_assert_ledger` debt helper) because there is zero pre-existing debt — all three already comply.
+
+**Verification**: `test_command_tree_invariants.py` (5 passed, incl. the new guard); full `tests/src/cli` (2022 passed);
+`make pre-commit` clean.
+
+### forge_cli_cleanup Slice 07: read-output consistency (+ F11 audit)
+
+**Goal**: Make every read surface default to human output, expose a stable `--json`, and keep human + JSON on stdout --
+draining the `JSON_MISSING_ALLOWLIST` / `JSON_DEST_ALLOWLIST` debt ledgers to empty.
+
+**Key changes**:
+
+- **`--json` added (A)**: 10 read leaves grew `--json` (dest `as_json`) -- the 8 allowlist leaves plus `auth profiles`
+  and `session transfer diff`. New shapes are stable + fully populated on empty paths. `auth status` exposes only
+  source/provenance labels (secret `value` is `null` -- verified no leakage); `memory shadows show` is multi-row;
+  `claude preset show` parses only inside the `--json` branch (human mode still tolerates a corrupt file).
+  `_READ_LEAVES` gained `profiles`/`diff`; `JSON_MISSING_ALLOWLIST` -> `{}`.
+- **`--json` dest normalized (B, D8)**: 9 leaves rebound `json_output` -> `as_json` across `proxy.py`/`policy.py`/
+  `workflow.py` (uniform rename -- every ref was leaf-private). `JSON_DEST_ALLOWLIST` -> `{}`.
+- **`search query` inverted (C)**: now prints a Rich table by default; `--json` re-emits the prior shape byte-stable
+  (including conditional `error`/`hint`/empty variants). Updated all JSON-parsing consumers: `test_search.py` (+2 new
+  human-default tests), the stop-snapshot regression test, the search integration test, QA 12.3 + walkthrough 10.5
+  checklists, `search.md`, `cli_reference.md`.
+- **Stream ownership (D)**: `proxy_audit.py` shared console flipped `stderr=True` -> stdout so `audit show`/`diff` human
+  tables join their JSON on stdout. New `tests/src/cli/test_output_streams.py` (plain `CliRunner()`; Click 8.2 removed
+  `mix_stderr`) asserts `--json` is valid JSON on stdout with empty stderr for the telemetry + audit leaves.
+- **F11 (record-only)**: audited ~32 session-scoped commands at 100% selector compliance; rule stays `_(review)_`, card
+  Open Question 1 resolved. Annotated the style-guide rule "audited compliant 2026-06-23".
+- **Shape-test backfill + hardening (review follow-up)**: the structural guard only proves `--json` *presence*, so added
+  ~40 behavioral shape tests across the 10 new branches (parseability, exact key sets, dispatch/empty/error paths) --
+  authored + adversarially verified via a fan-out workflow. The `auth status` no-secret-leak contract is now pinned by a
+  test that sets a real secret (env + file) and asserts every `is_secret` var serializes `value: null`. Fixed a real bug
+  this surfaced: `auth status --json` silently swallowed a corrupt-credentials `ValueError` (the human path warns),
+  violating the "best-effort degradation is never silent" rule -- now it carries an always-present `warning` key (null
+  when clean), mirroring `transfer show --json`. Also corrected `cli_style_guidelines.md`, which still called the
+  stdout/stderr JSON guard "planned/not yet wired".
+
+**Verification**: ~2021 CLI unit tests pass (4 `test_command_tree_invariants.py` guards with both ledgers empty,
+`test_search.py` ×25, `test_output_streams.py` ×7, ~40 new `--json` shape tests across the touched leaf suites,
+regression); secret-redaction + JSON round-trip smoke-checked; the wheel-installed `forge search query --json`
+integration test passes in Docker; `make pre-commit` clean (black/isort/ruff/mypy/pyright/mdformat).
+
+### forge_cli_cleanup Slice 02: session-scope move (transfer + memory split)
+
+**Goal**: Move session-scoped surfaces under `forge session` so the command taxonomy mirrors ownership -- transfer
+context and memory activation are session concerns; project-doc passports stay top-level.
+
+**Key changes**:
+
+- `forge transfer show|regenerate|edit|diff` -> `forge session transfer ...` (clean break; old paths return Click "No
+  such command", exit 2). The transfer group is wired onto `session` in `cli/main.py` (assembly layer) to avoid a
+  `session <-> transfer` import cycle.
+- Memory split (D4): activation/report verbs move to a new `forge session memory` group
+  (`enable`/`disable`/`status`/`report`); top-level `forge memory` keeps passport verbs (`track`/`list`/`passport`/
+  `shadows`). `report` is flattened from the former single-leaf `forge memory report show`.
+- New module `cli/session_memory.py` (errors routed through `print_error`, no hand-rolled markup); `memory_report.py`'s
+  `report` group collapsed to a single `report` command.
+- Resolved two debt ledgers in `test_command_tree_invariants.py`: removed `forge memory report` from
+  `SINGLE_LEAF_GROUP_ALLOWLIST` (flattened), and **fixed** the `forge memory report show` JSON-missing debt rather than
+  hiding it — `forge session memory report` gained a `--json` mode (dest `as_json`; latest path+content, or the report
+  list under `--all`), and `report` was added to the guard's `_READ_LEAVES` so the flattened leaf stays enforced (the
+  rename had moved it out of the `show`-named coverage). One fewer leaf for Slice 07 to drain.
+- Synced docs to the new paths: `cli_reference.md`, end-user (`transfer.md`/`session.md`/`memory.md`/`README.md`),
+  design docs, `board/README.md`, `impl_notes.md`, `AGENTS.md`, and QA/walkthrough checklist command blocks.
+
+**Verification**: full `tests/src/cli` unit suite including the new `test_session_memory.py` and `report --json` cases
+in `test_memory_report.py`; `test_command_tree_invariants.py` confirms `forge session memory report` is now a guarded
+read leaf with `--json`; the cross-package `tests/src/review/test_skill_content.py` guard repointed to
+`forge session memory enable`; `make pre-commit` clean (ruff/black/isort/mypy/pyright/mdformat/gitleaks); handoff
+integration (`tests/integration/cli/test_handoff_integration.py`, 10 passed) exercises
+`forge session memory enable`/`report` end-to-end against a wheel-installed forge in Docker.
+
+### forge_cli_cleanup Slice 03: move telemetry surfaces
+
+**Goal**: Co-locate operator observability under `forge telemetry` and clean-break the old scattered paths.
+
+**Key changes**:
+
+- Added `forge telemetry activity|trace|costs`; removed top-level `forge activity`, `forge provider`, and
+  `forge proxy costs`.
+- Retired `%provider trace` with no `%telemetry` replacement; `%help` no longer advertises it.
+- Moved telemetry-cost human output to stdout, kept JSON on stdout, and tightened the single-leaf group guard while
+  removing the fixed `forge provider` ledger entry.
+- Updated CLI docs, end-user guides, QA checklists, design breadcrumbs, integration activity coverage, and agent-facing
+  guidance.
+
+**Verification**: telemetry-focused unit/hooks suite (213 passed); targeted activity integration (1 passed); `uv build`;
+`make pre-commit`.
+
+### forge_cli_cleanup Slice 04: move backend under `forge model`
+
+**Goal**: Build the decided `forge model` namespace and clean-break the old top-level backend path.
+
+**Key changes**:
+
+- Added `forge model` with visible children `backend` and `catalog`; `catalog` renders the static model catalog with
+  `--json`.
+- Moved all backend verbs to `forge model backend`; old `forge backend ...` now falls through to Click's native "No such
+  command" handling.
+- Updated recovery tips, shipped QA/config templates, integration harness/fixture paths, `AGENTS.md`, docs, impl notes,
+  and command-tree invariant debt (`forge model backend show`, plus `catalog` in the read-leaf JSON guard).
+- Kept `forge workflow list-models` as runtime readiness and reworded it to "workflow models".
+
+**Verification**: focused unit/regression slice (69 passed); backend integration (8 passed); proxy smoke (1 passed);
+`uv build`; CLI sanity checks; `make pre-commit`.
+
+### forge_cli_cleanup Slice 06: remove `forge session context` (clean break)
+
+**Goal**: Drain the last hidden CLI tombstone — remove the deprecated `forge session context` alias so the surface
+relies on Click's native "No such command" instead of a redirect shim.
+
+**Key changes**:
+
+- Deleted the hidden `forge session context` command and its now-dead `_print_session_context` helper from
+  `session_manage.py` (plus the two `__all__` exports). The behavior already lives in `forge session show`
+  (`--json`/`--field`).
+- Kept the `forge.core.ops.session_context` module — still used by `session show`, `activity`, `policy`, and the
+  `%`-direct commands. Corrected its "Used by" docstring and two mis-attributed comments in `session_manage.py`.
+- Dropped the `session context` note from `cli_reference.md`; fixed the now-stale "deprecated" reference in
+  `impl_notes.md`.
+- Deleted `tests/src/cli/test_session_context.py` (removed code → delete test); the ops test
+  `tests/src/core/ops/test_session_context.py` stays.
+
+**Verification**: `forge session context` exits 2 with Click "No such command" (no tombstone). Tombstone sweep confirmed
+`context` was the only deprecated-alias `hidden=True` command (`hook`/`memory-writer`/`status-line`/`policy shadow run`
+are live internals). 267 tests pass across `test_session_commands`, `test_session_context` (ops),
+`test_command_tree_invariants`, `test_activity`, `test_policy_shadow`, `test_direct_commands_provider`.
 
 ### forge_codex_command_group closeout: sessionless Codex proxy launcher card
 
@@ -699,662 +1033,26 @@ derivation test); 4 integration tests green (new same-dir transfer argv has `--s
 `--append-system-prompt-file` and lacks `--resume`/`--fork-session`; 3 adjacent fork-launch regressions unchanged);
 `make pre-commit` clean.
 
-## 2026-06-14
-
-### supervisor_shadow_sampling: measure the cascade's false-aligned rate (3 slices, one PR)
-
-**Goal**: Audit how often the cascade's tier-1 `allow` short-circuits a frontier check the frontier would have blocked,
-without slowing the PreToolUse hook.
-
-**Key changes**:
-
-- **Slice 1 (capture, inert)**: `SupervisorConfig` gains `shadow_sample_rate`/`shadow_max_per_session`/`shadow_seed`
-  (range-validated in `__post_init__`, so a bad `session set` override surfaces as `InvalidOverrideValueError`). New
-  `policy/semantic/shadow.py`: deterministic stable-hash sampler (no RNG; rate 0/1 short-circuit), `capture_candidate`
-  freezes a *fresh* tier-1 allow's raw inputs + copied plan (`<hash>.plan.md`) + routing snapshot to
-  `.forge/artifacts/<session>/shadow/`. Cap/dedup count distinct stems across `.json`/`.processing`/`.done`. Seam in
-  `plan_check.py` (fresh-allow branch, gated on rate > 0, best-effort). Fully inert at rate 0 (dir never created).
-- **Slice 2 (Stop-batch drain)**: `run_supervisor_check` extracted as the single emitter (`usage_command` param +
-  `SupervisorRun{decision,verdict,run_ok,parsed}`); `parse_supervisor_verdict_with_status` distinguishes a parse failure
-  from a real low-confidence verdict. `enqueue_shadow_marker` + Stop-hook gate (`has_pending_candidates`) +
-  `_shadow_handler` (detached `Popen`, run-tree re-root via `_memory_writer_env`). New `shadow_runner.py`: atomic claim
-  (`rename` → `.processing`, at-most-once), reconstruct full context/config (plan → frozen sidecar), classify
-  agree/disagree/inconclusive/error with the supervisor's own block bar; never enforces.
-- **Slice 3 (read surface)**: `ShadowActivity` in `build_session_activity_summary` (counts from `.done` status, spend
-  from the `supervisor-shadow` ledger row); `forge activity` Shadow line + `render_summary_line` audited/queued segment;
-  `forge policy shadow` group (hidden `run` worker + `show` lists disagreement artifacts with citations).
-- Docs: design_workflows.md §1.2 shadow paragraph, design_appendix.md §A.13 `supervisor-shadow` emitter row.
-- Post-review hardening: relative `plan_override_path` now resolves against `forge_root` at capture (mirrors
-  `load_plan_override`); deterministic post-claim failures finalize as `.done` `status="error"` (no orphaned
-  `.processing` phantom-pending); detached shadow worker resets `FORGE_DEPTH=0` so the frontier replay spawns; renderer
-  shows only cited (blocking) violations for a disagreement.
-
-**Verification**: 42 drain tests (`test_shadow_runner.py`) + 73 capture tests (Slice 1) + 9 `test_usage_summary.py` + 2
-`test_activity.py` + 6 `test_policy_shadow.py`; 2500 policy/workqueue/cli/core-ops tests green; mypy + pyright clean on
-all 10 changed source files. Schema note: additive `SupervisorConfig` fields — old Forge cannot read new manifests
-(research-preview clean break).
-
-### codex_frontend closeout: Codex shipped as a first-class alternate runtime (card -> done)
-
-**Goal**: Close out the `codex_frontend` card after PR #26 merged to `main`. Phases 0-6 and the residual-risk
-mitigations each have their own dated entries below; this records the epic closeout and the v0.6.0 release.
-
-**Key changes**:
-
-- Card moved `doing/codex_frontend/ -> done/` (board-contract closeout). All phase and Open-Decision boxes ticked; only
-  the deliberate Deferred items remain (app-server transport, filing the upstream fail-open issue, PermissionRequest
-  source-dive).
-- Durable lessons promoted to `impl_notes.md`: the capability/lifecycle runtime seam (limits-as-capability-values),
-  Codex hook enrollment-gating + non-computable `trusted_hash` + fail-open PreToolUse, and the
-  native-direct-to-Responses topology (governed at the session/hook seams, not the wire; `isolate_codex_home` test
-  isolation).
-- Post-merge doc-sync landed on the branch in #26: `design.md` split into design/appendix/workflows/cli_reference for
-  the 30K doc-size limit; architecture diagrams (1/5/8) and the README updated to show Codex as an alternate runtime.
-
-**Verification**: Full checklist ticked with per-phase verification recorded; `make pre-commit` + `make test-unit` green
-before tagging; PR #26 CI (Docker integration) green at merge. Released as **v0.6.0** (covers #24 supervisor timeout,
-#25 supervisor cascade, #26 Codex runtime) via the `v0.6.0` tag -> `publish.yml` -> PyPI.
-
-## 2026-06-13
-
-### codex_frontend Phase 6 code-review fixes: 12-finding sweep (fork / enrollment / policy / handoff / invoker)
-
-**Goal**: Resolve a branch code review of `codex-frontend` (12 findings, P1->P3). Every confirmed behavioral finding is
-fixed with a regression test; doc/process findings are fixed in place. One finding was a verification artifact
-(uncommitted drift) closed by landing this slice.
-
-**Key changes**:
-
-- **Fork rejects a Codex parent (P1)** — two layers. `cli/session_fork.py` preflights with an actionable message (Codex
-  resume / branch commands), and `SessionManager.fork_session` now raises `CannotForkCodexParentError` at the internal
-  boundary before any child manifest/worktree is created. Codex sessions have no `claude_session_id`, so the old path
-  built child state then failed the UUID check, orphaning it; the manager guard makes the invariant hold for every
-  caller, not just the CLI preflight.
-- **No TYPE_CHECKING workaround (P1)** — `cli/runtime.py` imports `CodexEnrollmentVerification` directly;
-  `core/ops/codex_enrollment.py` moved its heavy probe-turn imports (invoker graph, session store) into
-  `_run_probe_turn` so the CLI-facing module import stays cheap. Re-greens the
-  `test_production_source_has_no_type_checking_workarounds` conformance check.
-- **Event-aware enrollment identity (P2)** — new `codex_registration_pairs()` (`(event, command)`) in
-  `install/codex_hooks.py`; `_read_user_scope_registration` checks `("SessionStart", cmd)`, so a wrong-event Forge
-  registration no longer reads as enrolled and burns a real `codex exec` turn.
-- **Shared path matcher for TDD (P2)** — extracted `is_under_directory()` into `policy/deterministic/base.py`; the Codex
-  tests-first sort (`cli/hooks/codex_policy.py`) and the TDD guard now share one nested-aware matcher (their drift was
-  the bug; a `pkg/tests/...` path was misordered).
-- **Staged-context one-shot backstop (P2)** — `consume_pending_context` empties the staging file when `unlink` fails,
-  and the delivered-reconciliation paths (`core/ops/codex_session.py`, `core/ops/codex_interactive.py`) clear pending
-  unconditionally, so a re-fired SessionStart can't re-deliver stale context.
-- **Runtime error is not success (P2)** — `cli/session_codex.py` adds `_codex_ok()` (returncode-success AND not
-  `runtime_is_error`); launch/resume exit codes, outcome render, and the resume tip all honor it.
-- **Argv exposure documented (P2)** — `session/codex_invoke.py` + `docs/end-user/session.md` note that an interactive
-  `--resume-from` prompt is visible in shared-host process listings, recommending `--context-delivery hook`; confirmed
-  the existing debug log emits only cwd/resume, never the prompt.
-- **Manifest corruption distinct from missing (P3)** — `resolve_codex_session` narrows not-found to
-  `SessionNotFoundError`; other `ForgeSessionError` now surfaces "could not be read (manifest may be corrupt)" rather
-  than a misleading "not found".
-- **No blank provider error (P3)** — `core/invoker/codex_stream.py` returns `None` for empty/whitespace error text and
-  `core/invoker/codex.py` backfills a fallback stderr when the stream is an error.
-- **Enrollment diagnostic never tracebacks (P3)** — `verify_codex_enrollment` wraps the gate sequence and degrades any
-  unexpected error to an UNVERIFIED result.
-- **Change-log heading restored (P3)** — the Phase 6 review-fixes entry regained its missing `###`.
-- **Change-log compaction** — summarized the 2026-05-22 → 2026-06-06 tail in place (board-contract size policy) so the
-  file clears the 30K-token doc limit (38.5K → 28.7K count-tokens); dates, breaking changes, decisions, and design
-  pointers preserved, per-test counts and play-by-play dropped (full detail in git history).
-
-**Verification**: 553 unit+regression tests green across the touched Codex suites — 7 new
-`tests/regression/test_bug_codex_*.py` (fork orphan at the CLI **and** `fork_session` layers, enrollment wrong-event,
-TDD nested layout, staged-context re-read, runtime-error exit-0, manifest corrupt-vs-missing, empty provider error) plus
-a `TestNeverRaises` case in `test_codex_enrollment.py`; the no-`TYPE_CHECKING` conformance test green; mypy clean (259
-files); pyright clean on the 15 changed source files (`manager.py` + `exceptions.py` added for the fork-guard
-invariant); `make pre-commit` clean (with every new file staged — an earlier pass silently skipped untracked files). 24
-Docker integration tests green against an image rebuilt with these changes — `test_policy_hooks.py` 21/21 (Claude +
-Codex `policy-check` wires and codex session-start/staged-context delivery, covering the shared `is_under_directory` and
-the one-shot staging backstop) and `test_installer.py` codex-hooks 3/3. The three real-`codex` API E2Es
-(`test_codex_session_start` / `codex_exec_smoke` / `claude_to_codex_resume`) stay `CODEX_API_KEY`-gated (only
-`OPENAI_API_KEY` is present, which codex rejects) and were not run; they exercise codex subprocess mechanics these fixes
-do not alter.
-
-## 2026-06-12
-
-### codex_frontend residual-risk mitigations: version-churn guard + empirical enrollment check
-
-**Goal**: Harden the external-binary residual risks from the card's "Risks / open questions" before closeout — Forge
-owns the *detection and confirmation* surface even where the underlying behavior is codex-cli's. Three actionable items
-(the `trusted_hash` source-dive and PermissionRequest pinning stay deliberately documented-not-built).
-
-**Key changes**:
-
-- **Validated-version ceiling (version churn).** `CODEX_VERSION_VALIDATED` (`core/runtime/codex_preflight.py`, `0.139.0`
-  — the last green probe round) + additive `CodexPreflight.version_validated`/`version_beyond_validated` (defaulted, so
-  every existing keyword construction stays valid). `forge runtime preflight codex` prints a **non-blocking** re-probe
-  notice when the installed binary sorts strictly above the ceiling (a bump never fails readiness — the pinned
-  trust/`apply_patch`/argv facts are just unverified for that version), and the real-codex E2E names the ceiling on
-  failure. Mirrors the 4g `CLAUDE_VERSION_VALIDATED` guard.
-- **Empirical enrollment check (the unverifiable ceremony).** `forge runtime preflight codex --verify-enrollment` over
-  new `core/ops/codex_enrollment.py`: the trust ceremony is unverifiable from a config read (`trusted_hash` not
-  computable), so this confirms it by *effect* — one trivial managed `codex exec` turn in a throwaway git repo, enrolled
-  iff `codex-session-start` fired (the Phase 5 observation receipt appeared). Reuses `_temporary_run_env` so the codex
-  child inherits `FORGE_SESSION`/`FORGE_FORGE_ROOT` and the hook resolves the disposable session exactly as in
-  production. Short-circuits with **no turn** when the answer is already knowable (not ready / not registered); a turn
-  that fails to complete reports `UNVERIFIED` (not "not enrolled"); the not-enrolled message is sharpened by `hook_seam`
-  (managed-suppressed / disabled / re-probe hint). Tests **user** scope only (path-stable, one-ceremony-covers-all).
-- **Upstream fail-open issue drafted.**
-  `scripts/experiments/codex-hooks/upstream-issues/pretooluse-malformed-fails-open.md` (probe-30h reproduction: `allow`
-  \+ unknown field + `continue:false` ran the command, refuting the documented fail-closed). **Owed**: the exact codex
-  docs citation + an operator-confirmed `gh issue create --repo openai/codex`.
-- **Docs**: design.md §5 (the verify-enrollment path beside "cannot perform or verify"); design_appendix §N.3 (both
-  guards); card Risks bullets annotated with the shipped mitigations; checklist residual-risk slice + Deferred update.
-
-**Verification**: 226 Codex-touching unit tests green (`tests/src/core/runtime/`, `test_runtime.py`,
-`test_codex_enrollment.py`, the four `core/ops`/`invoker`/`session` codex suites — defaulted preflight fields keep every
-construction valid); new `TestValidatedVersionGuard` (5), `test_codex_enrollment.py` (verdict-logic + `_run_probe_turn`
-mechanism via a FORGE_FORGE_ROOT→receipt simulation + git-init degrade + JSON-safe/secret-free), `TestVerifyEnrollment`
-CLI (4) and the two version-notice CLI cases; mypy + pyright clean on the three changed source files. No real `codex`
-runs in the suite (the turn is mocked). The `--verify-enrollment` real-codex behavior is operator-gated (one quota
-turn).
-
-### codex_frontend Phase 6 review fixes: tracking preservation + (event, command) dedupe + sync ceremony
-
-**Goal**: Fix three Phase 6 review findings — two P1s (a previously tracked Codex block orphaned when codex is
-temporarily off PATH; manual-registration dedupe matching bare command strings regardless of event, so a wrong-event
-registration silently skipped enforcement untracked) and one P2 (`extension sync` never printed the trust-ceremony
-next-steps and `_count_actions` ignored codex, rendering a false "Already up to date." on codex-only changes).
-
-**Key changes**:
-
-- `Installer._execute_codex` now returns `None` for "no authoritative outcome" (module not selected, codex binary
-  unavailable, conflict, apply failure) vs `(path, commands)` for a resolved read-back from disk; `init()` preserves
-  prior tracking on `None` — unifying the module-dropped branch — so disable always keeps knowing about a previously
-  written block. The skip-due-to-manual-registration outcome stays authoritative (`(None, [])`): ownership transferred
-  to the user, tracking correctly clears.
-- New `_collect_registrations()` in `codex_hooks.py`: dedupe compares `(event, command)` pairs with `type = "command"`,
-  matching Codex's own registration identity; matchers deliberately ignored (a matcher'd entry still fires on
-  overlapping events — installing alongside would double-fire). Wrong-event and bogus-event registrations now plan
-  `install`; conflict/post-merge-validation messages name `event: command`. The event-agnostic `_collect_commands()`
-  flatten is kept for the reporting surfaces (status, uninstall leftover warning) by design.
-- `_count_actions` returns a third codex component (install/update = 1 action) at both call sites, and `sync_cmd` calls
-  `_print_codex_completion` — a synced block can carry new entries whose per-entry `trusted_hash` is not yet granted, so
-  sync is exactly where the ceremony guidance matters.
-
-**Verification**: Two regression files, fail-confirmed against the unfixed code (6 failing + 3 behavior-guard cases):
-`tests/regression/test_bug_codex_tracking_lost_on_unavailable.py` (unavailable + conflict re-runs preserve tracking and
-disable still cleans up; manual-skip still drops tracking) and `tests/regression/test_bug_codex_dedupe_wrong_event.py`
-(swapped/bogus events install, partial wrong-event conflicts, correct-event + matcher'd dedupe kept, non-command type
-excluded). Three new CLI cases (sync restores block + counts it + prints ceremony; unchanged sync stays quiet;
-codex-less re-enable keeps tracking via `status --json`). Full sweep 6341 unit+regression green; Docker
-`test_installer.py` 15/15; mypy/pyright clean; `make pre-commit` clean.
-
-### codex_frontend Phase 6: codex-hooks installer module (scope-mirroring registration)
-
-**Goal**: `forge extension enable` registers Forge's two Codex hooks (`codex-session-start`, `codex-policy-check`) in
-the Codex config the **Forge install scope maps to** — resolving the stage-84 installer-scope trade-off by user
-decision: mirror the install scope (`user` -> `$CODEX_HOME/config.toml`; `project`/`local` ->
-`<project>/.codex/config.toml`, Codex has no settings.local analog). Accepted trade-off: project/local installs cost one
-trust ceremony per repo; enable names the ceremony explicitly so a registered-but-unenrolled install is never mistaken
-for active enforcement.
-
-**Key changes**:
-
-- **`install/codex_hooks.py`** (new): builtin entries (trust-durable command strings, PreToolUse with NO matcher — the
-  adapter filters), marker-delimited managed block (`# >>> forge hooks >>>`), `tomllib`-validated merge/remove that
-  never rewrites the codex-owned `config.toml` (no TOML-writer dependency; post-merge parse validation before an atomic
-  write; `.config.toml.forge.backup.<ts>`), event-name validation against the probe-pinned 10-event set (Codex loads
-  bogus names silently), and dedupe vs manual registrations (full -> skip untracked; partial -> conflict — installing
-  would double-register and Codex fires duplicates twice per event).
-- **Installer wiring**: settings-only `InstallModule.CODEX_HOOKS` in `standard`+`full`, presence-gated on the codex
-  binary (visible skip, never silent); `InstallPlan.codex` (`CodexPlan`); additive `Installation.codex_config_path`/
-  `codex_commands` tracking; **codex conflicts never set `has_conflicts`** (best-effort: another tool's config must not
-  fail the Claude install); uninstall removes only the managed block, refuses a tracked path that no longer matches the
-  scope mapping, and deletes a whitespace-only (Forge-created) file.
-- **CLI**: plan render gains a "Codex hooks (config.toml)" section; enable prints trust-ceremony Next-steps on
-  install/update; `extension status` shows the registration (human + `--json`); disable previews the block removal.
-- **Registry**: codex `install_scopes` `()` -> `("user", "project", "local")`; note rewritten to the shipped mapping.
-- **Test isolation fix**: the new installer tests exposed that nothing isolated `CODEX_HOME` — the suite wrote the
-  managed block into the real `~/.codex/config.toml` (restored from the Forge backup). New autouse `isolate_codex_home`
-  fixture in `tests/conftest.py` closes the leak class for all tests.
-- **Docs**: design.md §5 (seven modules + codex-hooks paragraph) + §4.1.4 (handler-only -> installer-registered +
-  ceremony); design_appendix §E.2 + new §E.6 (mechanics); end-user hook.md codex sections reframed (manual TOML kept as
-  a reference path); QA checklist §2.10/§2.11 (test-count 535 -> 541).
-
-**Verification**: 59 new unit cases — `test_codex_hooks.py` (40: trust-byte golden, inline-table post-validation-only
-failure with no write, full-vs-partial manual dedupe, whitespace-only deletion), `TestInstallerCodexHooks` (11: update
-byte-stability, conflict-never-blocks, tampered-path refusal, module-dropped tracking preservation),
-`TestEnableCodexHooks` (5 CliRunner end-to-end), registry pins; full unit+regression sweep 6329 green; Docker
-`test_installer.py` 15/15 (3 new `TestCodexHooksModule` cases through the real wheel CLI: enable->status->disable cycle
-with a codex shim, presence-gated skip, user-content preservation); live `forge runtime list --json` renders the flipped
-scopes; `make pre-commit` clean.
-
-### codex_frontend probe debt: operator-gated stages 85-87 harness
-
-**Goal**: Convert the owed Phase 3/4/5 operator-gated Codex checks from README sketches into runnable probe stages:
-product `codex-policy-check`, product `codex-session-start` with multi-KB `additionalContext`, and the real interactive
-TUI behavior smoke.
-
-**Key changes**:
-
-- Added product-probe helpers to `scripts/experiments/codex-hooks/lib.sh`: stage-isolated `FORGE_HOME`, repo-root
-  discovery, product-project setup, `forge` PATH guard for trust-durable product hook commands, and a guided trust
-  ceremony prompt.
-- Added stage `85-policy-check-e2e`: registers the real `forge hook codex-policy-check`, enables TDD on an isolated
-  Forge session, asks Codex to create an impl-only file, and passes only if the manifest records a deny and the file is
-  absent.
-- Added stage `86-sessionstart-delivery-e2e`: registers the real `forge hook codex-session-start`, seeds a large parent
-  transcript, runs the shipped `--context-delivery hook` bridge, and checks echo + `confirmed.codex` receipt facts.
-- Added stage `87-interactive-smoke`: foreground TUI flow for bare start, live reattach, active-gate refusal, positional
-  hold instructions, hook-delivered context, and read-only sandbox behavior, combining operator answers with manifest
-  facts.
-- Wired stages 85-87 into `reproduce.sh all`; post-run hardening keeps foreground TUI stdout/stderr attached to the
-  terminal, aborts early when 87A did not create a thread, uses the absolute `forge` path for the second-terminal active
-  gate command, and gives sandbox failures their own verdict.
-
-**Verification**: `bash -n` on the changed harness scripts; `shellcheck -e SC1091` on the same set (dynamic stage
-`source` parity); focused unit slice passed:
-`uv run pytest tests/src/cli/hooks/test_codex_policy_check.py tests/src/cli/hooks/test_codex_session_start.py tests/src/session/test_codex_handoff.py tests/src/core/ops/test_codex_session.py tests/src/core/ops/test_codex_interactive.py`
-(126 passed); `make pre-commit` clean. A minimal stage-style product project can run
-`forge session start smoke --no-launch --no-proxy` with isolated `FORGE_HOME`, and `uv run --project ... forge --help`
-validates the fallback helper command shape. Live operator run on codex-cli 0.139.0: stage 85 PASS (product
-`codex-policy-check` denied the impl-only `apply_patch`; blocked file absent); stage 86 PASS (11,519-byte transfer
-delivered through product `codex-session-start`, token echoed, `confirmed.codex.context_delivery` and `rollout_source`
-both `session_start_hook`); stage 87 PASS after harness hardening (bare start, reattach memory, second-terminal
-active-gate refusal, positional hold instructions, hook-delivered interactive bridge, and read-only sandbox denial all
-operator-confirmed with matching capture facts; `sandbox_should_not_exist.txt` stayed absent). The operator also
-observed that Codex CLI visibly rendered hook-delivered `SessionStart` `additionalContext` in the TUI transcript even
-though it was delivered passively rather than as a positional synthetic prompt; the non-gating observation prompt was
-codified after that PASS run, so the current capture predates `results/observations.txt`.
-
-## 2026-06-11
-
-### codex_frontend Phase 5: Interactive Codex frontend
-
-**Goal**: Forge-manage interactive `codex` TUI sessions -- bare `forge session start --runtime codex` opens the TUI,
-`--resume-from` without `--task` is an interactive bridge carrying the curated transfer, and bare `forge session resume`
-reattaches via `codex resume <thread_id>`. `--task` keeps meaning headless, byte-unchanged. **Scope (user decisions)**:
-bare = interactive; bridge composes both deliveries; thread capture = post-exit filesystem discovery + enrolled-home
-observation receipt (separate `observation-receipt.json`; the Phase 4 delivery-receipt contract stays byte-stable);
-`install_scopes` stays `()` (Phase 6) -- only `interactive="beta" -> "default"` flips.
-
-**Key changes**:
-
-- **Discovery** (`core/runtime/codex_rollouts.py`): `find_rollouts_since` -- mtime-filtered rollouts since a tight
-  pre-launch timestamp, head-cwd narrowing (never below one candidate), thread_id parsed from the filename. The ops
-  layer requires exactly one candidate (`rollout_source="discovered_post_exit"`); ambiguity refuses to guess.
-- **Observation receipt** (`session/codex_handoff.py` + `cli/hooks/codex_transfer.py`): nothing-staged turns in a
-  managed session record codex's own `session_id`/`transcript_path`; the handler branches on pending-file PRESENCE so a
-  failed staged delivery never masquerades as an observation. Receipts stay the hooks' only writes (design.md 3.5).
-- **Launcher** (`session/codex_invoke.py`, new): foreground `subprocess.run` of `codex --sandbox X [prompt]` (start) or
-  `codex resume --sandbox X <tid>` (reattach -- the subcommand declares its own flag); env = sanitized child env
-  (`sanitize_codex_child_env`, extracted behavior-neutral) + FORGE_SESSION/FORGE_FORGE_ROOT + a REQUIRED caller-minted
-  run-identity triple -- the TUI shares the transfer-curation event's root (one run tree; a mint-when-absent default
-  would silently fork it).
-- **Interactive ops** (`core/ops/codex_interactive.py`, new): `start_interactive_codex_session` (bare + bridge;
-  `assemble_codex_transfer` extracted from the bridge golden-pinned byte-identical; positional delivery wraps the body
-  in hold instructions via `compose_codex_interactive_context` -- the positional `[PROMPT]` starts a real model turn)
-  and `reattach_codex_session` (guards shared with `continue_codex_session` by extraction). Two timestamps
-  (activity-summary window vs discovery window); receipts beat discovery; rollback only before the TUI launches;
-  interactive turns emit no usage event; bare starts record `context_delivery=None`.
-- **CLI matrix** (`cli/session_codex.py`, `cli/session_lifecycle.py`): omitting `--task` = interactive; `--task` alone
-  errors; bare resume gates on the active-session registry (Claude reconnect parity, no `--force` escape) then
-  reattaches; cross-project resume restructure -- the unscoped fallback always runs on a scoped miss, codex dispatches
-  (cross-CWD by design), the Claude refusal stays byte-identical. `_post_exit_render` reused via lazy import (cycle).
-  `session show` gains a `Delivery:` line; registry `interactive="default"`.
-- **Docs**: design.md 3.4/3.5/3.9/3.10/4.0 + runtime matrix; session.md interactive section; transfer.md "later phase"
-  note replaced; hook.md observation bullet; probe README stage-87 operator checklist (real-TUI smoke incl. multi-KB
-  positional + hold-instructions no-autonomous-action).
-
-**Verification**: 70 `test_session_codex.py` (matrix incl. exact errors, cross-project both runtimes, renderers) + 22
-`test_codex_interactive.py` (bare/bridge/hook matrices, two-timestamp pin, run-identity equality pin, ambiguity refusal,
-reattach) + 13 `test_codex_invoke.py` (argv/env/auth postures) + observation-receipt suites; full `tests/src/cli` 1761
-green; runtime package 80 green; mypy clean. Docker `test_policy_hooks.py` observation cases added. Post-ship live
-probes (codex 0.139.0) closed the argv/rollout-head externals: `codex resume --help` pins
-`resume [OPTIONS] [SESSION_ID]` with its own `-s/--sandbox` (the launcher was corrected to pass `--sandbox` inside the
-subcommand instead of root-level), and a real rollout head matched the discovery parser exactly (`session_meta` +
-`payload.cwd`; filename timestamp confirmed LOCAL time, validating filter-by-mtime). Deferred verification: operator-
-gated stage 87 behavioral smoke (hold instructions, multi-KB positional, enrolled hook delivery, live reattach, sandbox
-behavior).
-
-### codex_frontend follow-up: codex-policy-check silent on unresolvable sessions
-
-**Goal**: Align the Phase 3 hook with the codex-session-start silence rule -- under a user-scope Codex registration, "no
-resolvable Forge session" means Forge is not managing the turn, and unrelated Codex sessions must see no Forge stderr
-noise.
-
-**Key changes**:
-
-- `codex_policy_check` (cli/hooks/commands.py): the no-session stderr print -> `logger.debug` (hooks debug log via
-  `FORGE_DEBUG=1`). Post-resolution diagnostics (manifest/intent/engine failures, block/check summaries, no-evaluable-
-  operations) keep stderr -- they only fire inside a managed Forge session. hook.md documents the silent-allow bullet.
-
-**Verification**: `test_no_session_passes_through` strengthened (empty stderr + caplog debug pin);
-`test_codex_policy_check.py` + `test_codex_session_start.py` 28/28; mypy clean.
-
-### codex_frontend Phase 4: SessionStart transfer delivery with initial-message fallback
-
-**Goal**: Ship the post-enrollment upgrade the 30e probe unlocked -- deliver the curated transfer to a Codex session via
-a trust-enrolled SessionStart hook (`additionalContext`) instead of the initial `codex exec` prompt, with
-initial-message staying the zero-setup default. The central constraint shaped the design: enrollment is unverifiable
-pre-turn (the `trusted_hash` is not computable), so hook mode = explicit opt-in + staged file + post-turn receipt
-reconciliation. **Scope (user decisions)**: `--context-delivery {initial-message,hook}` flag shape; hook-undelivered
-fails loud (exit 1, session kept); handler-only like Phase 3 (manual registration + ceremony until the Phase 6
-installer).
-
-**Key changes**:
-
-- **Staging module** (`session/codex_handoff.py`, new): `pending-context.md` + `context-receipt.json` under
-  `<session_dir>/codex/` (GC/delete free via the session dir; pinned anyway). `consume_pending_context` writes the
-  receipt BEFORE unlinking (a delivered-but-unreceipted turn would read `hook_undelivered` dishonestly); a failed
-  receipt write deliberately delivers nothing. `compose_codex_initial_message` split into
-  `compose_codex_handoff_context` + task suffix -- the default path is golden-pinned byte-identical (golden added before
-  the refactor).
-- **Handler** (`forge hook codex-session-start`, new `cli/hooks/codex_transfer.py`): resolves the session via
-  FORGE_SESSION + payload-cwd rooting (the Phase 3 rule), consumes the staged file, emits the probe-pinned strict
-  one-line `{"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": ...}}` (Codex fails OPEN on
-  malformed output). Never reads the manifest -- the receipt is its only write, so `confirmed.codex` stays CLI-owned
-  (design.md §3.5). Every non-delivery path (no session, nothing staged = resume turns, malformed stdin) is a silent
-  exit-0 no-op with NO output -- diagnostics log at debug to the hooks log (review fix: two stderr prints would have
-  made every non-Forge Codex session under a user-scope registration emit Forge noise). The command name is
-  trust-durable (renaming breaks `trusted_hash` enrollment).
-- **Bridge/op wiring**: `bridge_session_to_codex(staged_context_path=)` stages the framed body and sends the raw task as
-  the prompt; `_temporary_run_env` now also scopes `FORGE_FORGE_ROOT` (the CHILD's forge_root -- worktree sessions'
-  manifests aren't findable from payload cwd alone, benefits both codex hooks). `start_codex_session` gained
-  `context_delivery` + a pre-turn guard (knowable-negative seams `disabled|unknown|managed_suppressed|untrusted` fail
-  before any state; `enrollment_gated` proceeds). `_reconcile_hook_delivery` post-turn: receipt matching the stream
-  thread -> `session_start_hook` (receipt `transcript_path` supersedes glob as `rollout_source="session_start_hook"`,
-  cross-checked with a warning); receipt present when the stream missed `thread.started` -> **recovers**
-  `thread_id = receipt.session_id` (otherwise-unresumable session stays resumable); absent/mismatched ->
-  `hook_undelivered` + staged file cleared (one-shot: an enrolled resume can never late-deliver stale context; resume
-  also defensively clears).
-- **CLI**: `--context-delivery` Choice with Click default `None` (a real default would trip
-  `reject_codex_flags_for_claude` on every plain Claude start -- regression-pinned), resolved to initial-message in
-  `run_codex_start`; undelivered render prints `print_error_with_tip` (ceremony / delete-and-retry) and exits 1 even
-  when the codex turn succeeded. `CodexConfirmed.context_delivery` (additive).
-- **Docs**: design.md §3.9 (delivery contract; the stale "hook delivery deferred to Phase 6" claim removed at the code
-  slice that falsified it) + §3.5 (receipt note); end-user hook.md (`codex-session-start` section with the probe-pinned
-  NESTED registration TOML + trust-durable-name warning), session.md + transfer.md (flag, default, failure semantics);
-  probe README "stage 86" operator-gated note (enrolled E2E incl. the unprobed multi-KB additionalContext size).
-- **File-size compliance** (commit-hook limits): `cli/session_model_pin.py` split out of `session_lifecycle.py` (the
-  --model pin validate/apply/persist helpers; same pattern as the original session.py split), design.md §3.9 verbosity
-  trims (content-preserving), and the 2026-06-05 change_log block compacted per the board-contract size policy.
-
-**Verification**: 60+ new unit cases -- `test_codex_handoff.py` (16: roundtrip/one-shot/receipt-failure),
-`test_codex_session_start.py` (10: delivery, strict-wire key sets, payload-cwd rooting, 7 silent no-ops asserting empty
-stdout AND stderr, incl. consume-failure fail-open), `test_codex_bridge.py` (+7: golden, staging-at-Popen-time, env
-restore), `test_codex_session.py` (+8: hook-mode matrix incl. thread-id recovery + per-seam guard),
-`test_session_codex.py` (+5 incl. the plain-Claude-start None-default regression), `test_gc.py` (+1 handoff-files
-pinning); full blast radius 1270 ops/session/CLI tests green; mypy clean on all of `src/forge/`. Docker:
-`test_policy_hooks.py` 21/21 (4 new `TestCodexSessionStartDocker` cases through the real wheel CLI, incl. the
-no-FORGE_SESSION user-scope silence case; 17 pre-existing unchanged).
-
-**Deferred**: the real-codex enrolled-hook E2E is operator-gated (stage 86, with stage 85); additionalContext payload
-size beyond the 30e short token is unprobed until that round.
-
-### codex_frontend Phase 3 follow-up: blocked actions no longer persist policy state
-
-**Goal**: Fix four Phase 3 review findings, chiefly that both hook commands persisted engine-collected policy state
-before checking whether the composed decision blocks the action.
-
-**Key changes**:
-
-- A blocked action (deny / unresolved needs_review) never lands -- Claude denies the Write/Edit, Codex rejects the whole
-  all-or-nothing `apply_patch` -- so its collected state (e.g. TDD `tests_touched` from a clean test file riding in a
-  denied patch) no longer persists; decision-log entries still persist as the audit trail. Gated in
-  `_persist_policy_state` (Claude) and at the `codex-policy-check` persist call (cross-file aggregate).
-- Codex stderr telemetry now labels the decisive file (first denying / first unresolved result), not `file_results[0]`,
-  which could be an allowing file routing the label helper down the wrong branch.
-- All three Codex wire emissions print with explicit `file=sys.stdout`; `_join_sections` types its formatter as
-  `Callable[[CompositeDecision], str]`.
-
-**Verification**: New `tests/regression/test_bug_blocked_action_persists_policy_state.py` (both runtimes, fail-confirmed
-against the unfixed code) + telemetry-label unit test; 6,123 unit/regression tests green; Docker `test_policy_hooks.py`
-17/17; mypy/pyright clean.
-
-### codex_frontend Phase 3: Codex hook adapter/responder + `forge hook codex-policy-check`
-
-**Goal**: Fill the runtime-neutral `HookAdapter`/`HookResponder` protocols with the Codex pair so a `codex exec` turn
-can enforce Forge policy on `apply_patch` actions, carrying the resolved `ActionContext.runtime -> origin` rename. Scope
-(user decision): **PreToolUse only** (Stop/UserPromptSubmit/SessionStart land with their Phase 4/5 consumers;
-PermissionRequest stays descoped -- never observed firing headless); **handler-only** -- enforcement needs a manually
-registered + trust-enrolled Codex hook until the Phase 6 installer.
-
-**Key changes**:
-
-- **`origin` rename** (`policy/types.py`): `ActionContext.runtime -> origin`, values `{forge_cli, claude_code, codex}`
-  per the recorded `runtime_abstraction` decision -- the two on-demand CLI leaves (`forge policy check`/`supervisor`)
-  become `forge_cli`; `%policy check` stays `claude_code` (Claude-context); the false "flows into attribution" docstring
-  claim fixed. Zero behavioral surface (no read sites, never serialized); 47 test kwargs across 11 files.
-- **apply_patch parser** (`cli/hooks/codex_patch.py`, new): `parse_apply_patch -> list[PatchFileOp] | None` over the
-  probe-pinned grammar (Add/Update/Move to/Delete, `@@` hunks, End-of-File tolerance, CRLF); `None` = malformed ->
-  caller fails open (converges with Codex's own rejection); `path` is the post-op Move-to target.
-- **Adapter/responder** (`cli/hooks/codex_policy.py`, new): `CodexHookAdapter` normalizes per-file ops to the tool names
-  every policy's `applies_to` gates on (Add->`Write`, Update->`Edit`; deletes skipped; `Bash` -> `[]`), tagging
-  `origin="codex"` with runtime truth in `tool_args`; `CodexHookResponder` emits the probe-pinned deny wire
-  (`hookSpecificOutput.permissionDecision="deny"` + reason, strict `json.dumps` only -- Codex FAILS OPEN on malformed
-  output; `BLOCK_EXIT = 0`). Protocol cardinality became `build_contexts -> list[ActionContext]` (clean break; the
-  Claude adapter returns `[ctx]`/`[]`, wire bytes unchanged); deny reason text shared via extracted
-  `format_deny_text`/`format_needs_review_text` (Claude strings byte-identical).
-- **`forge hook codex-policy-check`** (`cli/hooks/commands.py`): per-file evaluation with tests-first ordering (an
-  atomic test+impl patch passes TDD, the `%policy check` precedent); cross-file precedence deny > needs_review >
-  warn/allow; allow emits NO stdout (allow-feedback delivery unprobed); session resolved via FORGE_SESSION with
-  payload-cwd `forge_root` rooting (Codex `session_id` is a thread UUID, never in the Claude index). Engine assembly
-  extracted as `build_hook_engine` + `register_supervisor_and_restore` (moved-not-changed; cascade resolver wiring now
-  serves both commands); `_persist_policy_decisions` writes one decision-log entry per file op in one lock cycle with an
-  **explicitly aggregated** `engine_state` -- `evaluate()` clears collected state per call, so a one-shot end read would
-  drop earlier files' TDD `tests_touched` (review finding, regression-pinned).
-- **Docs**: design.md §4.1.4 (both shipped pairs, normalization, list cardinality, handler-only caveat) + §4.1.5 (shared
-  reason text, per-runtime wire framing); registry codex note (`pretool_policy` stays `"partial"`); `protocols.py`
-  docstrings; end-user `hook.md` codex-policy-check section; probe README owes "stage 85" (operator-gated enrolled
-  end-to-end).
-
-**Verification**: 57 new unit cases (24 parser, 16 adapter/responder, 17 command incl. the state-aggregation,
-payload-cwd, and wire-strictness regressions and two cascade shared-wiring cases) -- full sweep 6118 unit+regression
-green; mypy/pyright/pre-commit clean. Docker: `test_policy_hooks.py` 17/17 (7 new Codex cases; 10 pre-existing unchanged
--- extraction moved no Claude bytes) + `test_supervisor_e2e.py` 9/9 (cascade through the extracted registration).
-
-**Deferred**: real-codex enrolled-hook E2E is operator-gated (trust ceremony) -- recorded as probe stage 85; whether
-Codex surfaces exit-0 stderr to the agent is unobserved (warnings are advisory).
-
-## 2026-06-10
-
-### Supervisor cascade: tier-1 plan check before the frontier supervisor
-
-**Goal**: Route semantic-supervisor checks through a cheap stateless tier-1 plan check (opt-in `--cascade`) so
-clearly-aligned Write/Edit actions short-circuit and only uncertain ones pay the frontier `claude -p --resume` call.
-
-**Key changes**:
-
-- `PolicyEngine.register_resolver()`: a resolver policy runs only when pass-1 emitted `needs_review` and nothing denied;
-  `_run_policy()` extraction keeps applies_to/fail-mode/state semantics identical for both passes; `_collected_state`
-  cleared per `evaluate()`; `rules_active` uses `registered_policy_ids` (includes the resolver). Cascade off is
-  bit-identical to the pre-cascade engine.
-- `PlanCheckPolicy` (`semantic.plan_check`, new `policy/semantic/plan_check.py`): one cheap `core.llm` call (tagger
-  mechanics, default OpenRouter `google/gemini-3.5-flash`, with per-provider defaults and an approximately 32K-token
-  configurable prompt budget) judging the action against the approved-plan snapshot. Prompt packing uses head+tail
-  excerpts, keeps diff file/hunk headers when truncated, includes Edit matched/replacement fragments and Write target
-  existence context, and tells the checker when plan or action fields were truncated. Emits only `allow` (cached via
-  ThrottleCache, plan fingerprint in key) or `needs_review`; every failure path escalates — degrades to frontier-always,
-  never to unsupervised. Reasons ride in low-severity violations (clamped 500 chars), never `decision.warnings`, so
-  resolved escalations stay silent on the allow path.
-- CLI/config: `SupervisorConfig.cascade`/`checker_provider`/`checker_model`/`checker_budget_tokens`;
-  `forge policy supervise --cascade/--no-cascade --checker-provider --checker-model` (modifiers with target, standalone
-  toggle without); advanced budget tuning stays in session config via
-  `forge session set policy.supervisor.checker_budget_tokens <tokens>`; enabling auto-resolves the plan snapshot via the
-  `--reload` machinery and fails loud pre-mutation when none resolves; `%policy supervise cascade on|off`; status/show
-  surfaces. Existing local LiteLLM backend configs created before `gemini/gemini-3.5-flash` was added must be
-  recreated/updated or paired with an explicit served checker model such as `gemini/gemini-2.5-flash`.
-- Measurement: decision-log-derived `plan_check_allow`/`plan_check_needs_review` counters (cached allows counted) in
-  `forge activity` + summary line; session-tagged `plan-check` ledger events via `emit_direct_llm_usage`. Named
-  needs-review (not "escalated") because a tier-1 `needs_review` co-occurring with a deterministic deny skips the
-  resolver; actual frontier runs are the supervisor counters.
-- Docs: design.md §4.1.2 cascade block + §4.1.5 resolver bullet + CLI row; design_appendix §D ownership + §A.13 emitter
-  rows; end-user policy.md cascade subsection.
-
-**Verification**: 5950+ unit/regression tests pass (`-m "not integration"`) incl. 80+ new cases (engine resolver,
-plan-check policy, CLI, dispatcher, hook wiring, activity); Docker tier 19/19 (`test_supervisor_e2e.py` +
-`test_policy_hooks.py` — escalation resolves aligned/divergent with exactly one frontier invocation, plan-check error
-ledger event, CLI wiring persistence, cascade-off regression, plus a `slow`-marked real-LLM short-circuit e2e: the
-default checker via the host's port-4001 LiteLLM approves an aligned action with zero frontier invocations);
-`make pre-commit` hooks clean on all touched files.
-
-**Deferred**: allow-verdict rationale is debug-logged only — validating false-aligned rates needs shadow-sampling
-(follow-up idea on the card).
-
-### codex_frontend Phase 1 follow-up: cross-project trust probe (stage 84) -> SCOPED
-
-**Goal**: Settle the last untested Phase-1 assumption gating the Phase 6 installer story -- does ONE Codex trust
-ceremony trust a hook command string in an UNRELATED repo, or only the enrolled project + its `git worktree` checkouts
-(82w)?
-
-**Key changes**:
-
-- **New probe** `scripts/experiments/codex-hooks/stages/84-fresh-project.sh` (extends the round-3 fixture harness;
-  headless, consumes the stage-80 enrolled fixture, no new ceremony). A fresh `git init` repo at a never-seen `mktemp`
-  path registers a byte-identical single-entry SessionStart (same stable `$HOOKBIN/SessionStart.sh` command, differing
-  ONLY in the registering config path); the path-stable user-level hook is the positive control. Two legs: 84a (no
-  folder trust) then 84b (folder-trust deconfound -- 40b: folder trust alone does not fire hooks, so a fire there is the
-  definition hash). Canonicalized `FRESH` (macOS /var->/private/var) so the run cwd matches the trust path; single
-  `finish_verdict` exit (restore-from-base + exit-code policy); pre-leg `grep -F` self-guards; rejects
-  `PROBE_USE_REAL_CODEX_HOME=1`. Wired into `reproduce.sh` (`FIXTURE_STAGES`, budget); README stage-map + 5-verdict
-  vocabulary + de-staled "fixtures are headless-unavailable" bottom section.
-- **Finding (real codex 0.139.0): `[CROSS-PROJECT-TRUST-SCOPED]`** -- both legs proj=0 user=1 (turn ran, positive
-  control fired -- a real no-fire, not a dead turn), self_enroll=no. Cross-project trust does NOT hold; the 82w worktree
-  survival was worktree->checkout canonicalization, not portable command-string trust. **Installer reframe:**
-  project-scope = a ceremony per repo; USER-scope (`$CODEX_HOME/config.toml`) = one ceremony covers all projects
-  (path-stable).
-- **Docs synced**: card Risk bullet (UNTESTED -> RESOLVED/SCOPED) + 82w annotation; checklist new ticked Phase-1 item +
-  Worktree/installer-scope Open Decision reframed; design.md §5.5.5 + `registry.py` codex note "per CODEX_HOME" ->
-  path-keyed trust + user-scope guidance.
-
-**Verification**: probe ran live on real codex 0.139.0 (2 turns) -> SCOPED, cross-checked against the
-`meta/user-config.84{a,b}-after.toml` captures (not just oracle text). `bash -n` clean; shellcheck stage 84 = only info
-SC1091 (one fewer finding than the shipped stage 82 -- at parity); `pre-commit` clean on stage/harness/README; the
-registry-note edit carries no test assertion (grep clean), runtime/preflight suites rerun green.
-
-### codex_frontend Phase 2 follow-up: suppress Claude display vestiges on Codex `session show`
-
-**Goal**: Stop `session show` printing `Agent: claude-code` and `Model Family: anthropic` for Codex sessions.
-
-**Key changes**: `_print_session_detail` gates the `Agent:` line (display-only `intent.agent` vestige, superseded by
-`Runtime:`) and the whole Computed Context block (Claude routing/tier/policy state) on `runtime == "claude_code"`.
-Claude sessions render unchanged; `--json` keeps its documented env-derived `context` shape.
-
-**Verification**: new `test_show_human_suppresses_claude_vestiges` + 229 session CLI tests green; mypy clean.
-
-### codex_frontend Phase 2: One-command Codex bridge CLI (`session start --runtime codex`)
-
-**Goal**: Wrap the Phase-5e `bridge_session_to_codex` op in a real session lifecycle -- one command derives a
-Codex-runtime session from a Claude parent, runs the first `codex exec` turn, and makes continuation a first-class
-`session resume` path.
-
-**Key changes**:
-
-- **CLI**: `forge session start [name] --runtime codex --resume-from <parent> --task "..."` (per the resolved flag-shape
-  decision) with `--strategy` (default `ai-curated`), `--depth`, `--sandbox`, `--worktree/--branch`; 17 Claude-only
-  flags rejected with codex and 5 codex-only flags rejected without it. `forge session resume <name> --task "..."`
-  dispatches on `intent.launch.runtime` before any Claude predicate and runs `codex exec resume <thread_id>` (cross-CWD,
-  in the session's recorded worktree, prompt on stdin); `_launch_claude_for_session` refuses codex manifests as a
-  backstop. New `cli/session_codex.py` (rendering) + `core/ops/codex_session.py`
-  (`start_codex_session`/`continue_codex_session`). `session show` renders Runtime/Thread/Rollout/Auth; JSON adds
-  `intent.runtime` + `confirmed.codex`.
-- **Manifest**: `LaunchIntent.runtime` (registry ids `claude_code`/`codex`; CLI maps `claude` -> `claude_code`;
-  `launch.runtime` blocked in `session set`), new `SessionConfirmed.codex` (`thread_id`, `rollout_path`,
-  `rollout_source="discovered_by_thread_id"`, `auth_method`/`auth_source`/`billing_mode` from preflight, `last_run_at`).
-  `confirmed.launch` + `claude_session_id` stay unset for codex (Claude-resume predicates refuse for free; ANTHROPIC-key
-  posture would misread). Older Forge cannot read new manifests (strict dacite) -- accepted research-preview break; old
-  manifests read fine (additive field with default).
-- **Invoker**: `CodexStreamResult.thread_id` parsed from `thread.started`; runtime-neutral
-  `HeadlessResult.runtime_session_id`; `prepare_codex_request(resume_thread_id=...)` appends the probe-60 form-A
-  `resume <tid>` argv. New `core/runtime/codex_rollouts.py` (`find_rollout_path` by thread_id, newest-mtime wins).
-- **Transfer/GC**: the snapshot is keyed by the **real session name** (Derivation.context_file -> GC-protected),
-  structurally retiring the Phase-5e synthetic-children debt; bridge gains `child`/`preflight`/`output_root` (snapshot
-  written under the child's indexed forge_root for nested-project worktrees, same output-root pattern as the fork
-  precedent); stale-snapshot guard (reference-checked via new public `gc.referenced_transfer_context_paths()`;
-  unreferenced -> replaced with paired `.notes.md`; referenced -> error) and two-phase rollback (guard failure deletes
-  only the session; post-guard failure also deletes this run's snapshot+notes).
-- **Docs**: design.md §3.4/§3.5/§3.9/§4.0 (one-command frontend shipped, runtime dispatch, `confirmed.codex` ownership);
-  end-user `session.md` (Codex workflow + cheat sheet) + `transfer.md` (one-command flow promoted, manual recipe kept
-  for sessionless handoffs).
-- **Review fixes (pre-merge)**: post-creation lookup/rollback-delete scoped to the child's forge_root -- session names
-  are project-scoped, so the unscoped strict resolution raised `AmbiguousSessionError` and stranded the just-created
-  session whenever another project had the same name (child root now read from `state.forge_root`, no index round-trip);
-  resume refreshes the recorded auth posture (`auth_method`/`auth_source`/`billing_mode`) from the fresh preflight so
-  `session show` cannot report the first turn's auth after the user switches Codex auth. Regressions:
-  `test_codex_session.py` (cross-project duplicate start + rollback isolation, changed-preflight resume).
-
-**Verification**: ~150 new/extended unit tests green (invoker stream/argv, manifest roundtrip + override rejection,
-rollout discovery, bridge extensions, op lifecycle incl. rollback/collision/worktree-ownership GC pinning, CLI flag
-matrix/dispatch/rendering); full CLI package 1619 green; mypy/pyright clean. **Live**: real-codex E2E
-`tests/integration/core/test_codex_session_start.py` passed (2 real turns) -- verifies the two probe-61 claims as a
-standing guard: the `$CODEX_HOME` rollout filename ends with the live stream's thread_id, and stdin-prompt +
-`exec resume` recalls turn-1 state with a stable thread id. (Probe stage 61 script written + wired into `reproduce.sh`;
-the E2E supersedes its one-shot run.)
-
-### codex_frontend Phase 1 closeout: `pretool_policy` rise + preflight `[hooks.state]` decision
-
-**Goal**: Ship the one code unit Phase 1 deferred for an explicit decision -- align the capability encoding with the
-round-3 probe findings before Phase 2 sessions load `design.md` §5.5.5 as context.
-
-**Key changes**:
-
-- **Registry (`core/runtime/registry.py`)**: Codex `pretool_policy` `"none"` -> `"partial"` -- Phase 1 confirmed
-  post-enrollment PreToolUse deny (JSON + exit-2) and `updatedInput` mutation headless, refuting the old "unprobed"
-  rationale. `"partial"`, not `"full"`: enforcement exists only in trust-enrolled homes, malformed hook output FAILS
-  OPEN, and PermissionRequest is unpinned headless. `PolicyEnforcement` comment rewritten (Codex is now the partial
-  runtime); the stale Codex `note` claims ("only SessionStart observed", "registration-string dimension unprobed",
-  "until pre-enrollment is settled") replaced with the round-3 facts (full event coverage incl. 30e, command string in
-  the `trusted_hash`, guided-ceremony posture, worktree survival, fails-open caveat, `Bash`/`apply_patch` tool names).
-- **Preflight (`codex_preflight.py`, comments/docstrings only -- behavior unchanged)**: the four forward-pointing "the
-  `[hooks.state]` read is Phase 1" notes now record the resolved decision -- the read is deliberately NOT implemented
-  (the `trusted_hash` is not black-box computable so a record cannot be validated; enrollment survives worktrees with no
-  record at the worktree's config path, so a path-keyed read would false-negative). The seam stays `enrollment_gated`;
-  `untrusted` stays reserved, reachable only if a codex-cli source-dive recovers the hash.
-- **`design.md` §5.5.5 synced**: `pretool_policy="partial"` with probe facts + caveats; the enrollment parenthetical
-  states the settled guided-ceremony posture. Board: card Deliverables 2/3 + checklist Current Focus/Phase 1/Phase 3
-  updated.
-
-**Verification**: 63 runtime/preflight/CLI unit tests green (assertions updated to `partial`); mypy clean; stale-claim
-grep (`unprobed|only SessionStart|settles pre-enrollment|...`) empty over the normative surfaces (`docs/design.md`,
-`docs/design_appendix.md`, `src/`, `tests/src/`) -- the active card/checklist round-2 snapshot lines that quote the
-superseded wording are annotated as historical (superseded by round 3) rather than deleted; live
-`forge runtime list --json` renders `pretool_policy: partial` + `native_hooks: enrollment_gated`; `make pre-commit`
-clean.
-
-### codex_frontend Phase 1: Enrollment-mechanics probe (compacted)
-
-**Goal**: Pin Codex hook enrollment mechanics before building Codex frontend code.
-
-**Key changes / findings**:
-
-- Extended `scripts/experiments/codex-hooks/` with persistent enrolled-fixture stages 80-83, hash-preimage scanning,
-  sanitized payload fixtures, and board/design updates.
-- Real codex-cli 0.138.0 findings: one guided "trust all" ceremony enrolled headless-firing hooks; the command string is
-  part of `trusted_hash`; `trusted_hash` was not black-box computable, so programmatic pre-enrollment remained blocked
-  pending source-diving; PreToolUse deny and `updatedInput` mutation worked, while malformed PreToolUse failed open.
-- Enrollment survived worktrees of the enrolled project with a path-stable command string, but broad cross-project trust
-  remained untested at this phase.
-
-**Verification**: `bash -n`/shellcheck clean, hash-preimage self-test green, live stages 80-83 ran against real codex
-0.138.0, captures cross-checked, `sanitize.sh` passed, and `make pre-commit` clean. Detailed probe matrices remain in
-git history before compaction.
-
-### codex_frontend Phase 0: Registry correction -- `headless_inert` -> `enrollment_gated`
-
-**Goal**: Correct the Codex hooks capability encoding refuted by gating-probe round 2: trust-enrolled hooks DO fire
-under headless `codex exec` (40c2/40d) and interactively (50c) -- the gate is a one-time trust enrollment, not the
-execution mode. First code commit of the `codex_frontend` card.
-
-**Key changes**:
-
-- `HookSupport` (registry) and `HookSeam` (preflight) renamed `headless_inert` -> `enrollment_gated` **together**, so
-  neither half of the capability model retains the refuted value. Resolves the card's literal-name Open Decision.
-- The preflight verdict is pinned as capability-not-state: "hooks can fire, but this preflight has not checked the
-  `[hooks.state]` record" -- never treat it as `active`. The per-hook enrollment read is Phase 1.
-- Codex `RuntimeSpec` note rewritten to the round-2 facts (trust lives in user `config.toml` `[hooks.state]` keyed by
-  the registering config's absolute path; survives script-*content* changes; only SessionStart observed firing).
-  `pretool_policy` stays `"none"` (post-enrollment PreToolUse unprobed). `design.md` §5.5.5 synced; card.md stale
-  "hook_seam is today honestly `unknown`" line fixed.
-
-**Verification**: 63 runtime/CLI/preflight unit tests green (incl. renamed
-`test_enabled_is_enrollment_gated_never_active`); mypy clean; `rg headless_inert docs/design.md src/ tests/` empty; live
-`forge runtime list` renders `enrollment_gated` and `forge runtime preflight codex` renders
-`Hook seam: enrollment_gated` (render asserted, exit code orthogonal); `make pre-commit` clean.
+## 2026-06-10 -- 2026-06-14 (compacted)
+
+- **Codex frontend shipped as a first-class alternate runtime.** Phases 2-6 added the one-command Codex launch path
+  (`forge session start/resume --runtime codex`), hook adapter/responder surfaces, SessionStart transfer delivery,
+  interactive TUI support, codex-hooks installation/enrollment plumbing, capability/version guards, and review fixes
+  around fork/rollback isolation, enrollment state, policy persistence, handoff artifacts, and invoker behavior. The
+  closeout moved the card to done and recorded remaining empirical enrollment residuals.
+- **Deferred Codex items remain tracked** (full detail in `done/codex_frontend/` and `done/runtime_abstraction/`):
+  app-server transport (`codex app-server`/`--stdio`, unevaluated by scope decision), filing the upstream fail-open
+  issue (draft ready), and the PermissionRequest/`trusted_hash` source-dive (documented-not-built).
+- **Codex probe and enrollment evidence was preserved at the decision level.** Stages 84-87 covered cross-project trust,
+  version churn, guided enrollment, and interactive reattach smoke paths. The durable outcome was that trust is scoped,
+  `pretool_policy` is partial/enrollment-gated, SessionStart additional context is viable when enrolled, and some
+  guided/operator steps remain intentionally external to non-interactive automation.
+- **Supervisor/session work landed in parallel.** Supervisor cascade added tier-1 plan checks before the frontier
+  supervisor; launch controls gained cascade/reasoning-effort parity across subprocesses; shadow sampling measured
+  false-aligned cascade outcomes; same-dir transfer forks decoupled transfer mode from worktree isolation.
+- **Verification highlights**: focused Codex runtime/hook/session suites, real-Codex E2E probes, supervisor cascade and
+  shadow suites, same-dir transfer fork regressions, mypy/pyright, and `make pre-commit` were run across the compacted
+  work. Detailed per-phase matrices remain in git history before this compaction.
 
 ## 2026-06-04 -- 2026-06-09 (compacted)
 

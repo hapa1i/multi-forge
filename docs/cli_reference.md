@@ -7,8 +7,9 @@ workflow-layer behavior lives in [design_workflows.md](design_workflows.md).
 
 ## 1. Terminal Command Reference
 
-**Command aliases:** `authentication` (canonical) has alias `auth`; `extension` (canonical) has alias `ext` and
-`extensions`; `session` (canonical) has alias `sess`. Full names always work; aliases are convenience shortcuts.
+**Command aliases:** `extension` (canonical) has alias `ext`; `session` has alias `sess`; `memory` has alias `mem`;
+`config` has alias `cfg`. Full names always work; aliases are convenience shortcuts. Credential management is
+canonically `forge auth` (there is no `authentication` alias).
 
 **Command-shape policy:** Forge uses explicit verbs for all commands. Non-leaf groups print help when invoked without a
 subcommand; they do not hide work behind bare group invocation. Leaf commands should do the sensible action when
@@ -37,18 +38,19 @@ reports "no such command/option" — no tombstone shims. List/show commands supp
 | `forge session set <key> <value>`      | Set a mid-session override                                                                                                  |
 | `forge session reset [key]`            | Reset overrides to intent                                                                                                   |
 | `forge session delete <name>...`       | Delete one or more sessions (`--all` for bulk deletion)                                                                     |
-| `forge session clean --older-than N`   | Bulk-delete sessions older than N days                                                                                      |
+| `forge session clean --older-than N`   | Preview sessions older than N days; `--yes` to delete                                                                       |
 | `forge session incognito [name]`       | Start an ephemeral session (auto-delete on exit)                                                                            |
 | `forge session shell [name]`           | Open shell in sidecar container                                                                                             |
 
-Note: `session context` is a deprecated alias for `session show`. `session resume --fresh --review` opens the per-child
-user-notes overlay (`children/<child>.notes.md`) in `$EDITOR` before launching Claude; the AI snapshot stays read-only.
-`forge session memory` is removed; use `forge memory`.
+Note: `session resume --fresh --review` opens the per-child user-notes overlay (`children/<child>.notes.md`) in
+`$EDITOR` before launching Claude; the AI snapshot stays read-only. Session-scoped memory activation lives under
+`forge session memory` (enable/disable/status/report); top-level `forge memory` keeps the project-doc passport verbs.
+Session transfer context lives under `forge session transfer`.
 
 `fork` and `start` accept the tier-1 launch controls alongside `--supervise`: `--cascade`, `--checker-model`,
 `--checker-provider`, `--checker-effort` (`none/low/medium/high/xhigh`), and `--supervisor-effort`
 (`low/medium/high/xhigh/max`). Launch-time `--cascade` sets the flag only; the runtime hook escalates to the frontier
-when no plan exists yet (unlike `forge policy supervise --cascade`, which resolves the plan eagerly). See
+when no plan exists yet (unlike `forge policy supervisor set --cascade`, which resolves the plan eagerly). See
 [session.md](end-user/session.md).
 
 Codex runtime ([design.md §3.9](design.md#39-session-resume-context-management)):
@@ -58,63 +60,78 @@ Codex runtime ([design.md §3.9](design.md#39-session-resume-context-management)
 `forge session resume <name>` reattaches the TUI; with `--task "…"` it runs the next headless `codex exec resume` turn.
 `--task` is Codex-only.
 
-### Transfer context
+### Session transfer context
 
-| Command                              | Purpose                                                                    |
-| ------------------------------------ | -------------------------------------------------------------------------- |
-| `forge transfer show <parent>`       | Show the parent AI cache, or a child's composed view (`--child`, `--json`) |
-| `forge transfer regenerate <parent>` | Rebuild the parent cache only (defaults to its current strategy/depth)     |
-| `forge transfer edit <parent>`       | Edit a child's user-notes overlay in `$EDITOR` (`--child`)                 |
-| `forge transfer diff <parent>`       | Show cache-vs-child-snapshot drift (`--child`)                             |
+| Command                                      | Purpose                                                                    |
+| -------------------------------------------- | -------------------------------------------------------------------------- |
+| `forge session transfer show <parent>`       | Show the parent AI cache, or a child's composed view (`--child`, `--json`) |
+| `forge session transfer regenerate <parent>` | Rebuild the parent cache only (defaults to its current strategy/depth)     |
+| `forge session transfer edit <parent>`       | Edit a child's user-notes overlay in `$EDITOR` (`--child`)                 |
+| `forge session transfer diff <parent>`       | Show cache-vs-child-snapshot drift (`--child`)                             |
 
-`forge transfer` pairs with `forge memory` as the two halves of the former "handoff": `forge memory` curates project
-docs; `forge transfer` assembles resume/fork context. Every verb takes a parent session argument. `show`/`regenerate`
-default to the parent cache; `edit`/`diff` resolve a child (inferred when the parent has exactly one, else `--child`).
+`forge session transfer` and `forge memory` are the two halves of session continuity: `forge memory` curates project
+docs; `forge session transfer` assembles resume/fork context. Every verb takes a parent session argument.
+`show`/`regenerate` default to the parent cache; `edit`/`diff` resolve a child (inferred when the parent has exactly
+one, else `--child`).
 
 ### Memory management
 
+Project-doc passports (project-scoped, git-tracked; sessionless):
+
 - `forge memory track <path>`: author a project passport on a doc, sessionless (`--strategy`, `--intent`, `--writers`,
   `--propose`, `--shadow-path`).
-- `forge memory enable|disable`: toggle session memory auto-update (`--session`, resolves `$FORGE_SESSION`). `enable`
-  takes `--effort` (`claude --effort` for the writer; updates effort even when already enabled in the same mode).
 - `forge memory list`: list passported memory docs under scan roots (`--json`).
-- `forge memory status`: show memory activation across sessions (`--scope`, `--json`).
-- `forge memory report show`: inspect memory writer review reports for a session (`--latest`, `--all`).
 - `forge memory shadows list|show|review`: list accumulated shadow proposals, inspect one doc's proposals, or curate
   them (`--scope`, `--for`, `--curate`, `--show-latest`, `--effort` with `--curate`).
 - `forge memory passport show|remove`: inspect or remove the project passport embedded in a memory doc (`--json`).
 
+### Session memory
+
+Session-scoped activation and reports (whether the memory writer runs for a session):
+
+- `forge session memory enable|disable`: toggle session memory auto-update (`--session`, resolves `$FORGE_SESSION`).
+  `enable` takes `--effort` (`claude --effort` for the writer; updates effort even when already enabled in the same
+  mode).
+- `forge session memory status`: show memory activation across sessions (`--scope`, `--json`).
+- `forge session memory report`: inspect memory writer review reports for a session (`--latest`, `--all`, `--json`).
+  `--json` emits the latest report's path + content, or the report list under `--all`. Flattened leaf (the former
+  `forge memory report show`).
+
 ### Proxy management
 
-| Command                              | Purpose                                                                |
-| ------------------------------------ | ---------------------------------------------------------------------- |
-| `forge proxy create <template>`      | Create a proxy from template and start it                              |
-| `forge proxy list`                   | List all proxies (`--json`)                                            |
-| `forge proxy show <id>`              | Show proxy configuration (`--json`, `--raw`)                           |
-| `forge proxy edit <id>`              | Edit proxy overlay in $EDITOR                                          |
-| `forge proxy set <id> <key>=<value>` | Set a proxy configuration value                                        |
-| `forge proxy start <id>`             | Start server for existing proxy                                        |
-| `forge proxy stop <id>`              | Stop server (keeps config)                                             |
-| `forge proxy delete <id>...`         | Delete one or more proxies (`--all` for bulk deletion)                 |
-| `forge proxy clean`                  | Remove stale proxies (dead pids)                                       |
-| `forge proxy validate <id>`          | Validate proxy configuration                                           |
-| `forge proxy metrics [id]`           | Show runtime metrics (`--json`, `--all`)                               |
-| `forge proxy costs show [id]`        | Show cost summary (`--period`, `--by-model`, `--by-verb`, `--json`)    |
-| `forge proxy costs reset`            | Wipe cost, usage, upstream/downstream telemetry (`--yes`, `--dry-run`) |
-| `forge proxy audit show [id]`        | Show redacted audit records (hashes/counts, no secrets)                |
-| `forge proxy audit diff [id]`        | Show system/tool drift + override mutations over time                  |
-| `forge proxy template list`          | List available templates                                               |
-| `forge proxy template show <name>`   | Show template configuration (`--raw`)                                  |
-| `forge proxy template edit <name>`   | Customize a template (copy-on-first-edit)                              |
-| `forge proxy template reset <name>`  | Reset template to built-in defaults                                    |
+| Command                              | Purpose                                                 |
+| ------------------------------------ | ------------------------------------------------------- |
+| `forge proxy create <template>`      | Create a proxy from template and start it               |
+| `forge proxy list`                   | List all proxies (`--json`)                             |
+| `forge proxy show <id>`              | Show proxy configuration (`--json`, `--raw`)            |
+| `forge proxy edit <id>`              | Edit proxy overlay in $EDITOR                           |
+| `forge proxy set <id> <key>=<value>` | Set a proxy configuration value                         |
+| `forge proxy start <id>`             | Start server for existing proxy                         |
+| `forge proxy stop <id>`              | Stop server (keeps config)                              |
+| `forge proxy delete <id>...`         | Delete one or more proxies (`--all` for bulk deletion)  |
+| `forge proxy validate <id>`          | Validate proxy configuration                            |
+| `forge proxy metrics [id]`           | Show runtime metrics (`--json`; aggregates all when >1) |
+| `forge proxy audit show [id]`        | Show redacted audit records (hashes/counts, no secrets) |
+| `forge proxy audit diff [id]`        | Show system/tool drift + override mutations over time   |
+| `forge proxy template list`          | List available templates                                |
+| `forge proxy template show <name>`   | Show template configuration (`--raw`)                   |
+| `forge proxy template edit <name>`   | Customize a template (copy-on-first-edit)               |
+| `forge proxy template reset <name>`  | Reset template to built-in defaults                     |
 
-### Provider trace
+### Telemetry
 
-| Command                                     | Purpose                                                                                     |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| `forge provider trace list`                 | List recent provider traces (`--session`, `--root-run-id`, `--period`, `--limit`, `--json`) |
-| `forge provider trace show <request_id>`    | Show one trace record (`--json`)                                                            |
-| `forge provider trace explain <request_id>` | Local-only provenance narrative for a request (`--json`)                                    |
+`forge telemetry` groups operator observability surfaces: per-session activity, proxy-scoped cost telemetry, and local
+provider traces. `activity` is best-effort per-session attribution; `costs show` is the authoritative proxy-scoped spend
+view.
+
+| Command                                      | Purpose                                                                                            |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `forge telemetry activity [session]`         | Per-session two-pane activity: operation outcomes + model calls/cost (`--json`, `--days`, `--all`) |
+| `forge telemetry costs show [id]`            | Show cost summary (`--period`, `--by-model`, `--by-verb`, `--json`)                                |
+| `forge telemetry costs reset`                | Wipe cost, usage, upstream/downstream telemetry (`--yes`, `--dry-run`)                             |
+| `forge telemetry trace list`                 | List recent provider traces (`--session`, `--root-run-id`, `--period`, `--limit`, `--json`)        |
+| `forge telemetry trace show <request_id>`    | Show one trace record (`--json`)                                                                   |
+| `forge telemetry trace explain <request_id>` | Local-only provenance narrative for a request (`--json`)                                           |
 
 Metadata-only, owner-only diagnostics read from downstream telemetry under `~/.forge/telemetry/downstream/`. `explain`
 answers "what happened to this request?" from local records only -- no remote lookup. `--session` matches the hashed
@@ -148,38 +165,44 @@ proxy-contract-validated version (≥0.141.0) before starting a proxy, auto-defa
 (override with `-- -m <model>`), and accepts `--sandbox read-only|workspace-write|danger-full-access` (default
 `workspace-write`). For direct use without a proxy, run native `codex`.
 
-### Backend management
+### Model management
 
-| Command                                     | Purpose                                                                                    |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `forge backend list`                        | List built-in backend sources and local runtime state (`--json`)                           |
-| `forge backend show <source-or-backend-id>` | Show source details or legacy runtime details (`--raw`)                                    |
-| `forge backend test-auth <source-id>`       | Check source credentials and run a reachability/auth probe (`--json`)                      |
-| `forge backend create <adapter>`            | Create local backend adapter config                                                        |
-| `forge backend start <source-or-adapter>`   | Start a local lifecycle source or adapter instance                                         |
-| `forge backend stop <source-or-adapter>`    | Stop a local lifecycle source or adapter instance                                          |
-| `forge backend delete <adapter>`            | Delete local backend instance or adapter config                                            |
-| `forge backend reconcile <source-id>`       | Join local telemetry to a backend's remote record (`--request-id`/`--remote-id`, `--json`) |
+`forge model catalog` lists Forge's static model catalog: canonical model ids, aliases, provider defaults, context
+windows, and model capabilities. `forge workflow list-models` is separate: it checks runtime readiness for workflow
+runners.
+
+| Command                                           | Purpose                                                                                    |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `forge model catalog`                             | List the static model catalog (`--json`)                                                   |
+| `forge model backend list`                        | List built-in backend sources and local runtime state (`--json`)                           |
+| `forge model backend show <source-or-backend-id>` | Show source details or legacy runtime details (`--raw`)                                    |
+| `forge model backend test-auth <source-id>`       | Check source credentials and run a reachability/auth probe (`--json`)                      |
+| `forge model backend create <adapter>`            | Create local backend adapter config                                                        |
+| `forge model backend start <source-or-adapter>`   | Start a local lifecycle source or adapter instance                                         |
+| `forge model backend stop <source-or-adapter>`    | Stop a local lifecycle source or adapter instance                                          |
+| `forge model backend delete <adapter>`            | Delete local backend instance or adapter config                                            |
+| `forge model backend reconcile <source-id>`       | Join local telemetry to a backend's remote record (`--request-id`/`--remote-id`, `--json`) |
 
 ### Policy enforcement
 
-| Command                                          | Purpose                                              |
-| ------------------------------------------------ | ---------------------------------------------------- |
-| `forge policy enable --bundle <name>`            | Enable policy enforcement for current session        |
-| `forge policy disable`                           | Disable policy enforcement                           |
-| `forge policy status`                            | Show current policy state (`--json`)                 |
-| `forge policy list`                              | List available bundles and rules (`--json`)          |
-| `forge policy check --bundle <name> -f <path>`   | Evaluate policies on demand                          |
-| `forge policy supervisor -f <path> -r <id>`      | Evaluate file against approved plan                  |
-| `forge policy supervise <target>`                | Set persistent supervisor for session                |
-| `forge policy supervise --cascade/--no-cascade`  | Toggle the tier-1 plan check (cascade)               |
-| `forge policy supervise --checker-effort <lvl>`  | Tier-1 checker effort (`none/low/medium/high/xhigh`) |
-| `forge policy supervise --supervisor-effort <l>` | Frontier effort (`low/medium/high/xhigh/max`)        |
-| `forge policy supervise --off / --on`            | Suspend/resume supervisor (preserves config)         |
-| `forge policy supervise --remove`                | Remove supervisor entirely                           |
-| `forge policy supervise --reload`                | Reload latest relevant approved plan                 |
-| `forge policy supervise --reload-from <path>`    | Reload plan from explicit file                       |
-| `forge policy shadow show [session]`             | Show shadow-audit disagreements (`--all`/`--json`)   |
+| Command                                                        | Purpose                                                             |
+| -------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `forge policy enable --bundle <name>`                          | Enable policy enforcement for current session                       |
+| `forge policy disable`                                         | Disable policy enforcement                                          |
+| `forge policy status`                                          | Show current policy state (`--json`)                                |
+| `forge policy list`                                            | List available bundles and rules (`--json`)                         |
+| `forge policy check --bundle <name> -f <path>`                 | Evaluate policies on demand                                         |
+| `forge policy supervisor evaluate -f <path> -r <id>`           | Evaluate file against approved plan                                 |
+| `forge policy supervisor set <target>`                         | Set persistent supervisor for session                               |
+| `forge policy supervisor cascade on/off`                       | Toggle the tier-1 plan check (cascade)                              |
+| `forge policy supervisor cascade on --checker-effort <lvl>`    | Tier-1 checker effort (`none/low/medium/high/xhigh`); also on `set` |
+| `forge policy supervisor set <target> --supervisor-effort <l>` | Frontier effort (`low/medium/high/xhigh/max`)                       |
+| `forge policy supervisor off / on`                             | Suspend/resume supervisor (preserves config)                        |
+| `forge policy supervisor remove`                               | Remove supervisor entirely                                          |
+| `forge policy supervisor reload`                               | Reload latest relevant approved plan                                |
+| `forge policy supervisor reload --from <path>`                 | Reload plan from explicit file                                      |
+| `forge policy shadow show [session]`                           | Show shadow-audit disagreements (`--all`/`--json`)                  |
+| `forge policy shadow status [session]`                         | Show shadow sample rate + pending/done audit counts (`--json`)      |
 
 ### Workflow
 
@@ -189,7 +212,7 @@ proxy-contract-validated version (≥0.141.0) before starting a proxy, auto-defa
 | `forge workflow analyze [topic]`     | Deep single-model analysis                 |
 | `forge workflow debate [subject]`    | Adversarial evaluation with stance workers |
 | `forge workflow consensus [subject]` | Two-round multi-model convergence          |
-| `forge workflow list-models`         | Show available model backends              |
+| `forge workflow list-models`         | Show available workflow models             |
 
 Workflow model specs support proxy-backed workers and explicit direct Claude workers. The stable `claude-opus` worker is
 kept on Claude Opus 4.6; newer direct workers such as `claude-opus-4.8` are opt-in and can attach per-worker prompt
@@ -201,24 +224,23 @@ workers (e.g., `claude-opus`) remain on Anthropic routing regardless of `--proxy
 
 ### Search
 
-| Command                      | Purpose                              |
-| ---------------------------- | ------------------------------------ |
-| `forge search query <query>` | Search transcripts                   |
-| `forge search rebuild-index` | Full index rebuild from artifacts    |
-| `forge search status`        | Show index statistics                |
-| `forge search clean`         | Remove orphaned documents from index |
+| Command                      | Purpose                                       |
+| ---------------------------- | --------------------------------------------- |
+| `forge search query <query>` | Search transcripts (table; `--json` for JSON) |
+| `forge search rebuild-index` | Full index rebuild from artifacts             |
+| `forge search status`        | Show index statistics                         |
+| `forge search clean`         | Preview orphaned documents; `--yes` to prune  |
 
 ### System
 
-| Command                       | Purpose                                                                                              |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `forge info`                  | Show global system information (`--json`)                                                            |
-| `forge activity [session]`    | Per-session two-pane activity: operation outcomes + model calls/cost (`--json`, `--days`, `--all`)   |
-| `forge clean`                 | Remove orphaned state (`--scope`, `--yes`)                                                           |
-| `forge config`                | Manage global runtime preferences                                                                    |
-| `forge authentication login`  | Store credentials for LLM providers                                                                  |
-| `forge authentication status` | Show credential status per provider                                                                  |
-| `forge logs`                  | Show log file locations/status; notes per-proxy request-diagnostics capture (redacted, no plaintext) |
+| Command             | Purpose                                                                                              |
+| ------------------- | ---------------------------------------------------------------------------------------------------- |
+| `forge info`        | Show global system information (`--json`)                                                            |
+| `forge clean`       | Remove orphaned state (`--scope`, `--yes`)                                                           |
+| `forge config`      | Manage global runtime preferences                                                                    |
+| `forge auth login`  | Store credentials for LLM providers                                                                  |
+| `forge auth status` | Show credential status per provider                                                                  |
+| `forge logs`        | Show log file locations/status; notes per-proxy request-diagnostics capture (redacted, no plaintext) |
 
 ### Internal (hidden from `forge --help`)
 
@@ -248,10 +270,8 @@ scope rationale remain in design.md.
 - **Session / plan**: allow `%session list` and `%plan`.
 - **Proxy**: allow read-only `%proxy list`, `%proxy show`, and `%proxy audit show/diff`; disallow `%proxy create`,
   `%proxy edit`, `%proxy set`, and `%proxy delete`.
-- **Provider trace**: allow read-only `%provider trace list`, `%provider trace show`, and `%provider trace explain`
-  (metadata only, never secrets).
 - **Policy / verification**: allow `%policy status`, `%policy enable`, `%policy disable`, `%policy check`,
-  `%policy supervise`, and `%cancel-verification`.
+  `%policy supervisor`, and `%cancel-verification`.
 - **Cleanup**: allow `%clean [--scope workspace|project|all]` as a read-only report. Destructive cleanup stays in the
   terminal via `forge clean --yes`.
 - **Utilities / config**: allow `%h`, `%help`, and `%config`.
@@ -270,13 +290,12 @@ Shared commands (mirrors CLI syntax):
 - `%proxy list` (read-only: shows available proxies)
 - `%proxy show <id>` (read-only: shows proxy details and tier mappings)
 - `%proxy audit show|diff [id]` (read-only: recent audit metadata / wire changes; metadata only, never secrets)
-- `%provider trace list|show|explain` (read-only: recent provider traces / one record / local provenance narrative)
 - `%policy status` (shows current policy config and state)
 - `%policy enable --bundle tdd [--permissive]` (enables policy enforcement)
 - `%policy disable` (disables all policies for the session)
 - `%policy check [--staged] [--bundle <name>]` (diagnostic policy evaluation against git diff)
-- `%policy supervise <target>` (set supervisor), `off` (suspend), `on` (resume), `remove` (delete)
-- `%policy supervise reload [path]` (reload latest approved plan, or from explicit path)
+- `%policy supervisor <target>` (set supervisor), `off` (suspend), `on` (resume), `remove` (delete)
+- `%policy supervisor reload [path]` (reload latest approved plan, or from explicit path)
 - `%cancel-verification` (bypasses the active Stop-hook verification loop)
 - `%clean [--scope workspace|project|all]` (read-only: shows orphaned state report, default scope=project)
 

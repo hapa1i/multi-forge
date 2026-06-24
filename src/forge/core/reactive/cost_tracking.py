@@ -97,7 +97,7 @@ def _compute_delta(before: dict[str, Any], after: dict[str, Any], base_url: str)
     # Clamp every delta at >= 0. A proxy restart/reset between the before/after
     # snapshots makes `after < before`, which would otherwise log a negative
     # "spend"/token delta -- and a negative cost delta inflates the unattributed
-    # "Interactive" residual in `forge proxy costs show`. A reset means "no attributable
+    # "Interactive" residual in `forge telemetry costs show`. A reset means "no attributable
     # delta for this verb," not negative usage.
     return ProxyCostDelta(
         base_url=base_url,

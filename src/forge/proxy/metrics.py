@@ -74,7 +74,7 @@ class ProxyMetrics:
 
     # Cost-evidence counts — the single signal that tells "known $0" (reported,
     # count>0) from "no dollar evidence" (unavailable). Downstream surfaces (verb
-    # snapshot, forge proxy costs show, status line, the X-Cumulative-Cost gate) all key
+    # snapshot, forge telemetry costs show, status line, the X-Cumulative-Cost gate) all key
     # off these instead of re-deriving evidence from request/token presence.
     cost_reported_requests: int = 0
     cost_unavailable_requests: int = 0

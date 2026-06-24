@@ -494,7 +494,7 @@ class TestRunSidecarSessionProxyAudit:
         assert f"{forge_home}/costs:/root/.forge/costs:rw" in cmd
         assert f"{forge_home}/telemetry:/root/.forge/telemetry:rw" in cmd
         # Usage ledger mounted read-write so the in-container supervisor/verb attribution
-        # events survive --rm and feed the host `forge activity` + session-end summary.
+        # events survive --rm and feed the host `forge telemetry activity` + session-end summary.
         assert f"{forge_home}/usage:/root/.forge/usage:rw" in cmd
 
     def test_config_yaml_mounted_ro_when_present(self) -> None:

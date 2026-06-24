@@ -448,7 +448,7 @@ def run_plan_check(
 
         verdict = parse_plan_check_verdict(response.text)
 
-        # Session-tagged (unlike the tagger) so `forge activity` shows a plan-check row.
+        # Session-tagged (unlike the tagger) so `forge telemetry activity` shows a plan-check row.
         emit_direct_llm_usage(
             command="plan-check",
             model=model,

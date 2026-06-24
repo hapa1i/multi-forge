@@ -370,3 +370,22 @@ class TestIndexStateStoreConvenience:
         loaded = store.read()
         assert str(gone) not in loaded.indexed_files
         assert str(transcript_file) in loaded.indexed_files
+
+    def test_find_missing_returns_orphans_without_mutating(
+        self, store: IndexStateStore, transcript_file: Path, tmp_path: Path
+    ) -> None:
+        """store.find_missing() reports deleted files without persisting any change."""
+        gone = tmp_path / "gone.jsonl"
+        state = IndexState()
+        state.mark_indexed(transcript_file)
+        state.indexed_files[str(gone)] = IndexedFileEntry(mtime=1.0, size=100, indexed_at="t")
+        store.write(state)
+
+        missing = store.find_missing()
+        assert str(gone) in missing
+        assert str(transcript_file) not in missing
+
+        # Nothing removed: the missing entry is still present on disk
+        loaded = store.read()
+        assert str(gone) in loaded.indexed_files
+        assert str(transcript_file) in loaded.indexed_files

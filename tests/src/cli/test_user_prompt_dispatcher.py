@@ -1243,7 +1243,7 @@ class TestGuardCheck:
 def _make_supervised_session(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *, suspended: bool = False
 ) -> SessionStore:
-    """Shared harness for the %policy supervise toggle/cascade test classes."""
+    """Shared harness for the %policy supervisor toggle/cascade test classes."""
     from forge.session import create_session_state
     from forge.session.models import PolicyIntent, SupervisorConfig
 
@@ -1282,14 +1282,35 @@ def _make_bare_session(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Sessi
     return store
 
 
-class TestGuardSuperviseToggle:
-    """Test %policy supervise off/on/remove/reload toggle commands."""
+class TestGuardSupervisorToggle:
+    """Test %policy supervisor off/on/remove/reload toggle commands."""
+
+    def test_old_supervise_verb_falls_through_to_usage(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Slice 10 clean break: the old `%policy supervise` verb is no longer recognized."""
+        store = _make_supervised_session(tmp_path, monkeypatch)
+
+        runner = CliRunner()
+        payload = {"prompt": "%policy supervise off", "transcript_path": ""}
+        result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
+
+        assert result.exit_code == 0
+        out = json.loads(result.output)
+        # Direct commands never reach Click: the unknown subcommand falls through to the
+        # dispatcher usage line, which names the new `supervisor` verb.
+        assert "Usage:" in out["reason"]
+        assert "supervisor" in out["reason"]
+
+        # The old verb did nothing -- the supervisor is still active, not suspended.
+        updated = store.read()
+        assert updated.intent.policy is not None
+        assert updated.intent.policy.supervisor is not None
+        assert updated.intent.policy.supervisor.suspended is False
 
     def test_off_suspends_not_removes(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         store = _make_supervised_session(tmp_path, monkeypatch)
 
         runner = CliRunner()
-        payload = {"prompt": "%policy supervise off", "transcript_path": ""}
+        payload = {"prompt": "%policy supervisor off", "transcript_path": ""}
         result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
 
         assert result.exit_code == 0
@@ -1306,7 +1327,7 @@ class TestGuardSuperviseToggle:
         store = _make_supervised_session(tmp_path, monkeypatch, suspended=True)
 
         runner = CliRunner()
-        payload = {"prompt": "%policy supervise on", "transcript_path": ""}
+        payload = {"prompt": "%policy supervisor on", "transcript_path": ""}
         result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
 
         assert result.exit_code == 0
@@ -1322,7 +1343,7 @@ class TestGuardSuperviseToggle:
         _make_bare_session(tmp_path, monkeypatch)
 
         runner = CliRunner()
-        payload = {"prompt": "%policy supervise on", "transcript_path": ""}
+        payload = {"prompt": "%policy supervisor on", "transcript_path": ""}
         result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
 
         assert result.exit_code == 0
@@ -1333,7 +1354,7 @@ class TestGuardSuperviseToggle:
         store = _make_supervised_session(tmp_path, monkeypatch)
 
         runner = CliRunner()
-        payload = {"prompt": "%policy supervise remove", "transcript_path": ""}
+        payload = {"prompt": "%policy supervisor remove", "transcript_path": ""}
         result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
 
         assert result.exit_code == 0
@@ -1350,7 +1371,7 @@ class TestGuardSuperviseToggle:
         _make_bare_session(tmp_path, monkeypatch)
 
         runner = CliRunner()
-        payload = {"prompt": "%policy supervise off", "transcript_path": ""}
+        payload = {"prompt": "%policy supervisor off", "transcript_path": ""}
         result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
 
         assert result.exit_code == 0
@@ -1363,7 +1384,7 @@ class TestGuardSuperviseToggle:
         plan.write_text("# The Plan")
 
         runner = CliRunner()
-        payload = {"prompt": f"%policy supervise reload {plan}", "transcript_path": ""}
+        payload = {"prompt": f"%policy supervisor reload {plan}", "transcript_path": ""}
         result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
 
         assert result.exit_code == 0
@@ -1379,7 +1400,7 @@ class TestGuardSuperviseToggle:
         _make_supervised_session(tmp_path, monkeypatch)
 
         runner = CliRunner()
-        payload = {"prompt": "%policy supervise reload a b", "transcript_path": ""}
+        payload = {"prompt": "%policy supervisor reload a b", "transcript_path": ""}
         result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
 
         assert result.exit_code == 0
@@ -1392,7 +1413,7 @@ class TestGuardSuperviseToggle:
         plan.write_text("# The Plan")
 
         runner = CliRunner()
-        payload = {"prompt": f"%policy supervise reload {plan}", "transcript_path": ""}
+        payload = {"prompt": f"%policy supervisor reload {plan}", "transcript_path": ""}
         result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
 
         assert result.exit_code == 0
@@ -1403,7 +1424,7 @@ class TestGuardSuperviseToggle:
         _make_supervised_session(tmp_path, monkeypatch, suspended=True)
 
         runner = CliRunner()
-        payload = {"prompt": "%policy supervise", "transcript_path": ""}
+        payload = {"prompt": "%policy supervisor", "transcript_path": ""}
         result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
 
         assert result.exit_code == 0
@@ -1419,7 +1440,7 @@ class TestGuardSuperviseToggle:
         store.update(timeout_s=5.0, mutate=_set_plan)
 
         runner = CliRunner()
-        payload = {"prompt": "%policy supervise", "transcript_path": ""}
+        payload = {"prompt": "%policy supervisor", "transcript_path": ""}
         result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
 
         assert result.exit_code == 0
@@ -1430,7 +1451,7 @@ class TestGuardSuperviseToggle:
         _make_supervised_session(tmp_path, monkeypatch)
 
         runner = CliRunner()
-        payload = {"prompt": "%policy supervise", "transcript_path": ""}
+        payload = {"prompt": "%policy supervisor", "transcript_path": ""}
         result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
 
         assert result.exit_code == 0
@@ -1447,7 +1468,7 @@ class TestGuardSuperviseToggle:
         store.update(timeout_s=5.0, mutate=_set_bad_provider)
 
         runner = CliRunner()
-        payload = {"prompt": "%policy supervise", "transcript_path": ""}
+        payload = {"prompt": "%policy supervisor", "transcript_path": ""}
         result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
 
         assert result.exit_code == 0
@@ -1455,8 +1476,8 @@ class TestGuardSuperviseToggle:
         assert "Checker: unresolved via anthropic (unsupported)" in out["reason"]
 
 
-class TestGuardSuperviseCascade:
-    """Test %policy supervise cascade on|off."""
+class TestGuardSupervisorCascade:
+    """Test %policy supervisor cascade on|off."""
 
     def test_cascade_on_with_existing_plan(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         store = _make_supervised_session(tmp_path, monkeypatch)
@@ -1469,7 +1490,7 @@ class TestGuardSuperviseCascade:
         store.update(timeout_s=5.0, mutate=_set_plan)
 
         runner = CliRunner()
-        payload = {"prompt": "%policy supervise cascade on", "transcript_path": ""}
+        payload = {"prompt": "%policy supervisor cascade on", "transcript_path": ""}
         result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
 
         assert result.exit_code == 0
@@ -1491,7 +1512,7 @@ class TestGuardSuperviseCascade:
         fake = SimpleNamespace(path=str(plan), source="self", session_name="test-session", captured_at=None)
 
         runner = CliRunner()
-        payload = {"prompt": "%policy supervise cascade on", "transcript_path": ""}
+        payload = {"prompt": "%policy supervisor cascade on", "transcript_path": ""}
         with mock_patch(
             "forge.policy.semantic.supervisor.resolve_supervisor_reload_plan_path",
             return_value=fake,
@@ -1515,7 +1536,7 @@ class TestGuardSuperviseCascade:
         store = _make_supervised_session(tmp_path, monkeypatch)
 
         runner = CliRunner()
-        payload = {"prompt": "%policy supervise cascade on", "transcript_path": ""}
+        payload = {"prompt": "%policy supervisor cascade on", "transcript_path": ""}
         with mock_patch(
             "forge.policy.semantic.supervisor.resolve_supervisor_reload_plan_path",
             return_value=None,
@@ -1541,7 +1562,7 @@ class TestGuardSuperviseCascade:
         store.update(timeout_s=5.0, mutate=_enable)
 
         runner = CliRunner()
-        payload = {"prompt": "%policy supervise cascade off", "transcript_path": ""}
+        payload = {"prompt": "%policy supervisor cascade off", "transcript_path": ""}
         result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
 
         assert result.exit_code == 0
@@ -1557,7 +1578,7 @@ class TestGuardSuperviseCascade:
         _make_supervised_session(tmp_path, monkeypatch)
 
         runner = CliRunner()
-        payload = {"prompt": "%policy supervise cascade maybe", "transcript_path": ""}
+        payload = {"prompt": "%policy supervisor cascade maybe", "transcript_path": ""}
         result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
 
         assert result.exit_code == 0
@@ -1570,7 +1591,7 @@ class TestGuardSuperviseCascade:
         _make_bare_session(tmp_path, monkeypatch)
 
         runner = CliRunner()
-        payload = {"prompt": "%policy supervise cascade on", "transcript_path": ""}
+        payload = {"prompt": "%policy supervisor cascade on", "transcript_path": ""}
         result = runner.invoke(hooks, ["user-prompt-submit"], input=json.dumps(payload))
 
         assert result.exit_code == 0

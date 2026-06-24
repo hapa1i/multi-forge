@@ -1,8 +1,8 @@
-"""``forge activity`` — per-session Forge automation outcomes plus model-call evidence.
+"""``forge telemetry activity`` — per-session Forge automation outcomes plus model-call evidence.
 
 Reads upstream outcomes, downstream attempts, transitional usage events, and the capped
 manifest policy fallback via :func:`forge.core.ops.usage_summary.build_session_activity_summary`.
-Cost is reported-or-estimated (best-effort attribution) — ``forge proxy costs show`` stays the
+Cost is reported-or-estimated (best-effort attribution) — ``forge telemetry costs show`` stays the
 authoritative spend view.
 """
 
@@ -43,13 +43,13 @@ def activity_cmd(session: str | None, as_json: bool, days: int, all_time: bool) 
     workflow verbs (panel/debate/...), transfer curation, and action tagging — plus
     the model-call evidence Forge can attribute to those operations. It is **not** your
     full interactive Claude usage. Cost is reported-or-estimated (best-effort attribution);
-    'forge proxy costs show' is the authoritative spend view.
+    'forge telemetry costs show' is the authoritative spend view.
 
     \b
     Examples:
-        forge activity                  # current session ($FORGE_SESSION)
-        forge activity planner          # a named session (or Claude UUID)
-        forge activity --all --json     # full history, JSON
+        forge telemetry activity                  # current session ($FORGE_SESSION)
+        forge telemetry activity planner          # a named session (or Claude UUID)
+        forge telemetry activity --all --json     # full history, JSON
     """
     try:
         session_name, forge_root = resolve_session_identifier(session)
@@ -214,7 +214,7 @@ def _footnotes(summary: SessionActivitySummary) -> list[str]:
     # the generic caveat -- there is no figure to call exact.
     exact = summary.total_cost_micro_usd is not None and not summary.cost_estimated
     evidence = "reported (no snapshot estimates mixed in)" if exact else "reported-or-estimated"
-    notes.append(f"cost is {evidence}, best-effort; 'forge proxy costs show' is the authoritative spend view")
+    notes.append(f"cost is {evidence}, best-effort; 'forge telemetry costs show' is the authoritative spend view")
     return notes
 
 

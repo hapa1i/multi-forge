@@ -12,8 +12,8 @@ official files or Forge-owned shadow proposal files.
 
 > **Memory writer vs. transfer.** This guide covers the **memory writer**: the Stop-time worker that curates project
 > memory docs (`docs/checklist.md`, shadow files for coding standards, etc.). Its per-session output lives under
-> `<forge_root>/.forge/artifacts/<session>/handoff/review-*.md` -- see `forge memory report show`. For **transfer** --
-> the parent-context file assembled for `forge session resume --fresh` (at
+> `<forge_root>/.forge/artifacts/<session>/handoff/review-*.md` -- see `forge session memory report`. For **transfer**
+> -- the parent-context file assembled for `forge session resume --fresh` (at
 > `<forge_root>/.forge/prev_sessions/<parent>/{generated.md,children/<child>.md}`) -- see [`session.md`](session.md).
 
 ---
@@ -75,12 +75,12 @@ forge memory track docs/developer/coding_standards.md \
   --propose --shadow-path .forge/memory/shadow_standards.md
 
 # Enable memory for a session (or start with --memory on):
-forge memory enable --session planner
+forge session memory enable --session planner
 forge session start planner --memory on     # equivalent at start time
 
 # Set the writer's reasoning effort (claude --effort: low/medium/high/xhigh/max).
 # --effort updates effort even when memory is already enabled in the same mode.
-forge memory enable --session planner --effort high
+forge session memory enable --session planner --effort high
 
 # Verify passported docs:
 forge memory list
@@ -115,8 +115,8 @@ forge memory track docs/checklist.md --strategy checklist
 forge memory passport remove docs/checklist.md
 
 # Enable/disable memory for a session
-forge memory enable --session planner
-forge memory disable --session planner
+forge session memory enable --session planner
+forge session memory disable --session planner
 ```
 
 One-off doc updates that don't need a passport are ordinary agent instructions -- just ask the agent to update a file
@@ -134,9 +134,10 @@ captured to a per-session review file:
 Inspect via:
 
 ```bash
-forge memory report show                    # Latest report for current session
-forge memory report show my-session         # Latest report for named session
-forge memory report show --all              # List every report (paths + timestamps)
+forge session memory report                    # Latest report for current session
+forge session memory report my-session         # Latest report for named session
+forge session memory report --all              # List every report (paths + timestamps)
+forge session memory report --json             # Latest report as JSON (path + content; list under --all)
 ```
 
 In `review-only` mode this is where the proposed-but-not-applied changes appear; in `augment` mode it records the
@@ -254,8 +255,8 @@ auto_update:
 Priority chain: `proxy` -> `confirmed.started_with_proxy` -> `ANTHROPIC_BASE_URL` env -> Anthropic direct.
 
 `effort` (optional) sets the writer's `claude --effort` level (`low/medium/high/xhigh/max`). Set it with
-`forge memory enable --effort <level>`. Shadow curation (`forge memory shadows review --curate`) inherits this effort
-unless overridden with its own `--effort`.
+`forge session memory enable --effort <level>`. Shadow curation (`forge memory shadows review --curate`) inherits this
+effort unless overridden with its own `--effort`.
 
 ---
 
@@ -288,7 +289,7 @@ The transcript path is also validated (same safety checks) since it comes from C
 
 Checklist:
 
-- `memory.auto_update.enabled` must be `true` in effective intent (`forge memory enable`)
+- `memory.auto_update.enabled` must be `true` in effective intent (`forge session memory enable`)
 - Session must have ≥ `min_turns` conversation turns (default: 5)
 - `claude` CLI must be on PATH
 - At least one memory doc must be discoverable: a passported doc under the scan roots
@@ -299,7 +300,8 @@ Checklist:
 - The file must exist before the writer runs (no file creation)
 - For shadow docs, the official doc must exist and the passport `shadow_path` must be valid
 - Check the strategy — does it match what you expect the writer to do?
-- Try `forge memory enable --review-only --session <name>` to see what the writer would change without modifying files
+- Try `forge session memory enable --review-only --session <name>` to see what the writer would change without modifying
+  files
 
 ### "Wrong file was updated" (path issues)
 

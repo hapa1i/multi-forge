@@ -1,12 +1,12 @@
 <!-- prereq: 0.3 -->
 
-## 3. Authentication (`forge authentication`)
+## 3. Authentication (`forge auth`)
 
 Tests credential storage/resolution in `$FORGE_HOME/credentials.yaml` (named profiles).
 
-> **Note:** These steps test Forge's credential management UI only. The keys stored via `forge authentication login` are
-> NOT used by the proxy or Claude Code. The proxy gets its backend keys from environment variables injected at container
-> start (`/etc/profile.d/forge-qa.sh`). You can use placeholder values (e.g., `sk-ant-manual-test-12345`) for all login
+> **Note:** These steps test Forge's credential management UI only. The keys stored via `forge auth login` are NOT used
+> by the proxy or Claude Code. The proxy gets its backend keys from environment variables injected at container start
+> (`/etc/profile.d/forge-qa.sh`). You can use placeholder values (e.g., `sk-ant-manual-test-12345`) for all login
 > prompts.
 
 ### 3.1 Login — Store Credentials
@@ -19,7 +19,7 @@ In a **shell inside the QA container** (`docker exec -it $CONTAINER bash -l` —
 
 ```
 # Store credentials for a single credential
-forge authentication login -c anthropic-api
+forge auth login -c anthropic-api
 
 # Expected: prompts for ANTHROPIC_API_KEY (input hidden)
 # Enter a test key, e.g.: sk-ant-manual-test-12345
@@ -38,15 +38,15 @@ In the **container shell**, store credentials under a named profile. Enter a dif
 
 ```
 # Store credentials in a named profile
-forge authentication login -c anthropic-api --profile work
+forge auth login -c anthropic-api --profile work
 # Enter a different key, e.g.: sk-ant-work-key-99999
 
 # Verify both profiles exist
-forge authentication profiles
+forge auth profiles
 ```
 
 - [ ] `work` profile created separately from `default`
-- [ ] `forge authentication profiles` shows both profiles with key counts
+- [ ] `forge auth profiles` shows both profiles with key counts
 - [ ] Active profile marked with "← active"
 
 ### 3.3 Login — Keep Existing Values
@@ -58,7 +58,7 @@ In the **container shell**, re-run login for the same credential. The existing v
 
 ```
 # Re-run login for same credential — existing value shown as masked default
-forge authentication login -c anthropic-api
+forge auth login -c anthropic-api
 
 # Expected: shows existing value like "ANTHROPIC_API_KEY [sk-a…5678]"
 # Press Enter to keep existing value
@@ -73,7 +73,7 @@ forge authentication login -c anthropic-api
 
 ```bash
 # Check credential status
-forge authentication status
+forge auth status
 
 # Expected output has two sections:
 #   Configured capabilities:
@@ -103,7 +103,7 @@ forge authentication status
 ```bash
 # Set env var that also exists in file
 export ANTHROPIC_API_KEY=sk-ant-from-env-override
-forge authentication status
+forge auth status
 
 # Expected: shows (env) source, not (file:default)
 unset ANTHROPIC_API_KEY
@@ -118,7 +118,7 @@ unset ANTHROPIC_API_KEY
 
 ```bash
 # Check status for a specific profile
-forge authentication status --profile work
+forge auth status --profile work
 ```
 
 - [ ] Shows `(file:work)` for keys stored in work profile
@@ -130,10 +130,10 @@ forge authentication status --profile work
 
 ```bash
 # List all profiles
-forge authentication profiles
+forge auth profiles
 
 # Change active profile via env var
-FORGE_PROFILE=work forge authentication profiles
+FORGE_PROFILE=work forge auth profiles
 ```
 
 - [ ] Shows profile names with key counts
@@ -146,10 +146,10 @@ FORGE_PROFILE=work forge authentication profiles
 
 ```bash
 # Remove a profile (with confirmation)
-printf 'y\n' | forge authentication logout --profile work
+printf 'y\n' | forge auth logout --profile work
 
 # Verify removed
-forge authentication profiles
+forge auth profiles
 ```
 
 - [ ] Confirmation prompt shown (unless `-y` used)
@@ -191,15 +191,15 @@ for name, profile in data.get('profiles', {}).items():
 # Unset env var, rely on file-based credential
 unset ANTHROPIC_API_KEY
 
-# If you have a valid key stored via forge authentication login:
+# If you have a valid key stored via forge auth login:
 # Starting a session or proxy that needs ANTHROPIC_API_KEY should work
 # without the env var set (it reads from $FORGE_HOME/credentials.yaml)
-forge authentication status --profile default
+forge auth status --profile default
 # Should show: * ANTHROPIC_API_KEY = sk-a…xxxx  (file:default)
 ```
 
 - [ ] Credential available via file when env var is unset
-- [ ] `forge authentication status` confirms file source
+- [ ] `forge auth status` confirms file source
 
 ### 3.11 Retired Credential Names
 
@@ -207,11 +207,11 @@ forge authentication status --profile default
 
 ```bash
 # Old 'anthropic' name should produce migration guidance
-forge authentication login -c anthropic 2>&1 || true
+forge auth login -c anthropic 2>&1 || true
 # Expected: exit 1, yellow message mentioning 'anthropic-api'
 
 # Old 'litellm-local' name should explain it's not a credential
-forge authentication login -c litellm-local 2>&1 || true
+forge auth login -c litellm-local 2>&1 || true
 # Expected: exit 1, message mentioning gemini-api, openai-api, anthropic-api
 ```
 

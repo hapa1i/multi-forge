@@ -121,16 +121,18 @@ forge proxy delete <proxy_id>
 - [ ] `validate` reports config health
 - [ ] `delete` removes proxy and cleans up registry
 
-### 4.5 Proxy Clean
+### 4.5 Stale Proxy Pruning
 
 <!-- auto -->
 
+Stale proxies (dead PIDs) are pruned automatically by `list`/`create`/`start`; `forge clean` removes them globally.
+There is no dedicated `forge proxy clean` command.
+
 ```bash
-# Clean up stale proxies (dead processes)
-forge proxy clean
+forge proxy list   # auto-prunes dead-PID entries as a side effect
 ```
 
-- [ ] Clean removes stale entries (or reports none found)
+- [ ] `proxy list` succeeds and shows no dead-PID entries
 
 ### 4.6 Launch Session with Host Proxy
 
@@ -338,18 +340,18 @@ forge proxy metrics "$FORGE_QA_GEMINI_PROXY"
 # JSON output
 forge proxy metrics "$FORGE_QA_GEMINI_PROXY" --json
 
-# All proxies
-forge proxy metrics --all
+# All proxies (the default aggregate when more than one is registered)
+forge proxy metrics
 
 # All proxies JSON (must be a single valid JSON object)
-forge proxy metrics --all --json
+forge proxy metrics --json
 ```
 
 - [ ] `forge proxy metrics` displays request counts, token totals, per-tier breakdown
 - [ ] Per-tier breakdown includes avg latency
 - [ ] `--json` outputs valid parseable JSON
-- [ ] `--all --json` outputs a single valid JSON object (not one per proxy)
-- [ ] Unreachable proxies show `null` in `--all --json` output
+- [ ] bare `metrics --json` (with >1 proxy) outputs a single valid JSON object (not one per proxy)
+- [ ] Unreachable proxies show `null` in `metrics --json` output
 
 ### 4.14 Proxy Metrics (Not Found / Shared-Port)
 
@@ -373,7 +375,7 @@ forge proxy metrics test-proxy-nostart
 
 ```bash
 # List built-in backend sources and local runtime instances (LiteLLM, etc.)
-forge backend list
+forge model backend list
 ```
 
 - [ ] Shows built-in local and remote source rows such as `openrouter` and `litellm-remote`
@@ -385,14 +387,14 @@ forge backend list
 
 ```bash
 # Create backend config (shared by all instances)
-forge backend create litellm
+forge model backend create litellm
 
 # Show config + status (even if not running)
-forge backend show litellm-4000 --raw
+forge model backend show litellm-4000 --raw
 ```
 
 - [ ] Backend config created (or reports it already exists)
-- [ ] `forge backend show` displays config YAML
+- [ ] `forge model backend show` displays config YAML
 
 ### 4.17 OpenRouter Templates
 

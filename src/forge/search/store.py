@@ -182,6 +182,15 @@ class SearchDocumentStore:
             docs.append(doc)
             self.write(docs)
 
+    def find_missing(self) -> list[str]:
+        """Return transcript_paths whose files no longer exist on disk.
+
+        Read-only counterpart to prune_missing (no lock, no write): the preview
+        for `forge search clean`. Same predicate as prune_missing, so the count
+        a preview reports matches what --yes would remove.
+        """
+        return [d.transcript_path for d in self.read() if not Path(d.transcript_path).is_file()]
+
     def prune_missing(self, *, timeout_s: float = STORE_LOCK_TIMEOUT_S) -> list[str]:
         """Remove documents whose transcript_path no longer exists on disk.
 

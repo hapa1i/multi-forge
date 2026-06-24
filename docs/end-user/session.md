@@ -159,8 +159,8 @@ forge session list --scope project  # Sessions in current Forge project only
 forge session list --scope all      # All sessions globally
 
 # What a session did (operation outcomes + model calls)
-forge activity [name]         # Per-session Forge automation outcomes, model calls, cost, tokens
-forge activity [name] --json --days N --all
+forge telemetry activity [name]         # Per-session Forge automation outcomes, model calls, cost, tokens
+forge telemetry activity [name] --json --days N --all
 
 # Fork (conversation branching)
 forge session fork <parent> [--name <name>] [--model <claude-model>] [--incognito] [--branch <branch>] [--worktree] [--into <path>] [--supervise] [--supervisor-proxy <id>] [--no-supervisor-proxy] [--cascade] [--checker-model <id>] [--checker-provider <p>] [--checker-effort <level>] [--supervisor-effort <level>] [--no-launch]
@@ -168,8 +168,8 @@ forge session fork <parent> [--name <name>] [--model <claude-model>] [--incognit
 # Delete
 forge session delete <name> [--keep-worktree] [--delete-branch] [--force] [--keep-transcripts]
 
-# Clean (age-based bulk delete)
-forge session clean --older-than DAYS [--dry-run] [--force] [--keep-transcripts] [--delete-worktree] [--delete-branch]
+# Clean (age-based bulk delete; previews by default, --yes to delete)
+forge session clean --older-than DAYS [--yes] [--force] [--keep-transcripts] [--delete-worktree] [--delete-branch]
 
 # Incognito (same options as start, auto-deletes on exit)
 forge session incognito [name] [--proxy <proxy_id>] [--no-proxy]
@@ -195,8 +195,8 @@ removed while Claude keeps running until the launch exits) and also overrides di
 Clean up old sessions by age:
 
 ```bash
-forge session clean --older-than 30           # Delete sessions > 30 days old
-forge session clean --older-than 30 --dry-run # Preview what would be cleaned
+forge session clean --older-than 30           # Preview sessions > 30 days old
+forge session clean --older-than 30 --yes     # Actually delete them
 forge session list --older-than 30            # List old sessions before cleaning
 ```
 
@@ -383,8 +383,8 @@ resumes carry the conversation verbatim and have no editable artifact).
 
 **Curating with `--review`.** When you pass `--review`, Forge opens the per-child **user-notes overlay**
 (`children/<child>.notes.md`) in `$EDITOR` and waits — the AI snapshot (`children/<child>.md`) stays read-only, so your
-notes survive a later `forge transfer regenerate`. Save and exit normally to launch; abort (`:cq` in vim) to skip the
-launch. Your notes are preserved on disk regardless. If you abort, the child remains unlaunched; run
+notes survive a later `forge session transfer regenerate`. Save and exit normally to launch; abort (`:cq` in vim) to
+skip the launch. Your notes are preserved on disk regardless. If you abort, the child remains unlaunched; run
 `forge session resume <child>` later. Notes are merged after the snapshot at launch.
 
 **Per-parent layout for resume artifacts.** Each parent gets a directory under `.forge/prev_sessions/`:
@@ -399,9 +399,10 @@ launch. Your notes are preserved on disk regardless. If you abort, the child rem
 ```
 
 Re-resuming the same parent regenerates `generated.md` but never disturbs an existing `children/<child>.md` **or** its
-`.notes.md` overlay. Write your edits to the notes overlay (via `--review` or `forge transfer edit`) so they survive
-regeneration. Inspect or reshape any of this with the `forge transfer` group (`show`/`regenerate`/`edit`/`diff`) — see
-[transfer.md](transfer.md), which also covers the cross-runtime (Codex) workflow.
+`.notes.md` overlay. Write your edits to the notes overlay (via `--review` or `forge session transfer edit`) so they
+survive regeneration. Inspect or reshape any of this with the `forge session transfer` group
+(`show`/`regenerate`/`edit`/`diff`) — see [transfer.md](transfer.md), which also covers the cross-runtime (Codex)
+workflow.
 
 Resume and fork-recovery launches inject the per-child file directly with `--append-system-prompt-file`. If you
 customize `CLAUDE.md`, do not also add manual references to `.forge/prev_sessions/...` there, or you may duplicate the
@@ -413,7 +414,7 @@ same transfer context.
 forge session start impl --runtime codex --resume-from planner --task "Implement the plan."
 forge session resume impl --task "Now add tests."
 forge session show impl      # Runtime, Codex thread id, rollout path, auth posture
-forge activity impl          # transfer-curate + codex turns under one run tree
+forge telemetry activity impl          # transfer-curate + codex turns under one run tree
 ```
 
 Requires `codex` installed and authenticated (`forge runtime preflight codex` → `Ready YES`). The start command curates
@@ -551,7 +552,7 @@ forge session fork planner --into /path/to/executor-worktree --inline-plan
 
 The `--supervise` flag wires the parent as a semantic supervisor. Every code change is checked against the approved plan
 at `PreToolUse` time. Supervisor config persists through `forge session resume`. You can also wire supervision on
-existing sessions with `forge policy supervise <session>` or `%policy supervise <session>` in-session.
+existing sessions with `forge policy supervisor set <session>` or `%policy supervisor <session>` in-session.
 
 **Supervisor routing:** By default, the supervisor inherits the planner's proxy. Use `--supervisor-proxy` or
 `--no-supervisor-proxy` to override:
@@ -567,11 +568,11 @@ forge session fork planner --worktree --supervise --no-supervisor-proxy
 forge session start executor --supervise planner --supervisor-proxy openrouter-gemini
 
 # Or change supervisor routing on an existing session
-forge policy supervise planner --supervisor-proxy openrouter-gemini
+forge policy supervisor set planner --supervisor-proxy openrouter-gemini
 ```
 
 **Launch-time cascade and checker controls:** `fork` and `start` accept the same tier-1 cascade knobs as
-`forge policy supervise`, so you can wire the cheap pre-check at launch instead of in a second command. All require
+`forge policy supervisor set`, so you can wire the cheap pre-check at launch instead of in a second command. All require
 `--supervise`:
 
 ```bash
@@ -584,8 +585,8 @@ forge session start executor --supervise planner --cascade --checker-model googl
 ```
 
 Launch-time `--cascade` only sets the flag; it does **not** resolve a plan eagerly. The runtime hook escalates to the
-frontier supervisor when no plan exists yet. This differs from `forge policy supervise --cascade`, which resolves the
-plan at the time you run it.
+frontier supervisor when no plan exists yet. This differs from `forge policy supervisor set --cascade`, which resolves
+the plan at the time you run it.
 
 **Reasoning effort:** `--supervisor-effort` sets the frontier supervisor's `claude --effort`
 (`low/medium/high/xhigh/max`; `max` is Claude-only). `--checker-effort` sets the tier-1 checker's reasoning effort
@@ -601,24 +602,24 @@ forge session fork planner --worktree --supervise --cascade \
 
 ```bash
 # Suspend supervision (preserves config — resume_id, proxy, timeouts)
-forge policy supervise --off
-%policy supervise off
+forge policy supervisor off
+%policy supervisor off
 
 # Resume suspended supervisor
-forge policy supervise --on
-%policy supervise on
+forge policy supervisor on
+%policy supervisor on
 
 # Remove supervisor entirely
-forge policy supervise --remove
-%policy supervise remove
+forge policy supervisor remove
+%policy supervisor remove
 
 # Reload plan when it evolves (searches current session, forks, target)
-forge policy supervise --reload
-%policy supervise reload
+forge policy supervisor reload
+%policy supervisor reload
 
 # Reload from explicit file
-forge policy supervise --reload-from ~/.claude/plans/updated-plan.md
-%policy supervise reload /path/to/plan.md
+forge policy supervisor reload --from ~/.claude/plans/updated-plan.md
+%policy supervisor reload /path/to/plan.md
 ```
 
 The planner session stays intact throughout — it can be forked multiple times for different executors or reviewers.
@@ -763,12 +764,12 @@ overlay. See [proxy.md](proxy.md) for proxy configuration.
 
 ---
 
-## What a session did (`forge activity` + session-end summary)
+## What a session did (`forge telemetry activity` + session-end summary)
 
 Two read surfaces report what Forge's automation did during a session (supervisor, memory writer, workflow verbs,
 transfer curation, action tagging, and policy decisions — **not** your full interactive Claude usage). They read
 upstream operation outcomes, downstream model-call evidence, transitional usage events, and the capped policy-decision
-fallback. Session-scoped spend figures are **best-effort attribution** — `forge proxy costs show` stays the
+fallback. Session-scoped spend figures are **best-effort attribution** — `forge telemetry costs show` stays the
 authoritative dollar view (see [proxy.md](proxy.md#cost-tracking-and-spend-caps), and
 [which surface answers which question?](proxy.md#which-surface-answers-which-question) for when to use each).
 
@@ -784,14 +785,14 @@ The `failing open` clause surfaces supervisor LLM calls that errored or timed ou
 proceeded without frontier review), broken down by kind — for example a 45s timeout or an OpenRouter content-filter
 rejection. The line is best-effort and prints only when the session had activity; incognito sessions are skipped.
 
-**`forge activity [session]` (on demand).** Inspect any session's Forge automation activity anytime:
+**`forge telemetry activity [session]` (on demand).** Inspect any session's Forge automation activity anytime:
 
 ```bash
-forge activity                      # current session ($FORGE_SESSION)
-forge activity my-feature           # a named session (or Claude UUID)
-forge activity my-feature --days 7  # last 7 days (default: 30)
-forge activity my-feature --all     # full history
-forge activity my-feature --json    # machine-readable
+forge telemetry activity                      # current session ($FORGE_SESSION)
+forge telemetry activity my-feature           # a named session (or Claude UUID)
+forge telemetry activity my-feature --days 7  # last 7 days (default: 30)
+forge telemetry activity my-feature --all     # full history
+forge telemetry activity my-feature --json    # machine-readable
 ```
 
 It renders two panes. **Operation outcomes** shows upstream outcomes such as policy checks, supervisor fail-open/no-call
@@ -808,8 +809,8 @@ with `log_capped`.
 The Supervisor line appends `failing open: N timeout, N error` when recent frontier checks failed open — this is the
 always-visible status line's `SUP!N <kind>` marker in detail (recent supervisor checks erroring/timing out means actions
 may be proceeding without frontier review). The two are scoped differently, so the counts can differ: `SUP!N` is the
-**current consecutive** fail-open streak (it resets on the supervisor's next successful check), while `forge activity`
-totals fail-opens across the selected window (`--days`/`--all`).
+**current consecutive** fail-open streak (it resets on the supervisor's next successful check), while
+`forge telemetry activity` totals fail-opens across the selected window (`--days`/`--all`).
 
 > **Sidecar:** both surfaces work in sidecar mode when the session launched with a proxy id (the in-container usage
 > ledger is mounted back to the host). A template-only sidecar shows only the policy-decision half.

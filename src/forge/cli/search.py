@@ -1,10 +1,10 @@
 """Search CLI commands for Forge transcript search.
 
 Provides:
-- forge search query <terms>: Search transcripts, output JSON
+- forge search query <terms>: Search transcripts (human table; --json for the machine-readable shape)
 - forge search rebuild-index: Full index rebuild (writes three stores)
 - forge search status: Show index statistics
-- forge search clean: Remove orphaned documents
+- forge search clean: Preview orphaned documents (--yes to prune)
 
 Stores are per-project at <forge_root>/.forge/search-index/:
 - documents.json (v2): metadata only
@@ -20,7 +20,7 @@ from pathlib import Path
 import click
 from rich.console import Console
 
-from forge.cli.output import print_tip
+from forge.cli.output import print_error_with_tip, print_tip
 from forge.core.paths import display_path
 from forge.core.state import SchemaVersionError
 from forge.search.bm25_store import BM25IndexData, BM25IndexStore
@@ -45,11 +45,10 @@ def _resolve_forge_root() -> Path:
 
 
 @click.group(
-    invoke_without_command=True,
+    no_args_is_help=True,
     context_settings={"help_option_names": ["-h", "--help"]},
 )
-@click.pass_context
-def search_cmd(ctx: click.Context) -> None:
+def search_cmd() -> None:
     """Search session transcripts.
 
     \b
@@ -58,10 +57,6 @@ def search_cmd(ctx: click.Context) -> None:
       forge search rebuild-index           Rebuild the search index
       forge search status                  Show index statistics
     """
-    if ctx.invoked_subcommand is not None:
-        return
-
-    click.echo(ctx.get_help())
 
 
 @search_cmd.command("query")
@@ -73,17 +68,22 @@ def search_cmd(ctx: click.Context) -> None:
     default="project",
     help="Search scope: current project (default) or all indexed projects",
 )
-def query_cmd(terms: tuple[str, ...], limit: int, scope: str) -> None:
-    """Search indexed session transcripts."""
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def query_cmd(terms: tuple[str, ...], limit: int, scope: str, as_json: bool) -> None:
+    """Search indexed session transcripts.
+
+    Prints a result table by default; pass --json for the machine-readable shape
+    (stable scripting contract: query / total_results / results[]).
+    """
     query = " ".join(terms)
 
-    _run_search(query, limit=limit, scope=scope)
+    _run_search(query, limit=limit, scope=scope, as_json=as_json)
 
 
-def _run_search(query: str, *, limit: int, scope: str) -> None:
-    """Execute a search and output JSON results."""
+def _run_search(query: str, *, limit: int, scope: str, as_json: bool) -> None:
+    """Execute a project-scoped search; render a table, or the stable JSON with --json."""
     if scope == "all":
-        _run_search_all_projects(query, limit=limit)
+        _run_search_all_projects(query, limit=limit, as_json=as_json)
         return
 
     project_root = _resolve_forge_root()
@@ -96,14 +96,21 @@ def _run_search(query: str, *, limit: int, scope: str) -> None:
         ContentStoreCorruptedError,
         SchemaVersionError,
     ) as e:
-        output = {
-            "query": query,
-            "total_results": 0,
-            "results": [],
-            "error": f"Search index corrupted or outdated: {e}",
-            "hint": "Run 'forge search rebuild-index' to rebuild.",
-        }
-        click.echo(json.dumps(output, indent=2))
+        if as_json:
+            output = {
+                "query": query,
+                "total_results": 0,
+                "results": [],
+                "error": f"Search index corrupted or outdated: {e}",
+                "hint": "Run 'forge search rebuild-index' to rebuild.",
+            }
+            click.echo(json.dumps(output, indent=2))
+            return
+        print_error_with_tip(
+            f"Search index corrupted or outdated: {e}",
+            "Run 'forge search rebuild-index' to rebuild.",
+            console=Console(),
+        )
         return
 
     if results is None:
@@ -115,19 +122,22 @@ def _run_search(query: str, *, limit: int, scope: str) -> None:
                 hint += " If hooks are not installed, transcripts are not captured automatically."
         except Exception:
             pass
-        output = {
-            "query": query,
-            "total_results": 0,
-            "results": [],
-            "hint": hint,
-        }
-        click.echo(json.dumps(output, indent=2))
+        if as_json:
+            output = {
+                "query": query,
+                "total_results": 0,
+                "results": [],
+                "hint": hint,
+            }
+            click.echo(json.dumps(output, indent=2))
+            return
+        print_tip(hint, console=Console())
         return
 
-    _output_results(query, results)
+    _output_results(query, results, as_json=as_json)
 
 
-def _run_search_all_projects(query: str, *, limit: int) -> None:
+def _run_search_all_projects(query: str, *, limit: int, as_json: bool) -> None:
     """Search across all known project indices."""
     import logging
 
@@ -166,25 +176,31 @@ def _run_search_all_projects(query: str, *, limit: int) -> None:
 
     if not all_results:
         if searched_any_index:
+            if as_json:
+                output = {
+                    "query": query,
+                    "total_results": 0,
+                    "results": [],
+                }
+                click.echo(json.dumps(output, indent=2))
+                return
+            _output_results(query, [], as_json=False)
+            return
+        if as_json:
             output = {
                 "query": query,
                 "total_results": 0,
                 "results": [],
+                "hint": "No indexed transcripts. Run 'forge search rebuild-index' first.",
             }
             click.echo(json.dumps(output, indent=2))
             return
-        output = {
-            "query": query,
-            "total_results": 0,
-            "results": [],
-            "hint": "No indexed transcripts. Run 'forge search rebuild-index' first.",
-        }
-        click.echo(json.dumps(output, indent=2))
+        print_tip("No indexed transcripts. Run 'forge search rebuild-index' first.", console=Console())
         return
 
     # Merge and sort by score descending
     all_results.sort(key=lambda r: r.score, reverse=True)
-    _output_results(query, all_results[:limit])
+    _output_results(query, all_results[:limit], as_json=as_json)
 
 
 def _search_project(project_root: Path, query: str, *, limit: int):
@@ -222,24 +238,42 @@ def _search_project(project_root: Path, query: str, *, limit: int):
     )
 
 
-def _output_results(query: str, results: list) -> None:
-    """Format and output search results as JSON."""
-    output = {
-        "query": query,
-        "total_results": len(results),
-        "results": [
-            {
-                "session_name": r.session_name,
-                "session_id": r.session_id,
-                "score": r.score,
-                "snippet": r.snippet,
-                "transcript_path": r.transcript_path,
-                "metadata": r.metadata,
-            }
-            for r in results
-        ],
-    }
-    click.echo(json.dumps(output, indent=2))
+def _output_results(query: str, results: list, *, as_json: bool) -> None:
+    """Render search results: a Rich table by default, or the stable JSON shape with --json."""
+    if as_json:
+        output = {
+            "query": query,
+            "total_results": len(results),
+            "results": [
+                {
+                    "session_name": r.session_name,
+                    "session_id": r.session_id,
+                    "score": r.score,
+                    "snippet": r.snippet,
+                    "transcript_path": r.transcript_path,
+                    "metadata": r.metadata,
+                }
+                for r in results
+            ],
+        }
+        click.echo(json.dumps(output, indent=2))
+        return
+
+    console = Console()
+    if not results:
+        console.print(f"[dim]No results for '{query}'.[/dim]")
+        return
+
+    from rich.table import Table
+
+    table = Table(show_header=True, header_style="bold")
+    table.add_column("Score", justify="right", style="cyan")
+    table.add_column("Session")
+    table.add_column("Snippet", style="dim", overflow="fold")
+    for r in results:
+        table.add_row(f"{r.score:.2f}", r.session_name, r.snippet)
+    console.print(table)
+    console.print(f"Found {len(results)} result(s).")
 
 
 @search_cmd.command("rebuild-index")
@@ -343,11 +377,13 @@ def rebuild_index_cmd() -> None:
 
 
 @search_cmd.command("clean")
-def clean_cmd() -> None:
+@click.option("--yes", "-y", is_flag=True, help="Actually prune (default is a preview)")
+def clean_cmd(yes: bool) -> None:
     """Remove orphaned documents whose transcript files no longer exist.
 
-    Scans all three stores and index state, removing entries that point
-    to transcript files that have been deleted or moved.
+    Scans all three stores and index state for entries that point to transcript
+    files that have been deleted or moved. Previews by default; pass --yes to
+    actually prune.
     """
     console = Console()
 
@@ -358,6 +394,19 @@ def clean_cmd() -> None:
     bm25_store = BM25IndexStore(forge_root=project_root)
     content_store = ContentStore(forge_root=project_root)
     index_store = IndexStateStore(forge_root=project_root)
+
+    if not yes:
+        missing_docs = doc_store.find_missing()
+        missing_index = index_store.find_missing()
+        if missing_docs or missing_index:
+            console.print(
+                f"Would prune [cyan]{len(missing_docs)}[/cyan] orphaned document(s)"
+                f" and [cyan]{len(missing_index)}[/cyan] stale index entr(ies)."
+            )
+            print_tip("Use --yes to prune.", console=console)
+        else:
+            console.print("[dim]No orphaned entries found.[/dim]")
+        return
 
     removed_docs = doc_store.prune_missing()
 
@@ -378,7 +427,8 @@ def clean_cmd() -> None:
 
 
 @search_cmd.command("status")
-def status_cmd() -> None:
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def status_cmd(as_json: bool) -> None:
     """Show search index statistics."""
     console = Console()
 
@@ -391,6 +441,22 @@ def status_cmd() -> None:
     index_dir = project_root / ".forge" / "search-index"
 
     if not doc_store.exists():
+        if as_json:
+            click.echo(
+                json.dumps(
+                    {
+                        "built": False,
+                        "index_location": str(index_dir),
+                        "documents_indexed": 0,
+                        "files_tracked": 0,
+                        "updated_at": None,
+                        "sessions": 0,
+                        "bm25": None,
+                    },
+                    indent=2,
+                )
+            )
+            return
         console.print("Search index: [yellow]not built[/yellow]")
         console.print(f"Index location: [dim]{display_path(index_dir)}[/dim]")
         print_tip("Run 'forge search rebuild-index' to build.", console=console)
@@ -398,6 +464,28 @@ def status_cmd() -> None:
 
     documents = doc_store.read()
     state = index_store.read()
+
+    if as_json:
+        bm25_index = bm25_store.read()
+        click.echo(
+            json.dumps(
+                {
+                    "built": True,
+                    "index_location": str(index_dir),
+                    "documents_indexed": len(documents),
+                    "files_tracked": len(state.indexed_files),
+                    "updated_at": str(state.updated_at) if state.updated_at else None,
+                    "sessions": len({d.session_name for d in documents}),
+                    "bm25": (
+                        {"documents": len(bm25_index.doc_keys), "unique_terms": len(bm25_index.doc_freqs)}
+                        if bm25_index is not None
+                        else None
+                    ),
+                },
+                indent=2,
+            )
+        )
+        return
 
     console.print(f"Index location: [dim]{display_path(index_dir)}[/dim]")
     console.print(f"Documents indexed: [cyan]{len(documents)}[/cyan]")

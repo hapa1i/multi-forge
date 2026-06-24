@@ -1,26 +1,28 @@
 """Authentication CLI commands.
 
-Provides ``forge authentication login`` for storing credentials in
-``~/.forge/credentials.yaml``, ``forge authentication status`` to check
-credential status, ``forge authentication logout`` to remove stored
-credentials, and ``forge authentication profiles`` to list saved profiles.
+Provides ``forge auth login`` for storing credentials in
+``~/.forge/credentials.yaml``, ``forge auth status`` to check
+credential status, ``forge auth logout`` to remove stored
+credentials, and ``forge auth profiles`` to list saved profiles.
 
 Usage:
-    forge authentication login                            # Credential selection menu
-    forge authentication login -c anthropic-api           # Single credential
-    forge authentication login -c anthropic-api --profile work
-    forge authentication status                           # Dual-view status
-    forge authentication logout --profile default         # Remove stored credentials
-    forge authentication profiles                         # List saved profiles
+    forge auth login                            # Credential selection menu
+    forge auth login -c anthropic-api           # Single credential
+    forge auth login -c anthropic-api --profile work
+    forge auth status                           # Dual-view status
+    forge auth logout --profile default         # Remove stored credentials
+    forge auth profiles                         # List saved profiles
 """
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 
 import click
 
+from forge.cli.output import print_tip
 from forge.core.auth.capabilities import (
     CREDENTIALS,
     RETIRED_NAMES,
@@ -136,9 +138,9 @@ def auth() -> None:
 
     \b
     Examples:
-        forge authentication login               # Store credentials
-        forge authentication status              # Check credential sources
-        forge authentication profiles            # List saved profiles
+        forge auth login               # Store credentials
+        forge auth status              # Check credential sources
+        forge auth profiles            # List saved profiles
     """
     pass
 
@@ -216,7 +218,7 @@ def login(credential: str | None, profile: str | None) -> None:
             f"✓ Credentials saved to {path} (profile: {profile_name})",
             fg="green",
         )
-        click.echo("Tip: Use 'forge auth status' to verify.")
+        print_tip("Use 'forge auth status' to verify.", blank_before=False)
     else:
         click.echo("\nNo credentials to save.")
 
@@ -332,17 +334,61 @@ def _prompt_env_var(
     default=None,
     help="Profile to check (default: 'default' or FORGE_PROFILE)",
 )
-def status(profile: str | None) -> None:
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def status(profile: str | None, as_json: bool) -> None:
     """Show credential status with capability summary and source details.
 
     \b
     Examples:
-        forge authentication status
-        forge authentication status --profile work
+        forge auth status
+        forge auth status --profile work
     """
     profile_name = resolve_profile(profile)
 
     ignore_env = _get_auth_ignore_env()
+
+    if as_json:
+        # Mirror the human path: a corrupt file degrades to env-only values, but the
+        # degradation must not be silent (coding_standards.md best-effort rule). Surface
+        # it as an always-present `warning` key (null when clean), like transfer show --json.
+        warning: str | None = None
+        try:
+            json_secrets = load_profile(profile_name)
+        except CredentialVersionError as e:
+            click.echo(json.dumps({"error": str(e)}))
+            raise SystemExit(1)
+        except ValueError:
+            json_secrets = {}
+            warning = "Credentials file is corrupt -- file-based values unavailable."
+        creds = []
+        for cred in CREDENTIALS.values():
+            state = _credential_state(cred, json_secrets, ignore_env, profile_name)
+            env_vars = []
+            for ev in cred.env_vars:
+                value, source = _resolve_var_source(ev, json_secrets, ignore_env)
+                env_vars.append(
+                    {
+                        "name": ev.name,
+                        "configured": bool(value),
+                        "source": f"file:{profile_name}" if source == "file" else source,
+                        "is_secret": ev.secret,
+                        "is_default": bool(ev.default_value and source == "not configured"),
+                        "value": value if (value and not ev.secret) else None,
+                    }
+                )
+            primary_source = state.split("(", 1)[1].rstrip(")") if "(" in state else None
+            creds.append(
+                {
+                    "name": cred.name,
+                    "summary": _capability_summary(cred),
+                    "configured": state.startswith("configured"),
+                    "state": state,
+                    "primary_source": primary_source,
+                    "env_vars": env_vars,
+                }
+            )
+        click.echo(json.dumps({"profile": profile_name, "credentials": creds, "warning": warning}, indent=2))
+        return
 
     try:
         file_secrets = load_profile(profile_name)
@@ -352,7 +398,7 @@ def status(profile: str | None) -> None:
     except ValueError:
         file_secrets = {}
         click.secho("⚠︎ Credentials file is corrupt -- file-based values unavailable.", fg="yellow")
-        click.echo("Tip: Run 'forge auth login' to recreate the file.")
+        print_tip("Run 'forge auth login' to recreate the file.", blank_before=False)
 
     click.echo(f"\nCredential status (profile: {profile_name})")
     click.echo("=" * 50)
@@ -416,9 +462,9 @@ def logout(profile: str | None, yes: bool) -> None:
 
     \b
     Examples:
-        forge authentication logout
-        forge authentication logout --profile work
-        forge authentication logout -y  # Skip confirmation
+        forge auth logout
+        forge auth logout --profile work
+        forge auth logout -y  # Skip confirmation
     """
     profile_name = resolve_profile(profile)
 
@@ -434,13 +480,25 @@ def logout(profile: str | None, yes: bool) -> None:
 
 
 @auth.command("profiles")
-def profiles_cmd() -> None:
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def profiles_cmd(as_json: bool) -> None:
     """List saved credential profiles.
 
     \b
     Examples:
-        forge authentication profiles
+        forge auth profiles
     """
+    if as_json:
+        try:
+            names = list_profiles()
+        except (CredentialVersionError, ValueError) as e:
+            click.echo(json.dumps({"error": str(e)}))
+            raise SystemExit(1)
+        active = resolve_profile()
+        profiles = [{"name": n, "key_count": len(load_profile(n)), "is_active": n == active} for n in names]
+        click.echo(json.dumps({"profiles": profiles}, indent=2))
+        return
+
     try:
         profile_names = list_profiles()
     except CredentialVersionError as e:
@@ -448,12 +506,12 @@ def profiles_cmd() -> None:
         raise SystemExit(1)
     except ValueError as e:
         click.secho(f"Error reading credentials file: {e}", fg="red")
-        click.echo("\nTip: Run 'forge auth login' to recreate the file.")
+        print_tip("Run 'forge auth login' to recreate the file.")
         raise SystemExit(1)
 
     if not profile_names:
         click.echo("No profiles found.")
-        click.echo("\nTip: Run 'forge auth login' to create one.")
+        print_tip("Run 'forge auth login' to create one.")
         return
 
     active = resolve_profile()

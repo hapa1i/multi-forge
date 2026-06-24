@@ -37,6 +37,35 @@ def _write_done(forge_root, cand_hash: str, *, status: str, session: str = "plan
     (d / f"{cand_hash}.done").write_text(json.dumps(record))
 
 
+def _write_pending(forge_root, cand_hash: str, *, session: str = "planner") -> None:
+    """Write a pending (``*.json``) shadow candidate -- only its existence matters for counts."""
+    d = Path(forge_root) / ".forge" / "artifacts" / session / "shadow"
+    d.mkdir(parents=True, exist_ok=True)
+    (d / f"{cand_hash}.json").write_text(json.dumps({"schema_version": 1}))
+
+
+def _patch_status_session(monkeypatch, tmp_path, *, name: str = "planner", rate: float | None = 0.25) -> None:
+    """Patch the policy-session path `shadow status` resolves through.
+
+    `status` uses `_resolve_policy_session` + `compute_effective_intent` (not the
+    `resolve_session_identifier` that `show` uses), so patch those directly.
+    """
+    from types import SimpleNamespace
+
+    manifest = SimpleNamespace(name=name, forge_root=str(tmp_path))
+    monkeypatch.setattr("forge.cli.policy._resolve_policy_session", lambda _cwd, _explicit: (None, manifest))
+
+    if rate is None:
+
+        def _unavailable(_m):  # noqa: ANN001  # test stub: config resolution fails
+            raise RuntimeError("config unavailable")
+
+        monkeypatch.setattr("forge.cli.policy.compute_effective_intent", _unavailable)
+    else:
+        effective = SimpleNamespace(policy=SimpleNamespace(supervisor=SimpleNamespace(shadow_sample_rate=rate)))
+        monkeypatch.setattr("forge.cli.policy.compute_effective_intent", lambda _m: effective)
+
+
 def test_group_help_lists_show_hides_run() -> None:
     result = CliRunner().invoke(main, ["policy", "shadow", "--help"])
     assert result.exit_code == 0
@@ -146,3 +175,44 @@ def test_show_not_found_exits_1(monkeypatch) -> None:
     result = CliRunner().invoke(main, ["policy", "shadow", "show", "ghost"])
     assert result.exit_code == 1
     assert "forge session list" in result.output
+
+
+def test_status_json_shape(monkeypatch, tmp_path) -> None:
+    """`status --json` emits a stable shape: rate + pending + all four done statuses zero-seeded."""
+    _write_done(tmp_path, "d1", status="disagree")
+    _write_done(tmp_path, "a1", status="agree")
+    _write_pending(tmp_path, "p1")
+    _write_pending(tmp_path, "p2")
+    _patch_status_session(monkeypatch, tmp_path, rate=0.25)
+
+    result = CliRunner().invoke(main, ["policy", "shadow", "status", "planner", "--json"])
+    assert result.exit_code == 0
+    data = json.loads(result.output)
+    assert data == {
+        "session": "planner",
+        "sample_rate": 0.25,
+        "pending": 2,
+        "done": {"agree": 1, "disagree": 1, "inconclusive": 0, "error": 0},
+    }
+
+
+def test_status_human_summary(monkeypatch, tmp_path) -> None:
+    _write_done(tmp_path, "d1", status="disagree")
+    _patch_status_session(monkeypatch, tmp_path, rate=0.5)
+    result = CliRunner().invoke(main, ["policy", "shadow", "status", "planner"])
+    assert result.exit_code == 0
+    assert "Shadow status" in result.output
+    assert "sample rate: 50%" in result.output
+    assert "pending: 0" in result.output
+    assert "disagree=1" in result.output
+
+
+def test_status_sample_rate_null_when_config_unavailable(monkeypatch, tmp_path) -> None:
+    """A read command never hard-fails on config: counts still report, sample_rate is null."""
+    _write_done(tmp_path, "a1", status="agree")
+    _patch_status_session(monkeypatch, tmp_path, rate=None)
+    result = CliRunner().invoke(main, ["policy", "shadow", "status", "planner", "--json"])
+    assert result.exit_code == 0
+    data = json.loads(result.output)
+    assert data["sample_rate"] is None
+    assert data["done"]["agree"] == 1

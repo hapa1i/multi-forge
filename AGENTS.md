@@ -56,16 +56,16 @@ confirms the local proxy process is reachable; use `forge proxy start <proxy_id>
 connectivity after first setup, credential changes, or proxy auth changes.
 
 For backend-source, telemetry, provider-trace, and cost-accounting changes, verify the operator read paths:
-`forge backend list|show <source-or-backend-id>|test-auth <source-id>`,
-`forge provider trace list|show <request_id>|explain <request_id>`, and `forge proxy costs show --by-model|--by-verb`.
-Use `forge proxy costs reset --dry-run` before destructive telemetry resets; `reset` wipes legacy costs,
-downstream/upstream telemetry, cap state, audit sidecar state, usage events, and derived status-line caches, while
-running proxies keep in-memory cost/cap counters until restarted.
+`forge model backend list|show <source-or-backend-id>|test-auth <source-id>`,
+`forge telemetry trace list|show <request_id>|explain <request_id>`, and
+`forge telemetry costs show --by-model|--by-verb`. Use `forge telemetry costs reset --dry-run` before destructive
+telemetry resets; `reset` wipes legacy costs, downstream/upstream telemetry, cap state, audit sidecar state, usage
+events, and derived status-line caches, while running proxies keep in-memory cost/cap counters until restarted.
 
 For resume, transfer, memory-writer, and activity changes, verify the user-facing surfaces:
-`forge session resume <name> --fresh --review`, `forge transfer show|regenerate|edit|diff`,
-`forge memory report show [--all]`, and `forge activity [session]`; `forge usage` is removed, and
-`forge proxy costs show` remains the authoritative proxy-scoped spend view.
+`forge session resume <name> --fresh --review`, `forge session transfer show|regenerate|edit|diff`,
+`forge session memory report [session] [--latest|--all|--json]`, and `forge telemetry activity [session]`; `forge usage`
+is removed, and `forge telemetry costs show` remains the authoritative proxy-scoped spend view.
 
 For Codex-runtime session changes, start with `forge runtime preflight codex`, then verify the relevant launch path:
 `forge session start <name> --runtime codex --resume-from <parent> --task "..."`,

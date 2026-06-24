@@ -4,7 +4,7 @@ Builds a structured view of everything Forge knows about a session:
 metadata, proxy routing, model family, tier mappings, and policy state.
 
 Used by:
-- ``forge session context`` CLI command
+- ``forge session show`` CLI command (``--json``/``--field``)
 - Skills auto-detecting model family via ``--field model_family``
 """
 

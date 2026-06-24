@@ -2,8 +2,8 @@
 
 Bug class: misleading remote reconciliation. A 200 whose JSON parses but is not a generation
 object (a JSON array/string/number, or a non-dict ``data`` wrapper) was treated as a successful
-``found`` record with empty metadata, so ``forge backend reconcile`` could report a join when the
-remote body was unusable. Such bodies must surface as ``unavailable``.
+``found`` record with empty metadata, so ``forge model backend reconcile`` could report a join
+when the remote body was unusable. Such bodies must surface as ``unavailable``.
 
 Root cause: ``_record_from_body`` fell back to ``data = payload`` (or ``{}``) for any non-dict
 shape instead of rejecting it.

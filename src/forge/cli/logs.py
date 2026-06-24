@@ -10,7 +10,7 @@ from pathlib import Path
 import click
 from rich.console import Console
 
-from forge.cli.output import print_tip
+from forge.cli.output import print_error, print_tip
 from forge.core.logging import get_effective_log_level
 from forge.core.paths import display_path, get_forge_home
 
@@ -263,11 +263,11 @@ def logs_cmd(clean: bool, older_than: int | None) -> None:
         forge logs --clean --older-than 7 # Remove logs older than 7 days
     """
     if older_than is not None and not clean:
-        console.print("[red]Error:[/red] --older-than requires --clean")
+        print_error("--older-than requires --clean", console=console)
         raise SystemExit(1)
 
     if older_than is not None and older_than < 1:
-        console.print("[red]Error:[/red] --older-than must be >= 1")
+        print_error("--older-than must be >= 1", console=console)
         raise SystemExit(1)
 
     logs_root = get_forge_home() / "logs"

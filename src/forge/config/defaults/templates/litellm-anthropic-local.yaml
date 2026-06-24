@@ -10,7 +10,7 @@
 # --model claude-opus-4-6 to select an Opus alternative instead.
 #
 # Note: If you added ANTHROPIC_API_KEY after the backend started,
-# restart with: forge backend stop litellm-4000
+# restart with: forge model backend stop litellm-4000
 
 proxy:
   family: anthropic

@@ -71,7 +71,7 @@ def test_requires_proxy_or_no_proxy():
     runner = CliRunner()
     result = runner.invoke(main, ["claude", "start"])
     assert result.exit_code == 1
-    assert "one of --proxy or --no-proxy is required" in result.output
+    assert "one of --proxy or --no-proxy is required" in result.stderr
 
 
 def test_no_proxy_and_proxy_mutually_exclusive():
@@ -79,7 +79,7 @@ def test_no_proxy_and_proxy_mutually_exclusive():
     runner = CliRunner()
     result = runner.invoke(main, ["claude", "start", "--no-proxy", "--proxy", "some-proxy"])
     assert result.exit_code == 1
-    assert "mutually exclusive" in result.output
+    assert "mutually exclusive" in result.stderr
 
 
 def test_proxy_not_found(tmp_path, monkeypatch):
@@ -427,7 +427,7 @@ def test_proxy_unknown_name_errors(tmp_path, monkeypatch):
     runner = CliRunner()
     result = runner.invoke(main, ["claude", "start", "--proxy", "totally-unknown-xyz"])
     assert result.exit_code == 1
-    assert "forge proxy template list" in result.output
+    assert "forge proxy template list" in result.stderr
 
 
 def test_proxy_template_ambiguous(tmp_path, monkeypatch):

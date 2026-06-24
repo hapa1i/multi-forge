@@ -11,7 +11,6 @@ Commands:
 - forge proxy start <id>        # Start server for existing proxy
 - forge proxy stop <id>         # Stop server for proxy
 - forge proxy set <id> k=v      # Set single value
-- forge proxy clean             # Clean up stale proxies
 - forge proxy validate <id>     # Validate proxy config
 - forge proxy metrics [id]      # Show runtime metrics for a running proxy
 - forge proxy template list     # List available templates
@@ -37,9 +36,8 @@ from rich.console import Console
 from rich.syntax import Syntax
 from rich.table import Table
 
-from forge.cli.output import print_error_with_tip, print_tip
+from forge.cli.output import err_console, print_error, print_error_with_tip, print_tip
 from forge.cli.proxy_audit import audit_cmd
-from forge.cli.proxy_costs import costs_group
 from forge.config.loader import (
     get_proxy_file_path,
     get_template_path,
@@ -95,7 +93,6 @@ def proxy() -> None:
     """
 
 
-proxy.add_command(costs_group)
 proxy.add_command(audit_cmd)
 
 
@@ -137,7 +134,7 @@ def list_cmd(as_json: bool) -> None:
 
             click.echo(json.dumps({"error": str(e)}, indent=2), err=True)
         else:
-            console.print(f"[red]Error:[/red] {e}")
+            print_error(f"{e}", console=console)
         sys.exit(1)
 
     if as_json:
@@ -243,7 +240,7 @@ def show_cmd(proxy_id: str, raw: bool, as_json: bool) -> None:
         print_error_with_tip(
             str(e),
             "Run 'forge proxy template show <name>' to show a template.",
-            console=console,
+            console=err_console,
         )
         sys.exit(1)
 
@@ -303,7 +300,7 @@ def show_cmd(proxy_id: str, raw: bool, as_json: bool) -> None:
 @click.option("--name", "-n", help="Name for the proxy (defaults to template name)")
 @click.option("--port", "-p", type=int, help="Port number (defaults to template's default)")
 @click.option("--no-start", is_flag=True, help="Create config only, don't start the server")
-@click.option("--json", "json_output", is_flag=True, help="Output as JSON")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
 @click.option("--host", type=str, default="localhost", help="Host to bind server to")
 @click.option("--base-url", "upstream_url", type=str, help="Upstream LiteLLM base URL (overrides env var)")
 # Per-tier reasoning effort overrides
@@ -320,7 +317,7 @@ def create_cmd(
     name: str | None,
     port: int | None,
     no_start: bool,
-    json_output: bool,
+    as_json: bool,
     host: str,
     upstream_url: str | None,
     haiku_reasoning: str | None,
@@ -347,11 +344,11 @@ def create_cmd(
     try:
         exists = template_exists(template)
     except ValueError as e:
-        console.print(f"[red]Error:[/red] {e}")
+        print_error(f"{e}", console=err_console)
         sys.exit(1)
     if not exists:
-        console.print(f"[red]Error:[/red] Template '{template}' not found")
-        print_tip("Run 'forge proxy template list' to see available templates.", console=console)
+        print_error(f"Template '{template}' not found", console=err_console)
+        print_tip("Run 'forge proxy template list' to see available templates.", console=err_console)
         sys.exit(1)
 
     proxy_name = name or template
@@ -367,7 +364,7 @@ def create_cmd(
         cfg = load_config(template=template)
         port = cfg.proxy.default_port
         if not port:
-            console.print("[red]Error:[/red] Template has no default_port, use --port")
+            print_error("Template has no default_port, use --port", console=err_console)
             sys.exit(1)
 
     base_url = f"http://{host}:{port}"
@@ -399,11 +396,11 @@ def create_cmd(
                 print_error_with_tip(
                     f"Proxy '{proxy_name}' already exists",
                     "Run 'forge proxy start' to start it, or 'forge proxy delete' to remove it first.",
-                    console=console,
+                    console=err_console,
                 )
                 sys.exit(1)
 
-        if not json_output:
+        if not as_json:
             console.print(f"Creating proxy [cyan]{proxy_name}[/cyan] from '{template}'...")
 
         # Only pass proxy_id/port when the user explicitly provided --name/--port.
@@ -423,22 +420,22 @@ def create_cmd(
                 upstream_base_url=upstream_url,
             )
         except ProxyRegistryCorruptedError as e:
-            console.print(f"[red]Error:[/red] {e}")
+            print_error(f"{e}", console=err_console)
             sys.exit(1)
         except ProxyStartError as e:
-            console.print(f"[red]Failed to start server:[/red] {e}")
+            print_error(f"Failed to start server: {e}", console=err_console)
             err_str = str(e)
             if "dependency backend" not in err_str and "upstream URL" not in err_str:
                 print_tip(
                     "Use --no-start to create the config without starting the server:",
                     commands=[f"forge proxy create {template} --name {proxy_name} --no-start"],
-                    console=console,
+                    console=err_console,
                 )
             sys.exit(1)
 
         proxy_entry = result.proxy
 
-        if json_output:
+        if as_json:
             import json
 
             print(
@@ -487,12 +484,12 @@ def create_cmd(
         if smoke_test:
             from forge.proxy.proxy_orchestrator import smoke_test_proxy
 
-            if not json_output:
+            if not as_json:
                 console.print("\n[dim]Smoke testing upstream LLM...[/dim]")
 
             ok, detail = smoke_test_proxy(base_url=proxy_entry.base_url)
 
-            if json_output:
+            if as_json:
                 import json
 
                 print(json.dumps({"smoke_test": {"passed": ok, "detail": detail}}))
@@ -507,7 +504,7 @@ def create_cmd(
             print_error_with_tip(
                 f"Proxy '{proxy_name}' already exists",
                 "Run 'forge proxy edit' to modify it, or 'forge proxy delete' to remove it first.",
-                console=console,
+                console=err_console,
             )
             sys.exit(1)
 
@@ -521,7 +518,7 @@ def create_cmd(
                 upstream_base_url=upstream_url,
             )
         except Exception as e:
-            console.print(f"[red]Error:[/red] Failed to create proxy: {e}")
+            print_error(f"Failed to create proxy: {e}", console=err_console)
             sys.exit(1)
 
         # Register the proxy in index.json so it appears in `forge proxy list`
@@ -549,18 +546,35 @@ def create_cmd(
             try:
                 shutil.rmtree(created_path.parent)
             except OSError as cleanup_error:
-                console.print(
+                err_console.print(
                     f"[yellow]Warning:[/yellow] Could not remove unregistered proxy directory: {cleanup_error}"
                 )
-            console.print(f"[red]Error:[/red] Could not register proxy: {e}")
+            print_error(f"Could not register proxy: {e}", console=err_console)
             sys.exit(1)
 
-        console.print(f"[green]Created[/green] proxy [cyan]{proxy_name}[/cyan] from '{template}'")
-        console.print(f"  Path: {display_path(created_path)}")
-        console.print(f"  Port: {port}")
-        console.print("\n[dim]Next steps:[/dim]")
-        console.print(f"  forge proxy edit {proxy_name}   # Customize config")
-        console.print(f"  forge proxy start {proxy_name}  # Start server")
+        if as_json:
+            import json
+
+            print(
+                json.dumps(
+                    {
+                        "proxy_id": proxy_entry.proxy_id,
+                        "template": proxy_entry.template,
+                        "base_url": proxy_entry.base_url,
+                        "port": proxy_entry.port,
+                        "pid": proxy_entry.pid,
+                        "status": proxy_entry.status,
+                        "source": "created",
+                    }
+                )
+            )
+        else:
+            console.print(f"[green]Created[/green] proxy [cyan]{proxy_name}[/cyan] from '{template}'")
+            console.print(f"  Path: {display_path(created_path)}")
+            console.print(f"  Port: {port}")
+            console.print("\n[dim]Next steps:[/dim]")
+            console.print(f"  forge proxy edit {proxy_name}   # Customize config")
+            console.print(f"  forge proxy start {proxy_name}  # Start server")
 
 
 # --- Start / Stop ---
@@ -644,14 +658,14 @@ def start_cmd(proxy_id: str, smoke_test: bool) -> None:
 
     proxy_path = get_proxy_file_path(proxy_id)
     if not proxy_path.exists():
-        console.print(f"[red]Error:[/red] Proxy '{proxy_id}' not found at {display_path(proxy_path)}")
+        print_error(f"Proxy '{proxy_id}' not found at {display_path(proxy_path)}", console=console)
         console.print("\n[dim]Create one first:[/dim]")
         console.print(f"  forge proxy create <template> --name {proxy_id}")
         sys.exit(1)
 
     config = load_proxy_instance_config(proxy_id)
     if config is None:
-        console.print(f"[red]Error:[/red] Failed to load proxy config for '{proxy_id}'")
+        print_error(f"Failed to load proxy config for '{proxy_id}'", console=console)
         sys.exit(1)
 
     try:
@@ -664,10 +678,10 @@ def start_cmd(proxy_id: str, smoke_test: bool) -> None:
             skip_proxy_file=True,
         )
     except ProxyRegistryCorruptedError as e:
-        console.print(f"[red]Error:[/red] {e}")
+        print_error(f"{e}", console=console)
         sys.exit(1)
     except ProxyStartError as e:
-        console.print(f"[red]Error:[/red] {e}")
+        print_error(f"{e}", console=console)
         sys.exit(1)
 
     proxy_entry = result.proxy
@@ -709,7 +723,7 @@ def stop_cmd(proxy_id: str, force: bool, kill_adopted: bool) -> None:
     try:
         registry = store.read()
     except ProxyRegistryCorruptedError as e:
-        console.print(f"[red]Error:[/red] {e}")
+        print_error(f"{e}", console=console)
         sys.exit(1)
 
     entry = registry.proxies.get(proxy_id)
@@ -807,7 +821,7 @@ def edit_cmd(proxy_id: str) -> None:
     editor = os.environ.get("EDITOR", "vim")
 
     if not shutil.which(editor):
-        console.print(f"[red]Error:[/red] Editor '{editor}' not found. Set $EDITOR to an available editor.")
+        print_error(f"Editor '{editor}' not found. Set $EDITOR to an available editor.", console=console)
         sys.exit(1)
 
     # Copy to temp file for safe editing
@@ -819,7 +833,7 @@ def edit_cmd(proxy_id: str) -> None:
     try:
         result = subprocess.run([editor, str(tmp_path)])
         if result.returncode != 0:
-            console.print(f"[red]Error:[/red] Editor exited with code {result.returncode}")
+            print_error(f"Editor exited with code {result.returncode}", console=console)
             console.print(f"Your changes are saved at: {display_path(tmp_path)}")
             sys.exit(1)
 
@@ -830,7 +844,7 @@ def edit_cmd(proxy_id: str) -> None:
             with open(tmp_path) as f:
                 edited_data = yaml.load(f)
         except Exception as e:
-            console.print(f"[red]Error:[/red] Invalid YAML: {e}")
+            print_error(f"Invalid YAML: {e}", console=console)
             console.print(f"Your changes are saved at: {display_path(tmp_path)}")
             sys.exit(1)
 
@@ -840,7 +854,7 @@ def edit_cmd(proxy_id: str) -> None:
 
             load_proxy_instance_config_from_dict(edited_data)
         except (ValueError, TypeError, KeyError, AttributeError) as e:
-            console.print(f"[red]Error:[/red] Invalid proxy configuration: {e}")
+            print_error(f"Invalid proxy configuration: {e}", console=console)
             console.print(f"Your changes are saved at: {display_path(tmp_path)}")
             sys.exit(1)
 
@@ -879,7 +893,7 @@ def set_cmd(proxy_id: str, key_value: str) -> None:
     console = Console(width=200)
 
     if "=" not in key_value:
-        console.print(f"[red]Error:[/red] Expected format: key=value (got: {key_value})")
+        print_error(f"Expected format: key=value (got: {key_value})", console=console)
         sys.exit(1)
 
     key, value = key_value.split("=", 1)
@@ -931,7 +945,7 @@ def set_cmd(proxy_id: str, key_value: str) -> None:
         else:
             coerced_value = value
     except ValueError as e:
-        console.print(f"[red]Error:[/red] Invalid value for '{final_key}': {e}")
+        print_error(f"Invalid value for '{final_key}': {e}", console=console)
         sys.exit(1)
 
     current[final_key] = coerced_value
@@ -942,7 +956,7 @@ def set_cmd(proxy_id: str, key_value: str) -> None:
 
         load_proxy_instance_config_from_dict(data)
     except (ValueError, TypeError, KeyError, AttributeError) as e:
-        console.print(f"[red]Error:[/red] Invalid value — {e}")
+        print_error(f"Invalid value — {e}", console=console)
         sys.exit(1)
 
     import io
@@ -1073,11 +1087,11 @@ def delete_cmd(proxy_ids: tuple[str, ...], delete_all: bool, yes: bool, kill_ado
     console = Console(width=200)
 
     if delete_all and proxy_ids:
-        console.print("[red]Error:[/red] Cannot combine --all with explicit proxy IDs")
+        print_error("Cannot combine --all with explicit proxy IDs", console=console)
         sys.exit(1)
 
     if not delete_all and not proxy_ids:
-        console.print("[red]Error:[/red] Provide proxy ID(s) or use --all")
+        print_error("Provide proxy ID(s) or use --all", console=console)
         sys.exit(1)
 
     store = ProxyRegistryStore()
@@ -1085,7 +1099,7 @@ def delete_cmd(proxy_ids: tuple[str, ...], delete_all: bool, yes: bool, kill_ado
     try:
         registry = store.read()
     except ProxyRegistryCorruptedError as e:
-        console.print(f"[red]Error:[/red] {e}")
+        print_error(f"{e}", console=console)
         sys.exit(1)
 
     if delete_all:
@@ -1125,7 +1139,7 @@ def delete_cmd(proxy_ids: tuple[str, ...], delete_all: bool, yes: bool, kill_ado
             if e.code not in (0, None):
                 failed += 1
         except Exception as e:
-            console.print(f"[red]Error:[/red] {proxy_id}: {e}")
+            print_error(f"{proxy_id}: {e}", console=console)
             failed += 1
 
     if len(targets) > 1:
@@ -1159,7 +1173,7 @@ def _delete_single_proxy(
     try:
         registry = store.read()
     except ProxyRegistryCorruptedError as e:
-        console.print(f"[red]Error:[/red] {e}")
+        print_error(f"{e}", console=console)
         raise SystemExit(1)
 
     entry = registry.proxies.get(proxy_id)
@@ -1250,7 +1264,7 @@ def _delete_single_proxy(
         try:
             store.update(timeout_s=CLI_LOCK_TIMEOUT_S, mutate=remove_and_check)
         except Exception as e:
-            console.print(f"[red]Error:[/red] Could not update registry: {e}")
+            print_error(f"Could not update registry: {e}", console=console)
             raise SystemExit(1)
 
     # Post-lock summary: show authoritative remaining aliases
@@ -1270,7 +1284,7 @@ def _delete_single_proxy(
                         f"[yellow]Warning:[/yellow] Could not restore registry entry after delete failure: "
                         f"{restore_error}"
                     )
-            console.print(f"[red]Error:[/red] Could not delete proxy directory: {e}")
+            print_error(f"Could not delete proxy directory: {e}", console=console)
             raise SystemExit(1)
 
     # Kill server only if the locked check confirmed we're the last reference
@@ -1280,29 +1294,6 @@ def _delete_single_proxy(
         console.print(f"[dim]Server kept alive (other proxies share port {entry.port})[/dim]")
 
     console.print(f"[green]Deleted[/green] proxy '{proxy_id}'")
-
-
-# --- Prune ---
-
-
-@proxy.command("clean")
-def clean_cmd() -> None:
-    """Clean up stale proxies (dead server processes)."""
-    console = Console(width=200)
-
-    try:
-        result = prune_stale_proxies()
-    except ProxyRegistryCorruptedError as e:
-        console.print(f"[red]Error:[/red] {e}")
-        sys.exit(1)
-
-    if not result.pruned_proxy_ids:
-        console.print("No stale proxies to clean.")
-        return
-
-    console.print(f"Cleaned {len(result.pruned_proxy_ids)} stale proxy(ies):")
-    for pid in result.pruned_proxy_ids:
-        console.print(f"  - {pid}")
 
 
 # --- Validate ---
@@ -1326,7 +1317,7 @@ def validate_cmd(proxy_id: str) -> None:
     try:
         config = load_proxy_instance_config(proxy_id)
         if config is None:
-            console.print(f"[red]Error:[/red] Failed to load proxy '{proxy_id}'")
+            print_error(f"Failed to load proxy '{proxy_id}'", console=console)
             sys.exit(1)
 
         console.print(f"[green]✓[/green] Proxy '{proxy_id}' is valid")
@@ -1526,12 +1517,12 @@ def _display_all_metrics(
     console: Console,
     proxies: list[ProxyEntry],
     *,
-    json_output: bool,
+    as_json: bool,
 ) -> None:
     """Render metrics for every registered proxy."""
     import json
 
-    if json_output:
+    if as_json:
         results: dict[str, Any] = {}
         for entry in proxies:
             info = _fetch_proxy_info(entry.base_url)
@@ -1558,10 +1549,13 @@ def _display_all_metrics(
 
 @proxy.command("metrics")
 @click.argument("proxy_id", required=False)
-@click.option("--json", "json_output", is_flag=True, help="Output raw JSON")
-@click.option("--all", "show_all", is_flag=True, help="Show all active proxies")
-def metrics_cmd(proxy_id: str | None, json_output: bool, show_all: bool) -> None:
-    """Show runtime metrics for a running proxy."""
+@click.option("--json", "as_json", is_flag=True, help="Output raw JSON")
+def metrics_cmd(proxy_id: str | None, as_json: bool) -> None:
+    """Show runtime metrics for a running proxy.
+
+    With no PROXY_ID, shows the sole registered proxy, or an aggregate table when
+    several are registered.
+    """
     import json
 
     console = Console(width=200)
@@ -1569,58 +1563,49 @@ def metrics_cmd(proxy_id: str | None, json_output: bool, show_all: bool) -> None
     try:
         store = ProxyRegistryStore()
     except ProxyRegistryCorruptedError as e:
-        console.print(f"[red]Error:[/red] Proxy registry error: {e}")
+        print_error(f"Proxy registry error: {e}", console=err_console)
         sys.exit(1)
-
-    if show_all:
-        try:
-            proxies = store.list_proxies()
-        except ProxyRegistryCorruptedError as e:
-            console.print(f"[red]Error:[/red] Proxy registry error: {e}")
-            sys.exit(1)
-        if not proxies:
-            console.print("[dim]No proxies registered.[/dim]")
-            return
-        _display_all_metrics(console, proxies, json_output=json_output)
-        return
 
     if not proxy_id:
         try:
             proxies = store.list_proxies()
         except ProxyRegistryCorruptedError as e:
-            console.print(f"[red]Error:[/red] Proxy registry error: {e}")
+            print_error(f"Proxy registry error: {e}", console=err_console)
             sys.exit(1)
         if len(proxies) == 1:
             proxy_id = proxies[0].proxy_id
         elif len(proxies) == 0:
-            console.print("[dim]No proxies registered.[/dim]")
+            if as_json:
+                console.print(json.dumps({}, indent=2))
+            else:
+                console.print("[dim]No proxies registered.[/dim]")
             return
         else:
-            _display_all_metrics(console, proxies, json_output=json_output)
+            _display_all_metrics(console, proxies, as_json=as_json)
             return
 
     assert proxy_id is not None
     try:
         registry = store.read()
     except ProxyRegistryCorruptedError as e:
-        console.print(f"[red]Error:[/red] Proxy registry error: {e}")
+        print_error(f"Proxy registry error: {e}", console=err_console)
         sys.exit(1)
     maybe_entry = registry.proxies.get(proxy_id)
     if maybe_entry is None:
         print_error_with_tip(
             f"Proxy '{proxy_id}' not found in registry.",
             "Run 'forge proxy list' to see configured proxies.",
-            console=console,
+            console=err_console,
         )
         sys.exit(1)
     entry = maybe_entry
 
     info = _fetch_proxy_info(entry.base_url)
     if info is None:
-        console.print(f"[dim]Proxy '{proxy_id}' not reachable at {entry.base_url}[/dim]")
+        err_console.print(f"[dim]Proxy '{proxy_id}' not reachable at {entry.base_url}[/dim]")
         sys.exit(1)
 
-    if json_output:
+    if as_json:
         console.print(json.dumps(info.metrics, indent=2))
     else:
         _display_metrics(console, proxy_id, entry.base_url, info)
@@ -1665,11 +1650,29 @@ def template_group() -> None:
 
 
 @template_group.command("list")
-def template_list_cmd() -> None:
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def template_list_cmd(as_json: bool) -> None:
     """List available proxy templates."""
     console = Console(width=200)
 
     templates = list_template_names()
+
+    if as_json:
+        import json
+
+        rows = []
+        for name in templates:
+            user = is_user_template(name)
+            shipped = shipped_template_exists(name)
+            source = "customized" if (user and shipped) else "user" if user else "built-in"
+            try:
+                description = _extract_template_description(read_template(name))
+            except Exception:
+                description = ""
+            rows.append({"name": name, "source": source, "description": description})
+        click.echo(json.dumps({"templates": rows}, indent=2))
+        return
+
     if not templates:
         console.print("[dim]No templates available.[/dim]")
         return
@@ -1704,7 +1707,8 @@ def template_list_cmd() -> None:
 @template_group.command("show")
 @click.argument("name")
 @click.option("--raw", is_flag=True, help="Output raw YAML without syntax highlighting")
-def template_show_cmd(name: str, raw: bool) -> None:
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def template_show_cmd(name: str, raw: bool, as_json: bool) -> None:
     """Show template configuration.
 
     \b
@@ -1717,11 +1721,21 @@ def template_show_cmd(name: str, raw: bool) -> None:
     try:
         exists = template_exists(name)
     except ValueError as e:
-        console.print(f"[red]Error:[/red] {e}")
+        if as_json:
+            import json
+
+            click.echo(json.dumps({"error": str(e)}))
+            sys.exit(1)
+        print_error(f"{e}", console=console)
         sys.exit(1)
 
     if not exists:
-        console.print(f"[red]Error:[/red] Template '{name}' not found")
+        if as_json:
+            import json
+
+            click.echo(json.dumps({"error": f"Template '{name}' not found"}))
+            sys.exit(1)
+        print_error(f"Template '{name}' not found", console=console)
         print_tip("Run 'forge proxy template list' to see available templates.", console=console)
         sys.exit(1)
 
@@ -1736,6 +1750,17 @@ def template_show_cmd(name: str, raw: bool) -> None:
         source_label = "user"
     else:
         source_label = "built-in"
+
+    if as_json:
+        import json
+
+        click.echo(
+            json.dumps(
+                {"name": name, "source": source_label, "path": str(path), "content": content},
+                indent=2,
+            )
+        )
+        return
 
     if raw:
         console.print(content)
@@ -1765,12 +1790,12 @@ def template_edit_cmd(name: str) -> None:
     try:
         validate_template_name(name)
     except ValueError as e:
-        console.print(f"[red]Error:[/red] {e}")
+        print_error(f"{e}", console=console)
         sys.exit(1)
 
     # edit requires a shipped template to seed from
     if not shipped_template_exists(name):
-        console.print(f"[red]Error:[/red] No built-in template '{name}' to customize")
+        print_error(f"No built-in template '{name}' to customize", console=console)
         print_tip("Run 'forge proxy template list' to see available templates.", console=console)
         sys.exit(1)
 
@@ -1783,7 +1808,7 @@ def template_edit_cmd(name: str) -> None:
 
     editor = os.environ.get("EDITOR", "vim")
     if not shutil.which(editor):
-        console.print(f"[red]Error:[/red] Editor '{editor}' not found. Set $EDITOR to an available editor.")
+        print_error(f"Editor '{editor}' not found. Set $EDITOR to an available editor.", console=console)
         sys.exit(1)
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as tmp:
@@ -1794,7 +1819,7 @@ def template_edit_cmd(name: str) -> None:
     try:
         result = subprocess.run([editor, str(tmp_path)])
         if result.returncode != 0:
-            console.print(f"[red]Error:[/red] Editor exited with code {result.returncode}")
+            print_error(f"Editor exited with code {result.returncode}", console=console)
             console.print(f"Your changes are saved at: {display_path(tmp_path)}")
             sys.exit(1)
 
@@ -1804,12 +1829,12 @@ def template_edit_cmd(name: str) -> None:
             with open(tmp_path, encoding="utf-8") as f:
                 edited_data = pyyaml.safe_load(f)
         except Exception as e:
-            console.print(f"[red]Error:[/red] Invalid YAML: {e}")
+            print_error(f"Invalid YAML: {e}", console=console)
             console.print(f"Your changes are saved at: {display_path(tmp_path)}")
             sys.exit(1)
 
         if not isinstance(edited_data, dict):
-            console.print("[red]Error:[/red] Template must be a YAML mapping")
+            print_error("Template must be a YAML mapping", console=console)
             console.print(f"Your changes are saved at: {display_path(tmp_path)}")
             sys.exit(1)
 
@@ -1819,9 +1844,9 @@ def template_edit_cmd(name: str) -> None:
         _proxy_block = edited_data.get("proxy")
         _family = _proxy_block.get("family", "") if isinstance(_proxy_block, dict) else ""
         if not isinstance(_family, str) or not _family.strip():
-            console.print(
-                "[red]Error:[/red] Invalid template configuration: "
-                "proxy.family is required (must be a non-blank string)"
+            print_error(
+                "Invalid template configuration: " "proxy.family is required (must be a non-blank string)",
+                console=console,
             )
             console.print(f"Your changes are saved at: {display_path(tmp_path)}")
             sys.exit(1)
@@ -1833,7 +1858,7 @@ def template_edit_cmd(name: str) -> None:
 
             dict_to_dataclass(ForgeConfig, edited_data, strict=True)
         except (ValueError, TypeError, KeyError, AttributeError) as e:
-            console.print(f"[red]Error:[/red] Invalid template configuration: {e}")
+            print_error(f"Invalid template configuration: {e}", console=console)
             console.print(f"Your changes are saved at: {display_path(tmp_path)}")
             sys.exit(1)
 
@@ -1876,7 +1901,7 @@ def template_reset_cmd(name: str, yes: bool) -> None:
     try:
         user_path = get_user_template_path(name)
     except ValueError as e:
-        console.print(f"[red]Error:[/red] {e}")
+        print_error(f"{e}", console=console)
         sys.exit(1)
 
     if not user_path.is_file():

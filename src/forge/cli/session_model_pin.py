@@ -11,7 +11,7 @@ import logging
 import sys
 from pathlib import Path
 
-from forge.cli.output import console, print_tip
+from forge.cli.output import console, print_error, print_tip
 from forge.config.schema import ProxyInstanceConfig
 from forge.core.state import FileLockTimeoutError
 from forge.session import SessionState, SessionStore
@@ -185,7 +185,7 @@ def _apply_and_persist_direct_model_override(
     if direct_model is None:
         return
     if use_sidecar:
-        console.print(f"[red]Error:[/red] --model cannot be combined with sidecar {surface}")
+        print_error(f"--model cannot be combined with sidecar {surface}", console=console)
         sys.exit(1)
 
     _apply_direct_model_override_to_state(state, direct_model)

@@ -167,19 +167,19 @@ inside Claude Code for an interactive walkthrough.
 
 ## CLI Overview
 
-| Command Group          | Purpose                                      |
-| ---------------------- | -------------------------------------------- |
-| `forge claude`         | Bare launch, settings preset management      |
-| `forge session`        | Named sessions, worktrees, resume, fork      |
-| `forge memory`         | Project memory passports, shadow proposals   |
-| `forge proxy`          | Model routing, templates, tier mappings      |
-| `forge authentication` | Credential management (`credentials.yaml`)   |
-| `forge policy`         | Policy enforcement, plan supervision         |
-| `forge workflow`       | Workflow runners (panel, analyze, debate)    |
-| `forge search`         | Transcript search across sessions            |
-| `forge config`         | Runtime preferences (`~/.forge/config.yaml`) |
-| `forge extension`      | Enable/sync/disable extensions               |
-| `forge info`           | System health and installation info          |
+| Command Group     | Purpose                                      |
+| ----------------- | -------------------------------------------- |
+| `forge claude`    | Bare launch, settings preset management      |
+| `forge session`   | Named sessions, worktrees, resume, fork      |
+| `forge memory`    | Project memory passports, shadow proposals   |
+| `forge proxy`     | Model routing, templates, tier mappings      |
+| `forge auth`      | Credential management (`credentials.yaml`)   |
+| `forge policy`    | Policy enforcement, plan supervision         |
+| `forge workflow`  | Workflow runners (panel, analyze, debate)    |
+| `forge search`    | Transcript search across sessions            |
+| `forge config`    | Runtime preferences (`~/.forge/config.yaml`) |
+| `forge extension` | Enable/sync/disable extensions               |
+| `forge info`      | System health and installation info          |
 
 Run `forge <command> --help` for details on any command.
 

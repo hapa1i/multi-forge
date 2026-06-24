@@ -17,7 +17,7 @@ import click
 from rich.console import Console
 from rich.table import Table
 
-from forge.cli.output import print_tip
+from forge.cli.output import err_console, print_error, print_tip
 from forge.core.paths import display_path
 from forge.install.exceptions import (
     ForgeInstallError,
@@ -559,7 +559,7 @@ def enable_cmd(
 
         version_check = check_minimum_version()
         if not version_check.ok:
-            console.print(f"[red]Error:[/red] {version_check.reason}")
+            print_error(f"{version_check.reason}", console=console)
             print_tip("Run 'claude update' to upgrade.", console=console)
             sys.exit(1)
 
@@ -649,7 +649,7 @@ def enable_cmd(
     except click.UsageError:
         raise
     except NoClaudeDirectoryError as e:
-        console.print(f"[red]Error:[/red] {e}")
+        print_error(f"{e}", console=console)
         print_tip(
             "Use --scope user to enable globally, or --root <dir> to target a specific directory.", console=console
         )
@@ -659,7 +659,7 @@ def enable_cmd(
         print_tip("Use --force to override.", console=console)
         sys.exit(1)
     except ForgeInstallError as e:
-        console.print(f"[red]Error:[/red] {e}")
+        print_error(f"{e}", console=console)
         sys.exit(1)
 
 
@@ -698,7 +698,7 @@ def sync_cmd(scope: str | None, force: bool) -> None:
 
         version_check = check_minimum_version()
         if not version_check.ok:
-            console.print(f"[red]Error:[/red] {version_check.reason}")
+            print_error(f"{version_check.reason}", console=console)
             print_tip("Run 'claude update' to upgrade.", console=console)
             sys.exit(1)
 
@@ -738,14 +738,14 @@ def sync_cmd(scope: str | None, force: bool) -> None:
             _print_codex_completion(plan, install_scope)
 
     except NoForgeInstallationError as e:
-        console.print(f"[red]Error:[/red] {e}")
+        print_error(f"{e}", console=console)
         sys.exit(1)
     except NotInstalledError as e:
-        console.print(f"[red]Error:[/red] {e}")
+        print_error(f"{e}", console=console)
         print_tip("Run 'forge extension enable' first.", console=console)
         sys.exit(1)
     except ForgeInstallError as e:
-        console.print(f"[red]Error:[/red] {e}")
+        print_error(f"{e}", console=console)
         sys.exit(1)
 
 
@@ -867,13 +867,13 @@ def disable_cmd(scope: str | None, uninstall_all: bool, yes: bool) -> None:
         console.print("\n[green]Extensions disabled.[/green]")
 
     except NoForgeInstallationError as e:
-        console.print(f"[red]Error:[/red] {e}")
+        print_error(f"{e}", console=console)
         sys.exit(1)
     except TrackingCorruptedError as e:
-        console.print(f"[bold red]Error:[/bold red] {e}")
+        print_error(f"{e}", console=console)
         sys.exit(1)
     except ForgeInstallError as e:
-        console.print(f"[red]Error:[/red] {e}")
+        print_error(f"{e}", console=console)
         sys.exit(1)
 
 
@@ -928,7 +928,7 @@ def status_cmd(scope: str | None, path: str | None, show_all: bool, as_json: boo
         tracking = TrackingStore()
         tracking.read()
     except TrackingCorruptedError as e:
-        console.print(f"[bold red]Error:[/bold red] {e}")
+        print_error(str(e), console=err_console)
         raise SystemExit(1) from None
 
     cwd = os.getcwd()

@@ -140,16 +140,34 @@ class TestSearchCommand:
     """Tests for forge search query <terms>."""
 
     def test_bare_search_prints_help(self, runner: CliRunner) -> None:
-        """Bare non-leaf command orients users; query is the explicit action."""
+        """Bare non-leaf prints help to stderr and exits 2 (usage error), like every other group."""
         result = runner.invoke(main, ["search"])
+        assert result.exit_code == 2
+        assert "Usage:" in result.stderr
+        assert "query" in result.stderr
+        assert "rebuild-index" in result.stderr
+
+    def test_search_default_renders_table(self, runner: CliRunner, populated_store: SearchDocumentStore) -> None:
+        """Default (no --json) renders a human table with a result-count footer, not JSON."""
+        result = runner.invoke(main, ["search", "query", "timeout"])
         assert result.exit_code == 0
-        assert "Usage:" in result.output
-        assert "query" in result.output
-        assert "rebuild-index" in result.output
+        with pytest.raises(json.JSONDecodeError):
+            json.loads(result.output)
+        assert "Score" in result.output
+        assert "db-config" in result.output
+        assert "result(s)" in result.output
+
+    def test_search_default_no_results_human_message(
+        self, runner: CliRunner, populated_store: SearchDocumentStore
+    ) -> None:
+        """Default with no matches prints a human 'No results' line, not empty JSON."""
+        result = runner.invoke(main, ["search", "query", "xyznonexistent"])
+        assert result.exit_code == 0
+        assert "No results" in result.output
 
     def test_search_outputs_json(self, runner: CliRunner, populated_store: SearchDocumentStore) -> None:
-        """Search outputs valid JSON with results (project scope, the default)."""
-        result = runner.invoke(main, ["search", "query", "timeout"])
+        """`--json` outputs valid JSON with results (project scope)."""
+        result = runner.invoke(main, ["search", "query", "timeout", "--json"])
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert "results" in data
@@ -158,8 +176,8 @@ class TestSearchCommand:
         assert "db-config" in session_names
 
     def test_search_no_results(self, runner: CliRunner, populated_store: SearchDocumentStore) -> None:
-        """Search for nonexistent term returns empty results."""
-        result = runner.invoke(main, ["search", "query", "xyznonexistent"])
+        """`--json` for a nonexistent term returns empty results."""
+        result = runner.invoke(main, ["search", "query", "xyznonexistent", "--json"])
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert data["total_results"] == 0
@@ -167,7 +185,7 @@ class TestSearchCommand:
 
     def test_search_limit(self, runner: CliRunner, populated_store: SearchDocumentStore) -> None:
         """--limit flag caps results."""
-        result = runner.invoke(main, ["search", "query", "timeout", "--limit", "1"])
+        result = runner.invoke(main, ["search", "query", "timeout", "--limit", "1", "--json"])
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert len(data["results"]) <= 1
@@ -181,7 +199,7 @@ class TestSearchCommand:
         (project / ".git").mkdir()
         monkeypatch.chdir(project)
 
-        result = runner.invoke(main, ["search", "query", "anything"])
+        result = runner.invoke(main, ["search", "query", "anything", "--json"])
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert data["total_results"] == 0
@@ -198,7 +216,7 @@ class TestSearchCommand:
             "forge.session.index.IndexStore.list_sessions",
             return_value=[("other-session", SimpleNamespace(project_root=str(other_root)))],
         ):
-            result = runner.invoke(main, ["search", "query", "timeout", "--scope", "all"])
+            result = runner.invoke(main, ["search", "query", "timeout", "--scope", "all", "--json"])
 
         assert result.exit_code == 0
         data = json.loads(result.output)
@@ -211,7 +229,7 @@ class TestSearchCommand:
     ) -> None:
         """--scope all should not claim the index is missing when indexed projects simply have no matches."""
         with patch("forge.session.index.IndexStore.list_sessions", return_value=[]):
-            result = runner.invoke(main, ["search", "query", "xyznonexistent", "--scope", "all"])
+            result = runner.invoke(main, ["search", "query", "xyznonexistent", "--scope", "all", "--json"])
 
         assert result.exit_code == 0
         data = json.loads(result.output)
@@ -229,7 +247,7 @@ class TestSearchCommand:
         monkeypatch.chdir(project)
 
         with patch("forge.session.index.IndexStore.list_sessions", return_value=[]):
-            result = runner.invoke(main, ["search", "query", "anything", "--scope", "all"])
+            result = runner.invoke(main, ["search", "query", "anything", "--scope", "all", "--json"])
 
         assert result.exit_code == 0
         data = json.loads(result.output)
@@ -250,7 +268,7 @@ class TestSearchCommand:
         store_dir.mkdir(parents=True)
         (store_dir / "bm25_index.json").write_text("not valid json {{{")
 
-        result = runner.invoke(main, ["search", "query", "anything"])
+        result = runner.invoke(main, ["search", "query", "anything", "--json"])
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert data["total_results"] == 0
@@ -375,7 +393,7 @@ class TestEndToEndPipeline:
         assert "Indexed 2 transcripts" in result.output
 
         # Step 2: Search for "database timeout"
-        result = runner.invoke(main, ["search", "query", "database timeout"])
+        result = runner.invoke(main, ["search", "query", "database timeout", "--json"])
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert data["total_results"] >= 1
@@ -383,7 +401,7 @@ class TestEndToEndPipeline:
         assert data["results"][0]["session_name"] == "db-work"
 
         # Step 3: Search for "authentication" — should find auth-work, not db-work
-        result = runner.invoke(main, ["search", "query", "authentication"])
+        result = runner.invoke(main, ["search", "query", "authentication", "--json"])
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert data["total_results"] >= 1
@@ -424,7 +442,7 @@ class TestEndToEndPipeline:
         runner.invoke(main, ["search", "status"])
 
         # Now search should find the indexed transcript
-        result = runner.invoke(main, ["search", "query", "memory leak"])
+        result = runner.invoke(main, ["search", "query", "memory leak", "--json"])
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert data["total_results"] >= 1
@@ -487,13 +505,53 @@ class TestPruneCmd:
         state = IndexState(indexed_files={"/nonexistent/ghost.jsonl": IndexedFileEntry(mtime=0, size=0, indexed_at="")})
         index_store.write(state)
 
-        result = runner.invoke(main, ["search", "clean"])
+        result = runner.invoke(main, ["search", "clean", "--yes"])
         assert result.exit_code == 0
         assert "1" in result.output and "orphaned documents" in result.output
         assert "1" in result.output and "stale index entries" in result.output
         # Both stores cleaned
         assert store.read() == []
         assert index_store.read().indexed_files == {}
+
+    def test_clean_previews_by_default_without_pruning(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Bare `clean` previews orphans and offers --yes, removing nothing."""
+        from forge.search.index_state import (
+            IndexedFileEntry,
+            IndexState,
+            IndexStateStore,
+        )
+
+        project_root = tmp_path / "project"
+        project_root.mkdir()
+        (project_root / ".git").mkdir()
+        monkeypatch.chdir(project_root)
+
+        store = SearchDocumentStore(forge_root=project_root)
+        store.write(
+            [
+                SearchDocumentMeta(
+                    transcript_path="/nonexistent/ghost.jsonl",
+                    session_name="ghost",
+                    session_id="g1",
+                    extracted_at="2026-01-01T00:00:00+00:00",
+                    metadata={},
+                ),
+            ]
+        )
+        index_store = IndexStateStore(forge_root=project_root)
+        index_store.write(
+            IndexState(indexed_files={"/nonexistent/ghost.jsonl": IndexedFileEntry(mtime=0, size=0, indexed_at="")})
+        )
+
+        result = runner.invoke(main, ["search", "clean"])
+        assert result.exit_code == 0
+        assert "Would prune" in result.output
+        assert "Use --yes to prune." in result.output
+        # Nothing removed by the preview
+        assert len(store.read()) == 1
+        assert index_store.read().indexed_files != {}
 
     def test_prune_nothing_to_do(self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """Prune with all valid documents reports nothing to do."""
@@ -548,3 +606,94 @@ class TestSearchStatus:
         normalized_output = result.output.replace("\n", "")
         assert ".forge/search-index" in normalized_output
         assert "3" in result.output  # 3 documents
+
+    def test_status_json_not_built(self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """`--json` for an unbuilt index emits the not-built shape with null/zero stats."""
+        project_root = tmp_path / "project"
+        project_root.mkdir()
+        (project_root / ".git").mkdir()
+        monkeypatch.chdir(project_root)
+
+        result = runner.invoke(main, ["search", "status", "--json"])
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert data == {
+            "built": False,
+            "index_location": str(project_root / ".forge" / "search-index"),
+            "documents_indexed": 0,
+            "files_tracked": 0,
+            "updated_at": None,
+            "sessions": 0,
+            "bm25": None,
+        }
+
+    def test_status_json_built(self, runner: CliRunner, populated_store: SearchDocumentStore) -> None:
+        """`--json` for a populated index emits built=True with document/session/bm25 stats."""
+        project_root = Path.cwd()
+        result = runner.invoke(main, ["search", "status", "--json"])
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+
+        assert set(data) == {
+            "built",
+            "index_location",
+            "documents_indexed",
+            "files_tracked",
+            "updated_at",
+            "sessions",
+            "bm25",
+        }
+        assert data["built"] is True
+        assert data["index_location"] == str(project_root / ".forge" / "search-index")
+        assert data["documents_indexed"] == 3
+        assert isinstance(data["files_tracked"], int)
+        # updated_at is null unless index state was written; assert nullable contract.
+        assert data["updated_at"] is None or isinstance(data["updated_at"], str)
+        assert data["sessions"] == 3  # db-config, auth-feature, pool-fix
+
+        bm25 = data["bm25"]
+        assert isinstance(bm25, dict)
+        assert set(bm25) == {"documents", "unique_terms"}
+        assert bm25["documents"] == 3
+        assert isinstance(bm25["unique_terms"], int)
+        assert bm25["unique_terms"] > 0
+
+    def test_status_json_built_tracks_files_and_timestamp(
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """After a real rebuild, files_tracked and updated_at are populated (non-zero/str).
+
+        The populated_store fixture never writes index state, so files_tracked/updated_at
+        stay at their zero/null floor there; this exercises them via the real rebuild path.
+        """
+        project_root = tmp_path / "project"
+        project_root.mkdir()
+        (project_root / ".git").mkdir()
+        tdir = project_root / ".forge" / "artifacts" / "sess" / "transcripts"
+        tdir.mkdir(parents=True)
+        (tdir / "s1.jsonl").write_text(
+            '{"requestId":"r1","timestamp":"2026-01-01T00:00:00Z",'
+            '"message":{"role":"user","content":[{"type":"text","text":"index the search timeout config"}]}}\n'
+        )
+        monkeypatch.chdir(project_root)
+
+        assert runner.invoke(main, ["search", "rebuild-index"]).exit_code == 0
+
+        result = runner.invoke(main, ["search", "status", "--json"])
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert data["built"] is True
+        assert data["files_tracked"] >= 1
+        assert isinstance(data["updated_at"], str) and data["updated_at"]
+
+    def test_status_json_built_without_bm25(self, runner: CliRunner, populated_store: SearchDocumentStore) -> None:
+        """built=True with bm25:null when documents exist but the BM25 store is absent."""
+        bm25_file = Path.cwd() / ".forge" / "search-index" / "bm25_index.json"
+        bm25_file.unlink()
+
+        result = runner.invoke(main, ["search", "status", "--json"])
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert data["built"] is True
+        assert data["documents_indexed"] == 3
+        assert data["bm25"] is None

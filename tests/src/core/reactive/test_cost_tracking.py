@@ -104,7 +104,7 @@ class TestComputeDelta:
         """A proxy restart/reset mid-verb (after < before) clamps every delta at 0.
 
         A negative cost delta would otherwise be logged and inflate the unattributed
-        "Interactive" residual in `forge proxy costs`; tokens and request counters
+        "Interactive" residual in `forge telemetry costs`; tokens and request counters
         must not go negative either. A reset means "no attributable delta," not
         negative usage.
         """

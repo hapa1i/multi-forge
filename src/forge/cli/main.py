@@ -18,7 +18,6 @@ load_dotenv()
 from forge.install.cli import info_cmd  # noqa: E402
 
 from .auth import auth  # noqa: E402
-from .backend import backend  # noqa: E402
 from .claude import claude  # noqa: E402
 from .codex import codex  # noqa: E402
 from .config_cmd import config as config_cmd  # noqa: E402
@@ -26,13 +25,15 @@ from .extensions import extensions  # noqa: E402
 from .hooks import hooks  # noqa: E402
 from .memory import memory as memory_cmd  # noqa: E402
 from .memory_writer import memory_writer  # noqa: E402
+from .model import model as model_cmd  # noqa: E402
 from .policy import policy  # noqa: E402
-from .provider import provider  # noqa: E402
 from .proxy import proxy  # noqa: E402
 from .runtime import runtime  # noqa: E402
 from .search import search_cmd  # noqa: E402
 from .session import session  # noqa: E402
+from .session_memory import session_memory  # noqa: E402
 from .status_line import status_line  # noqa: E402
+from .telemetry import telemetry  # noqa: E402
 from .transfer import transfer as transfer_cmd  # noqa: E402
 from .workflow import workflow_cmd  # noqa: E402
 
@@ -42,21 +43,18 @@ from .workflow import workflow_cmd  # noqa: E402
 _EXEMPT_SUBCOMMANDS = frozenset({"hook", "status-line", "logs", "clean"})
 
 # Session auto-cleanup is also exempt for session subcommands so that
-# inspection commands (list, clean --dry-run, show) are side-effect-free.
+# inspection commands (list, clean preview, show) are side-effect-free.
 # Auto-cleanup still fires on every other forge command.
 _SESSION_CLEANUP_EXEMPT = frozenset({"hook", "status-line", "logs", "session", "clean"})
 
 _ALIASES: dict[str, str] = {
-    "auth": "authentication",
     "ext": "extension",
-    "extensions": "extension",  # backward compat (renamed from plural)
     "sess": "session",
     "mem": "memory",
     "cfg": "config",
 }
 # Display aliases: canonical -> preferred short alias (shown in help)
 _DISPLAY_ALIASES: dict[str, str] = {
-    "authentication": "auth",
     "extension": "ext",
     "session": "sess",
     "memory": "mem",
@@ -377,11 +375,11 @@ def main(ctx: click.Context) -> None:
         _auto_clean_sessions_best_effort()
 
 
-main.add_command(auth, name="authentication")
-main.add_command(backend)
+main.add_command(auth, name="auth")
+main.add_command(model_cmd, name="model")
 main.add_command(session)
 main.add_command(proxy)
-main.add_command(provider)
+main.add_command(telemetry)
 main.add_command(policy)
 main.add_command(memory_writer)
 main.add_command(claude)
@@ -389,7 +387,6 @@ main.add_command(codex, name="codex")
 main.add_command(config_cmd, name="config")
 main.add_command(hooks)
 main.add_command(memory_cmd, name="memory")
-main.add_command(transfer_cmd, name="transfer")
 main.add_command(extensions, name="extension")
 main.add_command(status_line)
 main.add_command(info_cmd, name="info")
@@ -397,13 +394,17 @@ main.add_command(workflow_cmd, name="workflow")
 main.add_command(search_cmd, name="search")
 main.add_command(runtime, name="runtime")
 
-from forge.cli.activity import activity_cmd  # noqa: E402
+# Session-scoped subgroups are wired onto `session` here (the assembly layer),
+# not inside session.py: both transfer.py and session_memory.py import `console`
+# from session.py, so having session.py import them would form a cycle.
+session.add_command(transfer_cmd, name="transfer")
+session.add_command(session_memory, name="memory")
+
 from forge.cli.gc import clean_cmd  # noqa: E402
 from forge.cli.logs import logs_cmd  # noqa: E402
 
 main.add_command(clean_cmd, name="clean")
 main.add_command(logs_cmd, name="logs")
-main.add_command(activity_cmd, name="activity")
 
 
 if __name__ == "__main__":

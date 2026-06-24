@@ -434,10 +434,10 @@ bash "$SCRIPTS/run-in-repo.sh" forge search rebuild-index
 <!-- auto -->
 
 ```bash
-bash "$SCRIPTS/run-in-repo.sh" forge search query "emoji"
+bash "$SCRIPTS/run-in-repo.sh" forge search query "emoji" --json
 ```
 
-- [ ] Returns JSON output
+- [ ] Returns JSON output (`--json`; bare query prints a human table)
 - [ ] total_results >= 1 (finds the policy demo transcript)
 
 ### 10.6 Search Status (After Index)
@@ -533,8 +533,8 @@ EOF
 forge memory track .forge/memory/walkthrough-notes.md --strategy generic
 forge memory list
 forge memory list --json
-forge memory enable --session walkthrough-demo
-forge memory status
+forge session memory enable --session walkthrough-demo
+forge session memory status
 forge memory passport remove .forge/memory/walkthrough-notes.md
 forge memory list
 ```

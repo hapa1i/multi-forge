@@ -21,6 +21,12 @@ from forge.session.exceptions import ForgeSessionError, SessionExistsError
 # their width is preserved; only this fallback is width-less.
 console = Console()
 
+# Shared stderr console. Errors/diagnostics that must not pollute stdout (the
+# results stream, per cli_style_guidelines.md "Output Streams") pass this via
+# ``console=`` -- e.g. failures that previously raised ``click.ClickException``,
+# which Click renders to stderr.
+err_console = Console(stderr=True)
+
 
 def _resolve(console_arg: Console | None) -> Console:
     return console_arg if console_arg is not None else console

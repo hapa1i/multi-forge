@@ -68,6 +68,9 @@ Check which models are locally routable with `forge workflow list-models`. Model
 show `[configured]` / `[not configured]` status. Models whose proxy isn't running or whose API key isn't configured show
 as **unavailable**. Use `--available` to see only ready models, or `--json` for structured output.
 
+Use `forge model catalog` for Forge's static model capability catalog; `forge workflow list-models` is the runtime
+readiness view for workflow runners.
+
 ---
 
 ## Workflows
@@ -219,7 +222,7 @@ signals lets you make an informed call. A typical pattern:
 1. Executor implements with supervision enabled (drift is blocked)
 2. `forge workflow panel` or `forge workflow consensus` reviews the implemented code
 3. Reviewers recommend improvements that weren't in the plan
-4. You suspend the supervisor (`%policy supervise off`), apply the improvement, then reload an updated plan if needed
+4. You suspend the supervisor (`%policy supervisor off`), apply the improvement, then reload an updated plan if needed
 
 The review provides the evidence ("frozen dataclasses would be better here"), the supervisor ensures the deviation is
 your decision rather than the executor freelancing.

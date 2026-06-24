@@ -206,12 +206,12 @@ def _ensure_audit_plumbing_mounts(proxy_id: str) -> list[tuple[str, str, str]]:
       state persist where the host reads them.
     - legacy host audit/, costs/, and usage/ read-write during the clean-cut migration,
       so old cost history can seed cap state and any compatibility reads stay durable
-      reads them (`forge proxy audit|costs`, `forge activity`, the session-end summary)
+      reads them (`forge proxy audit|costs`, `forge telemetry activity`, the session-end summary)
       instead of dying with the --rm container. Each would otherwise be lost silently:
       caps bootstrap from cost history, so an unmounted costs/ resets daily/monthly caps
       every launch; and in sidecar mode the in-container supervisor + workflow verbs are
       the *only* writers of their usage events, so an unmounted usage/ makes the whole
-      session invisible to `forge activity`.
+      session invisible to `forge telemetry activity`.
     - host config.yaml read-only WHEN IT EXISTS, so the in-container proxy reads the global
       provider_trace.inject_provider_user toggle (it governs the proxied OpenRouter route too).
       A Docker bind source must pre-exist; an absent file means the toggle is its default (off),

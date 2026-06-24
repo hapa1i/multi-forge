@@ -119,7 +119,7 @@ def test_rebuild_index_sees_latest_turn_after_repeated_stop(
     assert rebuilt.exit_code == 0, rebuilt.output
     assert "Indexed 1 transcripts." in rebuilt.output
 
-    searched = runner.invoke(main, ["search", "query", "emoji"])
+    searched = runner.invoke(main, ["search", "query", "emoji", "--json"])
     assert searched.exit_code == 0, searched.output
     data = json.loads(searched.output)
     assert data["total_results"] == 1

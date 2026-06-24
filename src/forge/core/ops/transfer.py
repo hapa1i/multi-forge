@@ -1,6 +1,6 @@
 """Shared transfer-context operations (command-core).
 
-UI-agnostic operations behind ``forge transfer`` (and a future ``%transfer``
+UI-agnostic operations behind ``forge session transfer`` (and a future ``%transfer``
 direct command). They return structured data and raise ``ForgeOpError`` on
 failure -- no Click, no printing.
 

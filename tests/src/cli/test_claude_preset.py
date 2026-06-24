@@ -41,6 +41,57 @@ class TestPresetShow:
         assert result.exit_code == 2
         assert "Manage Claude Code settings preset" in result.output
 
+    def test_show_json_default(self) -> None:
+        runner = CliRunner()
+        result = runner.invoke(claude, ["preset", "show", "--json"])
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert set(data) == {"path", "preset"}
+        assert isinstance(data["path"], str)
+        assert data["path"].endswith("claude.preset.json")
+        assert isinstance(data["preset"], dict)
+        assert "hooks" in data["preset"]
+        assert "statusLine" in data["preset"]
+
+    def test_show_json_custom_content(self) -> None:
+        preset_path = ensure_preset()
+        custom = {"hooks": {}, "env": {"MY_VAR": "1"}}
+        preset_path.write_text(json.dumps(custom, indent=2))
+        runner = CliRunner()
+        result = runner.invoke(claude, ["preset", "show", "--json"])
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert set(data) == {"path", "preset"}
+        assert data["path"] == str(preset_path)
+        assert data["preset"] == custom
+
+    def test_show_json_corrupt_fails_loud(self) -> None:
+        preset_path = ensure_preset()
+        preset_path.write_text("{not valid json")
+        runner = CliRunner()
+        result = runner.invoke(claude, ["preset", "show", "--json"])
+        assert result.exit_code != 0
+        assert "Preset file is not valid JSON" in result.output
+
+    def test_show_human_tolerates_corrupt_preset(self) -> None:
+        preset_path = ensure_preset()
+        corrupt = "{not valid json"
+        preset_path.write_text(corrupt)
+        runner = CliRunner()
+        result = runner.invoke(claude, ["preset", "show"])
+        assert result.exit_code == 0
+        assert "Claude Code Settings Preset" in result.output
+        assert "not valid json" in result.output
+
+    def test_show_raw_tolerates_corrupt_preset(self) -> None:
+        preset_path = ensure_preset()
+        corrupt = "{not valid json"
+        preset_path.write_text(corrupt)
+        runner = CliRunner()
+        result = runner.invoke(claude, ["preset", "show", "--raw"])
+        assert result.exit_code == 0
+        assert corrupt in result.output
+
 
 class TestPresetReset:
     def test_reset_restores_builtin(self) -> None:

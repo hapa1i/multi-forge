@@ -1,11 +1,11 @@
 """Backend management CLI commands.
 
 Provides commands to manage backend services (LiteLLM, etc.) that proxies depend on:
-- forge backend list: List all backends
-- forge backend create: Create backend config
-- forge backend start: Start a backend instance
-- forge backend stop: Stop a backend instance
-- forge backend delete: Delete backend config or instance
+- forge model backend list: List all backends
+- forge model backend create: Create backend config
+- forge model backend start: Start a backend instance
+- forge model backend stop: Stop a backend instance
+- forge model backend delete: Delete backend config or instance
 """
 
 from __future__ import annotations
@@ -32,7 +32,7 @@ from forge.backend.sources import (
     list_model_sources,
     resolve_model_source_id,
 )
-from forge.cli.output import print_error, print_error_with_tip, print_tip
+from forge.cli.output import err_console, print_error, print_error_with_tip, print_tip
 from forge.core.auth.template_secrets import resolve_env_or_credential_with_source
 from forge.core.credential_registry import EnvVar
 from forge.core.ops import (
@@ -45,6 +45,7 @@ from forge.core.paths import display_path, get_forge_home
 
 _SUPPORTED_ADAPTERS = frozenset({"litellm"})
 _ENV_REF_RE = re.compile(r"^os\.environ/([A-Z][A-Z0-9_]*)$")
+_BACKEND_COMMAND = "forge model backend"
 
 
 @dataclass(frozen=True)
@@ -60,9 +61,9 @@ def backend() -> None:
 
     \b
     Examples:
-        forge backend list                     # List backends
-        forge backend create litellm           # Create backend config
-        forge backend start litellm -p 4000    # Start an instance
+        forge model backend list                     # List backends
+        forge model backend create litellm           # Create backend config
+        forge model backend start litellm -p 4000    # Start an instance
     """
 
 
@@ -359,7 +360,7 @@ def _resolve_lifecycle_operand(operand: str, port: int | None) -> tuple[str, int
         return operand, port
 
     raise click.ClickException(
-        f"Unknown backend source or adapter '{operand}'. Use 'forge backend list' to see source ids."
+        f"Unknown backend source or adapter '{operand}'. Use '{_BACKEND_COMMAND} list' to see source ids."
     )
 
 
@@ -376,13 +377,13 @@ def _resolve_local_adapter_operand(operand: str) -> str:
         adapter = source.local_lifecycle.adapter if source.local_lifecycle else "litellm"
         raise click.ClickException(
             f"Backend source '{source.id}' is built in; manage its local adapter config with "
-            f"'forge backend create {adapter}' or 'forge backend delete {adapter}'."
+            f"'{_BACKEND_COMMAND} create {adapter}' or '{_BACKEND_COMMAND} delete {adapter}'."
         )
 
     valid_adapters = ", ".join(sorted(_SUPPORTED_ADAPTERS))
     raise click.ClickException(
         f"Unknown backend adapter or source '{operand}'. Valid adapters: {valid_adapters}. "
-        "Use 'forge backend list' to see source ids."
+        f"Use '{_BACKEND_COMMAND} list' to see source ids."
     )
 
 
@@ -521,7 +522,7 @@ def _show_source(source: ModelSource, raw: bool, console: Console) -> None:
         else:
             console.print(f"\n[dim]No config found for adapter '{lifecycle.adapter}'.[/dim]")
             print_tip(
-                f"Run 'forge backend create {lifecycle.adapter}'.",
+                f"Run '{_BACKEND_COMMAND} create {lifecycle.adapter}'.",
                 blank_before=False,
                 console=console,
             )
@@ -599,16 +600,22 @@ def list_cmd(as_json: bool) -> None:
 @backend.command("show")
 @click.argument("backend_id")
 @click.option("--raw", is_flag=True, help="Output raw config without syntax highlighting")
-def show_cmd(backend_id: str, raw: bool) -> None:
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def show_cmd(backend_id: str, raw: bool, as_json: bool) -> None:
     """Show backend details and configuration.
 
     \b
     Examples:
-        forge backend show litellm-4000
+        forge model backend show litellm-4000
     """
     console = Console(width=200)
     source = _source_for_identifier(backend_id)
     if source is not None:
+        if as_json:
+            runtime_instances = _load_runtime_instances()
+            instance_sources = _instance_source_map(runtime_instances)
+            click.echo(json.dumps(_source_record(source, runtime_instances, instance_sources), indent=2, default=str))
+            return
         _show_source(source, raw, console)
         return
 
@@ -617,6 +624,41 @@ def show_cmd(backend_id: str, raw: bool) -> None:
     # Parse adapter type from backend_id (e.g., "litellm-4000" -> "litellm")
     parts = backend_id.rsplit("-", 1)
     adapter_type = parts[0] if len(parts) == 2 else backend_id
+
+    if as_json:
+        json_instance = None
+        try:
+            json_instance = store.read().backends.get(backend_id)
+        except Exception:
+            json_instance = None
+        json_config_path = get_backend_config_path(adapter_type)
+        runtime_record: dict[str, Any] | None = None
+        if json_instance is not None:
+            alive = json_instance.pid is not None and is_pid_alive(json_instance.pid)
+            runtime_record = {
+                "backend_id": backend_id,
+                "adapter_type": json_instance.adapter_type,
+                "port": json_instance.port,
+                "pid": json_instance.pid,
+                "status": json_instance.status,
+                "alive": alive,
+                "created_at": json_instance.created_at,
+            }
+        click.echo(
+            json.dumps(
+                {
+                    "backend_id": backend_id,
+                    "source_id": None,
+                    "found": json_instance is not None,
+                    "adapter_type": adapter_type,
+                    "runtime_instance": runtime_record,
+                    "config_path": str(json_config_path) if json_config_path.exists() else None,
+                },
+                indent=2,
+                default=str,
+            )
+        )
+        return
 
     try:
         registry = store.read()
@@ -662,7 +704,7 @@ def show_cmd(backend_id: str, raw: bool) -> None:
     else:
         console.print(f"\n[dim]No config found for adapter '{adapter_type}'.[/dim]")
         print_tip(
-            f"Run 'forge backend create {adapter_type}'.",
+            f"Run '{_BACKEND_COMMAND} create {adapter_type}'.",
             blank_before=False,
             console=console,
         )
@@ -684,8 +726,8 @@ def test_auth_cmd(source_id: str, as_json: bool, timeout: float) -> None:
     source = _source_for_identifier(source_id)
     if source is None:
         print_error(
-            f"Unknown backend source '{source_id}'. Use 'forge backend list' to see source ids.",
-            console=console,
+            f"Unknown backend source '{source_id}'. Use '{_BACKEND_COMMAND} list' to see source ids.",
+            console=err_console,
         )
         sys.exit(1)
 
@@ -751,7 +793,7 @@ def create_cmd(adapter: str, config: Path | None) -> None:
         print_error_with_tip(
             f"Backend config already exists: {display_path(config_path)}",
             "Start an instance with:",
-            commands=[f"forge backend start {adapter} --port 4000"],
+            commands=[f"{_BACKEND_COMMAND} start {adapter} --port 4000"],
             console=console,
         )
         sys.exit(1)
@@ -764,7 +806,7 @@ def create_cmd(adapter: str, config: Path | None) -> None:
         console.print(f"[green]Created[/green] backend config for '{adapter}'")
         console.print(f"  Config: {display_path(config_path)}")
         console.print("\n[dim]Start an instance with:[/dim]")
-        console.print(f"  forge backend start {adapter} --port 4000")
+        console.print(f"  {_BACKEND_COMMAND} start {adapter} --port 4000")
     except Exception as e:
         print_error(str(e), console=console)
         sys.exit(1)
@@ -786,7 +828,7 @@ def start_cmd(source_or_adapter: str, port: int | None) -> None:
         print_error_with_tip(
             f"Backend config not found for '{adapter}'",
             "Create it first:",
-            commands=[f"forge backend create {adapter}"],
+            commands=[f"{_BACKEND_COMMAND} create {adapter}"],
             console=console,
         )
         sys.exit(1)
@@ -875,7 +917,7 @@ def delete_cmd(adapter: str, port: int | None, yes: bool) -> None:
             print_error_with_tip(
                 f"Backend config not found for '{adapter}'",
                 "Create it first:",
-                commands=[f"forge backend create {adapter}"],
+                commands=[f"{_BACKEND_COMMAND} create {adapter}"],
                 console=console,
             )
             sys.exit(1)
@@ -926,15 +968,14 @@ def reconcile_cmd(source_id: str, request_id: str | None, remote_id: str | None,
     Provide exactly one of --request-id (local-anchored: local trace -> remote record) or
     --remote-id (remote-only: the backend's own record id, no local side).
     """
-    console = Console(width=200)
     if request_id and remote_id:
-        print_error("Use only one of --request-id or --remote-id, not both.", console=console)
+        print_error("Use only one of --request-id or --remote-id, not both.", console=err_console)
         sys.exit(1)
     if not request_id and not remote_id:
         print_error_with_tip(
             "Provide a local request id or a remote record id to reconcile.",
             "Use --request-id <id> (local) or --remote-id <id> (the backend's own record id).",
-            console=console,
+            console=err_console,
         )
         sys.exit(1)
 
@@ -947,11 +988,11 @@ def reconcile_cmd(source_id: str, request_id: str | None, remote_id: str | None,
             timeout_s=timeout,
         )
     except ForgeOpError as e:
-        print_error_with_tip(str(e), "Run 'forge backend list' to see source ids.", console=console)
+        print_error_with_tip(str(e), f"Run '{_BACKEND_COMMAND} list' to see source ids.", console=err_console)
         sys.exit(1)
     except RemoteAdapterError as e:
         # Adapter bug / config fault (e.g. no base URL) -- a clean CLI error, not a traceback.
-        print_error(f"Remote adapter error: {e}", console=console)
+        print_error(f"Remote adapter error: {e}", console=err_console)
         sys.exit(1)
 
     if as_json:

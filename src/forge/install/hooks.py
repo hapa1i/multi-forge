@@ -48,7 +48,7 @@ def _entry_has_command(entry: dict, needle: str) -> bool:
     """Check if a hook entry contains a command matching the needle.
 
     System boundary: reads Claude Code settings.json which may contain
-    either format depending on when the user last ran forge extensions sync.
+    either format depending on when the user last ran forge extension sync.
     - Current: {"hooks": [{"type": "command", "command": "..."}]}
     - Pre-sync: {"type": "command", "command": "..."}
     """
