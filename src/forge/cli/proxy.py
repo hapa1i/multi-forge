@@ -1575,7 +1575,10 @@ def metrics_cmd(proxy_id: str | None, as_json: bool) -> None:
         if len(proxies) == 1:
             proxy_id = proxies[0].proxy_id
         elif len(proxies) == 0:
-            console.print("[dim]No proxies registered.[/dim]")
+            if as_json:
+                console.print(json.dumps({}, indent=2))
+            else:
+                console.print("[dim]No proxies registered.[/dim]")
             return
         else:
             _display_all_metrics(console, proxies, as_json=as_json)

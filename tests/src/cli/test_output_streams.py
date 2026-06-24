@@ -25,6 +25,8 @@ _JSON_STDOUT_LEAVES = [
     ["telemetry", "trace", "list", "--json"],
     ["proxy", "audit", "show", "--json"],
     ["proxy", "audit", "diff", "--json"],
+    # Regression: empty registry used to print "No proxies registered." to stdout.
+    ["proxy", "metrics", "--json"],
 ]
 
 
@@ -35,6 +37,20 @@ def test_json_payload_on_stdout_with_clean_stderr(args: list[str]) -> None:
     assert result.exit_code == 0, result.output
     json.loads(result.stdout)  # raises if stdout is not pure JSON
     assert result.stderr == ""
+
+
+def test_shadows_review_bare_json_keeps_stdout_jq_safe(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Bare ``memory shadows review --for X --json`` forwards ``as_json`` (no human/Tip leak).
+
+    Regression (forge_cli_cleanup review): the bare-review path ``ctx.invoke``d
+    ``shadows_show`` without ``as_json`` and then ``print_tip``ped to stdout, leaking
+    non-JSON under ``--json``. Now it forwards ``as_json`` and gates the tip.
+    """
+    monkeypatch.setattr("forge.cli.memory._collect_shadow_entries", lambda scope, sf: ([], []))
+    result = CliRunner().invoke(main, ["memory", "shadows", "review", "--for", "docs/x.md", "--json"])
+    assert result.exit_code == 0, result.output
+    assert "Tip:" not in result.stdout
+    json.loads(result.stdout)  # raises if non-JSON leaked to stdout
 
 
 def test_activity_json_on_stdout_when_seeded(monkeypatch: pytest.MonkeyPatch) -> None:

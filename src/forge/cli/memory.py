@@ -716,8 +716,9 @@ def shadows_review_cmd(
 
     # Bare review: show raw content + hint
     ctx = click.get_current_context()
-    ctx.invoke(shadows_show_cmd, for_doc=for_doc, scope=scope)
-    print_tip("Use --curate to run LLM synthesis, --show-latest to view the last report.", console=console)
+    ctx.invoke(shadows_show_cmd, for_doc=for_doc, scope=scope, as_json=as_json)
+    if not as_json:
+        print_tip("Use --curate to run LLM synthesis, --show-latest to view the last report.", console=console)
 
 
 def _review_show_latest(
