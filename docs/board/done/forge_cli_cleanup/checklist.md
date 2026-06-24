@@ -27,8 +27,9 @@ namespace (backend moves under it); **D4 = split `forge memory` — activation/r
 finalized:** `auth` canonical (no `authentication` alias); new nouns `telemetry`/`model` get no alias; the `extensions`
 shim is removed; `ext`/`sess`/`mem`/`cfg` kept. **Slice 05 shipped 2026-06-24 — the final code slice. All Phase 2 slices
 (02-12) are complete and the card's code work is done. Closeout done: change log entry added, docs synced,
-`make pre-commit` clean, Docker integration 34/34 pass. Remaining: human-gated `impl_notes` promotion and the `doing/`
--> `done/` lane move (on merge).**
+`make pre-commit` clean, Docker integration 34/34 pass. **Closeout complete 2026-06-24:** durable lessons promoted to
+`impl_notes.md` (the D6 alias rule + the "symbol != CLI alias" trap), closeout change-log entry added, and the card
+moved `doing/` -> `done/`. Card is closed.**
 
 ## Audit reconciliation (verified 2026-06-23)
 

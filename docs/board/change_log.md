@@ -27,6 +27,21 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-24
 
+### forge_cli_cleanup closeout: CLI taxonomy cleanup card
+
+**Goal**: Close the active `forge_cli_cleanup` card after the full Phase 2 slice set (02-12) shipped and merged to
+`main`.
+
+**Key changes**:
+
+- Moved the card `doing/ -> done/` and corrected its stale status line (was "In progress; Slices 03, 04, 06 shipped").
+- Confirmed the durable lessons were already promoted to `impl_notes.md` (the D6 alias policy + the "Python symbol !=
+  CLI alias string" trap); no new promotion needed.
+- Recorded closeout completion in the card checklist's current-focus note.
+
+**Verification**: Code shipped via PR #49 (squash `8a38a372`); working tree clean on `main`. Docs-only closeout;
+`make pre-commit` clean.
+
 ### forge_cli_cleanup Slice 05: alias + canonical-name pass (final code slice)
 
 **Goal**: Apply the D6 alias decision — make `auth` the canonical command (remove the `authentication` alias) and remove
