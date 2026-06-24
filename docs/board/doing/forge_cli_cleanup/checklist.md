@@ -296,11 +296,21 @@ verification is recorded.
   `test_search`, `test_proxy_commands` (removal → exit 2), and the search-store `find_missing` units;
   `forge proxy clean` errors via Click; no stale `proxy clean` reference survives outside board files; `make pre-commit`
   clean.
-- [ ] **Slice 10 - Policy supervisor cleanup (F7).** Split `forge policy supervise` (12+ flags) into
-  `forge policy supervisor {status,set,off,on,reload,evaluate}`; `evaluate` (not `check`) is the one-shot file-vs-plan
-  eval; `forge policy check` keeps bundle-engine eval. Removing the collision drops `forge policy: supervise|supervisor`
-  from `LEAF_NAMING_ALLOWLIST`. Old `forge policy supervise` returns `No such command`. Update `%policy supervise`
-  direct command + docs.
+- [x] **Slice 10 - Policy supervisor cleanup (F7). SHIPPED.** Deleted `forge policy supervise` and promoted the lone
+  one-shot `supervisor` leaf into a `forge policy supervisor` group with **8 leaves**
+  `{status, set, off, on, remove, reload, cascade, evaluate}` (full fidelity: `remove` + a standalone `cascade on|off`
+  leaf preserved; cascade also stays a `set` modifier). The one-shot file-vs-plan eval is now `supervisor evaluate`
+  (`evaluate`, not `check` — `forge policy check` keeps bundle-engine eval, untouched). The re-slice is CLI-only; the
+  `supervisor.py` ops layer was unchanged (each leaf maps 1:1). `%policy supervise` direct command renamed to
+  `%policy supervisor` (handler `_handle_policy_supervisor`, sub-verbs unchanged). **Two clean breaks:** old
+  `forge policy supervise` and the bare one-shot `forge policy supervisor -f` both error via Click (exit 2); old
+  `%policy supervise` falls through the in-session dispatcher to block-JSON usage naming `supervisor` (no Click).
+  **Guards:** dropped the `forge policy: supervise|supervisor` entry from `LEAF_NAMING_ALLOWLIST` (now `{}`); the new
+  `supervisor status` leaf is forced by `_READ_LEAVES` to expose `--json` (shared `_supervisor_status_dict` with
+  `policy status`); no new confusable sibling pairs. **Verification:** 59 in `test_policy_supervisor.py` (incl. 2
+  clean-break tests + configured/unconfigured `status --json` shapes), 84 in `test_user_prompt_dispatcher.py` (incl.
+  old-verb-falls-through), 7 tree invariants, 2032 in `tests/src/cli`; complete doc/QA sweep (10 files) with empty stale
+  greps; `make pre-commit` clean.
 - [ ] **Slice 11 - Recovery-output cleanup (F9).** Route **all** terminal/user-visible `Tip:` output through
   `print_tip`/`print_error_with_tip`, **including tips embedded in `ClickException` messages**: the 8 plain
   `click.echo("Tip: …")` sites (auth.py ×4, claude.py ×2, hooks/install.py ×2) and the 2 `ClickException`-embedded tips
@@ -356,7 +366,7 @@ verification is recorded.
 | `--json` missing drained    | each read leaf                   | every `JSON_MISSING_ALLOWLIST` leaf + `authentication profiles` + `transfer diff` emits valid JSON; ledger `{}`                                                                                                                                    | `test_command_tree_invariants.py`                            |
 | `--json` dest normalized    | full tree                        | no leaf binds `json_output`; `JSON_DEST_ALLOWLIST` `{}`                                                                                                                                                                                            | `test_command_tree_invariants.py`                            |
 | Stream ownership            | `proxy costs`/`audit` (or moved) | `--json` mode: valid JSON on stdout, empty stderr; human mode on stdout                                                                                                                                                                            | `tests/src/cli/test_output_streams.py` (plain `CliRunner()`) |
-| Supervisor split            | session with supervisor          | `forge policy supervisor {status,set,off,on,reload,evaluate}` work; `supervise` exits 2; `LEAF_NAMING_ALLOWLIST` `{}`                                                                                                                              | `tests/src/cli/test_policy.py`                               |
+| Supervisor split            | session with supervisor          | `forge policy supervisor {status,set,off,on,remove,reload,cascade,evaluate}` work; `supervise` + bare `supervisor -f` exit 2; `status --json` shapes pinned; `LEAF_NAMING_ALLOWLIST` `{}`                                                          | `tests/src/cli/test_policy_supervisor.py`                    |
 | `session context` removed   | n/a                              | `forge session context` exits 2 "No such command"; `test_session_context.py` deleted                                                                                                                                                               | (removal)                                                    |
 | Error markup drained        | CLI source scan                  | `CLI_ERROR_MARKUP_ALLOWLIST` `{}`; all 10 terminal tips routed (incl. 2 `ClickException`); `proxy_costs.py:132` + `session_fork.py:467` reworded; tip guard fails on `Tip:` in CLI source, allowlist = exactly the 3 `direct_commands.py` payloads | `tests/src/cli/test_output.py`                               |
 

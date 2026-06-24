@@ -146,9 +146,9 @@ While the executor runs, the supervisor checks file edits against the planner's 
 during implementation, use the supervisor reload flow instead of removing supervision:
 
 ```text
-%policy supervise off
-%policy supervise reload
-%policy supervise on
+%policy supervisor off
+%policy supervisor reload
+%policy supervisor on
 ```
 
 When the executor stops, the memory writer runs in the executor checkout. The executor inherited memory activation from

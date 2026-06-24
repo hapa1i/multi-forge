@@ -552,7 +552,7 @@ forge session fork planner --into /path/to/executor-worktree --inline-plan
 
 The `--supervise` flag wires the parent as a semantic supervisor. Every code change is checked against the approved plan
 at `PreToolUse` time. Supervisor config persists through `forge session resume`. You can also wire supervision on
-existing sessions with `forge policy supervise <session>` or `%policy supervise <session>` in-session.
+existing sessions with `forge policy supervisor set <session>` or `%policy supervisor <session>` in-session.
 
 **Supervisor routing:** By default, the supervisor inherits the planner's proxy. Use `--supervisor-proxy` or
 `--no-supervisor-proxy` to override:
@@ -568,11 +568,11 @@ forge session fork planner --worktree --supervise --no-supervisor-proxy
 forge session start executor --supervise planner --supervisor-proxy openrouter-gemini
 
 # Or change supervisor routing on an existing session
-forge policy supervise planner --supervisor-proxy openrouter-gemini
+forge policy supervisor set planner --supervisor-proxy openrouter-gemini
 ```
 
 **Launch-time cascade and checker controls:** `fork` and `start` accept the same tier-1 cascade knobs as
-`forge policy supervise`, so you can wire the cheap pre-check at launch instead of in a second command. All require
+`forge policy supervisor set`, so you can wire the cheap pre-check at launch instead of in a second command. All require
 `--supervise`:
 
 ```bash
@@ -585,8 +585,8 @@ forge session start executor --supervise planner --cascade --checker-model googl
 ```
 
 Launch-time `--cascade` only sets the flag; it does **not** resolve a plan eagerly. The runtime hook escalates to the
-frontier supervisor when no plan exists yet. This differs from `forge policy supervise --cascade`, which resolves the
-plan at the time you run it.
+frontier supervisor when no plan exists yet. This differs from `forge policy supervisor set --cascade`, which resolves
+the plan at the time you run it.
 
 **Reasoning effort:** `--supervisor-effort` sets the frontier supervisor's `claude --effort`
 (`low/medium/high/xhigh/max`; `max` is Claude-only). `--checker-effort` sets the tier-1 checker's reasoning effort
@@ -602,24 +602,24 @@ forge session fork planner --worktree --supervise --cascade \
 
 ```bash
 # Suspend supervision (preserves config — resume_id, proxy, timeouts)
-forge policy supervise --off
-%policy supervise off
+forge policy supervisor off
+%policy supervisor off
 
 # Resume suspended supervisor
-forge policy supervise --on
-%policy supervise on
+forge policy supervisor on
+%policy supervisor on
 
 # Remove supervisor entirely
-forge policy supervise --remove
-%policy supervise remove
+forge policy supervisor remove
+%policy supervisor remove
 
 # Reload plan when it evolves (searches current session, forks, target)
-forge policy supervise --reload
-%policy supervise reload
+forge policy supervisor reload
+%policy supervisor reload
 
 # Reload from explicit file
-forge policy supervise --reload-from ~/.claude/plans/updated-plan.md
-%policy supervise reload /path/to/plan.md
+forge policy supervisor reload --from ~/.claude/plans/updated-plan.md
+%policy supervisor reload /path/to/plan.md
 ```
 
 The planner session stays intact throughout — it can be forked multiple times for different executors or reviewers.

@@ -465,11 +465,12 @@ forge proxy delete <proxy_id>
 ```
 
 **Launch-time auto-start (lookup-or-start).** `--proxy` (session start/resume/fork, `forge claude`) and
-`--supervisor-proxy` (session start/fork, `forge policy supervise`) accept a template name. When the name is a template,
-the launcher routes through `ensure_proxy()` → `start_proxy()` (reuse a live proxy, else adopt/spawn) instead of a
-lookup-only `resolve_proxy()`. This makes a template name with no running proxy — or a registry entry marked `healthy`
-that is no longer reachable — start a live proxy rather than fail. A bare proxy_id is still presence-only (revive with
-`forge proxy start <id>`); a name matching neither a proxy nor a template fails with a `forge proxy template list` hint.
+`--supervisor-proxy` (session start/fork, `forge policy supervisor set`) accept a template name. When the name is a
+template, the launcher routes through `ensure_proxy()` → `start_proxy()` (reuse a live proxy, else adopt/spawn) instead
+of a lookup-only `resolve_proxy()`. This makes a template name with no running proxy — or a registry entry marked
+`healthy` that is no longer reachable — start a live proxy rather than fail. A bare proxy_id is still presence-only
+(revive with `forge proxy start <id>`); a name matching neither a proxy nor a template fails with a
+`forge proxy template list` hint.
 
 **Key principle:** You do NOT edit internal templates/model catalog—only your proxy overlay.
 

@@ -466,7 +466,7 @@ def _handle_cmd_policy(data: dict[str, Any], argv: list[str]) -> None:
             json.dumps(
                 {
                     "decision": "block",
-                    "reason": "Usage: %policy status | enable | disable | check | supervise",
+                    "reason": "Usage: %policy status | enable | disable | check | supervisor",
                 }
             )
         )
@@ -490,12 +490,12 @@ def _handle_cmd_policy(data: dict[str, Any], argv: list[str]) -> None:
         _handle_policy_check(argv[1:])
         return
 
-    if sub == "supervise":
-        _handle_policy_supervise(argv[1:])
+    if sub == "supervisor":
+        _handle_policy_supervisor(argv[1:])
         return
 
     click.echo(
-        json.dumps({"decision": "block", "reason": "Usage: %policy status | enable | disable | check | supervise"})
+        json.dumps({"decision": "block", "reason": "Usage: %policy status | enable | disable | check | supervisor"})
     )
 
 
@@ -711,19 +711,19 @@ def _handle_policy_disable() -> None:
     click.echo(json.dumps({"decision": "block", "reason": "Policy enforcement disabled"}))
 
 
-def _handle_policy_supervise(argv: list[str]) -> None:
+def _handle_policy_supervisor(argv: list[str]) -> None:
     """Configure or show the semantic supervisor.
 
     Writes to intent (not overrides) so supervisor config survives
     ``resume --fresh`` which deepcopies ``intent.policy`` into child sessions.
 
-    - ``%policy supervise <target>``: set supervisor
-    - ``%policy supervise off``: suspend (preserves config)
-    - ``%policy supervise on``: resume suspended supervisor
-    - ``%policy supervise remove``: remove supervisor entirely
-    - ``%policy supervise reload [path]``: reload latest relevant approved plan
-    - ``%policy supervise cascade on|off``: toggle the tier-1 plan check
-    - ``%policy supervise``: show current config
+    - ``%policy supervisor <target>``: set supervisor
+    - ``%policy supervisor off``: suspend (preserves config)
+    - ``%policy supervisor on``: resume suspended supervisor
+    - ``%policy supervisor remove``: remove supervisor entirely
+    - ``%policy supervisor reload [path]``: reload latest relevant approved plan
+    - ``%policy supervisor cascade on|off``: toggle the tier-1 plan check
+    - ``%policy supervisor``: show current config
     """
     from forge.session.models import SessionState
 
@@ -741,7 +741,7 @@ def _handle_policy_supervise(argv: list[str]) -> None:
 
     cmd = argv[0].lower() if argv else ""
 
-    # %policy supervise off — suspend
+    # %policy supervisor off — suspend
     if cmd == "off":
         has_sup = (
             manifest.intent.policy and manifest.intent.policy.supervisor and manifest.intent.policy.supervisor.resume_id
@@ -766,7 +766,7 @@ def _handle_policy_supervise(argv: list[str]) -> None:
         )
         return
 
-    # %policy supervise on — resume
+    # %policy supervisor on — resume
     if cmd == "on":
 
         def _resume(m: object) -> None:
@@ -783,7 +783,7 @@ def _handle_policy_supervise(argv: list[str]) -> None:
                 json.dumps(
                     {
                         "decision": "block",
-                        "reason": "No supervisor configured. Use '%policy supervise <target>' to set one.",
+                        "reason": "No supervisor configured. Use '%policy supervisor <target>' to set one.",
                     }
                 )
             )
@@ -797,7 +797,7 @@ def _handle_policy_supervise(argv: list[str]) -> None:
         click.echo(json.dumps({"decision": "block", "reason": "Supervisor resumed"}))
         return
 
-    # %policy supervise remove — destructive
+    # %policy supervisor remove — destructive
     if cmd == "remove":
         has_sup = manifest.intent.policy and manifest.intent.policy.supervisor
         if not has_sup:
@@ -818,10 +818,10 @@ def _handle_policy_supervise(argv: list[str]) -> None:
         click.echo(json.dumps({"decision": "block", "reason": "Supervisor removed"}))
         return
 
-    # %policy supervise reload [path]
+    # %policy supervisor reload [path]
     if cmd == "reload":
         if len(argv) > 2:
-            click.echo(json.dumps({"decision": "block", "reason": "Usage: %policy supervise reload [path]"}))
+            click.echo(json.dumps({"decision": "block", "reason": "Usage: %policy supervisor reload [path]"}))
             return
 
         from forge.session.effective import compute_effective_intent
@@ -882,11 +882,11 @@ def _handle_policy_supervise(argv: list[str]) -> None:
         click.echo(json.dumps({"decision": "block", "reason": f"Supervisor plan updated from {source_desc}"}))
         return
 
-    # %policy supervise cascade on|off — toggle the tier-1 plan check
+    # %policy supervisor cascade on|off — toggle the tier-1 plan check
     if cmd == "cascade":
         sub = argv[1].lower() if len(argv) == 2 else None
         if sub not in ("on", "off"):
-            click.echo(json.dumps({"decision": "block", "reason": "Usage: %policy supervise cascade on|off"}))
+            click.echo(json.dumps({"decision": "block", "reason": "Usage: %policy supervisor cascade on|off"}))
             return
 
         sup = manifest.intent.policy.supervisor if manifest.intent.policy else None
@@ -895,7 +895,7 @@ def _handle_policy_supervise(argv: list[str]) -> None:
                 json.dumps(
                     {
                         "decision": "block",
-                        "reason": "No supervisor configured. Use '%policy supervise <target>' to set one.",
+                        "reason": "No supervisor configured. Use '%policy supervisor <target>' to set one.",
                     }
                 )
             )
@@ -936,7 +936,7 @@ def _handle_policy_supervise(argv: list[str]) -> None:
                             "decision": "block",
                             "reason": (
                                 "No approved plan snapshot found for the cascade's tier-1 checker. "
-                                "Approve a plan (ExitPlanMode), or use '%policy supervise reload <path>' "
+                                "Approve a plan (ExitPlanMode), or use '%policy supervisor reload <path>' "
                                 "to set one explicitly, then retry."
                             ),
                         }
@@ -970,7 +970,7 @@ def _handle_policy_supervise(argv: list[str]) -> None:
         click.echo(json.dumps({"decision": "block", "reason": msg}))
         return
 
-    # %policy supervise <target> — set supervisor
+    # %policy supervisor <target> — set supervisor
     if argv:
         target = argv[0]
 
@@ -1023,7 +1023,7 @@ def _handle_policy_supervise(argv: list[str]) -> None:
         click.echo(json.dumps({"decision": "block", "reason": msg}))
         return
 
-    # %policy supervise (no args) — show current config
+    # %policy supervisor (no args) — show current config
     from forge.session.effective import compute_effective_intent
 
     effective = compute_effective_intent(manifest)

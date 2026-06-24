@@ -1031,7 +1031,7 @@ def launch_new_session(
             current_direct=direct,
         )
         # Launch-time --cascade only flips the flag; the runtime hook escalates to
-        # the frontier when no plan exists (unlike `policy supervise --cascade`,
+        # the frontier when no plan exists (unlike `policy supervisor set --cascade`,
         # which resolves the plan eagerly). See plan_check._needs_review.
         if cascade_flag:
             sup_config.cascade = True

@@ -94,10 +94,9 @@ def _confusable(a: str, b: str) -> bool:
     return common >= SHARED_PREFIX_MIN
 
 
-# Pre-existing confusable pair; resolved by renaming the supervisor one-shot leaf.
-LEAF_NAMING_ALLOWLIST = {
-    "forge policy: supervise|supervisor",
-}
+# Drained in Slice 10 (forge_cli_cleanup): `forge policy supervise` was removed and the
+# one-shot `supervisor` leaf became the `supervisor` group, dissolving the collision.
+LEAF_NAMING_ALLOWLIST: set[str] = set()
 
 
 def test_no_confusable_sibling_leaves() -> None:

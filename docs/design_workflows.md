@@ -125,7 +125,7 @@ ambiguities.
 - Auto-reload may succeed even if the supervisor target session has been deleted (the current session or a related fork
   may still hold the plan). Status surfaces show `Target: <name>` when resolvable and omit it otherwise.
 
-**Cascade (tier-1 plan check, opt-in):** `forge policy supervise --cascade` (or `<target> --cascade`) routes checks
+**Cascade (tier-1 plan check, opt-in):** `forge policy supervisor set --cascade` (or `<target> --cascade`) routes checks
 through a cheap tier before the frontier. A stateless `core.llm` call (`PlanCheckPolicy`, `semantic.plan_check`, default
 OpenRouter model `google/gemini-3.5-flash`, configurable per provider via `--checker-provider`/`--checker-model`, with a
 configurable default prompt budget of roughly 32K tokens stored as `policy.supervisor.checker_budget_tokens`) evaluates
@@ -165,10 +165,10 @@ line with checked/disagree/pending counts) and `forge policy shadow show` (the d
 
 **Supervisor stuck playbook:** When the supervisor blocks because the plan evolved:
 
-- `%policy supervise off` (suspend, config preserved)
+- `%policy supervisor off` (suspend, config preserved)
 - Make the approved changes
-- `%policy supervise reload` (searches current session, forks, then target) or `%policy supervise reload <path>`
-- `%policy supervise on` (resume with updated plan context)
+- `%policy supervisor reload` (searches current session, forks, then target) or `%policy supervisor reload <path>`
+- `%policy supervisor on` (resume with updated plan context)
 
 **The underspecification problem (biggest failure mode):** Supervision catches explicit divergence (plan says X, agent
 did Y, citations are clear). Underspecification is harder: the plan is silent, the model picks a plausible default, and

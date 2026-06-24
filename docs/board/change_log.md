@@ -27,6 +27,42 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-24
 
+### forge_cli_cleanup Slice 10: policy supervisor cleanup
+
+**Goal**: Resolve card F7 — split the overloaded `forge policy supervise` (15 options, 7 mutually-exclusive actions)
+that collided with the separate one-shot `forge policy supervisor`, by deleting `supervise` and promoting `supervisor`
+into a verb group.
+
+**Key changes**:
+
+- **`forge policy supervisor` is now a group with 8 leaves**:
+  `{status, set, off, on, remove, reload, cascade, evaluate}`. Each leaf lifts one branch of the old `supervise_cmd`;
+  the per-invocation cross-flag validation (action-count, "`--timeout` requires a target") is gone because Click's tree
+  enforces it structurally. The `src/forge/policy/semantic/supervisor.py` ops layer was unchanged — leaves map 1:1 to
+  existing functions.
+- **One-shot file eval is now `forge policy supervisor evaluate`** (renamed from the standalone `supervisor` leaf;
+  `evaluate`, not `check`, since `forge policy check` owns bundle-engine eval and stays untouched).
+- **`supervisor status` gained `--json`** via a shared `_supervisor_status_dict()` helper reused by `policy status` (one
+  canonical supervisor JSON shape; configured + unconfigured shapes pinned in tests). Required by the `_READ_LEAVES`
+  guard — any leaf named `status` must expose `--json`.
+- **Direct command `%policy supervise` renamed to `%policy supervisor`** (`_handle_policy_supervisor`); sub-verbs
+  (off/on/remove/reload/cascade/`<target>`) unchanged.
+- **Guard**: dropped `forge policy: supervise|supervisor` from `LEAF_NAMING_ALLOWLIST` (now `{}`); the split dissolves
+  the confusable-sibling collision and introduces no new ones.
+- **Docs/QA**: complete clean-break sweep across 10 files (`cli_reference`, `design`, `design_workflows`, five
+  `end-user/*`, QA `13-policy.md`) mapping every `supervise`/one-shot form to the new leaves.
+
+**Breaking change (research preview)**: `forge policy supervise` is removed (every action moved to a `supervisor` leaf),
+and the bare one-shot `forge policy supervisor -f … -r …` now requires the `evaluate` subcommand because `supervisor`
+became a group. On the CLI both error via Click (exit 2). The in-session `%policy supervise` falls through the
+direct-command dispatcher to a block-JSON usage message naming `%policy supervisor`. `--reload`/`--reload-from`
+collapsed to `reload [--from PATH]`.
+
+**Verification**: 59 tests in `test_policy_supervisor.py` (incl. two clean-break tests and configured/unconfigured
+`status --json` shapes), 84 in `test_user_prompt_dispatcher.py` (incl. old-verb-falls-through), 7 tree invariants, 2032
+in `tests/src/cli`; live CLI confirms both clean breaks; repo-wide greps show no stale `supervise`/bare-one-shot refs
+outside board files; `make pre-commit` clean.
+
 ### forge_cli_cleanup Slice 09: destructive-command consistency
 
 **Goal**: Standardize destructive verbs (card F3 + F14a) — a `clean` verb previews by default and mutates only with

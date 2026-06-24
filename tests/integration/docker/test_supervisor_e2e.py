@@ -106,10 +106,10 @@ PY
 
 
 def _run_supervisor_check(workspace: ContainerLike, *, mode: str) -> tuple[int, dict[str, Any], str]:
-    """Run ``forge policy supervisor`` through the deterministic resume harness."""
+    """Run ``forge policy supervisor evaluate`` through the deterministic resume harness."""
     result = workspace.exec(
         f"cd /workspace && FORGE_TEST_SUPERVISOR_MODE={mode} "
-        f"forge policy supervisor -f src/demo.py -r {SUPERVISOR_RESUME_ID} --json"
+        f"forge policy supervisor evaluate -f src/demo.py -r {SUPERVISOR_RESUME_ID} --json"
     )
     invocations = workspace.read_file("/tmp/claude_invocations.log")
 
@@ -174,7 +174,8 @@ class TestSupervisorE2E:
         ws = supervisor_workspace
         result = ws.exec(
             f"cd /workspace && FORGE_TEST_SUPERVISOR_MODE=aligned "
-            f"forge policy supervisor -f src/demo.py -r {SUPERVISOR_RESUME_ID} --supervisor-effort medium --json"
+            f"forge policy supervisor evaluate -f src/demo.py -r {SUPERVISOR_RESUME_ID} "
+            f"--supervisor-effort medium --json"
         )
         assert result.returncode == 0, result.stderr
         invocations = ws.read_file("/tmp/claude_invocations.log")
@@ -350,20 +351,20 @@ class TestCascadeE2E:
         planner["confirmed"]["confirmed_by"] = "hook:SessionStart:startup"
         ws.write_json(planner_path, planner)
 
-        set_target = ws.exec("cd /workspace && forge policy supervise cascade-planner --session cascade-d")
+        set_target = ws.exec("cd /workspace && forge policy supervisor set cascade-planner --session cascade-d")
         assert set_target.returncode == 0, set_target.stderr
 
         # No approved snapshot anywhere yet: enabling cascade fails loud, pre-mutation.
-        unresolved = ws.exec("cd /workspace && forge policy supervise --cascade --session cascade-d")
+        unresolved = ws.exec("cd /workspace && forge policy supervisor cascade on --session cascade-d")
         assert unresolved.returncode == 1
         assert "No approved plan snapshot" in unresolved.stdout + unresolved.stderr
 
         reload_result = ws.exec(
-            "cd /workspace && forge policy supervise --reload-from /workspace/plan.md --session cascade-d"
+            "cd /workspace && forge policy supervisor reload --from /workspace/plan.md --session cascade-d"
         )
         assert reload_result.returncode == 0, reload_result.stderr
 
-        enabled = ws.exec("cd /workspace && forge policy supervise --cascade --session cascade-d")
+        enabled = ws.exec("cd /workspace && forge policy supervisor cascade on --session cascade-d")
         assert enabled.returncode == 0, enabled.stderr
 
         manifest = ws.read_json("/workspace/.forge/sessions/cascade-d/forge.session.json")

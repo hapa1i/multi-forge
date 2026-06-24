@@ -371,16 +371,16 @@ code (file:line) before promotion.
   rerun-at-default. This is deliberately the opposite of the `--output-format json` telemetry path, which
   retries-once-and-latches (`headless_json.mark_json_output_unsupported`). Rationale: effort changes model behavior, so
   a silent default-rerun would misreport what actually ran.
-- **Cascade-at-launch is flag-only — the asymmetry with `policy supervise --cascade` is intentional.**
+- **Cascade-at-launch is flag-only — the asymmetry with `policy supervisor cascade on` is intentional.**
   `fork`/`start --supervise --cascade` set `cascade=True` only; the runtime hook escalates to the frontier when no
-  approved plan exists yet. `forge policy supervise --cascade` instead resolves the approved-plan snapshot eagerly (via
-  the `--reload` machinery) and exits 1 if none resolves. Do not "fix" the divergence: launch time legitimately has no
-  plan snapshot yet.
+  approved plan exists yet. `forge policy supervisor cascade on` (and `supervisor set <target> --cascade`) instead
+  resolve the approved-plan snapshot eagerly (via the `--reload` machinery) and exit 1 if none resolves. Do not "fix"
+  the divergence: launch time legitimately has no plan snapshot yet.
 - **One Click-free checker-helper source prevents launch/policy drift.** `CHECKER_PROVIDER_CHOICES`,
   `normalize_checker_provider_arg`, `validate_checker_model` (raises `ValueError` containing "prefixed model id"), and
   `apply_checker_options` live in `policy/semantic/supervisor.py` (no Click). `cli/policy.py` and `plan_check.py` import
-  them, so launch commands, persistent `policy supervise`, and the tier-1 checker share one validation/normalization
-  source. Add new checker controls there, not at each CLI surface.
+  them, so launch commands, persistent `policy supervisor set`, and the tier-1 checker share one
+  validation/normalization source. Add new checker controls there, not at each CLI surface.
 - **Effort is per-caller by design — no global knob.** Wired per consumer: `SupervisorConfig.supervisor_effort` /
   `.checker_effort`, `MemoryWriterConfig.effort`, `TeamSupervisorConfig.effort`, `run_multi_review(reasoning_effort=)`.
   `checker_effort` feeds `ModelHyperparameters` via `merge_hyperparams` **and** is part of the plan-check throttle cache

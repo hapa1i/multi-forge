@@ -112,11 +112,11 @@ Enable TDD enforcement, coding standards checks, or a semantic supervisor that v
 
 ```bash
 forge policy enable --bundle tdd                        # Deterministic TDD policy
-forge policy supervise planner                          # Semantic plan supervision
+forge policy supervisor set planner                     # Semantic plan supervision
 forge session fork planner --name executor --supervise # Wire at fork time
-forge policy supervise --off                            # Suspend (preserves config)
-forge policy supervise --on                             # Resume
-forge policy supervise --reload                         # Reload plan after changes
+forge policy supervisor off                             # Suspend (preserves config)
+forge policy supervisor on                              # Resume
+forge policy supervisor reload                          # Reload plan after changes
 ```
 
 See [policy.md](policy.md).
