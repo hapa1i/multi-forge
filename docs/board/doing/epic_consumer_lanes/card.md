@@ -1,11 +1,12 @@
 # Epic: Consumer Lanes -- bind Forge's LLM-work to a chosen (runtime x backend x model) lane
 
-**Type**: Epic (coordinating card). Members are independently-shippable tickets that share the lane contract below.
-Members are sketched inline here; each splits into its own `card.md` (linking this epic) when the epic moves to `doing/`
-(board_contract "Epics").
+**Type**: Epic (coordinating card). Members are independently-shippable tickets that share the lane contract below. The
+first wave (T1a, T2, T3) is now split into member cards under `docs/board/todo/` (linked beneath the member table);
+T4/T5/T1b/T6 stay inline sketches until the spine (T1a+T3) lands (board_contract "Epics").
 
-**Status**: Proposed. Nothing accepted, no code. Converged from a 2026-06-25 design session; this card is the durable
-record of that model.
+**Status**: Accepted; coordinating in `doing/` (2026-06-25). First wave (T1a/T2/T3) authored as member cards in `todo/`;
+no execution branch or code yet. Converged from a 2026-06-25 design session; this card is the durable record of that
+model. Coordination is tracked in `checklist.md`.
 
 **One-line motivation**: Make "use a different runtime/backend/model for part of what Forge does" -- Codex on a
 subscription today, a local Ollama tomorrow -- a *registration + a consumer's lane choice*, not a bespoke rewrite each
@@ -135,8 +136,17 @@ once.
 | **T1b -- Generalize + freeze**                                       | Promote the narrow supervisor field to a uniform consumer-lane binding; persist the `intent` override + immutable `confirmed` binding (**durable-state rules: schema version, strict deser, reset path -- coding_standards §5**).                                                                                    | T4         | a durable contract, shape-proven     |
 | **T6 -- Generalize to other consumers** (optional, later)            | Lane-drive the fan-out workers, taggers, memory writer.                                                                                                                                                                                                                                                              | T1b        | spans consumers, not just supervisor |
 
-**Sibling cleanup (non-blocking)**: revisit the `claude -p` `unknown`/OAuth billing assumption (`billing.py`) against
-current Anthropic `-p` billing -- likely stale on the Claude side.
+**Member cards (first wave, accepted -> `todo/`)**: T1a -> `docs/board/todo/consumer_lane_resolver/card.md`; T2 ->
+`docs/board/todo/backend_subscription_sources/card.md`; T3 -> `docs/board/todo/supervisor_lane_driven/card.md`. The rows
+above stay the durable sketch; the cards carry verified touchpoints + fixture-grounded acceptance. **Correction
+(verified 2026-06-25):** the `ModelSource` catalog is code-defined (`BUILTIN_MODEL_SOURCES`, validated at import in
+`backend/sources.py`), so T2 is an *internal-surface clean break* -- **not** Forge-owned durable state. Schema
+version/strict-deser/reset rules apply only to T1b's session-manifest binding.
+
+**T0 -- sibling billing cleanup**: revisit the `claude -p` `unknown`/OAuth billing assumption (`billing.py`) against
+current Anthropic `-p` billing -- likely stale on the Claude side. **Non-blocking for the proven `chatgpt` path (T2/T4),
+but load-bearing for `claude-max`**: a `claude-max` subscription source must not claim `subscription_quota` until T0
+proves `claude -p` actually rides the Max subscription.
 
 **Assembly is cheap (verified).** The Codex supervisor (T4) reuses shipped pieces: the verdict parser takes a plain
 string (`verdict.py:86 parse_supervisor_verdict(response: str)`); `CodexHeadlessInvoker` already returns its final text
