@@ -54,6 +54,7 @@ from forge.config.loader import (
 )
 from forge.core.paths import display_path, get_forge_home
 from forge.core.process import find_pid_by_port
+from forge.core.state.exceptions import StateCorruptedError
 from forge.proxy.proxies import (
     CLI_LOCK_TIMEOUT_S,
     ProxyEntry,
@@ -1326,7 +1327,10 @@ def validate_cmd(proxy_id: str) -> None:
         console.print(f"  Port: {config.port}")
         console.print(f"  Default tier: {config.default_tier}")
 
-    except ValueError as e:
+    except (StateCorruptedError, ValueError) as e:
+        # Diagnostic boundary: validate exists to report a bad proxy.yaml, so it
+        # reports corruption as a validation failure here instead of letting it
+        # bubble to the global "delete .forge and reinstall" reset handler.
         console.print(f"[red]✗[/red] Validation failed: {e}")
         sys.exit(1)
     except Exception as e:

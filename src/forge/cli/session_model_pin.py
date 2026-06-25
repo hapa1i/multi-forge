@@ -72,10 +72,13 @@ def _apply_direct_model_env_if_supported(
 def _validate_proxy_model_pin(proxy_id: str, pin: DirectModelPin) -> str | None:
     """Return a user-facing error if a proxy cannot honor a Claude model pin."""
     from forge.config.loader import load_proxy_instance_config
+    from forge.core.state.exceptions import StateCorruptedError
 
     try:
         proxy_cfg = load_proxy_instance_config(proxy_id)
-    except (FileNotFoundError, TypeError, ValueError) as e:
+    except (StateCorruptedError, FileNotFoundError, TypeError, ValueError) as e:
+        # Validation boundary: report a corrupt/unreadable proxy.yaml as a contextual
+        # error instead of bubbling to the corrupt-state reset handler.
         return f"Could not load proxy config for '{proxy_id}': {e}"
 
     if proxy_cfg is None:

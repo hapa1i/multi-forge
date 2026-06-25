@@ -106,6 +106,22 @@ class TestActiveSessionStore:
         assert index.sessions == {}
         assert json.loads(store.index_path.read_text()) == {"version": 1, "sessions": {}}
 
+    def test_truncated_json_self_heals(self, store: ActiveSessionStore) -> None:
+        """Unparseable JSON (e.g. crash mid-write) is discarded, not raised as corruption.
+
+        Runtime-only state self-heals: a JSONDecodeError (subclass of ValueError) is
+        caught and the registry is recreated empty, so it never reaches the durable
+        corrupt-state handler.
+        """
+        store.index_path.parent.mkdir(parents=True, exist_ok=True)
+        store.index_path.write_text('{"version": 1, "sessions": {"x"')  # truncated
+
+        result = store.read()
+
+        assert result.sessions == {}
+        assert result.version == ACTIVE_INDEX_VERSION
+        assert json.loads(store.index_path.read_text()) == {"version": 1, "sessions": {}}
+
     def test_get_session_prunes_stale_host_entry(
         self, store: ActiveSessionStore, monkeypatch: pytest.MonkeyPatch
     ) -> None:

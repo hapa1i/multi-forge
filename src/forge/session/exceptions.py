@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from forge.core.state.exceptions import StateCorruptedError
+
 
 class ForgeSessionError(Exception):
     """Base exception for session module."""
@@ -48,32 +50,39 @@ class PassportError(ForgeSessionError):
         super().__init__(msg)
 
 
-class ManifestCorruptedError(ForgeSessionError):
-    """Raised when manifest file exists but cannot be parsed."""
+class ManifestCorruptedError(ForgeSessionError, StateCorruptedError):
+    """Raised when manifest file exists but cannot be parsed.
+
+    Also a ``StateCorruptedError`` so the one top-level corrupt-state handler
+    surfaces it with the uniform reset instruction. ``Exception.__init__`` is
+    called directly because ``super().__init__`` would route to
+    ``StateCorruptedError.__init__(path, reason)`` via the MRO with the wrong args.
+    """
 
     def __init__(self, path: str, reason: str) -> None:
         self.path = path
         self.reason = reason
-        super().__init__(f"manifest at '{path}': {reason}")
+        Exception.__init__(self, f"manifest at '{path}': {reason}")
 
 
-class ManifestValidationError(ForgeSessionError):
+class ManifestValidationError(ForgeSessionError, StateCorruptedError):
     """Raised when manifest is missing required fields."""
 
     def __init__(self, path: str, missing_fields: list[str]) -> None:
         self.path = path
         self.missing_fields = missing_fields
         fields_str = ", ".join(missing_fields)
-        super().__init__(f"manifest at '{path}' missing required fields: {fields_str}")
+        self.reason = f"missing required fields: {fields_str}"
+        Exception.__init__(self, f"manifest at '{path}' missing required fields: {fields_str}")
 
 
-class IndexCorruptedError(ForgeSessionError):
+class IndexCorruptedError(ForgeSessionError, StateCorruptedError):
     """Raised when index file exists but cannot be parsed."""
 
     def __init__(self, path: str, reason: str) -> None:
         self.path = path
         self.reason = reason
-        super().__init__(f"index at '{path}': {reason}")
+        Exception.__init__(self, f"index at '{path}': {reason}")
 
 
 class CannotForkIncognitoError(ForgeSessionError):

@@ -42,6 +42,7 @@ from forge.config.schema import (
     TierOverrides,
 )
 from forge.core.paths import get_forge_home
+from forge.core.state.exceptions import StateCorruptedError
 
 logger = logging.getLogger(__name__)
 
@@ -409,10 +410,10 @@ def load_proxy_instance_config(proxy_id: str) -> "ProxyInstanceConfig | None":
         with open(path, encoding="utf-8") as f:
             data = ruamel.load(f)
     except Exception as e:
-        raise ValueError(f"Failed to parse proxy file {path}: {e}")
+        raise StateCorruptedError(str(path), f"could not parse proxy file: {e}") from e
 
     if not isinstance(data, dict):
-        raise ValueError(f"Proxy file {path} must be a mapping, got {type(data)}")
+        raise StateCorruptedError(str(path), f"proxy file must be a mapping, got {type(data).__name__}")
 
     return load_proxy_instance_config_from_dict(data)
 

@@ -489,13 +489,15 @@ def _resolve_responses_posture(proxy_id: str | None) -> _Responses:
         return _Responses("native_direct", None)
 
     from forge.config.loader import load_proxy_instance_config
+    from forge.core.state.exceptions import StateCorruptedError
 
     try:
         config = load_proxy_instance_config(proxy_id)
-    except (ValueError, TypeError) as e:
-        # The loader raises on an invalid id (path traversal), corrupt YAML, or a schema
-        # violation. The preflight contract is fail-closed (never raise for an expected
-        # condition), so surface it as proxy_unsupported instead of a traceback.
+    except (StateCorruptedError, ValueError, TypeError) as e:
+        # The loader raises on an invalid id (path traversal), corrupt YAML (typed
+        # StateCorruptedError), or a schema violation. The preflight contract is fail-closed
+        # (never raise for an expected condition), so this readiness boundary surfaces it as
+        # proxy_unsupported instead of bubbling to the corrupt-state reset handler.
         return _Responses(
             "proxy_unsupported",
             f"proxy '{proxy_id}' is invalid or unreadable: {e} " "Omit --proxy to run native 'codex exec' directly.",

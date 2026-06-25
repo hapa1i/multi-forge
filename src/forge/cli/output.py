@@ -1,8 +1,9 @@
 """Shared Rich console output helpers for the Forge CLI.
 
-Leaf module: imports only ``rich`` and ``forge.session.exceptions``. Never
-import ``forge.cli.*`` here — CLI command modules import from this module, not
-the reverse. This keeps ``output`` circular-safe and prevents Rich markup from
+Leaf module: imports only ``rich`` and Forge exception leaves
+(``forge.session.exceptions``, ``forge.core.state.exceptions``). Never import
+``forge.cli.*`` here — CLI command modules import from this module, not the
+reverse. This keeps ``output`` circular-safe and prevents Rich markup from
 leaking into non-terminal layers (core/proxy/review build plain-text exception
 strings, not console output).
 """
@@ -14,6 +15,7 @@ from collections.abc import Callable, Sequence
 
 from rich.console import Console
 
+from forge.core.state.exceptions import StateCorruptedError
 from forge.session.exceptions import ForgeSessionError, SessionExistsError
 
 # Module-level fallback console. Call sites that keep their own
@@ -95,4 +97,23 @@ def handle_session_error(e: ForgeSessionError, *, console: Console | None = None
     tip_fn = _SESSION_ERROR_TIPS.get(type(e))
     if tip_fn is not None:
         print_tip(*tip_fn(e), console=out)
+    sys.exit(1)
+
+
+def handle_corrupt_state_error(e: StateCorruptedError, *, console: Console | None = None) -> None:
+    """Print a corrupt-state error with the uniform reset instruction, then exit 1.
+
+    The single handler for every Forge-owned durable-state corruption (manifests,
+    indexes, registries, proxy config). The error names the offending file, so the
+    tip covers both a one-file fix and a full reset; ``forge clean`` removes corrupt
+    Forge-written state. Wired once at the top-level ``AliasGroup.main`` catch.
+    """
+    out = console if console is not None else err_console
+    print_error(f"Forge state is corrupt: {e}", console=out)
+    print_tip(
+        "Fix or delete the file named above. For a full reset, delete .forge (project) or "
+        "~/.forge (global) and re-run 'forge extension enable'.",
+        "'forge clean' can detect and remove corrupt Forge state.",
+        console=out,
+    )
     sys.exit(1)

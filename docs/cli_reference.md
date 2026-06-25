@@ -236,7 +236,7 @@ workers (e.g., `claude-opus`) remain on Anthropic routing regardless of `--proxy
 | Command             | Purpose                                                                                              |
 | ------------------- | ---------------------------------------------------------------------------------------------------- |
 | `forge info`        | Show global system information (`--json`)                                                            |
-| `forge clean`       | Remove orphaned state (`--scope`, `--yes`)                                                           |
+| `forge clean`       | Remove orphaned and corrupt state (`--scope`, `--yes`)                                               |
 | `forge config`      | Manage global runtime preferences                                                                    |
 | `forge auth login`  | Store credentials for LLM providers                                                                  |
 | `forge auth status` | Show credential status per provider                                                                  |
