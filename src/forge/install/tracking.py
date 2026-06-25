@@ -111,20 +111,6 @@ class TrackingStore:
                 f"Delete this file and run 'forge extension enable' again.",
             )
 
-        # Guard: reject manifests from pre-OSS patching builds.
-        # patched_files was removed from the Installation dataclass; dacite
-        # strict=True rejects even "patched_files": []. Check raw JSON before
-        # deserialization so the error message is actionable.
-        installations = data.get("installations", {})
-        for inst in installations.values():
-            if isinstance(inst, dict) and "patched_files" in inst:
-                raise TrackingCorruptedError(
-                    str(self._path),
-                    "This Forge install manifest was created by a pre-OSS patching build. "
-                    f"Remove {self._path} and run `forge extension enable` again. "
-                    "If Claude Code was patched, run `claude update` or reinstall Claude Code.",
-                )
-
         try:
             return dacite.from_dict(
                 data_class=InstalledManifest,

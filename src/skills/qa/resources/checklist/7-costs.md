@@ -66,26 +66,6 @@ forge telemetry costs show qa-fixture --period all --json
 - [ ] `total_requests` is 3
 - [ ] `by_model` contains both `test/gemini-2.5-flash` and `test/gemini-3.1-pro-preview`
 
-### 7.4 Seed Fixture Verb Logs
-
-<!-- auto -->
-
-```bash
-# Seed QA-prefixed fixture verb logs matching cost_tracking.py verb record schema.
-mkdir -p ~/.forge/costs/verbs
-cat > ~/.forge/costs/verbs/qa-fixture_99999.jsonl <<'EOF'
-{"ts":"2026-05-01T00:05:00Z","verb":"qa-fixture-panel","total_cost_micros":1500,"estimated":true,"cost_measured":true,"input_tokens":700,"output_tokens":230,"cached_tokens":50,"request_count":2,"duration_ms":1200.0,"per_proxy":[{"base_url":"http://localhost:8084","cost_micros":1500,"input_tokens":700,"output_tokens":230,"cached_tokens":50,"request_count":2}]}
-EOF
-
-# Verify verb attribution appears. Do not proxy-filter this check: verb logs are scoped
-# by resolved proxy base_url, while qa-fixture is only a request-log proxy_id fixture.
-forge telemetry costs show --period all 2>&1
-```
-
-- [ ] Fixture file created at `~/.forge/costs/verbs/qa-fixture_99999.jsonl`
-- [ ] `forge telemetry costs show --period all` shows `qa-fixture-panel` verb in output
-- [ ] Verb cost attributed to `qa-fixture-panel` (1500 micros)
-
 ### 7.5 Cost CLI Breakdowns
 
 <!-- auto -->
@@ -155,14 +135,10 @@ forge proxy show "$FORGE_QA_GEMINI_PROXY" --raw
 <!-- auto -->
 
 ```bash
-# cap_mode was removed -- any value must be rejected as a tombstone (not silently accepted)
-forge proxy set "$FORGE_QA_GEMINI_PROXY" costs.cap_mode=post 2>&1; echo "EXIT=$?"
-
 # Invalid on_cap_hit -- should be rejected
 forge proxy set "$FORGE_QA_GEMINI_PROXY" costs.on_cap_hit=invalid 2>&1; echo "EXIT=$?"
 ```
 
-- [ ] `costs.cap_mode` rejected as removed (exit non-zero; message says it is no longer supported and to remove it)
 - [ ] Invalid `on_cap_hit` rejected with validation error (exit non-zero)
 - [ ] `on_cap_hit` error message references valid values (`reject`/`warn`)
 
@@ -184,12 +160,12 @@ forge proxy set "$FORGE_QA_OPENAI_PROXY" costs.caps.per_day=0.01
 forge proxy set "$FORGE_QA_OPENAI_PROXY" costs.on_cap_hit=reject
 
 # Seed a cost log with a current timestamp so the tracker bootstraps above the cap.
-# The tracker reads YYYY-MM_*.jsonl files on startup (bootstrap_from_logs).
-mkdir -p ~/.forge/costs/requests
+# The tracker reads ~/.forge/telemetry/downstream/YYYY-MM_*.jsonl on startup (bootstrap_from_logs).
+mkdir -p ~/.forge/telemetry/downstream
 MONTH=$(date -u +%Y-%m)
 TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 echo "{\"ts\":\"$TS\",\"proxy_id\":\"$FORGE_QA_OPENAI_PROXY\",\"model\":\"seed\",\"tier\":\"sonnet\",\"input_tokens\":0,\"output_tokens\":0,\"cached_tokens\":0,\"cost_micros\":50000,\"reporter\":\"litellm\",\"confidence\":\"gateway_calculated\",\"latency_ms\":0,\"failed\":false,\"request_id\":\"req-qa-cap-seed\"}" \
-  > ~/.forge/costs/requests/${MONTH}_qa-cap-seed.jsonl
+  > ~/.forge/telemetry/downstream/${MONTH}_99999_qa-cap-seed.jsonl
 
 # Restart proxy so it bootstraps from the seeded log (--force bypasses shared-port check)
 forge proxy stop "$FORGE_QA_OPENAI_PROXY" --force 2>/dev/null || true
@@ -200,7 +176,7 @@ forge claude start --proxy "$FORGE_QA_OPENAI_PROXY"
 # Say "hello" -- expect rejection or error about spend cap, then exit (/exit)
 
 # Clean up seeded log
-rm -f ~/.forge/costs/requests/${MONTH}_qa-cap-seed.jsonl
+rm -f ~/.forge/telemetry/downstream/${MONTH}_99999_qa-cap-seed.jsonl
 ```
 
 - [ ] After proxy restart, the seeded cost triggers the daily cap
@@ -225,11 +201,11 @@ forge proxy set "$FORGE_QA_OPENAI_PROXY" costs.caps.per_day=0.01
 forge proxy set "$FORGE_QA_OPENAI_PROXY" costs.on_cap_hit=warn
 
 # Re-seed the cost log (cleanup from 7.9 removed it)
-mkdir -p ~/.forge/costs/requests
+mkdir -p ~/.forge/telemetry/downstream
 MONTH=$(date -u +%Y-%m)
 TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 echo "{\"ts\":\"$TS\",\"proxy_id\":\"$FORGE_QA_OPENAI_PROXY\",\"model\":\"seed\",\"tier\":\"sonnet\",\"input_tokens\":0,\"output_tokens\":0,\"cached_tokens\":0,\"cost_micros\":50000,\"reporter\":\"litellm\",\"confidence\":\"gateway_calculated\",\"latency_ms\":0,\"failed\":false,\"request_id\":\"req-qa-cap-warn\"}" \
-  > ~/.forge/costs/requests/${MONTH}_qa-cap-seed.jsonl
+  > ~/.forge/telemetry/downstream/${MONTH}_99999_qa-cap-seed.jsonl
 
 # Restart proxy so it bootstraps with the seeded cost (--force bypasses shared-port check)
 forge proxy stop "$FORGE_QA_OPENAI_PROXY" --force 2>/dev/null || true
@@ -257,7 +233,7 @@ cat /tmp/qa-spend-warn.body | jq -r '._request_id // empty'
 forge claude start --proxy "$FORGE_QA_OPENAI_PROXY" -- --debug
 
 # Clean up seeded log
-rm -f ~/.forge/costs/requests/${MONTH}_qa-cap-seed.jsonl /tmp/qa-spend-warn.headers /tmp/qa-spend-warn.body
+rm -f ~/.forge/telemetry/downstream/${MONTH}_99999_qa-cap-seed.jsonl /tmp/qa-spend-warn.headers /tmp/qa-spend-warn.body
 ```
 
 - [ ] Request succeeds (not blocked) in warn mode
@@ -272,15 +248,13 @@ rm -f ~/.forge/costs/requests/${MONTH}_qa-cap-seed.jsonl /tmp/qa-spend-warn.head
 ```bash
 # Remove only QA fixture files -- do not touch real proxy cost logs
 rm -f ~/.forge/costs/requests/qa-fixture_*.jsonl
-rm -f ~/.forge/costs/verbs/qa-fixture_*.jsonl
 
 # Remove cap-seed logs from 7.9/7.10 (in case cleanup within those steps failed)
-rm -f ~/.forge/costs/requests/*_qa-cap-seed.jsonl
+rm -f ~/.forge/telemetry/downstream/*_qa-cap-seed.jsonl
 
 # Verify cleanup: no QA-owned cost fixture files remain
 ls ~/.forge/costs/requests/qa-fixture_*.jsonl 2>&1 || echo "QA_REQUEST_LOGS_CLEAN"
-ls ~/.forge/costs/verbs/qa-fixture_*.jsonl 2>&1 || echo "QA_VERB_LOGS_CLEAN"
-ls ~/.forge/costs/requests/*_qa-cap-seed.jsonl 2>&1 || echo "QA_CAP_SEED_LOGS_CLEAN"
+ls ~/.forge/telemetry/downstream/*_qa-cap-seed.jsonl 2>&1 || echo "QA_CAP_SEED_LOGS_CLEAN"
 
 # Reset spend caps on test proxies
 forge proxy set "$FORGE_QA_GEMINI_PROXY" costs.caps.per_day=none 2>/dev/null || true
@@ -296,8 +270,7 @@ forge proxy start "$FORGE_QA_OPENAI_PROXY"
 ```
 
 - [ ] QA fixture request logs removed (no `qa-fixture_*.jsonl` in `requests/`)
-- [ ] QA fixture verb logs removed (no `qa-fixture_*.jsonl` in `verbs/`)
-- [ ] QA cap seed logs removed (no `*_qa-cap-seed.jsonl` in `requests/`)
+- [ ] QA cap seed logs removed (no `*_qa-cap-seed.jsonl` in `telemetry/downstream/`)
 - [ ] Spend caps reset on QA OpenAI and Gemini test proxies
 
 ### 7.12 Per-Session Activity (`forge telemetry activity`)
@@ -408,8 +381,8 @@ rm -f ~/.forge/costs/requests/qa-fixture_prov-99999.jsonl
 
 <!-- destructive -->
 
-`forge telemetry costs reset` wipes every recorded cost + usage telemetry plane to zero: legacy request/verb cost logs
-(`~/.forge/costs/requests/`, `~/.forge/costs/verbs/`), downstream/upstream telemetry (`~/.forge/telemetry/downstream/`,
+`forge telemetry costs reset` wipes every recorded cost + usage telemetry plane to zero: legacy request cost logs
+(`~/.forge/costs/requests/`), downstream/upstream telemetry (`~/.forge/telemetry/downstream/`,
 `~/.forge/telemetry/upstream/`), durable spend-cap/audit-state snapshots, and the usage-attribution ledger
 (`~/.forge/usage/events/`). It also clears the **derived** status-line cost cache
 (`~/.forge/cache/statusline/fcost-*.json`) so `forge +$Y` recomputes from the now-empty ledger instead of replaying a
@@ -422,9 +395,8 @@ destructive: it clears all cost telemetry in the container, so it runs last in s
 ```bash
 # Seed one shard in each of the three reset planes, an audit sentinel that must survive,
 # a derived fcost cache that must clear, and a cache-hit entry that must survive.
-mkdir -p ~/.forge/costs/requests ~/.forge/costs/verbs ~/.forge/usage/events ~/.forge/audit ~/.forge/cache/statusline
+mkdir -p ~/.forge/costs/requests ~/.forge/usage/events ~/.forge/audit ~/.forge/cache/statusline
 echo '{"ts":"2026-05-01T00:00:00Z","proxy_id":"qa-reset","model":"test/x","tier":"haiku","input_tokens":1,"output_tokens":1,"cached_tokens":0,"cost_micros":100,"reporter":"litellm","confidence":"gateway_calculated","latency_ms":1.0,"failed":false,"request_id":"qa-reset-1"}' > ~/.forge/costs/requests/qa-reset_99999.jsonl
-echo '{"ts":"2026-05-01T00:00:00Z","proxy_id":"qa-reset","verb":"qa","cost_micros":100}' > ~/.forge/costs/verbs/qa-reset_99999.jsonl
 echo '{"schema_version":1,"run_id":"qa-reset-r1","root_run_id":"qa-reset-r1","runtime":"claude_code","command":"qa","status":"success","attribution_granularity":"verb","cost_micro_usd":100,"ts":"2026-05-01T00:00:00Z"}' > ~/.forge/usage/events/qa-reset_99999.jsonl
 echo '{"qa":"audit-sentinel"}' > ~/.forge/audit/qa-reset-sentinel.jsonl
 echo '{"version":1,"computed_at":0,"cost_micro_usd":9999}' > ~/.forge/cache/statusline/fcost-qareset.json
@@ -440,7 +412,6 @@ echo "---"
 
 # Verify the planes + fcost cache are empty, while audit + cache-hit survive.
 echo "requests=$(ls ~/.forge/costs/requests/*.jsonl 2>/dev/null | wc -l | tr -d ' ')"
-echo "verbs=$(ls ~/.forge/costs/verbs/*.jsonl 2>/dev/null | wc -l | tr -d ' ')"
 echo "events=$(ls ~/.forge/usage/events/*.jsonl 2>/dev/null | wc -l | tr -d ' ')"
 echo "fcost=$(ls ~/.forge/cache/statusline/fcost-*.json 2>/dev/null | wc -l | tr -d ' ')"
 echo "cache_hit=$(ls ~/.forge/cache/statusline/qaresetdigest.json 2>/dev/null | wc -l | tr -d ' ')"
@@ -454,12 +425,12 @@ forge telemetry costs reset --yes 2>&1
 rm -f ~/.forge/audit/qa-reset-sentinel.jsonl ~/.forge/cache/statusline/qaresetdigest.json
 ```
 
-- [ ] `--dry-run` prints `The following will be removed:` with a `request cost logs`, `verb cost logs`, `usage ledger`,
-  and `status-line cost cache` line, then `(dry-run) Nothing deleted.` -- and the planes still hold their shards
-- [ ] `--yes` prints `Reset complete: removed N telemetry file(s).` (N >= 4) followed by the `Tip:` restart guidance
+- [ ] `--dry-run` prints `The following will be removed:` with a `request cost logs`, `usage ledger`, and
+  `status-line cost cache` line, then `(dry-run) Nothing deleted.` -- and the planes still hold their shards
+- [ ] `--yes` prints `Reset complete: removed N telemetry file(s).` (N >= 3) followed by the `Tip:` restart guidance
   naming `forge proxy stop <id>` / `forge proxy start <id>`
-- [ ] After the real reset: `requests=0 verbs=0 events=0 fcost=0` (planes + derived cost cache cleared) while
-  `cache_hit=1` (transcript cache-hit untouched) and `audit_sentinel=1` (audit plane untouched)
+- [ ] After the real reset: `requests=0 events=0 fcost=0` (planes + derived cost cache cleared) while `cache_hit=1`
+  (transcript cache-hit untouched) and `audit_sentinel=1` (audit plane untouched)
 - [ ] The second `reset --yes` with nothing left prints `No cost or usage telemetry to reset.` (clean no-op, no error)
 - [ ] Audit sentinel + cache-hit entry removed at the end
 

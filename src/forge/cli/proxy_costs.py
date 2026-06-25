@@ -371,7 +371,6 @@ def _output_json(
 # a separate process the CLI cannot reach -- the printed tip points at a restart for those.
 _RESET_TARGETS: tuple[tuple[str, tuple[str, ...], str], ...] = (
     ("request cost logs", ("costs", "requests"), "*.jsonl"),
-    ("verb cost logs", ("costs", "verbs"), "*.jsonl"),
     ("usage ledger", ("usage", "events"), "*.jsonl"),
     ("downstream telemetry", ("telemetry", "downstream"), "*.jsonl"),
     ("upstream telemetry", ("telemetry", "upstream"), "*.jsonl"),

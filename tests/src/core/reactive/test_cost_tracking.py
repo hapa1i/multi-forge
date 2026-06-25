@@ -3,29 +3,16 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
 from forge.core.reactive.cost_tracking import (
-    ProxyCostDelta,
     VerbCostResult,
     _compute_delta,
-    _log_verb_cost,
-    read_verb_logs,
     resolve_proxy_urls,
     track_verb_cost,
 )
-
-
-@pytest.fixture
-def verb_log_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """Point verb logger to a temp directory."""
-    log_dir = tmp_path / "costs" / "verbs"
-    monkeypatch.setattr("forge.core.reactive.cost_tracking._verb_log_dir", lambda: log_dir)
-    return log_dir
 
 
 def _two_snapshot_urlopen(before_metrics: dict, after_metrics: dict):
@@ -127,75 +114,20 @@ class TestComputeDelta:
         assert delta.reported_request_count == 0
 
 
-class TestLogVerbCost:
-    def test_retired_writer_leaves_no_jsonl_record(self, verb_log_dir: Path):
-        result = VerbCostResult(
-            verb="panel",
-            total_cost_micros=120_000,
-            input_tokens=5000,
-            output_tokens=2000,
-            cached_tokens=500,
-            request_count=4,
-            duration_ms=30000.0,
-            per_proxy=[
-                ProxyCostDelta(
-                    base_url="http://localhost:8084",
-                    cost_micros=80_000,
-                    input_tokens=3000,
-                    output_tokens=1200,
-                    request_count=2,
-                ),
-            ],
-        )
-        _log_verb_cost(result)
-
-        files = list(verb_log_dir.glob("*.jsonl"))
-        assert files == []
-
-
-class TestReadVerbLogs:
-    def test_empty_returns_empty(self, verb_log_dir: Path):
-        assert read_verb_logs() == []
-
-    def test_reads_multiple_shards(self, verb_log_dir: Path):
-        verb_log_dir.mkdir(parents=True, exist_ok=True)
-        for pid in [111, 222]:
-            path = verb_log_dir / f"2026-05_{pid}.jsonl"
-            with open(path, "w") as f:
-                f.write(json.dumps({"ts": "2026-05-07T10:00:00Z", "verb": f"v{pid}"}) + "\n")
-
-        records = read_verb_logs()
-        assert len(records) == 2
-
-    def test_period_filtering(self, verb_log_dir: Path):
-        verb_log_dir.mkdir(parents=True, exist_ok=True)
-        path = verb_log_dir / "2026-05_999.jsonl"
-        with open(path, "w") as f:
-            f.write(json.dumps({"ts": "2026-05-07T08:00:00Z", "verb": "early"}) + "\n")
-            f.write(json.dumps({"ts": "2026-05-07T14:00:00Z", "verb": "mid"}) + "\n")
-            f.write(json.dumps({"ts": "2026-05-07T20:00:00Z", "verb": "late"}) + "\n")
-
-        start = datetime(2026, 5, 7, 12, 0, 0, tzinfo=timezone.utc)
-        end = datetime(2026, 5, 7, 18, 0, 0, tzinfo=timezone.utc)
-        records = read_verb_logs(period_start=start, period_end=end)
-        assert len(records) == 1
-        assert records[0]["verb"] == "mid"
-
-
 class TestTrackVerbCost:
-    def test_no_urls_is_noop(self, verb_log_dir: Path):
-        """Empty proxy URL list should not crash or write logs."""
-        with track_verb_cost("test", []):
+    def test_no_urls_is_noop(self):
+        """Empty proxy URL list should not crash, and the holder stays unmeasured."""
+        with track_verb_cost("test", []) as result:
             pass
-        assert not verb_log_dir.exists() or not list(verb_log_dir.glob("*.jsonl"))
+        assert result.measured is False
 
-    def test_unreachable_proxy_is_noop(self, verb_log_dir: Path):
+    def test_unreachable_proxy_is_noop(self):
         """Unreachable proxy URL should not crash."""
         with track_verb_cost("test", ["http://localhost:99999"]):
             pass
 
-    def test_snapshot_delta_logged(self, verb_log_dir: Path):
-        """With mocked snapshots, verify the delta is computed and logged."""
+    def test_snapshot_delta_computed(self):
+        """With mocked snapshots, verify the delta is computed into the holder."""
         before_snap = {
             "is_proxy": True,
             "metrics": {
@@ -239,9 +171,8 @@ class TestTrackVerbCost:
         assert result.total_cost_micros == 150_000
         assert result.request_count == 3
         assert result.input_tokens == 3000
-        assert read_verb_logs() == []
 
-    def test_snapshot_delta_logged_when_wrapped_code_raises(self, verb_log_dir: Path):
+    def test_snapshot_delta_logged_when_wrapped_code_raises(self):
         """Failed verb invocations should still attribute completed proxy work."""
         before_snap = {
             "is_proxy": True,
@@ -289,9 +220,8 @@ class TestTrackVerbCost:
         assert result.total_cost_micros == 75_000
         assert result.request_count == 2
         assert result.input_tokens == 1500
-        assert read_verb_logs() == []
 
-    def test_cost_measured_true_when_reported_advances(self, verb_log_dir: Path):
+    def test_cost_measured_true_when_reported_advances(self):
         """A window with a reported-cost request marks the verb cost_measured=True."""
         before = {
             "total_requests": 5,
@@ -310,9 +240,8 @@ class TestTrackVerbCost:
 
         assert result.cost_measured is True
         assert result.total_cost_micros == 70_000
-        assert read_verb_logs() == []
 
-    def test_cost_measured_false_when_only_tokens_advance(self, verb_log_dir: Path):
+    def test_cost_measured_false_when_only_tokens_advance(self):
         """Passthrough verb: tokens/requests advance, no reported cost → cost_measured=False.
 
         The proxy total_micros is reported-only (Step 1), so a passthrough window shows a
@@ -337,7 +266,6 @@ class TestTrackVerbCost:
         assert result.request_count == 3
         assert result.input_tokens == 3000
         assert result.cost_measured is False
-        assert read_verb_logs() == []
 
 
 class TestResolveProxyUrls:

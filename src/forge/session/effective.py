@@ -82,13 +82,6 @@ def compute_effective_intent(
     else:
         merged = intent_dict
 
-    # Defensive: strip removed designated_docs from merged dict. Primary guard
-    # is store.strip_preview_memory_doc_lists(); this covers code paths that
-    # construct a merged dict without going through SessionStore.read().
-    mem = merged.get("memory")
-    if isinstance(mem, dict):
-        mem.pop("designated_docs", None)
-
     if strict:
         try:
             return dacite.from_dict(
@@ -98,7 +91,7 @@ def compute_effective_intent(
             )
         except (dacite.DaciteError, TypeError, ValueError) as e:
             key = override_key or "unknown"
-            actual = _infer_actual_type(e, merged)
+            actual = _infer_actual_type(e)
             expected = _infer_expected_type(e)
             raise InvalidOverrideValueError(key, expected, actual) from e
 
@@ -147,7 +140,7 @@ def get_effective_value(state: SessionState, key: str) -> Any | None:
     return current
 
 
-def _infer_actual_type(error: Exception, merged: dict[str, Any]) -> str:
+def _infer_actual_type(error: Exception) -> str:
     """Try to infer the actual type/value from a dacite error."""
     error_str = str(error)
 

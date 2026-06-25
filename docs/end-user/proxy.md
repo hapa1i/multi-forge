@@ -489,8 +489,9 @@ curl http://localhost:8085/ | jq .metrics
 ## Cost tracking and spend caps
 
 Proxy request costs are logged as downstream telemetry under `~/.forge/telemetry/downstream/`. Legacy
-`~/.forge/costs/requests/` and `~/.forge/costs/verbs/` files may exist from older installs; new request spend writes to
-downstream records, and the by-verb view joins those records to run ids instead of writing new verb snapshot files.
+`~/.forge/costs/requests/` files may exist from older installs; Forge no longer reads or writes them
+(`forge telemetry costs reset` still cleans `costs/requests/` up). New request spend writes to downstream records, and
+the by-verb view joins those records to run ids instead of writing verb snapshot files.
 
 ```bash
 forge telemetry costs show                    # Today's costs, by verb
@@ -545,8 +546,7 @@ once logged spend reaches the cap. `on_cap_hit=reject` returns HTTP 429 with `sp
 lets the request continue and returns `X-Spend-Warning`.
 
 > Earlier versions had a `costs.cap_mode` setting (`post`/`strict`); it was removed and caps are now always post-event.
-> If an older `proxy.yaml` still has a `cap_mode:` line, remove it — the proxy otherwise refuses to load with a message
-> telling you to.
+> A `cap_mode:` line in an older `proxy.yaml` is now silently ignored — delete it to avoid confusion.
 
 Cap enforcement is process-local and best-effort. For reliable cap enforcement, run a single proxy process per proxy ID.
 Telemetry logs accumulate in `~/.forge/telemetry/` (with legacy cost logs under `~/.forge/costs/` from older installs).

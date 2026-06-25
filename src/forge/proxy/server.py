@@ -187,7 +187,6 @@ def _initialize_cost_tracker_from_config() -> CostTracker:
         cost_tracker.bootstrap_from_logs(
             get_forge_home() / "telemetry" / "downstream",
             proxy_id=PROXY_ID,
-            legacy_log_dir=get_forge_home() / "costs" / "requests",
         )
     else:
         cost_tracker = CostTracker()

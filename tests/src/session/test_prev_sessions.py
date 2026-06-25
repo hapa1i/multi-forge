@@ -23,7 +23,6 @@ from forge.session.prev_sessions import (
     generated_path_rel,
     iter_child_notes,
     iter_children,
-    iter_legacy_flat_files,
     iter_parents,
     notes_for_snapshot,
     notes_has_user_content,
@@ -118,23 +117,6 @@ class TestIterators:
 
         names = sorted(p.stem for p in iter_children(tmp_path, "p1"))
         assert names == ["c1", "c2"]
-
-    def test_iter_legacy_flat_files_empty_when_no_dir(self, tmp_path: Path) -> None:
-        assert list(iter_legacy_flat_files(tmp_path)) == []
-
-    def test_iter_legacy_flat_files_yields_top_level_md(self, tmp_path: Path) -> None:
-        root = tmp_path / ".forge" / PREV_SESSIONS_DIR
-        root.mkdir(parents=True)
-        (root / "p1.md").write_text("legacy a")
-        (root / "p2.md").write_text("legacy b")
-        # New-layout directory should not be yielded
-        (root / "p3").mkdir()
-        (root / "p3" / "generated.md").write_text("new-layout cache")
-        # Non-md files at top level should not be yielded either
-        (root / "data.json").write_text("{}")
-
-        names = sorted(p.stem for p in iter_legacy_flat_files(tmp_path))
-        assert names == ["p1", "p2"]
 
 
 class TestNotesOverlay:

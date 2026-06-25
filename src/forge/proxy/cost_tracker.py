@@ -87,7 +87,6 @@ class CostTracker:
         log_dir: Path,
         *,
         proxy_id: str | None = None,
-        legacy_log_dir: Path | None = None,
     ) -> None:
         """Read existing cost logs to initialize spend counters.
 
@@ -113,8 +112,6 @@ class CostTracker:
         keyed_log_records: dict[str, _ParsedCostRecord] = {}
 
         paths = list(sorted(log_dir.glob("*.jsonl"))) if log_dir.is_dir() else []
-        if legacy_log_dir is not None and legacy_log_dir.is_dir():
-            paths.extend(sorted(legacy_log_dir.glob("*.jsonl")))
 
         for path in paths:
             fname = path.stem  # e.g., "2026-05_12345"

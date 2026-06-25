@@ -239,15 +239,6 @@ def _coerce_cost_config(value: Any) -> CostConfig:
         return value
     if not isinstance(value, dict):
         raise ValueError("Invalid costs: must be a mapping")
-    if "cap_mode" in value:
-        # Removed in metric-evidence Phase 3: caps have one behavior now (post-event). The
-        # costs block is otherwise leniently parsed, so a removed key must be rejected
-        # explicitly or it would be silently ignored (coding-standards: removed = tombstone).
-        raise ValueError(
-            "costs.cap_mode is no longer supported. Forge enforces spend caps after each "
-            "completed request; there is no pre-flight 'strict' mode. Remove costs.cap_mode "
-            "from proxy.yaml."
-        )
     return CostConfig(
         caps=_coerce_cost_caps(value.get("caps", {}) or {}),
         on_cap_hit=value.get("on_cap_hit", "reject"),
@@ -469,10 +460,10 @@ def _coerce_provider_trace_config(value: Any) -> ProviderTraceConfig:
     # The inject toggle moved out of per-proxy proxy.yaml to the global
     # ~/.forge/config.yaml (provider_trace.inject_provider_user) so one switch governs both the
     # proxied and the direct OpenRouter routes. proxy.yaml is user-owned config (a system boundary,
-    # not strict durable state): warn-and-degrade on the relocated keys -- the current key and the
-    # older inject_openrouter_user alias -- rather than reject (coding-standards section 5). Pop
-    # them BEFORE the strict allowlist check so they do not trip _reject_unknown_keys.
-    relocated = [k for k in ("inject_provider_user", "inject_openrouter_user") if k in value]
+    # not strict durable state): warn-and-degrade on the relocated inject_provider_user key rather
+    # than reject (coding-standards section 5). Pop it BEFORE the strict allowlist check so it does
+    # not trip _reject_unknown_keys.
+    relocated = [k for k in ("inject_provider_user",) if k in value]
     if relocated:
         value = {k: v for k, v in value.items() if k not in relocated}
         _warn_legacy_inject_key(

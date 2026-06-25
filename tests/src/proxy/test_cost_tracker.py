@@ -321,25 +321,6 @@ class TestBootstrap:
         assert t.daily_spend_micros() == 500_000
         assert t.monthly_spend_micros() == 500_000
 
-    def test_legacy_current_month_import_prevents_clean_cut_reset(self, tmp_path: Path):
-        downstream_dir = tmp_path / "telemetry" / "downstream"
-        legacy_dir = tmp_path / "costs" / "requests"
-        downstream_dir.mkdir(parents=True)
-        legacy_dir.mkdir(parents=True)
-
-        now = datetime.now(timezone.utc)
-        month = now.strftime("%Y-%m")
-        ts = now.strftime("%Y-%m-%dT%H:%M:%SZ")
-        path = legacy_dir / f"{month}_9999.jsonl"
-        with open(path, "w") as f:
-            f.write(json.dumps({"ts": ts, "cost_micros": 700_000, "proxy_id": "proxy-a"}) + "\n")
-
-        t = CostTracker(daily_cap_usd=10.0, monthly_cap_usd=100.0)
-        t.bootstrap_from_logs(downstream_dir, proxy_id="proxy-a", legacy_log_dir=legacy_dir)
-
-        assert t.daily_spend_micros() == 700_000
-        assert t.monthly_spend_micros() == 700_000
-
     def test_previous_month_snapshot_keeps_rolling_daily_window(self, tmp_path: Path):
         log_dir = tmp_path / "telemetry" / "downstream"
         log_dir.mkdir(parents=True)

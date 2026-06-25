@@ -431,15 +431,14 @@ forge proxy set openrouter-anthropic costs.on_cap_hit=warn
 
 Runtime logs:
 
-| Path                                       | Schema owner                         | Retention policy                                     |
-| ------------------------------------------ | ------------------------------------ | ---------------------------------------------------- |
-| `~/.forge/telemetry/downstream/*.jsonl`    | `forge.core.telemetry.downstream`    | Append-only, reset/user-prune                        |
-| `~/.forge/telemetry/upstream/*.jsonl`      | `forge.core.telemetry.upstream`      | Append-only, reset/user-prune                        |
-| `~/.forge/telemetry/caps/<proxy_id>.json`  | `forge.core.telemetry.caps`          | Durable cap checkpoint; reset by explicit cost reset |
-| `~/.forge/telemetry/audit_state/<id>.json` | `forge.proxy.audit_logger`           | Sidecar drift baseline                               |
-| `~/.forge/usage/events/*.jsonl`            | `forge.core.usage.ledger`            | Transitional attribution ledger; reset/user-prune    |
-| `~/.forge/costs/requests/*.jsonl`          | legacy `forge.proxy.cost_logger`     | Legacy cap migration/reset compatibility             |
-| `~/.forge/costs/verbs/*.jsonl`             | legacy `forge.core.reactive` wrapper | Retired writer; legacy reset compatibility           |
+| Path                                       | Schema owner                      | Retention policy                                       |
+| ------------------------------------------ | --------------------------------- | ------------------------------------------------------ |
+| `~/.forge/telemetry/downstream/*.jsonl`    | `forge.core.telemetry.downstream` | Append-only, reset/user-prune                          |
+| `~/.forge/telemetry/upstream/*.jsonl`      | `forge.core.telemetry.upstream`   | Append-only, reset/user-prune                          |
+| `~/.forge/telemetry/caps/<proxy_id>.json`  | `forge.core.telemetry.caps`       | Durable cap checkpoint; reset by explicit cost reset   |
+| `~/.forge/telemetry/audit_state/<id>.json` | `forge.proxy.audit_logger`        | Sidecar drift baseline                                 |
+| `~/.forge/usage/events/*.jsonl`            | `forge.core.usage.ledger`         | Transitional attribution ledger; reset/user-prune      |
+| `~/.forge/costs/requests/*.jsonl`          | none (pre-OSS installs)           | Legacy; no longer written or read — reset cleanup only |
 
 Downstream attempt records contain timestamp, proxy/source ID, model/tier, token counts, `cost_micros` (null when no
 route reported a cost), request ID, latency, metric-evidence provenance (`reporter` + `confidence`), provider lifecycle
@@ -460,15 +459,15 @@ attempts/retries get distinct ids. `backend_id` filtering is applied after dupli
 records with null `backend_id` can add evidence without erasing attribution. Legacy verb records are no longer written;
 by-verb cost derives from downstream attempts joined to `usage/events` by run id.
 
-The proxy `GET /` endpoint reports in-memory metrics and cost totals for live status. The JSONL request logs remain the
-bootstrap source for cap enforcement after restart.
+The proxy `GET /` endpoint reports in-memory metrics and cost totals for live status. The downstream telemetry shards
+remain the bootstrap source for cap enforcement after restart.
 
 Cap enforcement is process-local. Each proxy process bootstraps from shared JSONL logs at startup, but in-flight spend
 is not coordinated across concurrent processes. To coordinate caps across processes, run a single proxy process per
 proxy ID.
 
-Telemetry logs accumulate indefinitely. `forge telemetry costs reset` wipes legacy cost-log planes (`costs/requests/` +
-`costs/verbs/`), downstream/upstream telemetry shards, cap-state snapshots, audit sidecar state, **and** the
+Telemetry logs accumulate indefinitely. `forge telemetry costs reset` wipes the legacy cost-log plane
+(`costs/requests/`), downstream/upstream telemetry shards, cap-state snapshots, audit sidecar state, **and** the
 usage-attribution ledger (`usage/events/`) to zero in one step, and clears the derived status-line caches
 (`cache/statusline/fcost-*.json` for `forge +$Y`, `fhealth-*.json` for supervisor health) so a wiped ledger cannot
 replay a cached value; it prompts for confirmation unless `--yes`, and `--dry-run` previews. Either way, a running proxy

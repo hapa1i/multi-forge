@@ -12,10 +12,9 @@ completion, tool output, or replayable request body ever appears here. The heade
 allowlist is re-applied at the writer (defense in depth) so even a future caller that
 bypasses the Phase 2 boundary cannot persist ``authorization``/``cookie``.
 
-Location: provider trace fields now live on downstream attempt records under
-``~/.forge/telemetry/downstream/YYYY-MM_<pid>.jsonl`` (owner-only, 0600). The legacy
-append helpers remain only for old retention compatibility; current writes go through
-``write_downstream_record`` and reset with the downstream plane.
+Location: provider trace fields live on downstream attempt records under
+``~/.forge/telemetry/downstream/YYYY-MM_<pid>.jsonl`` (owner-only, 0600). All writes go
+through ``write_downstream_record`` and reset with the downstream plane.
 """
 
 from __future__ import annotations

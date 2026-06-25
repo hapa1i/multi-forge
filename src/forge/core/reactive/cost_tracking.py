@@ -2,9 +2,8 @@
 
 Wraps subprocess invocations (panel, supervisor, memory-writer, etc.) to
 measure cost by snapshotting proxy metrics before and after execution.
-Results populate the yielded holder for usage attribution. The historical
-``~/.forge/costs/verbs`` writer is retired; downstream request records joined by
-run-tree identity now back the proxy spend surface.
+Results populate the yielded holder for usage attribution. Downstream request
+records joined by run-tree identity back the proxy spend surface.
 
 All verb costs are marked ``estimated`` because concurrent proxy traffic
 (e.g., the main interactive session) may share the same proxy during
@@ -16,21 +15,13 @@ from __future__ import annotations
 import json
 import logging
 import os
-import threading
 import time
 import urllib.request
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from datetime import datetime
-from pathlib import Path
 from typing import Any
 
-from forge.core.paths import get_forge_home
-from forge.core.state import decode_json_object
-
 logger = logging.getLogger(__name__)
-
-_verb_lock = threading.Lock()
 
 
 @dataclass
@@ -110,15 +101,6 @@ def _compute_delta(before: dict[str, Any], after: dict[str, Any], base_url: str)
             0, a_costs.get("reported_request_count", 0) - b_costs.get("reported_request_count", 0)
         ),
     )
-
-
-def _verb_log_dir() -> Path:
-    return get_forge_home() / "costs" / "verbs"
-
-
-def _log_verb_cost(result: VerbCostResult) -> None:
-    """Retired durable writer; the holder remains the live attribution contract."""
-    logger.debug("legacy verb cost log skipped for %s", result.verb)
 
 
 def resolve_subprocess_proxy_url() -> str | None:
@@ -252,43 +234,5 @@ def track_verb_cost(verb: str, proxy_base_urls: list[str]):
                 # a tokens-only passthrough verb reports cost-unavailable, not a fake $0.
                 holder.cost_measured = sum(d.reported_request_count for d in deltas) > 0
                 holder.per_proxy = deltas
-                _log_verb_cost(holder)
             except Exception as e:
                 logger.warning("Failed to track verb cost for %s: %s", verb, e)
-
-
-def read_verb_logs(
-    period_start: datetime | None = None,
-    period_end: datetime | None = None,
-) -> list[dict[str, Any]]:
-    """Read and aggregate verb cost records from all PID shards."""
-    log_dir = _verb_log_dir()
-    if not log_dir.is_dir():
-        return []
-
-    records: list[dict[str, Any]] = []
-    for path in sorted(log_dir.glob("*.jsonl")):
-        try:
-            with open(path) as f:
-                for line in f:
-                    record = decode_json_object(line)
-                    if record is None:
-                        continue
-
-                    if period_start or period_end:
-                        ts_str = record.get("ts", "")
-                        try:
-                            ts = datetime.fromisoformat(ts_str.rstrip("Z").removesuffix("+00:00") + "+00:00")
-                        except (ValueError, TypeError):
-                            continue
-                        if period_start and ts < period_start:
-                            continue
-                        if period_end and ts >= period_end:
-                            continue
-
-                    records.append(record)
-        except OSError as e:
-            logger.warning("Failed to read verb log %s: %s", path, e)
-
-    records.sort(key=lambda r: r.get("ts", ""))
-    return records

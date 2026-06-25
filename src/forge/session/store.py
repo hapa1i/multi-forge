@@ -126,11 +126,6 @@ class SessionStore:
         return self._forge_root
 
     @property
-    def worktree_path(self) -> Path:
-        """Deprecated alias for forge_root (kept for transition)."""
-        return self._forge_root
-
-    @property
     def session_name(self) -> str:
         """Return the session name."""
         return self._session_name

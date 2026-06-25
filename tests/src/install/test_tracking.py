@@ -94,8 +94,13 @@ class TestTrackingStore:
 
         assert "incompatible version" in str(exc_info.value)
 
-    def test_read_rejects_pre_oss_manifest_with_patched_files(self, tracking_store: TrackingStore) -> None:
-        """Old manifests containing patched_files produce a clean-break error."""
+    def test_read_rejects_manifest_with_removed_patched_files_field(self, tracking_store: TrackingStore) -> None:
+        """A manifest carrying the removed patched_files field is rejected, not silently loaded.
+
+        The bespoke pre-OSS tombstone is gone; dacite strict=True rejects the unexpected
+        field, so the manifest surfaces as TrackingCorruptedError (a StateCorruptedError)
+        through the unified corrupt-state handler instead of degrading to a default.
+        """
         tracking_store.path.write_text(
             json.dumps(
                 {
@@ -118,8 +123,7 @@ class TestTrackingStore:
         with pytest.raises(TrackingCorruptedError) as exc_info:
             tracking_store.read()
 
-        assert "pre-OSS patching build" in str(exc_info.value)
-        assert "forge extension enable" in str(exc_info.value)
+        assert "deserialization error" in str(exc_info.value)
 
     def test_write_creates_file(self, tracking_store: TrackingStore, sample_manifest: InstalledManifest) -> None:
         tracking_store.write(sample_manifest)
