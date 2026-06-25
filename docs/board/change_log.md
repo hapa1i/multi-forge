@@ -27,6 +27,37 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-24
 
+### Corrupt-state routing completion: fail-closed GC, full reset-tip coverage, strict costs
+
+**Goal**: Finish the corrupt-state work so every durable-corruption path surfaces the one reset instruction,
+`forge clean` never deletes live state on a transient read error, and user-edited spend caps reject unknown keys instead
+of silently changing behavior.
+
+**Key changes** (four commits on `main`: `2ec1c7f`, `8e2b6b2`, `f81676d`, `19b6bab`):
+
+- **GC fail-closed** (`core/ops/gc.py`): `_build_transfer_context_reference_set` no longer swallows manifest read errors
+  with `except Exception: continue`. A transient/corrupt read on a live child no longer drops its
+  `derivation.context_file` from the protected set, so `forge clean` can't unlink authoritative transfer context. The
+  same swallow fed the codex stale-snapshot guard. Regression test added.
+- **Full reset-tip coverage**: completed the `except StateCorruptedError: raise` (or propagate-from-op) pattern across
+  the remaining bypasses — proxy registry (`cli/proxy.py` x8 + claude/codex/session + `core/ops/proxy.py`),
+  session/index (resolution, `session_context` nested fallbacks, policy, memory, memory_report, session_lifecycle,
+  transfer), and codex ops (session/bridge/interactive). Corruption types multiply-inherit a domain base AND
+  `StateCorruptedError`, so a plain `except ForgeSessionError` was intercepting them before the top-level handler.
+- **Hook channel** (`cli/hooks/direct_commands.py`): `%proxy list` / `%session list` now emit the corrupt-state
+  `{decision:block}` JSON envelope (shared `_emit_corrupt_state_block` helper) instead of letting corruption escape to
+  the CLI Rich tip + exit 1, which broke the UserPromptSubmit contract.
+- **Strict costs** (`config/schema.py`): `costs` / `costs.caps` reject unknown keys (e.g. the removed `cap_mode`) with a
+  ValueError naming the offender, instead of silently ignoring them.
+
+**Adversarial verification**: a 3-lens skeptic panel over the routing diff converged on one real defect — the
+`%proxy list` hook regression above — fixed (with the identical pre-existing `%session list` gap) before commit.
+Deliberate soft-degrades confirmed intact: delete `--force` recovery, child-lookup callbacks, list-row enrichment,
+`show_proxy` degrade, `proxy_identity` ambient lookup, `forge clean`.
+
+**Verification**: 6922 unit tests pass (same 1 pre-existing unrelated telemetry failure,
+`test_result_run_tree_ids_are_optional`). 6 new regression tests in `test_corrupt_state.py`. `make pre-commit` clean.
+
 ### Backward-compat audit: unified corrupt-state handling + baggage removal
 
 **Goal**: As a clean-break fork with no users, carry no compatibility baggage, and make corrupt durable state fail

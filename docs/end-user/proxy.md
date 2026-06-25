@@ -546,9 +546,9 @@ once logged spend reaches the cap. `on_cap_hit=reject` returns HTTP 429 with `sp
 lets the request continue and returns `X-Spend-Warning`.
 
 > Earlier versions had a `costs.cap_mode` setting (`post`/`strict`); it was removed and caps are now always post-event.
-> A leftover `cap_mode:` line — or any unrecognized key under `costs`/`costs.caps` — is now rejected with a config
-> error naming the key, so a stale spend-cap setting can't silently change enforcement. Delete it; `forge proxy
-> validate` surfaces the error before the proxy starts.
+> A leftover `cap_mode:` line — or any unrecognized key under `costs`/`costs.caps` — is now rejected with a config error
+> naming the key, so a stale spend-cap setting can't silently change enforcement. Delete it; `forge proxy validate`
+> surfaces the error before the proxy starts.
 
 Cap enforcement is process-local and best-effort. For reliable cap enforcement, run a single proxy process per proxy ID.
 Telemetry logs accumulate in `~/.forge/telemetry/` (with legacy cost logs under `~/.forge/costs/` from older installs).
