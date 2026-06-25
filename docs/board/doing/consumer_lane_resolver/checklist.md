@@ -5,8 +5,9 @@
 ## Current focus
 
 Phases 0-3 implemented in `src/forge/core/lanes.py` with `tests/src/core/test_lanes.py` (15 tests green; mypy + pyright
-\+ pre-commit clean). Remaining: closeout (change_log entry, review, merge, move to `done/`). No consumer is rewired
-(T3); no persistence (T1b).
+\+ pre-commit clean). **Closeout in progress**: change_log entry added; PR open against `main`. After merge: flip the
+epic roster T1a -> done and move `doing/consumer_lane_resolver/` -> `done/`. No consumer is rewired (T3); no persistence
+(T1b).
 
 ## Decisions (resolved)
 
@@ -71,10 +72,10 @@ All 15 tests pass. The card's acceptance table plus the Phase 0 regression guard
 ## Phase 4 -- Closeout
 
 - [x] `make pre-commit` clean; `mypy` + `pyright` pass on `src/forge/core/lanes.py` + the test.
-- [ ] Design-doc sync deferred to T3: the resolver is unused until a consumer is wired, so the `design_appendix.md` §G /
-  `design.md` §3.6.12 update lands with T3 (already tracked in the epic checklist). T1a is internal + additive.
-- [ ] `change_log.md` entry (feature completion, ~15-25 lines); epic roster: T1a -> done.
-- [ ] After merge to `main`, move `doing/consumer_lane_resolver/` -> `done/` (board_contract closeout).
+- [x] Design-doc sync: nothing to sync for T1a (internal + additive). The `design_appendix.md` §G / `design.md` §3.6.12
+  update lands with T3 when a consumer is wired (tracked in the epic checklist).
+- [x] `change_log.md` entry added (2026-06-25). Epic roster T1a -> done flips at merge.
+- [ ] After the PR merges to `main`, move `doing/consumer_lane_resolver/` -> `done/` (board_contract closeout).
 
 ## Deferred / not in this ticket
 
