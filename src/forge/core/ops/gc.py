@@ -223,15 +223,28 @@ def _build_worktree_reference_set(ctx: ExecutionContext, scope: str, scope_roots
 
 
 def _build_transfer_context_reference_set(ref_set: set[tuple[str, str]]) -> set[str]:
-    """Build absolute paths referenced by session derivation context_file fields."""
+    """Build absolute paths referenced by session derivation context_file fields.
+
+    Raises:
+        StateCorruptedError: if an in-scope session manifest fails strict parse
+            (the store also surfaces transient read errors as corruption). Callers
+            MUST fail closed: a partial reference set silently drops the protection
+            on a live child snapshot, and the GC / codex deletion paths would then
+            unlink an in-use context file as a false orphan.
+    """
     from forge.session import SessionStore
+    from forge.session.exceptions import SessionFileNotFoundError
 
     result: set[str] = set()
     for name, forge_root in ref_set:
         try:
             state = SessionStore(forge_root, name).read()
-        except Exception:
-            _log.debug("Could not read session manifest for transfer GC: %s (%s)", name, forge_root, exc_info=True)
+        except SessionFileNotFoundError:
+            # Manifest gone -- a dangling index entry that slipped past
+            # list_sessions() self-heal (deleted between list and read). It
+            # references nothing, so there is genuinely no path to protect.
+            # Corruption (StateCorruptedError) is deliberately NOT caught here:
+            # it propagates so callers fail closed instead of dropping protection.
             continue
 
         derivation = state.confirmed.derivation
@@ -252,6 +265,12 @@ def referenced_transfer_context_paths() -> set[str]:
     Shared with the codex session op's stale-snapshot guard: ``context_file`` may be
     recorded absolute, so a same-named session in a different forge_root can reference
     a snapshot outside its own root -- a path-local existence check is not enough.
+
+    Raises:
+        StateCorruptedError: if any indexed session manifest is unreadable. The
+        guard depends on this -- when references can't be verified it must refuse
+        to delete a possibly-referenced snapshot (fail closed), never treat it as
+        unreferenced and unlink it.
     """
     from forge.session import SessionManager
 
@@ -313,7 +332,25 @@ def _detect_orphan_transfer_files(ref_set: set[tuple[str, str]], forge_roots: se
     from forge.session import prev_sessions as _ps
 
     orphans: list[str] = []
-    referenced_context_files = _build_transfer_context_reference_set(ref_set)
+    try:
+        referenced_context_files = _build_transfer_context_reference_set(ref_set)
+    except StateCorruptedError:
+        # A session manifest is unreadable, so the protected-paths set is
+        # incomplete -- we cannot know which child snapshot it references
+        # (context_file may even be an absolute path into another root). Deleting
+        # any transfer file now risks unlinking live, in-use context. Protect the
+        # whole category (empty result); _detect_corrupt_state still flags the bad
+        # manifest, and a later clean pass re-evaluates once the index self-heals.
+        _log.warning(
+            "forge clean: an unreadable session manifest blocked transfer-file orphan "
+            "detection; skipping that category to avoid deleting live context"
+        )
+        return OrphanCategory(
+            category="transfer_files",
+            description="Orphaned resume-context artifacts (transfer files)",
+            count=0,
+            items=[],
+        )
 
     for forge_root in forge_roots:
         prev_root = _ps.prev_sessions_root(forge_root)
