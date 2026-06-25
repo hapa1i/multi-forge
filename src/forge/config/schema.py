@@ -200,6 +200,23 @@ class CostCaps:
         self.per_month = _coerce_optional_usd_cap("costs.caps.per_month", self.per_month)
 
 
+def _reject_unknown_cost_keys(section: str, value: dict[Any, Any], known: set[str]) -> None:
+    """Strict-reject unrecognized keys in a proxy.yaml ``costs`` section.
+
+    Clean break: an unknown costs key (e.g. the removed ``cap_mode``) is a config
+    error, not silently ignored -- a stale spend-cap setting must never appear
+    accepted while quietly changing enforcement behavior. Raised as ValueError
+    (config validation), not StateCorruptedError, because the fix is editing
+    proxy.yaml, which ``forge clean`` never touches.
+    """
+    extra = sorted(str(k) for k in value if k not in known)
+    if extra:
+        raise ValueError(
+            f"Unknown {section} key(s) in proxy.yaml: {extra}. "
+            f"Valid {section} keys: {sorted(known)}. Remove the unknown key(s)."
+        )
+
+
 def _coerce_cost_caps(value: Any) -> CostCaps:
     """Normalize raw cost cap mappings into ``CostCaps``."""
     if value is None:
@@ -208,6 +225,7 @@ def _coerce_cost_caps(value: Any) -> CostCaps:
         return value
     if not isinstance(value, dict):
         raise ValueError("Invalid costs.caps: must be a mapping")
+    _reject_unknown_cost_keys("costs.caps", value, {"per_day", "per_month"})
     return CostCaps(
         per_day=value.get("per_day"),
         per_month=value.get("per_month"),
@@ -239,6 +257,7 @@ def _coerce_cost_config(value: Any) -> CostConfig:
         return value
     if not isinstance(value, dict):
         raise ValueError("Invalid costs: must be a mapping")
+    _reject_unknown_cost_keys("costs", value, {"caps", "on_cap_hit"})
     return CostConfig(
         caps=_coerce_cost_caps(value.get("caps", {}) or {}),
         on_cap_hit=value.get("on_cap_hit", "reject"),

@@ -313,6 +313,27 @@ class TestProxyInstanceConfig:
         assert config.caps.per_day == 20.0
         assert config.caps.per_month == 100.0
 
+    def test_cost_config_rejects_unknown_key(self):
+        """Strict break: an unknown costs key (e.g. the removed cap_mode) is rejected, not ignored.
+
+        Surfaces as a config ValueError (the fix is editing proxy.yaml), never a
+        StateCorruptedError -- 'forge clean' does not touch user config.
+        """
+        from forge.config.schema import _coerce_cost_config
+        from forge.core.state.exceptions import StateCorruptedError
+
+        with pytest.raises(ValueError) as ei:
+            _coerce_cost_config({"cap_mode": "strict"})
+        assert "cap_mode" in str(ei.value)
+        assert not isinstance(ei.value, StateCorruptedError)
+
+    def test_cost_caps_reject_unknown_key(self):
+        """Strict break: an unknown costs.caps key is rejected too (not only the top level)."""
+        from forge.config.schema import _coerce_cost_caps
+
+        with pytest.raises(ValueError, match=r"costs\.caps.*per_week"):
+            _coerce_cost_caps({"per_day": 10, "per_week": 5})
+
 
 class TestLeaseIdValidation:
     """Tests for proxy_id path traversal prevention."""
