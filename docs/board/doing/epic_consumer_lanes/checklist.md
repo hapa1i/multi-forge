@@ -5,22 +5,22 @@ checklists (board_contract "Epics"). Epic framing: `card.md`.
 
 ## Current focus
 
-First wave (T1a, T2, T3) authored as member cards in `docs/board/todo/`. No execution branch open yet. The next gate is
-a coordination *decision*, not code: resolve how `core.llm` sits relative to `RuntimeSpec` before T1a implementation
-starts (see Decisions owed).
+T1a is **active** on branch `consumer_lane_resolver` (moved to `doing/`, execution checklist written). T2/T3 remain
+authored in `todo/`; T4/T5/T1b/T6 stay inline sketches. The `core.llm` representation is decided (option 2 -- see
+Decisions).
 
 ## Member roster and sequencing
 
-| Member       | Card                                 | Lane | Depends on | State                      |
-| ------------ | ------------------------------------ | ---- | ---------- | -------------------------- |
-| T1a          | `todo/consumer_lane_resolver/`       | todo | --         | authored                   |
-| T2           | `todo/backend_subscription_sources/` | todo | T1a        | authored                   |
-| T3           | `todo/supervisor_lane_driven/`       | todo | T1a        | authored                   |
-| T4           | inline in `card.md`                  | --   | T1a,T2,T3  | sketch                     |
-| T5           | inline in `card.md`                  | --   | T3,T4      | sketch                     |
-| T1b          | inline in `card.md`                  | --   | T4         | sketch                     |
-| T6           | inline in `card.md`                  | --   | T1b        | sketch                     |
-| T0 (sibling) | inline in `card.md`                  | --   | none       | sketch; gates `claude-max` |
+| Member       | Card                                 | Lane  | Depends on | State                      |
+| ------------ | ------------------------------------ | ----- | ---------- | -------------------------- |
+| T1a          | `doing/consumer_lane_resolver/`      | doing | --         | active (branch)            |
+| T2           | `todo/backend_subscription_sources/` | todo  | T1a        | authored                   |
+| T3           | `todo/supervisor_lane_driven/`       | todo  | T1a        | authored                   |
+| T4           | inline in `card.md`                  | --    | T1a,T2,T3  | sketch                     |
+| T5           | inline in `card.md`                  | --    | T3,T4      | sketch                     |
+| T1b          | inline in `card.md`                  | --    | T4         | sketch                     |
+| T6           | inline in `card.md`                  | --    | T1b        | sketch                     |
+| T0 (sibling) | inline in `card.md`                  | --    | none       | sketch; gates `claude-max` |
 
 Sequencing (epic-canonical): T1a -> T3 -> T2 -> T4 -> T5 -> T1b -> T6. T2 and T3 both depend only on T1a and are
 mutually independent; T3 is sequenced first to prove the seam byte-identical before T2 adds backend vocabulary --
@@ -36,11 +36,10 @@ parallelizing T2/T3 is allowed but is not the default cursor. T0 is independent,
 
 ## Decisions owed (coordination, not code)
 
-- [ ] **core.llm vs RuntimeSpec shape** (blocks T1a). `RuntimeSpec` is subprocess-shaped (`headless_cmd`,
-  `is_installed()` via `shutil.which`, `core/runtime/registry.py:109`) and documents itself as "one *agent* runtime";
-  `core.llm` is in-process and single-shot. Decide: add a `core.llm` entry to `RUNTIMES` with an `execution` capability
-  attr and no real `headless_cmd`, or model the lane runtime axis as `{core.llm}` plus `RUNTIMES`. T1a card carries both
-  options + a recommendation.
+- [x] **core.llm vs RuntimeSpec shape** (was blocking T1a). **Decided: option 2** -- classify execution in the lane
+  layer; leave `RUNTIMES` untouched (adding a `core.llm` entry pollutes `list_runtimes()` / `installed_runtimes()` at
+  `core/runtime/registry.py:251,256` and their callers, and needs an always-true `is_installed()` hack). Lane runtime
+  axis = `{"core_llm"}` plus `RUNTIMES.keys()`. See `consumer_lane_resolver/checklist.md` Phase 0.
 - [ ] **Shared `BillingPosture` vocabulary** (T2 + T5). Fix one enum -- `per_token` / `subscription_quota` / `free` --
   used by T2's `ModelSource` field and surfaced by T5. One spelling, no parallel variants.
 - [ ] **Runtime-native credential shape** (T2). `ModelSource` requires >=1 `credential_id` and credentials are env-var
@@ -51,8 +50,8 @@ parallelizing T2/T3 is allowed but is not the default cursor. T0 is independent,
 
 - [ ] Each member card links this epic at its top via the current board path (`docs/board/doing/epic_consumer_lanes/`).
   Update both sides if the epic lane moves.
-- [ ] When T1a opens: branch, `git mv docs/board/todo/consumer_lane_resolver docs/board/doing/`, add its `checklist.md`,
-  update this roster.
+- [x] When T1a opens: branch, `git mv docs/board/todo/consumer_lane_resolver docs/board/doing/`, add its `checklist.md`,
+  update this roster. (done -- branch `consumer_lane_resolver`)
 - [ ] Promote T4/T5/T1b/T6 from inline sketch to member cards only after T1a+T3 land (shape proven).
 - [ ] Verify the M3 no-emission gaps (WorkflowPolicy Checker/Reviewer stages, team event tagger) are actually silent
   before they become T5 acceptance -- the epic `card.md` flags them "agent-reported, verify".

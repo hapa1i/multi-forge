@@ -3,7 +3,7 @@
 **Epic**: `docs/board/doing/epic_consumer_lanes/` -- read the epic for the shared lane contract (lane = runtime x
 backend x model; consumer; capability floor; binding).
 
-**Lane**: `todo/` (accepted, first wave). No execution branch open yet.
+**Lane**: `doing/` (active on branch `consumer_lane_resolver`). Execution plan in `checklist.md`.
 
 **Proves**: the lane abstraction fits the existing code with zero durable-schema commitment.
 
@@ -44,8 +44,11 @@ consumer rewired.** This is the contract every later ticket references.
 2. Keep `RUNTIMES` agent-only; model the lane runtime axis as `{core.llm}` plus `RUNTIMES.keys()`, with `core.llm`'s
    capability in a small separate record.
 
-Recommendation: option 1 with an explicit `execution` attr -- one table, and the floor reads `execution` directly.
-Record the choice in the epic `checklist.md` (it affects T3's default-lane wiring).
+Recommendation (updated after a code check): **option 2**. `RUNTIMES.values()` is iterated by `list_runtimes()` /
+`installed_runtimes()` (`registry.py:251,256`) and their callers, which assume *agent* runtimes -- injecting a
+`core.llm` entry pollutes all of them and needs an always-true `is_installed()` hack. Option 2 leaves `RUNTIMES`
+untouched and classifies execution in the lane layer (`core.llm` is not an agent runtime anyway). Resolved in
+`checklist.md` Phase 0.
 
 ## Acceptance (definition of done; operationalized in the checklist when this card opens)
 
