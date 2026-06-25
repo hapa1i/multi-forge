@@ -27,6 +27,23 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-25
 
+### consumer_lanes T1a: pure lane/consumer resolver
+
+**Goal**: Add the pure, I/O-free core of the consumer-lane model (epic `consumer_lanes`) so later tickets can place each
+unit of Forge LLM-work on a chosen `(runtime, backend, model)` lane.
+
+**Key changes**:
+
+- New `src/forge/core/lanes.py`: `Lane`, `Consumer`, `runtime_execution`, `valid_lanes`, `resolve_lane`, `LaneError`.
+- `core.llm` modeled in the lane layer (decision: option 2) -- `RUNTIMES` left untouched so `list_runtimes()` /
+  `installed_runtimes()` stay agent-only (regression-guarded).
+- Resolver is pure (no proxy/registry/network I/O): transport deferred to dispatch (T3); `backend_id` normalized to the
+  canonical `ModelSource` id (template aliases accepted); override is an allow-list over a consumer's declared lanes;
+  default validated at construction; model-catalog validation deferred to T3.
+
+**Verification**: 15 unit tests in `tests/src/core/test_lanes.py` (floor gating, default/override resolution, alias
+normalization, purity guard, `RUNTIMES`-untouched regression); `mypy` + `pyright` + `make pre-commit` clean.
+
 ### Read failures vs corruption: `StateUnreadableError` split (Fix A)
 
 **Goal**: A transient read failure (OSError) is not corruption — so `forge clean` must never delete a file it merely
