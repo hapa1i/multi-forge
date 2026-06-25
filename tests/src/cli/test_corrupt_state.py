@@ -9,6 +9,9 @@ and ``handle_corrupt_state_error`` prints the uniform recovery tip.
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import click
 import pytest
 
@@ -122,3 +125,104 @@ def test_session_list_corrupt_index_routes_to_handler() -> None:
     assert "Traceback" not in combined
     assert "Forge state is corrupt" in combined
     assert "forge clean" in combined
+
+
+# ---------------------------------------------------------------------------
+# User-facing command routing: corruption must reach the uniform reset handler,
+# not surface a raw parse error. Regression for the review finding that
+# session show / session resume / extension status bypassed the top-level handler.
+# ---------------------------------------------------------------------------
+
+
+def _seed_corrupt_manifest_session(name: str, tmp_path: Path) -> None:
+    """Index a session under tmp_path, then corrupt its manifest on disk."""
+    from forge.session import IndexStore, SessionStore, create_session_state
+
+    fr = tmp_path / "project"
+    SessionStore(str(fr), name).write(create_session_state(name, worktree_path=str(fr)))
+    IndexStore().add_session(
+        name=name,
+        worktree_path=str(fr),
+        project_root=str(tmp_path),
+        forge_root=str(fr),
+        checkout_root=str(fr),
+        relative_path=".",
+        is_incognito=False,
+        is_fork=False,
+        parent_session=None,
+    )
+    (fr / ".forge" / "sessions" / name / "forge.session.json").write_text("{ corrupt manifest", encoding="utf-8")
+
+
+def test_handle_session_error_routes_corruption_to_reset_handler(capsys: pytest.CaptureFixture[str]) -> None:
+    """The central session-error chokepoint delegates corruption to the corrupt-state tip.
+
+    Covers session resume + every other command that funnels through handle_session_error.
+    """
+    from forge.cli.output import handle_session_error
+
+    with pytest.raises(SystemExit) as ei:
+        handle_session_error(ManifestCorruptedError("/p/.forge/sessions/x/forge.session.json", "invalid JSON"))
+    assert ei.value.code == 1
+    out = capsys.readouterr().err
+    assert "Forge state is corrupt" in out
+    assert "forge clean" in out
+
+
+def test_get_session_context_propagates_corruption(tmp_path: Path) -> None:
+    """session show: a corrupt manifest raises StateCorruptedError, not a wrapped SessionContextError."""
+    from forge.core.ops.session_context import get_session_context
+
+    _seed_corrupt_manifest_session("bad", tmp_path)
+    with pytest.raises(StateCorruptedError):
+        get_session_context("bad")
+
+
+def test_session_show_corrupt_manifest_routes_to_handler(tmp_path: Path) -> None:
+    from click.testing import CliRunner
+
+    from forge.cli.main import main
+
+    _seed_corrupt_manifest_session("bad", tmp_path)
+    result = CliRunner().invoke(main, ["session", "show", "bad"])
+    combined = result.output + (result.stderr or "")
+    assert result.exit_code == 1
+    assert "Traceback" not in combined
+    assert "Forge state is corrupt" in combined
+    assert "forge clean" in combined
+
+
+def test_extension_status_corrupt_tracking_routes_to_handler() -> None:
+    from click.testing import CliRunner
+
+    from forge.cli.main import main
+    from forge.install.tracking import get_tracking_path
+
+    path = get_tracking_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("{ corrupt tracking", encoding="utf-8")
+
+    result = CliRunner().invoke(main, ["extension", "status"])
+    combined = result.output + (result.stderr or "")
+    assert result.exit_code == 1
+    assert "Traceback" not in combined
+    assert "Forge state is corrupt" in combined
+    assert "forge clean" in combined
+
+
+def test_in_chat_session_show_emits_json_block_on_corruption(tmp_path: Path) -> None:
+    """The %session show hook stays a JSON block decision -- never a Rich tip or traceback."""
+    import io
+    from contextlib import redirect_stdout
+
+    from forge.cli.hooks.direct_commands import _handle_session_show
+
+    _seed_corrupt_manifest_session("bad", tmp_path)
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        _handle_session_show(["bad"])
+
+    payload = json.loads(buf.getvalue())
+    assert payload["decision"] == "block"
+    assert "corrupt" in payload["reason"].lower()
+    assert "forge clean" in payload["reason"]

@@ -149,6 +149,7 @@ def _handle_session_show(argv: list[str]) -> None:
     fallback to avoid cross-repo ambiguity.
     """
     from forge.core.ops.session_context import SessionContextError, get_session_context
+    from forge.core.state.exceptions import StateCorruptedError
 
     # Explicit name or FORGE_SESSION env var (no active-session fallback)
     session_id: str | None = argv[0] if argv else os.environ.get("FORGE_SESSION")
@@ -167,6 +168,20 @@ def _handle_session_show(argv: list[str]) -> None:
 
     try:
         ctx = get_session_context(session_id)
+    except StateCorruptedError as e:
+        # Hook context: emit a JSON block decision, not the CLI Rich reset tip.
+        # %session is the assistant-facing dispatcher (the sole tip-bearing exception).
+        click.echo(
+            json.dumps(
+                {
+                    "decision": "block",
+                    "reason": f"Forge state is corrupt: {e}\n"
+                    "Tip: run 'forge clean', or delete .forge / ~/.forge and re-run "
+                    "'forge extension enable'.",
+                }
+            )
+        )
+        return
     except SessionContextError as e:
         click.echo(json.dumps({"decision": "block", "reason": f"Error: {e}"}))
         return

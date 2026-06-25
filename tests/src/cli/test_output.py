@@ -133,6 +133,7 @@ CLI_TIP_PAYLOAD_ALLOWLIST = {
     "Tip: Use /copy to copy assistant responses (built-in).",
     "Tip: Use 'forge session start' for managed sessions,",
     "Tip: This session supervises:",
+    "Tip: run 'forge clean', or delete .forge / ~/.forge and re-run",
 }
 
 

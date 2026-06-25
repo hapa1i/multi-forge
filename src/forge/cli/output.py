@@ -91,7 +91,15 @@ _SESSION_ERROR_TIPS: dict[type[ForgeSessionError], Callable[[ForgeSessionError],
 
 
 def handle_session_error(e: ForgeSessionError, *, console: Console | None = None) -> None:
-    """Print a session error (plus a context-free recovery tip, if mapped) and exit 1."""
+    """Print a session error (plus a context-free recovery tip, if mapped) and exit 1.
+
+    Durable-state corruption (ManifestCorruptedError / IndexCorruptedError, which are
+    also StateCorruptedError) routes to the single corrupt-state handler so every
+    session command that funnels errors here surfaces the uniform reset instruction
+    instead of a raw parse error.
+    """
+    if isinstance(e, StateCorruptedError):
+        handle_corrupt_state_error(e, console=console)
     out = _resolve(console)
     print_error(str(e), console=out)
     tip_fn = _SESSION_ERROR_TIPS.get(type(e))

@@ -17,7 +17,7 @@ import click
 from rich.console import Console
 from rich.table import Table
 
-from forge.cli.output import err_console, print_error, print_tip
+from forge.cli.output import print_error, print_tip
 from forge.core.paths import display_path
 from forge.core.state.exceptions import StateCorruptedError
 from forge.install.exceptions import (
@@ -26,7 +26,6 @@ from forge.install.exceptions import (
     NoForgeInstallationError,
     NotInstalledError,
     SettingsConflictError,
-    TrackingCorruptedError,
 )
 from forge.install.installer import Installer, find_claude_root, find_forge_installation
 from forge.install.models import (
@@ -874,11 +873,10 @@ def disable_cmd(scope: str | None, uninstall_all: bool, yes: bool) -> None:
     except NoForgeInstallationError as e:
         print_error(f"{e}", console=console)
         sys.exit(1)
-    except TrackingCorruptedError as e:
-        print_error(f"{e}", console=console)
-        sys.exit(1)
     except StateCorruptedError:
-        raise  # corruption defers to the unified top-level handler (uniform reset tip)
+        # Includes TrackingCorruptedError -- defers to the unified top-level handler
+        # (uniform reset tip) instead of printing a raw parse error.
+        raise
     except ForgeInstallError as e:
         print_error(f"{e}", console=console)
         sys.exit(1)
@@ -931,12 +929,10 @@ def status_cmd(scope: str | None, path: str | None, show_all: bool, as_json: boo
     if scope == "user" and anchor is not None:
         raise click.UsageError("--scope user is global; --root is not applicable.")
 
-    try:
-        tracking = TrackingStore()
-        tracking.read()
-    except TrackingCorruptedError as e:
-        print_error(str(e), console=err_console)
-        raise SystemExit(1) from None
+    # A corrupt installed.json raises TrackingCorruptedError (a StateCorruptedError);
+    # it propagates to the top-level handler for the uniform reset tip.
+    tracking = TrackingStore()
+    tracking.read()
 
     cwd = os.getcwd()
 
