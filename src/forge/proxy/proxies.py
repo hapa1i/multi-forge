@@ -24,6 +24,7 @@ import dacite
 from forge.core.paths import get_forge_home
 from forge.core.state import (
     StateCorruptedError,
+    StateUnreadableError,
     atomic_write_json,
     file_lock_for_target,
 )
@@ -68,6 +69,16 @@ def _is_orphaned_starting(entry: ProxyEntry) -> bool:
 
 class ProxyRegistryCorruptedError(StateCorruptedError):
     """Raised when the proxy registry cannot be parsed."""
+
+    pass
+
+
+class ProxyRegistryUnreadableError(StateUnreadableError):
+    """Raised when the proxy registry exists but the read failed (OSError), not corruption.
+
+    A ``StateUnreadableError`` (not ``StateCorruptedError``) so ``forge clean`` never
+    deletes a registry it merely failed to open.
+    """
 
     pass
 
@@ -229,7 +240,8 @@ class ProxyRegistryStore:
         except json.JSONDecodeError as e:
             raise ProxyRegistryCorruptedError(str(self._registry_path), f"invalid JSON: {e}")
         except OSError as e:
-            raise ProxyRegistryCorruptedError(str(self._registry_path), f"read error: {e}")
+            # A failed read is environmental, not corruption -- forge clean must not delete it.
+            raise ProxyRegistryUnreadableError(str(self._registry_path), f"read error: {e}")
 
         version = data.get("version")
         if version is None:

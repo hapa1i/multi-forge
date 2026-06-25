@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from forge.core.state.exceptions import StateCorruptedError
+from forge.core.state.exceptions import StateCorruptedError, StateUnreadableError
 
 
 class ForgeInstallError(Exception):
@@ -58,6 +58,19 @@ class TrackingCorruptedError(ForgeInstallError, StateCorruptedError):
     Attributes:
         path: Path to the problematic tracking file.
         reason: What went wrong during parsing.
+    """
+
+    def __init__(self, path: str, reason: str) -> None:
+        self.path = path
+        self.reason = reason
+        Exception.__init__(self, f"tracking file at '{path}': {reason}")
+
+
+class TrackingUnreadableError(ForgeInstallError, StateUnreadableError):
+    """Raised when the tracking file exists but the read failed (OSError), not corruption.
+
+    A ``StateUnreadableError`` (not ``StateCorruptedError``) so ``forge clean`` never
+    deletes a tracking file it merely failed to open.
     """
 
     def __init__(self, path: str, reason: str) -> None:

@@ -13,7 +13,7 @@ import click
 
 from forge.core.paths import display_path
 from forge.core.state import FileLockTimeoutError
-from forge.core.state.exceptions import StateCorruptedError
+from forge.core.state.exceptions import StateCorruptedError, StateUnreadableError
 from forge.session import set_override
 from forge.session.effective import compute_effective_intent
 from forge.session.hooks import resolve_session_store
@@ -59,25 +59,31 @@ def _parse_direct_command(prompt: str) -> tuple[str, list[str]] | None:
     return cmd, argv
 
 
-def _emit_corrupt_state_block(e: StateCorruptedError) -> None:
-    """Emit the corrupt-state reset tip as a UserPromptSubmit JSON block.
+def _emit_state_error_block(e: StateCorruptedError | StateUnreadableError) -> None:
+    """Emit a durable-state error as a UserPromptSubmit JSON block.
 
     Hook context: %-dispatched commands must emit a ``{decision:block}`` decision,
-    never the CLI Rich reset tip. Letting StateCorruptedError escape would unwind to
-    ``AliasGroup.main`` -> ``handle_corrupt_state_error`` (Rich stderr + ``sys.exit(1)``),
-    breaking the assistant-facing JSON contract. ``%session``/``%proxy`` are the
-    assistant-facing dispatchers and are the sole hand-rolled tip-bearing exception.
+    never the CLI Rich tip. Letting the error escape would unwind to ``AliasGroup.main``
+    -> ``handle_corrupt_state_error`` / ``handle_unreadable_state_error`` (Rich stderr +
+    ``sys.exit(1)``), breaking the assistant-facing JSON contract. ``%session``/``%proxy``
+    are the assistant-facing dispatchers and are the sole hand-rolled tip-bearing exception.
+
+    Corruption and an unreadable (failed-read) file get distinct guidance: corruption is
+    deletable/resettable, an unreadable file is transient and must NOT be deleted.
     """
-    click.echo(
-        json.dumps(
-            {
-                "decision": "block",
-                "reason": f"Forge state is corrupt: {e}\n"
-                "Tip: run 'forge clean', or delete .forge / ~/.forge and re-run "
-                "'forge extension enable'.",
-            }
+    if isinstance(e, StateCorruptedError):
+        reason = (
+            f"Forge state is corrupt: {e}\n"
+            "Tip: run 'forge clean', or delete .forge / ~/.forge and re-run "
+            "'forge extension enable'."
         )
-    )
+    else:
+        reason = (
+            f"Forge could not read a state file: {e}\n"
+            "Tip: this is usually transient (locked/busy file, I/O error, or permissions) -- "
+            "check the file named above and retry. Forge will not delete it."
+        )
+    click.echo(json.dumps({"decision": "block", "reason": reason}))
 
 
 def _handle_cmd_help() -> None:
@@ -148,8 +154,8 @@ def _handle_cmd_session(data: dict[str, Any], argv: list[str]) -> None:
 
     try:
         result = list_sessions_op(ctx=ctx, include_incognito=include_incognito, scope=scope)
-    except StateCorruptedError as e:
-        _emit_corrupt_state_block(e)
+    except (StateCorruptedError, StateUnreadableError) as e:
+        _emit_state_error_block(e)
         return
     except ForgeOpError as e:
         click.echo(json.dumps({"decision": "block", "reason": f"Error: {e}"}))
@@ -192,8 +198,8 @@ def _handle_session_show(argv: list[str]) -> None:
 
     try:
         ctx = get_session_context(session_id)
-    except StateCorruptedError as e:
-        _emit_corrupt_state_block(e)
+    except (StateCorruptedError, StateUnreadableError) as e:
+        _emit_state_error_block(e)
         return
     except SessionContextError as e:
         click.echo(json.dumps({"decision": "block", "reason": f"Error: {e}"}))
@@ -325,8 +331,8 @@ def _handle_proxy_list() -> None:
 
     try:
         result = list_proxies_op(ctx=ctx)
-    except StateCorruptedError as e:
-        _emit_corrupt_state_block(e)
+    except (StateCorruptedError, StateUnreadableError) as e:
+        _emit_state_error_block(e)
         return
     except ForgeOpError as e:
         click.echo(json.dumps({"decision": "block", "reason": f"Error: {e}"}))

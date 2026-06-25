@@ -551,11 +551,11 @@ lets the request continue and returns `X-Spend-Warning`.
 > surfaces the error before the proxy starts.
 
 Cap enforcement is process-local and best-effort. For reliable cap enforcement, run a single proxy process per proxy ID.
-Telemetry logs accumulate in `~/.forge/telemetry/` (with legacy cost logs under `~/.forge/costs/` from older installs).
-The proxy re-bootstraps from downstream/legacy cost logs plus `~/.forge/telemetry/caps/<proxy_id>.json` at next startup.
-That cap-state snapshot is deliberate: a path migration or dropped best-effort JSONL write must not silently reset a
-monthly cap to `$0`. Snapshot writes are coalesced by request count/time and flushed on graceful proxy shutdown; the
-live proxy's in-memory counters remain authoritative between flushes.
+Telemetry logs accumulate in `~/.forge/telemetry/`. The proxy re-bootstraps from downstream cost logs
+(`~/.forge/telemetry/downstream/`) plus `~/.forge/telemetry/caps/<proxy_id>.json` at next startup. That cap-state
+snapshot is deliberate: a path migration or dropped best-effort JSONL write must not silently reset a monthly cap to
+`$0`. Snapshot writes are coalesced by request count/time and flushed on graceful proxy shutdown; the live proxy's
+in-memory counters remain authoritative between flushes.
 
 ### Budget planning
 

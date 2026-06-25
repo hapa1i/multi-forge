@@ -25,6 +25,38 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-06-25
+
+### Read failures vs corruption: `StateUnreadableError` split (Fix A)
+
+**Goal**: A transient read failure (OSError) is not corruption — so `forge clean` must never delete a file it merely
+failed to open, and a momentarily unreadable state file must surface an actionable "check/retry" message instead of a
+misleading "corrupt" or "no session found".
+
+**Key changes** (continues the 2026-06-24 corrupt-state work):
+
+- **New exception family**: `StateUnreadableError(StateError)`, sibling of `StateCorruptedError`, with domain variants
+  (`Manifest`/`IndexUnreadableError` = `ForgeSessionError`; `TrackingUnreadableError` = `ForgeInstallError`;
+  `Proxy`/`BackendRegistryUnreadableError`). All five readers (store, index, tracking, proxies, backend) now raise the
+  unreadable variant on `OSError` instead of a `*CorruptedError`.
+- **`forge clean` no longer deletes on transient reads** (HIGH fix): `_detect_corrupt_state` deletes only
+  `StateCorruptedError`; an unreadable file is skipped. Backend registry added to `_global_registry_probes`;
+  transfer-context protection now triggers on corrupt *and* unreadable.
+- **CLI routing**: `handle_unreadable_state_error` (check/retry, never delete) wired into `handle_session_error` and the
+  top-level `AliasGroup.main` catch; `%`-handlers emit a distinct unreadable `{decision:block}` (generalized
+  `_emit_state_error_block`).
+- **Ripple** (~29 sites): at specific-target resolution sites (`session_context`, resolution, session/codex ops, policy,
+  memory\*, session_lifecycle, extensions) `except StateCorruptedError: raise` became
+  `except (StateCorruptedError, StateUnreadableError): raise`, so an unreadable file propagates to the retry handler
+  rather than being swallowed into "no session found". Best-effort sites (`show_proxy`, `codex status`) degrade on both.
+- **Docs**: `end-user/proxy.md` cost-bootstrap wording corrected (downstream only; bootstrap no longer reads legacy).
+
+**Verification**: 6927 unit + 464 regression pass; `make pre-commit` clean. 13 new tests (9 in
+`tests/regression/test_bug_state_unreadable_not_deleted.py` — clean never deletes/over-corrects, every reader maps
+OSError to unreadable, routing; 4 unreadable-routing in `test_corrupt_state.py`). The lone failing test
+(`test_result_run_tree_ids_are_optional`) fails only when `FORGE_RUN_ID` leaks from an active Forge session — passes on
+a clean tree, unrelated to this change.
+
 ## 2026-06-24
 
 ### Corrupt-state routing completion: fail-closed GC, full reset-tip coverage, strict costs

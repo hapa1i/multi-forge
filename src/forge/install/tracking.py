@@ -16,7 +16,7 @@ import dacite
 from forge.core.paths import get_forge_home
 from forge.core.state import atomic_write_json, file_lock_for_target
 
-from .exceptions import TrackingCorruptedError
+from .exceptions import TrackingCorruptedError, TrackingUnreadableError
 from .models import (
     TRACKING_VERSION,
     Installation,
@@ -100,7 +100,8 @@ class TrackingStore:
         except json.JSONDecodeError as e:
             raise TrackingCorruptedError(str(self._path), f"invalid JSON: {e}")
         except OSError as e:
-            raise TrackingCorruptedError(str(self._path), f"read error: {e}")
+            # A failed read is environmental, not corruption -- forge clean must not delete it.
+            raise TrackingUnreadableError(str(self._path), f"read error: {e}")
 
         # Version check (no migration support)
         version = data.get("version", 1)

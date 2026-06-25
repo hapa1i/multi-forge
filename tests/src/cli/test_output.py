@@ -134,6 +134,7 @@ CLI_TIP_PAYLOAD_ALLOWLIST = {
     "Tip: Use 'forge session start' for managed sessions,",
     "Tip: This session supervises:",
     "Tip: run 'forge clean', or delete .forge / ~/.forge and re-run",
+    "Tip: this is usually transient (locked/busy file, I/O error, or permissions) --",
 }
 
 
@@ -143,7 +144,7 @@ def test_cli_rich_tips_go_through_output_helpers() -> None:
     Scans the literal "Tip:" -- a superset of the Rich "[dim]Tip:" markup that
     also catches plain ``click.echo("Tip: ...")`` and ClickException-embedded
     ``"\\nTip: ..."`` -- since the user-facing prefix lives only in output.py.
-    Every match must be one of the three pinned assistant-facing payloads in
+    Every match must be one of the pinned assistant-facing payloads in
     direct_commands.py; any other "Tip:" line is an offender, and a payload that
     disappears must be pruned (mirrors the CLI_ERROR_MARKUP_ALLOWLIST ledger).
     """

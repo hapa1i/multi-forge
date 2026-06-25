@@ -15,7 +15,7 @@ from collections.abc import Callable, Sequence
 
 from rich.console import Console
 
-from forge.core.state.exceptions import StateCorruptedError
+from forge.core.state.exceptions import StateCorruptedError, StateUnreadableError
 from forge.session.exceptions import ForgeSessionError, SessionExistsError
 
 # Module-level fallback console. Call sites that keep their own
@@ -94,12 +94,17 @@ def handle_session_error(e: ForgeSessionError, *, console: Console | None = None
     """Print a session error (plus a context-free recovery tip, if mapped) and exit 1.
 
     Durable-state corruption (ManifestCorruptedError / IndexCorruptedError, which are
-    also StateCorruptedError) routes to the single corrupt-state handler so every
-    session command that funnels errors here surfaces the uniform reset instruction
-    instead of a raw parse error.
+    also StateCorruptedError) routes to the single corrupt-state handler, and a failed
+    read (ManifestUnreadableError / IndexUnreadableError, which are StateUnreadableError)
+    to the unreadable handler, so every session command that funnels errors here surfaces
+    the uniform instruction instead of a raw error.
     """
     if isinstance(e, StateCorruptedError):
         handle_corrupt_state_error(e, console=console)
+        return  # handle_corrupt_state_error exits; explicit return guards a future refactor-to-raise
+    if isinstance(e, StateUnreadableError):
+        handle_unreadable_state_error(e, console=console)
+        return
     out = _resolve(console)
     print_error(str(e), console=out)
     tip_fn = _SESSION_ERROR_TIPS.get(type(e))
@@ -122,6 +127,24 @@ def handle_corrupt_state_error(e: StateCorruptedError, *, console: Console | Non
         "Fix or delete the file named above. For a full reset, delete .forge (project) or "
         "~/.forge (global) and re-run 'forge extension enable'.",
         "'forge clean' can detect and remove corrupt Forge state.",
+        console=out,
+    )
+    sys.exit(1)
+
+
+def handle_unreadable_state_error(e: StateUnreadableError, *, console: Console | None = None) -> None:
+    """Print a 'could not read state file' error, then exit 1.
+
+    Distinct from the corrupt-state handler: the file's contents are not known to be bad --
+    the read itself failed (OSError). This is typically transient or environmental, so the
+    guidance is to check/retry, never to delete (``forge clean`` deliberately leaves these
+    alone). Wired at the top-level ``AliasGroup.main`` catch alongside the corrupt handler.
+    """
+    out = console if console is not None else err_console
+    print_error(f"Forge could not read a state file: {e}", console=out)
+    print_tip(
+        "This is usually transient (the file is locked/busy, an I/O error, or a permissions "
+        "problem) -- check the file named above and retry. Forge will not delete it.",
         console=out,
     )
     sys.exit(1)

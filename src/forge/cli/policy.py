@@ -28,7 +28,7 @@ from forge.cli.output import err_console, print_error, print_error_with_tip, pri
 from forge.core.effort import CLAUDE_EFFORT_LEVELS
 from forge.core.llm.types import REASONING_EFFORT_LEVELS
 from forge.core.paths import display_path
-from forge.core.state.exceptions import StateCorruptedError
+from forge.core.state.exceptions import StateCorruptedError, StateUnreadableError
 from forge.policy.queries import (
     find_sessions_supervised_by,
     read_scoped_supervisor_target,
@@ -135,7 +135,7 @@ def _resolve_policy_session(cwd: Path, explicit: str | None) -> tuple[SessionSto
                 err_console.print(Text(f"  - {display_path(root)}", style="dim", no_wrap=True), soft_wrap=True)
             err_console.print("[dim]Run the command from the target project directory.[/dim]")
             sys.exit(1)
-        except StateCorruptedError:
+        except (StateCorruptedError, StateUnreadableError):
             raise  # corrupt index/manifest -> top-level reset handler
         except ForgeSessionError as exc:
             print_error(f"Session '{explicit}' not found: {exc}", console=err_console)
@@ -161,7 +161,7 @@ def _resolve_policy_session(cwd: Path, explicit: str | None) -> tuple[SessionSto
     store = SessionStore(_resolve_forge_root(cwd), name)
     try:
         state = store.read()
-    except StateCorruptedError:
+    except (StateCorruptedError, StateUnreadableError):
         raise  # corrupt manifest -> top-level reset handler, not a generic "no session"
     except Exception:
         print_error(f"No session found in {display_path(cwd)}", console=err_console)

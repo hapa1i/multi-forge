@@ -23,6 +23,7 @@ import dacite
 from forge.core.paths import get_forge_home
 from forge.core.state import (
     StateCorruptedError,
+    StateUnreadableError,
     atomic_write_json,
     file_lock_for_target,
 )
@@ -41,6 +42,16 @@ from forge.core.process import is_pid_alive as is_pid_alive  # noqa: E402, F401 
 
 class BackendRegistryCorruptedError(StateCorruptedError):
     """Raised when the backend registry cannot be parsed."""
+
+    pass
+
+
+class BackendRegistryUnreadableError(StateUnreadableError):
+    """Raised when the backend registry exists but the read failed (OSError), not corruption.
+
+    A ``StateUnreadableError`` (not ``StateCorruptedError``) so ``forge clean`` never
+    deletes a registry it merely failed to open.
+    """
 
     pass
 
@@ -102,7 +113,8 @@ class BackendRegistryStore:
         except json.JSONDecodeError as e:
             raise BackendRegistryCorruptedError(str(self._registry_path), f"invalid JSON: {e}")
         except OSError as e:
-            raise BackendRegistryCorruptedError(str(self._registry_path), f"read error: {e}")
+            # A failed read is environmental, not corruption -- forge clean must not delete it.
+            raise BackendRegistryUnreadableError(str(self._registry_path), f"read error: {e}")
 
         version = data.get("version")
         if version is None:

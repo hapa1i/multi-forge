@@ -62,7 +62,7 @@ from forge.core.reactive.env import new_root_run_identity
 from forge.core.runtime.codex_preflight import CodexPreflightError, assert_codex_ready
 from forge.core.runtime.codex_rollouts import find_rollout_path, find_rollouts_since
 from forge.core.state import now_iso
-from forge.core.state.exceptions import StateCorruptedError
+from forge.core.state.exceptions import StateCorruptedError, StateUnreadableError
 from forge.session import ForgeSessionError, SessionManager, SessionState
 from forge.session.active import run_with_active_session
 from forge.session.codex_handoff import (
@@ -163,7 +163,7 @@ def start_interactive_codex_session(
         try:
             parent_entry = manager.get_session_entry(parent, forge_root=str(forge_root))
             manager.get_session(parent, forge_root=str(forge_root))
-        except StateCorruptedError:
+        except (StateCorruptedError, StateUnreadableError):
             raise  # corrupt parent manifest/index -> top-level reset handler
         except ForgeSessionError as e:
             raise ForgeOpError(f"Parent session '{parent}' not found: {e}") from e
@@ -190,7 +190,7 @@ def start_interactive_codex_session(
             runtime=CODEX_RUNTIME,
             parent_session=parent,
         )
-    except StateCorruptedError:
+    except (StateCorruptedError, StateUnreadableError):
         raise  # corrupt manifest/index -> top-level reset handler
     except ForgeSessionError as e:
         raise ForgeOpError(str(e)) from e

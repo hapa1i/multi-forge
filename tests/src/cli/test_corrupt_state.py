@@ -102,6 +102,35 @@ def test_aliasgroup_main_catches_corrupt_state(capsys: pytest.CaptureFixture[str
     assert "index.json" in out
 
 
+def test_aliasgroup_main_catches_unreadable_state(capsys: pytest.CaptureFixture[str]) -> None:
+    """A StateUnreadableError (failed read, not bad content) is caught at the root group too.
+
+    Routes to the distinct check/retry message -- never the corrupt-state reset tip (which
+    would wrongly suggest deletion) and never a traceback.
+    """
+    from forge.cli.main import AliasGroup
+    from forge.session.exceptions import IndexUnreadableError
+
+    @click.group(cls=AliasGroup)
+    def root() -> None:
+        pass
+
+    @root.command()
+    def boom() -> None:
+        raise IndexUnreadableError("/p/.forge/sessions/index.json", "read error: [Errno 5] I/O error")
+
+    assert boom.name == "boom"  # registered command; references the symbol
+
+    with pytest.raises(SystemExit) as ei:
+        root.main(["boom"], prog_name="forge")
+    assert ei.value.code == 1
+
+    out = capsys.readouterr().err
+    assert "could not read a state file" in out
+    assert "index.json" in out
+    assert "Forge state is corrupt" not in out  # not misrouted to the reset handler
+
+
 def test_session_list_corrupt_index_routes_to_handler() -> None:
     """A corrupt global index surfaces the uniform reset tip via `forge session list`.
 
@@ -190,6 +219,96 @@ def test_session_show_corrupt_manifest_routes_to_handler(tmp_path: Path) -> None
     assert "Traceback" not in combined
     assert "Forge state is corrupt" in combined
     assert "forge clean" in combined
+
+
+# ---------------------------------------------------------------------------
+# The exception-split ripple: a transient *read failure* (OSError) is a state
+# problem too, so it must propagate to the unreadable handler at the same
+# specific-target resolution sites -- never get swallowed into a misleading
+# "no session found" dead-end (the durable-state policy forbids that).
+# ---------------------------------------------------------------------------
+
+
+def _seed_valid_session(name: str, tmp_path: Path) -> Path:
+    """Index a session with a VALID manifest on disk. Returns the manifest path."""
+    from forge.session import IndexStore, SessionStore, create_session_state
+
+    fr = tmp_path / "project"
+    SessionStore(str(fr), name).write(create_session_state(name, worktree_path=str(fr)))
+    IndexStore().add_session(
+        name=name,
+        worktree_path=str(fr),
+        project_root=str(tmp_path),
+        forge_root=str(fr),
+        checkout_root=str(fr),
+        relative_path=".",
+        is_incognito=False,
+        is_fork=False,
+        parent_session=None,
+    )
+    return fr / ".forge" / "sessions" / name / "forge.session.json"
+
+
+def _fail_open_for(monkeypatch: pytest.MonkeyPatch, target: Path) -> None:
+    """Make ``open(target, ...)`` raise OSError; delegate every other open (path-scoped)."""
+    import builtins
+
+    real_open = builtins.open
+    target_str = str(target)
+
+    def fake_open(file, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if str(file) == target_str:
+            raise OSError("simulated transient I/O failure")
+        return real_open(file, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "open", fake_open)
+
+
+def test_get_session_context_propagates_unreadable(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """session show: an unreadable manifest raises StateUnreadableError, not 'no session found'."""
+    from forge.core.ops.session_context import get_session_context
+    from forge.core.state.exceptions import StateUnreadableError
+
+    manifest = _seed_valid_session("locked", tmp_path)
+    _fail_open_for(monkeypatch, manifest)
+    with pytest.raises(StateUnreadableError):
+        get_session_context("locked")
+
+
+def test_session_show_unreadable_manifest_routes_to_handler(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from click.testing import CliRunner
+
+    from forge.cli.main import main
+
+    manifest = _seed_valid_session("locked", tmp_path)
+    _fail_open_for(monkeypatch, manifest)
+    result = CliRunner().invoke(main, ["session", "show", "locked"])
+    combined = result.output + (result.stderr or "")
+    assert result.exit_code == 1
+    assert "Traceback" not in combined
+    assert "could not read a state file" in combined
+    assert "no session found" not in combined.lower()  # not the misleading dead-end
+    assert "Forge state is corrupt" not in combined  # not misrouted to the reset handler
+
+
+def test_in_chat_session_show_emits_block_on_unreadable(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """`%session show` stays a JSON block decision on an unreadable manifest -- with check/retry guidance."""
+    import io
+    from contextlib import redirect_stdout
+
+    from forge.cli.hooks.direct_commands import _handle_session_show
+
+    manifest = _seed_valid_session("locked", tmp_path)
+    _fail_open_for(monkeypatch, manifest)
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        _handle_session_show(["locked"])
+
+    payload = json.loads(buf.getvalue())
+    assert payload["decision"] == "block"
+    assert "could not read" in payload["reason"].lower()
+    assert "will not delete" in payload["reason"].lower()  # never suggests deletion
+    assert "corrupt" not in payload["reason"].lower()
 
 
 def test_extension_status_corrupt_tracking_routes_to_handler() -> None:

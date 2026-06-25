@@ -23,7 +23,7 @@ from rich.syntax import Syntax
 
 from forge.cli.output import err_console, print_error, print_error_with_tip, print_tip
 from forge.cli.session import _cwd_forge_root, console, handle_session_error
-from forge.core.state.exceptions import StateCorruptedError
+from forge.core.state.exceptions import StateCorruptedError, StateUnreadableError
 from forge.session import ForgeSessionError, SessionManager
 from forge.session.memory_writer import memory_report_dir
 
@@ -49,7 +49,7 @@ def _resolve_session_forge_root(session_name: str | None) -> tuple[str, Path]:
             env_root = os.environ.get("FORGE_FORGE_ROOT") or (str(current_root) if current_root else None)
             try:
                 env_entry = manager.index_store.get_session(env_name, forge_root=env_root)
-            except StateCorruptedError:
+            except (StateCorruptedError, StateUnreadableError):
                 raise  # corrupt index -> top-level reset handler, not "not in a project"
             except ForgeSessionError:
                 pass

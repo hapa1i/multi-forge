@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from forge.core.state.exceptions import StateCorruptedError
+from forge.core.state.exceptions import StateCorruptedError, StateUnreadableError
 
 
 class ForgeSessionError(Exception):
@@ -78,6 +78,30 @@ class ManifestValidationError(ForgeSessionError, StateCorruptedError):
 
 class IndexCorruptedError(ForgeSessionError, StateCorruptedError):
     """Raised when index file exists but cannot be parsed."""
+
+    def __init__(self, path: str, reason: str) -> None:
+        self.path = path
+        self.reason = reason
+        Exception.__init__(self, f"index at '{path}': {reason}")
+
+
+class ManifestUnreadableError(ForgeSessionError, StateUnreadableError):
+    """Raised when a manifest exists but the read failed (OSError), not corruption.
+
+    A ``ForgeSessionError`` so existing degrade sites (``except ForgeSessionError``)
+    still skip one unreadable session, but a ``StateUnreadableError`` (not
+    ``StateCorruptedError``) so ``forge clean`` never deletes a file it failed to open.
+    ``Exception.__init__`` is called directly (the MRO would otherwise misroute args).
+    """
+
+    def __init__(self, path: str, reason: str) -> None:
+        self.path = path
+        self.reason = reason
+        Exception.__init__(self, f"manifest at '{path}': {reason}")
+
+
+class IndexUnreadableError(ForgeSessionError, StateUnreadableError):
+    """Raised when the index exists but the read failed (OSError), not corruption."""
 
     def __init__(self, path: str, reason: str) -> None:
         self.path = path

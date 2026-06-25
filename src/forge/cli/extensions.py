@@ -19,7 +19,7 @@ from rich.table import Table
 
 from forge.cli.output import print_error, print_tip
 from forge.core.paths import display_path
-from forge.core.state.exceptions import StateCorruptedError
+from forge.core.state.exceptions import StateCorruptedError, StateUnreadableError
 from forge.install.exceptions import (
     ForgeInstallError,
     NoClaudeDirectoryError,
@@ -658,7 +658,7 @@ def enable_cmd(
         console.print(f"[red]Settings conflict:[/red] {e}")
         print_tip("Use --force to override.", console=console)
         sys.exit(1)
-    except StateCorruptedError:
+    except (StateCorruptedError, StateUnreadableError):
         raise  # corruption defers to the unified top-level handler (uniform reset tip)
     except ForgeInstallError as e:
         print_error(f"{e}", console=console)
@@ -746,7 +746,7 @@ def sync_cmd(scope: str | None, force: bool) -> None:
         print_error(f"{e}", console=console)
         print_tip("Run 'forge extension enable' first.", console=console)
         sys.exit(1)
-    except StateCorruptedError:
+    except (StateCorruptedError, StateUnreadableError):
         raise  # corruption defers to the unified top-level handler (uniform reset tip)
     except ForgeInstallError as e:
         print_error(f"{e}", console=console)
@@ -873,7 +873,7 @@ def disable_cmd(scope: str | None, uninstall_all: bool, yes: bool) -> None:
     except NoForgeInstallationError as e:
         print_error(f"{e}", console=console)
         sys.exit(1)
-    except StateCorruptedError:
+    except (StateCorruptedError, StateUnreadableError):
         # Includes TrackingCorruptedError -- defers to the unified top-level handler
         # (uniform reset tip) instead of printing a raw parse error.
         raise

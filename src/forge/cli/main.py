@@ -11,7 +11,7 @@ from typing import Any
 import click
 from dotenv import load_dotenv
 
-from forge.core.state.exceptions import StateCorruptedError
+from forge.core.state.exceptions import StateCorruptedError, StateUnreadableError
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +74,8 @@ class AliasGroup(click.Group):
         StateCorruptedError is not a ClickException, so it propagates out of
         Click's standalone-mode loop to here — the single place that turns
         corruption (manifests, indexes, registries, proxy config) into a clear
-        reset instruction instead of a traceback.
+        reset instruction instead of a traceback. StateUnreadableError (a failed
+        read, not bad content) routes to its own handler: check/retry, no delete.
         """
         try:
             return super().main(*args, **kwargs)
@@ -82,6 +83,10 @@ class AliasGroup(click.Group):
             from forge.cli.output import handle_corrupt_state_error
 
             handle_corrupt_state_error(e)  # prints + sys.exit(1)
+        except StateUnreadableError as e:
+            from forge.cli.output import handle_unreadable_state_error
+
+            handle_unreadable_state_error(e)  # prints + sys.exit(1)
 
     def get_command(self, ctx: click.Context, cmd_name: str) -> click.Command | None:
         rv = super().get_command(ctx, cmd_name)

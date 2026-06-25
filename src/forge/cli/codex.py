@@ -34,7 +34,11 @@ from forge.install.codex_hooks import (
     get_codex_config_path,
     read_codex_registration,
 )
-from forge.install.exceptions import NoForgeInstallationError, TrackingCorruptedError
+from forge.install.exceptions import (
+    NoForgeInstallationError,
+    TrackingCorruptedError,
+    TrackingUnreadableError,
+)
 from forge.install.installer import find_forge_installation
 from forge.install.models import InstallScope
 from forge.install.tracking import TrackingStore
@@ -208,12 +212,12 @@ def _build_report(scope: str | None, show_all: bool) -> _StatusReport:
     try:
         store.read()
         tracking = store
-    except TrackingCorruptedError as e:
-        # Best-effort: codex status reports enrollment, not tracking health, so a
-        # corrupt installed.json degrades the supplementary tracked-* fields rather
-        # than blocking the read. Surfaced (not silent) per the never-silent rule;
-        # 'forge extension status' / 'forge clean' route the same corruption to the
-        # uniform reset tip.
+    except (TrackingCorruptedError, TrackingUnreadableError) as e:
+        # Best-effort: codex status reports enrollment, not tracking health, so a corrupt
+        # OR momentarily unreadable installed.json degrades the supplementary tracked-*
+        # fields rather than blocking the read. Surfaced (not silent) per the never-silent
+        # rule; 'forge extension status' / 'forge clean' route the same problem to the
+        # uniform handler.
         _log.warning("codex status: installed.json unreadable (%s); tracked-* fields omitted", e)
         tracking = None
     targets = _resolve_targets(scope, show_all, tracking)

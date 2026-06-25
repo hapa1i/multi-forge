@@ -15,7 +15,7 @@ import os
 from dataclasses import dataclass
 from typing import Any
 
-from forge.core.state.exceptions import StateCorruptedError
+from forge.core.state.exceptions import StateCorruptedError, StateUnreadableError
 from forge.session import (
     ForgeSessionError,
     SessionIndexEntry,
@@ -112,7 +112,7 @@ def list_sessions(*, ctx: ExecutionContext, include_incognito: bool, scope: str 
             project_root_filter=project_root_filter,
             forge_root_filter=forge_root_filter,
         )
-    except StateCorruptedError:
+    except (StateCorruptedError, StateUnreadableError):
         raise  # corruption defers to the unified top-level handler (uniform reset tip)
     except ForgeSessionError as e:
         raise ForgeOpError(str(e)) from e
@@ -222,7 +222,7 @@ def resolve_session(*, ctx: ExecutionContext, session_name: str | None = None) -
                 state = store.read()
             else:
                 raise ForgeOpError("No session specified. Use --session or set $FORGE_SESSION.")
-    except StateCorruptedError:
+    except (StateCorruptedError, StateUnreadableError):
         raise  # corruption defers to the unified top-level handler (uniform reset tip)
     except ForgeSessionError as e:
         raise ForgeOpError(str(e)) from e
@@ -284,7 +284,7 @@ def set_session_override(
 
     except (InvalidOverrideKeyError, InvalidOverrideValueError) as e:
         raise ForgeOpError(str(e)) from e
-    except StateCorruptedError:
+    except (StateCorruptedError, StateUnreadableError):
         raise  # corruption defers to the unified top-level handler (uniform reset tip)
     except ForgeSessionError as e:
         raise ForgeOpError(str(e)) from e
@@ -347,7 +347,7 @@ def reset_session_overrides(
 
     except InvalidOverrideKeyError as e:
         raise ForgeOpError(str(e)) from e
-    except StateCorruptedError:
+    except (StateCorruptedError, StateUnreadableError):
         raise  # corruption defers to the unified top-level handler (uniform reset tip)
     except ForgeSessionError as e:
         raise ForgeOpError(str(e)) from e

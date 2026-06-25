@@ -23,7 +23,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from forge.core.state.exceptions import StateCorruptedError
+from forge.core.state.exceptions import StateCorruptedError, StateUnreadableError
 
 from .context import ExecutionContext
 
@@ -334,9 +334,9 @@ def _detect_orphan_transfer_files(ref_set: set[tuple[str, str]], forge_roots: se
     orphans: list[str] = []
     try:
         referenced_context_files = _build_transfer_context_reference_set(ref_set)
-    except StateCorruptedError:
-        # A session manifest is unreadable, so the protected-paths set is
-        # incomplete -- we cannot know which child snapshot it references
+    except (StateCorruptedError, StateUnreadableError):
+        # A session manifest is corrupt or could not be read, so the protected-paths
+        # set is incomplete -- we cannot know which child snapshot it references
         # (context_file may even be an absolute path into another root). Deleting
         # any transfer file now risks unlinking live, in-use context. Protect the
         # whole category (empty result); _detect_corrupt_state still flags the bad
@@ -594,6 +594,7 @@ def _global_registry_probes() -> list[tuple[Path, Callable[[], object]]]:
     Excludes user config (proxy.yaml), passports, and the rebuildable search
     cache: forge clean only removes Forge-owned registries, never user data.
     """
+    from forge.backend.registry import BackendRegistryStore, get_backend_registry_path
     from forge.install.tracking import TrackingStore, get_tracking_path
     from forge.proxy.proxies import ProxyRegistryStore, get_proxy_registry_path
     from forge.session.index import IndexStore, get_index_path
@@ -601,6 +602,7 @@ def _global_registry_probes() -> list[tuple[Path, Callable[[], object]]]:
     return [
         (get_index_path(), lambda: IndexStore().read()),
         (get_proxy_registry_path(), lambda: ProxyRegistryStore().read()),
+        (get_backend_registry_path(), lambda: BackendRegistryStore().read()),
         (get_tracking_path(), lambda: TrackingStore().read()),
     ]
 

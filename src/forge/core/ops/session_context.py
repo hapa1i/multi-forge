@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from forge.core.state.exceptions import StateCorruptedError
+from forge.core.state.exceptions import StateCorruptedError, StateUnreadableError
 from forge.session import (
     ForgeSessionError,
     SessionManager,
@@ -144,7 +144,7 @@ def resolve_session_identifier(session: str | None = None) -> tuple[str, str | N
             return session, entry.root
         except AmbiguousSessionError:
             raise  # Propagate with location list intact
-        except StateCorruptedError:
+        except (StateCorruptedError, StateUnreadableError):
             raise  # a corrupt index is not a "try the next strategy" case
         except ForgeSessionError:
             pass
@@ -155,13 +155,13 @@ def resolve_session_identifier(session: str | None = None) -> tuple[str, str | N
             return session, entry.root
         except AmbiguousSessionError:
             raise  # Propagate with location list intact
-        except StateCorruptedError:
+        except (StateCorruptedError, StateUnreadableError):
             raise  # corruption -> top-level reset handler, not "no session found"
         except ForgeSessionError as e:
             # Check if it's corruption (in index but manifest bad) vs not found
             try:
                 manager.get_session_entry(session)
-            except StateCorruptedError:
+            except (StateCorruptedError, StateUnreadableError):
                 raise  # corrupt index -> top-level reset handler
             except ForgeSessionError:
                 pass  # Not in index — fall through to UUID lookup
@@ -188,13 +188,13 @@ def resolve_session_identifier(session: str | None = None) -> tuple[str, str | N
         try:
             entry = manager.get_session_entry(env_session, forge_root=_cwd_forge_root)
             return env_session, entry.root
-        except StateCorruptedError:
+        except (StateCorruptedError, StateUnreadableError):
             raise  # corrupt index -> top-level reset handler, not env-context fallback
         except ForgeSessionError:
             try:
                 entry = manager.get_session_entry(env_session)
                 return env_session, entry.root
-            except StateCorruptedError:
+            except (StateCorruptedError, StateUnreadableError):
                 raise  # corrupt index -> top-level reset handler, not env-context fallback
             except ForgeSessionError:
                 pass
@@ -293,7 +293,7 @@ def get_session_context(session: str | None = None) -> SessionContext:
     try:
         state = manager.get_session(name, forge_root=resolved_forge_root)
         entry = manager.get_session_entry(name, forge_root=resolved_forge_root)
-    except StateCorruptedError:
+    except (StateCorruptedError, StateUnreadableError):
         raise  # corruption defers to the top-level reset handler (uniform tip)
     except ForgeSessionError as e:
         raise SessionContextError(str(e)) from e

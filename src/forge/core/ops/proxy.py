@@ -19,6 +19,7 @@ from forge.proxy.proxies import (
     ProxyEntry,
     ProxyRegistryCorruptedError,
     ProxyRegistryStore,
+    ProxyRegistryUnreadableError,
 )
 
 from .context import ExecutionContext
@@ -111,7 +112,9 @@ def show_proxy(*, ctx: ExecutionContext, proxy_id: str) -> ShowProxyResult:
     try:
         registry = store.read()
         entry = registry.proxies.get(proxy_id)
-    except ProxyRegistryCorruptedError:
+    except (ProxyRegistryCorruptedError, ProxyRegistryUnreadableError):
+        # Supplementary lookup (config loads separately); a corrupt or momentarily
+        # unreadable registry degrades to "no entry" rather than failing `proxy show`.
         _log.debug("Registry unreadable, proceeding without registry info")
 
     # Load config

@@ -25,6 +25,7 @@ from forge.core.state import (
 
 from .exceptions import (
     IndexCorruptedError,
+    IndexUnreadableError,
     InvalidSessionNameError,
     SessionExistsError,
     SessionNotFoundError,
@@ -104,7 +105,8 @@ class IndexStore:
         except json.JSONDecodeError as e:
             raise IndexCorruptedError(str(self._index_path), f"invalid JSON: {e}")
         except OSError as e:
-            raise IndexCorruptedError(str(self._index_path), f"read error: {e}")
+            # A failed read is environmental, not corruption -- forge clean must not delete it.
+            raise IndexUnreadableError(str(self._index_path), f"read error: {e}")
 
         # Validate version
         version = data.get("version")
