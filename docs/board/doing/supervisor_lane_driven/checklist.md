@@ -5,9 +5,11 @@
 
 ## Current focus
 
-Refactor `run_supervisor_check` (`src/forge/policy/semantic/supervisor.py:412-564`) so the supervisor is a `Consumer`
-whose lane is resolved (T1a `resolve_lane`) then dispatched through a thin, runtime-keyed seam. The `claude_code` arm is
-the existing path moved **verbatim**; the run must be **byte-identical to today**. No durable schema; no Codex (T4).
+**Implemented + verified; ready for PR.** `run_supervisor_check` resolves `SUPERVISOR_CONSUMER` via `resolve_lane` then
+dispatches through `_dispatch_supervisor`; the `claude_code` arm is the pre-T3 path moved verbatim. 94 supervisor tests
+(89 existing unchanged + 5 new) + 215 `policy/semantic` pass; mypy/pyright clean; a 4-lens adversarial byte-diff
+workflow returned **BYTE_IDENTICAL_HOLDS, 0 real divergences**. Remaining: `make pre-commit`, commit docs, PR -> `main`;
+then the lane move below.
 
 ## Verified touchpoints (2026-06-25 sweep, post-T1a)
 
@@ -27,8 +29,8 @@ the existing path moved **verbatim**; the run must be **byte-identical to today*
 - Existing dispatch tests already covering 4/5 acceptance rows: `test_proxied_supervisor_uses_proxy_opus_tier_*`
   (`:569`), `test_direct_mode_skips_routing_resolver` (`:603`), `test_proxy_not_found_is_structural_fail_open` (`:624`),
   `test_unparseable_response_is_structural_fail_open` (`:641`). Must stay green **unchanged**.
-- Callers of `run_supervisor_check`: `invoke_supervisor` (`:578`) and the shadow auditor (`usage_command="supervisor-shadow"`).
-  Both flow through the seam; verify neither double-emits.
+- Callers of `run_supervisor_check`: `invoke_supervisor` (`:578`) and the shadow auditor
+  (`usage_command="supervisor-shadow"`). Both flow through the seam; verify neither double-emits.
 
 ## Decisions (resolve in this ticket; flagged for review)
 
@@ -40,58 +42,61 @@ the existing path moved **verbatim**; the run must be **byte-identical to today*
   `run_supervisor_check` catches it and returns the **identical** `proxy_not_found` fail-open decision.
 - [x] **Nominal backend = `anthropic-direct`, model = `opus`** on the supervisor's default lane. **Only `runtime_id` is
   load-bearing in T3** (it selects the dispatch arm); the `claude_code` arm still derives `base_url` (transport) and the
-  `opus` pin dynamically per the byte-identical contract, so `backend_id`/`model` are not yet consulted. T2 makes backend
-  load-bearing; document this in code + flag for reviewer. (No single backend is "correct" -- a proxied supervisor routes
-  through whatever proxy -- so a documented nominal id over today's catalog is the honest T3 choice.)
+  `opus` pin dynamically per the byte-identical contract, so `backend_id`/`model` are not yet consulted. T2 makes
+  backend load-bearing; document this in code + flag for reviewer. (No single backend is "correct" -- a proxied
+  supervisor routes through whatever proxy -- so a documented nominal id over today's catalog is the honest T3 choice.)
 - [x] **Dispatch params passed as explicit kwargs** (not a `params` dataclass) for a thin T3 seam; a params bundle is
   deferred to T4 if the Codex arm wants it.
 
 ## Phase 1 -- Seam + consumer (`src/forge/policy/semantic/supervisor.py`)
 
-- [ ] Import `Consumer`, `Lane`, `LaneError`, `resolve_lane` from `forge.core.lanes`.
-- [ ] Module-level `SUPERVISOR_CONSUMER = Consumer(id="supervisor", capability_floor="tool_agent",
-  default_lane=Lane("claude_code", "anthropic-direct", "opus"))`, with a comment stating backend/model are nominal in T3.
-  (Pure construction -- dict lookups only, no I/O; safe at import.)
-- [ ] `_SupervisorRoutingError(Exception)` -- internal control-flow signal for a failed claude-arm routing resolution.
-- [ ] `_dispatch_supervisor(lane, *, prompt, config, context, resolved, usage_command) -> SessionResult`: switch on
-  `lane.runtime_id` -- `claude_code` -> `_dispatch_claude_supervisor(...)`; `codex` -> `NotImplementedError` (T4);
-  else -> `LaneError`.
-- [ ] `_dispatch_claude_supervisor(...)`: the **verbatim** body of `:468-530` (routing/model/env, `spawn_env`,
-  `track_verb_cost` + `run_claude_session`, `emit_usage_for_session_result`), raising `_SupervisorRoutingError` instead
-  of the inline early-return on routing failure; returns `SessionResult`.
+- [x] Import `Consumer`, `Lane`, `LaneError`, `resolve_lane` from `forge.core.lanes` (+ `SessionResult`).
+- [x] Module-level
+  `SUPERVISOR_CONSUMER = Consumer(id="supervisor", capability_floor="tool_agent", default_lane=Lane("claude_code", "anthropic-direct", "opus"))`,
+  with a comment stating backend/model are nominal in T3. (Pure construction -- dict lookups only, no I/O; safe at
+  import; verified no cycle.)
+- [x] `_SupervisorRoutingError(Exception)` -- internal control-flow signal for a failed claude-arm routing resolution.
+- [x] `_dispatch_supervisor(lane, *, prompt, config, context, resolved, usage_command) -> SessionResult`: switch on
+  `lane.runtime_id` -- `claude_code` -> `_dispatch_claude_supervisor(...)`; `codex` -> `NotImplementedError` (T4); else
+  -> `LaneError`.
+- [x] `_dispatch_claude_supervisor(...)`: the **verbatim** body (routing/model/env, `spawn_env`, `track_verb_cost` +
+  `run_claude_session`, `emit_usage_for_session_result`), raising `_SupervisorRoutingError` instead of the inline
+  early-return on routing failure; returns `SessionResult`. (Byte-diff confirmed verbatim.)
 
 ## Phase 2 -- Rewire `run_supervisor_check`
 
-- [ ] Replace the inline routing/dispatch/emit block (`:468-530`) with: `lane = resolve_lane(SUPERVISOR_CONSUMER)` then
-  `try: result = _dispatch_supervisor(lane, ...)` / `except _SupervisorRoutingError as e: return SupervisorRun(
-  _supervisor_fail_open_decision(str(e), failure_type="proxy_not_found"))`.
-- [ ] Leave untouched: the depth guard, `resume_id` guard, `_resolve_resume_target`, prompt composition
-  (`:458-466`), the `if not result.success` failure branch (`:532-548`), and the verdict parse + return (`:550-564`).
+- [x] Replaced the inline routing/dispatch/emit block with: `lane = resolve_lane(SUPERVISOR_CONSUMER)` then
+  `try: result = _dispatch_supervisor(lane, ...)` /
+  `except _SupervisorRoutingError as e: return SupervisorRun( _supervisor_fail_open_decision(str(e), failure_type="proxy_not_found"))`.
+- [x] Left untouched: the depth guard, `resume_id` guard, `_resolve_resume_target`, prompt composition, the
+  `if not result.success` failure branch, and the verdict parse + return. (Lens 1+4 confirmed character-identical.)
 
 ## Phase 3 -- Tests (`tests/src/policy/semantic/test_supervisor.py`)
 
 New `TestSupervisorLaneDispatch` class; existing tests untouched.
 
-| Test | Fixture | Assertion |
-| ---- | ------- | --------- |
-| consumer is resolvable | -- | `resolve_lane(SUPERVISOR_CONSUMER)` == `Lane("claude_code","anthropic-direct","opus")`; floor `tool_agent` |
-| single emission, success | patch `forge.core.usage.emit_usage_for_session_result`, `run_claude_session` ok | emit called exactly once |
-| single emission, failed run | `run_claude_session` returns `returncode=1` | emit still called exactly once (before the failure branch) |
-| codex arm stubbed | call `_dispatch_supervisor(Lane("codex",...), ...)` | raises `NotImplementedError` |
-| existing dispatch suite | -- | `test_proxied_*`, `test_direct_mode_*`, `test_proxy_not_found_*`, `test_unparseable_*` pass unchanged |
+| Test                        | Fixture                                                                         | Assertion                                                                                                  |
+| --------------------------- | ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| consumer is resolvable      | --                                                                              | `resolve_lane(SUPERVISOR_CONSUMER)` == `Lane("claude_code","anthropic-direct","opus")`; floor `tool_agent` |
+| single emission, success    | patch `forge.core.usage.emit_usage_for_session_result`, `run_claude_session` ok | emit called exactly once                                                                                   |
+| single emission, failed run | `run_claude_session` returns `returncode=1`                                     | emit still called exactly once (before the failure branch)                                                 |
+| codex arm stubbed           | call `_dispatch_supervisor(Lane("codex",...), ...)`                             | raises `NotImplementedError`                                                                               |
+| existing dispatch suite     | --                                                                              | `test_proxied_*`, `test_direct_mode_*`, `test_proxy_not_found_*`, `test_unparseable_*` pass unchanged      |
 
 ## Phase 4 -- Verify + closeout
 
-- [ ] `uv run pytest tests/src/policy/semantic/test_supervisor.py -v` green (existing + new).
-- [ ] Adversarial byte-identical verification (workflow): skeptics try to find any divergence in control flow, emit
-  count, env/kwargs, fail-open message, or log lines; fix anything real.
-- [ ] Grep `run_supervisor_check` callers (`invoke_supervisor`, shadow auditor) -> confirm no double-emit / no behavior
-  change. Run the shadow suite (`tests/src/policy/semantic/test_shadow*.py` if present).
-- [ ] `mypy` + `pyright` on `supervisor.py`; `make pre-commit` clean.
-- [ ] **Design-doc sync** (epic checklist item): add a brief note to `design_appendix.md` §G that the supervisor consumer
-  resolves a default lane then dispatches (transport still via `resolve_subprocess_routing`). Keep design.md §3.6.12
-  narrative deferred until >1 consumer is wired (T1b/T6) -- record as checklist debt if not done here.
-- [ ] `change_log.md` entry; flip the epic roster T3 -> done note (stays `doing` until merge).
+- [x] `uv run pytest tests/src/policy/semantic/test_supervisor.py` green: 94 passed (89 existing unchanged + 5 new).
+- [x] Adversarial byte-identical verification (4-lens workflow `verify-t3-byte-identical`): control-flow / emit+cost /
+  dispatch-args / blast-radius, each byte-diffing against `main` -> **BYTE_IDENTICAL_HOLDS, 0 real divergences**.
+  Nothing to fix.
+- [x] `run_supervisor_check` callers confirmed: `invoke_supervisor` (`supervisor.py:667`) + shadow auditor
+  (`shadow_runner.py:142`, `usage_command="supervisor-shadow"`). Both route through the seam -> single-emit. 215
+  `tests/src/policy/semantic` pass (incl. shadow).
+- [x] `mypy` + `pyright` clean on changed source. `make pre-commit` clean.
+- [x] **Design-doc sync**: `design_appendix.md` §G consumer-lane layering note added. **Debt (deferred):** design.md
+  §3.6.12 narrative left unchanged -- the supervisor is one byte-identical consumer; defer the §3.6.12 lane paragraph to
+  T1b/T6 when >1 consumer is wired and a durable binding exists. (Epic design-doc-sync item stays open for that.)
+- [x] `change_log.md` entry added (2026-06-25, newest-first).
 - [ ] After PR merges to `main`: move `doing/supervisor_lane_driven/` -> `done/`; epic roster T3 -> done.
 
 ## Non-goals (from card)

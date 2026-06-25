@@ -27,6 +27,32 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-25
 
+### consumer_lanes T3: supervisor becomes lane-driven (Claude default, byte-identical)
+
+**Goal**: Drive a real consumer (the semantic supervisor) through the T1a lane resolver -- proving the lane abstraction
+fits the existing code -- while keeping the run byte-identical to today (no durable schema, no Codex).
+
+**Key changes**:
+
+- `run_supervisor_check` (`policy/semantic/supervisor.py`) now resolves a `supervisor` `Consumer`
+  (`SUPERVISOR_CONSUMER`, floor `tool_agent`, default lane runtime `claude_code`) via `resolve_lane`, then dispatches
+  through a thin runtime-keyed seam `_dispatch_supervisor`. The `claude_code` arm (`_dispatch_claude_supervisor`) is the
+  pre-T3 path moved **verbatim** -- routing/model/env, the `track_verb_cost` + `run_claude_session` call, and the SOLE
+  `emit_usage_for_session_result`. A routing failure raises `_SupervisorRoutingError`, caught by the caller to emit the
+  unchanged `proxy_not_found` fail-open. The `codex` arm is `NotImplementedError` (T4); an unknown runtime raises
+  `LaneError`.
+- Only `lane.runtime_id` is load-bearing in T3 (it selects the arm); `backend_id` (`anthropic-direct`) and `model`
+  (`opus`) are nominal -- the arm still derives transport dynamically. T2 makes backend load-bearing.
+- Seam lives in `supervisor.py` (not a new module) so existing `patch("...supervisor.run_claude_session")` /
+  `resolve_subprocess_routing` targets keep binding.
+- Docs: `design_appendix.md` §G gains a consumer-lane layering note. design.md §3.6.12 narrative deferred to >1 wired
+  consumer (recorded as checklist debt).
+
+**Verification**: 94 supervisor unit tests (89 existing pass **unchanged** + 5 new: lane binding, single emission on
+success + failed run, codex/unknown-runtime arms); 215 `tests/src/policy/semantic` pass (incl. shadow). mypy + pyright
+clean on changed source. A 4-lens adversarial workflow (control-flow / emit+cost / dispatch-args / blast-radius), each
+byte-diffing against `main`, returned **BYTE_IDENTICAL_HOLDS** with 0 real divergences. `make pre-commit` clean.
+
 ### consumer_lanes T1a: pure lane/consumer resolver
 
 **Goal**: Add the pure, I/O-free core of the consumer-lane model (epic `consumer_lanes`) so later tickets can place each

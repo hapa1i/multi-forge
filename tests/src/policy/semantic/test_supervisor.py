@@ -719,7 +719,10 @@ class TestSupervisorLaneDispatch:
     def test_codex_dispatch_arm_not_implemented(self) -> None:
         """T3 stubs the codex arm; T4 wires it (epic consumer_lanes)."""
         from forge.core.lanes import Lane
-        from forge.policy.semantic.supervisor import _dispatch_supervisor, _ResolvedTarget
+        from forge.policy.semantic.supervisor import (
+            _dispatch_supervisor,
+            _ResolvedTarget,
+        )
 
         codex_lane = Lane(runtime_id="codex", backend_id="anthropic-direct", model="opus")
         with pytest.raises(NotImplementedError):
@@ -735,7 +738,10 @@ class TestSupervisorLaneDispatch:
     def test_unknown_runtime_arm_raises_lane_error(self) -> None:
         """A reachable lane with no supervisor adapter (core_llm) raises LaneError, not a silent skip."""
         from forge.core.lanes import Lane, LaneError
-        from forge.policy.semantic.supervisor import _dispatch_supervisor, _ResolvedTarget
+        from forge.policy.semantic.supervisor import (
+            _dispatch_supervisor,
+            _ResolvedTarget,
+        )
 
         single_shot_lane = Lane(runtime_id="core_llm", backend_id="anthropic-direct", model="opus")
         with pytest.raises(LaneError):

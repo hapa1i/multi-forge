@@ -1147,6 +1147,16 @@ changes vs $5.00 reviewing everything.
 Extracted from [design.md §3.6.12](design.md#3612-subprocess-routing-resolution-normative). Resolution chain concept,
 fail-open/fail-closed semantics, and per-invocation routing plan remain in design.md.
 
+**Consumer-lane layering (epic consumer_lanes).** Forge subprocess consumers are migrating to a *consumer-lane* model: a
+`(runtime, backend, model)` lane resolved per consumer and dispatched by runtime (`forge.core.lanes`; the pure resolver
+is `resolve_lane`). The **semantic supervisor** is the first wired consumer -- `run_supervisor_check` resolves its
+default lane (`SUPERVISOR_CONSUMER`, runtime `claude_code`) then dispatches through an in-module seam
+(`_dispatch_supervisor`). Only `runtime_id` is load-bearing today (it selects the dispatch arm); `backend_id`/`model` on
+the lane are nominal, and **transport (direct vs proxy / `base_url`) is still derived inside the `claude_code` arm by
+`resolve_subprocess_routing`** (the chain below) -- the lane layer never touches the proxy registry. All other consumers
+still call the resolver directly. A subscription-backed backend axis and additional runtime arms (e.g. `codex`) are
+later tickets.
+
 ### G.1 Core types (from `core.reactive.routing`)
 
 ```python
