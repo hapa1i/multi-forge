@@ -27,6 +27,36 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-24
 
+### Backward-compat audit: unified corrupt-state handling + baggage removal
+
+**Goal**: As a clean-break fork with no users, carry no compatibility baggage, and make corrupt durable state fail
+gracefully with one actionable instruction instead of a traceback.
+
+**Key changes** (two commits on `main`: `46142882`, `90d8d9d2`):
+
+- **Corrupt-state UX**: every durable-corruption error is now a `StateCorruptedError` (re-parented onto the existing
+  domain bases). The top-level `AliasGroup.main` catch routes them all to `handle_corrupt_state_error`, which names the
+  offending file and prints one recovery tip (`forge clean`, or reset `.forge` / `~/.forge` + `forge extension enable`).
+  The proxy-config loader now raises `StateCorruptedError` (was bare `ValueError`); a truncated `active.json` self-heals
+  via discard + recreate.
+- **`forge clean` recovery**: added corrupt-state detection/removal — global registries probed at every scope, corrupt
+  index falls back to corrupt-state-only mode (never flags every session dir).
+- **Removed baggage**: legacy verb-log cost plane (dir/glob + reactive helpers + `verbs` reset target + server arg);
+  `costs.cap_mode` and install `patched_files` removed-key tombstones (stale keys now ignored, not rejected); session
+  `worktree_path` alias, `designated_docs` strip + dead `_infer_actual_type` param, and the flat-layout
+  `iter_legacy_flat_files` reader.
+- **Docs/QA sync**: README corrupt-state note, `cli_reference.md`, `design.md`, `design_appendix.md`,
+  `end-user/proxy.md`, and the QA checklist (test-count 548 -> 543).
+
+**Adversarial review**: two findings fixed — (1) 7 high-traffic fail-report sites now defer `StateCorruptedError` ahead
+of the `ForgeOpError`/`ForgeInstallError` wrap so corruption keeps the reset tip; (2) `forge clean`'s scope gate removed
+so global-registry corruption is probed at every scope. Accepted limitation: ~50 best-effort/scan-degrade catch sites
+keep backstop semantics by design.
+
+**Verification**: 7361 unit tests pass (1 pre-existing unrelated failure, `test_result_run_tree_ids_are_optional`, a
+telemetry `run_id` leak from #49 — fails on clean tree, not touched here). `make pre-commit` clean (ruff, black, isort,
+mypy, pyright, mdformat). Net −7 lines despite adding the corrupt-state feature.
+
 ### forge_cli_cleanup closeout: CLI taxonomy cleanup card
 
 **Goal**: Close the active `forge_cli_cleanup` card after the full Phase 2 slice set (02-12) shipped and merged to
