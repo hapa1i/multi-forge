@@ -6,8 +6,9 @@ first wave is split into member cards (linked beneath the member table): T1a is 
 (board_contract "Epics").
 
 **Status**: Accepted; coordinating in `doing/` (2026-06-25). T1a is active in `doing/` on branch
-`consumer_lane_resolver`; T2/T3 are authored in `todo/`; no implementation code yet. Converged from a 2026-06-25 design
-session; this card is the durable record of that model. Coordination is tracked in `checklist.md`.
+`consumer_lane_resolver` (`src/forge/core/lanes.py` implemented, tests green, unmerged); T2/T3 are authored in `todo/`.
+Converged from a 2026-06-25 design session; this card is the durable record of that model. Coordination is tracked in
+`checklist.md`.
 
 **One-line motivation**: Make "use a different runtime/backend/model for part of what Forge does" -- Codex on a
 subscription today, a local Ollama tomorrow -- a *registration + a consumer's lane choice*, not a bespoke rewrite each

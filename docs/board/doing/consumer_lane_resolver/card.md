@@ -17,7 +17,8 @@ consumer rewired.** This is the contract every later ticket references.
 
 - New module `src/forge/core/lanes/` (first-class concept; depends on `core.reactive.routing`, `core.runtime.registry`,
   `backend.sources`).
-- `Lane`: a `(runtime, backend, model)` tuple plus the *derived* transport (direct vs proxy) -- computed, never chosen.
+- `Lane`: a `(runtime, backend, model)` tuple. Transport (direct vs proxy) is **not** stored or resolved here -- the
+  live `base_url`/proxy choice is I/O-bound and derived at dispatch (T3); the pure resolver never touches it.
 - `Consumer`: a stable id, a **capability floor**, and a **default lane** policy. The floor is read from runtime
   capability, not invented per consumer.
 - `resolve_lane(consumer, *, override=None) -> Lane`: intersect the floor with the reachable `(runtime, backend)` set,
