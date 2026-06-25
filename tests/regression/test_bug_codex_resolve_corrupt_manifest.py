@@ -4,9 +4,10 @@ Bug: ``resolve_codex_session`` caught broad ``ForgeSessionError`` as "not found"
 ``ManifestCorruptedError``/``ManifestValidationError`` (siblings of, not,
 ``SessionNotFoundError``), and treated corruption as a scoping miss in the fallback.
 
-Fix: narrow not-found handling to ``SessionNotFoundError``; surface other
-``ForgeSessionError`` as a distinct "could not be read (manifest may be corrupt)"
-``ForgeOpError`` (src/forge/core/ops/codex_session.py).
+Fix: narrow not-found handling to ``SessionNotFoundError``; corruption
+(``StateCorruptedError``, which every durable-corruption error multiply-inherits) now
+propagates to the top-level uniform reset handler instead of being masked as not-found or
+wrapped as a generic ``ForgeOpError`` (src/forge/core/ops/codex_session.py).
 """
 
 from __future__ import annotations
@@ -18,6 +19,7 @@ import pytest
 
 from forge.core.ops.codex_session import resolve_codex_session
 from forge.core.ops.session import ForgeOpError
+from forge.core.state.exceptions import StateCorruptedError
 from forge.session.exceptions import ManifestCorruptedError, SessionNotFoundError
 
 pytestmark = pytest.mark.regression
@@ -26,11 +28,11 @@ pytestmark = pytest.mark.regression
 def test_corrupt_manifest_on_scoped_read_is_not_reported_as_not_found() -> None:
     manager = MagicMock()
     manager.get_session_entry.side_effect = ManifestCorruptedError("/p/forge.session.json", "invalid JSON")
-    with pytest.raises(ForgeOpError) as ei:
+    # Corruption propagates as a StateCorruptedError to the reset handler -- never a
+    # SessionNotFoundError and never a generic ForgeOpError.
+    with pytest.raises(StateCorruptedError) as ei:
         resolve_codex_session(manager, "sess", forge_root=Path("/proj"))
-    msg = str(ei.value)
-    assert "could not be read" in msg
-    assert "not found" not in msg
+    assert "not found" not in str(ei.value)
 
 
 def test_corrupt_manifest_on_unscoped_fallback_is_not_reported_as_not_found() -> None:
@@ -40,9 +42,9 @@ def test_corrupt_manifest_on_unscoped_fallback_is_not_reported_as_not_found() ->
         SessionNotFoundError("sess"),
         ManifestCorruptedError("/p/forge.session.json", "deserialization error"),
     ]
-    with pytest.raises(ForgeOpError) as ei:
+    with pytest.raises(StateCorruptedError) as ei:
         resolve_codex_session(manager, "sess", forge_root=Path("/proj"))
-    assert "could not be read" in str(ei.value)
+    assert "not found" not in str(ei.value)
 
 
 def test_genuinely_missing_session_still_reports_not_found() -> None:
