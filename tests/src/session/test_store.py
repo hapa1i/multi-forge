@@ -70,10 +70,6 @@ class TestSessionStoreProperties:
         expected = temp_worktree / MANIFEST_DIR / "sessions" / "test-session"
         assert store.session_dir == expected
 
-    def test_worktree_path(self, store: SessionStore, temp_worktree: Path) -> None:
-        """worktree_path should be the resolved worktree path."""
-        assert store.worktree_path == temp_worktree.resolve()
-
     def test_exists_false_initially(self, store: SessionStore) -> None:
         """exists() should return False when no manifest."""
         assert store.exists() is False
@@ -90,9 +86,9 @@ class TestSessionStoreWrite:
 
     def test_write_creates_claude_directory(self, store: SessionStore, sample_manifest: SessionState) -> None:
         """write() should create .claude directory if missing."""
-        assert not (store.worktree_path / MANIFEST_DIR).exists()
+        assert not (store.forge_root / MANIFEST_DIR).exists()
         store.write(sample_manifest)
-        assert (store.worktree_path / MANIFEST_DIR).is_dir()
+        assert (store.forge_root / MANIFEST_DIR).is_dir()
 
     def test_write_valid_json(self, store: SessionStore, sample_manifest: SessionState) -> None:
         """write() should produce valid JSON."""

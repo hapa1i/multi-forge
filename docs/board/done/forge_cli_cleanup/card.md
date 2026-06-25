@@ -1,7 +1,8 @@
 # Forge CLI Cleanup And Taxonomy
 
-**Status**: In progress (`doing/`). Accepted and moved from `proposed/` on 2026-06-23; Slices 03, 04, and 06 have
-shipped. This card records the CLI style audit and taxonomy-level cleanup before adding more command groups.
+**Status**: Done (`done/`). Accepted and moved from `proposed/` on 2026-06-23; all Phase 2 slices (02-12) shipped and
+merged to `main` via PR #49 on 2026-06-24, then moved `doing/ -> done/` at closeout. This card records the CLI style
+audit and taxonomy-level cleanup before adding more command groups.
 
 **References**: `docs/developer/cli_style_guidelines.md`, `docs/cli_reference.md`, `docs/design.md` §3.12,
 `docs/board/done/remove_cli_tombstones/`, `docs/board/done/forge_codex_command_group/card.md`.

@@ -23,7 +23,6 @@ from forge.core.paths import display_path
 from forge.core.reactive.env import FORGE_PROXY_WIRE_SHAPE_VAR, resolve_proxy_wire_shape
 from forge.proxy.proxies import (
     ProxyNotFoundError,
-    ProxyRegistryCorruptedError,
     ProxyResolutionError,
 )
 from forge.session.direct_model import (
@@ -244,9 +243,6 @@ def start_cmd(
 
         try:
             entry, started = ensure_proxy(proxy_id)
-        except ProxyRegistryCorruptedError as e:
-            print_error(str(e), console=err_console)
-            sys.exit(1)
         except (ProxyResolutionError, ProxyStartError) as e:
             if isinstance(e, ProxyNotFoundError):
                 print_error_with_tip(

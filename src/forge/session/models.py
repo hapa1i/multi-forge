@@ -377,11 +377,10 @@ class Derivation:
         inherited_proxy: Template from parent's started_with_proxy (if any).
         resume_mode: "native" (--resume --fork-session), "native-relocate" (worktree fork that
             relocates the parent JSONL into the child CWD's encoded dir, then resumes), or
-            "transfer" (assembled context). None and legacy "handoff" are tolerated as transfer
-            (no reader branches on a loaded parent's mode token). Authoritative field for how
-            context was transferred.
+            "transfer" (assembled context). None is treated as transfer (no reader branches on a
+            loaded parent's mode token). Authoritative field for how context was transferred.
         strategy: Context assembly strategy (minimal|structured|full|ai-curated).
-            Only set when resume_mode is "transfer" (or legacy "handoff"/None). Null for native resumes.
+            Only set when resume_mode is "transfer" (or None). Null for native resumes.
         depth: How many ancestors were traversed (1 = parent only).
         resumed_at: ISO8601 timestamp when resume was executed.
         lineage: Ancestry chain from parent to oldest ancestor traversed.

@@ -4,16 +4,15 @@ Bug class: silent config drop / stale recognized config. The ``inject_provider_u
 from per-proxy ``proxy.yaml`` to the global ``~/.forge/config.yaml`` so one switch governs both the
 proxied and the direct OpenRouter routes (card: ``openrouter_user_direct_callers``). ``proxy.yaml``
 is user-owned config (a system boundary, coding-standards section 5), so a ``proxy.yaml`` that still
-carries the relocated key -- or the older ``inject_openrouter_user`` alias -- must warn-and-degrade
-(accepted, ignored, with a one-time notice naming the new home), never be silently dropped into an
-apparently-valid default and never rejected as an unknown key.
+carries the relocated key must warn-and-degrade (accepted, ignored, with a one-time notice naming the
+new home), never be silently dropped into an apparently-valid default and never rejected as an
+unknown key.
 
 Root causes guarded:
 1. ``ProviderTraceConfig`` no longer carries an inject field (it is retention-only).
 2. The relocated key is accepted (no unknown-key reject) and emits exactly one relocation warning
    naming ``~/.forge/config.yaml`` + the ``forge config set`` command.
-3. The older ``inject_openrouter_user`` alias relocates the same way.
-4. Retention siblings still apply alongside a relocated key; the warning is one-time per process.
+3. Retention siblings still apply alongside a relocated key; the warning is one-time per process.
 
 Affected file: src/forge/config/schema.py (_coerce_provider_trace_config).
 """
@@ -63,13 +62,6 @@ def test_relocated_key_accepted_ignored_with_one_warning(caplog):
     moved = [m for m in caplog.messages if _RELOCATION_MARKER in m]
     assert len(moved) == 1
     assert "forge config set provider_trace.inject_provider_user=true" in moved[0]
-
-
-def test_legacy_alias_also_relocates(caplog):
-    with caplog.at_level(logging.WARNING):
-        pt = _provider_trace(inject_openrouter_user=True)
-    assert isinstance(pt, ProviderTraceConfig)
-    assert any(_RELOCATION_MARKER in m for m in caplog.messages)
 
 
 def test_relocated_key_does_not_trip_unknown_key_reject():

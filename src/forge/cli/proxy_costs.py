@@ -370,8 +370,6 @@ def _output_json(
 # in one physical file. In-memory proxy state (ProxyMetrics totals, cap counters) lives in
 # a separate process the CLI cannot reach -- the printed tip points at a restart for those.
 _RESET_TARGETS: tuple[tuple[str, tuple[str, ...], str], ...] = (
-    ("request cost logs", ("costs", "requests"), "*.jsonl"),
-    ("verb cost logs", ("costs", "verbs"), "*.jsonl"),
     ("usage ledger", ("usage", "events"), "*.jsonl"),
     ("downstream telemetry", ("telemetry", "downstream"), "*.jsonl"),
     ("upstream telemetry", ("telemetry", "upstream"), "*.jsonl"),
@@ -388,10 +386,9 @@ _RESET_TARGETS: tuple[tuple[str, tuple[str, ...], str], ...] = (
 def reset_cmd(yes: bool, dry_run: bool) -> None:
     """Reset all recorded cost and usage telemetry to zero.
 
-    Deletes legacy cost logs, upstream/downstream telemetry, spend-cap snapshots, the
-    usage-attribution ledger, and the derived status-line caches (`forge +$Y` cost +
-    supervisor-health) under FORGE_HOME. Legacy audit records are left untouched. This is
-    irreversible.
+    Deletes upstream/downstream telemetry, spend-cap snapshots, the usage-attribution
+    ledger, and the derived status-line caches (`forge +$Y` cost + supervisor-health) under
+    FORGE_HOME. Legacy audit records are left untouched. This is irreversible.
 
     A running proxy keeps its cost totals AND cap counters in memory until restarted, so a
     live proxy's cumulative-cost header, snapshot, and `forge telemetry costs show` figures do

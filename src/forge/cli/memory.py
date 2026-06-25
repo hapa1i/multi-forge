@@ -22,6 +22,7 @@ from forge.core.ops.session import (
     ForgeOpError,
     resolve_session,
 )
+from forge.core.state.exceptions import StateCorruptedError, StateUnreadableError
 from forge.session.exceptions import (
     ForgeSessionError,
     PassportError,
@@ -736,6 +737,8 @@ def _review_show_latest(
     ctx = ExecutionContext.from_cwd()
     try:
         resolved = resolve_session(ctx=ctx, session_name=session_name)
+    except (StateCorruptedError, StateUnreadableError):
+        raise  # corrupt state -> top-level reset handler, not a generic ClickException
     except (ForgeSessionError, ForgeOpError) as e:
         raise click.ClickException(f"Could not resolve session: {e}. Set FORGE_SESSION or pass --session.")
 
@@ -798,6 +801,8 @@ def _review_curate(
     ctx = ExecutionContext.from_cwd()
     try:
         resolved = resolve_session(ctx=ctx, session_name=session_name)
+    except (StateCorruptedError, StateUnreadableError):
+        raise  # corrupt state -> top-level reset handler, not a generic ClickException
     except (ForgeSessionError, ForgeOpError) as e:
         raise click.ClickException(f"Curation requires an active session: {e}. Set FORGE_SESSION or pass --session.")
 

@@ -174,7 +174,9 @@ def test_python_m_proxy_app_import_initializes_spend_caps(tmp_path: Path):
         store.write(registry)
 
         now = datetime.now(timezone.utc)
-        cost_dir = forge_home / "costs" / "requests"
+        # Seed prior spend in the active cost plane the tracker bootstraps from
+        # (telemetry/downstream); the legacy costs/requests fallback was removed.
+        cost_dir = forge_home / "telemetry" / "downstream"
         cost_dir.mkdir(parents=True, exist_ok=True)
         cost_file = cost_dir / f"{now.strftime('%Y-%m')}_9999.jsonl"
         cost_file.write_text(

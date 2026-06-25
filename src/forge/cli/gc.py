@@ -162,5 +162,6 @@ def _category_label(category: str) -> str:
         "proxies": "Stale proxy entries:",
         "search_docs": "Orphan search docs:",
         "dead_installations": "Dead installations:",
+        "corrupt_state": "Corrupt state files:",
     }
     return labels.get(category, f"{category}:")

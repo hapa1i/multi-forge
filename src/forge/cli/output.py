@@ -1,8 +1,9 @@
 """Shared Rich console output helpers for the Forge CLI.
 
-Leaf module: imports only ``rich`` and ``forge.session.exceptions``. Never
-import ``forge.cli.*`` here — CLI command modules import from this module, not
-the reverse. This keeps ``output`` circular-safe and prevents Rich markup from
+Leaf module: imports only ``rich`` and Forge exception leaves
+(``forge.session.exceptions``, ``forge.core.state.exceptions``). Never import
+``forge.cli.*`` here — CLI command modules import from this module, not the
+reverse. This keeps ``output`` circular-safe and prevents Rich markup from
 leaking into non-terminal layers (core/proxy/review build plain-text exception
 strings, not console output).
 """
@@ -14,6 +15,7 @@ from collections.abc import Callable, Sequence
 
 from rich.console import Console
 
+from forge.core.state.exceptions import StateCorruptedError, StateUnreadableError
 from forge.session.exceptions import ForgeSessionError, SessionExistsError
 
 # Module-level fallback console. Call sites that keep their own
@@ -89,10 +91,60 @@ _SESSION_ERROR_TIPS: dict[type[ForgeSessionError], Callable[[ForgeSessionError],
 
 
 def handle_session_error(e: ForgeSessionError, *, console: Console | None = None) -> None:
-    """Print a session error (plus a context-free recovery tip, if mapped) and exit 1."""
+    """Print a session error (plus a context-free recovery tip, if mapped) and exit 1.
+
+    Durable-state corruption (ManifestCorruptedError / IndexCorruptedError, which are
+    also StateCorruptedError) routes to the single corrupt-state handler, and a failed
+    read (ManifestUnreadableError / IndexUnreadableError, which are StateUnreadableError)
+    to the unreadable handler, so every session command that funnels errors here surfaces
+    the uniform instruction instead of a raw error.
+    """
+    if isinstance(e, StateCorruptedError):
+        handle_corrupt_state_error(e, console=console)
+        return  # handle_corrupt_state_error exits; explicit return guards a future refactor-to-raise
+    if isinstance(e, StateUnreadableError):
+        handle_unreadable_state_error(e, console=console)
+        return
     out = _resolve(console)
     print_error(str(e), console=out)
     tip_fn = _SESSION_ERROR_TIPS.get(type(e))
     if tip_fn is not None:
         print_tip(*tip_fn(e), console=out)
+    sys.exit(1)
+
+
+def handle_corrupt_state_error(e: StateCorruptedError, *, console: Console | None = None) -> None:
+    """Print a corrupt-state error with the uniform reset instruction, then exit 1.
+
+    The single handler for every Forge-owned durable-state corruption (manifests,
+    indexes, registries, proxy config). The error names the offending file, so the
+    tip covers both a one-file fix and a full reset; ``forge clean`` removes corrupt
+    Forge-written state. Wired once at the top-level ``AliasGroup.main`` catch.
+    """
+    out = console if console is not None else err_console
+    print_error(f"Forge state is corrupt: {e}", console=out)
+    print_tip(
+        "Fix or delete the file named above. For a full reset, delete .forge (project) or "
+        "~/.forge (global) and re-run 'forge extension enable'.",
+        "'forge clean' can detect and remove corrupt Forge state.",
+        console=out,
+    )
+    sys.exit(1)
+
+
+def handle_unreadable_state_error(e: StateUnreadableError, *, console: Console | None = None) -> None:
+    """Print a 'could not read state file' error, then exit 1.
+
+    Distinct from the corrupt-state handler: the file's contents are not known to be bad --
+    the read itself failed (OSError). This is typically transient or environmental, so the
+    guidance is to check/retry, never to delete (``forge clean`` deliberately leaves these
+    alone). Wired at the top-level ``AliasGroup.main`` catch alongside the corrupt handler.
+    """
+    out = console if console is not None else err_console
+    print_error(f"Forge could not read a state file: {e}", console=out)
+    print_tip(
+        "This is usually transient (the file is locked/busy, an I/O error, or a permissions "
+        "problem) -- check the file named above and retry. Forge will not delete it.",
+        console=out,
+    )
     sys.exit(1)

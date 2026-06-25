@@ -13,6 +13,7 @@ from forge.core.ops.context import ExecutionContext
 from forge.core.ops.gc import (
     CleanError,
     CleanReport,
+    OrphanCategory,
     _detect_dead_installations,
     _detect_orphan_session_dirs,
     _detect_orphan_transfer_files,
@@ -24,6 +25,8 @@ from forge.core.ops.gc import (
     run_clean,
 )
 from forge.session import IndexStore
+from forge.session.models import create_session_state
+from forge.session.store import SessionStore
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -40,7 +43,9 @@ def _seed_session(tmp_path: Path, name: str, forge_root: Path | None = None) -> 
     fr = forge_root or tmp_path / "project"
     session_dir = fr / ".forge" / "sessions" / name
     session_dir.mkdir(parents=True, exist_ok=True)
-    (session_dir / "forge.session.json").write_text("{}")
+    # Write a valid manifest (not a `{}` sentinel): corrupt-state detection reads
+    # the manifest strictly, so a seeded session must model a healthy one.
+    SessionStore(str(fr), name).write(create_session_state(name, worktree_path=str(fr)))
 
     index = IndexStore()
     index.add_session(
@@ -296,20 +301,6 @@ class TestDetectOrphanHandoffFiles:
 
         assert result.count == 1
         assert result.items == [str(stale)]
-
-    def test_detects_legacy_flat_files(self, tmp_path: Path) -> None:
-        # Pre-0.2.0 flat <parent>.md files at the top of prev_sessions/ are
-        # always orphans -- new code never writes there.
-        fr = _seed_session(tmp_path, "alpha")
-
-        prev_dir = fr / ".forge" / "prev_sessions"
-        prev_dir.mkdir(parents=True)
-        (prev_dir / "alpha.md").write_text("# Legacy")  # parent is in index, still orphan
-        (prev_dir / "old-deleted.md").write_text("# Legacy")
-
-        ref_set = {("alpha", str(fr))}
-        result = _detect_orphan_transfer_files(ref_set, {fr})
-        assert result.count == 2
 
     def test_ignores_non_md_files(self, tmp_path: Path) -> None:
         fr = tmp_path / "project"
@@ -603,24 +594,6 @@ class TestRunClean:
 
         assert result.deleted_count >= 1
         assert not orphan_parent.exists()
-        assert "transfer_files" in result.categories_cleaned
-
-    def test_cleans_legacy_flat_handoff_file(self, tmp_path: Path) -> None:
-        # Legacy pre-0.2.0 flat <parent>.md files at the top of prev_sessions/.
-        # GC treats these as orphans regardless of whether parent is in index.
-        fr = _seed_session(tmp_path, "alpha")
-
-        prev_dir = fr / ".forge" / "prev_sessions"
-        prev_dir.mkdir(parents=True)
-        legacy = prev_dir / "alpha.md"
-        legacy.write_text("# Legacy flat file")
-        assert legacy.exists()
-
-        ctx = _make_ctx(tmp_path, forge_root=fr)
-        result = run_clean(ctx=ctx, scope="workspace")
-
-        assert result.deleted_count >= 1
-        assert not legacy.exists()
         assert "transfer_files" in result.categories_cleaned
 
     def test_cleans_empty_dirs_after_child_unlink(self, tmp_path: Path) -> None:
@@ -918,3 +891,110 @@ def _make_report_with_orphans(total: int) -> CleanReport:
         OrphanCategory("dead_installations", "Dead installations", 0, []),
     ]
     return CleanReport(categories=cats, scope="workspace")
+
+
+# ---------------------------------------------------------------------------
+# Corrupt-state detection (forge clean removes corrupt Forge state)
+# ---------------------------------------------------------------------------
+
+
+def _category(report: CleanReport, name: str) -> OrphanCategory:
+    match = next((c for c in report.categories if c.category == name), None)
+    return match or OrphanCategory(name, "", 0, [])
+
+
+def _manifest_path(forge_root: Path, name: str) -> Path:
+    return forge_root / ".forge" / "sessions" / name / "forge.session.json"
+
+
+class TestCorruptState:
+    def test_corrupt_manifest_detected_and_cleaned(self, tmp_path: Path) -> None:
+        """A corrupt session manifest is flagged and its file removed (any scope)."""
+        fr = _seed_session(tmp_path, "alpha")
+        manifest = _manifest_path(fr, "alpha")
+        manifest.write_text("{not valid json")
+        ctx = _make_ctx(tmp_path, forge_root=fr)
+
+        report = collect_clean_report(ctx=ctx, scope="workspace")
+        corrupt = _category(report, "corrupt_state")
+        assert corrupt.count == 1
+        assert str(manifest) in corrupt.items
+
+        result = run_clean(ctx=ctx, scope="workspace")
+        assert result.categories_cleaned.get("corrupt_state") == 1
+        assert not manifest.exists()
+
+    def test_cleaned_manifest_lets_index_entry_self_heal(self, tmp_path: Path) -> None:
+        """After the corrupt manifest is removed, the dangling index entry self-heals."""
+        fr = _seed_session(tmp_path, "alpha")
+        _manifest_path(fr, "alpha").write_text("garbage")
+        ctx = _make_ctx(tmp_path, forge_root=fr)
+
+        run_clean(ctx=ctx, scope="workspace")
+
+        # list_sessions() prunes the entry whose manifest is now missing.
+        assert IndexStore().list_sessions() == []
+
+    def test_corrupt_manifest_detected_project_scope(self, tmp_path: Path) -> None:
+        fr = _seed_session(tmp_path, "alpha")
+        _manifest_path(fr, "alpha").write_text("nope")
+        ctx = _make_ctx(tmp_path, forge_root=fr)
+
+        report = collect_clean_report(ctx=ctx, scope="project")
+        assert _category(report, "corrupt_state").count == 1
+
+    def test_global_registry_corruption_detected_at_any_scope(self, tmp_path: Path) -> None:
+        """A corrupt global registry is detected at every scope so plain `forge clean` recovers it.
+
+        The corrupt-state handler tells users to run `forge clean` regardless of scope, so a
+        corrupt global registry (a system-wide blocker) must surface even at the default
+        workspace scope, not only under --scope all.
+        """
+        from forge.proxy.proxies import get_proxy_registry_path
+
+        fr = _seed_session(tmp_path, "alpha")
+        reg = get_proxy_registry_path()
+        reg.parent.mkdir(parents=True, exist_ok=True)
+        reg.write_text("{bad json")
+        ctx = _make_ctx(tmp_path, forge_root=fr)
+
+        for scope in ("workspace", "project", "all"):
+            report = collect_clean_report(ctx=ctx, scope=scope)
+            assert str(reg) in _category(report, "corrupt_state").items, scope
+
+    def test_corrupt_index_reports_corrupt_state_only(self, tmp_path: Path) -> None:
+        """A corrupt global index degrades to corrupt-state-only -- never flags every session dir."""
+        from forge.session.index import get_index_path
+
+        fr = _seed_session(tmp_path, "alpha")
+        _seed_session(tmp_path, "beta", forge_root=fr)
+        index_path = get_index_path()
+        index_path.write_text("{corrupt index")
+        ctx = _make_ctx(tmp_path, forge_root=fr)
+
+        report = collect_clean_report(ctx=ctx, scope="all")
+        # Orphan detectors are skipped: only corrupt_state runs, so the two
+        # healthy session dirs are NOT proposed for deletion.
+        assert [c.category for c in report.categories] == ["corrupt_state"]
+        assert str(index_path) in _category(report, "corrupt_state").items
+
+        result = run_clean(ctx=ctx, scope="all")
+        assert result.categories_cleaned.get("corrupt_state") == 1
+        assert not index_path.exists()
+
+    def test_user_proxy_yaml_never_flagged_or_removed(self, tmp_path: Path) -> None:
+        """User config (proxy.yaml) is never probed, flagged, or deleted by forge clean."""
+        from forge.config.loader import get_proxy_file_path
+
+        fr = _seed_session(tmp_path, "alpha")
+        proxy_yaml = get_proxy_file_path("myproxy")
+        proxy_yaml.parent.mkdir(parents=True, exist_ok=True)
+        proxy_yaml.write_text("tiers: [unclosed")  # malformed user config
+        ctx = _make_ctx(tmp_path, forge_root=fr)
+
+        report = collect_clean_report(ctx=ctx, scope="all")
+        items = _category(report, "corrupt_state").items
+        assert all("proxy.yaml" not in item for item in items)
+
+        run_clean(ctx=ctx, scope="all")
+        assert proxy_yaml.exists()  # untouched

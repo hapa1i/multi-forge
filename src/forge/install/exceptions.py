@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from forge.core.state.exceptions import StateCorruptedError, StateUnreadableError
+
 
 class ForgeInstallError(Exception):
     """Base exception for install module."""
@@ -47,8 +49,11 @@ class SettingsConflictError(ConflictError):
         super().__init__(f"settings conflict at '{key_path}': " f"current={current_value!r}, forge={forge_value!r}")
 
 
-class TrackingCorruptedError(ForgeInstallError):
+class TrackingCorruptedError(ForgeInstallError, StateCorruptedError):
     """Raised when tracking file cannot be parsed.
+
+    Also a ``StateCorruptedError`` so the one top-level corrupt-state handler
+    surfaces it with the uniform reset instruction.
 
     Attributes:
         path: Path to the problematic tracking file.
@@ -58,7 +63,20 @@ class TrackingCorruptedError(ForgeInstallError):
     def __init__(self, path: str, reason: str) -> None:
         self.path = path
         self.reason = reason
-        super().__init__(f"tracking file at '{path}': {reason}")
+        Exception.__init__(self, f"tracking file at '{path}': {reason}")
+
+
+class TrackingUnreadableError(ForgeInstallError, StateUnreadableError):
+    """Raised when the tracking file exists but the read failed (OSError), not corruption.
+
+    A ``StateUnreadableError`` (not ``StateCorruptedError``) so ``forge clean`` never
+    deletes a tracking file it merely failed to open.
+    """
+
+    def __init__(self, path: str, reason: str) -> None:
+        self.path = path
+        self.reason = reason
+        Exception.__init__(self, f"tracking file at '{path}': {reason}")
 
 
 class NotInstalledError(ForgeInstallError):

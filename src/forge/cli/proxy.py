@@ -54,11 +54,11 @@ from forge.config.loader import (
 )
 from forge.core.paths import display_path, get_forge_home
 from forge.core.process import find_pid_by_port
+from forge.core.state.exceptions import StateCorruptedError
 from forge.proxy.proxies import (
     CLI_LOCK_TIMEOUT_S,
     ProxyEntry,
     ProxyRegistry,
-    ProxyRegistryCorruptedError,
     ProxyRegistryStore,
     is_pid_alive,
 )
@@ -419,9 +419,6 @@ def create_cmd(
                 tier_overrides=tier_overrides if has_overrides else None,
                 upstream_base_url=upstream_url,
             )
-        except ProxyRegistryCorruptedError as e:
-            print_error(f"{e}", console=err_console)
-            sys.exit(1)
         except ProxyStartError as e:
             print_error(f"Failed to start server: {e}", console=err_console)
             err_str = str(e)
@@ -677,9 +674,6 @@ def start_cmd(proxy_id: str, smoke_test: bool) -> None:
             port=config.port,
             skip_proxy_file=True,
         )
-    except ProxyRegistryCorruptedError as e:
-        print_error(f"{e}", console=console)
-        sys.exit(1)
     except ProxyStartError as e:
         print_error(f"{e}", console=console)
         sys.exit(1)
@@ -720,11 +714,7 @@ def stop_cmd(proxy_id: str, force: bool, kill_adopted: bool) -> None:
     console = Console(width=200)
     store = ProxyRegistryStore()
 
-    try:
-        registry = store.read()
-    except ProxyRegistryCorruptedError as e:
-        print_error(f"{e}", console=console)
-        sys.exit(1)
+    registry = store.read()
 
     entry = registry.proxies.get(proxy_id)
     if entry is None:
@@ -1096,11 +1086,7 @@ def delete_cmd(proxy_ids: tuple[str, ...], delete_all: bool, yes: bool, kill_ado
 
     store = ProxyRegistryStore()
 
-    try:
-        registry = store.read()
-    except ProxyRegistryCorruptedError as e:
-        print_error(f"{e}", console=console)
-        sys.exit(1)
+    registry = store.read()
 
     if delete_all:
         if not registry.proxies:
@@ -1170,11 +1156,7 @@ def _delete_single_proxy(
     Raises:
         SystemExit: If user cancels or proxy not found.
     """
-    try:
-        registry = store.read()
-    except ProxyRegistryCorruptedError as e:
-        print_error(f"{e}", console=console)
-        raise SystemExit(1)
+    registry = store.read()
 
     entry = registry.proxies.get(proxy_id)
     proxy_path = get_proxy_file_path(proxy_id)
@@ -1326,7 +1308,10 @@ def validate_cmd(proxy_id: str) -> None:
         console.print(f"  Port: {config.port}")
         console.print(f"  Default tier: {config.default_tier}")
 
-    except ValueError as e:
+    except (StateCorruptedError, ValueError) as e:
+        # Diagnostic boundary: validate exists to report a bad proxy.yaml, so it
+        # reports corruption as a validation failure here instead of letting it
+        # bubble to the global "delete .forge and reinstall" reset handler.
         console.print(f"[red]✗[/red] Validation failed: {e}")
         sys.exit(1)
     except Exception as e:
@@ -1560,18 +1545,10 @@ def metrics_cmd(proxy_id: str | None, as_json: bool) -> None:
 
     console = Console(width=200)
 
-    try:
-        store = ProxyRegistryStore()
-    except ProxyRegistryCorruptedError as e:
-        print_error(f"Proxy registry error: {e}", console=err_console)
-        sys.exit(1)
+    store = ProxyRegistryStore()
 
     if not proxy_id:
-        try:
-            proxies = store.list_proxies()
-        except ProxyRegistryCorruptedError as e:
-            print_error(f"Proxy registry error: {e}", console=err_console)
-            sys.exit(1)
+        proxies = store.list_proxies()
         if len(proxies) == 1:
             proxy_id = proxies[0].proxy_id
         elif len(proxies) == 0:
@@ -1585,11 +1562,7 @@ def metrics_cmd(proxy_id: str | None, as_json: bool) -> None:
             return
 
     assert proxy_id is not None
-    try:
-        registry = store.read()
-    except ProxyRegistryCorruptedError as e:
-        print_error(f"Proxy registry error: {e}", console=err_console)
-        sys.exit(1)
+    registry = store.read()
     maybe_entry = registry.proxies.get(proxy_id)
     if maybe_entry is None:
         print_error_with_tip(

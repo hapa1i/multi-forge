@@ -16,7 +16,7 @@ import dacite
 from forge.core.paths import get_forge_home
 from forge.core.state import atomic_write_json, file_lock_for_target
 
-from .exceptions import TrackingCorruptedError
+from .exceptions import TrackingCorruptedError, TrackingUnreadableError
 from .models import (
     TRACKING_VERSION,
     Installation,
@@ -100,7 +100,8 @@ class TrackingStore:
         except json.JSONDecodeError as e:
             raise TrackingCorruptedError(str(self._path), f"invalid JSON: {e}")
         except OSError as e:
-            raise TrackingCorruptedError(str(self._path), f"read error: {e}")
+            # A failed read is environmental, not corruption -- forge clean must not delete it.
+            raise TrackingUnreadableError(str(self._path), f"read error: {e}")
 
         # Version check (no migration support)
         version = data.get("version", 1)
@@ -110,20 +111,6 @@ class TrackingStore:
                 f"incompatible version {version} (this Forge expects {TRACKING_VERSION}). "
                 f"Delete this file and run 'forge extension enable' again.",
             )
-
-        # Guard: reject manifests from pre-OSS patching builds.
-        # patched_files was removed from the Installation dataclass; dacite
-        # strict=True rejects even "patched_files": []. Check raw JSON before
-        # deserialization so the error message is actionable.
-        installations = data.get("installations", {})
-        for inst in installations.values():
-            if isinstance(inst, dict) and "patched_files" in inst:
-                raise TrackingCorruptedError(
-                    str(self._path),
-                    "This Forge install manifest was created by a pre-OSS patching build. "
-                    f"Remove {self._path} and run `forge extension enable` again. "
-                    "If Claude Code was patched, run `claude update` or reinstall Claude Code.",
-                )
 
         try:
             return dacite.from_dict(

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import logging
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -33,10 +34,16 @@ from forge.install.codex_hooks import (
     get_codex_config_path,
     read_codex_registration,
 )
-from forge.install.exceptions import NoForgeInstallationError, TrackingCorruptedError
+from forge.install.exceptions import (
+    NoForgeInstallationError,
+    TrackingCorruptedError,
+    TrackingUnreadableError,
+)
 from forge.install.installer import find_forge_installation
 from forge.install.models import InstallScope
 from forge.install.tracking import TrackingStore
+
+_log = logging.getLogger(__name__)
 
 console = Console()
 err_console = Console(stderr=True)
@@ -205,7 +212,13 @@ def _build_report(scope: str | None, show_all: bool) -> _StatusReport:
     try:
         store.read()
         tracking = store
-    except TrackingCorruptedError:
+    except (TrackingCorruptedError, TrackingUnreadableError) as e:
+        # Best-effort: codex status reports enrollment, not tracking health, so a corrupt
+        # OR momentarily unreadable installed.json degrades the supplementary tracked-*
+        # fields rather than blocking the read. Surfaced (not silent) per the never-silent
+        # rule; 'forge extension status' / 'forge clean' route the same problem to the
+        # uniform handler.
+        _log.warning("codex status: installed.json unreadable (%s); tracked-* fields omitted", e)
         tracking = None
     targets = _resolve_targets(scope, show_all, tracking)
     return _StatusReport(
@@ -326,7 +339,6 @@ def start_cmd(proxy: str, sandbox: str, codex_args: tuple[str, ...]) -> None:
     # Heavy proxy/invoke imports are deferred so `forge codex status` stays light.
     from forge.proxy.proxies import (
         ProxyNotFoundError,
-        ProxyRegistryCorruptedError,
         ProxyResolutionError,
     )
     from forge.proxy.proxy_orchestrator import (
@@ -342,9 +354,6 @@ def start_cmd(proxy: str, sandbox: str, codex_args: tuple[str, ...]) -> None:
     # 3. Resolve + start/adopt the proxy.
     try:
         entry, started = ensure_proxy(proxy)
-    except ProxyRegistryCorruptedError as e:
-        print_error(str(e), console=err_console)
-        sys.exit(1)
     except (ProxyResolutionError, ProxyStartError) as e:
         if isinstance(e, ProxyNotFoundError):
             print_error_with_tip(

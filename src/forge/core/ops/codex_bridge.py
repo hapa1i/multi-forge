@@ -52,6 +52,7 @@ from forge.core.runtime.codex_preflight import (
     CodexPreflightError,
     assert_codex_ready,
 )
+from forge.core.state.exceptions import StateCorruptedError, StateUnreadableError
 from forge.core.state.io import atomic_write_text
 from forge.session import ForgeSessionError, SessionManager, SessionState
 from forge.session.prev_sessions import child_path, compose_child_context
@@ -174,6 +175,8 @@ def assemble_codex_transfer(
     manager = SessionManager()
     try:
         parent_state = manager.get_session(parent, forge_root=str(forge_root))
+    except (StateCorruptedError, StateUnreadableError):
+        raise  # corrupt parent manifest/index -> top-level reset handler
     except ForgeSessionError as e:
         raise ForgeOpError(f"Parent session '{parent}' not found: {e}") from e
 
@@ -325,6 +328,8 @@ def bridge_session_to_codex(
         raise ForgeOpError(f"Unknown strategy '{strategy}' (valid: {valid}).") from e
     try:
         SessionManager().get_session(parent, forge_root=str(forge_root))
+    except (StateCorruptedError, StateUnreadableError):
+        raise  # corrupt parent manifest/index -> top-level reset handler
     except ForgeSessionError as e:
         raise ForgeOpError(f"Parent session '{parent}' not found: {e}") from e
 

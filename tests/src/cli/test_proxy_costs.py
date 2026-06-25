@@ -127,7 +127,6 @@ def test_costs_json_mixed_reported_and_unavailable(monkeypatch) -> None:
         },
     ]
     monkeypatch.setattr("forge.proxy.cost_logger.read_cost_logs", lambda *a, **k: request_records)
-    monkeypatch.setattr("forge.core.reactive.cost_tracking.read_verb_logs", lambda *a, **k: [])
 
     result = CliRunner().invoke(main, _costs_args("show", "--json"))
 
@@ -148,7 +147,6 @@ def test_costs_human_output_renders_unavailable(monkeypatch) -> None:
         {"proxy_id": "p", "model": "m-unavail", "cost_micros": None, "input_tokens": 10, "output_tokens": 5},
     ]
     monkeypatch.setattr("forge.proxy.cost_logger.read_cost_logs", lambda *a, **k: request_records)
-    monkeypatch.setattr("forge.core.reactive.cost_tracking.read_verb_logs", lambda *a, **k: [])
 
     by_model = CliRunner().invoke(main, _costs_args("show", "--by-model"))
     assert by_model.exit_code == 0, by_model.output
@@ -164,7 +162,6 @@ def test_costs_human_output_uses_stdout(monkeypatch) -> None:
         {"proxy_id": "p", "model": "m", "cost_micros": 25_000, "input_tokens": 10, "output_tokens": 5},
     ]
     monkeypatch.setattr("forge.proxy.cost_logger.read_cost_logs", lambda *a, **k: request_records)
-    monkeypatch.setattr("forge.core.reactive.cost_tracking.read_verb_logs", lambda *a, **k: [])
 
     result = CliRunner().invoke(main, _costs_args("show", "--by-model"))
 
@@ -178,7 +175,6 @@ def test_costs_json_output_uses_stdout(monkeypatch) -> None:
         {"proxy_id": "p", "model": "m", "cost_micros": 25_000, "input_tokens": 10, "output_tokens": 5},
     ]
     monkeypatch.setattr("forge.proxy.cost_logger.read_cost_logs", lambda *a, **k: request_records)
-    monkeypatch.setattr("forge.core.reactive.cost_tracking.read_verb_logs", lambda *a, **k: [])
 
     result = CliRunner().invoke(main, _costs_args("show", "--json"))
 
@@ -254,11 +250,11 @@ def test_costs_human_verb_evidence_flag_renders_unavailable(monkeypatch) -> None
 
 
 class TestCostsReset:
-    """`forge telemetry costs reset` wipes the three spend/usage planes plus the derived
+    """`forge telemetry costs reset` wipes the spend/usage planes plus the derived
     status-line cost cache (the autouse `isolate_forge_home` fixture gives each test its
     own FORGE_HOME)."""
 
-    _PLANES = (("costs", "requests"), ("costs", "verbs"), ("usage", "events"))
+    _PLANES = (("telemetry", "downstream"), ("usage", "events"))
 
     def _seed(self) -> list[Path]:
         home = get_forge_home()
@@ -278,7 +274,7 @@ class TestCostsReset:
         assert "dry-run" in result.output
         assert all(f.exists() for f in files)
 
-    def test_yes_wipes_all_three_planes(self) -> None:
+    def test_yes_wipes_all_planes(self) -> None:
         files = self._seed()
         home = get_forge_home()
         result = CliRunner().invoke(main, _costs_args("reset", "--yes"))

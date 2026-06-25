@@ -173,7 +173,7 @@ class TestStaleManifestGuard:
 
     @pytest.fixture()
     def stale_manifest(self, tmp_path, monkeypatch):
-        """Write a pre-OSS manifest with patched_files."""
+        """Write a manifest carrying the removed patched_files field."""
         monkeypatch.setenv("FORGE_HOME", str(tmp_path))
         tracking_path = tmp_path / "installed.json"
         tracking_path.write_text(
@@ -197,19 +197,18 @@ class TestStaleManifestGuard:
         return tracking_path
 
     def test_forge_info_no_traceback(self, stale_manifest):
-        """forge info handles stale manifest without traceback."""
+        """forge info surfaces the stale manifest as an actionable error, not a traceback."""
         runner = CliRunner()
         result = runner.invoke(main, ["info"])
         assert "Traceback" not in result.output
-        # Rich wraps the guard message at console width; a long tmp_path can split
-        # "pre-OSS patching build" across a newline. Normalize whitespace so the
-        # assertion checks the message, not the render width.
-        assert "pre-OSS patching build" in " ".join(result.output.split())
+        # Normalize Rich's width-wrapping before the substring check. The removed
+        # patched_files field is rejected by strict parse, naming the offending file.
+        assert "deserialization error" in " ".join(result.output.split())
 
     def test_extension_status_no_traceback(self, stale_manifest):
-        """forge extension status handles stale manifest without traceback."""
+        """forge extension status surfaces the stale manifest as an actionable error."""
         runner = CliRunner()
         result = runner.invoke(main, ["extension", "status", "--scope", "user"])
         assert "Traceback" not in result.output
         assert result.exit_code != 0
-        assert "pre-OSS" in result.output
+        assert "deserialization error" in " ".join(result.output.split())

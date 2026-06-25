@@ -7,6 +7,8 @@ Detects and removes orphaned Forge state:
 - Stale work-queue markers (session gone or worktree gone)
 - Stale proxy entries (dead PIDs, orphaned "starting" state)
 - Orphaned search documents (transcript files deleted)
+- Corrupt Forge state files (unparseable manifests scoped by roots; corrupt
+  global registries at any scope)
 
 All detect functions are read-only (no mutations). The run_clean()
 function is the only mutator.
@@ -17,8 +19,11 @@ from __future__ import annotations
 import json
 import logging
 import shutil
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
+
+from forge.core.state.exceptions import StateCorruptedError, StateUnreadableError
 
 from .context import ExecutionContext
 
@@ -218,15 +223,28 @@ def _build_worktree_reference_set(ctx: ExecutionContext, scope: str, scope_roots
 
 
 def _build_transfer_context_reference_set(ref_set: set[tuple[str, str]]) -> set[str]:
-    """Build absolute paths referenced by session derivation context_file fields."""
+    """Build absolute paths referenced by session derivation context_file fields.
+
+    Raises:
+        StateCorruptedError: if an in-scope session manifest fails strict parse
+            (the store also surfaces transient read errors as corruption). Callers
+            MUST fail closed: a partial reference set silently drops the protection
+            on a live child snapshot, and the GC / codex deletion paths would then
+            unlink an in-use context file as a false orphan.
+    """
     from forge.session import SessionStore
+    from forge.session.exceptions import SessionFileNotFoundError
 
     result: set[str] = set()
     for name, forge_root in ref_set:
         try:
             state = SessionStore(forge_root, name).read()
-        except Exception:
-            _log.debug("Could not read session manifest for transfer GC: %s (%s)", name, forge_root, exc_info=True)
+        except SessionFileNotFoundError:
+            # Manifest gone -- a dangling index entry that slipped past
+            # list_sessions() self-heal (deleted between list and read). It
+            # references nothing, so there is genuinely no path to protect.
+            # Corruption (StateCorruptedError) is deliberately NOT caught here:
+            # it propagates so callers fail closed instead of dropping protection.
             continue
 
         derivation = state.confirmed.derivation
@@ -247,6 +265,12 @@ def referenced_transfer_context_paths() -> set[str]:
     Shared with the codex session op's stale-snapshot guard: ``context_file`` may be
     recorded absolute, so a same-named session in a different forge_root can reference
     a snapshot outside its own root -- a path-local existence check is not enough.
+
+    Raises:
+        StateCorruptedError: if any indexed session manifest is unreadable. The
+        guard depends on this -- when references can't be verified it must refuse
+        to delete a possibly-referenced snapshot (fail closed), never treat it as
+        unreferenced and unlink it.
     """
     from forge.session import SessionManager
 
@@ -292,7 +316,7 @@ def _detect_orphan_transfer_files(ref_set: set[tuple[str, str]], forge_roots: se
     """Find orphaned resume-context artifacts under ``prev_sessions/``.
 
     Walks the per-parent layout (``<parent>/generated.md`` +
-    ``<parent>/children/<child>.md``) and identifies three kinds of orphans:
+    ``<parent>/children/<child>.md``) and identifies two kinds of orphans:
 
     1. ``<parent>/`` directories whose parent session is not in the index --
        the whole directory is orphaned (rmtree).
@@ -300,8 +324,6 @@ def _detect_orphan_transfer_files(ref_set: set[tuple[str, str]], forge_roots: se
        ``Derivation.context_file`` (within a still-referenced parent dir) --
        just the file. A ``<child>.notes.md`` user-notes overlay is orphaned
        only together with its snapshot, never independently.
-    3. Top-level ``<parent>.md`` files (legacy pre-0.2.0 flat layout) --
-       always orphaned since new code never writes here.
 
     Parent liveness checks (session_name, forge_root) against the ref_set to
     handle name reuse across different Forge projects correctly. Child files
@@ -310,7 +332,25 @@ def _detect_orphan_transfer_files(ref_set: set[tuple[str, str]], forge_roots: se
     from forge.session import prev_sessions as _ps
 
     orphans: list[str] = []
-    referenced_context_files = _build_transfer_context_reference_set(ref_set)
+    try:
+        referenced_context_files = _build_transfer_context_reference_set(ref_set)
+    except (StateCorruptedError, StateUnreadableError):
+        # A session manifest is corrupt or could not be read, so the protected-paths
+        # set is incomplete -- we cannot know which child snapshot it references
+        # (context_file may even be an absolute path into another root). Deleting
+        # any transfer file now risks unlinking live, in-use context. Protect the
+        # whole category (empty result); _detect_corrupt_state still flags the bad
+        # manifest, and a later clean pass re-evaluates once the index self-heals.
+        _log.warning(
+            "forge clean: an unreadable session manifest blocked transfer-file orphan "
+            "detection; skipping that category to avoid deleting live context"
+        )
+        return OrphanCategory(
+            category="transfer_files",
+            description="Orphaned resume-context artifacts (transfer files)",
+            count=0,
+            items=[],
+        )
 
     for forge_root in forge_roots:
         prev_root = _ps.prev_sessions_root(forge_root)
@@ -346,10 +386,6 @@ def _detect_orphan_transfer_files(ref_set: set[tuple[str, str]], forge_roots: se
                 snapshot = _ps.snapshot_for_notes(notes_file)
                 if str(snapshot.resolve()) not in referenced_context_files:
                     orphans.append(str(notes_file))
-
-        # 3: legacy flat files at the top of prev_sessions/
-        for legacy_file in _ps.iter_legacy_flat_files(forge_root):
-            orphans.append(str(legacy_file))
 
     return OrphanCategory(
         category="transfer_files",
@@ -552,6 +588,105 @@ def _detect_dead_installations() -> OrphanCategory:
     )
 
 
+def _global_registry_probes() -> list[tuple[Path, Callable[[], object]]]:
+    """Return (path, reader) probes for global Forge-owned durable registries.
+
+    Excludes user config (proxy.yaml), passports, and the rebuildable search
+    cache: forge clean only removes Forge-owned registries, never user data.
+    """
+    from forge.backend.registry import BackendRegistryStore, get_backend_registry_path
+    from forge.install.tracking import TrackingStore, get_tracking_path
+    from forge.proxy.proxies import ProxyRegistryStore, get_proxy_registry_path
+    from forge.session.index import IndexStore, get_index_path
+
+    return [
+        (get_index_path(), lambda: IndexStore().read()),
+        (get_proxy_registry_path(), lambda: ProxyRegistryStore().read()),
+        (get_backend_registry_path(), lambda: BackendRegistryStore().read()),
+        (get_tracking_path(), lambda: TrackingStore().read()),
+    ]
+
+
+def _detect_corrupt_state(scope_roots: set[Path]) -> OrphanCategory:
+    """Find Forge-owned durable-state files that fail strict parse.
+
+    Two tiers:
+    - Per-project session manifests (scoped by ``scope_roots``): a
+      ``forge.session.json`` that raises StateCorruptedError on read is unusable.
+      Removing the file lets the index self-heal the dangling entry on the next
+      ``list_sessions()``.
+    - Global registries -- session index, proxy registry, installed manifest --
+      probed at every scope. They are global blockers, and the corrupt-state
+      handler tells users to run ``forge clean`` regardless of scope, so a plain
+      ``forge clean`` must be able to recover them. Removing a corrupt registry
+      recreates it empty on next use.
+
+    Read-only: probes readers, never mutates. Only StateCorruptedError counts as
+    corruption; a transient read error (e.g. OSError) is ignored so forge clean
+    never deletes a file it merely failed to open.
+    """
+    from forge.session import SessionStore
+
+    corrupt: list[str] = []
+
+    for forge_root in scope_roots:
+        sessions_dir = forge_root / ".forge" / "sessions"
+        if not sessions_dir.is_dir():
+            continue
+        for child in sessions_dir.iterdir():
+            manifest = child / "forge.session.json"
+            if not manifest.is_file():
+                continue
+            try:
+                SessionStore(str(forge_root), child.name).read()
+            except StateCorruptedError:
+                corrupt.append(str(manifest))
+            except Exception:
+                _log.debug("Non-corruption read error probing manifest %s", manifest, exc_info=True)
+
+    for path, reader in _global_registry_probes():
+        if not path.is_file():
+            continue
+        try:
+            reader()
+        except StateCorruptedError:
+            corrupt.append(str(path))
+        except Exception:
+            _log.debug("Non-corruption read error probing registry %s", path, exc_info=True)
+
+    return OrphanCategory(
+        category="corrupt_state",
+        description="Corrupt Forge state files",
+        count=len(corrupt),
+        items=sorted(corrupt),
+    )
+
+
+def _roots_without_index(ctx: ExecutionContext) -> set[Path]:
+    """Best-effort forge_roots for corrupt-state probing when the index is unreadable.
+
+    Avoids the session index entirely (it may be the corrupt file) and derives
+    roots from the current project plus the installed manifest, degrading to just
+    the current root if the manifest is also unreadable. Slightly over-broad under
+    workspace scope, which is acceptable in this degraded recovery path: probing
+    only ever removes a genuinely corrupt, Forge-owned manifest.
+    """
+    roots: set[Path] = set()
+    if ctx.forge_root is not None:
+        roots.add(ctx.forge_root)
+    try:
+        from forge.install.tracking import TrackingStore
+
+        manifest = TrackingStore().read()
+        for _key, installation in manifest.installations.items():
+            pp = installation.project_path
+            if pp and Path(pp).is_dir() and (Path(pp) / ".forge").is_dir():
+                roots.add(Path(pp))
+    except Exception:
+        _log.debug("Could not read installed manifest for fallback roots", exc_info=True)
+    return roots
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -591,10 +726,18 @@ def collect_clean_report(*, ctx: ExecutionContext, scope: str = "workspace") -> 
     if scope not in VALID_SCOPES:
         raise CleanError(f"Invalid scope: {scope!r}. Must be one of {VALID_SCOPES}")
 
-    scope_roots = _resolve_tracked_roots(ctx, scope)
-
-    ref_set = _build_reference_set(ctx, scope, scope_roots)
-    worktree_ref_set = _build_worktree_reference_set(ctx, scope, scope_roots)
+    try:
+        scope_roots = _resolve_tracked_roots(ctx, scope)
+        ref_set = _build_reference_set(ctx, scope, scope_roots)
+        worktree_ref_set = _build_worktree_reference_set(ctx, scope, scope_roots)
+    except StateCorruptedError:
+        # A corrupt index/registry blocks reference building. Report ONLY corrupt
+        # state so forge clean can remove the bad file; the orphan detectors are
+        # unsafe here -- an empty reference set would mark every session dir as an
+        # orphan and propose deleting them all.
+        _log.warning("forge clean: corrupt durable state blocked the normal scan; reporting corrupt state only")
+        fallback_roots = {ctx.forge_root} if scope == "project" and ctx.forge_root else _roots_without_index(ctx)
+        return CleanReport(categories=[_detect_corrupt_state(fallback_roots)], scope=scope)
 
     categories = [
         _detect_orphan_session_dirs(ref_set, scope_roots),
@@ -604,6 +747,7 @@ def collect_clean_report(*, ctx: ExecutionContext, scope: str = "workspace") -> 
         _detect_stale_proxies(),
         _detect_orphan_search_docs(scope_roots),
         _detect_dead_installations(),
+        _detect_corrupt_state(scope_roots),
     ]
 
     return CleanReport(categories=categories, scope=scope)
@@ -644,6 +788,11 @@ def run_clean(*, ctx: ExecutionContext, scope: str = "workspace") -> CleanResult
             cleaned = _clean_search_docs(report, result)
         elif category.category == "dead_installations":
             cleaned = _clean_dead_installations(category.items, result)
+        elif category.category == "corrupt_state":
+            # Corrupt manifests + global registries are single files: unlink each.
+            # A removed manifest self-heals its index entry; a removed registry
+            # recreates empty on next use.
+            cleaned = _clean_files(category.items, result)
 
         if cleaned > 0:
             result.categories_cleaned[category.category] = cleaned
@@ -682,7 +831,6 @@ def _clean_transfer_files(items: list[str], result: CleanResult) -> int:
     - ``<parent>/`` directories (whole orphaned parents) -- rmtree
     - ``<parent>/children/<child>.md`` files -- unlink, then prune empty
       ``children/`` and parent dirs that contain only ``generated.md``
-    - Top-level ``<parent>.md`` legacy flat files -- unlink
     """
     cleaned = 0
     dirs_to_check: set[Path] = set()

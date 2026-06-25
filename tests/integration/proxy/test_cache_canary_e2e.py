@@ -24,7 +24,11 @@ _CACHE_CANARY_PROMPT = "Reply with exactly one word: ok"
 
 
 def _request_records(forge_home: Path) -> list[dict[str, Any]]:
-    records_dir = forge_home / "costs" / "requests"
+    # The proxy writes per-request cost records to the downstream telemetry plane
+    # (cost_logger.log_request_cost); the legacy costs/requests plane was removed. The
+    # serialized DownstreamRecord carries ts / proxy_id / cached_tokens, which is all this
+    # canary reads.
+    records_dir = forge_home / "telemetry" / "downstream"
     if not records_dir.is_dir():
         return []
     indexed_records: list[tuple[str, str, int, dict[str, Any]]] = []

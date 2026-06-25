@@ -15,12 +15,6 @@ The split exists so that regenerating the parent cache (re-running resume
 against the same parent) never disturbs an existing child file. Once
 ``children/<child>.md`` exists, it is the authoritative context that gets
 appended to the child session's system prompt.
-
-Legacy note: pre-0.2.0, this was a single flat
-``<forge_root>/.forge/prev_sessions/<parent>.md`` (parent-scoped, overwritten
-by every resume/fork). New code never reads or writes the flat layout. GC
-treats any remaining flat ``*.md`` files at the top level of
-``prev_sessions/`` as orphans (see ``iter_legacy_flat_files``).
 """
 
 from __future__ import annotations
@@ -184,11 +178,7 @@ def ensure_child(forge_root: Path, parent_name: str, child_name: str) -> Path:
 
 
 def iter_parents(forge_root: Path) -> Iterator[Path]:
-    """Yield each ``<parent>/`` directory under ``prev_sessions/``.
-
-    Skips legacy flat ``.md`` files at the top level (see
-    ``iter_legacy_flat_files``).
-    """
+    """Yield each ``<parent>/`` directory under ``prev_sessions/``."""
     root = prev_sessions_root(forge_root)
     if not root.is_dir():
         return
@@ -220,17 +210,4 @@ def iter_child_notes(forge_root: Path, parent_name: str) -> Iterator[Path]:
         return
     for entry in target.iterdir():
         if entry.is_file() and entry.name.endswith(NOTES_SUFFIX):
-            yield entry
-
-
-def iter_legacy_flat_files(forge_root: Path) -> Iterator[Path]:
-    """Yield top-level ``<parent>.md`` files (legacy pre-0.2.0 layout).
-
-    These are orphan candidates for GC; new code never writes here.
-    """
-    root = prev_sessions_root(forge_root)
-    if not root.is_dir():
-        return
-    for entry in root.iterdir():
-        if entry.is_file() and entry.suffix == ".md":
             yield entry

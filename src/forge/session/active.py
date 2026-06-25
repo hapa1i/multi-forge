@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Callable, Iterator
 
 import dacite
+from dacite import DaciteError
 
 from forge.core.paths import get_forge_home
 from forge.core.process import is_pid_alive
@@ -73,25 +74,36 @@ class ActiveSessionStore:
         return self._index_path.is_file()
 
     def read(self) -> ActiveSessionIndex:
-        """Read the registry, returning an empty registry when missing."""
+        """Read the registry, returning an empty registry when missing.
+
+        Runtime-only state: any unreadable/incompatible content (truncated JSON,
+        wrong version, stale key shape, unknown fields) self-heals by discarding
+        and recreating an empty registry. It never raises corruption, so it never
+        reaches the durable corrupt-state handler (coding_standards section 5
+        mandates discard-and-recreate for runtime-only registries).
+        """
         if not self.exists():
             return ActiveSessionIndex()
 
-        with open(self._index_path, encoding="utf-8") as f:
-            data = json.load(f)
-
-        version = data.get("version")
-        if version != ACTIVE_INDEX_VERSION or not self._has_current_key_shape(data):
-            logger.info("Discarding incompatible active-session registry (version=%s)", version)
+        try:
+            with open(self._index_path, encoding="utf-8") as f:
+                data = json.load(f)
+            if (
+                not isinstance(data, dict)
+                or data.get("version") != ACTIVE_INDEX_VERSION
+                or not self._has_current_key_shape(data)
+            ):
+                raise ValueError("incompatible active-session registry")
+            return dacite.from_dict(
+                data_class=ActiveSessionIndex,
+                data=data,
+                config=dacite.Config(strict=True),
+            )
+        except (OSError, ValueError, DaciteError):
+            logger.info("Discarding unreadable active-session registry; recreating empty")
             empty = ActiveSessionIndex()
             self.write(empty)
             return empty
-
-        return dacite.from_dict(
-            data_class=ActiveSessionIndex,
-            data=data,
-            config=dacite.Config(strict=True),
-        )
 
     def _has_current_key_shape(self, data: dict[str, object]) -> bool:
         """Return True when the registry uses scoped session keys."""

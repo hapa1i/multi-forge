@@ -20,6 +20,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from forge.core.state.exceptions import StateCorruptedError, StateUnreadableError
 from forge.session import ForgeSessionError, SessionManager, SessionState
 from forge.session.prev_sessions import (
     child_notes_path,
@@ -249,6 +250,8 @@ def regenerate_transfer(
     manager = SessionManager()
     try:
         parent_state = manager.get_session(parent, forge_root=str(forge_root))
+    except (StateCorruptedError, StateUnreadableError):
+        raise  # corrupt parent manifest -> top-level reset handler
     except ForgeSessionError as e:
         raise ForgeOpError(f"Parent session '{parent}' not found: {e}") from e
 

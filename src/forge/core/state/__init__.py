@@ -40,6 +40,7 @@ from .exceptions import (
     StateCorruptedError,
     StateError,
     StateNotFoundError,
+    StateUnreadableError,
 )
 
 __all__ = [
@@ -62,5 +63,6 @@ __all__ = [
     "StateError",
     "StateNotFoundError",
     "StateCorruptedError",
+    "StateUnreadableError",
     "SchemaVersionError",
 ]

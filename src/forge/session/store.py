@@ -32,6 +32,7 @@ from forge.core.typing_helpers import unwrap_optional
 
 from .exceptions import (
     ManifestCorruptedError,
+    ManifestUnreadableError,
     ManifestValidationError,
     SessionFileNotFoundError,
 )
@@ -126,11 +127,6 @@ class SessionStore:
         return self._forge_root
 
     @property
-    def worktree_path(self) -> Path:
-        """Deprecated alias for forge_root (kept for transition)."""
-        return self._forge_root
-
-    @property
     def session_name(self) -> str:
         """Return the session name."""
         return self._session_name
@@ -167,7 +163,8 @@ class SessionStore:
 
         Raises:
             SessionFileNotFoundError: If manifest doesn't exist.
-            ManifestCorruptedError: If manifest cannot be parsed.
+            ManifestCorruptedError: If manifest content cannot be parsed.
+            ManifestUnreadableError: If the read itself failed (OSError; transient, not corruption).
             ManifestValidationError: If manifest is missing required fields.
         """
         if not self.exists():
@@ -179,7 +176,9 @@ class SessionStore:
         except json.JSONDecodeError as e:
             raise ManifestCorruptedError(str(self._manifest_path), f"invalid JSON: {e}")
         except OSError as e:
-            raise ManifestCorruptedError(str(self._manifest_path), f"read error: {e}")
+            # A failed open/read is environmental (locked/busy file, I/O error, permissions),
+            # NOT content corruption -- so forge clean must never delete it. See ManifestUnreadableError.
+            raise ManifestUnreadableError(str(self._manifest_path), f"read error: {e}")
 
         strip_preview_memory_doc_lists(data, session_name=self._session_name)
         self._validate_data(data)

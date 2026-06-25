@@ -1,7 +1,7 @@
 """Regression: cost_logger records must carry schema_version with forward-compat warn-skip.
 
 Bug (audit P4, note-only / durable-state parity): the PID-sharded cost log
-(~/.forge/costs/requests/<month>_<pid>.jsonl) had no schema_version field, unlike its sibling
+(now ~/.forge/telemetry/downstream/<month>_<pid>.jsonl) had no schema_version field, unlike its sibling
 durable JSONL writers proxy/audit_logger.py (AUDIT_SCHEMA_VERSION) and core/usage/ledger.py
 (USAGE_SCHEMA_VERSION). A newer Forge could append records of an unknown shape that an older Forge's
 read_cost_logs() would silently aggregate as if current, corrupting cost summaries.

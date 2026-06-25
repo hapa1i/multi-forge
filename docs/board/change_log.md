@@ -25,7 +25,115 @@ wc -l docs/board/change_log.md
 > `**Verification**:`. Use newest-first order. See `docs/developer/board_contract.md` "Change Log Policy" for the full
 > spec.
 
+## 2026-06-25
+
+### Read failures vs corruption: `StateUnreadableError` split (Fix A)
+
+**Goal**: A transient read failure (OSError) is not corruption — so `forge clean` must never delete a file it merely
+failed to open, and a momentarily unreadable state file must surface an actionable "check/retry" message instead of a
+misleading "corrupt" or "no session found".
+
+**Key changes** (continues the 2026-06-24 corrupt-state work):
+
+- **New exception family**: `StateUnreadableError(StateError)`, sibling of `StateCorruptedError`, with domain variants
+  (`Manifest`/`IndexUnreadableError` = `ForgeSessionError`; `TrackingUnreadableError` = `ForgeInstallError`;
+  `Proxy`/`BackendRegistryUnreadableError`). All five readers (store, index, tracking, proxies, backend) now raise the
+  unreadable variant on `OSError` instead of a `*CorruptedError`.
+- **`forge clean` no longer deletes on transient reads** (HIGH fix): `_detect_corrupt_state` deletes only
+  `StateCorruptedError`; an unreadable file is skipped. Backend registry added to `_global_registry_probes`;
+  transfer-context protection now triggers on corrupt *and* unreadable.
+- **CLI routing**: `handle_unreadable_state_error` (check/retry, never delete) wired into `handle_session_error` and the
+  top-level `AliasGroup.main` catch; `%`-handlers emit a distinct unreadable `{decision:block}` (generalized
+  `_emit_state_error_block`).
+- **Ripple** (~29 sites): at specific-target resolution sites (`session_context`, resolution, session/codex ops, policy,
+  memory\*, session_lifecycle, extensions) `except StateCorruptedError: raise` became
+  `except (StateCorruptedError, StateUnreadableError): raise`, so an unreadable file propagates to the retry handler
+  rather than being swallowed into "no session found". Best-effort sites (`show_proxy`, `codex status`) degrade on both.
+- **Docs**: `end-user/proxy.md` cost-bootstrap wording corrected (downstream only; bootstrap no longer reads legacy).
+
+**Verification**: 6927 unit + 464 regression pass; `make pre-commit` clean. 13 new tests (9 in
+`tests/regression/test_bug_state_unreadable_not_deleted.py` — clean never deletes/over-corrects, every reader maps
+OSError to unreadable, routing; 4 unreadable-routing in `test_corrupt_state.py`). The lone failing test
+(`test_result_run_tree_ids_are_optional`) fails only when `FORGE_RUN_ID` leaks from an active Forge session — passes on
+a clean tree, unrelated to this change.
+
 ## 2026-06-24
+
+### Corrupt-state routing completion: fail-closed GC, full reset-tip coverage, strict costs
+
+**Goal**: Finish the corrupt-state work so every durable-corruption path surfaces the one reset instruction,
+`forge clean` never deletes live state on a transient read error, and user-edited spend caps reject unknown keys instead
+of silently changing behavior.
+
+**Key changes** (four commits on `main`: `2ec1c7f`, `8e2b6b2`, `f81676d`, `19b6bab`):
+
+- **GC fail-closed** (`core/ops/gc.py`): `_build_transfer_context_reference_set` no longer swallows manifest read errors
+  with `except Exception: continue`. A transient/corrupt read on a live child no longer drops its
+  `derivation.context_file` from the protected set, so `forge clean` can't unlink authoritative transfer context. The
+  same swallow fed the codex stale-snapshot guard. Regression test added.
+- **Full reset-tip coverage**: completed the `except StateCorruptedError: raise` (or propagate-from-op) pattern across
+  the remaining bypasses — proxy registry (`cli/proxy.py` x8 + claude/codex/session + `core/ops/proxy.py`),
+  session/index (resolution, `session_context` nested fallbacks, policy, memory, memory_report, session_lifecycle,
+  transfer), and codex ops (session/bridge/interactive). Corruption types multiply-inherit a domain base AND
+  `StateCorruptedError`, so a plain `except ForgeSessionError` was intercepting them before the top-level handler.
+- **Hook channel** (`cli/hooks/direct_commands.py`): `%proxy list` / `%session list` now emit the corrupt-state
+  `{decision:block}` JSON envelope (shared `_emit_corrupt_state_block` helper) instead of letting corruption escape to
+  the CLI Rich tip + exit 1, which broke the UserPromptSubmit contract.
+- **Strict costs** (`config/schema.py`): `costs` / `costs.caps` reject unknown keys (e.g. the removed `cap_mode`) with a
+  ValueError naming the offender, instead of silently ignoring them.
+
+**Adversarial verification**: a 3-lens skeptic panel over the routing diff converged on one real defect — the
+`%proxy list` hook regression above — fixed (with the identical pre-existing `%session list` gap) before commit.
+Deliberate soft-degrades confirmed intact: delete `--force` recovery, child-lookup callbacks, list-row enrichment,
+`show_proxy` degrade, `proxy_identity` ambient lookup, `forge clean`.
+
+**Verification**: 6922 unit tests pass (same 1 pre-existing unrelated telemetry failure,
+`test_result_run_tree_ids_are_optional`). 6 new regression tests in `test_corrupt_state.py`. `make pre-commit` clean.
+
+### Backward-compat audit: unified corrupt-state handling + baggage removal
+
+**Goal**: As a clean-break fork with no users, carry no compatibility baggage, and make corrupt durable state fail
+gracefully with one actionable instruction instead of a traceback.
+
+**Key changes** (two commits on `main`: `46142882`, `90d8d9d2`):
+
+- **Corrupt-state UX**: every durable-corruption error is now a `StateCorruptedError` (re-parented onto the existing
+  domain bases). The top-level `AliasGroup.main` catch routes them all to `handle_corrupt_state_error`, which names the
+  offending file and prints one recovery tip (`forge clean`, or reset `.forge` / `~/.forge` + `forge extension enable`).
+  The proxy-config loader now raises `StateCorruptedError` (was bare `ValueError`); a truncated `active.json` self-heals
+  via discard + recreate.
+- **`forge clean` recovery**: added corrupt-state detection/removal — global registries probed at every scope, corrupt
+  index falls back to corrupt-state-only mode (never flags every session dir).
+- **Removed baggage**: legacy verb-log cost plane (dir/glob + reactive helpers + `verbs` reset target + server arg);
+  `costs.cap_mode` and install `patched_files` removed-key tombstones (stale keys now ignored, not rejected); session
+  `worktree_path` alias, `designated_docs` strip + dead `_infer_actual_type` param, and the flat-layout
+  `iter_legacy_flat_files` reader.
+- **Docs/QA sync**: README corrupt-state note, `cli_reference.md`, `design.md`, `design_appendix.md`,
+  `end-user/proxy.md`, and the QA checklist (test-count 548 -> 543).
+
+**Adversarial review**: two findings fixed — (1) 7 high-traffic fail-report sites now defer `StateCorruptedError` ahead
+of the `ForgeOpError`/`ForgeInstallError` wrap so corruption keeps the reset tip; (2) `forge clean`'s scope gate removed
+so global-registry corruption is probed at every scope. Accepted limitation: ~50 best-effort/scan-degrade catch sites
+keep backstop semantics by design.
+
+**Verification**: 7361 unit tests pass (1 pre-existing unrelated failure, `test_result_run_tree_ids_are_optional`, a
+telemetry `run_id` leak from #49 — fails on clean tree, not touched here). `make pre-commit` clean (ruff, black, isort,
+mypy, pyright, mdformat). Net −7 lines despite adding the corrupt-state feature.
+
+### forge_cli_cleanup closeout: CLI taxonomy cleanup card
+
+**Goal**: Close the active `forge_cli_cleanup` card after the full Phase 2 slice set (02-12) shipped and merged to
+`main`.
+
+**Key changes**:
+
+- Moved the card `doing/ -> done/` and corrected its stale status line (was "In progress; Slices 03, 04, 06 shipped").
+- Confirmed the durable lessons were already promoted to `impl_notes.md` (the D6 alias policy + the "Python symbol !=
+  CLI alias string" trap); no new promotion needed.
+- Recorded closeout completion in the card checklist's current-focus note.
+
+**Verification**: Code shipped via PR #49 (squash `8a38a372`); working tree clean on `main`. Docs-only closeout;
+`make pre-commit` clean.
 
 ### forge_cli_cleanup Slice 05: alias + canonical-name pass (final code slice)
 

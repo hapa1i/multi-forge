@@ -6,9 +6,12 @@ This module defines the `forge` command group and registers subcommands.
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 import click
 from dotenv import load_dotenv
+
+from forge.core.state.exceptions import StateCorruptedError, StateUnreadableError
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +67,26 @@ _DISPLAY_ALIASES: dict[str, str] = {
 
 class AliasGroup(click.Group):
     """Click group that resolves short aliases to canonical command names."""
+
+    def main(self, *args: Any, **kwargs: Any) -> Any:
+        """Run the CLI, surfacing any corrupt durable state through one handler.
+
+        StateCorruptedError is not a ClickException, so it propagates out of
+        Click's standalone-mode loop to here — the single place that turns
+        corruption (manifests, indexes, registries, proxy config) into a clear
+        reset instruction instead of a traceback. StateUnreadableError (a failed
+        read, not bad content) routes to its own handler: check/retry, no delete.
+        """
+        try:
+            return super().main(*args, **kwargs)
+        except StateCorruptedError as e:
+            from forge.cli.output import handle_corrupt_state_error
+
+            handle_corrupt_state_error(e)  # prints + sys.exit(1)
+        except StateUnreadableError as e:
+            from forge.cli.output import handle_unreadable_state_error
+
+            handle_unreadable_state_error(e)  # prints + sys.exit(1)
 
     def get_command(self, ctx: click.Context, cmd_name: str) -> click.Command | None:
         rv = super().get_command(ctx, cmd_name)

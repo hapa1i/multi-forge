@@ -200,6 +200,23 @@ class CostCaps:
         self.per_month = _coerce_optional_usd_cap("costs.caps.per_month", self.per_month)
 
 
+def _reject_unknown_cost_keys(section: str, value: dict[Any, Any], known: set[str]) -> None:
+    """Strict-reject unrecognized keys in a proxy.yaml ``costs`` section.
+
+    Clean break: an unknown costs key (e.g. the removed ``cap_mode``) is a config
+    error, not silently ignored -- a stale spend-cap setting must never appear
+    accepted while quietly changing enforcement behavior. Raised as ValueError
+    (config validation), not StateCorruptedError, because the fix is editing
+    proxy.yaml, which ``forge clean`` never touches.
+    """
+    extra = sorted(str(k) for k in value if k not in known)
+    if extra:
+        raise ValueError(
+            f"Unknown {section} key(s) in proxy.yaml: {extra}. "
+            f"Valid {section} keys: {sorted(known)}. Remove the unknown key(s)."
+        )
+
+
 def _coerce_cost_caps(value: Any) -> CostCaps:
     """Normalize raw cost cap mappings into ``CostCaps``."""
     if value is None:
@@ -208,6 +225,7 @@ def _coerce_cost_caps(value: Any) -> CostCaps:
         return value
     if not isinstance(value, dict):
         raise ValueError("Invalid costs.caps: must be a mapping")
+    _reject_unknown_cost_keys("costs.caps", value, {"per_day", "per_month"})
     return CostCaps(
         per_day=value.get("per_day"),
         per_month=value.get("per_month"),
@@ -239,15 +257,7 @@ def _coerce_cost_config(value: Any) -> CostConfig:
         return value
     if not isinstance(value, dict):
         raise ValueError("Invalid costs: must be a mapping")
-    if "cap_mode" in value:
-        # Removed in metric-evidence Phase 3: caps have one behavior now (post-event). The
-        # costs block is otherwise leniently parsed, so a removed key must be rejected
-        # explicitly or it would be silently ignored (coding-standards: removed = tombstone).
-        raise ValueError(
-            "costs.cap_mode is no longer supported. Forge enforces spend caps after each "
-            "completed request; there is no pre-flight 'strict' mode. Remove costs.cap_mode "
-            "from proxy.yaml."
-        )
+    _reject_unknown_cost_keys("costs", value, {"caps", "on_cap_hit"})
     return CostConfig(
         caps=_coerce_cost_caps(value.get("caps", {}) or {}),
         on_cap_hit=value.get("on_cap_hit", "reject"),
@@ -469,10 +479,10 @@ def _coerce_provider_trace_config(value: Any) -> ProviderTraceConfig:
     # The inject toggle moved out of per-proxy proxy.yaml to the global
     # ~/.forge/config.yaml (provider_trace.inject_provider_user) so one switch governs both the
     # proxied and the direct OpenRouter routes. proxy.yaml is user-owned config (a system boundary,
-    # not strict durable state): warn-and-degrade on the relocated keys -- the current key and the
-    # older inject_openrouter_user alias -- rather than reject (coding-standards section 5). Pop
-    # them BEFORE the strict allowlist check so they do not trip _reject_unknown_keys.
-    relocated = [k for k in ("inject_provider_user", "inject_openrouter_user") if k in value]
+    # not strict durable state): warn-and-degrade on the relocated inject_provider_user key rather
+    # than reject (coding-standards section 5). Pop it BEFORE the strict allowlist check so it does
+    # not trip _reject_unknown_keys.
+    relocated = [k for k in ("inject_provider_user",) if k in value]
     if relocated:
         value = {k: v for k, v in value.items() if k not in relocated}
         _warn_legacy_inject_key(

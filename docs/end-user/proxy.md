@@ -489,8 +489,9 @@ curl http://localhost:8085/ | jq .metrics
 ## Cost tracking and spend caps
 
 Proxy request costs are logged as downstream telemetry under `~/.forge/telemetry/downstream/`. Legacy
-`~/.forge/costs/requests/` and `~/.forge/costs/verbs/` files may exist from older installs; new request spend writes to
-downstream records, and the by-verb view joins those records to run ids instead of writing new verb snapshot files.
+`~/.forge/costs/requests/` files may exist from older installs; Forge no longer reads, writes, or cleans them -- delete
+them manually if present. New request spend writes to downstream records, and the by-verb view joins those records to
+run ids instead of writing verb snapshot files.
 
 ```bash
 forge telemetry costs show                    # Today's costs, by verb
@@ -545,15 +546,16 @@ once logged spend reaches the cap. `on_cap_hit=reject` returns HTTP 429 with `sp
 lets the request continue and returns `X-Spend-Warning`.
 
 > Earlier versions had a `costs.cap_mode` setting (`post`/`strict`); it was removed and caps are now always post-event.
-> If an older `proxy.yaml` still has a `cap_mode:` line, remove it — the proxy otherwise refuses to load with a message
-> telling you to.
+> A leftover `cap_mode:` line — or any unrecognized key under `costs`/`costs.caps` — is now rejected with a config error
+> naming the key, so a stale spend-cap setting can't silently change enforcement. Delete it; `forge proxy validate`
+> surfaces the error before the proxy starts.
 
 Cap enforcement is process-local and best-effort. For reliable cap enforcement, run a single proxy process per proxy ID.
-Telemetry logs accumulate in `~/.forge/telemetry/` (with legacy cost logs under `~/.forge/costs/` from older installs).
-The proxy re-bootstraps from downstream/legacy cost logs plus `~/.forge/telemetry/caps/<proxy_id>.json` at next startup.
-That cap-state snapshot is deliberate: a path migration or dropped best-effort JSONL write must not silently reset a
-monthly cap to `$0`. Snapshot writes are coalesced by request count/time and flushed on graceful proxy shutdown; the
-live proxy's in-memory counters remain authoritative between flushes.
+Telemetry logs accumulate in `~/.forge/telemetry/`. The proxy re-bootstraps from downstream cost logs
+(`~/.forge/telemetry/downstream/`) plus `~/.forge/telemetry/caps/<proxy_id>.json` at next startup. That cap-state
+snapshot is deliberate: a path migration or dropped best-effort JSONL write must not silently reset a monthly cap to
+`$0`. Snapshot writes are coalesced by request count/time and flushed on graceful proxy shutdown; the live proxy's
+in-memory counters remain authoritative between flushes.
 
 ### Budget planning
 

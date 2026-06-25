@@ -931,7 +931,6 @@ Operation outcomes (policy checks, including no-call fail-opens) write to `~/.fo
 | `telemetry/caps/<proxy_id>.json`           | Proxy spend-cap tracker                   | Durable cap checkpoint used at restart bootstrap            |
 | `telemetry/audit_state/<proxy_id>.json`    | Audit drift detector in proxy-id sidecars | Writable sidecar drift baseline                             |
 | `usage/events/<month>_<pid>.jsonl`         | Legacy usage emitters                     | Transitional session activity/read-surface attribution      |
-| `costs/requests/`, `costs/verbs/`          | Legacy writers from older releases        | Read only for cap migration/reset compatibility             |
 
 Downstream attempt records are the source of truth for proxy spend. **Forge is not a cost oracle:** it records the cost
 a route actually reported — OpenRouter's response-body `usage.cost` (`confidence="reported"`) or a LiteLLM gateway's
@@ -943,20 +942,20 @@ predates the cost). There is no local price catalog; cost is never inferred from
 `anthropic-direct`, etc.). Proxy-origin writers populate it from `proxy.source`; direct emitters populate it only where
 the provider/reporter maps unambiguously (`anthropic-direct`, `openrouter`) and otherwise leave it null for v1.
 `source_id`/`source_kind` remain the telemetry-origin axis (`proxy` or `provider`) and are not overloaded with
-local/remote source kind. The proxy bootstraps its in-memory `CostTracker` from downstream attempts plus legacy
-current/previous-month request logs on startup, then reconciles with `telemetry/caps/<proxy_id>.json` using the larger
-monthly total so a clean-cut path migration or dropped best-effort JSONL write does not silently reset spend caps to
-`$0`. Live request handling remains in-memory authoritative: a downstream write failure warns but does not block
-successful model traffic. The fail-closed posture lives at bootstrap via the durable cap checkpoint, not by turning a
-transient telemetry write failure into a live-request denial. Cap-state writes are coalesced by request count/time and
-flushed on graceful proxy shutdown so the request path does not fsync on every costed request. Downstream retention
-preserves current-calendar-month shards even when their mtime is old or the size budget is tight, so
-unkeyed/template-mode caps that have no cap snapshot do not lose the active month's JSONL spend on restart.
+local/remote source kind. The proxy bootstraps its in-memory `CostTracker` from downstream attempts on startup, then
+reconciles with `telemetry/caps/<proxy_id>.json` using the larger monthly total so a clean-cut path migration or dropped
+best-effort JSONL write does not silently reset spend caps to `$0`. Live request handling remains in-memory
+authoritative: a downstream write failure warns but does not block successful model traffic. The fail-closed posture
+lives at bootstrap via the durable cap checkpoint, not by turning a transient telemetry write failure into a
+live-request denial. Cap-state writes are coalesced by request count/time and flushed on graceful proxy shutdown so the
+request path does not fsync on every costed request. Downstream retention preserves current-calendar-month shards even
+when their mtime is old or the size budget is tight, so unkeyed/template-mode caps that have no cap snapshot do not lose
+the active month's JSONL spend on restart.
 
-Verb snapshot files under `costs/verbs/` are retired as a durable writer. The default `forge telemetry costs show`
-by-verb view now derives attribution by joining downstream attempts to `usage/events` via `forge_run_id`; unjoined
-requests remain "Interactive"/unattributed. The usage ledger itself remains during the transition for session activity
-and run-tree joins, but it is no longer the durable spend source.
+The legacy `costs/verbs/` writer and reader have been removed. The default `forge telemetry costs show` by-verb view
+derives attribution by joining downstream attempts to `usage/events` via `forge_run_id`; unjoined requests remain
+"Interactive"/unattributed. The usage ledger itself remains during the transition for session activity and run-tree
+joins, but it is no longer the durable spend source.
 
 A third plane, the **usage-attribution ledger** (`~/.forge/usage/events/`, schema in
 [§A.13](design_appendix.md#a13-usage-attribution-ledger-schema-314)), records *which run/workflow/session* invoked which

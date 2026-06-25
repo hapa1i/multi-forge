@@ -35,6 +35,7 @@ from forge.core.reactive.env import (
     InteractiveApiKeyDecision,
     compute_interactive_api_key_decision,
 )
+from forge.core.state.exceptions import StateCorruptedError, StateUnreadableError
 from forge.policy.semantic.supervisor import (
     CHECKER_PROVIDER_CHOICES,
     apply_checker_options,
@@ -972,6 +973,8 @@ def launch_new_session(
     except InvalidBranchNameError as e:
         print_error(f"{e}", console=console)
         return 1
+    except (StateCorruptedError, StateUnreadableError):
+        raise  # corrupt index/manifest -> top-level reset handler (sys.exit(launch_new_session()))
     except ForgeSessionError as e:
         print_error(f"{e}", console=console)
         return 1
