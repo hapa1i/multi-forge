@@ -98,16 +98,12 @@ def _resolve_routing_from_cli(
     from forge.cli.claude import _get_context_limit_for_proxy, _healthcheck_proxy
     from forge.proxy.proxies import (
         ProxyNotFoundError,
-        ProxyRegistryCorruptedError,
         ProxyResolutionError,
     )
     from forge.proxy.proxy_orchestrator import ProxyStartError, ensure_proxy
 
     try:
         entry, started = ensure_proxy(proxy_name)
-    except ProxyRegistryCorruptedError as e:
-        print_error(str(e), console=err_console)
-        sys.exit(1)
     except (ProxyResolutionError, ProxyStartError) as e:
         if isinstance(e, ProxyNotFoundError):
             print_error_with_tip(

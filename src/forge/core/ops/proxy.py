@@ -60,16 +60,15 @@ def list_proxies(*, ctx: ExecutionContext) -> ListProxiesResult:
         ListProxiesResult with proxy entries and configs.
 
     Raises:
-        ForgeOpError: if the proxy registry cannot be read.
+        ProxyRegistryCorruptedError: if the registry is corrupt. Propagates (a
+            StateCorruptedError) to the top-level reset handler instead of being
+            masked as a generic ForgeOpError.
     """
     _log.debug("list_proxies: cwd=%s", ctx.cwd)
 
     store = ProxyRegistryStore()
 
-    try:
-        registry = store.read()
-    except ProxyRegistryCorruptedError as e:
-        raise ForgeOpError(f"Proxy registry error: {e}") from e
+    registry = store.read()
 
     items: list[ListProxiesItem] = []
     for proxy_id, entry in registry.proxies.items():

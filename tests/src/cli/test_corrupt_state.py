@@ -226,3 +226,124 @@ def test_in_chat_session_show_emits_json_block_on_corruption(tmp_path: Path) -> 
     assert payload["decision"] == "block"
     assert "corrupt" in payload["reason"].lower()
     assert "forge clean" in payload["reason"]
+
+
+# ---------------------------------------------------------------------------
+# Comprehensive class fix: the op layer (proxy registry, codex resolve/start,
+# transfer regenerate) and the env-var resolution fallbacks all defer corruption
+# to the top-level handler instead of masking it as ForgeOpError / a generic
+# registry error / "no session found". Regression for the broad-`except`
+# interception class (a corruption error is also a domain error, so the domain
+# catch would otherwise swallow it before the root handler).
+# ---------------------------------------------------------------------------
+
+
+def test_proxy_registry_corrupt_routes_to_handler() -> None:
+    """A corrupt proxy registry surfaces the uniform reset tip via `forge proxy list`."""
+    from click.testing import CliRunner
+
+    from forge.cli.main import main
+    from forge.proxy.proxies import get_proxy_registry_path
+
+    path = get_proxy_registry_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("{ corrupt registry", encoding="utf-8")
+
+    result = CliRunner().invoke(main, ["proxy", "list"])
+    combined = result.output + (result.stderr or "")
+    assert result.exit_code == 1
+    assert "Traceback" not in combined
+    assert "Forge state is corrupt" in combined
+    assert "forge clean" in combined
+
+
+def test_resolve_codex_session_propagates_corruption(tmp_path: Path) -> None:
+    """The codex resolve op re-raises a corrupt manifest instead of wrapping it as ForgeOpError."""
+    from forge.core.ops.codex_session import resolve_codex_session
+    from forge.session import SessionManager
+
+    _seed_corrupt_manifest_session("bad", tmp_path)
+    with pytest.raises(StateCorruptedError):
+        resolve_codex_session(SessionManager(), "bad", forge_root=tmp_path / "project")
+
+
+def test_regenerate_transfer_propagates_corruption(tmp_path: Path) -> None:
+    """The transfer-regenerate op re-raises a corrupt parent manifest, not 'parent not found'."""
+    from forge.core.ops.context import ExecutionContext
+    from forge.core.ops.transfer import regenerate_transfer
+
+    _seed_corrupt_manifest_session("bad", tmp_path)
+    fr = tmp_path / "project"
+    ctx = ExecutionContext(cwd=fr, worktree_root=fr, project_root=fr, forge_root=fr)
+    with pytest.raises(StateCorruptedError):
+        regenerate_transfer(ctx=ctx, parent="bad")
+
+
+def test_in_chat_proxy_list_emits_json_block_on_corrupt_registry() -> None:
+    """`%proxy list` stays a JSON block decision on a corrupt registry -- not a Rich tip / exit 1.
+
+    Regression for the hook-contract gap: list_proxies now propagates
+    ProxyRegistryCorruptedError (a StateCorruptedError, not a ForgeOpError), so the
+    assistant-facing handler must catch it and emit a decision block rather than let it
+    escape to the CLI reset handler (which would break the UserPromptSubmit JSON contract).
+    """
+    import io
+    from contextlib import redirect_stdout
+
+    from forge.cli.hooks.direct_commands import _handle_proxy_list
+    from forge.proxy.proxies import get_proxy_registry_path
+
+    path = get_proxy_registry_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("{ corrupt registry", encoding="utf-8")
+
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        _handle_proxy_list()
+
+    payload = json.loads(buf.getvalue())
+    assert payload["decision"] == "block"
+    assert "corrupt" in payload["reason"].lower()
+    assert "forge clean" in payload["reason"]
+
+
+def test_in_chat_session_list_emits_json_block_on_corrupt_index() -> None:
+    """`%session list` stays a JSON block decision on a corrupt index -- not a Rich tip / exit 1."""
+    import io
+    from contextlib import redirect_stdout
+
+    from forge.cli.hooks.direct_commands import _handle_cmd_session
+    from forge.session.index import get_index_path
+
+    index_path = get_index_path()
+    index_path.parent.mkdir(parents=True, exist_ok=True)
+    index_path.write_text("{ corrupt index", encoding="utf-8")
+
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        _handle_cmd_session({}, ["list"])
+
+    payload = json.loads(buf.getvalue())
+    assert payload["decision"] == "block"
+    assert "corrupt" in payload["reason"].lower()
+    assert "forge clean" in payload["reason"]
+
+
+def test_resolve_session_identifier_env_corrupt_propagates(monkeypatch: pytest.MonkeyPatch) -> None:
+    """FORGE_SESSION pointing at a corrupt index propagates, not a silent fall-through.
+
+    Guards the nested env-fallback: IndexCorruptedError is also a ForgeSessionError, so
+    the env-var ``except ForgeSessionError`` would otherwise swallow it and end at the
+    generic "No session found" path instead of the reset handler.
+    """
+    from forge.core.ops.session_context import resolve_session_identifier
+    from forge.session.index import get_index_path
+
+    index_path = get_index_path()
+    index_path.parent.mkdir(parents=True, exist_ok=True)
+    index_path.write_text("{ corrupt index", encoding="utf-8")
+
+    monkeypatch.setenv("FORGE_SESSION", "whatever")
+    monkeypatch.delenv("FORGE_FORGE_ROOT", raising=False)
+    with pytest.raises(StateCorruptedError):
+        resolve_session_identifier(None)

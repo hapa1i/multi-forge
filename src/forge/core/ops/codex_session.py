@@ -43,6 +43,7 @@ from forge.core.runtime.codex_preflight import (
 )
 from forge.core.runtime.codex_rollouts import find_rollout_path
 from forge.core.state import now_iso
+from forge.core.state.exceptions import StateCorruptedError
 from forge.session import (
     ForgeSessionError,
     SessionManager,
@@ -136,12 +137,16 @@ def resolve_codex_session(
             state = manager.get_session(name, forge_root=None)
         except SessionNotFoundError as fallback:
             raise ForgeOpError(f"Session '{name}' not found: {fallback}") from fallback
+        except StateCorruptedError:
+            raise  # corrupt manifest/index -> top-level reset handler
         except ForgeSessionError as fallback:
             # A corrupt/invalid manifest is NOT a missing session: surface it as such so
             # the user repairs or deletes it, rather than seeing a misleading "not found".
             raise ForgeOpError(
                 f"Session '{name}' could not be read (manifest may be corrupt): {fallback}"
             ) from fallback
+    except StateCorruptedError:
+        raise  # corrupt manifest/index -> top-level reset handler
     except ForgeSessionError as e:
         # Same distinction on the scoped read: a non-not-found error is corruption, not absence.
         raise ForgeOpError(f"Session '{name}' could not be read (manifest may be corrupt): {e}") from e
@@ -203,6 +208,8 @@ def start_codex_session(
     try:
         parent_entry = manager.get_session_entry(parent, forge_root=str(forge_root))
         manager.get_session(parent, forge_root=str(forge_root))
+    except StateCorruptedError:
+        raise  # corrupt parent manifest/index -> top-level reset handler
     except ForgeSessionError as e:
         raise ForgeOpError(f"Parent session '{parent}' not found: {e}") from e
 
@@ -228,6 +235,8 @@ def start_codex_session(
             runtime=CODEX_RUNTIME,
             parent_session=parent,
         )
+    except StateCorruptedError:
+        raise  # corrupt manifest/index -> top-level reset handler
     except ForgeSessionError as e:
         raise ForgeOpError(str(e)) from e
 

@@ -335,7 +335,6 @@ def start_cmd(proxy: str, sandbox: str, codex_args: tuple[str, ...]) -> None:
     # Heavy proxy/invoke imports are deferred so `forge codex status` stays light.
     from forge.proxy.proxies import (
         ProxyNotFoundError,
-        ProxyRegistryCorruptedError,
         ProxyResolutionError,
     )
     from forge.proxy.proxy_orchestrator import (
@@ -351,9 +350,6 @@ def start_cmd(proxy: str, sandbox: str, codex_args: tuple[str, ...]) -> None:
     # 3. Resolve + start/adopt the proxy.
     try:
         entry, started = ensure_proxy(proxy)
-    except ProxyRegistryCorruptedError as e:
-        print_error(str(e), console=err_console)
-        sys.exit(1)
     except (ProxyResolutionError, ProxyStartError) as e:
         if isinstance(e, ProxyNotFoundError):
             print_error_with_tip(

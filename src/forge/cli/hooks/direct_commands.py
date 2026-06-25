@@ -13,6 +13,7 @@ import click
 
 from forge.core.paths import display_path
 from forge.core.state import FileLockTimeoutError
+from forge.core.state.exceptions import StateCorruptedError
 from forge.session import set_override
 from forge.session.effective import compute_effective_intent
 from forge.session.hooks import resolve_session_store
@@ -56,6 +57,27 @@ def _parse_direct_command(prompt: str) -> tuple[str, list[str]] | None:
         return None
 
     return cmd, argv
+
+
+def _emit_corrupt_state_block(e: StateCorruptedError) -> None:
+    """Emit the corrupt-state reset tip as a UserPromptSubmit JSON block.
+
+    Hook context: %-dispatched commands must emit a ``{decision:block}`` decision,
+    never the CLI Rich reset tip. Letting StateCorruptedError escape would unwind to
+    ``AliasGroup.main`` -> ``handle_corrupt_state_error`` (Rich stderr + ``sys.exit(1)``),
+    breaking the assistant-facing JSON contract. ``%session``/``%proxy`` are the
+    assistant-facing dispatchers and are the sole hand-rolled tip-bearing exception.
+    """
+    click.echo(
+        json.dumps(
+            {
+                "decision": "block",
+                "reason": f"Forge state is corrupt: {e}\n"
+                "Tip: run 'forge clean', or delete .forge / ~/.forge and re-run "
+                "'forge extension enable'.",
+            }
+        )
+    )
 
 
 def _handle_cmd_help() -> None:
@@ -126,6 +148,9 @@ def _handle_cmd_session(data: dict[str, Any], argv: list[str]) -> None:
 
     try:
         result = list_sessions_op(ctx=ctx, include_incognito=include_incognito, scope=scope)
+    except StateCorruptedError as e:
+        _emit_corrupt_state_block(e)
+        return
     except ForgeOpError as e:
         click.echo(json.dumps({"decision": "block", "reason": f"Error: {e}"}))
         return
@@ -149,7 +174,6 @@ def _handle_session_show(argv: list[str]) -> None:
     fallback to avoid cross-repo ambiguity.
     """
     from forge.core.ops.session_context import SessionContextError, get_session_context
-    from forge.core.state.exceptions import StateCorruptedError
 
     # Explicit name or FORGE_SESSION env var (no active-session fallback)
     session_id: str | None = argv[0] if argv else os.environ.get("FORGE_SESSION")
@@ -169,18 +193,7 @@ def _handle_session_show(argv: list[str]) -> None:
     try:
         ctx = get_session_context(session_id)
     except StateCorruptedError as e:
-        # Hook context: emit a JSON block decision, not the CLI Rich reset tip.
-        # %session is the assistant-facing dispatcher (the sole tip-bearing exception).
-        click.echo(
-            json.dumps(
-                {
-                    "decision": "block",
-                    "reason": f"Forge state is corrupt: {e}\n"
-                    "Tip: run 'forge clean', or delete .forge / ~/.forge and re-run "
-                    "'forge extension enable'.",
-                }
-            )
-        )
+        _emit_corrupt_state_block(e)
         return
     except SessionContextError as e:
         click.echo(json.dumps({"decision": "block", "reason": f"Error: {e}"}))
@@ -312,6 +325,9 @@ def _handle_proxy_list() -> None:
 
     try:
         result = list_proxies_op(ctx=ctx)
+    except StateCorruptedError as e:
+        _emit_corrupt_state_block(e)
+        return
     except ForgeOpError as e:
         click.echo(json.dumps({"decision": "block", "reason": f"Error: {e}"}))
         return

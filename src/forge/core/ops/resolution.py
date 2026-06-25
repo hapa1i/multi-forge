@@ -11,6 +11,7 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 
+from forge.core.state.exceptions import StateCorruptedError
 from forge.session import SessionIndexEntry, SessionManager, SessionState, SessionStore
 from forge.session.exceptions import (
     AmbiguousSessionError,
@@ -68,6 +69,8 @@ def resolve_session_repo_wide(
                 forge_root=entry.root,
                 is_cross_project=False,
             )
+        except StateCorruptedError:
+            raise  # corrupt index/manifest -> top-level reset handler, not Tier 2 fallthrough
         except (ForgeSessionError, FileNotFoundError):
             pass
 

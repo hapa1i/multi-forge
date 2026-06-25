@@ -161,6 +161,8 @@ def resolve_session_identifier(session: str | None = None) -> tuple[str, str | N
             # Check if it's corruption (in index but manifest bad) vs not found
             try:
                 manager.get_session_entry(session)
+            except StateCorruptedError:
+                raise  # corrupt index -> top-level reset handler
             except ForgeSessionError:
                 pass  # Not in index — fall through to UUID lookup
             else:
@@ -186,10 +188,14 @@ def resolve_session_identifier(session: str | None = None) -> tuple[str, str | N
         try:
             entry = manager.get_session_entry(env_session, forge_root=_cwd_forge_root)
             return env_session, entry.root
+        except StateCorruptedError:
+            raise  # corrupt index -> top-level reset handler, not env-context fallback
         except ForgeSessionError:
             try:
                 entry = manager.get_session_entry(env_session)
                 return env_session, entry.root
+            except StateCorruptedError:
+                raise  # corrupt index -> top-level reset handler, not env-context fallback
             except ForgeSessionError:
                 pass
 
