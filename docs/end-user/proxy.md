@@ -489,9 +489,9 @@ curl http://localhost:8085/ | jq .metrics
 ## Cost tracking and spend caps
 
 Proxy request costs are logged as downstream telemetry under `~/.forge/telemetry/downstream/`. Legacy
-`~/.forge/costs/requests/` files may exist from older installs; Forge no longer reads or writes them
-(`forge telemetry costs reset` still cleans `costs/requests/` up). New request spend writes to downstream records, and
-the by-verb view joins those records to run ids instead of writing verb snapshot files.
+`~/.forge/costs/requests/` files may exist from older installs; Forge no longer reads, writes, or cleans them -- delete
+them manually if present. New request spend writes to downstream records, and the by-verb view joins those records to
+run ids instead of writing verb snapshot files.
 
 ```bash
 forge telemetry costs show                    # Today's costs, by verb

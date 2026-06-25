@@ -50,8 +50,8 @@ print(f'reported={d[\"reported_requests\"]} unavailable={d[\"unavailable_request
 ```bash
 # Seed QA-prefixed fixture request logs matching cost_logger.py record schema.
 # Uses qa-fixture prefix and PID 99999 to avoid collision with real proxy logs.
-mkdir -p ~/.forge/costs/requests
-cat > ~/.forge/costs/requests/qa-fixture_99999.jsonl <<'EOF'
+mkdir -p ~/.forge/telemetry/downstream
+cat > ~/.forge/telemetry/downstream/qa-fixture_99999.jsonl <<'EOF'
 {"ts":"2026-05-01T00:00:00Z","proxy_id":"qa-fixture","model":"test/gemini-2.5-flash","tier":"haiku","input_tokens":200,"output_tokens":80,"cached_tokens":0,"cost_micros":300,"reporter":"litellm","confidence":"gateway_calculated","latency_ms":120.0,"failed":false,"request_id":"req-qa-001"}
 {"ts":"2026-05-01T00:01:00Z","proxy_id":"qa-fixture","model":"test/gemini-3.1-pro-preview","tier":"sonnet","input_tokens":500,"output_tokens":150,"cached_tokens":50,"cost_micros":1200,"reporter":"litellm","confidence":"gateway_calculated","latency_ms":350.0,"failed":false,"request_id":"req-qa-002"}
 {"ts":"2026-05-01T00:02:00Z","proxy_id":"qa-fixture","model":"test/gemini-3.1-pro-preview","tier":"opus","input_tokens":1000,"output_tokens":400,"cached_tokens":100,"cost_micros":3500,"reporter":"litellm","confidence":"gateway_calculated","latency_ms":800.0,"failed":false,"request_id":"req-qa-003"}
@@ -61,7 +61,7 @@ EOF
 forge telemetry costs show qa-fixture --period all --json
 ```
 
-- [ ] Fixture file created at `~/.forge/costs/requests/qa-fixture_99999.jsonl`
+- [ ] Fixture file created at `~/.forge/telemetry/downstream/qa-fixture_99999.jsonl`
 - [ ] `forge telemetry costs show qa-fixture --period all --json` shows `total_cost_micros` of 5000 (300 + 1200 + 3500)
 - [ ] `total_requests` is 3
 - [ ] `by_model` contains both `test/gemini-2.5-flash` and `test/gemini-3.1-pro-preview`
@@ -91,8 +91,8 @@ forge telemetry costs show qa-fixture --period all --json
 
 ```bash
 # Append non-JSON garbage lines to the fixture request log
-echo 'THIS_IS_NOT_JSON' >> ~/.forge/costs/requests/qa-fixture_99999.jsonl
-echo '<<<CORRUPT>>>' >> ~/.forge/costs/requests/qa-fixture_99999.jsonl
+echo 'THIS_IS_NOT_JSON' >> ~/.forge/telemetry/downstream/qa-fixture_99999.jsonl
+echo '<<<CORRUPT>>>' >> ~/.forge/telemetry/downstream/qa-fixture_99999.jsonl
 
 # Cost CLI should skip malformed lines -- filter to qa-fixture for deterministic count
 forge telemetry costs show qa-fixture --period all --json 2>&1
@@ -247,13 +247,13 @@ rm -f ~/.forge/telemetry/downstream/${MONTH}_99999_qa-cap-seed.jsonl /tmp/qa-spe
 
 ```bash
 # Remove only QA fixture files -- do not touch real proxy cost logs
-rm -f ~/.forge/costs/requests/qa-fixture_*.jsonl
+rm -f ~/.forge/telemetry/downstream/qa-fixture_*.jsonl
 
 # Remove cap-seed logs from 7.9/7.10 (in case cleanup within those steps failed)
 rm -f ~/.forge/telemetry/downstream/*_qa-cap-seed.jsonl
 
 # Verify cleanup: no QA-owned cost fixture files remain
-ls ~/.forge/costs/requests/qa-fixture_*.jsonl 2>&1 || echo "QA_REQUEST_LOGS_CLEAN"
+ls ~/.forge/telemetry/downstream/qa-fixture_*.jsonl 2>&1 || echo "QA_REQUEST_LOGS_CLEAN"
 ls ~/.forge/telemetry/downstream/*_qa-cap-seed.jsonl 2>&1 || echo "QA_CAP_SEED_LOGS_CLEAN"
 
 # Reset spend caps on test proxies
@@ -352,8 +352,8 @@ and excludes it from the dollar total -- it is never summed as `0`. Uses an isol
 `qa-fixture` 3-request invariant (7.5/7.6) is untouched.
 
 ```bash
-mkdir -p ~/.forge/costs/requests
-cat > ~/.forge/costs/requests/qa-fixture_prov-99999.jsonl <<'EOF'
+mkdir -p ~/.forge/telemetry/downstream
+cat > ~/.forge/telemetry/downstream/qa-fixture_prov-99999.jsonl <<'EOF'
 {"ts":"2026-05-01T00:00:00Z","proxy_id":"qa-prov","model":"test/gemini-2.5-flash","tier":"haiku","input_tokens":200,"output_tokens":80,"cached_tokens":0,"cost_micros":2500,"reporter":"litellm","confidence":"gateway_calculated","latency_ms":120.0,"failed":false,"request_id":"req-prov-001"}
 {"ts":"2026-05-01T00:01:00Z","proxy_id":"qa-prov","model":"test/gemini-3.1-pro-preview","tier":"sonnet","input_tokens":500,"output_tokens":150,"cached_tokens":0,"cost_micros":null,"reporter":"provider","confidence":"unavailable","latency_ms":300.0,"failed":false,"request_id":"req-prov-002"}
 EOF
@@ -367,7 +367,7 @@ print(f'total_cost_micros={d[\"total_cost_micros\"]}')
 "
 
 # Self-clean (the qa-fixture_* name is also swept by 7.11 as a safety net).
-rm -f ~/.forge/costs/requests/qa-fixture_prov-99999.jsonl
+rm -f ~/.forge/telemetry/downstream/qa-fixture_prov-99999.jsonl
 ```
 
 - [ ] `total_requests=2 reported=1 unavailable=1` (the null-cost `req-prov-002` is counted as unavailable, not dropped)
@@ -381,10 +381,9 @@ rm -f ~/.forge/costs/requests/qa-fixture_prov-99999.jsonl
 
 <!-- destructive -->
 
-`forge telemetry costs reset` wipes every recorded cost + usage telemetry plane to zero: legacy request cost logs
-(`~/.forge/costs/requests/`), downstream/upstream telemetry (`~/.forge/telemetry/downstream/`,
-`~/.forge/telemetry/upstream/`), durable spend-cap/audit-state snapshots, and the usage-attribution ledger
-(`~/.forge/usage/events/`). It also clears the **derived** status-line cost cache
+`forge telemetry costs reset` wipes every recorded cost + usage telemetry plane to zero: downstream/upstream telemetry
+(`~/.forge/telemetry/downstream/`, `~/.forge/telemetry/upstream/`), durable spend-cap/audit-state snapshots, and the
+usage-attribution ledger (`~/.forge/usage/events/`). It also clears the **derived** status-line cost cache
 (`~/.forge/cache/statusline/fcost-*.json`) so `forge +$Y` recomputes from the now-empty ledger instead of replaying a
 cached value within its TTL — but the unrelated transcript cache-hit entries (`{digest}.json`) survive, and the legacy
 audit plane (`~/.forge/audit/`) is left untouched. `--dry-run` lists what would go without deleting; `--yes` skips the
@@ -395,8 +394,8 @@ destructive: it clears all cost telemetry in the container, so it runs last in s
 ```bash
 # Seed one shard in each of the three reset planes, an audit sentinel that must survive,
 # a derived fcost cache that must clear, and a cache-hit entry that must survive.
-mkdir -p ~/.forge/costs/requests ~/.forge/usage/events ~/.forge/audit ~/.forge/cache/statusline
-echo '{"ts":"2026-05-01T00:00:00Z","proxy_id":"qa-reset","model":"test/x","tier":"haiku","input_tokens":1,"output_tokens":1,"cached_tokens":0,"cost_micros":100,"reporter":"litellm","confidence":"gateway_calculated","latency_ms":1.0,"failed":false,"request_id":"qa-reset-1"}' > ~/.forge/costs/requests/qa-reset_99999.jsonl
+mkdir -p ~/.forge/telemetry/downstream ~/.forge/usage/events ~/.forge/audit ~/.forge/cache/statusline
+echo '{"ts":"2026-05-01T00:00:00Z","proxy_id":"qa-reset","model":"test/x","tier":"haiku","input_tokens":1,"output_tokens":1,"cached_tokens":0,"cost_micros":100,"reporter":"litellm","confidence":"gateway_calculated","latency_ms":1.0,"failed":false,"request_id":"qa-reset-1"}' > ~/.forge/telemetry/downstream/qa-reset_99999.jsonl
 echo '{"schema_version":1,"run_id":"qa-reset-r1","root_run_id":"qa-reset-r1","runtime":"claude_code","command":"qa","status":"success","attribution_granularity":"verb","cost_micro_usd":100,"ts":"2026-05-01T00:00:00Z"}' > ~/.forge/usage/events/qa-reset_99999.jsonl
 echo '{"qa":"audit-sentinel"}' > ~/.forge/audit/qa-reset-sentinel.jsonl
 echo '{"version":1,"computed_at":0,"cost_micro_usd":9999}' > ~/.forge/cache/statusline/fcost-qareset.json
@@ -411,7 +410,7 @@ forge telemetry costs reset --yes 2>&1
 echo "---"
 
 # Verify the planes + fcost cache are empty, while audit + cache-hit survive.
-echo "requests=$(ls ~/.forge/costs/requests/*.jsonl 2>/dev/null | wc -l | tr -d ' ')"
+echo "downstream=$(ls ~/.forge/telemetry/downstream/*.jsonl 2>/dev/null | wc -l | tr -d ' ')"
 echo "events=$(ls ~/.forge/usage/events/*.jsonl 2>/dev/null | wc -l | tr -d ' ')"
 echo "fcost=$(ls ~/.forge/cache/statusline/fcost-*.json 2>/dev/null | wc -l | tr -d ' ')"
 echo "cache_hit=$(ls ~/.forge/cache/statusline/qaresetdigest.json 2>/dev/null | wc -l | tr -d ' ')"
@@ -425,7 +424,7 @@ forge telemetry costs reset --yes 2>&1
 rm -f ~/.forge/audit/qa-reset-sentinel.jsonl ~/.forge/cache/statusline/qaresetdigest.json
 ```
 
-- [ ] `--dry-run` prints `The following will be removed:` with a `request cost logs`, `usage ledger`, and
+- [ ] `--dry-run` prints `The following will be removed:` with a `usage ledger`, `downstream telemetry`, and
   `status-line cost cache` line, then `(dry-run) Nothing deleted.` -- and the planes still hold their shards
 - [ ] `--yes` prints `Reset complete: removed N telemetry file(s).` (N >= 3) followed by the `Tip:` restart guidance
   naming `forge proxy stop <id>` / `forge proxy start <id>`

@@ -34,7 +34,7 @@ _BAD_LINES = ["[]", '"x"', "1", "true", "null"]
 def _shard(*subdir: str) -> Path:
     """Return the current-PID shard path under the isolated FORGE_HOME, parent created.
 
-    ``log_request_cost()`` creates ``costs/requests`` itself, but the verb/audit valid
+    ``log_request_cost()`` creates ``telemetry/downstream`` itself, but the verb/audit valid
     records are hand-written, so the directory has to exist before the append.
     """
     month = datetime.now(timezone.utc).strftime("%Y-%m")

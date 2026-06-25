@@ -254,7 +254,7 @@ class TestCostsReset:
     status-line cost cache (the autouse `isolate_forge_home` fixture gives each test its
     own FORGE_HOME)."""
 
-    _PLANES = (("costs", "requests"), ("usage", "events"))
+    _PLANES = (("telemetry", "downstream"), ("usage", "events"))
 
     def _seed(self) -> list[Path]:
         home = get_forge_home()

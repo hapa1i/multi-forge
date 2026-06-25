@@ -931,7 +931,6 @@ Operation outcomes (policy checks, including no-call fail-opens) write to `~/.fo
 | `telemetry/caps/<proxy_id>.json`           | Proxy spend-cap tracker                   | Durable cap checkpoint used at restart bootstrap            |
 | `telemetry/audit_state/<proxy_id>.json`    | Audit drift detector in proxy-id sidecars | Writable sidecar drift baseline                             |
 | `usage/events/<month>_<pid>.jsonl`         | Legacy usage emitters                     | Transitional session activity/read-surface attribution      |
-| `costs/requests/`                          | Legacy (pre-OSS installs)                 | Reset cleanup only — no longer written or read              |
 
 Downstream attempt records are the source of truth for proxy spend. **Forge is not a cost oracle:** it records the cost
 a route actually reported — OpenRouter's response-body `usage.cost` (`confidence="reported"`) or a LiteLLM gateway's
