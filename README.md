@@ -12,12 +12,6 @@
 > **Research Preview** -- Forge is under active development. APIs, commands, and file formats may change without notice
 > between releases. Not recommended for production use.
 
-> [!NOTE]
-> **Corrupt state?** If Forge reports that its state is corrupt, it names the offending file and stops -- it never
-> silently runs on bad state. To recover, run `forge clean` to detect and remove corrupt Forge-written state. For a full
-> reset, delete `.forge` (project-local) or `~/.forge` (global) and re-run `forge extension enable`. Forge recreates
-> whatever it needs on the next run. Your own files and `proxy.yaml` config are never touched by `forge clean`.
-
 **Multi-runtime agent toolkit: proxy routing, cost control, session management, and policy enforcement for coding
 agents.**
 
@@ -140,6 +134,12 @@ Existing pre-OSS Forge installs are not supported in-place. If upgrading:
 3. Re-enable extensions: `forge extension enable`
 4. If you had `FORGE_CONTEXT_LIMIT` in your shell config, remove it. Use `CLAUDE_CODE_AUTO_COMPACT_WINDOW` for native
    Claude Code behavior, or `forge config set context_limit=N` for Forge proxy fallback.
+
+> [!NOTE]
+> **Corrupt state?** If Forge reports that its state is corrupt, it names the offending file and stops -- it never
+> silently runs on bad state. To recover, run `forge clean` to detect and remove corrupt Forge-written state. For a full
+> reset, delete `.forge` (project-local) or `~/.forge` (global) and re-run `forge extension enable`. Forge recreates
+> whatever it needs on the next run. Your own files and `proxy.yaml` config are never touched by `forge clean`.
 
 ### Example Workflow: Plan, Execute, Review
 
