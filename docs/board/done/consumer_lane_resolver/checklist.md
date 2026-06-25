@@ -75,7 +75,8 @@ All 15 tests pass. The card's acceptance table plus the Phase 0 regression guard
 - [x] Design-doc sync: nothing to sync for T1a (internal + additive). The `design_appendix.md` §G / `design.md` §3.6.12
   update lands with T3 when a consumer is wired (tracked in the epic checklist).
 - [x] `change_log.md` entry added (2026-06-25). Epic roster T1a -> done flips at merge.
-- [ ] After the PR merges to `main`, move `doing/consumer_lane_resolver/` -> `done/` (board_contract closeout).
+- [x] After the PR merges to `main`, move `doing/consumer_lane_resolver/` -> `done/` (board_contract closeout). Merged
+  as PR #51 (squash `b84e2462`); moved to `done/` 2026-06-25.
 
 ## Deferred / not in this ticket
 
