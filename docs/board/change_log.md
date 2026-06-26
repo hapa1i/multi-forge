@@ -27,6 +27,24 @@ wc -l docs/board/change_log.md
 
 ## 2026-06-25
 
+### Fix cascade short-circuit E2E: internally-inconsistent plan, not a flake
+
+**Goal**: Make `test_short_circuit_real_checker_skips_frontier` (the one real-LLM cascade test) pass reliably instead of
+consistently escalating to the frontier and blocking.
+
+**Key changes** (test-only; no `src/` change):
+
+- The test's approved plan said "Create src/demo.py ..." but the harness pre-creates that file, so the Write reaches the
+  tier-1 checker with `target_exists=true` / `write_mode=overwrite_existing_file`. The deliberately-conservative checker
+  ("never guess aligned") *correctly* escalated the create-vs-overwrite contradiction -- so the `mode=divergent`
+  frontier fired and blocked (exit 2). The model was right; the plan was wrong. Re-phrased the plan to authorize
+  overwriting the existing file to the exact action content, with a comment so it isn't "simplified" back to "Create".
+
+**Verification**: confirmed the test LiteLLM (port 4001) serves `gemini/gemini-2.5-flash` (so this was a plan-wording
+bug, not infra). `tests/integration/docker/test_supervisor_e2e.py` 10/10 in Docker; the fixed test passed 4/4 across
+repeated real-checker runs (was 0/2). Surfaced during the `supervisor_lane_driven` (T3) E2E pass; fixed on its own
+branch as T3-independent.
+
 ### consumer_lanes T3: supervisor becomes lane-driven (Claude default, byte-identical)
 
 **Goal**: Drive a real consumer (the semantic supervisor) through the T1a lane resolver -- proving the lane abstraction
