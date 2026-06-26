@@ -1,14 +1,14 @@
 # Epic: Consumer Lanes -- bind Forge's LLM-work to a chosen (runtime x backend x model) lane
 
 **Type**: Epic (coordinating card). Members are independently-shippable tickets that share the lane contract below. The
-first wave is split into member cards (linked beneath the member table): T1a is active in `doing/` (branch
-`consumer_lane_resolver`); T2/T3 are in `todo/`. T4/T5/T1b/T6 stay inline sketches until the spine (T1a+T3) lands
+first wave is split into member cards (linked beneath the member table): T1a and T3 are **done** (the spine has landed
+on `main`); T2 is authored in `todo/`. T4/T5/T1b/T6 stay inline sketches now that the spine (T1a+T3) has landed
 (board_contract "Epics").
 
-**Status**: Accepted; coordinating in `doing/` (2026-06-25). T1a is active in `doing/` on branch
-`consumer_lane_resolver` (`src/forge/core/lanes.py` implemented, tests green, unmerged); T2/T3 are authored in `todo/`.
-Converged from a 2026-06-25 design session; this card is the durable record of that model. Coordination is tracked in
-`checklist.md`.
+**Status**: Accepted; coordinating in `doing/` (2026-06-25). Spine landed on `main`: T1a (PR #51,
+`src/forge/core/lanes.py`) and T3 (PR #52, supervisor lane-driven, byte-identical) are both **done** in `done/`; T2 is
+authored in `todo/`. Converged from a 2026-06-25 design session; this card is the durable record of that model.
+Coordination is tracked in `checklist.md`.
 
 **One-line motivation**: Make "use a different runtime/backend/model for part of what Forge does" -- Codex on a
 subscription today, a local Ollama tomorrow -- a *registration + a consumer's lane choice*, not a bespoke rewrite each
@@ -138,13 +138,12 @@ once.
 | **T1b -- Generalize + freeze**                                       | Promote the narrow supervisor field to a uniform consumer-lane binding; persist the `intent` override + immutable `confirmed` binding (**durable-state rules: schema version, strict deser, reset path -- coding_standards §5**).                                                                                    | T4         | a durable contract, shape-proven     |
 | **T6 -- Generalize to other consumers** (optional, later)            | Lane-drive the fan-out workers, taggers, memory writer.                                                                                                                                                                                                                                                              | T1b        | spans consumers, not just supervisor |
 
-**Member cards (first wave)**: T1a -> `docs/board/doing/consumer_lane_resolver/` (active, branch
-`consumer_lane_resolver`); T2 -> `docs/board/todo/backend_subscription_sources/card.md`; T3 ->
-`docs/board/todo/supervisor_lane_driven/card.md`. The rows above stay the durable sketch; the cards carry verified
-touchpoints + fixture-grounded acceptance. **Correction (verified 2026-06-25):** the `ModelSource` catalog is
-code-defined (`BUILTIN_MODEL_SOURCES`, validated at import in `backend/sources.py`), so T2 is an *internal-surface clean
-break* -- **not** Forge-owned durable state. Schema version/strict-deser/reset rules apply only to T1b's
-session-manifest binding.
+**Member cards (first wave)**: T1a -> `docs/board/done/consumer_lane_resolver/` (done, PR #51); T2 ->
+`docs/board/todo/backend_subscription_sources/card.md`; T3 -> `docs/board/done/supervisor_lane_driven/card.md` (done, PR
+#52). The rows above stay the durable sketch; the cards carry verified touchpoints + fixture-grounded acceptance.
+**Correction (verified 2026-06-25):** the `ModelSource` catalog is code-defined (`BUILTIN_MODEL_SOURCES`, validated at
+import in `backend/sources.py`), so T2 is an *internal-surface clean break* -- **not** Forge-owned durable state. Schema
+version/strict-deser/reset rules apply only to T1b's session-manifest binding.
 
 **T0 -- sibling billing cleanup**: revisit the `claude -p` `unknown`/OAuth billing assumption (`billing.py`) against
 current Anthropic `-p` billing -- likely stale on the Claude side. **Non-blocking for the proven `chatgpt` path (T2/T4),

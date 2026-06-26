@@ -5,11 +5,11 @@
 
 ## Current focus
 
-**Implemented + verified; ready for PR.** `run_supervisor_check` resolves `SUPERVISOR_CONSUMER` via `resolve_lane` then
-dispatches through `_dispatch_supervisor`; the `claude_code` arm is the pre-T3 path moved verbatim. 94 supervisor tests
-(89 existing unchanged + 5 new) + 215 `policy/semantic` pass; mypy/pyright clean; a 4-lens adversarial byte-diff
-workflow returned **BYTE_IDENTICAL_HOLDS, 0 real divergences**. Remaining: `make pre-commit`, commit docs, PR -> `main`;
-then the lane move below.
+**Done -- shipped via PR #52 (`e66490af` on `main`); card closed out.** `run_supervisor_check` resolves
+`SUPERVISOR_CONSUMER` via `resolve_lane` then dispatches through `_dispatch_supervisor`; the `claude_code` arm is the
+pre-T3 path moved verbatim. 94 supervisor tests (89 existing unchanged + 5 new) + 215 `policy/semantic` pass;
+mypy/pyright clean; a 4-lens adversarial byte-diff workflow returned **BYTE_IDENTICAL_HOLDS, 0 real divergences**. Lane
+move done; epic roster T3 -> done.
 
 ## Verified touchpoints (2026-06-25 sweep, post-T1a)
 
@@ -102,7 +102,7 @@ New `TestSupervisorLaneDispatch` class; existing tests untouched.
   §3.6.12 narrative left unchanged -- the supervisor is one byte-identical consumer; defer the §3.6.12 lane paragraph to
   T1b/T6 when >1 consumer is wired and a durable binding exists. (Epic design-doc-sync item stays open for that.)
 - [x] `change_log.md` entry added (2026-06-25, newest-first).
-- [ ] After PR merges to `main`: move `doing/supervisor_lane_driven/` -> `done/`; epic roster T3 -> done.
+- [x] PR #52 merged to `main` (`e66490af`); card moved `doing/` -> `done/`; epic roster T3 -> done (2026-06-25).
 
 ## Non-goals (from card)
 

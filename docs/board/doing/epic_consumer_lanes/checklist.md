@@ -5,23 +5,23 @@ checklists (board_contract "Epics"). Epic framing: `card.md`.
 
 ## Current focus
 
-T1a is **done** (PR #51, squash `b84e2462`; card moved to `done/`). T3 is now **active** on branch
-`supervisor_lane_driven` (moved to `doing/`, execution checklist written) -- the canonical next cursor. T2 remains
-authored in `todo/`; T4/T5/T1b/T6 stay inline sketches. The `core.llm` representation is decided (option 2 -- see
-Decisions).
+T1a (PR #51, `b84e2462`) and T3 (PR #52, `e66490af`) are both **done** -- the spine (pure resolver + byte-identical
+Claude-default supervisor) is on `main`, both cards in `done/`. **T2** (`todo/backend_subscription_sources/`) is the
+canonical next cursor, gated on the two open T2 decisions below (`BillingPosture` vocabulary, runtime-native credential
+shape). T4/T5/T1b/T6 stay inline sketches. The `core.llm` representation is decided (option 2 -- see Decisions).
 
 ## Member roster and sequencing
 
-| Member       | Card                                 | Lane  | Depends on | State                      |
-| ------------ | ------------------------------------ | ----- | ---------- | -------------------------- |
-| T1a          | `done/consumer_lane_resolver/`       | done  | --         | done (PR #51)              |
-| T2           | `todo/backend_subscription_sources/` | todo  | T1a        | authored                   |
-| T3           | `doing/supervisor_lane_driven/`      | doing | T1a        | active (branch)            |
-| T4           | inline in `card.md`                  | --    | T1a,T2,T3  | sketch                     |
-| T5           | inline in `card.md`                  | --    | T3,T4      | sketch                     |
-| T1b          | inline in `card.md`                  | --    | T4         | sketch                     |
-| T6           | inline in `card.md`                  | --    | T1b        | sketch                     |
-| T0 (sibling) | inline in `card.md`                  | --    | none       | sketch; gates `claude-max` |
+| Member       | Card                                 | Lane | Depends on | State                      |
+| ------------ | ------------------------------------ | ---- | ---------- | -------------------------- |
+| T1a          | `done/consumer_lane_resolver/`       | done | --         | done (PR #51)              |
+| T2           | `todo/backend_subscription_sources/` | todo | T1a        | authored                   |
+| T3           | `done/supervisor_lane_driven/`       | done | T1a        | done (PR #52)              |
+| T4           | inline in `card.md`                  | --   | T1a,T2,T3  | sketch                     |
+| T5           | inline in `card.md`                  | --   | T3,T4      | sketch                     |
+| T1b          | inline in `card.md`                  | --   | T4         | sketch                     |
+| T6           | inline in `card.md`                  | --   | T1b        | sketch                     |
+| T0 (sibling) | inline in `card.md`                  | --   | none       | sketch; gates `claude-max` |
 
 Sequencing (epic-canonical): T1a -> T3 -> T2 -> T4 -> T5 -> T1b -> T6. T2 and T3 both depend only on T1a and are
 mutually independent; T3 is sequenced first to prove the seam byte-identical before T2 adds backend vocabulary --
