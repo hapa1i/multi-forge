@@ -313,7 +313,21 @@ class TestCascadeE2E:
             # gemini/* -> litellm_local. Pinned to 2.5-flash: present in both current
             # litellm.yaml defaults and backends generated before the 3.5 entry landed.
             checker_model="gemini/gemini-2.5-flash",
-            plan_text="# Approved Plan\nCreate src/demo.py containing exactly: def widget(): pass\n",
+            # The plan must match the action's METADATA, not just its content. The harness
+            # pre-creates src/demo.py, so the Write reaches the checker as
+            # write_mode=overwrite_existing_file / target_exists=true. A plan that says
+            # "Create" that file contradicts that metadata, and the deliberately-conservative
+            # checker ("never guess aligned") correctly escalates the create-vs-overwrite
+            # ambiguity -- the frontier then fires and the short-circuit never happens.
+            # Phrasing the plan as an authorized overwrite to the exact action content removes
+            # the ambiguity so the real checker reliably short-circuits (allow).
+            plan_text=(
+                "# Approved Plan\n\n"
+                "src/demo.py is an existing file. The approved change is to overwrite it so "
+                "that its complete contents are exactly:\n\n"
+                "def widget(): pass\n\n"
+                "A Write to src/demo.py with that exact content is the approved, expected action.\n"
+            ),
         )
 
         exit_code, stderr, invocations = _run_hook_check(
