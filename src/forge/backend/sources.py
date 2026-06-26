@@ -14,6 +14,7 @@ from urllib.parse import urlparse
 from forge.core.backend_dependency import BackendDependency
 from forge.core.credential_registry import CREDENTIALS, Credential
 from forge.core.provider_types import ProviderType
+from forge.core.runtime_vocab import LANE_RUNTIME_IDS
 
 ModelSourceKind = Literal["local", "remote"]
 EndpointKind = Literal["literal_url", "connection_value", "local_backend", "runtime_native"]
@@ -204,9 +205,12 @@ def _validate_source(source: ModelSource) -> None:
     for credential_id in source.credential_ids:
         if credential_id not in CREDENTIALS:
             raise ModelSourceCatalogError(f"source {source.id!r} references unknown credential {credential_id!r}")
+    # reachable_via entries are matched against lane.runtime_id, so a pin outside the
+    # lane runtime axis could never resolve -- reject it at import rather than let it
+    # read as silently "unreachable" in lanes._reachable.
     for runtime_id in source.reachable_via:
-        if not runtime_id:
-            raise ModelSourceCatalogError(f"source {source.id!r} has an empty reachable_via entry")
+        if runtime_id not in LANE_RUNTIME_IDS:
+            raise ModelSourceCatalogError(f"source {source.id!r} has unknown reachable_via runtime {runtime_id!r}")
     for template_name in source.template_names:
         if not _SOURCE_ID_RE.match(template_name):
             raise ModelSourceCatalogError(f"source {source.id!r} has invalid template name {template_name!r}")

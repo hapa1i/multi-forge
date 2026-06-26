@@ -28,15 +28,10 @@ from forge.backend.sources import (
     resolve_model_source_id,
 )
 from forge.core.runtime.registry import RUNTIMES
+from forge.core.runtime_vocab import CORE_LLM_RUNTIME
 
 ExecutionKind = Literal["single_shot", "tool_agent"]
 CapabilityFloor = ExecutionKind
-
-# The in-process single-shot runtime (``forge.core.llm``). It is deliberately NOT
-# an entry in ``RUNTIMES`` -- that table is the *agent* runtime registry, iterated
-# by ``list_runtimes()`` / ``installed_runtimes()``; a non-agent entry would
-# pollute every caller. The lane runtime axis adds it here instead.
-CORE_LLM_RUNTIME = "core_llm"
 
 _FLOOR_RANK: dict[ExecutionKind, int] = {"single_shot": 0, "tool_agent": 1}
 

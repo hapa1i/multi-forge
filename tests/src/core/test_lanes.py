@@ -56,6 +56,23 @@ def test_runtimes_table_not_polluted_by_core_llm():
     assert all(spec.id != "core_llm" for spec in list_runtimes())
 
 
+def test_lane_runtime_vocab_matches_registry():
+    # The dependency-light LANE_RUNTIME_IDS lets the catalog (forge.backend.sources)
+    # validate reachable_via pins without importing the heavy core.runtime package
+    # (which would cycle back through auth/template_secrets). It must stay in sync
+    # with the real agent registry plus core_llm -- this guards the duplication.
+    from forge.core.runtime_vocab import (
+        AGENT_RUNTIME_IDS,
+        CORE_LLM_RUNTIME,
+        LANE_RUNTIME_IDS,
+    )
+
+    assert set(AGENT_RUNTIME_IDS) == set(RUNTIMES)
+    assert LANE_RUNTIME_IDS == {CORE_LLM_RUNTIME} | set(RUNTIMES)
+    for runtime_id in LANE_RUNTIME_IDS:
+        runtime_execution(runtime_id)  # every vocab id is a runtime the resolver accepts
+
+
 # --- Lane construction validation ---
 
 

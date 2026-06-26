@@ -335,3 +335,37 @@ def test_invalid_billing_posture_is_rejected() -> None:
             credential_ids=("openrouter",),
             billing_posture=cast(BillingPosture, "free-lunch"),
         )
+
+
+def test_reachable_via_rejects_unknown_runtime() -> None:
+    """A reachable_via pin must name a real lane runtime; a typo (or empty id) fails at import.
+
+    The catalog is strict elsewhere (unknown provider/credential), so a bad runtime pin
+    should not survive to silently read as 'unreachable' in lanes._reachable.
+    """
+
+    for bad_pin in ("codx", ""):  # "codx" is a typo for "codex"; "" is an empty id
+        with pytest.raises(ModelSourceCatalogError, match="unknown reachable_via runtime"):
+            ModelSource(
+                id="bad-pin",
+                kind="remote",
+                provider="openrouter",
+                endpoint=SourceEndpoint.literal_url("https://example.test/v1"),
+                credential_ids=("openrouter",),
+                reachable_via=(bad_pin,),
+            )
+
+
+def test_reachable_via_accepts_lane_runtime_vocabulary() -> None:
+    """Every id in the lane runtime axis (agent RUNTIMES + core_llm) is a valid pin."""
+
+    for runtime_id in ("codex", "claude_code", "gemini", "core_llm"):
+        source = ModelSource(
+            id=f"pinned-{runtime_id}",
+            kind="remote",
+            provider="openrouter",
+            endpoint=SourceEndpoint.literal_url("https://example.test/v1"),
+            credential_ids=("openrouter",),
+            reachable_via=(runtime_id,),
+        )
+        assert source.reachable_via == (runtime_id,)

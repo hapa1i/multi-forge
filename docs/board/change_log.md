@@ -47,15 +47,24 @@ ChatGPT subscription reached through codex), so a lane can target it without inv
 - `cli/backend.py`: read surfaces treat `runtime_native` as runtime-owned, not "configured" -- `list` reports auth
   `runtime_native` / health `runtime-owned`; `test-auth` skips the probe and points to `forge runtime preflight codex`
   instead of reporting a credential failure.
+- `config/loader.py` (review fix): a `runtime_native` source cannot back a proxy -- template loading rejects a
+  `proxy.source` pointing at one, so a template can never mint a proxy for an undialable backend (enforces the "no proxy
+  support for subscriptions" boundary).
+- `core/runtime_vocab.py` (new, dependency-light; review fix): the lane runtime axis (`{core_llm}` + agent `RUNTIMES`).
+  `sources` validates `reachable_via` pins against it at import, so a typo like `("codx",)` fails loudly instead of
+  reading as silently unreachable in `lanes._reachable`. A drift test locks the vocab to `RUNTIMES`. Sources imports the
+  vocab (not `core.runtime.registry`) because that package pulls `auth`/`template_secrets` back into `sources` -- a
+  cycle; this mirrors the existing dependency-light `core.provider_types` pattern.
 
 **Decision**: runtime-native auth is a first-class semantic of the endpoint kind (Option c), not a relaxed credential
 exception. Forge names the backend and reasons about its billing/reachability; the runtime owns endpoint + auth, and
 `Credential` stays pure.
 
-**Verification**: 61 focused tests (`tests/src/backend/test_sources.py`, `tests/src/core/test_lanes.py`,
-`tests/src/cli/test_backend_commands.py`) pass; 1073 ripple tests across `core/llm`, `proxy`, `backend`, `core/usage`
-pass (confirming the `ProviderType += openai` change routes nowhere); mypy clean; `make pre-commit` clean. Design
-appendix §A.2.1 synced (schema bullets, catalog row, operator-view paragraph).
+**Verification**: focused suites pass (`test_sources.py`, `test_lanes.py`, `test_backend_commands.py`, `test_loader.py`,
+plus the custom-template-source regression); 4638 ripple tests across `core`, `backend`, `config`, `proxy`, `cli` pass
+(confirming the `ProviderType += openai` and import-graph changes route nowhere); mypy + pyright clean;
+`make pre-commit` clean. Design appendix §A.2.1 synced (schema bullets, catalog row, operator-view + template
+paragraphs, validation list).
 
 ## 2026-06-25
 

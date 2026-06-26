@@ -6,9 +6,10 @@
 ## Current focus
 
 Phases 1-4 **implemented and verified** (Option (c)); acceptance tests written; design appendix §A.2.1 synced;
-`change_log.md` entry added; `make pre-commit` green. Remaining: commit on the branch. Lane move to `done/` waits on a
-PR merge (user decision). Touchpoints were **verified against `main` @ `82076324`** (sweep below); all three design
-decisions resolved (A = Option (c), user 2026-06-26; B/C below).
+`change_log.md` entry added; two review findings fixed (see "Review fixes"); `make pre-commit` green. Remaining: commit
+the review-fix work on the branch. Lane move to `done/` waits on a PR merge (user decision). Touchpoints were **verified
+against `main` @ `82076324`** (sweep below); all three design decisions resolved (A = Option (c), user 2026-06-26; B/C
+below).
 
 ## Verified touchpoints (2026-06-25 sweep -- corrections to the card noted)
 
@@ -131,6 +132,26 @@ decisions resolved (A = Option (c), user 2026-06-26; B/C below).
 - [x] `make pre-commit` clean (ruff/black/isort/mypy/pyright/mdformat/gitleaks). Verified: all hooks pass.
 - [ ] After PR merges to `main`: move `doing/backend_subscription_sources/` -> `done/`; epic roster T2 -> done; epic
   "Current focus" -> next cursor (T4).
+
+## Review fixes (2026-06-26)
+
+Two findings from review, both verified real against the code before fixing:
+
+- [x] **Medium -- `runtime_native` could back a proxy template.** `_apply_template_source` (`config/loader.py`) handled
+  `literal_url`/`connection_value`/`local_backend` with no `else`, so a custom template `proxy.source: chatgpt` resolved
+  and fell through with no `base_url` -- minting a proxy for an undialable backend (violates the "no proxy support for
+  subscriptions" non-goal). Fix: reject `runtime_native` right after source resolution, before mutating the proxy block.
+  Verified: `test_runtime_native_source_cannot_back_a_proxy` (`tests/src/config/test_loader.py`).
+- [x] **Low -- `reachable_via` only rejected empty strings, not unknown runtimes.** A typo like `("codx",)` passed
+  catalog validation, then read as silently unreachable in `lanes._reachable`. Fix: validate each pin against the lane
+  runtime axis. The naive fix (import `RUNTIMES` into `sources`) creates a cycle -- importing `core.runtime.registry`
+  runs the package `__init__`, which pulls `codex_preflight -> core.auth -> template_secrets -> backend.sources`. Solved
+  with a new dependency-light `core/runtime_vocab.py` (`LANE_RUNTIME_IDS = {core_llm} | agent RUNTIMES`), mirroring the
+  `core.provider_types` pattern; `sources` validates against it, `lanes` sources `CORE_LLM_RUNTIME` from it, and a drift
+  test (`test_lane_runtime_vocab_matches_registry`) locks the vocab to `RUNTIMES`. Verified:
+  `test_reachable_via_rejects_unknown_runtime`, `test_reachable_via_accepts_lane_runtime_vocabulary`, plus the drift
+  test.
+- [x] Design-doc + change-log sync for both fixes; `make pre-commit` clean; 4638-test ripple green.
 
 ## Acceptance (definition of done -- extends the card's table)
 

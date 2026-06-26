@@ -622,6 +622,15 @@ def _apply_template_source(template: str, template_data: dict[str, Any]) -> None
         raise ValueError(f"Template '{template}' must have a 'proxy' mapping")
 
     source = _resolve_template_source(template, proxy_block)
+    # A runtime_native source (e.g. a ChatGPT subscription) is reached through its
+    # runtime, which owns the connection and auth; a key-authenticated proxy cannot
+    # carry it. Reject here so a template can never mint a proxy for an undialable
+    # backend (T2 non-goal: "no proxy support for subscriptions").
+    if source.endpoint.kind == "runtime_native":
+        raise ValueError(
+            f"Template '{template}' references runtime-native source '{source.id}', which a proxy cannot back: "
+            f"its connection and auth are owned by a runtime, not a key-authenticated proxy"
+        )
     proxy_block["source"] = source.id
 
     # backend_dependency is derived from the catalog so source identity, lifecycle, and

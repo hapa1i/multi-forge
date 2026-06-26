@@ -153,13 +153,16 @@ The shipped v1 catalog includes:
 | `litellm-gemini-test`     | local  | `litellm_local`  | local LiteLLM backend on port `4001` | `gemini-api`     | Internal integration-test dependency                                     |
 
 Catalog validation rejects duplicate source ids or aliases, unknown `kind`/`provider`/`billing_posture` values, missing
-or unknown credentials, a `runtime_native` source that declares any credential or endpoint URL, malformed literal URLs,
-malformed connection-value env var names, remote lifecycle declarations, and local sources without lifecycle. Remote
-definitions are never written to `BackendRegistry`.
+or unknown credentials, a `runtime_native` source that declares any credential or endpoint URL, a `reachable_via` entry
+outside the lane runtime axis (`{core_llm}` plus the agent `RUNTIMES`, via dependency-light `forge.core.runtime_vocab`),
+malformed literal URLs, malformed connection-value env var names, remote lifecycle declarations, and local sources
+without lifecycle. Remote definitions are never written to `BackendRegistry`.
 
 Proxy templates declare `proxy.source: <source-id-or-alias>`. During template loading, Forge resolves that value through
 the catalog, stores the canonical source id on `ProxyConfig.source`, derives any local `BackendDependency` from the
-source lifecycle, and resolves remote provider `base_url` from the source endpoint shape. Shipped local templates no
+source lifecycle, and resolves remote provider `base_url` from the source endpoint shape. A `runtime_native` source
+cannot back a proxy: template loading rejects a `proxy.source` pointing at one, because a key-authenticated proxy cannot
+carry a runtime-owned subscription (the "no proxy support for subscriptions" boundary). Shipped local templates no
 longer carry inline `backend_dependency`; OpenRouter and Anthropic passthrough templates no longer carry inline provider
 `base_url`. Remote LiteLLM templates resolve `LITELLM_BASE_URL` through the same connection-value path used by
 credentials. OpenRouter templates resolve `OPENROUTER_BASE_URL` the same way, defaulting to

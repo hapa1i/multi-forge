@@ -466,6 +466,24 @@ class TestTemplateFamilyMetadata:
         with pytest.raises(ValueError, match="backend_dependency.*remote source"):
             load_config(template="remote-with-backend")
 
+    def test_runtime_native_source_cannot_back_a_proxy(self, user_templates_dir):
+        """A subscription source (runtime_native, e.g. chatgpt) cannot be a proxy template source.
+
+        T2 non-goal: a key-authenticated proxy cannot carry a subscription whose auth
+        is owned by a runtime, so the template must fail to load -- not mint a proxy
+        for a backend Forge cannot dial.
+        """
+        bad = user_templates_dir / "custom-chatgpt.yaml"
+        bad.write_text(
+            "proxy:\n"
+            "  family: openai\n"
+            "  preferred_provider: litellm\n"
+            "  source: chatgpt\n"
+            "  default_port: 9999\n"
+        )
+        with pytest.raises(ValueError, match="runtime-native source 'chatgpt'"):
+            load_config(template="custom-chatgpt")
+
     def test_shipped_templates_declare_source_not_inline_lifecycle_or_base_url(self):
         """Shipped templates use source catalog ownership for lifecycle and remote endpoint facts."""
         for template in self._shipped_template_names():
