@@ -459,6 +459,12 @@ def _dispatch_supervisor(
             resolved=resolved,
             usage_command=usage_command,
         )
+    # Unreachable via run_supervisor_check in T3: resolve_lane(SUPERVISOR_CONSUMER)
+    # takes no override, so it always returns the claude_code default lane. Both arms
+    # below are exercised only by direct unit calls until T4 wires the codex lane + a
+    # SupervisorConfig override that can select a non-claude runtime. T4 must also
+    # decide the fail-open contract for these (see epic card "T3 -> T4 carry-forward
+    # seams"): the caller catches only _SupervisorRoutingError, so today they propagate.
     if runtime == "codex":
         raise NotImplementedError("Codex supervisor lane lands in T4 (epic consumer_lanes)")
     raise LaneError(f"No supervisor dispatch arm for runtime {runtime!r}")

@@ -46,6 +46,11 @@ parallelizing T2/T3 is allowed but is not the default cursor. T0 is independent,
 - [ ] **Runtime-native credential shape** (T2). `ModelSource` requires >=1 `credential_id` and credentials are env-var
   secrets; a subscription source's auth is the runtime's native login (claude OAuth / codex `chatgpt_tokens`), not an
   env secret. Decide how a `runtime_native` source expresses auth without faking an env var.
+- [ ] **Unsupported-lane failure mode** (T4, from T3 review). The supervisor is fail-open (design_workflows §1.2), but a
+  non-claude lane currently fails *loud*: `resolve_lane` sits outside the fail-open guard and `_dispatch_supervisor`
+  raises `NotImplementedError`/`LaneError` that the caller does not catch (`supervisor.py:463-464,603`). Decide whether
+  an unimplemented/misconfigured lane catches + fails open (consistent with `proxy_not_found`) or fails loud, then wire
+  it in T4. Full seam list: epic `card.md` "T3 -> T4 carry-forward seams".
 
 ## Link and drift control
 

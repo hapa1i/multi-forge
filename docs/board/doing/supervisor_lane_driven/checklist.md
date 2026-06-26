@@ -62,6 +62,11 @@ then the lane move below.
 - [x] `_dispatch_claude_supervisor(...)`: the **verbatim** body (routing/model/env, `spawn_env`, `track_verb_cost` +
   `run_claude_session`, `emit_usage_for_session_result`), raising `_SupervisorRoutingError` instead of the inline
   early-return on routing failure; returns `SessionResult`. (Byte-diff confirmed verbatim.)
+- [x] **T3 local review**: commented that the `codex`/unknown arms are unreachable via `run_supervisor_check` in T3
+  (only direct unit calls reach them, since `resolve_lane` takes no override). The three forward-looking seams that flip
+  live in T4 -- `resolve_lane` outside the fail-open guard, unsupported-lane fail-loud-vs-open, import-time `Lane`
+  validation -- are recorded in epic `card.md` ("T3 -> T4 carry-forward seams") with the open decision in the epic
+  checklist's Decisions owed.
 
 ## Phase 2 -- Rewire `run_supervisor_check`
 

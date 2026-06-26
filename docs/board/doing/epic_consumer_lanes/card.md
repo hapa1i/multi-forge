@@ -185,6 +185,30 @@ the shape is proven -- deferring durable state until a real override exists.
 - **Naming**: unit = `consumer` (vs `service`/`client`); `lane`; keep `runtime` narrow. Confirm before code.
 - **Decision recorded**: no fallback; default-to-current-behavior; first new lane = codex-exec supervisor.
 
+## T3 -> T4 carry-forward seams (fail-open boundary)
+
+Recorded during T3 local review. None are bugs in shipped T3: `resolve_lane(SUPERVISOR_CONSUMER)` takes no override, so
+it always returns the `claude_code` default lane and the non-claude dispatch arms are unreachable via
+`run_supervisor_check`. Each flips live the instant T4 adds the `SupervisorConfig` override / `codex` arm. The
+supervisor's contract is **fail-open** (a policy-eval failure degrades to "aligned" -- design_workflows §1.2), so a lane
+misconfig must not crash the policy hook.
+
+- **Move `resolve_lane` inside the fail-open guard (T4).** `run_supervisor_check` calls
+  `resolve_lane(SUPERVISOR_CONSUMER)` *outside* the `try/except _SupervisorRoutingError` (`supervisor.py:603`). With no
+  override it cannot raise; once T4 passes `override=...`, a bad override raises `LaneError` uncaught and crashes the
+  hook -- the opposite of fail-open. T4: pre-validate and degrade to the default lane, or move the `resolve_lane` call
+  inside the guard.
+- **Unsupported-lane failure mode is a decision, not an accident (T4).** `_dispatch_supervisor` raises
+  `NotImplementedError` (codex) / `LaneError` (unknown) (`supervisor.py:463-464`); the caller catches only
+  `_SupervisorRoutingError`, so an unimplemented/unknown runtime propagates and bricks the hook. Loud is defensible in
+  dev; a misconfigured production lane should not brick a session. Decide deliberately (catch + fail-open, consistent
+  with `proxy_not_found`, vs. intentional loud) -- tracked as a Decision owed in the epic checklist.
+- **`SUPERVISOR_CONSUMER` validates at import.** It is a module-level `Lane`, so `__post_init__` (`lanes.py:59-64`) runs
+  `runtime_execution` + `resolve_model_source_id` at import: renaming `claude_code` out of `RUNTIMES` or
+  `anthropic-direct` out of the catalog crashes `supervisor.py` import (cascading to CLI/hooks), not just supervisor
+  execution. Reasonable fail-fast, but a sharper blast radius than a runtime config error -- a note for whoever
+  maintains the runtime/backend catalogs.
+
 ## Out of scope
 
 Mid-session failover / capacity forecasting; making *every* consumer configurable on day one; runtime-mixing for the
