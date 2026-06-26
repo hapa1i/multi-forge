@@ -14,6 +14,7 @@ from forge.backend.registry import (
     BackendRegistryStore,
 )
 from forge.backend.sources import (
+    BillingPosture,
     LocalBackendLifecycle,
     ModelSource,
     ModelSourceCatalogError,
@@ -257,3 +258,80 @@ def test_model_source_lookup_misses_raise_domain_error_without_keyerror_quotes()
 
     assert str(source_exc.value) == "Unknown model source: missing-source"
     assert str(template_exc.value) == "Unknown model source or alias: unknown-template"
+
+
+# --- Runtime-native subscription sources (epic consumer_lanes, T2) ---
+
+
+def test_chatgpt_subscription_source_is_runtime_native() -> None:
+    """The chatgpt source: openai provider, runtime_native endpoint (no URL/credential), subscription billing."""
+
+    source = get_model_source("chatgpt")
+    assert source.provider == "openai"
+    assert source.kind == "remote"
+    assert source.endpoint.kind == "runtime_native"
+    assert source.endpoint.value is None
+    assert source.endpoint.default_url is None
+    assert source.credential_ids == ()
+    assert source.required_env_vars == ()
+    assert source.local_lifecycle is None
+    assert source.billing_posture == "subscription_quota"
+    assert source.reachable_via == ("codex",)
+
+
+def test_billing_posture_defaults_to_per_token() -> None:
+    """Every endpoint-based source keeps the per_token default -- no behavior change from the new field."""
+
+    for source in list_model_sources():
+        if source.id == "chatgpt":
+            continue
+        assert source.billing_posture == "per_token", source.id
+
+
+def test_runtime_native_source_must_not_declare_credentials() -> None:
+    """Validator symmetry: a runtime_native source's auth is runtime-owned, so a Forge credential is an error."""
+
+    with pytest.raises(ModelSourceCatalogError, match="must not declare credentials"):
+        ModelSource(
+            id="bad-runtime-native",
+            kind="remote",
+            provider="openai",
+            endpoint=SourceEndpoint.runtime_native(),
+            credential_ids=("openai-api",),
+        )
+
+
+def test_non_runtime_native_source_still_requires_a_credential() -> None:
+    """The >=1-credential rule still holds for endpoint-based sources (symmetry, not a blanket relaxation)."""
+
+    with pytest.raises(ModelSourceCatalogError, match="at least one credential"):
+        ModelSource(
+            id="bad-empty-cred",
+            kind="remote",
+            provider="openrouter",
+            endpoint=SourceEndpoint.literal_url("https://example.test/v1"),
+            credential_ids=(),
+        )
+
+
+def test_runtime_native_endpoint_rejects_url_or_default() -> None:
+    """A runtime_native endpoint carries no value/default_url -- no faked endpoint."""
+
+    with pytest.raises(ModelSourceCatalogError, match="runtime_native endpoint cannot set value"):
+        SourceEndpoint(kind="runtime_native", value="https://api.openai.com")
+    with pytest.raises(ModelSourceCatalogError, match="runtime_native endpoint cannot set value"):
+        SourceEndpoint(kind="runtime_native", default_url="https://api.openai.com")
+
+
+def test_invalid_billing_posture_is_rejected() -> None:
+    """billing_posture is validated against the catalog vocabulary."""
+
+    with pytest.raises(ModelSourceCatalogError, match="invalid billing_posture"):
+        ModelSource(
+            id="bad-posture",
+            kind="remote",
+            provider="openrouter",
+            endpoint=SourceEndpoint.literal_url("https://example.test/v1"),
+            credential_ids=("openrouter",),
+            billing_posture=cast(BillingPosture, "free-lunch"),
+        )

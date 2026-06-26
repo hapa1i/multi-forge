@@ -6,18 +6,18 @@ checklists (board_contract "Epics"). Epic framing: `card.md`.
 ## Current focus
 
 T1a (PR #51, `b84e2462`) and T3 (PR #52, `e66490af`) are both **done** -- the spine (pure resolver + byte-identical
-Claude-default supervisor) is on `main`, both cards in `done/`. **T2** is now **active** on branch
-`backend_subscription_sources` (`doing/backend_subscription_sources/`, checklist written, touchpoints verified). It is
-gated on **Decision A** (runtime-native credential shape, pending user sign-off); Decisions B/C (reachability-pin
-storage, `BillingPosture` home/vocab) are resolved in the T2 checklist. T4/T5/T1b/T6 stay inline sketches. The
-`core.llm` representation is decided (option 2 -- see Decisions).
+Claude-default supervisor) is on `main`, both cards in `done/`. **T2** is **implemented and verified** on branch
+`backend_subscription_sources` (all three decisions resolved -- A = Option (c), user 2026-06-26: `runtime_native` owns
+its auth, validator symmetry, runtime-owned display; B/C in the T2 checklist). Phases 1-4 + tests + design-doc sync +
+change-log are done; remaining is `make pre-commit` then commit, and a PR-merge decision (user) before the `done/` move.
+T4/T5/T1b/T6 stay inline sketches. The `core.llm` representation is decided (option 2 -- see Decisions).
 
 ## Member roster and sequencing
 
 | Member       | Card                                  | Lane  | Depends on | State                      |
 | ------------ | ------------------------------------- | ----- | ---------- | -------------------------- |
 | T1a          | `done/consumer_lane_resolver/`        | done  | --         | done (PR #51)              |
-| T2           | `doing/backend_subscription_sources/` | doing | T1a        | active (branch)            |
+| T2           | `doing/backend_subscription_sources/` | doing | T1a        | impl done; pre-merge       |
 | T3           | `done/supervisor_lane_driven/`        | done  | T1a        | done (PR #52)              |
 | T4           | inline in `card.md`                   | --    | T1a,T2,T3  | sketch                     |
 | T5           | inline in `card.md`                   | --    | T3,T4      | sketch                     |
@@ -47,10 +47,11 @@ parallelizing T2/T3 is allowed but is not the default cursor. T0 is independent,
   `Literal["per_token", "subscription_quota", "free"]` in `backend/sources.py`, a `ModelSource.billing_posture` field
   defaulting `per_token`, reusing the exact `subscription_quota` spelling shared with `BillingMode`. Separate enum from
   `BillingMode` by design (posture = source-level; mode = invocation-level).
-- [ ] **Runtime-native credential shape** (T2). `ModelSource` requires >=1 `credential_id` and credentials are env-var
-  secrets; a subscription source's auth is the runtime's native login (claude OAuth / codex `chatgpt_tokens`), not an
-  env secret. **Being resolved in the T2 checklist (Decision A), pending user sign-off**: (a) a no-env `Credential`
-  [recommended] vs (b) relax the `>=1 credential` rule for `runtime_native`.
+- [x] **Runtime-native credential shape** (T2). **Decided: Option (c)** (user 2026-06-26). `runtime_native` is a
+  first-class endpoint family that owns its own auth: a `runtime_native` source declares `credential_ids=()` (validator
+  symmetry -- `runtime_native` => empty, else => `>=1`); read surfaces render `auth_status="runtime_native"` /
+  `runtime-owned` health (verify via `forge runtime preflight codex`); codex-login guidance lives in Codex preflight,
+  not Forge credential storage. `Credential` stays key-only. See T2 checklist Decision A.
 - [ ] **Unsupported-lane failure mode** (T4, from T3 review). The supervisor is fail-open (design_workflows §1.2), but a
   non-claude lane currently fails *loud*: `resolve_lane` sits outside the fail-open guard and `_dispatch_supervisor`
   raises `NotImplementedError`/`LaneError` that the caller does not catch (`supervisor.py:463-464,603`). Decide whether
@@ -69,7 +70,9 @@ parallelizing T2/T3 is allowed but is not the default cursor. T0 is independent,
 
 ## Design-doc sync (board_contract "Design Doc Sync")
 
-- [ ] T2 ships -> update `design_appendix.md` §A.2.1 (`ModelSource` gains `billing_posture` + `runtime_native` access).
+- [x] T2 ships -> update `design_appendix.md` §A.2.1 (`ModelSource` gains `billing_posture` + `runtime_native` access +
+  `reachable_via`; `chatgpt` added to the shipped-catalog table; operator-view paragraph documents the runtime-owned
+  read surface). Done on branch `backend_subscription_sources`.
 - [ ] T1a/T3 ship -> update `design_appendix.md` §G + `design.md` §3.6.12 (lane resolver layered over subprocess
   routing).
 - [ ] T1b ships -> update `design.md` §3.6 (manifest gains consumer-lane `intent`/`confirmed`).

@@ -5,9 +5,10 @@
 
 ## Current focus
 
-Board set up (branch + lane move). Touchpoints **verified against `main` @ `82076324`** (sweep below). **One design
-decision needs sign-off before any source change** (Decision A -- runtime-native credential shape); Decisions B/C are
-resolved below. No `src/` changed yet.
+Phases 1-4 **implemented and verified** (Option (c)); acceptance tests written; design appendix §A.2.1 synced;
+`change_log.md` entry added; `make pre-commit` green. Remaining: commit on the branch. Lane move to `done/` waits on a
+PR merge (user decision). Touchpoints were **verified against `main` @ `82076324`** (sweep below); all three design
+decisions resolved (A = Option (c), user 2026-06-26; B/C below).
 
 ## Verified touchpoints (2026-06-25 sweep -- corrections to the card noted)
 
@@ -43,19 +44,21 @@ resolved below. No `src/` changed yet.
 
 ## Design decisions (resolve before code)
 
-- [ ] **Decision A -- runtime-native credential shape.** A `chatgpt` source's auth is codex's native
-  `chatgpt_tokens`/device-auth login -- no env secret -- but `_validate_source:169` requires `>=1 credential_id`.
-  - **(a) [recommended] a real `Credential("chatgpt", env_vars=())`** with rich `note`/`signup_url`/`not_needed_for`
-    (e.g. "ChatGPT subscription via `codex login --device-auth`; no key to store"). Source
-    `credential_ids=("chatgpt",)`. Preserves the `>=1` invariant; gives a home for the login guidance Forge's credential
-    surface already provides (`format_missing_credential_error`, `forge auth status`), consistent with
-    `codex-api`/`anthropic-api`. `required_env_vars` -> `()`; `source_bearer_auth_env_var` is never called on it. Cost:
-    confirm `_auth_record` (`backend list`) and `forge auth login -c chatgpt` render a no-env credential sanely (no
-    crash, no misleading "missing").
-  - **(b) relax the `>=1 credential` rule for `runtime_native`** -- source `credential_ids=()`; `_validate_source`
-    allows empty creds when `endpoint.kind == "runtime_native"`. Most literally honest ("no Forge-managed credential");
-    but no guidance home and weakens the invariant.
-  - *Pending user sign-off.*
+- [x] **Decision A -- runtime-native credential shape. Decided: Option (c)** (user, 2026-06-26). Relax the credential
+  rule as a **first-class semantic of `runtime_native`**, not an exception. A `runtime_native` source declares
+  `credential_ids=()`: "Forge names the backend and reasons about its billing/reachability, but endpoint **and auth**
+  are owned by the runtime." Three concrete consequences:
+  - **Validator symmetry** (`_validate_source`): the credential rule becomes a positive either/or tied to the endpoint
+    family -- `runtime_native` => `credential_ids` MUST be empty (auth is runtime-owned; declaring a Forge credential is
+    an **error**); every other kind => `>=1` credential (today's rule, unchanged -- the existing
+    `match="at least one credential"` test stays green). Not a `!= "runtime_native"` carve-out bolted onto the generic
+    check.
+  - **Display language** (`cli/backend.py`): a `runtime_native` source renders `auth_status="runtime_native"` (not the
+    misleading `configured` it would otherwise fall into via the empty-credential loop) and health **`runtime-owned`**
+    (not `missing`/`unprobed`); the probe + `test-auth` skip with detail pointing at `forge runtime preflight codex`.
+    `Credential` stays pure (no keyless marker credential).
+  - **Guidance home**: codex-login help (`codex login --device-auth`) lives in Codex preflight / runtime readiness, not
+    Forge credential storage. T2 adds none to the credential registry.
 - [x] **Decision B -- reachability-pin storage. Decided: `reachable_via: tuple[str, ...] = ()` on `ModelSource`** (empty
   = any runtime, preserving every existing source). `chatgpt` sets `("codex",)`.
   `lanes._reachable(runtime_id, backend_id)` becomes a pure lookup:
@@ -74,63 +77,72 @@ resolved below. No `src/` changed yet.
 
 ### Phase 1 -- `BillingPosture` + `ModelSource.billing_posture` (additive)
 
-- [ ] Add `BillingPosture = Literal["per_token", "subscription_quota", "free"]` to `backend/sources.py` + `__all__`.
-- [ ] Add `ModelSource.billing_posture: BillingPosture = "per_token"`. Assertion: every existing source keeps
-  `billing_posture == "per_token"` (no behavior change); `mypy`/`pyright` clean.
+- [x] Add `BillingPosture = Literal["per_token", "subscription_quota", "free"]` to `backend/sources.py` + `__all__`.
+- [x] Add `ModelSource.billing_posture: BillingPosture = "per_token"`. Assertion: every existing source keeps
+  `billing_posture == "per_token"` (no behavior change); `mypy`/`pyright` clean. Verified:
+  `test_billing_posture_defaults_to_per_token` (all built-ins except `chatgpt`); mypy clean.
 
 ### Phase 2 -- `runtime_native` access shape
 
-- [ ] `EndpointKind` += `"runtime_native"` (keep **one** enum; rename the type only if "endpoint" becomes a clear
-  misnomer -- do not add a second).
-- [ ] `SourceEndpoint.runtime_native()` factory (`kind="runtime_native"`, no `value`, no `default_url`) +
+- [x] `EndpointKind` += `"runtime_native"` (kept **one** enum; "endpoint" still reads fine as the access-shape axis).
+- [x] `SourceEndpoint.runtime_native()` factory (`kind="runtime_native"`, no `value`, no `default_url`) +
   `_validate_endpoint` arm rejecting any `value`/`default_url` (mirrors `local_backend`).
-- [ ] `_validate_source`: a `kind="remote"` source may use a `runtime_native` endpoint with **no** `local_lifecycle`.
-  Assertion: constructing a `runtime_native` source with a `literal_url` (or any `value`) is rejected.
+- [x] `_validate_source`: a `kind="remote"` source may use a `runtime_native` endpoint with **no** `local_lifecycle`.
+  Assertion: constructing a `runtime_native` source with a `literal_url` (or any `value`) is rejected. Verified:
+  `test_runtime_native_endpoint_rejects_url_or_default`, `test_chatgpt_subscription_source_is_runtime_native`.
 
 ### Phase 3 -- provider vocabulary + display/probe
 
-- [ ] `ProviderType` (`core/provider_types.py:7`) += `"openai"`. Assertion: `get_args(ProviderType)` includes `openai`;
-  full unit suite + `mypy`/`pyright` stay green (no exhaustiveness break -- verified none exists).
-- [ ] `cli/backend.py::_probe_model_source`: early
-  `return _ProbeResult(status="skipped", detail="runtime-native auth; no endpoint to probe")` for
-  `endpoint.kind == "runtime_native"`, before the base_url check.
-- [ ] Verify `_auth_record` renders a `runtime_native` / no-env-credential source without a misleading status (adjust if
-  it asserts `>=1` env var). Assertion: `forge model backend list --json` shows the source with `provider="openai"`,
-  `health` skipped, and an honest auth label.
-- [ ] Leave `detect_provider`/`is_implemented` **unchanged**; add a one-line comment at the `ProviderType` def noting
-  `openai` is catalog-only (never a `core.llm` routing provider). (Card-correction, flagged for reviewer.)
+- [x] `ProviderType` (`core/provider_types.py:7`) += `"openai"`. Assertion: `get_args(ProviderType)` includes `openai`;
+  full unit suite + `mypy`/`pyright` stay green (no exhaustiveness break -- verified none exists). Verified: 1073 ripple
+  tests (`core/llm`, `proxy`, `backend`, `core/usage`) pass; mypy clean.
+- [x] `cli/backend.py::_probe_model_source`: early skip for `endpoint.kind == "runtime_native"` (detail points at
+  `forge runtime preflight codex`), before the base_url check.
+- [x] `_auth_record` returns `status="runtime_native"` (empty credentials, no missing-env-var noise) instead of falling
+  into the misleading `configured` the empty-credential loop would yield; `_source_health` reports `runtime-owned`.
+  Assertion: `forge model backend list --json` shows `provider="openai"`, health `runtime-owned`, auth `runtime_native`.
+  Verified: `test_list_json_renders_runtime_native_source_as_runtime_owned`.
+- [x] Left `detect_provider`/`is_implemented` **unchanged**; added a comment at the `ProviderType` def noting `openai`
+  is catalog-only (never a `core.llm` routing provider; `detect_provider` maps `openai/<model>` to `litellm_remote`).
 
 ### Phase 4 -- `chatgpt` source + reachability pin (depends on Decision A)
 
-- [ ] `reachable_via: tuple[str, ...] = ()` on `ModelSource` (Decision B). Default empty preserves all sources.
-- [ ] `lanes._reachable` reads it (pure `get_model_source` lookup; `backend_id` is already canonical from
+- [x] `reachable_via: tuple[str, ...] = ()` on `ModelSource` (Decision B). Default empty preserves all sources.
+- [x] `lanes._reachable` reads it (pure `get_model_source` lookup; `backend_id` is already canonical from
   `Lane.__post_init__`). Assertion: `(codex, chatgpt)` reachable; `(claude_code, chatgpt)` not; every existing
-  `(runtime, backend)` still reachable.
-- [ ] Credential per Decision A.
-- [ ] New catalog entry `chatgpt`: `provider="openai"`, `endpoint=runtime_native`,
+  `(runtime, backend)` still reachable. Verified: `test_subscription_backend_reachable_only_via_pinned_runtime`,
+  `test_subscription_backend_cannot_default_for_unpinned_runtime`, `test_unpinned_backend_reachable_by_any_runtime`.
+- [x] Credential per Decision A: validator symmetry in `_validate_source` -- `runtime_native` MUST be credential-free,
+  every other kind keeps `>=1`. Verified: `test_runtime_native_source_must_not_declare_credentials`,
+  `test_non_runtime_native_source_still_requires_a_credential`.
+- [x] New catalog entry `chatgpt`: `provider="openai"`, `endpoint=runtime_native`,
   `billing_posture="subscription_quota"`, `reachable_via=("codex",)`, `kind="remote"`, no `local_lifecycle`. Assertion:
-  `validate_model_sources` passes at import; `get_model_source("chatgpt")` resolves.
+  `validate_model_sources` passes at import; `get_model_source("chatgpt")` resolves. Verified:
+  `test_chatgpt_subscription_source_is_runtime_native`, `test_builtin_catalog_validates`.
 
 ### Phase 5 -- tests + docs + closeout
 
-- [ ] Acceptance tests (table below).
-- [ ] Design-doc sync: `design_appendix.md` §A.2.1 (`ModelSource` gains `billing_posture` + `runtime_native` access +
-  `reachable_via`; add `chatgpt` to the shipped-catalog table). Tick the epic checklist's §A.2.1 design-doc-sync item.
-- [ ] `change_log.md` entry (newest-first). `make pre-commit` clean. mypy + pyright clean.
+- [x] Acceptance tests (table below) -- all rows covered in `test_sources.py`, `test_lanes.py`,
+  `test_backend_commands.py` (61 focused tests pass).
+- [x] Design-doc sync: `design_appendix.md` §A.2.1 (`ModelSource` gains `billing_posture` + `runtime_native` access +
+  `reachable_via`; `chatgpt` added to the shipped-catalog table; operator-view paragraph documents the runtime-owned
+  read surface). Epic checklist §A.2.1 design-doc-sync item ticked.
+- [x] `change_log.md` entry (newest-first) added. mypy clean.
+- [x] `make pre-commit` clean (ruff/black/isort/mypy/pyright/mdformat/gitleaks). Verified: all hooks pass.
 - [ ] After PR merges to `main`: move `doing/backend_subscription_sources/` -> `done/`; epic roster T2 -> done; epic
   "Current focus" -> next cursor (T4).
 
 ## Acceptance (definition of done -- extends the card's table)
 
-| Test                             | Fixture                 | Assertion                                                                                    | Test File                                                            |
-| -------------------------------- | ----------------------- | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| Subscription source, no endpoint | `chatgpt` catalog entry | validates with a `runtime_native` endpoint -- no URL, no lifecycle                           | `tests/src/backend/test_sources.py`                                  |
-| Billing posture is stored        | `chatgpt`               | `billing_posture == "subscription_quota"` as a field, not inferred                           | `tests/src/backend/test_sources.py`                                  |
-| Per-token default preserved      | every existing source   | `billing_posture == "per_token"` by default (no behavior change)                             | `tests/src/backend/test_sources.py`                                  |
-| Provider vocabulary expanded     | `chatgpt`               | `provider="openai"` validates; `backend list` shows it; the probe **skips** it (no endpoint) | `tests/src/backend/test_sources.py`, `tests/src/cli/test_backend.py` |
-| Reachability pins runtime        | resolver input          | `chatgpt` reachable only via `codex`; existing `(runtime, backend)` pairs unchanged          | `tests/src/core/test_lanes.py`                                       |
-| No faked endpoint                | `chatgpt`               | constructing it with a `literal_url` is rejected; `runtime_native` has no `value`            | `tests/src/backend/test_sources.py`                                  |
-| `reachable_via` default-empty    | every existing source   | empty `reachable_via` -> reachable by any lane runtime (T1a behavior preserved)              | `tests/src/core/test_lanes.py`                                       |
+| Test                             | Fixture                 | Assertion                                                                                    | Test File                                                                     |
+| -------------------------------- | ----------------------- | -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Subscription source, no endpoint | `chatgpt` catalog entry | validates with a `runtime_native` endpoint -- no URL, no lifecycle                           | `tests/src/backend/test_sources.py`                                           |
+| Billing posture is stored        | `chatgpt`               | `billing_posture == "subscription_quota"` as a field, not inferred                           | `tests/src/backend/test_sources.py`                                           |
+| Per-token default preserved      | every existing source   | `billing_posture == "per_token"` by default (no behavior change)                             | `tests/src/backend/test_sources.py`                                           |
+| Provider vocabulary expanded     | `chatgpt`               | `provider="openai"` validates; `backend list` shows it; the probe **skips** it (no endpoint) | `tests/src/backend/test_sources.py`, `tests/src/cli/test_backend_commands.py` |
+| Reachability pins runtime        | resolver input          | `chatgpt` reachable only via `codex`; existing `(runtime, backend)` pairs unchanged          | `tests/src/core/test_lanes.py`                                                |
+| No faked endpoint                | `chatgpt`               | constructing it with a `literal_url` is rejected; `runtime_native` has no `value`            | `tests/src/backend/test_sources.py`                                           |
+| `reachable_via` default-empty    | every existing source   | empty `reachable_via` -> reachable by any lane runtime (T1a behavior preserved)              | `tests/src/core/test_lanes.py`                                                |
 
 ## Non-goals (from card)
 

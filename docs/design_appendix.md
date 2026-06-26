@@ -121,10 +121,18 @@ Source definitions have:
 - `id`: stable catalog id, lowercase letters/digits plus `-`, `_`, or `.`
 - `kind`: `local` or `remote`
 - `provider`: `ProviderType` from dependency-light `forge.core.provider_types` (`litellm_remote`, `litellm_local`,
-  `anthropic`, `openrouter`)
-- `endpoint`: one of `literal_url`, `connection_value`, or `local_backend`
+  `anthropic`, `openrouter`, `openai`). `openai` is catalog-only -- a subscription/source provider, never a `core.llm`
+  routing target (`detect_provider` maps `openai/<model>` to `litellm_remote`)
+- `endpoint`: one of `literal_url`, `connection_value`, `local_backend`, or `runtime_native`. A `runtime_native`
+  endpoint carries no URL and no Forge credential -- connection and auth are owned by the runtime (a subscription
+  reached through its native login)
 - `credential_ids`: credential registry names such as `openrouter`, `litellm-remote`, `anthropic-api`, `openai-api`, or
-  `gemini-api`
+  `gemini-api`. By validator symmetry a `runtime_native` source declares **none** (auth is runtime-owned); every other
+  endpoint kind declares at least one
+- `billing_posture`: declared billing nature, `per_token` (default), `subscription_quota`, or `free`. Distinct from the
+  per-invocation `BillingMode` in `core/usage`; the two share only the `subscription_quota` spelling
+- `reachable_via`: lane runtimes that can reach the source, empty = any. A subscription pins the runtime whose native
+  login authenticates it (`chatgpt -> ("codex",)`); `forge.core.lanes._reachable` reads this
 - `capabilities`: currently includes auth-probe, provider-trace eligibility, and provider-user-grouping capability
 - `local_lifecycle`: local-only refinement with adapter and default port; required env vars are derived from
   `credential_ids`; remote sources never set it
@@ -132,20 +140,22 @@ Source definitions have:
 
 The shipped v1 catalog includes:
 
-| Source id                 | Kind   | Provider         | Endpoint shape                       | Credentials      | Notes                                     |
-| ------------------------- | ------ | ---------------- | ------------------------------------ | ---------------- | ----------------------------------------- |
-| `openrouter`              | remote | `openrouter`     | `OPENROUTER_BASE_URL` + default URL  | `openrouter`     | Provider-trace and user-group capable     |
-| `litellm-remote`          | remote | `litellm_remote` | `LITELLM_BASE_URL`                   | `litellm-remote` | Aliases remote LiteLLM templates          |
-| `anthropic-passthrough`   | remote | `anthropic`      | `https://api.anthropic.com`          | `anthropic-api`  | Proxy-template source, no lifecycle       |
-| `anthropic-direct`        | remote | `anthropic`      | `https://api.anthropic.com`          | `anthropic-api`  | Direct-runtime attribution source         |
-| `litellm-gemini-local`    | local  | `litellm_local`  | local LiteLLM backend on port `4000` | `gemini-api`     | Also aliases `litellm-gemini-flash-local` |
-| `litellm-openai-local`    | local  | `litellm_local`  | local LiteLLM backend on port `4000` | `openai-api`     | Also aliases `litellm-openai-codex-local` |
-| `litellm-anthropic-local` | local  | `litellm_local`  | local LiteLLM backend on port `4000` | `anthropic-api`  | Local Anthropic via LiteLLM               |
-| `litellm-gemini-test`     | local  | `litellm_local`  | local LiteLLM backend on port `4001` | `gemini-api`     | Internal integration-test dependency      |
+| Source id                 | Kind   | Provider         | Endpoint shape                       | Credentials      | Notes                                                                    |
+| ------------------------- | ------ | ---------------- | ------------------------------------ | ---------------- | ------------------------------------------------------------------------ |
+| `openrouter`              | remote | `openrouter`     | `OPENROUTER_BASE_URL` + default URL  | `openrouter`     | Provider-trace and user-group capable                                    |
+| `litellm-remote`          | remote | `litellm_remote` | `LITELLM_BASE_URL`                   | `litellm-remote` | Aliases remote LiteLLM templates                                         |
+| `anthropic-passthrough`   | remote | `anthropic`      | `https://api.anthropic.com`          | `anthropic-api`  | Proxy-template source, no lifecycle                                      |
+| `anthropic-direct`        | remote | `anthropic`      | `https://api.anthropic.com`          | `anthropic-api`  | Direct-runtime attribution source                                        |
+| `chatgpt`                 | remote | `openai`         | `runtime_native` (no URL)            | (none)           | Subscription via codex; `subscription_quota`, `reachable_via=("codex",)` |
+| `litellm-gemini-local`    | local  | `litellm_local`  | local LiteLLM backend on port `4000` | `gemini-api`     | Also aliases `litellm-gemini-flash-local`                                |
+| `litellm-openai-local`    | local  | `litellm_local`  | local LiteLLM backend on port `4000` | `openai-api`     | Also aliases `litellm-openai-codex-local`                                |
+| `litellm-anthropic-local` | local  | `litellm_local`  | local LiteLLM backend on port `4000` | `anthropic-api`  | Local Anthropic via LiteLLM                                              |
+| `litellm-gemini-test`     | local  | `litellm_local`  | local LiteLLM backend on port `4001` | `gemini-api`     | Internal integration-test dependency                                     |
 
-Catalog validation rejects duplicate source ids or aliases, unknown `kind`/`provider` values, missing or unknown
-credentials, malformed literal URLs, malformed connection-value env var names, remote lifecycle declarations, and local
-sources without lifecycle. Remote definitions are never written to `BackendRegistry`.
+Catalog validation rejects duplicate source ids or aliases, unknown `kind`/`provider`/`billing_posture` values, missing
+or unknown credentials, a `runtime_native` source that declares any credential or endpoint URL, malformed literal URLs,
+malformed connection-value env var names, remote lifecycle declarations, and local sources without lifecycle. Remote
+definitions are never written to `BackendRegistry`.
 
 Proxy templates declare `proxy.source: <source-id-or-alias>`. During template loading, Forge resolves that value through
 the catalog, stores the canonical source id on `ProxyConfig.source`, derives any local `BackendDependency` from the
@@ -168,10 +178,12 @@ offline auth/health status, and any matching local `BackendInstance`. The local 
 such an instance `(shared)` and `--json` carries a `runtime_instance.shared_with` list of the sibling source ids. The
 command stays offline for remote sources: configured remote sources show as `unprobed` until an operator runs
 `forge model backend test-auth <source-id>`, which resolves the same credentials and performs the source's
-reachability/auth probe without echoing secret values. `forge model backend show <source-id>` renders catalog details
-and local runtime state when a source has lifecycle. `start` and `stop` accept local source ids or legacy adapter
-operands; remote source operands return an intentional no-lifecycle capability error. `create` and `delete` remain local
-adapter/config operations because built-in remote sources are not user-created durable state.
+reachability/auth probe without echoing secret values. A `runtime_native` source carries no Forge credential, so `list`
+reports its auth as `runtime_native` and health as `runtime-owned`, and `test-auth` skips the probe with a pointer to
+`forge runtime preflight codex` instead of reporting a credential failure. `forge model backend show <source-id>`
+renders catalog details and local runtime state when a source has lifecycle. `start` and `stop` accept local source ids
+or legacy adapter operands; remote source operands return an intentional no-lifecycle capability error. `create` and
+`delete` remain local adapter/config operations because built-in remote sources are not user-created durable state.
 
 ### A.3 Confusion traps / anti-patterns (§3.6.6)
 

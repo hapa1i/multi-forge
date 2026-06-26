@@ -204,6 +204,12 @@ def _resolve_env_var(ev: EnvVar) -> dict[str, Any]:
 
 
 def _auth_record(source: ModelSource) -> dict[str, Any]:
+    # A runtime_native source has no Forge credential -- auth is owned by its
+    # runtime (e.g. chatgpt via codex login). Report that explicitly instead of
+    # letting the empty credential loop fall through to a misleading "configured".
+    if source.endpoint.kind == "runtime_native":
+        return {"status": "runtime_native", "credentials": [], "missing_required_env_vars": []}
+
     credentials: list[dict[str, Any]] = []
     missing_required: list[str] = []
     configured_required = 0
@@ -294,6 +300,8 @@ def _auth_display(auth: dict[str, Any]) -> str:
 
 
 def _source_health(source: ModelSource, instance: BackendInstance | None, auth: dict[str, Any]) -> str:
+    if source.endpoint.kind == "runtime_native":
+        return "runtime-owned"
     if source.kind == "remote":
         return "missing" if auth["status"] != "configured" else "unprobed"
     if instance is None:
@@ -417,6 +425,12 @@ def _probe_model_source(
     instance: BackendInstance | None,
     timeout_s: float,
 ) -> _ProbeResult:
+    if source.endpoint.kind == "runtime_native":
+        return _ProbeResult(
+            status="skipped",
+            detail="runtime-native auth; verify with 'forge runtime preflight codex'",
+        )
+
     import httpx
 
     base_url = _resolved_endpoint_url(source, instance)
@@ -735,7 +749,12 @@ def test_auth_cmd(source_id: str, as_json: bool, timeout: float) -> None:
     instance = _runtime_instance_for_source(source, runtime_instances)
     auth = _auth_record(source)
     probe: _ProbeResult
-    if auth["status"] != "configured":
+    if auth["status"] == "runtime_native":
+        probe = _ProbeResult(
+            status="skipped",
+            detail="runtime-native auth; verify with 'forge runtime preflight codex'",
+        )
+    elif auth["status"] != "configured":
         missing = ", ".join(auth["missing_required_env_vars"])
         probe = _ProbeResult(status="skipped", detail=f"missing required credential values: {missing}")
     elif not source.capabilities.auth_probe:
@@ -765,7 +784,7 @@ def test_auth_cmd(source_id: str, as_json: bool, timeout: float) -> None:
         console.print(f"[bold]Auth:[/bold] {_auth_display(auth)}")
         console.print(f"[bold]Probe:[/bold] {probe.status} - {probe.detail}")
 
-    if auth["status"] != "configured" or probe.status == "failed":
+    if auth["status"] not in ("configured", "runtime_native") or probe.status == "failed":
         sys.exit(1)
 
 

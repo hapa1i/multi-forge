@@ -22,7 +22,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-from forge.backend.sources import ModelSourceNotFoundError, resolve_model_source_id
+from forge.backend.sources import (
+    ModelSourceNotFoundError,
+    get_model_source,
+    resolve_model_source_id,
+)
 from forge.core.runtime.registry import RUNTIMES
 
 ExecutionKind = Literal["single_shot", "tool_agent"]
@@ -151,8 +155,11 @@ def _satisfies_floor(runtime_id: str, floor: CapabilityFloor) -> bool:
 
 
 def _reachable(runtime_id: str, backend_id: str) -> bool:
-    # T1a has no hard (runtime, backend) pins -- any catalog backend is reachable
-    # by any lane runtime, and the capability floor does the filtering. T2 adds
-    # subscription pins here (e.g. claude-max -> claude only, chatgpt -> codex).
-    del runtime_id, backend_id  # intentionally unused until T2 introduces pins
-    return True
+    # A source may pin the lane runtimes that can reach it: a subscription whose
+    # auth is a runtime's native login is reachable only via that runtime
+    # (chatgpt -> codex). Empty reachable_via = any runtime (every endpoint-based
+    # source, preserving T1a behavior). backend_id is already canonical
+    # (Lane.__post_init__), so the lookup resolves; this stays a pure dict read
+    # (no proxy/registry/network I/O).
+    source = get_model_source(backend_id)
+    return not source.reachable_via or runtime_id in source.reachable_via

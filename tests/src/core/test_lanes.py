@@ -153,3 +153,41 @@ def test_resolve_lane_does_no_file_io(monkeypatch):
     monkeypatch.setattr(builtins, "open", _boom)
     assert resolve_lane(consumer, override=_codex_lane()) == _codex_lane()
     assert resolve_lane(consumer) == _agent_lane()
+
+
+# --- reachability pins (T2: reachable_via on ModelSource) ---
+
+
+def test_subscription_backend_reachable_only_via_pinned_runtime():
+    # chatgpt pins reachable_via=("codex",): a codex lane to it is valid; a
+    # claude_code lane to the same backend is filtered out.
+    codex_chatgpt = Lane("codex", "chatgpt", "gpt-5.5")
+    consumer = Consumer("supervisor", "tool_agent", _agent_lane(), allowed_lanes=(codex_chatgpt,))
+    assert codex_chatgpt in valid_lanes(consumer)
+    assert resolve_lane(consumer, override=codex_chatgpt) == codex_chatgpt
+
+    claude_chatgpt = Lane("claude_code", "chatgpt", "gpt-5.5")
+    blocked = Consumer("supervisor", "tool_agent", _agent_lane(), allowed_lanes=(claude_chatgpt,))
+    assert claude_chatgpt not in valid_lanes(blocked)
+
+
+def test_subscription_backend_cannot_default_for_unpinned_runtime():
+    # A consumer defaulting to claude_code/chatgpt is unconstructible -- the
+    # default must pass reachability, and claude_code is not in chatgpt's pin.
+    with pytest.raises(LaneError):
+        Consumer("supervisor", "tool_agent", Lane("claude_code", "chatgpt", "m"))
+
+
+def test_unpinned_backend_reachable_by_any_runtime():
+    # Every endpoint-based (empty reachable_via) backend keeps T1a behavior:
+    # reachable by any lane runtime that satisfies the floor.
+    claude_openrouter = Lane("claude_code", "openrouter", "m")
+    consumer = Consumer(
+        "supervisor",
+        "tool_agent",
+        _agent_lane(),
+        allowed_lanes=(_codex_lane(), claude_openrouter),
+    )
+    lanes = valid_lanes(consumer)
+    assert _codex_lane() in lanes
+    assert claude_openrouter in lanes
