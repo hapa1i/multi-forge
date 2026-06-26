@@ -5,7 +5,8 @@ checklists (board_contract "Epics"). Epic framing: `card.md`.
 
 ## Current focus
 
-T1a is **active** on branch `consumer_lane_resolver` (moved to `doing/`, execution checklist written). T2/T3 remain
+T1a is **done** (PR #51, squash `b84e2462`; card moved to `done/`). T3 is now **active** on branch
+`supervisor_lane_driven` (moved to `doing/`, execution checklist written) -- the canonical next cursor. T2 remains
 authored in `todo/`; T4/T5/T1b/T6 stay inline sketches. The `core.llm` representation is decided (option 2 -- see
 Decisions).
 
@@ -13,9 +14,9 @@ Decisions).
 
 | Member       | Card                                 | Lane  | Depends on | State                      |
 | ------------ | ------------------------------------ | ----- | ---------- | -------------------------- |
-| T1a          | `doing/consumer_lane_resolver/`      | doing | --         | active (branch)            |
+| T1a          | `done/consumer_lane_resolver/`       | done  | --         | done (PR #51)              |
 | T2           | `todo/backend_subscription_sources/` | todo  | T1a        | authored                   |
-| T3           | `todo/supervisor_lane_driven/`       | todo  | T1a        | authored                   |
+| T3           | `doing/supervisor_lane_driven/`      | doing | T1a        | active (branch)            |
 | T4           | inline in `card.md`                  | --    | T1a,T2,T3  | sketch                     |
 | T5           | inline in `card.md`                  | --    | T3,T4      | sketch                     |
 | T1b          | inline in `card.md`                  | --    | T4         | sketch                     |
@@ -45,6 +46,11 @@ parallelizing T2/T3 is allowed but is not the default cursor. T0 is independent,
 - [ ] **Runtime-native credential shape** (T2). `ModelSource` requires >=1 `credential_id` and credentials are env-var
   secrets; a subscription source's auth is the runtime's native login (claude OAuth / codex `chatgpt_tokens`), not an
   env secret. Decide how a `runtime_native` source expresses auth without faking an env var.
+- [ ] **Unsupported-lane failure mode** (T4, from T3 review). The supervisor is fail-open (design_workflows §1.2), but a
+  non-claude lane currently fails *loud*: `resolve_lane` sits outside the fail-open guard and `_dispatch_supervisor`
+  raises `NotImplementedError`/`LaneError` that the caller does not catch (`supervisor.py:463-464,603`). Decide whether
+  an unimplemented/misconfigured lane catches + fails open (consistent with `proxy_not_found`) or fails loud, then wire
+  it in T4. Full seam list: epic `card.md` "T3 -> T4 carry-forward seams".
 
 ## Link and drift control
 

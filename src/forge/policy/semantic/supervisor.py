@@ -13,9 +13,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, cast
 
+from forge.core.lanes import Consumer, Lane, LaneError, resolve_lane
 from forge.core.reactive.env import FORGE_COMMAND_VAR, FORGE_SESSION_VAR
 from forge.core.reactive.routing import resolve_subprocess_routing
-from forge.core.reactive.session_runner import run_claude_session
+from forge.core.reactive.session_runner import SessionResult, run_claude_session
 from forge.core.reactive.throttle import ThrottleCache, compute_cache_key
 from forge.policy.deterministic.base import DeterministicPolicy
 from forge.policy.semantic.verdict import (
@@ -98,6 +99,21 @@ _CLAUDE_MODEL_PIN_ENV_VARS = (
     "ANTHROPIC_DEFAULT_HAIKU_MODEL",
     "ANTHROPIC_DEFAULT_SONNET_MODEL",
     "ANTHROPIC_DEFAULT_OPUS_MODEL",
+)
+
+# The supervisor as a consumer-lane binding (epic consumer_lanes, ticket T3). It
+# reads repo files (a `tool_agent` capability floor) and today always runs as
+# `claude -p`. In T3 only `runtime_id` is load-bearing -- it selects the dispatch
+# arm in `_dispatch_supervisor`. `backend_id`/`model` are nominal placement
+# metadata: the `claude_code` arm still derives transport (`base_url`) and the
+# `opus` pin dynamically (byte-identical contract), so they are not yet consulted.
+# `anthropic-direct` is a real catalog source (no single backend is "correct" for a
+# proxied supervisor, which routes through whatever proxy). T2 makes backend
+# load-bearing; T4 adds the `codex` arm + a narrow `SupervisorConfig` override.
+SUPERVISOR_CONSUMER = Consumer(
+    id="supervisor",
+    capability_floor="tool_agent",
+    default_lane=Lane(runtime_id="claude_code", backend_id="anthropic-direct", model="opus"),
 )
 
 
@@ -409,6 +425,127 @@ def _supervisor_fail_open_decision(
     )
 
 
+class _SupervisorRoutingError(Exception):
+    """Routing resolution failed for the ``claude_code`` supervisor arm.
+
+    Raised inside the dispatch arm so ``run_supervisor_check`` can emit the
+    structural ``proxy_not_found`` fail-open exactly as the pre-T3 inline path
+    did, while transport resolution lives with the runtime-specific arm (Codex
+    resolves transport differently -- T4).
+    """
+
+
+def _dispatch_supervisor(
+    lane: Lane,
+    *,
+    prompt: str,
+    config: SupervisorConfig,
+    context: ActionContext,
+    resolved: _ResolvedTarget,
+    usage_command: str,
+) -> SessionResult:
+    """Dispatch one supervisor run on the resolved lane's runtime.
+
+    T3 implements only the ``claude_code`` arm (the existing path, verbatim).
+    The ``codex`` arm lands in T4 (epic consumer_lanes); any other runtime has
+    no supervisor adapter.
+    """
+    runtime = lane.runtime_id
+    if runtime == "claude_code":
+        return _dispatch_claude_supervisor(
+            prompt=prompt,
+            config=config,
+            context=context,
+            resolved=resolved,
+            usage_command=usage_command,
+        )
+    # Unreachable via run_supervisor_check in T3: resolve_lane(SUPERVISOR_CONSUMER)
+    # takes no override, so it always returns the claude_code default lane. Both arms
+    # below are exercised only by direct unit calls until T4 wires the codex lane + a
+    # SupervisorConfig override that can select a non-claude runtime. T4 must also
+    # decide the fail-open contract for these (see epic card "T3 -> T4 carry-forward
+    # seams"): the caller catches only _SupervisorRoutingError, so today they propagate.
+    if runtime == "codex":
+        raise NotImplementedError("Codex supervisor lane lands in T4 (epic consumer_lanes)")
+    raise LaneError(f"No supervisor dispatch arm for runtime {runtime!r}")
+
+
+def _dispatch_claude_supervisor(
+    *,
+    prompt: str,
+    config: SupervisorConfig,
+    context: ActionContext,
+    resolved: _ResolvedTarget,
+    usage_command: str,
+) -> SessionResult:
+    """Run the supervisor as ``claude -p`` -- the byte-identical pre-T3 path.
+
+    Owns transport resolution (proxy vs direct), the executor-pin scrub, the
+    cost-tracked dispatch, and the SOLE usage emission. Raises
+    ``_SupervisorRoutingError`` on a routing failure so the caller emits the
+    unchanged ``proxy_not_found`` fail-open.
+    """
+    if config.direct:
+        base_url = None
+        model = None
+        unset_env_vars = None
+    else:
+        try:
+            routing_result = resolve_subprocess_routing(
+                explicit_base_url=config.base_url,
+                explicit_proxy=config.proxy,
+                require_route=False,
+            )
+            base_url = routing_result.base_url
+        except Exception as e:
+            _log.warning("Supervisor proxy '%s' not found: %s", config.proxy, e)
+            raise _SupervisorRoutingError(f"Supervisor proxy '{config.proxy}' not found: {e}") from e
+        # Keep executor model pins from leaking into the read-only supervisor.
+        # With a proxy URL, `--model opus` routes through the proxy's opus tier,
+        # so alternatives like claude-opus-4-8 remain opt-in for the executor.
+        model = "opus" if base_url else None
+        unset_env_vars = _CLAUDE_MODEL_PIN_ENV_VARS if base_url else None
+
+    from forge.core.reactive.cost_tracking import track_verb_cost
+    from forge.core.usage import emit_usage_for_session_result
+
+    tracking_url = base_url
+
+    # Stamp provider-trace identity so the fork's proxied requests group under this
+    # session + the supervisor role in the backend provider's dashboard. No session name -> the
+    # header derivation falls back to forge_run_<hash>.
+    spawn_env = {FORGE_COMMAND_VAR: "supervisor"}
+    if context.session_name:
+        spawn_env[FORGE_SESSION_VAR] = context.session_name
+
+    with track_verb_cost(usage_command, [tracking_url] if tracking_url else []) as cost:
+        result = run_claude_session(
+            prompt,
+            resume_id=resolved.resume_id,
+            fork_session=config.fork_session,
+            model=model,
+            reasoning_effort=config.supervisor_effort,
+            base_url=base_url,
+            direct=config.direct,
+            timeout_seconds=config.timeout_seconds,
+            cwd=resolved.source_cwd,
+            extra_env=spawn_env,
+            unset_env_vars=unset_env_vars,
+        )
+
+    # Attribute before the failure branch so failed runs are recorded too. This is the SOLE emitter for the run.
+    emit_usage_for_session_result(
+        result,
+        command=usage_command,
+        cost=cost,
+        session=context.session_name,
+        model=model,
+        base_url=base_url,
+        direct=config.direct,
+    )
+    return result
+
+
 def run_supervisor_check(
     config: SupervisorConfig,
     context: ActionContext,
@@ -465,69 +602,27 @@ def run_supervisor_check(
     if plan_content:
         prompt = _PLAN_OVERRIDE_PREAMBLE.format(plan_content=plan_content) + "\n\n" + prompt
 
-    if config.direct:
-        base_url = None
-        model = None
-        unset_env_vars = None
-    else:
-        try:
-            routing_result = resolve_subprocess_routing(
-                explicit_base_url=config.base_url,
-                explicit_proxy=config.proxy,
-                require_route=False,
-            )
-            base_url = routing_result.base_url
-        except Exception as e:
-            _log.warning("Supervisor proxy '%s' not found: %s", config.proxy, e)
-            return SupervisorRun(
-                _supervisor_fail_open_decision(
-                    f"Supervisor proxy '{config.proxy}' not found: {e}",
-                    failure_type="proxy_not_found",
-                )
-            )
-        # Keep executor model pins from leaking into the read-only supervisor.
-        # With a proxy URL, `--model opus` routes through the proxy's opus tier,
-        # so alternatives like claude-opus-4-8 remain opt-in for the executor.
-        model = "opus" if base_url else None
-        unset_env_vars = _CLAUDE_MODEL_PIN_ENV_VARS if base_url else None
-
-    from forge.core.reactive.cost_tracking import track_verb_cost
-    from forge.core.usage import emit_usage_for_session_result
-
-    tracking_url = base_url
-
-    # Stamp provider-trace identity so the fork's proxied requests group under this
-    # session + the supervisor role in the backend provider's dashboard. No session name -> the
-    # header derivation falls back to forge_run_<hash>.
-    spawn_env = {FORGE_COMMAND_VAR: "supervisor"}
-    if context.session_name:
-        spawn_env[FORGE_SESSION_VAR] = context.session_name
-
-    with track_verb_cost(usage_command, [tracking_url] if tracking_url else []) as cost:
-        result = run_claude_session(
-            prompt,
-            resume_id=resolved.resume_id,
-            fork_session=config.fork_session,
-            model=model,
-            reasoning_effort=config.supervisor_effort,
-            base_url=base_url,
-            direct=config.direct,
-            timeout_seconds=config.timeout_seconds,
-            cwd=resolved.source_cwd,
-            extra_env=spawn_env,
-            unset_env_vars=unset_env_vars,
+    # Resolve the supervisor's lane (T1a), then dispatch on its runtime. T3 wires
+    # only the default (`claude_code`) lane and keeps the run byte-identical; the
+    # arm owns transport/model/env + the sole usage emission. A routing failure in
+    # the arm surfaces as the unchanged structural fail-open.
+    lane = resolve_lane(SUPERVISOR_CONSUMER)
+    try:
+        result = _dispatch_supervisor(
+            lane,
+            prompt=prompt,
+            config=config,
+            context=context,
+            resolved=resolved,
+            usage_command=usage_command,
         )
-
-    # Attribute before the failure branch so failed runs are recorded too. This is the SOLE emitter for the run.
-    emit_usage_for_session_result(
-        result,
-        command=usage_command,
-        cost=cost,
-        session=context.session_name,
-        model=model,
-        base_url=base_url,
-        direct=config.direct,
-    )
+    except _SupervisorRoutingError as e:
+        return SupervisorRun(
+            _supervisor_fail_open_decision(
+                str(e),
+                failure_type="proxy_not_found",
+            )
+        )
 
     if not result.success:
         _log.warning(

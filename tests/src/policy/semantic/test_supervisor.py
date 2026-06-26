@@ -662,6 +662,99 @@ class TestSupervisorResumeTargetResolution:
         assert result.decision.telemetry_run_id == "run_parse_fail"
 
 
+# --- Lane Dispatch Tests (T3) ---
+
+
+class TestSupervisorLaneDispatch:
+    """T3: the supervisor is a Consumer whose lane is resolved then dispatched.
+
+    The default lane is ``claude_code`` and the run stays byte-identical -- the
+    existing ``TestSupervisorResumeTargetResolution`` cases now exercise the seam
+    end-to-end. These add the lane-binding, single-emission, and stubbed-arm
+    contracts specific to T3.
+    """
+
+    def test_supervisor_consumer_resolves_to_claude_lane(self) -> None:
+        from forge.core.lanes import Lane, resolve_lane
+        from forge.policy.semantic.supervisor import SUPERVISOR_CONSUMER
+
+        assert SUPERVISOR_CONSUMER.capability_floor == "tool_agent"
+        assert resolve_lane(SUPERVISOR_CONSUMER) == Lane(
+            runtime_id="claude_code", backend_id="anthropic-direct", model="opus"
+        )
+
+    @patch("forge.core.usage.emit_usage_for_session_result")
+    @patch("forge.policy.semantic.supervisor.run_claude_session")
+    def test_single_usage_emission_on_success(self, mock_run: MagicMock, mock_emit: MagicMock) -> None:
+        """A successful dispatch records exactly one usage event."""
+        from forge.core.reactive.session_runner import SessionResult
+        from forge.policy.semantic.supervisor import run_supervisor_check
+
+        mock_run.return_value = SessionResult(
+            stdout='```json\n{"verdict": "aligned", "confidence": 0.9, "violations": []}\n```',
+            stderr="",
+            returncode=0,
+        )
+        raw_uuid = "12345678-1234-1234-1234-123456789abc"
+
+        run_supervisor_check(_make_config(resume_id=raw_uuid, direct=True), _make_context())
+
+        assert mock_emit.call_count == 1
+
+    @patch("forge.core.usage.emit_usage_for_session_result")
+    @patch("forge.policy.semantic.supervisor.run_claude_session")
+    def test_single_usage_emission_on_failed_run(self, mock_run: MagicMock, mock_emit: MagicMock) -> None:
+        """A failed dispatch still records exactly one event (emitted before the fail branch)."""
+        from forge.core.reactive.session_runner import SessionResult
+        from forge.policy.semantic.supervisor import run_supervisor_check
+
+        mock_run.return_value = SessionResult(stdout="", stderr="boom", returncode=1, error="boom")
+        raw_uuid = "12345678-1234-1234-1234-123456789abc"
+
+        result = run_supervisor_check(_make_config(resume_id=raw_uuid, direct=True), _make_context())
+
+        assert mock_emit.call_count == 1
+        assert result.decision.fail_open is True
+
+    def test_codex_dispatch_arm_not_implemented(self) -> None:
+        """T3 stubs the codex arm; T4 wires it (epic consumer_lanes)."""
+        from forge.core.lanes import Lane
+        from forge.policy.semantic.supervisor import (
+            _dispatch_supervisor,
+            _ResolvedTarget,
+        )
+
+        codex_lane = Lane(runtime_id="codex", backend_id="anthropic-direct", model="opus")
+        with pytest.raises(NotImplementedError):
+            _dispatch_supervisor(
+                codex_lane,
+                prompt="x",
+                config=_make_config(direct=True),
+                context=_make_context(),
+                resolved=_ResolvedTarget(resume_id="uuid", source_cwd=None),
+                usage_command="supervisor",
+            )
+
+    def test_unknown_runtime_arm_raises_lane_error(self) -> None:
+        """A reachable lane with no supervisor adapter (core_llm) raises LaneError, not a silent skip."""
+        from forge.core.lanes import Lane, LaneError
+        from forge.policy.semantic.supervisor import (
+            _dispatch_supervisor,
+            _ResolvedTarget,
+        )
+
+        single_shot_lane = Lane(runtime_id="core_llm", backend_id="anthropic-direct", model="opus")
+        with pytest.raises(LaneError):
+            _dispatch_supervisor(
+                single_shot_lane,
+                prompt="x",
+                config=_make_config(direct=True),
+                context=_make_context(),
+                resolved=_ResolvedTarget(resume_id="uuid", source_cwd=None),
+                usage_command="supervisor",
+            )
+
+
 # --- Engine Integration Tests ---
 
 
