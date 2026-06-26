@@ -6,22 +6,24 @@ checklists (board_contract "Epics"). Epic framing: `card.md`.
 ## Current focus
 
 T1a (PR #51, `b84e2462`) and T3 (PR #52, `e66490af`) are both **done** -- the spine (pure resolver + byte-identical
-Claude-default supervisor) is on `main`, both cards in `done/`. **T2** (`todo/backend_subscription_sources/`) is the
-canonical next cursor, gated on the two open T2 decisions below (`BillingPosture` vocabulary, runtime-native credential
-shape). T4/T5/T1b/T6 stay inline sketches. The `core.llm` representation is decided (option 2 -- see Decisions).
+Claude-default supervisor) is on `main`, both cards in `done/`. **T2** is now **active** on branch
+`backend_subscription_sources` (`doing/backend_subscription_sources/`, checklist written, touchpoints verified). It is
+gated on **Decision A** (runtime-native credential shape, pending user sign-off); Decisions B/C (reachability-pin
+storage, `BillingPosture` home/vocab) are resolved in the T2 checklist. T4/T5/T1b/T6 stay inline sketches. The
+`core.llm` representation is decided (option 2 -- see Decisions).
 
 ## Member roster and sequencing
 
-| Member       | Card                                 | Lane | Depends on | State                      |
-| ------------ | ------------------------------------ | ---- | ---------- | -------------------------- |
-| T1a          | `done/consumer_lane_resolver/`       | done | --         | done (PR #51)              |
-| T2           | `todo/backend_subscription_sources/` | todo | T1a        | authored                   |
-| T3           | `done/supervisor_lane_driven/`       | done | T1a        | done (PR #52)              |
-| T4           | inline in `card.md`                  | --   | T1a,T2,T3  | sketch                     |
-| T5           | inline in `card.md`                  | --   | T3,T4      | sketch                     |
-| T1b          | inline in `card.md`                  | --   | T4         | sketch                     |
-| T6           | inline in `card.md`                  | --   | T1b        | sketch                     |
-| T0 (sibling) | inline in `card.md`                  | --   | none       | sketch; gates `claude-max` |
+| Member       | Card                                  | Lane  | Depends on | State                      |
+| ------------ | ------------------------------------- | ----- | ---------- | -------------------------- |
+| T1a          | `done/consumer_lane_resolver/`        | done  | --         | done (PR #51)              |
+| T2           | `doing/backend_subscription_sources/` | doing | T1a        | active (branch)            |
+| T3           | `done/supervisor_lane_driven/`        | done  | T1a        | done (PR #52)              |
+| T4           | inline in `card.md`                   | --    | T1a,T2,T3  | sketch                     |
+| T5           | inline in `card.md`                   | --    | T3,T4      | sketch                     |
+| T1b          | inline in `card.md`                   | --    | T4         | sketch                     |
+| T6           | inline in `card.md`                   | --    | T1b        | sketch                     |
+| T0 (sibling) | inline in `card.md`                   | --    | none       | sketch; gates `claude-max` |
 
 Sequencing (epic-canonical): T1a -> T3 -> T2 -> T4 -> T5 -> T1b -> T6. T2 and T3 both depend only on T1a and are
 mutually independent; T3 is sequenced first to prove the seam byte-identical before T2 adds backend vocabulary --
@@ -41,11 +43,14 @@ parallelizing T2/T3 is allowed but is not the default cursor. T0 is independent,
   layer; leave `RUNTIMES` untouched (adding a `core.llm` entry pollutes `list_runtimes()` / `installed_runtimes()` at
   `core/runtime/registry.py:251,256` and their callers, and needs an always-true `is_installed()` hack). Lane runtime
   axis = `{"core_llm"}` plus `RUNTIMES.keys()`. See `consumer_lane_resolver/checklist.md` Phase 0.
-- [ ] **Shared `BillingPosture` vocabulary** (T2 + T5). Fix one enum -- `per_token` / `subscription_quota` / `free` --
-  used by T2's `ModelSource` field and surfaced by T5. One spelling, no parallel variants.
+- [x] **Shared `BillingPosture` vocabulary** (T2 + T5). **Decided** (T2 checklist Decision C): one enum
+  `Literal["per_token", "subscription_quota", "free"]` in `backend/sources.py`, a `ModelSource.billing_posture` field
+  defaulting `per_token`, reusing the exact `subscription_quota` spelling shared with `BillingMode`. Separate enum from
+  `BillingMode` by design (posture = source-level; mode = invocation-level).
 - [ ] **Runtime-native credential shape** (T2). `ModelSource` requires >=1 `credential_id` and credentials are env-var
   secrets; a subscription source's auth is the runtime's native login (claude OAuth / codex `chatgpt_tokens`), not an
-  env secret. Decide how a `runtime_native` source expresses auth without faking an env var.
+  env secret. **Being resolved in the T2 checklist (Decision A), pending user sign-off**: (a) a no-env `Credential`
+  [recommended] vs (b) relax the `>=1 credential` rule for `runtime_native`.
 - [ ] **Unsupported-lane failure mode** (T4, from T3 review). The supervisor is fail-open (design_workflows §1.2), but a
   non-claude lane currently fails *loud*: `resolve_lane` sits outside the fail-open guard and `_dispatch_supervisor`
   raises `NotImplementedError`/`LaneError` that the caller does not catch (`supervisor.py:463-464,603`). Decide whether
