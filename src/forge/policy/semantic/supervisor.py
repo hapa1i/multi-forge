@@ -114,6 +114,11 @@ SUPERVISOR_CONSUMER = Consumer(
     id="supervisor",
     capability_floor="tool_agent",
     default_lane=Lane(runtime_id="claude_code", backend_id="anthropic-direct", model="opus"),
+    # T4: the codex-exec lane on the ChatGPT subscription (chatgpt.reachable_via=("codex",), T2). An
+    # override must be a declared candidate -- resolve_lane(override=...) rejects anything outside
+    # valid_lanes. backend_id/model are nominal (only runtime_id drives dispatch in T4; codex picks
+    # its own model unless `-m` is passed). T1b generalizes this to a uniform consumer-lane binding.
+    allowed_lanes=(Lane(runtime_id="codex", backend_id="chatgpt", model="gpt-5-codex"),),
 )
 
 

@@ -214,6 +214,23 @@ class TestSupervisorConfigCompat:
         assert loaded.intent.policy.supervisor.checker_provider == "litellm_local"
         assert loaded.intent.policy.supervisor.checker_budget_tokens == 64000
 
+    def test_supervisor_runtime_round_trip(self, tmp_path: Path) -> None:
+        """T4: the lane runtime override persists through a manifest write/read."""
+        from forge.session.models import PolicyIntent, SupervisorConfig
+
+        store = SessionStore(str(tmp_path), "codex-lane-session")
+        state = create_session_state("codex-lane-session", worktree_path=str(tmp_path))
+        state.intent.policy = PolicyIntent(
+            enabled=True,
+            supervisor=SupervisorConfig(resume_id="planner", supervisor_runtime="codex"),
+        )
+        store.write(state)
+
+        loaded = store.read()
+        assert loaded.intent.policy is not None
+        assert loaded.intent.policy.supervisor is not None
+        assert loaded.intent.policy.supervisor.supervisor_runtime == "codex"
+
 
 class TestEffortVocabularyValidation:
     """Effort fields validate against their respective vocabularies in __post_init__.
@@ -265,6 +282,33 @@ class TestEffortVocabularyValidation:
 
         with pytest.raises(ValueError):
             SupervisorConfig(supervisor_effort="bogus")
+
+
+class TestSupervisorRuntimeValidation:
+    """SupervisorConfig.supervisor_runtime lane-override vocabulary (epic consumer_lanes, T4)."""
+
+    def test_supervisor_runtime_none_is_valid(self) -> None:
+        from forge.session.models import SupervisorConfig
+
+        # Absent override => the byte-identical claude_code default lane.
+        assert SupervisorConfig().supervisor_runtime is None
+
+    def test_supervisor_runtime_codex_is_valid(self) -> None:
+        from forge.session.models import SupervisorConfig
+
+        assert SupervisorConfig(supervisor_runtime="codex").supervisor_runtime == "codex"
+
+    def test_supervisor_runtime_claude_code_is_valid(self) -> None:
+        from forge.session.models import SupervisorConfig
+
+        assert SupervisorConfig(supervisor_runtime="claude_code").supervisor_runtime == "claude_code"
+
+    def test_supervisor_runtime_bogus_rejected(self) -> None:
+        from forge.session.models import SupervisorConfig
+
+        # Validated in __post_init__ (the dacite-invoked path); unknown runtime is rejected.
+        with pytest.raises(ValueError):
+            SupervisorConfig(supervisor_runtime="gemini")
 
 
 class TestSessionStoreUpdate:

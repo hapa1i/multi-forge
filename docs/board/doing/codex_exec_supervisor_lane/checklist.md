@@ -63,17 +63,22 @@ T3** (`claude_code` lane).
   (`transfer_body` + a separate `task`) -- the wrong shape here. **Card synced** (Phase 0).
 - [x] **Preflight in the hook path = `run_doctor=False` + fail open** (review claim 4). Skip the ~20s `codex doctor`
   probe in the per-Write/Edit hot path; if preflight raises (codex absent / not ready), degrade to "aligned".
-- [ ] **Override field shape.** *Recommend* a narrow `supervisor_runtime: str | None` on `SupervisorConfig`, validated
-  in `__post_init__` against a small vocabulary (`{"claude_code", "codex"}`) -- precedent: `checker_effort` validation in
-  the same `__post_init__`. The arm maps the string to the declared codex `allowed_lane` (a `Lane`, which is what
-  `resolve_lane(override=...)` needs). Additive optional field -- **no `SCHEMA_VERSION` bump** (T1b owns the durable
-  binding). Confirm name/vocabulary before code.
-- [ ] **Plan-context strategy when no plan resolves** (review claim 1, the biggest codex problem). *Recommend*: the codex
-  lane relies on the existing `plan_override_path` preamble injection (already in `prompt`); when **no** plan content
-  resolves, **fail open (aligned)** -- a supervisor with no plan reference cannot meaningfully evaluate, and codex has no
-  resume fallback. Pairs naturally with cascade (which resolves an approved-plan snapshot eagerly). Heavier alternative
-  -- assemble transfer context from the supervisor target via the bridge -- is **deferred** (out of T4's "blind/
-  transfer-fed, assembly is cheap" scope). Confirm before code.
+- [x] **Override field shape = narrow `supervisor_runtime: str | None`** (epic-decided: T4 rides a narrow
+  `SupervisorConfig` field; T1b generalizes). Validated in `__post_init__` against `{"claude_code", "codex"}` --
+  precedent: `checker_effort` validation in the same `__post_init__`. The arm maps the string to the declared codex
+  `allowed_lane` (a `Lane`, which is what `resolve_lane(override=...)` needs). Additive optional field -- **no
+  `SCHEMA_VERSION` bump** (T1b owns the durable binding).
+- [x] **Plan-context when no plan resolves = fail open, observable, re-checkable** (user-decided 2026-06-26, review claim
+  1). When the codex lane is selected but `load_plan_override(config)` yields nothing (codex has no `--resume`, so the
+  plan can only reach it via `plan_override_path`/cascade):
+  - **Do not spawn Codex** -- short-circuit before the subprocess (no wasted ~spawn, no empty-plan evaluation).
+  - Return a **structured fail-open allow** (`_supervisor_fail_open_decision`), **not** a normal "aligned" verdict, with a
+    distinct `failure_type="plan_missing"` (a `configuration_error` flavor) so it is visibly attributed.
+  - **Surface in telemetry** (`forge telemetry activity` / the fail-open upstream outcome) -- not a silent no-op.
+  - **Re-checkable, never permanently disabled**: the per-check decision is not a persistent disable; the throttle cache
+    key already includes the plan fingerprint, so setting `plan_override_path` or `%policy supervisor reload` makes the
+    next check re-evaluate and the lane start supervising. Heavier alternative (assemble transfer context from the
+    supervisor target via the bridge) stays **deferred** (out of T4's narrow scope).
 
 ## Phases
 
@@ -87,16 +92,16 @@ T3** (`claude_code` lane).
 
 ### Phase 1 -- Lane plumbing (candidate + override field)
 
-- [ ] **Add the codex candidate to `SUPERVISOR_CONSUMER.allowed_lanes`** (`supervisor.py:113`):
-  `Lane(runtime_id="codex", backend_id="chatgpt", model=<non-empty codex model id; nominal in T4>)`. **Assertion:**
-  `resolve_lane(SUPERVISOR_CONSUMER, override=codex_lane)` returns the codex lane (no `LaneError`); `resolve_lane(...)`
-  with no override still returns the `claude_code` default (T3 byte-identical).
-- [ ] **Add `supervisor_runtime` override field to `SupervisorConfig`** (`session/models.py:149`), validated in
-  `__post_init__` (reject values outside `{"claude_code", "codex"}`). **Assertion:** the field round-trips through dacite
-  (manifest read + `forge session set`/override); an invalid value raises (-> `InvalidOverrideValueError` on the strict
-  override path). Absent => `claude_code` default lane.
+- [x] **Add the codex candidate to `SUPERVISOR_CONSUMER.allowed_lanes`**
+  (`Lane(runtime_id="codex", backend_id="chatgpt", model="gpt-5-codex")`; backend/model nominal). Verified:
+  `test_supervisor_consumer_allows_codex_override` (override resolves; default still `claude_code`); import-time lane
+  validation passes (chatgpt reachable via codex, T2).
+- [x] **Add `supervisor_runtime` override field to `SupervisorConfig`** (`session/models.py`), validated in
+  `__post_init__` against `_SUPERVISOR_RUNTIMES = ("claude_code", "codex")`. Verified: `test_supervisor_runtime_*`
+  (none/codex/claude_code valid, bogus rejected) + `test_supervisor_runtime_round_trip` (survives `store.write`/`read`).
 - [ ] `run_supervisor_check` maps the field to the override `Lane` and passes `resolve_lane(SUPERVISOR_CONSUMER,
-  override=...)` **inside** the fail-open guard (Phase 3).
+  override=...)` **inside** the fail-open guard. **Bundled with Phase 2/3** (the wiring needs the codex arm + the
+  fail-open boundary to be meaningful).
 
 ### Phase 2 -- The `codex` arm of `_dispatch_supervisor`
 

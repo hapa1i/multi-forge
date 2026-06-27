@@ -683,6 +683,17 @@ class TestSupervisorLaneDispatch:
             runtime_id="claude_code", backend_id="anthropic-direct", model="opus"
         )
 
+    def test_supervisor_consumer_allows_codex_override(self) -> None:
+        """T4: the codex-exec lane is a declared candidate, so an override resolves (not LaneError)."""
+        from forge.core.lanes import Lane, resolve_lane
+        from forge.policy.semantic.supervisor import SUPERVISOR_CONSUMER
+
+        codex_lane = Lane(runtime_id="codex", backend_id="chatgpt", model="gpt-5-codex")
+        assert codex_lane in SUPERVISOR_CONSUMER.allowed_lanes
+        assert resolve_lane(SUPERVISOR_CONSUMER, override=codex_lane) == codex_lane
+        # Default (no override) stays claude_code -- byte-identical to T3.
+        assert resolve_lane(SUPERVISOR_CONSUMER).runtime_id == "claude_code"
+
     @patch("forge.core.usage.emit_usage_for_session_result")
     @patch("forge.policy.semantic.supervisor.run_claude_session")
     def test_single_usage_emission_on_success(self, mock_run: MagicMock, mock_emit: MagicMock) -> None:
