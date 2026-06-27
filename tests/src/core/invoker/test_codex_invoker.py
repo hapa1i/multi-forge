@@ -121,6 +121,25 @@ class TestCodexResultBuilding:
         assert (outcomes[0].run_id, outcomes[0].root_run_id) == ("run_c", "run_root")
 
     @patch("forge.core.invoker._lifecycle.subprocess.Popen")
+    def test_operation_none_suppresses_upstream_keeps_usage(self, mock_popen):
+        """T5/WS1: the codex supervisor passes operation=None -- the downstream usage event
+        still fires but the upstream-outcome row is suppressed, so the engine's policy.evaluate
+        is the only upstream row (no double-count). The gate must not over-reach to usage. Driven
+        on a runtime-error run so the suppressed row would otherwise be recorded (the volume
+        policy drops successful rows regardless)."""
+        from forge.core.telemetry.upstream import read_upstream_outcomes
+        from forge.core.usage.ledger import read_usage_events
+
+        mock_popen.return_value = _mock_proc(_ERROR_STREAM, returncode=1)
+        CodexHeadlessInvoker().run_parallel(
+            [_codex_req(env=dict(_IDENT), attribution=Attribution(command="bridge", session="planner", operation=None))]
+        )
+
+        events = read_usage_events()
+        assert len(events) == 1 and events[0].command == "bridge"  # downstream untouched
+        assert read_upstream_outcomes(session="planner", command="bridge") == []  # upstream suppressed
+
+    @patch("forge.core.invoker._lifecycle.subprocess.Popen")
     def test_error_message_surfaced_on_empty_stderr(self, mock_popen):
         # codex reports the failure reason in the JSONL stream with empty stderr; the
         # provider reason must reach stderr so callers don't see a blank failure.

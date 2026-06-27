@@ -5,8 +5,8 @@ non-goals). **Branch**: `lane_observability` (opened 2026-06-27; promoted from t
 
 ## Current focus
 
-**REVIEWED 2026-06-27 -- decisions D1-D4 resolved; ready for Phase 1 (awaiting go-ahead to commit + implement).** This
-checklist scaffolds T5 from the 2026-06-27 read-only surface map (4 parallel readers, high-confidence), with the
+**EXECUTING 2026-06-27 -- Phase 1 (WS1) in progress.** Decisions D1-D4 resolved; scaffolding committed (`56047204`).
+This checklist scaffolds T5 from the 2026-06-27 read-only surface map (4 parallel readers, high-confidence), with the
 review's three fixes folded in: (M1) "chosen lane" is split across two honest surfaces -- per-call
 `runtime`/`billing_mode` in `forge telemetry activity` (the usage event has no backend id) and the full
 `(runtime, backend, model)` lane in `forge policy supervisor status`; (M2) WS2 emissions are **session-tagged** (else
@@ -103,15 +103,20 @@ resolves `session` from `FORGE_SESSION` best-effort, else ambient.
 
 ### Phase 1 -- WS1: configurable upstream operation (D1)
 
-- [ ] Add `operation` to `Attribution` (additive, defaulted); invoker `_emit_worker`/`_emit_codex` read it and emit the
-  upstream row only when non-None. Today both emit a hardcoded `operation="workflow.worker"` (`codex.py:249`,
-  `claude.py:162`) with no parameter in scope; thread the field, then wrap **only** the `record_upstream_operation(...)`
-  call in a new inner `if operation is not None:`. Leave the shared early-return guard (`codex.py:223` /
-  `claude.py:131`) and `emit_codex_usage` / `emit_worker_usage` untouched -- gating the whole function would kill the
-  downstream usage event.
-- [ ] Codex supervisor sets `operation=None`; verify codex now emits exactly one upstream row (`policy.evaluate`),
-  parity with the claude arm; review workers still emit `workflow.worker`.
-- [ ] Update the `supervisor.py:598-604` carry-forward comment (limitation resolved).
+- [x] Add `operation` to `Attribution` (additive, default `"workflow.worker"`); invoker `_emit_worker`/`_emit_codex`
+  read it and emit the upstream row only when non-None. Threaded the field (`types.py:39`), then wrapped **only** the
+  `record_upstream_operation(...)` call in a new inner `if attribution.operation is None: return` (`claude.py:160-163`,
+  `codex.py:246-249`). The shared early-return guard and `emit_codex_usage`/`emit_worker_usage` are untouched.
+  **Verified**: gate tests driven on the FAILURE path (success upstream rows are volume-dropped by
+  `should_record_upstream_outcome`, so only a failure proves the gate, not the volume policy) --
+  `test_operation_none_suppresses_upstream_keeps_usage` (claude + codex) +
+  `test_operation_label_threads_to_upstream_row`.
+- [x] Codex supervisor sets `operation=None` (`supervisor.py:622`); engine `policy.evaluate` is the arm's only upstream
+  row, parity with the claude arm; review workers still emit `workflow.worker` (default field; `test_engine.py` green).
+  **Verified**: `test_codex_arm_dispatches_through_invoker` asserts `attribution.operation is None`; suppression proven
+  at the invoker level.
+- [x] Updated the `supervisor.py` carry-forward comment (now "Upstream-row parity (T5/WS1)", limitation resolved).
+  **Verified**: 196 tests green across supervisor/invoker/codex-emit/review; `mypy` clean on the 4 changed source files.
 
 ### Phase 2 -- WS2: close the M3 no-emission gaps (D2)
 

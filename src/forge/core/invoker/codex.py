@@ -242,11 +242,16 @@ def _emit_codex(request: HeadlessRequest, result: HeadlessResult) -> None:
         output_tokens=result.output_tokens,
         cached_tokens=result.cached_tokens,
     )
+    # Opt-out upstream row: operation=None (the codex supervisor) keeps the usage event
+    # above but suppresses this row, so its only upstream outcome is the engine's
+    # policy.evaluate -- no double-count. See Attribution.operation.
+    if attribution.operation is None:
+        return
     from forge.core.telemetry.upstream import UpstreamStatus, record_upstream_operation
 
     record_upstream_operation(
         command=attribution.command,
-        operation="workflow.worker",
+        operation=attribution.operation,
         status=cast(UpstreamStatus, status),
         session=attribution.session,
         run_id=result.run_id,

@@ -29,6 +29,9 @@ class Attribution:
     ``billing_mode`` carries a runtime's resolved billing posture (Codex's
     :class:`CodexPreflight.billing_mode`) to the usage event -- the invoker can't
     infer it from argv, and Claude leaves it ``None`` (its mode is inferred at emit).
+    ``operation`` is the upstream-outcome label the invoker records next to the usage
+    event; ``None`` keeps the usage event but suppresses the upstream row (the codex
+    supervisor sets it so its only upstream row is the engine's ``policy.evaluate``).
     """
 
     command: str
@@ -36,6 +39,7 @@ class Attribution:
     session: str | None = None
     runtime: str = "claude_code"
     billing_mode: BillingMode | None = None
+    operation: str | None = "workflow.worker"
 
 
 @dataclass
